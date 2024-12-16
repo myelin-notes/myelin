@@ -1,32 +1,24 @@
 <script lang="ts" setup>
-import HelloWorld from "./components/HelloWorld.vue";
+import {ref, computed} from 'vue'
+import Home from "./pages/Home.vue";
+import FreeCanvas from "./pages/FreeCanvas.vue";
+
+const routes = {
+  // '/': Home,
+  '/': FreeCanvas,
+}
+
+const currentPath = ref(window.location.hash)
+
+window.addEventListener('hashchange', () => {
+  currentPath.value = window.location.hash
+})
+
+const currentView = computed(() => {
+  return routes[currentPath.value.slice(1) || '/']
+})
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/vue.svg" width="150" height="150" />
-
-    <div class="wrapper">
-      <HelloWorld />
-    </div>
-  </header>
+  <component :is="currentView" />
 </template>
-
-<style scoped>
-body #app header {
-  margin: 0;
-  padding: 0;
-}
-
-header {
-  height: 100vh;
-  width: 100vw;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.wrapper {
-  padding-left: 30px;
-}
-</style>

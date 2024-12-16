@@ -1,8 +1,12 @@
 import { createApp } from "vue";
+import { ToastService } from "primevue";
+
 import App from "./App.vue";
 import PrimeVue from 'primevue/config';
 import Aura from '@primevue/themes/aura';
-import {Button, Toast, ToastService} from "primevue";
+
+import "./assets/base.css";
+import 'primeicons/primeicons.css'
 
 const app = createApp(App);
 
@@ -12,8 +16,5 @@ app.use(PrimeVue, {
         preset: Aura
     }
 });
-
-app.component("Button", Button);
-app.component("Toast", Toast);
 
 app.mount("#app");
