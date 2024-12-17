@@ -1,14 +1,17 @@
 import {IDrawableElement} from "./DrawableCanvas.ts";
-import {getStroke} from "perfect-freehand";
+import {getStroke, getStrokeOutlinePoints, getStrokePoints} from "perfect-freehand";
 
 export class Stroke implements IDrawableElement {
+    private box: DOMRect;
 
     public constructor(private points: [number, number, number][], private hasPressure: boolean) {
+        this.buildBoundingBox();
+        this.box = new DOMRect(0, 0, 0, 0);
     }
 
     public draw(ctx: CanvasRenderingContext2D): void {
         if (this.points.length == 0) return;
-        
+
         const baked = getStroke(this.points, {
             simulatePressure: !this.hasPressure,
         });
@@ -18,9 +21,42 @@ export class Stroke implements IDrawableElement {
         ctx.fillStyle = "black";
         ctx.fill(path);
     }
-    
+
+    public boundingBox(): DOMRect {
+        return this.box;
+    }
+
     public addPoint(x: number, y: number, pressure: number | undefined) {
         this.points = [...this.points, [x, y, pressure ?? 0]];
+    }
+
+    public buildBoundingBox() {
+        const outlinePoints = getStrokeOutlinePoints(getStrokePoints(this.points));
+
+        let minX = Number.MAX_VALUE;
+        let minY = Number.MAX_VALUE;
+        let maxX = Number.MIN_VALUE;
+        let maxY = Number.MIN_VALUE;
+
+        for (const [x, y, _pressure] of outlinePoints) {
+            if (x < minX) {
+                minX = x;
+            }
+
+            if (x > maxX) {
+                maxX = x;
+            }
+
+            if (y < minY) {
+                minY = y;
+            }
+            
+            if (y > maxY) {
+                maxY = y;
+            }
+        }
+        
+        this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     }
 
     private average(a: number, b: number) {

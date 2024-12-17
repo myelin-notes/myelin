@@ -15,6 +15,7 @@ window.addEventListener('hashchange', () => {
 })
 
 const currentView = computed(() => {
+  // @ts-ignore
   return routes[currentPath.value.slice(1) || '/']
 })
 </script>
