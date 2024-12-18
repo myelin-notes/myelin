@@ -21,12 +21,7 @@ export class DrawableCanvas {
     private physicalSize: DOMRect = new DOMRect();
     private currentStroke: Stroke | null = null;
 
-    public constructor(canvas: HTMLCanvasElement | null) {
-        if (!canvas) {
-            console.error("Failed to get canvas ref");
-            return;
-        }
-
+    public constructor(canvas: HTMLCanvasElement) {
         const ctx = canvas.getContext("2d");
         if (!ctx) {
             console.error("Failed to get canvas context");

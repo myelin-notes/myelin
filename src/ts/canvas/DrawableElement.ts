@@ -1,17 +1,9 @@
 import {Vector2} from "./DrawableCanvas.ts";
 
 export abstract class DrawableElement {
-    
     private scale: Vector2 = { x: 1, y: 1 };
-    private elapsed = 0;
     
     public draw(ctx: CanvasRenderingContext2D, deltaTime: number): void {
-        this.elapsed += deltaTime;
-        
-        if (this.boundingBox().width > 20) {
-            this.changeDimensionRelative(Math.sin(Math.PI * this.elapsed * 0.5), 0);
-        }
-        
         ctx.save();
         ctx.scale(this.scale.x, this.scale.y);
         this.draw2D(ctx, deltaTime);
@@ -41,4 +33,8 @@ export abstract class DrawableElement {
     public abstract boundingBox(): DOMRect;
     protected abstract updateBoundingBox(scale: Vector2): void;
     protected abstract draw2D(ctx: CanvasRenderingContext2D, deltaTime: number): void;
+}
+
+export abstract class StatefulElement extends DrawableElement {
+    
 }
