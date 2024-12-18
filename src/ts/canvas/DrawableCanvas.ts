@@ -1,7 +1,10 @@
 import {Stroke} from "./Stroke.ts";
 import {StateMachine} from "../utils/StateMachine.ts";
+import {Ref, ref} from "vue";
+import {DrawableElement} from "./DrawableElement.ts";
 
 export type Vector2 = { x: number, y: number };
+
 export class DrawableCanvas {
 
     // @ts-ignore
@@ -12,11 +15,10 @@ export class DrawableCanvas {
     private readonly state: StateMachine<InteractState>;
 
     private spaceDown: boolean = false;
-    private elements: IDrawableElement[] = [];
-    private offset: Vector2 = { x: 0, y: 0 };
-    private zoom: number = 1;
+    private elements: DrawableElement[] = [];
+    private offset: Vector2 = {x: 0, y: 0};
+    private zoom: Ref<number> = ref(1);
     private physicalSize: DOMRect = new DOMRect();
-
     private currentStroke: Stroke | null = null;
 
     public constructor(canvas: HTMLCanvasElement | null) {
@@ -31,6 +33,79 @@ export class DrawableCanvas {
             return;
         }
 
+        this.canvas = canvas;
+        this.ctx = ctx;
+        this.state = new StateMachine(InteractState.Idle);
+
+        this.initEventListeners(canvas);
+        this.initStates();
+        this.resizeCanvas(window.innerWidth, window.innerHeight);
+    }
+
+    public redraw(deltaTime: number) {
+        this.ctx.fillStyle = "white";
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.save();
+        this.ctx.scale(this.zoom.value, this.zoom.value);
+        this.ctx.translate(this.offset.x, this.offset.y);
+        this.elements.forEach(element => {
+            element.draw(this.ctx, deltaTime);
+        });
+        // this.ctx.strokeStyle = "red";
+        // this.ctx.strokeRect(this.physicalSize.left, this.physicalSize.top, this.physicalSize.width, this.physicalSize.height);
+        this.ctx.restore();
+    }
+
+    public get getZoom() {
+        return this.zoom;
+    }
+
+    public get getOffset() {
+        return this.offset;
+    }
+
+    public get getPhysicalSize() {
+        return this.physicalSize
+    }
+
+    private initStates() {
+        this.state.addEnd(InteractState.Drawing, () => {
+            this.currentStroke?.updateBounds();
+            this.currentStroke = null
+            this.updateBounding();
+        });
+
+        this.state.addStart(InteractState.Drawing, () => {
+            const stroke = new Stroke([], false);
+            this.addElement(stroke);
+            this.currentStroke = stroke;
+        });
+
+        this.state.addUpdate(InteractState.Drawing, (event: PointerEvent) => {
+            const x = event.pageX / this.zoom.value - this.offset.x;
+            const y = event.pageY / this.zoom.value - this.offset.y;
+            this.currentStroke?.addPoint(x, y, event.pressure);
+        });
+
+        this.state.addUpdate(InteractState.Moving, (event: PointerEvent) => {
+            const newPos = {
+                x: event.movementX / this.zoom.value,
+                y: event.movementY / this.zoom.value,
+            };
+
+            this.offset = {
+                x: this.offset.x + newPos.x,
+                y: this.offset.y + newPos.y,
+            }
+        });
+    }
+
+    private initEventListeners(canvas: HTMLCanvasElement) {
+        canvas.addEventListener("wheel", evt => {
+            this.zoom.value += evt.deltaY * -0.0005;
+            this.zoom.value = Math.min(3, Math.max(0.2, this.zoom.value));
+        });
+        
         canvas.addEventListener("pointermove", evt => {
             this.state.update(evt);
         });
@@ -43,13 +118,20 @@ export class DrawableCanvas {
                     break;
                 // @ts-ignore
                 case "mouse":
+                    const x = evt.pageX / this.zoom.value - this.offset.x;
+                    const y = evt.pageY / this.zoom.value - this.offset.y;
+                    
+                    if (evt.button === 0 && this.within(this.physicalSize, { x: x, y: y })) {
+                        break;
+                    }
+                    
                     // middle click
                     if (this.spaceDown || evt.button === 1) {
                         this.state.change(InteractState.Moving);
                         this.state.update(evt);
                         break;
                     }
-                    
+
                     if (evt.button === 2) {
                         break;
                     }
@@ -61,13 +143,6 @@ export class DrawableCanvas {
             }
         });
         
-        canvas.addEventListener("wheel", evt => {
-            this.zoom += evt.deltaY * -0.0005;
-            // clamp between 0 and 4
-            this.zoom = Math.min(2.5, Math.max(0.4, this.zoom));
-            this.resizeCanvas(window.innerWidth / this.zoom, window.innerHeight / this.zoom);
-        });
-
         window.addEventListener("pointerup", evt => {
             switch (evt.pointerType) {
                 case "mouse":
@@ -79,7 +154,7 @@ export class DrawableCanvas {
                     break;
             }
         });
-
+        
         window.addEventListener("keyup", evt => {
             if (evt.key === " ") {
                 this.spaceDown = false;
@@ -94,53 +169,12 @@ export class DrawableCanvas {
         });
 
         window.addEventListener("resize", () => this.resizeCanvas(window.innerWidth, window.innerHeight));
-
-        this.canvas = canvas;
-        this.ctx = ctx;
-        this.state = new StateMachine(InteractState.Idle);
-        
-        this.initStates();
-        this.resizeCanvas(window.innerWidth, window.innerHeight);
     }
 
-    public redraw() {
-        this.ctx.fillStyle = "white";
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.resetTransform();
-        this.ctx.scale(this.zoom, this.zoom);
-        this.ctx.translate(this.offset.x, this.offset.y);
-        this.elements.forEach(element => {
-            element.draw(this.ctx);
-        });
-        
-        this.ctx.strokeStyle = "red";
-        this.ctx.strokeRect(this.physicalSize.left, this.physicalSize.top, this.physicalSize.width, this.physicalSize.height);
-
-        console.log(this.canvas.width);
-        console.log(this.canvas.height);
-    }
-    
-    public resizeCanvas(width: number, height: number) {
-        if (width < this.physicalSize.width) {
-            width = this.physicalSize.width;
-        }
-
-        if (height < this.physicalSize.height) {
-            height = this.physicalSize.height;
-        }
-        
-        this.canvas.width = width;
-        this.canvas.height = height;
-    }
-    
-    public get getPhysicalSize() {
-        return this.physicalSize;
-    }
-
-    private addElement(element: IDrawableElement) {
+    private addElement(element: DrawableElement) {
         this.elements = [...this.elements, element];
     }
-    
+
     private updateBounding() {
         let minX = Number.MAX_VALUE;
         let minY = Number.MAX_VALUE;
@@ -149,7 +183,7 @@ export class DrawableCanvas {
 
         for (const element of this.elements) {
             const rect = element.boundingBox();
-            
+
             if (rect.left < minX) {
                 minX = rect.left;
             }
@@ -165,67 +199,24 @@ export class DrawableCanvas {
             if (rect.bottom > maxY) {
                 maxY = rect.bottom;
             }
-            
+
             console.log(rect);
         }
 
         this.physicalSize = new DOMRect(minX, minY, maxX - minX, maxY - minY);
-        console.log(this.physicalSize);
     }
 
-    private initStates() {
-        this.state.addEnd(InteractState.Drawing, () => {
-            this.currentStroke?.buildBoundingBox();
-            this.currentStroke = null
-            this.updateBounding();
-        });
-        
-        this.state.addStart(InteractState.Drawing, () => {
-            const stroke = new Stroke([], false);
-            this.addElement(stroke);
-            this.currentStroke = stroke;
-        });
-        
-        this.state.addUpdate(InteractState.Drawing, (event: PointerEvent) => {
-            const x = (event.pageX - this.offset.x) / this.zoom;
-            const y = (event.pageY - this.offset.y) / this.zoom;
-            
-            if (this.withinCanvas(x, y)) {
-                this.currentStroke?.addPoint(x, y, event.pressure);
-                return;
-            }
-            
-            this.currentStroke?.buildBoundingBox();
-            this.currentStroke = null;
-        });
-
-        this.state.addUpdate(InteractState.Moving, (event: PointerEvent) => {
-            const newPos = {
-                x: event.movementX / this.zoom,
-                y: event.movementY / this.zoom,
-            };
-            
-            this.offset = {
-                x: this.offset.x + newPos.x,
-                y: this.offset.y + newPos.y,
-            }
-        });
+    private resizeCanvas(width: number, height: number) {
+        this.canvas.width = width;
+        this.canvas.height = height;
     }
     
-    private withinCanvas(x: number, y: number) {
-        const rect = this.canvas.getBoundingClientRect();
-        return (
-            x >= rect.left &&
-            x <= rect.right &&
-            y >= rect.top &&
-            y <= rect.bottom
-        );
+    private within(rect: DOMRect, point: Vector2) {
+        return point.x >= rect.x &&
+            point.x < rect.x + rect.width &&
+            point.y > rect.y &&
+            point.y < rect.y + rect.height;
     }
-}
-
-export interface IDrawableElement {
-    draw(ctx: CanvasRenderingContext2D): void;
-    boundingBox(): DOMRect;
 }
 
 enum InteractState {

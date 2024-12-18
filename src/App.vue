@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import {ref, computed} from 'vue'
-import Home from "./pages/Home.vue";
+// import Home from "./pages/Home.vue";
 import FreeCanvas from "./pages/FreeCanvas.vue";
 
 const routes = {

@@ -1,15 +1,21 @@
-import {IDrawableElement} from "./DrawableCanvas.ts";
 import {getStroke, getStrokeOutlinePoints, getStrokePoints} from "perfect-freehand";
+import {DrawableElement} from "./DrawableElement.ts";
+import {Vector2} from "./DrawableCanvas.ts";
 
-export class Stroke implements IDrawableElement {
+export class Stroke extends DrawableElement {
     private box: DOMRect;
 
     public constructor(private points: [number, number, number][], private hasPressure: boolean) {
-        this.buildBoundingBox();
+        super();
+        this.updateBounds();
         this.box = new DOMRect(0, 0, 0, 0);
     }
+    
+    public addPoint(x: number, y: number, pressure: number | undefined) {
+        this.points = [...this.points, [x, y, pressure ?? 0]];
+    }
 
-    public draw(ctx: CanvasRenderingContext2D): void {
+    public draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
         if (this.points.length == 0) return;
 
         const baked = getStroke(this.points, {
@@ -20,17 +26,18 @@ export class Stroke implements IDrawableElement {
 
         ctx.fillStyle = "black";
         ctx.fill(path);
+        
+        ctx.strokeStyle = "red";
+        ctx.strokeRect(this.box.x, this.box.y, this.box.width, this.box.height);
     }
 
     public boundingBox(): DOMRect {
         return this.box;
     }
 
-    public addPoint(x: number, y: number, pressure: number | undefined) {
-        this.points = [...this.points, [x, y, pressure ?? 0]];
-    }
-
-    public buildBoundingBox() {
+    protected updateBoundingBox(scale: Vector2) {
+        if (this.points.length === 0) return;
+        
         const outlinePoints = getStrokeOutlinePoints(getStrokePoints(this.points));
 
         let minX = Number.MAX_VALUE;
@@ -55,6 +62,11 @@ export class Stroke implements IDrawableElement {
                 maxY = y;
             }
         }
+        
+        minX /= scale.x;
+        minY /= scale.y;
+        maxX /= scale.x;
+        maxY /= scale.y;
         
         this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     }
