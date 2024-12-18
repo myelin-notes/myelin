@@ -2,6 +2,7 @@ import {Stroke} from "./Stroke.ts";
 import {StateMachine} from "../utils/StateMachine.ts";
 import {Ref, ref} from "vue";
 import {DrawableElement} from "./DrawableElement.ts";
+import {UndoableState} from "../utils/UndoRedo.ts";
 
 export type Vector2 = { x: number, y: number };
 
@@ -14,11 +15,12 @@ export class DrawableCanvas {
     // @ts-ignore
     private readonly state: StateMachine<InteractState>;
 
-    private spaceDown: boolean = false;
-    private elements: DrawableElement[] = [];
     private offset: Vector2 = {x: 0, y: 0};
     private zoom: Ref<number> = ref(1);
     private physicalSize: DOMRect = new DOMRect();
+    private spaceDown: boolean = false;
+
+    private elements: UndoableState<DrawableElement> = new UndoableState();
     private currentStroke: Stroke | null = null;
 
     public constructor(canvas: HTMLCanvasElement) {
@@ -43,7 +45,7 @@ export class DrawableCanvas {
         this.ctx.save();
         this.ctx.scale(this.zoom.value, this.zoom.value);
         this.ctx.translate(this.offset.x, this.offset.y);
-        this.elements.forEach(element => {
+        this.elements.actives.forEach(element => {
             element.draw(this.ctx, deltaTime);
         });
         // this.ctx.strokeStyle = "red";
@@ -100,7 +102,7 @@ export class DrawableCanvas {
             this.zoom.value += evt.deltaY * -0.0005;
             this.zoom.value = Math.min(3, Math.max(0.2, this.zoom.value));
         });
-        
+
         canvas.addEventListener("pointermove", evt => {
             this.state.update(evt);
         });
@@ -115,11 +117,11 @@ export class DrawableCanvas {
                 case "mouse":
                     const x = evt.pageX / this.zoom.value - this.offset.x;
                     const y = evt.pageY / this.zoom.value - this.offset.y;
-                    
-                    if (evt.button === 0 && this.within(this.physicalSize, { x: x, y: y })) {
+
+                    if (evt.button === 0 && this.within(this.physicalSize, {x: x, y: y})) {
                         break;
                     }
-                    
+
                     // middle click
                     if (this.spaceDown || evt.button === 1) {
                         this.state.change(InteractState.Moving);
@@ -137,19 +139,11 @@ export class DrawableCanvas {
                     break;
             }
         });
-        
-        window.addEventListener("pointerup", evt => {
-            switch (evt.pointerType) {
-                case "mouse":
-                    this.state.change(InteractState.Selecting);
-                    break;
-                case "touch":
-                default:
-                    this.state.change(InteractState.Idle);
-                    break;
-            }
+
+        window.addEventListener("pointerup", _evt => {
+            this.state.change(InteractState.Idle);
         });
-        
+
         window.addEventListener("keyup", evt => {
             if (evt.key === " ") {
                 this.spaceDown = false;
@@ -161,13 +155,21 @@ export class DrawableCanvas {
                 this.spaceDown = true;
                 console.log(this.elements);
             }
+
+            if (evt.key === "z" && evt.ctrlKey) {
+                this.undo();
+            }
+
+            if (evt.key === "Z" && evt.ctrlKey) {
+                this.redo();
+            }
         });
 
         window.addEventListener("resize", () => this.resizeCanvas(window.innerWidth, window.innerHeight));
     }
 
     private addElement(element: DrawableElement) {
-        this.elements = [...this.elements, element];
+        this.elements.do(element);
     }
 
     private updateBounding() {
@@ -176,7 +178,7 @@ export class DrawableCanvas {
         let maxX = Number.MIN_VALUE;
         let maxY = Number.MIN_VALUE;
 
-        for (const element of this.elements) {
+        for (const element of this.elements.actives) {
             const rect = element.boundingBox();
 
             if (rect.left < minX) {
@@ -194,8 +196,6 @@ export class DrawableCanvas {
             if (rect.bottom > maxY) {
                 maxY = rect.bottom;
             }
-
-            console.log(rect);
         }
 
         this.physicalSize = new DOMRect(minX, minY, maxX - minX, maxY - minY);
@@ -205,12 +205,22 @@ export class DrawableCanvas {
         this.canvas.width = width;
         this.canvas.height = height;
     }
-    
+
     private within(rect: DOMRect, point: Vector2) {
         return point.x >= rect.x &&
             point.x < rect.x + rect.width &&
             point.y > rect.y &&
             point.y < rect.y + rect.height;
+    }
+
+    private undo() {
+        this.elements.undo();
+        this.updateBounding();
+    }
+
+    private redo() {
+        this.elements.redo();
+        this.updateBounding();
     }
 }
 

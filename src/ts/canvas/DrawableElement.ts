@@ -34,7 +34,3 @@ export abstract class DrawableElement {
     protected abstract updateBoundingBox(scale: Vector2): void;
     protected abstract draw2D(ctx: CanvasRenderingContext2D, deltaTime: number): void;
 }
-
-export abstract class StatefulElement extends DrawableElement {
-    
-}

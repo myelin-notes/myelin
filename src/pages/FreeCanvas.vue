@@ -5,7 +5,7 @@ import {DrawableCanvas} from "../ts/canvas/DrawableCanvas.ts";
 const canvasRef = useTemplateRef("canvas");
 const zoomLevel = ref<number>(100);
 const deltaTime = ref(0);
-const fps = computed(() => 1 / deltaTime.value);
+const fps = computed(() => Math.round(1 / deltaTime.value));
 
 let drawableCanvas: DrawableCanvas | null = null;
 let animationFrameId: number;
