@@ -5,8 +5,8 @@ import {Vector2} from "./DrawableCanvas.ts";
 export class Stroke extends DrawableElement {
     private box: DOMRect;
 
-    public constructor(private points: [number, number, number][], private hasPressure: boolean) {
-        super();
+    public constructor(index: number, private points: [number, number, number][], private hasPressure: boolean) {
+        super(index);
         this.updateBounds();
         this.box = new DOMRect(0, 0, 0, 0);
     }

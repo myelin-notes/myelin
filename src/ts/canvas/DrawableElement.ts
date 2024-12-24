@@ -2,6 +2,9 @@ import {Vector2} from "./DrawableCanvas.ts";
 
 export abstract class DrawableElement {
     private scale: Vector2 = { x: 1, y: 1 };
+	
+	public constructor(public readonly index: number) {
+	}
     
     public draw(ctx: CanvasRenderingContext2D, deltaTime: number): void {
         ctx.save();

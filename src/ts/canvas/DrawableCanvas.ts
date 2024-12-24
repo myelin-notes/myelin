@@ -73,8 +73,7 @@ export class DrawableCanvas {
         });
 
         this.state.addStart(InteractState.Drawing, () => {
-            const stroke = new Stroke([], false);
-            this.addElement(stroke);
+            const stroke = this.addElement(i => new Stroke(i, [], false));
             this.currentStroke = stroke;
         });
 
@@ -168,8 +167,8 @@ export class DrawableCanvas {
         window.addEventListener("resize", () => this.resizeCanvas(window.innerWidth, window.innerHeight));
     }
 
-    private addElement(element: DrawableElement) {
-        this.elements.do(element);
+    private addElement<T extends DrawableElement>(element: (i: number) => T): T {
+        return this.elements.add(element);
     }
 
     private updateBounding() {
@@ -178,7 +177,7 @@ export class DrawableCanvas {
         let maxX = Number.MIN_VALUE;
         let maxY = Number.MIN_VALUE;
 
-        for (const element of this.elements.actives) {
+		this.elements.actives.forEach(element => {
             const rect = element.boundingBox();
 
             if (rect.left < minX) {
@@ -196,7 +195,7 @@ export class DrawableCanvas {
             if (rect.bottom > maxY) {
                 maxY = rect.bottom;
             }
-        }
+		});
 
         this.physicalSize = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     }
