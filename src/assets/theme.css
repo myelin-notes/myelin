@@ -1,0 +1,65 @@
+:root {
+    font-family: "Inter", Arial, sans-serif;
+    
+    --c-primary: #DECDF5;
+    --c-secondary: #F8F1FF;
+    --c-icons: #65558F;
+    --c-accent: #FF9A52;
+    --c-text: #000000;
+    --c-surface: #FFFFFF;
+
+    --p-border-radius: 8px;
+    --p-box-shadow: 0px 1px 5px 0px rgba(0, 0, 0, 0.25);
+    --p-padding-reg: 16px;
+    --p-transition: ease-out 100ms;
+    
+    --p-gap-same-context: 16px;
+    --p-gap-diff-context: 32px;
+}
+
+/*:root[data-theme='dark'] {*/
+/*    --primary: #DECDF5;*/
+/*    --secondary: #F8F1FF;*/
+/*    --icons: #65558F;*/
+/*    --accent: #FF9A52;*/
+/*    --text: #000000;*/
+/*    --surface: #FFFFFF;*/
+/*}*/
+
+h1 {
+    font-size: 1.15rem;
+    font-weight: normal;
+    margin: 0;
+    color: var(--c-text);
+}
+
+h2 {
+    font-size: 1.05rem;
+    font-weight: normal;
+    margin: 0;
+    color: var(--c-text);
+}
+
+span {
+    font-size: 1rem;
+    color: var(--c-text);
+}
+
+.bubble {
+    background-color: var(--c-surface);
+    box-shadow: var(--p-box-shadow);
+    border-radius: var(--p-border-radius);
+    padding: var(--p-padding-reg);
+}
+
+.foreground-item {
+    background-color: var(--c-secondary);
+    box-shadow: var(--p-box-shadow);
+    border-radius: var(--p-border-radius);
+    padding: var(--p-padding-reg);
+}
+
+.icon {
+    font-size: 1.4rem;
+    color: var(--c-icons);
+}
