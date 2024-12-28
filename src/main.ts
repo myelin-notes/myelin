@@ -2,17 +2,34 @@ import {createApp} from "vue";
 import {createMemoryHistory, createRouter} from "vue-router";
 
 import App from "./App.vue";
-import FileExplorer from "./pages/FileExplorer/FileExplorer.vue";
-import FreeCanvas from "./pages/FreeCanvas.vue";
+import ExplorerWrapper from "./pages/FileExplorer/ExplorerWrapper.vue";
 
 import "./assets/base.css";
 import "./assets/theme.css";
 import 'primeicons/primeicons.css'
+import FreeCanvas from "./pages/FreeCanvas.vue";
+import DocumentWrapper from "./pages/DocumentEditor/DocumentWrapper.vue";
 
 const routes = [
-    {path: '/', redirect: '/file/'},
-    {path: '/file/:path*', component: FileExplorer, props: true },
-    {path: '/file/:path*/canvas', component: FreeCanvas},
+    {
+        path: '/',
+        redirect: '/file/home'
+    },
+    {
+        path: '/file/:path*',
+        component: ExplorerWrapper,
+        props: true,
+    },
+    {
+        path: '/canvas/:path*',
+        component: FreeCanvas,
+        props: true,
+    },
+    {
+        path: '/document/:path*',
+        component: DocumentWrapper,
+        props: true,
+    }
 ];
 
 const router = createRouter({

@@ -6,6 +6,9 @@ const canvasRef = useTemplateRef("canvas");
 const zoomLevel = ref<number>(100);
 const deltaTime = ref(0);
 const fps = computed(() => Math.round(1 / deltaTime.value));
+const props = defineProps<{
+  path: string[]
+}>();
 
 let drawableCanvas: DrawableCanvas | null = null;
 let animationFrameId: number;
@@ -33,7 +36,6 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(animationFrameId);
 });
-
 </script>
 
 <template>

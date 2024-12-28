@@ -45,6 +45,17 @@ span {
     color: var(--c-text);
 }
 
+button {
+    outline: none;
+    border: none;
+}
+
+button:hover {
+    outline: none;
+    border: none;
+    cursor: pointer;
+}
+
 .bubble {
     background-color: var(--c-surface);
     box-shadow: var(--p-box-shadow);

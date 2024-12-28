@@ -90,17 +90,17 @@ export class UndoableState<T> {
 		this.dirty = true;
     }
 
-    private isUndoable(object: any): object is IUndoable {
-        return (
-            typeof object === "object" &&
-            object !== null &&
-            typeof object.cutoff === "function" &&
-            typeof object.canUndo === "function" &&
-            typeof object.canRedo === "function" &&
-            typeof object.undo === "function" &&
-            typeof object.redo === "function"
-        );
-    }
+    // private isUndoable(object: any): object is IUndoable {
+    //     return (
+    //         typeof object === "object" &&
+    //         object !== null &&
+    //         typeof object.cutoff === "function" &&
+    //         typeof object.canUndo === "function" &&
+    //         typeof object.canRedo === "function" &&
+    //         typeof object.undo === "function" &&
+    //         typeof object.redo === "function"
+    //     );
+    // }
 
 	private computeActives() {
 		this.dirty = false;
