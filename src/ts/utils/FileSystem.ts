@@ -18,6 +18,10 @@ export namespace FileSystem {
             await mkdir("", {baseDir: BaseDirectory.AppData});
         }
 
+        if (!await exists("Home", {baseDir: BaseDirectory.AppData})) {
+            await mkdir("Home", {baseDir: BaseDirectory.AppData});
+        }
+
         const result = await readDir(pathJoined, {
             baseDir: BaseDirectory.AppData,
         });

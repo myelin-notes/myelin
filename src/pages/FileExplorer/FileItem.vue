@@ -4,11 +4,17 @@ import {MyelinFile} from "../../ts/utils/FileSystem.ts";
 defineProps<{
   file?: MyelinFile,
   link?: string,
+  openCtx: (event: PointerEvent, item: string) => void,
 }>();
 </script>
 
 <template>
-  <RouterLink id="item" class="foreground-item" :to="`/${file?.type === 'mcanvas' ? 'canvas' : 'document'}/${link}`">
+  <RouterLink
+      id="item"
+      class="foreground-item"
+      @contextmenu="openCtx($event, link!)"
+      aria-haspopup="true"
+      :to="`/${file?.type === 'mcanvas' ? 'canvas' : 'document'}/${link}`">
     <div id="title">
       <svg v-if="file?.type === 'mcanvas'" class="icon" xmlns="http://www.w3.org/2000/svg" height="24px"
            viewBox="0 -960 960 960" fill="currentColor">
