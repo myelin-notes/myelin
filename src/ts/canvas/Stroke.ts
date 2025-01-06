@@ -27,8 +27,8 @@ export class Stroke extends DrawableElement {
         ctx.fillStyle = "black";
         ctx.fill(path);
         
-        ctx.strokeStyle = "red";
-        ctx.strokeRect(this.box.x, this.box.y, this.box.width, this.box.height);
+        // ctx.strokeStyle = "red";
+        // ctx.strokeRect(this.box.x, this.box.y, this.box.width, this.box.height);
     }
 
     public boundingBox(): DOMRect {
