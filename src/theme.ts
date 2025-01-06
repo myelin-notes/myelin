@@ -1,4 +1,3 @@
-
 import {definePreset, palette} from "@primevue/themes";
 import Aura from '@primevue/themes/aura';
 
@@ -9,6 +8,7 @@ const textC = theme.getPropertyValue('--c-text');
 const iconC = theme.getPropertyValue('--c-icons');
 const regPadding = theme.getPropertyValue('--p-padding-reg');
 const shadow = theme.getPropertyValue('--p-box-shadow')
+const bgC = theme.getPropertyValue('--c-surface');
 
 const navigationConfig = {
     item: {
@@ -34,28 +34,53 @@ const navigationConfig = {
     }
 };
 
+const secondaryBtnConfig = {
+    background: '{background.500}',
+    hoverBackground: '{surface.500}',
+    activeBackground: '{surface.500}',
+    borderColor: 'transparent',
+    hoverBorderColor: 'transparent',
+    activeBorderColor: '{surface.500}',
+};
+
+const textConfig = {
+    color: '{textColor.500}',
+    hoverColor: '{textColor.600}',
+    mutedColor: '{textColor.200}',
+    hoverMutedColor: '{textColor.300}'
+};
+
 export const MyelinPreset = definePreset(Aura, {
     primitive: {
         borderRadius: {
             md: '8px',
         },
+        red: palette("#FFA8A9"),
+        green: palette("#7dc257"),
     },
     semantic: {
         primary: palette(primaryC),
-        surface: palette(surfaceC),
+        textColor: palette(textC),
+        background: palette(bgC),
         transitionDuration: theme.getPropertyValue('--p-transition-duration'),
-        text: {
-            color: textC,
-            hoverColor: textC,
-            mutedColor: textC,
-            hoverMutedColor: textC
-        },
         colorScheme: {
             light: {
-                navigation: navigationConfig
+                navigation: navigationConfig,
+                surface: palette(surfaceC),
+                text: textConfig,
+                formField: {
+                    color: '{textColor.500}',
+                    placeholderColor: '{textColor.200}',
+                },
             },
             dark: {
-                navigation: navigationConfig
+                navigation: navigationConfig,
+                surface: palette(surfaceC),
+                text: textConfig,
+                formField: {
+                    color: '{textColor.500}',
+                    placeholderColor: '{textColor.200}',
+                },
             }
         },
         overlay: {
@@ -83,6 +108,30 @@ export const MyelinPreset = definePreset(Aura, {
         },
         popover: {
             contentPadding: `${regPadding} 0`
-        }
+        },
+        button: {
+            colorScheme: {
+                light: {
+                    secondary: secondaryBtnConfig,
+                    text: {
+                        secondary: {
+                            hoverBackground: '{surface.500}',
+                            activeBackground: '{surface.500}',
+                            color: '{text.color}',
+                        },
+                    },
+                },
+                dark: {
+                    secondary: secondaryBtnConfig,
+                    text: {
+                        secondary: {
+                            hoverBackground: '{surface.500}',
+                            activeBackground: '{surface.500}',
+                            color: '{text.color}',
+                        },
+                    },
+                },
+            },
+        },
     },
 });

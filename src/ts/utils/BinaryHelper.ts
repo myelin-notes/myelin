@@ -112,3 +112,9 @@ export class BinaryReader {
         return this.view.buffer.slice(this.offset, this.offset + length);
     }
 }
+
+export interface ISerializable {
+    write(writer: BinaryWriter): void;
+    read(reader: BinaryReader): void;
+    get reservedSize(): number;
+}

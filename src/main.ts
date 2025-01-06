@@ -11,8 +11,8 @@ import FreeCanvas from "./pages/FreeCanvas.vue";
 import DocumentWrapper from "./pages/DocumentEditor/DocumentWrapper.vue";
 
 import PrimeVue from 'primevue/config';
-import ConfirmationService from 'primevue/confirmationservice';
 import {MyelinPreset} from "./theme.ts";
+import {ConfirmationService, ToastService} from "primevue";
 
 const router = createRouter({
     history: createMemoryHistory(),
@@ -27,12 +27,12 @@ const router = createRouter({
             props: true,
         },
         {
-            path: '/canvas/:path*',
+            path: '/mcanvas/:path*',
             component: FreeCanvas,
             props: true,
         },
         {
-            path: '/document/:path*',
+            path: '/mdoc/:path*',
             component: DocumentWrapper,
             props: true,
         }
@@ -43,6 +43,7 @@ const app = createApp(App);
 
 app.use(router);
 app.use(ConfirmationService);
+app.use(ToastService);
 app.use(PrimeVue, {
     theme: {preset: MyelinPreset}
 });

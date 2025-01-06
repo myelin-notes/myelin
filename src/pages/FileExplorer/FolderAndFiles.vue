@@ -1,60 +1,87 @@
 <script setup lang="ts">
 import FolderItem from "./FolderItem.vue";
 import FileItem from "./FileItem.vue";
-import {MyelinFile} from "../../ts/utils/FileSystem.ts";
-import {computed, ref} from "vue";
-import {ContextMenu, useConfirm, ConfirmDialog} from "primevue";
+import {FileSystem, MyelinFile} from "../../ts/utils/FileSystem.ts";
+import {ref} from "vue";
+import {ConfirmDialog, ContextMenu, Dialog, InputText, useConfirm, useToast} from "primevue";
 import {MenuItem} from "primevue/menuitem";
+import {basename, extname} from "@tauri-apps/api/path";
+import {BaseDirectory, stat} from '@tauri-apps/plugin-fs';
 
-const props = defineProps<{
+const emit = defineEmits(["reload"]);
+defineProps<{
   path: string[],
   directories: string[],
   files: MyelinFile[]
 }>();
 
 const menu = ref();
-const confirm = useConfirm();
 const selectedItem = ref<null | string>(null);
+const renameDialogOpen = ref(false);
+const renameName = ref<null | string>(null);
 
-const slash = computed(() => props.path.length === 1 ? '' : '/');
+const confirm = useConfirm();
+const toast = useToast();
+
 const items: MenuItem[] = [
   {
     label: 'Rename',
     icon: 'pi pi-pen-to-square',
-    command: () => {
-      confirm.require({
-        message: 'Do you want to delete this record?',
-        header: 'Danger Zone',
-        icon: 'pi pi-info-circle',
-        rejectLabel: 'Cancel',
-        rejectProps: {
-          label: 'Cancel',
-          severity: 'secondary',
-          outlined: true
-        },
-        acceptProps: {
-          label: 'Delete',
-          severity: 'danger'
-        },
-        accept: () => {
-        },
-        reject: () => {
-        }        
-      })
-    },
+    command: async () => {
+      const path = selectedItem.value!;
+      const isFile = (await stat(path, { baseDir: BaseDirectory.AppData })).isFile;
+      
+      if (isFile) {
+        let name = await basename(path, await extname(path));
+        name = name.slice(0, name.length - 1);
+        renameName.value = name;
+      } else {
+        renameName.value = await basename(path);
+      }
+      
+      renameDialogOpen.value = true;
+    }
   },
   {
     label: 'Delete',
     icon: 'pi pi-trash',
     command: () => {
+      confirm.require({
+        header: 'Do you want to delete this?',
+        message: 'This can not be undone!',
+        rejectLabel: 'Cancel',
+        rejectProps: {
+          label: 'Cancel',
+          severity: 'secondary',
+        },
+        acceptProps: {
+          label: 'Delete',
+          severity: 'danger'
+        },
+        accept: async () => {
+          await FileSystem.deleteFileOrFolder(selectedItem.value!);
+          emit('reload');
+        },
+      });
     }
   },
 ];
 
 function openCtx(event: PointerEvent, item: string) {
   selectedItem.value = item;
-  console.log(item);
+  console.log(selectedItem.value);
   menu.value.show(event);
+}
+
+async function rename() {
+  await FileSystem.renameFileOrFolder(selectedItem.value!, renameName.value!);
+  emit('reload');
+  toast.add({
+    severity: "success",
+    summary: "Renamed successfully",
+    detail: `Renamed to ${renameName.value}`,
+    life: 4000,
+  });
 }
 </script>
 
@@ -80,7 +107,7 @@ function openCtx(event: PointerEvent, item: string) {
         <template v-for="file in files">
           <FileItem
               :file="file"
-              :link="path.join('/') + `${slash}${file.name}.${file.type}`"
+              :link="path.join('/') + `/${file.name}.${file.type}`"
               :open-ctx/>
         </template>
       </div>
@@ -90,6 +117,23 @@ function openCtx(event: PointerEvent, item: string) {
     </div>
     <ContextMenu ref="menu" :model="items"/>
     <ConfirmDialog/>
+    
+    <Dialog modal v-model:visible="renameDialogOpen">
+      <template #container="{ closeCallback }">
+        <div class="dialog bubble">
+          <h1>Rename Folder</h1>
+          <InputText autofocus placeholder="Folder Name" v-model="renameName"/>
+          <div class="dialog-buttons">
+            <button class="btn" @click="closeCallback()">
+              <span>Cancel</span>
+            </button>
+            <button class="btn" @click="closeCallback();rename();">
+              <span>Confirm</span>
+            </button>
+          </div>
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>
 

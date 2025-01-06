@@ -79,3 +79,42 @@ button:hover {
     font-size: 1.4rem;
     color: var(--c-icons);
 }
+
+.btn {
+    background-color: transparent;
+    padding: 8px 16px;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: var(--p-gap-same-context);
+}
+
+.btn:hover {
+    background-color: var(--c-secondary);
+}
+
+.btn .icon {
+    color: var(--c-primary);
+}
+
+.btn:hover .icon {
+    color: var(--c-icons);
+}
+
+.dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-gap-same-context);
+}
+
+.dialog-buttons {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.dialog-buttons * {
+    border-radius: var(--p-border-radius);
+}

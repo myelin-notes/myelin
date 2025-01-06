@@ -14,7 +14,7 @@ defineProps<{
       class="foreground-item"
       @contextmenu="openCtx($event, link!)"
       aria-haspopup="true"
-      :to="`/${file?.type === 'mcanvas' ? 'canvas' : 'document'}/${link}`">
+      :to="`/${file?.type}/${link}`">
     <div id="title">
       <svg v-if="file?.type === 'mcanvas'" class="icon" xmlns="http://www.w3.org/2000/svg" height="24px"
            viewBox="0 -960 960 960" fill="currentColor">

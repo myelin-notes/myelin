@@ -7,7 +7,12 @@ defineProps<{
 </script>
 
 <template>
-  <DocumentView :path="path"/>
+  <Suspense>
+    <DocumentView :path="path"/>
+    <template #fallback>
+      Loading
+    </template>
+  </Suspense>
 </template>
 
 <style scoped>

@@ -11,7 +11,7 @@ const {title = 'Folder Name', link} = defineProps<{
       :to="`/file/${link}`" 
       id="item"
       class="foreground-item"
-      @contextmenu="openCtx($event, link)"
+      @contextmenu="openCtx($event, link!)"
       aria-haspopup="true">
     <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
       <path fill="currentColor"
