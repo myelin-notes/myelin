@@ -1,8 +1,9 @@
-import {Stroke} from "./Stroke.ts";
 import {StateMachine} from "../utils/StateMachine.ts";
 import {Ref, ref} from "vue";
 import {DrawableElement} from "./DrawableElement.ts";
 import {UndoableState} from "../utils/UndoRedo.ts";
+import {ITool} from "./tools/Tools.ts";
+import {PenTool} from "./tools/PenTool.ts";
 
 export type Vector2 = { x: number, y: number };
 
@@ -14,6 +15,8 @@ export class DrawableCanvas {
     private readonly canvas: HTMLCanvasElement;
     // @ts-ignore
     private readonly state: StateMachine<InteractState>;
+    // @ts-ignore
+    public readonly tools: ITool[];
 
     private offset: Vector2 = {x: 0, y: 0};
     private zoom: Ref<number> = ref(1);
@@ -21,7 +24,8 @@ export class DrawableCanvas {
     private spaceDown: boolean = false;
 
     private elements: UndoableState<DrawableElement> = new UndoableState();
-    private currentStroke: Stroke | null = null;
+    // @ts-ignore
+    private toolSelected: ITool;
 
     public constructor(canvas: HTMLCanvasElement) {
         const ctx = canvas.getContext("2d");
@@ -33,6 +37,9 @@ export class DrawableCanvas {
         this.canvas = canvas;
         this.ctx = ctx;
         this.state = new StateMachine(InteractState.Idle);
+        this.tools = DrawableCanvas.makeTools();
+        
+        this.toolSelected = this.tools[0];
 
         this.initEventListeners(canvas);
         this.initStates();
@@ -66,21 +73,18 @@ export class DrawableCanvas {
     }
 
     private initStates() {
-        this.state.addEnd(InteractState.Drawing, () => {
-            this.currentStroke?.updateBounds();
-            this.currentStroke = null
-            this.updateBounding();
+        this.state.addEnd(InteractState.UsingTool, event => {
+            this.toolSelected.finish(this, event);
         });
 
-        this.state.addStart(InteractState.Drawing, () => {
-            const stroke = this.addElement(i => new Stroke(i, [], false));
-            this.currentStroke = stroke;
+        this.state.addStart(InteractState.UsingTool, event => {
+            this.toolSelected.start(this, event);
         });
 
-        this.state.addUpdate(InteractState.Drawing, (event: PointerEvent) => {
+        this.state.addUpdate(InteractState.UsingTool, (event: PointerEvent) => {
             const x = event.pageX / this.zoom.value - this.offset.x;
             const y = event.pageY / this.zoom.value - this.offset.y;
-            this.currentStroke?.addPoint(x, y, event.pressure);
+            this.toolSelected.update(this, event, { x: x, y: y });
         });
 
         this.state.addUpdate(InteractState.Moving, (event: PointerEvent) => {
@@ -98,8 +102,30 @@ export class DrawableCanvas {
 
     private initEventListeners(canvas: HTMLCanvasElement) {
         canvas.addEventListener("wheel", evt => {
-            this.zoom.value += evt.deltaY * -0.0005;
-            this.zoom.value = Math.min(3, Math.max(0.2, this.zoom.value));
+            const prevZoom = this.zoom.value;
+            const newZoom = prevZoom + evt.deltaY * -0.001;
+            // this.zoom.value = Math.min(3, Math.max(0.2, newZoom));
+            this.zoom.value = newZoom;
+
+            // Calculate the canvas center relative to the current zoom and offset
+            const canvasCenter = {
+                x: this.canvas.width / 2,
+                y: this.canvas.height / 2,
+            };
+
+            const worldCenterBeforeZoom = {
+                x: (canvasCenter.x / prevZoom) - this.offset.x,
+                y: (canvasCenter.y / prevZoom) - this.offset.y,
+            };
+
+            const worldCenterAfterZoom = {
+                x: (canvasCenter.x / this.zoom.value) - this.offset.x,
+                y: (canvasCenter.y / this.zoom.value) - this.offset.y,
+            };
+
+            // Adjust the offset to maintain the same visual center
+            this.offset.x += worldCenterAfterZoom.x - worldCenterBeforeZoom.x;
+            this.offset.y += worldCenterAfterZoom.y - worldCenterBeforeZoom.y;
         });
 
         canvas.addEventListener("pointermove", evt => {
@@ -133,7 +159,7 @@ export class DrawableCanvas {
                     }
                 // fallthrough
                 default:
-                    this.state.change(InteractState.Drawing);
+                    this.state.change(InteractState.UsingTool);
                     this.state.update(evt);
                     break;
             }
@@ -167,8 +193,8 @@ export class DrawableCanvas {
         window.addEventListener("resize", () => this.resizeCanvas(window.innerWidth, window.innerHeight));
     }
 
-    private addElement<T extends DrawableElement>(element: (i: number) => T): T {
-        return this.elements.add(element);
+    private addElement(element: DrawableElement) {
+        this.elements.add(element);
     }
 
     private updateBounding() {
@@ -177,8 +203,8 @@ export class DrawableCanvas {
         let maxX = Number.MIN_VALUE;
         let maxY = Number.MIN_VALUE;
 
-		this.elements.actives.forEach(element => {
-            const rect = element.boundingBox();
+        for (const element of this.elements.actives) {
+            const rect = element.boundingBox;
 
             if (rect.left < minX) {
                 minX = rect.left;
@@ -195,7 +221,7 @@ export class DrawableCanvas {
             if (rect.bottom > maxY) {
                 maxY = rect.bottom;
             }
-		});
+        }
 
         this.physicalSize = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     }
@@ -221,11 +247,22 @@ export class DrawableCanvas {
         this.elements.redo();
         this.updateBounding();
     }
+    
+    public static makeTools() {
+        return [
+            new PenTool(),
+            new PenTool(),
+            new PenTool(),
+            new PenTool(),
+            new PenTool(),
+            new PenTool(),
+            new PenTool(),
+        ];
+    }
 }
 
 enum InteractState {
-    Drawing = 0,
+    UsingTool = 0,
     Moving,
-    Selecting,
     Idle,
 }

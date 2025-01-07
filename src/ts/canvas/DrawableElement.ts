@@ -20,8 +20,8 @@ export abstract class DrawableElement {
     }
 
     public changeDimensionRelative(x: number, y: number) {
-        const propX = x / this.boundingBox().width;
-        const propY = y / this.boundingBox().height;
+        const propX = x / this.boundingBox.width;
+        const propY = y / this.boundingBox.height;
         
         this.scale.x = this.scale.x + propX;
         this.scale.y = this.scale.y + propY;
@@ -33,7 +33,7 @@ export abstract class DrawableElement {
         this.updateBoundingBox(this.scale);
     }
     
-    public abstract boundingBox(): DOMRect;
+    public abstract get boundingBox(): DOMRect;
     protected abstract updateBoundingBox(scale: Vector2): void;
     protected abstract draw2D(ctx: CanvasRenderingContext2D, deltaTime: number): void;
 }

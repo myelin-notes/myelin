@@ -31,7 +31,7 @@ export class Stroke extends DrawableElement {
         ctx.strokeRect(this.box.x, this.box.y, this.box.width, this.box.height);
     }
 
-    public boundingBox(): DOMRect {
+    public get boundingBox(): DOMRect {
         return this.box;
     }
 
