@@ -26,28 +26,32 @@ import { Button } from "@/components/ui/button";
 const itemClass = "gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary";
 
 interface CreateNewDropdownProps {
+  currentPath: string[];
   onCreated?: () => void;
 }
 
-export function CreateNewDropdown({ onCreated }: CreateNewDropdownProps) {
+export function CreateNewDropdown({ currentPath, onCreated }: CreateNewDropdownProps) {
   const navigate = useNavigate();
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [folderName, setFolderName] = useState("Unnamed Folder");
 
+  const pathJoined = currentPath.join("/");
+
   const createFolder = useCallback(async () => {
-    const path = await join("Home", folderName);
+    const path = await join(...currentPath, folderName);
     await mkdir(path, { baseDir: BaseDirectory.AppData });
     toast.success("Folder created");
     setFolderDialogOpen(false);
     onCreated?.();
-  }, [folderName, onCreated]);
+  }, [folderName, pathJoined, onCreated]);
 
   const createFile = useCallback(async (title: string, type: FileType) => {
-    const name = await FileSystem.getUniqueFileName(title, type, "Home");
-    const file = await create(await join("Home", name), { baseDir: BaseDirectory.AppData });
+    const dirPath = await join(...currentPath);
+    const name = await FileSystem.getUniqueFileName(title, type, dirPath);
+    const file = await create(await join(dirPath, name), { baseDir: BaseDirectory.AppData });
     await file.close();
-    navigate(`/${type}/Home/${name}`);
-  }, [navigate]);
+    navigate(`/${type}/${pathJoined}/${name}`);
+  }, [navigate, pathJoined]);
 
   return (
     <>

@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { FolderInput, ArrowDownAZ, Search } from "lucide-react";
+import { useRef, useState } from "react";
+import { FolderInput, ArrowDownAZ, Search, ChevronRight } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { RecentCard } from "./recent-card";
 import { ExplorerTree, ExplorerTreeHandle } from "./explorer/explorer-tree";
@@ -37,13 +37,14 @@ const recentItems = [
 
 export function LibraryPage() {
   const explorerRef = useRef<ExplorerTreeHandle>(null);
+  const [currentPath, setCurrentPath] = useState<string[]>(["Home"]);
 
   return (
     <div className="relative flex h-full w-full bg-page">
       <Sidebar />
 
       <main className="ml-64 flex-1 overflow-y-auto px-12 pt-12 pb-12">
-        <h1 className="font-heading text-5xl font-extralight leading-[48px] text-text-primary">
+        <h1 className="font-heading text-8xl font-extralight leading-[48px] text-text-primary">
           Digital Library
         </h1>
 
@@ -75,9 +76,37 @@ export function LibraryPage() {
             </div>
 
             <div className="flex items-center justify-between">
-              <h3 className="font-heading text-2xl font-normal leading-8 text-text-primary">
-                Explorer
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3
+                  onClick={() => setCurrentPath(["Home"])}
+                  className="font-heading text-2xl font-normal leading-8 text-text-primary cursor-pointer hover:text-text-secondary transition-colors"
+                >
+                  Explorer
+                </h3>
+                {currentPath.length > 1 && (
+                  <div className="flex items-center gap-1 text-sm text-text-muted">
+                    <ChevronRight className="size-3.5 shrink-0" />
+                    {currentPath.slice(1).map((segment, i) => {
+                      const isLast = i === currentPath.length - 2;
+                      return (
+                        <span key={i} className="flex items-center gap-1">
+                          {i > 0 && <ChevronRight className="size-3 shrink-0 text-text-muted" />}
+                          <button
+                            onClick={() => setCurrentPath(currentPath.slice(0, i + 2))}
+                            className={`transition-colors ${
+                              isLast
+                                ? "text-text-secondary font-medium"
+                                : "text-text-muted hover:text-text-secondary cursor-pointer"
+                            }`}
+                          >
+                            {segment}
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-3">
                 <button className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
                   <FolderInput className="size-4" />
@@ -85,11 +114,18 @@ export function LibraryPage() {
                 <button className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
                   <ArrowDownAZ className="size-4" />
                 </button>
-                <CreateNewDropdown onCreated={() => explorerRef.current?.reload()} />
+                <CreateNewDropdown
+                  currentPath={currentPath}
+                  onCreated={() => explorerRef.current?.reload()}
+                />
               </div>
             </div>
 
-            <ExplorerTree ref={explorerRef} />
+            <ExplorerTree
+              ref={explorerRef}
+              currentPath={currentPath}
+              onNavigate={setCurrentPath}
+            />
           </div>
 
           <div className="col-span-4">
