@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useImperativeHandle, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronDown,
@@ -7,6 +7,10 @@ import {
   FileText,
 } from "lucide-react";
 import { FileSystem, MyelinFile } from "@/lib/utils/file-system";
+
+export interface ExplorerTreeHandle {
+  reload: () => Promise<void>;
+}
 
 function FileItem({ file, path }: { file: MyelinFile; path: string[] }) {
   const navigate = useNavigate();
@@ -81,23 +85,25 @@ function FolderItem({ name, path }: { name: string; path: string[] }) {
   );
 }
 
-export function ExplorerTree() {
+export const ExplorerTree = forwardRef<ExplorerTreeHandle>(function ExplorerTree(_, ref) {
   const [directories, setDirectories] = useState<string[]>([]);
   const [files, setFiles] = useState<MyelinFile[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [dirs, fs] = await FileSystem.loadDirectory(["Home"]);
-        setDirectories(dirs);
-        setFiles(fs);
-      } catch (err) {
-        console.error("Failed to load root directory:", err);
-      }
-      setLoading(false);
-    })();
+  const reload = useCallback(async () => {
+    try {
+      const [dirs, fs] = await FileSystem.loadDirectory(["Home"]);
+      setDirectories(dirs);
+      setFiles(fs);
+    } catch (err) {
+      console.error("Failed to load root directory:", err);
+    }
+    setLoading(false);
   }, []);
+
+  useImperativeHandle(ref, () => ({ reload }), [reload]);
+
+  useEffect(() => { reload(); }, [reload]);
 
   if (loading) {
     return (
@@ -120,4 +126,4 @@ export function ExplorerTree() {
       )}
     </div>
   );
-}
+});
