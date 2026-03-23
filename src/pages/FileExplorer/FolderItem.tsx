@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import FolderIcon from "@/assets/icons/folder.svg?react";
+import { Folder as FolderIcon } from "lucide-react";
 
 interface FolderItemProps {
   title: string;

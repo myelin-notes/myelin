@@ -1,7 +1,7 @@
 import {ITool, SvgIcon} from "./ITool";
 import {DrawableCanvas, Vector2} from "../DrawableCanvas";
 import {CollisionHelper} from "../../utils/CollisionHelper";
-import PointerIcon from "@/assets/icons/pointer.svg?react";
+import { MousePointer2 as PointerIcon } from "lucide-react";
 
 export class SelectTool implements ITool {
 

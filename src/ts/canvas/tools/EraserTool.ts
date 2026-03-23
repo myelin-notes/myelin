@@ -1,6 +1,6 @@
 import {ITool, SvgIcon} from "./ITool";
 import {DrawableCanvas, Vector2} from "../DrawableCanvas";
-import EraserIcon from "@/assets/icons/eraser.svg?react";
+import { Eraser as EraserIcon } from "lucide-react";
 
 export class EraserTool implements ITool {
     private radius: number;

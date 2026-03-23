@@ -22,10 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import PlusIcon from "@/assets/icons/plus.svg?react";
-import FolderPlusIcon from "@/assets/icons/folder-plus.svg?react";
-import FilePlusIcon from "@/assets/icons/file-plus.svg?react";
-import CanvasIcon from "@/assets/icons/canvas-icon.svg?react";
+import { Plus as PlusIcon, FolderPlus as FolderPlusIcon, FilePlus as FilePlusIcon, LayoutGrid as CanvasIcon } from "lucide-react";
 
 export function ExplorerPage() {
   const params = useParams();

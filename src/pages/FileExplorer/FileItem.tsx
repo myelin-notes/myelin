@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { MyelinFile } from "@/ts/utils/FileSystem";
-import CanvasIcon from "@/assets/icons/canvas-icon.svg?react";
-import DocumentIcon from "@/assets/icons/document-icon.svg?react";
+import { LayoutGrid as CanvasIcon, FileText as DocumentIcon } from "lucide-react";
 
 interface FileItemProps {
   file: MyelinFile;

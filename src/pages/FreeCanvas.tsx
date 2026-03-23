@@ -11,8 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import ChevronLeftIcon from "@/assets/icons/chevron-left.svg?react";
-import XIcon from "@/assets/icons/x.svg?react";
+import { ChevronLeft as ChevronLeftIcon, X as XIcon } from "lucide-react";
 
 function toolToWheelItem(
   getCanvas: () => DrawableCanvas | null,

@@ -1,7 +1,7 @@
 import {DrawableCanvas, Vector2} from "../DrawableCanvas";
-import type {FC, SVGProps} from "react";
+import type {LucideIcon} from "lucide-react";
 
-export type SvgIcon = FC<SVGProps<SVGSVGElement>>;
+export type SvgIcon = LucideIcon;
 
 export interface ITool {
     start(canvas: DrawableCanvas, event: PointerEvent): void;

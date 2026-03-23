@@ -2,7 +2,7 @@ import {DrawableCanvas} from "../DrawableCanvas";
 import {PenTool} from "./PenTool";
 import {Stroke} from "../elements/Stroke";
 import type {SvgIcon} from "./ITool";
-import HighlighterIcon from "@/assets/icons/highlighter.svg?react";
+import { Highlighter as HighlighterIcon } from "lucide-react";
 
 export class HighlighterTool extends PenTool {
     public start(canvas: DrawableCanvas, _event: PointerEvent): void {

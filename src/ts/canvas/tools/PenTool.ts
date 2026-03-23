@@ -1,7 +1,7 @@
 import {ITool, SvgIcon} from "./ITool";
 import {DrawableCanvas, Vector2} from "../DrawableCanvas";
 import {Stroke} from "../elements/Stroke";
-import PenIcon from "@/assets/icons/pen.svg?react";
+import { PenTool as PenIcon } from "lucide-react";
 
 export class PenTool implements ITool {
     protected currentStroke: Stroke | null = null;
