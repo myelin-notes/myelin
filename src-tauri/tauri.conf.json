@@ -12,13 +12,18 @@
   "app": {
     "windows": [
       {
-        "title": "myelin",
+        "title": "Myelin",
         "width": 800,
         "height": 600
       }
     ],
     "security": {
-      "csp": null
+      "capabilities": ["default"],
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$CACHE/**"]
+      }
     }
   },
   "bundle": {
