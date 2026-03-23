@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tags = [
@@ -71,13 +70,13 @@ export function SemanticTags() {
       </div>
 
       {/* Smart Suggestion */}
-      <div className="flex items-center gap-4 rounded bg-accent-green p-4">
+      {/* <div className="flex items-center gap-4 rounded bg-accent-green p-4">
         <Lightbulb className="size-[18px] shrink-0 text-text-green" />
         <p className="text-[11px] font-medium leading-[13.75px] text-text-green">
           Try grouping &ldquo;Architecture&rdquo; and &ldquo;Minimalism&rdquo;
           into a new Smart Collection.
         </p>
-      </div>
+      </div> */}
     </div>
   );
 }

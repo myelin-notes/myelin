@@ -109,6 +109,15 @@ export namespace FileSystem {
         });
     }
 
+    export async function moveItem(fromPath: string, toDir: string) {
+        const name = await basename(fromPath);
+        const dest = await join(toDir, name);
+        await rename(fromPath, dest, {
+            oldPathBaseDir: BaseDirectory.AppData,
+            newPathBaseDir: BaseDirectory.AppData,
+        });
+    }
+
     function isValidFileType(str: unknown): str is FileType {
         // @ts-ignore
         return typeof str === "string" && FileTypes.includes(str);
