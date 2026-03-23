@@ -1,3 +1,8 @@
+export interface ISerializable {
+    save(writer: BinaryWriter): void;
+    load(reader: BinaryReader): void;
+}
+
 export class BinaryWriter {
     private readonly strEncoder: TextEncoder;
     private buffer: ArrayBuffer;

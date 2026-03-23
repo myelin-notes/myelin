@@ -12,8 +12,8 @@ import {
 } from "@tauri-apps/plugin-fs";
 import {appCacheDir, basename, dirname, extname, join} from "@tauri-apps/api/path";
 import {convertFileSrc, invoke} from "@tauri-apps/api/core";
-import {ISerializable} from "./ISerializable";
-import {BinaryReader, BinaryWriter} from "./BinaryHelper";
+import {ISerializable} from "./binary-helper";
+import {BinaryReader, BinaryWriter} from "./binary-helper";
 
 export const FileTypes = ['mcanvas', 'mdoc'] as const;
 export type FileType = typeof FileTypes[number];

@@ -1,10 +1,10 @@
 import {getStroke, getStrokeOutlinePoints, getStrokePoints} from "perfect-freehand";
-import {DrawableElement} from "./DrawableElement";
-import {Vector2} from "../DrawableCanvas";
-import {BinaryReader, BinaryWriter} from "../../utils/BinaryHelper";
-import {DrawableElementRegistry} from "./DrawableElementRegistry";
+import {DrawableElement} from "./drawable-element";
+import {Vector2} from "../drawable-canvas";
+import {BinaryReader, BinaryWriter} from "../../../lib/utils/binary-helper";
+import {DrawableElementRegistry} from "./drawable-element-registry";
 import ElementType = DrawableElementRegistry.ElementType;
-import {CollisionHelper} from "../../utils/CollisionHelper";
+import {CollisionHelper} from "../../../lib/utils/collision-helper";
 
 export interface StrokeStyle {
     color: string,

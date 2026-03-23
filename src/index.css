@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -6,7 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: var(--font-sans);
+  --font-heading: "Newsreader", "Georgia", serif;
   --font-sans: "Inter", Arial, sans-serif;
   --color-icons: #65558F;
   --color-low-contrast: #DFDFDF;
@@ -48,28 +48,86 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --color-page: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-sidebar-bg: var(--bg-sidebar);
+  --color-card-active: var(--bg-card-active);
+  --color-tag: var(--bg-tag);
+  --color-tag-active: var(--bg-tag-active);
+  --color-accent-green: var(--bg-accent-green);
+  --color-toolbar: var(--bg-toolbar);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-on-dark: var(--text-on-dark);
+  --color-text-green: var(--text-green);
+  --color-text-tag: var(--text-tag);
+  --color-text-brand: var(--text-brand);
+
+  --color-accent-dark: var(--accent-dark);
+  --color-accent-navy: var(--accent-navy);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-divider: var(--border-divider);
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #000000;
+  --background: #f7f9fb;
+  --foreground: #191c1e;
   --card: #ffffff;
-  --card-foreground: #000000;
+  --card-foreground: #191c1e;
   --popover: #ffffff;
-  --popover-foreground: #000000;
-  --primary: #DECDF5;
-  --primary-foreground: #65558F;
-  --secondary: #F8F1FF;
-  --secondary-foreground: #000000;
-  --muted: #f1f5f9;
+  --popover-foreground: #191c1e;
+  --primary: #1c2738;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f4f6;
+  --secondary-foreground: #191c1e;
+  --muted: #f2f4f6;
   --muted-foreground: #64748b;
-  --accent: #FF9A52;
-  --accent-foreground: #000000;
+  --accent: #6ffbbe;
+  --accent-foreground: #005236;
   --destructive: #ef4444;
-  --border: #DFDFDF;
-  --input: #DFDFDF;
-  --ring: #DECDF5;
+  --border: rgba(195, 199, 202, 0.2);
+  --input: #e0e3e5;
+  --ring: #1c2738;
   --radius: 0.5rem;
+
+  /* Theme colors — light mode */
+  --bg-page: #f7f9fb;
+  --bg-surface: #f2f4f6;
+  --bg-sidebar: #e0e3e5;
+  --bg-card: #ffffff;
+  --bg-card-active: #ffffff;
+  --bg-tag: #d0e1fb;
+  --bg-tag-active: #1c2738;
+  --bg-input: #f2f4f6;
+  --bg-accent-green: #6ffbbe;
+  --bg-toolbar: rgba(255, 255, 255, 0.8);
+
+  --text-primary: #191c1e;
+  --text-secondary: #43474a;
+  --text-muted: #64748b;
+  --text-on-dark: #ffffff;
+  --text-green: #005236;
+  --text-tag: #54647a;
+  --text-brand: #2f3e46;
+
+  --accent-dark: #1c2738;
+  --accent-navy: #2f3e46;
+
+  --border-subtle: rgba(195, 199, 202, 0.2);
+  --border-divider: rgba(195, 199, 202, 0.3);
+
+  --shadow-toolbar: 0px 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* Dark mode — supply colors here to enable */
+.dark {
+  /* --bg-page: ...; */
+  /* --text-primary: ...; */
+  /* etc. */
 }
 
 @layer base {
@@ -78,12 +136,14 @@
   }
 
   body {
-    @apply font-sans bg-background text-foreground;
+    @apply font-sans bg-page text-text-primary;
     margin: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    font-size: 18px;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   :root {

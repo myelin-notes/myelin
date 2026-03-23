@@ -1,5 +1,5 @@
-import {ISerializable} from "./ISerializable";
-import {BinaryReader, BinaryWriter} from "./BinaryHelper";
+import {ISerializable} from "./binary-helper";
+import {BinaryReader, BinaryWriter} from "./binary-helper";
 
 export class UndoableState<T> implements ISerializable {
 

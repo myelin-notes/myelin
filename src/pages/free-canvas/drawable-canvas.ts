@@ -1,15 +1,15 @@
-import {StateMachine} from "../utils/StateMachine";
-import {DrawableElement} from "./elements/DrawableElement";
-import {UndoableState} from "../utils/UndoRedo";
-import {PenTool} from "./tools/PenTool";
-import {ITool} from "./tools/ITool";
-import {EraserTool} from "./tools/EraserTool";
-import {ISerializable} from "../utils/ISerializable";
-import {BinaryReader, BinaryWriter} from "../utils/BinaryHelper";
-import {DrawableElementRegistry} from "./elements/DrawableElementRegistry";
+import {StateMachine} from "../../lib/utils/state-machine";
+import {DrawableElement} from "./elements/drawable-element";
+import {UndoableState} from "../../lib/utils/undo-redo";
+import {PenTool} from "./tools/pen-tool";
+import {ITool} from "./tools/tool";
+import {EraserTool} from "./tools/eraser-tool";
+import {ISerializable} from "../../lib/utils/binary-helper";
+import {BinaryReader, BinaryWriter} from "../../lib/utils/binary-helper";
+import {DrawableElementRegistry} from "./elements/drawable-element-registry";
 import ElementType = DrawableElementRegistry.ElementType;
-import {HighlighterTool} from "./tools/HighlighterTool";
-import {SelectTool} from "./tools/SelectTool";
+import {HighlighterTool} from "./tools/highlighter-tool";
+import {SelectTool} from "./tools/select-tool";
 
 export type Vector2 = { x: number, y: number };
 

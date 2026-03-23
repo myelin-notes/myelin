@@ -1,5 +1,5 @@
-import {Stroke} from "./Stroke";
-import {DrawableElement} from "./DrawableElement";
+import {Stroke} from "./stroke";
+import {DrawableElement} from "./drawable-element";
 
 export namespace DrawableElementRegistry {
     export const enum ElementType {

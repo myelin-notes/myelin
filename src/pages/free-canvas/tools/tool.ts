@@ -1,4 +1,4 @@
-import {DrawableCanvas, Vector2} from "../DrawableCanvas";
+import {DrawableCanvas, Vector2} from "../drawable-canvas";
 import type {LucideIcon} from "lucide-react";
 
 export type SvgIcon = LucideIcon;

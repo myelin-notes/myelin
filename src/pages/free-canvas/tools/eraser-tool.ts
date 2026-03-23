@@ -1,5 +1,5 @@
-import {ITool, SvgIcon} from "./ITool";
-import {DrawableCanvas, Vector2} from "../DrawableCanvas";
+import {ITool, SvgIcon} from "./tool";
+import {DrawableCanvas, Vector2} from "../drawable-canvas";
 import { Eraser as EraserIcon } from "lucide-react";
 
 export class EraserTool implements ITool {

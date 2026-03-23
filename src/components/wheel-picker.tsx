@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react";
-import type { SvgIcon } from "@/ts/canvas/tools/ITool";
+import type { SvgIcon } from "@/pages/free-canvas/tools/tool";
 
 const CENTER_ZONE = 40;
 

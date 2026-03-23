@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { DrawableCanvas } from "@/ts/canvas/DrawableCanvas";
-import { ITool } from "@/ts/canvas/tools/ITool";
-import { WheelPicker, WheelPickerHandle, WheelItem } from "@/components/WheelPicker";
-import { FileSystem } from "@/ts/utils/FileSystem";
+import { DrawableCanvas } from "@/pages/free-canvas/drawable-canvas";
+import { ITool } from "@/pages/free-canvas/tools/tool";
+import { WheelPicker, WheelPickerHandle, WheelItem } from "@/components/wheel-picker";
+import { FileSystem } from "@/lib/utils/file-system";
 import { BaseDirectory } from "@tauri-apps/api/path";
 import {
   Tooltip,
@@ -29,7 +29,7 @@ function toolToWheelItem(
   };
 }
 
-export function FreeCanvas() {
+export function CanvasView() {
   const params = useParams();
   const path = params["*"]?.split("/").filter(Boolean) ?? [];
   const navigate = useNavigate();

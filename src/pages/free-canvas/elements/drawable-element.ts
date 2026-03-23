@@ -1,7 +1,7 @@
-import {Vector2} from "../DrawableCanvas";
-import {ISerializable} from "../../utils/ISerializable";
-import {BinaryReader, BinaryWriter} from "../../utils/BinaryHelper";
-import {DrawableElementRegistry} from "./DrawableElementRegistry";
+import {Vector2} from "../drawable-canvas";
+import {ISerializable} from "../../../lib/utils/binary-helper";
+import {BinaryReader, BinaryWriter} from "../../../lib/utils/binary-helper";
+import {DrawableElementRegistry} from "./drawable-element-registry";
 import ElementType = DrawableElementRegistry.ElementType;
 
 export const PRIMARY_COLOR = '#DECDF5';
