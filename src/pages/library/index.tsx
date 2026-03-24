@@ -44,7 +44,7 @@ export function LibraryPage() {
       <Sidebar />
 
       <main className="ml-64 flex-1 overflow-y-auto px-12 pt-12 pb-12">
-        <h1 className="font-heading text-8xl font-extralight leading-[48px] text-text-primary">
+        <h1 className="font-heading text-5xl font-extralight leading-[48px] text-text-primary">
           Digital Library
         </h1>
 
