@@ -53,7 +53,7 @@ export function ExplorerTree({ currentPath, onNavigate, ref }: ExplorerTreeProps
     return (
       <div
         {...dropTargetProps}
-        className={`flex flex-col gap-1 rounded-lg min-h-[80px] transition-colors ${
+        className={`flex flex-col gap-1 rounded-xl min-h-[80px] transition-colors ${
           dragOver ? "bg-accent/10" : ""
         }`}
       >

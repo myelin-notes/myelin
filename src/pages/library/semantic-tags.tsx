@@ -25,7 +25,7 @@ export function SemanticTags() {
   const [activeTag, setActiveTag] = useState("Systems");
 
   return (
-    <div className="flex flex-col gap-6 rounded-lg bg-surface p-8">
+    <div className="flex flex-col gap-6 rounded-xl bg-surface p-8">
       {/* Heading */}
       <h3 className="font-heading text-xl font-normal text-text-primary leading-7">
         Semantic Tags
@@ -38,10 +38,10 @@ export function SemanticTags() {
             key={tag}
             onClick={() => setActiveTag(tag)}
             className={cn(
-              "rounded-xl px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer",
+              "rounded-xl px-3 py-1.5 text-xs font-medium transition-shadow cursor-pointer",
               tag === activeTag
                 ? "bg-tag-active text-text-on-dark shadow-md"
-                : "bg-card text-text-secondary hover:bg-card-active"
+                : "bg-card text-text-secondary hover:shadow-md"
             )}
           >
             #{tag}

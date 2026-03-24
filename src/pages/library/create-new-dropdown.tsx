@@ -56,7 +56,7 @@ export function CreateNewDropdown({ currentPath, onCreated }: CreateNewDropdownP
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-sm bg-accent-dark px-2.5 py-1 text-text-on-dark transition-opacity hover:opacity-85 cursor-pointer outline-none">
+        <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-lg bg-accent-dark px-2.5 py-1 text-text-on-dark transition-shadow hover:shadow-md cursor-pointer outline-none">
           <Plus className="size-3" strokeWidth={2.5} />
           <span className="text-xs font-medium">New</span>
         </DropdownMenuTrigger>

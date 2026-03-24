@@ -20,7 +20,7 @@ export function RecentCard({
   return (
     <div
       className={cn(
-        "relative flex flex-col rounded-lg p-6 h-[204px] overflow-hidden cursor-pointer transition-shadow hover:shadow-md",
+        "relative flex flex-col rounded-xl p-6 h-[204px] overflow-hidden cursor-pointer transition-shadow hover:shadow-md",
         featured ? "bg-card-active" : "bg-surface"
       )}
     >
