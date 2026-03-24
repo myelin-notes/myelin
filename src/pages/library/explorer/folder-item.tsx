@@ -46,7 +46,7 @@ export function FolderItem({ name, currentPath, onNavigate, onMoved }: FolderIte
             }}
             onDragStart={handleDragStart}
             {...dropTargetProps}
-            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 transition-shadow cursor-pointer ${
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 transition-shadow cursor-pointer ${
               dragOver
                 ? "bg-accent/15 ring-1 ring-accent/40"
                 : "hover:shadow-md"
