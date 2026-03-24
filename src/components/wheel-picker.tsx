@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react";
+import { useEffect, useRef, useState, useImperativeHandle, useCallback } from "react";
 import type { SvgIcon } from "@/pages/free-canvas/tools/tool";
 
 const CENTER_ZONE = 40;
@@ -15,14 +15,14 @@ export interface WheelPickerHandle {
 }
 
 interface WheelPickerProps {
+  ref?: React.Ref<WheelPickerHandle>;
   radius: number;
   items: WheelItem[];
   children?: React.ReactNode;
   onCenterClicked?: () => void;
 }
 
-export const WheelPicker = forwardRef<WheelPickerHandle, WheelPickerProps>(
-  ({ radius, items, children, onCenterClicked }, ref) => {
+export function WheelPicker({ radius, items, children, onCenterClicked, ref }: WheelPickerProps) {
     const groupRef = useRef<HTMLDivElement>(null);
     const [visible, setVisible] = useState(false);
     const centerPosRef = useRef([0, 0]);
@@ -135,5 +135,4 @@ export const WheelPicker = forwardRef<WheelPickerHandle, WheelPickerProps>(
         )}
       </div>
     );
-  }
-);
+}

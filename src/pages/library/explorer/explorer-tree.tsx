@@ -1,25 +1,23 @@
-import { useEffect, useState, useCallback, useImperativeHandle, forwardRef, useRef } from "react";
+import { useEffect, useState, useCallback, useImperativeHandle } from "react";
 import { FileSystem, MyelinFile } from "@/lib/utils/file-system";
-import { join } from "@tauri-apps/api/path";
 import { FolderItem } from "./folder-item";
 import { FileItem } from "./file-item";
+import { useDropTarget } from "./use-drop-target";
 
 export interface ExplorerTreeHandle {
   reload: () => Promise<void>;
 }
 
 interface ExplorerTreeProps {
+  ref?: React.Ref<ExplorerTreeHandle>;
   currentPath: string[];
   onNavigate: (path: string[]) => void;
 }
 
-export const ExplorerTree = forwardRef<ExplorerTreeHandle, ExplorerTreeProps>(
-  function ExplorerTree({ currentPath, onNavigate }, ref) {
+export function ExplorerTree({ currentPath, onNavigate, ref }: ExplorerTreeProps) {
     const [directories, setDirectories] = useState<string[]>([]);
     const [files, setFiles] = useState<MyelinFile[]>([]);
     const [loading, setLoading] = useState(true);
-    const [dragOver, setDragOver] = useState(false);
-    const dragCountRef = useRef(0);
 
     const reload = useCallback(async () => {
       setLoading(true);
@@ -39,46 +37,10 @@ export const ExplorerTree = forwardRef<ExplorerTreeHandle, ExplorerTreeProps>(
       reload();
     }, [reload]);
 
-    const handleDragOver = (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes("application/myelin-item")) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-    };
-
-    const handleDragEnter = (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes("application/myelin-item")) return;
-      e.preventDefault();
-      dragCountRef.current++;
-      setDragOver(true);
-    };
-
-    const handleDragLeave = () => {
-      dragCountRef.current--;
-      if (dragCountRef.current === 0) setDragOver(false);
-    };
-
-    const handleDrop = async (e: React.DragEvent) => {
-      e.preventDefault();
-      dragCountRef.current = 0;
-      setDragOver(false);
-
-      const raw = e.dataTransfer.getData("application/myelin-item");
-      if (!raw) return;
-
-      const { segments } = JSON.parse(raw) as { segments: string[]; isDirectory: boolean };
-
-      // Don't drop into the same directory it's already in
-      if (segments.slice(0, -1).join("/") === currentPath.join("/")) return;
-
-      try {
-        const fromPath = await join(...segments);
-        const toDir = await join(...currentPath);
-        await FileSystem.moveItem(fromPath, toDir);
-        reload();
-      } catch (err) {
-        console.error("Failed to move item:", err);
-      }
-    };
+    const { dragOver, dropTargetProps } = useDropTarget({
+      targetPath: currentPath,
+      onMoved: reload,
+    });
 
     if (loading) {
       return (
@@ -90,10 +52,7 @@ export const ExplorerTree = forwardRef<ExplorerTreeHandle, ExplorerTreeProps>(
 
     return (
       <div
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        {...dropTargetProps}
         className={`flex flex-col gap-1 rounded-lg min-h-[80px] transition-colors ${
           dragOver ? "bg-accent/10" : ""
         }`}
@@ -108,12 +67,11 @@ export const ExplorerTree = forwardRef<ExplorerTreeHandle, ExplorerTreeProps>(
           />
         ))}
         {files.map((file) => (
-          <FileItem key={file.name} file={file} path={currentPath} />
+          <FileItem key={file.name} file={file} path={currentPath} onChanged={reload} />
         ))}
         {directories.length === 0 && files.length === 0 && (
           <span className="px-4 py-3 text-sm text-text-muted">No files yet</span>
         )}
       </div>
     );
-  }
-);
+}
