@@ -1,10 +1,12 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { FolderInput, ArrowDownAZ, Search, ChevronRight } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { RecentCard } from "./recent-card";
 import { ExplorerTree, ExplorerTreeHandle } from "./explorer/explorer-tree";
 import { SemanticTags } from "./semantic-tags";
 import { CreateNewDropdown } from "./create-new-dropdown";
+import { FileSystem } from "@/lib/utils/file-system";
+import { join } from "@tauri-apps/api/path";
 
 
 const recentItems = [
@@ -38,6 +40,72 @@ const recentItems = [
 export function LibraryPage() {
   const explorerRef = useRef<ExplorerTreeHandle>(null);
   const [currentPath, setCurrentPath] = useState<string[]>(["Home"]);
+  const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(null);
+
+  const clearDragTimer = useCallback(() => {
+    if (dragTimerRef.current) {
+      clearTimeout(dragTimerRef.current);
+      dragTimerRef.current = null;
+    }
+  }, []);
+
+  const handleBreadcrumbDrop = useCallback(
+    async (e: React.DragEvent, targetPath: string[]) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearDragTimer();
+      setBreadcrumbDragIdx(null);
+
+      const raw = e.dataTransfer.getData("application/myelin-item");
+      if (!raw) return;
+
+      const { segments } = JSON.parse(raw) as { segments: string[]; isDirectory: boolean };
+
+      // Don't drop into the same directory
+      if (segments.slice(0, -1).join("/") === targetPath.join("/")) return;
+
+      try {
+        const fromPath = await join(...segments);
+        const toDir = await join(...targetPath);
+        await FileSystem.moveItem(fromPath, toDir);
+        setCurrentPath(targetPath);
+        explorerRef.current?.reload();
+      } catch (err) {
+        console.error("Failed to move item:", err);
+      }
+    },
+    [clearDragTimer]
+  );
+
+  const makeBreadcrumbDragHandlers = useCallback(
+    (targetPath: string[], idx: number) => ({
+      onDragOver: (e: React.DragEvent) => {
+        if (!e.dataTransfer.types.includes("application/myelin-item")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+      },
+      onDragEnter: (e: React.DragEvent) => {
+        if (!e.dataTransfer.types.includes("application/myelin-item")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setBreadcrumbDragIdx(idx);
+        clearDragTimer();
+        dragTimerRef.current = setTimeout(() => {
+          setCurrentPath(targetPath);
+          setBreadcrumbDragIdx(null);
+        }, 800);
+      },
+      onDragLeave: (e: React.DragEvent) => {
+        e.stopPropagation();
+        setBreadcrumbDragIdx((prev) => (prev === idx ? null : prev));
+        clearDragTimer();
+      },
+      onDrop: (e: React.DragEvent) => handleBreadcrumbDrop(e, targetPath),
+    }),
+    [clearDragTimer, handleBreadcrumbDrop]
+  );
 
   return (
     <div className="relative flex h-full w-full bg-page">
@@ -79,7 +147,12 @@ export function LibraryPage() {
               <div className="flex items-center gap-2">
                 <h3
                   onClick={() => setCurrentPath(["Home"])}
-                  className="font-heading text-2xl font-normal leading-8 text-text-primary cursor-pointer hover:text-text-secondary transition-colors"
+                  className={`font-heading text-2xl font-normal leading-8 cursor-pointer transition-colors ${
+                    breadcrumbDragIdx === -1
+                      ? "text-accent-foreground"
+                      : "text-text-primary hover:text-text-secondary"
+                  }`}
+                  {...makeBreadcrumbDragHandlers(["Home"], -1)}
                 >
                   Explorer
                 </h3>
@@ -88,16 +161,21 @@ export function LibraryPage() {
                     <ChevronRight className="size-3.5 shrink-0" />
                     {currentPath.slice(1).map((segment, i) => {
                       const isLast = i === currentPath.length - 2;
+                      const targetPath = currentPath.slice(0, i + 2);
+                      const isDragTarget = breadcrumbDragIdx === i;
                       return (
                         <span key={i} className="flex items-center gap-1">
                           {i > 0 && <ChevronRight className="size-3 shrink-0 text-text-muted" />}
                           <button
-                            onClick={() => setCurrentPath(currentPath.slice(0, i + 2))}
-                            className={`transition-colors ${
-                              isLast
-                                ? "text-text-secondary font-medium"
-                                : "text-text-muted hover:text-text-secondary cursor-pointer"
+                            onClick={() => setCurrentPath(targetPath)}
+                            className={`rounded px-1 transition-colors ${
+                              isDragTarget
+                                ? "bg-accent/15 text-accent-foreground ring-1 ring-accent/40"
+                                : isLast
+                                  ? "text-text-secondary font-medium"
+                                  : "text-text-muted hover:text-text-secondary cursor-pointer"
                             }`}
+                            {...makeBreadcrumbDragHandlers(targetPath, i)}
                           >
                             {segment}
                           </button>
