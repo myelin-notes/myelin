@@ -130,8 +130,13 @@ export class DrawableCanvas implements ISerializable {
     }
 
     public redraw(deltaTime: number) {
+        const dpr = window.devicePixelRatio || 1;
+        const logicalW = this.canvas.width / dpr;
+        const logicalH = this.canvas.height / dpr;
+
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.ctx.fillStyle = this.bgColor;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.fillRect(0, 0, logicalW, logicalH);
 
         // Draw dot grid
         if (this.dotPattern) {
@@ -140,10 +145,10 @@ export class DrawableCanvas implements ISerializable {
             this.ctx.translate(this.offset.x, this.offset.y);
             this.ctx.fillStyle = this.dotPattern;
             this.ctx.fillRect(
-                -this.offset.x - this.canvas.width / this._zoom,
-                -this.offset.y - this.canvas.height / this._zoom,
-                this.canvas.width * 3 / this._zoom,
-                this.canvas.height * 3 / this._zoom,
+                -this.offset.x - logicalW / this._zoom,
+                -this.offset.y - logicalH / this._zoom,
+                logicalW * 3 / this._zoom,
+                logicalH * 3 / this._zoom,
             );
             this.ctx.restore();
         }
@@ -182,6 +187,14 @@ export class DrawableCanvas implements ISerializable {
             this.toolSelected.update(this, event, this.getPoint(event));
         });
 
+        this.state.addStart(InteractState.Moving, () => {
+            this.canvas.style.cursor = 'grabbing';
+        });
+
+        this.state.addEnd(InteractState.Moving, () => {
+            this.canvas.style.cursor = 'default';
+        });
+
         this.state.addUpdate(InteractState.Moving, (event: PointerEvent) => {
             const newPos = {
                 x: event.movementX / this._zoom,
@@ -201,9 +214,10 @@ export class DrawableCanvas implements ISerializable {
             const newZoom = prevZoom + evt.deltaY * -0.005;
             this._zoom = Math.min(3, Math.max(0.2, newZoom));
 
+            const dpr = window.devicePixelRatio || 1;
             const canvasCenter = {
-                x: this.canvas.width / 2,
-                y: this.canvas.height / 2,
+                x: this.canvas.width / dpr / 2,
+                y: this.canvas.height / dpr / 2,
             };
 
             const worldCenterBeforeZoom = {
@@ -327,12 +341,20 @@ export class DrawableCanvas implements ISerializable {
     }
 
     private resizeCanvas(width: number, height: number) {
-        this.canvas.width = width;
-        this.canvas.height = height;
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+        this.canvas.style.width = width + "px";
+        this.canvas.style.height = height + "px";
     }
 
     public setSpaceDown(value: boolean) {
         this.spaceDown = value;
+        if (value && this.state.current === InteractState.Idle) {
+            this.canvas.style.cursor = 'grab';
+        } else if (!value && this.state.current === InteractState.Idle) {
+            this.canvas.style.cursor = 'default';
+        }
     }
 
     public undo() {

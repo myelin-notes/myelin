@@ -9,6 +9,8 @@ export class StateMachine<T extends number> {
     private readonly onUpdate: Subscribers<T>;
     private readonly onEnd: Subscribers<T>;
 
+    public get current(): T { return this.currentState; }
+
     public constructor(starting: T) {
         this.currentState = starting;
         this.onStart = {};

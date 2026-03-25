@@ -164,14 +164,15 @@ export abstract class DrawableElement implements ISerializable {
         return this.isOverLocal(localX, localY, localRadius, ctx);
     }
 
-    /** Handle corner positions in world space */
+    /** Handle corner positions in world space (includes selection padding) */
     public getHandles(): Vector2[] {
         const box = this.boundingBox;
+        const p = SELECTION_PADDING;
         return [
-            { x: box.x, y: box.y },
-            { x: box.right, y: box.y },
-            { x: box.x, y: box.bottom },
-            { x: box.right, y: box.bottom },
+            { x: box.x - p, y: box.y - p },
+            { x: box.right + p, y: box.y - p },
+            { x: box.x - p, y: box.bottom + p },
+            { x: box.right + p, y: box.bottom + p },
         ];
     }
 
