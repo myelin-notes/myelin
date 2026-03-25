@@ -19,6 +19,7 @@ export class DrawableCanvas implements ISerializable {
     private readonly canvas: HTMLCanvasElement;
     private readonly state: StateMachine<InteractState>;
     public readonly tools: ITool[];
+    private dotPattern: CanvasPattern | null = null;
 
     private offset: Vector2 = {x: 0, y: 0};
     private _zoom: number = 1;
@@ -45,6 +46,7 @@ export class DrawableCanvas implements ISerializable {
         this.initEventListeners(canvas);
         this.initStates();
         this.resizeCanvas(window.innerWidth, window.innerHeight);
+        this.buildDotPattern();
     }
 
     public setOnZoomChange(callback: (zoom: number) => void) {
@@ -52,8 +54,24 @@ export class DrawableCanvas implements ISerializable {
     }
 
     public redraw(deltaTime: number) {
-        this.ctx.fillStyle = "white";
+        this.ctx.fillStyle = "#f7f9fb";
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Draw dot grid
+        if (this.dotPattern) {
+            this.ctx.save();
+            this.ctx.scale(this._zoom, this._zoom);
+            this.ctx.translate(this.offset.x, this.offset.y);
+            this.ctx.fillStyle = this.dotPattern;
+            this.ctx.fillRect(
+                -this.offset.x - this.canvas.width / this._zoom,
+                -this.offset.y - this.canvas.height / this._zoom,
+                this.canvas.width * 3 / this._zoom,
+                this.canvas.height * 3 / this._zoom,
+            );
+            this.ctx.restore();
+        }
+
         this.ctx.save();
         this.ctx.scale(this._zoom, this._zoom);
         this.ctx.translate(this.offset.x, this.offset.y);
@@ -102,7 +120,7 @@ export class DrawableCanvas implements ISerializable {
     private initEventListeners(canvas: HTMLCanvasElement) {
         canvas.addEventListener("wheel", evt => {
             const prevZoom = this._zoom;
-            const newZoom = prevZoom + evt.deltaY * -0.001;
+            const newZoom = prevZoom + evt.deltaY * -0.005;
             this._zoom = Math.min(3, Math.max(0.2, newZoom));
 
             const canvasCenter = {
@@ -205,6 +223,20 @@ export class DrawableCanvas implements ISerializable {
             if (rect.top < minY) minY = rect.top;
             if (rect.bottom > maxY) maxY = rect.bottom;
 		});
+    }
+
+    private buildDotPattern() {
+        const spacing = 24;
+        const dotRadius = 1;
+        const patternCanvas = document.createElement("canvas");
+        patternCanvas.width = spacing;
+        patternCanvas.height = spacing;
+        const pctx = patternCanvas.getContext("2d")!;
+        pctx.fillStyle = "rgba(195, 199, 202, 0.4)";
+        pctx.beginPath();
+        pctx.arc(spacing / 2, spacing / 2, dotRadius, 0, Math.PI * 2);
+        pctx.fill();
+        this.dotPattern = this.ctx.createPattern(patternCanvas, "repeat");
     }
 
     private resizeCanvas(width: number, height: number) {

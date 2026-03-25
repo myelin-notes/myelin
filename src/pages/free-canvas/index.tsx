@@ -28,6 +28,8 @@ function toolToWheelItem(
   };
 }
 
+const glassPanel = "backdrop-blur-xl bg-white/80 border border-white/50 rounded-xl shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)]";
+
 export function CanvasView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -129,37 +131,37 @@ export function CanvasView() {
   }, []);
 
   return (
-    <div className="bg-black w-full h-full overflow-hidden relative">
+    <div className="bg-page w-full h-full overflow-hidden relative">
       {/* Title bar */}
-      <div className="absolute left-4 top-4 bg-white rounded-lg shadow-md p-4 flex flex-row justify-center items-center gap-4 z-10">
+      <div className={`absolute left-6 top-6 ${glassPanel} px-4 py-3 flex items-center gap-3 z-10`}>
         <button onClick={back} className="bg-transparent p-0 border-none cursor-pointer">
-          <ChevronLeftIcon width={20} height={20} className="text-primary hover:text-icons transition-colors" />
+          <ChevronLeftIcon className="size-5 text-text-secondary hover:text-text-primary transition-colors" />
         </button>
-        <h2 className="text-base font-normal m-0">{fileName}</h2>
-        <span className="text-xs self-end -ml-2 text-low-contrast">Canvas</span>
+        <span className="h-4 w-px bg-border-divider" />
+        <h2 className="text-sm font-medium text-text-primary m-0">{fileName}</h2>
+        <span className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Canvas</span>
       </div>
 
       {/* Toolbar */}
       <TooltipProvider>
-        <div className="absolute top-4 right-1/2 translate-x-1/2 bg-white rounded-lg shadow-md p-4 flex flex-row items-center justify-center gap-4 z-10">
+        <div className={`absolute top-6 left-1/2 -translate-x-1/2 ${glassPanel} px-3 py-2 flex items-center gap-1 z-10`}>
           {canvasTools.map((tool, index) => {
             const Icon = tool.icon;
+            const isActive = selectedToolIndex === index;
             return (
               <Tooltip key={index}>
                 <TooltipTrigger
-                    className="bg-transparent p-0 border-none cursor-pointer"
+                    className={`p-2.5 rounded-lg border-none cursor-pointer transition-colors ${
+                      isActive
+                        ? "bg-accent-dark text-white"
+                        : "bg-transparent text-text-secondary hover:bg-black/5"
+                    }`}
                     onClick={() => {
                       drawableCanvasRef.current?.switchTool(index);
                       setSelectedToolIndex(index);
                     }}
                   >
-                    <Icon
-                      width="1.7em"
-                      height="1.7em"
-                      className={`transition-colors ${
-                        selectedToolIndex === index ? "text-icons" : "text-primary hover:text-icons"
-                      }`}
-                    />
+                    <Icon className="size-4" />
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   <p>{tool.label}</p>
@@ -174,14 +176,15 @@ export function CanvasView() {
       <canvas ref={canvasRef} className="w-full h-full block" />
 
       {/* Info panel */}
-      <div className="absolute left-4 bottom-4 bg-white rounded-lg shadow-md p-4 z-10">
-        <span className="text-sm">Zoom: {zoomLevel}%</span><br />
-        <span className="text-sm">FPS: {fps}</span>
+      <div className={`absolute right-6 bottom-6 ${glassPanel} px-4 py-3 z-10`}>
+        <span className="text-xs font-medium text-text-secondary">{zoomLevel}%</span>
+        <span className="mx-2 text-border-divider">|</span>
+        <span className="text-xs font-medium text-text-muted">{fps} fps</span>
       </div>
 
       {/* Wheel picker */}
       <WheelPicker ref={wheelRef} radius={100} items={tools}>
-        <XIcon width={16} height={16} className="text-icons" />
+        <XIcon className="size-4 text-white" />
       </WheelPicker>
     </div>
   );

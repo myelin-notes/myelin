@@ -111,7 +111,7 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
         {visible && (
           <div data-wheel-container className="relative left-0 top-0 animate-in fade-in duration-150">
             <button
-              className="center absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full aspect-square p-3 bg-secondary focus:bg-primary border-none outline-none cursor-pointer"
+              className="center absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-xl size-12 bg-accent-dark shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] border-none outline-none cursor-pointer flex items-center justify-center"
               onClick={onCenterClicked}
             >
               {children}
@@ -122,12 +122,12 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
               return (
                 <button
                   key={index}
-                  className="menu-btn absolute -translate-x-1/2 -translate-y-1/2 rounded-full aspect-square p-3 bg-secondary focus:bg-primary border-none outline-none cursor-pointer"
+                  className="group menu-btn absolute -translate-x-1/2 -translate-y-1/2 rounded-xl size-10 backdrop-blur-xl bg-white/80 border border-white/50 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1)] outline-none cursor-pointer flex items-center justify-center transition-colors focus:bg-accent-dark focus:border-transparent"
                   style={{ left: `${positions[index][0]}px`, top: `${positions[index][1]}px` }}
                   title={item.label}
                   onClick={item.command}
                 >
-                  <Icon className="text-icons" width="1.2em" height="1.2em" />
+                  <Icon className="size-4 text-text-secondary group-focus:text-white" />
                 </button>
               );
             })}

@@ -51,10 +51,10 @@ export function FolderItem({ id, name, tags, autoRename, onNavigate, onMoved }: 
               }}
               onDragStart={handleDragStart}
               {...dropTargetProps}
-              className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 transition-shadow cursor-pointer ${
+              className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 transition-colors cursor-pointer ${
                 dragOver
                   ? "bg-accent/15 ring-1 ring-accent/40"
-                  : "hover:shadow-md"
+                  : "hover:bg-black/5"
               }`}
             />
           }

@@ -147,7 +147,7 @@ export function LibraryPage() {
         {/* Explorer + Tags */}
         <section className="mt-12 grid grid-cols-12 gap-12">
           <div className="col-span-8 flex flex-col gap-8">
-            <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-1.5 transition-shadow hover:shadow-md">
+            <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-1.5 transition-colors hover:bg-black/5">
               <Search className="size-3.5 text-text-muted shrink-0" />
               <input
                 type="text"

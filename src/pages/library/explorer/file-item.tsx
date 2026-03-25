@@ -45,7 +45,7 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
                 if (!renaming) navigate(`/${file.fileType}/${file.id}`);
               }}
               onDragStart={handleDragStart}
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-2 transition-shadow hover:shadow-md cursor-pointer"
+              className="flex w-full items-center gap-3 rounded-lg px-4 py-2 transition-colors hover:bg-black/5 cursor-pointer"
             />
           }
         >
