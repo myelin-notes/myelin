@@ -1,9 +1,6 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, FolderPlus, FilePlus, LayoutGrid } from "lucide-react";
-import { mkdir, create } from "@tauri-apps/plugin-fs";
-import { BaseDirectory } from "@tauri-apps/plugin-fs";
-import { join } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { FileSystem, FileType } from "@/lib/utils/file-system";
 import {
@@ -26,32 +23,27 @@ import { Button } from "@/components/ui/button";
 const itemClass = "gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary";
 
 interface CreateNewDropdownProps {
-  currentPath: string[];
+  currentFolderId: string | null;
   onCreated?: () => void;
 }
 
-export function CreateNewDropdown({ currentPath, onCreated }: CreateNewDropdownProps) {
+export function CreateNewDropdown({ currentFolderId, onCreated }: CreateNewDropdownProps) {
   const navigate = useNavigate();
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [folderName, setFolderName] = useState("Unnamed Folder");
 
-  const pathJoined = currentPath.join("/");
-
   const createFolder = useCallback(async () => {
-    const path = await join(...currentPath, folderName);
-    await mkdir(path, { baseDir: BaseDirectory.AppData });
+    await FileSystem.createFolder(folderName, currentFolderId);
     toast.success("Folder created");
     setFolderDialogOpen(false);
     onCreated?.();
-  }, [folderName, pathJoined, onCreated]);
+  }, [folderName, currentFolderId, onCreated]);
 
   const createFile = useCallback(async (title: string, type: FileType) => {
-    const dirPath = await join(...currentPath);
-    const name = await FileSystem.getUniqueFileName(title, type, dirPath);
-    const file = await create(await join(dirPath, name), { baseDir: BaseDirectory.AppData });
-    await file.close();
-    navigate(`/${type}/${pathJoined}/${name}`);
-  }, [navigate, pathJoined]);
+    const name = await FileSystem.getUniqueFileName(title, currentFolderId);
+    const id = await FileSystem.createFile(name, type, currentFolderId);
+    navigate(`/${type}/${id}`);
+  }, [navigate, currentFolderId]);
 
   return (
     <>

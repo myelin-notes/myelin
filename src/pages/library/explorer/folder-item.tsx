@@ -8,15 +8,13 @@ import { useDropTarget } from "./use-drop-target";
 import { ItemContextMenu } from "./item-context-menu";
 
 interface FolderItemProps {
+  id: string;
   name: string;
-  currentPath: string[];
   onNavigate: () => void;
   onMoved: () => void;
 }
 
-export function FolderItem({ name, currentPath, onNavigate, onMoved }: FolderItemProps) {
-  const folderPath = [...currentPath, name];
-
+export function FolderItem({ id, name, onNavigate, onMoved }: FolderItemProps) {
   const {
     renaming,
     startRenaming,
@@ -24,14 +22,13 @@ export function FolderItem({ name, currentPath, onNavigate, onMoved }: FolderIte
     handleDragStart,
     renameInputProps,
   } = useExplorerItem({
+    nodeId: id,
     name,
-    segments: folderPath,
-    isDirectory: true,
     onChanged: onMoved,
   });
 
   const { dragOver, dropTargetProps } = useDropTarget({
-    targetPath: folderPath,
+    targetFolderId: id,
     onMoved,
   });
 

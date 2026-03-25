@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useImperativeHandle } from "react";
-import { FileSystem, MyelinFile } from "@/lib/utils/file-system";
+import { FileSystem, VFSFileNode, VFSFolderNode } from "@/lib/utils/file-system";
 import { FolderItem } from "./folder-item";
 import { FileItem } from "./file-item";
 import { useDropTarget } from "./use-drop-target";
@@ -10,26 +10,26 @@ export interface ExplorerTreeHandle {
 
 interface ExplorerTreeProps {
   ref?: React.Ref<ExplorerTreeHandle>;
-  currentPath: string[];
-  onNavigate: (path: string[]) => void;
+  currentFolderId: string | null;
+  onNavigate: (folderId: string) => void;
 }
 
-export function ExplorerTree({ currentPath, onNavigate, ref }: ExplorerTreeProps) {
-    const [directories, setDirectories] = useState<string[]>([]);
-    const [files, setFiles] = useState<MyelinFile[]>([]);
+export function ExplorerTree({ currentFolderId, onNavigate, ref }: ExplorerTreeProps) {
+    const [directories, setDirectories] = useState<VFSFolderNode[]>([]);
+    const [files, setFiles] = useState<VFSFileNode[]>([]);
     const [loading, setLoading] = useState(true);
 
     const reload = useCallback(async () => {
       setLoading(true);
       try {
-        const [dirs, fs] = await FileSystem.loadDirectory(currentPath);
+        const [dirs, fs] = await FileSystem.loadDirectory(currentFolderId);
         setDirectories(dirs);
         setFiles(fs);
       } catch (err) {
         console.error("Failed to load directory:", err);
       }
       setLoading(false);
-    }, [currentPath.join("/")]);
+    }, [currentFolderId]);
 
     useImperativeHandle(ref, () => ({ reload }), [reload]);
 
@@ -38,7 +38,7 @@ export function ExplorerTree({ currentPath, onNavigate, ref }: ExplorerTreeProps
     }, [reload]);
 
     const { dragOver, dropTargetProps } = useDropTarget({
-      targetPath: currentPath,
+      targetFolderId: currentFolderId,
       onMoved: reload,
     });
 
@@ -59,15 +59,15 @@ export function ExplorerTree({ currentPath, onNavigate, ref }: ExplorerTreeProps
       >
         {directories.map((dir) => (
           <FolderItem
-            key={dir}
-            name={dir}
-            currentPath={currentPath}
-            onNavigate={() => onNavigate([...currentPath, dir])}
+            key={dir.id}
+            id={dir.id}
+            name={dir.name}
+            onNavigate={() => onNavigate(dir.id)}
             onMoved={reload}
           />
         ))}
         {files.map((file) => (
-          <FileItem key={file.name} file={file} path={currentPath} onChanged={reload} />
+          <FileItem key={file.id} file={file} onChanged={reload} />
         ))}
         {directories.length === 0 && files.length === 0 && (
           <span className="px-4 py-3 text-sm text-text-muted">No files yet</span>

@@ -3,192 +3,410 @@ import {
     exists,
     mkdir,
     open,
-    readDir,
     readFile,
+    readTextFile,
     remove,
-    rename,
-    stat,
-    writeFile
+    writeFile,
+    writeTextFile,
 } from "@tauri-apps/plugin-fs";
-import {appCacheDir, basename, dirname, extname, join} from "@tauri-apps/api/path";
-import {convertFileSrc, invoke} from "@tauri-apps/api/core";
-import {ISerializable} from "./binary-helper";
-import {BinaryReader, BinaryWriter} from "./binary-helper";
+import { appCacheDir, appDataDir, join } from "@tauri-apps/api/path";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { ISerializable } from "./binary-helper";
+import { BinaryReader, BinaryWriter } from "./binary-helper";
 
 export const FileTypes = ['mcanvas', 'mdoc'] as const;
 export type FileType = typeof FileTypes[number];
 
-export interface MyelinFile {
-    preview: string;
+export interface VFSFileNode {
+    id: string;
     name: string;
-    type: FileType;
+    type: 'file';
+    fileType: FileType;
+    parentId: string | null;
+    tags: string[];
 }
 
+export interface VFSFolderNode {
+    id: string;
+    name: string;
+    type: 'folder';
+    parentId: string | null;
+    children: string[];
+    tags: string[];
+}
+
+export type VFSNode = VFSFileNode | VFSFolderNode;
+
+export interface VFSManifest {
+    version: number;
+    children: string[];
+    nodes: Record<string, VFSNode>;
+}
+
+function generateId(): string {
+    return crypto.randomUUID();
+}
+
+const CURRENT_MANIFEST_VERSION = 1;
+const MANIFEST_PATH = "manifest.json";
+const FILES_DIR = "files";
+const FILE_EXT = ".myelin";
+
 export namespace FileSystem {
-    export async function loadDirectory(path: string[]): Promise<[string[], MyelinFile[]]> {
-        const pathJoined = await join(...path);
+    let _manifest: VFSManifest | null = null;
 
-        if (!await exists("", {baseDir: BaseDirectory.AppData})) {
-            await mkdir("", {baseDir: BaseDirectory.AppData});
+    async function ensureDirs() {
+        if (!await exists("", { baseDir: BaseDirectory.AppData })) {
+            await mkdir("", { baseDir: BaseDirectory.AppData });
+        }
+        if (!await exists(FILES_DIR, { baseDir: BaseDirectory.AppData })) {
+            await mkdir(FILES_DIR, { baseDir: BaseDirectory.AppData });
+        }
+        if (!await exists("Thumbnails", { baseDir: BaseDirectory.AppCache })) {
+            await mkdir("Thumbnails", { baseDir: BaseDirectory.AppCache, recursive: true });
+        }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function migrate(parsed: any): VFSManifest {
+        return parsed as VFSManifest;
+    }
+
+    async function loadManifest(): Promise<VFSManifest> {
+        if (_manifest) return _manifest;
+
+        await ensureDirs();
+
+        if (await exists(MANIFEST_PATH, { baseDir: BaseDirectory.AppData })) {
+            const text = await readTextFile(MANIFEST_PATH, { baseDir: BaseDirectory.AppData });
+            const parsed = JSON.parse(text);
+            _manifest = migrate(parsed);
+            await saveManifest(_manifest);
+            return _manifest;
         }
 
-        if (!await exists("Home", {baseDir: BaseDirectory.AppData})) {
-            await mkdir("Home", {baseDir: BaseDirectory.AppData});
-        }
+        const manifest: VFSManifest = { version: CURRENT_MANIFEST_VERSION, children: [], nodes: {} };
+        await saveManifest(manifest);
+        _manifest = manifest;
+        return manifest;
+    }
 
-        const result = await readDir(pathJoined, {
+    async function saveManifest(manifest: VFSManifest) {
+        _manifest = manifest;
+        await writeTextFile(MANIFEST_PATH, JSON.stringify(manifest, null, 2), {
             baseDir: BaseDirectory.AppData,
         });
+    }
 
-        const dirs: string[] = [];
-        const files: MyelinFile[] = [];
+    function getChildrenIds(manifest: VFSManifest, folderId: string | null): string[] {
+        if (folderId === null) return manifest.children;
+        const folder = manifest.nodes[folderId];
+        if (!folder || folder.type !== 'folder') return [];
+        return folder.children;
+    }
 
-        for (const entry of result) {
-            if (entry.isSymlink) {
-                continue;
-            }
-
-            if (entry.isDirectory) {
-                dirs.push(entry.name);
-                continue;
-            }
-
-            if (entry.isFile) {
-                const ext = await extname(entry.name);
-                let name = await basename(entry.name, ext);
-                name = name.slice(0, name.length - 1);
-
-                if (!isValidFileType(ext)) {
-                    continue;
-                }
-
-                files.push(await parseFile(path, name, ext));
+    function addChild(manifest: VFSManifest, parentId: string | null, childId: string) {
+        if (parentId === null) {
+            manifest.children.push(childId);
+        } else {
+            const parent = manifest.nodes[parentId];
+            if (parent && parent.type === 'folder') {
+                parent.children.push(childId);
             }
         }
-
-        return [dirs, files];
     }
 
-    export async function deleteFileOrFolder(path: string[]) {
-        const url = await join(...path);
-        const isDir = (await stat(url, { baseDir: BaseDirectory.AppData })).isDirectory;
-        await remove(url, {baseDir: BaseDirectory.AppData, recursive: true});
-        const thumbnailUrl = await join("Thumbnails", isDir ? await join(...path) : await join(...path) + ".png");
-
-        if (await exists(thumbnailUrl, { baseDir: BaseDirectory.AppCache })) {
-            await remove(thumbnailUrl, { baseDir: BaseDirectory.AppCache, recursive: true });
+    function removeChild(manifest: VFSManifest, parentId: string | null, childId: string) {
+        if (parentId === null) {
+            manifest.children = manifest.children.filter(id => id !== childId);
+        } else {
+            const parent = manifest.nodes[parentId];
+            if (parent && parent.type === 'folder') {
+                parent.children = parent.children.filter(id => id !== childId);
+            }
         }
     }
 
-    export async function renameFileOrFolder(path: string, to: string) {
-        const pathTo = await dirname(path);
-        const j = await join(pathTo, to);
+    export async function getManifest(): Promise<VFSManifest> {
+        return loadManifest();
+    }
 
-        if ((await stat(path, {baseDir: BaseDirectory.AppData})).isFile) {
-            const ext = await extname(path);
-            await rename(path, `${j}.${ext}`, {
-                oldPathBaseDir: BaseDirectory.AppData,
-                newPathBaseDir: BaseDirectory.AppData
-            });
+    export function getNode(manifest: VFSManifest, id: string): VFSNode | undefined {
+        return manifest.nodes[id];
+    }
 
-            await rename(await join("Thumbnails", path + ".png"), await join("Thumbnails", `${j}.${ext}.png`), {
-                oldPathBaseDir: BaseDirectory.AppCache,
-                newPathBaseDir: BaseDirectory.AppCache
-            })
-            return;
+    export function getChildren(manifest: VFSManifest, folderId: string | null): VFSNode[] {
+        return getChildrenIds(manifest, folderId).map(id => manifest.nodes[id]).filter(Boolean);
+    }
+
+    export function getFolderChain(manifest: VFSManifest, folderId: string | null): VFSFolderNode[] {
+        if (folderId === null) return [];
+        const chain: VFSFolderNode[] = [];
+        let current: VFSNode | undefined = manifest.nodes[folderId];
+        while (current && current.type === 'folder') {
+            chain.unshift(current);
+            if (current.parentId === null) break;
+            current = manifest.nodes[current.parentId];
+        }
+        return chain;
+    }
+
+    export async function loadDirectory(folderId: string | null): Promise<[VFSFolderNode[], VFSFileNode[]]> {
+        const manifest = await loadManifest();
+        const children = getChildren(manifest, folderId);
+
+        const folders: VFSFolderNode[] = [];
+        const files: VFSFileNode[] = [];
+
+        for (const node of children) {
+            if (node.type === 'folder') {
+                folders.push(node);
+            } else {
+                files.push(node);
+            }
         }
 
-        await rename(path, `${j}`, {
-            oldPathBaseDir: BaseDirectory.AppData,
-            newPathBaseDir: BaseDirectory.AppData
-        });
-
-        await rename(await join("Thumbnails", path), await join("Thumbnails", j), {
-            oldPathBaseDir: BaseDirectory.AppCache,
-            newPathBaseDir: BaseDirectory.AppCache
-        });
+        return [folders, files];
     }
 
-    export async function moveItem(fromPath: string, toDir: string) {
-        const name = await basename(fromPath);
-        const dest = await join(toDir, name);
-        await rename(fromPath, dest, {
-            oldPathBaseDir: BaseDirectory.AppData,
-            newPathBaseDir: BaseDirectory.AppData,
-        });
+    export async function getThumbnailUrl(nodeId: string): Promise<string> {
+        const url = await join(await appCacheDir(), "Thumbnails", `${nodeId}.png`);
+        return convertFileSrc(url);
     }
 
-    function isValidFileType(str: unknown): str is FileType {
-        // @ts-ignore
-        return typeof str === "string" && FileTypes.includes(str);
+    // --- Tag queries ---
+
+    export function queryByTags(
+        manifest: VFSManifest,
+        filter: (tags: string[]) => boolean,
+    ): VFSNode[] {
+        return Object.values(manifest.nodes).filter(n => filter(n.tags));
     }
 
-    async function parseFile(path: string[], name: string, ext: FileType): Promise<MyelinFile> {
-        if (!(await exists("Thumbnails", {baseDir: BaseDirectory.AppCache}))) {
-            await mkdir("Thumbnails", {baseDir: BaseDirectory.AppCache, recursive: true});
-        }
+    // --- Mutations ---
 
-        const url = await join(await appCacheDir(), "Thumbnails", `${await join(...path, name)}.${ext}.png`);
-        return {
-            preview: convertFileSrc(url),
-            name: name,
-            type: ext,
+    export async function createFolder(name: string, parentId: string | null): Promise<string> {
+        const manifest = await loadManifest();
+
+        const id = generateId();
+        manifest.nodes[id] = {
+            id,
+            name,
+            type: 'folder',
+            parentId,
+            children: [],
+            tags: [],
         };
+        addChild(manifest, parentId, id);
+        await saveManifest(manifest);
+        return id;
     }
 
-    export async function saveThumbnail(path: string[], blob: Blob) {
-        if (!(await exists("Thumbnails", {baseDir: BaseDirectory.AppCache}))) {
-            await mkdir("Thumbnails", {baseDir: BaseDirectory.AppCache, recursive: true});
+    export async function createFile(name: string, fileType: FileType, parentId: string | null): Promise<string> {
+        const manifest = await loadManifest();
+
+        const id = generateId();
+
+        const filePath = await join(FILES_DIR, `${id}${FILE_EXT}`);
+        const file = await open(filePath, {
+            write: true,
+            create: true,
+            baseDir: BaseDirectory.AppData,
+        });
+        await file.close();
+
+        manifest.nodes[id] = {
+            id,
+            name,
+            type: 'file',
+            fileType,
+            parentId,
+            tags: [],
+        };
+        addChild(manifest, parentId, id);
+        await saveManifest(manifest);
+        return id;
+    }
+
+    export async function renameNode(nodeId: string, newName: string) {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node) return;
+        node.name = newName;
+        await saveManifest(manifest);
+    }
+
+    export async function deleteNode(nodeId: string) {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node) return;
+
+        removeChild(manifest, node.parentId, nodeId);
+
+        // Collect all descendants to delete
+        const toDelete: string[] = [];
+        function collect(id: string) {
+            toDelete.push(id);
+            const n = manifest.nodes[id];
+            if (n && n.type === 'folder') {
+                for (const childId of n.children) {
+                    collect(childId);
+                }
+            }
+        }
+        collect(nodeId);
+
+        for (const id of toDelete) {
+            const n = manifest.nodes[id];
+            if (n && n.type === 'file') {
+                const filePath = await join(FILES_DIR, `${id}${FILE_EXT}`);
+                if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
+                    await remove(filePath, { baseDir: BaseDirectory.AppData });
+                }
+                const thumbPath = await join("Thumbnails", `${id}.png`);
+                if (await exists(thumbPath, { baseDir: BaseDirectory.AppCache })) {
+                    await remove(thumbPath, { baseDir: BaseDirectory.AppCache });
+                }
+            }
+            delete manifest.nodes[id];
         }
 
-        const url = (await join("Thumbnails", ...path)) + '.png';
-        await invoke("create_dir_all", {
-            path: await join(await appCacheDir(), "Thumbnails", ...path.slice(0, path.length - 1))
-        });
-        const file = await open(url, {
-            write: true,
-            append: false,
-            create: true,
-            baseDir: BaseDirectory.AppCache
-        });
-        await file.write(new Uint8Array(await blob.arrayBuffer()));
-        await file.close();
+        await saveManifest(manifest);
     }
 
-    export async function saveToFile(path: string[], baseDir: BaseDirectory, content: ISerializable) {
+    export async function moveNode(nodeId: string, newParentId: string | null) {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node) return;
+        if (node.parentId === newParentId) return;
+
+        if (newParentId !== null) {
+            const newParent = manifest.nodes[newParentId];
+            if (!newParent || newParent.type !== 'folder') return;
+
+            // Prevent moving a folder into itself or a descendant
+            if (node.type === 'folder') {
+                let checkId: string | null = newParentId;
+                while (checkId !== null) {
+                    if (checkId === nodeId) return;
+                    const n: VFSNode | undefined = manifest.nodes[checkId];
+                    checkId = n?.parentId ?? null;
+                }
+            }
+        }
+
+        removeChild(manifest, node.parentId, nodeId);
+        node.parentId = newParentId;
+        addChild(manifest, newParentId, nodeId);
+        await saveManifest(manifest);
+    }
+
+    export async function setTags(nodeId: string, tags: string[]) {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node) return;
+        node.tags = tags;
+        await saveManifest(manifest);
+    }
+
+    export async function addTag(nodeId: string, tag: string) {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node || node.tags.includes(tag)) return;
+        node.tags.push(tag);
+        await saveManifest(manifest);
+    }
+
+    export async function removeTag(nodeId: string, tag: string) {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node) return;
+        node.tags = node.tags.filter(t => t !== tag);
+        await saveManifest(manifest);
+    }
+
+    export async function getUniqueFileName(baseName: string, parentId: string | null): Promise<string> {
+        const manifest = await loadManifest();
+        const children = getChildren(manifest, parentId);
+        const names = new Set(children.map(n => n.name));
+
+        if (!names.has(baseName)) return baseName;
+
+        let counter = 1;
+        while (names.has(`${baseName} ${counter}`)) {
+            counter++;
+        }
+        return `${baseName} ${counter}`;
+    }
+
+    // --- File I/O (by node ID) ---
+
+    export async function saveToFile(nodeId: string, content: ISerializable) {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node || node.type !== 'file') return;
+
         const writer = new BinaryWriter(64);
         content.save(writer);
         if (writer.getBuffer().byteLength === 0) return;
-        await writeFile(await join(...path), new Uint8Array(writer.getBuffer()), {baseDir});
+
+        if (!await exists(FILES_DIR, { baseDir: BaseDirectory.AppData })) {
+            await mkdir(FILES_DIR, { baseDir: BaseDirectory.AppData });
+        }
+
+        const filePath = await join(FILES_DIR, `${nodeId}${FILE_EXT}`);
+        await writeFile(filePath, new Uint8Array(writer.getBuffer()), {
+            baseDir: BaseDirectory.AppData,
+        });
     }
 
-    export async function loadFromFile(path: string[], baseDir: BaseDirectory, content: ISerializable) {
-        const data = await readFile(await join(...path), {baseDir});
+    export async function loadFromFile(nodeId: string, content: ISerializable) {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node || node.type !== 'file') return;
+
+        const filePath = await join(FILES_DIR, `${nodeId}${FILE_EXT}`);
+        if (!await exists(filePath, { baseDir: BaseDirectory.AppData })) return;
+        const data = await readFile(filePath, { baseDir: BaseDirectory.AppData });
         if (data.length === 0) return;
         const reader = new BinaryReader(data.buffer);
         content.load(reader);
     }
 
-    export async function getUniqueFileName(originName: string, type: FileType, path: string): Promise<string> {
-        let files: string[];
-        try {
-            const entries = await readDir(path, {baseDir: BaseDirectory.AppData});
-            files = entries
-                .filter(entry => entry.isFile && entry.name.length > 0)
-                .map(entry => entry.name || '');
-        } catch (error) {
-            console.error(`Error reading directory: ${error}`);
-            return originName;
+    export async function saveThumbnail(nodeId: string, blob: Blob) {
+        if (!await exists("Thumbnails", { baseDir: BaseDirectory.AppCache })) {
+            await mkdir("Thumbnails", { baseDir: BaseDirectory.AppCache, recursive: true });
         }
 
-        let candidateName = `${originName}.${type}`;
-        let counter = 0;
+        const thumbPath = await join("Thumbnails", `${nodeId}.png`);
+        const file = await open(thumbPath, {
+            write: true,
+            append: false,
+            create: true,
+            baseDir: BaseDirectory.AppCache,
+        });
+        await file.write(new Uint8Array(await blob.arrayBuffer()));
+        await file.close();
+    }
 
-        while (files.includes(candidateName)) {
-            counter += 1;
-            candidateName = `${originName} ${counter}.${type}`;
-        }
+    export async function getNodeFileName(nodeId: string): Promise<string | null> {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node) return null;
+        return node.name;
+    }
 
-        return candidateName;
+    export async function getNodeFileType(nodeId: string): Promise<FileType | null> {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node || node.type !== 'file') return null;
+        return node.fileType;
+    }
+
+    export async function getDiskPath(nodeId: string): Promise<string | null> {
+        const manifest = await loadManifest();
+        const node = manifest.nodes[nodeId];
+        if (!node || node.type !== 'file') return null;
+        return join(await appDataDir(), FILES_DIR, `${nodeId}${FILE_EXT}`);
     }
 }

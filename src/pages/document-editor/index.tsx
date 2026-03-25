@@ -1,8 +1,7 @@
 import { useParams } from "react-router-dom";
 
 export function DocumentView() {
-  const params = useParams();
-  const path = params["*"]?.split("/").filter(Boolean) ?? [];
+  const { id } = useParams<{ id: string }>();
 
-  return <div className="p-8">{path.join("/")}</div>;
+  return <div className="p-8">Document: {id}</div>;
 }

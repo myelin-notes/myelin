@@ -1,13 +1,12 @@
 import { useState, useRef } from "react";
 import { FileSystem } from "@/lib/utils/file-system";
-import { join } from "@tauri-apps/api/path";
 
 interface UseDropTargetOptions {
-  targetPath: string[];
+  targetFolderId: string | null;
   onMoved: () => void;
 }
 
-export function useDropTarget({ targetPath, onMoved }: UseDropTargetOptions) {
+export function useDropTarget({ targetFolderId, onMoved }: UseDropTargetOptions) {
   const [dragOver, setDragOver] = useState(false);
   const dragCountRef = useRef(0);
 
@@ -20,33 +19,33 @@ export function useDropTarget({ targetPath, onMoved }: UseDropTargetOptions) {
   const handleDragEnter = (e: React.DragEvent) => {
     if (!e.dataTransfer.types.includes("application/myelin-item")) return;
     e.preventDefault();
+    e.stopPropagation();
     dragCountRef.current++;
     setDragOver(true);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.stopPropagation();
     dragCountRef.current--;
     if (dragCountRef.current === 0) setDragOver(false);
   };
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     dragCountRef.current = 0;
     setDragOver(false);
 
     const raw = e.dataTransfer.getData("application/myelin-item");
     if (!raw) return;
 
-    const { segments } = JSON.parse(raw) as { segments: string[]; isDirectory: boolean };
+    const { nodeId } = JSON.parse(raw) as { nodeId: string };
 
-    // Don't drop onto self or into current parent
-    if (segments.join("/") === targetPath.join("/")) return;
-    if (segments.slice(0, -1).join("/") === targetPath.join("/")) return;
+    // Don't drop onto self
+    if (nodeId === targetFolderId) return;
 
     try {
-      const fromPath = await join(...segments);
-      const toDir = await join(...targetPath);
-      await FileSystem.moveItem(fromPath, toDir);
+      await FileSystem.moveNode(nodeId, targetFolderId);
       onMoved();
     } catch (err) {
       console.error("Failed to move item:", err);

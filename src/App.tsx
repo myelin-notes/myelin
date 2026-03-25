@@ -14,8 +14,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/library" replace />} />
         <Route path="/library" element={<LibraryPage />} />
-        <Route path="/mcanvas/*" element={<CanvasView />} />
-        <Route path="/mdoc/*" element={<DocumentView />} />
+        <Route path="/mcanvas/:id" element={<CanvasView />} />
+        <Route path="/mdoc/:id" element={<DocumentView />} />
       </Routes>
     </MemoryRouter>
   );

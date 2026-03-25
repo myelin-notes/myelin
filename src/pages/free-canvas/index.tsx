@@ -4,7 +4,6 @@ import { DrawableCanvas } from "@/pages/free-canvas/drawable-canvas";
 import { ITool } from "@/pages/free-canvas/tools/tool";
 import { WheelPicker, WheelPickerHandle, WheelItem } from "@/components/wheel-picker";
 import { FileSystem } from "@/lib/utils/file-system";
-import { BaseDirectory } from "@tauri-apps/api/path";
 import {
   Tooltip,
   TooltipContent,
@@ -30,8 +29,7 @@ function toolToWheelItem(
 }
 
 export function CanvasView() {
-  const params = useParams();
-  const path = params["*"]?.split("/").filter(Boolean) ?? [];
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -41,6 +39,7 @@ export function CanvasView() {
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
+  const [fileName, setFileName] = useState("");
 
   const [tools] = useState<WheelItem[]>(() => {
     const canvasTools = DrawableCanvas.makeTools();
@@ -53,8 +52,8 @@ export function CanvasView() {
   const [canvasTools] = useState(() => DrawableCanvas.makeTools());
 
   const autoSave = useCallback(async () => {
-    if (!drawableCanvasRef.current || !canvasRef.current) return;
-    await FileSystem.saveToFile(path, BaseDirectory.AppData, drawableCanvasRef.current);
+    if (!drawableCanvasRef.current || !canvasRef.current || !id) return;
+    await FileSystem.saveToFile(id, drawableCanvasRef.current);
     await new Promise<void>((resolve, reject) => {
       canvasRef.current!.toBlob(async (b) => {
         if (b === null) {
@@ -62,21 +61,27 @@ export function CanvasView() {
           reject();
           return;
         }
-        await FileSystem.saveThumbnail(path, b);
+        await FileSystem.saveThumbnail(id, b);
         resolve();
       }, "image/png");
     });
-  }, [path.join("/")]);
+  }, [id]);
 
   const back = useCallback(async () => {
     await autoSave();
-    const url = `/file/${path.slice(0, path.length - 1).join("/")}`;
-    navigate(url);
-  }, [autoSave, navigate, path]);
+    navigate("/library");
+  }, [autoSave, navigate]);
+
+  useEffect(() => {
+    if (!id) return;
+    FileSystem.getNodeFileName(id).then((name) => {
+      if (name) setFileName(name);
+    });
+  }, [id]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !id) return;
 
     canvas.addEventListener("contextmenu", (evt) => {
       if (evt.shiftKey) return;
@@ -114,18 +119,14 @@ export function CanvasView() {
 
     animationFrameId = requestAnimationFrame(animate);
 
-    FileSystem.loadFromFile(path, BaseDirectory.AppData, dc)
-      .then(() => FileSystem.saveToFile(path, BaseDirectory.AppData, dc))
+    FileSystem.loadFromFile(id, dc)
+      .then(() => FileSystem.saveToFile(id, dc))
       .catch(console.error);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
-
-  const fileName = path.length > 0
-    ? path[path.length - 1].substring(0, path[path.length - 1].lastIndexOf("."))
-    : "";
 
   return (
     <div className="bg-black w-full h-full overflow-hidden relative">

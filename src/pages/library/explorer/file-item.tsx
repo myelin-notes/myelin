@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { FileText } from "lucide-react";
-import { MyelinFile } from "@/lib/utils/file-system";
+import { FileSystem, VFSFileNode } from "@/lib/utils/file-system";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -9,14 +10,12 @@ import { useExplorerItem } from "./use-explorer-item";
 import { ItemContextMenu } from "./item-context-menu";
 
 interface FileItemProps {
-  file: MyelinFile;
-  path: string[];
+  file: VFSFileNode;
   onChanged: () => Promise<void>;
 }
 
-export function FileItem({ file, path, onChanged }: FileItemProps) {
+export function FileItem({ file, onChanged }: FileItemProps) {
   const navigate = useNavigate();
-  const fullName = `${file.name}.${file.type}`;
 
   const {
     renaming,
@@ -25,9 +24,8 @@ export function FileItem({ file, path, onChanged }: FileItemProps) {
     handleDragStart,
     renameInputProps,
   } = useExplorerItem({
+    nodeId: file.id,
     name: file.name,
-    segments: [...path, fullName],
-    isDirectory: false,
     onChanged,
   });
 
@@ -38,7 +36,7 @@ export function FileItem({ file, path, onChanged }: FileItemProps) {
           <button
             draggable={!renaming}
             onClick={() => {
-              if (!renaming) navigate(`/${file.type}/${path.join("/")}/${fullName}`);
+              if (!renaming) navigate(`/${file.fileType}/${file.id}`);
             }}
             onDragStart={handleDragStart}
             className="flex w-full items-center gap-3 rounded-lg px-4 py-2 transition-shadow hover:shadow-md cursor-pointer"
@@ -57,7 +55,14 @@ export function FileItem({ file, path, onChanged }: FileItemProps) {
           </span>
         )}
       </ContextMenuTrigger>
-      <ItemContextMenu onRename={startRenaming} onRemove={handleRemove} />
+      <ItemContextMenu
+        onRename={startRenaming}
+        onRemove={handleRemove}
+        onReveal={async () => {
+          const path = await FileSystem.getDiskPath(file.id);
+          if (path) await revealItemInDir(path);
+        }}
+      />
     </ContextMenu>
   );
 }

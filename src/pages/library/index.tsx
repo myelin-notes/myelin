@@ -1,12 +1,11 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { FolderInput, ArrowDownAZ, Search, ChevronRight } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { RecentCard } from "./recent-card";
 import { ExplorerTree, ExplorerTreeHandle } from "./explorer/explorer-tree";
 import { SemanticTags } from "./semantic-tags";
 import { CreateNewDropdown } from "./create-new-dropdown";
-import { FileSystem } from "@/lib/utils/file-system";
-import { join } from "@tauri-apps/api/path";
+import { FileSystem, VFSFolderNode } from "@/lib/utils/file-system";
 
 
 const recentItems = [
@@ -39,9 +38,21 @@ const recentItems = [
 
 export function LibraryPage() {
   const explorerRef = useRef<ExplorerTreeHandle>(null);
-  const [currentPath, setCurrentPath] = useState<string[]>(["Home"]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(null);
+
+  // Update breadcrumbs when folder changes
+  useEffect(() => {
+    if (currentFolderId === null) {
+      setBreadcrumbs([]);
+      return;
+    }
+    FileSystem.getManifest().then((manifest) => {
+      setBreadcrumbs(FileSystem.getFolderChain(manifest, currentFolderId));
+    });
+  }, [currentFolderId]);
 
   const clearDragTimer = useCallback(() => {
     if (dragTimerRef.current) {
@@ -51,7 +62,7 @@ export function LibraryPage() {
   }, []);
 
   const handleBreadcrumbDrop = useCallback(
-    async (e: React.DragEvent, targetPath: string[]) => {
+    async (e: React.DragEvent, targetFolderId: string | null) => {
       e.preventDefault();
       e.stopPropagation();
       clearDragTimer();
@@ -60,16 +71,11 @@ export function LibraryPage() {
       const raw = e.dataTransfer.getData("application/myelin-item");
       if (!raw) return;
 
-      const { segments } = JSON.parse(raw) as { segments: string[]; isDirectory: boolean };
-
-      // Don't drop into the same directory
-      if (segments.slice(0, -1).join("/") === targetPath.join("/")) return;
+      const { nodeId } = JSON.parse(raw) as { nodeId: string };
 
       try {
-        const fromPath = await join(...segments);
-        const toDir = await join(...targetPath);
-        await FileSystem.moveItem(fromPath, toDir);
-        setCurrentPath(targetPath);
+        await FileSystem.moveNode(nodeId, targetFolderId);
+        setCurrentFolderId(targetFolderId);
         explorerRef.current?.reload();
       } catch (err) {
         console.error("Failed to move item:", err);
@@ -79,7 +85,7 @@ export function LibraryPage() {
   );
 
   const makeBreadcrumbDragHandlers = useCallback(
-    (targetPath: string[], idx: number) => ({
+    (targetFolderId: string | null, idx: number) => ({
       onDragOver: (e: React.DragEvent) => {
         if (!e.dataTransfer.types.includes("application/myelin-item")) return;
         e.preventDefault();
@@ -93,7 +99,7 @@ export function LibraryPage() {
         setBreadcrumbDragIdx(idx);
         clearDragTimer();
         dragTimerRef.current = setTimeout(() => {
-          setCurrentPath(targetPath);
+          setCurrentFolderId(targetFolderId);
           setBreadcrumbDragIdx(null);
         }, 800);
       },
@@ -102,7 +108,7 @@ export function LibraryPage() {
         setBreadcrumbDragIdx((prev) => (prev === idx ? null : prev));
         clearDragTimer();
       },
-      onDrop: (e: React.DragEvent) => handleBreadcrumbDrop(e, targetPath),
+      onDrop: (e: React.DragEvent) => handleBreadcrumbDrop(e, targetFolderId),
     }),
     [clearDragTimer, handleBreadcrumbDrop]
   );
@@ -146,28 +152,27 @@ export function LibraryPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h3
-                  onClick={() => setCurrentPath(["Home"])}
+                  onClick={() => setCurrentFolderId(null)}
                   className={`font-heading text-2xl font-normal leading-8 cursor-pointer transition-colors ${
                     breadcrumbDragIdx === -1
                       ? "text-accent-foreground"
                       : "text-text-primary hover:text-text-secondary"
                   }`}
-                  {...makeBreadcrumbDragHandlers(["Home"], -1)}
+                  {...makeBreadcrumbDragHandlers(null, -1)}
                 >
                   Explorer
                 </h3>
-                {currentPath.length > 1 && (
+                {breadcrumbs.length > 0 && (
                   <div className="flex items-center gap-1 text-sm text-text-muted">
                     <ChevronRight className="size-3.5 shrink-0" />
-                    {currentPath.slice(1).map((segment, i) => {
-                      const isLast = i === currentPath.length - 2;
-                      const targetPath = currentPath.slice(0, i + 2);
+                    {breadcrumbs.map((crumb, i) => {
+                      const isLast = i === breadcrumbs.length - 1;
                       const isDragTarget = breadcrumbDragIdx === i;
                       return (
-                        <span key={i} className="flex items-center gap-1">
+                        <span key={crumb.id} className="flex items-center gap-1">
                           {i > 0 && <ChevronRight className="size-3 shrink-0 text-text-muted" />}
                           <button
-                            onClick={() => setCurrentPath(targetPath)}
+                            onClick={() => setCurrentFolderId(crumb.id)}
                             className={`rounded px-1 transition-colors ${
                               isDragTarget
                                 ? "bg-accent/15 text-accent-foreground ring-1 ring-accent/40"
@@ -175,9 +180,9 @@ export function LibraryPage() {
                                   ? "text-text-secondary font-medium"
                                   : "text-text-muted hover:text-text-secondary cursor-pointer"
                             }`}
-                            {...makeBreadcrumbDragHandlers(targetPath, i)}
+                            {...makeBreadcrumbDragHandlers(crumb.id, i)}
                           >
-                            {segment}
+                            {crumb.name}
                           </button>
                         </span>
                       );
@@ -193,7 +198,7 @@ export function LibraryPage() {
                   <ArrowDownAZ className="size-4" />
                 </button>
                 <CreateNewDropdown
-                  currentPath={currentPath}
+                  currentFolderId={currentFolderId}
                   onCreated={() => explorerRef.current?.reload()}
                 />
               </div>
@@ -201,8 +206,8 @@ export function LibraryPage() {
 
             <ExplorerTree
               ref={explorerRef}
-              currentPath={currentPath}
-              onNavigate={setCurrentPath}
+              currentFolderId={currentFolderId}
+              onNavigate={setCurrentFolderId}
             />
           </div>
 

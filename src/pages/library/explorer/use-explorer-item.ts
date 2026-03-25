@@ -1,15 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { FileSystem } from "@/lib/utils/file-system";
-import { join } from "@tauri-apps/api/path";
 
 interface UseExplorerItemOptions {
+  nodeId: string;
   name: string;
-  segments: string[];
-  isDirectory: boolean;
   onChanged: () => void;
 }
 
-export function useExplorerItem({ name, segments, isDirectory, onChanged }: UseExplorerItemOptions) {
+export function useExplorerItem({ nodeId, name, onChanged }: UseExplorerItemOptions) {
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -38,8 +36,7 @@ export function useExplorerItem({ name, segments, isDirectory, onChanged }: UseE
       return;
     }
     try {
-      const itemPath = await join(...segments);
-      await FileSystem.renameFileOrFolder(itemPath, trimmed);
+      await FileSystem.renameNode(nodeId, trimmed);
     } catch (err) {
       console.error("Failed to rename:", err);
     }
@@ -49,7 +46,7 @@ export function useExplorerItem({ name, segments, isDirectory, onChanged }: UseE
 
   const handleRemove = async () => {
     try {
-      await FileSystem.deleteFileOrFolder(segments);
+      await FileSystem.deleteNode(nodeId);
       onChanged();
     } catch (err) {
       console.error("Failed to delete:", err);
@@ -57,10 +54,7 @@ export function useExplorerItem({ name, segments, isDirectory, onChanged }: UseE
   };
 
   const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData(
-      "application/myelin-item",
-      JSON.stringify({ segments, isDirectory })
-    );
+    e.dataTransfer.setData("application/myelin-item", JSON.stringify({ nodeId }));
     e.dataTransfer.effectAllowed = "move";
   };
 
