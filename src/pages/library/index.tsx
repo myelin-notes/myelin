@@ -42,6 +42,13 @@ export function LibraryPage() {
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+
+  const triggerRefresh = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+    explorerRef.current?.reload();
+  }, []);
 
   // Update breadcrumbs when folder changes
   useEffect(() => {
@@ -76,12 +83,12 @@ export function LibraryPage() {
       try {
         await FileSystem.moveNode(nodeId, targetFolderId);
         setCurrentFolderId(targetFolderId);
-        explorerRef.current?.reload();
+        triggerRefresh();
       } catch (err) {
         console.error("Failed to move item:", err);
       }
     },
-    [clearDragTimer]
+    [clearDragTimer, triggerRefresh]
   );
 
   const makeBreadcrumbDragHandlers = useCallback(
@@ -199,7 +206,8 @@ export function LibraryPage() {
                 </button>
                 <CreateNewDropdown
                   currentFolderId={currentFolderId}
-                  onCreated={() => explorerRef.current?.reload()}
+                  onCreated={triggerRefresh}
+                  onNewFolder={() => explorerRef.current?.startNewFolder()}
                 />
               </div>
             </div>
@@ -208,11 +216,21 @@ export function LibraryPage() {
               ref={explorerRef}
               currentFolderId={currentFolderId}
               onNavigate={setCurrentFolderId}
+              onTagsChanged={() => setRefreshKey((k) => k + 1)}
+              filterTags={[...activeTags]}
             />
           </div>
 
           <div className="col-span-4">
-            <SemanticTags />
+            <SemanticTags
+              refreshKey={refreshKey}
+              activeTags={activeTags}
+              onActiveTagsChanged={(tags) => {
+                setActiveTags(tags);
+                // Force explorer reload when tags change
+                setTimeout(() => explorerRef.current?.reload(), 0);
+              }}
+            />
           </div>
         </section>
       </main>

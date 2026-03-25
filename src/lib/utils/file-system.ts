@@ -183,6 +183,39 @@ export namespace FileSystem {
         return Object.values(manifest.nodes).filter(n => filter(n.tags));
     }
 
+    export function getAllTags(manifest: VFSManifest): { tag: string; count: number }[] {
+        const counts = new Map<string, number>();
+        for (const node of Object.values(manifest.nodes)) {
+            for (const tag of node.tags) {
+                counts.set(tag, (counts.get(tag) ?? 0) + 1);
+            }
+        }
+        return Array.from(counts.entries())
+            .map(([tag, count]) => ({ tag, count }))
+            .sort((a, b) => b.count - a.count);
+    }
+
+    export function getNodesByTag(manifest: VFSManifest, tag: string): VFSNode[] {
+        return Object.values(manifest.nodes).filter(n => n.tags.includes(tag));
+    }
+
+    export function getNodesByAnyTag(manifest: VFSManifest, tags: string[]): VFSNode[] {
+        const tagSet = new Set(tags);
+        return Object.values(manifest.nodes).filter(n => n.tags.some(t => tagSet.has(t)));
+    }
+
+    export function getStats(manifest: VFSManifest): { totalFiles: number; totalFolders: number; totalTags: number } {
+        let totalFiles = 0;
+        let totalFolders = 0;
+        const tagSet = new Set<string>();
+        for (const node of Object.values(manifest.nodes)) {
+            if (node.type === 'file') totalFiles++;
+            else totalFolders++;
+            for (const t of node.tags) tagSet.add(t);
+        }
+        return { totalFiles, totalFolders, totalTags: tagSet.size };
+    }
+
     // --- Mutations ---
 
     export async function createFolder(name: string, parentId: string | null): Promise<string> {

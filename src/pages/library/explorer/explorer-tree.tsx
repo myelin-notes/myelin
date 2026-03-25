@@ -1,45 +1,64 @@
 import { useEffect, useState, useCallback, useImperativeHandle } from "react";
-import { FileSystem, VFSFileNode, VFSFolderNode } from "@/lib/utils/file-system";
+import { FileSystem, VFSNode } from "@/lib/utils/file-system";
 import { FolderItem } from "./folder-item";
 import { FileItem } from "./file-item";
 import { useDropTarget } from "./use-drop-target";
 
 export interface ExplorerTreeHandle {
   reload: () => Promise<void>;
+  startNewFolder: () => Promise<void>;
 }
 
 interface ExplorerTreeProps {
   ref?: React.Ref<ExplorerTreeHandle>;
   currentFolderId: string | null;
   onNavigate: (folderId: string) => void;
+  onTagsChanged?: () => void;
+  filterTags?: string[];
 }
 
-export function ExplorerTree({ currentFolderId, onNavigate, ref }: ExplorerTreeProps) {
-    const [directories, setDirectories] = useState<VFSFolderNode[]>([]);
-    const [files, setFiles] = useState<VFSFileNode[]>([]);
+export function ExplorerTree({ currentFolderId, onNavigate, ref, onTagsChanged, filterTags }: ExplorerTreeProps) {
+    const [nodes, setNodes] = useState<VFSNode[]>([]);
     const [loading, setLoading] = useState(true);
+    const isFiltering = filterTags && filterTags.length > 0;
 
     const reload = useCallback(async () => {
       setLoading(true);
       try {
-        const [dirs, fs] = await FileSystem.loadDirectory(currentFolderId);
-        setDirectories(dirs);
-        setFiles(fs);
+        if (isFiltering) {
+          const manifest = await FileSystem.getManifest();
+          setNodes(FileSystem.getNodesByAnyTag(manifest, filterTags));
+        } else {
+          const [dirs, files] = await FileSystem.loadDirectory(currentFolderId);
+          setNodes([...dirs, ...files]);
+        }
       } catch (err) {
         console.error("Failed to load directory:", err);
       }
       setLoading(false);
-    }, [currentFolderId]);
+    }, [currentFolderId, isFiltering, filterTags]);
 
-    useImperativeHandle(ref, () => ({ reload }), [reload]);
+    const startNewFolder = useCallback(async () => {
+      const name = await FileSystem.getUniqueFileName("Unnamed Folder", currentFolderId);
+      await FileSystem.createFolder(name, currentFolderId);
+      await reload();
+      onTagsChanged?.();
+    }, [currentFolderId, reload, onTagsChanged]);
+
+    useImperativeHandle(ref, () => ({ reload, startNewFolder }), [reload, startNewFolder]);
 
     useEffect(() => {
       reload();
     }, [reload]);
 
+    const reloadAndNotify = useCallback(async () => {
+      await reload();
+      onTagsChanged?.();
+    }, [reload, onTagsChanged]);
+
     const { dragOver, dropTargetProps } = useDropTarget({
       targetFolderId: currentFolderId,
-      onMoved: reload,
+      onMoved: reloadAndNotify,
     });
 
     if (loading) {
@@ -52,25 +71,29 @@ export function ExplorerTree({ currentFolderId, onNavigate, ref }: ExplorerTreeP
 
     return (
       <div
-        {...dropTargetProps}
+        {...(isFiltering ? {} : dropTargetProps)}
         className={`flex flex-col gap-1 rounded-xl min-h-[80px] transition-colors ${
-          dragOver ? "bg-accent/10" : ""
+          dragOver && !isFiltering ? "bg-accent/10" : ""
         }`}
       >
-        {directories.map((dir) => (
-          <FolderItem
-            key={dir.id}
-            id={dir.id}
-            name={dir.name}
-            onNavigate={() => onNavigate(dir.id)}
-            onMoved={reload}
-          />
-        ))}
-        {files.map((file) => (
-          <FileItem key={file.id} file={file} onChanged={reload} />
-        ))}
-        {directories.length === 0 && files.length === 0 && (
-          <span className="px-4 py-3 text-sm text-text-muted">No files yet</span>
+        {nodes.map((node) =>
+          node.type === 'folder' ? (
+            <FolderItem
+              key={node.id}
+              id={node.id}
+              name={node.name}
+              tags={node.tags}
+              onNavigate={() => onNavigate(node.id)}
+              onMoved={reloadAndNotify}
+            />
+          ) : (
+            <FileItem key={node.id} file={node} onChanged={reloadAndNotify} />
+          )
+        )}
+        {nodes.length === 0 && (
+          <span className="px-4 py-3 text-sm text-text-muted">
+            {isFiltering ? "No items match the selected tags" : "No files yet"}
+          </span>
         )}
       </div>
     );
