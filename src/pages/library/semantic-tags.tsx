@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from "react";
-import { Plus } from "lucide-react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { FileSystem, VFSManifest } from "@/lib/utils/file-system";
 
@@ -12,9 +11,6 @@ interface SemanticTagsProps {
 export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: SemanticTagsProps) {
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [stats, setStats] = useState({ totalFiles: 0, totalFolders: 0, totalTags: 0 });
-  const [isCreating, setIsCreating] = useState(false);
-  const [newTagName, setNewTagName] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     FileSystem.getManifest().then((manifest: VFSManifest) => {
@@ -33,10 +29,6 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
     });
   }, [refreshKey]);
 
-  useEffect(() => {
-    if (isCreating) inputRef.current?.focus();
-  }, [isCreating]);
-
   const toggleTag = (tag: string) => {
     const next = new Set(activeTags);
     if (next.has(tag)) {
@@ -51,12 +43,6 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
     onActiveTagsChanged(new Set());
   };
 
-  const handleCreateTag = () => {
-    setNewTagName("");
-    setIsCreating(false);
-    // Tags only exist when assigned to nodes — this is just a UX hint
-  };
-
   return (
     <div className="flex flex-col gap-6 rounded-xl bg-surface p-8">
       {/* Heading */}
@@ -64,28 +50,19 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
         <h3 className="font-heading text-xl font-normal text-text-primary leading-7">
           Semantic Tags
         </h3>
-        <div className="flex items-center gap-3">
-          {activeTags.size > 0 && (
-            <button
-              onClick={clearAll}
-              className="text-[10px] font-bold uppercase tracking-[1px] text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
-            >
-              Clear
-            </button>
-          )}
+        {activeTags.size > 0 && (
           <button
-            onClick={() => setIsCreating(true)}
-            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[1px] text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
+            onClick={clearAll}
+            className="text-[10px] font-bold uppercase tracking-[1px] text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
           >
-            <Plus className="size-3" />
-            New
+            Clear
           </button>
-        </div>
+        )}
       </div>
 
       {/* Tag Cloud */}
       <div className="flex flex-wrap gap-2 min-h-[36px]">
-        {tags.length === 0 && !isCreating && (
+        {tags.length === 0 && (
           <p className="text-xs text-text-muted italic">
             No tags yet. Right-click a file and choose &ldquo;Manage Tags&rdquo; to start.
           </p>
@@ -116,27 +93,6 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
             </button>
           );
         })}
-
-        {isCreating && (
-          <div className="flex items-center gap-1 rounded-xl bg-card px-3 py-1.5 ring-1 ring-border-divider">
-            <span className="text-xs text-text-muted">#</span>
-            <input
-              ref={inputRef}
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
-              onBlur={handleCreateTag}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreateTag();
-                if (e.key === "Escape") {
-                  setNewTagName("");
-                  setIsCreating(false);
-                }
-              }}
-              placeholder="tag name"
-              className="bg-transparent text-xs font-medium text-text-primary placeholder:text-text-muted outline-none w-20"
-            />
-          </div>
-        )}
       </div>
 
       {/* Insights */}
