@@ -260,6 +260,18 @@ export class DrawableCanvas implements ISerializable {
         this._undoRedo.push(new RemoveElementCommand(this._elements, element));
     }
 
+    public deleteSelected() {
+        const selected = this._elements.filter(e => e.isSelected);
+        if (selected.length === 0) return;
+        this._undoRedo.beginGroup();
+        for (const e of selected) {
+            e.unselect();
+            this._undoRedo.push(new RemoveElementCommand(this._elements, e));
+        }
+        this._undoRedo.endGroup();
+        this.updateBounding();
+    }
+
     public pushApplied(command: UndoCommand) {
         this._undoRedo.pushApplied(command);
     }

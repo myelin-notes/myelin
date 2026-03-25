@@ -1,5 +1,4 @@
 export interface ActionMap {}
-
 export type Action = keyof ActionMap & string;
 
 export interface KeyCombo {

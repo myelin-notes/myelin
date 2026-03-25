@@ -11,6 +11,7 @@ declare module "@/lib/keybindings" {
     "canvas:pan": true;
     "canvas:undo": true;
     "canvas:redo": true;
+    "canvas:delete": true;
   }
 }
 import {
@@ -135,12 +136,14 @@ export function CanvasView() {
       "canvas:pan": { key: " " },
       "canvas:undo": { key: "z", mod: true },
       "canvas:redo": { key: "z", mod: true, shift: true },
+      "canvas:delete": { key: "Backspace" },
     });
 
     const unbindKeys = keybindings.register([
       { action: "canvas:pan", onDown: () => dc.setSpaceDown(true), onUp: () => dc.setSpaceDown(false) },
       { action: "canvas:undo", onDown: () => dc.undo() },
       { action: "canvas:redo", onDown: () => dc.redo() },
+      { action: "canvas:delete", onDown: () => dc.deleteSelected() },
     ]);
 
     FileSystem.loadFromFile(id, dc)
