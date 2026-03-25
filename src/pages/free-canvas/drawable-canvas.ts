@@ -94,6 +94,7 @@ export class DrawableCanvas implements ISerializable {
     private _undoRedo = new UndoRedoStack();
     private _nextIndex = 0;
     private toolSelected: ITool;
+    private _toolCursor: string = 'default';
 
     private onZoomChange?: (zoom: number) => void;
     private onRequestTextEdit?: (screenPos: Vector2, worldPos: Vector2, zoom: number, onCommit: (text: string) => void) => void;
@@ -188,11 +189,11 @@ export class DrawableCanvas implements ISerializable {
         });
 
         this.state.addStart(InteractState.Moving, () => {
-            this.canvas.style.cursor = 'grabbing';
+            this.updateCursor();
         });
 
         this.state.addEnd(InteractState.Moving, () => {
-            this.canvas.style.cursor = 'default';
+            this.updateCursor();
         });
 
         this.state.addUpdate(InteractState.Moving, (event: PointerEvent) => {
@@ -240,6 +241,7 @@ export class DrawableCanvas implements ISerializable {
             this.mousePosition = this.getPoint(evt);
             this.state.update(evt);
             this.toolSelected.hover?.(this, this.mousePosition);
+            this.updateCursor();
         });
 
         canvas.addEventListener("pointerdown", evt => {
@@ -301,14 +303,25 @@ export class DrawableCanvas implements ISerializable {
     }
 
     public setCursor(cursor: string) {
-        this.canvas.style.cursor = cursor;
+        this._toolCursor = cursor;
+    }
+
+    private updateCursor() {
+        if (this.state.current === InteractState.Moving) {
+            this.canvas.style.cursor = 'grabbing';
+        } else if (this.spaceDown) {
+            this.canvas.style.cursor = 'grab';
+        } else {
+            this.canvas.style.cursor = this._toolCursor;
+        }
     }
 
     public switchTool(to: number) {
         this.toolSelected.interrupt(this);
         for (const e of this._elements) e.unselect();
         this.toolSelected = this.tools[to];
-        this.canvas.style.cursor = 'default';
+        this._toolCursor = 'default';
+        this.updateCursor();
     }
 
     public updateBounding() {
@@ -350,11 +363,7 @@ export class DrawableCanvas implements ISerializable {
 
     public setSpaceDown(value: boolean) {
         this.spaceDown = value;
-        if (value && this.state.current === InteractState.Idle) {
-            this.canvas.style.cursor = 'grab';
-        } else if (!value && this.state.current === InteractState.Idle) {
-            this.canvas.style.cursor = 'default';
-        }
+        this.updateCursor();
     }
 
     public undo() {
