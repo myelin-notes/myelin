@@ -4,6 +4,15 @@ import { DrawableCanvas } from "@/pages/free-canvas/drawable-canvas";
 import { ITool } from "@/pages/free-canvas/tools/tool";
 import { WheelPicker, WheelPickerHandle, WheelItem } from "@/components/wheel-picker";
 import { FileSystem } from "@/lib/utils/file-system";
+import { keybindings } from "@/lib/keybindings";
+
+declare module "@/lib/keybindings" {
+  interface ActionMap {
+    "canvas:pan": true;
+    "canvas:undo": true;
+    "canvas:redo": true;
+  }
+}
 import {
   Tooltip,
   TooltipContent,
@@ -122,12 +131,25 @@ export function CanvasView() {
 
     animationFrameId = requestAnimationFrame(animate);
 
+    keybindings.defineDefaults({
+      "canvas:pan": { key: " " },
+      "canvas:undo": { key: "z", mod: true },
+      "canvas:redo": { key: "z", mod: true, shift: true },
+    });
+
+    const unbindKeys = keybindings.register([
+      { action: "canvas:pan", onDown: () => dc.setSpaceDown(true), onUp: () => dc.setSpaceDown(false) },
+      { action: "canvas:undo", onDown: () => dc.undo() },
+      { action: "canvas:redo", onDown: () => dc.redo() },
+    ]);
+
     FileSystem.loadFromFile(id, dc)
       .then(() => FileSystem.saveToFile(id, dc))
       .catch(console.error);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      unbindKeys();
     };
   }, []);
 

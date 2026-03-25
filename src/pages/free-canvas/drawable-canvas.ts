@@ -247,26 +247,6 @@ export class DrawableCanvas implements ISerializable {
             this.state.change(InteractState.Idle, evt);
         });
 
-        window.addEventListener("keyup", evt => {
-            if (evt.key === " ") {
-                this.spaceDown = false;
-            }
-        });
-
-        window.addEventListener("keydown", evt => {
-            if (evt.key === " ") {
-                this.spaceDown = true;
-            }
-
-            if (evt.key === "z" && evt.ctrlKey) {
-                this.undo();
-            }
-
-            if (evt.key === "Z" && evt.ctrlKey) {
-                this.redo();
-            }
-        });
-
         window.addEventListener("resize", () => this.resizeCanvas(window.innerWidth, window.innerHeight));
     }
 
@@ -329,12 +309,16 @@ export class DrawableCanvas implements ISerializable {
         this.canvas.height = height;
     }
 
-    private undo() {
+    public setSpaceDown(value: boolean) {
+        this.spaceDown = value;
+    }
+
+    public undo() {
         this._undoRedo.undo();
         this.updateBounding();
     }
 
-    private redo() {
+    public redo() {
         this._undoRedo.redo();
         this.updateBounding();
     }
