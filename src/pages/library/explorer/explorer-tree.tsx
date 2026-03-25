@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useImperativeHandle } from "react";
-import { FileSystem, VFSNode } from "@/lib/utils/file-system";
+import { FileSystem, FileType, VFSNode } from "@/lib/utils/file-system";
 import { FolderItem } from "./folder-item";
 import { FileItem } from "./file-item";
 import { useDropTarget } from "./use-drop-target";
@@ -7,6 +7,7 @@ import { useDropTarget } from "./use-drop-target";
 export interface ExplorerTreeHandle {
   reload: () => Promise<void>;
   startNewFolder: () => Promise<void>;
+  startNewFile: (title: string, type: FileType) => Promise<void>;
 }
 
 interface ExplorerTreeProps {
@@ -48,7 +49,16 @@ export function ExplorerTree({ currentFolderId, onNavigate, ref, onTagsChanged, 
       onTagsChanged?.();
     }, [currentFolderId, onTagsChanged]);
 
-    useImperativeHandle(ref, () => ({ reload, startNewFolder }), [reload, startNewFolder]);
+    const startNewFile = useCallback(async (title: string, type: FileType) => {
+      const name = await FileSystem.getUniqueFileName(title, currentFolderId);
+      const id = await FileSystem.createFile(name, type, currentFolderId);
+      setRenamingNewId(id);
+      setNodes(prev => [...prev, { id, name, type: 'file' as const, fileType: type, parentId: currentFolderId, tags: [] }]);
+      requestAnimationFrame(() => setRenamingNewId(null));
+      onTagsChanged?.();
+    }, [currentFolderId, onTagsChanged]);
+
+    useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [reload, startNewFolder, startNewFile]);
 
     useEffect(() => {
       reload();
@@ -91,7 +101,7 @@ export function ExplorerTree({ currentFolderId, onNavigate, ref, onTagsChanged, 
               onMoved={reloadAndNotify}
             />
           ) : (
-            <FileItem key={node.id} file={node} onChanged={reloadAndNotify} />
+            <FileItem key={node.id} file={node} autoRename={node.id === renamingNewId} onChanged={reloadAndNotify} />
           )
         )}
         {nodes.length === 0 && (

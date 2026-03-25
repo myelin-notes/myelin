@@ -13,10 +13,11 @@ import { TagManageDialog } from "../tag-manage-dialog";
 
 interface FileItemProps {
   file: VFSFileNode;
+  autoRename?: boolean;
   onChanged: () => Promise<void>;
 }
 
-export function FileItem({ file, onChanged }: FileItemProps) {
+export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
   const navigate = useNavigate();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
 
@@ -30,6 +31,7 @@ export function FileItem({ file, onChanged }: FileItemProps) {
     nodeId: file.id,
     name: file.name,
     onChanged,
+    initialRenaming: autoRename,
   });
 
   return (

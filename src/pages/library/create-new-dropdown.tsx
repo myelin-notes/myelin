@@ -1,7 +1,4 @@
-import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { Plus, FolderPlus, FilePlus, LayoutGrid } from "lucide-react";
-import { FileSystem, FileType } from "@/lib/utils/file-system";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,20 +10,11 @@ import {
 const itemClass = "gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary";
 
 interface CreateNewDropdownProps {
-  currentFolderId: string | null;
-  onCreated?: () => void;
   onNewFolder?: () => void;
+  onNewFile?: (title: string, type: string) => void;
 }
 
-export function CreateNewDropdown({ currentFolderId, onCreated, onNewFolder }: CreateNewDropdownProps) {
-  const navigate = useNavigate();
-
-  const createFile = useCallback(async (title: string, type: FileType) => {
-    const name = await FileSystem.getUniqueFileName(title, currentFolderId);
-    const id = await FileSystem.createFile(name, type, currentFolderId);
-    onCreated?.();
-    navigate(`/${type}/${id}`);
-  }, [navigate, currentFolderId, onCreated]);
+export function CreateNewDropdown({ onNewFolder, onNewFile }: CreateNewDropdownProps) {
 
   return (
     <DropdownMenu>
@@ -49,14 +37,14 @@ export function CreateNewDropdown({ currentFolderId, onCreated, onNewFolder }: C
         <DropdownMenuSeparator className="my-1 bg-border-subtle" />
         <DropdownMenuItem
           className={itemClass}
-          onClick={() => createFile("Untitled Document", "mdoc")}
+          onClick={() => onNewFile?.("Untitled Document", "mdoc")}
         >
           <FilePlus className="size-4" />
           New Document
         </DropdownMenuItem>
         <DropdownMenuItem
           className={itemClass}
-          onClick={() => createFile("Untitled Canvas", "mcanvas")}
+          onClick={() => onNewFile?.("Untitled Canvas", "mcanvas")}
         >
           <LayoutGrid className="size-4" />
           New Canvas

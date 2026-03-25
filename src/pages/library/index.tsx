@@ -205,9 +205,8 @@ export function LibraryPage() {
                   <ArrowDownAZ className="size-4" />
                 </button>
                 <CreateNewDropdown
-                  currentFolderId={currentFolderId}
-                  onCreated={triggerRefresh}
                   onNewFolder={() => explorerRef.current?.startNewFolder()}
+                  onNewFile={(title, type) => explorerRef.current?.startNewFile(title, type)}
                 />
               </div>
             </div>
