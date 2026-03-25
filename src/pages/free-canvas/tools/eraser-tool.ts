@@ -19,10 +19,9 @@ export class EraserTool implements ITool {
     }
 
     public update(canvas: DrawableCanvas, _event: PointerEvent, position: Vector2): void {
-        canvas.getElements
-            .actives
+        canvas.elements
             .filter(e => e.isOver(position.x, position.y, this.radius, canvas.ctx))
-            .forEach(e => canvas.getElements.remove(e.index));
+            .forEach(e => canvas.removeElement(e));
     }
 
     public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {

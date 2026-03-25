@@ -1,6 +1,6 @@
 import {StateMachine} from "../../lib/utils/state-machine";
 import {DrawableElement} from "./elements/drawable-element";
-import {UndoableState} from "../../lib/utils/undo-redo";
+import {UndoCommand, UndoRedoStack} from "../../lib/utils/undo-redo";
 import {PenTool} from "./tools/pen-tool";
 import {ITool} from "./tools/tool";
 import {EraserTool} from "./tools/eraser-tool";
@@ -12,6 +12,32 @@ import {HighlighterTool} from "./tools/highlighter-tool";
 import {SelectTool} from "./tools/select-tool";
 
 export type Vector2 = { x: number, y: number };
+
+class AddElementCommand implements UndoCommand {
+    constructor(private list: DrawableElement[], private element: DrawableElement) {}
+    execute() { this.list.push(this.element); }
+    undo() {
+        const idx = this.list.indexOf(this.element);
+        if (idx >= 0) this.list.splice(idx, 1);
+    }
+}
+
+class RemoveElementCommand implements UndoCommand {
+    private position = -1;
+    constructor(private list: DrawableElement[], private element: DrawableElement) {}
+    execute() {
+        const idx = this.list.indexOf(this.element);
+        if (idx >= 0) {
+            this.position = idx;
+            this.list.splice(idx, 1);
+        }
+    }
+    undo() {
+        if (this.position >= 0) {
+            this.list.splice(Math.min(this.position, this.list.length), 0, this.element);
+        }
+    }
+}
 
 export class DrawableCanvas implements ISerializable {
 
@@ -27,7 +53,9 @@ export class DrawableCanvas implements ISerializable {
     private mousePosition: Vector2 = { x: 0, y: 0 };
     private bgColor: string;
 
-    private elements: UndoableState<DrawableElement> = new UndoableState(this.saveElement, this.loadElement);
+    private _elements: DrawableElement[] = [];
+    private _undoRedo = new UndoRedoStack();
+    private _nextIndex = 0;
     private toolSelected: ITool;
 
     private onZoomChange?: (zoom: number) => void;
@@ -77,7 +105,7 @@ export class DrawableCanvas implements ISerializable {
         this.ctx.save();
         this.ctx.scale(this._zoom, this._zoom);
         this.ctx.translate(this.offset.x, this.offset.y);
-        this.elements.actives.forEach(element => {
+        this._elements.forEach(element => {
             element.draw(this.ctx, deltaTime);
         });
 
@@ -89,16 +117,18 @@ export class DrawableCanvas implements ISerializable {
         return this._zoom;
     }
 
-    public get getElements() {
-        return this.elements;
+    public get elements(): DrawableElement[] {
+        return this._elements;
     }
 
     private initStates() {
         this.state.addEnd(InteractState.UsingTool, event => {
             this.toolSelected.finish(this, event);
+            this._undoRedo.endGroup();
         });
 
         this.state.addStart(InteractState.UsingTool, event => {
+            this._undoRedo.beginGroup();
             this.toolSelected.start(this, event);
         });
 
@@ -203,8 +233,14 @@ export class DrawableCanvas implements ISerializable {
         window.addEventListener("resize", () => this.resizeCanvas(window.innerWidth, window.innerHeight));
     }
 
-    public addElement<T extends DrawableElement>(element: (i: number) => T): T {
-        return this.elements.add(element);
+    public addElement<T extends DrawableElement>(factory: (i: number) => T): T {
+        const element = factory(this._nextIndex++);
+        this._undoRedo.push(new AddElementCommand(this._elements, element));
+        return element;
+    }
+
+    public removeElement(element: DrawableElement) {
+        this._undoRedo.push(new RemoveElementCommand(this._elements, element));
     }
 
     public switchTool(to: number) {
@@ -218,7 +254,7 @@ export class DrawableCanvas implements ISerializable {
         let maxX = Number.MIN_VALUE;
         let maxY = Number.MIN_VALUE;
 
-		this.elements.actives.forEach(element => {
+		this._elements.forEach(element => {
             const rect = element.boundingBox;
             if (rect.left < minX) minX = rect.left;
             if (rect.right > maxX) maxX = rect.right;
@@ -247,13 +283,17 @@ export class DrawableCanvas implements ISerializable {
     }
 
     private undo() {
-        this.elements.undo();
+        this._undoRedo.undo();
         this.updateBounding();
     }
 
     private redo() {
-        this.elements.redo();
+        this._undoRedo.redo();
         this.updateBounding();
+    }
+
+    public collapse() {
+        this._undoRedo.collapse();
     }
 
     public getPoint(evt: PointerEvent): Vector2 {
@@ -265,7 +305,16 @@ export class DrawableCanvas implements ISerializable {
     public load(reader: BinaryReader): void {
         this._zoom = reader.readF32();
         this.offset = { x: reader.readF32(), y: reader.readF32() };
-        this.elements.load(reader);
+
+        const count = reader.readU32();
+        this._elements = [];
+        for (let i = 0; i < count; i++) {
+            this._elements.push(this.loadElement(reader));
+        }
+        this._nextIndex = this._elements.length > 0
+            ? Math.max(...this._elements.map(e => e.index)) + 1
+            : 0;
+
         this.onZoomChange?.(this._zoom);
     }
 
@@ -273,7 +322,11 @@ export class DrawableCanvas implements ISerializable {
         writer.writeF32(this._zoom);
         writer.writeF32(this.offset.x);
         writer.writeF32(this.offset.y);
-        this.elements.save(writer);
+
+        writer.writeU32(this._elements.length);
+        for (const ele of this._elements) {
+            this.saveElement(ele, writer);
+        }
     }
 
     private loadElement(reader: BinaryReader): DrawableElement {

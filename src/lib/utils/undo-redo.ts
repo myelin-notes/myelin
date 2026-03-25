@@ -1,182 +1,74 @@
-import {ISerializable} from "./binary-helper";
-import {BinaryReader, BinaryWriter} from "./binary-helper";
-
-export class UndoableState<T> implements ISerializable {
-
-    private history: T[] = [];
-	private steps: Step[] = [];
-    private lastIndexActive: number = -1;
-
-	private dirty = false;
-	private activesCached: T[] = [];
-
-	public constructor(
-		private readonly serializer: (value: T, writer: BinaryWriter) => void,
-		private readonly deserializer: (reader: BinaryReader) => T) {
-	}
-
-    public get actives() {
-		if (this.dirty) {
-			this.activesCached = this.computeActives();
-		}
-
-		return this.activesCached;
-    }
-
-    public add<T1 extends T>(change: (i: number) => T1): T1 {
-        if (this.lastIndexActive != this.steps.length - 1) {
-			const removedSteps = this.steps.slice(this.lastIndexActive + 1);
-
-			for (const s of removedSteps) {
-				if (s.type != StepType.ADDED) {
-					continue;
-				}
-
-				this.history = this.history.slice(0, s.index);
-				break;
-			}
-
-            this.steps = this.steps.slice(0, this.lastIndexActive + 1);
-        }
-
-		const res = change(this.history.length);
-        this.history.push(res);
-		this.steps.push({
-			type: StepType.ADDED,
-			index: this.history.length - 1,
-		});
-
-        this.lastIndexActive++;
-		this.dirty = true;
-
-		return res;
-    }
-
-	public remove(index: number) {
-		this.steps.push({
-			type: StepType.REMOVED,
-			index: index,
-		});
-
-		this.lastIndexActive++;
-		this.dirty = true;
-	}
-
-	public modify(index: number) {
-		this.steps.push({
-			type: StepType.MODIFIED,
-			index: index,
-		});
-		this.dirty = true;
-	}
-
-    public undo() {
-        if (this.steps.length <= 0) {
-            return;
-        }
-
-		if (this.lastIndexActive === -1) {
-			return;
-		}
-
-        this.lastIndexActive--;
-		this.dirty = true;
-    }
-
-    public redo() {
-        if (this.lastIndexActive === this.steps.length - 1) {
-            return;
-        }
-
-        this.lastIndexActive++;
-		this.dirty = true;
-    }
-
-	private computeActives() {
-		this.dirty = false;
-		const usedSteps = this.steps.slice(0, this.lastIndexActive + 1);
-		const resultIndices = new Set<number>();
-
-		for (const s of usedSteps) {
-			switch (s.type) {
-				case StepType.ADDED:
-					resultIndices.add(s.index);
-					break;
-				case StepType.REMOVED:
-					resultIndices.delete(s.index);
-					break;
-				case StepType.MODIFIED:
-					break;
-			}
-		}
-
-		const result = new Array(resultIndices.size);
-		let i = 0;
-
-		for (const s of resultIndices) {
-			result[i] = this.history[s];
-			i++;
-		}
-
-		return result;
-	}
-
-	public load(reader: BinaryReader): void {
-		this.lastIndexActive = reader.readI32();
-
-		const stepsLen = reader.readU32();
-		const steps: Step[] = new Array(stepsLen);
-
-		for (let i = 0; i < stepsLen; i++) {
-			steps[i] = {
-				index: reader.readU32(),
-				type: reader.readU8() as StepType
-			};
-		}
-
-		const historyLen = reader.readU32();
-		const history = new Array(historyLen);
-
-		for (let i = 0; i < historyLen; i++) {
-			history[i] = this.deserializer(reader);
-		}
-
-		this.steps = steps;
-		this.history = history;
-		this.dirty = true;
-	}
-
-	public save(writer: BinaryWriter): void {
-		writer.writeI32(this.lastIndexActive);
-		writer.writeU32(this.steps.length);
-
-		for (const step of this.steps) {
-			writer.writeU32(step.index);
-			writer.writeU8(step.type);
-		}
-
-		writer.writeU32(this.history.length);
-		for (const ele of this.history) {
-			this.serializer(ele, writer);
-		}
-	}
+export interface UndoCommand {
+	execute(): void;
+	undo(): void;
 }
 
-export interface IUndoable {
-    cutoff(): boolean;
-    canUndo(): boolean;
-    canRedo(): boolean;
-    undo(): void;
-    redo(): void;
+export class UndoRedoStack {
+	private undoStack: UndoCommand[] = [];
+	private redoStack: UndoCommand[] = [];
+	private groupBuffer: UndoCommand[] | null = null;
+
+	push(command: UndoCommand) {
+		command.execute();
+		if (this.groupBuffer) {
+			this.groupBuffer.push(command);
+		} else {
+			this.undoStack.push(command);
+			this.redoStack = [];
+		}
+	}
+
+	beginGroup() {
+		this.groupBuffer = [];
+	}
+
+	endGroup() {
+		if (!this.groupBuffer) return;
+		if (this.groupBuffer.length > 0) {
+			this.undoStack.push(
+				this.groupBuffer.length === 1
+					? this.groupBuffer[0]
+					: new CompoundCommand(this.groupBuffer)
+			);
+			this.redoStack = [];
+		}
+		this.groupBuffer = null;
+	}
+
+	undo() {
+		const cmd = this.undoStack.pop();
+		if (!cmd) return;
+		cmd.undo();
+		this.redoStack.push(cmd);
+	}
+
+	redo() {
+		const cmd = this.redoStack.pop();
+		if (!cmd) return;
+		cmd.execute();
+		this.undoStack.push(cmd);
+	}
+
+	collapse() {
+		this.undoStack = [];
+		this.redoStack = [];
+		this.groupBuffer = null;
+	}
+
+	canUndo() { return this.undoStack.length > 0; }
+	canRedo() { return this.redoStack.length > 0; }
 }
 
-const enum StepType {
-	ADDED = 0,
-	REMOVED,
-	MODIFIED
-}
+class CompoundCommand implements UndoCommand {
+	constructor(private commands: UndoCommand[]) {}
 
-interface Step {
-	type: StepType,
-	index: number;
+	execute() {
+		for (const cmd of this.commands) cmd.execute();
+	}
+
+	undo() {
+		for (let i = this.commands.length - 1; i >= 0; i--) {
+			this.commands[i].undo();
+		}
+	}
 }

@@ -37,7 +37,7 @@ export class SelectTool implements ITool {
         this.startPoint = canvas.getPoint(event);
         this.finished = false;
 
-        for (const e of canvas.getElements.actives) {
+        for (const e of canvas.elements) {
             if (CollisionHelper.inBox(this.startPoint, e.boundingBox)) {
                 e.select();
             } else {
@@ -47,7 +47,7 @@ export class SelectTool implements ITool {
     }
 
     public update(canvas: DrawableCanvas, _event: PointerEvent, position: Vector2): void {
-        for (const e of canvas.getElements.actives) {
+        for (const e of canvas.elements) {
             if (CollisionHelper.overlappingAreaOf2Rect(
                 new DOMRect(
                     Math.min(this.startPoint.x, position.x),

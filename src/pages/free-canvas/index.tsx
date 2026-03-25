@@ -71,6 +71,7 @@ export function CanvasView() {
 
   const back = useCallback(async () => {
     await autoSave();
+    drawableCanvasRef.current?.collapse();
     navigate("/library");
   }, [autoSave, navigate]);
 
