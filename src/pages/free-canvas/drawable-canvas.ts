@@ -230,31 +230,39 @@ export class DrawableCanvas implements ISerializable {
 
     private initEventListeners(canvas: HTMLCanvasElement) {
         canvas.addEventListener("wheel", evt => {
-            const prevZoom = this._zoom;
-            const newZoom = prevZoom + evt.deltaY * -0.005;
-            this._zoom = Math.min(3, Math.max(0.2, newZoom));
+            if (evt.ctrlKey) {
+                // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures)
+                evt.preventDefault();
+                const prevZoom = this._zoom;
+                const newZoom = prevZoom + evt.deltaY * -0.005;
+                this._zoom = Math.min(3, Math.max(0.2, newZoom));
 
-            const dpr = window.devicePixelRatio || 1;
-            const canvasCenter = {
-                x: this.canvas.width / dpr / 2,
-                y: this.canvas.height / dpr / 2,
-            };
+                const dpr = window.devicePixelRatio || 1;
+                const canvasCenter = {
+                    x: this.canvas.width / dpr / 2,
+                    y: this.canvas.height / dpr / 2,
+                };
 
-            const worldCenterBeforeZoom = {
-                x: (canvasCenter.x / prevZoom) - this.offset.x,
-                y: (canvasCenter.y / prevZoom) - this.offset.y,
-            };
+                const worldCenterBeforeZoom = {
+                    x: (canvasCenter.x / prevZoom) - this.offset.x,
+                    y: (canvasCenter.y / prevZoom) - this.offset.y,
+                };
 
-            const worldCenterAfterZoom = {
-                x: (canvasCenter.x / this._zoom) - this.offset.x,
-                y: (canvasCenter.y / this._zoom) - this.offset.y,
-            };
+                const worldCenterAfterZoom = {
+                    x: (canvasCenter.x / this._zoom) - this.offset.x,
+                    y: (canvasCenter.y / this._zoom) - this.offset.y,
+                };
 
-            this.offset.x += worldCenterAfterZoom.x - worldCenterBeforeZoom.x;
-            this.offset.y += worldCenterAfterZoom.y - worldCenterBeforeZoom.y;
+                this.offset.x += worldCenterAfterZoom.x - worldCenterBeforeZoom.x;
+                this.offset.y += worldCenterAfterZoom.y - worldCenterBeforeZoom.y;
 
-            this.onZoomChange?.(this._zoom);
-        }, { passive: true });
+                this.onZoomChange?.(this._zoom);
+            } else {
+                // Two-finger scroll on trackpad / mouse wheel → pan
+                this.offset.x -= evt.deltaX / this._zoom;
+                this.offset.y -= evt.deltaY / this._zoom;
+            }
+        }, { passive: false });
 
         canvas.addEventListener("pointermove", evt => {
             this.mousePosition = this.getPoint(evt);
