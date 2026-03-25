@@ -49,14 +49,16 @@ export class TextTool implements ITool {
     }
 
     private createNew(canvas: DrawableCanvas, worldPos: Vector2) {
-        const screenPos = canvas.worldToScreen(worldPos);
+        const halfLine = DEFAULT_FONT_SIZE * 1.3 / 2;
+        const placedPos = { x: worldPos.x, y: worldPos.y - halfLine };
+        const screenPos = canvas.worldToScreen(placedPos);
         const screenFontSize = DEFAULT_FONT_SIZE * canvas.zoom;
 
         canvas.requestTextEdit(screenPos, screenFontSize, "", (text: string) => {
             if (!text.trim()) return;
             const el = canvas.addElement(i => {
                 const te = new TextElement(i, text);
-                te.setPosition(worldPos.x, worldPos.y);
+                te.setPosition(placedPos.x, placedPos.y);
                 return te;
             });
             el.updateBounds();

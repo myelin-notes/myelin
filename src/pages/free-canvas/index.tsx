@@ -239,20 +239,41 @@ export function CanvasView() {
           }}
           ref={(el) => {
             if (!el) return;
-            el.style.height = "auto";
-            el.style.height = el.scrollHeight + "px";
-            el.style.width = "auto";
-            el.style.width = el.scrollWidth + 4 + "px";
-
-            // Compute exact half-leading using the font's real content area
+            // Measure text width via canvas to avoid wrapping
             const fs = textEdit.screenFontSize;
             const mc = document.createElement("canvas").getContext("2d")!;
             mc.font = `${fs}px sans-serif`;
+
+            // Set width from canvas text measurement to prevent wrapping
+            const lines = el.value.split("\n");
+            let maxW = 0;
+            for (const line of lines) {
+              maxW = Math.max(maxW, mc.measureText(line).width);
+            }
+            el.style.width = Math.ceil(maxW + fs) + "px";
+            el.style.height = "auto";
+            el.style.height = el.scrollHeight + "px";
+
+            // Compute exact half-leading using the font's real content area
             mc.textBaseline = "alphabetic";
             const m = mc.measureText("Mg");
             const contentArea = m.fontBoundingBoxAscent + m.fontBoundingBoxDescent;
             const halfLeading = (fs * 1.3 - contentArea) / 2;
             el.style.top = `${textEdit.screenPos.y - halfLeading}px`;
+          }}
+          onInput={(e) => {
+            const ta = e.currentTarget;
+            const fs = textEdit.screenFontSize;
+            const mc = document.createElement("canvas").getContext("2d")!;
+            mc.font = `${fs}px sans-serif`;
+            const lines = ta.value.split("\n");
+            let maxW = 0;
+            for (const line of lines) {
+              maxW = Math.max(maxW, mc.measureText(line).width);
+            }
+            ta.style.width = Math.ceil(maxW + fs) + "px";
+            ta.style.height = "auto";
+            ta.style.height = ta.scrollHeight + "px";
           }}
           onBlur={(e) => {
             textEdit.onCommit(e.currentTarget.value);
@@ -268,13 +289,6 @@ export function CanvasView() {
               textEdit.onCommit(e.currentTarget.value);
               setTextEdit(null);
             }
-          }}
-          onInput={(e) => {
-            const ta = e.currentTarget;
-            ta.style.height = "auto";
-            ta.style.height = ta.scrollHeight + "px";
-            ta.style.width = "auto";
-            ta.style.width = ta.scrollWidth + 4 + "px";
           }}
         />
       )}
