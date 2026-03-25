@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { FolderInput, ArrowDownAZ, Search, ChevronRight } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { RecentCard } from "./recent-card";
@@ -44,6 +44,7 @@ export function LibraryPage() {
   const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
 
   const triggerRefresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -216,7 +217,7 @@ export function LibraryPage() {
               currentFolderId={currentFolderId}
               onNavigate={setCurrentFolderId}
               onTagsChanged={() => setRefreshKey((k) => k + 1)}
-              filterTags={[...activeTags]}
+              filterTags={filterTagsArr}
             />
           </div>
 

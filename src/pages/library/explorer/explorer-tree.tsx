@@ -46,8 +46,7 @@ export function ExplorerTree({ currentFolderId, onNavigate, ref, onTagsChanged, 
       setRenamingNewId(id);
       setNodes(prev => [{ id, name, type: 'folder' as const, parentId: currentFolderId, children: [], tags: [] }, ...prev]);
       requestAnimationFrame(() => setRenamingNewId(null));
-      onTagsChanged?.();
-    }, [currentFolderId, onTagsChanged]);
+    }, [currentFolderId]);
 
     const startNewFile = useCallback(async (title: string, type: FileType) => {
       const name = await FileSystem.getUniqueFileName(title, currentFolderId);
@@ -55,8 +54,7 @@ export function ExplorerTree({ currentFolderId, onNavigate, ref, onTagsChanged, 
       setRenamingNewId(id);
       setNodes(prev => [...prev, { id, name, type: 'file' as const, fileType: type, parentId: currentFolderId, tags: [] }]);
       requestAnimationFrame(() => setRenamingNewId(null));
-      onTagsChanged?.();
-    }, [currentFolderId, onTagsChanged]);
+    }, [currentFolderId]);
 
     useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [reload, startNewFolder, startNewFile]);
 
