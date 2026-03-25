@@ -98,7 +98,7 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
       {/* Insights */}
       <div className={cn(
         "flex flex-col gap-4 border-t border-border-subtle",
-        activeTags.size > 0 ? "pt-4" : "pt-10"
+        "pt-4"
       )}>
         <h4 className="text-[10px] font-bold uppercase tracking-[1px] text-text-secondary">
           Studio Insights
