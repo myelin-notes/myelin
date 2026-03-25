@@ -24,6 +24,8 @@ export interface VFSFileNode {
     fileType: FileType;
     parentId: string | null;
     tags: string[];
+    createdAt: number;
+    modifiedAt: number;
 }
 
 export interface VFSFolderNode {
@@ -33,6 +35,8 @@ export interface VFSFolderNode {
     parentId: string | null;
     children: string[];
     tags: string[];
+    createdAt: number;
+    modifiedAt: number;
 }
 
 export type VFSNode = VFSFileNode | VFSFolderNode;
@@ -69,6 +73,11 @@ export namespace FileSystem {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function migrate(parsed: any): VFSManifest {
+        const now = Date.now();
+        for (const node of Object.values(parsed.nodes) as any[]) {
+            if (node.createdAt == null) node.createdAt = now;
+            if (node.modifiedAt == null) node.modifiedAt = now;
+        }
         return parsed as VFSManifest;
     }
 
@@ -204,6 +213,13 @@ export namespace FileSystem {
         return Object.values(manifest.nodes).filter(n => n.tags.some(t => tagSet.has(t)));
     }
 
+    export function searchNodes(manifest: VFSManifest, query: string): VFSNode[] {
+        const q = query.toLowerCase();
+        return Object.values(manifest.nodes).filter(n =>
+            n.name.toLowerCase().includes(q) || n.tags.some(t => t.toLowerCase().includes(q))
+        );
+    }
+
     export function getStats(manifest: VFSManifest): { totalFiles: number; totalFolders: number; totalTags: number } {
         let totalFiles = 0;
         let totalFolders = 0;
@@ -222,6 +238,7 @@ export namespace FileSystem {
         const manifest = await loadManifest();
 
         const id = generateId();
+        const now = Date.now();
         manifest.nodes[id] = {
             id,
             name,
@@ -229,6 +246,8 @@ export namespace FileSystem {
             parentId,
             children: [],
             tags: [],
+            createdAt: now,
+            modifiedAt: now,
         };
         addChild(manifest, parentId, id);
         await saveManifest(manifest);
@@ -248,6 +267,7 @@ export namespace FileSystem {
         });
         await file.close();
 
+        const now = Date.now();
         manifest.nodes[id] = {
             id,
             name,
@@ -255,6 +275,8 @@ export namespace FileSystem {
             fileType,
             parentId,
             tags: [],
+            createdAt: now,
+            modifiedAt: now,
         };
         addChild(manifest, parentId, id);
         await saveManifest(manifest);
@@ -266,6 +288,7 @@ export namespace FileSystem {
         const node = manifest.nodes[nodeId];
         if (!node) return;
         node.name = newName;
+        node.modifiedAt = Date.now();
         await saveManifest(manifest);
     }
 
@@ -330,6 +353,7 @@ export namespace FileSystem {
 
         removeChild(manifest, node.parentId, nodeId);
         node.parentId = newParentId;
+        node.modifiedAt = Date.now();
         addChild(manifest, newParentId, nodeId);
         await saveManifest(manifest);
     }
@@ -339,6 +363,7 @@ export namespace FileSystem {
         const node = manifest.nodes[nodeId];
         if (!node) return;
         node.tags = tags;
+        node.modifiedAt = Date.now();
         await saveManifest(manifest);
     }
 
@@ -347,6 +372,7 @@ export namespace FileSystem {
         const node = manifest.nodes[nodeId];
         if (!node || node.tags.includes(tag)) return;
         node.tags.push(tag);
+        node.modifiedAt = Date.now();
         await saveManifest(manifest);
     }
 
@@ -355,6 +381,7 @@ export namespace FileSystem {
         const node = manifest.nodes[nodeId];
         if (!node) return;
         node.tags = node.tags.filter(t => t !== tag);
+        node.modifiedAt = Date.now();
         await saveManifest(manifest);
     }
 
@@ -391,6 +418,9 @@ export namespace FileSystem {
         await writeFile(filePath, new Uint8Array(writer.getBuffer()), {
             baseDir: BaseDirectory.AppData,
         });
+
+        node.modifiedAt = Date.now();
+        await saveManifest(manifest);
     }
 
     export async function loadFromFile(nodeId: string, content: ISerializable) {

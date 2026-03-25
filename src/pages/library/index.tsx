@@ -1,8 +1,8 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { FolderInput, ArrowDownAZ, Search, ChevronRight } from "lucide-react";
+import { ArrowDownAZ, ArrowDownZA, Clock, CalendarPlus, Search, ChevronRight } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { RecentCard } from "./recent-card";
-import { ExplorerTree, ExplorerTreeHandle } from "./explorer/explorer-tree";
+import { ExplorerTree, ExplorerTreeHandle, SortMode } from "./explorer/explorer-tree";
 import { SemanticTags } from "./semantic-tags";
 import { CreateNewDropdown } from "./create-new-dropdown";
 import { FileSystem, VFSFolderNode } from "@/lib/utils/file-system";
@@ -45,6 +45,12 @@ export function LibraryPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const sortModes: SortMode[] = ["name-asc", "name-desc", "modified", "created"];
+  const [sortMode, setSortMode] = useState<SortMode>("name-asc");
+  const cycleSortMode = useCallback(() => {
+    setSortMode((prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length]);
+  }, []);
 
   const triggerRefresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -152,6 +158,8 @@ export function LibraryPage() {
               <Search className="size-3.5 text-text-muted shrink-0" />
               <input
                 type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search studio..."
                 className="w-full bg-transparent py-2 px-3 text-sm font-medium text-text-primary placeholder:text-text-muted outline-none"
               />
@@ -199,11 +207,15 @@ export function LibraryPage() {
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <button className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
-                  <FolderInput className="size-4" />
-                </button>
-                <button className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
-                  <ArrowDownAZ className="size-4" />
+                <button
+                  onClick={cycleSortMode}
+                  title={`Sort: ${sortMode}`}
+                  className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                >
+                  {sortMode === "name-asc" && <ArrowDownAZ className="size-4" />}
+                  {sortMode === "name-desc" && <ArrowDownZA className="size-4" />}
+                  {sortMode === "modified" && <Clock className="size-4" />}
+                  {sortMode === "created" && <CalendarPlus className="size-4" />}
                 </button>
                 <CreateNewDropdown
                   onNewFolder={() => explorerRef.current?.startNewFolder()}
@@ -217,6 +229,8 @@ export function LibraryPage() {
               currentFolderId={currentFolderId}
               onNavigate={setCurrentFolderId}
               onTagsChanged={() => setRefreshKey((k) => k + 1)}
+              sortMode={sortMode}
+              searchQuery={searchQuery}
               filterTags={filterTagsArr}
             />
           </div>
