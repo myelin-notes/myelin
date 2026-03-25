@@ -24,6 +24,9 @@ export class SelectTool implements ITool {
     private totalDelta: Vector2 = {x: 0, y: 0};
     private movingElements: DrawableElement[] = [];
 
+    // Cycle-through state
+    private lastCycledElement: DrawableElement | null = null;
+
     // Scale state
     private scalingElement: DrawableElement | null = null;
     private handleIndex: number = -1;
@@ -81,21 +84,25 @@ export class SelectTool implements ITool {
             }
         }
 
-        // 2. Hit-test elements (topmost first)
-        let topHit: DrawableElement | null = null;
+        // 2. Hit-test elements (topmost first), cycle on repeated clicks
+        const hits: DrawableElement[] = [];
         for (let i = canvas.elements.length - 1; i >= 0; i--) {
             const e = canvas.elements[i];
             if (CollisionHelper.inBox(point, e.boundingBox)) {
-                topHit = e;
-                break;
+                hits.push(e);
             }
         }
 
-        if (topHit) {
-            if (!topHit.isSelected) {
-                for (const e of canvas.elements) e.unselect();
-                topHit.select();
+        if (hits.length > 0) {
+            let pick = hits[0];
+            if (hits.length > 1 && this.lastCycledElement && hits.includes(this.lastCycledElement)) {
+                const idx = hits.indexOf(this.lastCycledElement);
+                pick = hits[(idx + 1) % hits.length];
             }
+            this.lastCycledElement = pick;
+
+            for (const e of canvas.elements) e.unselect();
+            pick.select();
             this.mode = SelectMode.Moving;
             this.lastPoint = point;
             this.totalDelta = { x: 0, y: 0 };
@@ -104,6 +111,7 @@ export class SelectTool implements ITool {
         }
 
         // 3. Empty space → marquee
+        this.lastCycledElement = null;
         this.mode = SelectMode.Marquee;
         for (const e of canvas.elements) e.unselect();
     }
@@ -228,6 +236,7 @@ export class SelectTool implements ITool {
             this.scalingElement.setScale(this.originalScale.x, this.originalScale.y);
             this.scalingElement.setOffset(this.originalOffset.x, this.originalOffset.y);
         }
+        this.lastCycledElement = null;
         this.reset();
     }
 
