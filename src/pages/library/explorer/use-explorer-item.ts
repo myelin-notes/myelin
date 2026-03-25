@@ -5,10 +5,11 @@ interface UseExplorerItemOptions {
   nodeId: string;
   name: string;
   onChanged: () => void;
+  initialRenaming?: boolean;
 }
 
-export function useExplorerItem({ nodeId, name, onChanged }: UseExplorerItemOptions) {
-  const [renaming, setRenaming] = useState(false);
+export function useExplorerItem({ nodeId, name, onChanged, initialRenaming }: UseExplorerItemOptions) {
+  const [renaming, setRenaming] = useState(initialRenaming ?? false);
   const [renameValue, setRenameValue] = useState(name);
   const inputRef = useRef<HTMLInputElement>(null);
 

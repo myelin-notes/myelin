@@ -13,11 +13,12 @@ interface FolderItemProps {
   id: string;
   name: string;
   tags: string[];
+  autoRename?: boolean;
   onNavigate: () => void;
   onMoved: () => void;
 }
 
-export function FolderItem({ id, name, tags, onNavigate, onMoved }: FolderItemProps) {
+export function FolderItem({ id, name, tags, autoRename, onNavigate, onMoved }: FolderItemProps) {
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
 
   const {
@@ -30,6 +31,7 @@ export function FolderItem({ id, name, tags, onNavigate, onMoved }: FolderItemPr
     nodeId: id,
     name,
     onChanged: onMoved,
+    initialRenaming: autoRename,
   });
 
   const { dragOver, dropTargetProps } = useDropTarget({

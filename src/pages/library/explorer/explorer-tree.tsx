@@ -20,6 +20,7 @@ interface ExplorerTreeProps {
 export function ExplorerTree({ currentFolderId, onNavigate, ref, onTagsChanged, filterTags }: ExplorerTreeProps) {
     const [nodes, setNodes] = useState<VFSNode[]>([]);
     const [loading, setLoading] = useState(true);
+    const [renamingNewId, setRenamingNewId] = useState<string | null>(null);
     const isFiltering = filterTags && filterTags.length > 0;
 
     const reload = useCallback(async () => {
@@ -40,10 +41,12 @@ export function ExplorerTree({ currentFolderId, onNavigate, ref, onTagsChanged, 
 
     const startNewFolder = useCallback(async () => {
       const name = await FileSystem.getUniqueFileName("Unnamed Folder", currentFolderId);
-      await FileSystem.createFolder(name, currentFolderId);
-      await reload();
+      const id = await FileSystem.createFolder(name, currentFolderId);
+      setRenamingNewId(id);
+      setNodes(prev => [{ id, name, type: 'folder' as const, parentId: currentFolderId, children: [], tags: [] }, ...prev]);
+      requestAnimationFrame(() => setRenamingNewId(null));
       onTagsChanged?.();
-    }, [currentFolderId, reload, onTagsChanged]);
+    }, [currentFolderId, onTagsChanged]);
 
     useImperativeHandle(ref, () => ({ reload, startNewFolder }), [reload, startNewFolder]);
 
@@ -83,6 +86,7 @@ export function ExplorerTree({ currentFolderId, onNavigate, ref, onTagsChanged, 
               id={node.id}
               name={node.name}
               tags={node.tags}
+              autoRename={node.id === renamingNewId}
               onNavigate={() => onNavigate(node.id)}
               onMoved={reloadAndNotify}
             />
