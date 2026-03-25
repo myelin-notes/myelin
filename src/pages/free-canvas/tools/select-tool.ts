@@ -10,10 +10,27 @@ export class SelectTool implements ITool {
 
     public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
         if (this.finished) return;
-        ctx.setLineDash([15]);
-        ctx.lineWidth = 1.25;
-        ctx.strokeStyle = 'black';
-        ctx.strokeRect(this.startPoint.x, this.startPoint.y, position.x - this.startPoint.x, position.y - this.startPoint.y);
+
+        const x = Math.min(this.startPoint.x, position.x);
+        const y = Math.min(this.startPoint.y, position.y);
+        const w = Math.abs(position.x - this.startPoint.x);
+        const h = Math.abs(position.y - this.startPoint.y);
+
+        // Marquee fill
+        ctx.fillStyle = 'rgba(208, 225, 251, 0.15)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 3);
+        ctx.fill();
+
+        // Marquee border
+        ctx.strokeStyle = '#2f3e46';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 4]);
+        ctx.lineDashOffset = 0;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 3);
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 
     public start(canvas: DrawableCanvas, event: PointerEvent): void {

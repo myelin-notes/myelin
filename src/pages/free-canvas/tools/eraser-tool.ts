@@ -26,7 +26,13 @@ export class EraserTool implements ITool {
     }
 
     public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
-        ctx.strokeStyle = "black";
+        ctx.fillStyle = 'rgba(208, 225, 251, 0.15)';
+        ctx.beginPath();
+        ctx.arc(position.x, position.y, this.radius, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(47, 62, 70, 0.5)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(position.x, position.y, this.radius, 0, 2 * Math.PI);
         ctx.stroke();

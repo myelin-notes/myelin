@@ -25,6 +25,7 @@ export class DrawableCanvas implements ISerializable {
     private _zoom: number = 1;
     private spaceDown: boolean = false;
     private mousePosition: Vector2 = { x: 0, y: 0 };
+    private bgColor: string;
 
     private elements: UndoableState<DrawableElement> = new UndoableState(this.saveElement, this.loadElement);
     private toolSelected: ITool;
@@ -43,6 +44,7 @@ export class DrawableCanvas implements ISerializable {
         this.tools = DrawableCanvas.makeTools();
         this.toolSelected = this.tools[0];
 
+        this.bgColor = getComputedStyle(canvas).getPropertyValue('--bg-page').trim() || '#f7f9fb';
         this.initEventListeners(canvas);
         this.initStates();
         this.resizeCanvas(window.innerWidth, window.innerHeight);
@@ -54,7 +56,7 @@ export class DrawableCanvas implements ISerializable {
     }
 
     public redraw(deltaTime: number) {
-        this.ctx.fillStyle = "#f7f9fb";
+        this.ctx.fillStyle = this.bgColor;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         // Draw dot grid
@@ -227,12 +229,12 @@ export class DrawableCanvas implements ISerializable {
 
     private buildDotPattern() {
         const spacing = 24;
-        const dotRadius = 1;
+        const dotRadius = 0.75;
         const patternCanvas = document.createElement("canvas");
         patternCanvas.width = spacing;
         patternCanvas.height = spacing;
         const pctx = patternCanvas.getContext("2d")!;
-        pctx.fillStyle = "rgba(195, 199, 202, 0.4)";
+        pctx.fillStyle = "rgba(195, 199, 202, 0.35)";
         pctx.beginPath();
         pctx.arc(spacing / 2, spacing / 2, dotRadius, 0, Math.PI * 2);
         pctx.fill();

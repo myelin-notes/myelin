@@ -4,11 +4,16 @@ import {BinaryReader, BinaryWriter} from "../../../lib/utils/binary-helper";
 import {DrawableElementRegistry} from "./drawable-element-registry";
 import ElementType = DrawableElementRegistry.ElementType;
 
-export const PRIMARY_COLOR = '#DECDF5';
+const SELECTION_STROKE = '#2f3e46';
+const HANDLE_SIZE = 6;
+const SELECTION_PADDING = 4;
+const SELECTION_RADIUS = 4;
+const SELECTION_ANIM_SPEED = 8;
 
 export abstract class DrawableElement implements ISerializable {
     private scale: Vector2 = { x: 1, y: 1 };
     private selected: boolean = false;
+    private selectionT: number = 0;
 
 	protected constructor(public readonly index: number, public readonly type: ElementType) {
 	}
@@ -20,13 +25,68 @@ export abstract class DrawableElement implements ISerializable {
         this.draw2D(ctx, deltaTime);
 
         if (this.selected) {
-            const box = this.boundingBox;
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = PRIMARY_COLOR;
-            ctx.strokeRect(box.x, box.y, box.width, box.height);
+            this.selectionT = Math.min(1, this.selectionT + deltaTime * SELECTION_ANIM_SPEED);
+        }
+
+        if (this.selectionT > 0) {
+            this.drawSelection(ctx, this.selectionT);
         }
 
         ctx.restore();
+    }
+
+    private drawSelection(ctx: CanvasRenderingContext2D, t: number): void {
+        const box = this.boundingBox;
+        const eased = 1 - (1 - t) * (1 - t);
+
+        const pad = SELECTION_PADDING * eased;
+        const x = box.x - pad;
+        const y = box.y - pad;
+        const w = box.width + pad * 2;
+        const h = box.height + pad * 2;
+        const r = SELECTION_RADIUS * eased;
+
+        ctx.globalAlpha = eased;
+
+        // Selection fill
+        ctx.fillStyle = `rgba(208, 225, 251, 0.12)`;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, r);
+        ctx.fill();
+
+        // Selection border
+        ctx.strokeStyle = SELECTION_STROKE;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, r);
+        ctx.stroke();
+
+        // Corner handles
+        const handleScale = eased;
+        const size = HANDLE_SIZE * handleScale;
+        const half = size / 2;
+        const corners: [number, number][] = [
+            [x - half, y - half],
+            [x + w - half, y - half],
+            [x - half, y + h - half],
+            [x + w - half, y + h - half],
+        ];
+
+        for (const [cx, cy] of corners) {
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.roundRect(cx, cy, size, size, 1.5 * handleScale);
+            ctx.fill();
+
+            ctx.strokeStyle = SELECTION_STROKE;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(cx, cy, size, size, 1.5 * handleScale);
+            ctx.stroke();
+        }
+
+        ctx.globalAlpha = 1;
     }
 
     public select() {
@@ -35,6 +95,7 @@ export abstract class DrawableElement implements ISerializable {
 
     public unselect() {
         this.selected = false;
+        this.selectionT = 0;
     }
 
     public changeDimensionRelative(x: number, y: number) {
