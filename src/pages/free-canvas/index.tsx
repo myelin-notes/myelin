@@ -153,7 +153,7 @@ export function CanvasView() {
                 <TooltipTrigger
                     className={`p-2.5 rounded-lg border-none cursor-pointer transition-colors ${
                       isActive
-                        ? "bg-accent-dark text-white"
+                        ? "bg-accent-dark text-white shadow-md"
                         : "bg-transparent text-text-secondary hover:bg-black/5"
                     }`}
                     onClick={() => {

@@ -220,6 +220,13 @@ export namespace FileSystem {
         );
     }
 
+    export function getRecentFiles(manifest: VFSManifest, limit: number = 3): VFSFileNode[] {
+        return Object.values(manifest.nodes)
+            .filter((n): n is VFSFileNode => n.type === 'file')
+            .sort((a, b) => b.modifiedAt - a.modifiedAt)
+            .slice(0, limit);
+    }
+
     export function getStats(manifest: VFSManifest): { totalFiles: number; totalFolders: number; totalTags: number } {
         let totalFiles = 0;
         let totalFolders = 0;

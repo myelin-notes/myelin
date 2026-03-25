@@ -4,9 +4,10 @@ interface RecentCardProps {
   category: string;
   time: string;
   title: string;
-  excerpt: string;
+  excerpt?: string;
   tags: string[];
   featured?: boolean;
+  onClick?: () => void;
 }
 
 export function RecentCard({
@@ -16,9 +17,11 @@ export function RecentCard({
   excerpt,
   tags,
   featured,
+  onClick,
 }: RecentCardProps) {
   return (
     <div
+      onClick={onClick}
       className={cn(
         "relative flex flex-col rounded-xl p-6 h-[204px] overflow-hidden cursor-pointer transition-shadow hover:shadow-md",
         featured ? "bg-card-active" : "bg-surface"
@@ -45,9 +48,11 @@ export function RecentCard({
         {title}
       </h4>
 
-      <p className="mt-4 text-sm font-normal leading-5 text-text-secondary line-clamp-2">
-        {excerpt}
-      </p>
+      {excerpt && (
+        <p className="mt-4 text-sm font-normal leading-5 text-text-secondary line-clamp-2">
+          {excerpt}
+        </p>
+      )}
 
       <div className="mt-auto flex flex-wrap gap-2 pt-3">
         {tags.map((tag) => (

@@ -1,48 +1,42 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { ArrowDownAZ, ArrowDownZA, Clock, CalendarPlus, Search, ChevronRight } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { RecentCard } from "./recent-card";
 import { ExplorerTree, ExplorerTreeHandle, SortMode } from "./explorer/explorer-tree";
 import { SemanticTags } from "./semantic-tags";
 import { CreateNewDropdown } from "./create-new-dropdown";
-import { FileSystem, VFSFolderNode } from "@/lib/utils/file-system";
+import { FileSystem, VFSFileNode, VFSFolderNode } from "@/lib/utils/file-system";
 
 
-const recentItems = [
-  {
-    category: "Draft",
-    time: "2h ago",
-    title: "The Architecture of Silence",
-    excerpt:
-      "Exploring the spatial dynamics of monastic retreats in the modern\u2026",
-    tags: ["Architecture"],
-    featured: true,
-  },
-  {
-    category: "Research",
-    time: "Yesterday",
-    title: "Phenomenology of Tools",
-    excerpt:
-      "How physical interfaces dictate the cognitive flow of digital creators.",
-    tags: ["Philosophy", "Systems"],
-  },
-  {
-    category: "Note",
-    time: "3 days ago",
-    title: "Brutalist Typography",
-    excerpt:
-      "Collecting specimens of high-contrast sans-serifs in late 70s\u2026",
-    tags: ["Design"],
-  },
-];
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+const fileTypeLabel: Record<string, string> = {
+  mdoc: "Document",
+  mcanvas: "Canvas",
+};
 
 export function LibraryPage() {
+  const navigate = useNavigate();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -56,6 +50,12 @@ export function LibraryPage() {
     setRefreshKey((k) => k + 1);
     explorerRef.current?.reload();
   }, []);
+
+  useEffect(() => {
+    FileSystem.getManifest().then((manifest) => {
+      setRecentFiles(FileSystem.getRecentFiles(manifest, 3));
+    });
+  }, [refreshKey]);
 
   // Update breadcrumbs when folder changes
   useEffect(() => {
@@ -137,19 +137,29 @@ export function LibraryPage() {
         </h1>
 
         {/* Recently Opened */}
-        <section className="mt-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-heading text-2xl font-normal leading-8 text-text-primary">
-              Recently Opened
-            </h3>
-          </div>
+        {recentFiles.length > 0 && (
+          <section className="mt-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-heading text-2xl font-normal leading-8 text-text-primary">
+                Recently Opened
+              </h3>
+            </div>
 
-          <div className="grid grid-cols-3 gap-6">
-            {recentItems.map((item) => (
-              <RecentCard key={item.title} {...item} />
-            ))}
-          </div>
-        </section>
+            <div className="grid grid-cols-3 gap-6">
+              {recentFiles.map((file, i) => (
+                <RecentCard
+                  key={file.id}
+                  category={fileTypeLabel[file.fileType] ?? file.fileType}
+                  time={formatRelativeTime(file.modifiedAt)}
+                  title={file.name}
+                  tags={file.tags}
+                  featured={i === 0}
+                  onClick={() => navigate(`/${file.fileType}/${file.id}`)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Explorer + Tags */}
         <section className="mt-12 grid grid-cols-12 gap-12">
