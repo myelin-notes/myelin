@@ -12,6 +12,7 @@ declare module "@/lib/keybindings" {
     "canvas:undo": true;
     "canvas:redo": true;
     "canvas:delete": true;
+    "canvas:tool-text": true;
   }
 }
 import {
@@ -21,6 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ChevronLeft as ChevronLeftIcon, X as XIcon } from "lucide-react";
+import { Vector2 } from "@/pages/free-canvas/drawable-canvas";
 
 function toolToWheelItem(
   getCanvas: () => DrawableCanvas | null,
@@ -52,6 +54,11 @@ export function CanvasView() {
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
   const [fileName, setFileName] = useState("");
+  const [textEdit, setTextEdit] = useState<{
+    screenPos: Vector2;
+    zoom: number;
+    onCommit: (text: string) => void;
+  } | null>(null);
 
   const [tools] = useState<WheelItem[]>(() => {
     const canvasTools = DrawableCanvas.makeTools();
@@ -119,6 +126,10 @@ export function CanvasView() {
       setZoomLevel(Math.round(zoom * 100));
     });
 
+    dc.setOnRequestTextEdit((screenPos, _worldPos, zoom, onCommit) => {
+      setTextEdit({ screenPos, zoom, onCommit });
+    });
+
     let prevTime = 0;
     let animationFrameId: number;
 
@@ -137,6 +148,7 @@ export function CanvasView() {
       "canvas:undo": { key: "z", mod: true },
       "canvas:redo": { key: "z", mod: true, shift: true },
       "canvas:delete": { key: "Backspace" },
+      "canvas:tool-text": { key: "t" },
     });
 
     const unbindKeys = keybindings.register([
@@ -144,6 +156,7 @@ export function CanvasView() {
       { action: "canvas:undo", onDown: () => dc.undo() },
       { action: "canvas:redo", onDown: () => dc.redo() },
       { action: "canvas:delete", onDown: () => dc.deleteSelected() },
+      { action: "canvas:tool-text", onDown: () => { dc.switchTool(4); setSelectedToolIndex(4); } },
     ]);
 
     FileSystem.loadFromFile(id, dc)
@@ -207,6 +220,45 @@ export function CanvasView() {
         <span className="mx-2 text-border-divider">|</span>
         <span className="text-xs font-medium text-text-muted">{fps} fps</span>
       </div>
+
+      {/* Text editing overlay */}
+      {textEdit && (
+        <textarea
+          autoFocus
+          className="absolute z-20 bg-transparent border-none outline-none resize-none overflow-hidden text-text-primary caret-accent-dark"
+          style={{
+            left: textEdit.screenPos.x,
+            top: textEdit.screenPos.y,
+            fontSize: 24 * textEdit.zoom,
+            lineHeight: 1.3,
+            fontFamily: "sans-serif",
+            minWidth: 4,
+            minHeight: 24 * textEdit.zoom * 1.3,
+          }}
+          onBlur={(e) => {
+            textEdit.onCommit(e.currentTarget.value);
+            setTextEdit(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.currentTarget.blur();
+              setTextEdit(null);
+            }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              textEdit.onCommit(e.currentTarget.value);
+              setTextEdit(null);
+            }
+          }}
+          onInput={(e) => {
+            const ta = e.currentTarget;
+            ta.style.height = "auto";
+            ta.style.height = ta.scrollHeight + "px";
+            ta.style.width = "auto";
+            ta.style.width = ta.scrollWidth + 4 + "px";
+          }}
+        />
+      )}
 
       {/* Wheel picker */}
       <WheelPicker ref={wheelRef} radius={100} items={tools}>

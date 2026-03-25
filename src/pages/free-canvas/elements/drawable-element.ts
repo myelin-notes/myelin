@@ -1,8 +1,7 @@
 import {Vector2} from "../drawable-canvas";
 import {ISerializable} from "../../../lib/utils/binary-helper";
 import {BinaryReader, BinaryWriter} from "../../../lib/utils/binary-helper";
-import {DrawableElementRegistry} from "./drawable-element-registry";
-import ElementType = DrawableElementRegistry.ElementType;
+import {ElementType} from "./element-type";
 
 const SELECTION_STROKE = '#2f3e46';
 const HANDLE_SIZE = 6;
@@ -47,22 +46,27 @@ export abstract class DrawableElement implements ISerializable {
             this.selectionT = Math.min(1, this.selectionT + deltaTime * SELECTION_ANIM_SPEED);
         }
 
-        if (this.selectionT > 0) {
-            this.drawSelection(ctx, this.selectionT);
-        }
-
+        // Draw selection outside the element's scale transform
         ctx.restore();
+        if (this.selectionT > 0) {
+            ctx.save();
+            ctx.translate(this._offset.x, this._offset.y);
+            this.drawSelection(ctx, this.selectionT);
+            ctx.restore();
+        }
     }
 
     private drawSelection(ctx: CanvasRenderingContext2D, t: number): void {
-        const box = this.localBoundingBox;
+        const local = this.localBoundingBox;
         const eased = 1 - (1 - t) * (1 - t);
 
         const pad = SELECTION_PADDING * eased;
-        const x = box.x - pad;
-        const y = box.y - pad;
-        const w = box.width + pad * 2;
-        const h = box.height + pad * 2;
+        const sx = this._scale.x;
+        const sy = this._scale.y;
+        const x = local.x * sx - pad;
+        const y = local.y * sy - pad;
+        const w = local.width * sx + pad * 2;
+        const h = local.height * sy + pad * 2;
         const r = SELECTION_RADIUS * eased;
 
         ctx.globalAlpha = eased;

@@ -1,15 +1,14 @@
 import {Stroke} from "./stroke";
+import {TextElement} from "./text-element";
 import {DrawableElement} from "./drawable-element";
+import {ElementType} from "./element-type";
 
 export namespace DrawableElementRegistry {
-    export const enum ElementType {
-        STROKE = 0,
-    }
-
     export const MAP: Record<ElementType, (i: number) => DrawableElement> = {
         [ElementType.STROKE]: i => new Stroke(i, [], false, {
             color: "black",
             size: 12,
         }),
+        [ElementType.TEXT]: i => new TextElement(i),
     };
 }

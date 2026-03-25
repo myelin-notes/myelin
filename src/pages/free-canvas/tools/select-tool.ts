@@ -136,8 +136,14 @@ export class SelectTool implements ITool {
                     y: position.y - this.anchorWorld.y,
                 };
 
-                const ratioX = origDist.x !== 0 ? curDist.x / origDist.x : 1;
-                const ratioY = origDist.y !== 0 ? curDist.y / origDist.y : 1;
+                let ratioX = origDist.x !== 0 ? curDist.x / origDist.x : 1;
+                let ratioY = origDist.y !== 0 ? curDist.y / origDist.y : 1;
+
+                if (_event.shiftKey) {
+                    const uniform = Math.abs(ratioX) > Math.abs(ratioY) ? ratioX : ratioY;
+                    ratioX = uniform;
+                    ratioY = uniform;
+                }
 
                 const newScale = {
                     x: Math.max(MIN_SCALE, this.originalScale.x * ratioX),

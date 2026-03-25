@@ -131,7 +131,13 @@ class KeybindingManager {
         this.listening = false;
     }
 
+    private shouldIgnore(e: KeyboardEvent): boolean {
+        const tag = (e.target as HTMLElement)?.tagName;
+        return tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable === true;
+    }
+
     private onKeyDown = (e: KeyboardEvent) => {
+        if (this.shouldIgnore(e)) return;
         for (const b of this.bindings) {
             const combo = this.getCombo(b.action);
             if (combo && comboMatches(e, combo)) b.onDown?.(e);
@@ -139,6 +145,7 @@ class KeybindingManager {
     };
 
     private onKeyUp = (e: KeyboardEvent) => {
+        if (this.shouldIgnore(e)) return;
         for (const b of this.bindings) {
             const combo = this.getCombo(b.action);
             if (combo && comboMatches(e, combo)) b.onUp?.(e);

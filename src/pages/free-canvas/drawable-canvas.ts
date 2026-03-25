@@ -7,9 +7,10 @@ import {EraserTool} from "./tools/eraser-tool";
 import {ISerializable} from "../../lib/utils/binary-helper";
 import {BinaryReader, BinaryWriter} from "../../lib/utils/binary-helper";
 import {DrawableElementRegistry} from "./elements/drawable-element-registry";
-import ElementType = DrawableElementRegistry.ElementType;
+import {ElementType} from "./elements/element-type";
 import {HighlighterTool} from "./tools/highlighter-tool";
 import {SelectTool} from "./tools/select-tool";
+import {TextTool} from "./tools/text-tool";
 
 export type Vector2 = { x: number, y: number };
 
@@ -95,6 +96,7 @@ export class DrawableCanvas implements ISerializable {
     private toolSelected: ITool;
 
     private onZoomChange?: (zoom: number) => void;
+    private onRequestTextEdit?: (screenPos: Vector2, worldPos: Vector2, zoom: number, onCommit: (text: string) => void) => void;
 
     public constructor(canvas: HTMLCanvasElement) {
         const ctx = canvas.getContext("2d", { alpha: false });
@@ -117,6 +119,14 @@ export class DrawableCanvas implements ISerializable {
 
     public setOnZoomChange(callback: (zoom: number) => void) {
         this.onZoomChange = callback;
+    }
+
+    public setOnRequestTextEdit(callback: (screenPos: Vector2, worldPos: Vector2, zoom: number, onCommit: (text: string) => void) => void) {
+        this.onRequestTextEdit = callback;
+    }
+
+    public requestTextEdit(screenPos: Vector2, worldPos: Vector2, onCommit: (text: string) => void) {
+        this.onRequestTextEdit?.(screenPos, worldPos, this._zoom, onCommit);
     }
 
     public redraw(deltaTime: number) {
@@ -395,6 +405,7 @@ export class DrawableCanvas implements ISerializable {
             new PenTool(),
             new HighlighterTool(),
             new EraserTool(),
+            new TextTool(),
         ];
     }
 }
