@@ -11,17 +11,36 @@ const SELECTION_RADIUS = 4;
 const SELECTION_ANIM_SPEED = 8;
 
 export abstract class DrawableElement implements ISerializable {
-    private scale: Vector2 = { x: 1, y: 1 };
+    private _scale: Vector2 = { x: 1, y: 1 };
+    private _offset: Vector2 = { x: 0, y: 0 };
     private selected: boolean = false;
     private selectionT: number = 0;
 
 	protected constructor(public readonly index: number, public readonly type: ElementType) {
 	}
 
+    public get offset(): Vector2 { return this._offset; }
+    public get scale(): Vector2 { return this._scale; }
+
+    public translate(dx: number, dy: number) {
+        this._offset.x += dx;
+        this._offset.y += dy;
+    }
+
+    public setOffset(x: number, y: number) {
+        this._offset = { x, y };
+    }
+
+    public setScale(x: number, y: number) {
+        this._scale = { x, y };
+        this.updateBoundingBox();
+    }
+
     public draw(ctx: CanvasRenderingContext2D, deltaTime: number): void {
         ctx.save();
 
-        ctx.scale(this.scale.x, this.scale.y);
+        ctx.translate(this._offset.x, this._offset.y);
+        ctx.scale(this._scale.x, this._scale.y);
         this.draw2D(ctx, deltaTime);
 
         if (this.selected) {
@@ -36,7 +55,7 @@ export abstract class DrawableElement implements ISerializable {
     }
 
     private drawSelection(ctx: CanvasRenderingContext2D, t: number): void {
-        const box = this.boundingBox;
+        const box = this.localBoundingBox;
         const eased = 1 - (1 - t) * (1 - t);
 
         const pad = SELECTION_PADDING * eased;
@@ -98,36 +117,63 @@ export abstract class DrawableElement implements ISerializable {
         this.selectionT = 0;
     }
 
-    public changeDimensionRelative(x: number, y: number) {
-        const propX = x / this.boundingBox.width;
-        const propY = y / this.boundingBox.height;
-
-        this.scale.x = this.scale.x + propX;
-        this.scale.y = this.scale.y + propY;
-
-        this.updateBounds();
-    }
-
     public updateBounds() {
-        this.updateBoundingBox(this.scale);
+        this.updateBoundingBox();
     }
 
     public load(reader: BinaryReader): void {
-        this.scale.x = reader.readF32();
-        this.scale.y = reader.readF32();
+        this._scale.x = reader.readF32();
+        this._scale.y = reader.readF32();
+        this._offset.x = reader.readF32();
+        this._offset.y = reader.readF32();
     }
 
     public save(writer: BinaryWriter): void {
-        writer.writeF32(this.scale.x);
-        writer.writeF32(this.scale.y);
+        writer.writeF32(this._scale.x);
+        writer.writeF32(this._scale.y);
+        writer.writeF32(this._offset.x);
+        writer.writeF32(this._offset.y);
     }
 
     public get isSelected() {
         return this.selected;
     }
 
-    public abstract get boundingBox(): DOMRect;
-    public abstract isOver(x: number, y: number, radius: number, ctx: CanvasRenderingContext2D): boolean;
-    protected abstract updateBoundingBox(scale: Vector2): void;
+    /** World-space bounding box (local * scale + offset) */
+    public get boundingBox(): DOMRect {
+        const raw = this.localBoundingBox;
+        const x1 = raw.x * this._scale.x + this._offset.x;
+        const y1 = raw.y * this._scale.y + this._offset.y;
+        const x2 = (raw.x + raw.width) * this._scale.x + this._offset.x;
+        const y2 = (raw.y + raw.height) * this._scale.y + this._offset.y;
+        return new DOMRect(
+            Math.min(x1, x2), Math.min(y1, y2),
+            Math.abs(x2 - x1), Math.abs(y2 - y1)
+        );
+    }
+
+    /** World-space hit test, delegates to local-space after transforming coords */
+    public isOver(x: number, y: number, radius: number, ctx: CanvasRenderingContext2D): boolean {
+        const localX = (x - this._offset.x) / this._scale.x;
+        const localY = (y - this._offset.y) / this._scale.y;
+        const localRadius = radius / Math.min(Math.abs(this._scale.x), Math.abs(this._scale.y));
+        return this.isOverLocal(localX, localY, localRadius, ctx);
+    }
+
+    /** Handle corner positions in world space */
+    public getHandles(): Vector2[] {
+        const box = this.boundingBox;
+        return [
+            { x: box.x, y: box.y },
+            { x: box.right, y: box.y },
+            { x: box.x, y: box.bottom },
+            { x: box.right, y: box.bottom },
+        ];
+    }
+
+    /** Bounding box in element-local space (before scale/offset) */
+    public abstract get localBoundingBox(): DOMRect;
+    protected abstract isOverLocal(x: number, y: number, radius: number, ctx: CanvasRenderingContext2D): boolean;
+    protected abstract updateBoundingBox(): void;
     protected abstract draw2D(ctx: CanvasRenderingContext2D, deltaTime: number): void;
 }

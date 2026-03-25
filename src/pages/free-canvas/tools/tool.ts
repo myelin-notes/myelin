@@ -9,6 +9,7 @@ export interface ITool {
     finish(canvas: DrawableCanvas, event: PointerEvent): void;
     interrupt(canvas: DrawableCanvas): void;
     drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void;
+    hover?(canvas: DrawableCanvas, position: Vector2): void;
     get icon(): SvgIcon;
     get label(): string;
 }

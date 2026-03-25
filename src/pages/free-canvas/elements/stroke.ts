@@ -1,6 +1,5 @@
 import {getStroke, getStrokeOutlinePoints, getStrokePoints} from "perfect-freehand";
 import {DrawableElement} from "./drawable-element";
-import {Vector2} from "../drawable-canvas";
 import {BinaryReader, BinaryWriter} from "../../../lib/utils/binary-helper";
 import {DrawableElementRegistry} from "./drawable-element-registry";
 import ElementType = DrawableElementRegistry.ElementType;
@@ -44,15 +43,15 @@ export class Stroke extends DrawableElement {
         ctx.fill(this.cachedPath);
     }
 
-    public isOver(x: number, y: number, radius: number, _ctx: CanvasRenderingContext2D): boolean {
+    protected isOverLocal(x: number, y: number, radius: number, _ctx: CanvasRenderingContext2D): boolean {
         return CollisionHelper.isPathOverlappingCircle(this.cachedPoints, {x, y}, radius);
     }
 
-    public get boundingBox(): DOMRect {
+    public get localBoundingBox(): DOMRect {
         return this.box;
     }
 
-    protected updateBoundingBox(scale: Vector2) {
+    protected updateBoundingBox() {
         if (this.points.length === 0) return;
 
         const outlinePoints = getStrokeOutlinePoints(getStrokePoints(this.points));
@@ -68,11 +67,6 @@ export class Stroke extends DrawableElement {
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
         }
-
-        minX /= scale.x;
-        minY /= scale.y;
-        maxX /= scale.x;
-        maxY /= scale.y;
 
         this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     }

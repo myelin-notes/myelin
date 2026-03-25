@@ -22,6 +22,15 @@ export class UndoRedoStack {
 		this.groupBuffer = [];
 	}
 
+	pushApplied(command: UndoCommand) {
+		if (this.groupBuffer) {
+			this.groupBuffer.push(command);
+		} else {
+			this.undoStack.push(command);
+			this.redoStack = [];
+		}
+	}
+
 	endGroup() {
 		if (!this.groupBuffer) return;
 		if (this.groupBuffer.length > 0) {

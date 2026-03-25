@@ -39,6 +39,42 @@ class RemoveElementCommand implements UndoCommand {
     }
 }
 
+export class MoveElementsCommand implements UndoCommand {
+    constructor(
+        private targets: DrawableElement[],
+        private dx: number,
+        private dy: number,
+    ) {}
+
+    execute() {
+        for (const e of this.targets) e.translate(this.dx, this.dy);
+    }
+
+    undo() {
+        for (const e of this.targets) e.translate(-this.dx, -this.dy);
+    }
+}
+
+export class ScaleElementCommand implements UndoCommand {
+    constructor(
+        private element: DrawableElement,
+        private oldScale: Vector2,
+        private oldOffset: Vector2,
+        private newScale: Vector2,
+        private newOffset: Vector2,
+    ) {}
+
+    execute() {
+        this.element.setScale(this.newScale.x, this.newScale.y);
+        this.element.setOffset(this.newOffset.x, this.newOffset.y);
+    }
+
+    undo() {
+        this.element.setScale(this.oldScale.x, this.oldScale.y);
+        this.element.setOffset(this.oldOffset.x, this.oldOffset.y);
+    }
+}
+
 export class DrawableCanvas implements ISerializable {
 
     public readonly ctx: CanvasRenderingContext2D;
@@ -179,6 +215,7 @@ export class DrawableCanvas implements ISerializable {
         canvas.addEventListener("pointermove", evt => {
             this.mousePosition = this.getPoint(evt);
             this.state.update(evt);
+            this.toolSelected.hover?.(this, this.mousePosition);
         });
 
         canvas.addEventListener("pointerdown", evt => {
@@ -243,9 +280,19 @@ export class DrawableCanvas implements ISerializable {
         this._undoRedo.push(new RemoveElementCommand(this._elements, element));
     }
 
+    public pushApplied(command: UndoCommand) {
+        this._undoRedo.pushApplied(command);
+    }
+
+    public setCursor(cursor: string) {
+        this.canvas.style.cursor = cursor;
+    }
+
     public switchTool(to: number) {
         this.toolSelected.interrupt(this);
+        for (const e of this._elements) e.unselect();
         this.toolSelected = this.tools[to];
+        this.canvas.style.cursor = 'default';
     }
 
     public updateBounding() {

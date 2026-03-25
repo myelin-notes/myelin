@@ -1,15 +1,39 @@
 import {ITool, SvgIcon} from "./tool";
-import {DrawableCanvas, Vector2} from "../drawable-canvas";
+import {DrawableCanvas, MoveElementsCommand, ScaleElementCommand, Vector2} from "../drawable-canvas";
 import {CollisionHelper} from "../../../lib/utils/collision-helper";
+import {DrawableElement} from "../elements/drawable-element";
 import { MousePointer2 as PointerIcon } from "lucide-react";
+
+const HANDLE_HIT_RADIUS = 10;
+const MIN_SCALE = 0.05;
+
+const enum SelectMode {
+    None,
+    Moving,
+    Scaling,
+    Marquee,
+}
 
 export class SelectTool implements ITool {
 
+    private mode: SelectMode = SelectMode.None;
     private startPoint: Vector2 = {x: 0, y: 0};
-    private finished: boolean = true;
+
+    // Move state
+    private lastPoint: Vector2 = {x: 0, y: 0};
+    private totalDelta: Vector2 = {x: 0, y: 0};
+    private movingElements: DrawableElement[] = [];
+
+    // Scale state
+    private scalingElement: DrawableElement | null = null;
+    private handleIndex: number = -1;
+    private anchorWorld: Vector2 = {x: 0, y: 0};
+    private originalScale: Vector2 = {x: 1, y: 1};
+    private originalOffset: Vector2 = {x: 0, y: 0};
+    private originalDraggedWorld: Vector2 = {x: 0, y: 0};
 
     public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
-        if (this.finished) return;
+        if (this.mode !== SelectMode.Marquee) return;
 
         const x = Math.min(this.startPoint.x, position.x);
         const y = Math.min(this.startPoint.y, position.y);
@@ -34,39 +58,233 @@ export class SelectTool implements ITool {
     }
 
     public start(canvas: DrawableCanvas, event: PointerEvent): void {
-        this.startPoint = canvas.getPoint(event);
-        this.finished = false;
+        const point = canvas.getPoint(event);
+        this.startPoint = point;
 
-        for (const e of canvas.elements) {
-            if (CollisionHelper.inBox(this.startPoint, e.boundingBox)) {
-                e.select();
-            } else {
-                e.unselect();
+        // 1. Check handles on selected elements first
+        for (let i = canvas.elements.length - 1; i >= 0; i--) {
+            const e = canvas.elements[i];
+            if (!e.isSelected) continue;
+            const handleIdx = this.hitHandle(e, point, canvas.zoom);
+            if (handleIdx >= 0) {
+                this.mode = SelectMode.Scaling;
+                this.scalingElement = e;
+                this.handleIndex = handleIdx;
+                this.originalScale = { ...e.scale };
+                this.originalOffset = { ...e.offset };
+
+                const handles = e.getHandles();
+                const anchorIdx = 3 - handleIdx;
+                this.anchorWorld = handles[anchorIdx];
+                this.originalDraggedWorld = handles[handleIdx];
+                return;
             }
         }
+
+        // 2. Hit-test elements (topmost first)
+        let topHit: DrawableElement | null = null;
+        for (let i = canvas.elements.length - 1; i >= 0; i--) {
+            const e = canvas.elements[i];
+            if (CollisionHelper.inBox(point, e.boundingBox)) {
+                topHit = e;
+                break;
+            }
+        }
+
+        if (topHit) {
+            if (!topHit.isSelected) {
+                for (const e of canvas.elements) e.unselect();
+                topHit.select();
+            }
+            this.mode = SelectMode.Moving;
+            this.lastPoint = point;
+            this.totalDelta = { x: 0, y: 0 };
+            this.movingElements = canvas.elements.filter(e => e.isSelected);
+            return;
+        }
+
+        // 3. Empty space → marquee
+        this.mode = SelectMode.Marquee;
+        for (const e of canvas.elements) e.unselect();
     }
 
     public update(canvas: DrawableCanvas, _event: PointerEvent, position: Vector2): void {
-        for (const e of canvas.elements) {
-            if (CollisionHelper.overlappingAreaOf2Rect(
-                new DOMRect(
+        switch (this.mode) {
+            case SelectMode.Moving: {
+                const dx = position.x - this.lastPoint.x;
+                const dy = position.y - this.lastPoint.y;
+                this.totalDelta.x += dx;
+                this.totalDelta.y += dy;
+                for (const e of this.movingElements) {
+                    e.translate(dx, dy);
+                }
+                this.lastPoint = position;
+                break;
+            }
+            case SelectMode.Scaling: {
+                if (!this.scalingElement) break;
+                const e = this.scalingElement;
+                const localBox = e.localBoundingBox;
+                if (localBox.width === 0 || localBox.height === 0) break;
+
+                const origDist = {
+                    x: this.originalDraggedWorld.x - this.anchorWorld.x,
+                    y: this.originalDraggedWorld.y - this.anchorWorld.y,
+                };
+                const curDist = {
+                    x: position.x - this.anchorWorld.x,
+                    y: position.y - this.anchorWorld.y,
+                };
+
+                const ratioX = origDist.x !== 0 ? curDist.x / origDist.x : 1;
+                const ratioY = origDist.y !== 0 ? curDist.y / origDist.y : 1;
+
+                const newScale = {
+                    x: Math.max(MIN_SCALE, this.originalScale.x * ratioX),
+                    y: Math.max(MIN_SCALE, this.originalScale.y * ratioY),
+                };
+
+                // Compute anchor in local space to keep it fixed
+                const anchorLocal = {
+                    x: (this.anchorWorld.x - this.originalOffset.x) / this.originalScale.x,
+                    y: (this.anchorWorld.y - this.originalOffset.y) / this.originalScale.y,
+                };
+                const newOffset = {
+                    x: this.anchorWorld.x - anchorLocal.x * newScale.x,
+                    y: this.anchorWorld.y - anchorLocal.y * newScale.y,
+                };
+
+                e.setScale(newScale.x, newScale.y);
+                e.setOffset(newOffset.x, newOffset.y);
+                break;
+            }
+            case SelectMode.Marquee: {
+                const marqueeRect = new DOMRect(
                     Math.min(this.startPoint.x, position.x),
                     Math.min(this.startPoint.y, position.y),
                     Math.abs(position.x - this.startPoint.x),
-                    Math.abs(position.y - this.startPoint.y)),
-                e.boundingBox) > e.boundingBox.width * e.boundingBox.height * 0.5
-            ) {
-                e.select();
+                    Math.abs(position.y - this.startPoint.y)
+                );
+                for (const e of canvas.elements) {
+                    const box = e.boundingBox;
+                    if (CollisionHelper.overlappingAreaOf2Rect(marqueeRect, box) > box.width * box.height * 0.5) {
+                        e.select();
+                    } else {
+                        e.unselect();
+                    }
+                }
+                break;
             }
         }
     }
 
-    public finish(_canvas: DrawableCanvas, _event: PointerEvent): void {
-        this.finished = true;
+    public finish(canvas: DrawableCanvas, _event: PointerEvent): void {
+        switch (this.mode) {
+            case SelectMode.Moving: {
+                if (this.totalDelta.x !== 0 || this.totalDelta.y !== 0) {
+                    canvas.pushApplied(new MoveElementsCommand(
+                        [...this.movingElements],
+                        this.totalDelta.x,
+                        this.totalDelta.y,
+                    ));
+                }
+                break;
+            }
+            case SelectMode.Scaling: {
+                if (this.scalingElement) {
+                    const e = this.scalingElement;
+                    if (e.scale.x !== this.originalScale.x || e.scale.y !== this.originalScale.y
+                        || e.offset.x !== this.originalOffset.x || e.offset.y !== this.originalOffset.y) {
+                        canvas.pushApplied(new ScaleElementCommand(
+                            e,
+                            { ...this.originalScale },
+                            { ...this.originalOffset },
+                            { ...e.scale },
+                            { ...e.offset },
+                        ));
+                    }
+                }
+                break;
+            }
+        }
+
+        canvas.updateBounding();
+        this.reset();
     }
 
     public interrupt(_canvas: DrawableCanvas): void {
-        this.finished = true;
+        if (this.mode === SelectMode.Moving) {
+            for (const e of this.movingElements) {
+                e.translate(-this.totalDelta.x, -this.totalDelta.y);
+            }
+        }
+        if (this.mode === SelectMode.Scaling && this.scalingElement) {
+            this.scalingElement.setScale(this.originalScale.x, this.originalScale.y);
+            this.scalingElement.setOffset(this.originalOffset.x, this.originalOffset.y);
+        }
+        this.reset();
+    }
+
+    public hover(canvas: DrawableCanvas, position: Vector2): void {
+        if (this.mode === SelectMode.Moving) {
+            canvas.setCursor('move');
+            return;
+        }
+        if (this.mode === SelectMode.Scaling) {
+            canvas.setCursor(SelectTool.resizeCursor(this.handleIndex));
+            return;
+        }
+        if (this.mode === SelectMode.Marquee) {
+            canvas.setCursor('crosshair');
+            return;
+        }
+
+        // Idle — check handles on selected elements
+        for (let i = canvas.elements.length - 1; i >= 0; i--) {
+            const e = canvas.elements[i];
+            if (!e.isSelected) continue;
+            const handleIdx = this.hitHandle(e, position, canvas.zoom);
+            if (handleIdx >= 0) {
+                canvas.setCursor(SelectTool.resizeCursor(handleIdx));
+                return;
+            }
+        }
+
+        // Check selected element bodies
+        for (let i = canvas.elements.length - 1; i >= 0; i--) {
+            const e = canvas.elements[i];
+            if (e.isSelected && CollisionHelper.inBox(position, e.boundingBox)) {
+                canvas.setCursor('move');
+                return;
+            }
+        }
+
+        canvas.setCursor('default');
+    }
+
+    private static resizeCursor(handleIndex: number): string {
+        // 0: top-left, 3: bottom-right → nwse
+        // 1: top-right, 2: bottom-left → nesw
+        return (handleIndex === 0 || handleIndex === 3) ? 'nwse-resize' : 'nesw-resize';
+    }
+
+    private reset() {
+        this.mode = SelectMode.None;
+        this.movingElements = [];
+        this.scalingElement = null;
+    }
+
+    private hitHandle(element: DrawableElement, point: Vector2, zoom: number): number {
+        const handles = element.getHandles();
+        const hitRadius = HANDLE_HIT_RADIUS / zoom;
+        for (let i = 0; i < handles.length; i++) {
+            const dx = point.x - handles[i].x;
+            const dy = point.y - handles[i].y;
+            if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public get icon(): SvgIcon {
