@@ -8,6 +8,7 @@ import {ISerializable} from "../../lib/utils/binary-helper";
 import {BinaryReader, BinaryWriter} from "../../lib/utils/binary-helper";
 import {DrawableElementRegistry} from "./elements/drawable-element-registry";
 import {ElementType} from "./elements/element-type";
+import {TextElement} from "./elements/text-element";
 import {HighlighterTool} from "./tools/highlighter-tool";
 import {SelectTool} from "./tools/select-tool";
 import {TextTool} from "./tools/text-tool";
@@ -56,6 +57,24 @@ export class MoveElementsCommand implements UndoCommand {
     }
 }
 
+export class EditTextCommand implements UndoCommand {
+    constructor(
+        private element: TextElement,
+        private oldText: string,
+        private newText: string,
+    ) {}
+
+    execute() {
+        this.element.setText(this.newText);
+        this.element.updateBounds();
+    }
+
+    undo() {
+        this.element.setText(this.oldText);
+        this.element.updateBounds();
+    }
+}
+
 export class ScaleElementCommand implements UndoCommand {
     constructor(
         private element: DrawableElement,
@@ -97,7 +116,7 @@ export class DrawableCanvas implements ISerializable {
     private _toolCursor: string = 'default';
 
     private onZoomChange?: (zoom: number) => void;
-    private onRequestTextEdit?: (screenPos: Vector2, worldPos: Vector2, zoom: number, onCommit: (text: string) => void) => void;
+    private onRequestTextEdit?: (screenPos: Vector2, screenFontSize: number, initialText: string, onCommit: (text: string) => void) => void;
 
     public constructor(canvas: HTMLCanvasElement) {
         const ctx = canvas.getContext("2d", { alpha: false });
@@ -122,12 +141,12 @@ export class DrawableCanvas implements ISerializable {
         this.onZoomChange = callback;
     }
 
-    public setOnRequestTextEdit(callback: (screenPos: Vector2, worldPos: Vector2, zoom: number, onCommit: (text: string) => void) => void) {
+    public setOnRequestTextEdit(callback: (screenPos: Vector2, screenFontSize: number, initialText: string, onCommit: (text: string) => void) => void) {
         this.onRequestTextEdit = callback;
     }
 
-    public requestTextEdit(screenPos: Vector2, worldPos: Vector2, onCommit: (text: string) => void) {
-        this.onRequestTextEdit?.(screenPos, worldPos, this._zoom, onCommit);
+    public requestTextEdit(screenPos: Vector2, screenFontSize: number, initialText: string, onCommit: (text: string) => void) {
+        this.onRequestTextEdit?.(screenPos, screenFontSize, initialText, onCommit);
     }
 
     public redraw(deltaTime: number) {
@@ -359,6 +378,13 @@ export class DrawableCanvas implements ISerializable {
         this.canvas.height = height * dpr;
         this.canvas.style.width = width + "px";
         this.canvas.style.height = height + "px";
+    }
+
+    public worldToScreen(world: Vector2): Vector2 {
+        return {
+            x: (world.x + this.offset.x) * this._zoom,
+            y: (world.y + this.offset.y) * this._zoom,
+        };
     }
 
     public setSpaceDown(value: boolean) {

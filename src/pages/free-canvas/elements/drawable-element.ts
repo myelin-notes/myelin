@@ -14,6 +14,7 @@ export abstract class DrawableElement implements ISerializable {
     private _offset: Vector2 = { x: 0, y: 0 };
     private selected: boolean = false;
     private selectionT: number = 0;
+    private _hidden: boolean = false;
 
 	protected constructor(public readonly index: number, public readonly type: ElementType) {
 	}
@@ -35,7 +36,11 @@ export abstract class DrawableElement implements ISerializable {
         this.updateBoundingBox();
     }
 
+    public get hidden(): boolean { return this._hidden; }
+    public set hidden(value: boolean) { this._hidden = value; }
+
     public draw(ctx: CanvasRenderingContext2D, deltaTime: number): void {
+        if (this._hidden) return;
         ctx.save();
 
         ctx.translate(this._offset.x, this._offset.y);

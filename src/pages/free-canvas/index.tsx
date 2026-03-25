@@ -56,7 +56,8 @@ export function CanvasView() {
   const [fileName, setFileName] = useState("");
   const [textEdit, setTextEdit] = useState<{
     screenPos: Vector2;
-    zoom: number;
+    screenFontSize: number;
+    initialText: string;
     onCommit: (text: string) => void;
   } | null>(null);
 
@@ -126,8 +127,8 @@ export function CanvasView() {
       setZoomLevel(Math.round(zoom * 100));
     });
 
-    dc.setOnRequestTextEdit((screenPos, _worldPos, zoom, onCommit) => {
-      setTextEdit({ screenPos, zoom, onCommit });
+    dc.setOnRequestTextEdit((screenPos, screenFontSize, initialText, onCommit) => {
+      setTextEdit({ screenPos, screenFontSize, initialText, onCommit });
     });
 
     let prevTime = 0;
@@ -225,15 +226,33 @@ export function CanvasView() {
       {textEdit && (
         <textarea
           autoFocus
-          className="absolute z-20 bg-transparent border-none outline-none resize-none overflow-hidden text-text-primary caret-accent-dark"
+          defaultValue={textEdit.initialText}
+          className="absolute z-20 bg-transparent border-none outline-none resize-none overflow-hidden text-text-primary caret-accent-dark p-0 m-0"
           style={{
             left: textEdit.screenPos.x,
             top: textEdit.screenPos.y,
-            fontSize: 24 * textEdit.zoom,
+            fontSize: textEdit.screenFontSize,
             lineHeight: 1.3,
             fontFamily: "sans-serif",
             minWidth: 4,
-            minHeight: 24 * textEdit.zoom * 1.3,
+            minHeight: textEdit.screenFontSize * 1.3,
+          }}
+          ref={(el) => {
+            if (!el) return;
+            el.style.height = "auto";
+            el.style.height = el.scrollHeight + "px";
+            el.style.width = "auto";
+            el.style.width = el.scrollWidth + 4 + "px";
+
+            // Compute exact half-leading using the font's real content area
+            const fs = textEdit.screenFontSize;
+            const mc = document.createElement("canvas").getContext("2d")!;
+            mc.font = `${fs}px sans-serif`;
+            mc.textBaseline = "alphabetic";
+            const m = mc.measureText("Mg");
+            const contentArea = m.fontBoundingBoxAscent + m.fontBoundingBoxDescent;
+            const halfLeading = (fs * 1.3 - contentArea) / 2;
+            el.style.top = `${textEdit.screenPos.y - halfLeading}px`;
           }}
           onBlur={(e) => {
             textEdit.onCommit(e.currentTarget.value);
