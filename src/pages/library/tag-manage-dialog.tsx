@@ -83,8 +83,8 @@ export function TagManageDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[380px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Tag className="size-4 text-text-muted" />
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Tag className="size-5 text-text-muted" />
             Manage Tags
           </DialogTitle>
           <DialogDescription>
@@ -127,7 +127,7 @@ export function TagManageDialog({
                   onClick={() => toggleTag(tag)}
                   className={cn(
                     "rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer",
-                    "bg-surface text-text-secondary hover:bg-tag hover:text-text-tag hover:shadow-sm"
+                    "bg-surface text-text-secondary hover:bg-tag hover:text-text-tag"
                   )}
                 >
                   #{tag}
@@ -138,7 +138,7 @@ export function TagManageDialog({
         )}
 
         {/* Create new tag */}
-        <div className="border-t border-border-subtle pt-3">
+        <div className="rounded-lg bg-page p-3">
           {isAdding ? (
             <div className="flex items-center gap-2">
               <span className="text-text-muted text-sm">#</span>
@@ -155,7 +155,7 @@ export function TagManageDialog({
                   }
                 }}
                 placeholder="Tag name..."
-                className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none border-b border-border-divider pb-0.5"
+                className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none border-b-2 border-primary pb-0.5"
               />
             </div>
           ) : (

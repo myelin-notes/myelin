@@ -40,7 +40,7 @@ function toolToWheelItem(
   };
 }
 
-const glassPanel = "backdrop-blur-xl bg-white/80 border border-white/50 rounded-xl shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)]";
+const glassPanel = "backdrop-blur-[24px] bg-white/80 rounded-xl shadow-ambient";
 
 export function CanvasView() {
   const { id } = useParams<{ id: string }>();
@@ -177,9 +177,8 @@ export function CanvasView() {
         <button onClick={back} className="bg-transparent p-0 border-none cursor-pointer">
           <ChevronLeftIcon className="size-5 text-text-secondary hover:text-text-primary transition-colors" />
         </button>
-        <span className="h-4 w-px bg-border-divider" />
-        <h2 className="text-sm font-medium text-text-primary m-0">{fileName}</h2>
-        <span className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Canvas</span>
+        <h2 className="text-sm font-medium text-text-primary m-0 ml-1">{fileName}</h2>
+        <span className="text-[10px] uppercase tracking-[0.05em] font-bold text-text-muted">Canvas</span>
       </div>
 
       {/* Toolbar */}
@@ -191,10 +190,10 @@ export function CanvasView() {
             return (
               <Tooltip key={index}>
                 <TooltipTrigger
-                    className={`p-2.5 rounded-lg border-none cursor-pointer transition-colors ${
+                    className={`p-2.5 rounded-xl cursor-pointer transition-colors ${
                       isActive
-                        ? "bg-accent-dark text-white shadow-md"
-                        : "bg-transparent text-text-secondary hover:bg-black/5"
+                        ? "bg-accent-dark text-white"
+                        : "bg-transparent text-text-secondary hover:bg-hover-tint"
                     }`}
                     onClick={() => {
                       drawableCanvasRef.current?.switchTool(index);
@@ -218,7 +217,7 @@ export function CanvasView() {
       {/* Info panel */}
       <div className={`absolute right-6 bottom-6 ${glassPanel} px-4 py-3 z-10`}>
         <span className="text-xs font-medium text-text-secondary">{zoomLevel}%</span>
-        <span className="mx-2 text-border-divider">|</span>
+        <span className="mx-2 text-text-muted/30">|</span>
         <span className="text-xs font-medium text-text-muted">{fps} fps</span>
       </div>
 

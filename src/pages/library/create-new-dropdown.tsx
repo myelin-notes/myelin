@@ -19,14 +19,14 @@ export function CreateNewDropdown({ onNewFolder, onNewFile }: CreateNewDropdownP
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-lg bg-accent-dark px-2.5 py-1 text-text-on-dark transition-colors hover:bg-accent-dark/90 cursor-pointer outline-none">
-        <Plus className="size-3" strokeWidth={2.5} />
+      <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-xl bg-accent-dark px-2.5 py-1 text-text-on-dark transition-colors hover:bg-accent-dark/90 cursor-pointer outline-none">
+        <Plus className="size-3" />
         <span className="text-xs font-medium">New</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="min-w-[180px] rounded-lg bg-page p-1.5 shadow-lg ring-1 ring-border-subtle"
+        className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient"
       >
         <DropdownMenuItem
           className={itemClass}
@@ -35,7 +35,7 @@ export function CreateNewDropdown({ onNewFolder, onNewFile }: CreateNewDropdownP
           <FolderPlus className="size-4" />
           New Folder
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="my-1 bg-border-subtle" />
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           className={itemClass}
           onClick={() => onNewFile?.("Untitled Document", "mdoc")}

@@ -76,8 +76,8 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
               className={cn(
                 "rounded-xl px-3 py-1.5 text-xs font-medium transition-all cursor-pointer",
                 isActive
-                  ? "bg-tag-active text-text-on-dark shadow-md scale-[1.04]"
-                  : "bg-card text-text-secondary hover:shadow-md"
+                  ? "bg-tag-active text-text-on-dark scale-[1.04]"
+                  : "bg-card text-text-secondary hover:bg-card-active hover:shadow-ambient"
               )}
             >
               <span className="opacity-50">#</span>
@@ -96,10 +96,7 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
       </div>
 
       {/* Insights */}
-      <div className={cn(
-        "flex flex-col gap-4 border-t border-border-subtle",
-        "pt-4"
-      )}>
+      <div className="flex flex-col gap-4 rounded-lg bg-page p-4">
         <h4 className="text-[10px] font-bold uppercase tracking-[1px] text-text-secondary">
           Studio Insights
         </h4>

@@ -57,6 +57,7 @@
   --color-tag-active: var(--bg-tag-active);
   --color-accent-green: var(--bg-accent-green);
   --color-toolbar: var(--bg-toolbar);
+  --color-hover-tint: var(--bg-hover-tint);
 
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
@@ -71,6 +72,12 @@
 
   --color-border-subtle: var(--border-subtle);
   --color-border-divider: var(--border-divider);
+  --color-border-ghost: var(--border-ghost);
+
+  --color-secondary-container: var(--bg-secondary-container);
+  --color-primary-container: var(--bg-primary-container);
+
+  --shadow-ambient: 0 0 32px 0 rgba(25, 28, 30, 0.06);
 }
 
 :root {
@@ -117,10 +124,13 @@
   --accent-dark: #1c2738;
   --accent-navy: #2f3e46;
 
+  --bg-hover-tint: rgba(25, 28, 30, 0.05);
+  --bg-secondary-container: #dce4ed;
+  --bg-primary-container: #2a3a50;
+
   --border-subtle: rgba(195, 199, 202, 0.2);
   --border-divider: rgba(195, 199, 202, 0.3);
-
-  --shadow-toolbar: 0px 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --border-ghost: rgba(195, 199, 202, 0.15);
 }
 
 /* Dark mode — supply colors here to enable */
@@ -172,5 +182,10 @@
   a {
     text-decoration: none;
     color: inherit;
+  }
+
+  /* DESIGN.md §7: light-stroke (1.5px) icons matching Inter stroke weight */
+  svg.lucide {
+    stroke-width: 1.5px;
   }
 }

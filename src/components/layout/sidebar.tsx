@@ -47,10 +47,10 @@ export function Sidebar() {
               key={item.label}
               href="#"
               className={cn(
-                "flex items-center gap-3 px-2 py-2",
+                "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors",
                 item.active
-                  ? "border-l-2 border-accent-navy pl-2.5"
-                  : ""
+                  ? "bg-hover-tint"
+                  : "hover:bg-hover-tint"
               )}
             >
               <span className={cn(

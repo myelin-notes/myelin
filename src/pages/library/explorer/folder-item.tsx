@@ -54,7 +54,7 @@ export function FolderItem({ id, name, tags, autoRename, onNavigate, onMoved }: 
               className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 transition-colors cursor-pointer ${
                 dragOver
                   ? "bg-accent/15 ring-1 ring-accent/40"
-                  : "hover:bg-black/5"
+                  : "hover:bg-hover-tint"
               }`}
             />
           }
@@ -63,7 +63,7 @@ export function FolderItem({ id, name, tags, autoRename, onNavigate, onMoved }: 
           {renaming ? (
             <input
               {...renameInputProps}
-              className="text-sm font-medium text-text-primary bg-transparent border-b border-border-divider outline-none min-w-0 flex-1"
+              className="text-sm font-medium text-text-primary bg-transparent border-b-2 border-primary outline-none min-w-0 flex-1"
             />
           ) : (
             <div className="flex items-center gap-2 min-w-0">

@@ -23,7 +23,7 @@ export function RecentCard({
     <div
       onClick={onClick}
       className={cn(
-        "relative flex flex-col rounded-xl p-6 h-[204px] overflow-hidden cursor-pointer transition-shadow hover:shadow-md",
+        "relative flex flex-col rounded-xl p-6 h-[204px] overflow-hidden cursor-pointer transition-all hover:bg-card hover:shadow-ambient",
         featured ? "bg-card-active" : "bg-surface"
       )}
     >
@@ -58,7 +58,7 @@ export function RecentCard({
         {tags.map((tag) => (
           <span
             key={tag}
-            className="rounded-xl bg-tag px-2 py-0.5 text-[10px] font-normal text-text-tag"
+            className="rounded-md bg-tag px-2 py-0.5 text-[10px] font-normal text-text-tag"
           >
             #{tag}
           </span>

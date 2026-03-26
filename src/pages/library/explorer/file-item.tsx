@@ -45,7 +45,7 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
                 if (!renaming) navigate(`/${file.fileType}/${file.id}`);
               }}
               onDragStart={handleDragStart}
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-2 transition-colors hover:bg-black/5 cursor-pointer"
+              className="flex w-full items-center gap-3 rounded-lg px-4 py-2 transition-colors hover:bg-hover-tint cursor-pointer"
             />
           }
         >
@@ -53,7 +53,7 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
           {renaming ? (
             <input
               {...renameInputProps}
-              className="text-sm font-normal text-text-secondary bg-transparent border-b border-border-divider outline-none min-w-0 flex-1"
+              className="text-sm font-normal text-text-secondary bg-transparent border-b-2 border-primary outline-none min-w-0 flex-1"
             />
           ) : (
             <div className="flex items-center gap-2 min-w-0">
