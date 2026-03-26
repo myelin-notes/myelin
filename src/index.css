@@ -189,3 +189,45 @@
     stroke-width: 1.5px;
   }
 }
+
+/* Tool options range slider — matches the Soft Studio aesthetic */
+input[type="range"].tool-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background: rgba(195, 199, 202, 0.4);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"].tool-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--accent-dark);
+  cursor: pointer;
+  border: none;
+  transition: transform 0.1s ease;
+}
+
+input[type="range"].tool-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+input[type="range"].tool-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--accent-dark);
+  cursor: pointer;
+  border: none;
+}
+
+input[type="range"].tool-slider::-moz-range-track {
+  height: 3px;
+  background: rgba(195, 199, 202, 0.4);
+  border-radius: 2px;
+}

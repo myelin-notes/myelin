@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import type { ITool } from "@/pages/free-canvas/tools/tool";
-
-const STORAGE_KEY = "myelin:wheel-tools";
+import { UserPrefs } from "@/lib/user-prefs";
 
 interface ToolShelfProps {
   tools: ITool[];
@@ -76,18 +75,15 @@ export function ToolShelf({ tools, enabledIndices, onToggle, onClose, containerR
 }
 
 export function loadWheelToolIndices(toolCount: number): Set<number> {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed: number[] = JSON.parse(stored);
-      const valid = parsed.filter((i) => i >= 0 && i < toolCount);
-      if (valid.length > 0) return new Set(valid);
-    }
-  } catch {}
+  const stored = UserPrefs.get("wheelTools");
+  if (stored.length > 0) {
+    const valid = stored.filter((i) => i >= 0 && i < toolCount);
+    if (valid.length > 0) return new Set(valid);
+  }
   // Default: all tools enabled
   return new Set(Array.from({ length: toolCount }, (_, i) => i));
 }
 
 export function saveWheelToolIndices(indices: Set<number>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...indices]));
+  UserPrefs.set("wheelTools", [...indices]);
 }

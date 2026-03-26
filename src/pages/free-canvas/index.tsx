@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DrawableCanvas } from "@/pages/free-canvas/drawable-canvas";
 import { ITool } from "@/pages/free-canvas/tools/tool";
@@ -24,6 +24,8 @@ import {
 import { ChevronLeft as ChevronLeftIcon, X as XIcon, SlidersHorizontal as SlidersIcon } from "lucide-react";
 import { Vector2 } from "@/pages/free-canvas/drawable-canvas";
 import { ToolShelf, loadWheelToolIndices, saveWheelToolIndices } from "@/components/tool-shelf";
+import { ToolOptionsPanel, loadGoogleFont } from "@/components/tool-options-panel";
+import { UserPrefs } from "@/lib/user-prefs";
 
 function toolToWheelItem(
   getCanvas: () => DrawableCanvas | null,
@@ -53,17 +55,35 @@ export function CanvasView() {
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
+  const [optionsVisible, setOptionsVisible] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
   const [fileName, setFileName] = useState("");
+  const [optionsTick, setOptionsTick] = useState(0);
   const [textEdit, setTextEdit] = useState<{
     screenPos: Vector2;
     screenFontSize: number;
+    fontFamily: string;
     initialText: string;
     onCommit: (text: string) => void;
   } | null>(null);
 
-  const [canvasTools] = useState(() => DrawableCanvas.makeTools());
+  const [canvasTools] = useState(() => {
+    const tools = DrawableCanvas.makeTools();
+    const saved = UserPrefs.get("toolOptions");
+    for (const tool of tools) {
+      const opts = saved[tool.label];
+      if (opts && tool.setOption) {
+        for (const [key, value] of Object.entries(opts)) {
+          tool.setOption(key, value);
+          if (key === "fontFamily" && typeof value === "string") {
+            loadGoogleFont(value);
+          }
+        }
+      }
+    }
+    return tools;
+  });
 
   const [allWheelItems] = useState<WheelItem[]>(() =>
     canvasTools.map((tool, index) =>
@@ -77,6 +97,31 @@ export function CanvasView() {
   const [shelfOpen, setShelfOpen] = useState(false);
 
   const wheelItems = allWheelItems.filter((_, i) => wheelEnabledIndices.has(i));
+
+  // Hide options when switching tools
+  useEffect(() => {
+    setOptionsVisible(false);
+  }, [selectedToolIndex]);
+
+  const activeOptions = useMemo(() => {
+    void optionsTick;
+    const tool = canvasTools[selectedToolIndex];
+    return tool?.getOptions?.() ?? [];
+  }, [selectedToolIndex, optionsTick, canvasTools]);
+
+  const hasOptions = activeOptions.length > 0;
+
+  const handleSetOption = useCallback((key: string, value: unknown) => {
+    const tool = canvasTools[selectedToolIndex];
+    if (tool?.setOption) {
+      tool.setOption(key, value);
+      setOptionsTick(t => t + 1);
+      UserPrefs.update("toolOptions", (all) => {
+        const opts = { ...all[tool.label], [key]: value };
+        return { ...all, [tool.label]: opts };
+      });
+    }
+  }, [selectedToolIndex, canvasTools]);
 
   const handleToggleWheelTool = useCallback((index: number) => {
     setWheelEnabledIndices((prev) => {
@@ -140,15 +185,15 @@ export function CanvasView() {
       }
     });
 
-    const dc = new DrawableCanvas(canvas);
+    const dc = new DrawableCanvas(canvas, canvasTools);
     drawableCanvasRef.current = dc;
 
     dc.setOnZoomChange((zoom) => {
       setZoomLevel(Math.round(zoom * 100));
     });
 
-    dc.setOnRequestTextEdit((screenPos, screenFontSize, initialText, onCommit) => {
-      setTextEdit({ screenPos, screenFontSize, initialText, onCommit });
+    dc.setOnRequestTextEdit((screenPos, screenFontSize, fontFamily, initialText, onCommit) => {
+      setTextEdit({ screenPos, screenFontSize, fontFamily, initialText, onCommit });
     });
 
     let prevTime = 0;
@@ -203,28 +248,38 @@ export function CanvasView() {
 
       {/* Toolbar */}
       <TooltipProvider>
-        <div ref={toolbarRef} className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-end gap-2">
+        <div ref={toolbarRef} className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
           <div className={`${glassPanel} px-3 py-2 flex items-center gap-1`}>
             {canvasTools.map((tool, index) => {
               const Icon = tool.icon;
               const isActive = selectedToolIndex === index;
+              const toolHasOptions = (tool.getOptions?.()?.length ?? 0) > 0;
               return (
                 <Tooltip key={index}>
                   <TooltipTrigger
-                      className={`p-2.5 rounded-xl cursor-pointer transition-colors ${
+                      className={`relative p-2.5 rounded-xl cursor-pointer transition-colors ${
                         isActive
                           ? "bg-accent-dark text-white"
                           : "bg-transparent text-text-secondary hover:bg-hover-tint"
                       }`}
                       onClick={() => {
-                        drawableCanvasRef.current?.switchTool(index);
-                        setSelectedToolIndex(index);
+                        if (isActive && toolHasOptions) {
+                          setOptionsVisible(v => !v);
+                          setShelfOpen(false);
+                        } else {
+                          drawableCanvasRef.current?.switchTool(index);
+                          setSelectedToolIndex(index);
+                          setShelfOpen(false);
+                        }
                       }}
                     >
                       <Icon className="size-4" />
+                      {isActive && toolHasOptions && !optionsVisible && (
+                        <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 size-1 rounded-full bg-white/70" />
+                      )}
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                    <p>{tool.label}</p>
+                    <p>{tool.label}{isActive && toolHasOptions ? " — click for options" : ""}</p>
                   </TooltipContent>
                 </Tooltip>
               );
@@ -239,7 +294,10 @@ export function CanvasView() {
                     ? "bg-accent-dark text-white"
                     : "bg-transparent text-text-secondary hover:bg-hover-tint"
                 }`}
-                onClick={() => setShelfOpen((v) => !v)}
+                onClick={() => {
+                  setShelfOpen(v => !v);
+                  setOptionsVisible(false);
+                }}
               >
                 <SlidersIcon className="size-4" />
               </TooltipTrigger>
@@ -248,6 +306,11 @@ export function CanvasView() {
               </TooltipContent>
             </Tooltip>
           </div>
+
+          {/* Tool options panel — toggled by clicking the active tool */}
+          {optionsVisible && hasOptions && !shelfOpen && (
+            <ToolOptionsPanel options={activeOptions} onSetOption={handleSetOption} />
+          )}
 
           {shelfOpen && (
             <ToolShelf
@@ -276,24 +339,24 @@ export function CanvasView() {
         <textarea
           autoFocus
           defaultValue={textEdit.initialText}
-          className="absolute z-20 bg-transparent border-none outline-none resize-none overflow-hidden text-text-primary caret-accent-dark p-0 m-0"
+          className="absolute z-20 bg-transparent border-none outline-none resize-none overflow-hidden caret-accent-dark p-0 m-0"
           style={{
             left: textEdit.screenPos.x,
             top: textEdit.screenPos.y,
             fontSize: textEdit.screenFontSize,
             lineHeight: 1.3,
-            fontFamily: "sans-serif",
+            fontFamily: `"${textEdit.fontFamily}", sans-serif`,
+            color: "var(--text-primary)",
             minWidth: 4,
             minHeight: textEdit.screenFontSize * 1.3,
           }}
           ref={(el) => {
             if (!el) return;
-            // Measure text width via canvas to avoid wrapping
             const fs = textEdit.screenFontSize;
+            const font = `${fs}px "${textEdit.fontFamily}", sans-serif`;
             const mc = document.createElement("canvas").getContext("2d")!;
-            mc.font = `${fs}px sans-serif`;
+            mc.font = font;
 
-            // Set width from canvas text measurement to prevent wrapping
             const lines = el.value.split("\n");
             let maxW = 0;
             for (const line of lines) {
@@ -303,7 +366,6 @@ export function CanvasView() {
             el.style.height = "auto";
             el.style.height = el.scrollHeight + "px";
 
-            // Compute exact half-leading using the font's real content area
             mc.textBaseline = "alphabetic";
             const m = mc.measureText("Mg");
             const contentArea = m.fontBoundingBoxAscent + m.fontBoundingBoxDescent;
@@ -313,8 +375,9 @@ export function CanvasView() {
           onInput={(e) => {
             const ta = e.currentTarget;
             const fs = textEdit.screenFontSize;
+            const font = `${fs}px "${textEdit.fontFamily}", sans-serif`;
             const mc = document.createElement("canvas").getContext("2d")!;
-            mc.font = `${fs}px sans-serif`;
+            mc.font = font;
             const lines = ta.value.split("\n");
             let maxW = 0;
             for (const line of lines) {

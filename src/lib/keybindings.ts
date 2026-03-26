@@ -14,8 +14,9 @@ export interface ActionBinding {
     onUp?: (e: KeyboardEvent) => void;
 }
 
+import { UserPrefs } from "@/lib/user-prefs";
+
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-const STORAGE_KEY = "myelin:keybindings";
 
 function comboMatches(e: KeyboardEvent, combo: KeyCombo): boolean {
     if (e.key.toLowerCase() !== combo.key.toLowerCase()) return false;
@@ -103,20 +104,16 @@ class KeybindingManager {
     }
 
     private loadOverrides() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return;
-            const parsed = JSON.parse(raw);
-            for (const [action, combo] of Object.entries(parsed)) {
-                this.overrides.set(action, combo as KeyCombo);
-            }
-        } catch { /* ignore corrupt data */ }
+        const saved = UserPrefs.get("keybindings");
+        for (const [action, combo] of Object.entries(saved)) {
+            this.overrides.set(action, combo);
+        }
     }
 
     private saveOverrides() {
         const obj: Record<string, KeyCombo> = {};
         for (const [action, combo] of this.overrides) obj[action] = combo;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+        UserPrefs.set("keybindings", obj);
     }
 
     private startListening() {

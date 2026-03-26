@@ -1,4 +1,4 @@
-import {ITool, SvgIcon} from "./tool";
+import {ITool, SvgIcon, ToolOption} from "./tool";
 import {DrawableCanvas, Vector2} from "../drawable-canvas";
 import { Eraser as EraserIcon } from "lucide-react";
 
@@ -43,5 +43,15 @@ export class EraserTool implements ITool {
 
     get label(): string {
         return "Eraser";
+    }
+
+    getOptions(): ToolOption[] {
+        return [
+            { type: 'size', key: 'size', label: 'Size', value: this.radius, min: 5, max: 60, step: 1 },
+        ];
+    }
+
+    setOption(key: string, value: unknown): void {
+        if (key === 'size' && typeof value === 'number') this.radius = value;
     }
 }

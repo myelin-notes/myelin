@@ -117,9 +117,9 @@ export class DrawableCanvas implements ISerializable {
     private _toolCursor: string = 'default';
 
     private onZoomChange?: (zoom: number) => void;
-    private onRequestTextEdit?: (screenPos: Vector2, screenFontSize: number, initialText: string, onCommit: (text: string) => void) => void;
+    private onRequestTextEdit?: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, onCommit: (text: string) => void) => void;
 
-    public constructor(canvas: HTMLCanvasElement) {
+    public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
         const ctx = canvas.getContext("2d", { alpha: false });
         if (!ctx) {
             console.error("Failed to get canvas context");
@@ -128,7 +128,7 @@ export class DrawableCanvas implements ISerializable {
         this.canvas = canvas;
         this.ctx = ctx!;
         this.state = new StateMachine(InteractState.Idle);
-        this.tools = DrawableCanvas.makeTools();
+        this.tools = tools ?? DrawableCanvas.makeTools();
         this.toolSelected = this.tools[0];
 
         this.bgColor = getComputedStyle(canvas).getPropertyValue('--bg-page').trim() || '#f7f9fb';
@@ -142,12 +142,12 @@ export class DrawableCanvas implements ISerializable {
         this.onZoomChange = callback;
     }
 
-    public setOnRequestTextEdit(callback: (screenPos: Vector2, screenFontSize: number, initialText: string, onCommit: (text: string) => void) => void) {
+    public setOnRequestTextEdit(callback: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, onCommit: (text: string) => void) => void) {
         this.onRequestTextEdit = callback;
     }
 
-    public requestTextEdit(screenPos: Vector2, screenFontSize: number, initialText: string, onCommit: (text: string) => void) {
-        this.onRequestTextEdit?.(screenPos, screenFontSize, initialText, onCommit);
+    public requestTextEdit(screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, onCommit: (text: string) => void) {
+        this.onRequestTextEdit?.(screenPos, screenFontSize, fontFamily, initialText, onCommit);
     }
 
     public redraw(deltaTime: number) {
