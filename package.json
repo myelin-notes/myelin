@@ -19,6 +19,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jsxgraph": "^1.12.2",
     "lucide-react": "^0.577.0",
     "perfect-freehand": "^1.2.3",
     "react": "^19.1.0",
