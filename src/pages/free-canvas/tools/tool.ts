@@ -11,7 +11,8 @@ export interface FontEntry {
 export type ToolOption =
     | { type: 'color'; key: string; label: string; value: string; palette: string[] }
     | { type: 'size'; key: string; label: string; value: number; min: number; max: number; step: number }
-    | { type: 'font'; key: string; label: string; value: string; fonts: FontEntry[] };
+    | { type: 'font'; key: string; label: string; value: string; fonts: FontEntry[] }
+    | { type: 'choice'; key: string; label: string; value: string; choices: { value: string; label: string; icon?: LucideIcon }[] };
 
 export interface ITool {
     start(canvas: DrawableCanvas, event: PointerEvent): void;

@@ -43,6 +43,19 @@ export namespace CollisionHelper {
         return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
     }
 
+    export function isPointInPolygon(point: Vector2, polygon: Vector2[]): boolean {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = polygon[i].x, yi = polygon[i].y;
+            const xj = polygon[j].x, yj = polygon[j].y;
+            if ((yi > point.y) !== (yj > point.y) &&
+                point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi) {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
     export function isPathOverlappingCircle(path: number[][], circle: Vector2, radius: number): boolean {
         for (let i = 0; i < path.length - 1; i++) {
             const currentPoint: Vector2 = {x: path[i][0], y: path[i][1]};

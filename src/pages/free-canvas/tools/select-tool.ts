@@ -1,8 +1,8 @@
-import {ITool, SvgIcon} from "./tool";
+import {ITool, SvgIcon, ToolOption} from "./tool";
 import {DrawableCanvas, MoveElementsCommand, ScaleElementCommand, Vector2} from "../drawable-canvas";
 import {CollisionHelper} from "../../../lib/utils/collision-helper";
 import {DrawableElement} from "../elements/drawable-element";
-import { MousePointer2 as PointerIcon } from "lucide-react";
+import { MousePointer2 as PointerIcon, BoxSelect as BoxSelectIcon, Lasso as LassoIcon } from "lucide-react";
 
 const HANDLE_HIT_RADIUS = 10;
 const MIN_SCALE = 0.05;
@@ -12,12 +12,14 @@ const enum SelectMode {
     Moving,
     Scaling,
     Marquee,
+    Lasso,
 }
 
 export class SelectTool implements ITool {
 
     private mode: SelectMode = SelectMode.None;
     private startPoint: Vector2 = {x: 0, y: 0};
+    private selectionStyle: 'rectangle' | 'lasso' = 'rectangle';
 
     // Move state
     private lastPoint: Vector2 = {x: 0, y: 0};
@@ -35,29 +37,47 @@ export class SelectTool implements ITool {
     private originalOffset: Vector2 = {x: 0, y: 0};
     private originalDraggedWorld: Vector2 = {x: 0, y: 0};
 
+    // Lasso state
+    private lassoPath: Vector2[] = [];
+
     public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
-        if (this.mode !== SelectMode.Marquee) return;
+        if (this.mode === SelectMode.Marquee) {
+            const x = Math.min(this.startPoint.x, position.x);
+            const y = Math.min(this.startPoint.y, position.y);
+            const w = Math.abs(position.x - this.startPoint.x);
+            const h = Math.abs(position.y - this.startPoint.y);
 
-        const x = Math.min(this.startPoint.x, position.x);
-        const y = Math.min(this.startPoint.y, position.y);
-        const w = Math.abs(position.x - this.startPoint.x);
-        const h = Math.abs(position.y - this.startPoint.y);
+            ctx.fillStyle = 'rgba(208, 225, 251, 0.15)';
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 3);
+            ctx.fill();
 
-        // Marquee fill
-        ctx.fillStyle = 'rgba(208, 225, 251, 0.15)';
-        ctx.beginPath();
-        ctx.roundRect(x, y, w, h, 3);
-        ctx.fill();
+            ctx.strokeStyle = '#2f3e46';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([6, 4]);
+            ctx.lineDashOffset = 0;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 3);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        } else if (this.mode === SelectMode.Lasso && this.lassoPath.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(this.lassoPath[0].x, this.lassoPath[0].y);
+            for (let i = 1; i < this.lassoPath.length; i++) {
+                ctx.lineTo(this.lassoPath[i].x, this.lassoPath[i].y);
+            }
+            ctx.lineTo(position.x, position.y);
+            ctx.closePath();
 
-        // Marquee border
-        ctx.strokeStyle = '#2f3e46';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([6, 4]);
-        ctx.lineDashOffset = 0;
-        ctx.beginPath();
-        ctx.roundRect(x, y, w, h, 3);
-        ctx.stroke();
-        ctx.setLineDash([]);
+            ctx.fillStyle = 'rgba(208, 225, 251, 0.15)';
+            ctx.fill();
+
+            ctx.strokeStyle = '#2f3e46';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([6, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
 
     public start(canvas: DrawableCanvas, event: PointerEvent): void {
@@ -110,9 +130,14 @@ export class SelectTool implements ITool {
             return;
         }
 
-        // 3. Empty space → marquee
+        // 3. Empty space → marquee or lasso
         this.lastCycledElement = null;
-        this.mode = SelectMode.Marquee;
+        if (this.selectionStyle === 'lasso') {
+            this.mode = SelectMode.Lasso;
+            this.lassoPath = [point];
+        } else {
+            this.mode = SelectMode.Marquee;
+        }
         for (const e of canvas.elements) e.unselect();
     }
 
@@ -189,6 +214,23 @@ export class SelectTool implements ITool {
                 }
                 break;
             }
+            case SelectMode.Lasso: {
+                this.lassoPath.push(position);
+                const poly = [...this.lassoPath, position];
+                for (const e of canvas.elements) {
+                    const box = e.boundingBox;
+                    const center: Vector2 = {
+                        x: box.x + box.width * 0.5,
+                        y: box.y + box.height * 0.5,
+                    };
+                    if (CollisionHelper.isPointInPolygon(center, poly)) {
+                        e.select();
+                    } else {
+                        e.unselect();
+                    }
+                }
+                break;
+            }
         }
     }
 
@@ -249,7 +291,7 @@ export class SelectTool implements ITool {
             canvas.setCursor(SelectTool.resizeCursor(this.handleIndex));
             return;
         }
-        if (this.mode === SelectMode.Marquee) {
+        if (this.mode === SelectMode.Marquee || this.mode === SelectMode.Lasso) {
             canvas.setCursor('crosshair');
             return;
         }
@@ -287,6 +329,7 @@ export class SelectTool implements ITool {
         this.mode = SelectMode.None;
         this.movingElements = [];
         this.scalingElement = null;
+        this.lassoPath = [];
     }
 
     private hitHandle(element: DrawableElement, point: Vector2, zoom: number): number {
@@ -300,6 +343,25 @@ export class SelectTool implements ITool {
             }
         }
         return -1;
+    }
+
+    public getOptions(): ToolOption[] {
+        return [{
+            type: 'choice',
+            key: 'selectionStyle',
+            label: 'Mode',
+            value: this.selectionStyle,
+            choices: [
+                { value: 'rectangle', label: 'Rectangle', icon: BoxSelectIcon },
+                { value: 'lasso', label: 'Lasso', icon: LassoIcon },
+            ],
+        }];
+    }
+
+    public setOption(key: string, value: unknown): void {
+        if (key === 'selectionStyle') {
+            this.selectionStyle = value as 'rectangle' | 'lasso';
+        }
     }
 
     public get icon(): SvgIcon {

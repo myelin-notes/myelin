@@ -147,6 +147,36 @@ export function ToolOptionsPanel({ options, onSetOption }: ToolOptionsPanelProps
                     );
                 }
 
+                if (option.type === "choice") {
+                    return (
+                        <div key={option.key} className="flex items-center gap-2.5">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-muted select-none">
+                                {option.label}
+                            </span>
+                            <div className="flex items-center bg-surface rounded-lg p-0.5 gap-0.5">
+                                {option.choices.map((choice) => {
+                                    const active = option.value === choice.value;
+                                    const Icon = choice.icon;
+                                    return (
+                                        <button
+                                            key={choice.value}
+                                            onClick={() => onSetOption(option.key, choice.value)}
+                                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border-none cursor-pointer transition-all duration-150 ${
+                                                active
+                                                    ? "bg-white text-text-primary shadow-sm"
+                                                    : "bg-transparent text-text-muted hover:text-text-secondary"
+                                            }`}
+                                        >
+                                            {Icon && <Icon className="size-3.5" />}
+                                            {choice.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                }
+
                 if (option.type === "font") {
                     return (
                         <div key={option.key} className="flex items-center gap-2.5">
