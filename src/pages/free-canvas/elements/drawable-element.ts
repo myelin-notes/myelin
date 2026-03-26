@@ -10,7 +10,7 @@ const SELECTION_RADIUS = 4;
 const SELECTION_ANIM_SPEED = 8;
 
 export abstract class DrawableElement implements ISerializable {
-    private _scale: Vector2 = { x: 1, y: 1 };
+    protected _scale: Vector2 = { x: 1, y: 1 };
     private _offset: Vector2 = { x: 0, y: 0 };
     private selected: boolean = false;
     private selectionT: number = 0;

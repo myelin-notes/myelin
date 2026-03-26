@@ -120,7 +120,7 @@ export class DrawableCanvas implements ISerializable {
     private _toolCursor: string = 'default';
 
     private onZoomChange?: (zoom: number) => void;
-    private onRequestTextEdit?: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, onCommit: (text: string) => void) => void;
+    private onRequestTextEdit?: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, boxScreenWidth: number, boxScreenHeight: number, onCommit: (text: string) => void) => void;
     private onRequestFilePick?: (screenPos: Vector2) => void;
 
     public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
@@ -146,12 +146,12 @@ export class DrawableCanvas implements ISerializable {
         this.onZoomChange = callback;
     }
 
-    public setOnRequestTextEdit(callback: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, onCommit: (text: string) => void) => void) {
+    public setOnRequestTextEdit(callback: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, boxScreenWidth: number, boxScreenHeight: number, onCommit: (text: string) => void) => void) {
         this.onRequestTextEdit = callback;
     }
 
-    public requestTextEdit(screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, onCommit: (text: string) => void) {
-        this.onRequestTextEdit?.(screenPos, screenFontSize, fontFamily, initialText, onCommit);
+    public requestTextEdit(screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, boxScreenWidth: number, boxScreenHeight: number, onCommit: (text: string) => void) {
+        this.onRequestTextEdit?.(screenPos, screenFontSize, fontFamily, initialText, boxScreenWidth, boxScreenHeight, onCommit);
     }
 
     public setOnRequestFilePick(callback: (screenPos: Vector2) => void) {
