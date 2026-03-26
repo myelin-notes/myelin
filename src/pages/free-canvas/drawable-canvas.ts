@@ -107,6 +107,7 @@ export class DrawableCanvas implements ISerializable {
     private _zoom: number = 1;
     private spaceDown: boolean = false;
     private mousePosition: Vector2 = { x: 0, y: 0 };
+    private screenPosition: Vector2 = { x: 0, y: 0 };
     private bgColor: string;
 
     private _elements: DrawableElement[] = [];
@@ -262,10 +263,12 @@ export class DrawableCanvas implements ISerializable {
                 this.offset.x -= evt.deltaX / this._zoom;
                 this.offset.y -= evt.deltaY / this._zoom;
             }
+            this.mousePosition = this.screenToWorld(this.screenPosition);
         }, { passive: false });
 
         canvas.addEventListener("pointermove", evt => {
-            this.mousePosition = this.getPoint(evt);
+            this.screenPosition = { x: evt.pageX, y: evt.pageY };
+            this.mousePosition = this.screenToWorld(this.screenPosition);
             this.state.update(evt);
             this.toolSelected.hover?.(this, this.mousePosition);
             this.updateCursor();
@@ -414,10 +417,15 @@ export class DrawableCanvas implements ISerializable {
         this._undoRedo.collapse();
     }
 
+    private screenToWorld(screen: Vector2): Vector2 {
+        return {
+            x: screen.x / this._zoom - this.offset.x,
+            y: screen.y / this._zoom - this.offset.y,
+        };
+    }
+
     public getPoint(evt: PointerEvent): Vector2 {
-        const x = evt.pageX / this._zoom - this.offset.x;
-        const y = evt.pageY / this._zoom - this.offset.y;
-        return { x: x, y: y };
+        return this.screenToWorld({ x: evt.pageX, y: evt.pageY });
     }
 
     public load(reader: BinaryReader): void {
