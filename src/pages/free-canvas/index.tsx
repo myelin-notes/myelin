@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DrawableCanvas } from "@/pages/free-canvas/drawable-canvas";
-import { ITool } from "@/pages/free-canvas/tools/tool";
+import { ITool, ToolOption } from "@/pages/free-canvas/tools/tool";
 import { WheelPicker, WheelPickerHandle, WheelItem } from "@/components/wheel-picker";
 import { FileSystem } from "@/lib/utils/file-system";
 import { keybindings } from "@/lib/keybindings";
@@ -27,19 +27,52 @@ import { ToolShelf, loadWheelToolIndices, saveWheelToolIndices } from "@/compone
 import { ToolOptionsPanel, loadGoogleFont } from "@/components/tool-options-panel";
 import { UserPrefs } from "@/lib/user-prefs";
 
+function makeSizeChildren(
+  tool: ITool,
+  sizeOpt: Extract<ToolOption, { type: 'size' }>,
+  applyRef: { current: (tool: ITool, key: string, value: unknown) => void },
+): WheelItem[] {
+  const { min, max, key } = sizeOpt;
+  const mid = Math.round((min + max) / 2);
+  return [
+    { label: `Fine (${min})`,   dot: 4,  command: () => applyRef.current(tool, key, min) },
+    { label: `Medium (${mid})`, dot: 8,  command: () => applyRef.current(tool, key, mid) },
+    { label: `Bold (${max})`,   dot: 14, command: () => applyRef.current(tool, key, max) },
+  ];
+}
+
 function toolToWheelItem(
   getCanvas: () => DrawableCanvas | null,
   tool: ITool,
-  index: number,
-  setSelectedToolIndex: (i: number) => void
+  toolIndex: number,
+  setSelectedToolIndex: (i: number) => void,
+  applyRef: { current: (tool: ITool, key: string, value: unknown) => void },
 ): WheelItem {
+  const options = tool.getOptions?.() ?? [];
+  const colorOpt = options.find((o): o is Extract<ToolOption, { type: 'color' }> => o.type === 'color');
+  const sizeOpt = options.find((o): o is Extract<ToolOption, { type: 'size' }> => o.type === 'size');
+
+  let children: WheelItem[] | undefined;
+
+  if (colorOpt) {
+    children = colorOpt.palette.map(hex => ({
+      label: hex,
+      color: hex,
+      command: () => applyRef.current(tool, colorOpt.key, hex),
+      children: sizeOpt ? makeSizeChildren(tool, sizeOpt, applyRef) : undefined,
+    }));
+  } else if (sizeOpt) {
+    children = makeSizeChildren(tool, sizeOpt, applyRef);
+  }
+
   return {
     label: tool.label,
     icon: tool.icon,
     command: () => {
-      getCanvas()?.switchTool(index);
-      setSelectedToolIndex(index);
+      getCanvas()?.switchTool(toolIndex);
+      setSelectedToolIndex(toolIndex);
     },
+    children,
   };
 }
 
@@ -85,9 +118,23 @@ export function CanvasView() {
     return tools;
   });
 
+  // Ref for wheel sub-item commands — avoids stale closures since wheel items are created once
+  const applyOptionRef = useRef<(tool: ITool, key: string, value: unknown) => void>(() => {});
+  applyOptionRef.current = (tool: ITool, key: string, value: unknown) => {
+    tool.setOption?.(key, value);
+    setOptionsTick(t => t + 1);
+    UserPrefs.update("toolOptions", (all) => ({
+      ...all, [tool.label]: { ...all[tool.label], [key]: value },
+    }));
+  };
+
   const [allWheelItems] = useState<WheelItem[]>(() =>
     canvasTools.map((tool, index) =>
-      toolToWheelItem(() => drawableCanvasRef.current, tool, index, setSelectedToolIndex)
+      toolToWheelItem(
+        () => drawableCanvasRef.current,
+        tool, index, setSelectedToolIndex,
+        applyOptionRef,
+      )
     )
   );
 
@@ -96,7 +143,10 @@ export function CanvasView() {
   );
   const [shelfOpen, setShelfOpen] = useState(false);
 
-  const wheelItems = allWheelItems.filter((_, i) => wheelEnabledIndices.has(i));
+  const wheelItems = useMemo(
+    () => allWheelItems.filter((_, i) => wheelEnabledIndices.has(i)),
+    [allWheelItems, wheelEnabledIndices],
+  );
 
   // Hide options when switching tools
   useEffect(() => {
