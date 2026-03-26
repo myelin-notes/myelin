@@ -9,9 +9,11 @@ import {BinaryReader, BinaryWriter} from "../../lib/utils/binary-helper";
 import {DrawableElementRegistry} from "./elements/drawable-element-registry";
 import {ElementType} from "./elements/element-type";
 import {TextElement} from "./elements/text-element";
+import {ImageElement} from "./elements/image-element";
 import {HighlighterTool} from "./tools/highlighter-tool";
 import {SelectTool} from "./tools/select-tool";
 import {TextTool} from "./tools/text-tool";
+import {EmbedTool} from "./tools/embed-tool";
 
 export type Vector2 = { x: number, y: number };
 
@@ -118,6 +120,7 @@ export class DrawableCanvas implements ISerializable {
 
     private onZoomChange?: (zoom: number) => void;
     private onRequestTextEdit?: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, onCommit: (text: string) => void) => void;
+    private onRequestFilePick?: (screenPos: Vector2) => void;
 
     public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
         const ctx = canvas.getContext("2d", { alpha: false });
@@ -148,6 +151,14 @@ export class DrawableCanvas implements ISerializable {
 
     public requestTextEdit(screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, onCommit: (text: string) => void) {
         this.onRequestTextEdit?.(screenPos, screenFontSize, fontFamily, initialText, onCommit);
+    }
+
+    public setOnRequestFilePick(callback: (screenPos: Vector2) => void) {
+        this.onRequestFilePick = callback;
+    }
+
+    public requestFilePick(screenPos: Vector2) {
+        this.onRequestFilePick?.(screenPos);
     }
 
     public redraw(deltaTime: number) {
@@ -328,6 +339,21 @@ export class DrawableCanvas implements ISerializable {
         this.updateBounding();
     }
 
+    public async addImageFromBlob(blob: Blob, screenX?: number, screenY?: number) {
+        const data = await blob.arrayBuffer();
+        const img = this.addElement(i => new ImageElement(i));
+        await img.setImageData(data);
+
+        // Place at given screen position (or center of viewport)
+        const dpr = window.devicePixelRatio || 1;
+        const cx = screenX ?? (this.canvas.width / dpr / 2);
+        const cy = screenY ?? (this.canvas.height / dpr / 2);
+        const world = this.screenToWorld({ x: cx, y: cy });
+        img.setPosition(world.x - img.naturalWidth / 2, world.y - img.naturalHeight / 2);
+        img.updateBounds();
+        this.updateBounding();
+    }
+
     public pushApplied(command: UndoCommand) {
         this._undoRedo.pushApplied(command);
     }
@@ -417,7 +443,7 @@ export class DrawableCanvas implements ISerializable {
         this._undoRedo.collapse();
     }
 
-    private screenToWorld(screen: Vector2): Vector2 {
+    public screenToWorld(screen: Vector2): Vector2 {
         return {
             x: screen.x / this._zoom - this.offset.x,
             y: screen.y / this._zoom - this.offset.y,
@@ -479,6 +505,7 @@ export class DrawableCanvas implements ISerializable {
             new HighlighterTool(),
             new EraserTool(),
             new TextTool(),
+            new EmbedTool(),
         ];
     }
 }

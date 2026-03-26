@@ -86,6 +86,8 @@ export function CanvasView() {
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingEmbedPos = useRef<Vector2 | null>(null);
 
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -186,6 +188,16 @@ export function CanvasView() {
     });
   }, []);
 
+  const embedFiles = useCallback((files: FileList | File[], screenX?: number, screenY?: number) => {
+    const dc = drawableCanvasRef.current;
+    if (!dc) return;
+    for (const file of files) {
+      if (file.type.startsWith("image/")) {
+        dc.addImageFromBlob(file, screenX, screenY);
+      }
+    }
+  }, []);
+
   const autoSave = useCallback(async () => {
     if (!drawableCanvasRef.current || !canvasRef.current || !id) return;
     await FileSystem.saveToFile(id, drawableCanvasRef.current);
@@ -235,6 +247,36 @@ export function CanvasView() {
       }
     });
 
+    // Drag-and-drop media onto canvas
+    canvas.addEventListener("dragover", (evt) => {
+      evt.preventDefault();
+    });
+
+    canvas.addEventListener("drop", (evt) => {
+      evt.preventDefault();
+      if (evt.dataTransfer?.files?.length) {
+        embedFiles(Array.from(evt.dataTransfer.files), evt.pageX, evt.pageY);
+      }
+    });
+
+    // Paste media from clipboard
+    const handlePaste = (evt: ClipboardEvent) => {
+      const items = evt.clipboardData?.items;
+      if (!items) return;
+      const blobs: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          const file = items[i].getAsFile();
+          if (file) blobs.push(file);
+        }
+      }
+      if (blobs.length > 0) {
+        evt.preventDefault();
+        embedFiles(blobs);
+      }
+    };
+    document.addEventListener("paste", handlePaste);
+
     const dc = new DrawableCanvas(canvas, canvasTools);
     drawableCanvasRef.current = dc;
 
@@ -244,6 +286,11 @@ export function CanvasView() {
 
     dc.setOnRequestTextEdit((screenPos, screenFontSize, fontFamily, initialText, onCommit) => {
       setTextEdit({ screenPos, screenFontSize, fontFamily, initialText, onCommit });
+    });
+
+    dc.setOnRequestFilePick((screenPos) => {
+      pendingEmbedPos.current = screenPos;
+      fileInputRef.current?.click();
     });
 
     let prevTime = 0;
@@ -282,6 +329,7 @@ export function CanvasView() {
     return () => {
       cancelAnimationFrame(animationFrameId);
       unbindKeys();
+      document.removeEventListener("paste", handlePaste);
     };
   }, []);
 
@@ -376,6 +424,23 @@ export function CanvasView() {
 
       {/* Canvas */}
       <canvas ref={canvasRef} className="w-full h-full block" />
+
+      {/* Hidden file input for embed tool */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = e.currentTarget.files;
+          if (files?.length) {
+            embedFiles(Array.from(files), pendingEmbedPos.current?.x, pendingEmbedPos.current?.y);
+          }
+          e.currentTarget.value = "";
+          pendingEmbedPos.current = null;
+        }}
+      />
 
       {/* Info panel */}
       <div className={`absolute right-6 bottom-6 ${glassPanel} px-4 py-3 z-10`}>

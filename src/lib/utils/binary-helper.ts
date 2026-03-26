@@ -139,6 +139,8 @@ export class BinaryReader {
 
     public readBuffer(): ArrayBuffer {
         const length = this.readU32();
-        return this.view.buffer.slice(this.offset, this.offset + length);
+        const buf = this.view.buffer.slice(this.offset, this.offset + length);
+        this.offset += length;
+        return buf;
     }
 }
