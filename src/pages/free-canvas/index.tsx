@@ -21,8 +21,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ChevronLeft as ChevronLeftIcon, X as XIcon } from "lucide-react";
+import { ChevronLeft as ChevronLeftIcon, X as XIcon, SlidersHorizontal as SlidersIcon } from "lucide-react";
 import { Vector2 } from "@/pages/free-canvas/drawable-canvas";
+import { ToolShelf, loadWheelToolIndices, saveWheelToolIndices } from "@/components/tool-shelf";
 
 function toolToWheelItem(
   getCanvas: () => DrawableCanvas | null,
@@ -49,6 +50,7 @@ export function CanvasView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -61,15 +63,33 @@ export function CanvasView() {
     onCommit: (text: string) => void;
   } | null>(null);
 
-  const [tools] = useState<WheelItem[]>(() => {
-    const canvasTools = DrawableCanvas.makeTools();
-    const items = canvasTools.map((tool, index) =>
-      toolToWheelItem(() => drawableCanvasRef.current, tool, index, setSelectedToolIndex)
-    );
-    return items;
-  });
-
   const [canvasTools] = useState(() => DrawableCanvas.makeTools());
+
+  const [allWheelItems] = useState<WheelItem[]>(() =>
+    canvasTools.map((tool, index) =>
+      toolToWheelItem(() => drawableCanvasRef.current, tool, index, setSelectedToolIndex)
+    )
+  );
+
+  const [wheelEnabledIndices, setWheelEnabledIndices] = useState<Set<number>>(
+    () => loadWheelToolIndices(canvasTools.length)
+  );
+  const [shelfOpen, setShelfOpen] = useState(false);
+
+  const wheelItems = allWheelItems.filter((_, i) => wheelEnabledIndices.has(i));
+
+  const handleToggleWheelTool = useCallback((index: number) => {
+    setWheelEnabledIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      saveWheelToolIndices(next);
+      return next;
+    });
+  }, []);
 
   const autoSave = useCallback(async () => {
     if (!drawableCanvasRef.current || !canvasRef.current || !id) return;
@@ -183,31 +203,61 @@ export function CanvasView() {
 
       {/* Toolbar */}
       <TooltipProvider>
-        <div className={`absolute top-6 left-1/2 -translate-x-1/2 ${glassPanel} px-3 py-2 flex items-center gap-1 z-10`}>
-          {canvasTools.map((tool, index) => {
-            const Icon = tool.icon;
-            const isActive = selectedToolIndex === index;
-            return (
-              <Tooltip key={index}>
-                <TooltipTrigger
-                    className={`p-2.5 rounded-xl cursor-pointer transition-colors ${
-                      isActive
-                        ? "bg-accent-dark text-white"
-                        : "bg-transparent text-text-secondary hover:bg-hover-tint"
-                    }`}
-                    onClick={() => {
-                      drawableCanvasRef.current?.switchTool(index);
-                      setSelectedToolIndex(index);
-                    }}
-                  >
-                    <Icon className="size-4" />
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>{tool.label}</p>
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+        <div ref={toolbarRef} className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-end gap-2">
+          <div className={`${glassPanel} px-3 py-2 flex items-center gap-1`}>
+            {canvasTools.map((tool, index) => {
+              const Icon = tool.icon;
+              const isActive = selectedToolIndex === index;
+              return (
+                <Tooltip key={index}>
+                  <TooltipTrigger
+                      className={`p-2.5 rounded-xl cursor-pointer transition-colors ${
+                        isActive
+                          ? "bg-accent-dark text-white"
+                          : "bg-transparent text-text-secondary hover:bg-hover-tint"
+                      }`}
+                      onClick={() => {
+                        drawableCanvasRef.current?.switchTool(index);
+                        setSelectedToolIndex(index);
+                      }}
+                    >
+                      <Icon className="size-4" />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>{tool.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+
+            <div className="w-px h-4 bg-border-divider mx-1" />
+
+            <Tooltip>
+              <TooltipTrigger
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors ${
+                  shelfOpen
+                    ? "bg-accent-dark text-white"
+                    : "bg-transparent text-text-secondary hover:bg-hover-tint"
+                }`}
+                onClick={() => setShelfOpen((v) => !v)}
+              >
+                <SlidersIcon className="size-4" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Customize wheel</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          {shelfOpen && (
+            <ToolShelf
+              tools={canvasTools}
+              enabledIndices={wheelEnabledIndices}
+              onToggle={handleToggleWheelTool}
+              onClose={() => setShelfOpen(false)}
+              containerRef={toolbarRef}
+            />
+          )}
         </div>
       </TooltipProvider>
 
@@ -293,7 +343,7 @@ export function CanvasView() {
       )}
 
       {/* Wheel picker */}
-      <WheelPicker ref={wheelRef} radius={100} items={tools}>
+      <WheelPicker ref={wheelRef} radius={100} items={wheelItems}>
         <XIcon className="size-4 text-white" />
       </WheelPicker>
     </div>

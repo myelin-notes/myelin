@@ -39,13 +39,14 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
     }
 
     const show = useCallback((event: PointerEvent) => {
+      if (items.length === 0) return;
       if (groupRef.current) {
         groupRef.current.style.left = `${event.clientX}px`;
         groupRef.current.style.top = `${event.clientY}px`;
       }
       setVisible(true);
       centerPosRef.current = [event.clientX, event.clientY];
-    }, []);
+    }, [items.length]);
 
     const hide = useCallback(() => {
       setVisible(false);
