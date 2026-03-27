@@ -14,7 +14,6 @@ import {HighlighterTool} from "./tools/highlighter-tool";
 import {SelectTool} from "./tools/select-tool";
 import {TextTool} from "./tools/text-tool";
 import {EmbedTool} from "./tools/embed-tool";
-import {GraphTool} from "./tools/graph-tool";
 
 export type Vector2 = { x: number, y: number };
 
@@ -507,7 +506,6 @@ export class DrawableCanvas implements ISerializable {
             new EraserTool(),
             new TextTool(),
             new EmbedTool(),
-            new GraphTool(),
         ];
     }
 }
