@@ -1,4 +1,4 @@
-import { Plus, FolderPlus, FilePlus, LayoutGrid } from "lucide-react";
+import { Plus, FolderPlus, LayoutGrid } from "lucide-react";
 import type { FileType } from "@/lib/utils/file-system";
 import {
   DropdownMenu,
@@ -36,13 +36,6 @@ export function CreateNewDropdown({ onNewFolder, onNewFile }: CreateNewDropdownP
           New Folder
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className={itemClass}
-          onClick={() => onNewFile?.("Untitled Document", "mdoc")}
-        >
-          <FilePlus className="size-4" />
-          New Document
-        </DropdownMenuItem>
         <DropdownMenuItem
           className={itemClass}
           onClick={() => onNewFile?.("Untitled Canvas", "mcanvas")}

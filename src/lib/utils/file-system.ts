@@ -14,7 +14,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { ISerializable } from "./binary-helper";
 import { BinaryReader, BinaryWriter } from "./binary-helper";
 
-export const FileTypes = ['mcanvas', 'mdoc'] as const;
+export const FileTypes = ['mcanvas'] as const;
 export type FileType = typeof FileTypes[number];
 
 export interface VFSFileNode {

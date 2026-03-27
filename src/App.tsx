@@ -3,7 +3,6 @@ import { Toaster } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 import { LibraryPage } from "@/pages/library";
 import { CanvasView } from "@/pages/free-canvas";
-import { DocumentView } from "@/pages/document-editor";
 
 function App() {
   useTheme("light");
@@ -15,7 +14,6 @@ function App() {
         <Route path="/" element={<Navigate to="/library" replace />} />
         <Route path="/library" element={<LibraryPage />} />
         <Route path="/mcanvas/:id" element={<CanvasView />} />
-        <Route path="/mdoc/:id" element={<DocumentView />} />
       </Routes>
     </MemoryRouter>
   );

@@ -24,7 +24,6 @@ function formatRelativeTime(timestamp: number): string {
 }
 
 const fileTypeLabel: Record<string, string> = {
-  mdoc: "Document",
   mcanvas: "Canvas",
 };
 
