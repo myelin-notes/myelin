@@ -94,15 +94,15 @@ export function ToolOptionsPanel({ options, onSetOption }: ToolOptionsPanelProps
     if (options.length === 0) return null;
 
     return (
-        <div className="backdrop-blur-[24px] bg-white/85 rounded-xl shadow-ambient px-4 py-2.5 animate-in fade-in slide-in-from-top-2 duration-200 flex items-center gap-5">
+        <div className="backdrop-blur-[24px] bg-white/85 rounded-xl shadow-ambient px-3.5 py-3 animate-in fade-in slide-in-from-left-2 duration-200 flex flex-col gap-3">
             {options.map((option) => {
                 if (option.type === "color") {
                     return (
-                        <div key={option.key} className="flex items-center gap-2.5">
+                        <div key={option.key} className="flex flex-col gap-1.5">
                             <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-muted select-none">
                                 {option.label}
                             </span>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap max-w-[120px]">
                                 {option.palette.map((color) => {
                                     const active = option.value === color;
                                     return (
@@ -127,29 +127,31 @@ export function ToolOptionsPanel({ options, onSetOption }: ToolOptionsPanelProps
 
                 if (option.type === "size") {
                     return (
-                        <div key={option.key} className="flex items-center gap-2.5">
+                        <div key={option.key} className="flex flex-col gap-1.5">
                             <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-muted select-none">
                                 {option.label}
                             </span>
-                            <input
-                                type="range"
-                                min={option.min}
-                                max={option.max}
-                                step={option.step}
-                                value={option.value}
-                                onChange={(e) => onSetOption(option.key, Number(e.target.value))}
-                                className="tool-slider w-24"
-                            />
-                            <span className="text-[10px] font-medium text-text-secondary w-5 text-right tabular-nums select-none">
-                                {option.value}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="range"
+                                    min={option.min}
+                                    max={option.max}
+                                    step={option.step}
+                                    value={option.value}
+                                    onChange={(e) => onSetOption(option.key, Number(e.target.value))}
+                                    className="tool-slider w-20"
+                                />
+                                <span className="text-[10px] font-medium text-text-secondary w-5 text-right tabular-nums select-none">
+                                    {option.value}
+                                </span>
+                            </div>
                         </div>
                     );
                 }
 
                 if (option.type === "choice") {
                     return (
-                        <div key={option.key} className="flex items-center gap-2.5">
+                        <div key={option.key} className="flex flex-col gap-1.5">
                             <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-muted select-none">
                                 {option.label}
                             </span>
@@ -179,7 +181,7 @@ export function ToolOptionsPanel({ options, onSetOption }: ToolOptionsPanelProps
 
                 if (option.type === "font") {
                     return (
-                        <div key={option.key} className="flex items-center gap-2.5">
+                        <div key={option.key} className="flex flex-col gap-1.5">
                             <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-muted select-none">
                                 {option.label}
                             </span>

@@ -22,7 +22,7 @@ export function ToolShelf({ tools, enabledIndices, onToggle, onClose, containerR
   }, [onClose, containerRef]);
 
   return (
-    <div className="w-56 backdrop-blur-[24px] bg-white/85 rounded-xl shadow-ambient overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="w-56 backdrop-blur-[24px] bg-white/85 rounded-xl shadow-ambient overflow-hidden animate-in fade-in slide-in-from-left-2 duration-200">
       <div className="px-4 py-3 flex items-center justify-between">
         <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-primary">
           Tool Shelf
