@@ -375,13 +375,10 @@ export class DrawableCanvas implements ISerializable {
 
     private initEventListeners(canvas: HTMLCanvasElement) {
         canvas.addEventListener("wheel", evt => {
-            if (this._editingElement) {
-                evt.preventDefault();
-                return;
-            }
             if (evt.ctrlKey) {
                 // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures)
                 evt.preventDefault();
+                if (this._editingElement) return;
                 const prevZoom = this._zoom;
                 const newZoom = prevZoom + evt.deltaY * -0.005;
                 this._zoom = Math.min(3, Math.max(0.2, newZoom));
