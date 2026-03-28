@@ -10,6 +10,8 @@ import {DrawableElementRegistry} from "./elements/drawable-element-registry";
 import {ElementType} from "./elements/element-type";
 import {TextElement} from "./elements/text-element";
 import {ImageElement} from "./elements/image-element";
+import {PageFrameElement} from "./elements/page-frame-element";
+import type { EditableBlock } from "./elements/block-editor";
 import {HighlighterTool} from "./tools/highlighter-tool";
 import {SelectTool} from "./tools/select-tool";
 import {TextTool} from "./tools/text-tool";
@@ -77,6 +79,22 @@ export class EditTextCommand implements UndoCommand {
     }
 }
 
+export class EditPageFrameCommand implements UndoCommand {
+    constructor(
+        private element: PageFrameElement,
+        private oldBlocks: EditableBlock[],
+        private newBlocks: EditableBlock[],
+    ) {}
+
+    execute() {
+        this.element.editor.setBlocks(this.newBlocks);
+    }
+
+    undo() {
+        this.element.editor.setBlocks(this.oldBlocks);
+    }
+}
+
 export class ScaleElementCommand implements UndoCommand {
     constructor(
         private element: DrawableElement,
@@ -122,6 +140,13 @@ export class DrawableCanvas implements ISerializable {
     private onRequestTextEdit?: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, boxScreenWidth: number, boxScreenHeight: number, onCommit: (text: string) => void) => void;
     private onRequestFilePick?: (screenPos: Vector2) => void;
 
+    // Canvas-based page frame editing
+    private _editingElement: PageFrameElement | null = null;
+    private _textarea: HTMLTextAreaElement | null = null;
+    private _composing: boolean = false;
+    private _keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+    private _textareaAbort: AbortController | null = null;
+
     public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
         const ctx = canvas.getContext("2d", { alpha: false });
         if (!ctx) {
@@ -159,6 +184,114 @@ export class DrawableCanvas implements ISerializable {
 
     public requestFilePick(screenPos: Vector2) {
         this.onRequestFilePick?.(screenPos);
+    }
+
+    public setHiddenTextarea(textarea: HTMLTextAreaElement): void {
+        this._textarea = textarea;
+
+        // Abort previous listeners if re-called (e.g. React StrictMode)
+        this._textareaAbort?.abort();
+        this._textareaAbort = new AbortController();
+        const { signal } = this._textareaAbort;
+
+        textarea.addEventListener("input", () => {
+            if (this._composing) return;
+            if (this._editingElement && textarea.value) {
+                this._editingElement.editor.insertText(textarea.value);
+                textarea.value = "";
+            }
+        }, { signal });
+
+        textarea.addEventListener("compositionstart", () => {
+            this._composing = true;
+        }, { signal });
+
+        textarea.addEventListener("compositionend", () => {
+            this._composing = false;
+            if (this._editingElement && textarea.value) {
+                this._editingElement.editor.insertText(textarea.value);
+                textarea.value = "";
+            }
+        }, { signal });
+    }
+
+    public get editingElement(): PageFrameElement | null {
+        return this._editingElement;
+    }
+
+    private _oldBlocks: EditableBlock[] = [];
+
+    public enterPageFrameEdit(element: PageFrameElement): void {
+        if (this._editingElement) {
+            this.exitPageFrameEdit();
+        }
+        this._editingElement = element;
+        this._oldBlocks = element.editor.snapshotBlocks();
+        element.enterEditMode();
+
+        // Focus hidden textarea for input capture.
+        // Deferred so the browser's default pointerdown focus behavior doesn't
+        // immediately steal focus back to the canvas.
+        const textarea = this._textarea;
+        if (textarea) {
+            textarea.value = "";
+            setTimeout(() => textarea.focus(), 0);
+        }
+
+        // Install keyboard handler (capture phase so it fires before keybindings)
+        this._keydownHandler = (e: KeyboardEvent) => {
+            if (!this._editingElement) return;
+
+            const result = this._editingElement.editor.handleKey(e.key, e.metaKey || e.ctrlKey, e.shiftKey);
+
+            if (result === "exit") {
+                e.preventDefault();
+                e.stopPropagation();
+                this.exitPageFrameEdit();
+                return;
+            }
+
+            if (result === "handled") {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+
+            // "passthrough" — let the event reach the textarea for input processing.
+            // The keybinding system already ignores events from TEXTAREA elements.
+        };
+        window.addEventListener("keydown", this._keydownHandler, true);
+    }
+
+    public exitPageFrameEdit(): void {
+        if (!this._editingElement) return;
+
+        const element = this._editingElement;
+        const newBlocks = element.editor.snapshotBlocks();
+        element.exitEditMode();
+
+        const changed = JSON.stringify(newBlocks) !== JSON.stringify(this._oldBlocks);
+        if (changed) {
+            this.pushApplied(new EditPageFrameCommand(element, this._oldBlocks, newBlocks));
+        }
+
+        this._editingElement = null;
+        this._textarea?.blur();
+
+        // Remove keyboard handler
+        if (this._keydownHandler) {
+            window.removeEventListener("keydown", this._keydownHandler, true);
+            this._keydownHandler = null;
+        }
+    }
+
+    public destroy(): void {
+        if (this._editingElement) {
+            this.exitPageFrameEdit();
+        }
+        this._textareaAbort?.abort();
+        this._textareaAbort = null;
+        this._textarea = null;
     }
 
     public redraw(deltaTime: number) {
@@ -242,6 +375,10 @@ export class DrawableCanvas implements ISerializable {
 
     private initEventListeners(canvas: HTMLCanvasElement) {
         canvas.addEventListener("wheel", evt => {
+            if (this._editingElement) {
+                evt.preventDefault();
+                return;
+            }
             if (evt.ctrlKey) {
                 // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures)
                 evt.preventDefault();
@@ -286,6 +423,25 @@ export class DrawableCanvas implements ISerializable {
         });
 
         canvas.addEventListener("pointerdown", evt => {
+            // Handle clicks during page frame editing
+            if (this._editingElement) {
+                const point = this.getPoint(evt);
+                const box = this._editingElement.boundingBox;
+                if (point.x >= box.x && point.x <= box.right &&
+                    point.y >= box.y && point.y <= box.bottom) {
+                    // Click inside editing element — reposition cursor
+                    const localX = point.x - box.x;
+                    const localY = point.y - box.y;
+                    this._editingElement.editor.hitTestCursor(localX, localY, this.ctx);
+                    evt.preventDefault(); // Prevent canvas from stealing focus
+                    this._textarea?.focus();
+                } else {
+                    // Click outside — commit and exit
+                    this.exitPageFrameEdit();
+                }
+                return;
+            }
+
             switch (evt.pointerType) {
                 case "touch":
                     this.state.change(InteractState.Moving, evt);

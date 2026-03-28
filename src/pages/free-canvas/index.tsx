@@ -56,6 +56,17 @@ export function CanvasView() {
         onChange={engine.handleFileInputChange}
       />
 
+      {/* Hidden textarea for canvas-based page frame editing input capture */}
+      <textarea
+        ref={engine.hiddenTextareaRef}
+        className="absolute opacity-0 pointer-events-none"
+        style={{ left: -9999, top: -9999, width: 1, height: 1 }}
+        tabIndex={-1}
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+      />
+
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
 
       {engine.textEdit && (

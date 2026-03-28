@@ -2,6 +2,7 @@ import {ITool, SvgIcon, ToolOption} from "./tool";
 import {DrawableCanvas, MoveElementsCommand, ScaleElementCommand, Vector2} from "../drawable-canvas";
 import {CollisionHelper} from "../../../lib/utils/collision-helper";
 import {DrawableElement} from "../elements/drawable-element";
+import {PageFrameElement} from "../elements/page-frame-element";
 import { MousePointer2 as PointerIcon, BoxSelect as BoxSelectIcon, Lasso as LassoIcon } from "lucide-react";
 
 const HANDLE_HIT_RADIUS = 10;
@@ -39,6 +40,10 @@ export class SelectTool implements ITool {
 
     // Lasso state
     private lassoPath: Vector2[] = [];
+
+    // Double-click state
+    private lastClickTime: number = 0;
+    private lastClickPos: Vector2 = { x: 0, y: 0 };
 
     public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
         if (this.mode === SelectMode.Marquee) {
@@ -104,7 +109,25 @@ export class SelectTool implements ITool {
             }
         }
 
-        // 2. Hit-test elements (topmost first), cycle on repeated clicks
+        // 2. Double-click detection for page frame editing
+        const now = Date.now();
+        const dx = point.x - this.lastClickPos.x;
+        const dy = point.y - this.lastClickPos.y;
+        const isDoubleClick = (now - this.lastClickTime) < 400 && (dx * dx + dy * dy) < 25;
+
+        if (isDoubleClick) {
+            for (let i = canvas.elements.length - 1; i >= 0; i--) {
+                const e = canvas.elements[i];
+                if (e instanceof PageFrameElement && CollisionHelper.inBox(point, e.boundingBox)) {
+                    for (const el of canvas.elements) el.unselect();
+                    canvas.enterPageFrameEdit(e);
+                    this.lastClickTime = 0;
+                    return;
+                }
+            }
+        }
+
+        // 3. Hit-test elements (topmost first), cycle on repeated clicks
         const hits: DrawableElement[] = [];
         for (let i = canvas.elements.length - 1; i >= 0; i--) {
             const e = canvas.elements[i];
@@ -265,6 +288,8 @@ export class SelectTool implements ITool {
         }
 
         canvas.updateBounding();
+        this.lastClickTime = Date.now();
+        this.lastClickPos = { ...this.startPoint };
         this.reset();
     }
 
@@ -290,12 +315,8 @@ export class SelectTool implements ITool {
         if (this.mode === SelectMode.Scaling) {
             canvas.setCursor(SelectTool.resizeCursor(this.handleIndex));
             return;
-        }
-        if (this.mode === SelectMode.Marquee || this.mode === SelectMode.Lasso) {
-            canvas.setCursor('crosshair');
-            return;
-        }
-
+        }        
+        
         // Idle — check handles on selected elements
         for (let i = canvas.elements.length - 1; i >= 0; i--) {
             const e = canvas.elements[i];

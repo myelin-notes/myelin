@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { DrawableCanvas, Vector2 } from "@/pages/free-canvas/drawable-canvas";
+import { PageFrameElement } from "@/pages/free-canvas/elements/page-frame-element";
 import { ITool } from "@/pages/free-canvas/tools/tool";
 import { WheelPickerHandle } from "@/components/wheel-picker";
 import { FileSystem } from "@/lib/utils/file-system";
@@ -50,6 +51,7 @@ export function useCanvasEngine({
   const [fps, setFps] = useState(0);
   const [fileName, setFileName] = useState("");
   const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
+  const hiddenTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const embedFiles = useCallback((files: FileList | File[], screenX?: number, screenY?: number) => {
     const dc = drawableCanvasRef.current;
@@ -154,6 +156,11 @@ export function useCanvasEngine({
       fileInputRef.current?.click();
     });
 
+    // Wire up hidden textarea for canvas-based page frame editing
+    if (hiddenTextareaRef.current) {
+      dc.setHiddenTextarea(hiddenTextareaRef.current);
+    }
+
     let prevTime = 0;
     let animationFrameId: number;
 
@@ -184,13 +191,31 @@ export function useCanvasEngine({
     ]);
 
     FileSystem.loadFromFile(id, dc)
-      .then(() => FileSystem.saveToFile(id, dc))
+      .then(() => {
+        // Auto-create a page frame for empty canvases
+        if (dc.elements.length === 0) {
+          const dpr = window.devicePixelRatio || 1;
+          const centerWorld = dc.screenToWorld({
+            x: canvas.width / dpr / 2,
+            y: canvas.height / dpr / 2,
+          });
+          const frame = dc.addElement(i => new PageFrameElement(i));
+          frame.setOffset(
+            centerWorld.x - frame.pageWidth / 2,
+            centerWorld.y - frame.pageHeight / 2,
+          );
+          frame.updateBounds();
+          dc.updateBounding();
+        }
+        return FileSystem.saveToFile(id, dc);
+      })
       .catch(console.error);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
       unbindKeys();
       document.removeEventListener("paste", handlePaste);
+      dc.destroy();
     };
   }, []);
 
@@ -205,6 +230,7 @@ export function useCanvasEngine({
 
   return {
     fileInputRef,
+    hiddenTextareaRef,
     zoomLevel,
     fps,
     fileName,
