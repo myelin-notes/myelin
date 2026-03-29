@@ -271,6 +271,8 @@ export class DrawableCanvas implements ISerializable {
         this.ctx.scale(this._zoom, this._zoom);
         this.ctx.translate(this._offset.x, this._offset.y);
         this._elements.forEach(element => {
+            // Skip page frames — they are rendered entirely by the DOM layer
+            if (element.type === ElementType.PAGE_FRAME) return;
             element.draw(this.ctx, deltaTime);
         });
 
@@ -369,18 +371,10 @@ export class DrawableCanvas implements ISerializable {
         });
 
         canvas.addEventListener("pointerdown", evt => {
-            // Handle clicks during page frame editing
+            // During page frame editing, any click that reaches the canvas
+            // (i.e. outside the raised DOM contentEditable) exits edit mode
             if (this._editingElement) {
-                const point = this.getPoint(evt);
-                const box = this._editingElement.boundingBox;
-                if (point.x >= box.x && point.x <= box.right &&
-                    point.y >= box.y && point.y <= box.bottom) {
-                    // Click inside editing element — handled by DOM contentEditable
-                    return;
-                } else {
-                    // Click outside — commit and exit (DOM layer will serialize blocks)
-                    this.exitPageFrameEdit();
-                }
+                this.exitPageFrameEdit();
                 return;
             }
 
