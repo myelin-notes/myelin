@@ -1,15 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { FileText } from "lucide-react";
-import { FileSystem, VFSFileNode } from "@/lib/utils/file-system";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { useExplorerItem } from "./use-explorer-item";
-import { ItemContextMenu } from "./item-context-menu";
-import { TagManageDialog } from "../tag-manage-dialog";
+import { useState } from 'react';
+import { FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { FileSystem, type VFSFileNode } from '@/lib/utils/file-system';
+import { TagManageDialog } from '../tag-manage-dialog';
+import { ItemContextMenu } from './item-context-menu';
+import { useExplorerItem } from './use-explorer-item';
 
 interface FileItemProps {
   file: VFSFileNode;
@@ -42,30 +39,32 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
             <button
               draggable={!renaming}
               onClick={() => {
-                if (!renaming) navigate(`/${file.fileType}/${file.id}`);
+                if (!renaming) {
+                  navigate(`/${file.fileType}/${file.id}`);
+                }
               }}
               onDragStart={handleDragStart}
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-2 transition-colors hover:bg-hover-tint cursor-pointer"
+              className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-2 transition-colors hover:bg-hover-tint"
             />
           }
         >
-          <FileText className="size-3 text-text-secondary shrink-0" />
+          <FileText className="size-3 shrink-0 text-text-secondary" />
           {renaming ? (
             <input
               {...renameInputProps}
-              className="text-sm font-normal text-text-secondary bg-transparent border-b-2 border-primary outline-none min-w-0 flex-1"
+              className="min-w-0 flex-1 border-primary border-b-2 bg-transparent font-normal text-sm text-text-secondary outline-none"
             />
           ) : (
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-normal text-text-secondary truncate">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-normal text-sm text-text-secondary">
                 {file.name}
               </span>
               {file.tags.length > 0 && (
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex shrink-0 items-center gap-1">
                   {file.tags.slice(0, 2).map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-md bg-tag/60 px-1.5 py-0.5 text-[9px] font-medium text-text-tag"
+                      className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
                     >
                       #{tag}
                     </span>
@@ -86,7 +85,9 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
           onManageTags={() => setTagDialogOpen(true)}
           onReveal={async () => {
             const path = await FileSystem.getDiskPath(file.id);
-            if (path) await revealItemInDir(path);
+            if (path) {
+              await revealItemInDir(path);
+            }
           }}
         />
       </ContextMenu>

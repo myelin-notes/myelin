@@ -1,14 +1,14 @@
-import { useRef } from "react";
-import { ITool, ToolOption } from "@/pages/free-canvas/tools/tool";
+import { useRef } from 'react';
+import { SlidersHorizontal as SlidersIcon } from 'lucide-react';
+import { ToolOptionsPanel } from '@/components/tool-options-panel';
+import { ToolShelf } from '@/components/tool-shelf';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { SlidersHorizontal as SlidersIcon } from "lucide-react";
-import { ToolShelf } from "@/components/tool-shelf";
-import { ToolOptionsPanel } from "@/components/tool-options-panel";
+} from '@/components/ui/tooltip';
+import type { ITool, ToolOption } from '@/pages/free-canvas/tools/tool';
 
 interface CanvasToolbarProps {
   tools: ITool[];
@@ -47,16 +47,26 @@ export function CanvasToolbar({
   const shelfButtonRef = useRef<HTMLElement | null>(null);
 
   const getButtonOffset = (btn: HTMLElement | null) => {
-    if (!btn || !toolbarInnerRef.current) return 0;
+    if (!(btn && toolbarInnerRef.current)) {
+      return 0;
+    }
     return btn.offsetTop - toolbarInnerRef.current.offsetTop;
   };
-  const optionsPanelOffset = getButtonOffset(toolButtonRefs.current[selectedToolIndex]);
+  const optionsPanelOffset = getButtonOffset(
+    toolButtonRefs.current[selectedToolIndex],
+  );
   const shelfPanelOffset = getButtonOffset(shelfButtonRef.current);
 
   return (
     <TooltipProvider>
-      <div ref={toolbarRef} className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
-        <div ref={toolbarInnerRef} className="backdrop-blur-[24px] bg-white/80 rounded-xl shadow-ambient px-2 py-3 flex flex-col items-center gap-1">
+      <div
+        ref={toolbarRef}
+        className="absolute top-1/2 left-6 z-10 -translate-y-1/2"
+      >
+        <div
+          ref={toolbarInnerRef}
+          className="flex flex-col items-center gap-1 rounded-xl bg-white/80 px-2 py-3 shadow-ambient backdrop-blur-[24px]"
+        >
           {tools.map((tool, index) => {
             const Icon = tool.icon;
             const isActive = selectedToolIndex === index;
@@ -64,41 +74,48 @@ export function CanvasToolbar({
             return (
               <Tooltip key={index}>
                 <TooltipTrigger
-                    ref={(el) => { toolButtonRefs.current[index] = el; }}
-                    className={`relative p-2.5 rounded-xl cursor-pointer transition-colors ${
-                      isActive
-                        ? "bg-accent-dark text-white"
-                        : "bg-transparent text-text-secondary hover:bg-hover-tint"
-                    }`}
-                    onClick={() => {
-                      if (isActive && toolHasOptions) {
-                        onToggleOptions();
-                      } else {
-                        onSelectTool(index);
-                      }
-                    }}
-                  >
-                    <Icon className="size-4" />
-                    {isActive && toolHasOptions && !optionsVisible && (
-                      <span className="absolute -right-0.5 top-1/2 -translate-y-1/2 size-1 rounded-full bg-white/70" />
-                    )}
+                  ref={(el) => {
+                    toolButtonRefs.current[index] = el;
+                  }}
+                  className={`relative cursor-pointer rounded-xl p-2.5 transition-colors ${
+                    isActive
+                      ? 'bg-accent-dark text-white'
+                      : 'bg-transparent text-text-secondary hover:bg-hover-tint'
+                  }`}
+                  onClick={() => {
+                    if (isActive && toolHasOptions) {
+                      onToggleOptions();
+                    } else {
+                      onSelectTool(index);
+                    }
+                  }}
+                >
+                  <Icon className="size-4" />
+                  {isActive && toolHasOptions && !optionsVisible && (
+                    <span className="absolute top-1/2 -right-0.5 size-1 -translate-y-1/2 rounded-full bg-white/70" />
+                  )}
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p>{tool.label}{isActive && toolHasOptions ? " — click for options" : ""}</p>
+                  <p>
+                    {tool.label}
+                    {isActive && toolHasOptions ? ' — click for options' : ''}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             );
           })}
 
-          <div className="h-px w-4 bg-border-divider my-1" />
+          <div className="my-1 h-px w-4 bg-border-divider" />
 
           <Tooltip>
             <TooltipTrigger
-              ref={(el) => { shelfButtonRef.current = el; }}
-              className={`p-2.5 rounded-xl cursor-pointer transition-colors ${
+              ref={(el) => {
+                shelfButtonRef.current = el;
+              }}
+              className={`cursor-pointer rounded-xl p-2.5 transition-colors ${
                 shelfOpen
-                  ? "bg-accent-dark text-white"
-                  : "bg-transparent text-text-secondary hover:bg-hover-tint"
+                  ? 'bg-accent-dark text-white'
+                  : 'bg-transparent text-text-secondary hover:bg-hover-tint'
               }`}
               onClick={onToggleShelf}
             >
@@ -111,13 +128,22 @@ export function CanvasToolbar({
         </div>
 
         {optionsVisible && hasOptions && !shelfOpen && (
-          <div className="absolute left-full top-0 ml-2" style={{ paddingTop: optionsPanelOffset }}>
-            <ToolOptionsPanel options={activeOptions} onSetOption={onSetOption} />
+          <div
+            className="absolute top-0 left-full ml-2"
+            style={{ paddingTop: optionsPanelOffset }}
+          >
+            <ToolOptionsPanel
+              options={activeOptions}
+              onSetOption={onSetOption}
+            />
           </div>
         )}
 
         {shelfOpen && (
-          <div className="absolute left-full top-0 ml-2" style={{ paddingTop: shelfPanelOffset }}>
+          <div
+            className="absolute top-0 left-full ml-2"
+            style={{ paddingTop: shelfPanelOffset }}
+          >
             <ToolShelf
               tools={tools}
               enabledIndices={wheelEnabledIndices}

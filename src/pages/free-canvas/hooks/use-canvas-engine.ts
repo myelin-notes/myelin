@@ -1,20 +1,23 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { DrawableCanvas, Vector2 } from "@/pages/free-canvas/drawable-canvas";
-import { PageFrameElement } from "@/pages/free-canvas/elements/page-frame-element";
-import type { EditableBlock } from "@/pages/free-canvas/elements/block-editor";
-import { ITool } from "@/pages/free-canvas/tools/tool";
-import { WheelPickerHandle } from "@/components/wheel-picker";
-import { FileSystem } from "@/lib/utils/file-system";
-import { keybindings } from "@/lib/keybindings";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { WheelPickerHandle } from '@/components/wheel-picker';
+import { keybindings } from '@/lib/keybindings';
+import { FileSystem } from '@/lib/utils/file-system';
+import {
+  DrawableCanvas,
+  type Vector2,
+} from '@/pages/free-canvas/drawable-canvas';
+import type { EditableBlock } from '@/pages/free-canvas/elements/block-editor';
+import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
+import type { ITool } from '@/pages/free-canvas/tools/tool';
 
-declare module "@/lib/keybindings" {
+declare module '@/lib/keybindings' {
   interface ActionMap {
-    "canvas:pan": true;
-    "canvas:undo": true;
-    "canvas:redo": true;
-    "canvas:delete": true;
-    "canvas:tool-text": true;
+    'canvas:pan': true;
+    'canvas:undo': true;
+    'canvas:redo': true;
+    'canvas:delete': true;
+    'canvas:tool-text': true;
   }
 }
 
@@ -50,33 +53,41 @@ export function useCanvasEngine({
 
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
-  const [fileName, setFileName] = useState("");
+  const [fileName, setFileName] = useState('');
   const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
-  const [editingPageFrame, setEditingPageFrame] = useState<PageFrameElement | null>(null);
+  const [editingPageFrame, setEditingPageFrame] =
+    useState<PageFrameElement | null>(null);
 
-  const embedFiles = useCallback((files: FileList | File[], screenX?: number, screenY?: number) => {
-    const dc = drawableCanvasRef.current;
-    if (!dc) return;
-    for (const file of files) {
-      if (file.type.startsWith("image/")) {
-        dc.addImageFromBlob(file, screenX, screenY);
+  const embedFiles = useCallback(
+    (files: FileList | File[], screenX?: number, screenY?: number) => {
+      const dc = drawableCanvasRef.current;
+      if (!dc) {
+        return;
       }
-    }
-  }, [drawableCanvasRef]);
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          dc.addImageFromBlob(file, screenX, screenY);
+        }
+      }
+    },
+    [drawableCanvasRef],
+  );
 
   const autoSave = useCallback(async () => {
-    if (!drawableCanvasRef.current || !canvasRef.current || !id) return;
+    if (!(drawableCanvasRef.current && canvasRef.current && id)) {
+      return;
+    }
     await FileSystem.saveToFile(id, drawableCanvasRef.current);
     await new Promise<void>((resolve, reject) => {
       canvasRef.current!.toBlob(async (b) => {
         if (b === null) {
-          console.warn("Failed to generate thumbnail");
+          console.warn('Failed to generate thumbnail');
           reject();
           return;
         }
         await FileSystem.saveThumbnail(id, b);
         resolve();
-      }, "image/png");
+      }, 'image/png');
     });
   }, [id, drawableCanvasRef, canvasRef]);
 
@@ -85,30 +96,40 @@ export function useCanvasEngine({
   const back = useCallback(async () => {
     await autoSave();
     drawableCanvasRef.current?.collapse();
-    navigate("/library");
+    navigate('/library');
   }, [autoSave, navigate, drawableCanvasRef]);
 
   // Load file name
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      return;
+    }
     FileSystem.getNodeFileName(id).then((name) => {
-      if (name) setFileName(name);
+      if (name) {
+        setFileName(name);
+      }
     });
   }, [id]);
 
   // Initialize canvas, event listeners, animation loop, and keybindings
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !id) return;
+    if (!(canvas && id)) {
+      return;
+    }
 
-    canvas.addEventListener("contextmenu", (evt) => {
-      if (evt.shiftKey) return;
+    canvas.addEventListener('contextmenu', (evt) => {
+      if (evt.shiftKey) {
+        return;
+      }
       evt.preventDefault();
     });
 
-    canvas.addEventListener("pointerdown", (evt) => {
-      if (evt.shiftKey) return;
-      if (evt.pointerType === "mouse") {
+    canvas.addEventListener('pointerdown', (evt) => {
+      if (evt.shiftKey) {
+        return;
+      }
+      if (evt.pointerType === 'mouse') {
         if (evt.button === 2) {
           wheelRef.current?.show(evt);
         } else {
@@ -117,9 +138,9 @@ export function useCanvasEngine({
       }
     });
 
-    canvas.addEventListener("dragover", (evt) => evt.preventDefault());
+    canvas.addEventListener('dragover', (evt) => evt.preventDefault());
 
-    canvas.addEventListener("drop", (evt) => {
+    canvas.addEventListener('drop', (evt) => {
       evt.preventDefault();
       if (evt.dataTransfer?.files?.length) {
         embedFiles(Array.from(evt.dataTransfer.files), evt.pageX, evt.pageY);
@@ -128,12 +149,16 @@ export function useCanvasEngine({
 
     const handlePaste = (evt: ClipboardEvent) => {
       const items = evt.clipboardData?.items;
-      if (!items) return;
+      if (!items) {
+        return;
+      }
       const blobs: File[] = [];
       for (let i = 0; i < items.length; i++) {
-        if (items[i].type.startsWith("image/")) {
+        if (items[i].type.startsWith('image/')) {
           const file = items[i].getAsFile();
-          if (file) blobs.push(file);
+          if (file) {
+            blobs.push(file);
+          }
         }
       }
       if (blobs.length > 0) {
@@ -141,16 +166,34 @@ export function useCanvasEngine({
         embedFiles(blobs);
       }
     };
-    document.addEventListener("paste", handlePaste);
+    document.addEventListener('paste', handlePaste);
 
     const dc = new DrawableCanvas(canvas, canvasTools);
     drawableCanvasRef.current = dc;
 
     dc.setOnZoomChange((zoom) => setZoomLevel(Math.round(zoom * 100)));
 
-    dc.setOnRequestTextEdit((screenPos, screenFontSize, fontFamily, initialText, boxScreenWidth, boxScreenHeight, onCommit) => {
-      setTextEdit({ screenPos, screenFontSize, fontFamily, initialText, boxScreenWidth, boxScreenHeight, onCommit });
-    });
+    dc.setOnRequestTextEdit(
+      (
+        screenPos,
+        screenFontSize,
+        fontFamily,
+        initialText,
+        boxScreenWidth,
+        boxScreenHeight,
+        onCommit,
+      ) => {
+        setTextEdit({
+          screenPos,
+          screenFontSize,
+          fontFamily,
+          initialText,
+          boxScreenWidth,
+          boxScreenHeight,
+          onCommit,
+        });
+      },
+    );
 
     dc.setOnRequestFilePick((screenPos) => {
       pendingEmbedPos.current = screenPos;
@@ -175,19 +218,29 @@ export function useCanvasEngine({
     animationFrameId = requestAnimationFrame(animate);
 
     keybindings.defineDefaults({
-      "canvas:pan": { key: " " },
-      "canvas:undo": { key: "z", mod: true },
-      "canvas:redo": { key: "z", mod: true, shift: true },
-      "canvas:delete": { key: "Backspace" },
-      "canvas:tool-text": { key: "t" },
+      'canvas:pan': { key: ' ' },
+      'canvas:undo': { key: 'z', mod: true },
+      'canvas:redo': { key: 'z', mod: true, shift: true },
+      'canvas:delete': { key: 'Backspace' },
+      'canvas:tool-text': { key: 't' },
     });
 
     const unbindKeys = keybindings.register([
-      { action: "canvas:pan", onDown: () => dc.setSpaceDown(true), onUp: () => dc.setSpaceDown(false) },
-      { action: "canvas:undo", onDown: () => dc.undo() },
-      { action: "canvas:redo", onDown: () => dc.redo() },
-      { action: "canvas:delete", onDown: () => dc.deleteSelected() },
-      { action: "canvas:tool-text", onDown: () => { dc.switchTool(4); setSelectedToolIndex(4); } },
+      {
+        action: 'canvas:pan',
+        onDown: () => dc.setSpaceDown(true),
+        onUp: () => dc.setSpaceDown(false),
+      },
+      { action: 'canvas:undo', onDown: () => dc.undo() },
+      { action: 'canvas:redo', onDown: () => dc.redo() },
+      { action: 'canvas:delete', onDown: () => dc.deleteSelected() },
+      {
+        action: 'canvas:tool-text',
+        onDown: () => {
+          dc.switchTool(4);
+          setSelectedToolIndex(4);
+        },
+      },
     ]);
 
     FileSystem.loadFromFile(id, dc)
@@ -199,7 +252,7 @@ export function useCanvasEngine({
             x: canvas.width / dpr / 2,
             y: canvas.height / dpr / 2,
           });
-          const frame = dc.addElement(i => new PageFrameElement(i));
+          const frame = dc.addElement((i) => new PageFrameElement(i));
           frame.setOffset(
             centerWorld.x - frame.pageWidth / 2,
             centerWorld.y - frame.pageHeight / 2,
@@ -214,23 +267,42 @@ export function useCanvasEngine({
     return () => {
       cancelAnimationFrame(animationFrameId);
       unbindKeys();
-      document.removeEventListener("paste", handlePaste);
+      document.removeEventListener('paste', handlePaste);
       dc.destroy();
     };
-  }, []);
+  }, [
+    canvasRef.current,
+    canvasTools,
+    drawableCanvasRef,
+    embedFiles,
+    id,
+    setSelectedToolIndex,
+    wheelRef.current?.hide,
+    wheelRef.current?.show,
+  ]);
 
-  const commitPageFrameEdit = useCallback((blocks: EditableBlock[]) => {
-    drawableCanvasRef.current?.exitPageFrameEdit(blocks);
-  }, [drawableCanvasRef]);
+  const commitPageFrameEdit = useCallback(
+    (blocks: EditableBlock[]) => {
+      drawableCanvasRef.current?.exitPageFrameEdit(blocks);
+    },
+    [drawableCanvasRef],
+  );
 
-  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.currentTarget.files;
-    if (files?.length) {
-      embedFiles(Array.from(files), pendingEmbedPos.current?.x, pendingEmbedPos.current?.y);
-    }
-    e.currentTarget.value = "";
-    pendingEmbedPos.current = null;
-  }, [embedFiles]);
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.currentTarget.files;
+      if (files?.length) {
+        embedFiles(
+          Array.from(files),
+          pendingEmbedPos.current?.x,
+          pendingEmbedPos.current?.y,
+        );
+      }
+      e.currentTarget.value = '';
+      pendingEmbedPos.current = null;
+    },
+    [embedFiles],
+  );
 
   return {
     fileInputRef,

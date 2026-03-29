@@ -1,9 +1,4 @@
-import {
-  LayoutGrid,
-  PenLine,
-  Shuffle,
-  RefreshCw,
-} from "lucide-react";
+import { LayoutGrid, PenLine, RefreshCw, Shuffle } from 'lucide-react';
 
 interface ToolbarItem {
   icon: React.ReactNode;
@@ -11,9 +6,9 @@ interface ToolbarItem {
 }
 
 const mainTools: ToolbarItem[] = [
-  { icon: <LayoutGrid className="size-5" />, label: "Library" },
-  { icon: <PenLine className="size-5" />, label: "Write" },
-  { icon: <Shuffle className="size-5" />, label: "Shuffle" },
+  { icon: <LayoutGrid className="size-5" />, label: 'Library' },
+  { icon: <PenLine className="size-5" />, label: 'Write' },
+  { icon: <Shuffle className="size-5" />, label: 'Shuffle' },
 ];
 
 export function FloatingToolbar() {
@@ -25,10 +20,10 @@ export function FloatingToolbar() {
           {mainTools.map((tool) => (
             <button
               key={tool.label}
-              className="flex flex-col items-center gap-0.5 text-white/60 hover:text-white transition-colors cursor-pointer"
+              className="flex cursor-pointer flex-col items-center gap-0.5 text-white/60 transition-colors hover:text-white"
             >
               {tool.icon}
-              <span className="text-[9px] font-bold uppercase tracking-[0.05em]">
+              <span className="font-bold text-[9px] uppercase tracking-[0.05em]">
                 {tool.label}
               </span>
             </button>
@@ -39,9 +34,9 @@ export function FloatingToolbar() {
         <div className="w-2" />
 
         {/* Cloud */}
-        <button className="relative flex flex-col items-center gap-0.5 text-white/60 hover:text-white transition-colors cursor-pointer">
+        <button className="relative flex cursor-pointer flex-col items-center gap-0.5 text-white/60 transition-colors hover:text-white">
           <RefreshCw className="size-5" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.05em]">
+          <span className="font-bold text-[9px] uppercase tracking-[0.05em]">
             Cloud
           </span>
         </button>

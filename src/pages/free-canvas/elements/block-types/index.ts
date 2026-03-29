@@ -1,8 +1,8 @@
-import { BlockType, registerBlockType } from "./block-type-def";
-import { ParagraphBlock } from "./paragraph";
-import { Heading1Block, Heading2Block, Heading3Block } from "./heading";
-import { ListItemBlock } from "./list-item";
-import { BlockquoteBlock } from "./blockquote";
+import { BlockType, registerBlockType } from './block-type-def';
+import { BlockquoteBlock } from './blockquote';
+import { Heading1Block, Heading2Block, Heading3Block } from './heading';
+import { ListItemBlock } from './list-item';
+import { ParagraphBlock } from './paragraph';
 
 // ── Registration ─────────────────────────────────────────────
 
@@ -15,5 +15,5 @@ registerBlockType(BlockType.BLOCKQUOTE, new BlockquoteBlock());
 
 // ── Re-exports ───────────────────────────────────────────────
 
-export { BlockType, BlockTypeDef, BlockTypeRegistry } from "./block-type-def";
-export type { BlockStyle } from "./block-type-def";
+export type { BlockStyle } from './block-type-def';
+export { BlockType, BlockTypeDef, BlockTypeRegistry } from './block-type-def';

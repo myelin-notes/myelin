@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from "react";
-import { Plus, X, Tag } from "lucide-react";
+import { useEffect, useRef, useState } from 'react';
+import { Plus, Tag, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { FileSystem, VFSManifest } from "@/lib/utils/file-system";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { FileSystem, type VFSManifest } from '@/lib/utils/file-system';
 
 interface TagManageDialogProps {
   open: boolean;
@@ -27,12 +27,14 @@ export function TagManageDialog({
 }: TagManageDialogProps) {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [nodeTags, setNodeTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState("");
+  const [newTag, setNewTag] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
     FileSystem.getManifest().then((manifest: VFSManifest) => {
       const all = FileSystem.getAllTags(manifest).map((t) => t.tag);
       const node = manifest.nodes[nodeId];
@@ -42,7 +44,9 @@ export function TagManageDialog({
   }, [open, nodeId]);
 
   useEffect(() => {
-    if (isAdding) inputRef.current?.focus();
+    if (isAdding) {
+      inputRef.current?.focus();
+    }
   }, [isAdding]);
 
   const toggleTag = async (tag: string) => {
@@ -66,13 +70,11 @@ export function TagManageDialog({
       return;
     }
     await FileSystem.addTag(nodeId, trimmed);
-    setNodeTags((prev) =>
-      prev.includes(trimmed) ? prev : [...prev, trimmed]
-    );
+    setNodeTags((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
     if (!allTags.includes(trimmed)) {
       setAllTags((prev) => [...prev, trimmed]);
     }
-    setNewTag("");
+    setNewTag('');
     setIsAdding(false);
     onChanged();
   };
@@ -88,27 +90,30 @@ export function TagManageDialog({
             Manage Tags
           </DialogTitle>
           <DialogDescription>
-            Tags on <span className="font-medium text-text-primary">{nodeName}</span>
+            Tags on{' '}
+            <span className="font-medium text-text-primary">{nodeName}</span>
           </DialogDescription>
         </DialogHeader>
 
         {/* Current tags on this node */}
         <div className="flex flex-col gap-3">
-          <span className="text-[10px] font-bold uppercase tracking-[1px] text-text-muted">
+          <span className="font-bold text-[10px] text-text-muted uppercase tracking-[1px]">
             Active Tags
           </span>
-          <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+          <div className="flex min-h-[32px] flex-wrap gap-1.5">
             {nodeTags.length === 0 && (
-              <span className="text-xs text-text-muted italic">No tags yet</span>
+              <span className="text-text-muted text-xs italic">
+                No tags yet
+              </span>
             )}
             {nodeTags.map((tag) => (
               <button
                 key={tag}
                 onClick={() => toggleTag(tag)}
-                className="group/tag flex items-center gap-1 rounded-lg bg-tag-active px-2.5 py-1 text-xs font-medium text-text-on-dark transition-all hover:bg-accent-dark cursor-pointer"
+                className="group/tag flex cursor-pointer items-center gap-1 rounded-lg bg-tag-active px-2.5 py-1 font-medium text-text-on-dark text-xs transition-all hover:bg-accent-dark"
               >
                 #{tag}
-                <X className="size-3 opacity-0 group-hover/tag:opacity-100 transition-opacity" />
+                <X className="size-3 opacity-0 transition-opacity group-hover/tag:opacity-100" />
               </button>
             ))}
           </div>
@@ -117,7 +122,7 @@ export function TagManageDialog({
         {/* Available tags */}
         {unusedTags.length > 0 && (
           <div className="flex flex-col gap-3">
-            <span className="text-[10px] font-bold uppercase tracking-[1px] text-text-muted">
+            <span className="font-bold text-[10px] text-text-muted uppercase tracking-[1px]">
               Available
             </span>
             <div className="flex flex-wrap gap-1.5">
@@ -126,8 +131,8 @@ export function TagManageDialog({
                   key={tag}
                   onClick={() => toggleTag(tag)}
                   className={cn(
-                    "rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer",
-                    "bg-surface text-text-secondary hover:bg-tag hover:text-text-tag"
+                    'cursor-pointer rounded-lg px-2.5 py-1 font-medium text-xs transition-all',
+                    'bg-surface text-text-secondary hover:bg-tag hover:text-text-tag',
                   )}
                 >
                   #{tag}
@@ -141,27 +146,29 @@ export function TagManageDialog({
         <div className="rounded-lg bg-page p-3">
           {isAdding ? (
             <div className="flex items-center gap-2">
-              <span className="text-text-muted text-sm">#</span>
+              <span className="text-sm text-text-muted">#</span>
               <input
                 ref={inputRef}
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 onBlur={handleCreateTag}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateTag();
-                  if (e.key === "Escape") {
-                    setNewTag("");
+                  if (e.key === 'Enter') {
+                    handleCreateTag();
+                  }
+                  if (e.key === 'Escape') {
+                    setNewTag('');
                     setIsAdding(false);
                   }
                 }}
                 placeholder="Tag name..."
-                className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none border-b-2 border-primary pb-0.5"
+                className="flex-1 border-primary border-b-2 bg-transparent pb-0.5 text-sm text-text-primary outline-none placeholder:text-text-muted"
               />
             </div>
           ) : (
             <button
               onClick={() => setIsAdding(true)}
-              className="flex items-center gap-2 text-xs font-medium text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
+              className="flex cursor-pointer items-center gap-2 font-medium text-text-muted text-xs transition-colors hover:text-text-secondary"
             >
               <Plus className="size-3.5" />
               Create new tag

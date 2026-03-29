@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { cn } from "@/lib/utils";
-import { FileSystem, VFSManifest } from "@/lib/utils/file-system";
+import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
+import { FileSystem, type VFSManifest } from '@/lib/utils/file-system';
 
 interface SemanticTagsProps {
   refreshKey: number;
@@ -8,9 +8,17 @@ interface SemanticTagsProps {
   onActiveTagsChanged: (tags: Set<string>) => void;
 }
 
-export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: SemanticTagsProps) {
+export function SemanticTags({
+  refreshKey: _refreshKey,
+  activeTags,
+  onActiveTagsChanged,
+}: SemanticTagsProps) {
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
-  const [stats, setStats] = useState({ totalFiles: 0, totalFolders: 0, totalTags: 0 });
+  const [stats, setStats] = useState({
+    totalFiles: 0,
+    totalFolders: 0,
+    totalTags: 0,
+  });
 
   useEffect(() => {
     FileSystem.getManifest().then((manifest: VFSManifest) => {
@@ -27,7 +35,7 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
         }
       }
     });
-  }, [refreshKey]);
+  }, [activeTags, onActiveTagsChanged]);
 
   const toggleTag = (tag: string) => {
     const next = new Set(activeTags);
@@ -47,13 +55,13 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
     <div className="flex flex-col gap-6 rounded-xl bg-surface p-8">
       {/* Heading */}
       <div className="flex items-center justify-between">
-        <h3 className="font-heading text-xl font-normal text-text-primary leading-7">
+        <h3 className="font-heading font-normal text-text-primary text-xl leading-7">
           Semantic Tags
         </h3>
         {activeTags.size > 0 && (
           <button
             onClick={clearAll}
-            className="text-[10px] font-bold uppercase tracking-[1px] text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
+            className="cursor-pointer font-bold text-[10px] text-text-muted uppercase tracking-[1px] transition-colors hover:text-text-secondary"
           >
             Clear
           </button>
@@ -61,10 +69,11 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
       </div>
 
       {/* Tag Cloud */}
-      <div className="flex flex-wrap gap-2 min-h-[36px]">
+      <div className="flex min-h-[36px] flex-wrap gap-2">
         {tags.length === 0 && (
-          <p className="text-xs text-text-muted italic">
-            No tags yet. Right-click a file and choose &ldquo;Manage Tags&rdquo; to start.
+          <p className="text-text-muted text-xs italic">
+            No tags yet. Right-click a file and choose &ldquo;Manage Tags&rdquo;
+            to start.
           </p>
         )}
         {tags.map(({ tag, count }) => {
@@ -74,18 +83,18 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
               key={tag}
               onClick={() => toggleTag(tag)}
               className={cn(
-                "rounded-xl px-3 py-1.5 text-xs font-medium transition-all cursor-pointer",
+                'cursor-pointer rounded-xl px-3 py-1.5 font-medium text-xs transition-all',
                 isActive
-                  ? "bg-tag-active text-text-on-dark scale-[1.04]"
-                  : "bg-card text-text-secondary hover:bg-card-active hover:shadow-ambient"
+                  ? 'scale-[1.04] bg-tag-active text-text-on-dark'
+                  : 'bg-card text-text-secondary hover:bg-card-active hover:shadow-ambient',
               )}
             >
               <span className="opacity-50">#</span>
               {tag}
               <span
                 className={cn(
-                  "ml-1.5 text-[10px]",
-                  isActive ? "text-text-on-dark/60" : "text-text-muted"
+                  'ml-1.5 text-[10px]',
+                  isActive ? 'text-text-on-dark/60' : 'text-text-muted',
                 )}
               >
                 {count}
@@ -97,26 +106,32 @@ export function SemanticTags({ refreshKey, activeTags, onActiveTagsChanged }: Se
 
       {/* Insights */}
       <div className="flex flex-col gap-4 rounded-lg bg-page p-4">
-        <h4 className="text-[10px] font-bold uppercase tracking-[1px] text-text-secondary">
+        <h4 className="font-bold text-[10px] text-text-secondary uppercase tracking-[1px]">
           Studio Insights
         </h4>
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-normal text-text-secondary">Total Files</span>
-            <span className="text-sm font-medium text-text-primary tabular-nums">
+            <span className="font-normal text-sm text-text-secondary">
+              Total Files
+            </span>
+            <span className="font-medium text-sm text-text-primary tabular-nums">
               {stats.totalFiles}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-normal text-text-secondary">Folders</span>
-            <span className="text-sm font-medium text-text-primary tabular-nums">
+            <span className="font-normal text-sm text-text-secondary">
+              Folders
+            </span>
+            <span className="font-medium text-sm text-text-primary tabular-nums">
               {stats.totalFolders}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-normal text-text-secondary">Unique Tags</span>
-            <span className="text-sm font-medium text-text-primary tabular-nums">
+            <span className="font-normal text-sm text-text-secondary">
+              Unique Tags
+            </span>
+            <span className="font-medium text-sm text-text-primary tabular-nums">
               {stats.totalTags}
             </span>
           </div>

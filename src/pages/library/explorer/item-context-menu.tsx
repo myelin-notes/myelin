@@ -1,9 +1,9 @@
-import { Pencil, Trash2, FolderOpen, Tag } from "lucide-react";
+import { FolderOpen, Pencil, Tag, Trash2 } from 'lucide-react';
 import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-} from "@/components/ui/context-menu";
+} from '@/components/ui/context-menu';
 
 interface ItemContextMenuProps {
   onRename: () => void;
@@ -12,7 +12,12 @@ interface ItemContextMenuProps {
   onManageTags?: () => void;
 }
 
-export function ItemContextMenu({ onRename, onRemove, onReveal, onManageTags }: ItemContextMenuProps) {
+export function ItemContextMenu({
+  onRename,
+  onRemove,
+  onReveal,
+  onManageTags,
+}: ItemContextMenuProps) {
   return (
     <ContextMenuContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
       <ContextMenuItem
@@ -42,7 +47,7 @@ export function ItemContextMenu({ onRename, onRemove, onReveal, onManageTags }: 
       )}
       <ContextMenuSeparator />
       <ContextMenuItem
-        className="gap-2.5 rounded-md px-3 py-2 text-sm text-destructive focus:bg-destructive/10 focus:text-destructive focus:*:[svg]:text-destructive"
+        className="gap-2.5 rounded-md px-3 py-2 text-destructive text-sm focus:bg-destructive/10 focus:text-destructive focus:*:[svg]:text-destructive"
         onClick={onRemove}
       >
         <Trash2 className="size-4" />

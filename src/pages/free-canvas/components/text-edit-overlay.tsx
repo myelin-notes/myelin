@@ -1,4 +1,4 @@
-import type { TextEditState } from "../hooks/use-canvas-engine";
+import type { TextEditState } from '../hooks/use-canvas-engine';
 
 interface TextEditOverlayProps {
   textEdit: TextEditState;
@@ -10,7 +10,7 @@ export function TextEditOverlay({ textEdit, onDismiss }: TextEditOverlayProps) {
     <textarea
       autoFocus
       defaultValue={textEdit.initialText}
-      className="absolute z-20 bg-transparent border-none outline-none resize-none overflow-hidden caret-accent-dark p-0 m-0"
+      className="absolute z-20 m-0 resize-none overflow-hidden border-none bg-transparent p-0 caret-accent-dark outline-none"
       style={{
         left: textEdit.screenPos.x,
         top: textEdit.screenPos.y,
@@ -19,21 +19,21 @@ export function TextEditOverlay({ textEdit, onDismiss }: TextEditOverlayProps) {
         fontSize: textEdit.screenFontSize,
         lineHeight: 1.3,
         fontFamily: `"${textEdit.fontFamily}", sans-serif`,
-        color: "var(--text-primary)",
-        wordWrap: "break-word",
-        overflowWrap: "break-word",
-        whiteSpace: "pre-wrap",
+        color: 'var(--text-primary)',
+        wordWrap: 'break-word',
+        overflowWrap: 'break-word',
+        whiteSpace: 'pre-wrap',
       }}
       onBlur={(e) => {
         textEdit.onCommit(e.currentTarget.value);
         onDismiss();
       }}
       onKeyDown={(e) => {
-        if (e.key === "Escape") {
+        if (e.key === 'Escape') {
           e.currentTarget.blur();
           onDismiss();
         }
-        if (e.key === "Enter" && !e.shiftKey) {
+        if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           textEdit.onCommit(e.currentTarget.value);
           onDismiss();

@@ -1,5 +1,11 @@
-import { useEffect, useRef, useState, useImperativeHandle, useCallback } from "react";
-import type { SvgIcon } from "@/pages/free-canvas/tools/tool";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
+import type { SvgIcon } from '@/pages/free-canvas/tools/tool';
 
 const TWO_PI = 2 * Math.PI;
 const CENTER_ZONE = 40;
@@ -35,30 +41,50 @@ function pointerAngle(dx: number, dy: number): number {
 
 function angleDiff(a: number, b: number): number {
   let d = a - b;
-  if (d > Math.PI) d -= TWO_PI;
-  if (d < -Math.PI) d += TWO_PI;
+  if (d > Math.PI) {
+    d -= TWO_PI;
+  }
+  if (d < -Math.PI) {
+    d += TWO_PI;
+  }
   return d;
 }
 
 function angleToIndex(angle: number, count: number): number {
-  if (count === 0) return -1;
+  if (count === 0) {
+    return -1;
+  }
   const delta = TWO_PI / count;
   let t = angle + delta / 2;
-  if (t >= TWO_PI) t -= TWO_PI;
+  if (t >= TWO_PI) {
+    t -= TWO_PI;
+  }
   return Math.min(Math.floor(t / delta), count - 1);
 }
 
-function childAngleOf(parentAngle: number, index: number, count: number): number {
+function childAngleOf(
+  parentAngle: number,
+  index: number,
+  count: number,
+): number {
   const totalArc = SUB_SPACING * (count - 1);
   return parentAngle - totalArc / 2 + SUB_SPACING * index;
 }
 
-function angleToChildIndex(angle: number, parentAngle: number, count: number): number | null {
-  if (count === 0) return null;
+function angleToChildIndex(
+  angle: number,
+  parentAngle: number,
+  count: number,
+): number | null {
+  if (count === 0) {
+    return null;
+  }
   const diff = angleDiff(angle, parentAngle);
   const totalArc = SUB_SPACING * (count - 1);
   const halfExtent = totalArc / 2 + SUB_SPACING / 2;
-  if (Math.abs(diff) > halfExtent) return null;
+  if (Math.abs(diff) > halfExtent) {
+    return null;
+  }
   const idx = Math.floor((diff + totalArc / 2 + SUB_SPACING / 2) / SUB_SPACING);
   return Math.max(0, Math.min(count - 1, idx));
 }
@@ -73,7 +99,13 @@ function pathsEqual(a: number[], b: number[]): boolean {
 
 /* ── Component ─────────────────────────────────────── */
 
-export function WheelPicker({ radius, items, children, onCenterClicked, ref }: WheelPickerProps) {
+export function WheelPicker({
+  radius,
+  items,
+  children,
+  onCenterClicked,
+  ref,
+}: WheelPickerProps) {
   const groupRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const centerRef = useRef([0, 0]);
@@ -86,17 +118,22 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
   const R1 = radius + 60;
   const R2 = R1 + 55;
 
-  const show = useCallback((event: PointerEvent) => {
-    if (items.length === 0) return;
-    if (groupRef.current) {
-      groupRef.current.style.left = `${event.clientX}px`;
-      groupRef.current.style.top = `${event.clientY}px`;
-    }
-    setVisible(true);
-    centerRef.current = [event.clientX, event.clientY];
-    focusPathRef.current = [];
-    setFocusPath([]);
-  }, [items.length]);
+  const show = useCallback(
+    (event: PointerEvent) => {
+      if (items.length === 0) {
+        return;
+      }
+      if (groupRef.current) {
+        groupRef.current.style.left = `${event.clientX}px`;
+        groupRef.current.style.top = `${event.clientY}px`;
+      }
+      setVisible(true);
+      centerRef.current = [event.clientX, event.clientY];
+      focusPathRef.current = [];
+      setFocusPath([]);
+    },
+    [items.length],
+  );
 
   const hide = useCallback(() => {
     setVisible(false);
@@ -109,7 +146,9 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
   /* ── Pointer tracking ────────────────────────────── */
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      return;
+    }
 
     // Geometry for hit-testing (derived from radius)
     const r1 = radius + 60;
@@ -118,14 +157,18 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
     const r1Outer = (r1 + r2) / 2;
 
     function updateFocus(path: number[]) {
-      if (pathsEqual(focusPathRef.current, path)) return;
+      if (pathsEqual(focusPathRef.current, path)) {
+        return;
+      }
       focusPathRef.current = path;
       setFocusPath([...path]);
     }
 
     function handlePointerMove(evt: PointerEvent) {
       const its = itemsRef.current;
-      if (its.length === 0) return;
+      if (its.length === 0) {
+        return;
+      }
 
       const [cx, cy] = centerRef.current;
       const dx = evt.clientX - cx;
@@ -145,7 +188,9 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
       // Ring 0
       if (dist < r0Outer) {
         const idx = angleToIndex(angle, count);
-        if (idx >= 0) updateFocus([idx]);
+        if (idx >= 0) {
+          updateFocus([idx]);
+        }
         return;
       }
 
@@ -184,11 +229,15 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
 
       // Fallback: ring 0
       const idx = angleToIndex(angle, count);
-      if (idx >= 0) updateFocus([idx]);
+      if (idx >= 0) {
+        updateFocus([idx]);
+      }
     }
 
     function handlePointerUp(evt: PointerEvent) {
-      if (evt.pointerType !== "mouse") return;
+      if (evt.pointerType !== 'mouse') {
+        return;
+      }
 
       const its = itemsRef.current;
       const fp = focusPathRef.current;
@@ -197,8 +246,12 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
       const commands: (() => void)[] = [];
       let current: WheelItem[] | undefined = its;
       for (const idx of fp) {
-        if (!current?.[idx]) break;
-        if (current[idx].command) commands.push(current[idx].command!);
+        if (!current?.[idx]) {
+          break;
+        }
+        if (current[idx].command) {
+          commands.push(current[idx].command!);
+        }
         current = current[idx].children;
       }
 
@@ -212,11 +265,11 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
       setFocusPath([]);
     }
 
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
     return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [visible, radius]);
 
@@ -230,20 +283,27 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
   const r0Angle = r0Idx != null ? delta * r0Idx : 0;
 
   const r1Idx = focusPath[1];
-  const l2Items = r1Idx != null && l1Items ? l1Items[r1Idx]?.children : undefined;
-  const r1Angle = r1Idx != null && l1Items
-    ? childAngleOf(r0Angle, r1Idx, l1Items.length)
-    : 0;
+  const l2Items =
+    r1Idx != null && l1Items ? l1Items[r1Idx]?.children : undefined;
+  const r1Angle =
+    r1Idx != null && l1Items ? childAngleOf(r0Angle, r1Idx, l1Items.length) : 0;
 
   /* ── Render ──────────────────────────────────────── */
 
   return (
-    <div ref={groupRef} className="absolute left-0 top-0" onContextMenu={e => e.preventDefault()}>
+    <div
+      ref={groupRef}
+      className="absolute top-0 left-0"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {visible && (
-        <div data-wheel-container className="relative left-0 top-0 animate-in fade-in duration-150">
+        <div
+          data-wheel-container
+          className="fade-in relative top-0 left-0 animate-in duration-150"
+        >
           {/* Center button */}
           <button
-            className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-xl size-12 bg-accent-dark shadow-ambient outline-none cursor-pointer flex items-center justify-center"
+            className="absolute top-0 left-0 flex size-12 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl bg-accent-dark shadow-ambient outline-none"
             onClick={onCenterClicked}
           >
             {children}
@@ -257,13 +317,17 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
             return (
               <button
                 key={i}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-xl size-10 backdrop-blur-xl bg-white/85 shadow-ambient outline-none cursor-pointer flex items-center justify-center transition-colors ${
-                  inPath ? "bg-secondary-container" : ""
+                className={`absolute flex size-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl bg-white/85 shadow-ambient outline-none backdrop-blur-xl transition-colors ${
+                  inPath ? 'bg-secondary-container' : ''
                 }`}
                 style={{ left: x, top: y }}
                 title={item.label}
               >
-                {Icon && <Icon className={`size-4 ${inPath ? "text-text-primary" : "text-text-secondary"}`} />}
+                {Icon && (
+                  <Icon
+                    className={`size-4 ${inPath ? 'text-text-primary' : 'text-text-secondary'}`}
+                  />
+                )}
               </button>
             );
           })}
@@ -278,29 +342,31 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
             return (
               <button
                 key={`r1-${r0Idx}-${j}`}
-                className={`absolute rounded-xl shadow-ambient outline-none cursor-pointer flex items-center justify-center transition-all duration-100 animate-in fade-in zoom-in-75 ${
+                className={`fade-in zoom-in-75 absolute flex animate-in cursor-pointer items-center justify-center rounded-xl shadow-ambient outline-none transition-all duration-100 ${
                   isColor
-                    ? "size-7 p-0 border-none"
-                    : `size-9 backdrop-blur-xl bg-white/85 ${focused ? "bg-secondary-container" : ""}`
+                    ? 'size-7 border-none p-0'
+                    : `size-9 bg-white/85 backdrop-blur-xl ${focused ? 'bg-secondary-container' : ''}`
                 }`}
                 style={{
                   left: x,
                   top: y,
                   animationDelay: `${j * 15}ms`,
-                  animationFillMode: "both",
-                  transform: `translate(-50%,-50%)${focused ? " scale(1.15)" : ""}`,
-                  ...(isColor ? {
-                    backgroundColor: child.color,
-                    boxShadow: focused
-                      ? "0 0 0 2px rgba(255,255,255,0.9), 0 0 0 3.5px rgba(25,28,30,0.3)"
-                      : "inset 0 0 0 1px rgba(25,28,30,0.06), 0 0 32px 0 rgba(25,28,30,0.06)",
-                  } : {}),
+                  animationFillMode: 'both',
+                  transform: `translate(-50%,-50%)${focused ? ' scale(1.15)' : ''}`,
+                  ...(isColor
+                    ? {
+                        backgroundColor: child.color,
+                        boxShadow: focused
+                          ? '0 0 0 2px rgba(255,255,255,0.9), 0 0 0 3.5px rgba(25,28,30,0.3)'
+                          : 'inset 0 0 0 1px rgba(25,28,30,0.06), 0 0 32px 0 rgba(25,28,30,0.06)',
+                      }
+                    : {}),
                 }}
                 title={child.label}
               >
                 {child.dot != null && (
                   <span
-                    className={`block rounded-full ${focused ? "bg-text-primary" : "bg-text-secondary"}`}
+                    className={`block rounded-full ${focused ? 'bg-text-primary' : 'bg-text-secondary'}`}
                     style={{ width: child.dot, height: child.dot }}
                   />
                 )}
@@ -317,20 +383,22 @@ export function WheelPicker({ radius, items, children, onCenterClicked, ref }: W
             return (
               <button
                 key={`r2-${r0Idx}-${r1Idx}-${k}`}
-                className="absolute rounded-xl size-9 backdrop-blur-xl bg-white/85 shadow-ambient outline-none cursor-pointer flex items-center justify-center transition-all duration-100 animate-in fade-in zoom-in-75"
+                className="fade-in zoom-in-75 absolute flex size-9 animate-in cursor-pointer items-center justify-center rounded-xl bg-white/85 shadow-ambient outline-none backdrop-blur-xl transition-all duration-100"
                 style={{
                   left: x,
                   top: y,
                   animationDelay: `${k * 15}ms`,
-                  animationFillMode: "both",
-                  transform: `translate(-50%,-50%)${focused ? " scale(1.15)" : ""}`,
-                  ...(focused ? { backgroundColor: "var(--bg-secondary-container)" } : {}),
+                  animationFillMode: 'both',
+                  transform: `translate(-50%,-50%)${focused ? ' scale(1.15)' : ''}`,
+                  ...(focused
+                    ? { backgroundColor: 'var(--bg-secondary-container)' }
+                    : {}),
                 }}
                 title={gc.label}
               >
                 {gc.dot != null && (
                   <span
-                    className={`block rounded-full ${focused ? "bg-text-primary" : "bg-text-secondary"}`}
+                    className={`block rounded-full ${focused ? 'bg-text-primary' : 'bg-text-secondary'}`}
                     style={{ width: gc.dot, height: gc.dot }}
                   />
                 )}

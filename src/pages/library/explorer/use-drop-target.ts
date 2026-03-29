@@ -1,23 +1,30 @@
-import { useState, useRef } from "react";
-import { FileSystem } from "@/lib/utils/file-system";
+import { useRef, useState } from 'react';
+import { FileSystem } from '@/lib/utils/file-system';
 
 interface UseDropTargetOptions {
   targetFolderId: string | null;
   onMoved: () => void;
 }
 
-export function useDropTarget({ targetFolderId, onMoved }: UseDropTargetOptions) {
+export function useDropTarget({
+  targetFolderId,
+  onMoved,
+}: UseDropTargetOptions) {
   const [dragOver, setDragOver] = useState(false);
   const dragCountRef = useRef(0);
 
   const handleDragOver = (e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes("application/myelin-item")) return;
+    if (!e.dataTransfer.types.includes('application/myelin-item')) {
+      return;
+    }
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDragEnter = (e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes("application/myelin-item")) return;
+    if (!e.dataTransfer.types.includes('application/myelin-item')) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     dragCountRef.current++;
@@ -27,7 +34,9 @@ export function useDropTarget({ targetFolderId, onMoved }: UseDropTargetOptions)
   const handleDragLeave = (e: React.DragEvent) => {
     e.stopPropagation();
     dragCountRef.current--;
-    if (dragCountRef.current === 0) setDragOver(false);
+    if (dragCountRef.current === 0) {
+      setDragOver(false);
+    }
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -36,19 +45,23 @@ export function useDropTarget({ targetFolderId, onMoved }: UseDropTargetOptions)
     dragCountRef.current = 0;
     setDragOver(false);
 
-    const raw = e.dataTransfer.getData("application/myelin-item");
-    if (!raw) return;
+    const raw = e.dataTransfer.getData('application/myelin-item');
+    if (!raw) {
+      return;
+    }
 
     const { nodeId } = JSON.parse(raw) as { nodeId: string };
 
     // Don't drop onto self
-    if (nodeId === targetFolderId) return;
+    if (nodeId === targetFolderId) {
+      return;
+    }
 
     try {
       await FileSystem.moveNode(nodeId, targetFolderId);
       onMoved();
     } catch (err) {
-      console.error("Failed to move item:", err);
+      console.error('Failed to move item:', err);
     }
   };
 

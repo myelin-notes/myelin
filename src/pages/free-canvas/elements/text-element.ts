@@ -1,196 +1,240 @@
-import {DrawableElement} from "./drawable-element";
-import {BinaryReader, BinaryWriter} from "../../../lib/utils/binary-helper";
-import {ElementType} from "./element-type";
-import {LineBreaker} from "css-line-break";
+import { LineBreaker } from 'css-line-break';
+import type {
+  BinaryReader,
+  BinaryWriter,
+} from '../../../lib/utils/binary-helper';
+import { DrawableElement } from './drawable-element';
+import { ElementType } from './element-type';
 
 export interface TextStyle {
-    color: string;
-    fontSize: number;
-    fontFamily: string;
+  color: string;
+  fontSize: number;
+  fontFamily: string;
 }
 
 const DEFAULT_STYLE: TextStyle = {
-    color: "#1a1a1a",
-    fontSize: 24,
-    fontFamily: "sans-serif",
+  color: '#1a1a1a',
+  fontSize: 24,
+  fontFamily: 'sans-serif',
 };
 
 const DEFAULT_BOX_WIDTH = 200;
 const DEFAULT_BOX_HEIGHT = 80;
 
 export class TextElement extends DrawableElement {
-    private box: DOMRect = new DOMRect(0, 0, 0, 0);
-    private _text: string = "";
-    private _style: TextStyle;
-    private _position: { x: number; y: number } = { x: 0, y: 0 };
-    private _boxWidth: number = DEFAULT_BOX_WIDTH;
-    private _boxHeight: number = DEFAULT_BOX_HEIGHT;
-    private _editing: boolean = false;
+  private box: DOMRect = new DOMRect(0, 0, 0, 0);
+  private _text: string = '';
+  private _style: TextStyle;
+  private _position: { x: number; y: number } = { x: 0, y: 0 };
+  private _boxWidth: number = DEFAULT_BOX_WIDTH;
+  private _boxHeight: number = DEFAULT_BOX_HEIGHT;
+  private _editing: boolean = false;
 
-    public constructor(
-        index: number,
-        text: string = "",
-        style: Partial<TextStyle> = {},
-        boxWidth: number = DEFAULT_BOX_WIDTH,
-        boxHeight: number = DEFAULT_BOX_HEIGHT,
-    ) {
-        super(index, ElementType.TEXT);
-        this._text = text;
-        this._style = { ...DEFAULT_STYLE, ...style };
-        this._boxWidth = boxWidth;
-        this._boxHeight = boxHeight;
+  public constructor(
+    index: number,
+    text: string = '',
+    style: Partial<TextStyle> = {},
+    boxWidth: number = DEFAULT_BOX_WIDTH,
+    boxHeight: number = DEFAULT_BOX_HEIGHT,
+  ) {
+    super(index, ElementType.TEXT);
+    this._text = text;
+    this._style = { ...DEFAULT_STYLE, ...style };
+    this._boxWidth = boxWidth;
+    this._boxHeight = boxHeight;
+  }
+
+  public get text(): string {
+    return this._text;
+  }
+  public get style(): TextStyle {
+    return this._style;
+  }
+  public get position(): { x: number; y: number } {
+    return this._position;
+  }
+  public get boxWidth(): number {
+    return this._boxWidth;
+  }
+  public get boxHeight(): number {
+    return this._boxHeight;
+  }
+  public get editing(): boolean {
+    return this._editing;
+  }
+  public set editing(value: boolean) {
+    this._editing = value;
+  }
+
+  public setText(text: string) {
+    this._text = text;
+    this.measureAndUpdate();
+  }
+
+  public setPosition(x: number, y: number) {
+    this._position = { x, y };
+    this.measureAndUpdate();
+  }
+
+  public setBoxSize(width: number, height: number) {
+    this._boxWidth = width;
+    this._boxHeight = height;
+    this.measureAndUpdate();
+  }
+
+  // Absorb scale into box dimensions so font size stays constant
+  public override setScale(x: number, y: number) {
+    const prevSx = this._scale.x || 1;
+    const prevSy = this._scale.y || 1;
+    const rx = x / prevSx;
+    const ry = y / prevSy;
+
+    this._boxWidth = Math.abs(this._boxWidth * rx);
+    this._boxHeight = Math.abs(this._boxHeight * ry);
+    this._position.x *= rx;
+    this._position.y *= ry;
+
+    this._scale = { x: 1, y: 1 };
+    this.measureAndUpdate();
+  }
+
+  protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
+    if (!this._text || this._editing) {
+      return;
     }
+    const fontSize = this._style.fontSize;
+    ctx.font = `${fontSize}px ${this._style.fontFamily}`;
+    ctx.fillStyle = this._style.color;
+    ctx.textBaseline = 'top';
 
-    public get text(): string { return this._text; }
-    public get style(): TextStyle { return this._style; }
-    public get position(): { x: number; y: number } { return this._position; }
-    public get boxWidth(): number { return this._boxWidth; }
-    public get boxHeight(): number { return this._boxHeight; }
-    public get editing(): boolean { return this._editing; }
-    public set editing(value: boolean) { this._editing = value; }
+    const lineHeight = fontSize * 1.3;
+    const lines = wrapText(ctx, this._text, this._boxWidth);
 
-    public setText(text: string) {
-        this._text = text;
-        this.measureAndUpdate();
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(
+        lines[i],
+        this._position.x,
+        this._position.y + i * lineHeight,
+      );
     }
+  }
 
-    public setPosition(x: number, y: number) {
-        this._position = { x, y };
-        this.measureAndUpdate();
+  protected isOverLocal(
+    x: number,
+    y: number,
+    _radius: number,
+    _ctx: CanvasRenderingContext2D,
+  ): boolean {
+    return (
+      x >= this._position.x &&
+      x <= this._position.x + this._boxWidth &&
+      y >= this._position.y &&
+      y <= this._position.y + this._boxHeight
+    );
+  }
+
+  public get localBoundingBox(): DOMRect {
+    return this.box;
+  }
+
+  protected updateBoundingBox(): void {
+    this.measureAndUpdate();
+  }
+
+  private measureAndUpdate() {
+    if (this._text) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      ctx.font = `${this._style.fontSize}px ${this._style.fontFamily}`;
+      const lines = wrapText(ctx, this._text, this._boxWidth);
+      const textHeight = lines.length * this._style.fontSize * 1.3;
+      if (textHeight > this._boxHeight) {
+        this._boxHeight = textHeight;
+      }
     }
+    this.box = new DOMRect(
+      this._position.x,
+      this._position.y,
+      this._boxWidth,
+      this._boxHeight,
+    );
+  }
 
-    public setBoxSize(width: number, height: number) {
-        this._boxWidth = width;
-        this._boxHeight = height;
-        this.measureAndUpdate();
-    }
+  public load(reader: BinaryReader): void {
+    super.load(reader);
+    this._text = reader.readString();
+    this._style = {
+      color: reader.readString(),
+      fontSize: reader.readF32(),
+      fontFamily: reader.readString(),
+    };
+    this._position = { x: reader.readF32(), y: reader.readF32() };
+    this._boxWidth = reader.readF32();
+    this._boxHeight = reader.readF32();
+    this.measureAndUpdate();
+  }
 
-    // Absorb scale into box dimensions so font size stays constant
-    public override setScale(x: number, y: number) {
-        const prevSx = this._scale.x || 1;
-        const prevSy = this._scale.y || 1;
-        const rx = x / prevSx;
-        const ry = y / prevSy;
-
-        this._boxWidth = Math.abs(this._boxWidth * rx);
-        this._boxHeight = Math.abs(this._boxHeight * ry);
-        this._position.x *= rx;
-        this._position.y *= ry;
-
-        this._scale = { x: 1, y: 1 };
-        this.measureAndUpdate();
-    }
-
-    protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
-        if (!this._text || this._editing) return;
-        const fontSize = this._style.fontSize;
-        ctx.font = `${fontSize}px ${this._style.fontFamily}`;
-        ctx.fillStyle = this._style.color;
-        ctx.textBaseline = "top";
-
-        const lineHeight = fontSize * 1.3;
-        const lines = wrapText(ctx, this._text, this._boxWidth);
-
-        for (let i = 0; i < lines.length; i++) {
-            ctx.fillText(lines[i], this._position.x, this._position.y + i * lineHeight);
-        }
-    }
-
-    protected isOverLocal(x: number, y: number, _radius: number, _ctx: CanvasRenderingContext2D): boolean {
-        return x >= this._position.x && x <= this._position.x + this._boxWidth &&
-               y >= this._position.y && y <= this._position.y + this._boxHeight;
-    }
-
-    public get localBoundingBox(): DOMRect {
-        return this.box;
-    }
-
-    protected updateBoundingBox(): void {
-        this.measureAndUpdate();
-    }
-
-    private measureAndUpdate() {
-        if (this._text) {
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d")!;
-            ctx.font = `${this._style.fontSize}px ${this._style.fontFamily}`;
-            const lines = wrapText(ctx, this._text, this._boxWidth);
-            const textHeight = lines.length * this._style.fontSize * 1.3;
-            if (textHeight > this._boxHeight) {
-                this._boxHeight = textHeight;
-            }
-        }
-        this.box = new DOMRect(this._position.x, this._position.y, this._boxWidth, this._boxHeight);
-    }
-
-    public load(reader: BinaryReader): void {
-        super.load(reader);
-        this._text = reader.readString();
-        this._style = {
-            color: reader.readString(),
-            fontSize: reader.readF32(),
-            fontFamily: reader.readString(),
-        };
-        this._position = { x: reader.readF32(), y: reader.readF32() };
-        this._boxWidth = reader.readF32();
-        this._boxHeight = reader.readF32();
-        this.measureAndUpdate();
-    }
-
-    public save(writer: BinaryWriter): void {
-        super.save(writer);
-        writer.writeString(this._text);
-        writer.writeString(this._style.color);
-        writer.writeF32(this._style.fontSize);
-        writer.writeString(this._style.fontFamily);
-        writer.writeF32(this._position.x);
-        writer.writeF32(this._position.y);
-        writer.writeF32(this._boxWidth);
-        writer.writeF32(this._boxHeight);
-    }
+  public save(writer: BinaryWriter): void {
+    super.save(writer);
+    writer.writeString(this._text);
+    writer.writeString(this._style.color);
+    writer.writeF32(this._style.fontSize);
+    writer.writeString(this._style.fontFamily);
+    writer.writeF32(this._position.x);
+    writer.writeF32(this._position.y);
+    writer.writeF32(this._boxWidth);
+    writer.writeF32(this._boxHeight);
+  }
 }
 
-const SOFT_HYPHEN = "\u00AD";
+const SOFT_HYPHEN = '\u00AD';
 
-export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-    const result: string[] = [];
-    const breaker = LineBreaker(text, { lineBreak: "normal", wordBreak: "normal" });
+export function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string[] {
+  const result: string[] = [];
+  const breaker = LineBreaker(text, {
+    lineBreak: 'normal',
+    wordBreak: 'normal',
+  });
 
-    let currentLine = "";
-    let bk;
-    while (!(bk = breaker.next()).done) {
-        const segment = bk.value!;
-        let chunk = segment.slice();
+  let currentLine = '';
+  let bk: IteratorResult<{ slice: () => string; required: boolean }>;
+  while (!(bk = breaker.next()).done) {
+    const segment = bk.value!;
+    const chunk = segment.slice();
 
-        // Handle mandatory breaks (newlines) — they come as trailing \n in the segment
-        const hasMandatory = segment.required;
+    // Handle mandatory breaks (newlines) — they come as trailing \n in the segment
+    const hasMandatory = segment.required;
 
-        // Strip trailing newline/carriage-return from the chunk itself
-        const cleaned = chunk.replace(/[\r\n]+$/, "");
+    // Strip trailing newline/carriage-return from the chunk itself
+    const cleaned = chunk.replace(/[\r\n]+$/, '');
 
-        // If soft-hyphen at the end, test with visible hyphen for measurement
-        const endsWithShy = cleaned.endsWith(SOFT_HYPHEN);
-        const displayChunk = endsWithShy ? cleaned.slice(0, -1) + "-" : cleaned;
+    // If soft-hyphen at the end, test with visible hyphen for measurement
+    const endsWithShy = cleaned.endsWith(SOFT_HYPHEN);
+    const displayChunk = endsWithShy ? `${cleaned.slice(0, -1)}-` : cleaned;
 
-        const testLine = currentLine + displayChunk;
+    const testLine = currentLine + displayChunk;
 
-        if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-            // Emit current line, possibly with trailing hyphen from previous soft-hyphen
-            result.push(currentLine.replace(/\u00AD$/, "-"));
-            currentLine = cleaned.replace(/^\s+/, "");
-        } else {
-            currentLine += cleaned;
-        }
-
-        if (hasMandatory) {
-            result.push(currentLine.replace(/\u00AD/g, ""));
-            currentLine = "";
-        }
+    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+      // Emit current line, possibly with trailing hyphen from previous soft-hyphen
+      result.push(currentLine.replace(/\u00AD$/, '-'));
+      currentLine = cleaned.replace(/^\s+/, '');
+    } else {
+      currentLine += cleaned;
     }
 
-    if (currentLine) {
-        result.push(currentLine.replace(/\u00AD/g, ""));
+    if (hasMandatory) {
+      result.push(currentLine.replace(/\u00AD/g, ''));
+      currentLine = '';
     }
+  }
 
-    return result;
+  if (currentLine) {
+    result.push(currentLine.replace(/\u00AD/g, ''));
+  }
+
+  return result;
 }

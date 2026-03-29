@@ -1,13 +1,10 @@
-import { useState } from "react";
-import { Folder } from "lucide-react";
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { useExplorerItem } from "./use-explorer-item";
-import { useDropTarget } from "./use-drop-target";
-import { ItemContextMenu } from "./item-context-menu";
-import { TagManageDialog } from "../tag-manage-dialog";
+import { useState } from 'react';
+import { Folder } from 'lucide-react';
+import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { TagManageDialog } from '../tag-manage-dialog';
+import { ItemContextMenu } from './item-context-menu';
+import { useDropTarget } from './use-drop-target';
+import { useExplorerItem } from './use-explorer-item';
 
 interface FolderItemProps {
   id: string;
@@ -18,7 +15,14 @@ interface FolderItemProps {
   onMoved: () => void;
 }
 
-export function FolderItem({ id, name, tags, autoRename, onNavigate, onMoved }: FolderItemProps) {
+export function FolderItem({
+  id,
+  name,
+  tags,
+  autoRename,
+  onNavigate,
+  onMoved,
+}: FolderItemProps) {
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
 
   const {
@@ -47,33 +51,37 @@ export function FolderItem({ id, name, tags, autoRename, onNavigate, onMoved }: 
             <button
               draggable={!renaming}
               onClick={() => {
-                if (!renaming) onNavigate();
+                if (!renaming) {
+                  onNavigate();
+                }
               }}
               onDragStart={handleDragStart}
               {...dropTargetProps}
-              className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 transition-colors cursor-pointer ${
+              className={`flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
                 dragOver
-                  ? "bg-accent/15 ring-1 ring-accent/40"
-                  : "hover:bg-hover-tint"
+                  ? 'bg-accent/15 ring-1 ring-accent/40'
+                  : 'hover:bg-hover-tint'
               }`}
             />
           }
         >
-          <Folder className="size-4 text-amber-400 fill-amber-400 shrink-0" />
+          <Folder className="size-4 shrink-0 fill-amber-400 text-amber-400" />
           {renaming ? (
             <input
               {...renameInputProps}
-              className="text-sm font-medium text-text-primary bg-transparent border-b-2 border-primary outline-none min-w-0 flex-1"
+              className="min-w-0 flex-1 border-primary border-b-2 bg-transparent font-medium text-sm text-text-primary outline-none"
             />
           ) : (
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-medium text-text-primary truncate">{name}</span>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium text-sm text-text-primary">
+                {name}
+              </span>
               {tags.length > 0 && (
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex shrink-0 items-center gap-1">
                   {tags.slice(0, 2).map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-md bg-tag/60 px-1.5 py-0.5 text-[9px] font-medium text-text-tag"
+                      className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
                     >
                       #{tag}
                     </span>

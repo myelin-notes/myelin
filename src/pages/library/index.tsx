@@ -1,30 +1,54 @@
-import { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowDownAZ, ArrowDownZA, Clock, CalendarPlus, Search, ChevronRight } from "lucide-react";
-import { Sidebar } from "@/components/layout/sidebar";
-import { RecentCard } from "./recent-card";
-import { ExplorerTree, ExplorerTreeHandle, SortMode } from "./explorer/explorer-tree";
-import { SemanticTags } from "./semantic-tags";
-import { CreateNewDropdown } from "./create-new-dropdown";
-import { FileSystem, VFSFileNode, VFSFolderNode } from "@/lib/utils/file-system";
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowDownAZ,
+  ArrowDownZA,
+  CalendarPlus,
+  ChevronRight,
+  Clock,
+  Search,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Sidebar } from '@/components/layout/sidebar';
+import {
+  FileSystem,
+  type VFSFileNode,
+  type VFSFolderNode,
+} from '@/lib/utils/file-system';
+import { CreateNewDropdown } from './create-new-dropdown';
+import {
+  ExplorerTree,
+  type ExplorerTreeHandle,
+  type SortMode,
+} from './explorer/explorer-tree';
+import { RecentCard } from './recent-card';
+import { SemanticTags } from './semantic-tags';
 
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) {
+    return 'Just now';
+  }
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
   const days = Math.floor(hours / 24);
-  if (days === 1) return "Yesterday";
-  if (days < 30) return `${days}d ago`;
+  if (days === 1) {
+    return 'Yesterday';
+  }
+  if (days < 30) {
+    return `${days}d ago`;
+  }
   const months = Math.floor(days / 30);
   return `${months}mo ago`;
 }
 
 const fileTypeLabel: Record<string, string> = {
-  mcanvas: "Canvas",
+  mcanvas: 'Canvas',
 };
 
 export function LibraryPage() {
@@ -33,17 +57,27 @@ export function LibraryPage() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(null);
+  const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(
+    null,
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const sortModes: SortMode[] = ["name-asc", "name-desc", "modified", "created"];
-  const [sortMode, setSortMode] = useState<SortMode>("name-asc");
+  const [searchQuery, setSearchQuery] = useState('');
+  const sortModes: SortMode[] = [
+    'name-asc',
+    'name-desc',
+    'modified',
+    'created',
+  ];
+  const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const cycleSortMode = useCallback(() => {
-    setSortMode((prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length]);
-  }, []);
+    setSortMode(
+      (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
+    );
+    // biome-ignore lint/correctness/useExhaustiveDependencies: sortModes is a static array
+  }, [sortModes]);
 
   const triggerRefresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -54,7 +88,7 @@ export function LibraryPage() {
     FileSystem.getManifest().then((manifest) => {
       setRecentFiles(FileSystem.getRecentFiles(manifest, 3));
     });
-  }, [refreshKey]);
+  }, []);
 
   // Update breadcrumbs when folder changes
   useEffect(() => {
@@ -81,8 +115,10 @@ export function LibraryPage() {
       clearDragTimer();
       setBreadcrumbDragIdx(null);
 
-      const raw = e.dataTransfer.getData("application/myelin-item");
-      if (!raw) return;
+      const raw = e.dataTransfer.getData('application/myelin-item');
+      if (!raw) {
+        return;
+      }
 
       const { nodeId } = JSON.parse(raw) as { nodeId: string };
 
@@ -91,22 +127,26 @@ export function LibraryPage() {
         setCurrentFolderId(targetFolderId);
         triggerRefresh();
       } catch (err) {
-        console.error("Failed to move item:", err);
+        console.error('Failed to move item:', err);
       }
     },
-    [clearDragTimer, triggerRefresh]
+    [clearDragTimer, triggerRefresh],
   );
 
   const makeBreadcrumbDragHandlers = useCallback(
     (targetFolderId: string | null, idx: number) => ({
       onDragOver: (e: React.DragEvent) => {
-        if (!e.dataTransfer.types.includes("application/myelin-item")) return;
+        if (!e.dataTransfer.types.includes('application/myelin-item')) {
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
-        e.dataTransfer.dropEffect = "move";
+        e.dataTransfer.dropEffect = 'move';
       },
       onDragEnter: (e: React.DragEvent) => {
-        if (!e.dataTransfer.types.includes("application/myelin-item")) return;
+        if (!e.dataTransfer.types.includes('application/myelin-item')) {
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         setBreadcrumbDragIdx(idx);
@@ -123,7 +163,7 @@ export function LibraryPage() {
       },
       onDrop: (e: React.DragEvent) => handleBreadcrumbDrop(e, targetFolderId),
     }),
-    [clearDragTimer, handleBreadcrumbDrop]
+    [clearDragTimer, handleBreadcrumbDrop],
   );
 
   return (
@@ -131,15 +171,15 @@ export function LibraryPage() {
       <Sidebar />
 
       <main className="ml-64 flex-1 overflow-y-auto px-12 pt-12 pb-12">
-        <h1 className="font-heading text-5xl font-extralight leading-[48px] text-text-primary">
+        <h1 className="font-extralight font-heading text-5xl text-text-primary leading-[48px]">
           Digital Library
         </h1>
 
         {/* Recently Opened */}
         {recentFiles.length > 0 && (
           <section className="mt-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-heading text-2xl font-normal leading-8 text-text-primary">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="font-heading font-normal text-2xl text-text-primary leading-8">
                 Recently Opened
               </h3>
             </div>
@@ -164,24 +204,29 @@ export function LibraryPage() {
         <section className="mt-12 grid grid-cols-12 gap-12">
           <div className="col-span-8 flex flex-col gap-8">
             <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-1.5 transition-colors hover:bg-hover-tint">
-              <Search className="size-3.5 text-text-muted shrink-0" />
+              <Search className="size-3.5 shrink-0 text-text-muted" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search studio..."
-                className="w-full bg-transparent py-2 px-3 text-sm font-medium text-text-primary placeholder:text-text-muted outline-none"
+                className="w-full bg-transparent px-3 py-2 font-medium text-sm text-text-primary outline-none placeholder:text-text-muted"
               />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h3
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setCurrentFolderId(null);
+                    }
+                  }}
                   onClick={() => setCurrentFolderId(null)}
-                  className={`font-heading text-2xl font-normal leading-8 cursor-pointer transition-colors ${
+                  className={`cursor-pointer font-heading font-normal text-2xl leading-8 transition-colors ${
                     breadcrumbDragIdx === -1
-                      ? "text-accent-foreground"
-                      : "text-text-primary hover:text-text-secondary"
+                      ? 'text-accent-foreground'
+                      : 'text-text-primary hover:text-text-secondary'
                   }`}
                   {...makeBreadcrumbDragHandlers(null, -1)}
                 >
@@ -194,16 +239,21 @@ export function LibraryPage() {
                       const isLast = i === breadcrumbs.length - 1;
                       const isDragTarget = breadcrumbDragIdx === i;
                       return (
-                        <span key={crumb.id} className="flex items-center gap-1">
-                          {i > 0 && <ChevronRight className="size-3 shrink-0 text-text-muted" />}
+                        <span
+                          key={crumb.id}
+                          className="flex items-center gap-1"
+                        >
+                          {i > 0 && (
+                            <ChevronRight className="size-3 shrink-0 text-text-muted" />
+                          )}
                           <button
                             onClick={() => setCurrentFolderId(crumb.id)}
                             className={`rounded px-1 transition-colors ${
                               isDragTarget
-                                ? "bg-accent/15 text-accent-foreground ring-1 ring-accent/40"
+                                ? 'bg-accent/15 text-accent-foreground ring-1 ring-accent/40'
                                 : isLast
-                                  ? "text-text-secondary font-medium"
-                                  : "text-text-muted hover:text-text-secondary cursor-pointer"
+                                  ? 'font-medium text-text-secondary'
+                                  : 'cursor-pointer text-text-muted hover:text-text-secondary'
                             }`}
                             {...makeBreadcrumbDragHandlers(crumb.id, i)}
                           >
@@ -219,16 +269,24 @@ export function LibraryPage() {
                 <button
                   onClick={cycleSortMode}
                   title={`Sort: ${sortMode}`}
-                  className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                  className="cursor-pointer text-text-secondary transition-colors hover:text-text-primary"
                 >
-                  {sortMode === "name-asc" && <ArrowDownAZ className="size-4" />}
-                  {sortMode === "name-desc" && <ArrowDownZA className="size-4" />}
-                  {sortMode === "modified" && <Clock className="size-4" />}
-                  {sortMode === "created" && <CalendarPlus className="size-4" />}
+                  {sortMode === 'name-asc' && (
+                    <ArrowDownAZ className="size-4" />
+                  )}
+                  {sortMode === 'name-desc' && (
+                    <ArrowDownZA className="size-4" />
+                  )}
+                  {sortMode === 'modified' && <Clock className="size-4" />}
+                  {sortMode === 'created' && (
+                    <CalendarPlus className="size-4" />
+                  )}
                 </button>
                 <CreateNewDropdown
                   onNewFolder={() => explorerRef.current?.startNewFolder()}
-                  onNewFile={(title, type) => explorerRef.current?.startNewFile(title, type)}
+                  onNewFile={(title, type) =>
+                    explorerRef.current?.startNewFile(title, type)
+                  }
                 />
               </div>
             </div>

@@ -1,11 +1,11 @@
-import { MemoryRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "sonner";
-import { useTheme } from "@/hooks/useTheme";
-import { LibraryPage } from "@/pages/library";
-import { CanvasView } from "@/pages/free-canvas";
+import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Toaster } from 'sonner';
+import { useTheme } from '@/hooks/useTheme';
+import { CanvasView } from '@/pages/free-canvas';
+import { LibraryPage } from '@/pages/library';
 
 function App() {
-  useTheme("light");
+  useTheme('light');
 
   return (
     <MemoryRouter>
