@@ -4,12 +4,9 @@ import {
   MousePointer2 as PointerIcon,
 } from 'lucide-react';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
-import {
-  type DrawableCanvas,
-  MoveElementsCommand,
-  ScaleElementCommand,
-  type Vector2,
-} from '../drawable-canvas';
+import { MoveElementsCommand } from '../commands/move-elements';
+import { ScaleElementCommand } from '../commands/scale-element';
+import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
 import { PageFrameElement } from '../elements/page-frame-element';
 import type { ITool, SvgIcon, ToolOption } from './tool';

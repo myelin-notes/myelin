@@ -1,10 +1,7 @@
 import { Type as TypeIcon } from 'lucide-react';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
-import {
-  type DrawableCanvas,
-  EditTextCommand,
-  type Vector2,
-} from '../drawable-canvas';
+import { EditTextCommand } from '../commands/edit-text';
+import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { TextElement } from '../elements/text-element';
 import type { FontEntry, ITool, SvgIcon, ToolOption } from './tool';
 

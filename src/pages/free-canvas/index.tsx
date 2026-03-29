@@ -4,12 +4,12 @@ import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import type { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
 import { CanvasToolbar } from './components/canvas-toolbar';
-import { PageFrameDomLayer } from './components/page-frame-dom-layer';
 import { StatusBar } from './components/status-bar';
 import { TextEditOverlay } from './components/text-edit-overlay';
 import { TitleBar } from './components/title-bar';
 import { useCanvasEngine } from './hooks/use-canvas-engine';
 import { useToolState } from './hooks/use-tool-state';
+import { PageFrameDomLayer } from './page-frame/dom-layer';
 
 export function CanvasView() {
   const { id } = useParams<{ id: string }>();

@@ -1,6 +1,6 @@
-import type { EditableBlock } from '../../elements/block-editor';
-import { BlockType, BlockTypeRegistry } from '../../elements/block-types';
 import { LINE_HEIGHT } from '../../elements/text-layout';
+import type { EditableBlock } from '../block-editor';
+import { BlockType, BlockTypeRegistry } from '../block-types';
 import { flatStyle } from './flat-style';
 
 // ── Block styles ────────────────────────────────────────────

@@ -4,14 +4,19 @@ import type {
   ISerializable,
 } from '../../lib/utils/binary-helper';
 import { StateMachine } from '../../lib/utils/state-machine';
-import { type UndoCommand, UndoRedoStack } from '../../lib/utils/undo-redo';
-import type { EditableBlock } from './elements/block-editor';
+import type { UndoCommand } from '../../lib/utils/undo-redo';
+import { UndoRedoStack } from '../../lib/utils/undo-redo';
+import {
+  AddElementCommand,
+  EditPageFrameCommand,
+  RemoveElementCommand,
+} from './commands';
 import type { DrawableElement } from './elements/drawable-element';
 import { DrawableElementRegistry } from './elements/drawable-element-registry';
 import { ElementType } from './elements/element-type';
 import { ImageElement } from './elements/image-element';
 import type { PageFrameElement } from './elements/page-frame-element';
-import type { TextElement } from './elements/text-element';
+import type { EditableBlock } from './page-frame/block-editor';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
@@ -21,120 +26,6 @@ import { TextTool } from './tools/text-tool';
 import type { ITool } from './tools/tool';
 
 export type Vector2 = { x: number; y: number };
-
-class AddElementCommand implements UndoCommand {
-  constructor(
-    private list: DrawableElement[],
-    private element: DrawableElement,
-  ) {}
-  execute() {
-    this.list.push(this.element);
-  }
-  undo() {
-    const idx = this.list.indexOf(this.element);
-    if (idx >= 0) {
-      this.list.splice(idx, 1);
-    }
-  }
-}
-
-class RemoveElementCommand implements UndoCommand {
-  private position = -1;
-  constructor(
-    private list: DrawableElement[],
-    private element: DrawableElement,
-  ) {}
-  execute() {
-    const idx = this.list.indexOf(this.element);
-    if (idx >= 0) {
-      this.position = idx;
-      this.list.splice(idx, 1);
-    }
-  }
-  undo() {
-    if (this.position >= 0) {
-      this.list.splice(
-        Math.min(this.position, this.list.length),
-        0,
-        this.element,
-      );
-    }
-  }
-}
-
-export class MoveElementsCommand implements UndoCommand {
-  constructor(
-    private targets: DrawableElement[],
-    private dx: number,
-    private dy: number,
-  ) {}
-
-  execute() {
-    for (const e of this.targets) {
-      e.translate(this.dx, this.dy);
-    }
-  }
-
-  undo() {
-    for (const e of this.targets) {
-      e.translate(-this.dx, -this.dy);
-    }
-  }
-}
-
-export class EditTextCommand implements UndoCommand {
-  constructor(
-    private element: TextElement,
-    private oldText: string,
-    private newText: string,
-  ) {}
-
-  execute() {
-    this.element.setText(this.newText);
-    this.element.updateBounds();
-  }
-
-  undo() {
-    this.element.setText(this.oldText);
-    this.element.updateBounds();
-  }
-}
-
-export class EditPageFrameCommand implements UndoCommand {
-  constructor(
-    private element: PageFrameElement,
-    private oldBlocks: EditableBlock[],
-    private newBlocks: EditableBlock[],
-  ) {}
-
-  execute() {
-    this.element.editor.setBlocks(this.newBlocks);
-  }
-
-  undo() {
-    this.element.editor.setBlocks(this.oldBlocks);
-  }
-}
-
-export class ScaleElementCommand implements UndoCommand {
-  constructor(
-    private element: DrawableElement,
-    private oldScale: Vector2,
-    private oldOffset: Vector2,
-    private newScale: Vector2,
-    private newOffset: Vector2,
-  ) {}
-
-  execute() {
-    this.element.setScale(this.newScale.x, this.newScale.y);
-    this.element.setOffset(this.newOffset.x, this.newOffset.y);
-  }
-
-  undo() {
-    this.element.setScale(this.oldScale.x, this.oldScale.y);
-    this.element.setOffset(this.oldOffset.x, this.oldOffset.y);
-  }
-}
 
 export class DrawableCanvas implements ISerializable {
   public readonly ctx: CanvasRenderingContext2D;

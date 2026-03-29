@@ -2,12 +2,10 @@ import type {
   BinaryReader,
   BinaryWriter,
 } from '../../../lib/utils/binary-helper';
-import { BlockEditor } from './block-editor';
-import type { BlockType } from './block-types/index';
+import { BlockEditor } from '../page-frame/block-editor';
+import type { BlockType } from '../page-frame/block-types/index';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
-
-export type { EditableBlock } from './block-editor';
 
 export const PAGE_WIDTH = 680;
 export const PAGE_HEIGHT = 880;

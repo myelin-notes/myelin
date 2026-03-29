@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { DrawableCanvas } from '../../drawable-canvas';
-import type { EditableBlock } from '../../elements/block-editor';
 import type { PageFrameElement } from '../../elements/page-frame-element';
+import type { EditableBlock } from '../block-editor';
 import { blocksToDOM, domToBlocks } from './block-dom';
 import { checkMarkdownShortcut, handleEnterKey } from './block-editing';
 import { flatStyle } from './flat-style';

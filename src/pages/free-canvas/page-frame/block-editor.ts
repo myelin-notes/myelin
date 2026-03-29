@@ -1,4 +1,4 @@
-import type { BlockType } from './block-types';
+import type { BlockType } from '../page-frame/block-types';
 
 export interface EditableBlock {
   type: BlockType;

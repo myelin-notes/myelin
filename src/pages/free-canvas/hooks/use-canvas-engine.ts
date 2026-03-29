@@ -7,9 +7,9 @@ import {
   DrawableCanvas,
   type Vector2,
 } from '@/pages/free-canvas/drawable-canvas';
-import type { EditableBlock } from '@/pages/free-canvas/elements/block-editor';
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
+import type { EditableBlock } from '../page-frame/block-editor';
 
 declare module '@/lib/keybindings' {
   interface ActionMap {

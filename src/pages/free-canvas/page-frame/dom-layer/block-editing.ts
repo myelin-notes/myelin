@@ -1,4 +1,4 @@
-import { BlockType, BlockTypeRegistry } from '../../elements/block-types';
+import { BlockType, BlockTypeRegistry } from '../block-types';
 import { getBlockStyle, getBlockText, readBlockType } from './block-dom';
 
 // ── Markdown shortcuts ───────────────────────────────────────
