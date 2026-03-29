@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { DrawableCanvas, Vector2 } from "@/pages/free-canvas/drawable-canvas";
 import { PageFrameElement } from "@/pages/free-canvas/elements/page-frame-element";
+import type { EditableBlock } from "@/pages/free-canvas/elements/block-editor";
 import { ITool } from "@/pages/free-canvas/tools/tool";
 import { WheelPickerHandle } from "@/components/wheel-picker";
 import { FileSystem } from "@/lib/utils/file-system";
@@ -51,7 +52,7 @@ export function useCanvasEngine({
   const [fps, setFps] = useState(0);
   const [fileName, setFileName] = useState("");
   const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
-  const hiddenTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editingPageFrame, setEditingPageFrame] = useState<PageFrameElement | null>(null);
 
   const embedFiles = useCallback((files: FileList | File[], screenX?: number, screenY?: number) => {
     const dc = drawableCanvasRef.current;
@@ -156,10 +157,9 @@ export function useCanvasEngine({
       fileInputRef.current?.click();
     });
 
-    // Wire up hidden textarea for canvas-based page frame editing
-    if (hiddenTextareaRef.current) {
-      dc.setHiddenTextarea(hiddenTextareaRef.current);
-    }
+    dc.setOnPageFrameEdit((element) => {
+      setEditingPageFrame(element);
+    });
 
     let prevTime = 0;
     let animationFrameId: number;
@@ -219,6 +219,10 @@ export function useCanvasEngine({
     };
   }, []);
 
+  const commitPageFrameEdit = useCallback((blocks: EditableBlock[]) => {
+    drawableCanvasRef.current?.exitPageFrameEdit(blocks);
+  }, [drawableCanvasRef]);
+
   const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files;
     if (files?.length) {
@@ -230,12 +234,14 @@ export function useCanvasEngine({
 
   return {
     fileInputRef,
-    hiddenTextareaRef,
+    drawableCanvasRef,
     zoomLevel,
     fps,
     fileName,
     textEdit,
     setTextEdit,
+    editingPageFrame,
+    commitPageFrameEdit,
     back,
     handleFileInputChange,
   };

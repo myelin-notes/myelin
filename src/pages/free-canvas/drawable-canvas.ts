@@ -123,12 +123,11 @@ export class DrawableCanvas implements ISerializable {
     public readonly tools: ITool[];
     private dotPattern: CanvasPattern | null = null;
 
-    private offset: Vector2 = {x: 0, y: 0};
+    private _offset: Vector2 = {x: 0, y: 0};
     private _zoom: number = 1;
     private spaceDown: boolean = false;
     private mousePosition: Vector2 = { x: 0, y: 0 };
     private screenPosition: Vector2 = { x: 0, y: 0 };
-    private bgColor: string;
 
     private _elements: DrawableElement[] = [];
     private _undoRedo = new UndoRedoStack();
@@ -139,16 +138,14 @@ export class DrawableCanvas implements ISerializable {
     private onZoomChange?: (zoom: number) => void;
     private onRequestTextEdit?: (screenPos: Vector2, screenFontSize: number, fontFamily: string, initialText: string, boxScreenWidth: number, boxScreenHeight: number, onCommit: (text: string) => void) => void;
     private onRequestFilePick?: (screenPos: Vector2) => void;
+    private onPageFrameEdit?: (element: PageFrameElement | null) => void;
 
-    // Canvas-based page frame editing
+    // Page frame editing state
     private _editingElement: PageFrameElement | null = null;
-    private _textarea: HTMLTextAreaElement | null = null;
-    private _composing: boolean = false;
-    private _keydownHandler: ((e: KeyboardEvent) => void) | null = null;
-    private _textareaAbort: AbortController | null = null;
+    private _getEditingBlocks?: () => EditableBlock[];
 
     public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
-        const ctx = canvas.getContext("2d", { alpha: false });
+        const ctx = canvas.getContext("2d", { alpha: true });
         if (!ctx) {
             console.error("Failed to get canvas context");
         }
@@ -159,7 +156,6 @@ export class DrawableCanvas implements ISerializable {
         this.tools = tools ?? DrawableCanvas.makeTools();
         this.toolSelected = this.tools[0];
 
-        this.bgColor = getComputedStyle(canvas).getPropertyValue('--bg-page').trim() || '#f7f9fb';
         this.initEventListeners(canvas);
         this.initStates();
         this.resizeCanvas(window.innerWidth, window.innerHeight);
@@ -182,37 +178,22 @@ export class DrawableCanvas implements ISerializable {
         this.onRequestFilePick = callback;
     }
 
-    public requestFilePick(screenPos: Vector2) {
-        this.onRequestFilePick?.(screenPos);
+    public setOnPageFrameEdit(callback: (element: PageFrameElement | null) => void) {
+        this.onPageFrameEdit = callback;
     }
 
-    public setHiddenTextarea(textarea: HTMLTextAreaElement): void {
-        this._textarea = textarea;
+    public setGetEditingBlocks(fn: () => EditableBlock[]) {
+        this._getEditingBlocks = fn;
+    }
 
-        // Abort previous listeners if re-called (e.g. React StrictMode)
-        this._textareaAbort?.abort();
-        this._textareaAbort = new AbortController();
-        const { signal } = this._textareaAbort;
+    public get viewOffset(): Vector2 { return this._offset; }
 
-        textarea.addEventListener("input", () => {
-            if (this._composing) return;
-            if (this._editingElement && textarea.value) {
-                this._editingElement.editor.insertText(textarea.value);
-                textarea.value = "";
-            }
-        }, { signal });
+    public get pageFrames(): PageFrameElement[] {
+        return this._elements.filter(e => e.type === ElementType.PAGE_FRAME) as PageFrameElement[];
+    }
 
-        textarea.addEventListener("compositionstart", () => {
-            this._composing = true;
-        }, { signal });
-
-        textarea.addEventListener("compositionend", () => {
-            this._composing = false;
-            if (this._editingElement && textarea.value) {
-                this._editingElement.editor.insertText(textarea.value);
-                textarea.value = "";
-            }
-        }, { signal });
+    public requestFilePick(screenPos: Vector2) {
+        this.onRequestFilePick?.(screenPos);
     }
 
     public get editingElement(): PageFrameElement | null {
@@ -228,70 +209,39 @@ export class DrawableCanvas implements ISerializable {
         this._editingElement = element;
         this._oldBlocks = element.editor.snapshotBlocks();
         element.enterEditMode();
-
-        // Focus hidden textarea for input capture.
-        // Deferred so the browser's default pointerdown focus behavior doesn't
-        // immediately steal focus back to the canvas.
-        const textarea = this._textarea;
-        if (textarea) {
-            textarea.value = "";
-            setTimeout(() => textarea.focus(), 0);
-        }
-
-        // Install keyboard handler (capture phase so it fires before keybindings)
-        this._keydownHandler = (e: KeyboardEvent) => {
-            if (!this._editingElement) return;
-
-            const result = this._editingElement.editor.handleKey(e.key, e.metaKey || e.ctrlKey, e.shiftKey);
-
-            if (result === "exit") {
-                e.preventDefault();
-                e.stopPropagation();
-                this.exitPageFrameEdit();
-                return;
-            }
-
-            if (result === "handled") {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-            }
-
-            // "passthrough" — let the event reach the textarea for input processing.
-            // The keybinding system already ignores events from TEXTAREA elements.
-        };
-        window.addEventListener("keydown", this._keydownHandler, true);
+        this.onPageFrameEdit?.(element);
     }
 
-    public exitPageFrameEdit(): void {
+    public exitPageFrameEdit(newBlocks?: EditableBlock[]): void {
         if (!this._editingElement) return;
 
         const element = this._editingElement;
-        const newBlocks = element.editor.snapshotBlocks();
+
+        // Get blocks from DOM if not provided directly
+        if (!newBlocks && this._getEditingBlocks) {
+            newBlocks = this._getEditingBlocks();
+        }
+
+        if (newBlocks) {
+            element.editor.setBlocks(newBlocks);
+        }
+
+        const finalBlocks = element.editor.snapshotBlocks();
         element.exitEditMode();
 
-        const changed = JSON.stringify(newBlocks) !== JSON.stringify(this._oldBlocks);
+        const changed = JSON.stringify(finalBlocks) !== JSON.stringify(this._oldBlocks);
         if (changed) {
-            this.pushApplied(new EditPageFrameCommand(element, this._oldBlocks, newBlocks));
+            this.pushApplied(new EditPageFrameCommand(element, this._oldBlocks, finalBlocks));
         }
 
         this._editingElement = null;
-        this._textarea?.blur();
-
-        // Remove keyboard handler
-        if (this._keydownHandler) {
-            window.removeEventListener("keydown", this._keydownHandler, true);
-            this._keydownHandler = null;
-        }
+        this.onPageFrameEdit?.(null);
     }
 
     public destroy(): void {
         if (this._editingElement) {
             this.exitPageFrameEdit();
         }
-        this._textareaAbort?.abort();
-        this._textareaAbort = null;
-        this._textarea = null;
     }
 
     public redraw(deltaTime: number) {
@@ -300,18 +250,17 @@ export class DrawableCanvas implements ISerializable {
         const logicalH = this.canvas.height / dpr;
 
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        this.ctx.fillStyle = this.bgColor;
-        this.ctx.fillRect(0, 0, logicalW, logicalH);
+        this.ctx.clearRect(0, 0, logicalW, logicalH);
 
-        // Draw dot grid
+        // Draw dot grid (needs to follow zoom/pan)
         if (this.dotPattern) {
             this.ctx.save();
             this.ctx.scale(this._zoom, this._zoom);
-            this.ctx.translate(this.offset.x, this.offset.y);
+            this.ctx.translate(this._offset.x, this._offset.y);
             this.ctx.fillStyle = this.dotPattern;
             this.ctx.fillRect(
-                -this.offset.x - logicalW / this._zoom,
-                -this.offset.y - logicalH / this._zoom,
+                -this._offset.x - logicalW / this._zoom,
+                -this._offset.y - logicalH / this._zoom,
                 logicalW * 3 / this._zoom,
                 logicalH * 3 / this._zoom,
             );
@@ -320,7 +269,7 @@ export class DrawableCanvas implements ISerializable {
 
         this.ctx.save();
         this.ctx.scale(this._zoom, this._zoom);
-        this.ctx.translate(this.offset.x, this.offset.y);
+        this.ctx.translate(this._offset.x, this._offset.y);
         this._elements.forEach(element => {
             element.draw(this.ctx, deltaTime);
         });
@@ -366,9 +315,9 @@ export class DrawableCanvas implements ISerializable {
                 y: event.movementY / this._zoom,
             };
 
-            this.offset = {
-                x: this.offset.x + newPos.x,
-                y: this.offset.y + newPos.y,
+            this._offset = {
+                x: this._offset.x + newPos.x,
+                y: this._offset.y + newPos.y,
             }
         });
     }
@@ -390,23 +339,23 @@ export class DrawableCanvas implements ISerializable {
                 };
 
                 const worldCenterBeforeZoom = {
-                    x: (canvasCenter.x / prevZoom) - this.offset.x,
-                    y: (canvasCenter.y / prevZoom) - this.offset.y,
+                    x: (canvasCenter.x / prevZoom) - this._offset.x,
+                    y: (canvasCenter.y / prevZoom) - this._offset.y,
                 };
 
                 const worldCenterAfterZoom = {
-                    x: (canvasCenter.x / this._zoom) - this.offset.x,
-                    y: (canvasCenter.y / this._zoom) - this.offset.y,
+                    x: (canvasCenter.x / this._zoom) - this._offset.x,
+                    y: (canvasCenter.y / this._zoom) - this._offset.y,
                 };
 
-                this.offset.x += worldCenterAfterZoom.x - worldCenterBeforeZoom.x;
-                this.offset.y += worldCenterAfterZoom.y - worldCenterBeforeZoom.y;
+                this._offset.x += worldCenterAfterZoom.x - worldCenterBeforeZoom.x;
+                this._offset.y += worldCenterAfterZoom.y - worldCenterBeforeZoom.y;
 
                 this.onZoomChange?.(this._zoom);
             } else {
                 // Two-finger scroll on trackpad / mouse wheel → pan
-                this.offset.x -= evt.deltaX / this._zoom;
-                this.offset.y -= evt.deltaY / this._zoom;
+                this._offset.x -= evt.deltaX / this._zoom;
+                this._offset.y -= evt.deltaY / this._zoom;
             }
             this.mousePosition = this.screenToWorld(this.screenPosition);
         }, { passive: false });
@@ -426,14 +375,10 @@ export class DrawableCanvas implements ISerializable {
                 const box = this._editingElement.boundingBox;
                 if (point.x >= box.x && point.x <= box.right &&
                     point.y >= box.y && point.y <= box.bottom) {
-                    // Click inside editing element — reposition cursor
-                    const localX = point.x - box.x;
-                    const localY = point.y - box.y;
-                    this._editingElement.editor.hitTestCursor(localX, localY, this.ctx);
-                    evt.preventDefault(); // Prevent canvas from stealing focus
-                    this._textarea?.focus();
+                    // Click inside editing element — handled by DOM contentEditable
+                    return;
                 } else {
-                    // Click outside — commit and exit
+                    // Click outside — commit and exit (DOM layer will serialize blocks)
                     this.exitPageFrameEdit();
                 }
                 return;
@@ -572,8 +517,8 @@ export class DrawableCanvas implements ISerializable {
 
     public worldToScreen(world: Vector2): Vector2 {
         return {
-            x: (world.x + this.offset.x) * this._zoom,
-            y: (world.y + this.offset.y) * this._zoom,
+            x: (world.x + this._offset.x) * this._zoom,
+            y: (world.y + this._offset.y) * this._zoom,
         };
     }
 
@@ -598,8 +543,8 @@ export class DrawableCanvas implements ISerializable {
 
     public screenToWorld(screen: Vector2): Vector2 {
         return {
-            x: screen.x / this._zoom - this.offset.x,
-            y: screen.y / this._zoom - this.offset.y,
+            x: screen.x / this._zoom - this._offset.x,
+            y: screen.y / this._zoom - this._offset.y,
         };
     }
 
@@ -609,7 +554,7 @@ export class DrawableCanvas implements ISerializable {
 
     public load(reader: BinaryReader): void {
         this._zoom = reader.readF32();
-        this.offset = { x: reader.readF32(), y: reader.readF32() };
+        this._offset = { x: reader.readF32(), y: reader.readF32() };
 
         const count = reader.readU32();
         this._elements = [];
@@ -625,8 +570,8 @@ export class DrawableCanvas implements ISerializable {
 
     public save(writer: BinaryWriter): void {
         writer.writeF32(this._zoom);
-        writer.writeF32(this.offset.x);
-        writer.writeF32(this.offset.y);
+        writer.writeF32(this._offset.x);
+        writer.writeF32(this._offset.y);
 
         writer.writeU32(this._elements.length);
         for (const ele of this._elements) {
