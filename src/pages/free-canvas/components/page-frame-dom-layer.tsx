@@ -398,15 +398,6 @@ export function PageFrameDomLayer({ canvasRef, editingElement, onCommitEdit }: P
                 const screenX = (worldX + offset.x) * zoom;
                 const screenY = (worldY + offset.y) * zoom;
                 div.style.transform = `translate(${screenX}px, ${screenY}px) scale(${zoom})`;
-
-                // Selection indicator (mirrors the canvas selection box style)
-                if (frame.isSelected && !frame.editing) {
-                    div.style.outline = "1.5px solid #2f3e46";
-                    div.style.outlineOffset = "4px";
-                } else {
-                    div.style.outline = "";
-                    div.style.outlineOffset = "";
-                }
             }
 
             // Remove divs for deleted frames

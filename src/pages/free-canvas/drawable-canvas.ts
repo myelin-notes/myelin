@@ -271,8 +271,6 @@ export class DrawableCanvas implements ISerializable {
         this.ctx.scale(this._zoom, this._zoom);
         this.ctx.translate(this._offset.x, this._offset.y);
         this._elements.forEach(element => {
-            // Skip page frames — they are rendered entirely by the DOM layer
-            if (element.type === ElementType.PAGE_FRAME) return;
             element.draw(this.ctx, deltaTime);
         });
 
