@@ -1,5 +1,7 @@
+import { BlockType } from "./block-types";
+
 export interface EditableBlock {
-    type: string;
+    type: BlockType;
     text: string;
 }
 

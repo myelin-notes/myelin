@@ -2,7 +2,7 @@ import { DrawableElement } from "./drawable-element";
 import { ElementType } from "./element-type";
 import { BinaryReader, BinaryWriter } from "../../../lib/utils/binary-helper";
 import { BlockEditor } from "./block-editor";
-import { BlockTypeRegistry } from "./block-types";
+import { BlockType } from "./block-types/index";
 
 export type { EditableBlock } from "./block-editor";
 
@@ -76,7 +76,7 @@ export class PageFrameElement extends DrawableElement {
         const blocks = this.editor.blocks;
         writer.writeU32(blocks.length);
         for (const block of blocks) {
-            writer.writeU8(BlockTypeRegistry.get(block.type).id);
+            writer.writeU8(block.type);
             writer.writeString(block.text);
         }
     }
@@ -88,9 +88,9 @@ export class PageFrameElement extends DrawableElement {
         const count = reader.readU32();
         const blocks = [];
         for (let i = 0; i < count; i++) {
-            const typeId = reader.readU8();
+            const type = reader.readU8() as BlockType;
             const text = reader.readString();
-            blocks.push({ type: BlockTypeRegistry.getById(typeId).name, text });
+            blocks.push({ type, text });
         }
         this.editor.setBlocks(blocks);
     }
