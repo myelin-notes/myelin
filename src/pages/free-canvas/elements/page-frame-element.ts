@@ -9,12 +9,14 @@ export type { EditableBlock } from "./block-editor";
 export const PAGE_WIDTH = 680;
 export const PAGE_HEIGHT = 880;
 export const PAGE_PADDING = 48;
+export const PAGE_GAP = 40;
 export const PAGE_CORNER_RADIUS = 3;
 
 export class PageFrameElement extends DrawableElement {
     private _pageWidth = PAGE_WIDTH;
     private _pageHeight = PAGE_HEIGHT;
     private _editing = false;
+    private _numPages = 1;
 
     public readonly editor = new BlockEditor();
 
@@ -25,13 +27,25 @@ export class PageFrameElement extends DrawableElement {
     public get editing(): boolean { return this._editing; }
     public get pageWidth(): number { return this._pageWidth; }
     public get pageHeight(): number { return this._pageHeight; }
+    public get numPages(): number { return this._numPages; }
+    public set numPages(n: number) { this._numPages = n; }
+
+    public get totalHeight(): number {
+        const n = this._numPages;
+        return n * this._pageHeight + Math.max(0, n - 1) * PAGE_GAP;
+    }
 
     public get localBoundingBox(): DOMRect {
-        return new DOMRect(0, 0, this._pageWidth, this._pageHeight);
+        return new DOMRect(0, 0, this._pageWidth, this.totalHeight);
     }
 
     protected isOverLocal(x: number, y: number, _radius: number, _ctx: CanvasRenderingContext2D): boolean {
-        return x >= 0 && x <= this._pageWidth && y >= 0 && y <= this._pageHeight;
+        if (x < 0 || x > this._pageWidth) return false;
+        for (let p = 0; p < this._numPages; p++) {
+            const pageTop = p * (this._pageHeight + PAGE_GAP);
+            if (y >= pageTop && y <= pageTop + this._pageHeight) return true;
+        }
+        return false;
     }
 
     protected updateBoundingBox(): void {}
