@@ -197,6 +197,12 @@ export function PageFrameDomLayer({
     return () => {
       refs.contentDiv.removeEventListener('input', handleInput);
       refs.contentDiv.removeEventListener('keydown', handleKeyDown);
+      // Sync snapshot so the rAF loop won't tear down & rebuild the
+      // DOM that was just edited — it already has the correct content.
+      blockSnapshotsMap.current.set(
+        editingElement.index,
+        JSON.stringify(editingElement.editor.blocks),
+      );
     };
   }, [editingElement, commitEdit, canvasRef]);
 
