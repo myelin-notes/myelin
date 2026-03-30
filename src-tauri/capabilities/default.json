@@ -11,6 +11,7 @@
     "fs:allow-appdata-write",
     "fs:allow-appcache-read-recursive",
     "fs:allow-appcache-write-recursive",
-    "dialog:default"
+    "dialog:default",
+    "mcp-bridge:default"
   ]
 }
