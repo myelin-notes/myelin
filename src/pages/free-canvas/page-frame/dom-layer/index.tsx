@@ -108,6 +108,19 @@ export function PageFrameDomLayer({
         }
       }
 
+      // When contentEditable elements are focused, the browser may scroll
+      // this overflow:hidden container to keep the cursor visible. Absorb
+      // that scroll into the canvas viewport offset so the canvas selection
+      // overlay stays in sync with the DOM layer.
+      if (container.scrollTop !== 0 || container.scrollLeft !== 0) {
+        dc.panBy(
+          -container.scrollLeft / zoom,
+          -container.scrollTop / zoom,
+        );
+        container.scrollTop = 0;
+        container.scrollLeft = 0;
+      }
+
       rafId = requestAnimationFrame(sync);
     }
 

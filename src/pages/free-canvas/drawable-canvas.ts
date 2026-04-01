@@ -59,6 +59,13 @@ export class DrawableCanvas implements ISerializable {
   private onRequestFilePick?: (screenPos: Vector2) => void;
   private onPageFrameEdit?: (element: PageFrameElement | null) => void;
 
+  // Event handlers (stored for cleanup in destroy())
+  private _handlePointerDown!: (evt: PointerEvent) => void;
+  private _handlePointerMove!: (evt: PointerEvent) => void;
+  private _handleWheel!: (evt: WheelEvent) => void;
+  private _handlePointerUp!: (evt: PointerEvent) => void;
+  private _handleResize!: () => void;
+
   // Page frame editing state
   private _editingElement: PageFrameElement | null = null;
   private _getEditingBlocks?: () => EditableBlock[];
@@ -137,6 +144,11 @@ export class DrawableCanvas implements ISerializable {
     return this._offset;
   }
 
+  public panBy(dx: number, dy: number) {
+    this._offset.x += dx;
+    this._offset.y += dy;
+  }
+
   public get pageFrames(): PageFrameElement[] {
     return this._elements.filter(
       (e) => e.type === ElementType.PAGE_FRAME,
@@ -199,6 +211,11 @@ export class DrawableCanvas implements ISerializable {
     if (this._editingElement) {
       this.exitPageFrameEdit();
     }
+    this.canvas.removeEventListener('wheel', this._handleWheel);
+    this.canvas.removeEventListener('pointermove', this._handlePointerMove);
+    this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
+    window.removeEventListener('pointerup', this._handlePointerUp);
+    window.removeEventListener('resize', this._handleResize);
   }
 
   public redraw(deltaTime: number) {
@@ -280,62 +297,63 @@ export class DrawableCanvas implements ISerializable {
   }
 
   private initEventListeners(canvas: HTMLCanvasElement) {
-    canvas.addEventListener(
-      'wheel',
-      (evt) => {
-        if (evt.ctrlKey) {
-          // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures)
-          evt.preventDefault();
-          if (this._editingElement) {
-            return;
-          }
-          const prevZoom = this._zoom;
-          const newZoom = prevZoom + evt.deltaY * -0.005;
-          this._zoom = Math.min(3, Math.max(0.2, newZoom));
-
-          const dpr = window.devicePixelRatio || 1;
-          const canvasCenter = {
-            x: this.canvas.width / dpr / 2,
-            y: this.canvas.height / dpr / 2,
-          };
-
-          const worldCenterBeforeZoom = {
-            x: canvasCenter.x / prevZoom - this._offset.x,
-            y: canvasCenter.y / prevZoom - this._offset.y,
-          };
-
-          const worldCenterAfterZoom = {
-            x: canvasCenter.x / this._zoom - this._offset.x,
-            y: canvasCenter.y / this._zoom - this._offset.y,
-          };
-
-          this._offset.x += worldCenterAfterZoom.x - worldCenterBeforeZoom.x;
-          this._offset.y += worldCenterAfterZoom.y - worldCenterBeforeZoom.y;
-
-          this.onZoomChange?.(this._zoom);
-        } else {
-          // Two-finger scroll on trackpad / mouse wheel → pan
-          this._offset.x -= evt.deltaX / this._zoom;
-          this._offset.y -= evt.deltaY / this._zoom;
+    this._handleWheel = (evt) => {
+      if (evt.ctrlKey) {
+        // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures)
+        evt.preventDefault();
+        if (this._editingElement) {
+          return;
         }
-        this.mousePosition = this.screenToWorld(this.screenPosition);
-      },
-      { passive: false },
-    );
+        const prevZoom = this._zoom;
+        const newZoom = prevZoom + evt.deltaY * -0.005;
+        this._zoom = Math.min(3, Math.max(0.2, newZoom));
 
-    canvas.addEventListener('pointermove', (evt) => {
+        const dpr = window.devicePixelRatio || 1;
+        const canvasCenter = {
+          x: this.canvas.width / dpr / 2,
+          y: this.canvas.height / dpr / 2,
+        };
+
+        const worldCenterBeforeZoom = {
+          x: canvasCenter.x / prevZoom - this._offset.x,
+          y: canvasCenter.y / prevZoom - this._offset.y,
+        };
+
+        const worldCenterAfterZoom = {
+          x: canvasCenter.x / this._zoom - this._offset.x,
+          y: canvasCenter.y / this._zoom - this._offset.y,
+        };
+
+        this._offset.x += worldCenterAfterZoom.x - worldCenterBeforeZoom.x;
+        this._offset.y += worldCenterAfterZoom.y - worldCenterBeforeZoom.y;
+
+        this.onZoomChange?.(this._zoom);
+      } else {
+        // Two-finger scroll on trackpad / mouse wheel → pan
+        this._offset.x -= evt.deltaX / this._zoom;
+        this._offset.y -= evt.deltaY / this._zoom;
+      }
+      this.mousePosition = this.screenToWorld(this.screenPosition);
+    };
+    canvas.addEventListener('wheel', this._handleWheel, { passive: false });
+
+    this._handlePointerMove = (evt) => {
       this.screenPosition = { x: evt.pageX, y: evt.pageY };
       this.mousePosition = this.screenToWorld(this.screenPosition);
       this.state.update(evt);
       this.toolSelected.hover?.(this, this.mousePosition);
       this.updateCursor();
-    });
+    };
+    canvas.addEventListener('pointermove', this._handlePointerMove);
 
-    canvas.addEventListener('pointerdown', (evt) => {
+    this._handlePointerDown = (evt) => {
       // During page frame editing, any click that reaches the canvas
       // (i.e. outside the raised DOM contentEditable) exits edit mode
+      // and re-selects the frame so handles remain visible.
       if (this._editingElement) {
+        const frame = this._editingElement;
         this.exitPageFrameEdit();
+        frame.select();
         return;
       }
 
@@ -362,15 +380,17 @@ export class DrawableCanvas implements ISerializable {
           this.state.update(evt);
           break;
       }
-    });
+    };
+    canvas.addEventListener('pointerdown', this._handlePointerDown);
 
-    window.addEventListener('pointerup', (evt) => {
+    this._handlePointerUp = (evt) => {
       this.state.change(InteractState.Idle, evt);
-    });
+    };
+    window.addEventListener('pointerup', this._handlePointerUp);
 
-    window.addEventListener('resize', () =>
-      this.resizeCanvas(window.innerWidth, window.innerHeight),
-    );
+    this._handleResize = () =>
+      this.resizeCanvas(window.innerWidth, window.innerHeight);
+    window.addEventListener('resize', this._handleResize);
   }
 
   public addElement<T extends DrawableElement>(factory: (i: number) => T): T {

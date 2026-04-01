@@ -112,20 +112,24 @@ export function useCanvasEngine({
   }, [id]);
 
   // Initialize canvas, event listeners, animation loop, and keybindings
+  // biome-ignore lint/correctness/useExhaustiveDependencies: useless dependencies
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!(canvas && id)) {
       return;
     }
 
-    canvas.addEventListener('contextmenu', (evt) => {
+    let disposed = false;
+
+    const handleContextMenu = (evt: MouseEvent) => {
       if (evt.shiftKey) {
         return;
       }
       evt.preventDefault();
-    });
+    };
+    canvas.addEventListener('contextmenu', handleContextMenu);
 
-    canvas.addEventListener('pointerdown', (evt) => {
+    const handleWheelPointerDown = (evt: PointerEvent) => {
       if (evt.shiftKey) {
         return;
       }
@@ -136,16 +140,19 @@ export function useCanvasEngine({
           wheelRef.current?.hide();
         }
       }
-    });
+    };
+    canvas.addEventListener('pointerdown', handleWheelPointerDown);
 
-    canvas.addEventListener('dragover', (evt) => evt.preventDefault());
+    const handleDragOver = (evt: DragEvent) => evt.preventDefault();
+    canvas.addEventListener('dragover', handleDragOver);
 
-    canvas.addEventListener('drop', (evt) => {
+    const handleDrop = (evt: DragEvent) => {
       evt.preventDefault();
       if (evt.dataTransfer?.files?.length) {
         embedFiles(Array.from(evt.dataTransfer.files), evt.pageX, evt.pageY);
       }
-    });
+    };
+    canvas.addEventListener('drop', handleDrop);
 
     const handlePaste = (evt: ClipboardEvent) => {
       const items = evt.clipboardData?.items;
@@ -206,12 +213,25 @@ export function useCanvasEngine({
 
     let prevTime = 0;
     let animationFrameId: number;
+    let fpsAccum = 0;
+    let fpsFrames = 0;
 
     function animate(time: number) {
       const dt = (time - prevTime) / 1000;
       prevTime = time;
       dc.redraw(dt);
-      setFps(dt > 0 ? Math.round(1 / dt) : 0);
+
+      // Throttle fps state updates to ~2/sec to avoid re-rendering every frame
+      if (dt > 0) {
+        fpsAccum += dt;
+        fpsFrames++;
+        if (fpsAccum >= 0.5) {
+          setFps(Math.round(fpsFrames / fpsAccum));
+          fpsAccum = 0;
+          fpsFrames = 0;
+        }
+      }
+
       animationFrameId = requestAnimationFrame(animate);
     }
 
@@ -245,6 +265,11 @@ export function useCanvasEngine({
 
     FileSystem.loadFromFile(id, dc)
       .then(() => {
+        // Guard against StrictMode double-fire: if this effect was
+        // cleaned up before the async load finished, bail out.
+        if (disposed) {
+          return;
+        }
         // Auto-create a page frame for empty canvases
         if (dc.elements.length === 0) {
           const dpr = window.devicePixelRatio || 1;
@@ -265,21 +290,20 @@ export function useCanvasEngine({
       .catch(console.error);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(animationFrameId);
       unbindKeys();
+      canvas.removeEventListener('contextmenu', handleContextMenu);
+      canvas.removeEventListener('pointerdown', handleWheelPointerDown);
+      canvas.removeEventListener('dragover', handleDragOver);
+      canvas.removeEventListener('drop', handleDrop);
       document.removeEventListener('paste', handlePaste);
       dc.destroy();
     };
-  }, [
-    canvasRef.current,
-    canvasTools,
-    drawableCanvasRef,
-    embedFiles,
-    id,
-    setSelectedToolIndex,
-    wheelRef.current?.hide,
-    wheelRef.current?.show,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- id is the only
+    // real dependency; canvasRef.current is always set before the first effect
+    // runs and the guard above handles the null case.
+  }, [id]);
 
   const commitPageFrameEdit = useCallback(
     (blocks: EditableBlock[]) => {

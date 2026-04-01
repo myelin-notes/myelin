@@ -88,7 +88,7 @@ export function LibraryPage() {
     FileSystem.getManifest().then((manifest) => {
       setRecentFiles(FileSystem.getRecentFiles(manifest, 3));
     });
-  }, []);
+  }, [refreshKey]);
 
   // Update breadcrumbs when folder changes
   useEffect(() => {
