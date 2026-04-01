@@ -24,6 +24,7 @@
     "clsx": "^2.1.1",
     "css-line-break": "^2.1.0",
     "lucide-react": "^0.577.0",
+    "motion": "^12.38.0",
     "perfect-freehand": "^1.2.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

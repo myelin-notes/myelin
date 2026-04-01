@@ -44,11 +44,11 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
                 }
               }}
               onDragStart={handleDragStart}
-              className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-2 transition-colors hover:bg-hover-tint"
+              className="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-2 transition-all duration-200 hover:bg-hover-tint"
             />
           }
         >
-          <FileText className="size-3 shrink-0 text-text-secondary" />
+          <FileText className="size-3 shrink-0 text-text-muted transition-colors duration-200 group-hover:text-text-secondary" />
           {renaming ? (
             <input
               {...renameInputProps}
@@ -56,7 +56,7 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
             />
           ) : (
             <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-normal text-sm text-text-secondary">
+              <span className="truncate font-normal text-sm text-text-secondary transition-colors duration-200 group-hover:text-text-primary">
                 {file.name}
               </span>
               {file.tags.length > 0 && (

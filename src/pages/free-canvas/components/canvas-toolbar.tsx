@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { SlidersHorizontal as SlidersIcon } from 'lucide-react';
+import { motion } from 'motion/react';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
 import {
@@ -59,8 +60,11 @@ export function CanvasToolbar({
 
   return (
     <TooltipProvider>
-      <div
+      <motion.div
         ref={toolbarRef}
+        initial={{ opacity: 0, x: -12 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
         className="absolute top-1/2 left-6 z-10 -translate-y-1/2"
       >
         <div
@@ -153,7 +157,7 @@ export function CanvasToolbar({
             />
           </div>
         )}
-      </div>
+      </motion.div>
     </TooltipProvider>
   );
 }

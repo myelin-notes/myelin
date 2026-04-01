@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import {
   ArrowDownAZ,
   ArrowDownZA,
@@ -175,6 +176,13 @@ export function LibraryPage() {
           Digital Library
         </h1>
 
+        {recentFiles.length === 0 && (
+          <p className="mt-3 max-w-lg font-normal text-sm text-text-muted leading-relaxed">
+            Your personal knowledge workspace. Create a canvas to start
+            collecting ideas, notes, and research.
+          </p>
+        )}
+
         {/* Recently Opened */}
         {recentFiles.length > 0 && (
           <section className="mt-6">
@@ -186,15 +194,26 @@ export function LibraryPage() {
 
             <div className="grid grid-cols-3 gap-4">
               {recentFiles.map((file, i) => (
-                <RecentCard
+                <motion.div
                   key={file.id}
-                  category={fileTypeLabel[file.fileType] ?? file.fileType}
-                  time={formatRelativeTime(file.modifiedAt)}
-                  title={file.name}
-                  tags={file.tags}
-                  featured={i === 0}
-                  onClick={() => navigate(`/${file.fileType}/${file.id}`)}
-                />
+                  className="min-w-0"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.4,
+                    delay: i * 0.08,
+                    ease: [0.25, 0.1, 0.25, 1],
+                  }}
+                >
+                  <RecentCard
+                    category={fileTypeLabel[file.fileType] ?? file.fileType}
+                    time={formatRelativeTime(file.modifiedAt)}
+                    title={file.name}
+                    tags={file.tags}
+                    featured={i === 0}
+                    onClick={() => navigate(`/${file.fileType}/${file.id}`)}
+                  />
+                </motion.div>
               ))}
             </div>
           </section>
@@ -203,7 +222,7 @@ export function LibraryPage() {
         {/* Explorer + Tags */}
         <section className="mt-12 grid grid-cols-12 gap-12">
           <div className="col-span-8 flex flex-col gap-8">
-            <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-1.5 transition-colors hover:bg-hover-tint">
+            <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-1.5 transition-shadow duration-200 hover:bg-hover-tint focus-within:shadow-ambient">
               <Search className="size-3.5 shrink-0 text-text-muted" />
               <input
                 type="text"

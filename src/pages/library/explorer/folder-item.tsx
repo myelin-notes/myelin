@@ -57,7 +57,7 @@ export function FolderItem({
               }}
               onDragStart={handleDragStart}
               {...dropTargetProps}
-              className={`flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
+              className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-all duration-200 ${
                 dragOver
                   ? 'bg-accent/15 ring-1 ring-accent/40'
                   : 'hover:bg-hover-tint'
@@ -65,7 +65,7 @@ export function FolderItem({
             />
           }
         >
-          <Folder className="size-4 shrink-0 fill-amber-400 text-amber-400" />
+          <Folder className="size-4 shrink-0 fill-amber-400 text-amber-400 transition-all duration-200 group-hover:fill-amber-500 group-hover:text-amber-500" />
           {renaming ? (
             <input
               {...renameInputProps}

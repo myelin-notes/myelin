@@ -24,7 +24,7 @@ export function RecentCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'relative flex h-[204px] cursor-pointer flex-col overflow-hidden rounded-xl p-6 text-left transition-all hover:bg-card hover:shadow-ambient',
+        'group relative flex h-[204px] w-full cursor-pointer flex-col overflow-hidden rounded-xl p-6 text-left transition-all duration-300 hover:bg-card hover:shadow-ambient hover:scale-[1.01]',
         featured ? 'bg-card-active' : 'bg-surface',
       )}
     >
@@ -48,7 +48,7 @@ export function RecentCard({
         {category} &bull; {time}
       </span>
 
-      <h4 className="mt-4 font-heading font-normal text-text-primary text-xl leading-7">
+      <h4 className="mt-4 font-heading font-normal text-text-primary text-xl leading-7 transition-colors duration-200 group-hover:text-accent-dark">
         {title}
       </h4>
 
