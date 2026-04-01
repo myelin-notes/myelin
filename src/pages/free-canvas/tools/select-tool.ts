@@ -131,8 +131,11 @@ export class SelectTool implements ITool {
           CollisionHelper.inBox(point, e.boundingBox)
         ) {
           for (const el of canvas.elements) {
-            el.unselect();
+            if (el !== e) {
+              el.unselect();
+            }
           }
+          e.select();
           canvas.enterPageFrameEdit(e);
           this.lastClickTime = 0;
           return;
