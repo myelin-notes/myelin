@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadGoogleFont } from '@/components/tool-options-panel';
 import {
   loadWheelToolIndices,
@@ -127,40 +127,32 @@ export function useToolState(
     () => loadWheelToolIndices(canvasTools.length),
   );
 
-  const wheelItems = useMemo(
-    () => allWheelItems.filter((_, i) => wheelEnabledIndices.has(i)),
-    [allWheelItems, wheelEnabledIndices],
-  );
+  const wheelItems = allWheelItems.filter((_, i) => wheelEnabledIndices.has(i));
 
   // Hide options when switching tools
   useEffect(() => {
     setOptionsVisible(false);
   }, []);
 
-  const activeOptions = useMemo(() => {
-    void optionsTick;
-    const tool = canvasTools[selectedToolIndex];
-    return tool?.getOptions?.() ?? [];
-  }, [selectedToolIndex, optionsTick, canvasTools]);
+  void optionsTick;
+  const tool = canvasTools[selectedToolIndex];
+  const activeOptions = tool?.getOptions?.() ?? [];
 
   const hasOptions = activeOptions.length > 0;
 
-  const handleSetOption = useCallback(
-    (key: string, value: unknown) => {
-      const tool = canvasTools[selectedToolIndex];
-      if (tool?.setOption) {
-        tool.setOption(key, value);
-        setOptionsTick((t) => t + 1);
-        UserPrefs.update('toolOptions', (all) => {
-          const opts = { ...all[tool.label], [key]: value };
-          return { ...all, [tool.label]: opts };
-        });
-      }
-    },
-    [selectedToolIndex, canvasTools],
-  );
+  const handleSetOption = (key: string, value: unknown) => {
+    const tool = canvasTools[selectedToolIndex];
+    if (tool?.setOption) {
+      tool.setOption(key, value);
+      setOptionsTick((t) => t + 1);
+      UserPrefs.update('toolOptions', (all) => {
+        const opts = { ...all[tool.label], [key]: value };
+        return { ...all, [tool.label]: opts };
+      });
+    }
+  };
 
-  const handleToggleWheelTool = useCallback((index: number) => {
+  const handleToggleWheelTool = (index: number) => {
     setWheelEnabledIndices((prev) => {
       const next = new Set(prev);
       if (next.has(index)) {
@@ -171,30 +163,27 @@ export function useToolState(
       saveWheelToolIndices(next);
       return next;
     });
-  }, []);
+  };
 
-  const selectTool = useCallback(
-    (index: number) => {
-      drawableCanvasRef.current?.switchTool(index);
-      setSelectedToolIndex(index);
-      setShelfOpen(false);
-    },
-    [drawableCanvasRef],
-  );
+  const selectTool = (index: number) => {
+    drawableCanvasRef.current?.switchTool(index);
+    setSelectedToolIndex(index);
+    setShelfOpen(false);
+  };
 
-  const toggleOptions = useCallback(() => {
+  const toggleOptions = () => {
     setOptionsVisible((v) => !v);
     setShelfOpen(false);
-  }, []);
+  };
 
-  const toggleShelf = useCallback(() => {
+  const toggleShelf = () => {
     setShelfOpen((v) => !v);
     setOptionsVisible(false);
-  }, []);
+  };
 
-  const closeShelf = useCallback(() => {
+  const closeShelf = () => {
     setShelfOpen(false);
-  }, []);
+  };
 
   return {
     canvasTools,

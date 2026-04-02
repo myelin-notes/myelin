@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -9,9 +9,9 @@ export function useTheme(initial: ThemeMode = 'light') {
     document.documentElement.classList.toggle('dark', mode === 'dark');
   }, [mode]);
 
-  const toggle = useCallback(() => {
+  const toggle = () => {
     setMode((m) => (m === 'light' ? 'dark' : 'light'));
-  }, []);
+  };
 
-  return useMemo(() => ({ mode, setMode, toggle }), [mode, toggle]);
+  return { mode, setMode, toggle };
 }

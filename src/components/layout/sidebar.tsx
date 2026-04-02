@@ -44,8 +44,8 @@ export function Sidebar() {
               className={cn(
                 'group flex items-center gap-3 px-2 py-2 transition-all duration-200',
                 item.active
-                  ? 'border-l-2 border-accent-navy pl-2.5'
-                  : 'border-l-2 border-transparent pl-2.5',
+                  ? 'border-accent-navy border-l-2 pl-2.5'
+                  : 'border-transparent border-l-2 pl-2.5',
               )}
             >
               <span
@@ -62,8 +62,8 @@ export function Sidebar() {
                 className={cn(
                   'text-xs uppercase transition-colors duration-200',
                   item.active
-                    ? 'font-semibold tracking-[0.8px] text-accent-navy'
-                    : 'font-normal tracking-[0.6px] text-text-muted group-hover:text-text-primary',
+                    ? 'font-semibold text-accent-navy tracking-[0.8px]'
+                    : 'font-normal text-text-muted tracking-[0.6px] group-hover:text-text-primary',
                 )}
               >
                 {item.label}

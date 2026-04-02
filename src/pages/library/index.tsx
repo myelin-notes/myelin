@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDownAZ,
   ArrowDownZA,
@@ -8,6 +7,7 @@ import {
   Clock,
   Search,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/sidebar';
 import {
@@ -64,7 +64,7 @@ export function LibraryPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
-  const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
+  const filterTagsArr = [...activeTags];
   const [searchQuery, setSearchQuery] = useState('');
   const sortModes: SortMode[] = [
     'name-asc',
@@ -73,23 +73,22 @@ export function LibraryPage() {
     'created',
   ];
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
-  const cycleSortMode = useCallback(() => {
+  const cycleSortMode = () => {
     setSortMode(
       (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
     );
-    // biome-ignore lint/correctness/useExhaustiveDependencies: sortModes is a static array
-  }, [sortModes]);
+  };
 
-  const triggerRefresh = useCallback(() => {
+  const triggerRefresh = () => {
     setRefreshKey((k) => k + 1);
     explorerRef.current?.reload();
-  }, []);
+  };
 
   useEffect(() => {
     FileSystem.getManifest().then((manifest) => {
       setRecentFiles(FileSystem.getRecentFiles(manifest, 3));
     });
-  }, [refreshKey]);
+  }, []);
 
   // Update breadcrumbs when folder changes
   useEffect(() => {
@@ -102,70 +101,70 @@ export function LibraryPage() {
     });
   }, [currentFolderId]);
 
-  const clearDragTimer = useCallback(() => {
+  const clearDragTimer = () => {
     if (dragTimerRef.current) {
       clearTimeout(dragTimerRef.current);
       dragTimerRef.current = null;
     }
-  }, []);
+  };
 
-  const handleBreadcrumbDrop = useCallback(
-    async (e: React.DragEvent, targetFolderId: string | null) => {
-      e.preventDefault();
-      e.stopPropagation();
-      clearDragTimer();
-      setBreadcrumbDragIdx(null);
+  const handleBreadcrumbDrop = async (
+    e: React.DragEvent,
+    targetFolderId: string | null,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearDragTimer();
+    setBreadcrumbDragIdx(null);
 
-      const raw = e.dataTransfer.getData('application/myelin-item');
-      if (!raw) {
+    const raw = e.dataTransfer.getData('application/myelin-item');
+    if (!raw) {
+      return;
+    }
+
+    const { nodeId } = JSON.parse(raw) as { nodeId: string };
+
+    try {
+      await FileSystem.moveNode(nodeId, targetFolderId);
+      setCurrentFolderId(targetFolderId);
+      triggerRefresh();
+    } catch (err) {
+      console.error('Failed to move item:', err);
+    }
+  };
+
+  const makeBreadcrumbDragHandlers = (
+    targetFolderId: string | null,
+    idx: number,
+  ) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes('application/myelin-item')) {
         return;
       }
-
-      const { nodeId } = JSON.parse(raw) as { nodeId: string };
-
-      try {
-        await FileSystem.moveNode(nodeId, targetFolderId);
-        setCurrentFolderId(targetFolderId);
-        triggerRefresh();
-      } catch (err) {
-        console.error('Failed to move item:', err);
-      }
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
     },
-    [clearDragTimer, triggerRefresh],
-  );
-
-  const makeBreadcrumbDragHandlers = useCallback(
-    (targetFolderId: string | null, idx: number) => ({
-      onDragOver: (e: React.DragEvent) => {
-        if (!e.dataTransfer.types.includes('application/myelin-item')) {
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = 'move';
-      },
-      onDragEnter: (e: React.DragEvent) => {
-        if (!e.dataTransfer.types.includes('application/myelin-item')) {
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        setBreadcrumbDragIdx(idx);
-        clearDragTimer();
-        dragTimerRef.current = setTimeout(() => {
-          setCurrentFolderId(targetFolderId);
-          setBreadcrumbDragIdx(null);
-        }, 800);
-      },
-      onDragLeave: (e: React.DragEvent) => {
-        e.stopPropagation();
-        setBreadcrumbDragIdx((prev) => (prev === idx ? null : prev));
-        clearDragTimer();
-      },
-      onDrop: (e: React.DragEvent) => handleBreadcrumbDrop(e, targetFolderId),
-    }),
-    [clearDragTimer, handleBreadcrumbDrop],
-  );
+    onDragEnter: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes('application/myelin-item')) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      setBreadcrumbDragIdx(idx);
+      clearDragTimer();
+      dragTimerRef.current = setTimeout(() => {
+        setCurrentFolderId(targetFolderId);
+        setBreadcrumbDragIdx(null);
+      }, 800);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      e.stopPropagation();
+      setBreadcrumbDragIdx((prev) => (prev === idx ? null : prev));
+      clearDragTimer();
+    },
+    onDrop: (e: React.DragEvent) => handleBreadcrumbDrop(e, targetFolderId),
+  });
 
   return (
     <div className="relative flex h-full w-full bg-page">
@@ -222,7 +221,7 @@ export function LibraryPage() {
         {/* Explorer + Tags */}
         <section className="mt-12 grid grid-cols-12 gap-12">
           <div className="col-span-8 flex flex-col gap-8">
-            <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-1.5 transition-shadow duration-200 hover:bg-hover-tint focus-within:shadow-ambient">
+            <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-1.5 transition-shadow duration-200 focus-within:shadow-ambient hover:bg-hover-tint">
               <Search className="size-3.5 shrink-0 text-text-muted" />
               <input
                 type="text"

@@ -113,10 +113,7 @@ export function PageFrameDomLayer({
       // that scroll into the canvas viewport offset so the canvas selection
       // overlay stays in sync with the DOM layer.
       if (container.scrollTop !== 0 || container.scrollLeft !== 0) {
-        dc.panBy(
-          -container.scrollLeft / zoom,
-          -container.scrollTop / zoom,
-        );
+        dc.panBy(-container.scrollLeft / zoom, -container.scrollTop / zoom);
         container.scrollTop = 0;
         container.scrollLeft = 0;
       }

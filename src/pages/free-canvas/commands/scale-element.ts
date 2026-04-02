@@ -1,6 +1,6 @@
 import type { UndoCommand } from '../../../lib/utils/undo-redo';
-import type { DrawableElement } from '../elements/drawable-element';
 import type { Vector2 } from '../drawable-canvas';
+import type { DrawableElement } from '../elements/drawable-element';
 
 export class ScaleElementCommand implements UndoCommand {
   constructor(

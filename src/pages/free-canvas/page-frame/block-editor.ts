@@ -7,13 +7,19 @@ export interface EditableBlock {
 
 export class BlockEditor {
   private _blocks: EditableBlock[] = [];
+  private _version = 0;
 
   get blocks(): EditableBlock[] {
     return this._blocks;
   }
 
+  get version(): number {
+    return this._version;
+  }
+
   setBlocks(blocks: EditableBlock[]): void {
     this._blocks = blocks.map((b) => ({ ...b }));
+    this._version++;
   }
 
   snapshotBlocks(): EditableBlock[] {

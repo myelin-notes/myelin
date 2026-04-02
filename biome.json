@@ -90,7 +90,7 @@
         "useValidForDirection": "error",
         "useValidTypeof": "error",
         "useYield": "error",
-        "useExhaustiveDependencies": "error"
+        "useExhaustiveDependencies": "off"
       },
       "suspicious": {
         "noArrayIndexKey": "off",

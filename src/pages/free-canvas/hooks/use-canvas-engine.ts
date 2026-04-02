@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { keybindings } from '@/lib/keybindings';
@@ -58,22 +58,23 @@ export function useCanvasEngine({
   const [editingPageFrame, setEditingPageFrame] =
     useState<PageFrameElement | null>(null);
 
-  const embedFiles = useCallback(
-    (files: FileList | File[], screenX?: number, screenY?: number) => {
-      const dc = drawableCanvasRef.current;
-      if (!dc) {
-        return;
+  const embedFiles = (
+    files: FileList | File[],
+    screenX?: number,
+    screenY?: number,
+  ) => {
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
+    }
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        dc.addImageFromBlob(file, screenX, screenY);
       }
-      for (const file of files) {
-        if (file.type.startsWith('image/')) {
-          dc.addImageFromBlob(file, screenX, screenY);
-        }
-      }
-    },
-    [drawableCanvasRef],
-  );
+    }
+  };
 
-  const autoSave = useCallback(async () => {
+  const autoSave = async () => {
     if (!(drawableCanvasRef.current && canvasRef.current && id)) {
       return;
     }
@@ -89,15 +90,15 @@ export function useCanvasEngine({
         resolve();
       }, 'image/png');
     });
-  }, [id, drawableCanvasRef, canvasRef]);
+  };
 
   const navigate = useNavigate();
 
-  const back = useCallback(async () => {
+  const back = async () => {
     await autoSave();
     drawableCanvasRef.current?.collapse();
     navigate('/library');
-  }, [autoSave, navigate, drawableCanvasRef]);
+  };
 
   // Load file name
   useEffect(() => {
@@ -112,7 +113,6 @@ export function useCanvasEngine({
   }, [id]);
 
   // Initialize canvas, event listeners, animation loop, and keybindings
-  // biome-ignore lint/correctness/useExhaustiveDependencies: useless dependencies
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!(canvas && id)) {
@@ -305,28 +305,22 @@ export function useCanvasEngine({
     // runs and the guard above handles the null case.
   }, [id]);
 
-  const commitPageFrameEdit = useCallback(
-    (blocks: EditableBlock[]) => {
-      drawableCanvasRef.current?.exitPageFrameEdit(blocks);
-    },
-    [drawableCanvasRef],
-  );
+  const commitPageFrameEdit = (blocks: EditableBlock[]) => {
+    drawableCanvasRef.current?.exitPageFrameEdit(blocks);
+  };
 
-  const handleFileInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.currentTarget.files;
-      if (files?.length) {
-        embedFiles(
-          Array.from(files),
-          pendingEmbedPos.current?.x,
-          pendingEmbedPos.current?.y,
-        );
-      }
-      e.currentTarget.value = '';
-      pendingEmbedPos.current = null;
-    },
-    [embedFiles],
-  );
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.currentTarget.files;
+    if (files?.length) {
+      embedFiles(
+        Array.from(files),
+        pendingEmbedPos.current?.x,
+        pendingEmbedPos.current?.y,
+      );
+    }
+    e.currentTarget.value = '';
+    pendingEmbedPos.current = null;
+  };
 
   return {
     fileInputRef,
