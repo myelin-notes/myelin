@@ -1,15 +1,40 @@
 import { BlockType, BlockTypeRegistry } from '../block-types';
 import { getBlockStyle, getBlockText, readBlockType } from './block-dom';
 
+// ── Helpers ─────────────────────────────────────────────────
+
+/** Clear all inline styles and apply the styles for the given block type. */
+function setBlockType(div: HTMLDivElement, type: BlockType): void {
+  div.dataset.blockType = String(type);
+  div.style.cssText = '';
+  Object.assign(div.style, getBlockStyle(type));
+}
+
+function placeCursorAtEnd(div: HTMLDivElement): void {
+  const sel = window.getSelection();
+  if (sel) {
+    const range = document.createRange();
+    range.selectNodeContents(div);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
 // ── Markdown shortcuts ───────────────────────────────────────
 
 export function checkMarkdownShortcut(div: HTMLDivElement): boolean {
+  // Only trigger on plain paragraph blocks — prevents re-triggering on
+  // already-styled blocks whose state was corrupted by contentEditable.
+  if (readBlockType(div) !== BlockType.PARAGRAPH) {
+    return false;
+  }
+
   const text = div.textContent ?? '';
   for (const [type, def] of BlockTypeRegistry.all()) {
     const trigger = def.markdownTrigger;
     if (trigger?.test(text)) {
-      div.dataset.blockType = String(type);
-      Object.assign(div.style, getBlockStyle(type));
+      setBlockType(div, type);
 
       div.innerHTML = '';
       const decoration = def.createDecoration();
@@ -18,18 +43,74 @@ export function checkMarkdownShortcut(div: HTMLDivElement): boolean {
       }
       div.appendChild(document.createElement('br'));
 
-      const sel = window.getSelection();
-      if (sel) {
-        const range = document.createRange();
-        range.selectNodeContents(div);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
+      placeCursorAtEnd(div);
       return true;
     }
   }
   return false;
+}
+
+// ── Backspace handling ──────────────────────────────────────
+
+/**
+ * On Backspace in an empty non-paragraph block, revert it to a plain paragraph.
+ * Returns true if the event was handled (caller should skip default behavior).
+ */
+export function handleBackspace(
+  e: KeyboardEvent,
+  container: HTMLDivElement,
+): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.getRangeAt(0).collapsed) {
+    return false;
+  }
+
+  const range = sel.getRangeAt(0);
+
+  let currentDiv: HTMLDivElement | null = null;
+  let node: Node | null = range.startContainer;
+  while (node && node !== container) {
+    if (
+      node instanceof HTMLDivElement &&
+      node.parentElement === container &&
+      !node.dataset.pageBreak
+    ) {
+      currentDiv = node;
+      break;
+    }
+    node = node.parentNode;
+  }
+  if (!currentDiv) {
+    return false;
+  }
+
+  const blockType = readBlockType(currentDiv);
+  if (blockType === BlockType.PARAGRAPH) {
+    return false;
+  }
+
+  if (getBlockText(currentDiv).length > 0) {
+    return false;
+  }
+
+  e.preventDefault();
+
+  setBlockType(currentDiv, BlockType.PARAGRAPH);
+
+  // Remove decorations
+  for (const child of Array.from(currentDiv.childNodes)) {
+    if (child instanceof HTMLElement && child.contentEditable === 'false') {
+      child.remove();
+    }
+  }
+
+  // Ensure <br> placeholder
+  if (!currentDiv.querySelector('br')) {
+    currentDiv.appendChild(document.createElement('br'));
+  }
+
+  placeCursorAtEnd(currentDiv);
+  return true;
 }
 
 // ── Enter key ────────────────────────────────────────────────
@@ -103,8 +184,7 @@ export function handleEnterKey(
 
   // Empty continuing block (e.g., empty list item) reverts to paragraph
   if (def.continuesOnEnter && !hasTextLeft) {
-    currentDiv.dataset.blockType = String(BlockType.PARAGRAPH);
-    Object.assign(currentDiv.style, getBlockStyle(BlockType.PARAGRAPH));
+    setBlockType(currentDiv, BlockType.PARAGRAPH);
     for (const child of Array.from(currentDiv.childNodes)) {
       if (child instanceof HTMLElement && child.contentEditable === 'false') {
         child.remove();
@@ -121,8 +201,7 @@ export function handleEnterKey(
   const newType = def.continuesOnEnter ? blockType : BlockType.PARAGRAPH;
   const newDef = BlockTypeRegistry.get(newType);
   const newDiv = document.createElement('div');
-  newDiv.dataset.blockType = String(newType);
-  Object.assign(newDiv.style, getBlockStyle(newType));
+  setBlockType(newDiv, newType);
 
   const decoration = newDef.createDecoration();
   if (decoration) {

@@ -38,6 +38,7 @@ interface UseCanvasEngineArgs {
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
   setSelectedToolIndex: (i: number) => void;
+  onCanvasPointerDown: () => void;
 }
 
 export function useCanvasEngine({
@@ -47,9 +48,12 @@ export function useCanvasEngine({
   drawableCanvasRef,
   canvasTools,
   setSelectedToolIndex,
+  onCanvasPointerDown,
 }: UseCanvasEngineArgs) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingEmbedPos = useRef<Vector2 | null>(null);
+  const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
+  onCanvasPointerDownRef.current = onCanvasPointerDown;
 
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
@@ -129,7 +133,8 @@ export function useCanvasEngine({
     };
     canvas.addEventListener('contextmenu', handleContextMenu);
 
-    const handleWheelPointerDown = (evt: PointerEvent) => {
+    const handleCanvasPointerDown = (evt: PointerEvent) => {
+      onCanvasPointerDownRef.current();
       if (evt.shiftKey) {
         return;
       }
@@ -141,7 +146,7 @@ export function useCanvasEngine({
         }
       }
     };
-    canvas.addEventListener('pointerdown', handleWheelPointerDown);
+    canvas.addEventListener('pointerdown', handleCanvasPointerDown);
 
     const handleDragOver = (evt: DragEvent) => evt.preventDefault();
     canvas.addEventListener('dragover', handleDragOver);
@@ -294,7 +299,7 @@ export function useCanvasEngine({
       cancelAnimationFrame(animationFrameId);
       unbindKeys();
       canvas.removeEventListener('contextmenu', handleContextMenu);
-      canvas.removeEventListener('pointerdown', handleWheelPointerDown);
+      canvas.removeEventListener('pointerdown', handleCanvasPointerDown);
       canvas.removeEventListener('dragover', handleDragOver);
       canvas.removeEventListener('drop', handleDrop);
       document.removeEventListener('paste', handlePaste);

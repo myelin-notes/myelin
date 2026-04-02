@@ -24,6 +24,7 @@ export function CanvasView() {
     drawableCanvasRef,
     canvasTools: toolState.canvasTools,
     setSelectedToolIndex: toolState.setSelectedToolIndex,
+    onCanvasPointerDown: toolState.hideOptions,
   });
 
   return (

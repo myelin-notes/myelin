@@ -3,7 +3,11 @@ import type { DrawableCanvas } from '../../drawable-canvas';
 import type { PageFrameElement } from '../../elements/page-frame-element';
 import type { EditableBlock } from '../block-editor';
 import { blocksToDOM, domToBlocks } from './block-dom';
-import { checkMarkdownShortcut, handleEnterKey } from './block-editing';
+import {
+  checkMarkdownShortcut,
+  handleBackspace,
+  handleEnterKey,
+} from './block-editing';
 import { flatStyle } from './flat-style';
 import {
   CONTENT_STYLE,
@@ -191,6 +195,12 @@ export function PageFrameDomLayer({
         e.stopPropagation();
         commitEdit();
         return;
+      }
+      if (e.key === 'Backspace') {
+        if (handleBackspace(e, refs.contentDiv)) {
+          repaginate();
+          return;
+        }
       }
       if (e.key === 'Enter' && !e.shiftKey) {
         handleEnterKey(e, refs.contentDiv);

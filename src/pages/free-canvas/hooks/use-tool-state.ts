@@ -169,11 +169,18 @@ export function useToolState(
     drawableCanvasRef.current?.switchTool(index);
     setSelectedToolIndex(index);
     setShelfOpen(false);
+    const toolHasOptions =
+      (canvasTools[index]?.getOptions?.()?.length ?? 0) > 0;
+    setOptionsVisible(toolHasOptions);
   };
 
   const toggleOptions = () => {
     setOptionsVisible((v) => !v);
     setShelfOpen(false);
+  };
+
+  const hideOptions = () => {
+    setOptionsVisible(false);
   };
 
   const toggleShelf = () => {
@@ -198,6 +205,7 @@ export function useToolState(
     activeOptions,
     hasOptions,
     handleSetOption,
+    hideOptions,
     wheelItems,
     wheelEnabledIndices,
     handleToggleWheelTool,

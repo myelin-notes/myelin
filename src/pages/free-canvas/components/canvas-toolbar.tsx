@@ -81,7 +81,7 @@ export function CanvasToolbar({
                   ref={(el) => {
                     toolButtonRefs.current[index] = el;
                   }}
-                  className={`relative cursor-pointer rounded-xl p-2.5 transition-colors ${
+                  className={`group relative cursor-pointer rounded-xl p-2.5 transition-colors ${
                     isActive
                       ? 'bg-accent-dark text-white'
                       : 'bg-transparent text-text-secondary hover:bg-hover-tint'
@@ -95,8 +95,14 @@ export function CanvasToolbar({
                   }}
                 >
                   <Icon className="size-4" />
-                  {isActive && toolHasOptions && !optionsVisible && (
-                    <span className="absolute top-1/2 -right-0.5 size-1 -translate-y-1/2 rounded-full bg-white/70" />
+                  {toolHasOptions && (
+                    <span
+                      className={`absolute bottom-1 left-1/2 h-[2px] w-3 -translate-x-1/2 rounded-full transition-opacity ${
+                        isActive
+                          ? 'bg-white/60'
+                          : 'bg-current opacity-0 group-hover:opacity-20'
+                      }`}
+                    />
                   )}
                 </TooltipTrigger>
                 <TooltipContent side="right">
