@@ -493,15 +493,13 @@ export class DrawableCanvas implements ISerializable {
   private buildDotPattern() {
     const spacing = 24;
     const dotRadius = 0.75;
-    const patternCanvas = document.createElement('canvas');
-    patternCanvas.width = spacing;
-    patternCanvas.height = spacing;
-    const pctx = patternCanvas.getContext('2d')!;
+    const tile = new OffscreenCanvas(spacing, spacing);
+    const pctx = tile.getContext('2d')!;
     pctx.fillStyle = 'rgba(195, 199, 202, 0.35)';
     pctx.beginPath();
     pctx.arc(spacing / 2, spacing / 2, dotRadius, 0, Math.PI * 2);
     pctx.fill();
-    this.dotPattern = this.ctx.createPattern(patternCanvas, 'repeat');
+    this.dotPattern = this.ctx.createPattern(tile, 'repeat');
   }
 
   private resizeCanvas(width: number, height: number) {

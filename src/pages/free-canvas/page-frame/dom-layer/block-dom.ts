@@ -1,7 +1,6 @@
 import { LINE_HEIGHT } from '../../elements/text-layout';
 import type { EditableBlock } from '../block-editor';
 import { BlockType, BlockTypeRegistry } from '../block-types';
-import { flatStyle } from './flat-style';
 
 // ── Block styles ────────────────────────────────────────────
 
@@ -22,13 +21,11 @@ for (const [type, def] of BlockTypeRegistry.all()) {
   });
 }
 
-export function getBlockStyle(type: BlockType): Record<string, string> {
-  const base = flatStyle(
-    BLOCK_BASE_STYLES.get(type) ?? BLOCK_BASE_STYLES.get(BlockType.PARAGRAPH)!,
-  );
-  const def = BlockTypeRegistry.get(type);
-  const css = def.style.css ? flatStyle(def.style.css) : {};
-  return { ...base, ...css };
+export function getBlockStyle(type: BlockType): React.CSSProperties {
+  const base =
+    BLOCK_BASE_STYLES.get(type) ?? BLOCK_BASE_STYLES.get(BlockType.PARAGRAPH)!;
+  const css = BlockTypeRegistry.get(type).style.css;
+  return css ? { ...base, ...css } : base;
 }
 
 // ── DOM helpers ─────────────────────────────────────────────
@@ -69,25 +66,7 @@ export function createBlockElement(block: EditableBlock): HTMLDivElement {
     div.appendChild(decoration);
   }
 
-  if (block.type === BlockType.CODE_BLOCK) {
-    // Code blocks use <br> for line breaks; always end with a placeholder <br>.
-    if (block.text) {
-      const parts = block.text.split('\n');
-      for (let i = 0; i < parts.length; i++) {
-        if (i > 0) {
-          div.appendChild(document.createElement('br'));
-        }
-        if (parts[i]) {
-          div.appendChild(document.createTextNode(parts[i]));
-        }
-      }
-    }
-    div.appendChild(document.createElement('br'));
-  } else if (block.text) {
-    div.appendChild(document.createTextNode(block.text));
-  } else {
-    div.appendChild(document.createElement('br'));
-  }
+  def.populateElement(div, block.text);
   return div;
 }
 
@@ -101,39 +80,10 @@ export function domToBlocks(container: HTMLDivElement): EditableBlock[] {
       continue;
     }
     const type = readBlockType(child);
-    const isCode = type === BlockType.CODE_BLOCK;
-    let text = '';
-    for (const node of child.childNodes) {
-      if (node instanceof HTMLElement && node.contentEditable === 'false') {
-        continue;
-      }
-      if (node instanceof HTMLBRElement) {
-        if (isCode) {
-          text += '\n';
-        }
-        continue;
-      }
-      text += node.textContent ?? '';
-    }
-    // Trim the trailing placeholder \n that code blocks always have.
-    if (isCode && text.endsWith('\n')) {
-      text = text.slice(0, -1);
-    }
+    const text = BlockTypeRegistry.get(type).readText(child);
+
     blocks.push({ type, text });
   }
   return blocks.length > 0 ? blocks : [{ type: BlockType.PARAGRAPH, text: '' }];
 }
 
-export function getBlockText(div: HTMLDivElement): string {
-  let text = '';
-  for (const node of div.childNodes) {
-    if (node instanceof HTMLElement && node.contentEditable === 'false') {
-      continue;
-    }
-    if (node instanceof HTMLBRElement) {
-      continue;
-    }
-    text += node.textContent ?? '';
-  }
-  return text;
-}

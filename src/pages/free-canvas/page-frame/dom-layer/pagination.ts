@@ -6,7 +6,6 @@ import {
   PAGE_WIDTH,
   type PageFrameElement,
 } from '../../elements/page-frame-element';
-import { flatStyle } from './flat-style';
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -24,7 +23,7 @@ export const FRAME_STYLE: React.CSSProperties = {
   overflow: 'hidden',
 };
 
-export const PAGE_CHROME_CSS = flatStyle({
+export const PAGE_CHROME_CSS: React.CSSProperties = {
   position: 'absolute',
   left: 0,
   width: PAGE_WIDTH,
@@ -34,7 +33,7 @@ export const PAGE_CHROME_CSS = flatStyle({
   boxShadow: '0 4px 24px rgba(25, 28, 30, 0.08)',
   border: '0.5px solid rgba(195, 199, 202, 0.2)',
   pointerEvents: 'none',
-} as React.CSSProperties);
+};
 
 export const CONTENT_STYLE: React.CSSProperties = {
   position: 'relative',

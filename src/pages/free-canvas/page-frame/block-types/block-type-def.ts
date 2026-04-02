@@ -6,7 +6,6 @@ export enum BlockType {
   HEADING_3 = 3,
   LIST_ITEM = 4,
   BLOCKQUOTE = 5,
-  CODE_BLOCK = 6,
 }
 
 export interface BlockStyle {
@@ -32,14 +31,33 @@ export abstract class BlockTypeDef {
     return false;
   }
 
-  /** If true, Enter inserts a newline within this block instead of creating a new block. */
-  get capturesEnter(): boolean {
-    return false;
-  }
-
   /** Create a non-editable decoration element (e.g., bullet) to prepend to the block. */
   createDecoration(): HTMLElement | null {
     return null;
+  }
+
+  /** Populate a block div with text content (appended after any decoration). */
+  populateElement(div: HTMLDivElement, text: string): void {
+    if (text) {
+      div.appendChild(document.createTextNode(text));
+    } else {
+      div.appendChild(document.createElement('br'));
+    }
+  }
+
+  /** Read text content from a block div's DOM nodes. */
+  readText(div: HTMLDivElement): string {
+    let text = '';
+    for (const node of div.childNodes) {
+      if (node instanceof HTMLElement && node.contentEditable === 'false') {
+        continue;
+      }
+      if (node instanceof HTMLBRElement) {
+        continue;
+      }
+      text += node.textContent ?? '';
+    }
+    return text;
   }
 }
 

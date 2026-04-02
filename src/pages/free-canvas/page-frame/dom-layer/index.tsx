@@ -6,11 +6,9 @@ import { blocksToDOM, domToBlocks } from './block-dom';
 import {
   checkMarkdownShortcut,
   handleBackspace,
-  handleCodeBlockExit,
   handleCrossBlockInput,
   handleEnterKey,
 } from './block-editing';
-import { flatStyle } from './flat-style';
 import {
   CONTENT_STYLE,
   FRAME_STYLE,
@@ -70,11 +68,11 @@ export function PageFrameDomLayer({
 
         if (!frameMap.current.has(frame.index)) {
           const frameDiv = document.createElement('div');
-          Object.assign(frameDiv.style, flatStyle(FRAME_STYLE));
+          Object.assign(frameDiv.style, FRAME_STYLE);
           frameDiv.dataset.frameIndex = String(frame.index);
 
           const contentDiv = document.createElement('div');
-          Object.assign(contentDiv.style, flatStyle(CONTENT_STYLE));
+          Object.assign(contentDiv.style, CONTENT_STYLE);
           contentDiv.contentEditable = 'false';
 
           frameDiv.appendChild(contentDiv);
@@ -142,10 +140,11 @@ export function PageFrameDomLayer({
       return;
     }
 
-    const refs = frameMap.current.get(editingElement.index);
-    if (!refs) {
+    const maybeRefs = frameMap.current.get(editingElement.index);
+    if (!maybeRefs) {
       return;
     }
+    const refs = maybeRefs;
 
     refs.frameDiv.style.zIndex = '10';
     refs.frameDiv.style.pointerEvents = 'auto';
@@ -169,21 +168,28 @@ export function PageFrameDomLayer({
     }
 
     const repaginate = () => paginateFrame(refs, editingElement);
+
+    function findBlockDivFromNode(node: Node): HTMLDivElement | null {
+      let n: Node | null = node;
+      while (n && n !== refs.contentDiv) {
+        if (
+          n instanceof HTMLDivElement &&
+          n.parentElement === refs.contentDiv &&
+          !n.dataset.pageBreak
+        ) {
+          return n;
+        }
+        n = n.parentNode;
+      }
+      return null;
+    }
+
+    // ── Event handlers ──────────────────────────────────────
+
     const handleInput = () => {
       const focusNode = window.getSelection()?.focusNode;
       if (focusNode) {
-        let div: HTMLDivElement | null = null;
-        let n: Node | null = focusNode;
-        while (n && n !== refs.contentDiv) {
-          if (
-            n instanceof HTMLDivElement &&
-            n.parentElement === refs.contentDiv
-          ) {
-            div = n;
-            break;
-          }
-          n = n.parentNode;
-        }
+        const div = findBlockDivFromNode(focusNode);
         if (div) {
           checkMarkdownShortcut(div);
         }
@@ -204,24 +210,10 @@ export function PageFrameDomLayer({
           return;
         }
       }
-      // Mod+Enter — exit code block to paragraph below
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-        if (handleCodeBlockExit(e, refs.contentDiv)) {
-          repaginate();
-          return;
-        }
-      }
       if (e.key === 'Enter' && !e.shiftKey) {
         handleEnterKey(e, refs.contentDiv);
         repaginate();
         return;
-      }
-      // ArrowDown on last line of code block — exit to paragraph below
-      if (e.key === 'ArrowDown') {
-        if (handleCodeBlockExit(e, refs.contentDiv, true)) {
-          repaginate();
-          return;
-        }
       }
     };
 
