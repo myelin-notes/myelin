@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { SlidersHorizontal as SlidersIcon } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
 import {
@@ -137,17 +137,24 @@ export function CanvasToolbar({
           </Tooltip>
         </div>
 
-        {optionsVisible && hasOptions && !shelfOpen && (
-          <div
-            className="absolute top-0 left-full ml-2"
-            style={{ paddingTop: optionsPanelOffset }}
-          >
-            <ToolOptionsPanel
-              options={activeOptions}
-              onSetOption={onSetOption}
-            />
-          </div>
-        )}
+        <AnimatePresence>
+          {optionsVisible && hasOptions && !shelfOpen && (
+            <motion.div
+              key={selectedToolIndex}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+              className="absolute top-0 left-full ml-2"
+              style={{ paddingTop: optionsPanelOffset }}
+            >
+              <ToolOptionsPanel
+                options={activeOptions}
+                onSetOption={onSetOption}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {shelfOpen && (
           <div
