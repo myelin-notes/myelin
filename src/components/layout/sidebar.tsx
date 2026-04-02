@@ -5,17 +5,11 @@ interface NavItem {
   label: string;
   icon?: React.ReactNode;
   active?: boolean;
-  small?: boolean;
 }
 
 const mainNav: NavItem[] = [
   { label: 'Library', icon: <BookOpen className="size-4" />, active: true },
   { label: 'Graph', icon: <Waypoints className="size-5" /> },
-];
-
-const secondaryNav: NavItem[] = [
-  { label: 'Recently Opened', small: true },
-  { label: 'Favorites', small: true },
 ];
 
 const bottomNav: NavItem[] = [
@@ -24,6 +18,7 @@ const bottomNav: NavItem[] = [
 ];
 
 export function Sidebar() {
+
   return (
     <aside className="fixed top-0 bottom-0 left-0 z-20 flex w-64 flex-col bg-sidebar-bg p-6">
       {/* Brand */}
@@ -42,7 +37,7 @@ export function Sidebar() {
               key={item.label}
               href="#"
               className={cn(
-                'group flex items-center gap-3 px-2 py-2 transition-all duration-200',
+                'group flex items-center gap-3 px-2 py-2 transition-all duration-150',
                 item.active
                   ? 'border-accent-navy border-l-2 pl-2.5'
                   : 'border-transparent border-l-2 pl-2.5',
@@ -50,7 +45,7 @@ export function Sidebar() {
             >
               <span
                 className={cn(
-                  'transition-colors duration-200',
+                  'transition-colors duration-150',
                   item.active
                     ? 'text-accent-navy'
                     : 'text-text-muted group-hover:text-text-secondary',
@@ -60,27 +55,12 @@ export function Sidebar() {
               </span>
               <span
                 className={cn(
-                  'text-xs uppercase transition-colors duration-200',
+                  'text-xs uppercase transition-colors duration-150',
                   item.active
                     ? 'font-semibold text-accent-navy tracking-[0.8px]'
                     : 'font-normal text-text-muted tracking-[0.6px] group-hover:text-text-primary',
                 )}
               >
-                {item.label}
-              </span>
-            </a>
-          ))}
-        </div>
-
-        {/* Secondary Nav */}
-        <div className="mt-2 flex flex-col">
-          {secondaryNav.map((item) => (
-            <a
-              key={item.label}
-              href="#"
-              className="group flex items-center px-2 py-2"
-            >
-              <span className="font-normal text-[10px] text-text-muted uppercase tracking-[0.6px] transition-colors duration-200 group-hover:text-text-secondary">
                 {item.label}
               </span>
             </a>
@@ -96,12 +76,12 @@ export function Sidebar() {
             <a
               key={item.label}
               href="#"
-              className="group flex items-center gap-3 px-2 py-2 transition-all duration-200"
+              className="group flex items-center gap-3 px-2 py-2 transition-all duration-150"
             >
-              <span className="text-text-muted transition-colors duration-200 group-hover:text-text-secondary">
+              <span className="text-text-muted transition-colors duration-150 group-hover:text-text-secondary">
                 {item.icon}
               </span>
-              <span className="font-normal text-text-muted text-xs uppercase tracking-[0.6px] transition-colors duration-200 group-hover:text-text-primary">
+              <span className="font-normal text-text-muted text-xs uppercase tracking-[0.6px] transition-colors duration-150 group-hover:text-text-primary">
                 {item.label}
               </span>
             </a>
