@@ -1,5 +1,7 @@
-import { BookOpen, HelpCircle, Settings, Waypoints } from 'lucide-react';
+import { BookOpen, HelpCircle, Plus, Settings, Waypoints } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { FileSystem } from '@/lib/utils/file-system';
 
 interface NavItem {
   label: string;
@@ -18,6 +20,13 @@ const bottomNav: NavItem[] = [
 ];
 
 export function Sidebar() {
+  const navigate = useNavigate();
+
+  const handleNewCanvas = async () => {
+    const name = await FileSystem.getUniqueFileName('Untitled Canvas', null);
+    const id = await FileSystem.createFile(name, 'mcanvas', null);
+    navigate(`/mcanvas/${id}`);
+  };
 
   return (
     <aside className="fixed top-0 bottom-0 left-0 z-20 flex w-64 flex-col bg-sidebar-bg p-6">
@@ -29,8 +38,20 @@ export function Sidebar() {
         </span>
       </div>
 
+      {/* New Canvas */}
+      <button
+        type="button"
+        onClick={handleNewCanvas}
+        className="group flex cursor-pointer items-center justify-center gap-2 rounded-md bg-gradient-to-b from-primary-container to-accent-dark px-4 py-2.5 transition-all duration-150 hover:brightness-125"
+      >
+        <Plus className="size-3.5 text-text-on-dark transition-transform duration-150 group-hover:rotate-90" />
+        <span className="font-medium text-text-on-dark text-xs uppercase tracking-[0.6px]">
+          New Canvas
+        </span>
+      </button>
+
       {/* Main Nav */}
-      <nav className="flex flex-1 flex-col pt-4">
+      <nav className="flex flex-1 flex-col pt-6">
         <div className="flex flex-col">
           {mainNav.map((item) => (
             <a

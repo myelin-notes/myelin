@@ -6,6 +6,7 @@ export enum BlockType {
   HEADING_3 = 3,
   LIST_ITEM = 4,
   BLOCKQUOTE = 5,
+  CODE_BLOCK = 6,
 }
 
 export interface BlockStyle {
@@ -28,6 +29,11 @@ export abstract class BlockTypeDef {
 
   /** If true, pressing Enter at the end of this block creates another of the same type. */
   get continuesOnEnter(): boolean {
+    return false;
+  }
+
+  /** If true, Enter inserts a newline within this block instead of creating a new block. */
+  get capturesEnter(): boolean {
     return false;
   }
 

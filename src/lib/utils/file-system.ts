@@ -473,8 +473,11 @@ export namespace FileSystem {
     if (!node || node.tags.includes(tag)) {
       return;
     }
-    node.tags.push(tag);
-    node.modifiedAt = Date.now();
+    manifest.nodes[nodeId] = {
+      ...node,
+      tags: [...node.tags, tag],
+      modifiedAt: Date.now(),
+    };
     await saveManifest(manifest);
   }
 
@@ -484,8 +487,11 @@ export namespace FileSystem {
     if (!node) {
       return;
     }
-    node.tags = node.tags.filter((t) => t !== tag);
-    node.modifiedAt = Date.now();
+    manifest.nodes[nodeId] = {
+      ...node,
+      tags: node.tags.filter((t) => t !== tag),
+      modifiedAt: Date.now(),
+    };
     await saveManifest(manifest);
   }
 

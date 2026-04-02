@@ -6,6 +6,8 @@ import { blocksToDOM, domToBlocks } from './block-dom';
 import {
   checkMarkdownShortcut,
   handleBackspace,
+  handleCodeBlockExit,
+  handleCrossBlockInput,
   handleEnterKey,
 } from './block-editing';
 import { flatStyle } from './flat-style';
@@ -202,19 +204,41 @@ export function PageFrameDomLayer({
           return;
         }
       }
+      // Mod+Enter — exit code block to paragraph below
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        if (handleCodeBlockExit(e, refs.contentDiv)) {
+          repaginate();
+          return;
+        }
+      }
       if (e.key === 'Enter' && !e.shiftKey) {
         handleEnterKey(e, refs.contentDiv);
         repaginate();
         return;
       }
+      // ArrowDown on last line of code block — exit to paragraph below
+      if (e.key === 'ArrowDown') {
+        if (handleCodeBlockExit(e, refs.contentDiv, true)) {
+          repaginate();
+          return;
+        }
+      }
     };
 
+    const handleBeforeInput = (e: Event) => {
+      if (handleCrossBlockInput(e as InputEvent, refs.contentDiv)) {
+        repaginate();
+      }
+    };
+
+    refs.contentDiv.addEventListener('beforeinput', handleBeforeInput);
     refs.contentDiv.addEventListener('input', handleInput);
     refs.contentDiv.addEventListener('keydown', handleKeyDown);
 
     repaginate();
 
     return () => {
+      refs.contentDiv.removeEventListener('beforeinput', handleBeforeInput);
       refs.contentDiv.removeEventListener('input', handleInput);
       refs.contentDiv.removeEventListener('keydown', handleKeyDown);
       // Sync snapshot so the rAF loop won't tear down & rebuild the

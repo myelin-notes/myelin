@@ -9,7 +9,7 @@ interface SemanticTagsProps {
 }
 
 export function SemanticTags({
-  refreshKey: _refreshKey,
+  refreshKey,
   activeTags,
   onActiveTagsChanged,
 }: SemanticTagsProps) {
@@ -35,7 +35,7 @@ export function SemanticTags({
         }
       }
     });
-  }, [activeTags, onActiveTagsChanged]);
+  }, [refreshKey, activeTags, onActiveTagsChanged]);
 
   const toggleTag = (tag: string) => {
     const next = new Set(activeTags);
