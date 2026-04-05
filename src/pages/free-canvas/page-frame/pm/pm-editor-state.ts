@@ -85,6 +85,7 @@ export class PageFrameEditorState {
         }
         const newState = this._view.state.apply(tr);
         this._view.updateState(newState);
+        this._view.dom.dispatchEvent(new Event('pm-update'));
       },
     });
 

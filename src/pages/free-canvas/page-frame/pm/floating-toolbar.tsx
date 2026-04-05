@@ -38,12 +38,12 @@ const MARK_BUTTONS: {
   { mark: schema.marks.code, icon: Code, label: 'Code', shortcut: '⌘E' },
 ];
 
-function isMarkActive(view: EditorView, markType: MarkType): boolean {
-  const { from, $from, to, empty } = view.state.selection;
+function isMarkActive(state: EditorView['state'], markType: MarkType): boolean {
+  const { from, $from, to, empty } = state.selection;
   if (empty) {
-    return !!markType.isInSet(view.state.storedMarks ?? $from.marks());
+    return !!markType.isInSet(state.storedMarks ?? $from.marks());
   }
-  return view.state.doc.rangeHasMark(from, to, markType);
+  return state.doc.rangeHasMark(from, to, markType);
 }
 
 export function FloatingToolbar({ view }: FloatingToolbarProps) {
@@ -52,33 +52,41 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     y: 0,
     visible: false,
   });
-  const [, forceRender] = useState(0);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  /** Track PM selection range to avoid repositioning on mark-only changes. */
+  // Snapshot of active marks — drives button highlighting.
+  const [activeMarks, setActiveMarks] = useState<Set<MarkType>>(new Set());
+  // Track PM selection range so we only reposition when it changes,
+  // not when marks toggle on the same range (which changes text size).
   const lastSelRange = useRef<{ from: number; to: number } | null>(null);
 
   useEffect(() => {
-    function updatePosition() {
+    function syncState() {
       const { selection } = view.state;
+
+      // Update active marks on every state change.
+      const nextActive = new Set<MarkType>();
+      for (const { mark } of MARK_BUTTONS) {
+        if (isMarkActive(view.state, mark)) {
+          nextActive.add(mark);
+        }
+      }
+      setActiveMarks(nextActive);
+
+      // Hide when nothing is selected.
       if (selection.empty) {
         lastSelRange.current = null;
         setPos((p) => (p.visible ? { ...p, visible: false } : p));
         return;
       }
 
-      // Only recompute position when the selection range itself changes,
-      // not when marks are toggled on the same range.
+      // Skip repositioning if only marks changed on the same range.
       const prev = lastSelRange.current;
       const rangeChanged =
         !prev || prev.from !== selection.from || prev.to !== selection.to;
       lastSelRange.current = { from: selection.from, to: selection.to };
+      if (!rangeChanged) return;
 
-      if (!rangeChanged) {
-        // Marks changed but range didn't — keep current position, just re-render buttons.
-        setPos((p) => (p.visible ? { ...p } : p));
-        return;
-      }
-
+      // Reposition above the DOM selection.
       const domSel = window.getSelection();
       if (!domSel || domSel.rangeCount === 0) {
         setPos((p) => (p.visible ? { ...p, visible: false } : p));
@@ -99,15 +107,19 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
       setPos({ x, y, visible: true });
     }
 
-    const onSelectionChange = () => requestAnimationFrame(updatePosition);
+    // pm-update fires after every ProseMirror transaction — this is the
+    // single source of truth for both mark state and selection changes.
+    const onUpdate = () => requestAnimationFrame(syncState);
+    view.dom.addEventListener('pm-update', onUpdate);
+
+    // selectionchange covers browser-driven selection (drag-select, etc.)
+    // that may not go through dispatchTransaction.
+    const onSelectionChange = () => requestAnimationFrame(syncState);
     document.addEventListener('selectionchange', onSelectionChange);
 
-    const onPointerUp = () => requestAnimationFrame(updatePosition);
-    document.addEventListener('pointerup', onPointerUp);
-
     return () => {
+      view.dom.removeEventListener('pm-update', onUpdate);
       document.removeEventListener('selectionchange', onSelectionChange);
-      document.removeEventListener('pointerup', onPointerUp);
     };
   }, [view]);
 
@@ -115,7 +127,8 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     const cmd = toggleMark(markType);
     cmd(view.state, view.dispatch);
     view.focus();
-    forceRender((n) => n + 1);
+    // No forceRender needed — dispatchTransaction emits pm-update,
+    // which triggers syncState above.
   };
 
   if (!pos.visible) {
@@ -136,24 +149,21 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
         e.stopPropagation();
       }}
     >
-      {MARK_BUTTONS.map(({ mark, icon: Icon, label }) => {
-        const active = isMarkActive(view, mark);
-        return (
-          <button
-            key={label}
-            type="button"
-            className={`flex size-7 items-center justify-center rounded-md transition-colors ${
-              active
-                ? 'bg-accent-dark/10 text-accent-dark'
-                : 'text-text-secondary hover:bg-hover-tint'
-            }`}
-            onClick={() => handleToggleMark(mark)}
-            title={label}
-          >
-            <Icon className="size-3.5" />
-          </button>
-        );
-      })}
+      {MARK_BUTTONS.map(({ mark, icon: Icon, label }) => (
+        <button
+          key={label}
+          type="button"
+          className={`flex size-7 items-center justify-center rounded-md transition-colors ${
+            activeMarks.has(mark)
+              ? 'bg-accent-dark/10 text-accent-dark'
+              : 'text-text-secondary hover:bg-hover-tint'
+          }`}
+          onClick={() => handleToggleMark(mark)}
+          title={label}
+        >
+          <Icon className="size-3.5" />
+        </button>
+      ))}
     </div>
   );
 }
