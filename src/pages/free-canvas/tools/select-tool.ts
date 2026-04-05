@@ -136,7 +136,7 @@ export class SelectTool implements ITool {
             }
           }
           e.select();
-          canvas.enterElementEdit(e);
+          canvas.enterElementEdit(e, event.clientX, event.clientY);
           this.lastClickTime = 0;
           return;
         }

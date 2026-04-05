@@ -115,7 +115,11 @@ export class DrawableCanvas implements ISerializable {
     return this._editingElement;
   }
 
-  public enterElementEdit(element: DrawableElement): void {
+  public enterElementEdit(
+    element: DrawableElement,
+    screenX?: number,
+    screenY?: number,
+  ): void {
     if (this._editingElement) {
       this.exitElementEdit();
     }
@@ -123,7 +127,7 @@ export class DrawableCanvas implements ISerializable {
     // Drop foreground canvas between background (z:0) and DOM (z:2)
     this.canvas.style.pointerEvents = 'none';
     this.canvas.style.zIndex = '1';
-    element.enterEditMode();
+    element.enterEditMode(screenX, screenY);
     this.onElementEdit?.(element);
   }
 

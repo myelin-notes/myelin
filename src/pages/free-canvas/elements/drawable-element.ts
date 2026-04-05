@@ -146,7 +146,7 @@ export abstract class DrawableElement implements ISerializable {
   }
 
   /** Called when the element enters inline edit mode. */
-  public enterEditMode(): void {}
+  public enterEditMode(_screenX?: number, _screenY?: number): void {}
   /** Called when the element exits inline edit mode. Returns an undo command if the content changed. */
   public exitEditMode(): UndoCommand | null {
     return null;

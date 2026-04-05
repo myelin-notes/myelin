@@ -79,7 +79,7 @@ export class TextTool implements ITool {
           e instanceof TextElement &&
           CollisionHelper.inBox(endPos, e.boundingBox)
         ) {
-          this.editExisting(canvas, e);
+          this.editExisting(canvas, e, event.clientX, event.clientY);
           this.dragStart = null;
           this.dragCurrent = null;
           return;
@@ -105,9 +105,14 @@ export class TextTool implements ITool {
     this.dragCurrent = null;
   }
 
-  private editExisting(canvas: DrawableCanvas, element: TextElement) {
+  private editExisting(
+    canvas: DrawableCanvas,
+    element: TextElement,
+    screenX?: number,
+    screenY?: number,
+  ) {
     element.select();
-    canvas.enterElementEdit(element);
+    canvas.enterElementEdit(element, screenX, screenY);
   }
 
   private createNew(

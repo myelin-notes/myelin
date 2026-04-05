@@ -73,19 +73,27 @@ export class PageFrameElement extends DrawableElement {
 
   protected updateBoundingBox(): void {}
 
-  public override enterEditMode(): void {
+  public override enterEditMode(screenX?: number, screenY?: number): void {
     this._editing = true;
     this._oldDocJSON = this.pmEditor.toJSON();
     this.pmEditor.setEditable(true);
 
-    // Focus and place cursor at end
     const view = this.pmEditor.view;
     if (view) {
+      // Resolve click position BEFORE focus — focus may scroll the
+      // container, which would invalidate the viewport coordinates.
+      let pos: number | null = null;
+      if (screenX != null && screenY != null) {
+        const coords = view.posAtCoords({ left: screenX, top: screenY });
+        if (coords) pos = coords.pos;
+      }
+      if (pos == null) {
+        pos = view.state.doc.content.size - 1;
+      }
+
       view.focus();
-      const { doc } = view.state;
-      const endPos = doc.content.size - 1;
       const tr = view.state.tr.setSelection(
-        Selection.near(doc.resolve(endPos)),
+        Selection.near(view.state.doc.resolve(pos)),
       );
       view.dispatch(tr);
     }
