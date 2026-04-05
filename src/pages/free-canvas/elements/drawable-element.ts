@@ -3,6 +3,7 @@ import type {
   BinaryWriter,
   ISerializable,
 } from '../../../lib/utils/binary-helper';
+import type { UndoCommand } from '../../../lib/utils/undo-redo';
 import type { Vector2 } from '../drawable-canvas';
 import type { ElementType } from './element-type';
 
@@ -142,6 +143,13 @@ export abstract class DrawableElement implements ISerializable {
   public unselect() {
     this.selected = false;
     this.selectionT = 0;
+  }
+
+  /** Called when the element enters inline edit mode. */
+  public enterEditMode(): void {}
+  /** Called when the element exits inline edit mode. Returns an undo command if the content changed. */
+  public exitEditMode(): UndoCommand | null {
+    return null;
   }
 
   public updateBounds() {

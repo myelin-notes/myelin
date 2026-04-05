@@ -62,8 +62,14 @@ export class TextElement extends DrawableElement {
   public get editing(): boolean {
     return this._editing;
   }
-  public set editing(value: boolean) {
-    this._editing = value;
+
+  public override enterEditMode(): void {
+    this._editing = true;
+  }
+
+  public override exitEditMode() {
+    this._editing = false;
+    return null;
   }
 
   public setText(text: string) {
@@ -189,7 +195,7 @@ export class TextElement extends DrawableElement {
 
 const SOFT_HYPHEN = '\u00AD';
 
-export function wrapText(
+function wrapText(
   ctx: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,

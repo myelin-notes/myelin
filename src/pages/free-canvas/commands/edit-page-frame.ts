@@ -1,19 +1,18 @@
 import type { UndoCommand } from '../../../lib/utils/undo-redo';
 import type { PageFrameElement } from '../elements/page-frame-element';
-import type { EditableBlock } from '../page-frame/block-editor';
 
 export class EditPageFrameCommand implements UndoCommand {
   constructor(
     private element: PageFrameElement,
-    private oldBlocks: EditableBlock[],
-    private newBlocks: EditableBlock[],
+    private oldDocJSON: Record<string, unknown>,
+    private newDocJSON: Record<string, unknown>,
   ) {}
 
   execute() {
-    this.element.editor.setBlocks(this.newBlocks);
+    this.element.pmEditor.setDocJSON(this.newDocJSON);
   }
 
   undo() {
-    this.element.editor.setBlocks(this.oldBlocks);
+    this.element.pmEditor.setDocJSON(this.oldDocJSON);
   }
 }

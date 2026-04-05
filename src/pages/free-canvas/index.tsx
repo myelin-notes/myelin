@@ -7,6 +7,8 @@ import { CanvasToolbar } from './components/canvas-toolbar';
 import { StatusBar } from './components/status-bar';
 import { TextEditOverlay } from './components/text-edit-overlay';
 import { TitleBar } from './components/title-bar';
+import { ElementType } from './elements/element-type';
+import type { TextElement } from './elements/text-element';
 import { useCanvasEngine } from './hooks/use-canvas-engine';
 import { useToolState } from './hooks/use-tool-state';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
@@ -14,18 +16,25 @@ import { PageFrameDomLayer } from './page-frame/dom-layer';
 export function CanvasView() {
   const { id } = useParams<{ id: string }>();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const toolState = useToolState(drawableCanvasRef);
   const engine = useCanvasEngine({
     id,
     canvasRef,
+    bgCanvasRef,
     wheelRef,
     drawableCanvasRef,
     canvasTools: toolState.canvasTools,
     setSelectedToolIndex: toolState.setSelectedToolIndex,
     onCanvasPointerDown: toolState.hideOptions,
   });
+
+  const editingText =
+    engine.editingElement?.type === ElementType.TEXT
+      ? (engine.editingElement as unknown as TextElement)
+      : null;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
@@ -47,21 +56,24 @@ export function CanvasView() {
         onToggleWheelTool={toolState.handleToggleWheelTool}
       />
 
-      {/* z:0 — Background (dot grid is drawn on the canvas layer since it follows zoom/pan) */}
-      <div className="absolute inset-0 bg-page" style={{ zIndex: 0 }} />
-
-      {/* z:1 — DOM layer for page frame chrome + text */}
-      <PageFrameDomLayer
-        canvasRef={engine.drawableCanvasRef}
-        editingElement={engine.editingPageFrame}
-        onCommitEdit={engine.commitPageFrameEdit}
+      {/* z:0 — Background canvas: dot grid + page chrome */}
+      <canvas
+        ref={bgCanvasRef}
+        className="absolute inset-0 block h-full w-full"
+        style={{ zIndex: 0 }}
       />
 
-      {/* z:5 — Transparent canvas for strokes, images, selection */}
+      {/* z:1 — DOM layer: PM editor text */}
+      <PageFrameDomLayer
+        canvasRef={engine.drawableCanvasRef}
+        editingElement={engine.editingElement}
+        onCommitEdit={engine.commitElementEdit}
+      />
+
+      {/* Foreground canvas: strokes, images, selection (z-index managed by DrawableCanvas) */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full"
-        style={{ zIndex: 5 }}
       />
 
       <input
@@ -75,10 +87,11 @@ export function CanvasView() {
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
 
-      {engine.textEdit && (
+      {editingText && (
         <TextEditOverlay
-          textEdit={engine.textEdit}
-          onDismiss={() => engine.setTextEdit(null)}
+          element={editingText}
+          canvas={drawableCanvasRef.current!}
+          onDismiss={engine.commitElementEdit}
         />
       )}
 

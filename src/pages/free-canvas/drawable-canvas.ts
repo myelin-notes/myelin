@@ -6,17 +6,12 @@ import type {
 import { StateMachine } from '../../lib/utils/state-machine';
 import type { UndoCommand } from '../../lib/utils/undo-redo';
 import { UndoRedoStack } from '../../lib/utils/undo-redo';
-import {
-  AddElementCommand,
-  EditPageFrameCommand,
-  RemoveElementCommand,
-} from './commands';
+import { AddElementCommand, RemoveElementCommand } from './commands';
 import type { DrawableElement } from './elements/drawable-element';
 import { DrawableElementRegistry } from './elements/drawable-element-registry';
 import { ElementType } from './elements/element-type';
 import { ImageElement } from './elements/image-element';
 import type { PageFrameElement } from './elements/page-frame-element';
-import type { EditableBlock } from './page-frame/block-editor';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
@@ -30,6 +25,8 @@ export type Vector2 = { x: number; y: number };
 export class DrawableCanvas implements ISerializable {
   public readonly ctx: CanvasRenderingContext2D;
   private readonly canvas: HTMLCanvasElement;
+  private bgCtx: CanvasRenderingContext2D | null = null;
+  private bgCanvas: HTMLCanvasElement | null = null;
   private readonly state: StateMachine<InteractState>;
   public readonly tools: ITool[];
   private dotPattern: CanvasPattern | null = null;
@@ -47,17 +44,8 @@ export class DrawableCanvas implements ISerializable {
   private _toolCursor: string = 'default';
 
   private onZoomChange?: (zoom: number) => void;
-  private onRequestTextEdit?: (
-    screenPos: Vector2,
-    screenFontSize: number,
-    fontFamily: string,
-    initialText: string,
-    boxScreenWidth: number,
-    boxScreenHeight: number,
-    onCommit: (text: string) => void,
-  ) => void;
   private onRequestFilePick?: (screenPos: Vector2) => void;
-  private onPageFrameEdit?: (element: PageFrameElement | null) => void;
+  private onElementEdit?: (element: DrawableElement | null) => void;
 
   // Event handlers (stored for cleanup in destroy())
   private _handlePointerDown!: (evt: PointerEvent) => void;
@@ -66,9 +54,8 @@ export class DrawableCanvas implements ISerializable {
   private _handlePointerUp!: (evt: PointerEvent) => void;
   private _handleResize!: () => void;
 
-  // Page frame editing state
-  private _editingElement: PageFrameElement | null = null;
-  private _getEditingBlocks?: () => EditableBlock[];
+  // Element editing state (e.g., page frame inline editing)
+  private _editingElement: DrawableElement | null = null;
 
   public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
     const ctx = canvas.getContext('2d', { alpha: true });
@@ -77,6 +64,7 @@ export class DrawableCanvas implements ISerializable {
     }
 
     this.canvas = canvas;
+    this.canvas.style.zIndex = '5';
     this.ctx = ctx!;
     this.state = new StateMachine(InteractState.Idle);
     this.tools = tools ?? DrawableCanvas.makeTools();
@@ -88,56 +76,22 @@ export class DrawableCanvas implements ISerializable {
     this.buildDotPattern();
   }
 
+  public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
+    this.bgCanvas = canvas;
+    this.bgCtx = canvas.getContext('2d', { alpha: true });
+    this.resizeBgCanvas(window.innerWidth, window.innerHeight);
+  }
+
   public setOnZoomChange(callback: (zoom: number) => void) {
     this.onZoomChange = callback;
-  }
-
-  public setOnRequestTextEdit(
-    callback: (
-      screenPos: Vector2,
-      screenFontSize: number,
-      fontFamily: string,
-      initialText: string,
-      boxScreenWidth: number,
-      boxScreenHeight: number,
-      onCommit: (text: string) => void,
-    ) => void,
-  ) {
-    this.onRequestTextEdit = callback;
-  }
-
-  public requestTextEdit(
-    screenPos: Vector2,
-    screenFontSize: number,
-    fontFamily: string,
-    initialText: string,
-    boxScreenWidth: number,
-    boxScreenHeight: number,
-    onCommit: (text: string) => void,
-  ) {
-    this.onRequestTextEdit?.(
-      screenPos,
-      screenFontSize,
-      fontFamily,
-      initialText,
-      boxScreenWidth,
-      boxScreenHeight,
-      onCommit,
-    );
   }
 
   public setOnRequestFilePick(callback: (screenPos: Vector2) => void) {
     this.onRequestFilePick = callback;
   }
 
-  public setOnPageFrameEdit(
-    callback: (element: PageFrameElement | null) => void,
-  ) {
-    this.onPageFrameEdit = callback;
-  }
-
-  public setGetEditingBlocks(fn: () => EditableBlock[]) {
-    this._getEditingBlocks = fn;
+  public setOnElementEdit(callback: (element: DrawableElement | null) => void) {
+    this.onElementEdit = callback;
   }
 
   public get viewOffset(): Vector2 {
@@ -149,67 +103,49 @@ export class DrawableCanvas implements ISerializable {
     this._offset.y += dy;
   }
 
-  public get pageFrames(): PageFrameElement[] {
-    return this._elements.filter(
-      (e) => e.type === ElementType.PAGE_FRAME,
-    ) as PageFrameElement[];
+  public getElementsByType(type: ElementType): DrawableElement[] {
+    return this._elements.filter((e) => e.type === type);
   }
 
   public requestFilePick(screenPos: Vector2) {
     this.onRequestFilePick?.(screenPos);
   }
 
-  public get editingElement(): PageFrameElement | null {
+  public get editingElement(): DrawableElement | null {
     return this._editingElement;
   }
 
-  private _oldBlocks: EditableBlock[] = [];
-
-  public enterPageFrameEdit(element: PageFrameElement): void {
+  public enterElementEdit(element: DrawableElement): void {
     if (this._editingElement) {
-      this.exitPageFrameEdit();
+      this.exitElementEdit();
     }
     this._editingElement = element;
-    this._oldBlocks = element.editor.snapshotBlocks();
+    // Drop foreground canvas between background (z:0) and DOM (z:2)
+    this.canvas.style.pointerEvents = 'none';
+    this.canvas.style.zIndex = '1';
     element.enterEditMode();
-    this.onPageFrameEdit?.(element);
+    this.onElementEdit?.(element);
   }
 
-  public exitPageFrameEdit(newBlocks?: EditableBlock[]): void {
+  public exitElementEdit(): void {
     if (!this._editingElement) {
       return;
     }
-
     const element = this._editingElement;
-
-    // Get blocks from DOM if not provided directly
-    let blocks = newBlocks;
-    if (!blocks && this._getEditingBlocks) {
-      blocks = this._getEditingBlocks();
+    const undoCmd = element.exitEditMode();
+    if (undoCmd) {
+      this.pushApplied(undoCmd);
     }
-
-    if (blocks) {
-      element.editor.setBlocks(blocks);
-    }
-
-    const finalBlocks = element.editor.snapshotBlocks();
-    element.exitEditMode();
-
-    const changed =
-      JSON.stringify(finalBlocks) !== JSON.stringify(this._oldBlocks);
-    if (changed) {
-      this.pushApplied(
-        new EditPageFrameCommand(element, this._oldBlocks, finalBlocks),
-      );
-    }
-
     this._editingElement = null;
-    this.onPageFrameEdit?.(null);
+    // Restore foreground canvas above DOM layer
+    this.canvas.style.pointerEvents = '';
+    this.canvas.style.zIndex = '5';
+    this.onElementEdit?.(null);
   }
 
   public destroy(): void {
     if (this._editingElement) {
-      this.exitPageFrameEdit();
+      this.exitElementEdit();
     }
     this.canvas.removeEventListener('wheel', this._handleWheel);
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
@@ -223,30 +159,63 @@ export class DrawableCanvas implements ISerializable {
     const logicalW = this.canvas.width / dpr;
     const logicalH = this.canvas.height / dpr;
 
+    const editing = this._editingElement !== null;
+
+    // ── Background canvas: dot grid + chrome (when not editing) ──
+    if (this.bgCtx && this.bgCanvas) {
+      const bgW = this.bgCanvas.width / dpr;
+      const bgH = this.bgCanvas.height / dpr;
+      this.bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.bgCtx.clearRect(0, 0, bgW, bgH);
+
+      if (this.dotPattern) {
+        this.bgCtx.save();
+        this.bgCtx.scale(this._zoom, this._zoom);
+        this.bgCtx.translate(this._offset.x, this._offset.y);
+        this.bgCtx.fillStyle = this.dotPattern;
+        this.bgCtx.fillRect(
+          -this._offset.x - bgW / this._zoom,
+          -this._offset.y - bgH / this._zoom,
+          (bgW * 3) / this._zoom,
+          (bgH * 3) / this._zoom,
+        );
+        this.bgCtx.restore();
+      }
+
+      if (!editing) {
+        this.bgCtx.save();
+        this.bgCtx.scale(this._zoom, this._zoom);
+        this.bgCtx.translate(this._offset.x, this._offset.y);
+        for (const element of this._elements) {
+          if (element.type === ElementType.PAGE_FRAME) {
+            (element as PageFrameElement).drawChrome(this.bgCtx);
+          }
+        }
+        this.bgCtx.restore();
+      }
+    }
+
+    // ── Foreground canvas ──
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.clearRect(0, 0, logicalW, logicalH);
-
-    // Draw dot grid (needs to follow zoom/pan)
-    if (this.dotPattern) {
-      this.ctx.save();
-      this.ctx.scale(this._zoom, this._zoom);
-      this.ctx.translate(this._offset.x, this._offset.y);
-      this.ctx.fillStyle = this.dotPattern;
-      this.ctx.fillRect(
-        -this._offset.x - logicalW / this._zoom,
-        -this._offset.y - logicalH / this._zoom,
-        (logicalW * 3) / this._zoom,
-        (logicalH * 3) / this._zoom,
-      );
-      this.ctx.restore();
-    }
 
     this.ctx.save();
     this.ctx.scale(this._zoom, this._zoom);
     this.ctx.translate(this._offset.x, this._offset.y);
-    this._elements.forEach((element) => {
+
+    for (const element of this._elements) {
       element.draw(this.ctx, deltaTime);
-    });
+    }
+    // When editing, chrome draws after strokes (but below DOM text at z:2).
+    // Page frames are sorted to front so we stop at the first non-frame.
+    if (editing) {
+      for (const element of this._elements) {
+        if (element.type !== ElementType.PAGE_FRAME) {
+          break;
+        }
+        (element as PageFrameElement).drawChrome(this.ctx);
+      }
+    }
 
     this.toolSelected.drawCursor(this.ctx, this.mousePosition);
     this.ctx.restore();
@@ -351,9 +320,9 @@ export class DrawableCanvas implements ISerializable {
       // (i.e. outside the raised DOM contentEditable) exits edit mode
       // and re-selects the frame so handles remain visible.
       if (this._editingElement) {
-        const frame = this._editingElement;
-        this.exitPageFrameEdit();
-        frame.select();
+        const el = this._editingElement;
+        this.exitElementEdit();
+        el.select();
         return;
       }
 
@@ -388,8 +357,10 @@ export class DrawableCanvas implements ISerializable {
     };
     window.addEventListener('pointerup', this._handlePointerUp);
 
-    this._handleResize = () =>
+    this._handleResize = () => {
       this.resizeCanvas(window.innerWidth, window.innerHeight);
+      this.resizeBgCanvas(window.innerWidth, window.innerHeight);
+    };
     window.addEventListener('resize', this._handleResize);
   }
 
@@ -510,6 +481,17 @@ export class DrawableCanvas implements ISerializable {
     this.canvas.style.height = `${height}px`;
   }
 
+  private resizeBgCanvas(width: number, height: number) {
+    if (!this.bgCanvas) {
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    this.bgCanvas.width = width * dpr;
+    this.bgCanvas.height = height * dpr;
+    this.bgCanvas.style.width = `${width}px`;
+    this.bgCanvas.style.height = `${height}px`;
+  }
+
   public worldToScreen(world: Vector2): Vector2 {
     return {
       x: (world.x + this._offset.x) * this._zoom,
@@ -556,6 +538,12 @@ export class DrawableCanvas implements ISerializable {
     for (let i = 0; i < count; i++) {
       this._elements.push(this.loadElement(reader));
     }
+    // Page frames draw first (below other elements)
+    this._elements.sort((a, b) => {
+      const aIsFrame = a.type === ElementType.PAGE_FRAME ? 0 : 1;
+      const bIsFrame = b.type === ElementType.PAGE_FRAME ? 0 : 1;
+      return aIsFrame - bIsFrame;
+    });
     this._nextIndex =
       this._elements.length > 0
         ? Math.max(...this._elements.map((e) => e.index)) + 1

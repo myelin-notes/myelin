@@ -7,9 +7,9 @@ import {
   DrawableCanvas,
   type Vector2,
 } from '@/pages/free-canvas/drawable-canvas';
+import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-element';
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
-import type { EditableBlock } from '../page-frame/block-editor';
 
 declare module '@/lib/keybindings' {
   interface ActionMap {
@@ -21,19 +21,10 @@ declare module '@/lib/keybindings' {
   }
 }
 
-export interface TextEditState {
-  screenPos: Vector2;
-  screenFontSize: number;
-  fontFamily: string;
-  initialText: string;
-  boxScreenWidth: number;
-  boxScreenHeight: number;
-  onCommit: (text: string) => void;
-}
-
 interface UseCanvasEngineArgs {
   id: string | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  bgCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   wheelRef: React.RefObject<WheelPickerHandle | null>;
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
@@ -44,6 +35,7 @@ interface UseCanvasEngineArgs {
 export function useCanvasEngine({
   id,
   canvasRef,
+  bgCanvasRef,
   wheelRef,
   drawableCanvasRef,
   canvasTools,
@@ -55,12 +47,13 @@ export function useCanvasEngine({
   const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
   onCanvasPointerDownRef.current = onCanvasPointerDown;
 
+  const navigate = useNavigate();
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
   const [fileName, setFileName] = useState('');
-  const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
-  const [editingPageFrame, setEditingPageFrame] =
-    useState<PageFrameElement | null>(null);
+  const [editingElement, setEditingElement] = useState<DrawableElement | null>(
+    null,
+  );
 
   const embedFiles = (
     files: FileList | File[],
@@ -95,8 +88,6 @@ export function useCanvasEngine({
       }, 'image/png');
     });
   };
-
-  const navigate = useNavigate();
 
   const back = async () => {
     await autoSave();
@@ -183,37 +174,19 @@ export function useCanvasEngine({
     const dc = new DrawableCanvas(canvas, canvasTools);
     drawableCanvasRef.current = dc;
 
-    dc.setOnZoomChange((zoom) => setZoomLevel(Math.round(zoom * 100)));
+    if (bgCanvasRef.current) {
+      dc.setBackgroundCanvas(bgCanvasRef.current);
+    }
 
-    dc.setOnRequestTextEdit(
-      (
-        screenPos,
-        screenFontSize,
-        fontFamily,
-        initialText,
-        boxScreenWidth,
-        boxScreenHeight,
-        onCommit,
-      ) => {
-        setTextEdit({
-          screenPos,
-          screenFontSize,
-          fontFamily,
-          initialText,
-          boxScreenWidth,
-          boxScreenHeight,
-          onCommit,
-        });
-      },
-    );
+    dc.setOnZoomChange((zoom) => setZoomLevel(Math.round(zoom * 100)));
 
     dc.setOnRequestFilePick((screenPos) => {
       pendingEmbedPos.current = screenPos;
       fileInputRef.current?.click();
     });
 
-    dc.setOnPageFrameEdit((element) => {
-      setEditingPageFrame(element);
+    dc.setOnElementEdit((element) => {
+      setEditingElement(element);
     });
 
     let prevTime = 0;
@@ -270,12 +243,9 @@ export function useCanvasEngine({
 
     FileSystem.loadFromFile(id, dc)
       .then(() => {
-        // Guard against StrictMode double-fire: if this effect was
-        // cleaned up before the async load finished, bail out.
         if (disposed) {
           return;
         }
-        // Auto-create a page frame for empty canvases
         if (dc.elements.length === 0) {
           const dpr = window.devicePixelRatio || 1;
           const centerWorld = dc.screenToWorld({
@@ -305,13 +275,11 @@ export function useCanvasEngine({
       document.removeEventListener('paste', handlePaste);
       dc.destroy();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- id is the only
-    // real dependency; canvasRef.current is always set before the first effect
-    // runs and the guard above handles the null case.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const commitPageFrameEdit = (blocks: EditableBlock[]) => {
-    drawableCanvasRef.current?.exitPageFrameEdit(blocks);
+  const commitElementEdit = () => {
+    drawableCanvasRef.current?.exitElementEdit();
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -333,10 +301,8 @@ export function useCanvasEngine({
     zoomLevel,
     fps,
     fileName,
-    textEdit,
-    setTextEdit,
-    editingPageFrame,
-    commitPageFrameEdit,
+    editingElement,
+    commitElementEdit,
     back,
     handleFileInputChange,
   };

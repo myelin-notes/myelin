@@ -1,6 +1,5 @@
 import { Type as TypeIcon } from 'lucide-react';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
-import { EditTextCommand } from '../commands/edit-text';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { TextElement } from '../elements/text-element';
 import type { FontEntry, ITool, SvgIcon, ToolOption } from './tool';
@@ -107,35 +106,8 @@ export class TextTool implements ITool {
   }
 
   private editExisting(canvas: DrawableCanvas, element: TextElement) {
-    const worldOrigin = { x: element.boundingBox.x, y: element.boundingBox.y };
-    const screenPos = canvas.worldToScreen(worldOrigin);
-    const screenFontSize = element.style.fontSize * canvas.zoom;
-    const screenBoxWidth = element.boxWidth * canvas.zoom;
-    const screenBoxHeight = element.boxHeight * canvas.zoom;
-    const oldText = element.text;
-
-    element.editing = true;
     element.select();
-    canvas.requestTextEdit(
-      screenPos,
-      screenFontSize,
-      element.style.fontFamily,
-      oldText,
-      screenBoxWidth,
-      screenBoxHeight,
-      (text: string) => {
-        element.editing = false;
-        element.unselect();
-        if (!text.trim()) {
-          canvas.removeElement(element);
-        } else if (text !== oldText) {
-          element.setText(text);
-          element.updateBounds();
-          canvas.pushApplied(new EditTextCommand(element, oldText, text));
-        }
-        canvas.updateBounding();
-      },
-    );
+    canvas.enterElementEdit(element);
   }
 
   private createNew(
@@ -144,7 +116,6 @@ export class TextTool implements ITool {
     boxWidth: number,
     boxHeight: number,
   ) {
-    // Create element immediately so its selection outline is visible during editing
     const el = canvas.addElement((i) => {
       const te = new TextElement(
         i,
@@ -160,33 +131,8 @@ export class TextTool implements ITool {
       te.setPosition(worldPos.x, worldPos.y);
       return te;
     });
-    el.editing = true;
     el.select();
-
-    const screenPos = canvas.worldToScreen(worldPos);
-    const screenFontSize = this.fontSize * canvas.zoom;
-    const screenBoxWidth = boxWidth * canvas.zoom;
-    const screenBoxHeight = boxHeight * canvas.zoom;
-
-    canvas.requestTextEdit(
-      screenPos,
-      screenFontSize,
-      this.fontFamily,
-      '',
-      screenBoxWidth,
-      screenBoxHeight,
-      (text: string) => {
-        el.editing = false;
-        el.unselect();
-        if (!text.trim()) {
-          canvas.removeElement(el);
-        } else {
-          el.setText(text);
-          el.updateBounds();
-        }
-        canvas.updateBounding();
-      },
-    );
+    canvas.enterElementEdit(el);
   }
 
   interrupt(_canvas: DrawableCanvas): void {

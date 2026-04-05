@@ -231,3 +231,174 @@ input[type="range"].tool-slider::-moz-range-track {
   background: rgba(195, 199, 202, 0.4);
   border-radius: 2px;
 }
+
+/* ── ProseMirror editor styles ─────────────────────────── */
+
+.pm-editor {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  color: #191c1e;
+}
+
+.pm-editor .ProseMirror {
+  outline: none;
+  min-height: 1.5em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.pm-editor .ProseMirror > * + * {
+  margin-top: 0;
+}
+
+/* Paragraphs */
+.pm-editor p {
+  font: 400 16px "Inter", sans-serif;
+  color: #191c1e;
+  margin: 0 0 6.4px 0; /* 16px * 0.4 */
+  min-height: 24px; /* 16px * 1.5 */
+}
+
+/* Headings */
+.pm-editor h1 {
+  font: 700 32px "Newsreader", serif;
+  color: #191c1e;
+  margin: 0 0 12.8px 0; /* 32px * 0.4 */
+  min-height: 48px; /* 32px * 1.5 */
+  line-height: 1.5;
+}
+
+.pm-editor h2 {
+  font: 700 24px "Newsreader", serif;
+  color: #191c1e;
+  margin: 0 0 9.6px 0;
+  min-height: 36px;
+  line-height: 1.5;
+}
+
+.pm-editor h3 {
+  font: 600 20px "Newsreader", serif;
+  color: #191c1e;
+  margin: 0 0 8px 0;
+  min-height: 30px;
+  line-height: 1.5;
+}
+
+/* Lists */
+.pm-editor ul,
+.pm-editor ol {
+  margin: 0 0 6.4px 0;
+  padding-left: 24px;
+}
+
+.pm-editor li {
+  font: 400 16px "Inter", sans-serif;
+  color: #191c1e;
+  min-height: 24px;
+}
+
+.pm-editor li p {
+  margin-bottom: 0;
+}
+
+.pm-editor ul {
+  list-style-type: disc;
+}
+
+.pm-editor ol {
+  list-style-type: decimal;
+}
+
+/* Nested lists */
+.pm-editor li > ul,
+.pm-editor li > ol {
+  margin-bottom: 0;
+}
+
+/* Blockquote */
+.pm-editor blockquote {
+  font: 400 16px "Inter", sans-serif;
+  color: #64748b;
+  border-left: 3px solid rgba(195, 199, 202, 0.5);
+  padding-left: 18px;
+  margin: 0 0 6.4px 0;
+  min-height: 24px;
+}
+
+.pm-editor blockquote p {
+  color: #64748b;
+}
+
+/* Code block */
+.pm-editor pre {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 14px;
+  background: rgba(195, 199, 202, 0.12);
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin: 0 0 6.4px 0;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+.pm-editor pre code {
+  font-family: inherit;
+  font-size: inherit;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Horizontal rule */
+.pm-editor hr {
+  border: none;
+  border-top: 1px solid rgba(195, 199, 202, 0.5);
+  margin: 12px 0;
+}
+
+/* Inline code */
+.pm-editor code {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.9em;
+  background: rgba(195, 199, 202, 0.15);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* Links */
+.pm-editor a {
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Mention chips */
+.pm-editor .mention {
+  display: inline-block;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* Inline images */
+.pm-editor img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+/* Selection styling */
+.pm-editor .ProseMirror-selectednode {
+  outline: 2px solid #3b82f6;
+  border-radius: 2px;
+}
+
+/* Placeholder for empty paragraphs (first child only) */
+.pm-editor .ProseMirror > p:first-child:last-child:empty::before,
+.pm-editor .ProseMirror > p:first-child:last-child > br:only-child::before {
+  content: "";
+  pointer-events: none;
+}
