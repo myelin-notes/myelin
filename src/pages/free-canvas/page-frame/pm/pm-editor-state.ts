@@ -64,7 +64,10 @@ export class PageFrameEditorState {
    * Create a persistent EditorView mounted into the given container.
    * Starts non-editable. Call `setEditable(true)` to enable editing.
    */
-  createView(container: HTMLElement): EditorView {
+  createView(
+    container: HTMLElement,
+    onPageCount?: (n: number) => void,
+  ): EditorView {
     if (this._view) {
       this.destroyView();
     }
@@ -72,7 +75,7 @@ export class PageFrameEditorState {
     const doc = schema.nodeFromJSON(this._docJSON);
     const state = EditorState.create({
       doc,
-      plugins: buildPlugins(),
+      plugins: buildPlugins(onPageCount),
     });
 
     this._editable = false;
@@ -120,11 +123,13 @@ export class PageFrameEditorState {
     this._docJSON = json;
     if (this._view) {
       const doc = schema.nodeFromJSON(json);
-      const state = EditorState.create({
-        doc,
-        plugins: buildPlugins(),
-      });
-      this._view.updateState(state);
+      const tr = this._view.state.tr.replaceWith(
+        0,
+        this._view.state.doc.content.size,
+        doc.content,
+      );
+      tr.setMeta('addToHistory', false);
+      this._view.dispatch(tr);
     }
   }
 }

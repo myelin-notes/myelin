@@ -4,8 +4,6 @@ import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
 import {
-  PAGE_GAP,
-  PAGE_HEIGHT,
   PAGE_PADDING,
   PAGE_WIDTH,
   type PageFrameElement,
@@ -34,66 +32,6 @@ const CONTENT_STYLE: Record<string, string> = {
 interface FrameRefs {
   frameDiv: HTMLDivElement;
   contentDiv: HTMLDivElement;
-  observer: MutationObserver;
-}
-
-// ── Pagination ─────────────────────────────────────────────
-
-const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2;
-const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING;
-
-function paginateFrame(refs: FrameRefs, frame: PageFrameElement): void {
-  const contentDiv = refs.contentDiv;
-
-  for (const el of Array.from(
-    contentDiv.querySelectorAll('[data-page-break]'),
-  )) {
-    el.remove();
-  }
-
-  const pmRoot = contentDiv.querySelector('.ProseMirror') ?? contentDiv;
-  const blocks = Array.from(pmRoot.children) as HTMLElement[];
-  let yInPage = 0;
-  let pageCount = 1;
-  const spacerInsertions: { before: HTMLElement; height: number }[] = [];
-
-  for (const block of blocks) {
-    if ((block as HTMLElement).dataset?.pageBreak) {
-      continue;
-    }
-    const style = getComputedStyle(block);
-    const blockHeight =
-      block.offsetHeight +
-      parseFloat(style.marginTop) +
-      parseFloat(style.marginBottom);
-
-    if (yInPage + blockHeight > CONTENT_HEIGHT && yInPage > 0) {
-      const remaining = CONTENT_HEIGHT - yInPage;
-      spacerInsertions.push({
-        before: block,
-        height: remaining + PAGE_BREAK_GAP,
-      });
-      pageCount++;
-      yInPage = blockHeight;
-    } else {
-      yInPage += blockHeight;
-    }
-  }
-
-  for (let i = spacerInsertions.length - 1; i >= 0; i--) {
-    const { before, height } = spacerInsertions[i];
-    const spacer = document.createElement('div');
-    spacer.dataset.pageBreak = 'true';
-    spacer.contentEditable = 'false';
-    spacer.style.height = `${height}px`;
-    spacer.style.pointerEvents = 'none';
-    spacer.style.userSelect = 'none';
-    spacer.style.flexShrink = '0';
-    pmRoot.insertBefore(spacer, before);
-  }
-
-  frame.numPages = pageCount;
-  refs.frameDiv.style.height = `${frame.totalHeight}px`;
 }
 
 // ── Component ──────────────────────────────────────────────
@@ -153,38 +91,26 @@ export function PageFrameDomLayer({
           frameDiv.appendChild(contentDiv);
           container.appendChild(frameDiv);
 
-          frame.pmEditor.createView(contentDiv);
-
-          // Always-on observer for pagination (handles edits + external doc changes)
-          const refs: FrameRefs = {
-            frameDiv,
-            contentDiv,
-            observer: null!,
-          };
-          const observer = new MutationObserver(() => {
-            requestAnimationFrame(() => paginateFrame(refs, frame));
-          });
-          observer.observe(contentDiv, {
-            childList: true,
-            subtree: true,
-            characterData: true,
-          });
-          refs.observer = observer;
-
+          const refs: FrameRefs = { frameDiv, contentDiv };
           frameMap.current.set(frame.index, refs);
-          requestAnimationFrame(() => paginateFrame(refs, frame));
+
+          // Pagination is handled by a ProseMirror plugin (widget decorations).
+          // The callback keeps frame.numPages in sync.
+          frame.pmEditor.createView(contentDiv, (n) => {
+            frame.numPages = n;
+          });
         }
 
         const refs = frameMap.current.get(frame.index)!;
         const screenX = (frame.offset.x + offset.x) * zoom;
         const screenY = (frame.offset.y + offset.y) * zoom;
+        refs.frameDiv.style.height = `${frame.totalHeight}px`;
         refs.frameDiv.style.transform = `translate(${screenX}px, ${screenY}px) scale(${zoom})`;
       }
 
       // Clean up removed frames
       for (const [index, refs] of frameMap.current) {
         if (!existingIndices.has(index)) {
-          refs.observer.disconnect();
           refs.frameDiv.remove();
           frameMap.current.delete(index);
         }

@@ -84,7 +84,9 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
       const rangeChanged =
         !prev || prev.from !== selection.from || prev.to !== selection.to;
       lastSelRange.current = { from: selection.from, to: selection.to };
-      if (!rangeChanged) return;
+      if (!rangeChanged) {
+        return;
+      }
 
       // Reposition above the DOM selection.
       const domSel = window.getSelection();

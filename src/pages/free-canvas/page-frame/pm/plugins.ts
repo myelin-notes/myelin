@@ -25,7 +25,8 @@ import {
   sinkListItem,
   splitListItem,
 } from 'prosemirror-schema-list';
-import type { Command, Plugin } from 'prosemirror-state';
+import { type Command, Plugin, PluginKey } from 'prosemirror-state';
+import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import { schema } from './schema';
 
 // ── Input Rules (Markdown Shortcuts) ────────────────────
@@ -127,6 +128,113 @@ function buildKeymap(s: Schema) {
   });
 }
 
-export function buildPlugins(): Plugin[] {
-  return [buildInputRules(schema), buildKeymap(schema), history()];
+// ── Pagination (widget decorations) ────────────────────
+
+/** Content area height per page: PAGE_HEIGHT (880) − PAGE_PADDING (48) × 2 */
+const CONTENT_HEIGHT = 880 - 48 * 2;
+/** Gap to insert between pages: PAGE_PADDING + PAGE_GAP + PAGE_PADDING */
+const PAGE_BREAK_GAP = 48 + 40 + 48;
+
+const paginationKey = new PluginKey<DecorationSet>('pagination');
+
+function calculatePageBreaks(
+  view: EditorView,
+): { pos: number; height: number }[] {
+  const breaks: { pos: number; height: number }[] = [];
+  let yInPage = 0;
+
+  view.state.doc.forEach((_node, offset) => {
+    const dom = view.nodeDOM(offset) as HTMLElement | null;
+    if (!dom?.offsetHeight) {
+      return;
+    }
+
+    const style = getComputedStyle(dom);
+    const blockHeight =
+      dom.offsetHeight +
+      parseFloat(style.marginTop) +
+      parseFloat(style.marginBottom);
+
+    if (yInPage + blockHeight > CONTENT_HEIGHT && yInPage > 0) {
+      const remaining = CONTENT_HEIGHT - yInPage;
+      breaks.push({ pos: offset, height: remaining + PAGE_BREAK_GAP });
+      yInPage = blockHeight;
+    } else {
+      yInPage += blockHeight;
+    }
+  });
+
+  return breaks;
+}
+
+function paginationPlugin(onPageCount: (n: number) => void): Plugin {
+  return new Plugin({
+    key: paginationKey,
+    state: {
+      init() {
+        return DecorationSet.empty;
+      },
+      apply(tr, decos) {
+        const next = tr.getMeta(paginationKey);
+        if (next !== undefined) {
+          return next;
+        }
+        return decos.map(tr.mapping, tr.doc);
+      },
+    },
+    props: {
+      decorations(state) {
+        return paginationKey.getState(state) ?? DecorationSet.empty;
+      },
+    },
+    view(editorView) {
+      let lastKey = '';
+
+      function paginate(view: EditorView) {
+        const breaks = calculatePageBreaks(view);
+        const key = JSON.stringify(breaks);
+        if (key === lastKey) {
+          return;
+        }
+        lastKey = key;
+
+        onPageCount(breaks.length + 1);
+
+        const decos = breaks.map(({ pos, height }) => {
+          const spacer = document.createElement('div');
+          spacer.style.height = `${height}px`;
+          spacer.style.pointerEvents = 'none';
+          spacer.style.userSelect = 'none';
+          spacer.style.flexShrink = '0';
+          return Decoration.widget(pos, spacer, { side: -1 });
+        });
+
+        const tr = view.state.tr;
+        tr.setMeta(paginationKey, DecorationSet.create(view.state.doc, decos));
+        tr.setMeta('addToHistory', false);
+        view.dispatch(tr);
+      }
+
+      // Initial pagination after DOM is ready.
+      requestAnimationFrame(() => paginate(editorView));
+
+      return {
+        update(view: EditorView) {
+          paginate(view);
+        },
+      };
+    },
+  });
+}
+
+export function buildPlugins(onPageCount?: (n: number) => void): Plugin[] {
+  const plugins: Plugin[] = [
+    buildInputRules(schema),
+    buildKeymap(schema),
+    history(),
+  ];
+  if (onPageCount) {
+    plugins.push(paginationPlugin(onPageCount));
+  }
+  return plugins;
 }
