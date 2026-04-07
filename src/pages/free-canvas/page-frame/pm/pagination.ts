@@ -1,6 +1,11 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
+import {
+  type LayoutCursor,
+  layoutWithLines,
+  prepareWithSegments,
+} from '@chenglou/pretext';
 
 const PAGE_HEIGHT = 880;
 const PAGE_PADDING = 48;
@@ -100,134 +105,58 @@ interface ParagraphPaginationResult {
 }
 
 /**
- * Walk a single overflowing paragraph at line granularity and emit breaks.
+ * One visual line inside a paragraph, in CSS pixels relative to the editor
+ * content top, as if no pagination decorations existed. `getPos` is lazy —
+ * it's only called when the pagination loop actually decides to emit a
+ * break at this line, so measurers can defer any expensive DOM lookups
+ * (e.g. `view.posAtCoords`) until they're needed.
+ */
+interface ParagraphLine {
+  naturalTop: number;
+  naturalBottom: number;
+  getPos: () => number | null;
+}
+
+/**
+ * Walk a paragraph's line list and emit page breaks.
  *
- * This is the expensive operation: it materializes line rects via
- * `Range.getClientRects()` and may call `view.posAtCoords` once per emitted
- * break. It is only called for paragraphs whose effective bottom crosses
- * the current page boundary.
- *
- * Convergence: a paragraph that already contains widget breaks from a prior
- * pass will produce the same break set this pass, because the line rects
- * include the widget gaps and we subtract `existingShiftAt(linePos)` to
- * recover natural coordinates. The fast path (no inner widgets) uses a
- * single uniform `blockShift` and skips per-line `posAtCoords` entirely.
+ * This is the *only* pagination algorithm for paragraphs. It doesn't know
+ * or care how the lines were measured — Pretext or DOM — it just walks
+ * them in order, checks whether each one crosses the current page boundary
+ * in effective coordinates (natural + accumulated shift), and emits a
+ * widget break when one does.
  */
 function paginateParagraph(
-  block: BlockInfo,
-  view: EditorView,
-  editorScreenTop: number,
-  invScale: number,
+  lines: ParagraphLine[],
+  blockPos: number,
+  blockEnd: number,
   initialPageStart: number,
   initialPageBoundary: number,
   initialCumulativeShift: number,
-  blockShift: number,
-  hasInnerWidgets: boolean,
-  existingShiftAt: (pos: number) => number,
 ): ParagraphPaginationResult {
-  // 1. Materialize line rects from text descendants. Walking text nodes
-  //    explicitly skips our own widget DOM nodes so they don't pollute the
-  //    line set on subsequent passes.
-  const rawRects: DOMRect[] = [];
-  const walker = document.createTreeWalker(block.dom, NodeFilter.SHOW_TEXT);
-  let textNode = walker.nextNode();
-  while (textNode) {
-    const range = document.createRange();
-    range.selectNodeContents(textNode);
-    const rects = range.getClientRects();
-    for (let i = 0; i < rects.length; i++) {
-      const r = rects[i];
-      if (r.width > 0 && r.height > 0) {
-        rawRects.push(r);
-      }
-    }
-    textNode = walker.nextNode();
-  }
-
-  // 2. Group rects by visual line (multi-fragment lines share a top).
-  interface Line {
-    top: number;
-    bottom: number;
-    left: number;
-  }
-  const lines: Line[] = [];
-  for (const r of rawRects) {
-    const last = lines[lines.length - 1];
-    if (last && Math.abs(r.top - last.top) < 1) {
-      if (r.bottom > last.bottom) {
-        last.bottom = r.bottom;
-      }
-      if (r.left < last.left) {
-        last.left = r.left;
-      }
-    } else {
-      lines.push({ top: r.top, bottom: r.bottom, left: r.left });
-    }
-  }
-
   const breaks: Break[] = [];
   let pageStart = initialPageStart;
   let pageBoundary = initialPageBoundary;
   let cumulativeShift = initialCumulativeShift;
   let pageAdvances = 0;
 
-  if (lines.length === 0) {
-    return {
-      breaks,
-      cumulativeShift,
-      pageStart,
-      pageBoundary,
-      pageAdvances,
-    };
-  }
-
   for (const line of lines) {
-    const lineMeasuredTop = (line.top - editorScreenTop) * invScale;
-    const lineMeasuredBottom = (line.bottom - editorScreenTop) * invScale;
-
-    // Fast path: when no widgets exist inside this paragraph, every line
-    // shares the same existing shift, so we can compute natural coords
-    // without calling posAtCoords. This is the common case during normal
-    // typing and avoids per-line DOM walks entirely.
-    let lineNaturalTop: number;
-    let lineNaturalBottom: number;
-    if (hasInnerWidgets) {
-      const result = view.posAtCoords({
-        left: line.left + 1,
-        top: line.top + (line.bottom - line.top) / 2,
-      });
-      const linePos = result?.pos ?? block.pos;
-      const lineShift = existingShiftAt(linePos);
-      lineNaturalTop = lineMeasuredTop - lineShift;
-      lineNaturalBottom = lineMeasuredBottom - lineShift;
-    } else {
-      lineNaturalTop = lineMeasuredTop - blockShift;
-      lineNaturalBottom = lineMeasuredBottom - blockShift;
-    }
-
-    const lineEffectiveTop = lineNaturalTop + cumulativeShift;
-    const lineEffectiveBottom = lineNaturalBottom + cumulativeShift;
+    const lineEffectiveTop = line.naturalTop + cumulativeShift;
+    const lineEffectiveBottom = line.naturalBottom + cumulativeShift;
 
     if (lineEffectiveBottom <= pageBoundary) {
       continue;
     }
 
-    // The line crosses the boundary. Emit a break unless we're already at
-    // the top of the current page (oversized line / first-line case).
+    // Crosses the boundary. Emit a break unless the line is already at
+    // the top of the current page (oversized/first-line case).
     if (lineEffectiveTop > pageStart) {
       const spacer = pageBoundary + PAGE_BREAK_GAP - lineEffectiveTop;
       if (spacer > 0) {
-        // Now — and only now — pay for posAtCoords to anchor the break.
-        const result = view.posAtCoords({
-          left: line.left + 1,
-          top: line.top + (line.bottom - line.top) / 2,
-        });
-        if (result) {
-          const linePos = Math.max(
-            block.pos + 2,
-            Math.min(result.pos, block.pos + block.nodeSize - 1),
-          );
-          breaks.push({ pos: linePos, spacer, kind: 'inline' });
+        const pos = line.getPos();
+        if (pos !== null) {
+          const clamped = Math.max(blockPos + 2, Math.min(pos, blockEnd - 1));
+          breaks.push({ pos: clamped, spacer, kind: 'inline' });
           cumulativeShift += spacer;
         }
       }
@@ -239,6 +168,247 @@ function paginateParagraph(
   }
 
   return { breaks, cumulativeShift, pageStart, pageBoundary, pageAdvances };
+}
+
+/**
+ * Convert a Pretext layout cursor into a character offset. For ASCII text,
+ * grapheme index equals char index within a segment; summing segment
+ * lengths gives the global offset. Complex Unicode (emoji ZWJ, combining
+ * marks) may be off by a few units — acceptable for line-start placement.
+ */
+function cursorToCharOffset(
+  cursor: LayoutCursor,
+  segments: readonly string[],
+): number {
+  let offset = 0;
+  const end = Math.min(cursor.segmentIndex, segments.length);
+  for (let i = 0; i < end; i++) {
+    offset += segments[i].length;
+  }
+  return offset + cursor.graphemeIndex;
+}
+
+/**
+ * Measure a paragraph's lines using Pretext's canvas-based layout.
+ *
+ * Pure arithmetic after a single `prepareWithSegments` call — no DOM reads
+ * for line positions, no `view.posAtCoords`. Character offsets come from
+ * each `LayoutLine.start` cursor and map directly to PM doc positions via
+ * `block.pos + 1 + charOffset` (only valid when the paragraph contains no
+ * inline atoms — mentions/images inflate node size without contributing to
+ * `textContent`, which would break the mapping).
+ *
+ * Returns `null` for paragraphs Pretext can't handle (non-text children,
+ * empty text, missing CSS inputs, or Pretext itself throwing).
+ */
+function measureLinesWithPretext(
+  block: BlockInfo,
+  view: EditorView,
+  blockNaturalTop: number,
+): ParagraphLine[] | null {
+  const paragraphNode = view.state.doc.nodeAt(block.pos);
+  if (!paragraphNode) {
+    return null;
+  }
+
+  let hasNonText = false;
+  paragraphNode.forEach((child) => {
+    if (!child.isText) {
+      hasNonText = true;
+    }
+  });
+  if (hasNonText) {
+    return null;
+  }
+
+  const text = paragraphNode.textContent;
+  if (text.length === 0) {
+    return null;
+  }
+
+  const cs = getComputedStyle(block.dom);
+  const fontSize = Number.parseFloat(cs.fontSize);
+  if (!Number.isFinite(fontSize) || fontSize <= 0) {
+    return null;
+  }
+  let lineHeight = Number.parseFloat(cs.lineHeight);
+  if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+    lineHeight = fontSize * 1.5;
+  }
+  const fontString = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const width = block.dom.clientWidth;
+  if (width <= 0) {
+    return null;
+  }
+
+  let prepared: ReturnType<typeof prepareWithSegments>;
+  let layoutResult: ReturnType<typeof layoutWithLines>;
+  try {
+    prepared = prepareWithSegments(text, fontString);
+    layoutResult = layoutWithLines(prepared, width, lineHeight);
+  } catch {
+    return null;
+  }
+
+  const layoutLines = layoutResult.lines;
+  const lines: ParagraphLine[] = new Array(layoutLines.length);
+  const contentSize = paragraphNode.content.size;
+  for (let i = 0; i < layoutLines.length; i++) {
+    const layoutLine = layoutLines[i];
+    const naturalTop = blockNaturalTop + i * lineHeight;
+    lines[i] = {
+      naturalTop,
+      naturalBottom: naturalTop + lineHeight,
+      getPos: () => {
+        const charOffset = cursorToCharOffset(
+          layoutLine.start,
+          prepared.segments,
+        );
+        const clamped = Math.max(0, Math.min(charOffset, contentSize));
+        return block.pos + 1 + clamped;
+      },
+    };
+  }
+  return lines;
+}
+
+/**
+ * Measure a paragraph's lines using DOM range rects — the fallback when
+ * Pretext can't handle the paragraph (contains mentions, images, etc.).
+ *
+ * Walks text descendants, collects one rect per visual line, and detects
+ * widget gaps from rect spacing so `posAtCoords` is only called at the
+ * break point (lazy `getPos`) rather than per line.
+ */
+function measureLinesWithDom(
+  block: BlockInfo,
+  view: EditorView,
+  editorScreenTop: number,
+  invScale: number,
+  blockShift: number,
+): ParagraphLine[] {
+  interface Rect {
+    top: number;
+    bottom: number;
+    left: number;
+  }
+  const rects: Rect[] = [];
+  const walker = document.createTreeWalker(block.dom, NodeFilter.SHOW_TEXT);
+  let textNode = walker.nextNode();
+  while (textNode) {
+    const range = document.createRange();
+    range.selectNodeContents(textNode);
+    const domRects = range.getClientRects();
+    for (let i = 0; i < domRects.length; i++) {
+      const r = domRects[i];
+      if (r.width <= 0 || r.height <= 0) {
+        continue;
+      }
+      const last = rects[rects.length - 1];
+      if (last && Math.abs(r.top - last.top) < 1) {
+        if (r.bottom > last.bottom) {
+          last.bottom = r.bottom;
+        }
+        if (r.left < last.left) {
+          last.left = r.left;
+        }
+      } else {
+        rects.push({ top: r.top, bottom: r.bottom, left: r.left });
+      }
+    }
+    textNode = walker.nextNode();
+  }
+
+  if (rects.length === 0) {
+    return [];
+  }
+
+  // Detect natural line spacing: the minimum adjacent gap when we have
+  // enough rects, else fall back to computed CSS.
+  let lineSpacing = 0;
+  if (rects.length >= 3) {
+    let min = Number.POSITIVE_INFINITY;
+    for (let i = 1; i < rects.length; i++) {
+      const gap = rects[i].top - rects[i - 1].top;
+      if (gap > 0 && gap < min) {
+        min = gap;
+      }
+    }
+    if (Number.isFinite(min)) {
+      lineSpacing = min;
+    }
+  }
+  if (lineSpacing <= 0) {
+    const cs = getComputedStyle(block.dom);
+    const parsed = Number.parseFloat(cs.lineHeight);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      lineSpacing = parsed / invScale; // cs is CSS px; rect gaps are viewport px
+    } else {
+      lineSpacing = rects[0].bottom - rects[0].top;
+    }
+  }
+  const tolerance = 1;
+
+  // Walk rects. Any adjacent gap larger than `lineSpacing` is a widget from
+  // a prior pass; its excess contributes to cumulative inner shift.
+  const lines: ParagraphLine[] = new Array(rects.length);
+  let innerShiftViewport = 0;
+  let prevTop = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < rects.length; i++) {
+    const rect = rects[i];
+    if (prevTop !== Number.NEGATIVE_INFINITY) {
+      const excess = rect.top - prevTop - lineSpacing;
+      if (excess > tolerance) {
+        innerShiftViewport += excess;
+      }
+    }
+    prevTop = rect.top;
+
+    const measuredTop = (rect.top - editorScreenTop) * invScale;
+    const measuredBottom = (rect.bottom - editorScreenTop) * invScale;
+    const totalExistingShift = blockShift + innerShiftViewport * invScale;
+
+    // Capture rect for the lazy getPos closure.
+    const rectLeft = rect.left;
+    const rectCenterY = rect.top + (rect.bottom - rect.top) / 2;
+    lines[i] = {
+      naturalTop: measuredTop - totalExistingShift,
+      naturalBottom: measuredBottom - totalExistingShift,
+      getPos: () => {
+        const result = view.posAtCoords({
+          left: rectLeft + 1,
+          top: rectCenterY,
+        });
+        return result?.pos ?? null;
+      },
+    };
+  }
+  return lines;
+}
+
+/**
+ * Measure a paragraph's lines. Tries Pretext first, falls back to DOM.
+ * The pagination algorithm in `paginateParagraph` is the same for both.
+ */
+function measureParagraphLines(
+  block: BlockInfo,
+  view: EditorView,
+  editorScreenTop: number,
+  invScale: number,
+  blockNaturalTop: number,
+  blockShift: number,
+): ParagraphLine[] {
+  const fromPretext = measureLinesWithPretext(block, view, blockNaturalTop);
+  if (fromPretext) {
+    return fromPretext;
+  }
+  return measureLinesWithDom(
+    block,
+    view,
+    editorScreenTop,
+    invScale,
+    blockShift,
+  );
 }
 
 /**
@@ -268,16 +438,6 @@ function calculateLayout(
     return shift;
   }
 
-  function paragraphHasInnerWidgets(block: BlockInfo): boolean {
-    const blockEnd = block.pos + block.nodeSize;
-    for (const b of sorted) {
-      if (b.kind === 'inline' && b.pos > block.pos && b.pos < blockEnd) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   const newBreaks: Break[] = [];
   let pageStart = 0;
   let pageBoundary = CONTENT_HEIGHT;
@@ -295,17 +455,21 @@ function calculateLayout(
     }
 
     if (block.isParagraph && blockEffectiveTop < pageBoundary) {
-      const result = paginateParagraph(
+      const lines = measureParagraphLines(
         block,
         view,
         editorScreenTop,
         invScale,
+        blockNaturalTop,
+        blockShift,
+      );
+      const result = paginateParagraph(
+        lines,
+        block.pos,
+        block.pos + block.nodeSize,
         pageStart,
         pageBoundary,
         cumulativeShift,
-        blockShift,
-        paragraphHasInnerWidgets(block),
-        existingShiftAt,
       );
       for (const b of result.breaks) {
         newBreaks.push(b);
