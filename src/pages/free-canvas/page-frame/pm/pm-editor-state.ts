@@ -57,8 +57,14 @@ export class PageFrameEditorState {
   /**
    * Create a persistent EditorView mounted into the given container.
    * Starts non-editable. Call `setEditable(true)` to enable editing.
+   *
+   * `onPageCount`, when provided, is invoked whenever the pagination plugin
+   * computes a new page count for the document.
    */
-  createView(container: HTMLElement): EditorView {
+  createView(
+    container: HTMLElement,
+    onPageCount?: (pageCount: number) => void,
+  ): EditorView {
     if (this._view) {
       this.destroyView();
     }
@@ -66,7 +72,7 @@ export class PageFrameEditorState {
     const doc = schema.nodeFromJSON(this._docJSON);
     const state = EditorState.create({
       doc,
-      plugins: buildPlugins(),
+      plugins: buildPlugins(onPageCount),
     });
 
     this._editable = false;

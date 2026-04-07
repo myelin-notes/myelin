@@ -87,7 +87,10 @@ export function PageFrameDomLayer({
 
           const refs: FrameRefs = { frameDiv, contentDiv };
           frameMap.current.set(frame.index, refs);
-          frame.pmEditor.createView(contentDiv);
+          const capturedFrame = frame;
+          frame.pmEditor.createView(contentDiv, (pageCount) => {
+            capturedFrame.numPages = pageCount;
+          });
         }
 
         const refs = frameMap.current.get(frame.index)!;
