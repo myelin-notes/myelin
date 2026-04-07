@@ -4,7 +4,7 @@ import type {
   ISerializable,
 } from '../../../lib/utils/binary-helper';
 import type { UndoCommand } from '../../../lib/utils/undo-redo';
-import type { Vector2 } from '../drawable-canvas';
+import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { ElementType } from './element-type';
 
 const SELECTION_STROKE = '#2f3e46';
@@ -146,7 +146,11 @@ export abstract class DrawableElement implements ISerializable {
   }
 
   /** Called when the element enters inline edit mode. */
-  public enterEditMode(_screenX?: number, _screenY?: number): void {}
+  public enterEditMode(
+    _canvas: DrawableCanvas,
+    _screenX?: number,
+    _screenY?: number,
+  ): void {}
   /** Called when the element exits inline edit mode. Returns an undo command if the content changed. */
   public exitEditMode(): UndoCommand | null {
     return null;

@@ -5,6 +5,7 @@ import type {
 } from '../../../lib/utils/binary-helper';
 import type { UndoCommand } from '../../../lib/utils/undo-redo';
 import { EditPageFrameCommand } from '../commands/edit-page-frame';
+import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
@@ -73,10 +74,37 @@ export class PageFrameElement extends DrawableElement {
 
   protected updateBoundingBox(): void {}
 
-  public override enterEditMode(screenX?: number, screenY?: number): void {
+  public override enterEditMode(
+    canvas: DrawableCanvas,
+    screenX?: number,
+    screenY?: number,
+  ): void {
     this._editing = true;
     this._oldDocJSON = this.pmEditor.toJSON();
     this.pmEditor.setEditable(true);
+
+    // Center on the page that was clicked (or page 0 if entered with no
+    // pointer location), and fit its width to 80% of the viewport.
+    const sx = Math.abs(this._scale.x);
+    const sy = Math.abs(this._scale.y);
+    let pageIndex = 0;
+    if (screenX != null && screenY != null) {
+      const world = canvas.screenToWorld({ x: screenX, y: screenY });
+      const localY = (world.y - this.offset.y) / sy;
+      const slot = this._pageHeight + PAGE_GAP;
+      pageIndex = Math.max(
+        0,
+        Math.min(this._numPages - 1, Math.floor(localY / slot)),
+      );
+    }
+    const pageTopLocal = pageIndex * (this._pageHeight + PAGE_GAP);
+    const pageRect = new DOMRect(
+      this.offset.x,
+      this.offset.y + pageTopLocal * sy,
+      this._pageWidth * sx,
+      this._pageHeight * sy,
+    );
+    canvas.animateViewToFitRect(pageRect, 0.65);
 
     const view = this.pmEditor.view;
     if (view) {
@@ -85,7 +113,9 @@ export class PageFrameElement extends DrawableElement {
       let pos: number | null = null;
       if (screenX != null && screenY != null) {
         const coords = view.posAtCoords({ left: screenX, top: screenY });
-        if (coords) pos = coords.pos;
+        if (coords) {
+          pos = coords.pos;
+        }
       }
       if (pos == null) {
         pos = view.state.doc.content.size - 1;

@@ -1,3 +1,4 @@
+import { type AnimationPlaybackControls, animate } from 'motion';
 import type {
   BinaryReader,
   BinaryWriter,
@@ -53,9 +54,15 @@ export class DrawableCanvas implements ISerializable {
   private _handleWheel!: (evt: WheelEvent) => void;
   private _handlePointerUp!: (evt: PointerEvent) => void;
   private _handleResize!: () => void;
+  // Wheel is attached to the canvas's parent (not the canvas) so it still
+  // fires during edit mode, when the canvas has pointer-events: none.
+  private _wheelTarget!: HTMLElement;
 
   // Element editing state (e.g., page frame inline editing)
   private _editingElement: DrawableElement | null = null;
+
+  // Active pan/zoom transition (driven by motion's animate())
+  private _viewAnim: AnimationPlaybackControls | null = null;
 
   public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
     const ctx = canvas.getContext('2d', { alpha: true });
@@ -127,8 +134,73 @@ export class DrawableCanvas implements ISerializable {
     // Drop foreground canvas between background (z:0) and DOM (z:2)
     this.canvas.style.pointerEvents = 'none';
     this.canvas.style.zIndex = '1';
-    element.enterEditMode(screenX, screenY);
+    element.enterEditMode(this, screenX, screenY);
     this.onElementEdit?.(element);
+  }
+
+  /**
+   * Animate pan & zoom so the given world-space rect is centered in the
+   * viewport and its width occupies `widthRatio` of the window width.
+   *
+   * Lerps the SCREEN-SPACE position of the rect's center (not offset
+   * directly) so the focal point traces a straight line on the screen.
+   * Lerping offset linearly while zoom also changes makes any fixed world
+   * point trace a curved screen-space path, which shows up visually as
+   * the focal point sliding off-center mid-animation and then "returning"
+   * — i.e. the wobble.
+   */
+  public animateViewToFitRect(
+    worldRect: DOMRect,
+    widthRatio: number = 0.8,
+  ): void {
+    const dpr = window.devicePixelRatio || 1;
+    const screenW = this.canvas.width / dpr;
+    const screenH = this.canvas.height / dpr;
+
+    const targetZoom = Math.min(
+      3,
+      Math.max(0.2, (widthRatio * screenW) / worldRect.width),
+    );
+
+    const worldFocus: Vector2 = {
+      x: worldRect.x + worldRect.width / 2,
+      y: worldRect.y + worldRect.height / 2,
+    };
+
+    // Where the focus point is on screen right now, and where it should
+    // end up (dead center).
+    const startScreenFocus: Vector2 = {
+      x: (worldFocus.x + this._offset.x) * this._zoom,
+      y: (worldFocus.y + this._offset.y) * this._zoom,
+    };
+    const targetScreenFocus: Vector2 = {
+      x: screenW / 2,
+      y: screenH / 2,
+    };
+
+    const startZoom = this._zoom;
+
+    this._viewAnim?.stop();
+    this._viewAnim = animate(0, 1, {
+      duration: 0.7,
+      ease: [0.22, 1, 0.36, 1], // ease-out quint
+      onUpdate: (t) => {
+        const z = startZoom + (targetZoom - startZoom) * t;
+        const sx =
+          startScreenFocus.x + (targetScreenFocus.x - startScreenFocus.x) * t;
+        const sy =
+          startScreenFocus.y + (targetScreenFocus.y - startScreenFocus.y) * t;
+        this._zoom = z;
+        this._offset = {
+          x: sx / z - worldFocus.x,
+          y: sy / z - worldFocus.y,
+        };
+        this.onZoomChange?.(this._zoom);
+      },
+      onComplete: () => {
+        this._viewAnim = null;
+      },
+    });
   }
 
   public exitElementEdit(): void {
@@ -151,7 +223,12 @@ export class DrawableCanvas implements ISerializable {
     if (this._editingElement) {
       this.exitElementEdit();
     }
-    this.canvas.removeEventListener('wheel', this._handleWheel);
+    this._viewAnim?.stop();
+    this._viewAnim = null;
+    this._wheelTarget.removeEventListener(
+      'wheel',
+      this._handleWheel as EventListener,
+    );
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
     window.removeEventListener('pointerup', this._handlePointerUp);
@@ -271,9 +348,15 @@ export class DrawableCanvas implements ISerializable {
 
   private initEventListeners(canvas: HTMLCanvasElement) {
     this._handleWheel = (evt) => {
+      // Cancel any in-progress view animation when the user interacts.
+      this._viewAnim?.stop();
+      this._viewAnim = null;
+      // Stop the browser from scrolling any ancestor / contentEditable; the
+      // canvas owns wheel-driven view changes regardless of edit mode.
+      evt.preventDefault();
       if (evt.ctrlKey) {
-        // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures)
-        evt.preventDefault();
+        // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures).
+        // Zoom is locked while editing — pan still works (else branch below).
         if (this._editingElement) {
           return;
         }
@@ -308,7 +391,14 @@ export class DrawableCanvas implements ISerializable {
       }
       this.mousePosition = this.screenToWorld(this.screenPosition);
     };
-    canvas.addEventListener('wheel', this._handleWheel, { passive: false });
+    // Attach to the canvas's parent so wheel events still reach us during
+    // edit mode (when the canvas itself has pointer-events: none).
+    this._wheelTarget = canvas.parentElement ?? canvas;
+    this._wheelTarget.addEventListener(
+      'wheel',
+      this._handleWheel as EventListener,
+      { passive: false },
+    );
 
     this._handlePointerMove = (evt) => {
       this.screenPosition = { x: evt.pageX, y: evt.pageY };
