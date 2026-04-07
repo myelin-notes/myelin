@@ -108,9 +108,11 @@ export function PageFrameDomLayer({
         }
       }
 
-      // Absorb browser scroll from contentEditable focus
+      // The browser may try to scrollIntoView the focused contentEditable on
+      // its own. Zero those out so they don't accumulate, but DON'T convert
+      // them into a canvas pan — the follow-cursor effect below is the
+      // single source of truth for keeping the caret in view.
       if (container.scrollTop !== 0 || container.scrollLeft !== 0) {
-        dc.panBy(-container.scrollLeft / zoom, -container.scrollTop / zoom);
         container.scrollTop = 0;
         container.scrollLeft = 0;
       }
@@ -168,6 +170,68 @@ export function PageFrameDomLayer({
       document.removeEventListener('pointerdown', handlePointerDown);
     };
   }, [editingElement, onCommitEdit]);
+
+  // Follow-cursor: keep the caret inside a margin-padded viewport while
+  // editing. Fires on every PM transaction (typing, arrow-key navigation,
+  // mark toggles) AND on browser-driven selectionchange (drag-select). This
+  // is the single source of truth — the absorber above no longer pans.
+  useEffect(() => {
+    if (!editingElement) {
+      return;
+    }
+    const view = editingElement.pmEditor.view;
+    if (!view) {
+      return;
+    }
+
+    let pendingRaf = 0;
+    const followCursor = () => {
+      pendingRaf = 0;
+      const dc = canvasRef.current;
+      if (!dc || dc.isAnimatingView) {
+        return;
+      }
+      const sel = view.state.selection;
+      // coordsAtPos can throw if the position is stale (mid-transaction)
+      let rect: { top: number; bottom: number };
+      try {
+        rect = view.coordsAtPos(sel.head);
+      } catch {
+        return;
+      }
+
+      const margin = 120;
+      const viewportTop = margin;
+      const viewportBottom = window.innerHeight - margin;
+
+      let dy = 0;
+      if (rect.bottom > viewportBottom) {
+        dy = (viewportBottom - rect.bottom) / dc.zoom;
+      } else if (rect.top < viewportTop) {
+        dy = (viewportTop - rect.top) / dc.zoom;
+      }
+      if (dy !== 0) {
+        dc.panBy(0, dy);
+      }
+    };
+
+    const schedule = () => {
+      if (pendingRaf === 0) {
+        pendingRaf = requestAnimationFrame(followCursor);
+      }
+    };
+
+    view.dom.addEventListener('pm-update', schedule);
+    document.addEventListener('selectionchange', schedule);
+
+    return () => {
+      if (pendingRaf !== 0) {
+        cancelAnimationFrame(pendingRaf);
+      }
+      view.dom.removeEventListener('pm-update', schedule);
+      document.removeEventListener('selectionchange', schedule);
+    };
+  }, [editingElement, canvasRef]);
 
   return (
     <>

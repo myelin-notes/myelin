@@ -52,11 +52,16 @@ export class DrawableCanvas implements ISerializable {
   private _handlePointerDown!: (evt: PointerEvent) => void;
   private _handlePointerMove!: (evt: PointerEvent) => void;
   private _handleWheel!: (evt: WheelEvent) => void;
+  private _handleTouchStart!: (evt: TouchEvent) => void;
+  private _handleTouchMove!: (evt: TouchEvent) => void;
+  private _handleTouchEnd!: (evt: TouchEvent) => void;
   private _handlePointerUp!: (evt: PointerEvent) => void;
   private _handleResize!: () => void;
-  // Wheel is attached to the canvas's parent (not the canvas) so it still
-  // fires during edit mode, when the canvas has pointer-events: none.
-  private _wheelTarget!: HTMLElement;
+  // Wheel + touch are attached to the canvas's parent (not the canvas) so
+  // they still fire during edit mode, when the canvas has pointer-events: none.
+  private _gestureTarget!: HTMLElement;
+  // Two-finger touch pan state during edit mode
+  private _touchPanLastY: number | null = null;
 
   // Element editing state (e.g., page frame inline editing)
   private _editingElement: DrawableElement | null = null;
@@ -120,6 +125,10 @@ export class DrawableCanvas implements ISerializable {
 
   public get editingElement(): DrawableElement | null {
     return this._editingElement;
+  }
+
+  public get isAnimatingView(): boolean {
+    return this._viewAnim !== null;
   }
 
   public enterElementEdit(
@@ -225,9 +234,21 @@ export class DrawableCanvas implements ISerializable {
     }
     this._viewAnim?.stop();
     this._viewAnim = null;
-    this._wheelTarget.removeEventListener(
+    this._gestureTarget.removeEventListener(
       'wheel',
       this._handleWheel as EventListener,
+    );
+    this._gestureTarget.removeEventListener(
+      'touchstart',
+      this._handleTouchStart as EventListener,
+    );
+    this._gestureTarget.removeEventListener(
+      'touchmove',
+      this._handleTouchMove as EventListener,
+    );
+    this._gestureTarget.removeEventListener(
+      'touchend',
+      this._handleTouchEnd as EventListener,
     );
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
@@ -385,19 +406,72 @@ export class DrawableCanvas implements ISerializable {
 
         this.onZoomChange?.(this._zoom);
       } else {
-        // Two-finger scroll on trackpad / mouse wheel → pan
-        this._offset.x -= evt.deltaX / this._zoom;
+        // Two-finger scroll on trackpad / mouse wheel → pan.
+        // While editing, restrict to vertical pan only — the page is
+        // centered horizontally and there's nothing meaningful left/right.
+        if (!this._editingElement) {
+          this._offset.x -= evt.deltaX / this._zoom;
+        }
         this._offset.y -= evt.deltaY / this._zoom;
       }
       this.mousePosition = this.screenToWorld(this.screenPosition);
     };
-    // Attach to the canvas's parent so wheel events still reach us during
-    // edit mode (when the canvas itself has pointer-events: none).
-    this._wheelTarget = canvas.parentElement ?? canvas;
-    this._wheelTarget.addEventListener(
+    // Attach wheel + touch to the canvas's parent so they still reach us
+    // during edit mode (when the canvas itself has pointer-events: none).
+    this._gestureTarget = canvas.parentElement ?? canvas;
+    this._gestureTarget.addEventListener(
       'wheel',
       this._handleWheel as EventListener,
       { passive: false },
+    );
+
+    // Two-finger touch pan during edit mode (vertical only). Single-finger
+    // touch is left to the contentEditable for cursor placement / selection.
+    this._handleTouchStart = (evt) => {
+      if (!this._editingElement) {
+        return;
+      }
+      if (evt.touches.length >= 2) {
+        this._touchPanLastY =
+          (evt.touches[0].clientY + evt.touches[1].clientY) / 2;
+        evt.preventDefault();
+      } else {
+        this._touchPanLastY = null;
+      }
+    };
+    this._handleTouchMove = (evt) => {
+      if (!this._editingElement) {
+        return;
+      }
+      if (evt.touches.length < 2 || this._touchPanLastY == null) {
+        return;
+      }
+      evt.preventDefault();
+      this._viewAnim?.stop();
+      this._viewAnim = null;
+      const avgY = (evt.touches[0].clientY + evt.touches[1].clientY) / 2;
+      const dy = avgY - this._touchPanLastY;
+      this._touchPanLastY = avgY;
+      this._offset.y += dy / this._zoom;
+    };
+    this._handleTouchEnd = (evt) => {
+      if (evt.touches.length < 2) {
+        this._touchPanLastY = null;
+      }
+    };
+    this._gestureTarget.addEventListener(
+      'touchstart',
+      this._handleTouchStart as EventListener,
+      { passive: false },
+    );
+    this._gestureTarget.addEventListener(
+      'touchmove',
+      this._handleTouchMove as EventListener,
+      { passive: false },
+    );
+    this._gestureTarget.addEventListener(
+      'touchend',
+      this._handleTouchEnd as EventListener,
     );
 
     this._handlePointerMove = (evt) => {

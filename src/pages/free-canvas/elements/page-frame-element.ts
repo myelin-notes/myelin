@@ -83,28 +83,26 @@ export class PageFrameElement extends DrawableElement {
     this._oldDocJSON = this.pmEditor.toJSON();
     this.pmEditor.setEditable(true);
 
-    // Center on the page that was clicked (or page 0 if entered with no
-    // pointer location), and fit its width to 80% of the viewport.
+    // Horizontally: center the page (zoom fits page width to 65% of viewport).
+    // Vertically: center on the click's world Y so the user lands on exactly
+    // the line they tapped. Fall back to the first page's middle when entered
+    // with no pointer location.
     const sx = Math.abs(this._scale.x);
     const sy = Math.abs(this._scale.y);
-    let pageIndex = 0;
-    if (screenX != null && screenY != null) {
-      const world = canvas.screenToWorld({ x: screenX, y: screenY });
-      const localY = (world.y - this.offset.y) / sy;
-      const slot = this._pageHeight + PAGE_GAP;
-      pageIndex = Math.max(
-        0,
-        Math.min(this._numPages - 1, Math.floor(localY / slot)),
-      );
-    }
-    const pageTopLocal = pageIndex * (this._pageHeight + PAGE_GAP);
-    const pageRect = new DOMRect(
+    const focusWorldY =
+      screenX != null && screenY != null
+        ? canvas.screenToWorld({ x: screenX, y: screenY }).y
+        : this.offset.y + (this._pageHeight * sy) / 2;
+    // Zero-height rect: animateViewToFitRect uses width for zoom and the
+    // rect's center as the focal point, so a 0-height rect at focusWorldY
+    // gives us "fit page width, vertical center = focusWorldY".
+    const focusRect = new DOMRect(
       this.offset.x,
-      this.offset.y + pageTopLocal * sy,
+      focusWorldY,
       this._pageWidth * sx,
-      this._pageHeight * sy,
+      0,
     );
-    canvas.animateViewToFitRect(pageRect, 0.65);
+    canvas.animateViewToFitRect(focusRect, 0.65);
 
     const view = this.pmEditor.view;
     if (view) {
