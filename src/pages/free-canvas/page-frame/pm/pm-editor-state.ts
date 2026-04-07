@@ -20,8 +20,6 @@ export class PageFrameEditorState {
       docJSON ?? (createDefaultDoc().toJSON() as Record<string, unknown>);
   }
 
-  // ── Accessors ──────────────────────────────────────────
-
   get doc(): PMNode {
     if (this._view) {
       return this._view.state.doc;
@@ -48,8 +46,6 @@ export class PageFrameEditorState {
     return this._editable;
   }
 
-  // ── Serialization ──────────────────────────────────────
-
   toJSON(): Record<string, unknown> {
     return this.docJSON;
   }
@@ -58,16 +54,11 @@ export class PageFrameEditorState {
     return new PageFrameEditorState(json);
   }
 
-  // ── View lifecycle ─────────────────────────────────────
-
   /**
    * Create a persistent EditorView mounted into the given container.
    * Starts non-editable. Call `setEditable(true)` to enable editing.
    */
-  createView(
-    container: HTMLElement,
-    onPageCount?: (n: number) => void,
-  ): EditorView {
+  createView(container: HTMLElement): EditorView {
     if (this._view) {
       this.destroyView();
     }
@@ -75,7 +66,7 @@ export class PageFrameEditorState {
     const doc = schema.nodeFromJSON(this._docJSON);
     const state = EditorState.create({
       doc,
-      plugins: buildPlugins(onPageCount),
+      plugins: buildPlugins(),
     });
 
     this._editable = false;
@@ -133,8 +124,6 @@ export class PageFrameEditorState {
     }
   }
 }
-
-// ── Helpers ──────────────────────────────────────────────
 
 function createDefaultDoc(): PMNode {
   return schema.node('doc', null, [schema.node('paragraph', null)]);

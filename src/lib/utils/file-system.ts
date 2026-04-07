@@ -234,8 +234,6 @@ export namespace FileSystem {
     return convertFileSrc(url);
   }
 
-  // --- Tag queries ---
-
   export function queryByTags(
     manifest: VFSManifest,
     filter: (tags: string[]) => boolean,
@@ -310,8 +308,6 @@ export namespace FileSystem {
     }
     return { totalFiles, totalFolders, totalTags: tagSet.size };
   }
-
-  // --- Mutations ---
 
   export async function createFolder(
     name: string,
@@ -513,8 +509,6 @@ export namespace FileSystem {
     }
     return `${baseName} ${counter}`;
   }
-
-  // --- File I/O (by node ID) ---
 
   export async function saveToFile(nodeId: string, content: ISerializable) {
     const manifest = await loadManifest();

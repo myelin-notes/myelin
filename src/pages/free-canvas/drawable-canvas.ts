@@ -165,7 +165,7 @@ export class DrawableCanvas implements ISerializable {
 
     const editing = this._editingElement !== null;
 
-    // ── Background canvas: dot grid + chrome (when not editing) ──
+    // Background canvas: dot grid + chrome (when not editing)
     if (this.bgCtx && this.bgCanvas) {
       const bgW = this.bgCanvas.width / dpr;
       const bgH = this.bgCanvas.height / dpr;
@@ -199,7 +199,7 @@ export class DrawableCanvas implements ISerializable {
       }
     }
 
-    // ── Foreground canvas ──
+    // Foreground canvas
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.clearRect(0, 0, logicalW, logicalH);
 

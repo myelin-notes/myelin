@@ -1,7 +1,5 @@
 import { type MarkSpec, type NodeSpec, Schema } from 'prosemirror-model';
 
-// ── Block nodes ──────────────────────────────────────────
-
 const doc: NodeSpec = {
   content: 'block+',
 };
@@ -102,8 +100,6 @@ const horizontalRule: NodeSpec = {
   parseDOM: [{ tag: 'hr' }],
 };
 
-// ── Inline nodes ─────────────────────────────────────────
-
 const image: NodeSpec = {
   inline: true,
   group: 'inline',
@@ -158,8 +154,6 @@ const mention: NodeSpec = {
     },
   ],
 };
-
-// ── Marks ────────────────────────────────────────────────
 
 const bold: MarkSpec = {
   toDOM() {
@@ -231,8 +225,6 @@ const link: MarkSpec = {
     },
   ],
 };
-
-// ── Schema ───────────────────────────────────────────────
 
 export const schema = new Schema({
   nodes: {

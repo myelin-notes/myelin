@@ -10,8 +10,6 @@ import {
 } from '../../elements/page-frame-element';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 
-// ── Style constants ────────────────────────────────────────
-
 const FRAME_STYLE: Record<string, string> = {
   transformOrigin: '0 0',
   position: 'absolute',
@@ -27,14 +25,10 @@ const CONTENT_STYLE: Record<string, string> = {
   outline: 'none',
 };
 
-// ── Types ──────────────────────────────────────────────────
-
 interface FrameRefs {
   frameDiv: HTMLDivElement;
   contentDiv: HTMLDivElement;
 }
-
-// ── Component ──────────────────────────────────────────────
 
 interface PageFrameDomLayerProps {
   canvasRef: React.RefObject<DrawableCanvas | null>;
@@ -93,12 +87,7 @@ export function PageFrameDomLayer({
 
           const refs: FrameRefs = { frameDiv, contentDiv };
           frameMap.current.set(frame.index, refs);
-
-          // Pagination is handled by a ProseMirror plugin (widget decorations).
-          // The callback keeps frame.numPages in sync.
-          frame.pmEditor.createView(contentDiv, (n) => {
-            frame.numPages = n;
-          });
+          frame.pmEditor.createView(contentDiv);
         }
 
         const refs = frameMap.current.get(frame.index)!;
