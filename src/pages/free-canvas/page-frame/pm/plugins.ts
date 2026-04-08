@@ -1,6 +1,6 @@
 import { history } from 'prosemirror-history';
 import type { Plugin } from 'prosemirror-state';
-import { buildInputRules } from './input-rules';
+import { buildInputRules, inlineMarkAutoFormatPlugin } from './input-rules';
 import { buildKeymap } from './keymap';
 import { paginationPlugin } from './pagination';
 import { schema } from './schema';
@@ -10,6 +10,7 @@ export function buildPlugins(
 ): Plugin[] {
   const plugins: Plugin[] = [
     buildInputRules(schema),
+    inlineMarkAutoFormatPlugin(schema),
     buildKeymap(schema),
     history(),
   ];

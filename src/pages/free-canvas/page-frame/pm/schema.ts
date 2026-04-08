@@ -196,6 +196,9 @@ const strikethrough: MarkSpec = {
 };
 
 const code: MarkSpec = {
+  // Markdown semantics: a code span is a hard, atomic island — it can't
+  // coexist with bold/italic/etc. `'_'` excludes all other marks.
+  excludes: '_',
   toDOM() {
     return ['code', 0];
   },
