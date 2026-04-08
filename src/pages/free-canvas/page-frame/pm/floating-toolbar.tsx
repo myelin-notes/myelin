@@ -15,12 +15,17 @@ interface ToolbarPosition {
   visible: boolean;
 }
 
-const MARK_BUTTONS: {
+interface MarkButton {
   mark: MarkType;
   icon: React.FC<{ className?: string }>;
   label: string;
   shortcut: string;
-}[] = [
+}
+
+// Two visual groups joined by spacing — DESIGN.md §2 forbids divider lines,
+// so the typographic marks and the structural "code" mark are separated via
+// the spacing scale instead.
+const TYPOGRAPHY_MARKS: MarkButton[] = [
   { mark: schema.marks.bold, icon: Bold, label: 'Bold', shortcut: '⌘B' },
   { mark: schema.marks.italic, icon: Italic, label: 'Italic', shortcut: '⌘I' },
   {
@@ -35,8 +40,13 @@ const MARK_BUTTONS: {
     label: 'Strikethrough',
     shortcut: '⌘⇧S',
   },
+];
+
+const STRUCTURAL_MARKS: MarkButton[] = [
   { mark: schema.marks.code, icon: Code, label: 'Code', shortcut: '⌘E' },
 ];
+
+const ALL_MARKS = [...TYPOGRAPHY_MARKS, ...STRUCTURAL_MARKS];
 
 function isMarkActive(state: EditorView['state'], markType: MarkType): boolean {
   const { from, $from, to, empty } = state.selection;
@@ -65,7 +75,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
 
       // Update active marks on every state change.
       const nextActive = new Set<MarkType>();
-      for (const { mark } of MARK_BUTTONS) {
+      for (const { mark } of ALL_MARKS) {
         if (isMarkActive(view.state, mark)) {
           nextActive.add(mark);
         }
@@ -102,9 +112,9 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
         return;
       }
 
-      const toolbarWidth = toolbarRef.current?.offsetWidth ?? 200;
+      const toolbarWidth = toolbarRef.current?.offsetWidth ?? 220;
       const x = rect.left + rect.width / 2 - toolbarWidth / 2;
-      const y = rect.top - 44;
+      const y = rect.top - 52;
 
       setPos({ x, y, visible: true });
     }
@@ -119,9 +129,31 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     const onSelectionChange = () => requestAnimationFrame(syncState);
     document.addEventListener('selectionchange', onSelectionChange);
 
+    // Hide on any click that lands outside both the editor and the toolbar.
+    // PM keeps its selection state across blur, and browsers keep the visual
+    // text selection alive when focus moves to a non-editable element — so
+    // syncState's range-change check alone won't catch "click somewhere else
+    // on the page". Capture phase so we run before element-level handlers.
+    const onOutsidePointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (toolbarRef.current?.contains(target)) {
+        return;
+      }
+      if (view.dom.contains(target)) {
+        return;
+      }
+      lastSelRange.current = null;
+      setPos((p) => (p.visible ? { ...p, visible: false } : p));
+    };
+    document.addEventListener('pointerdown', onOutsidePointerDown, true);
+
     return () => {
       view.dom.removeEventListener('pm-update', onUpdate);
       document.removeEventListener('selectionchange', onSelectionChange);
+      document.removeEventListener('pointerdown', onOutsidePointerDown, true);
     };
   }, [view]);
 
@@ -137,35 +169,45 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     return null;
   }
 
+  const renderButton = ({ mark, icon: Icon, label, shortcut }: MarkButton) => {
+    const active = activeMarks.has(mark);
+    return (
+      <button
+        key={label}
+        type="button"
+        title={`${label}  ·  ${shortcut}`}
+        onClick={() => handleToggleMark(mark)}
+        className={`flex size-8 cursor-pointer items-center justify-center rounded-lg border-none transition-colors duration-100 ${
+          active
+            ? 'bg-gradient-to-b from-accent-dark to-primary-container text-text-on-dark'
+            : 'bg-transparent text-text-secondary hover:bg-hover-tint hover:text-text-primary'
+        }`}
+      >
+        <Icon className="size-4" />
+      </button>
+    );
+  };
+
   return (
     <div
       ref={toolbarRef}
-      className="fixed z-50 flex items-center gap-0.5 rounded-lg bg-white/90 px-1 py-0.5 shadow-ambient backdrop-blur-[24px]"
+      className="fade-in-0 zoom-in-95 slide-in-from-bottom-1 fixed z-50 flex animate-in items-center gap-2 rounded-xl bg-card/80 px-1.5 py-1 shadow-ambient backdrop-blur-[24px] duration-150"
       style={{
         left: pos.x,
         top: pos.y,
-        border: '0.5px solid rgba(195, 199, 202, 0.25)',
+        border: '0.5px solid var(--border-ghost)',
       }}
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
       }}
     >
-      {MARK_BUTTONS.map(({ mark, icon: Icon, label }) => (
-        <button
-          key={label}
-          type="button"
-          className={`flex size-7 items-center justify-center rounded-md transition-colors ${
-            activeMarks.has(mark)
-              ? 'bg-accent-dark/10 text-accent-dark'
-              : 'text-text-secondary hover:bg-hover-tint'
-          }`}
-          onClick={() => handleToggleMark(mark)}
-          title={label}
-        >
-          <Icon className="size-3.5" />
-        </button>
-      ))}
+      <div className="flex items-center gap-0.5">
+        {TYPOGRAPHY_MARKS.map(renderButton)}
+      </div>
+      <div className="flex items-center gap-0.5">
+        {STRUCTURAL_MARKS.map(renderButton)}
+      </div>
     </div>
   );
 }

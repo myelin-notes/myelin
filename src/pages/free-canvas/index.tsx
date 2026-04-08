@@ -38,24 +38,6 @@ export function CanvasView() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
-      <TitleBar fileName={engine.fileName} onBack={engine.back} />
-
-      <CanvasToolbar
-        tools={toolState.canvasTools}
-        selectedToolIndex={toolState.selectedToolIndex}
-        optionsVisible={toolState.optionsVisible}
-        shelfOpen={toolState.shelfOpen}
-        activeOptions={toolState.activeOptions}
-        hasOptions={toolState.hasOptions}
-        wheelEnabledIndices={toolState.wheelEnabledIndices}
-        onSelectTool={toolState.selectTool}
-        onToggleOptions={toolState.toggleOptions}
-        onSetOption={toolState.handleSetOption}
-        onToggleShelf={toolState.toggleShelf}
-        onCloseShelf={toolState.closeShelf}
-        onToggleWheelTool={toolState.handleToggleWheelTool}
-      />
-
       {/* z:0 — Background canvas: dot grid + page chrome */}
       <canvas
         ref={bgCanvasRef}
@@ -86,6 +68,23 @@ export function CanvasView() {
       />
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
+      <TitleBar fileName={engine.fileName} onBack={engine.back} />
+
+      <CanvasToolbar
+        tools={toolState.canvasTools}
+        selectedToolIndex={toolState.selectedToolIndex}
+        optionsVisible={toolState.optionsVisible}
+        shelfOpen={toolState.shelfOpen}
+        activeOptions={toolState.activeOptions}
+        hasOptions={toolState.hasOptions}
+        wheelEnabledIndices={toolState.wheelEnabledIndices}
+        onSelectTool={toolState.selectTool}
+        onToggleOptions={toolState.toggleOptions}
+        onSetOption={toolState.handleSetOption}
+        onToggleShelf={toolState.toggleShelf}
+        onCloseShelf={toolState.closeShelf}
+        onToggleWheelTool={toolState.handleToggleWheelTool}
+      />
 
       {editingText && (
         <TextEditOverlay
