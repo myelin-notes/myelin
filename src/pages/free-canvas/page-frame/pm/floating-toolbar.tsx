@@ -3,6 +3,13 @@ import { Bold, Code, Italic, Strikethrough, Underline } from 'lucide-react';
 import { toggleMark } from 'prosemirror-commands';
 import type { MarkType } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { formatKeyCombo, type KeyCombo } from '@/lib/keybindings';
 import { schema } from './schema';
 
 interface FloatingToolbarProps {
@@ -19,31 +26,46 @@ interface MarkButton {
   mark: MarkType;
   icon: React.FC<{ className?: string }>;
   label: string;
-  shortcut: string;
+  combo: KeyCombo;
 }
 
 // Two visual groups joined by spacing — DESIGN.md §2 forbids divider lines,
 // so the typographic marks and the structural "code" mark are separated via
 // the spacing scale instead.
 const TYPOGRAPHY_MARKS: MarkButton[] = [
-  { mark: schema.marks.bold, icon: Bold, label: 'Bold', shortcut: '⌘B' },
-  { mark: schema.marks.italic, icon: Italic, label: 'Italic', shortcut: '⌘I' },
+  {
+    mark: schema.marks.bold,
+    icon: Bold,
+    label: 'Bold',
+    combo: { mod: true, key: 'b' },
+  },
+  {
+    mark: schema.marks.italic,
+    icon: Italic,
+    label: 'Italic',
+    combo: { mod: true, key: 'i' },
+  },
   {
     mark: schema.marks.underline,
     icon: Underline,
     label: 'Underline',
-    shortcut: '⌘U',
+    combo: { mod: true, key: 'u' },
   },
   {
     mark: schema.marks.strikethrough,
     icon: Strikethrough,
     label: 'Strikethrough',
-    shortcut: '⌘⇧S',
+    combo: { mod: true, shift: true, key: 's' },
   },
 ];
 
 const STRUCTURAL_MARKS: MarkButton[] = [
-  { mark: schema.marks.code, icon: Code, label: 'Code', shortcut: '⌘E' },
+  {
+    mark: schema.marks.code,
+    icon: Code,
+    label: 'Code',
+    combo: { mod: true, key: 'e' },
+  },
 ];
 
 const ALL_MARKS = [...TYPOGRAPHY_MARKS, ...STRUCTURAL_MARKS];
@@ -169,45 +191,56 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     return null;
   }
 
-  const renderButton = ({ mark, icon: Icon, label, shortcut }: MarkButton) => {
+  const renderButton = ({ mark, icon: Icon, label, combo }: MarkButton) => {
     const active = activeMarks.has(mark);
     return (
-      <button
-        key={label}
-        type="button"
-        title={`${label}  ·  ${shortcut}`}
-        onClick={() => handleToggleMark(mark)}
-        className={`flex size-8 cursor-pointer items-center justify-center rounded-lg border-none transition-colors duration-100 ${
-          active
-            ? 'bg-gradient-to-b from-accent-dark to-primary-container text-text-on-dark'
-            : 'bg-transparent text-text-secondary hover:bg-hover-tint hover:text-text-primary'
-        }`}
-      >
-        <Icon className="size-4" />
-      </button>
+      <Tooltip key={label}>
+        <TooltipTrigger
+          type="button"
+          onClick={() => handleToggleMark(mark)}
+          className={`flex size-8 cursor-pointer items-center justify-center rounded-lg border-none transition-colors duration-100 ${
+            active
+              ? 'bg-gradient-to-b from-accent-dark to-primary-container text-text-on-dark'
+              : 'bg-transparent text-text-secondary hover:bg-hover-tint hover:text-text-primary'
+          }`}
+        >
+          <Icon className="size-4" />
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={6}>
+          <span>{label}</span>
+          <kbd
+            data-slot="kbd"
+            className="ml-1 rounded bg-white/10 px-1.5 py-0.5 font-medium text-[10px] text-white/80"
+          >
+            {formatKeyCombo(combo)}
+          </kbd>
+        </TooltipContent>
+      </Tooltip>
     );
   };
 
   return (
-    <div
-      ref={toolbarRef}
-      className="fade-in-0 zoom-in-95 slide-in-from-bottom-1 fixed z-50 flex animate-in items-center gap-2 rounded-xl bg-card/80 px-1.5 py-1 shadow-ambient backdrop-blur-[24px] duration-150"
-      style={{
-        left: pos.x,
-        top: pos.y,
-        border: '0.5px solid var(--border-ghost)',
-      }}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-    >
-      <div className="flex items-center gap-0.5">
-        {TYPOGRAPHY_MARKS.map(renderButton)}
+    <TooltipProvider delay={250}>
+      <div
+        ref={toolbarRef}
+        className="fade-in-0 zoom-in-95 slide-in-from-bottom-1 fixed z-50 flex animate-in items-center gap-2 rounded-xl bg-card/80 px-1.5 py-1 shadow-ambient backdrop-blur-[24px] duration-150"
+        style={{
+          left: pos.x,
+          top: pos.y,
+          border: '0.5px solid var(--border-ghost)',
+        }}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        <div className="flex items-center gap-0.5">
+          {TYPOGRAPHY_MARKS.map(renderButton)}
+        </div>
+        <div className="flex items-center gap-0.5">
+          {STRUCTURAL_MARKS.map(renderButton)}
+        </div>
       </div>
-      <div className="flex items-center gap-0.5">
-        {STRUCTURAL_MARKS.map(renderButton)}
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }

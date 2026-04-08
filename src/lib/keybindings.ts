@@ -56,7 +56,7 @@ export function formatKeyCombo(combo: KeyCombo): string {
         ? combo.key.toUpperCase()
         : combo.key;
   parts.push(key);
-  return isMac ? parts.join('') : parts.join('+');
+  return isMac ? parts.join(' ') : parts.join('+');
 }
 
 class KeybindingManager {
