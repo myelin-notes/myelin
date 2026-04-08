@@ -220,20 +220,6 @@ export function inlineMarkAutoFormatPlugin(s: Schema): Plugin {
         return tr;
       }
 
-      // No auto-format pattern matched. Defensive: if the cursor's parent
-      // block is empty (i.e. the user just deleted the entire marked
-      // section) but storedMarks somehow persisted, clear them so the next
-      // typed character starts fresh. This is normally a no-op (PM's
-      // `addStep` clears `tr.storedMarks` automatically), but covers any
-      // edge case where stored marks linger after the block is empty.
-      if (
-        $cursor.parent.content.size === 0 &&
-        newState.storedMarks &&
-        newState.storedMarks.length > 0
-      ) {
-        return newState.tr.setStoredMarks(null);
-      }
-
       return null;
     },
   });

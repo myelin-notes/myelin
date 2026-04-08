@@ -20,9 +20,13 @@ const FRAME_STYLE: Record<string, string> = {
 };
 
 const CONTENT_STYLE: Record<string, string> = {
-  position: 'relative',
+  // Fill the entire frame so clicks anywhere on the page reach PM. With
+  // auto height, an empty document only covers the top ~120px (one
+  // paragraph + padding) and the rest of the page falls outside the
+  // contenteditable area.
+  position: 'absolute',
+  inset: '0',
   padding: `${PAGE_PADDING}px`,
-  outline: 'none',
 };
 
 interface FrameRefs {

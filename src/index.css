@@ -241,9 +241,14 @@ input[type="range"].tool-slider::-moz-range-track {
   color: #191c1e;
 }
 
+/* PM creates the `.ProseMirror` contenteditable as a CHILD of our
+   `.pm-editor` content div (not the same element), so use a descendant
+   selector. `outline: none` here suppresses the slate-blue focus ring
+   that WebKit otherwise paints, picking up the color from the base
+   layer's universal `outline-color: var(--ring)/50` rule. */
 .pm-editor .ProseMirror {
+  min-height: 100%;
   outline: none;
-  min-height: 1.5em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -390,15 +395,8 @@ input[type="range"].tool-slider::-moz-range-track {
   border-radius: 4px;
 }
 
-/* Selection styling */
+/* Node-selection outline */
 .pm-editor .ProseMirror-selectednode {
   outline: 2px solid #3b82f6;
   border-radius: 2px;
-}
-
-/* Placeholder for empty paragraphs (first child only) */
-.pm-editor .ProseMirror > p:first-child:last-child:empty::before,
-.pm-editor .ProseMirror > p:first-child:last-child > br:only-child::before {
-  content: "";
-  pointer-events: none;
 }
