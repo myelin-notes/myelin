@@ -178,7 +178,7 @@ export function useCanvasEngine({
       dc.setBackgroundCanvas(bgCanvasRef.current);
     }
 
-    dc.setOnZoomChange((zoom) => setZoomLevel(Math.round(zoom * 100)));
+    dc.viewport.setOnZoomChange((zoom) => setZoomLevel(Math.round(zoom * 100)));
 
     dc.setOnRequestFilePick((screenPos) => {
       pendingEmbedPos.current = screenPos;
@@ -248,7 +248,7 @@ export function useCanvasEngine({
         }
         if (dc.elements.length === 0) {
           const dpr = window.devicePixelRatio || 1;
-          const centerWorld = dc.screenToWorld({
+          const centerWorld = dc.viewport.screenToWorld({
             x: canvas.width / dpr / 2,
             y: canvas.height / dpr / 2,
           });

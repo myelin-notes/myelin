@@ -15,8 +15,8 @@ export function TextEditOverlay({
   onDismiss,
 }: TextEditOverlayProps) {
   const oldTextRef = useRef(element.text);
-  const zoom = canvas.zoom;
-  const screenPos = canvas.worldToScreen({
+  const zoom = canvas.viewport.zoom;
+  const screenPos = canvas.viewport.worldToScreen({
     x: element.boundingBox.x,
     y: element.boundingBox.y,
   });

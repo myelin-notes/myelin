@@ -62,8 +62,8 @@ export function PageFrameDomLayer({
         return;
       }
 
-      const zoom = dc.zoom;
-      const offset = dc.viewOffset;
+      const zoom = dc.viewport.zoom;
+      const offset = dc.viewport.offset;
       const frames = dc.getElementsByType(
         ElementType.PAGE_FRAME,
       ) as PageFrameElement[];
@@ -188,7 +188,7 @@ export function PageFrameDomLayer({
     const followCursor = () => {
       pendingRaf = 0;
       const dc = canvasRef.current;
-      if (!dc || dc.isAnimatingView) {
+      if (!dc || dc.viewport.isAnimatingView) {
         return;
       }
       const sel = view.state.selection;
@@ -206,12 +206,12 @@ export function PageFrameDomLayer({
 
       let dy = 0;
       if (rect.bottom > viewportBottom) {
-        dy = (viewportBottom - rect.bottom) / dc.zoom;
+        dy = (viewportBottom - rect.bottom) / dc.viewport.zoom;
       } else if (rect.top < viewportTop) {
-        dy = (viewportTop - rect.top) / dc.zoom;
+        dy = (viewportTop - rect.top) / dc.viewport.zoom;
       }
       if (dy !== 0) {
-        dc.panBy(0, dy);
+        dc.viewport.panBy(0, dy);
       }
     };
 

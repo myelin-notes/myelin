@@ -1,4 +1,3 @@
-import { type AnimationPlaybackControls, animate } from 'motion';
 import type {
   BinaryReader,
   BinaryWriter,
@@ -7,6 +6,7 @@ import type {
 import { StateMachine } from '../../lib/utils/state-machine';
 import type { UndoCommand } from '../../lib/utils/undo-redo';
 import { UndoRedoStack } from '../../lib/utils/undo-redo';
+import { CanvasViewport } from './canvas-viewport';
 import { AddElementCommand, RemoveElementCommand } from './commands';
 import type { DrawableElement } from './elements/drawable-element';
 import { DrawableElementRegistry } from './elements/drawable-element-registry';
@@ -25,6 +25,7 @@ export type Vector2 = { x: number; y: number };
 
 export class DrawableCanvas implements ISerializable {
   public readonly ctx: CanvasRenderingContext2D;
+  public readonly viewport: CanvasViewport;
   private readonly canvas: HTMLCanvasElement;
   private bgCtx: CanvasRenderingContext2D | null = null;
   private bgCanvas: HTMLCanvasElement | null = null;
@@ -32,10 +33,7 @@ export class DrawableCanvas implements ISerializable {
   public readonly tools: ITool[];
   private dotPattern: CanvasPattern | null = null;
 
-  private _offset: Vector2 = { x: 0, y: 0 };
-  private _zoom: number = 1;
   private spaceDown: boolean = false;
-  private mousePosition: Vector2 = { x: 0, y: 0 };
   private screenPosition: Vector2 = { x: 0, y: 0 };
 
   private _elements: DrawableElement[] = [];
@@ -44,30 +42,17 @@ export class DrawableCanvas implements ISerializable {
   private toolSelected: ITool;
   private _toolCursor: string = 'default';
 
-  private onZoomChange?: (zoom: number) => void;
   private onRequestFilePick?: (screenPos: Vector2) => void;
   private onElementEdit?: (element: DrawableElement | null) => void;
 
   // Event handlers (stored for cleanup in destroy())
   private _handlePointerDown!: (evt: PointerEvent) => void;
   private _handlePointerMove!: (evt: PointerEvent) => void;
-  private _handleWheel!: (evt: WheelEvent) => void;
-  private _handleTouchStart!: (evt: TouchEvent) => void;
-  private _handleTouchMove!: (evt: TouchEvent) => void;
-  private _handleTouchEnd!: (evt: TouchEvent) => void;
   private _handlePointerUp!: (evt: PointerEvent) => void;
   private _handleResize!: () => void;
-  // Wheel + touch are attached to the canvas's parent (not the canvas) so
-  // they still fire during edit mode, when the canvas has pointer-events: none.
-  private _gestureTarget!: HTMLElement;
-  // Two-finger touch pan state during edit mode
-  private _touchPanLastY: number | null = null;
 
   // Element editing state (e.g., page frame inline editing)
   private _editingElement: DrawableElement | null = null;
-
-  // Active pan/zoom transition (driven by motion's animate())
-  private _viewAnim: AnimationPlaybackControls | null = null;
 
   public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
     const ctx = canvas.getContext('2d', { alpha: true });
@@ -78,6 +63,7 @@ export class DrawableCanvas implements ISerializable {
     this.canvas = canvas;
     this.canvas.style.zIndex = '5';
     this.ctx = ctx!;
+    this.viewport = new CanvasViewport(canvas);
     this.state = new StateMachine(InteractState.Idle);
     this.tools = tools ?? DrawableCanvas.makeTools();
     this.toolSelected = this.tools[0];
@@ -94,25 +80,12 @@ export class DrawableCanvas implements ISerializable {
     this.resizeBgCanvas(window.innerWidth, window.innerHeight);
   }
 
-  public setOnZoomChange(callback: (zoom: number) => void) {
-    this.onZoomChange = callback;
-  }
-
   public setOnRequestFilePick(callback: (screenPos: Vector2) => void) {
     this.onRequestFilePick = callback;
   }
 
   public setOnElementEdit(callback: (element: DrawableElement | null) => void) {
     this.onElementEdit = callback;
-  }
-
-  public get viewOffset(): Vector2 {
-    return this._offset;
-  }
-
-  public panBy(dx: number, dy: number) {
-    this._offset.x += dx;
-    this._offset.y += dy;
   }
 
   public getElementsByType(type: ElementType): DrawableElement[] {
@@ -127,10 +100,6 @@ export class DrawableCanvas implements ISerializable {
     return this._editingElement;
   }
 
-  public get isAnimatingView(): boolean {
-    return this._viewAnim !== null;
-  }
-
   public enterElementEdit(
     element: DrawableElement,
     screenX?: number,
@@ -143,73 +112,10 @@ export class DrawableCanvas implements ISerializable {
     // Drop foreground canvas between background (z:0) and DOM (z:2)
     this.canvas.style.pointerEvents = 'none';
     this.canvas.style.zIndex = '1';
+    // Camera switches to "vertical-only pan + handle two-finger touch" mode.
+    this.viewport.editMode = true;
     element.enterEditMode(this, screenX, screenY);
     this.onElementEdit?.(element);
-  }
-
-  /**
-   * Animate pan & zoom so the given world-space rect is centered in the
-   * viewport and its width occupies `widthRatio` of the window width.
-   *
-   * Lerps the SCREEN-SPACE position of the rect's center (not offset
-   * directly) so the focal point traces a straight line on the screen.
-   * Lerping offset linearly while zoom also changes makes any fixed world
-   * point trace a curved screen-space path, which shows up visually as
-   * the focal point sliding off-center mid-animation and then "returning"
-   * — i.e. the wobble.
-   */
-  public animateViewToFitRect(
-    worldRect: DOMRect,
-    widthRatio: number = 0.8,
-  ): void {
-    const dpr = window.devicePixelRatio || 1;
-    const screenW = this.canvas.width / dpr;
-    const screenH = this.canvas.height / dpr;
-
-    const targetZoom = Math.min(
-      3,
-      Math.max(0.2, (widthRatio * screenW) / worldRect.width),
-    );
-
-    const worldFocus: Vector2 = {
-      x: worldRect.x + worldRect.width / 2,
-      y: worldRect.y + worldRect.height / 2,
-    };
-
-    // Where the focus point is on screen right now, and where it should
-    // end up (dead center).
-    const startScreenFocus: Vector2 = {
-      x: (worldFocus.x + this._offset.x) * this._zoom,
-      y: (worldFocus.y + this._offset.y) * this._zoom,
-    };
-    const targetScreenFocus: Vector2 = {
-      x: screenW / 2,
-      y: screenH / 2,
-    };
-
-    const startZoom = this._zoom;
-
-    this._viewAnim?.stop();
-    this._viewAnim = animate(0, 1, {
-      duration: 0.7,
-      ease: [0.22, 1, 0.36, 1], // ease-out quint
-      onUpdate: (t) => {
-        const z = startZoom + (targetZoom - startZoom) * t;
-        const sx =
-          startScreenFocus.x + (targetScreenFocus.x - startScreenFocus.x) * t;
-        const sy =
-          startScreenFocus.y + (targetScreenFocus.y - startScreenFocus.y) * t;
-        this._zoom = z;
-        this._offset = {
-          x: sx / z - worldFocus.x,
-          y: sy / z - worldFocus.y,
-        };
-        this.onZoomChange?.(this._zoom);
-      },
-      onComplete: () => {
-        this._viewAnim = null;
-      },
-    });
   }
 
   public exitElementEdit(): void {
@@ -222,6 +128,7 @@ export class DrawableCanvas implements ISerializable {
       this.pushApplied(undoCmd);
     }
     this._editingElement = null;
+    this.viewport.editMode = false;
     // Restore foreground canvas above DOM layer
     this.canvas.style.pointerEvents = '';
     this.canvas.style.zIndex = '5';
@@ -232,24 +139,7 @@ export class DrawableCanvas implements ISerializable {
     if (this._editingElement) {
       this.exitElementEdit();
     }
-    this._viewAnim?.stop();
-    this._viewAnim = null;
-    this._gestureTarget.removeEventListener(
-      'wheel',
-      this._handleWheel as EventListener,
-    );
-    this._gestureTarget.removeEventListener(
-      'touchstart',
-      this._handleTouchStart as EventListener,
-    );
-    this._gestureTarget.removeEventListener(
-      'touchmove',
-      this._handleTouchMove as EventListener,
-    );
-    this._gestureTarget.removeEventListener(
-      'touchend',
-      this._handleTouchEnd as EventListener,
-    );
+    this.viewport.destroy();
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
     window.removeEventListener('pointerup', this._handlePointerUp);
@@ -262,6 +152,8 @@ export class DrawableCanvas implements ISerializable {
     const logicalH = this.canvas.height / dpr;
 
     const editing = this._editingElement !== null;
+    const zoom = this.viewport.zoom;
+    const offset = this.viewport.offset;
 
     // Background canvas: dot grid + chrome (when not editing)
     if (this.bgCtx && this.bgCanvas) {
@@ -272,22 +164,22 @@ export class DrawableCanvas implements ISerializable {
 
       if (this.dotPattern) {
         this.bgCtx.save();
-        this.bgCtx.scale(this._zoom, this._zoom);
-        this.bgCtx.translate(this._offset.x, this._offset.y);
+        this.bgCtx.scale(zoom, zoom);
+        this.bgCtx.translate(offset.x, offset.y);
         this.bgCtx.fillStyle = this.dotPattern;
         this.bgCtx.fillRect(
-          -this._offset.x - bgW / this._zoom,
-          -this._offset.y - bgH / this._zoom,
-          (bgW * 3) / this._zoom,
-          (bgH * 3) / this._zoom,
+          -offset.x - bgW / zoom,
+          -offset.y - bgH / zoom,
+          (bgW * 3) / zoom,
+          (bgH * 3) / zoom,
         );
         this.bgCtx.restore();
       }
 
       if (!editing) {
         this.bgCtx.save();
-        this.bgCtx.scale(this._zoom, this._zoom);
-        this.bgCtx.translate(this._offset.x, this._offset.y);
+        this.bgCtx.scale(zoom, zoom);
+        this.bgCtx.translate(offset.x, offset.y);
         for (const element of this._elements) {
           if (element.type === ElementType.PAGE_FRAME) {
             (element as PageFrameElement).drawChrome(this.bgCtx);
@@ -302,8 +194,8 @@ export class DrawableCanvas implements ISerializable {
     this.ctx.clearRect(0, 0, logicalW, logicalH);
 
     this.ctx.save();
-    this.ctx.scale(this._zoom, this._zoom);
-    this.ctx.translate(this._offset.x, this._offset.y);
+    this.ctx.scale(zoom, zoom);
+    this.ctx.translate(offset.x, offset.y);
 
     for (const element of this._elements) {
       element.draw(this.ctx, deltaTime);
@@ -319,12 +211,11 @@ export class DrawableCanvas implements ISerializable {
       }
     }
 
-    this.toolSelected.drawCursor(this.ctx, this.mousePosition);
+    // Cursor: compute fresh from screen position so it's correct even if
+    // the user wheel-zoomed without moving the mouse since.
+    const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
+    this.toolSelected.drawCursor(this.ctx, mouseWorld);
     this.ctx.restore();
-  }
-
-  public get zoom(): number {
-    return this._zoom;
   }
 
   public get elements(): DrawableElement[] {
@@ -343,7 +234,7 @@ export class DrawableCanvas implements ISerializable {
     });
 
     this.state.addUpdate(InteractState.UsingTool, (event: PointerEvent) => {
-      this.toolSelected.update(this, event, this.getPoint(event));
+      this.toolSelected.update(this, event, this.viewport.getPoint(event));
     });
 
     this.state.addStart(InteractState.Moving, () => {
@@ -355,130 +246,19 @@ export class DrawableCanvas implements ISerializable {
     });
 
     this.state.addUpdate(InteractState.Moving, (event: PointerEvent) => {
-      const newPos = {
-        x: event.movementX / this._zoom,
-        y: event.movementY / this._zoom,
-      };
-
-      this._offset = {
-        x: this._offset.x + newPos.x,
-        y: this._offset.y + newPos.y,
-      };
+      this.viewport.panBy(
+        event.movementX / this.viewport.zoom,
+        event.movementY / this.viewport.zoom,
+      );
     });
   }
 
   private initEventListeners(canvas: HTMLCanvasElement) {
-    this._handleWheel = (evt) => {
-      // Cancel any in-progress view animation when the user interacts.
-      this._viewAnim?.stop();
-      this._viewAnim = null;
-      // Stop the browser from scrolling any ancestor / contentEditable; the
-      // canvas owns wheel-driven view changes regardless of edit mode.
-      evt.preventDefault();
-      if (evt.ctrlKey) {
-        // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures).
-        // Zoom is locked while editing — pan still works (else branch below).
-        if (this._editingElement) {
-          return;
-        }
-        const prevZoom = this._zoom;
-        const newZoom = prevZoom + evt.deltaY * -0.005;
-        this._zoom = Math.min(3, Math.max(0.2, newZoom));
-
-        const dpr = window.devicePixelRatio || 1;
-        const canvasCenter = {
-          x: this.canvas.width / dpr / 2,
-          y: this.canvas.height / dpr / 2,
-        };
-
-        const worldCenterBeforeZoom = {
-          x: canvasCenter.x / prevZoom - this._offset.x,
-          y: canvasCenter.y / prevZoom - this._offset.y,
-        };
-
-        const worldCenterAfterZoom = {
-          x: canvasCenter.x / this._zoom - this._offset.x,
-          y: canvasCenter.y / this._zoom - this._offset.y,
-        };
-
-        this._offset.x += worldCenterAfterZoom.x - worldCenterBeforeZoom.x;
-        this._offset.y += worldCenterAfterZoom.y - worldCenterBeforeZoom.y;
-
-        this.onZoomChange?.(this._zoom);
-      } else {
-        // Two-finger scroll on trackpad / mouse wheel → pan.
-        // While editing, restrict to vertical pan only — the page is
-        // centered horizontally and there's nothing meaningful left/right.
-        if (!this._editingElement) {
-          this._offset.x -= evt.deltaX / this._zoom;
-        }
-        this._offset.y -= evt.deltaY / this._zoom;
-      }
-      this.mousePosition = this.screenToWorld(this.screenPosition);
-    };
-    // Attach wheel + touch to the canvas's parent so they still reach us
-    // during edit mode (when the canvas itself has pointer-events: none).
-    this._gestureTarget = canvas.parentElement ?? canvas;
-    this._gestureTarget.addEventListener(
-      'wheel',
-      this._handleWheel as EventListener,
-      { passive: false },
-    );
-
-    // Two-finger touch pan during edit mode (vertical only). Single-finger
-    // touch is left to the contentEditable for cursor placement / selection.
-    this._handleTouchStart = (evt) => {
-      if (!this._editingElement) {
-        return;
-      }
-      if (evt.touches.length >= 2) {
-        this._touchPanLastY =
-          (evt.touches[0].clientY + evt.touches[1].clientY) / 2;
-        evt.preventDefault();
-      } else {
-        this._touchPanLastY = null;
-      }
-    };
-    this._handleTouchMove = (evt) => {
-      if (!this._editingElement) {
-        return;
-      }
-      if (evt.touches.length < 2 || this._touchPanLastY == null) {
-        return;
-      }
-      evt.preventDefault();
-      this._viewAnim?.stop();
-      this._viewAnim = null;
-      const avgY = (evt.touches[0].clientY + evt.touches[1].clientY) / 2;
-      const dy = avgY - this._touchPanLastY;
-      this._touchPanLastY = avgY;
-      this._offset.y += dy / this._zoom;
-    };
-    this._handleTouchEnd = (evt) => {
-      if (evt.touches.length < 2) {
-        this._touchPanLastY = null;
-      }
-    };
-    this._gestureTarget.addEventListener(
-      'touchstart',
-      this._handleTouchStart as EventListener,
-      { passive: false },
-    );
-    this._gestureTarget.addEventListener(
-      'touchmove',
-      this._handleTouchMove as EventListener,
-      { passive: false },
-    );
-    this._gestureTarget.addEventListener(
-      'touchend',
-      this._handleTouchEnd as EventListener,
-    );
-
     this._handlePointerMove = (evt) => {
       this.screenPosition = { x: evt.pageX, y: evt.pageY };
-      this.mousePosition = this.screenToWorld(this.screenPosition);
       this.state.update(evt);
-      this.toolSelected.hover?.(this, this.mousePosition);
+      const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
+      this.toolSelected.hover?.(this, mouseWorld);
       this.updateCursor();
     };
     canvas.addEventListener('pointermove', this._handlePointerMove);
@@ -569,7 +349,7 @@ export class DrawableCanvas implements ISerializable {
     const dpr = window.devicePixelRatio || 1;
     const cx = screenX ?? this.canvas.width / dpr / 2;
     const cy = screenY ?? this.canvas.height / dpr / 2;
-    const world = this.screenToWorld({ x: cx, y: cy });
+    const world = this.viewport.screenToWorld({ x: cx, y: cy });
     img.setPosition(
       world.x - img.naturalWidth / 2,
       world.y - img.naturalHeight / 2,
@@ -660,13 +440,6 @@ export class DrawableCanvas implements ISerializable {
     this.bgCanvas.style.height = `${height}px`;
   }
 
-  public worldToScreen(world: Vector2): Vector2 {
-    return {
-      x: (world.x + this._offset.x) * this._zoom,
-      y: (world.y + this._offset.y) * this._zoom,
-    };
-  }
-
   public setSpaceDown(value: boolean) {
     this.spaceDown = value;
     this.updateCursor();
@@ -686,20 +459,8 @@ export class DrawableCanvas implements ISerializable {
     this._undoRedo.collapse();
   }
 
-  public screenToWorld(screen: Vector2): Vector2 {
-    return {
-      x: screen.x / this._zoom - this._offset.x,
-      y: screen.y / this._zoom - this._offset.y,
-    };
-  }
-
-  public getPoint(evt: PointerEvent): Vector2 {
-    return this.screenToWorld({ x: evt.pageX, y: evt.pageY });
-  }
-
   public load(reader: BinaryReader): void {
-    this._zoom = reader.readF32();
-    this._offset = { x: reader.readF32(), y: reader.readF32() };
+    this.viewport.load(reader);
 
     const count = reader.readU32();
     this._elements = [];
@@ -716,14 +477,10 @@ export class DrawableCanvas implements ISerializable {
       this._elements.length > 0
         ? Math.max(...this._elements.map((e) => e.index)) + 1
         : 0;
-
-    this.onZoomChange?.(this._zoom);
   }
 
   public save(writer: BinaryWriter): void {
-    writer.writeF32(this._zoom);
-    writer.writeF32(this._offset.x);
-    writer.writeF32(this._offset.y);
+    this.viewport.save(writer);
 
     writer.writeU32(this._elements.length);
     for (const ele of this._elements) {

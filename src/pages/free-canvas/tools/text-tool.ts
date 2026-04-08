@@ -44,7 +44,7 @@ export class TextTool implements ITool {
   private dragCurrent: Vector2 | null = null;
 
   start(canvas: DrawableCanvas, event: PointerEvent): void {
-    this.dragStart = canvas.getPoint(event);
+    this.dragStart = canvas.viewport.getPoint(event);
     this.dragCurrent = this.dragStart;
   }
 
@@ -59,7 +59,7 @@ export class TextTool implements ITool {
   }
 
   finish(canvas: DrawableCanvas, event: PointerEvent): void {
-    const endPos = canvas.getPoint(event);
+    const endPos = canvas.viewport.getPoint(event);
 
     if (!this.dragStart) {
       this.dragStart = null;

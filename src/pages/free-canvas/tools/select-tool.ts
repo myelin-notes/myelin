@@ -91,7 +91,7 @@ export class SelectTool implements ITool {
   }
 
   public start(canvas: DrawableCanvas, event: PointerEvent): void {
-    const point = canvas.getPoint(event);
+    const point = canvas.viewport.getPoint(event);
     this.startPoint = point;
 
     // 1. Check handles on selected elements first
@@ -100,7 +100,7 @@ export class SelectTool implements ITool {
       if (!e.isSelected) {
         continue;
       }
-      const handleIdx = this.hitHandle(e, point, canvas.zoom);
+      const handleIdx = this.hitHandle(e, point, canvas.viewport.zoom);
       if (handleIdx >= 0) {
         this.mode = SelectMode.Scaling;
         this.scalingElement = e;
@@ -371,7 +371,7 @@ export class SelectTool implements ITool {
       if (!e.isSelected) {
         continue;
       }
-      const handleIdx = this.hitHandle(e, position, canvas.zoom);
+      const handleIdx = this.hitHandle(e, position, canvas.viewport.zoom);
       if (handleIdx >= 0) {
         canvas.setCursor(SelectTool.resizeCursor(handleIdx));
         return;

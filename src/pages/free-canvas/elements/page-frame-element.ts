@@ -91,7 +91,7 @@ export class PageFrameElement extends DrawableElement {
     const sy = Math.abs(this._scale.y);
     const focusWorldY =
       screenX != null && screenY != null
-        ? canvas.screenToWorld({ x: screenX, y: screenY }).y
+        ? canvas.viewport.screenToWorld({ x: screenX, y: screenY }).y
         : this.offset.y + (this._pageHeight * sy) / 2;
     // Zero-height rect: animateViewToFitRect uses width for zoom and the
     // rect's center as the focal point, so a 0-height rect at focusWorldY
@@ -102,7 +102,7 @@ export class PageFrameElement extends DrawableElement {
       this._pageWidth * sx,
       0,
     );
-    canvas.animateViewToFitRect(focusRect, 0.65);
+    canvas.viewport.animateViewToFitRect(focusRect, 0.65);
 
     const view = this.pmEditor.view;
     if (view) {
