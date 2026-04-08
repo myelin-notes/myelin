@@ -1,140 +1,60 @@
-import {
-  InputRule,
-  inputRules,
-  textblockTypeInputRule,
-  wrappingInputRule,
-} from 'prosemirror-inputrules';
-import type { MarkType, Schema } from 'prosemirror-model';
+import type { MarkType, NodeType, Schema } from 'prosemirror-model';
 import { Plugin, PluginKey } from 'prosemirror-state';
 
-/**
- * Build an input rule that wraps the captured group in a mark, removing the
- * delimiter characters from both sides. The regex must:
- *   - capture the inner text (without delimiters) in group 1
- *   - end with `$` so it fires the moment the closing delimiter is typed
- *
- * `delim` is the literal opening delimiter string (e.g. `**`, `*`, `` ` ``,
- * `~~`). It is used to locate the delimiter inside the matched text, which
- * lets the regex include a leading non-delimiter context character — needed
- * to disambiguate `**bold**` from `*italic*` — without breaking the math.
- */
-function markInputRule(
-  regexp: RegExp,
-  markType: MarkType,
-  delim: string,
-): InputRule {
-  return new InputRule(regexp, (state, match, start, end) => {
-    const captured = match[1];
-    if (!captured) {
-      return null;
-    }
+const markdownKey = new PluginKey('markdownAutoFormat');
 
-    // Bail out in nodes that don't allow this mark (e.g. code blocks).
-    const $start = state.doc.resolve(start);
-    if (!$start.parent.type.allowsMarkType(markType)) {
-      return null;
-    }
-
-    // Locate the opening delimiter inside the full match. The regex may have
-    // consumed a leading context char (`(?:^|[^*])`), so the delimiter isn't
-    // necessarily at offset 0 of match[0].
-    const openOffset = match[0].indexOf(delim);
-    if (openOffset < 0) {
-      return null;
-    }
-    const openDelimStart = start + openOffset;
-    const captureStart = openDelimStart + delim.length;
-    const captureEnd = captureStart + captured.length;
-
-    // If the captured range is already marked, do nothing.
-    if (state.doc.rangeHasMark(captureStart, captureEnd, markType)) {
-      return null;
-    }
-
-    const tr = state.tr;
-    // Delete closing first so the earlier positions remain valid.
-    tr.delete(captureEnd, end);
-    tr.delete(openDelimStart, captureStart);
-    tr.addMark(
-      openDelimStart,
-      openDelimStart + captured.length,
-      markType.create(),
-    );
-    // Don't carry the mark forward to the next typed character.
-    tr.removeStoredMark(markType);
-    return tr;
-  });
-}
-
-export function buildInputRules(s: Schema) {
-  return inputRules({
-    rules: [
-      // # Heading 1
-      textblockTypeInputRule(/^#\s$/, s.nodes.heading, { level: 1 }),
-      // ## Heading 2
-      textblockTypeInputRule(/^##\s$/, s.nodes.heading, { level: 2 }),
-      // ### Heading 3
-      textblockTypeInputRule(/^###\s$/, s.nodes.heading, { level: 3 }),
-      // - Bullet list
-      wrappingInputRule(/^\s*[-*]\s$/, s.nodes.bulletList),
-      // 1. Ordered list
-      wrappingInputRule(
-        /^\s*(\d+)\.\s$/,
-        s.nodes.orderedList,
-        (match) => ({ start: Number(match[1]) }),
-        (match, node) =>
-          node.childCount + node.attrs.start === Number(match[1]),
-      ),
-      // > Blockquote
-      wrappingInputRule(/^\s*>\s$/, s.nodes.blockquote),
-      // ``` Code block
-      textblockTypeInputRule(/^```$/, s.nodes.codeBlock),
-
-      // Inline mark rules. Order matters — bold (`**`) must be tried before
-      // italic (`*`) so the second `*` of a closing pair doesn't fire italic
-      // first. The leading `(?:^|[^*])` keeps stray `*` characters elsewhere
-      // in the line from accidentally anchoring an italic match.
-      markInputRule(/(?:^|[^*])\*\*([^*\n]+)\*\*$/, s.marks.bold, '**'),
-      markInputRule(/(?:^|[^*])\*([^*\n]+)\*$/, s.marks.italic, '*'),
-      markInputRule(/`([^`\n]+)`$/, s.marks.code, '`'),
-      markInputRule(/~~([^~\n]+)~~$/, s.marks.strikethrough, '~~'),
-    ],
-  });
-}
-
-const autoFormatKey = new PluginKey('inlineMarkAutoFormat');
-
-interface DelimSpec {
+interface InlineSpec {
   delim: string;
   markType: MarkType;
 }
 
+interface BlockSpec {
+  prefix: string;
+  nodeType: NodeType;
+  attrs?: Record<string, unknown>;
+}
+
 /**
- * The end-anchored input rules above only fire when the user types the
- * closing delimiter LAST. This plugin handles the other common flow:
- * the user types both delimiters first (e.g. `` ` ` ``), moves the cursor
- * between them, and then types content. After each typed character we look
- * for a `delim…content…delim` pattern straddling the cursor and, if we find
- * one, apply the mark and strip the delimiters. PM's normal stored-marks
- * behavior then carries the mark forward to subsequent typed characters.
+ * Markdown auto-format. After every user-driven text change we scan the
+ * parent textblock for markdown patterns and apply formatting WITHOUT
+ * consuming the delimiter characters. The delimiters get the `mdDelim`
+ * mark, which renders them visually muted via CSS — so the user can still
+ * see, edit, and delete them like normal text.
+ *
+ *   inline: **bold**, *italic*, `code`, ~~strikethrough~~
+ *   block:  `# `, `## `, `### ` (headings) and `` ``` `` (code block)
+ *
+ * Block conversion fires when the text BEFORE the cursor exactly equals one
+ * of the prefix patterns — same trigger as PM's textblockTypeInputRule, just
+ * without the destructive `tr.delete` call that strips the prefix.
  */
-export function inlineMarkAutoFormatPlugin(s: Schema): Plugin {
-  // Longest delimiter first so `**` is tested before `*`, and `~~` before
+export function markdownAutoFormatPlugin(s: Schema): Plugin {
+  // Longer delimiters first so `**` is tested before `*`, and `~~` before
   // any future single-`~` rule.
-  const specs: DelimSpec[] = [
+  const inlineSpecs: InlineSpec[] = [
     { delim: '**', markType: s.marks.bold },
     { delim: '~~', markType: s.marks.strikethrough },
     { delim: '*', markType: s.marks.italic },
     { delim: '`', markType: s.marks.code },
   ];
 
+  // Longer prefixes first so `### ` beats `## ` beats `# `.
+  const blockSpecs: BlockSpec[] = [
+    { prefix: '### ', nodeType: s.nodes.heading, attrs: { level: 3 } },
+    { prefix: '## ', nodeType: s.nodes.heading, attrs: { level: 2 } },
+    { prefix: '# ', nodeType: s.nodes.heading, attrs: { level: 1 } },
+    { prefix: '```', nodeType: s.nodes.codeBlock },
+  ];
+
+  const delimMark = s.marks.mdDelim;
+
   return new Plugin({
-    key: autoFormatKey,
+    key: markdownKey,
     appendTransaction(transactions, _oldState, newState) {
-      // Only react to user-driven doc changes — and never to our own
-      // generated transactions, to avoid re-entrant loops.
+      // Only react to user-driven doc changes — never to our own generated
+      // transactions, to avoid re-entrant loops.
       const userChange = transactions.some(
-        (tr) => tr.docChanged && !tr.getMeta(autoFormatKey),
+        (tr) => tr.docChanged && !tr.getMeta(markdownKey),
       );
       if (!userChange) {
         return null;
@@ -151,75 +71,121 @@ export function inlineMarkAutoFormatPlugin(s: Schema): Plugin {
         return null;
       }
 
-      // textBetween joins the parent's inline content with `\ufffc` placeholders
-      // for non-text children, so character offsets stay aligned with PM positions.
+      const blockStart = $cursor.start();
+      const cursorOffset = $cursor.parentOffset;
+      // textBetween joins inline content with `\ufffc` placeholders for
+      // non-text children, so character offsets stay aligned with PM
+      // positions.
       const text = parent.textBetween(
         0,
         parent.content.size,
         undefined,
         '\ufffc',
       );
-      const blockStart = $cursor.start();
-      const cursorOffset = $cursor.parentOffset;
 
-      for (const { delim, markType } of specs) {
+      // 1. Block-type conversion. Only convert plain paragraphs whose
+      // text-before-cursor exactly matches one of the prefixes. Anchoring on
+      // the cursor (instead of a substring match) means subsequent typing in
+      // the converted block doesn't keep re-firing the rule.
+      if (parent.type === s.nodes.paragraph) {
+        const before = text.slice(0, cursorOffset);
+        for (const { prefix, nodeType, attrs } of blockSpecs) {
+          if (before !== prefix) {
+            continue;
+          }
+          const tr = newState.tr;
+          // codeBlock only allows the `mdDelim` mark — strip every other
+          // mark from the existing inline content before the type swap,
+          // otherwise setBlockType produces a doc that violates the schema.
+          if (nodeType === s.nodes.codeBlock) {
+            tr.removeMark(blockStart, blockStart + parent.content.size, null);
+          }
+          tr.setBlockType(blockStart, blockStart, nodeType, attrs);
+          if (delimMark) {
+            tr.addMark(
+              blockStart,
+              blockStart + prefix.length,
+              delimMark.create(),
+            );
+          }
+          tr.setMeta(markdownKey, true);
+          return tr;
+        }
+      }
+
+      // 2. Inline marks. Scan the parent text for any complete
+      // `delim…content…delim` pairs that aren't already marked, and apply
+      // both the formatting mark to the inner content and `mdDelim` to the
+      // surrounding delimiters. Multiple pairs are batched into one
+      // transaction so e.g. typing `**bold** *italic*` in one go marks both.
+      const tr = newState.tr;
+      let modified = false;
+
+      for (const { delim, markType } of inlineSpecs) {
         if (!parent.type.allowsMarkType(markType)) {
           continue;
         }
 
-        // Closing delimiter at-or-after cursor.
-        const closeIdx = text.indexOf(delim, cursorOffset);
-        if (closeIdx < 0) {
-          continue;
-        }
-        // Opening delimiter that ends at-or-before cursor.
-        const openIdx = text.lastIndexOf(delim, cursorOffset - delim.length);
-        if (openIdx < 0 || openIdx + delim.length > cursorOffset) {
-          continue;
-        }
+        let searchFrom = 0;
+        while (searchFrom < text.length) {
+          const openIdx = text.indexOf(delim, searchFrom);
+          if (openIdx < 0) {
+            break;
+          }
+          const closeIdx = text.indexOf(delim, openIdx + delim.length);
+          if (closeIdx < 0) {
+            break;
+          }
 
-        const contentStart = openIdx + delim.length;
-        const contentEnd = closeIdx;
-        if (contentStart >= contentEnd) {
-          continue;
+          const contentStart = openIdx + delim.length;
+          const contentEnd = closeIdx;
+          // Empty pair (e.g. `**` immediately followed by another `**`).
+          // Skip past the closing delim and keep scanning.
+          if (contentStart >= contentEnd) {
+            searchFrom = closeIdx + delim.length;
+            continue;
+          }
+
+          const inner = text.slice(contentStart, contentEnd);
+          // Refuse if the inner spans a newline or non-text marker — that
+          // would mean we're not really inside a clean pair.
+          if (inner.includes('\n') || inner.includes('\ufffc')) {
+            searchFrom = closeIdx + delim.length;
+            continue;
+          }
+
+          const docContentStart = blockStart + contentStart;
+          const docContentEnd = blockStart + contentEnd;
+          // Already formatted? Nothing to do for this pair.
+          if (
+            newState.doc.rangeHasMark(docContentStart, docContentEnd, markType)
+          ) {
+            searchFrom = closeIdx + delim.length;
+            continue;
+          }
+
+          tr.addMark(docContentStart, docContentEnd, markType.create());
+          if (delimMark) {
+            tr.addMark(
+              blockStart + openIdx,
+              blockStart + contentStart,
+              delimMark.create(),
+            );
+            tr.addMark(
+              blockStart + closeIdx,
+              blockStart + closeIdx + delim.length,
+              delimMark.create(),
+            );
+          }
+          modified = true;
+          searchFrom = closeIdx + delim.length;
         }
-
-        const inner = text.slice(contentStart, contentEnd);
-        // Refuse if the inner spans the delimiter, a newline, or a non-text
-        // marker — those would mean the user isn't really inside a clean pair.
-        if (
-          inner.includes(delim) ||
-          inner.includes('\n') ||
-          inner.includes('\ufffc')
-        ) {
-          continue;
-        }
-
-        const docContentStart = blockStart + contentStart;
-        const docContentEnd = blockStart + contentEnd;
-
-        // Already marked? Nothing to do.
-        if (
-          newState.doc.rangeHasMark(docContentStart, docContentEnd, markType)
-        ) {
-          continue;
-        }
-
-        const tr = newState.tr;
-        tr.addMark(docContentStart, docContentEnd, markType.create());
-        // Delete closing delim first so the lower positions stay valid.
-        tr.delete(
-          blockStart + closeIdx,
-          blockStart + closeIdx + delim.length,
-        );
-        tr.delete(
-          blockStart + openIdx,
-          blockStart + openIdx + delim.length,
-        );
-        tr.setMeta(autoFormatKey, true);
-        return tr;
       }
 
+      if (modified) {
+        tr.setMeta(markdownKey, true);
+        return tr;
+      }
       return null;
     },
   });

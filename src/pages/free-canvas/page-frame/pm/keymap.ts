@@ -39,13 +39,20 @@ const clearBlockFormatting: Command = (state, dispatch) => {
     return false;
   }
   if (dispatch) {
-    dispatch(
-      state.tr.setBlockType(
-        $cursor.before(),
-        $cursor.after(),
-        schema.nodes.paragraph,
-      ),
+    const tr = state.tr;
+    // The reverted paragraph shouldn't carry leftover `mdDelim` marks from
+    // when it was a heading/codeBlock — those only make sense inside the
+    // block types the markdown auto-format converts to.
+    const mdDelim = schema.marks.mdDelim;
+    if (mdDelim) {
+      tr.removeMark($cursor.start(), $cursor.end(), mdDelim);
+    }
+    tr.setBlockType(
+      $cursor.before(),
+      $cursor.after(),
+      schema.nodes.paragraph,
     );
+    dispatch(tr);
   }
   return true;
 };

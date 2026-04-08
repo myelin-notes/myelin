@@ -83,7 +83,9 @@ const blockquote: NodeSpec = {
 const codeBlock: NodeSpec = {
   content: 'text*',
   group: 'block',
-  marks: '',
+  // Allow `mdDelim` so the opening ``` fence can stay inside the block as
+  // muted text after the markdown auto-format conversion.
+  marks: 'mdDelim',
   code: true,
   defining: true,
   toDOM() {
@@ -205,6 +207,22 @@ const code: MarkSpec = {
   parseDOM: [{ tag: 'code' }],
 };
 
+/**
+ * Markdown delimiter mark — applied to the literal `*`, `**`, `` ` ``, and
+ * `~~` characters around a formatted span. The delimiters stay in the
+ * document as editable text but render visually muted (see `.md-delim`
+ * styles in index.css). Non-inclusive so the cursor naturally exits this
+ * mark when typing past the right edge.
+ */
+const mdDelim: MarkSpec = {
+  inclusive: false,
+  excludes: '',
+  toDOM() {
+    return ['span', { class: 'md-delim' }, 0];
+  },
+  parseDOM: [{ tag: 'span.md-delim' }],
+};
+
 const link: MarkSpec = {
   attrs: { href: {}, title: { default: null } },
   inclusive: false,
@@ -251,5 +269,6 @@ export const schema = new Schema({
     strikethrough,
     code,
     link,
+    mdDelim,
   },
 });

@@ -400,3 +400,20 @@ input[type="range"].tool-slider::-moz-range-track {
   outline: 2px solid #3b82f6;
   border-radius: 2px;
 }
+
+/* Markdown delimiters (`*`, `**`, `` ` ``, `~~`) — kept in the document as
+   editable text but rendered visually muted so the formatted content stands
+   out. */
+.pm-editor .md-delim {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Inline placeholder injected by `emptyBlockCaretPlaceholder` (see
+   plugins.ts). It's a real DOM node so the selection range has something
+   to anchor on in empty textblocks — `getClientRects()` returns empty
+   inside an empty `<p>` containing only PM's trailing `<br>`, which leaves
+   the caret unrendered on WKWebView. */
+.pm-editor .ProseMirror .pm-caret-anchor {
+  display: inline-block;
+}
