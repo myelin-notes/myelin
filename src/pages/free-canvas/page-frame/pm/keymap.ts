@@ -47,11 +47,7 @@ const clearBlockFormatting: Command = (state, dispatch) => {
     if (mdDelim) {
       tr.removeMark($cursor.start(), $cursor.end(), mdDelim);
     }
-    tr.setBlockType(
-      $cursor.before(),
-      $cursor.after(),
-      schema.nodes.paragraph,
-    );
+    tr.setBlockType($cursor.before(), $cursor.after(), schema.nodes.paragraph);
     dispatch(tr);
   }
   return true;

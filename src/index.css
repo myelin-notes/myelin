@@ -417,3 +417,14 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-caret-anchor {
   display: inline-block;
 }
+
+/* PM injects an `<img class="ProseMirror-separator">` into empty textblocks
+   to anchor inline content. By default it ships as `display: block`, which
+   inserts a hard line break BETWEEN our caret-anchor placeholder and PM's
+   trailing `<br>` — splitting the empty paragraph into two visual lines and
+   parking the caret on the wrong one. Forcing the separator inline keeps
+   the empty paragraph at one line, so the visible caret sits exactly where
+   the first typed character will land. */
+.pm-editor .ProseMirror img.ProseMirror-separator {
+  display: inline;
+}

@@ -50,6 +50,12 @@ export class SelectTool implements ITool {
   private lastClickTime: number = 0;
   private lastClickPos: Vector2 = { x: 0, y: 0 };
 
+  // Click-to-edit state: clicking an already-selected page frame without
+  // dragging re-enters edit mode (file-rename pattern). Resolved on finish().
+  private clickToEditCandidate: PageFrameElement | null = null;
+  private clickToEditClientX: number = 0;
+  private clickToEditClientY: number = 0;
+
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
     if (this.mode === SelectMode.Marquee) {
       const x = Math.min(this.startPoint.x, position.x);
@@ -164,6 +170,8 @@ export class SelectTool implements ITool {
       }
       this.lastCycledElement = pick;
 
+      const wasAlreadySelected = pick.isSelected;
+
       for (const e of canvas.elements) {
         e.unselect();
       }
@@ -172,6 +180,15 @@ export class SelectTool implements ITool {
       this.lastPoint = point;
       this.totalDelta = { x: 0, y: 0 };
       this.movingElements = canvas.elements.filter((e) => e.isSelected);
+
+      // Clicking an already-selected page frame (without dragging) re-enters
+      // edit mode. Otherwise the user can be left in a "selected but not
+      // editing" state where pressing Backspace deletes the whole frame.
+      if (pick instanceof PageFrameElement && wasAlreadySelected) {
+        this.clickToEditCandidate = pick;
+        this.clickToEditClientX = event.clientX;
+        this.clickToEditClientY = event.clientY;
+      }
       return;
     }
 
@@ -305,6 +322,12 @@ export class SelectTool implements ITool {
               this.totalDelta.y,
             ),
           );
+        } else if (this.clickToEditCandidate) {
+          canvas.enterElementEdit(
+            this.clickToEditCandidate,
+            this.clickToEditClientX,
+            this.clickToEditClientY,
+          );
         }
         break;
       }
@@ -403,6 +426,7 @@ export class SelectTool implements ITool {
     this.movingElements = [];
     this.scalingElement = null;
     this.lassoPath = [];
+    this.clickToEditCandidate = null;
   }
 
   private hitHandle(
