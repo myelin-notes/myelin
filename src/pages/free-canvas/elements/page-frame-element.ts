@@ -78,7 +78,7 @@ export class PageFrameElement extends DrawableElement {
     canvas: DrawableCanvas,
     screenX?: number,
     screenY?: number,
-  ): void {
+  ): HTMLElement | null {
     this._editing = true;
     this._oldDocJSON = this.pmEditor.toJSON();
     this.pmEditor.setEditable(true);
@@ -124,7 +124,11 @@ export class PageFrameElement extends DrawableElement {
         Selection.near(view.state.doc.resolve(pos)),
       );
       view.dispatch(tr);
+
+      // Frame div is the editing DOM root (contentDiv > frameDiv)
+      return view.dom.parentElement?.parentElement ?? null;
     }
+    return null;
   }
 
   public override exitEditMode(): UndoCommand | null {

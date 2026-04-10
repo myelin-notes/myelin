@@ -5,10 +5,7 @@ import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import type { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { StatusBar } from './components/status-bar';
-import { TextEditOverlay } from './components/text-edit-overlay';
 import { TitleBar } from './components/title-bar';
-import { ElementType } from './elements/element-type';
-import type { TextElement } from './elements/text-element';
 import { useCanvasEngine } from './hooks/use-canvas-engine';
 import { useToolState } from './hooks/use-tool-state';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
@@ -31,11 +28,6 @@ export function CanvasView() {
     onCanvasPointerDown: toolState.hideOptions,
   });
 
-  const editingText =
-    engine.editingElement?.type === ElementType.TEXT
-      ? (engine.editingElement as unknown as TextElement)
-      : null;
-
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
       {/* z:0 — Background canvas: dot grid + page chrome */}
@@ -49,7 +41,6 @@ export function CanvasView() {
       <PageFrameDomLayer
         canvasRef={engine.drawableCanvasRef}
         editingElement={engine.editingElement}
-        onCommitEdit={engine.commitElementEdit}
       />
 
       {/* Foreground canvas: strokes, images, selection (z-index managed by DrawableCanvas) */}
@@ -85,14 +76,6 @@ export function CanvasView() {
         onCloseShelf={toolState.closeShelf}
         onToggleWheelTool={toolState.handleToggleWheelTool}
       />
-
-      {editingText && (
-        <TextEditOverlay
-          element={editingText}
-          canvas={drawableCanvasRef.current!}
-          onDismiss={engine.commitElementEdit}
-        />
-      )}
 
       <div
         style={{ zIndex: 20 }}

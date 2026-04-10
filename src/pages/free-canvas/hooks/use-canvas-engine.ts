@@ -278,10 +278,6 @@ export function useCanvasEngine({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const commitElementEdit = () => {
-    drawableCanvasRef.current?.exitElementEdit();
-  };
-
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files;
     if (files?.length) {
@@ -302,7 +298,6 @@ export function useCanvasEngine({
     fps,
     fileName,
     editingElement,
-    commitElementEdit,
     back,
     handleFileInputChange,
   };

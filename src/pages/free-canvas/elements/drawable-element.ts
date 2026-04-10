@@ -145,12 +145,14 @@ export abstract class DrawableElement implements ISerializable {
     this.selectionT = 0;
   }
 
-  /** Called when the element enters inline edit mode. */
+  /** Called when the element enters inline edit mode. Returns the root DOM element of the editing UI, if any. */
   public enterEditMode(
     _canvas: DrawableCanvas,
     _screenX?: number,
     _screenY?: number,
-  ): void {}
+  ): HTMLElement | null {
+    return null;
+  }
   /** Called when the element exits inline edit mode. Returns an undo command if the content changed. */
   public exitEditMode(): UndoCommand | null {
     return null;

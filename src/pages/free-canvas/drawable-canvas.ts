@@ -53,6 +53,7 @@ export class DrawableCanvas implements ISerializable {
 
   // Element editing state (e.g., page frame inline editing)
   private _editingElement: DrawableElement | null = null;
+  private _cleanupEditListeners: (() => void) | null = null;
 
   public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
     const ctx = canvas.getContext('2d', { alpha: true });
@@ -114,14 +115,44 @@ export class DrawableCanvas implements ISerializable {
     this.canvas.style.zIndex = '1';
     // Camera switches to "vertical-only pan + handle two-finger touch" mode.
     this.viewport.editMode = true;
-    element.enterEditMode(this, screenX, screenY);
+    const editDomRoot = element.enterEditMode(this, screenX, screenY);
     this.onElementEdit?.(element);
+
+    // Escape exits edit mode
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        this.exitElementEdit();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Click outside editing DOM exits edit mode
+    let handlePointerDown: ((e: PointerEvent) => void) | null = null;
+    if (editDomRoot) {
+      handlePointerDown = (e: PointerEvent) => {
+        if (!editDomRoot.contains(e.target as Node)) {
+          this.exitElementEdit();
+        }
+      };
+      document.addEventListener('pointerdown', handlePointerDown);
+    }
+
+    this._cleanupEditListeners = () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (handlePointerDown) {
+        document.removeEventListener('pointerdown', handlePointerDown);
+      }
+    };
   }
 
   public exitElementEdit(): void {
     if (!this._editingElement) {
       return;
     }
+    this._cleanupEditListeners?.();
+    this._cleanupEditListeners = null;
     const element = this._editingElement;
     const undoCmd = element.exitEditMode();
     if (undoCmd) {

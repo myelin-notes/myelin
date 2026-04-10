@@ -37,13 +37,11 @@ interface FrameRefs {
 interface PageFrameDomLayerProps {
   canvasRef: React.RefObject<DrawableCanvas | null>;
   editingElement: DrawableElement | null;
-  onCommitEdit: () => void;
 }
 
 export function PageFrameDomLayer({
   canvasRef,
   editingElement: rawEditingElement,
-  onCommitEdit,
 }: PageFrameDomLayerProps) {
   const editingElement =
     rawEditingElement?.type === ElementType.PAGE_FRAME
@@ -147,33 +145,7 @@ export function PageFrameDomLayer({
     // so the editing frame naturally receives events without z-index promotion.
     refs.frameDiv.style.pointerEvents = 'auto';
     setActiveView(editingElement.pmEditor.view);
-
-    // Escape exits edit mode
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        onCommitEdit();
-      }
-    };
-    refs.contentDiv.addEventListener('keydown', handleKeyDown);
-
-    // Click outside exits edit mode (deferred to avoid catching the initiating click)
-    const handlePointerDown = (e: PointerEvent) => {
-      if (!refs.frameDiv.contains(e.target as Node)) {
-        onCommitEdit();
-      }
-    };
-    const rafId = requestAnimationFrame(() => {
-      document.addEventListener('pointerdown', handlePointerDown);
-    });
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      refs.contentDiv.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('pointerdown', handlePointerDown);
-    };
-  }, [editingElement, onCommitEdit]);
+  }, [editingElement]);
 
   // Follow-cursor: keep the caret inside a margin-padded viewport while
   // editing. Fires on every PM transaction (typing, arrow-key navigation,

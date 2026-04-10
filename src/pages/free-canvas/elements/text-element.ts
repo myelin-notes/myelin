@@ -3,6 +3,9 @@ import type {
   BinaryReader,
   BinaryWriter,
 } from '../../../lib/utils/binary-helper';
+import type { UndoCommand } from '../../../lib/utils/undo-redo';
+import { EditTextCommand } from '../commands/edit-text';
+import type { DrawableCanvas } from '../drawable-canvas';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
@@ -29,6 +32,9 @@ export class TextElement extends DrawableElement {
   private _boxWidth: number = DEFAULT_BOX_WIDTH;
   private _boxHeight: number = DEFAULT_BOX_HEIGHT;
   private _editing: boolean = false;
+  private _textarea: HTMLTextAreaElement | null = null;
+  private _oldText: string = '';
+  private _canvas: DrawableCanvas | null = null;
 
   public constructor(
     index: number,
@@ -63,12 +69,85 @@ export class TextElement extends DrawableElement {
     return this._editing;
   }
 
-  public override enterEditMode(): void {
+  public override enterEditMode(canvas: DrawableCanvas): HTMLElement | null {
     this._editing = true;
+    this._oldText = this._text;
+    this._canvas = canvas;
+
+    const zoom = canvas.viewport.zoom;
+    const screenPos = canvas.viewport.worldToScreen({
+      x: this.boundingBox.x,
+      y: this.boundingBox.y,
+    });
+
+    const textarea = document.createElement('textarea');
+    textarea.value = this._text;
+    Object.assign(textarea.style, {
+      position: 'absolute',
+      zIndex: '20',
+      left: `${screenPos.x}px`,
+      top: `${screenPos.y}px`,
+      width: `${this._boxWidth * zoom}px`,
+      height: `${this._boxHeight * zoom}px`,
+      fontSize: `${this._style.fontSize * zoom}px`,
+      lineHeight: '1.3',
+      fontFamily: `"${this._style.fontFamily}", sans-serif`,
+      color: 'var(--text-primary)',
+      caretColor: 'var(--accent-dark)',
+      wordWrap: 'break-word',
+      overflowWrap: 'break-word',
+      whiteSpace: 'pre-wrap',
+      margin: '0',
+      padding: '0',
+      resize: 'none',
+      overflow: 'hidden',
+      border: 'none',
+      background: 'transparent',
+      outline: 'none',
+    });
+
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        canvas.exitElementEdit();
+      }
+    });
+
+    document.body.appendChild(textarea);
+    textarea.focus();
+
+    this._textarea = textarea;
+    return textarea;
   }
 
-  public override exitEditMode() {
+  public override exitEditMode(): UndoCommand | null {
     this._editing = false;
+
+    const textarea = this._textarea;
+    const canvas = this._canvas;
+    this._textarea = null;
+    this._canvas = null;
+
+    if (!textarea || !canvas) {
+      return null;
+    }
+
+    const newText = textarea.value;
+    textarea.remove();
+
+    if (!newText.trim()) {
+      canvas.removeElement(this);
+      canvas.updateBounding();
+      return null;
+    }
+
+    if (newText !== this._oldText) {
+      this.setText(newText);
+      this.updateBounds();
+      canvas.updateBounding();
+      return new EditTextCommand(this, this._oldText, newText);
+    }
+
     return null;
   }
 
