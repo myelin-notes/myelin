@@ -3,6 +3,7 @@ import type { Plugin } from 'prosemirror-state';
 import { buildKeymap } from './keymap';
 import { paginationPlugin } from './pagination';
 import { schema } from './schema';
+import { selectionHighlightPlugin } from './selection-highlight';
 
 export function buildPlugins(
   onPageCount?: (pageCount: number) => void,
@@ -11,6 +12,7 @@ export function buildPlugins(
     buildKeymap(schema),
     history(),
     paginationPlugin(onPageCount),
+    selectionHighlightPlugin(),
   ];
   return plugins;
 }
