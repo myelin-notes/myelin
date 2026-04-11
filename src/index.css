@@ -246,3 +246,105 @@ input[type="range"].tool-slider::-moz-range-track {
   background: rgba(195, 199, 202, 0.4);
   border-radius: 2px;
 }
+
+.pm-editor .ProseMirror {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pm-editor .ProseMirror > *:first-child {
+  margin-top: 0;
+}
+
+.pm-editor .ProseMirror > *:last-child {
+  margin-bottom: 0;
+}
+
+.pm-editor .ProseMirror p,
+.pm-editor .ProseMirror li {
+  margin: 0 0 0.9em;
+}
+
+.pm-editor .ProseMirror h1,
+.pm-editor .ProseMirror h2,
+.pm-editor .ProseMirror h3 {
+  margin: 1.35em 0 0.5em;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-weight: 560;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.pm-editor .ProseMirror h1 {
+  font-size: 2.35rem;
+}
+
+.pm-editor .ProseMirror h2 {
+  font-size: 1.8rem;
+}
+
+.pm-editor .ProseMirror h3 {
+  font-size: 1.4rem;
+}
+
+.pm-editor .ProseMirror blockquote {
+  margin: 1.15em 0;
+  padding-left: 1rem;
+  border-left: 2px solid rgba(195, 199, 202, 0.5);
+  color: var(--text-secondary);
+}
+
+.pm-editor .ProseMirror pre {
+  margin: 1.15em 0;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(195, 199, 202, 0.32);
+  border-radius: 18px;
+  background: rgba(242, 244, 246, 0.92);
+  color: var(--text-primary);
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.pm-editor .ProseMirror pre code {
+  font: inherit;
+}
+
+.pm-editor .ProseMirror .pm-md-delim {
+  color: var(--text-muted);
+  opacity: 0.72;
+}
+
+.pm-editor .ProseMirror .pm-md-bold {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.pm-editor .ProseMirror .pm-md-italic {
+  font-style: italic;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code {
+  padding: 0.02em 0.22em;
+  border-radius: 0.35rem;
+  background: rgba(28, 39, 56, 0.08);
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 0.94em;
+}
+
+.pm-editor .ProseMirror .pm-md-code-fence {
+  letter-spacing: 0.015em;
+}
+
+.pm-editor .ProseMirror .pm-md-code-content {
+  color: var(--text-primary);
+}

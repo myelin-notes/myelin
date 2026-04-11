@@ -13,6 +13,7 @@ import {
   toggleMark,
 } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
+import { undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
 import {
@@ -27,6 +28,7 @@ import {
   type KeyCombo,
   registry,
 } from '@/lib/keybinds';
+import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { schema } from './schema';
 
 declare module '@/lib/keybinds' {
@@ -71,10 +73,6 @@ const clearBlockFormatting: Command = (state, dispatch) => {
   }
   if (dispatch) {
     const tr = state.tr;
-    const mdDelim = schema.marks.mdDelim;
-    if (mdDelim) {
-      tr.removeMark($cursor.start(), $cursor.end(), mdDelim);
-    }
     tr.setBlockType($cursor.before(), $cursor.after(), schema.nodes.paragraph);
     dispatch(tr);
   }
@@ -100,6 +98,7 @@ export function buildKeymap(s: Schema) {
     ...(isMac ? {} : { [`${mod}-y`]: redo }),
 
     Enter: chainCommands(
+      exitFencedCodeBlock,
       newlineInCode,
       splitListItem(s.nodes.listItem),
       liftEmptyBlock,
@@ -107,6 +106,7 @@ export function buildKeymap(s: Schema) {
     ),
     Backspace: chainCommands(
       deleteSelection,
+      undoInputRule,
       clearBlockFormatting,
       liftListItem(s.nodes.listItem),
       lift,
