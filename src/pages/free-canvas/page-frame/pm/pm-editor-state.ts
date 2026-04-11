@@ -1,6 +1,7 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
+import { PM_ADD_TO_HISTORY, PM_UPDATE_EVENT } from './constants';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
 
@@ -11,12 +12,12 @@ import { schema } from './schema';
  * via `setEditable()` rather than creating/destroying the view.
  */
 export class PageFrameEditorState {
-  private _docJSON: Record<string, unknown>;
+  private _offlineDoc: Record<string, unknown>;
   private _view: EditorView | null = null;
   private _editable = false;
 
   constructor(docJSON?: Record<string, unknown>) {
-    this._docJSON =
+    this._offlineDoc =
       docJSON ?? (createDefaultDoc().toJSON() as Record<string, unknown>);
   }
 
@@ -24,34 +25,22 @@ export class PageFrameEditorState {
     if (this._view) {
       return this._view.state.doc;
     }
-    return schema.nodeFromJSON(this._docJSON);
+    return schema.nodeFromJSON(this._offlineDoc);
   }
 
   get docJSON(): Record<string, unknown> {
     if (this._view) {
       return this._view.state.doc.toJSON() as Record<string, unknown>;
     }
-    return this._docJSON;
+    return this._offlineDoc;
   }
 
   get view(): EditorView | null {
     return this._view;
   }
 
-  get hasView(): boolean {
-    return this._view !== null;
-  }
-
-  get editable(): boolean {
-    return this._editable;
-  }
-
   toJSON(): Record<string, unknown> {
     return this.docJSON;
-  }
-
-  static fromJSON(json: Record<string, unknown>): PageFrameEditorState {
-    return new PageFrameEditorState(json);
   }
 
   /**
@@ -69,7 +58,7 @@ export class PageFrameEditorState {
       this.destroyView();
     }
 
-    const doc = schema.nodeFromJSON(this._docJSON);
+    const doc = schema.nodeFromJSON(this._offlineDoc);
     const state = EditorState.create({
       doc,
       plugins: buildPlugins(onPageCount),
@@ -78,14 +67,14 @@ export class PageFrameEditorState {
     this._editable = false;
     this._view = new EditorView(container, {
       state,
-      editable: () => this._editable,
+      editable: (_state) => this._editable,
       dispatchTransaction: (tr) => {
         if (!this._view) {
           return;
         }
         const newState = this._view.state.apply(tr);
         this._view.updateState(newState);
-        this._view.dom.dispatchEvent(new Event('pm-update'));
+        this._view.dom.dispatchEvent(new Event(PM_UPDATE_EVENT));
       },
     });
 
@@ -98,7 +87,7 @@ export class PageFrameEditorState {
   setEditable(editable: boolean): void {
     this._editable = editable;
     // Force PM to re-evaluate the editable prop
-    this._view?.setProps({ editable: () => this._editable });
+    this._view?.setProps({ editable: (_state) => this._editable });
   }
 
   /**
@@ -106,7 +95,10 @@ export class PageFrameEditorState {
    */
   destroyView(): void {
     if (this._view) {
-      this._docJSON = this._view.state.doc.toJSON() as Record<string, unknown>;
+      this._offlineDoc = this._view.state.doc.toJSON() as Record<
+        string,
+        unknown
+      >;
       this._view.destroy();
       this._view = null;
       this._editable = false;
@@ -117,7 +109,7 @@ export class PageFrameEditorState {
    * Replace the stored doc (e.g., from undo/redo at the canvas level).
    */
   setDocJSON(json: Record<string, unknown>): void {
-    this._docJSON = json;
+    this._offlineDoc = json;
     if (this._view) {
       const doc = schema.nodeFromJSON(json);
       const tr = this._view.state.tr.replaceWith(
@@ -125,7 +117,7 @@ export class PageFrameEditorState {
         this._view.state.doc.content.size,
         doc.content,
       );
-      tr.setMeta('addToHistory', false);
+      tr.setMeta(PM_ADD_TO_HISTORY, false);
       this._view.dispatch(tr);
     }
   }

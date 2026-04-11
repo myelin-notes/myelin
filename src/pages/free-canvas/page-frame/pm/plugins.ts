@@ -7,9 +7,10 @@ import { schema } from './schema';
 export function buildPlugins(
   onPageCount?: (pageCount: number) => void,
 ): Plugin[] {
-  const plugins: Plugin[] = [buildKeymap(schema), history()];
-  if (onPageCount) {
-    plugins.push(paginationPlugin(onPageCount));
-  }
+  const plugins: Plugin[] = [
+    buildKeymap(schema),
+    history(),
+    paginationPlugin(onPageCount),
+  ];
   return plugins;
 }

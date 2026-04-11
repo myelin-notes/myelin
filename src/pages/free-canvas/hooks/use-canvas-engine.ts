@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
-import { keybindings } from '@/lib/keybindings';
+import { keybindings, registry } from '@/lib/keybinds';
 import { FileSystem } from '@/lib/utils/file-system';
 import {
   DrawableCanvas,
@@ -11,7 +11,7 @@ import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-elem
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
 
-declare module '@/lib/keybindings' {
+declare module '@/lib/keybinds' {
   interface ActionMap {
     'canvas:pan': true;
     'canvas:undo': true;
@@ -20,6 +20,14 @@ declare module '@/lib/keybindings' {
     'canvas:tool-text': true;
   }
 }
+
+registry.defineDefaults({
+  'canvas:pan': { key: ' ' },
+  'canvas:undo': { key: 'z', mod: true },
+  'canvas:redo': { key: 'z', mod: true, shift: true },
+  'canvas:delete': { key: 'Backspace' },
+  'canvas:tool-text': { key: 't' },
+});
 
 interface UseCanvasEngineArgs {
   id: string | undefined;
@@ -214,14 +222,6 @@ export function useCanvasEngine({
     }
 
     animationFrameId = requestAnimationFrame(animate);
-
-    keybindings.defineDefaults({
-      'canvas:pan': { key: ' ' },
-      'canvas:undo': { key: 'z', mod: true },
-      'canvas:redo': { key: 'z', mod: true, shift: true },
-      'canvas:delete': { key: 'Backspace' },
-      'canvas:tool-text': { key: 't' },
-    });
 
     const unbindKeys = keybindings.register([
       {

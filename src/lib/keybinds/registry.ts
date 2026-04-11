@@ -1,6 +1,10 @@
+import { UserPrefs } from '@/lib/user-prefs';
+
 // biome-ignore lint/suspicious/noEmptyInterface: intentionally empty, extended via declaration merging
 export interface ActionMap {}
-export type Action = keyof ActionMap & string;
+export type Action = [keyof ActionMap] extends [never]
+  ? string
+  : keyof ActionMap & string;
 
 export interface KeyCombo {
   key: string;
@@ -9,19 +13,11 @@ export interface KeyCombo {
   alt?: boolean;
 }
 
-export interface ActionBinding {
-  action: Action;
-  onDown?: (e: KeyboardEvent) => void;
-  onUp?: (e: KeyboardEvent) => void;
-}
-
-import { UserPrefs } from '@/lib/user-prefs';
-
 const isMac =
   typeof navigator !== 'undefined' &&
   /Mac|iPhone|iPad/.test(navigator.platform);
 
-function comboMatches(e: KeyboardEvent, combo: KeyCombo): boolean {
+export function comboMatches(e: KeyboardEvent, combo: KeyCombo): boolean {
   if (e.key.toLowerCase() !== combo.key.toLowerCase()) {
     return false;
   }
@@ -59,11 +55,25 @@ export function formatKeyCombo(combo: KeyCombo): string {
   return isMac ? parts.join(' ') : parts.join('+');
 }
 
-class KeybindingManager {
+/** Convert a KeyCombo to a ProseMirror keymap string (e.g., "Mod-b"). */
+export function comboToPMKey(combo: KeyCombo): string {
+  const parts: string[] = [];
+  if (combo.mod) {
+    parts.push('Mod');
+  }
+  if (combo.shift) {
+    parts.push('Shift');
+  }
+  if (combo.alt) {
+    parts.push('Alt');
+  }
+  parts.push(combo.key);
+  return parts.join('-');
+}
+
+export class KeybindingRegistry {
   private defaults = new Map<string, KeyCombo>();
   private overrides = new Map<string, KeyCombo>();
-  private bindings: ActionBinding[] = [];
-  private listening = false;
 
   constructor() {
     this.loadOverrides();
@@ -75,24 +85,6 @@ class KeybindingManager {
         this.defaults.set(action, combo);
       }
     }
-  }
-
-  register(bindings: ActionBinding[]): () => void {
-    this.bindings.push(...bindings);
-    if (!this.listening) {
-      this.startListening();
-    }
-    return () => {
-      for (const b of bindings) {
-        const i = this.bindings.indexOf(b);
-        if (i >= 0) {
-          this.bindings.splice(i, 1);
-        }
-      }
-      if (this.bindings.length === 0) {
-        this.stopListening();
-      }
-    };
   }
 
   getCombo(action: Action): KeyCombo | undefined {
@@ -145,51 +137,4 @@ class KeybindingManager {
     }
     UserPrefs.set('keybindings', obj);
   }
-
-  private startListening() {
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
-    this.listening = true;
-  }
-
-  private stopListening() {
-    window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('keyup', this.onKeyUp);
-    this.listening = false;
-  }
-
-  private shouldIgnore(e: KeyboardEvent): boolean {
-    const tag = (e.target as HTMLElement)?.tagName;
-    return (
-      tag === 'INPUT' ||
-      tag === 'TEXTAREA' ||
-      (e.target as HTMLElement)?.isContentEditable === true
-    );
-  }
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    if (this.shouldIgnore(e)) {
-      return;
-    }
-    for (const b of this.bindings) {
-      const combo = this.getCombo(b.action);
-      if (combo && comboMatches(e, combo)) {
-        b.onDown?.(e);
-      }
-    }
-  };
-
-  private onKeyUp = (e: KeyboardEvent) => {
-    if (this.shouldIgnore(e)) {
-      return;
-    }
-    for (const b of this.bindings) {
-      const combo = this.getCombo(b.action);
-      if (combo && comboMatches(e, combo)) {
-        b.onUp?.(e);
-      }
-    }
-  };
 }
-
-export const keybindings = new KeybindingManager();

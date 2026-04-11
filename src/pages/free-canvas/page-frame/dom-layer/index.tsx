@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import type { EditorView } from 'prosemirror-view';
+import { useEffect, useRef } from 'react';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
@@ -8,6 +7,7 @@ import {
   PAGE_WIDTH,
   type PageFrameElement,
 } from '../../elements/page-frame-element';
+import { PM_EDITOR_CLASS, PM_UPDATE_EVENT } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 
 const FRAME_STYLE: Record<string, string> = {
@@ -34,6 +34,40 @@ interface FrameRefs {
   contentDiv: HTMLDivElement;
 }
 
+function createFrameRefs(
+  frame: PageFrameElement,
+  container: HTMLDivElement,
+): FrameRefs {
+  const frameDiv = document.createElement('div');
+  Object.assign(frameDiv.style, FRAME_STYLE);
+  frameDiv.dataset.frameIndex = String(frame.index);
+
+  const contentDiv = document.createElement('div');
+  Object.assign(contentDiv.style, CONTENT_STYLE);
+  contentDiv.classList.add(PM_EDITOR_CLASS);
+
+  frameDiv.appendChild(contentDiv);
+  container.appendChild(frameDiv);
+
+  frame.pmEditor.createView(contentDiv, (pageCount) => {
+    frame.numPages = pageCount;
+  });
+
+  return { frameDiv, contentDiv };
+}
+
+function removeStaleFrames(
+  frameMap: Map<number, FrameRefs>,
+  activeIndices: Set<number>,
+): void {
+  for (const [index, refs] of frameMap) {
+    if (!activeIndices.has(index)) {
+      refs.frameDiv.remove();
+      frameMap.delete(index);
+    }
+  }
+}
+
 interface PageFrameDomLayerProps {
   canvasRef: React.RefObject<DrawableCanvas | null>;
   editingElement: DrawableElement | null;
@@ -50,7 +84,7 @@ export function PageFrameDomLayer({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const frameMap = useRef<Map<number, FrameRefs>>(new Map());
-  const [activeView, setActiveView] = useState<EditorView | null>(null);
+  const activeView = editingElement?.pmEditor.view ?? null;
 
   // Sync loop — create/remove/position frame containers each frame
   useEffect(() => {
@@ -75,24 +109,7 @@ export function PageFrameDomLayer({
         existingIndices.add(frame.index);
 
         if (!frameMap.current.has(frame.index)) {
-          // Create frame container + persistent EditorView
-          const frameDiv = document.createElement('div');
-          Object.assign(frameDiv.style, FRAME_STYLE);
-          frameDiv.dataset.frameIndex = String(frame.index);
-
-          const contentDiv = document.createElement('div');
-          Object.assign(contentDiv.style, CONTENT_STYLE);
-          contentDiv.classList.add('pm-editor');
-
-          frameDiv.appendChild(contentDiv);
-          container.appendChild(frameDiv);
-
-          const refs: FrameRefs = { frameDiv, contentDiv };
-          frameMap.current.set(frame.index, refs);
-          const capturedFrame = frame;
-          frame.pmEditor.createView(contentDiv, (pageCount) => {
-            capturedFrame.numPages = pageCount;
-          });
+          frameMap.current.set(frame.index, createFrameRefs(frame, container));
         }
 
         const refs = frameMap.current.get(frame.index)!;
@@ -100,15 +117,10 @@ export function PageFrameDomLayer({
         const screenY = (frame.offset.y + offset.y) * zoom;
         refs.frameDiv.style.height = `${frame.totalHeight}px`;
         refs.frameDiv.style.transform = `translate(${screenX}px, ${screenY}px) scale(${zoom})`;
+        refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
       }
 
-      // Clean up removed frames
-      for (const [index, refs] of frameMap.current) {
-        if (!existingIndices.has(index)) {
-          refs.frameDiv.remove();
-          frameMap.current.delete(index);
-        }
-      }
+      removeStaleFrames(frameMap.current, existingIndices);
 
       // The browser may try to scrollIntoView the focused contentEditable on
       // its own. Zero those out so they don't accumulate, but DON'T convert
@@ -125,27 +137,6 @@ export function PageFrameDomLayer({
     rafId = requestAnimationFrame(sync);
     return () => cancelAnimationFrame(rafId);
   }, [canvasRef]);
-
-  // Toggle editing state (pointer-events, toolbar, click-outside)
-  useEffect(() => {
-    if (!editingElement) {
-      for (const [, refs] of frameMap.current) {
-        refs.frameDiv.style.pointerEvents = '';
-      }
-      setActiveView(null);
-      return;
-    }
-
-    const refs = frameMap.current.get(editingElement.index);
-    if (!refs) {
-      return;
-    }
-
-    // The foreground canvas has pointer-events:none (set by DrawableCanvas),
-    // so the editing frame naturally receives events without z-index promotion.
-    refs.frameDiv.style.pointerEvents = 'auto';
-    setActiveView(editingElement.pmEditor.view);
-  }, [editingElement]);
 
   // Follow-cursor: keep the caret inside a margin-padded viewport while
   // editing. Fires on every PM transaction (typing, arrow-key navigation,
@@ -197,14 +188,14 @@ export function PageFrameDomLayer({
       }
     };
 
-    view.dom.addEventListener('pm-update', schedule);
+    view.dom.addEventListener(PM_UPDATE_EVENT, schedule);
     document.addEventListener('selectionchange', schedule);
 
     return () => {
       if (pendingRaf !== 0) {
         cancelAnimationFrame(pendingRaf);
       }
-      view.dom.removeEventListener('pm-update', schedule);
+      view.dom.removeEventListener(PM_UPDATE_EVENT, schedule);
       document.removeEventListener('selectionchange', schedule);
     };
   }, [editingElement, canvasRef]);

@@ -14,14 +14,45 @@ import {
 } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
-import type { Schema } from 'prosemirror-model';
+import type { MarkType, Schema } from 'prosemirror-model';
 import {
   liftListItem,
   sinkListItem,
   splitListItem,
 } from 'prosemirror-schema-list';
 import type { Command } from 'prosemirror-state';
+import {
+  type Action,
+  comboToPMKey,
+  type KeyCombo,
+  registry,
+} from '@/lib/keybinds';
 import { schema } from './schema';
+
+declare module '@/lib/keybinds' {
+  interface ActionMap {
+    'editor:bold': true;
+    'editor:italic': true;
+    'editor:underline': true;
+    'editor:strikethrough': true;
+    'editor:code': true;
+  }
+}
+
+const EDITOR_MARK_ACTIONS: Record<string, KeyCombo & { type: MarkType }> = {
+  'editor:bold': { mod: true, key: 'b', type: schema.marks.bold },
+  'editor:italic': { mod: true, key: 'i', type: schema.marks.italic },
+  'editor:underline': { mod: true, key: 'u', type: schema.marks.underline },
+  'editor:strikethrough': {
+    mod: true,
+    shift: true,
+    key: 's',
+    type: schema.marks.strikethrough,
+  },
+  'editor:code': { mod: true, key: 'e', type: schema.marks.code },
+};
+
+registry.defineDefaults(EDITOR_MARK_ACTIONS);
 
 /**
  * At the start of a non-paragraph textblock (heading, code block),
@@ -40,9 +71,6 @@ const clearBlockFormatting: Command = (state, dispatch) => {
   }
   if (dispatch) {
     const tr = state.tr;
-    // The reverted paragraph shouldn't carry leftover `mdDelim` marks from
-    // when it was a heading/codeBlock — those only make sense inside the
-    // block types the markdown auto-format converts to.
     const mdDelim = schema.marks.mdDelim;
     if (mdDelim) {
       tr.removeMark($cursor.start(), $cursor.end(), mdDelim);
@@ -58,12 +86,14 @@ export function buildKeymap(s: Schema) {
     typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
   const mod = isMac ? 'Mod' : 'Ctrl';
 
+  const markBindings: Record<string, Command> = {};
+  for (const [action, defaultCombo] of Object.entries(EDITOR_MARK_ACTIONS)) {
+    const combo = registry.getCombo(action as Action) ?? defaultCombo;
+    markBindings[comboToPMKey(combo)] = toggleMark(defaultCombo.type);
+  }
+
   return keymap({
-    [`${mod}-b`]: toggleMark(s.marks.bold),
-    [`${mod}-i`]: toggleMark(s.marks.italic),
-    [`${mod}-u`]: toggleMark(s.marks.underline),
-    [`${mod}-e`]: toggleMark(s.marks.code),
-    [`${mod}-shift-s`]: toggleMark(s.marks.strikethrough),
+    ...markBindings,
 
     [`${mod}-z`]: undo,
     [`${mod}-shift-z`]: redo,

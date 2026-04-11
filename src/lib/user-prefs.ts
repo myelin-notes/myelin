@@ -15,7 +15,7 @@ function pref<T>(storageKey: string, defaultValue: T) {
 }
 
 const PREFS = {
-  keybindings: pref<Record<string, import('@/lib/keybindings').KeyCombo>>(
+  keybindings: pref<Record<string, import('@/lib/keybinds').KeyCombo>>(
     'keybindings',
     {},
   ),

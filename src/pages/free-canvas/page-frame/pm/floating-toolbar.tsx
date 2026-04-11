@@ -9,7 +9,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { formatKeyCombo, type KeyCombo } from '@/lib/keybindings';
+import { type Action, formatKeyCombo, registry } from '@/lib/keybinds';
+import { PM_UPDATE_EVENT } from './constants';
 import { schema } from './schema';
 
 interface FloatingToolbarProps {
@@ -26,46 +27,33 @@ interface MarkButton {
   mark: MarkType;
   icon: React.FC<{ className?: string }>;
   label: string;
-  combo: KeyCombo;
+  action: Action;
 }
 
-// Two visual groups joined by spacing — DESIGN.md §2 forbids divider lines,
-// so the typographic marks and the structural "code" mark are separated via
-// the spacing scale instead.
 const TYPOGRAPHY_MARKS: MarkButton[] = [
-  {
-    mark: schema.marks.bold,
-    icon: Bold,
-    label: 'Bold',
-    combo: { mod: true, key: 'b' },
-  },
+  { mark: schema.marks.bold, icon: Bold, label: 'Bold', action: 'editor:bold' },
   {
     mark: schema.marks.italic,
     icon: Italic,
     label: 'Italic',
-    combo: { mod: true, key: 'i' },
+    action: 'editor:italic',
   },
   {
     mark: schema.marks.underline,
     icon: Underline,
     label: 'Underline',
-    combo: { mod: true, key: 'u' },
+    action: 'editor:underline',
   },
   {
     mark: schema.marks.strikethrough,
     icon: Strikethrough,
     label: 'Strikethrough',
-    combo: { mod: true, shift: true, key: 's' },
+    action: 'editor:strikethrough',
   },
 ];
 
 const STRUCTURAL_MARKS: MarkButton[] = [
-  {
-    mark: schema.marks.code,
-    icon: Code,
-    label: 'Code',
-    combo: { mod: true, key: 'e' },
-  },
+  { mark: schema.marks.code, icon: Code, label: 'Code', action: 'editor:code' },
 ];
 
 const ALL_MARKS = [...TYPOGRAPHY_MARKS, ...STRUCTURAL_MARKS];
@@ -144,7 +132,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     // pm-update fires after every ProseMirror transaction — this is the
     // single source of truth for both mark state and selection changes.
     const onUpdate = () => requestAnimationFrame(syncState);
-    view.dom.addEventListener('pm-update', onUpdate);
+    view.dom.addEventListener(PM_UPDATE_EVENT, onUpdate);
 
     // selectionchange covers browser-driven selection (drag-select, etc.)
     // that may not go through dispatchTransaction.
@@ -173,7 +161,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     document.addEventListener('pointerdown', onOutsidePointerDown, true);
 
     return () => {
-      view.dom.removeEventListener('pm-update', onUpdate);
+      view.dom.removeEventListener(PM_UPDATE_EVENT, onUpdate);
       document.removeEventListener('selectionchange', onSelectionChange);
       document.removeEventListener('pointerdown', onOutsidePointerDown, true);
     };
@@ -191,8 +179,9 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     return null;
   }
 
-  const renderButton = ({ mark, icon: Icon, label, combo }: MarkButton) => {
+  const renderButton = ({ mark, icon: Icon, label, action }: MarkButton) => {
     const active = activeMarks.has(mark);
+    const combo = registry.getCombo(action);
     return (
       <Tooltip key={label}>
         <TooltipTrigger
@@ -208,12 +197,14 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={6}>
           <span>{label}</span>
-          <kbd
-            data-slot="kbd"
-            className="ml-1 rounded bg-white/10 px-1.5 py-0.5 font-medium text-[10px] text-white/80"
-          >
-            {formatKeyCombo(combo)}
-          </kbd>
+          {combo && (
+            <kbd
+              data-slot="kbd"
+              className="ml-1 rounded bg-white/10 px-1.5 py-0.5 font-medium text-[10px] text-white/80"
+            >
+              {formatKeyCombo(combo)}
+            </kbd>
+          )}
         </TooltipContent>
       </Tooltip>
     );

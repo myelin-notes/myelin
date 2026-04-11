@@ -563,7 +563,7 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
 }
 
 export function paginationPlugin(
-  onPageCount: (pageCount: number) => void,
+  onPageCount?: (pageCount: number) => void,
 ): Plugin {
   return new Plugin<PaginationState>({
     key: paginationKey,
@@ -647,7 +647,7 @@ export function paginationPlugin(
         }
 
         if (pageCount !== prevPageCount) {
-          onPageCount(pageCount);
+          onPageCount?.(pageCount);
         }
 
         const decos = buildDecorationSet(editorView, breaks);
