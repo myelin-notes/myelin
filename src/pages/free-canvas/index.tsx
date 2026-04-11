@@ -30,20 +30,20 @@ export function CanvasView() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
-      {/* z:0 — Background canvas: dot grid + page chrome */}
+      {/* Background canvas: dot grid */}
       <canvas
         ref={bgCanvasRef}
         className="absolute inset-0 block h-full w-full"
-        style={{ zIndex: 0 }}
+        style={{ zIndex: -1 }}
       />
 
-      {/* z:1 — DOM layer: PM editor text */}
+      {/* DOM layer: page chrome + PM editor text */}
       <PageFrameDomLayer
         canvasRef={engine.drawableCanvasRef}
         editingElement={engine.editingElement}
       />
 
-      {/* Foreground canvas: strokes, images, selection (z-index managed by DrawableCanvas) */}
+      {/* Foreground canvas: strokes, images, selection (z-index toggled by DrawableCanvas) */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full"

@@ -6,15 +6,13 @@ import {
   layoutWithLines,
   prepareWithSegments,
 } from '@chenglou/pretext';
+import { PM_ADD_TO_HISTORY } from './constants';
 
 const PAGE_HEIGHT = 880;
 const PAGE_PADDING = 48;
 const PAGE_GAP = 40;
-/** Usable content height per page. */
 const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 784
-/** Vertical space consumed by a page break: bottom padding + gap + top padding. */
 const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
-
 const CONTAINER_NODE_NAMES = new Set([
   'bulletList',
   'orderedList',
@@ -653,7 +651,7 @@ export function paginationPlugin(
         const decos = buildDecorationSet(editorView, breaks);
         const tr = editorView.state.tr;
         tr.setMeta(paginationKey, { decos, breaks, pageCount });
-        tr.setMeta('addToHistory', false);
+        tr.setMeta(PM_ADD_TO_HISTORY, false);
         editorView.dispatch(tr);
       }
 

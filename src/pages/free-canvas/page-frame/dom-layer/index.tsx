@@ -3,6 +3,9 @@ import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
 import {
+  PAGE_CORNER_RADIUS,
+  PAGE_GAP,
+  PAGE_HEIGHT,
   PAGE_PADDING,
   PAGE_WIDTH,
   type PageFrameElement,
@@ -32,6 +35,34 @@ const CONTENT_STYLE: Record<string, string> = {
 interface FrameRefs {
   frameDiv: HTMLDivElement;
   contentDiv: HTMLDivElement;
+  pageChromeDivs: HTMLDivElement[];
+}
+
+const PAGE_CHROME_STYLE: Record<string, string> = {
+  position: 'absolute',
+  left: '0px',
+  width: `${PAGE_WIDTH}px`,
+  height: `${PAGE_HEIGHT}px`,
+  background: '#ffffff',
+  borderRadius: `${PAGE_CORNER_RADIUS}px`,
+  boxShadow: '0 4px 24px rgba(25, 28, 30, 0.08)',
+  border: '0.5px solid rgba(195, 199, 202, 0.2)',
+  pointerEvents: 'none',
+};
+
+function syncPageChrome(refs: FrameRefs, numPages: number): void {
+  while (refs.pageChromeDivs.length < numPages) {
+    const div = document.createElement('div');
+    Object.assign(div.style, PAGE_CHROME_STYLE);
+    refs.frameDiv.insertBefore(div, refs.contentDiv);
+    refs.pageChromeDivs.push(div);
+  }
+  while (refs.pageChromeDivs.length > numPages) {
+    refs.pageChromeDivs.pop()!.remove();
+  }
+  for (let p = 0; p < numPages; p++) {
+    refs.pageChromeDivs[p].style.top = `${p * (PAGE_HEIGHT + PAGE_GAP)}px`;
+  }
 }
 
 function createFrameRefs(
@@ -49,11 +80,12 @@ function createFrameRefs(
   frameDiv.appendChild(contentDiv);
   container.appendChild(frameDiv);
 
+  frame.mountDOM(frameDiv, contentDiv);
   frame.pmEditor.createView(contentDiv, (pageCount) => {
     frame.numPages = pageCount;
   });
 
-  return { frameDiv, contentDiv };
+  return { frameDiv, contentDiv, pageChromeDivs: [] };
 }
 
 function removeStaleFrames(
@@ -118,6 +150,7 @@ export function PageFrameDomLayer({
         refs.frameDiv.style.height = `${frame.totalHeight}px`;
         refs.frameDiv.style.transform = `translate(${screenX}px, ${screenY}px) scale(${zoom})`;
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
+        syncPageChrome(refs, frame.numPages);
       }
 
       removeStaleFrames(frameMap.current, existingIndices);
@@ -203,13 +236,14 @@ export function PageFrameDomLayer({
   return (
     <>
       <div
+        id="page-frame-overlay"
         ref={containerRef}
         style={{
           position: 'absolute',
           inset: 0,
           pointerEvents: 'none',
           overflow: 'hidden',
-          zIndex: 2,
+          zIndex: 5,
         }}
       />
       {activeView && <FloatingToolbar view={activeView} />}

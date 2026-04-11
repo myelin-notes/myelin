@@ -12,7 +12,6 @@ import type { DrawableElement } from './elements/drawable-element';
 import { DrawableElementRegistry } from './elements/drawable-element-registry';
 import { ElementType } from './elements/element-type';
 import { ImageElement } from './elements/image-element';
-import type { PageFrameElement } from './elements/page-frame-element';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
@@ -62,7 +61,7 @@ export class DrawableCanvas implements ISerializable {
     }
 
     this.canvas = canvas;
-    this.canvas.style.zIndex = '5';
+    this.canvas.style.zIndex = '10';
     this.ctx = ctx!;
     this.viewport = new CanvasViewport(canvas);
     this.state = new StateMachine(InteractState.Idle);
@@ -103,19 +102,24 @@ export class DrawableCanvas implements ISerializable {
 
   public enterElementEdit(
     element: DrawableElement,
-    screenX?: number,
-    screenY?: number,
+    event?: Event,
   ): void {
     if (this._editingElement) {
       this.exitElementEdit();
     }
+
+    // Stop the initiating event from bubbling to the document-level
+    // click-outside listener we're about to register.
+    event?.stopPropagation();
+
     this._editingElement = element;
-    // Drop foreground canvas between background (z:0) and DOM (z:2)
+    // Drop foreground canvas below DOM layer (z:5) so editing UI receives events
     this.canvas.style.pointerEvents = 'none';
-    this.canvas.style.zIndex = '1';
+    this.canvas.style.zIndex = '2';
     // Camera switches to "vertical-only pan + handle two-finger touch" mode.
     this.viewport.editMode = true;
-    const editDomRoot = element.enterEditMode(this, screenX, screenY);
+    const pe = event instanceof PointerEvent ? event : undefined;
+    const editDomRoot = element.enterEditMode(this, pe?.clientX, pe?.clientY);
     this.onElementEdit?.(element);
 
     // Escape exits edit mode
@@ -128,26 +132,23 @@ export class DrawableCanvas implements ISerializable {
     };
     document.addEventListener('keydown', handleKeyDown);
 
-    // Click outside editing DOM exits edit mode
-    let handlePointerDown: ((e: PointerEvent) => void) | null = null;
-    if (editDomRoot) {
-      handlePointerDown = (e: PointerEvent) => {
-        if (!editDomRoot.contains(e.target as Node)) {
-          this.exitElementEdit();
-        }
-      };
-      document.addEventListener('pointerdown', handlePointerDown);
-    }
+    // Click outside editing DOM exits edit mode (no DOM root → any click exits)
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!editDomRoot?.contains(e.target as Node)) {
+        this.exitElementEdit();
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
 
     this._cleanupEditListeners = () => {
       document.removeEventListener('keydown', handleKeyDown);
-      if (handlePointerDown) {
-        document.removeEventListener('pointerdown', handlePointerDown);
-      }
+      document.removeEventListener('pointerdown', handlePointerDown);
     };
   }
 
   public exitElementEdit(): void {
+    console.trace('EXITING ');
+
     if (!this._editingElement) {
       return;
     }
@@ -160,9 +161,9 @@ export class DrawableCanvas implements ISerializable {
     }
     this._editingElement = null;
     this.viewport.editMode = false;
-    // Restore foreground canvas above DOM layer
+    // Restore foreground canvas above DOM layer (z:5)
     this.canvas.style.pointerEvents = '';
-    this.canvas.style.zIndex = '5';
+    this.canvas.style.zIndex = '10';
     this.onElementEdit?.(null);
   }
 
@@ -182,7 +183,6 @@ export class DrawableCanvas implements ISerializable {
     const logicalW = this.canvas.width / dpr;
     const logicalH = this.canvas.height / dpr;
 
-    const editing = this._editingElement !== null;
     const zoom = this.viewport.zoom;
     const offset = this.viewport.offset;
 
@@ -207,17 +207,6 @@ export class DrawableCanvas implements ISerializable {
         this.bgCtx.restore();
       }
 
-      if (!editing) {
-        this.bgCtx.save();
-        this.bgCtx.scale(zoom, zoom);
-        this.bgCtx.translate(offset.x, offset.y);
-        for (const element of this._elements) {
-          if (element.type === ElementType.PAGE_FRAME) {
-            (element as PageFrameElement).drawChrome(this.bgCtx);
-          }
-        }
-        this.bgCtx.restore();
-      }
     }
 
     // Foreground canvas
@@ -231,17 +220,6 @@ export class DrawableCanvas implements ISerializable {
     for (const element of this._elements) {
       element.draw(this.ctx, deltaTime);
     }
-    // When editing, chrome draws after strokes (but below DOM text at z:2).
-    // Page frames are sorted to front so we stop at the first non-frame.
-    if (editing) {
-      for (const element of this._elements) {
-        if (element.type !== ElementType.PAGE_FRAME) {
-          break;
-        }
-        (element as PageFrameElement).drawChrome(this.ctx);
-      }
-    }
-
     // Cursor: compute fresh from screen position so it's correct even if
     // the user wheel-zoomed without moving the mouse since.
     const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
@@ -295,16 +273,6 @@ export class DrawableCanvas implements ISerializable {
     canvas.addEventListener('pointermove', this._handlePointerMove);
 
     this._handlePointerDown = (evt) => {
-      // During page frame editing, any click that reaches the canvas
-      // (i.e. outside the raised DOM contentEditable) exits edit mode
-      // and re-selects the frame so handles remain visible.
-      if (this._editingElement) {
-        const el = this._editingElement;
-        this.exitElementEdit();
-        el.select();
-        return;
-      }
-
       switch (evt.pointerType) {
         case 'touch':
           this.state.change(InteractState.Moving, evt);

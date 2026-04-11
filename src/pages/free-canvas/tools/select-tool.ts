@@ -53,8 +53,6 @@ export class SelectTool implements ITool {
   // Click-to-edit state: clicking an already-selected page frame without
   // dragging re-enters edit mode (file-rename pattern). Resolved on finish().
   private clickToEditCandidate: PageFrameElement | null = null;
-  private clickToEditClientX: number = 0;
-  private clickToEditClientY: number = 0;
 
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
     if (this.mode === SelectMode.Marquee) {
@@ -142,7 +140,7 @@ export class SelectTool implements ITool {
             }
           }
           e.select();
-          canvas.enterElementEdit(e, event.clientX, event.clientY);
+          canvas.enterElementEdit(e, event);
           this.lastClickTime = 0;
           return;
         }
@@ -186,8 +184,6 @@ export class SelectTool implements ITool {
       // editing" state where pressing Backspace deletes the whole frame.
       if (pick instanceof PageFrameElement && wasAlreadySelected) {
         this.clickToEditCandidate = pick;
-        this.clickToEditClientX = event.clientX;
-        this.clickToEditClientY = event.clientY;
       }
       return;
     }
@@ -323,11 +319,7 @@ export class SelectTool implements ITool {
             ),
           );
         } else if (this.clickToEditCandidate) {
-          canvas.enterElementEdit(
-            this.clickToEditCandidate,
-            this.clickToEditClientX,
-            this.clickToEditClientY,
-          );
+          canvas.enterElementEdit(this.clickToEditCandidate, event);
         }
         break;
       }

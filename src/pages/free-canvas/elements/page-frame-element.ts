@@ -4,7 +4,7 @@ import type {
   BinaryWriter,
 } from '../../../lib/utils/binary-helper';
 import type { UndoCommand } from '../../../lib/utils/undo-redo';
-import { EditPageFrameCommand } from '../commands/edit-page-frame';
+import { EditPageFrameCommand } from '../commands';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { DrawableElement } from './drawable-element';
@@ -24,6 +24,21 @@ export class PageFrameElement extends DrawableElement {
   private _oldDocJSON: Record<string, unknown> = {};
 
   public readonly pmEditor = new PageFrameEditorState();
+
+  private _frameDiv: HTMLDivElement | null = null;
+  private _contentDiv: HTMLDivElement | null = null;
+
+  public get frameDiv(): HTMLDivElement | null {
+    return this._frameDiv;
+  }
+  public get contentDiv(): HTMLDivElement | null {
+    return this._contentDiv;
+  }
+
+  public mountDOM(frameDiv: HTMLDivElement, contentDiv: HTMLDivElement): void {
+    this._frameDiv = frameDiv;
+    this._contentDiv = contentDiv;
+  }
 
   constructor(index: number) {
     super(index, ElementType.PAGE_FRAME);
@@ -124,11 +139,9 @@ export class PageFrameElement extends DrawableElement {
         Selection.near(view.state.doc.resolve(pos)),
       );
       view.dispatch(tr);
-
-      // Frame div is the editing DOM root (contentDiv > frameDiv)
-      return view.dom.parentElement?.parentElement ?? null;
     }
-    return null;
+
+    return this.frameDiv;
   }
 
   public override exitEditMode(): UndoCommand | null {
@@ -138,6 +151,7 @@ export class PageFrameElement extends DrawableElement {
     const newDocJSON = this.pmEditor.toJSON();
     const changed =
       JSON.stringify(newDocJSON) !== JSON.stringify(this._oldDocJSON);
+
     if (changed) {
       return new EditPageFrameCommand(this, this._oldDocJSON, newDocJSON);
     }
@@ -145,43 +159,6 @@ export class PageFrameElement extends DrawableElement {
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
-
-  /** Draw page chrome (white card + shadow). Called on the background canvas. */
-  public drawChrome(ctx: CanvasRenderingContext2D): void {
-    ctx.save();
-    ctx.translate(this.offset.x, this.offset.y);
-    for (let p = 0; p < this._numPages; p++) {
-      const y = p * (this._pageHeight + PAGE_GAP);
-      ctx.save();
-      ctx.shadowColor = 'rgba(25, 28, 30, 0.08)';
-      ctx.shadowBlur = 24;
-      ctx.shadowOffsetY = 4;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.roundRect(
-        0,
-        y,
-        this._pageWidth,
-        this._pageHeight,
-        PAGE_CORNER_RADIUS,
-      );
-      ctx.fill();
-      ctx.restore();
-
-      ctx.strokeStyle = 'rgba(195, 199, 202, 0.2)';
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.roundRect(
-        0,
-        y,
-        this._pageWidth,
-        this._pageHeight,
-        PAGE_CORNER_RADIUS,
-      );
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
 
   public save(writer: BinaryWriter): void {
     super.save(writer);

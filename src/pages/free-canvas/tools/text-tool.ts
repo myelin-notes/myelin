@@ -79,19 +79,14 @@ export class TextTool implements ITool {
           e instanceof TextElement &&
           CollisionHelper.inBox(endPos, e.boundingBox)
         ) {
-          this.editExisting(canvas, e, event.clientX, event.clientY);
+          this.editExisting(canvas, event, e);
           this.dragStart = null;
           this.dragCurrent = null;
           return;
         }
       }
       // Click-to-create with default size
-      this.createNew(
-        canvas,
-        this.dragStart,
-        DEFAULT_BOX_WIDTH,
-        DEFAULT_BOX_HEIGHT,
-      );
+      this.createNew(canvas, this.dragStart, DEFAULT_BOX_WIDTH, DEFAULT_BOX_HEIGHT);
     } else {
       // Drag-to-create with custom size
       const x = Math.min(this.dragStart.x, endPos.x);
@@ -107,12 +102,11 @@ export class TextTool implements ITool {
 
   private editExisting(
     canvas: DrawableCanvas,
+    event: Event,
     element: TextElement,
-    screenX?: number,
-    screenY?: number,
   ) {
     element.select();
-    canvas.enterElementEdit(element, screenX, screenY);
+    canvas.enterElementEdit(element, event);
   }
 
   private createNew(
