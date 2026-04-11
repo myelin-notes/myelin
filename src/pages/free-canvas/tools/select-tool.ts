@@ -8,7 +8,6 @@ import { MoveElementsCommand } from '../commands/move-elements';
 import { ScaleElementCommand } from '../commands/scale-element';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
-import { PageFrameElement } from '../elements/page-frame-element';
 import type { ITool, SvgIcon, ToolOption } from './tool';
 
 const HANDLE_HIT_RADIUS = 10;
@@ -52,7 +51,7 @@ export class SelectTool implements ITool {
 
   // Click-to-edit state: clicking an already-selected page frame without
   // dragging re-enters edit mode (file-rename pattern). Resolved on finish().
-  private clickToEditCandidate: PageFrameElement | null = null;
+  private clickToEditCandidate: DrawableElement | null = null;
 
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
     if (this.mode === SelectMode.Marquee) {
@@ -130,10 +129,7 @@ export class SelectTool implements ITool {
     if (isDoubleClick) {
       for (let i = canvas.elements.length - 1; i >= 0; i--) {
         const e = canvas.elements[i];
-        if (
-          e instanceof PageFrameElement &&
-          CollisionHelper.inBox(point, e.boundingBox)
-        ) {
+        if (e.editable && CollisionHelper.inBox(point, e.boundingBox)) {
           for (const el of canvas.elements) {
             if (el !== e) {
               el.unselect();
@@ -179,10 +175,9 @@ export class SelectTool implements ITool {
       this.totalDelta = { x: 0, y: 0 };
       this.movingElements = canvas.elements.filter((e) => e.isSelected);
 
-      // Clicking an already-selected page frame (without dragging) re-enters
-      // edit mode. Otherwise the user can be left in a "selected but not
-      // editing" state where pressing Backspace deletes the whole frame.
-      if (pick instanceof PageFrameElement && wasAlreadySelected) {
+      // Clicking an already-selected editable element (without dragging)
+      // re-enters edit mode.
+      if (pick.editable && wasAlreadySelected) {
         this.clickToEditCandidate = pick;
       }
       return;
@@ -251,19 +246,25 @@ export class SelectTool implements ITool {
           y: Math.max(MIN_SCALE, this.originalScale.y * ratioY),
         };
 
-        // Compute anchor in local space to keep it fixed
-        const anchorLocal = {
-          x:
-            (this.anchorWorld.x - this.originalOffset.x) / this.originalScale.x,
-          y:
-            (this.anchorWorld.y - this.originalOffset.y) / this.originalScale.y,
-        };
-        const newOffset = {
-          x: this.anchorWorld.x - anchorLocal.x * newScale.x,
-          y: this.anchorWorld.y - anchorLocal.y * newScale.y,
-        };
-
         e.setScale(newScale.x, newScale.y);
+
+        // Re-derive offset from CURRENT localBBox so elements with
+        // changing local bounds (e.g. text reflow) stay anchored.
+        const pad = 4; // SELECTION_PADDING
+        const padX = (3 - this.handleIndex) % 2 === 0 ? -pad : pad;
+        const padY = (3 - this.handleIndex) < 2 ? -pad : pad;
+        const local = e.localBoundingBox;
+        const localCorners = [
+          { x: local.x, y: local.y },
+          { x: local.right, y: local.y },
+          { x: local.x, y: local.bottom },
+          { x: local.right, y: local.bottom },
+        ];
+        const anchorLocal = localCorners[3 - this.handleIndex];
+        const newOffset = {
+          x: this.anchorWorld.x - padX - anchorLocal.x * newScale.x,
+          y: this.anchorWorld.y - padY - anchorLocal.y * newScale.y,
+        };
         e.setOffset(newOffset.x, newOffset.y);
         break;
       }

@@ -145,6 +145,11 @@ export abstract class DrawableElement implements ISerializable {
     this.selectionT = 0;
   }
 
+  /** Whether this element supports inline editing (double-click to edit). */
+  public get editable(): boolean {
+    return false;
+  }
+
   /** Called when the element enters inline edit mode. Returns the root DOM element of the editing UI, if any. */
   public enterEditMode(
     _canvas: DrawableCanvas,

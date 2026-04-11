@@ -89,6 +89,10 @@ export class PageFrameElement extends DrawableElement {
 
   protected updateBoundingBox(): void {}
 
+  public override get editable(): boolean {
+    return true;
+  }
+
   public override enterEditMode(
     canvas: DrawableCanvas,
     screenX?: number,

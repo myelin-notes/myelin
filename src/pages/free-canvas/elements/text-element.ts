@@ -1,4 +1,8 @@
-import { LineBreaker } from 'css-line-break';
+import {
+  type LayoutLine,
+  layoutWithLines,
+  prepareWithSegments,
+} from '@chenglou/pretext';
 import type {
   BinaryReader,
   BinaryWriter,
@@ -35,6 +39,8 @@ export class TextElement extends DrawableElement {
   private _textarea: HTMLTextAreaElement | null = null;
   private _oldText: string = '';
   private _canvas: DrawableCanvas | null = null;
+  private _cachedLines: LayoutLine[] = [];
+  private _cachedLineHeight: number = 0;
 
   public constructor(
     index: number,
@@ -69,15 +75,20 @@ export class TextElement extends DrawableElement {
     return this._editing;
   }
 
+  public override get editable(): boolean {
+    return true;
+  }
+
   public override enterEditMode(canvas: DrawableCanvas): HTMLElement | null {
     this._editing = true;
     this._oldText = this._text;
     this._canvas = canvas;
 
     const zoom = canvas.viewport.zoom;
+    const box = this.boundingBox;
     const screenPos = canvas.viewport.worldToScreen({
-      x: this.boundingBox.x,
-      y: this.boundingBox.y,
+      x: box.x,
+      y: box.y,
     });
 
     const textarea = document.createElement('textarea');
@@ -87,12 +98,12 @@ export class TextElement extends DrawableElement {
       zIndex: '20',
       left: `${screenPos.x}px`,
       top: `${screenPos.y}px`,
-      width: `${this._boxWidth * zoom}px`,
-      height: `${this._boxHeight * zoom}px`,
+      width: `${box.width * zoom}px`,
+      height: `${box.height * zoom}px`,
       fontSize: `${this._style.fontSize * zoom}px`,
-      lineHeight: '1.3',
-      fontFamily: `"${this._style.fontFamily}", sans-serif`,
-      color: 'var(--text-primary)',
+      lineHeight: `${this._style.fontSize * 1.3 * zoom}px`,
+      fontFamily: this._style.fontFamily,
+      color: this._style.color,
       caretColor: 'var(--accent-dark)',
       wordWrap: 'break-word',
       overflowWrap: 'break-word',
@@ -153,53 +164,42 @@ export class TextElement extends DrawableElement {
 
   public setText(text: string) {
     this._text = text;
-    this.measureAndUpdate();
+    this.recomputeBox();
   }
 
   public setPosition(x: number, y: number) {
     this._position = { x, y };
-    this.measureAndUpdate();
+    this.recomputeBox();
   }
 
   public setBoxSize(width: number, height: number) {
     this._boxWidth = width;
     this._boxHeight = height;
-    this.measureAndUpdate();
+    this.recomputeBox();
   }
 
-  // Absorb scale into box dimensions so font size stays constant
-  public override setScale(x: number, y: number) {
-    const prevSx = this._scale.x || 1;
-    const prevSy = this._scale.y || 1;
-    const rx = x / prevSx;
-    const ry = y / prevSy;
-
-    this._boxWidth = Math.abs(this._boxWidth * rx);
-    this._boxHeight = Math.abs(this._boxHeight * ry);
-    this._position.x *= rx;
-    this._position.y *= ry;
-
-    this._scale = { x: 1, y: 1 };
-    this.measureAndUpdate();
-  }
 
   protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
     if (!this._text || this._editing) {
       return;
     }
+    const sx = this._scale.x;
+    const sy = this._scale.y;
+
+    // Counter the parent's scale so text renders at native font size
+    ctx.scale(1 / sx, 1 / sy);
+
     const fontSize = this._style.fontSize;
     ctx.font = `${fontSize}px ${this._style.fontFamily}`;
     ctx.fillStyle = this._style.color;
     ctx.textBaseline = 'top';
 
-    const lineHeight = fontSize * 1.3;
-    const lines = wrapText(ctx, this._text, this._boxWidth);
-
-    for (let i = 0; i < lines.length; i++) {
+    const lh = this._cachedLineHeight;
+    for (let i = 0; i < this._cachedLines.length; i++) {
       ctx.fillText(
-        lines[i],
-        this._position.x,
-        this._position.y + i * lineHeight,
+        this._cachedLines[i].text,
+        this._position.x * sx,
+        this._position.y * sy + i * lh,
       );
     }
   }
@@ -210,12 +210,8 @@ export class TextElement extends DrawableElement {
     _radius: number,
     _ctx: CanvasRenderingContext2D,
   ): boolean {
-    return (
-      x >= this._position.x &&
-      x <= this._position.x + this._boxWidth &&
-      y >= this._position.y &&
-      y <= this._position.y + this._boxHeight
-    );
+    const b = this.box;
+    return x >= b.x && x <= b.right && y >= b.y && y <= b.bottom;
   }
 
   public get localBoundingBox(): DOMRect {
@@ -223,25 +219,50 @@ export class TextElement extends DrawableElement {
   }
 
   protected updateBoundingBox(): void {
-    this.measureAndUpdate();
+    this.recomputeBox();
   }
 
-  private measureAndUpdate() {
+  private recomputeBox() {
+    const sx = Math.abs(this._scale.x) || 1;
+    const sy = Math.abs(this._scale.y) || 1;
+    const fontSize = this._style.fontSize;
+    const lineHeight = fontSize * 1.3;
+    this._cachedLineHeight = lineHeight;
+
+    let localHeight = this._boxHeight;
+
     if (this._text) {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-      ctx.font = `${this._style.fontSize}px ${this._style.fontFamily}`;
-      const lines = wrapText(ctx, this._text, this._boxWidth);
-      const textHeight = lines.length * this._style.fontSize * 1.3;
-      if (textHeight > this._boxHeight) {
-        this._boxHeight = textHeight;
+      const fontString = `${fontSize}px ${this._style.fontFamily}`;
+      const effectiveWidth = this._boxWidth * sx;
+      const prepared = prepareWithSegments(this._text, fontString);
+      this._cachedLines = layoutWithLines(
+        prepared,
+        effectiveWidth,
+        lineHeight,
+      ).lines;
+
+      const textHeight = this._cachedLines.length * lineHeight;
+
+      if (sx === 1 && sy === 1) {
+        // Unscaled: grow box to fit text permanently
+        if (textHeight > this._boxHeight) {
+          this._boxHeight = textHeight;
+        }
+        localHeight = this._boxHeight;
+      } else {
+        // Scaled: local height must produce correct world height
+        // boundingBox = local * scale, so local = visualHeight / sy
+        localHeight = Math.max(this._boxHeight, textHeight / sy);
       }
+    } else {
+      this._cachedLines = [];
     }
+
     this.box = new DOMRect(
       this._position.x,
       this._position.y,
       this._boxWidth,
-      this._boxHeight,
+      localHeight,
     );
   }
 
@@ -256,7 +277,7 @@ export class TextElement extends DrawableElement {
     this._position = { x: reader.readF32(), y: reader.readF32() };
     this._boxWidth = reader.readF32();
     this._boxHeight = reader.readF32();
-    this.measureAndUpdate();
+    this.recomputeBox();
   }
 
   public save(writer: BinaryWriter): void {
@@ -270,56 +291,4 @@ export class TextElement extends DrawableElement {
     writer.writeF32(this._boxWidth);
     writer.writeF32(this._boxHeight);
   }
-}
-
-const SOFT_HYPHEN = '\u00AD';
-
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-): string[] {
-  const result: string[] = [];
-  const breaker = LineBreaker(text, {
-    lineBreak: 'normal',
-    wordBreak: 'normal',
-  });
-
-  let currentLine = '';
-  let bk: IteratorResult<{ slice: () => string; required: boolean }>;
-  while (!(bk = breaker.next()).done) {
-    const segment = bk.value!;
-    const chunk = segment.slice();
-
-    // Handle mandatory breaks (newlines) — they come as trailing \n in the segment
-    const hasMandatory = segment.required;
-
-    // Strip trailing newline/carriage-return from the chunk itself
-    const cleaned = chunk.replace(/[\r\n]+$/, '');
-
-    // If soft-hyphen at the end, test with visible hyphen for measurement
-    const endsWithShy = cleaned.endsWith(SOFT_HYPHEN);
-    const displayChunk = endsWithShy ? `${cleaned.slice(0, -1)}-` : cleaned;
-
-    const testLine = currentLine + displayChunk;
-
-    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-      // Emit current line, possibly with trailing hyphen from previous soft-hyphen
-      result.push(currentLine.replace(/\u00AD$/, '-'));
-      currentLine = cleaned.replace(/^\s+/, '');
-    } else {
-      currentLine += cleaned;
-    }
-
-    if (hasMandatory) {
-      result.push(currentLine.replace(/\u00AD/g, ''));
-      currentLine = '';
-    }
-  }
-
-  if (currentLine) {
-    result.push(currentLine.replace(/\u00AD/g, ''));
-  }
-
-  return result;
 }
