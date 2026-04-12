@@ -330,13 +330,11 @@ input[type="range"].tool-slider::-moz-range-track {
 }
 
 .pm-editor .ProseMirror .pm-monaco-code-block__delimiter {
-  color: var(--text-muted);
-  opacity: 0.72;
+  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
 }
 
 .pm-editor .ProseMirror .pm-md-delim {
-  color: var(--text-muted);
-  opacity: 0.72;
+  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
 }
 
 .pm-editor .ProseMirror .pm-md-bold {
