@@ -1,42 +1,99 @@
 import { exitCode } from 'prosemirror-commands';
 import { InputRule, inputRules } from 'prosemirror-inputrules';
-import type { Schema } from 'prosemirror-model';
+import { Fragment, type Node as PMNode, type Schema } from 'prosemirror-model';
 import type { Plugin } from 'prosemirror-state';
-import { type Command, TextSelection } from 'prosemirror-state';
-import { findFenceLineAtOffset, parseFenceMarkdown } from './parse-fences';
+import {
+  type Command,
+  Selection,
+  Plugin as StatePlugin,
+  TextSelection,
+} from 'prosemirror-state';
+import {
+  findFenceLineAtOffset,
+  isClosingFenceLine,
+  isOpeningFenceLine,
+  parseFenceMarkdown,
+} from './parse-fences';
 
-const FENCE = '```';
-const OPEN_FENCE_TEXT = '```\n';
+function isPlainTextParagraph(
+  node: PMNode,
+  paragraphType: PMNode['type'],
+): boolean {
+  if (node.type !== paragraphType) {
+    return false;
+  }
 
-function buildOpenFenceInputRule(schema: Schema): InputRule {
+  let hasOnlyTextChildren = true;
+  node.forEach((child) => {
+    if (!child.isText) {
+      hasOnlyTextChildren = false;
+    }
+  });
+  return hasOnlyTextChildren;
+}
+
+function buildClosedFenceInputRule(schema: Schema): InputRule {
   return new InputRule(/^```$/, (state, _match, start) => {
     const codeBlockType = schema.nodes.codeBlock;
     const paragraphType = schema.nodes.paragraph;
     const $start = state.doc.resolve(start);
-    const paragraph = $start.parent;
+    const closingParagraph = $start.parent;
 
-    if (paragraph.type !== paragraphType || paragraph.textContent !== '``') {
+    if (
+      closingParagraph.type !== paragraphType ||
+      closingParagraph.textContent !== '``'
+    ) {
       return null;
     }
 
-    const parent = $start.node(-1);
-    const index = $start.index(-1);
-    if (!parent.canReplaceWith(index, index + 1, codeBlockType)) {
+    const parentDepth = $start.depth - 1;
+    if (parentDepth < 0) {
       return null;
     }
 
-    const blockPos = $start.before();
-    const codeBlock = codeBlockType.create(
-      null,
-      state.schema.text(OPEN_FENCE_TEXT),
-    );
-    let tr = state.tr.replaceWith(
-      blockPos,
-      blockPos + paragraph.nodeSize,
-      codeBlock,
-    );
+    const parent = $start.node(parentDepth);
+    const closingIndex = $start.index(parentDepth);
+    let blockStartPos = $start.before();
+    let openingIndex = -1;
+
+    for (let index = closingIndex - 1; index >= 0; index--) {
+      const sibling = parent.child(index);
+      blockStartPos -= sibling.nodeSize;
+
+      if (!isPlainTextParagraph(sibling, paragraphType)) {
+        return null;
+      }
+
+      if (isOpeningFenceLine(sibling.textContent)) {
+        openingIndex = index;
+        break;
+      }
+    }
+
+    if (openingIndex === -1) {
+      return null;
+    }
+
+    const blockEndPos = $start.before() + closingParagraph.nodeSize;
+    const lines: string[] = [];
+    for (let index = openingIndex; index <= closingIndex; index++) {
+      const sibling = parent.child(index);
+      if (!isPlainTextParagraph(sibling, paragraphType)) {
+        return null;
+      }
+
+      lines.push(index === closingIndex ? '```' : sibling.textContent);
+    }
+
+    if (!parent.canReplaceWith(openingIndex, closingIndex + 1, codeBlockType)) {
+      return null;
+    }
+
+    const codeText = lines.join('\n');
+    const codeBlock = codeBlockType.create(null, state.schema.text(codeText));
+    let tr = state.tr.replaceWith(blockStartPos, blockEndPos, codeBlock);
     tr = tr.setSelection(
-      TextSelection.create(tr.doc, blockPos + 1 + OPEN_FENCE_TEXT.length),
+      TextSelection.create(tr.doc, blockStartPos + 1 + codeText.length),
     );
     return tr.scrollIntoView();
   });
@@ -44,7 +101,79 @@ function buildOpenFenceInputRule(schema: Schema): InputRule {
 
 export function fenceMarkdownInputRules(schema: Schema): Plugin {
   return inputRules({
-    rules: [buildOpenFenceInputRule(schema)],
+    rules: [buildClosedFenceInputRule(schema)],
+  });
+}
+
+function buildParagraphsFromCodeText(schema: Schema, text: string): PMNode[] {
+  const paragraphType = schema.nodes.paragraph;
+  const lines = text.split('\n');
+  const normalizedLines = lines.length > 0 ? lines : [''];
+
+  return normalizedLines.map((line) =>
+    line.length > 0
+      ? paragraphType.create(null, schema.text(line))
+      : paragraphType.create(),
+  );
+}
+
+interface InvalidFenceReplacement {
+  from: number;
+  to: number;
+  node: PMNode;
+}
+
+function findInvalidFenceReplacement(
+  doc: PMNode,
+  schema: Schema,
+): InvalidFenceReplacement | null {
+  let replacement: InvalidFenceReplacement | null = null;
+
+  doc.descendants((node, pos) => {
+    if (node.type !== schema.nodes.codeBlock) {
+      return true;
+    }
+
+    const parsed = parseFenceMarkdown(node.textContent);
+    if (parsed.hasOpeningFence && parsed.hasClosingFence) {
+      return false;
+    }
+
+    replacement = {
+      from: pos,
+      to: pos + node.nodeSize,
+      node,
+    };
+    return false;
+  });
+
+  return replacement;
+}
+
+export function fenceMarkdownNormalizationPlugin(schema: Schema): Plugin {
+  return new StatePlugin({
+    appendTransaction(_transactions, _oldState, newState) {
+      const target = findInvalidFenceReplacement(newState.doc, schema);
+      if (!target) {
+        return null;
+      }
+
+      const paragraphs = buildParagraphsFromCodeText(
+        schema,
+        target.node.textContent,
+      );
+      const tr = newState.tr.replaceWith(
+        target.from,
+        target.to,
+        Fragment.fromArray(paragraphs),
+      );
+      const selectionPos = Math.min(
+        tr.doc.content.size,
+        Math.max(1, target.from + 1),
+      );
+      tr.setSelection(Selection.near(tr.doc.resolve(selectionPos), 1));
+      return tr;
+    },
   });
 }
 
@@ -60,7 +189,7 @@ export const exitFencedCodeBlock: Command = (state, dispatch) => {
   }
 
   const line = findFenceLineAtOffset(parsed, $from.parentOffset);
-  if (!line || line.kind !== 'closingFence' || line.text !== FENCE) {
+  if (!line || line.kind !== 'closingFence' || !isClosingFenceLine(line.text)) {
     return false;
   }
 

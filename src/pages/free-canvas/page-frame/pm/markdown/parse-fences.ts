@@ -1,6 +1,7 @@
 import type { FenceLine, ParsedFenceMarkdown } from './types';
 
 const FENCE = '```';
+const OPENING_FENCE_RE = /^```(\w+)?$/;
 
 function splitLines(text: string): Omit<FenceLine, 'kind'>[] {
   if (text.length === 0) {
@@ -43,12 +44,12 @@ export function parseFenceMarkdown(text: string): ParsedFenceMarkdown {
     };
   }
 
-  const hasOpeningFence = rawLines[0].text === FENCE;
+  const hasOpeningFence = isOpeningFenceLine(rawLines[0].text);
   let closingFenceIndex = -1;
 
   if (hasOpeningFence) {
     for (let i = 1; i < rawLines.length; i++) {
-      if (rawLines[i].text === FENCE) {
+      if (isClosingFenceLine(rawLines[i].text)) {
         closingFenceIndex = i;
         break;
       }
@@ -72,6 +73,14 @@ export function parseFenceMarkdown(text: string): ParsedFenceMarkdown {
     lines,
     closingFence: closingFenceIndex === -1 ? null : lines[closingFenceIndex],
   };
+}
+
+export function isOpeningFenceLine(text: string): boolean {
+  return OPENING_FENCE_RE.test(text);
+}
+
+export function isClosingFenceLine(text: string): boolean {
+  return text === FENCE;
 }
 
 export function findFenceLineAtOffset(
