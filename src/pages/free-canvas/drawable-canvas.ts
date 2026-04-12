@@ -12,6 +12,7 @@ import type { DrawableElement } from './elements/drawable-element';
 import { DrawableElementRegistry } from './elements/drawable-element-registry';
 import { ElementType } from './elements/element-type';
 import { ImageElement } from './elements/image-element';
+import { PageFrameElement } from './elements/page-frame-element';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
@@ -100,10 +101,7 @@ export class DrawableCanvas implements ISerializable {
     return this._editingElement;
   }
 
-  public enterElementEdit(
-    element: DrawableElement,
-    event?: Event,
-  ): void {
+  public enterElementEdit(element: DrawableElement, event?: Event): void {
     if (this._editingElement) {
       this.exitElementEdit();
     }
@@ -115,7 +113,10 @@ export class DrawableCanvas implements ISerializable {
     this._editingElement = element;
     // Drop foreground canvas below DOM layer (z:5) so editing UI receives events
     this.canvas.style.pointerEvents = 'none';
-    this.canvas.style.zIndex = '2';
+    if (this.editingElement instanceof PageFrameElement) {
+      this.canvas.style.zIndex = '2';
+    }
+
     // Camera switches to "vertical-only pan + handle two-finger touch" mode.
     this.viewport.editMode = true;
     const pe = event instanceof PointerEvent ? event : undefined;
@@ -206,7 +207,6 @@ export class DrawableCanvas implements ISerializable {
         );
         this.bgCtx.restore();
       }
-
     }
 
     // Foreground canvas

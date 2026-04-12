@@ -275,7 +275,6 @@ export function useCanvasEngine({
       document.removeEventListener('paste', handlePaste);
       dc.destroy();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
