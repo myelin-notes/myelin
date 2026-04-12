@@ -1,0 +1,19 @@
+import type { NodeViewConstructor } from 'prosemirror-view';
+import { CodeBlockNodeView } from './code-block-node-view';
+
+export function buildNodeViews(): Record<string, NodeViewConstructor> {
+  return {
+    codeBlock(node, view, getPos) {
+      if (typeof getPos !== 'function') {
+        throw new Error('codeBlock node view requires a stable getPos');
+      }
+      return new CodeBlockNodeView(node, view, () => {
+        const pos = getPos();
+        if (typeof pos !== 'number') {
+          throw new Error('codeBlock node view position is unavailable');
+        }
+        return pos;
+      });
+    },
+  };
+}

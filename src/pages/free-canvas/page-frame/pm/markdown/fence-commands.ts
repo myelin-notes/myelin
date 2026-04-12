@@ -1,10 +1,9 @@
 import { exitCode } from 'prosemirror-commands';
 import { InputRule, inputRules } from 'prosemirror-inputrules';
 import { Fragment, type Node as PMNode, type Schema } from 'prosemirror-model';
-import type { Plugin } from 'prosemirror-state';
+import type { Plugin, Transaction } from 'prosemirror-state';
 import {
   type Command,
-  Selection,
   Plugin as StatePlugin,
   TextSelection,
 } from 'prosemirror-state';
@@ -121,6 +120,69 @@ function buildParagraphsFromCodeText(schema: Schema, text: string): PMNode[] {
   );
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function mapCodeTextOffsetToParagraphSelection(
+  blockPos: number,
+  text: string,
+  offset: number,
+): number {
+  const lines = text.split('\n');
+  const normalizedLines = lines.length > 0 ? lines : [''];
+  let remaining = clamp(offset, 0, text.length);
+  let paragraphPos = blockPos;
+  let fallback = blockPos + 1;
+
+  for (let index = 0; index < normalizedLines.length; index++) {
+    const line = normalizedLines[index];
+    const textStart = paragraphPos + 1;
+    const textEnd = textStart + line.length;
+    fallback = textEnd;
+
+    if (remaining <= line.length) {
+      return textStart + remaining;
+    }
+
+    remaining -= line.length;
+    paragraphPos += line.length + 2;
+
+    if (index < normalizedLines.length - 1) {
+      remaining = Math.max(0, remaining - 1);
+    }
+  }
+
+  return fallback;
+}
+
+function mapSelectionPointThroughFenceReplacement(
+  selectionPos: number,
+  target: InvalidFenceReplacement,
+): number {
+  const textStart = target.from + 1;
+  const textEnd = target.to - 1;
+  const offset = clamp(selectionPos, textStart, textEnd) - textStart;
+  return mapCodeTextOffsetToParagraphSelection(
+    target.from,
+    target.node.textContent,
+    offset,
+  );
+}
+
+function mapSelectionPointAfterFenceReplacement(
+  selectionPos: number,
+  target: InvalidFenceReplacement,
+  tr: Transaction,
+): number {
+  const textStart = target.from + 1;
+  const textEnd = target.to - 1;
+  if (selectionPos >= textStart && selectionPos <= textEnd) {
+    return mapSelectionPointThroughFenceReplacement(selectionPos, target);
+  }
+  return tr.mapping.map(selectionPos);
+}
+
 interface InvalidFenceReplacement {
   from: number;
   to: number;
@@ -181,11 +243,22 @@ export function fenceMarkdownNormalizationPlugin(schema: Schema): Plugin {
         target.to,
         Fragment.fromArray(paragraphs),
       );
-      const selectionPos = Math.min(
-        tr.doc.content.size,
-        Math.max(1, target.from + 1),
+      const mappedAnchor = mapSelectionPointAfterFenceReplacement(
+        newState.selection.anchor,
+        target,
+        tr,
       );
-      tr.setSelection(Selection.near(tr.doc.resolve(selectionPos), 1));
+      const mappedHead = mapSelectionPointAfterFenceReplacement(
+        newState.selection.head,
+        target,
+        tr,
+      );
+      tr.setSelection(
+        TextSelection.between(
+          tr.doc.resolve(mappedAnchor),
+          tr.doc.resolve(mappedHead),
+        ),
+      );
       return tr;
     },
   });

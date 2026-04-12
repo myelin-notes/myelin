@@ -2,6 +2,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { PM_ADD_TO_HISTORY, PM_UPDATE_EVENT } from './constants';
+import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
 
@@ -68,12 +69,28 @@ export class PageFrameEditorState {
     this._view = new EditorView(container, {
       state,
       editable: (_state) => this._editable,
+      nodeViews: buildNodeViews(),
       dispatchTransaction: (tr) => {
         if (!this._view) {
           return;
         }
+        const hadNestedFocus =
+          document.activeElement instanceof HTMLElement &&
+          this._view.dom.contains(document.activeElement);
+        const wasInCodeBlock =
+          this._view.state.selection.$from.parent.type ===
+          schema.nodes.codeBlock;
         const newState = this._view.state.apply(tr);
         this._view.updateState(newState);
+        const isInCodeBlock =
+          newState.selection.$from.parent.type === schema.nodes.codeBlock;
+        // When Monaco-backed code blocks unwrap into regular PM paragraphs,
+        // focus can still be sitting inside the soon-to-be-destroyed nested
+        // editor. Re-focus PM so the DOM caret reflects the preserved state
+        // selection instead of falling back to the start of the editor.
+        if (hadNestedFocus && wasInCodeBlock && !isInCodeBlock) {
+          this._view.focus();
+        }
         this._view.dom.dispatchEvent(new Event(PM_UPDATE_EVENT));
       },
     });
@@ -88,6 +105,16 @@ export class PageFrameEditorState {
     this._editable = editable;
     // Force PM to re-evaluate the editable prop
     this._view?.setProps({ editable: (_state) => this._editable });
+  }
+
+  blur(): void {
+    const activeElement = document.activeElement;
+    if (
+      activeElement instanceof HTMLElement &&
+      this._view?.dom.contains(activeElement)
+    ) {
+      activeElement.blur();
+    }
   }
 
   /**

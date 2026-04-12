@@ -151,6 +151,7 @@ export class PageFrameElement extends DrawableElement {
   public override exitEditMode(): UndoCommand | null {
     this._editing = false;
     this.pmEditor.setEditable(false);
+    this.pmEditor.blur();
 
     const newDocJSON = this.pmEditor.toJSON();
     const changed =

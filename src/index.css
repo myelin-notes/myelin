@@ -317,6 +317,23 @@ input[type="range"].tool-slider::-moz-range-track {
   font: inherit;
 }
 
+.pm-editor .ProseMirror .pm-monaco-code-block {
+  margin: 1.15em 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: rgba(230, 234, 240, 0.52);
+  border-left: 2.5px solid color-mix(in srgb, var(--accent-navy) 18%, transparent);
+}
+
+.pm-editor .ProseMirror .pm-monaco-code-block__editor {
+  overflow: hidden;
+}
+
+.pm-editor .ProseMirror .pm-monaco-code-block__delimiter {
+  color: var(--text-muted);
+  opacity: 0.72;
+}
+
 .pm-editor .ProseMirror .pm-md-delim {
   color: var(--text-muted);
   opacity: 0.72;

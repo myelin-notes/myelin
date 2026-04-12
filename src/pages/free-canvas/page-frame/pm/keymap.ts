@@ -21,7 +21,7 @@ import {
   sinkListItem,
   splitListItem,
 } from 'prosemirror-schema-list';
-import type { Command } from 'prosemirror-state';
+import { type Command, Selection } from 'prosemirror-state';
 import {
   type Action,
   comboToPMKey,
@@ -118,5 +118,33 @@ export function buildKeymap(s: Schema) {
     Tab: sinkListItem(s.nodes.listItem),
     'Shift-Tab': liftListItem(s.nodes.listItem),
     'Shift-Enter': exitCode,
+    ArrowLeft: arrowHandler('left', s),
+    ArrowRight: arrowHandler('right', s),
+    ArrowUp: arrowHandler('up', s),
+    ArrowDown: arrowHandler('down', s),
   });
+}
+
+function arrowHandler(
+  dir: 'left' | 'right' | 'up' | 'down',
+  schema: Schema,
+): Command {
+  return (state, dispatch, view) => {
+    if (!view || !state.selection.empty || !view.endOfTextblock(dir)) {
+      return false;
+    }
+
+    const side = dir === 'left' || dir === 'up' ? -1 : 1;
+    const { $head } = state.selection;
+    const nextSelection = Selection.near(
+      state.doc.resolve(side > 0 ? $head.after() : $head.before()),
+      side,
+    );
+    if (nextSelection.$head.parent.type !== schema.nodes.codeBlock) {
+      return false;
+    }
+
+    dispatch?.(state.tr.setSelection(nextSelection));
+    return true;
+  };
 }
