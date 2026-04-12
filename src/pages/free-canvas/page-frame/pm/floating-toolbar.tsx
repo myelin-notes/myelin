@@ -124,7 +124,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
 
       const toolbarWidth = toolbarRef.current?.offsetWidth ?? 220;
       const x = rect.left + rect.width / 2 - toolbarWidth / 2;
-      const y = rect.top - 52;
+      const y = rect.top - 64;
 
       setPos({ x, y, visible: true });
     }

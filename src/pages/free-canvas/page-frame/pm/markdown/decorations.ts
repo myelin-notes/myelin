@@ -109,6 +109,23 @@ function addFenceDecorations(
   }
 }
 
+export function buildMarkdownDecorationsForTextblock(
+  node: PMNode,
+  pos: number,
+): Decoration[] {
+  if (!node.isTextblock) {
+    return [];
+  }
+
+  const decorations: Decoration[] = [];
+  if (node.type.spec.code) {
+    addFenceDecorations(node, pos, decorations);
+  } else {
+    addInlineDecorations(node, pos, decorations);
+  }
+  return decorations;
+}
+
 export function buildMarkdownDecorations(doc: PMNode): Decoration[] {
   const decorations: Decoration[] = [];
 
@@ -117,12 +134,7 @@ export function buildMarkdownDecorations(doc: PMNode): Decoration[] {
       return true;
     }
 
-    if (node.type.spec.code) {
-      addFenceDecorations(node, pos, decorations);
-      return false;
-    }
-
-    addInlineDecorations(node, pos, decorations);
+    decorations.push(...buildMarkdownDecorationsForTextblock(node, pos));
     return false;
   });
 

@@ -14,6 +14,10 @@ import {
   isOpeningFenceLine,
   parseFenceMarkdown,
 } from './parse-fences';
+import {
+  collectAffectedTextblocks,
+  getChangedRangesForTransactions,
+} from './range-tracking';
 
 function isPlainTextParagraph(
   node: PMNode,
@@ -124,36 +128,46 @@ interface InvalidFenceReplacement {
 }
 
 function findInvalidFenceReplacement(
+  targets: readonly InvalidFenceReplacement[],
+): InvalidFenceReplacement | null {
+  return targets[0] ?? null;
+}
+
+function collectInvalidFenceReplacements(
   doc: PMNode,
   schema: Schema,
-): InvalidFenceReplacement | null {
-  let replacement: InvalidFenceReplacement | null = null;
-
-  doc.descendants((node, pos) => {
-    if (node.type !== schema.nodes.codeBlock) {
-      return true;
-    }
-
-    const parsed = parseFenceMarkdown(node.textContent);
-    if (parsed.hasOpeningFence && parsed.hasClosingFence) {
-      return false;
-    }
-
-    replacement = {
+  ranges: ReturnType<typeof getChangedRangesForTransactions>,
+): InvalidFenceReplacement[] {
+  return collectAffectedTextblocks(
+    doc,
+    ranges,
+    (node) => node.type === schema.nodes.codeBlock,
+  )
+    .filter(({ node }) => {
+      const parsed = parseFenceMarkdown(node.textContent);
+      return !(parsed.hasOpeningFence && parsed.hasClosingFence);
+    })
+    .map(({ pos, node }) => ({
       from: pos,
       to: pos + node.nodeSize,
       node,
-    };
-    return false;
-  });
-
-  return replacement;
+    }));
 }
 
 export function fenceMarkdownNormalizationPlugin(schema: Schema): Plugin {
   return new StatePlugin({
-    appendTransaction(_transactions, _oldState, newState) {
-      const target = findInvalidFenceReplacement(newState.doc, schema);
+    appendTransaction(transactions, _oldState, newState) {
+      const changedRanges = getChangedRangesForTransactions(
+        transactions,
+        newState.doc.content.size,
+      );
+      if (changedRanges.length === 0) {
+        return null;
+      }
+
+      const target = findInvalidFenceReplacement(
+        collectInvalidFenceReplacements(newState.doc, schema, changedRanges),
+      );
       if (!target) {
         return null;
       }
