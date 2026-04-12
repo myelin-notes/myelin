@@ -18,6 +18,14 @@ const FRAME_STYLE: Record<string, string> = {
   position: 'absolute',
   left: '0px',
   top: '0px',
+  overflow: 'hidden',
+};
+
+const VIEWPORT_STYLE: Record<string, string> = {
+  transformOrigin: '0 0',
+  position: 'absolute',
+  left: '0px',
+  top: '0px',
   width: `${PAGE_WIDTH}px`,
   overflow: 'hidden',
 };
@@ -34,6 +42,7 @@ const CONTENT_STYLE: Record<string, string> = {
 
 interface FrameRefs {
   frameDiv: HTMLDivElement;
+  viewportDiv: HTMLDivElement;
   contentDiv: HTMLDivElement;
   pageChromeDivs: HTMLDivElement[];
 }
@@ -50,11 +59,16 @@ const PAGE_CHROME_STYLE: Record<string, string> = {
   pointerEvents: 'none',
 };
 
+function snapToDevicePixel(value: number): number {
+  const dpr = window.devicePixelRatio || 1;
+  return Math.round(value * dpr) / dpr;
+}
+
 function syncPageChrome(refs: FrameRefs, numPages: number): void {
   while (refs.pageChromeDivs.length < numPages) {
     const div = document.createElement('div');
     Object.assign(div.style, PAGE_CHROME_STYLE);
-    refs.frameDiv.insertBefore(div, refs.contentDiv);
+    refs.viewportDiv.insertBefore(div, refs.contentDiv);
     refs.pageChromeDivs.push(div);
   }
   while (refs.pageChromeDivs.length > numPages) {
@@ -73,11 +87,15 @@ function createFrameRefs(
   Object.assign(frameDiv.style, FRAME_STYLE);
   frameDiv.dataset.frameIndex = String(frame.index);
 
+  const viewportDiv = document.createElement('div');
+  Object.assign(viewportDiv.style, VIEWPORT_STYLE);
+
   const contentDiv = document.createElement('div');
   Object.assign(contentDiv.style, CONTENT_STYLE);
   contentDiv.classList.add(PM_EDITOR_CLASS);
 
-  frameDiv.appendChild(contentDiv);
+  viewportDiv.appendChild(contentDiv);
+  frameDiv.appendChild(viewportDiv);
   container.appendChild(frameDiv);
 
   frame.mountDOM(frameDiv, contentDiv);
@@ -85,7 +103,7 @@ function createFrameRefs(
     frame.numPages = pageCount;
   });
 
-  return { frameDiv, contentDiv, pageChromeDivs: [] };
+  return { frameDiv, viewportDiv, contentDiv, pageChromeDivs: [] };
 }
 
 function removeStaleFrames(
@@ -145,10 +163,26 @@ export function PageFrameDomLayer({
         }
 
         const refs = frameMap.current.get(frame.index)!;
-        const screenX = (frame.offset.x + offset.x) * zoom;
-        const screenY = (frame.offset.y + offset.y) * zoom;
-        refs.frameDiv.style.height = `${frame.totalHeight}px`;
-        refs.frameDiv.style.transform = `translate(${screenX}px, ${screenY}px) scale(${zoom})`;
+        const screenX = snapToDevicePixel((frame.offset.x + offset.x) * zoom);
+        const screenY = snapToDevicePixel((frame.offset.y + offset.y) * zoom);
+
+        // Outer frame: screen-sized clip box, translate only (no scale)
+        refs.frameDiv.style.width = `${PAGE_WIDTH * zoom}px`;
+        refs.frameDiv.style.height = `${frame.totalHeight * zoom}px`;
+        refs.frameDiv.style.transform = `translate(${screenX}px, ${screenY}px)`;
+
+        // Inner viewport: world-sized. A fixed CSS zoom of devicePixelRatio
+        // tells WebKit to rasterise the compositing-layer backing store at
+        // DPR² resolution, producing crisp text at every canvas zoom level.
+        // Because the zoom value is constant, text metrics and line breaks
+        // never change — the variable canvas zoom is handled entirely by
+        // transform: scale(), which is a post-layout GPU operation.
+        const dpr = window.devicePixelRatio || 1;
+        refs.viewportDiv.style.height = `${frame.totalHeight}px`;
+        refs.viewportDiv.style.zoom = `${dpr}`;
+        refs.viewportDiv.style.setProperty('--vp-zoom', `${dpr}`);
+        refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
+
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
         syncPageChrome(refs, frame.numPages);
       }
@@ -200,15 +234,23 @@ export function PageFrameDomLayer({
         return;
       }
 
+      // The viewport div has a fixed CSS zoom of DPR (not in
+      // getBoundingClientRect) plus transform: scale(zoom/DPR) (IS in
+      // getBoundingClientRect). Multiply by DPR to get screen coords.
+      const zoom = dc.viewport.zoom;
+      const dpr = window.devicePixelRatio || 1;
+      const screenBottom = rect.bottom * dpr;
+      const screenTop = rect.top * dpr;
+
       const margin = 120;
       const viewportTop = margin;
       const viewportBottom = window.innerHeight - margin;
 
       let dy = 0;
-      if (rect.bottom > viewportBottom) {
-        dy = (viewportBottom - rect.bottom) / dc.viewport.zoom;
-      } else if (rect.top < viewportTop) {
-        dy = (viewportTop - rect.top) / dc.viewport.zoom;
+      if (screenBottom > viewportBottom) {
+        dy = (viewportBottom - screenBottom) / zoom;
+      } else if (screenTop < viewportTop) {
+        dy = (viewportTop - screenTop) / zoom;
       }
       if (dy !== 0) {
         dc.viewport.panBy(0, dy);

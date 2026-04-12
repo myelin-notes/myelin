@@ -318,11 +318,17 @@ input[type="range"].tool-slider::-moz-range-track {
 }
 
 .pm-editor .ProseMirror .pm-monaco-code-block {
-  margin: 1.15em 0;
+  /* The viewport div applies a fixed CSS zoom (--vp-zoom, typically DPR)
+     for crisp text rasterization. Monaco's internal coordinate handling
+     doesn't account for ancestor CSS zoom, so we counter-zoom the code
+     block wrapper and scale decorative properties back up to compensate. */
+  --z: var(--vp-zoom, 1);
+  zoom: calc(1 / var(--z));
+  margin: calc(1.15em * var(--z)) 0;
   overflow: hidden;
-  border-radius: var(--radius-lg);
+  border-radius: calc(var(--radius-lg) * var(--z));
   background: rgba(230, 234, 240, 0.52);
-  border-left: 2.5px solid color-mix(in srgb, var(--accent-navy) 18%, transparent);
+  border-left: calc(2.5px * var(--z)) solid color-mix(in srgb, var(--accent-navy) 18%, transparent);
 }
 
 .pm-editor .ProseMirror .pm-monaco-code-block__editor {
