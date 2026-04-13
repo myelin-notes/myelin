@@ -153,7 +153,10 @@ function paginateParagraph(
       if (spacer > 0) {
         const pos = line.getPos();
         if (pos !== null) {
-          const clamped = Math.max(blockPos + 2, Math.min(pos, blockEnd - 1));
+          // Allow breaks before the first character of a paragraph. Clamping
+          // to `blockPos + 2` strands the first grapheme on the previous page
+          // when an entire paragraph line needs to move forward.
+          const clamped = Math.max(blockPos + 1, Math.min(pos, blockEnd - 1));
           breaks.push({ pos: clamped, spacer, kind: 'inline' });
           cumulativeShift += spacer;
         }
