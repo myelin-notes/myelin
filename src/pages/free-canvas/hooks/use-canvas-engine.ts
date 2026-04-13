@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { keybindings, registry } from '@/lib/keybinds';
-import { FileSystem } from '@/lib/utils/file-system';
+import { type RepositoryNoteHandle, repository } from '@/lib/repository';
 import {
   DrawableCanvas,
   type Vector2,
@@ -52,6 +52,7 @@ export function useCanvasEngine({
   onCanvasPointerDown,
 }: UseCanvasEngineArgs) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const noteRef = useRef<RepositoryNoteHandle | null>(null);
   const pendingEmbedPos = useRef<Vector2 | null>(null);
   const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
   onCanvasPointerDownRef.current = onCanvasPointerDown;
@@ -81,12 +82,13 @@ export function useCanvasEngine({
   };
 
   const autoSave = async () => {
-    if (!(drawableCanvasRef.current && canvasRef.current && id)) {
+    const note = noteRef.current;
+    if (!(drawableCanvasRef.current && canvasRef.current && note)) {
       return;
     }
     const ydoc = drawableCanvasRef.current.ydoc;
     const data = ydoc.encodeState();
-    await FileSystem.saveToFile(id, data);
+    await note.save(data);
     await new Promise<void>((resolve, reject) => {
       canvasRef.current!.toBlob(async (b) => {
         if (b === null) {
@@ -94,7 +96,7 @@ export function useCanvasEngine({
           reject();
           return;
         }
-        await FileSystem.saveThumbnail(id, b);
+        await note.saveThumbnail(b);
         resolve();
       }, 'image/png');
     });
@@ -108,13 +110,19 @@ export function useCanvasEngine({
   // Load file name
   useEffect(() => {
     if (!id) {
+      noteRef.current = null;
       return;
     }
-    FileSystem.getNodeFileName(id).then((name) => {
-      if (name) {
-        setFileName(name);
-      }
-    });
+    repository
+      .openNote(id)
+      .then(async (note) => {
+        noteRef.current = note;
+        const name = await note.getName();
+        if (name) {
+          setFileName(name);
+        }
+      })
+      .catch(console.error);
   }, [id]);
 
   // Initialize canvas, event listeners, animation loop, and keybindings
@@ -125,6 +133,7 @@ export function useCanvasEngine({
     }
 
     let disposed = false;
+    noteRef.current = null;
 
     const handleContextMenu = (evt: MouseEvent) => {
       if (evt.shiftKey) {
@@ -182,8 +191,11 @@ export function useCanvasEngine({
     document.addEventListener('paste', handlePaste);
 
     // Load or create Y.Doc, then build canvas
-    FileSystem.loadFromFile(id)
-      .then((bytes) => {
+    repository
+      .openNote(id)
+      .then(async (note) => {
+        noteRef.current = note;
+        const bytes = await note.load();
         if (disposed) {
           return;
         }
@@ -227,7 +239,7 @@ export function useCanvasEngine({
         }
 
         // Initial save to persist the Y.Doc state
-        FileSystem.saveToFile(id, dc.ydoc.encodeState()).catch(console.error);
+        note.save(dc.ydoc.encodeState()).catch(console.error);
 
         // Start animation loop
         let prevTime = 0;
@@ -290,6 +302,7 @@ export function useCanvasEngine({
 
     return () => {
       disposed = true;
+      noteRef.current = null;
       cancelAnimationFrame(animationFrameId);
       unbindKeys();
       canvas.removeEventListener('contextmenu', handleContextMenu);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { repository } from '@/lib/repository';
 import { cn } from '@/lib/utils';
-import { FileSystem, type VFSManifest } from '@/lib/utils/file-system';
 
 interface SemanticTagsProps {
   refreshKey: number;
@@ -21,20 +21,23 @@ export function SemanticTags({
   });
 
   useEffect(() => {
-    FileSystem.getManifest().then((manifest: VFSManifest) => {
-      const allTags = FileSystem.getAllTags(manifest);
-      setTags(allTags);
-      setStats(FileSystem.getStats(manifest));
+    Promise.all([repository.listTags(), repository.getStats()])
+      .then(([allTags, nextStats]) => {
+        setTags(allTags);
+        setStats(nextStats);
 
-      // Prune any active tags that no longer exist
-      if (activeTags.size > 0) {
-        const existing = new Set(allTags.map((t) => t.tag));
-        const pruned = new Set([...activeTags].filter((t) => existing.has(t)));
-        if (pruned.size !== activeTags.size) {
-          onActiveTagsChanged(pruned);
+        // Prune any active tags that no longer exist
+        if (activeTags.size > 0) {
+          const existing = new Set(allTags.map((t) => t.tag));
+          const pruned = new Set(
+            [...activeTags].filter((t) => existing.has(t)),
+          );
+          if (pruned.size !== activeTags.size) {
+            onActiveTagsChanged(pruned);
+          }
         }
-      }
-    });
+      })
+      .catch(console.error);
   }, [refreshKey, activeTags, onActiveTagsChanged]);
 
   const toggleTag = (tag: string) => {

@@ -5,11 +5,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import {
-  FileSystem,
-  type FileType,
-  type VFSNode,
-} from '@/lib/utils/file-system';
+import { type FileType, repository, type VFSNode } from '@/lib/repository';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
 import { useDropTarget } from './use-drop-target';
@@ -51,18 +47,16 @@ export function ExplorerTree({
     setLoading(true);
     try {
       if (isSearching) {
-        const manifest = await FileSystem.getManifest();
-        let results = FileSystem.searchNodes(manifest, searchQuery!.trim());
+        let results = await repository.searchNodes(searchQuery!.trim());
         if (isFiltering) {
           const tagSet = new Set(filterTags);
           results = results.filter((n) => n.tags.some((t) => tagSet.has(t)));
         }
         setNodes(results);
       } else if (isFiltering) {
-        const manifest = await FileSystem.getManifest();
-        setNodes(FileSystem.getNodesByAnyTag(manifest, filterTags));
+        setNodes(await repository.getNodesByAnyTag(filterTags));
       } else {
-        const [dirs, files] = await FileSystem.loadDirectory(currentFolderId);
+        const [dirs, files] = await repository.listDirectory(currentFolderId);
         setNodes([...dirs, ...files]);
       }
     } catch (err) {
@@ -72,11 +66,11 @@ export function ExplorerTree({
   }, [currentFolderId, isFiltering, filterTags, isSearching, searchQuery]);
 
   const startNewFolder = useCallback(async () => {
-    const name = await FileSystem.getUniqueFileName(
+    const name = await repository.getUniqueFileName(
       'Unnamed Folder',
       currentFolderId,
     );
-    const id = await FileSystem.createFolder(name, currentFolderId);
+    const id = await repository.createFolder(name, currentFolderId);
     setRenamingNewId(id);
     const now = Date.now();
     setNodes((prev) => [
@@ -97,8 +91,8 @@ export function ExplorerTree({
 
   const startNewFile = useCallback(
     async (title: string, type: FileType) => {
-      const name = await FileSystem.getUniqueFileName(title, currentFolderId);
-      const id = await FileSystem.createFile(name, type, currentFolderId);
+      const name = await repository.getUniqueFileName(title, currentFolderId);
+      const id = await repository.createFile(name, type, currentFolderId);
       setRenamingNewId(id);
       const now = Date.now();
       setNodes((prev) => [

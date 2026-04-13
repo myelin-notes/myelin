@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FileSystem } from '@/lib/utils/file-system';
+import { repository } from '@/lib/repository';
 
 interface UseDropTargetOptions {
   targetFolderId: string | null;
@@ -58,7 +58,7 @@ export function useDropTarget({
     }
 
     try {
-      await FileSystem.moveNode(nodeId, targetFolderId);
+      await repository.moveNode(nodeId, targetFolderId);
       onMoved();
     } catch (err) {
       console.error('Failed to move item:', err);

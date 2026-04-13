@@ -496,6 +496,9 @@ export class DrawableCanvas {
   }
 
   public deleteSelected() {
+    if (this._editingElement) {
+      return;
+    }
     const selected = this._elements.filter((e) => e.isSelected);
     if (selected.length === 0) {
       return;

@@ -11,10 +11,10 @@ import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/sidebar';
 import {
-  FileSystem,
+  repository,
   type VFSFileNode,
   type VFSFolderNode,
-} from '@/lib/utils/file-system';
+} from '@/lib/repository';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
@@ -85,9 +85,7 @@ export function LibraryPage() {
   };
 
   useEffect(() => {
-    FileSystem.getManifest().then((manifest) => {
-      setRecentFiles(FileSystem.getRecentFiles(manifest, 3));
-    });
+    repository.getRecentFiles(3).then(setRecentFiles).catch(console.error);
   }, [refreshKey]);
 
   // Update breadcrumbs when folder changes
@@ -96,9 +94,10 @@ export function LibraryPage() {
       setBreadcrumbs([]);
       return;
     }
-    FileSystem.getManifest().then((manifest) => {
-      setBreadcrumbs(FileSystem.getFolderChain(manifest, currentFolderId));
-    });
+    repository
+      .getFolderChain(currentFolderId)
+      .then(setBreadcrumbs)
+      .catch(console.error);
   }, [currentFolderId]);
 
   const clearDragTimer = () => {
@@ -125,7 +124,7 @@ export function LibraryPage() {
     const { nodeId } = JSON.parse(raw) as { nodeId: string };
 
     try {
-      await FileSystem.moveNode(nodeId, targetFolderId);
+      await repository.moveNode(nodeId, targetFolderId);
       setCurrentFolderId(targetFolderId);
       triggerRefresh();
     } catch (err) {

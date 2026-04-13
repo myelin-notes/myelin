@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FileSystem } from '@/lib/utils/file-system';
+import { repository } from '@/lib/repository';
 
 interface UseExplorerItemOptions {
   nodeId: string;
@@ -42,7 +42,7 @@ export function useExplorerItem({
       return;
     }
     try {
-      await FileSystem.renameNode(nodeId, trimmed);
+      await repository.renameNode(nodeId, trimmed);
     } catch (err) {
       console.error('Failed to rename:', err);
     }
@@ -52,7 +52,7 @@ export function useExplorerItem({
 
   const handleRemove = async () => {
     try {
-      await FileSystem.deleteNode(nodeId);
+      await repository.deleteNode(nodeId);
       onChanged();
     } catch (err) {
       console.error('Failed to delete:', err);

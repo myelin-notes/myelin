@@ -1,7 +1,7 @@
 import { BookOpen, HelpCircle, Plus, Settings, Waypoints } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { repository } from '@/lib/repository';
 import { cn } from '@/lib/utils';
-import { FileSystem } from '@/lib/utils/file-system';
 
 interface NavItem {
   label: string;
@@ -84,8 +84,8 @@ export function Sidebar() {
   const location = useLocation();
 
   const handleNewCanvas = async () => {
-    const name = await FileSystem.getUniqueFileName('Untitled Canvas', null);
-    const id = await FileSystem.createFile(name, 'mcanvas', null);
+    const name = await repository.getUniqueFileName('Untitled Canvas', null);
+    const id = await repository.createFile(name, 'mcanvas', null);
     navigate(`/mcanvas/${id}`);
   };
 

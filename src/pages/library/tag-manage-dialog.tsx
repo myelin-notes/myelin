@@ -7,8 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { repository } from '@/lib/repository';
 import { cn } from '@/lib/utils';
-import { FileSystem, type VFSManifest } from '@/lib/utils/file-system';
 
 interface TagManageDialogProps {
   open: boolean;
@@ -35,12 +35,12 @@ export function TagManageDialog({
     if (!open) {
       return;
     }
-    FileSystem.getManifest().then((manifest: VFSManifest) => {
-      const all = FileSystem.getAllTags(manifest).map((t) => t.tag);
-      const node = manifest.nodes[nodeId];
-      setAllTags(all);
-      setNodeTags(node ? [...node.tags] : []);
-    });
+    Promise.all([repository.listTags(), repository.getNode(nodeId)])
+      .then(([tags, node]) => {
+        setAllTags(tags.map((entry) => entry.tag));
+        setNodeTags(node ? [...node.tags] : []);
+      })
+      .catch(console.error);
   }, [open, nodeId]);
 
   useEffect(() => {
@@ -51,10 +51,10 @@ export function TagManageDialog({
 
   const toggleTag = async (tag: string) => {
     if (nodeTags.includes(tag)) {
-      await FileSystem.removeTag(nodeId, tag);
+      await repository.removeTag(nodeId, tag);
       setNodeTags((prev) => prev.filter((t) => t !== tag));
     } else {
-      await FileSystem.addTag(nodeId, tag);
+      await repository.addTag(nodeId, tag);
       setNodeTags((prev) => [...prev, tag]);
       if (!allTags.includes(tag)) {
         setAllTags((prev) => [...prev, tag]);
@@ -69,7 +69,7 @@ export function TagManageDialog({
       setIsAdding(false);
       return;
     }
-    await FileSystem.addTag(nodeId, trimmed);
+    await repository.addTag(nodeId, trimmed);
     setNodeTags((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
     if (!allTags.includes(trimmed)) {
       setAllTags((prev) => [...prev, trimmed]);
