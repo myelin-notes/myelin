@@ -1,12 +1,19 @@
-import { LocalStorageRepository } from './local-storage-repository';
+import { LocalNoteStore } from './local/note-store';
+import { LocalRepository } from './local/repository';
+import { LocalStorageBackend } from './local/storage-backend';
 
-export const repository = new LocalStorageRepository();
+const backend = new LocalStorageBackend();
+
+export const repository = new LocalRepository(backend);
+export const noteStore = new LocalNoteStore(backend);
 
 export type {
   FileType,
+  NoteSession,
+  NoteSessionStatus,
+  NoteStore,
   Repository,
   RepositoryCapabilities,
-  RepositoryNoteHandle,
   RepositoryStats,
   RepositoryTag,
   VFSFileNode,

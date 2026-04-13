@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { keybindings, registry } from '@/lib/keybinds';
-import { type RepositoryNoteHandle, repository } from '@/lib/repository';
+import { type NoteSession, noteStore, repository } from '@/lib/repository';
+import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import {
   DrawableCanvas,
   type Vector2,
@@ -10,7 +11,6 @@ import {
 import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-element';
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
-import { YDocManager } from '@/pages/free-canvas/ydoc-manager';
 
 declare module '@/lib/keybinds' {
   interface ActionMap {
@@ -52,7 +52,7 @@ export function useCanvasEngine({
   onCanvasPointerDown,
 }: UseCanvasEngineArgs) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const noteRef = useRef<RepositoryNoteHandle | null>(null);
+  const noteSessionRef = useRef<NoteSession | null>(null);
   const pendingEmbedPos = useRef<Vector2 | null>(null);
   const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
   onCanvasPointerDownRef.current = onCanvasPointerDown;
@@ -82,13 +82,11 @@ export function useCanvasEngine({
   };
 
   const autoSave = async () => {
-    const note = noteRef.current;
-    if (!(drawableCanvasRef.current && canvasRef.current && note)) {
+    const session = noteSessionRef.current;
+    if (!(drawableCanvasRef.current && canvasRef.current && session && id)) {
       return;
     }
-    const ydoc = drawableCanvasRef.current.ydoc;
-    const data = ydoc.encodeState();
-    await note.save(data);
+    await session.flush();
     await new Promise<void>((resolve, reject) => {
       canvasRef.current!.toBlob(async (b) => {
         if (b === null) {
@@ -96,7 +94,7 @@ export function useCanvasEngine({
           reject();
           return;
         }
-        await note.saveThumbnail(b);
+        await ThumbnailCache.save(id, b);
         resolve();
       }, 'image/png');
     });
@@ -110,17 +108,18 @@ export function useCanvasEngine({
   // Load file name
   useEffect(() => {
     if (!id) {
-      noteRef.current = null;
+      noteSessionRef.current = null;
+      setFileName('');
       return;
     }
     repository
-      .openNote(id)
-      .then(async (note) => {
-        noteRef.current = note;
-        const name = await note.getName();
-        if (name) {
-          setFileName(name);
+      .getNode(id)
+      .then((node) => {
+        if (node?.type === 'file') {
+          setFileName(node.name);
+          return;
         }
+        setFileName('');
       })
       .catch(console.error);
   }, [id]);
@@ -133,7 +132,9 @@ export function useCanvasEngine({
     }
 
     let disposed = false;
-    noteRef.current = null;
+    const priorSession = noteSessionRef.current;
+    noteSessionRef.current = null;
+    void priorSession?.close();
 
     const handleContextMenu = (evt: MouseEvent) => {
       if (evt.shiftKey) {
@@ -191,18 +192,17 @@ export function useCanvasEngine({
     document.addEventListener('paste', handlePaste);
 
     // Load or create Y.Doc, then build canvas
-    repository
-      .openNote(id)
-      .then(async (note) => {
-        noteRef.current = note;
-        const bytes = await note.load();
+    noteStore
+      .openSession(id)
+      .then(async (session) => {
         if (disposed) {
+          await session.close();
           return;
         }
 
-        const ydoc = bytes ? YDocManager.fromUpdate(bytes) : new YDocManager();
+        noteSessionRef.current = session;
 
-        const dc = new DrawableCanvas(canvas, ydoc, canvasTools);
+        const dc = new DrawableCanvas(canvas, session.ydoc, canvasTools);
         drawableCanvasRef.current = dc;
 
         if (bgCanvasRef.current) {
@@ -239,7 +239,7 @@ export function useCanvasEngine({
         }
 
         // Initial save to persist the Y.Doc state
-        note.save(dc.ydoc.encodeState()).catch(console.error);
+        session.flush().catch(console.error);
 
         // Start animation loop
         let prevTime = 0;
@@ -302,7 +302,9 @@ export function useCanvasEngine({
 
     return () => {
       disposed = true;
-      noteRef.current = null;
+      const session = noteSessionRef.current;
+      noteSessionRef.current = null;
+      void session?.close();
       cancelAnimationFrame(animationFrameId);
       unbindKeys();
       canvas.removeEventListener('contextmenu', handleContextMenu);

@@ -1,3 +1,5 @@
+import type { YDocManager } from '@/pages/free-canvas/ydoc-manager';
+
 export const FileTypes = ['mcanvas'] as const;
 export type FileType = (typeof FileTypes)[number];
 
@@ -42,19 +44,8 @@ export interface RepositoryCapabilities {
   liveSync: boolean;
 }
 
-export interface RepositoryNoteHandle {
-  readonly id: string;
-  getName(): Promise<string | null>;
-  getFileType(): Promise<FileType | null>;
-  load(): Promise<Uint8Array | null>;
-  save(data: Uint8Array): Promise<void>;
-  saveThumbnail(blob: Blob): Promise<void>;
-  getRevealPath(): Promise<string | null>;
-}
-
 export interface Repository {
   readonly kind: string;
-  readonly capabilities: RepositoryCapabilities;
 
   getNode(nodeId: string): Promise<VFSNode | null>;
   listDirectory(
@@ -79,6 +70,28 @@ export interface Repository {
   setTags(nodeId: string, tags: string[]): Promise<void>;
   addTag(nodeId: string, tag: string): Promise<void>;
   removeTag(nodeId: string, tag: string): Promise<void>;
-  getThumbnailUrl(nodeId: string): Promise<string>;
-  openNote(nodeId: string): Promise<RepositoryNoteHandle>;
+}
+
+export interface NoteSessionStatus {
+  phase: 'idle' | 'refreshing' | 'flushing' | 'closed';
+  lastError: Error | null;
+  lastSyncedAt: number | null;
+  remoteRevision: string | null;
+}
+
+export interface NoteSession {
+  readonly id: string;
+  readonly ydoc: YDocManager;
+  readonly status: NoteSessionStatus;
+  refresh(): Promise<void>;
+  flush(): Promise<void>;
+  close(): Promise<void>;
+}
+
+export interface NoteStore {
+  readonly kind: string;
+  readonly capabilities: RepositoryCapabilities;
+
+  openSession(nodeId: string): Promise<NoteSession>;
+  getRevealPath(nodeId: string): Promise<string | null>;
 }

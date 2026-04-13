@@ -1,5 +1,4 @@
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { appCacheDir, appDataDir, join } from '@tauri-apps/api/path';
+import { appDataDir, join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
   exists,
@@ -11,16 +10,15 @@ import {
   writeFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
+import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import type {
   FileType,
-  Repository,
-  RepositoryNoteHandle,
   RepositoryStats,
   RepositoryTag,
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
-} from './types';
+} from '../types';
 
 interface VFSManifest {
   version: number;
@@ -37,14 +35,7 @@ const MANIFEST_PATH = 'manifest.json';
 const FILES_DIR = 'files';
 const FILE_EXT = '.myelin';
 
-export class LocalStorageRepository implements Repository {
-  public readonly kind = 'local-storage';
-  public readonly capabilities = {
-    revealOnDisk: true,
-    polling: false,
-    liveSync: false,
-  };
-
+export class LocalStorageBackend {
   private manifest: VFSManifest | null = null;
 
   async getNode(nodeId: string): Promise<VFSNode | null> {
@@ -269,15 +260,8 @@ export class LocalStorageRepository implements Repository {
     for (const id of toDelete) {
       const current = manifest.nodes[id];
       if (current && current.type === 'file') {
-        const filePath = await join(FILES_DIR, `${id}${FILE_EXT}`);
-        if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
-          await remove(filePath, { baseDir: BaseDirectory.AppData });
-        }
-
-        const thumbPath = await join('Thumbnails', `${id}.png`);
-        if (await exists(thumbPath, { baseDir: BaseDirectory.AppCache })) {
-          await remove(thumbPath, { baseDir: BaseDirectory.AppCache });
-        }
+        await this.deleteNoteData(id);
+        await ThumbnailCache.remove(id);
       }
 
       delete manifest.nodes[id];
@@ -360,27 +344,50 @@ export class LocalStorageRepository implements Repository {
     await this.saveManifest(manifest);
   }
 
-  async getThumbnailUrl(nodeId: string): Promise<string> {
-    const url = await join(await appCacheDir(), 'Thumbnails', `${nodeId}.png`);
-    return convertFileSrc(url);
+  async loadNoteData(nodeId: string): Promise<Uint8Array | null> {
+    const manifest = await this.loadManifest();
+    const node = manifest.nodes[nodeId];
+    if (!node || node.type !== 'file') {
+      return null;
+    }
+
+    const filePath = await join(FILES_DIR, `${nodeId}${FILE_EXT}`);
+    if (!(await exists(filePath, { baseDir: BaseDirectory.AppData }))) {
+      return null;
+    }
+
+    const data = await readFile(filePath, { baseDir: BaseDirectory.AppData });
+    return data.length > 0 ? data : null;
   }
 
-  async openNote(nodeId: string): Promise<RepositoryNoteHandle> {
-    return {
-      id: nodeId,
-      getName: async () => {
-        const node = await this.getNode(nodeId);
-        return node?.name ?? null;
-      },
-      getFileType: async () => {
-        const node = await this.getNode(nodeId);
-        return node?.type === 'file' ? node.fileType : null;
-      },
-      load: async () => this.loadNoteData(nodeId),
-      save: async (data) => this.saveNoteData(nodeId, data),
-      saveThumbnail: async (blob) => this.saveThumbnailBlob(nodeId, blob),
-      getRevealPath: async () => this.getDiskPath(nodeId),
-    };
+  async saveNoteData(nodeId: string, data: Uint8Array): Promise<void> {
+    const manifest = await this.loadManifest();
+    const node = manifest.nodes[nodeId];
+    if (!node || node.type !== 'file' || data.byteLength === 0) {
+      return;
+    }
+
+    if (!(await exists(FILES_DIR, { baseDir: BaseDirectory.AppData }))) {
+      await mkdir(FILES_DIR, { baseDir: BaseDirectory.AppData });
+    }
+
+    const filePath = await join(FILES_DIR, `${nodeId}${FILE_EXT}`);
+    await writeFile(filePath, data, {
+      baseDir: BaseDirectory.AppData,
+    });
+
+    node.modifiedAt = Date.now();
+    await this.saveManifest(manifest);
+  }
+
+  async getDiskPath(nodeId: string): Promise<string | null> {
+    const manifest = await this.loadManifest();
+    const node = manifest.nodes[nodeId];
+    if (!node || node.type !== 'file') {
+      return null;
+    }
+
+    return join(await appDataDir(), FILES_DIR, `${nodeId}${FILE_EXT}`);
   }
 
   private async ensureDirs(): Promise<void> {
@@ -389,12 +396,6 @@ export class LocalStorageRepository implements Repository {
     }
     if (!(await exists(FILES_DIR, { baseDir: BaseDirectory.AppData }))) {
       await mkdir(FILES_DIR, { baseDir: BaseDirectory.AppData });
-    }
-    if (!(await exists('Thumbnails', { baseDir: BaseDirectory.AppCache }))) {
-      await mkdir('Thumbnails', {
-        baseDir: BaseDirectory.AppCache,
-        recursive: true,
-      });
     }
   }
 
@@ -504,68 +505,10 @@ export class LocalStorageRepository implements Repository {
     }
   }
 
-  private async saveNoteData(nodeId: string, data: Uint8Array): Promise<void> {
-    const manifest = await this.loadManifest();
-    const node = manifest.nodes[nodeId];
-    if (!node || node.type !== 'file' || data.byteLength === 0) {
-      return;
-    }
-
-    if (!(await exists(FILES_DIR, { baseDir: BaseDirectory.AppData }))) {
-      await mkdir(FILES_DIR, { baseDir: BaseDirectory.AppData });
-    }
-
+  private async deleteNoteData(nodeId: string): Promise<void> {
     const filePath = await join(FILES_DIR, `${nodeId}${FILE_EXT}`);
-    await writeFile(filePath, data, {
-      baseDir: BaseDirectory.AppData,
-    });
-
-    node.modifiedAt = Date.now();
-    await this.saveManifest(manifest);
-  }
-
-  private async loadNoteData(nodeId: string): Promise<Uint8Array | null> {
-    const manifest = await this.loadManifest();
-    const node = manifest.nodes[nodeId];
-    if (!node || node.type !== 'file') {
-      return null;
+    if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
+      await remove(filePath, { baseDir: BaseDirectory.AppData });
     }
-
-    const filePath = await join(FILES_DIR, `${nodeId}${FILE_EXT}`);
-    if (!(await exists(filePath, { baseDir: BaseDirectory.AppData }))) {
-      return null;
-    }
-
-    const data = await readFile(filePath, { baseDir: BaseDirectory.AppData });
-    return data.length > 0 ? data : null;
-  }
-
-  private async saveThumbnailBlob(nodeId: string, blob: Blob): Promise<void> {
-    if (!(await exists('Thumbnails', { baseDir: BaseDirectory.AppCache }))) {
-      await mkdir('Thumbnails', {
-        baseDir: BaseDirectory.AppCache,
-        recursive: true,
-      });
-    }
-
-    const thumbPath = await join('Thumbnails', `${nodeId}.png`);
-    const file = await open(thumbPath, {
-      write: true,
-      append: false,
-      create: true,
-      baseDir: BaseDirectory.AppCache,
-    });
-    await file.write(new Uint8Array(await blob.arrayBuffer()));
-    await file.close();
-  }
-
-  private async getDiskPath(nodeId: string): Promise<string | null> {
-    const manifest = await this.loadManifest();
-    const node = manifest.nodes[nodeId];
-    if (!node || node.type !== 'file') {
-      return null;
-    }
-
-    return join(await appDataDir(), FILES_DIR, `${nodeId}${FILE_EXT}`);
   }
 }
