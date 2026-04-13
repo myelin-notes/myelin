@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { keybindings, registry } from '@/lib/keybinds';
-import { type NoteSession, noteStore, repository } from '@/lib/repository';
+import { type NoteSession, repository } from '@/lib/repository';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import {
   DrawableCanvas,
@@ -86,7 +86,7 @@ export function useCanvasEngine({
     if (!(drawableCanvasRef.current && canvasRef.current && session && id)) {
       return;
     }
-    await session.flush();
+    await session.push();
     await new Promise<void>((resolve, reject) => {
       canvasRef.current!.toBlob(async (b) => {
         if (b === null) {
@@ -192,7 +192,7 @@ export function useCanvasEngine({
     document.addEventListener('paste', handlePaste);
 
     // Load or create Y.Doc, then build canvas
-    noteStore
+    repository
       .openSession(id)
       .then(async (session) => {
         if (disposed) {
@@ -239,7 +239,7 @@ export function useCanvasEngine({
         }
 
         // Initial save to persist the Y.Doc state
-        session.flush().catch(console.error);
+        session.push().catch(console.error);
 
         // Start animation loop
         let prevTime = 0;

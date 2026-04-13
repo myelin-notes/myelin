@@ -110,6 +110,23 @@ export class YDocManager {
     return Y.encodeStateAsUpdate(this.doc);
   }
 
+  /** Encode the document state vector for diff-based sync. */
+  encodeStateVector(): Uint8Array {
+    return Y.encodeStateVector(this.doc);
+  }
+
+  /** Encode only the updates missing from the given state vector. */
+  encodeDiff(stateVector?: Uint8Array | null): Uint8Array {
+    return stateVector
+      ? Y.encodeStateAsUpdate(this.doc, stateVector)
+      : Y.encodeStateAsUpdate(this.doc);
+  }
+
+  /** Apply a remote or external Yjs update to this document. */
+  applyUpdate(update: Uint8Array, origin?: unknown): void {
+    Y.applyUpdate(this.doc, update, origin);
+  }
+
   /** Create a YDocManager from a persisted state. */
   static fromUpdate(bytes: Uint8Array): YDocManager {
     const doc = new Y.Doc();

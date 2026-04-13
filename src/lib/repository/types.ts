@@ -39,13 +39,42 @@ export interface RepositoryStats {
 }
 
 export interface RepositoryCapabilities {
-  revealOnDisk: boolean;
   polling: boolean;
   liveSync: boolean;
 }
 
+export interface YjsSyncSnapshot {
+  update: Uint8Array | null;
+  stateVector: Uint8Array;
+  revision: string | null;
+}
+
+export interface YjsSyncPushOptions {
+  baseRevision: string | null;
+  localStateVector?: Uint8Array | null;
+}
+
+export interface YjsSyncPushResult extends YjsSyncSnapshot {
+  accepted: boolean;
+  remoteUpdate: Uint8Array | null;
+}
+
+export interface YjsSyncTarget {
+  loadDocument(nodeId: string): Promise<YjsSyncSnapshot>;
+  pullUpdates(
+    nodeId: string,
+    stateVector?: Uint8Array | null,
+  ): Promise<YjsSyncSnapshot>;
+  pushUpdates(
+    nodeId: string,
+    update: Uint8Array,
+    options: YjsSyncPushOptions,
+  ): Promise<YjsSyncPushResult>;
+}
+
 export interface Repository {
   readonly kind: string;
+  readonly capabilities: RepositoryCapabilities;
 
   getNode(nodeId: string): Promise<VFSNode | null>;
   listDirectory(
@@ -70,10 +99,12 @@ export interface Repository {
   setTags(nodeId: string, tags: string[]): Promise<void>;
   addTag(nodeId: string, tag: string): Promise<void>;
   removeTag(nodeId: string, tag: string): Promise<void>;
+
+  openSession(nodeId: string): Promise<NoteSession>;
 }
 
 export interface NoteSessionStatus {
-  phase: 'idle' | 'refreshing' | 'flushing' | 'closed';
+  phase: 'idle' | 'pulling' | 'pushing' | 'closed';
   lastError: Error | null;
   lastSyncedAt: number | null;
   remoteRevision: string | null;
@@ -83,15 +114,10 @@ export interface NoteSession {
   readonly id: string;
   readonly ydoc: YDocManager;
   readonly status: NoteSessionStatus;
-  refresh(): Promise<void>;
-  flush(): Promise<void>;
+  encodeStateVector(): Uint8Array;
+  encodeUpdate(stateVector?: Uint8Array | null): Uint8Array;
+  applyUpdate(update: Uint8Array): void;
+  pull(): Promise<Uint8Array | null>;
+  push(): Promise<void>;
   close(): Promise<void>;
-}
-
-export interface NoteStore {
-  readonly kind: string;
-  readonly capabilities: RepositoryCapabilities;
-
-  openSession(nodeId: string): Promise<NoteSession>;
-  getRevealPath(nodeId: string): Promise<string | null>;
 }

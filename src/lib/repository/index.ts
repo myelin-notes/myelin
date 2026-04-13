@@ -1,17 +1,11 @@
-import { LocalNoteStore } from './local/note-store';
 import { LocalRepository } from './local/repository';
-import { LocalStorageBackend } from './local/storage-backend';
 
-const backend = new LocalStorageBackend();
-
-export const repository = new LocalRepository(backend);
-export const noteStore = new LocalNoteStore(backend);
+export const repository = new LocalRepository();
 
 export type {
   FileType,
   NoteSession,
   NoteSessionStatus,
-  NoteStore,
   Repository,
   RepositoryCapabilities,
   RepositoryStats,
@@ -19,5 +13,9 @@ export type {
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
+  YjsSyncPushOptions,
+  YjsSyncPushResult,
+  YjsSyncSnapshot,
+  YjsSyncTarget,
 } from './types';
 export { FileTypes } from './types';
