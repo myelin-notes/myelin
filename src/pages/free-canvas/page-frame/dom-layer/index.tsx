@@ -99,7 +99,7 @@ function createFrameRefs(
   container.appendChild(frameDiv);
 
   frame.mountDOM(frameDiv, contentDiv);
-  frame.pmEditor.createView(contentDiv, (pageCount) => {
+  frame.pmEditor?.createView(contentDiv, (pageCount) => {
     frame.numPages = pageCount;
   });
 
@@ -134,7 +134,7 @@ export function PageFrameDomLayer({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const frameMap = useRef<Map<number, FrameRefs>>(new Map());
-  const activeView = editingElement?.pmEditor.view ?? null;
+  const activeView = editingElement?.pmEditor?.view ?? null;
 
   // Sync loop — create/remove/position frame containers each frame
   useEffect(() => {
@@ -213,7 +213,7 @@ export function PageFrameDomLayer({
     if (!editingElement) {
       return;
     }
-    const view = editingElement.pmEditor.view;
+    const view = editingElement.pmEditor?.view;
     if (!view) {
       return;
     }

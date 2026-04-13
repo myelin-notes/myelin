@@ -4,8 +4,6 @@ import {
   MousePointer2 as PointerIcon,
 } from 'lucide-react';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
-import { MoveElementsCommand } from '../commands/move-elements';
-import { ScaleElementCommand } from '../commands/scale-element';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
 import type { ITool, SvgIcon, ToolOption } from './tool';
@@ -39,7 +37,6 @@ export class SelectTool implements ITool {
   private handleIndex: number = -1;
   private anchorWorld: Vector2 = { x: 0, y: 0 };
   private originalScale: Vector2 = { x: 1, y: 1 };
-  private originalOffset: Vector2 = { x: 0, y: 0 };
   private originalDraggedWorld: Vector2 = { x: 0, y: 0 };
 
   // Lasso state
@@ -109,7 +106,6 @@ export class SelectTool implements ITool {
         this.scalingElement = e;
         this.handleIndex = handleIdx;
         this.originalScale = { ...e.scale };
-        this.originalOffset = { ...e.offset };
 
         const handles = e.getHandles();
         const anchorIdx = 3 - handleIdx;
@@ -252,7 +248,7 @@ export class SelectTool implements ITool {
         // changing local bounds (e.g. text reflow) stay anchored.
         const pad = 4; // SELECTION_PADDING
         const padX = (3 - this.handleIndex) % 2 === 0 ? -pad : pad;
-        const padY = (3 - this.handleIndex) < 2 ? -pad : pad;
+        const padY = 3 - this.handleIndex < 2 ? -pad : pad;
         const local = e.localBoundingBox;
         const localCorners = [
           { x: local.x, y: local.y },
@@ -311,39 +307,16 @@ export class SelectTool implements ITool {
   public finish(canvas: DrawableCanvas, _event: PointerEvent): void {
     switch (this.mode) {
       case SelectMode.Moving: {
-        if (this.totalDelta.x !== 0 || this.totalDelta.y !== 0) {
-          canvas.pushApplied(
-            new MoveElementsCommand(
-              [...this.movingElements],
-              this.totalDelta.x,
-              this.totalDelta.y,
-            ),
-          );
-        } else if (this.clickToEditCandidate) {
-          canvas.enterElementEdit(this.clickToEditCandidate, event);
+        if (this.totalDelta.x === 0 && this.totalDelta.y === 0) {
+          if (this.clickToEditCandidate) {
+            canvas.enterElementEdit(this.clickToEditCandidate, event);
+          }
         }
+        // Yjs captures translate() mutations automatically — no command needed
         break;
       }
       case SelectMode.Scaling: {
-        if (this.scalingElement) {
-          const e = this.scalingElement;
-          if (
-            e.scale.x !== this.originalScale.x ||
-            e.scale.y !== this.originalScale.y ||
-            e.offset.x !== this.originalOffset.x ||
-            e.offset.y !== this.originalOffset.y
-          ) {
-            canvas.pushApplied(
-              new ScaleElementCommand(
-                e,
-                { ...this.originalScale },
-                { ...this.originalOffset },
-                { ...e.scale },
-                { ...e.offset },
-              ),
-            );
-          }
-        }
+        // Yjs captures setScale/setOffset mutations automatically — no command needed
         break;
       }
     }
@@ -354,18 +327,21 @@ export class SelectTool implements ITool {
     this.reset();
   }
 
-  public interrupt(_canvas: DrawableCanvas): void {
-    if (this.mode === SelectMode.Moving) {
-      for (const e of this.movingElements) {
-        e.translate(-this.totalDelta.x, -this.totalDelta.y);
-      }
+  public interrupt(canvas: DrawableCanvas): void {
+    if (
+      this.mode === SelectMode.Moving &&
+      (this.totalDelta.x !== 0 || this.totalDelta.y !== 0)
+    ) {
+      canvas.undo();
     }
     if (this.mode === SelectMode.Scaling && this.scalingElement) {
-      this.scalingElement.setScale(this.originalScale.x, this.originalScale.y);
-      this.scalingElement.setOffset(
-        this.originalOffset.x,
-        this.originalOffset.y,
-      );
+      const e = this.scalingElement;
+      if (
+        e.scale.x !== this.originalScale.x ||
+        e.scale.y !== this.originalScale.y
+      ) {
+        canvas.undo();
+      }
     }
     this.lastCycledElement = null;
     this.reset();

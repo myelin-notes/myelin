@@ -3,11 +3,10 @@ import {
   getStrokeOutlinePoints,
   getStrokePoints,
 } from 'perfect-freehand';
-import type {
-  BinaryReader,
-  BinaryWriter,
-} from '../../../lib/utils/binary-helper';
+import * as Y from 'yjs';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
+import { bindYFields } from '../y-fields';
+import { LOCAL_ORIGIN } from '../ydoc-manager';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
@@ -16,11 +15,31 @@ export interface StrokeStyle {
   size: number;
 }
 
-export class Stroke extends DrawableElement {
+export class StrokeElement extends DrawableElement {
   protected box: DOMRect;
   protected dirty: boolean = true;
   protected cachedPath: Path2D;
   protected cachedPoints: number[][];
+
+  /** Yjs backing array for points (flat: [x,y,p, x,y,p, ...]). */
+  private _yPoints: Y.Array<number> | null = null;
+
+  public get strokeStyle(): StrokeStyle {
+    return this.style;
+  }
+
+  public get pressureEnabled(): boolean {
+    return this.hasPressure;
+  }
+
+  public override getYMapProps(): Record<string, unknown> {
+    return {
+      color: this.style.color,
+      size: this.style.size,
+      hasPressure: this.hasPressure,
+      points: new Y.Array<number>(),
+    };
+  }
 
   public constructor(
     index: number,
@@ -34,9 +53,55 @@ export class Stroke extends DrawableElement {
     this.cachedPoints = [];
   }
 
-  public addPoint(x: number, y: number, pressure: number | undefined) {
-    this.points = [...this.points, [x, y, pressure ?? 0]];
+  public override bindToYMap(yMap: Y.Map<unknown>): void {
+    super.bindToYMap(yMap);
+    bindYFields(yMap, {
+      color: (v) => {
+        this.style.color = v as string;
+      },
+      size: (v) => {
+        this.style.size = v as number;
+      },
+      hasPressure: (v) => {
+        this.hasPressure = v as boolean;
+      },
+    });
+
+    const yPoints = yMap.get('points') as Y.Array<number> | undefined;
+    if (yPoints) {
+      this._yPoints = yPoints;
+      this.rebuildPointsFromYArray();
+      yPoints.observe((event) => {
+        if (event.transaction.origin === LOCAL_ORIGIN) {
+          return;
+        }
+        this.rebuildPointsFromYArray();
+      });
+    }
+  }
+
+  private rebuildPointsFromYArray(): void {
+    if (!this._yPoints) {
+      return;
+    }
+    const flat = this._yPoints.toArray();
+    const len = Math.floor(flat.length / 3);
+    this.points = new Array(len);
+    for (let i = 0; i < len; i++) {
+      this.points[i] = [flat[i * 3], flat[i * 3 + 1], flat[i * 3 + 2]];
+    }
     this.dirty = true;
+  }
+
+  public addPoint(x: number, y: number, pressure: number | undefined) {
+    const p = pressure ?? 0;
+    this.points = [...this.points, [x, y, p]];
+    this.dirty = true;
+    if (this._yPoints) {
+      this._yPoints.doc!.transact(() => {
+        this._yPoints!.push([x, y, p]);
+      }, LOCAL_ORIGIN);
+    }
   }
 
   public draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
@@ -140,50 +205,5 @@ export class Stroke extends DrawableElement {
     }
 
     return result;
-  }
-
-  public load(reader: BinaryReader) {
-    super.load(reader);
-
-    const c = reader.readString();
-    const s = reader.readF32();
-    this.style = {
-      color: c,
-      size: s,
-    };
-
-    this.hasPressure = reader.readBool();
-    const len = reader.readU32();
-    this.points = new Array(len);
-
-    for (let i = 0; i < len; i++) {
-      this.points[i] = [
-        reader.readF32(),
-        reader.readF32(),
-        this.hasPressure ? reader.readF32() : 0,
-      ];
-    }
-
-    this.dirty = true;
-    this.updateBounds();
-  }
-
-  public save(writer: BinaryWriter) {
-    super.save(writer);
-
-    writer.writeString(this.style.color);
-    writer.writeF32(this.style.size);
-
-    writer.writeBool(this.hasPressure);
-    writer.writeU32(this.points.length);
-
-    for (const [x, y, pressure] of this.points) {
-      writer.writeF32(x);
-      writer.writeF32(y);
-
-      if (this.hasPressure) {
-        writer.writeF32(pressure);
-      }
-    }
   }
 }

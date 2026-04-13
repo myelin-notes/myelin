@@ -12,7 +12,6 @@ import {
   splitBlock,
   toggleMark,
 } from 'prosemirror-commands';
-import { redo, undo } from 'prosemirror-history';
 import { undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
@@ -22,6 +21,7 @@ import {
   splitListItem,
 } from 'prosemirror-schema-list';
 import { type Command, Selection } from 'prosemirror-state';
+import { redo, undo } from 'y-prosemirror';
 import {
   type Action,
   comboToPMKey,

@@ -1,5 +1,6 @@
-import { history } from 'prosemirror-history';
 import type { Plugin } from 'prosemirror-state';
+import { ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
+import type * as Y from 'yjs';
 import { buildKeymap } from './keymap';
 import {
   fenceMarkdownInputRules,
@@ -12,15 +13,17 @@ import { schema } from './schema';
 import { selectionHighlightPlugin } from './selection-highlight';
 
 export function buildPlugins(
+  yXmlFragment: Y.XmlFragment,
   onPageCount?: (pageCount: number) => void,
 ): Plugin[] {
   const plugins: Plugin[] = [
+    ySyncPlugin(yXmlFragment),
+    yUndoPlugin(),
     prefixMarkdownInputRules(schema),
     fenceMarkdownInputRules(schema),
     fenceMarkdownNormalizationPlugin(schema),
     markdownPreviewPlugin(),
     buildKeymap(schema),
-    history(),
     paginationPlugin(onPageCount),
     selectionHighlightPlugin(),
   ];

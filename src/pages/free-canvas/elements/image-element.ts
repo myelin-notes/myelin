@@ -1,14 +1,10 @@
-import type {
-  BinaryReader,
-  BinaryWriter,
-} from '../../../lib/utils/binary-helper';
+import type * as Y from 'yjs';
+import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
 export class ImageElement extends DrawableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
-  private _position: { x: number; y: number } = { x: 0, y: 0 };
-  private _imageData: ArrayBuffer = new ArrayBuffer(0);
   private _bitmap: ImageBitmap | null = null;
   private _naturalWidth: number = 0;
   private _naturalHeight: number = 0;
@@ -17,9 +13,32 @@ export class ImageElement extends DrawableElement {
     super(index, ElementType.IMAGE);
   }
 
-  public get position(): { x: number; y: number } {
-    return this._position;
+  public override getYMapProps(): Record<string, unknown> {
+    return {
+      naturalWidth: this._naturalWidth,
+      naturalHeight: this._naturalHeight,
+    };
   }
+
+  public override bindToYMap(yMap: Y.Map<unknown>): void {
+    super.bindToYMap(yMap);
+    bindYFields(yMap, {
+      naturalWidth: (v) => {
+        this._naturalWidth = v as number;
+      },
+      naturalHeight: (v) => {
+        this._naturalHeight = v as number;
+      },
+      imageData: (v) => {
+        const blob = new Blob([(v as Uint8Array).slice()]);
+        createImageBitmap(blob).then((bmp) => {
+          this._bitmap = bmp;
+        });
+      },
+    });
+    this.updateBox();
+  }
+
   public get naturalWidth(): number {
     return this._naturalWidth;
   }
@@ -27,34 +46,28 @@ export class ImageElement extends DrawableElement {
     return this._naturalHeight;
   }
 
-  public setPosition(x: number, y: number) {
-    this._position = { x, y };
-    this.updateBox();
-  }
-
   public async setImageData(data: ArrayBuffer) {
-    this._imageData = data;
     const blob = new Blob([data]);
     this._bitmap = await createImageBitmap(blob);
     this._naturalWidth = this._bitmap.width;
     this._naturalHeight = this._bitmap.height;
     this.updateBox();
+    this.syncToYMap({
+      imageData: new Uint8Array(data),
+      naturalWidth: this._naturalWidth,
+      naturalHeight: this._naturalHeight,
+    });
   }
 
   private updateBox() {
-    this.box = new DOMRect(
-      this._position.x,
-      this._position.y,
-      this._naturalWidth,
-      this._naturalHeight,
-    );
+    this.box = new DOMRect(0, 0, this._naturalWidth, this._naturalHeight);
   }
 
   protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
     if (!this._bitmap) {
       return;
     }
-    ctx.drawImage(this._bitmap, this._position.x, this._position.y);
+    ctx.drawImage(this._bitmap, 0, 0);
   }
 
   protected isOverLocal(
@@ -73,29 +86,5 @@ export class ImageElement extends DrawableElement {
 
   protected updateBoundingBox(): void {
     this.updateBox();
-  }
-
-  public load(reader: BinaryReader): void {
-    super.load(reader);
-    this._position = { x: reader.readF32(), y: reader.readF32() };
-    this._naturalWidth = reader.readF32();
-    this._naturalHeight = reader.readF32();
-    this._imageData = reader.readBuffer();
-    this.updateBox();
-
-    // Rebuild bitmap asynchronously
-    const blob = new Blob([this._imageData]);
-    createImageBitmap(blob).then((bmp) => {
-      this._bitmap = bmp;
-    });
-  }
-
-  public save(writer: BinaryWriter): void {
-    super.save(writer);
-    writer.writeF32(this._position.x);
-    writer.writeF32(this._position.y);
-    writer.writeF32(this._naturalWidth);
-    writer.writeF32(this._naturalHeight);
-    writer.writeBuffer(this._imageData);
   }
 }

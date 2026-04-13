@@ -1,5 +1,4 @@
 import { type AnimationPlaybackControls, animate } from 'motion';
-import type { BinaryReader, BinaryWriter } from '../../lib/utils/binary-helper';
 import type { Vector2 } from './drawable-canvas';
 
 /**
@@ -259,18 +258,6 @@ export class CanvasViewport {
   public cancelAnimation(): void {
     this._viewAnim?.stop();
     this._viewAnim = null;
-  }
-
-  public save(writer: BinaryWriter): void {
-    writer.writeF32(this._zoom);
-    writer.writeF32(this._offset.x);
-    writer.writeF32(this._offset.y);
-  }
-
-  public load(reader: BinaryReader): void {
-    this._zoom = reader.readF32();
-    this._offset = { x: reader.readF32(), y: reader.readF32() };
-    this._onZoomChange?.(this._zoom);
   }
 
   public destroy(): void {

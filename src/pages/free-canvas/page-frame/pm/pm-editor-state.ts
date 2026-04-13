@@ -1,7 +1,7 @@
-import type { Node as PMNode } from 'prosemirror-model';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { PM_ADD_TO_HISTORY, PM_UPDATE_EVENT } from './constants';
+import type * as Y from 'yjs';
+import { PM_UPDATE_EVENT } from './constants';
 import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
@@ -9,39 +9,18 @@ import { schema } from './schema';
 /**
  * Manages ProseMirror document state for a single PageFrameElement.
  *
+ * The Y.XmlFragment is the source of truth for document content.
  * The EditorView is created once and kept alive. Editing is toggled
  * via `setEditable()` rather than creating/destroying the view.
  */
 export class PageFrameEditorState {
-  private _offlineDoc: Record<string, unknown>;
   private _view: EditorView | null = null;
   private _editable = false;
 
-  constructor(docJSON?: Record<string, unknown>) {
-    this._offlineDoc =
-      docJSON ?? (createDefaultDoc().toJSON() as Record<string, unknown>);
-  }
-
-  get doc(): PMNode {
-    if (this._view) {
-      return this._view.state.doc;
-    }
-    return schema.nodeFromJSON(this._offlineDoc);
-  }
-
-  get docJSON(): Record<string, unknown> {
-    if (this._view) {
-      return this._view.state.doc.toJSON() as Record<string, unknown>;
-    }
-    return this._offlineDoc;
-  }
+  constructor(private readonly _yXmlFragment: Y.XmlFragment) {}
 
   get view(): EditorView | null {
     return this._view;
-  }
-
-  toJSON(): Record<string, unknown> {
-    return this.docJSON;
   }
 
   /**
@@ -59,10 +38,9 @@ export class PageFrameEditorState {
       this.destroyView();
     }
 
-    const doc = schema.nodeFromJSON(this._offlineDoc);
     const state = EditorState.create({
-      doc,
-      plugins: buildPlugins(onPageCount),
+      schema,
+      plugins: buildPlugins(this._yXmlFragment, onPageCount),
     });
 
     this._editable = false;
@@ -122,34 +100,9 @@ export class PageFrameEditorState {
    */
   destroyView(): void {
     if (this._view) {
-      this._offlineDoc = this._view.state.doc.toJSON() as Record<
-        string,
-        unknown
-      >;
       this._view.destroy();
       this._view = null;
       this._editable = false;
     }
   }
-
-  /**
-   * Replace the stored doc (e.g., from undo/redo at the canvas level).
-   */
-  setDocJSON(json: Record<string, unknown>): void {
-    this._offlineDoc = json;
-    if (this._view) {
-      const doc = schema.nodeFromJSON(json);
-      const tr = this._view.state.tr.replaceWith(
-        0,
-        this._view.state.doc.content.size,
-        doc.content,
-      );
-      tr.setMeta(PM_ADD_TO_HISTORY, false);
-      this._view.dispatch(tr);
-    }
-  }
-}
-
-function createDefaultDoc(): PMNode {
-  return schema.node('doc', null, [schema.node('paragraph', null)]);
 }

@@ -1,10 +1,6 @@
-import type {
-  BinaryReader,
-  BinaryWriter,
-  ISerializable,
-} from '../../../lib/utils/binary-helper';
-import type { UndoCommand } from '../../../lib/utils/undo-redo';
+import type * as Y from 'yjs';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import { bindYFields, writeYMap } from '../y-fields';
 import type { ElementType } from './element-type';
 
 const SELECTION_STROKE = '#2f3e46';
@@ -13,17 +9,24 @@ const SELECTION_PADDING = 4;
 const SELECTION_RADIUS = 4;
 const SELECTION_ANIM_SPEED = 8;
 
-export abstract class DrawableElement implements ISerializable {
+export abstract class DrawableElement {
   protected _scale: Vector2 = { x: 1, y: 1 };
   private _offset: Vector2 = { x: 0, y: 0 };
   private selected: boolean = false;
   private selectionT: number = 0;
   private _hidden: boolean = false;
 
+  /** Yjs backing map — set after element is bound to a Y.Doc. */
+  protected _yMap: Y.Map<unknown> | null = null;
+
   protected constructor(
     public readonly index: number,
     public readonly type: ElementType,
   ) {}
+
+  public get yMap(): Y.Map<unknown> | null {
+    return this._yMap;
+  }
 
   public get offset(): Vector2 {
     return this._offset;
@@ -32,18 +35,52 @@ export abstract class DrawableElement implements ISerializable {
     return this._scale;
   }
 
+  /**
+   * Bind this element to a Y.Map, reading initial values and observing
+   * future changes. Subclasses override to bind additional fields.
+   */
+  public bindToYMap(yMap: Y.Map<unknown>): void {
+    this._yMap = yMap;
+    bindYFields(yMap, {
+      offsetX: (v) => {
+        this._offset.x = v as number;
+      },
+      offsetY: (v) => {
+        this._offset.y = v as number;
+      },
+      scaleX: (v) => {
+        this._scale.x = v as number;
+        this.updateBoundingBox();
+      },
+      scaleY: (v) => {
+        this._scale.y = v as number;
+        this.updateBoundingBox();
+      },
+    });
+  }
+
+  /** Write key-value pairs to the backing Y.Map in a single transaction. */
+  protected syncToYMap(updates: Record<string, unknown>): void {
+    if (this._yMap) {
+      writeYMap(this._yMap, updates);
+    }
+  }
+
   public translate(dx: number, dy: number) {
     this._offset.x += dx;
     this._offset.y += dy;
+    this.syncToYMap({ offsetX: this._offset.x, offsetY: this._offset.y });
   }
 
   public setOffset(x: number, y: number) {
     this._offset = { x, y };
+    this.syncToYMap({ offsetX: x, offsetY: y });
   }
 
   public setScale(x: number, y: number) {
     this._scale = { x, y };
     this.updateBoundingBox();
+    this.syncToYMap({ scaleX: x, scaleY: y });
   }
 
   public get hidden(): boolean {
@@ -158,27 +195,11 @@ export abstract class DrawableElement implements ISerializable {
   ): HTMLElement | null {
     return null;
   }
-  /** Called when the element exits inline edit mode. Returns an undo command if the content changed. */
-  public exitEditMode(): UndoCommand | null {
-    return null;
-  }
+  /** Called when the element exits inline edit mode. */
+  public exitEditMode(): void {}
 
   public updateBounds() {
     this.updateBoundingBox();
-  }
-
-  public load(reader: BinaryReader): void {
-    this._scale.x = reader.readF32();
-    this._scale.y = reader.readF32();
-    this._offset.x = reader.readF32();
-    this._offset.y = reader.readF32();
-  }
-
-  public save(writer: BinaryWriter): void {
-    writer.writeF32(this._scale.x);
-    writer.writeF32(this._scale.y);
-    writer.writeF32(this._offset.x);
-    writer.writeF32(this._offset.y);
   }
 
   public get isSelected() {
@@ -225,6 +246,9 @@ export abstract class DrawableElement implements ISerializable {
       { x: box.right + p, y: box.bottom + p },
     ];
   }
+
+  /** Return type-specific Y.Map properties for initial serialization. */
+  public abstract getYMapProps(): Record<string, unknown>;
 
   /** Bounding box in element-local space (before scale/offset) */
   public abstract get localBoundingBox(): DOMRect;

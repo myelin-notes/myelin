@@ -1,6 +1,6 @@
 import { Highlighter as HighlighterIcon } from 'lucide-react';
 import type { DrawableCanvas } from '../drawable-canvas';
-import { Stroke } from '../elements/stroke';
+import { StrokeElement } from '../elements/stroke-element';
 import { PenTool } from './pen-tool';
 import type { SvgIcon, ToolOption } from './tool';
 
@@ -29,7 +29,7 @@ export class HighlighterTool extends PenTool {
   public start(canvas: DrawableCanvas, _event: PointerEvent): void {
     this.currentStroke = canvas.addElement(
       (i) =>
-        new Stroke(i, [], false, {
+        new StrokeElement(i, [], false, {
           color: hexToRgba(this.color, 0.3),
           size: this.size,
         }),

@@ -1,18 +1,12 @@
-import type {
-  BinaryReader,
-  BinaryWriter,
-  ISerializable,
-} from '../../lib/utils/binary-helper';
+import type * as Y from 'yjs';
 import { StateMachine } from '../../lib/utils/state-machine';
-import type { UndoCommand } from '../../lib/utils/undo-redo';
-import { UndoRedoStack } from '../../lib/utils/undo-redo';
 import { CanvasViewport } from './canvas-viewport';
-import { AddElementCommand, RemoveElementCommand } from './commands';
 import type { DrawableElement } from './elements/drawable-element';
-import { DrawableElementRegistry } from './elements/drawable-element-registry';
 import { ElementType } from './elements/element-type';
 import { ImageElement } from './elements/image-element';
 import { PageFrameElement } from './elements/page-frame-element';
+import { StrokeElement } from './elements/stroke-element';
+import { TextElement } from './elements/text-element';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
@@ -20,10 +14,11 @@ import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
 import type { ITool } from './tools/tool';
+import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type Vector2 = { x: number; y: number };
 
-export class DrawableCanvas implements ISerializable {
+export class DrawableCanvas {
   public readonly ctx: CanvasRenderingContext2D;
   public readonly viewport: CanvasViewport;
   private readonly canvas: HTMLCanvasElement;
@@ -37,8 +32,9 @@ export class DrawableCanvas implements ISerializable {
   private screenPosition: Vector2 = { x: 0, y: 0 };
 
   private _elements: DrawableElement[] = [];
-  private _undoRedo = new UndoRedoStack();
-  private _nextIndex = 0;
+  private _ydoc: YDocManager;
+  /** Maps Y.Map instances to their DrawableElement wrappers. */
+  private _yMapToElement = new Map<Y.Map<unknown>, DrawableElement>();
   private toolSelected: ITool;
   private _toolCursor: string = 'default';
 
@@ -55,7 +51,11 @@ export class DrawableCanvas implements ISerializable {
   private _editingElement: DrawableElement | null = null;
   private _cleanupEditListeners: (() => void) | null = null;
 
-  public constructor(canvas: HTMLCanvasElement, tools?: ITool[]) {
+  public constructor(
+    canvas: HTMLCanvasElement,
+    ydoc: YDocManager,
+    tools?: ITool[],
+  ) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {
       console.error('Failed to get canvas context');
@@ -68,11 +68,142 @@ export class DrawableCanvas implements ISerializable {
     this.state = new StateMachine(InteractState.Idle);
     this.tools = tools ?? DrawableCanvas.makeTools();
     this.toolSelected = this.tools[0];
+    this._ydoc = ydoc;
 
     this.initEventListeners(canvas);
     this.initStates();
     this.resizeCanvas(window.innerWidth, window.innerHeight);
     this.buildDotPattern();
+
+    // Hydrate existing elements from Y.Doc (for loaded documents)
+    this.hydrateFromYDoc();
+
+    // Observe Y.Array for future add/remove (handles undo/redo + remote changes)
+    this._ydoc.elements.observe((event) => {
+      this.handleYArrayChange(event);
+    });
+  }
+
+  public get ydoc(): YDocManager {
+    return this._ydoc;
+  }
+
+  /**
+   * Populate _elements from the current Y.Array state.
+   * Called once on construction for loaded documents.
+   */
+  private hydrateFromYDoc(): void {
+    for (let i = 0; i < this._ydoc.elements.length; i++) {
+      const yMap = this._ydoc.elements.get(i);
+      const element = this.createElementFromYMap(yMap);
+      if (element) {
+        this._elements.push(element);
+        this._yMapToElement.set(yMap, element);
+      }
+    }
+    // Sort: page frames first
+    this._elements.sort((a, b) => {
+      const aIsFrame = a.type === ElementType.PAGE_FRAME ? 0 : 1;
+      const bIsFrame = b.type === ElementType.PAGE_FRAME ? 0 : 1;
+      return aIsFrame - bIsFrame;
+    });
+    // Sync nextIndex
+    if (this._elements.length > 0) {
+      const maxIndex = Math.max(...this._elements.map((e) => e.index));
+      if (maxIndex >= this._ydoc.nextIndex) {
+        this._ydoc.nextIndex = maxIndex + 1;
+      }
+    }
+  }
+
+  /**
+   * Create a DrawableElement from a Y.Map, bind it, and return it.
+   */
+  private createElementFromYMap(yMap: Y.Map<unknown>): DrawableElement | null {
+    const type = yMap.get('type') as ElementType;
+    const index = yMap.get('index') as number;
+
+    let element: DrawableElement;
+    switch (type) {
+      case ElementType.STROKE:
+        element = new StrokeElement(index, [], false, {
+          color: 'black',
+          size: 12,
+        });
+        break;
+      case ElementType.TEXT:
+        element = new TextElement(index);
+        break;
+      case ElementType.IMAGE:
+        element = new ImageElement(index);
+        break;
+      case ElementType.PAGE_FRAME: {
+        const pf = new PageFrameElement(index);
+        const frag = this._ydoc.getXmlFragment(index);
+        pf.bindYProseMirror(frag);
+        element = pf;
+        break;
+      }
+      default:
+        return null;
+    }
+
+    element.bindToYMap(yMap);
+    return element;
+  }
+
+  /**
+   * Handle Y.Array changes — keeps _elements in sync with the Y.Doc.
+   * Fires on undo/redo and future remote changes.
+   */
+  private handleYArrayChange(event: Y.YArrayEvent<Y.Map<unknown>>): void {
+    // Skip locally-originated changes — we already updated _elements inline
+    if (event.transaction.origin === LOCAL_ORIGIN) {
+      return;
+    }
+
+    let index = 0;
+    for (const delta of event.changes.delta) {
+      if ('retain' in delta) {
+        index += delta.retain!;
+      }
+      if ('delete' in delta) {
+        // Find and remove the elements that were deleted
+        const count = delta.delete!;
+        for (let i = 0; i < count; i++) {
+          // Find which element was at this Y.Array position
+          // We need to find elements that are no longer in the Y.Array
+        }
+      }
+      if ('insert' in delta) {
+        const inserted = delta.insert as Y.Map<unknown>[];
+        for (const yMap of inserted) {
+          if (!this._yMapToElement.has(yMap)) {
+            const element = this.createElementFromYMap(yMap);
+            if (element) {
+              this._elements.splice(index, 0, element);
+              this._yMapToElement.set(yMap, element);
+            }
+          }
+          index++;
+        }
+      }
+    }
+
+    // Handle deletions: remove elements whose Y.Maps are no longer in the array
+    const currentYMaps = new Set<Y.Map<unknown>>();
+    for (let i = 0; i < this._ydoc.elements.length; i++) {
+      currentYMaps.add(this._ydoc.elements.get(i));
+    }
+    this._elements = this._elements.filter((el) => {
+      if (el.yMap && !currentYMaps.has(el.yMap)) {
+        this._yMapToElement.delete(el.yMap);
+        return false;
+      }
+      return true;
+    });
+
+    this.updateBounding();
   }
 
   public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
@@ -148,18 +279,14 @@ export class DrawableCanvas implements ISerializable {
   }
 
   public exitElementEdit(): void {
-    console.trace('EXITING ');
-
     if (!this._editingElement) {
       return;
     }
     this._cleanupEditListeners?.();
     this._cleanupEditListeners = null;
     const element = this._editingElement;
-    const undoCmd = element.exitEditMode();
-    if (undoCmd) {
-      this.pushApplied(undoCmd);
-    }
+    element.exitEditMode();
+    // Yjs captures changes automatically — no command to push
     this._editingElement = null;
     this.viewport.editMode = false;
     // Restore foreground canvas above DOM layer (z:5)
@@ -234,11 +361,11 @@ export class DrawableCanvas implements ISerializable {
   private initStates() {
     this.state.addEnd(InteractState.UsingTool, (event) => {
       this.toolSelected.finish(this, event);
-      this._undoRedo.endGroup();
+      this._ydoc.undoManager.stopCapturing();
     });
 
     this.state.addStart(InteractState.UsingTool, (event) => {
-      this._undoRedo.beginGroup();
+      this._ydoc.undoManager.stopCapturing();
       this.toolSelected.start(this, event);
     });
 
@@ -311,14 +438,61 @@ export class DrawableCanvas implements ISerializable {
     window.addEventListener('resize', this._handleResize);
   }
 
+  /**
+   * Add a new element to the canvas. The factory receives the element index.
+   * The element is created locally, bound to a new Y.Map, and added to the Y.Array.
+   */
   public addElement<T extends DrawableElement>(factory: (i: number) => T): T {
-    const element = factory(this._nextIndex++);
-    this._undoRedo.push(new AddElementCommand(this._elements, element));
+    const index = this._ydoc.nextIndex;
+    const element = factory(index);
+
+    // Build the Y.Map properties from the element's current state
+    const props: Record<string, unknown> = {
+      offsetX: element.offset.x,
+      offsetY: element.offset.y,
+      scaleX: element.scale.x,
+      scaleY: element.scale.y,
+      ...element.getYMapProps(),
+    };
+
+    // Create Y.Map and add to array (page frames go first)
+    let yMap: Y.Map<unknown>;
+    if (element.type === ElementType.PAGE_FRAME) {
+      yMap = this._ydoc.insertElementMap(0, element.type, index, props);
+      this._elements.unshift(element);
+    } else {
+      yMap = this._ydoc.createElementMap(element.type, index, props);
+      this._elements.push(element);
+    }
+
+    // Bind element to its Y.Map
+    element.bindToYMap(yMap);
+    this._yMapToElement.set(yMap, element);
+
+    // For PageFrames, also bind the XmlFragment
+    if (element instanceof PageFrameElement) {
+      const frag = this._ydoc.getXmlFragment(index);
+      element.bindYProseMirror(frag);
+    }
+
+    // Increment nextIndex
+    this._ydoc.transact(() => {
+      this._ydoc.nextIndex = index + 1;
+    });
+
     return element;
   }
 
   public removeElement(element: DrawableElement) {
-    this._undoRedo.push(new RemoveElementCommand(this._elements, element));
+    const yMap = element.yMap;
+    if (yMap) {
+      this._ydoc.removeElementMap(yMap);
+      this._yMapToElement.delete(yMap);
+    }
+    const idx = this._elements.indexOf(element);
+    if (idx >= 0) {
+      this._elements.splice(idx, 1);
+    }
   }
 
   public deleteSelected() {
@@ -326,12 +500,17 @@ export class DrawableCanvas implements ISerializable {
     if (selected.length === 0) {
       return;
     }
-    this._undoRedo.beginGroup();
-    for (const e of selected) {
-      e.unselect();
-      this._undoRedo.push(new RemoveElementCommand(this._elements, e));
-    }
-    this._undoRedo.endGroup();
+    this._ydoc.transact(() => {
+      for (const e of selected) {
+        e.unselect();
+        const yMap = e.yMap;
+        if (yMap) {
+          this._ydoc.removeElementMap(yMap);
+          this._yMapToElement.delete(yMap);
+        }
+      }
+    });
+    this._elements = this._elements.filter((e) => !selected.includes(e));
     this.updateBounding();
   }
 
@@ -349,16 +528,12 @@ export class DrawableCanvas implements ISerializable {
     const cx = screenX ?? this.canvas.width / dpr / 2;
     const cy = screenY ?? this.canvas.height / dpr / 2;
     const world = this.viewport.screenToWorld({ x: cx, y: cy });
-    img.setPosition(
+    img.setOffset(
       world.x - img.naturalWidth / 2,
       world.y - img.naturalHeight / 2,
     );
     img.updateBounds();
     this.updateBounding();
-  }
-
-  public pushApplied(command: UndoCommand) {
-    this._undoRedo.pushApplied(command);
   }
 
   public setCursor(cursor: string) {
@@ -445,63 +620,13 @@ export class DrawableCanvas implements ISerializable {
   }
 
   public undo() {
-    this._undoRedo.undo();
+    this._ydoc.undoManager.undo();
     this.updateBounding();
   }
 
   public redo() {
-    this._undoRedo.redo();
+    this._ydoc.undoManager.redo();
     this.updateBounding();
-  }
-
-  public collapse() {
-    this._undoRedo.collapse();
-  }
-
-  public load(reader: BinaryReader): void {
-    this.viewport.load(reader);
-
-    const count = reader.readU32();
-    this._elements = [];
-    for (let i = 0; i < count; i++) {
-      this._elements.push(this.loadElement(reader));
-    }
-    // Page frames draw first (below other elements)
-    this._elements.sort((a, b) => {
-      const aIsFrame = a.type === ElementType.PAGE_FRAME ? 0 : 1;
-      const bIsFrame = b.type === ElementType.PAGE_FRAME ? 0 : 1;
-      return aIsFrame - bIsFrame;
-    });
-    this._nextIndex =
-      this._elements.length > 0
-        ? Math.max(...this._elements.map((e) => e.index)) + 1
-        : 0;
-  }
-
-  public save(writer: BinaryWriter): void {
-    this.viewport.save(writer);
-
-    writer.writeU32(this._elements.length);
-    for (const ele of this._elements) {
-      this.saveElement(ele, writer);
-    }
-  }
-
-  private loadElement(reader: BinaryReader): DrawableElement {
-    const type = reader.readU8() as ElementType;
-    const index = reader.readU8();
-
-    const factory = DrawableElementRegistry.MAP[type];
-    const element = factory(index);
-    element.load(reader);
-
-    return element;
-  }
-
-  private saveElement(ele: DrawableElement, writer: BinaryWriter) {
-    writer.writeU8(ele.type);
-    writer.writeU8(ele.index);
-    ele.save(writer);
   }
 
   public static makeTools(): ITool[] {

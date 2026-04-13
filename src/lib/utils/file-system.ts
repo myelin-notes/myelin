@@ -11,11 +11,6 @@ import {
   writeFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
-import {
-  BinaryReader,
-  BinaryWriter,
-  type ISerializable,
-} from './binary-helper';
 
 export const FileTypes = ['mcanvas'] as const;
 export type FileType = (typeof FileTypes)[number];
@@ -510,16 +505,14 @@ export namespace FileSystem {
     return `${baseName} ${counter}`;
   }
 
-  export async function saveToFile(nodeId: string, content: ISerializable) {
+  export async function saveToFile(nodeId: string, data: Uint8Array) {
     const manifest = await loadManifest();
     const node = manifest.nodes[nodeId];
     if (!node || node.type !== 'file') {
       return;
     }
 
-    const writer = new BinaryWriter(64);
-    content.save(writer);
-    if (writer.getBuffer().byteLength === 0) {
+    if (data.byteLength === 0) {
       return;
     }
 
@@ -528,7 +521,7 @@ export namespace FileSystem {
     }
 
     const filePath = await join(FILES_DIR, `${nodeId}${FILE_EXT}`);
-    await writeFile(filePath, new Uint8Array(writer.getBuffer()), {
+    await writeFile(filePath, data, {
       baseDir: BaseDirectory.AppData,
     });
 
@@ -536,23 +529,24 @@ export namespace FileSystem {
     await saveManifest(manifest);
   }
 
-  export async function loadFromFile(nodeId: string, content: ISerializable) {
+  export async function loadFromFile(
+    nodeId: string,
+  ): Promise<Uint8Array | null> {
     const manifest = await loadManifest();
     const node = manifest.nodes[nodeId];
     if (!node || node.type !== 'file') {
-      return;
+      return null;
     }
 
     const filePath = await join(FILES_DIR, `${nodeId}${FILE_EXT}`);
     if (!(await exists(filePath, { baseDir: BaseDirectory.AppData }))) {
-      return;
+      return null;
     }
     const data = await readFile(filePath, { baseDir: BaseDirectory.AppData });
     if (data.length === 0) {
-      return;
+      return null;
     }
-    const reader = new BinaryReader(data.buffer);
-    content.load(reader);
+    return data;
   }
 
   export async function saveThumbnail(nodeId: string, blob: Blob) {

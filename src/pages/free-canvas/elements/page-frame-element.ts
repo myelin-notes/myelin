@@ -1,12 +1,8 @@
 import { Selection } from 'prosemirror-state';
-import type {
-  BinaryReader,
-  BinaryWriter,
-} from '../../../lib/utils/binary-helper';
-import type { UndoCommand } from '../../../lib/utils/undo-redo';
-import { EditPageFrameCommand } from '../commands';
+import type * as Y from 'yjs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
+import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
@@ -21,9 +17,10 @@ export class PageFrameElement extends DrawableElement {
   private _pageHeight = PAGE_HEIGHT;
   private _editing = false;
   private _numPages = 1;
-  private _oldDocJSON: Record<string, unknown> = {};
 
-  public readonly pmEditor = new PageFrameEditorState();
+  /** Set externally by DrawableCanvas after binding to Y.Doc. */
+  private _yXmlFragment: Y.XmlFragment | null = null;
+  public pmEditor: PageFrameEditorState | null = null;
 
   private _frameDiv: HTMLDivElement | null = null;
   private _contentDiv: HTMLDivElement | null = null;
@@ -42,6 +39,35 @@ export class PageFrameElement extends DrawableElement {
 
   constructor(index: number) {
     super(index, ElementType.PAGE_FRAME);
+  }
+
+  public override getYMapProps(): Record<string, unknown> {
+    return {
+      pageWidth: this._pageWidth,
+      pageHeight: this._pageHeight,
+    };
+  }
+
+  /** Bind Yjs shared types. Must be called after bindToYMap. */
+  public bindYProseMirror(yXmlFragment: Y.XmlFragment): void {
+    this._yXmlFragment = yXmlFragment;
+    this.pmEditor = new PageFrameEditorState(yXmlFragment);
+  }
+
+  public get yXmlFragment(): Y.XmlFragment | null {
+    return this._yXmlFragment;
+  }
+
+  public override bindToYMap(yMap: Y.Map<unknown>): void {
+    super.bindToYMap(yMap);
+    bindYFields(yMap, {
+      pageWidth: (v) => {
+        this._pageWidth = v as number;
+      },
+      pageHeight: (v) => {
+        this._pageHeight = v as number;
+      },
+    });
   }
 
   public get editing(): boolean {
@@ -99,8 +125,7 @@ export class PageFrameElement extends DrawableElement {
     screenY?: number,
   ): HTMLElement | null {
     this._editing = true;
-    this._oldDocJSON = this.pmEditor.toJSON();
-    this.pmEditor.setEditable(true);
+    this.pmEditor?.setEditable(true);
 
     // Horizontally: center the page (zoom fits page width to 65% of viewport).
     // Vertically: center on the click's world Y so the user lands on exactly
@@ -123,7 +148,7 @@ export class PageFrameElement extends DrawableElement {
     );
     canvas.viewport.animateViewToFitRect(focusRect, 0.65);
 
-    const view = this.pmEditor.view;
+    const view = this.pmEditor?.view;
     if (view) {
       // Resolve click position BEFORE focus — focus may scroll the
       // container, which would invalidate the viewport coordinates.
@@ -148,35 +173,12 @@ export class PageFrameElement extends DrawableElement {
     return this.frameDiv;
   }
 
-  public override exitEditMode(): UndoCommand | null {
+  public override exitEditMode(): void {
     this._editing = false;
-    this.pmEditor.setEditable(false);
-    this.pmEditor.blur();
-
-    const newDocJSON = this.pmEditor.toJSON();
-    const changed =
-      JSON.stringify(newDocJSON) !== JSON.stringify(this._oldDocJSON);
-
-    if (changed) {
-      return new EditPageFrameCommand(this, this._oldDocJSON, newDocJSON);
-    }
-    return null;
+    this.pmEditor?.setEditable(false);
+    this.pmEditor?.blur();
+    // Yjs UndoManager captures PM changes automatically — no snapshot needed
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
-
-  public save(writer: BinaryWriter): void {
-    super.save(writer);
-    writer.writeF32(this._pageWidth);
-    writer.writeF32(this._pageHeight);
-    writer.writeString(JSON.stringify(this.pmEditor.toJSON()));
-  }
-
-  public load(reader: BinaryReader): void {
-    super.load(reader);
-    this._pageWidth = reader.readF32();
-    this._pageHeight = reader.readF32();
-    const jsonStr = reader.readString();
-    this.pmEditor.setDocJSON(JSON.parse(jsonStr) as Record<string, unknown>);
-  }
 }

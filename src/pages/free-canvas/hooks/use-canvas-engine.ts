@@ -10,6 +10,7 @@ import {
 import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-element';
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
+import { YDocManager } from '@/pages/free-canvas/ydoc-manager';
 
 declare module '@/lib/keybinds' {
   interface ActionMap {
@@ -83,7 +84,8 @@ export function useCanvasEngine({
     if (!(drawableCanvasRef.current && canvasRef.current && id)) {
       return;
     }
-    await FileSystem.saveToFile(id, drawableCanvasRef.current);
+    const data = drawableCanvasRef.current.ydoc.encodeState();
+    await FileSystem.saveToFile(id, data);
     await new Promise<void>((resolve, reject) => {
       canvasRef.current!.toBlob(async (b) => {
         if (b === null) {
@@ -99,7 +101,6 @@ export function useCanvasEngine({
 
   const back = async () => {
     await autoSave();
-    drawableCanvasRef.current?.collapse();
     navigate('/library');
   };
 
@@ -179,73 +180,36 @@ export function useCanvasEngine({
     };
     document.addEventListener('paste', handlePaste);
 
-    const dc = new DrawableCanvas(canvas, canvasTools);
-    drawableCanvasRef.current = dc;
-
-    if (bgCanvasRef.current) {
-      dc.setBackgroundCanvas(bgCanvasRef.current);
-    }
-
-    dc.viewport.setOnZoomChange((zoom) => setZoomLevel(Math.round(zoom * 100)));
-
-    dc.setOnRequestFilePick((screenPos) => {
-      pendingEmbedPos.current = screenPos;
-      fileInputRef.current?.click();
-    });
-
-    dc.setOnElementEdit((element) => {
-      setEditingElement(element);
-    });
-
-    let prevTime = 0;
-    let animationFrameId: number;
-    let fpsAccum = 0;
-    let fpsFrames = 0;
-
-    function animate(time: number) {
-      const dt = (time - prevTime) / 1000;
-      prevTime = time;
-      dc.redraw(dt);
-
-      // Throttle fps state updates to ~2/sec to avoid re-rendering every frame
-      if (dt > 0) {
-        fpsAccum += dt;
-        fpsFrames++;
-        if (fpsAccum >= 0.5) {
-          setFps(Math.round(fpsFrames / fpsAccum));
-          fpsAccum = 0;
-          fpsFrames = 0;
-        }
-      }
-
-      animationFrameId = requestAnimationFrame(animate);
-    }
-
-    animationFrameId = requestAnimationFrame(animate);
-
-    const unbindKeys = keybindings.register([
-      {
-        action: 'canvas:pan',
-        onDown: () => dc.setSpaceDown(true),
-        onUp: () => dc.setSpaceDown(false),
-      },
-      { action: 'canvas:undo', onDown: () => dc.undo() },
-      { action: 'canvas:redo', onDown: () => dc.redo() },
-      { action: 'canvas:delete', onDown: () => dc.deleteSelected() },
-      {
-        action: 'canvas:tool-text',
-        onDown: () => {
-          dc.switchTool(4);
-          setSelectedToolIndex(4);
-        },
-      },
-    ]);
-
-    FileSystem.loadFromFile(id, dc)
-      .then(() => {
+    // Load or create Y.Doc, then build canvas
+    FileSystem.loadFromFile(id)
+      .then((bytes) => {
         if (disposed) {
           return;
         }
+
+        const ydoc = bytes ? YDocManager.fromUpdate(bytes) : new YDocManager();
+
+        const dc = new DrawableCanvas(canvas, ydoc, canvasTools);
+        drawableCanvasRef.current = dc;
+
+        if (bgCanvasRef.current) {
+          dc.setBackgroundCanvas(bgCanvasRef.current);
+        }
+
+        dc.viewport.setOnZoomChange((zoom) =>
+          setZoomLevel(Math.round(zoom * 100)),
+        );
+
+        dc.setOnRequestFilePick((screenPos) => {
+          pendingEmbedPos.current = screenPos;
+          fileInputRef.current?.click();
+        });
+
+        dc.setOnElementEdit((element) => {
+          setEditingElement(element);
+        });
+
+        // If no elements, create default PageFrame
         if (dc.elements.length === 0) {
           const dpr = window.devicePixelRatio || 1;
           const centerWorld = dc.viewport.screenToWorld({
@@ -260,9 +224,68 @@ export function useCanvasEngine({
           frame.updateBounds();
           dc.updateBounding();
         }
-        return FileSystem.saveToFile(id, dc);
+
+        // Initial save to persist the Y.Doc state
+        FileSystem.saveToFile(id, dc.ydoc.encodeState()).catch(console.error);
+
+        // Start animation loop
+        let prevTime = 0;
+        let fpsAccum = 0;
+        let fpsFrames = 0;
+
+        function animate(time: number) {
+          if (disposed) {
+            return;
+          }
+          const dt = (time - prevTime) / 1000;
+          prevTime = time;
+          dc.redraw(dt);
+
+          if (dt > 0) {
+            fpsAccum += dt;
+            fpsFrames++;
+            if (fpsAccum >= 0.5) {
+              setFps(Math.round(fpsFrames / fpsAccum));
+              fpsAccum = 0;
+              fpsFrames = 0;
+            }
+          }
+
+          animationFrameId = requestAnimationFrame(animate);
+        }
+
+        animationFrameId = requestAnimationFrame(animate);
       })
       .catch(console.error);
+
+    let animationFrameId = 0;
+
+    const unbindKeys = keybindings.register([
+      {
+        action: 'canvas:pan',
+        onDown: () => drawableCanvasRef.current?.setSpaceDown(true),
+        onUp: () => drawableCanvasRef.current?.setSpaceDown(false),
+      },
+      {
+        action: 'canvas:undo',
+        onDown: () => drawableCanvasRef.current?.undo(),
+      },
+      {
+        action: 'canvas:redo',
+        onDown: () => drawableCanvasRef.current?.redo(),
+      },
+      {
+        action: 'canvas:delete',
+        onDown: () => drawableCanvasRef.current?.deleteSelected(),
+      },
+      {
+        action: 'canvas:tool-text',
+        onDown: () => {
+          drawableCanvasRef.current?.switchTool(4);
+          setSelectedToolIndex(4);
+        },
+      },
+    ]);
 
     return () => {
       disposed = true;
@@ -273,7 +296,7 @@ export function useCanvasEngine({
       canvas.removeEventListener('dragover', handleDragOver);
       canvas.removeEventListener('drop', handleDrop);
       document.removeEventListener('paste', handlePaste);
-      dc.destroy();
+      drawableCanvasRef.current?.destroy();
     };
   }, [id]);
 

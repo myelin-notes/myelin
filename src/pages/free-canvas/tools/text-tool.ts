@@ -86,7 +86,12 @@ export class TextTool implements ITool {
         }
       }
       // Click-to-create with default size
-      this.createNew(canvas, this.dragStart, DEFAULT_BOX_WIDTH, DEFAULT_BOX_HEIGHT);
+      this.createNew(
+        canvas,
+        this.dragStart,
+        DEFAULT_BOX_WIDTH,
+        DEFAULT_BOX_HEIGHT,
+      );
     } else {
       // Drag-to-create with custom size
       const x = Math.min(this.dragStart.x, endPos.x);
@@ -127,7 +132,7 @@ export class TextTool implements ITool {
         boxWidth,
         boxHeight,
       );
-      te.setPosition(worldPos.x, worldPos.y);
+      te.setOffset(worldPos.x, worldPos.y);
       return te;
     });
     el.select();

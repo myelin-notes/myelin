@@ -254,7 +254,10 @@ export class CodeBlockNodeView implements NodeView {
       model: this.model,
       overviewRulerBorder: false,
       overviewRulerLanes: 0,
-      padding: { top: 14 * (window.devicePixelRatio || 1), bottom: 14 * (window.devicePixelRatio || 1) },
+      padding: {
+        top: 14 * (window.devicePixelRatio || 1),
+        bottom: 14 * (window.devicePixelRatio || 1),
+      },
       readOnly: false,
       renderLineHighlight: 'none',
       roundedSelection: true,

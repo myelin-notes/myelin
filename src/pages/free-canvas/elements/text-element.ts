@@ -1,15 +1,11 @@
+import type * as Y from 'yjs';
 import {
   type LayoutLine,
   layoutWithLines,
   prepareWithSegments,
 } from '@chenglou/pretext';
-import type {
-  BinaryReader,
-  BinaryWriter,
-} from '../../../lib/utils/binary-helper';
-import type { UndoCommand } from '../../../lib/utils/undo-redo';
-import { EditTextCommand } from '../commands/edit-text';
 import type { DrawableCanvas } from '../drawable-canvas';
+import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
@@ -32,7 +28,6 @@ export class TextElement extends DrawableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
   private _text: string = '';
   private _style: TextStyle;
-  private _position: { x: number; y: number } = { x: 0, y: 0 };
   private _boxWidth: number = DEFAULT_BOX_WIDTH;
   private _boxHeight: number = DEFAULT_BOX_HEIGHT;
   private _editing: boolean = false;
@@ -56,14 +51,48 @@ export class TextElement extends DrawableElement {
     this._boxHeight = boxHeight;
   }
 
+  public override getYMapProps(): Record<string, unknown> {
+    return {
+      text: this._text,
+      color: this._style.color,
+      fontSize: this._style.fontSize,
+      fontFamily: this._style.fontFamily,
+      boxWidth: this._boxWidth,
+      boxHeight: this._boxHeight,
+    };
+  }
+
+  public override bindToYMap(yMap: Y.Map<unknown>): void {
+    super.bindToYMap(yMap);
+    bindYFields(yMap, {
+      text: (v) => {
+        this._text = v as string;
+      },
+      color: (v) => {
+        this._style.color = v as string;
+      },
+      fontSize: (v) => {
+        this._style.fontSize = v as number;
+      },
+      fontFamily: (v) => {
+        this._style.fontFamily = v as string;
+      },
+      boxWidth: (v) => {
+        this._boxWidth = v as number;
+      },
+      boxHeight: (v) => {
+        this._boxHeight = v as number;
+        this.recomputeBox();
+      },
+    });
+    this.recomputeBox();
+  }
+
   public get text(): string {
     return this._text;
   }
   public get style(): TextStyle {
     return this._style;
-  }
-  public get position(): { x: number; y: number } {
-    return this._position;
   }
   public get boxWidth(): number {
     return this._boxWidth;
@@ -131,7 +160,7 @@ export class TextElement extends DrawableElement {
     return textarea;
   }
 
-  public override exitEditMode(): UndoCommand | null {
+  public override exitEditMode(): void {
     this._editing = false;
 
     const textarea = this._textarea;
@@ -140,7 +169,7 @@ export class TextElement extends DrawableElement {
     this._canvas = null;
 
     if (!textarea || !canvas) {
-      return null;
+      return;
     }
 
     const newText = textarea.value;
@@ -149,35 +178,28 @@ export class TextElement extends DrawableElement {
     if (!newText.trim()) {
       canvas.removeElement(this);
       canvas.updateBounding();
-      return null;
+      return;
     }
 
     if (newText !== this._oldText) {
       this.setText(newText);
       this.updateBounds();
       canvas.updateBounding();
-      return new EditTextCommand(this, this._oldText, newText);
     }
-
-    return null;
   }
 
   public setText(text: string) {
     this._text = text;
     this.recomputeBox();
-  }
-
-  public setPosition(x: number, y: number) {
-    this._position = { x, y };
-    this.recomputeBox();
+    this.syncToYMap({ text });
   }
 
   public setBoxSize(width: number, height: number) {
     this._boxWidth = width;
     this._boxHeight = height;
     this.recomputeBox();
+    this.syncToYMap({ boxWidth: width, boxHeight: height });
   }
-
 
   protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
     if (!this._text || this._editing) {
@@ -196,11 +218,7 @@ export class TextElement extends DrawableElement {
 
     const lh = this._cachedLineHeight;
     for (let i = 0; i < this._cachedLines.length; i++) {
-      ctx.fillText(
-        this._cachedLines[i].text,
-        this._position.x * sx,
-        this._position.y * sy + i * lh,
-      );
+      ctx.fillText(this._cachedLines[i].text, 0, i * lh);
     }
   }
 
@@ -258,37 +276,6 @@ export class TextElement extends DrawableElement {
       this._cachedLines = [];
     }
 
-    this.box = new DOMRect(
-      this._position.x,
-      this._position.y,
-      this._boxWidth,
-      localHeight,
-    );
-  }
-
-  public load(reader: BinaryReader): void {
-    super.load(reader);
-    this._text = reader.readString();
-    this._style = {
-      color: reader.readString(),
-      fontSize: reader.readF32(),
-      fontFamily: reader.readString(),
-    };
-    this._position = { x: reader.readF32(), y: reader.readF32() };
-    this._boxWidth = reader.readF32();
-    this._boxHeight = reader.readF32();
-    this.recomputeBox();
-  }
-
-  public save(writer: BinaryWriter): void {
-    super.save(writer);
-    writer.writeString(this._text);
-    writer.writeString(this._style.color);
-    writer.writeF32(this._style.fontSize);
-    writer.writeString(this._style.fontFamily);
-    writer.writeF32(this._position.x);
-    writer.writeF32(this._position.y);
-    writer.writeF32(this._boxWidth);
-    writer.writeF32(this._boxHeight);
+    this.box = new DOMRect(0, 0, this._boxWidth, localHeight);
   }
 }
