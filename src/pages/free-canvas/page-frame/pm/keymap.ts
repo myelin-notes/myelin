@@ -4,7 +4,6 @@ import {
   exitCode,
   joinBackward,
   joinForward,
-  lift,
   liftEmptyBlock,
   newlineInCode,
   selectNodeBackward,
@@ -15,11 +14,6 @@ import {
 import { undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
-import {
-  liftListItem,
-  sinkListItem,
-  splitListItem,
-} from 'prosemirror-schema-list';
 import { type Command, Selection } from 'prosemirror-state';
 import { redo, undo } from 'y-prosemirror';
 import {
@@ -55,6 +49,109 @@ const EDITOR_MARK_ACTIONS: Record<string, KeyCombo & { type: MarkType }> = {
 };
 
 registry.defineDefaults(EDITOR_MARK_ACTIONS);
+
+/**
+ * Enter inside a flat list-item textblock: split into a new item of the
+ * same type, or convert an empty item back to a paragraph.
+ */
+const splitFlatListItem: Command = (state, dispatch) => {
+  const { $cursor } = state.selection as {
+    $cursor?: ReturnType<typeof state.doc.resolve>;
+  };
+  if (!$cursor) {
+    return false;
+  }
+  const node = $cursor.parent;
+  if (
+    node.type !== schema.nodes.bulletListItem &&
+    node.type !== schema.nodes.orderedListItem
+  ) {
+    return false;
+  }
+  if (node.content.size === 0) {
+    if (dispatch) {
+      const tr = state.tr.setBlockType(
+        $cursor.before(),
+        $cursor.after(),
+        schema.nodes.paragraph,
+      );
+      dispatch(tr);
+    }
+    return true;
+  }
+  if (dispatch) {
+    const indent = node.attrs.indent as number;
+    const attrs =
+      node.type === schema.nodes.orderedListItem
+        ? { order: (node.attrs.order as number) + 1, indent }
+        : { indent };
+    const tr = state.tr.split($cursor.pos, 1, [{ type: node.type, attrs }]);
+    dispatch(tr);
+  }
+  return true;
+};
+
+const MAX_INDENT = 4;
+
+const indentListItem: Command = (state, dispatch) => {
+  const { $cursor } = state.selection as {
+    $cursor?: ReturnType<typeof state.doc.resolve>;
+  };
+  if (!$cursor) {
+    return false;
+  }
+  const node = $cursor.parent;
+  if (
+    node.type !== schema.nodes.bulletListItem &&
+    node.type !== schema.nodes.orderedListItem
+  ) {
+    return false;
+  }
+  const indent = (node.attrs.indent as number) || 0;
+  if (indent >= MAX_INDENT) {
+    return true;
+  }
+  if (dispatch) {
+    const pos = $cursor.before();
+    dispatch(
+      state.tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        indent: indent + 1,
+      }),
+    );
+  }
+  return true;
+};
+
+const dedentListItem: Command = (state, dispatch) => {
+  const { $cursor } = state.selection as {
+    $cursor?: ReturnType<typeof state.doc.resolve>;
+  };
+  if (!$cursor) {
+    return false;
+  }
+  const node = $cursor.parent;
+  if (
+    node.type !== schema.nodes.bulletListItem &&
+    node.type !== schema.nodes.orderedListItem
+  ) {
+    return false;
+  }
+  const indent = (node.attrs.indent as number) || 0;
+  if (indent <= 0) {
+    return false;
+  }
+  if (dispatch) {
+    const pos = $cursor.before();
+    dispatch(
+      state.tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        indent: indent - 1,
+      }),
+    );
+  }
+  return true;
+};
 
 /**
  * At the start of a non-paragraph textblock (heading, code block),
@@ -100,7 +197,7 @@ export function buildKeymap(s: Schema) {
     Enter: chainCommands(
       exitFencedCodeBlock,
       newlineInCode,
-      splitListItem(s.nodes.listItem),
+      splitFlatListItem,
       liftEmptyBlock,
       splitBlock,
     ),
@@ -108,15 +205,12 @@ export function buildKeymap(s: Schema) {
       deleteSelection,
       undoInputRule,
       clearBlockFormatting,
-      liftListItem(s.nodes.listItem),
-      lift,
       joinBackward,
       selectNodeBackward,
     ),
     Delete: chainCommands(deleteSelection, joinForward, selectNodeForward),
-
-    Tab: sinkListItem(s.nodes.listItem),
-    'Shift-Tab': liftListItem(s.nodes.listItem),
+    Tab: indentListItem,
+    'Shift-Tab': dedentListItem,
     'Shift-Enter': exitCode,
     ArrowLeft: arrowHandler('left', s),
     ArrowRight: arrowHandler('right', s),

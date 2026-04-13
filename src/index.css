@@ -269,6 +269,29 @@ input[type="range"].tool-slider::-moz-range-track {
   margin: 0 0 0.9em;
 }
 
+.pm-editor .ProseMirror .bullet-list-item,
+.pm-editor .ProseMirror .ordered-list-item {
+  padding-left: 1.5em;
+  position: relative;
+}
+
+.pm-editor .ProseMirror .bullet-list-item::before {
+  content: '\2022';
+  position: absolute;
+  left: 0.35em;
+}
+
+.pm-editor .ProseMirror .ordered-list-item::before {
+  content: attr(data-order) '.';
+  position: absolute;
+  left: 0.1em;
+}
+
+.pm-editor .ProseMirror [data-indent="1"] { margin-left: 1.5em; }
+.pm-editor .ProseMirror [data-indent="2"] { margin-left: 3em; }
+.pm-editor .ProseMirror [data-indent="3"] { margin-left: 4.5em; }
+.pm-editor .ProseMirror [data-indent="4"] { margin-left: 6em; }
+
 .pm-editor .ProseMirror h1,
 .pm-editor .ProseMirror h2,
 .pm-editor .ProseMirror h3 {

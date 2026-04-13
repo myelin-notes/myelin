@@ -1,7 +1,4 @@
-import {
-  inputRules,
-  textblockTypeInputRule,
-} from 'prosemirror-inputrules';
+import { inputRules, textblockTypeInputRule } from 'prosemirror-inputrules';
 import type { Schema } from 'prosemirror-model';
 import type { Plugin } from 'prosemirror-state';
 import type { BlockPrefixMatch } from './types';
@@ -25,6 +22,12 @@ export function buildPrefixMarkdownRules(schema: Schema) {
       return { level };
     }),
     textblockTypeInputRule(/^>\s$/, schema.nodes.blockquote),
+    textblockTypeInputRule(/^[-*]\s$/, schema.nodes.bulletListItem),
+    textblockTypeInputRule(
+      /^(\d+)\.\s$/,
+      schema.nodes.orderedListItem,
+      (match) => ({ order: Number(match[1]) }),
+    ),
   ];
 }
 

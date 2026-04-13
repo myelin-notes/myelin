@@ -28,46 +28,82 @@ const heading: NodeSpec = {
   ],
 };
 
-const bulletList: NodeSpec = {
-  content: 'listItem+',
+const bulletListItem: NodeSpec = {
+  content: 'inline*',
   group: 'block',
-  toDOM() {
-    return ['ul', 0];
-  },
-  parseDOM: [{ tag: 'ul' }],
-};
-
-const orderedList: NodeSpec = {
-  content: 'listItem+',
-  group: 'block',
-  attrs: { start: { default: 1 } },
+  defining: true,
+  attrs: { indent: { default: 0 } },
   toDOM(node) {
-    return node.attrs.start === 1
-      ? ['ol', 0]
-      : ['ol', { start: node.attrs.start }, 0];
+    const indent = node.attrs.indent as number;
+    return [
+      'div',
+      {
+        class: 'bullet-list-item',
+        ...(indent > 0 ? { 'data-indent': indent } : {}),
+      },
+      0,
+    ];
   },
   parseDOM: [
     {
-      tag: 'ol',
+      tag: 'div.bullet-list-item',
       getAttrs(dom) {
         const el = dom as HTMLElement;
-        return {
-          start: el.hasAttribute('start')
-            ? Number(el.getAttribute('start'))
-            : 1,
-        };
+        return { indent: Number(el.getAttribute('data-indent')) || 0 };
+      },
+    },
+    {
+      tag: 'li',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        return el.parentElement?.tagName === 'UL' ? { indent: 0 } : false;
       },
     },
   ],
 };
 
-const listItem: NodeSpec = {
-  content: 'block+',
+const orderedListItem: NodeSpec = {
+  content: 'inline*',
+  group: 'block',
   defining: true,
-  toDOM() {
-    return ['li', 0];
+  attrs: { order: { default: 1 }, indent: { default: 0 } },
+  toDOM(node) {
+    const indent = node.attrs.indent as number;
+    return [
+      'div',
+      {
+        class: 'ordered-list-item',
+        'data-order': node.attrs.order,
+        ...(indent > 0 ? { 'data-indent': indent } : {}),
+      },
+      0,
+    ];
   },
-  parseDOM: [{ tag: 'li' }],
+  parseDOM: [
+    {
+      tag: 'div.ordered-list-item',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        return {
+          order: Number(el.getAttribute('data-order')) || 1,
+          indent: Number(el.getAttribute('data-indent')) || 0,
+        };
+      },
+    },
+    {
+      tag: 'li',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        if (el.parentElement?.tagName !== 'OL') {
+          return false;
+        }
+        const parent = el.parentElement;
+        const start = Number(parent.getAttribute('start')) || 1;
+        const index = Array.from(parent.children).indexOf(el);
+        return { order: start + index, indent: 0 };
+      },
+    },
+  ],
 };
 
 const blockquote: NodeSpec = {
@@ -232,9 +268,8 @@ export const schema = new Schema({
     doc,
     paragraph,
     heading,
-    bulletList,
-    orderedList,
-    listItem,
+    bulletListItem,
+    orderedListItem,
     blockquote,
     codeBlock,
     horizontalRule,

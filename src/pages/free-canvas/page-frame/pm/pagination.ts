@@ -13,10 +13,7 @@ const PAGE_PADDING = 48;
 const PAGE_GAP = 40;
 const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 784
 const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
-const CONTAINER_NODE_NAMES = new Set([
-  'bulletList',
-  'orderedList',
-]);
+const CONTAINER_NODE_NAMES = new Set<string>([]);
 
 type BreakKind = 'block' | 'inline';
 
