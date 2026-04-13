@@ -85,23 +85,7 @@ export function useCanvasEngine({
       return;
     }
     const ydoc = drawableCanvasRef.current.ydoc;
-    // Debug: check what's in the Y.Doc before saving
-    const elemCount = ydoc.elements.length;
-    for (let i = 0; i < elemCount; i++) {
-      const m = ydoc.elements.get(i);
-      const idx = m.get('index') as number;
-      const type = m.get('type') as number;
-      if (type === 3) {
-        // PAGE_FRAME
-        const frag = ydoc.doc.getXmlFragment(`pf-${idx}`);
-        console.log(
-          `[save] PageFrame pf-${idx}: fragment children=${frag.length}, toString=${frag.toString().slice(0, 200)}`,
-        );
-      }
-    }
-    console.log(`[save] elements=${elemCount}, encoding...`);
     const data = ydoc.encodeState();
-    console.log(`[save] encoded ${data.length} bytes`);
     await FileSystem.saveToFile(id, data);
     await new Promise<void>((resolve, reject) => {
       canvasRef.current!.toBlob(async (b) => {
@@ -204,21 +188,7 @@ export function useCanvasEngine({
           return;
         }
 
-        console.log(`[load] bytes=${bytes?.length ?? 'null'}`);
         const ydoc = bytes ? YDocManager.fromUpdate(bytes) : new YDocManager();
-        console.log(`[load] elements=${ydoc.elements.length}`);
-        for (let i = 0; i < ydoc.elements.length; i++) {
-          const m = ydoc.elements.get(i);
-          const idx = m.get('index') as number;
-          const type = m.get('type') as number;
-          console.log(`[load] element[${i}]: type=${type} index=${idx}`);
-          if (type === 3) {
-            const frag = ydoc.doc.getXmlFragment(`pf-${idx}`);
-            console.log(
-              `[load] PageFrame pf-${idx}: fragment children=${frag.length}, toString=${frag.toString().slice(0, 200)}`,
-            );
-          }
-        }
 
         const dc = new DrawableCanvas(canvas, ydoc, canvasTools);
         drawableCanvasRef.current = dc;

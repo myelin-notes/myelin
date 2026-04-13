@@ -16,7 +16,6 @@ const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
 const CONTAINER_NODE_NAMES = new Set([
   'bulletList',
   'orderedList',
-  'blockquote',
 ]);
 
 type BreakKind = 'block' | 'inline';

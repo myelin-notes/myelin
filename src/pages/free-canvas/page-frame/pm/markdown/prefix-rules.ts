@@ -1,7 +1,6 @@
 import {
   inputRules,
   textblockTypeInputRule,
-  wrappingInputRule,
 } from 'prosemirror-inputrules';
 import type { Schema } from 'prosemirror-model';
 import type { Plugin } from 'prosemirror-state';
@@ -25,7 +24,7 @@ export function buildPrefixMarkdownRules(schema: Schema) {
       const level = matchType === 'h1' ? 1 : matchType === 'h2' ? 2 : 3;
       return { level };
     }),
-    wrappingInputRule(/^>\s$/, schema.nodes.blockquote),
+    textblockTypeInputRule(/^>\s$/, schema.nodes.blockquote),
   ];
 }
 

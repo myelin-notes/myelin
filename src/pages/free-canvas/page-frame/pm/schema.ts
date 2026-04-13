@@ -71,7 +71,7 @@ const listItem: NodeSpec = {
 };
 
 const blockquote: NodeSpec = {
-  content: 'block+',
+  content: 'inline*',
   group: 'block',
   defining: true,
   toDOM() {
