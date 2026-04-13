@@ -71,6 +71,7 @@ export class StrokeElement extends DrawableElement {
     if (yPoints) {
       this._yPoints = yPoints;
       this.rebuildPointsFromYArray();
+      this.updateBounds();
       yPoints.observe((event) => {
         if (event.transaction.origin === LOCAL_ORIGIN) {
           return;

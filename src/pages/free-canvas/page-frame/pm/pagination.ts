@@ -138,7 +138,8 @@ function paginateParagraph(
   let cumulativeShift = initialCumulativeShift;
   let pageAdvances = 0;
 
-  for (const line of lines) {
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const line = lines[lineIndex];
     const lineEffectiveTop = line.naturalTop + cumulativeShift;
     const lineEffectiveBottom = line.naturalBottom + cumulativeShift;
 
@@ -151,14 +152,19 @@ function paginateParagraph(
     if (lineEffectiveTop > pageStart) {
       const spacer = pageBoundary + PAGE_BREAK_GAP - lineEffectiveTop;
       if (spacer > 0) {
-        const pos = line.getPos();
-        if (pos !== null) {
-          // Allow breaks before the first character of a paragraph. Clamping
-          // to `blockPos + 2` strands the first grapheme on the previous page
-          // when an entire paragraph line needs to move forward.
-          const clamped = Math.max(blockPos + 1, Math.min(pos, blockEnd - 1));
-          breaks.push({ pos: clamped, spacer, kind: 'inline' });
+        if (lineIndex === 0) {
+          // If the paragraph's first visual line doesn't fit, move the whole
+          // paragraph with a block break. An inline widget at char 0 creates
+          // unstable layout inside the paragraph itself.
+          breaks.push({ pos: blockPos, spacer, kind: 'block' });
           cumulativeShift += spacer;
+        } else {
+          const pos = line.getPos();
+          if (pos !== null) {
+            const clamped = Math.max(blockPos + 2, Math.min(pos, blockEnd - 1));
+            breaks.push({ pos: clamped, spacer, kind: 'inline' });
+            cumulativeShift += spacer;
+          }
         }
       }
     }
@@ -388,8 +394,9 @@ function measureLinesWithDom(
 }
 
 /**
- * Measure a paragraph's lines. Tries Pretext first, falls back to DOM.
- * The pagination algorithm in `paginateParagraph` is the same for both.
+ * Measure a paragraph's lines. Prefer DOM rects so pagination follows the
+ * browser's actual wrapped lines. Fall back to Pretext if the DOM path can't
+ * produce line boxes.
  */
 function measureParagraphLines(
   block: BlockInfo,
@@ -399,17 +406,17 @@ function measureParagraphLines(
   blockNaturalTop: number,
   blockShift: number,
 ): ParagraphLine[] {
-  const fromPretext = measureLinesWithPretext(block, view, blockNaturalTop);
-  if (fromPretext) {
-    return fromPretext;
-  }
-  return measureLinesWithDom(
+  const fromDom = measureLinesWithDom(
     block,
     view,
     editorScreenTop,
     invScale,
     blockShift,
   );
+  if (fromDom.length > 0) {
+    return fromDom;
+  }
+  return measureLinesWithPretext(block, view, blockNaturalTop) ?? [];
 }
 
 /**
@@ -511,36 +518,27 @@ function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
   }
   const decos: Decoration[] = [];
   for (const { pos, spacer, kind } of breaks) {
-    if (kind === 'block') {
-      const node = view.state.doc.nodeAt(pos);
-      if (!node) {
-        continue;
-      }
-      decos.push(
-        Decoration.node(pos, pos + node.nodeSize, {
-          style: `margin-top: ${spacer}px`,
-          'data-page-break': 'block',
-        }),
-      );
-    } else {
-      const widgetSpacer = spacer;
-      decos.push(
-        Decoration.widget(
-          pos,
-          () => {
-            const div = document.createElement('div');
-            div.style.display = 'block';
-            div.style.height = `${widgetSpacer}px`;
-            div.style.userSelect = 'none';
-            div.style.pointerEvents = 'none';
-            div.contentEditable = 'false';
-            div.setAttribute('data-page-break', 'inline');
-            return div;
-          },
-          { side: -1, ignoreSelection: true, key: `pb-${pos}-${widgetSpacer}` },
-        ),
-      );
-    }
+    const widgetSpacer = spacer;
+    decos.push(
+      Decoration.widget(
+        pos,
+        () => {
+          const div = document.createElement('div');
+          div.style.display = 'block';
+          div.style.height = `${widgetSpacer}px`;
+          div.style.userSelect = 'none';
+          div.style.pointerEvents = 'none';
+          div.contentEditable = 'false';
+          div.setAttribute('data-page-break', kind);
+          return div;
+        },
+        {
+          side: -1,
+          ignoreSelection: true,
+          key: `pb-${kind}-${pos}-${widgetSpacer}`,
+        },
+      ),
+    );
   }
   return DecorationSet.create(view.state.doc, decos);
 }

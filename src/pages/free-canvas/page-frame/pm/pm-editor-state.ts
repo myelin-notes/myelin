@@ -1,4 +1,4 @@
-import { EditorState } from 'prosemirror-state';
+import { EditorState, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import { PM_UPDATE_EVENT } from './constants';
@@ -44,34 +44,43 @@ export class PageFrameEditorState {
     });
 
     this._editable = false;
+
+    // Use a regular function for dispatchTransaction so ProseMirror binds
+    // the EditorView as `this`. This is critical because ySyncPlugin
+    // dispatches a transaction during the EditorView constructor (to load
+    // XmlFragment content), before `this._view` is assigned.
+    const editable = () => this._editable;
+
     this._view = new EditorView(container, {
       state,
-      editable: (_state) => this._editable,
+      editable: (_state) => editable(),
       nodeViews: buildNodeViews(),
-      dispatchTransaction: (tr) => {
-        if (!this._view) {
-          return;
-        }
+      dispatchTransaction(this: EditorView, tr: Transaction) {
+        // `this` is the EditorView (bound by ProseMirror via .call())
         const hadNestedFocus =
           document.activeElement instanceof HTMLElement &&
-          this._view.dom.contains(document.activeElement);
+          this.dom.contains(document.activeElement);
         const wasInCodeBlock =
-          this._view.state.selection.$from.parent.type ===
-          schema.nodes.codeBlock;
-        const newState = this._view.state.apply(tr);
-        this._view.updateState(newState);
+          this.state.selection.$from.parent.type === schema.nodes.codeBlock;
+        const newState = this.state.apply(tr);
+        this.updateState(newState);
         const isInCodeBlock =
           newState.selection.$from.parent.type === schema.nodes.codeBlock;
-        // When Monaco-backed code blocks unwrap into regular PM paragraphs,
-        // focus can still be sitting inside the soon-to-be-destroyed nested
-        // editor. Re-focus PM so the DOM caret reflects the preserved state
-        // selection instead of falling back to the start of the editor.
         if (hadNestedFocus && wasInCodeBlock && !isInCodeBlock) {
-          this._view.focus();
+          this.focus();
         }
-        this._view.dom.dispatchEvent(new Event(PM_UPDATE_EVENT));
+        this.dom.dispatchEvent(new Event(PM_UPDATE_EVENT));
       },
     });
+
+    // ySyncPlugin may focus the view during init — blur immediately
+    // since the editor starts non-editable.
+    if (
+      document.activeElement instanceof HTMLElement &&
+      this._view.dom.contains(document.activeElement)
+    ) {
+      (document.activeElement as HTMLElement).blur();
+    }
 
     return this._view;
   }
@@ -81,7 +90,6 @@ export class PageFrameEditorState {
    */
   setEditable(editable: boolean): void {
     this._editable = editable;
-    // Force PM to re-evaluate the editable prop
     this._view?.setProps({ editable: (_state) => this._editable });
   }
 

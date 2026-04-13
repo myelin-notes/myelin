@@ -97,10 +97,7 @@ export class YDocManager {
 
   /** Get or create the Y.XmlFragment for a PageFrame's ProseMirror content. */
   getXmlFragment(elementIndex: number): Y.XmlFragment {
-    const frag = this.doc.getXmlFragment(`pf-${elementIndex}`);
-    // Add to undo scope so PM edits are undoable
-    this.undoManager.addToScope(frag);
-    return frag;
+    return this.doc.getXmlFragment(`pf-${elementIndex}`);
   }
 
   /** Wrap a mutation in a transaction with the local origin. */
