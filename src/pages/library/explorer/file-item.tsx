@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { DEBUG } from '@/lib/debug';
 import { repository, type VFSFileNode } from '@/lib/repository';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
@@ -84,7 +85,7 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
           onRemove={handleRemove}
           onManageTags={() => setTagDialogOpen(true)}
           onReveal={
-            import.meta.env.DEV
+            DEBUG
               ? async () => {
                   const path = await repository.getRevealPath(file.id);
                   if (path) {

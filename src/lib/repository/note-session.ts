@@ -1,9 +1,5 @@
 import { YDocManager } from '@/pages/free-canvas/ydoc-manager';
-import type {
-  NoteSession,
-  NoteSessionStatus,
-  YjsSyncTarget,
-} from './types';
+import type { NoteSession, NoteSessionStatus, YjsSyncTarget } from './types';
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) {

@@ -1,5 +1,13 @@
-import { BookOpen, HelpCircle, Plus, Settings, Waypoints } from 'lucide-react';
+import {
+  BookOpen,
+  Bug,
+  HelpCircle,
+  Plus,
+  Settings,
+  Waypoints,
+} from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { DEBUG } from '@/lib/debug';
 import { repository } from '@/lib/repository';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +33,15 @@ const mainNav: NavItem[] = [
 ];
 
 const bottomNav: NavItem[] = [
+  ...(DEBUG
+    ? [
+        {
+          label: 'Debug',
+          icon: <Bug className="size-4" />,
+          navTo: '/debug',
+        },
+      ]
+    : []),
   {
     label: 'Settings',
     icon: <Settings className="size-4" />,

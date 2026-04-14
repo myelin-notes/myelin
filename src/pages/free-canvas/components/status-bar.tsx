@@ -1,11 +1,13 @@
 import { motion } from 'motion/react';
+import { DEBUG } from '@/lib/debug';
 
 interface StatusBarProps {
   zoomLevel: number;
   fps: number;
+  noteId?: string;
 }
 
-export function StatusBar({ zoomLevel, fps }: StatusBarProps) {
+export function StatusBar({ zoomLevel, fps, noteId }: StatusBarProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -20,6 +22,14 @@ export function StatusBar({ zoomLevel, fps }: StatusBarProps) {
       <span className="font-medium text-text-muted text-xs tabular-nums">
         {fps} fps
       </span>
+      {DEBUG && noteId && (
+        <>
+          <span className="mx-2 text-text-muted/30">|</span>
+          <span className="font-mono text-[10px] text-text-muted">
+            {noteId}
+          </span>
+        </>
+      )}
     </motion.div>
   );
 }

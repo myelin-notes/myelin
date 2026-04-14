@@ -58,7 +58,7 @@ export function CanvasView() {
         onChange={engine.handleFileInputChange}
       />
 
-      <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
+      <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} noteId={id} />
       <TitleBar fileName={engine.fileName} onBack={engine.back} />
 
       <CanvasToolbar

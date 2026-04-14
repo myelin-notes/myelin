@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { keybindings, registry } from '@/lib/keybinds';
 import { type NoteSession, repository } from '@/lib/repository';
+import { WebRTCSync } from '@/lib/repository/webrtc-sync';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import {
   DrawableCanvas,
@@ -53,6 +54,7 @@ export function useCanvasEngine({
 }: UseCanvasEngineArgs) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const noteSessionRef = useRef<NoteSession | null>(null);
+  const webrtcRef = useRef<WebRTCSync | null>(null);
   const pendingEmbedPos = useRef<Vector2 | null>(null);
   const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
   onCanvasPointerDownRef.current = onCanvasPointerDown;
@@ -201,6 +203,7 @@ export function useCanvasEngine({
         }
 
         noteSessionRef.current = session;
+        webrtcRef.current = new WebRTCSync(session, `myelin-${id}`);
 
         const dc = new DrawableCanvas(canvas, session.ydoc, canvasTools);
         drawableCanvasRef.current = dc;
@@ -302,6 +305,8 @@ export function useCanvasEngine({
 
     return () => {
       disposed = true;
+      webrtcRef.current?.destroy();
+      webrtcRef.current = null;
       const session = noteSessionRef.current;
       noteSessionRef.current = null;
       void session?.close();
