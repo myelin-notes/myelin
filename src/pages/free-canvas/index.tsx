@@ -2,8 +2,10 @@ import { useRef } from 'react';
 import { X as XIcon } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
+import { DEBUG } from '@/lib/debug';
 import type { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
 import { CanvasToolbar } from './components/canvas-toolbar';
+import { PeerSyncPanel } from './components/peer-sync-panel';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
 import { useCanvasEngine } from './hooks/use-canvas-engine';
@@ -59,6 +61,9 @@ export function CanvasView() {
       />
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} noteId={id} />
+      {DEBUG && (
+        <PeerSyncPanel ydoc={engine.noteSessionRef.current?.ydoc ?? null} />
+      )}
       <TitleBar fileName={engine.fileName} onBack={engine.back} />
 
       <CanvasToolbar
