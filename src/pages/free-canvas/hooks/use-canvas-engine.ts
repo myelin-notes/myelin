@@ -11,6 +11,7 @@ import {
 import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-element';
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
+import type { YDocManager } from '@/pages/free-canvas/ydoc-manager';
 
 declare module '@/lib/keybinds' {
   interface ActionMap {
@@ -61,6 +62,7 @@ export function useCanvasEngine({
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
   const [fileName, setFileName] = useState('');
+  const [ydoc, setYdoc] = useState<YDocManager | null>(null);
   const [editingElement, setEditingElement] = useState<DrawableElement | null>(
     null,
   );
@@ -201,6 +203,7 @@ export function useCanvasEngine({
         }
 
         noteSessionRef.current = session;
+        setYdoc(session.ydoc);
 
         const dc = new DrawableCanvas(canvas, session.ydoc, canvasTools);
         drawableCanvasRef.current = dc;
@@ -222,8 +225,11 @@ export function useCanvasEngine({
           setEditingElement(element);
         });
 
-        // If no elements, create default PageFrame
-        if (dc.elements.length === 0) {
+        // Only create default PageFrame for notes that exist locally.
+        // Peer-joined sessions (note doesn't exist locally) will receive
+        // elements from the remote peer.
+        const nodeExists = await repository.getNode(id);
+        if (dc.elements.length === 0 && nodeExists) {
           const dpr = window.devicePixelRatio || 1;
           const centerWorld = dc.viewport.screenToWorld({
             x: canvas.width / dpr / 2,
@@ -331,8 +337,8 @@ export function useCanvasEngine({
 
   return {
     fileInputRef,
-    noteSessionRef,
     drawableCanvasRef,
+    ydoc,
     zoomLevel,
     fps,
     fileName,
