@@ -1,5 +1,7 @@
 use std::fs;
 
+mod peer;
+
 #[tauri::command]
 fn create_dir_all(path: &str) -> Result<(), String> {
     fs::create_dir_all(path).map_err(|e| format!("{}", e))?;
@@ -13,7 +15,15 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_ocr::init())
-        .invoke_handler(tauri::generate_handler![create_dir_all]);
+        .manage(peer::PeerState::new())
+        .invoke_handler(tauri::generate_handler![
+            create_dir_all,
+            peer::peer_host,
+            peer::peer_join,
+            peer::peer_send,
+            peer::peer_disconnect,
+            peer::get_local_ip,
+        ]);
 
     #[cfg(debug_assertions)]
     {

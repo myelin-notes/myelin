@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Radio, X } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 import { PeerSync } from '@/lib/repository/peer-sync';
 import type { YDocManager } from '../ydoc-manager';
 
-type Phase = 'idle' | 'waiting-for-answer' | 'waiting-for-offer' | 'connected';
+type Phase = 'idle' | 'hosting' | 'joining' | 'connected';
 
 interface PeerSyncPanelProps {
   ydoc: YDocManager | null;
@@ -11,50 +12,70 @@ interface PeerSyncPanelProps {
 
 export function PeerSyncPanel({ ydoc }: PeerSyncPanelProps) {
   const [phase, setPhase] = useState<Phase>('idle');
-  const [signal, setSignal] = useState('');
-  const [remoteSignal, setRemoteSignal] = useState('');
+  const [joinAddr, setJoinAddr] = useState('');
+  const [localIp, setLocalIp] = useState('');
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
   const peerRef = useRef<PeerSync | null>(null);
 
-  const cleanup = useCallback(() => {
-    peerRef.current?.destroy();
+  useEffect(() => {
+    invoke<string>('get_local_ip')
+      .then(setLocalIp)
+      .catch(() => setLocalIp('unknown'));
+  }, []);
+
+  const cleanup = useCallback(async () => {
+    await peerRef.current?.destroy();
     peerRef.current = null;
     setPhase('idle');
-    setSignal('');
-    setRemoteSignal('');
+    setJoinAddr('');
+    setError('');
     setCopied(false);
   }, []);
 
-  const initPeer = useCallback(
-    (initiator: boolean) => {
-      if (!ydoc) return;
-      cleanup();
-      setPhase(initiator ? 'waiting-for-answer' : 'waiting-for-offer');
-      const peer = new PeerSync(ydoc, initiator);
-      peerRef.current = peer;
-      peer.onSignal = (s) => setSignal(s);
-      peer.onConnect = () => setPhase('connected');
-      peer.onClose = cleanup;
-    },
-    [ydoc, cleanup],
-  );
-
-  const host = useCallback(() => initPeer(true), [initPeer]);
-  const join = useCallback(() => initPeer(false), [initPeer]);
-
-  const submitRemoteSignal = useCallback(() => {
-    if (!peerRef.current || !remoteSignal.trim()) {
+  const host = useCallback(async () => {
+    if (!ydoc) {
       return;
     }
-    peerRef.current.acceptSignal(remoteSignal.trim());
-    setRemoteSignal('');
-  }, [remoteSignal]);
+    await cleanup();
+    setError('');
+    const peer = new PeerSync(ydoc);
+    peerRef.current = peer;
+    peer.onConnect = () => setPhase('connected');
+    peer.onClose = () => cleanup();
+    try {
+      await peer.host(9090);
+      setPhase('hosting');
+    } catch (err) {
+      setError(String(err));
+    }
+  }, [ydoc, cleanup]);
 
-  const copySignal = useCallback(() => {
-    navigator.clipboard.writeText(signal);
+  const join = useCallback(async () => {
+    if (!ydoc || !joinAddr.trim()) {
+      return;
+    }
+    await cleanup();
+    setError('');
+    const peer = new PeerSync(ydoc);
+    peerRef.current = peer;
+    peer.onConnect = () => setPhase('connected');
+    peer.onClose = () => cleanup();
+    try {
+      setPhase('joining');
+      await peer.join(joinAddr.trim());
+    } catch (err) {
+      setError(String(err));
+      setPhase('idle');
+    }
+  }, [ydoc, joinAddr, cleanup]);
+
+  const copyAddr = useCallback(() => {
+    const addr = `${localIp}:9090`;
+    navigator.clipboard.writeText(addr);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [signal]);
+  }, [localIp]);
 
   if (!ydoc) {
     return null;
@@ -80,124 +101,75 @@ export function PeerSyncPanel({ ydoc }: PeerSyncPanelProps) {
         )}
       </div>
 
-      {phase === 'idle' && (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={host}
-            className="flex-1 rounded-lg bg-primary px-3 py-1.5 font-medium text-white text-xs hover:bg-primary/90"
-          >
-            Host
-          </button>
-          <button
-            type="button"
-            onClick={join}
-            className="flex-1 rounded-lg bg-surface px-3 py-1.5 font-medium text-text-secondary text-xs hover:bg-hover-tint"
-          >
-            Join
-          </button>
+      {error && (
+        <div className="rounded-md bg-red-50 px-2 py-1 text-[10px] text-red-600">
+          {error}
         </div>
       )}
 
-      {phase === 'waiting-for-answer' &&
-        (signal ? (
-          <>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-text-muted">
-                Send this to peer:
-              </span>
-              <button
-                type="button"
-                onClick={copySignal}
-                className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80"
-              >
-                {copied ? (
-                  <Check className="size-3" />
-                ) : (
-                  <Copy className="size-3" />
-                )}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-            <textarea
-              readOnly
-              value={signal}
-              className="h-16 resize-none rounded-md bg-surface p-2 font-mono text-[9px] text-text-secondary"
-            />
-            <span className="text-[10px] text-text-muted">
-              Paste answer from peer:
-            </span>
-            <textarea
-              value={remoteSignal}
-              onChange={(e) => setRemoteSignal(e.target.value)}
-              placeholder="Paste answer here..."
-              className="h-16 resize-none rounded-md bg-surface p-2 font-mono text-[9px] text-text-secondary placeholder:text-text-muted"
+      {phase === 'idle' && (
+        <>
+          <button
+            type="button"
+            onClick={host}
+            className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white text-xs hover:bg-primary/90"
+          >
+            Host ({localIp || '...'})
+          </button>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={joinAddr}
+              onChange={(e) => setJoinAddr(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && join()}
+              placeholder="IP:port (e.g. 192.168.1.5:9090)"
+              className="min-w-0 flex-1 rounded-lg bg-surface px-2 py-1.5 font-mono text-[10px] text-text-secondary outline-none placeholder:text-text-muted"
             />
             <button
               type="button"
-              onClick={submitRemoteSignal}
-              disabled={!remoteSignal.trim()}
-              className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white text-xs hover:bg-primary/90 disabled:opacity-40"
+              onClick={join}
+              disabled={!joinAddr.trim()}
+              className="rounded-lg bg-surface px-3 py-1.5 font-medium text-text-secondary text-xs hover:bg-hover-tint disabled:opacity-40"
             >
-              Connect
+              Join
             </button>
-          </>
-        ) : (
-          <span className="text-center text-[10px] text-text-muted">
-            Generating offer...
-          </span>
-        ))}
+          </div>
+        </>
+      )}
 
-      {phase === 'waiting-for-offer' &&
-        (!signal ? (
-          <>
+      {phase === 'hosting' && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
             <span className="text-[10px] text-text-muted">
-              Paste offer from host:
+              Waiting for peer...
             </span>
-            <textarea
-              value={remoteSignal}
-              onChange={(e) => setRemoteSignal(e.target.value)}
-              placeholder="Paste offer here..."
-              className="h-16 resize-none rounded-md bg-surface p-2 font-mono text-[9px] text-text-secondary placeholder:text-text-muted"
-            />
             <button
               type="button"
-              onClick={submitRemoteSignal}
-              disabled={!remoteSignal.trim()}
-              className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white text-xs hover:bg-primary/90 disabled:opacity-40"
+              onClick={copyAddr}
+              className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80"
             >
-              Generate Answer
+              {copied ? (
+                <Check className="size-3" />
+              ) : (
+                <Copy className="size-3" />
+              )}
+              {copied ? 'Copied' : 'Copy'}
             </button>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-text-muted">
-                Send this back to host:
-              </span>
-              <button
-                type="button"
-                onClick={copySignal}
-                className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80"
-              >
-                {copied ? (
-                  <Check className="size-3" />
-                ) : (
-                  <Copy className="size-3" />
-                )}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-            <textarea
-              readOnly
-              value={signal}
-              className="h-16 resize-none rounded-md bg-surface p-2 font-mono text-[9px] text-text-secondary"
-            />
-            <span className="text-center text-[10px] text-text-muted">
-              Waiting for connection...
-            </span>
-          </>
-        ))}
+          </div>
+          <div className="rounded-md bg-surface px-2 py-1.5 text-center font-mono text-text-primary text-xs">
+            {localIp}:9090
+          </div>
+          <span className="text-center text-[10px] text-text-muted">
+            Share this address with peer
+          </span>
+        </div>
+      )}
+
+      {phase === 'joining' && (
+        <span className="text-center text-[10px] text-text-muted">
+          Connecting...
+        </span>
+      )}
 
       {phase === 'connected' && (
         <div className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5">

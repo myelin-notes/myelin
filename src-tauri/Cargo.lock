@@ -2178,6 +2178,7 @@ dependencies = [
  "tauri-plugin-mcp-bridge",
  "tauri-plugin-ocr",
  "tauri-plugin-opener",
+ "tokio",
 ]
 
 [[package]]
