@@ -2,64 +2,93 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpListener, TcpStream,
+    },
     sync::Mutex,
 };
 
-struct PeerConnection {
-    stream: TcpStream,
-}
-
 pub struct PeerState {
-    connection: Arc<Mutex<Option<PeerConnection>>>,
+    writer: Arc<Mutex<Option<OwnedWriteHalf>>>,
+    /// Signals the read loop to stop when the connection is replaced.
+    cancel: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
 }
 
 impl PeerState {
     pub fn new() -> Self {
         Self {
-            connection: Arc::new(Mutex::new(None)),
+            writer: Arc::new(Mutex::new(None)),
+            cancel: Arc::new(Mutex::new(None)),
         }
     }
 }
 
-/// Length-prefix framing: [4 bytes big-endian length][payload]
-async fn write_frame(stream: &mut TcpStream, data: &[u8]) -> std::io::Result<()> {
+async fn write_frame(writer: &mut OwnedWriteHalf, data: &[u8]) -> std::io::Result<()> {
     let len = (data.len() as u32).to_be_bytes();
-    stream.write_all(&len).await?;
-    stream.write_all(data).await?;
-    stream.flush().await
+    writer.write_all(&len).await?;
+    writer.write_all(data).await?;
+    writer.flush().await
 }
 
-async fn read_frame(stream: &mut TcpStream) -> std::io::Result<Vec<u8>> {
+async fn read_frame(reader: &mut OwnedReadHalf) -> std::io::Result<Vec<u8>> {
     let mut len_buf = [0u8; 4];
-    stream.read_exact(&mut len_buf).await?;
+    reader.read_exact(&mut len_buf).await?;
     let len = u32::from_be_bytes(len_buf) as usize;
     let mut buf = vec![0u8; len];
-    stream.read_exact(&mut buf).await?;
+    reader.read_exact(&mut buf).await?;
     Ok(buf)
 }
 
-fn spawn_read_loop(app: AppHandle, stream_half: Arc<Mutex<Option<PeerConnection>>>) {
-    let conn = stream_half.clone();
+fn setup_connection(
+    app: &AppHandle,
+    state: &PeerState,
+    stream: TcpStream,
+) -> tokio::sync::oneshot::Sender<()> {
+    let (reader, writer) = stream.into_split();
+
+    // Store writer for peer_send
+    {
+        let w = state.writer.clone();
+        tauri::async_runtime::spawn(async move {
+            *w.lock().await = Some(writer);
+        });
+    }
+
+    // Spawn read loop
+    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
+        let mut reader = reader;
+        let mut cancel_rx = cancel_rx;
         loop {
-            let data = {
-                let mut guard = conn.lock().await;
-                let Some(peer) = guard.as_mut() else {
-                    break;
-                };
-                match read_frame(&mut peer.stream).await {
-                    Ok(data) => data,
-                    Err(_) => {
-                        *guard = None;
-                        let _ = app.emit("peer-disconnected", ());
-                        break;
+            tokio::select! {
+                result = read_frame(&mut reader) => {
+                    match result {
+                        Ok(data) => {
+                            let _ = app_clone.emit("peer-update", data);
+                        }
+                        Err(_) => {
+                            let _ = app_clone.emit("peer-disconnected", ());
+                            break;
+                        }
                     }
                 }
-            };
-            let _ = app.emit("peer-update", data);
+                _ = &mut cancel_rx => {
+                    break;
+                }
+            }
         }
     });
+
+    cancel_tx
+}
+
+async fn close_existing(state: &PeerState) {
+    *state.writer.lock().await = None;
+    if let Some(cancel) = state.cancel.lock().await.take() {
+        let _ = cancel.send(());
+    }
 }
 
 #[tauri::command]
@@ -68,33 +97,55 @@ pub async fn peer_host(
     state: tauri::State<'_, PeerState>,
     port: u16,
 ) -> Result<String, String> {
-    // Close existing connection
-    {
-        let mut guard = state.connection.lock().await;
-        *guard = None;
-    }
+    close_existing(&state).await;
 
     let listener = TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
         .map_err(|e| format!("Failed to bind: {}", e))?;
 
-    let local_addr = listener
-        .local_addr()
-        .map_err(|e| format!("Failed to get local address: {}", e))?;
+    let addr_str = format!(
+        "{}",
+        listener
+            .local_addr()
+            .map_err(|e| format!("Failed to get local address: {}", e))?
+    );
 
-    // Get local IP for display
-    let addr_str = format!("{}", local_addr);
-
-    let conn = state.connection.clone();
+    let writer = state.writer.clone();
+    let cancel_store = state.cancel.clone();
     let app_clone = app.clone();
+
     tauri::async_runtime::spawn(async move {
         if let Ok((stream, peer_addr)) = listener.accept().await {
-            {
-                let mut guard = conn.lock().await;
-                *guard = Some(PeerConnection { stream });
-            }
+            let (reader, w) = stream.into_split();
+            *writer.lock().await = Some(w);
+
+            let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+            *cancel_store.lock().await = Some(cancel_tx);
+
             let _ = app_clone.emit("peer-connected", format!("{}", peer_addr));
-            spawn_read_loop(app_clone, conn);
+
+            // Read loop
+            let mut reader = reader;
+            let mut cancel_rx = cancel_rx;
+            loop {
+                tokio::select! {
+                    result = read_frame(&mut reader) => {
+                        match result {
+                            Ok(data) => {
+                                let _ = app_clone.emit("peer-update", data);
+                            }
+                            Err(_) => {
+                                *writer.lock().await = None;
+                                let _ = app_clone.emit("peer-disconnected", ());
+                                break;
+                            }
+                        }
+                    }
+                    _ = &mut cancel_rx => {
+                        break;
+                    }
+                }
+            }
         }
     });
 
@@ -107,24 +158,16 @@ pub async fn peer_join(
     state: tauri::State<'_, PeerState>,
     addr: String,
 ) -> Result<(), String> {
-    // Close existing connection
-    {
-        let mut guard = state.connection.lock().await;
-        *guard = None;
-    }
+    close_existing(&state).await;
 
     let stream = TcpStream::connect(&addr)
         .await
         .map_err(|e| format!("Failed to connect to {}: {}", addr, e))?;
 
-    {
-        let mut guard = state.connection.lock().await;
-        *guard = Some(PeerConnection { stream });
-    }
+    let cancel_tx = setup_connection(&app, &state, stream);
+    *state.cancel.lock().await = Some(cancel_tx);
 
     let _ = app.emit("peer-connected", addr);
-    spawn_read_loop(app, state.connection.clone());
-
     Ok(())
 }
 
@@ -133,11 +176,11 @@ pub async fn peer_send(
     state: tauri::State<'_, PeerState>,
     data: Vec<u8>,
 ) -> Result<(), String> {
-    let mut guard = state.connection.lock().await;
-    let peer = guard
+    let mut guard = state.writer.lock().await;
+    let writer = guard
         .as_mut()
         .ok_or_else(|| "No peer connected".to_string())?;
-    write_frame(&mut peer.stream, &data)
+    write_frame(writer, &data)
         .await
         .map_err(|e| format!("Send failed: {}", e))
 }
@@ -147,22 +190,15 @@ pub async fn peer_disconnect(
     app: AppHandle,
     state: tauri::State<'_, PeerState>,
 ) -> Result<(), String> {
-    let mut guard = state.connection.lock().await;
-    *guard = None;
+    close_existing(&state).await;
     let _ = app.emit("peer-disconnected", ());
     Ok(())
 }
 
 #[tauri::command]
 pub fn get_local_ip() -> Result<String, String> {
-    // Find local network IP
-    let socket = std::net::UdpSocket::bind("0.0.0.0:0")
-        .map_err(|e| format!("{}", e))?;
-    socket
-        .connect("8.8.8.8:80")
-        .map_err(|e| format!("{}", e))?;
-    let addr = socket
-        .local_addr()
-        .map_err(|e| format!("{}", e))?;
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0").map_err(|e| format!("{}", e))?;
+    socket.connect("8.8.8.8:80").map_err(|e| format!("{}", e))?;
+    let addr = socket.local_addr().map_err(|e| format!("{}", e))?;
     Ok(format!("{}", addr.ip()))
 }
