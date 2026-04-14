@@ -31,6 +31,115 @@ registry.defineDefaults({
   'canvas:tool-text': { key: 't' },
 });
 
+function setupCanvasListeners(
+  canvas: HTMLCanvasElement,
+  wheelRef: React.RefObject<WheelPickerHandle | null>,
+  onCanvasPointerDownRef: React.RefObject<() => void>,
+  embedFiles: (
+    files: FileList | File[],
+    screenX?: number,
+    screenY?: number,
+  ) => void,
+) {
+  const handleContextMenu = (evt: MouseEvent) => {
+    if (evt.shiftKey) {
+      return;
+    }
+    evt.preventDefault();
+  };
+  canvas.addEventListener('contextmenu', handleContextMenu);
+
+  const handlePointerDown = (evt: PointerEvent) => {
+    onCanvasPointerDownRef.current();
+    if (evt.shiftKey) {
+      return;
+    }
+    if (evt.pointerType === 'mouse') {
+      if (evt.button === 2) {
+        wheelRef.current?.show(evt);
+      } else {
+        wheelRef.current?.hide();
+      }
+    }
+  };
+  canvas.addEventListener('pointerdown', handlePointerDown);
+
+  const handleDragOver = (evt: DragEvent) => evt.preventDefault();
+  canvas.addEventListener('dragover', handleDragOver);
+
+  const handleDrop = (evt: DragEvent) => {
+    evt.preventDefault();
+    if (evt.dataTransfer?.files?.length) {
+      embedFiles(Array.from(evt.dataTransfer.files), evt.pageX, evt.pageY);
+    }
+  };
+  canvas.addEventListener('drop', handleDrop);
+
+  const handlePaste = (evt: ClipboardEvent) => {
+    const items = evt.clipboardData?.items;
+    if (!items) {
+      return;
+    }
+    const blobs: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const file = items[i].getAsFile();
+        if (file) {
+          blobs.push(file);
+        }
+      }
+    }
+    if (blobs.length > 0) {
+      evt.preventDefault();
+      embedFiles(blobs);
+    }
+  };
+  document.addEventListener('paste', handlePaste);
+
+  return () => {
+    canvas.removeEventListener('contextmenu', handleContextMenu);
+    canvas.removeEventListener('pointerdown', handlePointerDown);
+    canvas.removeEventListener('dragover', handleDragOver);
+    canvas.removeEventListener('drop', handleDrop);
+    document.removeEventListener('paste', handlePaste);
+  };
+}
+
+function startAnimationLoop(
+  dc: DrawableCanvas,
+  setFps: (fps: number) => void,
+  isDisposed: () => boolean,
+) {
+  let prevTime = 0;
+  let fpsAccum = 0;
+  let fpsFrames = 0;
+  let frameId = 0;
+
+  function animate(time: number) {
+    if (isDisposed()) {
+      return;
+    }
+    const dt = (time - prevTime) / 1000;
+    prevTime = time;
+    dc.redraw(dt);
+
+    if (dt > 0) {
+      fpsAccum += dt;
+      fpsFrames++;
+      if (fpsAccum >= 0.5) {
+        setFps(Math.round(fpsFrames / fpsAccum));
+        fpsAccum = 0;
+        fpsFrames = 0;
+      }
+    }
+
+    frameId = requestAnimationFrame(animate);
+  }
+
+  frameId = requestAnimationFrame(animate);
+  return () => cancelAnimationFrame(frameId);
+}
+
 interface UseCanvasEngineArgs {
   id: string | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -126,7 +235,7 @@ export function useCanvasEngine({
       .catch(console.error);
   }, [id]);
 
-  // Initialize canvas, event listeners, animation loop, and keybindings
+  // Initialize canvas, event listeners, and animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!(canvas && id)) {
@@ -138,62 +247,15 @@ export function useCanvasEngine({
     noteSessionRef.current = null;
     void priorSession?.close();
 
-    const handleContextMenu = (evt: MouseEvent) => {
-      if (evt.shiftKey) {
-        return;
-      }
-      evt.preventDefault();
-    };
-    canvas.addEventListener('contextmenu', handleContextMenu);
+    const removeListeners = setupCanvasListeners(
+      canvas,
+      wheelRef,
+      onCanvasPointerDownRef,
+      embedFiles,
+    );
 
-    const handleCanvasPointerDown = (evt: PointerEvent) => {
-      onCanvasPointerDownRef.current();
-      if (evt.shiftKey) {
-        return;
-      }
-      if (evt.pointerType === 'mouse') {
-        if (evt.button === 2) {
-          wheelRef.current?.show(evt);
-        } else {
-          wheelRef.current?.hide();
-        }
-      }
-    };
-    canvas.addEventListener('pointerdown', handleCanvasPointerDown);
+    let stopAnimation = () => {};
 
-    const handleDragOver = (evt: DragEvent) => evt.preventDefault();
-    canvas.addEventListener('dragover', handleDragOver);
-
-    const handleDrop = (evt: DragEvent) => {
-      evt.preventDefault();
-      if (evt.dataTransfer?.files?.length) {
-        embedFiles(Array.from(evt.dataTransfer.files), evt.pageX, evt.pageY);
-      }
-    };
-    canvas.addEventListener('drop', handleDrop);
-
-    const handlePaste = (evt: ClipboardEvent) => {
-      const items = evt.clipboardData?.items;
-      if (!items) {
-        return;
-      }
-      const blobs: File[] = [];
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.startsWith('image/')) {
-          const file = items[i].getAsFile();
-          if (file) {
-            blobs.push(file);
-          }
-        }
-      }
-      if (blobs.length > 0) {
-        evt.preventDefault();
-        embedFiles(blobs);
-      }
-    };
-    document.addEventListener('paste', handlePaste);
-
-    // Load or create Y.Doc, then build canvas
     repository
       .openSession(id)
       .then(async (session) => {
@@ -244,42 +306,25 @@ export function useCanvasEngine({
           dc.updateBounding();
         }
 
-        // Initial save to persist the Y.Doc state
         session.push().catch(console.error);
-
-        // Start animation loop
-        let prevTime = 0;
-        let fpsAccum = 0;
-        let fpsFrames = 0;
-
-        function animate(time: number) {
-          if (disposed) {
-            return;
-          }
-          const dt = (time - prevTime) / 1000;
-          prevTime = time;
-          dc.redraw(dt);
-
-          if (dt > 0) {
-            fpsAccum += dt;
-            fpsFrames++;
-            if (fpsAccum >= 0.5) {
-              setFps(Math.round(fpsFrames / fpsAccum));
-              fpsAccum = 0;
-              fpsFrames = 0;
-            }
-          }
-
-          animationFrameId = requestAnimationFrame(animate);
-        }
-
-        animationFrameId = requestAnimationFrame(animate);
+        stopAnimation = startAnimationLoop(dc, setFps, () => disposed);
       })
       .catch(console.error);
 
-    let animationFrameId = 0;
+    return () => {
+      disposed = true;
+      const session = noteSessionRef.current;
+      noteSessionRef.current = null;
+      void session?.close();
+      stopAnimation();
+      removeListeners();
+      drawableCanvasRef.current?.destroy();
+    };
+  }, [id]);
 
-    const unbindKeys = keybindings.register([
+  // Keybindings
+  useEffect(() => {
+    return keybindings.register([
       {
         action: 'canvas:pan',
         onDown: () => drawableCanvasRef.current?.setSpaceDown(true),
@@ -305,22 +350,7 @@ export function useCanvasEngine({
         },
       },
     ]);
-
-    return () => {
-      disposed = true;
-      const session = noteSessionRef.current;
-      noteSessionRef.current = null;
-      void session?.close();
-      cancelAnimationFrame(animationFrameId);
-      unbindKeys();
-      canvas.removeEventListener('contextmenu', handleContextMenu);
-      canvas.removeEventListener('pointerdown', handleCanvasPointerDown);
-      canvas.removeEventListener('dragover', handleDragOver);
-      canvas.removeEventListener('drop', handleDrop);
-      document.removeEventListener('paste', handlePaste);
-      drawableCanvasRef.current?.destroy();
-    };
-  }, [id]);
+  }, []);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files;
