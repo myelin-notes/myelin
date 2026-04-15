@@ -24,6 +24,11 @@ const PREFS = {
     'tool-options',
     {},
   ),
+  canvasBackground: pref<'grid' | 'dots' | 'blank'>(
+    'canvas-background',
+    'dots',
+  ),
+  language: pref<string>('language', 'en'),
 };
 
 /* ── Derived types ───────────────────────────────────────── */

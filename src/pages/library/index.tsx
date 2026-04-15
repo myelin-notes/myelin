@@ -170,6 +170,11 @@ export function LibraryPage() {
       <Sidebar />
 
       <main className="ml-64 flex-1 overflow-y-auto px-12 pt-12 pb-12">
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.15 }}
+        >
         <h1 className="font-extralight font-heading text-5xl text-text-primary leading-[48px]">
           Digital Library
         </h1>
@@ -220,7 +225,7 @@ export function LibraryPage() {
         {/* Explorer + Tags */}
         <section className="mt-12 grid grid-cols-12 gap-12">
           <div className="col-span-8 flex flex-col gap-8">
-            <div className="flex items-center gap-3 rounded-xl bg-surface px-4 py-1.5 transition-shadow duration-200 focus-within:shadow-ambient hover:bg-hover-tint">
+            <div className="flex items-center gap-3 rounded-xl bg-input px-4 py-1.5 transition-shadow duration-200 focus-within:shadow-ambient hover:bg-hover-tint">
               <Search className="size-3.5 shrink-0 text-text-muted" />
               <input
                 type="text"
@@ -331,6 +336,7 @@ export function LibraryPage() {
             />
           </div>
         </section>
+        </motion.div>
       </main>
     </div>
   );
