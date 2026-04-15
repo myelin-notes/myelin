@@ -12,10 +12,9 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
-import { NoteSessionImpl } from '../note-session';
+import { NoteSession } from '../note-session';
 import type {
   FileType,
-  NoteSession,
   Repository,
   RepositoryCapabilities,
   RepositoryStats,
@@ -381,7 +380,7 @@ export class LocalRepository implements Repository, YjsSyncTarget {
   }
 
   async openSession(nodeId: string): Promise<NoteSession> {
-    return NoteSessionImpl.open(nodeId, this);
+    return NoteSession.open(nodeId, this);
   }
 
   async getRevealPath(nodeId: string): Promise<string | null> {

@@ -1,4 +1,4 @@
-import type { YDocManager } from '@/pages/free-canvas/ydoc-manager';
+import type { NoteSession } from './note-session';
 
 export const FileTypes = ['mcanvas'] as const;
 export type FileType = (typeof FileTypes)[number];
@@ -110,14 +110,4 @@ export interface NoteSessionStatus {
   remoteRevision: string | null;
 }
 
-export interface NoteSession {
-  readonly id: string;
-  readonly ydoc: YDocManager;
-  readonly status: NoteSessionStatus;
-  encodeStateVector(): Uint8Array;
-  encodeUpdate(stateVector?: Uint8Array | null): Uint8Array;
-  applyUpdate(update: Uint8Array): void;
-  pull(): Promise<Uint8Array | null>;
-  push(): Promise<void>;
-  close(): Promise<void>;
-}
+export type { NoteSession };

@@ -1,5 +1,5 @@
 import { YDocManager } from '@/pages/free-canvas/ydoc-manager';
-import type { NoteSession, NoteSessionStatus, YjsSyncTarget } from './types';
+import type { NoteSessionStatus, YjsSyncTarget } from './types';
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) {
@@ -13,7 +13,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-export class NoteSessionImpl implements NoteSession {
+export class NoteSession {
   public readonly status: NoteSessionStatus = {
     phase: 'idle',
     lastError: null,
@@ -37,12 +37,12 @@ export class NoteSessionImpl implements NoteSession {
   static async open(
     nodeId: string,
     syncTarget: YjsSyncTarget,
-  ): Promise<NoteSessionImpl> {
+  ): Promise<NoteSession> {
     const initial = await syncTarget.loadDocument(nodeId);
     const ydoc = initial.update
       ? YDocManager.fromUpdate(initial.update)
       : new YDocManager();
-    return new NoteSessionImpl(
+    return new NoteSession(
       nodeId,
       ydoc,
       syncTarget,

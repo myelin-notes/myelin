@@ -2,9 +2,9 @@ import { LocalRepository } from './local/repository';
 
 export const repository = new LocalRepository();
 
+export type { NoteSession } from './note-session';
 export type {
   FileType,
-  NoteSession,
   NoteSessionStatus,
   Repository,
   RepositoryCapabilities,
