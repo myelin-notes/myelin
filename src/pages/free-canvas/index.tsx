@@ -36,7 +36,7 @@ export function CanvasView() {
       <canvas
         ref={bgCanvasRef}
         className="absolute inset-0 block h-full w-full"
-        style={{ zIndex: -1 }}
+        style={{ zIndex: 0 }}
       />
 
       {/* DOM layer: page chrome + PM editor text */}

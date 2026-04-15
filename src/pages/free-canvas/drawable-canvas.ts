@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasViewport } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
@@ -26,7 +27,8 @@ export class DrawableCanvas {
   private bgCanvas: HTMLCanvasElement | null = null;
   private readonly state: StateMachine<InteractState>;
   public readonly tools: ITool[];
-  private dotPattern: CanvasPattern | null = null;
+  private bgPattern: CanvasPattern | null = null;
+  private unsubBgPref: (() => void) | null = null;
 
   private spaceDown: boolean = false;
   private screenPosition: Vector2 = { x: 0, y: 0 };
@@ -73,7 +75,10 @@ export class DrawableCanvas {
     this.initEventListeners(canvas);
     this.initStates();
     this.resizeCanvas(window.innerWidth, window.innerHeight);
-    this.buildDotPattern();
+    this.buildBgPattern(UserPrefs.get('canvasBackground'));
+    this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
+      this.buildBgPattern(bg);
+    });
 
     // Hydrate existing elements from Y.Doc (for loaded documents)
     this.hydrateFromYDoc();
@@ -299,6 +304,7 @@ export class DrawableCanvas {
     if (this._editingElement) {
       this.exitElementEdit();
     }
+    this.unsubBgPref?.();
     this.viewport.destroy();
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
@@ -321,11 +327,11 @@ export class DrawableCanvas {
       this.bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       this.bgCtx.clearRect(0, 0, bgW, bgH);
 
-      if (this.dotPattern) {
+      if (this.bgPattern) {
         this.bgCtx.save();
         this.bgCtx.scale(zoom, zoom);
         this.bgCtx.translate(offset.x, offset.y);
-        this.bgCtx.fillStyle = this.dotPattern;
+        this.bgCtx.fillStyle = this.bgPattern;
         this.bgCtx.fillRect(
           -offset.x - bgW / zoom,
           -offset.y - bgH / zoom,
@@ -586,16 +592,35 @@ export class DrawableCanvas {
     });
   }
 
-  private buildDotPattern() {
+  private buildBgPattern(style: 'grid' | 'dots' | 'blank') {
+    if (style === 'blank') {
+      this.bgPattern = null;
+      return;
+    }
+
     const spacing = 24;
-    const dotRadius = 0.75;
     const tile = new OffscreenCanvas(spacing, spacing);
     const pctx = tile.getContext('2d')!;
-    pctx.fillStyle = 'rgba(195, 199, 202, 0.35)';
-    pctx.beginPath();
-    pctx.arc(spacing / 2, spacing / 2, dotRadius, 0, Math.PI * 2);
-    pctx.fill();
-    this.dotPattern = this.ctx.createPattern(tile, 'repeat');
+    const color = 'rgba(164, 168, 172, 0.35)';
+
+    if (style === 'dots') {
+      pctx.fillStyle = color;
+      pctx.beginPath();
+      pctx.arc(spacing / 2, spacing / 2, 0.75, 0, Math.PI * 2);
+      pctx.fill();
+    } else {
+      // grid
+      pctx.strokeStyle = color;
+      pctx.lineWidth = 0.5;
+      pctx.beginPath();
+      pctx.moveTo(spacing, 0);
+      pctx.lineTo(spacing, spacing);
+      pctx.moveTo(0, spacing);
+      pctx.lineTo(spacing, spacing);
+      pctx.stroke();
+    }
+
+    this.bgPattern = this.ctx.createPattern(tile, 'repeat');
   }
 
   private resizeCanvas(width: number, height: number) {
