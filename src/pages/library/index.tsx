@@ -10,11 +10,7 @@ import {
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/sidebar';
-import {
-  repository,
-  type VFSFileNode,
-  type VFSFolderNode,
-} from '@/lib/sync';
+import { repository, type VFSFileNode, type VFSFolderNode } from '@/lib/sync';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
@@ -175,167 +171,167 @@ export function LibraryPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
         >
-        <h1 className="font-extralight font-heading text-5xl text-text-primary leading-[48px]">
-          Digital Library
-        </h1>
+          <h1 className="font-extralight font-heading text-5xl text-text-primary leading-[48px]">
+            Digital Library
+          </h1>
 
-        {recentFiles.length === 0 && (
-          <p className="mt-3 max-w-lg font-normal text-sm text-text-muted leading-relaxed">
-            Your personal knowledge workspace. Create a canvas to start
-            collecting ideas, notes, and research.
-          </p>
-        )}
+          {recentFiles.length === 0 && (
+            <p className="mt-3 max-w-lg font-normal text-sm text-text-muted leading-relaxed">
+              Your personal knowledge workspace. Create a canvas to start
+              collecting ideas, notes, and research.
+            </p>
+          )}
 
-        {/* Recently Opened */}
-        {recentFiles.length > 0 && (
-          <section className="mt-6">
-            <div className="mb-6 flex items-center justify-between">
-              <h3 className="font-heading font-normal text-2xl text-text-primary leading-8">
-                Recently Opened
-              </h3>
-            </div>
+          {/* Recently Opened */}
+          {recentFiles.length > 0 && (
+            <section className="mt-6">
+              <div className="mb-6 flex items-center justify-between">
+                <h3 className="font-heading font-normal text-2xl text-text-primary leading-8">
+                  Recently Opened
+                </h3>
+              </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              {recentFiles.map((file, i) => (
-                <motion.div
-                  key={file.id}
-                  className="min-w-0"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.4,
-                    delay: i * 0.08,
-                    ease: [0.25, 0.1, 0.25, 1],
-                  }}
-                >
-                  <RecentCard
-                    category={fileTypeLabel[file.fileType] ?? file.fileType}
-                    time={formatRelativeTime(file.modifiedAt)}
-                    title={file.name}
-                    tags={file.tags}
-                    featured={i === 0}
-                    onClick={() => navigate(`/${file.fileType}/${file.id}`)}
+              <div className="grid grid-cols-3 gap-4">
+                {recentFiles.map((file, i) => (
+                  <motion.div
+                    key={file.id}
+                    className="min-w-0"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.4,
+                      delay: i * 0.08,
+                      ease: [0.25, 0.1, 0.25, 1],
+                    }}
+                  >
+                    <RecentCard
+                      category={fileTypeLabel[file.fileType] ?? file.fileType}
+                      time={formatRelativeTime(file.modifiedAt)}
+                      title={file.name}
+                      tags={file.tags}
+                      featured={i === 0}
+                      onClick={() => navigate(`/${file.fileType}/${file.id}`)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Explorer + Tags */}
+          <section className="mt-12 grid grid-cols-12 gap-12">
+            <div className="col-span-8 flex flex-col gap-8">
+              <div className="flex items-center gap-3 rounded-xl bg-input px-4 py-1.5 transition-shadow duration-200 focus-within:shadow-ambient hover:bg-hover-tint">
+                <Search className="size-3.5 shrink-0 text-text-muted" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search studio..."
+                  className="w-full bg-transparent px-3 py-2 font-medium text-sm text-text-primary outline-none placeholder:text-text-muted"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        setCurrentFolderId(null);
+                      }
+                    }}
+                    onClick={() => setCurrentFolderId(null)}
+                    className={`cursor-pointer font-heading font-normal text-2xl leading-8 transition-colors ${
+                      breadcrumbDragIdx === -1
+                        ? 'text-accent-foreground'
+                        : 'text-text-primary hover:text-text-secondary'
+                    }`}
+                    {...makeBreadcrumbDragHandlers(null, -1)}
+                  >
+                    Explorer
+                  </h3>
+                  {breadcrumbs.length > 0 && (
+                    <div className="flex items-center gap-1 text-sm text-text-muted">
+                      <ChevronRight className="size-3.5 shrink-0" />
+                      {breadcrumbs.map((crumb, i) => {
+                        const isLast = i === breadcrumbs.length - 1;
+                        const isDragTarget = breadcrumbDragIdx === i;
+                        return (
+                          <span
+                            key={crumb.id}
+                            className="flex items-center gap-1"
+                          >
+                            {i > 0 && (
+                              <ChevronRight className="size-3 shrink-0 text-text-muted" />
+                            )}
+                            <button
+                              onClick={() => setCurrentFolderId(crumb.id)}
+                              className={`rounded px-1 transition-colors ${
+                                isDragTarget
+                                  ? 'bg-accent/15 text-accent-foreground ring-1 ring-accent/40'
+                                  : isLast
+                                    ? 'font-medium text-text-secondary'
+                                    : 'cursor-pointer text-text-muted hover:text-text-secondary'
+                              }`}
+                              {...makeBreadcrumbDragHandlers(crumb.id, i)}
+                            >
+                              {crumb.name}
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={cycleSortMode}
+                    title={`Sort: ${sortMode}`}
+                    className="cursor-pointer text-text-secondary transition-colors hover:text-text-primary"
+                  >
+                    {sortMode === 'name-asc' && (
+                      <ArrowDownAZ className="size-4" />
+                    )}
+                    {sortMode === 'name-desc' && (
+                      <ArrowDownZA className="size-4" />
+                    )}
+                    {sortMode === 'modified' && <Clock className="size-4" />}
+                    {sortMode === 'created' && (
+                      <CalendarPlus className="size-4" />
+                    )}
+                  </button>
+                  <CreateNewDropdown
+                    onNewFolder={() => explorerRef.current?.startNewFolder()}
+                    onNewFile={(title, type) =>
+                      explorerRef.current?.startNewFile(title, type)
+                    }
                   />
-                </motion.div>
-              ))}
-            </div>
-          </section>
-        )}
+                </div>
+              </div>
 
-        {/* Explorer + Tags */}
-        <section className="mt-12 grid grid-cols-12 gap-12">
-          <div className="col-span-8 flex flex-col gap-8">
-            <div className="flex items-center gap-3 rounded-xl bg-input px-4 py-1.5 transition-shadow duration-200 focus-within:shadow-ambient hover:bg-hover-tint">
-              <Search className="size-3.5 shrink-0 text-text-muted" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search studio..."
-                className="w-full bg-transparent px-3 py-2 font-medium text-sm text-text-primary outline-none placeholder:text-text-muted"
+              <ExplorerTree
+                ref={explorerRef}
+                currentFolderId={currentFolderId}
+                onNavigate={setCurrentFolderId}
+                onTagsChanged={() => setRefreshKey((k) => k + 1)}
+                sortMode={sortMode}
+                searchQuery={searchQuery}
+                filterTags={filterTagsArr}
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h3
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      setCurrentFolderId(null);
-                    }
-                  }}
-                  onClick={() => setCurrentFolderId(null)}
-                  className={`cursor-pointer font-heading font-normal text-2xl leading-8 transition-colors ${
-                    breadcrumbDragIdx === -1
-                      ? 'text-accent-foreground'
-                      : 'text-text-primary hover:text-text-secondary'
-                  }`}
-                  {...makeBreadcrumbDragHandlers(null, -1)}
-                >
-                  Explorer
-                </h3>
-                {breadcrumbs.length > 0 && (
-                  <div className="flex items-center gap-1 text-sm text-text-muted">
-                    <ChevronRight className="size-3.5 shrink-0" />
-                    {breadcrumbs.map((crumb, i) => {
-                      const isLast = i === breadcrumbs.length - 1;
-                      const isDragTarget = breadcrumbDragIdx === i;
-                      return (
-                        <span
-                          key={crumb.id}
-                          className="flex items-center gap-1"
-                        >
-                          {i > 0 && (
-                            <ChevronRight className="size-3 shrink-0 text-text-muted" />
-                          )}
-                          <button
-                            onClick={() => setCurrentFolderId(crumb.id)}
-                            className={`rounded px-1 transition-colors ${
-                              isDragTarget
-                                ? 'bg-accent/15 text-accent-foreground ring-1 ring-accent/40'
-                                : isLast
-                                  ? 'font-medium text-text-secondary'
-                                  : 'cursor-pointer text-text-muted hover:text-text-secondary'
-                            }`}
-                            {...makeBreadcrumbDragHandlers(crumb.id, i)}
-                          >
-                            {crumb.name}
-                          </button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={cycleSortMode}
-                  title={`Sort: ${sortMode}`}
-                  className="cursor-pointer text-text-secondary transition-colors hover:text-text-primary"
-                >
-                  {sortMode === 'name-asc' && (
-                    <ArrowDownAZ className="size-4" />
-                  )}
-                  {sortMode === 'name-desc' && (
-                    <ArrowDownZA className="size-4" />
-                  )}
-                  {sortMode === 'modified' && <Clock className="size-4" />}
-                  {sortMode === 'created' && (
-                    <CalendarPlus className="size-4" />
-                  )}
-                </button>
-                <CreateNewDropdown
-                  onNewFolder={() => explorerRef.current?.startNewFolder()}
-                  onNewFile={(title, type) =>
-                    explorerRef.current?.startNewFile(title, type)
-                  }
-                />
-              </div>
+            <div className="col-span-4">
+              <SemanticTags
+                refreshKey={refreshKey}
+                activeTags={activeTags}
+                onActiveTagsChanged={(tags) => {
+                  setActiveTags(tags);
+                  // Force explorer reload when tags change
+                  setTimeout(() => explorerRef.current?.reload(), 0);
+                }}
+              />
             </div>
-
-            <ExplorerTree
-              ref={explorerRef}
-              currentFolderId={currentFolderId}
-              onNavigate={setCurrentFolderId}
-              onTagsChanged={() => setRefreshKey((k) => k + 1)}
-              sortMode={sortMode}
-              searchQuery={searchQuery}
-              filterTags={filterTagsArr}
-            />
-          </div>
-
-          <div className="col-span-4">
-            <SemanticTags
-              refreshKey={refreshKey}
-              activeTags={activeTags}
-              onActiveTagsChanged={(tags) => {
-                setActiveTags(tags);
-                // Force explorer reload when tags change
-                setTimeout(() => explorerRef.current?.reload(), 0);
-              }}
-            />
-          </div>
-        </section>
+          </section>
         </motion.div>
       </main>
     </div>

@@ -1,28 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  type Action,
-  formatKeyCombo,
-  type KeyCombo,
-  registry,
-} from '@/lib/keybinds';
+import { type Action, type KeyCombo, registry } from '@/lib/keybinds';
 import { cn } from '@/lib/utils';
 
-function humanizeAction(action: string): { category: string; label: string } {
-  const [ns, ...rest] = action.split(':');
-  const label = rest
-    .join(' ')
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-  const category = ns.charAt(0).toUpperCase() + ns.slice(1);
-  return { category, label };
+function categoryOf(action: string): string {
+  const ns = action.split(':')[0];
+  return ns.charAt(0).toUpperCase() + ns.slice(1);
+}
+
+const isMac =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad/.test(navigator.platform);
+
+function keyParts(combo: KeyCombo): string[] {
+  const parts: string[] = [];
+  if (combo.mod) {
+    parts.push(isMac ? '⌘' : 'Ctrl');
+  }
+  if (combo.shift) {
+    parts.push(isMac ? '⇧' : 'Shift');
+  }
+  if (combo.alt) {
+    parts.push(isMac ? '⌥' : 'Alt');
+  }
+  const key =
+    combo.key === ' '
+      ? 'Space'
+      : combo.key.length === 1
+        ? combo.key.toUpperCase()
+        : combo.key;
+  parts.push(key);
+  return parts;
 }
 
 function KeyCapture({
@@ -80,7 +89,7 @@ function KeyCapture({
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.95, opacity: 0 }}
       transition={{ duration: 0.1 }}
-      className="flex h-8 items-center justify-center rounded-lg bg-accent-navy px-4 font-semibold text-[10px] text-white uppercase tracking-widest outline-none"
+      className="flex h-8 min-w-20 items-center justify-center rounded-lg bg-accent-navy px-4 font-semibold text-[10px] text-white uppercase tracking-widest outline-none"
     >
       Press a key&hellip;
     </motion.div>
@@ -90,7 +99,6 @@ function KeyCapture({
 function KeybindRow({
   action,
   combo,
-  isRebound,
 }: {
   action: Action;
   combo: KeyCombo | undefined;
@@ -98,29 +106,33 @@ function KeybindRow({
 }) {
   const [capturing, setCapturing] = useState(false);
   const [currentCombo, setCurrentCombo] = useState(combo);
-  const [rebound, setRebound] = useState(isRebound);
-  const { label } = humanizeAction(action);
+  const meta = registry.getMeta(action);
+
+  useEffect(() => {
+    const onReset = () => setCurrentCombo(registry.getCombo(action));
+    window.addEventListener('keybinds-reset', onReset);
+    return () => window.removeEventListener('keybinds-reset', onReset);
+  }, [action]);
 
   const handleCapture = (newCombo: KeyCombo) => {
     registry.rebind(action, newCombo);
     setCurrentCombo(newCombo);
-    setRebound(true);
     setCapturing(false);
-  };
-
-  const handleReset = () => {
-    registry.resetBinding(action);
-    setCurrentCombo(registry.getCombo(action));
-    setRebound(false);
   };
 
   return (
     <button
-      type="button"
       onClick={() => !capturing && setCapturing(true)}
-      className="group flex w-full cursor-pointer items-center gap-4 rounded-xl px-4 py-3 text-left transition-colors hover:bg-hover-tint"
+      className="group flex w-full cursor-pointer items-center gap-4 rounded-xl bg-input/40 px-4 py-2.5 text-left transition-colors hover:bg-hover-tint"
     >
-      <span className="flex-1 text-sm text-text-primary">{label}</span>
+      <div className="flex-1">
+        <span className="text-sm text-text-primary">
+          {meta?.label ?? action}
+        </span>
+        {meta?.description && (
+          <p className="text-text-muted text-xs">{meta.description}</p>
+        )}
+      </div>
 
       <div className="flex items-center gap-2">
         <AnimatePresence mode="wait">
@@ -131,43 +143,32 @@ function KeybindRow({
               onCancel={() => setCapturing(false)}
             />
           ) : (
-            <motion.span
+            <motion.div
               key="display"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.1 }}
-              className={cn(
-                'flex h-8 items-center justify-center rounded-lg px-3 font-medium text-xs tracking-wide',
-                currentCombo
-                  ? 'bg-input text-text-secondary'
-                  : 'bg-input text-text-muted',
-              )}
+              className="flex items-center gap-1"
             >
-              {currentCombo ? formatKeyCombo(currentCombo) : 'Unbound'}
-            </motion.span>
+              {currentCombo ? (
+                keyParts(currentCombo).map((part, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      'flex h-7 items-center justify-center rounded-md border-stone-300/50 border-b-2 bg-stone-200/50 font-bold text-text-secondary text-xs shadow-[0_1px_0_rgba(0,0,0,0.04)]',
+                      part.length === 1 ? 'w-9' : 'px-4',
+                    )}
+                  >
+                    {part}
+                  </span>
+                ))
+              ) : (
+                <span className="text-text-muted text-xs">Unbound</span>
+              )}
+            </motion.div>
           )}
         </AnimatePresence>
-
-        {rebound && !capturing && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleReset();
-                  }}
-                />
-              }
-            >
-              <RotateCcw className="size-3 text-text-muted" />
-            </TooltipTrigger>
-            <TooltipContent>Reset to default</TooltipContent>
-          </Tooltip>
-        )}
       </div>
     </button>
   );
@@ -181,7 +182,7 @@ export function KeybindsSection() {
     { action: Action; combo: KeyCombo | undefined; isRebound: boolean }[]
   >();
   for (const action of actions) {
-    const { category } = humanizeAction(action);
+    const category = categoryOf(action);
     if (!grouped.has(category)) {
       grouped.set(category, []);
     }
@@ -201,24 +202,26 @@ export function KeybindsSection() {
     <>
       <div className="mb-6 flex items-baseline justify-between">
         <h3 className="font-heading text-xl">Keybinds</h3>
-        <Button variant="ghost" size="xs" onClick={handleResetAll}>
+        <button
+          type="button"
+          onClick={handleResetAll}
+          className="flex items-center gap-1.5 text-text-muted text-xs transition-colors hover:text-text-secondary"
+        >
           <RotateCcw className="size-3" />
-          Reset All
-        </Button>
+          Reset all
+        </button>
       </div>
 
       <div className="space-y-8">
         {[...grouped.entries()].map(([category, items]) => (
           <div key={category}>
-            <div className="mb-2 flex items-baseline justify-between px-4">
+            <div className="mb-2 flex items-center gap-2 px-4">
+              <span className="h-px w-3 bg-text-muted/50" />
               <span className="font-semibold text-[10px] text-text-muted uppercase tracking-widest">
                 {category}
               </span>
-              <span className="text-[10px] text-text-muted uppercase tracking-widest">
-                Shortcut
-              </span>
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-1.5">
               {items.map(({ action, combo, isRebound }) => (
                 <KeybindRow
                   key={action}

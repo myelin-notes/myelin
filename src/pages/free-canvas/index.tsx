@@ -61,9 +61,7 @@ export function CanvasView() {
       />
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} noteId={id} />
-      {DEBUG && (
-        <PeerSyncPanel session={engine.noteSession} />
-      )}
+      {DEBUG && <PeerSyncPanel session={engine.noteSession} />}
       <TitleBar fileName={engine.fileName} onBack={engine.back} />
 
       <CanvasToolbar
