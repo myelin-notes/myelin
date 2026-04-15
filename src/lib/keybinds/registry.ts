@@ -74,15 +74,22 @@ export function comboToPMKey(combo: KeyCombo): string {
 export class KeybindingRegistry {
   private defaults = new Map<string, KeyCombo>();
   private overrides = new Map<string, KeyCombo>();
+  private locked = new Set<string>();
 
   constructor() {
     this.loadOverrides();
   }
 
-  defineDefaults(defaults: Partial<Record<Action, KeyCombo>>) {
+  defineDefaults(
+    defaults: Partial<Record<Action, KeyCombo>>,
+    options?: { locked?: boolean },
+  ) {
     for (const [action, combo] of Object.entries(defaults)) {
       if (combo) {
         this.defaults.set(action, combo);
+        if (options?.locked) {
+          this.locked.add(action);
+        }
       }
     }
   }
@@ -105,6 +112,7 @@ export class KeybindingRegistry {
   }
 
   rebind(action: Action, combo: KeyCombo) {
+    if (this.locked.has(action)) return;
     this.overrides.set(action, combo);
     this.saveOverrides();
   }
@@ -120,7 +128,9 @@ export class KeybindingRegistry {
   }
 
   get actions(): Action[] {
-    return [...this.defaults.keys()] as Action[];
+    return [...this.defaults.keys()].filter(
+      (a) => !this.locked.has(a),
+    ) as Action[];
   }
 
   private loadOverrides() {

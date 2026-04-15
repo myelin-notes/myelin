@@ -31,17 +31,10 @@ const PREFS = {
   language: pref<string>('language', 'en'),
 };
 
-/* ── Derived types ───────────────────────────────────────── */
-
 type PrefKey = keyof typeof PREFS;
 type PrefValue<K extends PrefKey> = (typeof PREFS)[K]['defaultValue'];
-
-/* ── Listeners ───────────────────────────────────────────── */
-
 type Listener<K extends PrefKey> = (value: PrefValue<K>) => void;
 const listeners = new Map<PrefKey, Set<Listener<never>>>();
-
-/* ── Core API ────────────────────────────────────────────── */
 
 export const UserPrefs = {
   get<K extends PrefKey>(key: K): PrefValue<K> {

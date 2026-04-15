@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
-import { keybindings, registry } from '@/lib/keybinds';
+import { useKeybindings } from '@/hooks/useKeybindings';
 import { type NoteSession, repository } from '@/lib/sync';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import {
@@ -12,24 +12,6 @@ import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-elem
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
 import type { YDocManager } from '@/pages/free-canvas/ydoc-manager';
-
-declare module '@/lib/keybinds' {
-  interface ActionMap {
-    'canvas:pan': true;
-    'canvas:undo': true;
-    'canvas:redo': true;
-    'canvas:delete': true;
-    'canvas:tool-text': true;
-  }
-}
-
-registry.defineDefaults({
-  'canvas:pan': { key: ' ' },
-  'canvas:undo': { key: 'z', mod: true },
-  'canvas:redo': { key: 'z', mod: true, shift: true },
-  'canvas:delete': { key: 'Backspace' },
-  'canvas:tool-text': { key: 't' },
-});
 
 function setupCanvasListeners(
   canvas: HTMLCanvasElement,
@@ -324,35 +306,32 @@ export function useCanvasEngine({
     };
   }, [id]);
 
-  // Keybindings
-  useEffect(() => {
-    return keybindings.register([
-      {
-        action: 'canvas:pan',
-        onDown: () => drawableCanvasRef.current?.setSpaceDown(true),
-        onUp: () => drawableCanvasRef.current?.setSpaceDown(false),
+  useKeybindings([
+    {
+      action: 'canvas:pan',
+      onDown: () => drawableCanvasRef.current?.setSpaceDown(true),
+      onUp: () => drawableCanvasRef.current?.setSpaceDown(false),
+    },
+    {
+      action: 'canvas:undo',
+      onDown: () => drawableCanvasRef.current?.undo(),
+    },
+    {
+      action: 'canvas:redo',
+      onDown: () => drawableCanvasRef.current?.redo(),
+    },
+    {
+      action: 'canvas:delete',
+      onDown: () => drawableCanvasRef.current?.deleteSelected(),
+    },
+    {
+      action: 'canvas:tool-text',
+      onDown: () => {
+        drawableCanvasRef.current?.switchTool(4);
+        setSelectedToolIndex(4);
       },
-      {
-        action: 'canvas:undo',
-        onDown: () => drawableCanvasRef.current?.undo(),
-      },
-      {
-        action: 'canvas:redo',
-        onDown: () => drawableCanvasRef.current?.redo(),
-      },
-      {
-        action: 'canvas:delete',
-        onDown: () => drawableCanvasRef.current?.deleteSelected(),
-      },
-      {
-        action: 'canvas:tool-text',
-        onDown: () => {
-          drawableCanvasRef.current?.switchTool(4);
-          setSelectedToolIndex(4);
-        },
-      },
-    ]);
-  }, []);
+    },
+  ]);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files;

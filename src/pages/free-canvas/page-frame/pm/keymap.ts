@@ -16,39 +16,17 @@ import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
 import { type Command, Selection } from 'prosemirror-state';
 import { redo, undo } from 'y-prosemirror';
-import {
-  type Action,
-  comboToPMKey,
-  type KeyCombo,
-  registry,
-} from '@/lib/keybinds';
+import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { schema } from './schema';
 
-declare module '@/lib/keybinds' {
-  interface ActionMap {
-    'editor:bold': true;
-    'editor:italic': true;
-    'editor:underline': true;
-    'editor:strikethrough': true;
-    'editor:code': true;
-  }
-}
-
-const EDITOR_MARK_ACTIONS: Record<string, KeyCombo & { type: MarkType }> = {
-  'editor:bold': { mod: true, key: 'b', type: schema.marks.bold },
-  'editor:italic': { mod: true, key: 'i', type: schema.marks.italic },
-  'editor:underline': { mod: true, key: 'u', type: schema.marks.underline },
-  'editor:strikethrough': {
-    mod: true,
-    shift: true,
-    key: 's',
-    type: schema.marks.strikethrough,
-  },
-  'editor:code': { mod: true, key: 'e', type: schema.marks.code },
+const EDITOR_MARK_ACTIONS: Record<string, { type: MarkType }> = {
+  'editor:bold': { type: schema.marks.bold },
+  'editor:italic': { type: schema.marks.italic },
+  'editor:underline': { type: schema.marks.underline },
+  'editor:strikethrough': { type: schema.marks.strikethrough },
+  'editor:code': { type: schema.marks.code },
 };
-
-registry.defineDefaults(EDITOR_MARK_ACTIONS);
 
 /**
  * Enter inside a flat list-item textblock: split into a new item of the
@@ -182,9 +160,11 @@ export function buildKeymap(s: Schema) {
   const mod = isMac ? 'Mod' : 'Ctrl';
 
   const markBindings: Record<string, Command> = {};
-  for (const [action, defaultCombo] of Object.entries(EDITOR_MARK_ACTIONS)) {
-    const combo = registry.getCombo(action as Action) ?? defaultCombo;
-    markBindings[comboToPMKey(combo)] = toggleMark(defaultCombo.type);
+  for (const [action, entry] of Object.entries(EDITOR_MARK_ACTIONS)) {
+    const combo = registry.getCombo(action as Action);
+    if (combo) {
+      markBindings[comboToPMKey(combo)] = toggleMark(entry.type);
+    }
   }
 
   return keymap({
