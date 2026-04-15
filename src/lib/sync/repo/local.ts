@@ -19,6 +19,7 @@ import type {
   YjsSyncSnapshot,
   YjsSyncTarget,
 } from '../types';
+import type { RepositoryLifecycle } from './config';
 import type {
   FileType,
   Repository,
@@ -66,7 +67,9 @@ function createDocFromBytes(bytes: Uint8Array | null): Y.Doc {
   return doc;
 }
 
-export class LocalRepository implements Repository, YjsSyncTarget {
+export class LocalRepository
+  implements Repository, YjsSyncTarget, RepositoryLifecycle
+{
   public readonly kind = 'local-storage';
   public readonly capabilities: RepositoryCapabilities = {
     polling: false,
@@ -74,6 +77,19 @@ export class LocalRepository implements Repository, YjsSyncTarget {
   };
 
   private manifest: VFSManifest | null = null;
+
+  async initialize(): Promise<void> {
+    await this.loadManifest();
+  }
+
+  async refresh(): Promise<void> {
+    this.manifest = null;
+    await this.loadManifest();
+  }
+
+  async flushPending(): Promise<void> {}
+
+  async dispose(): Promise<void> {}
 
   async getNode(nodeId: string): Promise<VFSNode | null> {
     const manifest = await this.loadManifest();

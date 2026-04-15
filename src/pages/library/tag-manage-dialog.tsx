@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { repository } from '@/lib/sync';
+import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
 interface TagManageDialogProps {
@@ -25,6 +25,7 @@ export function TagManageDialog({
   nodeName,
   onChanged,
 }: TagManageDialogProps) {
+  const repository = useRepository();
   const [allTags, setAllTags] = useState<string[]>([]);
   const [nodeTags, setNodeTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');

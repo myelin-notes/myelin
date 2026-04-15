@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { repository } from '@/lib/sync';
+import { useRepository } from '@/lib/sync';
 
 interface UseExplorerItemOptions {
   nodeId: string;
@@ -14,6 +14,7 @@ export function useExplorerItem({
   onChanged,
   initialRenaming,
 }: UseExplorerItemOptions) {
+  const repository = useRepository();
   const [renaming, setRenaming] = useState(initialRenaming ?? false);
   const [renameValue, setRenameValue] = useState(name);
   const inputRef = useRef<HTMLInputElement>(null);

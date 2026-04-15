@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
-import { type NoteSession, repository } from '@/lib/sync';
+import { type NoteSession, useRepository } from '@/lib/sync';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import {
   DrawableCanvas,
@@ -143,6 +143,7 @@ export function useCanvasEngine({
   setSelectedToolIndex,
   onCanvasPointerDown,
 }: UseCanvasEngineArgs) {
+  const repository = useRepository();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const noteSessionRef = useRef<NoteSession | null>(null);
   const pendingEmbedPos = useRef<Vector2 | null>(null);
@@ -216,7 +217,7 @@ export function useCanvasEngine({
         setFileName('');
       })
       .catch(console.error);
-  }, [id]);
+  }, [id, repository]);
 
   // Initialize canvas, event listeners, and animation loop
   useEffect(() => {
@@ -228,7 +229,7 @@ export function useCanvasEngine({
     let disposed = false;
     const priorSession = noteSessionRef.current;
     noteSessionRef.current = null;
-    void priorSession?.close();
+    void priorSession?.close().catch(console.error);
 
     const removeListeners = setupCanvasListeners(
       canvas,
@@ -299,12 +300,12 @@ export function useCanvasEngine({
       disposed = true;
       const session = noteSessionRef.current;
       noteSessionRef.current = null;
-      void session?.close();
+      void session?.close().catch(console.error);
       stopAnimation();
       removeListeners();
       drawableCanvasRef.current?.destroy();
     };
-  }, [id]);
+  }, [id, repository]);
 
   useKeybindings([
     {

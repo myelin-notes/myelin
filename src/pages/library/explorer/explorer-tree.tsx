@@ -5,7 +5,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { type FileType, repository, type VFSNode } from '@/lib/sync';
+import { type FileType, useRepository, type VFSNode } from '@/lib/sync';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
 import { useDropTarget } from './use-drop-target';
@@ -37,6 +37,7 @@ export function ExplorerTree({
   searchQuery,
   filterTags,
 }: ExplorerTreeProps) {
+  const repository = useRepository();
   const [nodes, setNodes] = useState<VFSNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [renamingNewId, setRenamingNewId] = useState<string | null>(null);

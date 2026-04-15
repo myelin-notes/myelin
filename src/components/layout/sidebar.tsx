@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DEBUG } from '@/lib/debug';
-import { repository } from '@/lib/sync';
+import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -97,6 +97,7 @@ function NavButton({
 }
 
 export function Sidebar() {
+  const repository = useRepository();
   const navigate = useNavigate();
   const location = useLocation();
 

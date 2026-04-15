@@ -10,7 +10,11 @@ import {
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/sidebar';
-import { repository, type VFSFileNode, type VFSFolderNode } from '@/lib/sync';
+import {
+  useRepository,
+  type VFSFileNode,
+  type VFSFolderNode,
+} from '@/lib/sync';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
@@ -49,6 +53,7 @@ const fileTypeLabel: Record<string, string> = {
 };
 
 export function LibraryPage() {
+  const repository = useRepository();
   const navigate = useNavigate();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -82,7 +87,7 @@ export function LibraryPage() {
 
   useEffect(() => {
     repository.getRecentFiles(3).then(setRecentFiles).catch(console.error);
-  }, [refreshKey]);
+  }, [refreshKey, repository]);
 
   // Update breadcrumbs when folder changes
   useEffect(() => {
@@ -94,7 +99,7 @@ export function LibraryPage() {
       .getFolderChain(currentFolderId)
       .then(setBreadcrumbs)
       .catch(console.error);
-  }, [currentFolderId]);
+  }, [currentFolderId, repository]);
 
   const clearDragTimer = () => {
     if (dragTimerRef.current) {

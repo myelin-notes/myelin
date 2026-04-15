@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { repository } from '@/lib/sync';
+import { useRepository } from '@/lib/sync';
 
 interface UseDropTargetOptions {
   targetFolderId: string | null;
@@ -10,6 +10,7 @@ export function useDropTarget({
   targetFolderId,
   onMoved,
 }: UseDropTargetOptions) {
+  const repository = useRepository();
   const [dragOver, setDragOver] = useState(false);
   const dragCountRef = useRef(0);
 

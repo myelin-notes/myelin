@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { repository } from '@/lib/sync';
+import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
 interface SemanticTagsProps {
@@ -13,6 +13,7 @@ export function SemanticTags({
   activeTags,
   onActiveTagsChanged,
 }: SemanticTagsProps) {
+  const repository = useRepository();
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [stats, setStats] = useState({
     totalFiles: 0,
@@ -38,7 +39,7 @@ export function SemanticTags({
         }
       })
       .catch(console.error);
-  }, [refreshKey, activeTags, onActiveTagsChanged]);
+  }, [refreshKey, activeTags, onActiveTagsChanged, repository]);
 
   const toggleTag = (tag: string) => {
     const next = new Set(activeTags);

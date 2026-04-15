@@ -26,6 +26,7 @@ export class NoteSession {
   };
 
   private closed = false;
+  private closing: Promise<void> | null = null;
   private remoteStateVector: Uint8Array;
   private transport: Transport = noopTransport;
 
@@ -162,9 +163,15 @@ export class NoteSession {
   }
 
   async close(): Promise<void> {
-    this.clearTransport();
-    this.closed = true;
-    this.status.phase = 'closed';
+    if (this.closed) {
+      return;
+    }
+
+    if (!this.closing) {
+      this.closing = this.closeInternal();
+    }
+
+    await this.closing;
   }
 
   private onTransportMessage = (data: Uint8Array) => {
@@ -186,6 +193,30 @@ export class NoteSession {
         console.error('[NoteSession] initial sync error:', err);
       }
     });
+  }
+
+  private hasRemoteChanges(): boolean {
+    return !bytesEqual(this.ydoc.encodeStateVector(), this.remoteStateVector);
+  }
+
+  private async closeInternal(): Promise<void> {
+    let closeError: unknown = null;
+
+    try {
+      if (this.hasRemoteChanges()) {
+        await this.push();
+      }
+    } catch (error) {
+      closeError = error;
+    }
+
+    this.clearTransport();
+    this.closed = true;
+    this.status.phase = 'closed';
+
+    if (closeError) {
+      throw closeError;
+    }
   }
 
   private async runWithPhase(

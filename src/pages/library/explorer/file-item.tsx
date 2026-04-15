@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { DEBUG } from '@/lib/debug';
-import { repository, type VFSFileNode } from '@/lib/sync';
+import { useRepository, type VFSFileNode } from '@/lib/sync';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
 import { useExplorerItem } from './use-explorer-item';
@@ -16,6 +16,7 @@ interface FileItemProps {
 }
 
 export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
+  const repository = useRepository();
   const navigate = useNavigate();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
 

@@ -70,6 +70,7 @@ export interface Repository {
   setTags(nodeId: string, tags: string[]): Promise<void>;
   addTag(nodeId: string, tag: string): Promise<void>;
   removeTag(nodeId: string, tag: string): Promise<void>;
+  getRevealPath(nodeId: string): Promise<string | null>;
 
   openSession(nodeId: string): Promise<NoteSession>;
 }
