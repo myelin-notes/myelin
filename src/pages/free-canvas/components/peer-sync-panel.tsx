@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Radio, X } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { PeerSync } from '@/lib/repository/peer-sync';
-import type { YDocManager } from '../ydoc-manager';
+import type { NoteSession } from '@/lib/sync';
+import { TcpTransport } from '@/lib/sync/live/tcp';
 
 type Phase = 'idle' | 'hosting' | 'joining' | 'connected';
 
 interface PeerSyncPanelProps {
-  ydoc: YDocManager | null;
+  session: NoteSession | null;
 }
 
-export function PeerSyncPanel({ ydoc }: PeerSyncPanelProps) {
+export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [joinAddr, setJoinAddr] = useState('');
   const [localIp, setLocalIp] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
-  const peerRef = useRef<PeerSync | null>(null);
+  const transportRef = useRef<TcpTransport | null>(null);
 
   useEffect(() => {
     invoke<string>('get_local_ip')
@@ -25,50 +25,53 @@ export function PeerSyncPanel({ ydoc }: PeerSyncPanelProps) {
   }, []);
 
   const cleanup = useCallback(async () => {
-    await peerRef.current?.destroy();
-    peerRef.current = null;
+    session?.clearTransport();
+    await transportRef.current?.destroy();
+    transportRef.current = null;
     setPhase('idle');
     setJoinAddr('');
     setError('');
     setCopied(false);
-  }, []);
+  }, [session]);
 
   const host = useCallback(async () => {
-    if (!ydoc) {
+    if (!session) {
       return;
     }
     await cleanup();
     setError('');
-    const peer = new PeerSync(ydoc);
-    peerRef.current = peer;
-    peer.onConnect = () => setPhase('connected');
-    peer.onClose = () => cleanup();
+    const transport = new TcpTransport();
+    transportRef.current = transport;
+    transport.on('connected', () => setPhase('connected'));
+    transport.on('disconnected', () => cleanup());
+    session.setTransport(transport);
     try {
-      await peer.host(9090);
+      await transport.host(9090);
       setPhase('hosting');
     } catch (err) {
       setError(String(err));
     }
-  }, [ydoc, cleanup]);
+  }, [session, cleanup]);
 
   const join = useCallback(async () => {
-    if (!ydoc || !joinAddr.trim()) {
+    if (!session || !joinAddr.trim()) {
       return;
     }
     await cleanup();
     setError('');
-    const peer = new PeerSync(ydoc);
-    peerRef.current = peer;
-    peer.onConnect = () => setPhase('connected');
-    peer.onClose = () => cleanup();
+    const transport = new TcpTransport();
+    transportRef.current = transport;
+    transport.on('connected', () => setPhase('connected'));
+    transport.on('disconnected', () => cleanup());
+    session.setTransport(transport);
     try {
       setPhase('joining');
-      await peer.join(joinAddr.trim());
+      await transport.join(joinAddr.trim());
     } catch (err) {
       setError(String(err));
       setPhase('idle');
     }
-  }, [ydoc, joinAddr, cleanup]);
+  }, [session, joinAddr, cleanup]);
 
   const copyAddr = useCallback(() => {
     const addr = `${localIp}:9090`;
@@ -77,7 +80,7 @@ export function PeerSyncPanel({ ydoc }: PeerSyncPanelProps) {
     setTimeout(() => setCopied(false), 2000);
   }, [localIp]);
 
-  if (!ydoc) {
+  if (!session) {
     return null;
   }
 

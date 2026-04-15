@@ -1,5 +1,9 @@
+import { DEBUG } from '@/lib/debug';
 import { YDocManager } from '@/pages/free-canvas/ydoc-manager';
+import { noopTransport, type Transport } from './live/transport';
 import type { NoteSessionStatus, YjsSyncTarget } from './types';
+
+const PEER_ORIGIN = 'remote-peer';
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) {
@@ -23,6 +27,7 @@ export class NoteSession {
 
   private closed = false;
   private remoteStateVector: Uint8Array;
+  private transport: Transport = noopTransport;
 
   constructor(
     public readonly id: string,
@@ -32,6 +37,16 @@ export class NoteSession {
     initialStateVector: Uint8Array,
   ) {
     this.remoteStateVector = initialStateVector;
+
+    this.ydoc.doc.on('update', (update: Uint8Array, origin: unknown) => {
+      if (origin !== PEER_ORIGIN && this.transport.connected) {
+        this.transport.send(new Uint8Array(update)).catch((err) => {
+          if (DEBUG) {
+            console.error('[NoteSession] transport send error:', err);
+          }
+        });
+      }
+    });
   }
 
   static async open(
@@ -51,6 +66,34 @@ export class NoteSession {
     );
   }
 
+  get transportConnected(): boolean {
+    return this.transport.connected;
+  }
+
+  setTransport(transport: Transport): void {
+    if (this.closed) {
+      return;
+    }
+
+    this.transport.off('message', this.onTransportMessage);
+    this.transport.off('disconnected', this.onTransportDisconnected);
+    this.transport.off('connected', this.onTransportConnected);
+
+    this.transport = transport;
+
+    transport.on('message', this.onTransportMessage);
+    transport.on('disconnected', this.onTransportDisconnected);
+    transport.on('connected', this.onTransportConnected);
+
+    if (transport.connected) {
+      this.sendInitialState();
+    }
+  }
+
+  clearTransport(): void {
+    this.setTransport(noopTransport);
+  }
+
   encodeStateVector(): Uint8Array {
     return this.ydoc.encodeStateVector();
   }
@@ -59,8 +102,8 @@ export class NoteSession {
     return this.ydoc.encodeDiff(stateVector);
   }
 
-  applyUpdate(update: Uint8Array): void {
-    this.ydoc.applyUpdate(update);
+  applyUpdate(update: Uint8Array, origin?: unknown): void {
+    this.ydoc.applyUpdate(update, origin);
   }
 
   async pull(): Promise<Uint8Array | null> {
@@ -119,8 +162,30 @@ export class NoteSession {
   }
 
   async close(): Promise<void> {
+    this.clearTransport();
     this.closed = true;
     this.status.phase = 'closed';
+  }
+
+  private onTransportMessage = (data: Uint8Array) => {
+    this.ydoc.applyUpdate(data, PEER_ORIGIN);
+  };
+
+  private onTransportConnected = () => {
+    this.sendInitialState();
+  };
+
+  private onTransportDisconnected = () => {
+    this.clearTransport();
+  };
+
+  private sendInitialState(): void {
+    const state = this.ydoc.encodeDiff();
+    this.transport.send(state).catch((err) => {
+      if (DEBUG) {
+        console.error('[NoteSession] initial sync error:', err);
+      }
+    });
   }
 
   private async runWithPhase(

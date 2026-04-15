@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { repository } from '@/lib/repository';
+import { repository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
 interface SemanticTagsProps {

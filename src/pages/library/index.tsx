@@ -14,7 +14,7 @@ import {
   repository,
   type VFSFileNode,
   type VFSFolderNode,
-} from '@/lib/repository';
+} from '@/lib/sync';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,

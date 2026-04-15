@@ -1,4 +1,4 @@
-import type { NoteSession } from './note-session';
+import type { NoteSession } from '../session';
 
 export const FileTypes = ['mcanvas'] as const;
 export type FileType = (typeof FileTypes)[number];
@@ -43,35 +43,6 @@ export interface RepositoryCapabilities {
   liveSync: boolean;
 }
 
-export interface YjsSyncSnapshot {
-  update: Uint8Array | null;
-  stateVector: Uint8Array;
-  revision: string | null;
-}
-
-export interface YjsSyncPushOptions {
-  baseRevision: string | null;
-  localStateVector?: Uint8Array | null;
-}
-
-export interface YjsSyncPushResult extends YjsSyncSnapshot {
-  accepted: boolean;
-  remoteUpdate: Uint8Array | null;
-}
-
-export interface YjsSyncTarget {
-  loadDocument(nodeId: string): Promise<YjsSyncSnapshot>;
-  pullUpdates(
-    nodeId: string,
-    stateVector?: Uint8Array | null,
-  ): Promise<YjsSyncSnapshot>;
-  pushUpdates(
-    nodeId: string,
-    update: Uint8Array,
-    options: YjsSyncPushOptions,
-  ): Promise<YjsSyncPushResult>;
-}
-
 export interface Repository {
   readonly kind: string;
   readonly capabilities: RepositoryCapabilities;
@@ -101,13 +72,6 @@ export interface Repository {
   removeTag(nodeId: string, tag: string): Promise<void>;
 
   openSession(nodeId: string): Promise<NoteSession>;
-}
-
-export interface NoteSessionStatus {
-  phase: 'idle' | 'pulling' | 'pushing' | 'closed';
-  lastError: Error | null;
-  lastSyncedAt: number | null;
-  remoteRevision: string | null;
 }
 
 export type { NoteSession };

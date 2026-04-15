@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { repository } from '@/lib/repository';
+import { repository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
 interface TagManageDialogProps {

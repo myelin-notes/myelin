@@ -5,7 +5,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { type FileType, repository, type VFSNode } from '@/lib/repository';
+import { type FileType, repository, type VFSNode } from '@/lib/sync';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
 import { useDropTarget } from './use-drop-target';

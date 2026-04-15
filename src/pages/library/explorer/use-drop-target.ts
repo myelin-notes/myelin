@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { repository } from '@/lib/repository';
+import { repository } from '@/lib/sync';
 
 interface UseDropTargetOptions {
   targetFolderId: string | null;

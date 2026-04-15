@@ -12,7 +12,13 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
-import { NoteSession } from '../note-session';
+import { NoteSession } from '../session';
+import type {
+  YjsSyncPushOptions,
+  YjsSyncPushResult,
+  YjsSyncSnapshot,
+  YjsSyncTarget,
+} from '../types';
 import type {
   FileType,
   Repository,
@@ -22,11 +28,7 @@ import type {
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
-  YjsSyncPushOptions,
-  YjsSyncPushResult,
-  YjsSyncSnapshot,
-  YjsSyncTarget,
-} from '../types';
+} from './types';
 
 interface VFSManifest {
   version: number;

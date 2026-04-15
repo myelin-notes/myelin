@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { keybindings, registry } from '@/lib/keybinds';
-import { type NoteSession, repository } from '@/lib/repository';
+import { type NoteSession, repository } from '@/lib/sync';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import {
   DrawableCanvas,
@@ -171,6 +171,7 @@ export function useCanvasEngine({
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
   const [fileName, setFileName] = useState('');
+  const [noteSession, setNoteSession] = useState<NoteSession | null>(null);
   const [ydoc, setYdoc] = useState<YDocManager | null>(null);
   const [editingElement, setEditingElement] = useState<DrawableElement | null>(
     null,
@@ -265,6 +266,7 @@ export function useCanvasEngine({
         }
 
         noteSessionRef.current = session;
+        setNoteSession(session);
         setYdoc(session.ydoc);
 
         const dc = new DrawableCanvas(canvas, session.ydoc, canvasTools);
@@ -368,6 +370,7 @@ export function useCanvasEngine({
   return {
     fileInputRef,
     drawableCanvasRef,
+    noteSession,
     ydoc,
     zoomLevel,
     fps,

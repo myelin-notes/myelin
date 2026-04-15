@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DEBUG } from '@/lib/debug';
-import { repository } from '@/lib/repository';
+import { repository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
