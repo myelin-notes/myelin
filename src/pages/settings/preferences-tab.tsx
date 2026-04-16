@@ -10,6 +10,7 @@ import {
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { KeybindsSection } from './keybinds-tab';
+import { RepositorySection } from './repository-section';
 
 type CanvasBg = 'grid' | 'dots' | 'blank';
 
@@ -192,6 +193,11 @@ export function PreferencesTab() {
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+        </section>
+
+        {/* Repository */}
+        <section>
+          <RepositorySection />
         </section>
 
         {/* Keybinds */}

@@ -1,5 +1,7 @@
 use std::fs;
 
+mod github_credentials;
+mod github_repo;
 mod peer;
 
 #[tauri::command]
@@ -18,6 +20,13 @@ pub fn run() {
         .manage(peer::PeerState::new())
         .invoke_handler(tauri::generate_handler![
             create_dir_all,
+            github_credentials::github_clear_token,
+            github_credentials::github_has_token,
+            github_credentials::github_secure_storage_available,
+            github_credentials::github_store_token,
+            github_repo::github_delete_contents,
+            github_repo::github_get_contents,
+            github_repo::github_put_contents,
             peer::peer_host,
             peer::peer_join,
             peer::peer_send,

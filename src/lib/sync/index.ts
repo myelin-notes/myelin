@@ -12,6 +12,17 @@ export {
   type RepositoryLifecycle,
 } from './repo/config';
 export { createRepository } from './repo/factory';
+export {
+  clearGitHubToken,
+  hasGitHubToken,
+  isGitHubSecureStorageAvailable,
+  storeGitHubToken,
+} from './repo/github-credentials';
+export {
+  getRepositoryConfig,
+  setRepositoryConfig,
+  subscribeRepositoryConfig,
+} from './repo/repository-settings';
 export type {
   FileType,
   Repository,

@@ -7,12 +7,12 @@ import {
   useState,
 } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import {
-  type ActiveRepository,
-  DEFAULT_REPOSITORY_CONFIG,
-  type RepositoryConfig,
-} from './repo/config';
+import type { ActiveRepository, RepositoryConfig } from './repo/config';
 import { createRepository } from './repo/factory';
+import {
+  getRepositoryConfig,
+  subscribeRepositoryConfig,
+} from './repo/repository-settings';
 
 export interface RepositoryStatus {
   config: RepositoryConfig;
@@ -62,16 +62,32 @@ function isTauriWindowAvailable(): boolean {
 
 export function RepositoryProvider({
   children,
-  config = DEFAULT_REPOSITORY_CONFIG,
+  config,
 }: PropsWithChildren<{ config?: RepositoryConfig }>) {
-  const configKey = getConfigKey(config);
-  const repository = useMemo(() => createRepository(config), [configKey]);
+  const [resolvedConfig, setResolvedConfig] = useState<RepositoryConfig>(
+    () => config ?? getRepositoryConfig(),
+  );
+  const configKey = getConfigKey(resolvedConfig);
+  const repository = useMemo(
+    () => createRepository(resolvedConfig),
+    [configKey, resolvedConfig],
+  );
   const [status, setStatus] = useState<RepositoryStatus>(() =>
-    createRepositoryStatus(config),
+    createRepositoryStatus(resolvedConfig),
   );
 
   useEffect(() => {
-    setStatus(createRepositoryStatus(config));
+    if (config) {
+      setResolvedConfig(config);
+      return;
+    }
+
+    setResolvedConfig(getRepositoryConfig());
+    return subscribeRepositoryConfig(setResolvedConfig);
+  }, [config]);
+
+  useEffect(() => {
+    setStatus(createRepositoryStatus(resolvedConfig));
 
     let disposed = false;
 
@@ -104,7 +120,7 @@ export function RepositoryProvider({
       disposed = true;
       void repository.dispose().catch(console.error);
     };
-  }, [configKey, config, repository]);
+  }, [configKey, resolvedConfig, repository]);
 
   useEffect(() => {
     const handleBeforeUnload = () => {

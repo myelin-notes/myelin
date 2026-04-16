@@ -1,4 +1,5 @@
 import type { ActiveRepository, RepositoryConfig } from './config';
+import { GitHubRepository } from './github';
 import { LocalRepository } from './local';
 
 export function createRepository(config: RepositoryConfig): ActiveRepository {
@@ -6,6 +7,11 @@ export function createRepository(config: RepositoryConfig): ActiveRepository {
     case 'local':
       return new LocalRepository();
     case 'github':
-      throw new Error('GitHub repository backend is not implemented yet.');
+      return new GitHubRepository({
+        owner: config.owner,
+        repo: config.repo,
+        branch: config.branch ?? 'main',
+        credentialId: config.credentialId,
+      });
   }
 }

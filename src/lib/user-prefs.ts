@@ -6,6 +6,8 @@
  * declaration. No other code should touch localStorage directly.
  */
 
+import type { RepositoryConfig } from './sync/repo/config';
+
 const PREFIX = 'myelin:';
 
 /* ── Single-source pref declarations ─────────────────────── */
@@ -29,6 +31,9 @@ const PREFS = {
     'dots',
   ),
   language: pref<string>('language', 'en'),
+  repositoryConfig: pref<RepositoryConfig>('repository-config', {
+    kind: 'local',
+  }),
 };
 
 type PrefKey = keyof typeof PREFS;
