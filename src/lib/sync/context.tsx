@@ -7,7 +7,11 @@ import {
   useState,
 } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { ActiveRepository, RepositoryConfig } from './repo/config';
+import type {
+  ActiveRepository,
+  RepositoryConfig,
+  RepositoryRuntimeStatus,
+} from './repo/config';
 import { createRepository } from './repo/factory';
 import {
   getRepositoryConfig,
@@ -38,6 +42,19 @@ function createRepositoryStatus(config: RepositoryConfig): RepositoryStatus {
     pendingRemoteWrites: 0,
     lastRemoteSyncAt: null,
     lastError: null,
+  };
+}
+
+function mergeRuntimeStatus(
+  current: RepositoryStatus,
+  runtimeStatus: RepositoryRuntimeStatus,
+): RepositoryStatus {
+  return {
+    ...current,
+    online: runtimeStatus.online,
+    pendingRemoteWrites: runtimeStatus.pendingRemoteWrites,
+    lastRemoteSyncAt: runtimeStatus.lastRemoteSyncAt,
+    lastError: runtimeStatus.lastError,
   };
 }
 
@@ -87,9 +104,21 @@ export function RepositoryProvider({
   }, [config]);
 
   useEffect(() => {
-    setStatus(createRepositoryStatus(resolvedConfig));
+    setStatus(
+      mergeRuntimeStatus(
+        createRepositoryStatus(resolvedConfig),
+        repository.getRuntimeStatus(),
+      ),
+    );
 
     let disposed = false;
+    const unsubscribeStatus = repository.subscribeStatus((runtimeStatus) => {
+      if (disposed) {
+        return;
+      }
+
+      setStatus((current) => mergeRuntimeStatus(current, runtimeStatus));
+    });
 
     void repository
       .initialize()
@@ -101,7 +130,6 @@ export function RepositoryProvider({
         setStatus((current) => ({
           ...current,
           initializing: false,
-          lastError: null,
         }));
       })
       .catch((error) => {
@@ -118,6 +146,7 @@ export function RepositoryProvider({
 
     return () => {
       disposed = true;
+      unsubscribeStatus();
       void repository.dispose().catch(console.error);
     };
   }, [configKey, resolvedConfig, repository]);

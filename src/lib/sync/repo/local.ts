@@ -18,6 +18,7 @@ import {
   getNoteFileName,
   MANIFEST_PATH,
   migrateManifest,
+  type RepositorySnapshot,
   type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities } from './types';
@@ -31,6 +32,10 @@ export class LocalRepository extends BaseRepository {
 
   private manifest: VFSManifest | null = null;
 
+  constructor(private readonly storageRoot: string = '') {
+    super();
+  }
+
   async refresh(): Promise<void> {
     this.manifest = null;
     await this.loadManifestImpl();
@@ -42,12 +47,61 @@ export class LocalRepository extends BaseRepository {
     if (!node || node.type !== 'file') {
       return null;
     }
-    return join(await appDataDir(), FILES_DIR, getNoteFileName(nodeId));
+    return join(
+      await appDataDir(),
+      ...(this.storageRoot ? [this.storageRoot] : []),
+      FILES_DIR,
+      getNoteFileName(nodeId),
+    );
+  }
+
+  async replaceSnapshot(snapshot: RepositorySnapshot): Promise<void> {
+    await this.ensureDirs();
+
+    const filesDirPath = await this.resolveStoragePath(FILES_DIR);
+    if (await exists(filesDirPath, { baseDir: BaseDirectory.AppData })) {
+      await remove(filesDirPath, {
+        baseDir: BaseDirectory.AppData,
+        recursive: true,
+      });
+    }
+    await mkdir(filesDirPath, { baseDir: BaseDirectory.AppData });
+
+    for (const node of Object.values(snapshot.manifest.nodes)) {
+      if (node.type !== 'file') {
+        continue;
+      }
+
+      const filePath = await this.resolveStoragePath(
+        FILES_DIR,
+        getNoteFileName(node.id),
+      );
+      const bytes = snapshot.notes[node.id] ?? null;
+      if (bytes && bytes.byteLength > 0) {
+        await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+        continue;
+      }
+
+      const file = await open(filePath, {
+        write: true,
+        create: true,
+        truncate: true,
+        baseDir: BaseDirectory.AppData,
+      });
+      await file.close();
+    }
+
+    const manifest = migrateManifest(structuredClone(snapshot.manifest));
+    await this.writeManifestToDisk(manifest);
+    this.manifest = manifest;
   }
 
   protected async onFileCreated(nodeId: string): Promise<void> {
     await this.ensureDirs();
-    const filePath = await join(FILES_DIR, getNoteFileName(nodeId));
+    const filePath = await this.resolveStoragePath(
+      FILES_DIR,
+      getNoteFileName(nodeId),
+    );
     const file = await open(filePath, {
       write: true,
       create: true,
@@ -75,8 +129,10 @@ export class LocalRepository extends BaseRepository {
 
     await this.ensureDirs();
 
-    if (await exists(MANIFEST_PATH, { baseDir: BaseDirectory.AppData })) {
-      const text = await readTextFile(MANIFEST_PATH, {
+    const manifestPath = await this.resolveStoragePath(MANIFEST_PATH);
+
+    if (await exists(manifestPath, { baseDir: BaseDirectory.AppData })) {
+      const text = await readTextFile(manifestPath, {
         baseDir: BaseDirectory.AppData,
       });
       const parsed = JSON.parse(text) as VFSManifest;
@@ -111,7 +167,10 @@ export class LocalRepository extends BaseRepository {
       return { bytes: null, revision: null };
     }
 
-    const filePath = await join(FILES_DIR, getNoteFileName(nodeId));
+    const filePath = await this.resolveStoragePath(
+      FILES_DIR,
+      getNoteFileName(nodeId),
+    );
     if (!(await exists(filePath, { baseDir: BaseDirectory.AppData }))) {
       return { bytes: null, revision: null };
     }
@@ -131,7 +190,10 @@ export class LocalRepository extends BaseRepository {
     const node = manifest.nodes[nodeId];
     if (node && node.type === 'file' && bytes.byteLength > 0) {
       await this.ensureDirs();
-      const filePath = await join(FILES_DIR, getNoteFileName(nodeId));
+      const filePath = await this.resolveStoragePath(
+        FILES_DIR,
+        getNoteFileName(nodeId),
+      );
       await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
     }
 
@@ -139,24 +201,60 @@ export class LocalRepository extends BaseRepository {
   }
 
   protected async deleteNoteBytes(nodeId: string): Promise<void> {
-    const filePath = await join(FILES_DIR, getNoteFileName(nodeId));
+    const filePath = await this.resolveStoragePath(
+      FILES_DIR,
+      getNoteFileName(nodeId),
+    );
     if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
       await remove(filePath, { baseDir: BaseDirectory.AppData });
     }
   }
 
   private async ensureDirs(): Promise<void> {
-    if (!(await exists('', { baseDir: BaseDirectory.AppData }))) {
-      await mkdir('', { baseDir: BaseDirectory.AppData });
+    const rootPath = await this.resolveStoragePath();
+    if (
+      rootPath &&
+      !(await exists(rootPath, { baseDir: BaseDirectory.AppData }))
+    ) {
+      await mkdir(rootPath, {
+        baseDir: BaseDirectory.AppData,
+        recursive: true,
+      });
     }
-    if (!(await exists(FILES_DIR, { baseDir: BaseDirectory.AppData }))) {
-      await mkdir(FILES_DIR, { baseDir: BaseDirectory.AppData });
+
+    const filesDirPath = await this.resolveStoragePath(FILES_DIR);
+    if (!(await exists(filesDirPath, { baseDir: BaseDirectory.AppData }))) {
+      await mkdir(filesDirPath, {
+        baseDir: BaseDirectory.AppData,
+        recursive: true,
+      });
     }
   }
 
   private async writeManifestToDisk(manifest: VFSManifest): Promise<void> {
-    await writeTextFile(MANIFEST_PATH, JSON.stringify(manifest, null, 2), {
-      baseDir: BaseDirectory.AppData,
-    });
+    await writeTextFile(
+      await this.resolveStoragePath(MANIFEST_PATH),
+      JSON.stringify(manifest, null, 2),
+      {
+        baseDir: BaseDirectory.AppData,
+      },
+    );
+  }
+
+  private async resolveStoragePath(...segments: string[]): Promise<string> {
+    const filteredSegments = [
+      ...(this.storageRoot ? [this.storageRoot] : []),
+      ...segments,
+    ].filter(Boolean);
+
+    if (filteredSegments.length === 0) {
+      return '';
+    }
+
+    if (filteredSegments.length === 1) {
+      return filteredSegments[0];
+    }
+
+    return join(...filteredSegments);
   }
 }

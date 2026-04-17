@@ -14,6 +14,11 @@ export interface VFSManifest {
   nodes: Record<string, VFSNode>;
 }
 
+export interface RepositorySnapshot {
+  manifest: VFSManifest;
+  notes: Record<string, Uint8Array | null>;
+}
+
 export const CURRENT_MANIFEST_VERSION = 1;
 export const MANIFEST_PATH = 'manifest.json';
 export const FILES_DIR = 'files';

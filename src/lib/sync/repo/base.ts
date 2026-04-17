@@ -7,7 +7,11 @@ import type {
   YjsSyncSnapshot,
   YjsSyncTarget,
 } from '../types';
-import type { RepositoryLifecycle } from './config';
+import type {
+  RepositoryLifecycle,
+  RepositoryRuntimeStatus,
+  RepositoryStatusSource,
+} from './config';
 import {
   addChild,
   createDocFromBytes,
@@ -23,6 +27,7 @@ import {
   listDirectoryNodes,
   listTags,
   moveNodeInManifest,
+  type RepositorySnapshot,
   searchNodes,
   type VFSManifest,
 } from './shared';
@@ -38,10 +43,24 @@ import type {
 } from './types';
 
 export abstract class BaseRepository
-  implements Repository, YjsSyncTarget, RepositoryLifecycle
+  implements
+    Repository,
+    YjsSyncTarget,
+    RepositoryLifecycle,
+    RepositoryStatusSource
 {
   public abstract readonly kind: string;
   public abstract readonly capabilities: RepositoryCapabilities;
+
+  private runtimeStatus: RepositoryRuntimeStatus = {
+    online: true,
+    pendingRemoteWrites: 0,
+    lastRemoteSyncAt: null,
+    lastError: null,
+  };
+  private readonly statusListeners = new Set<
+    (status: RepositoryRuntimeStatus) => void
+  >();
 
   protected abstract loadManifestImpl(): Promise<{
     manifest: VFSManifest;
@@ -80,6 +99,51 @@ export abstract class BaseRepository
 
   protected async onNoteSaved(_nodeId: string): Promise<void> {}
 
+  getRuntimeStatus(): RepositoryRuntimeStatus {
+    return { ...this.runtimeStatus };
+  }
+
+  subscribeStatus(
+    listener: (status: RepositoryRuntimeStatus) => void,
+  ): () => void {
+    this.statusListeners.add(listener);
+    listener(this.getRuntimeStatus());
+    return () => {
+      this.statusListeners.delete(listener);
+    };
+  }
+
+  async exportSnapshot(): Promise<RepositorySnapshot> {
+    const { manifest } = await this.loadManifestImpl();
+    const snapshotManifest = structuredClone(manifest);
+    const fileNodes = Object.values(snapshotManifest.nodes).filter(
+      (node): node is VFSFileNode => node.type === 'file',
+    );
+
+    const noteEntries = await Promise.all(
+      fileNodes.map(async (node) => {
+        const { bytes } = await this.loadNoteBytes(node.id);
+        return [node.id, bytes ? new Uint8Array(bytes) : null] as const;
+      }),
+    );
+
+    return {
+      manifest: snapshotManifest,
+      notes: Object.fromEntries(noteEntries),
+    };
+  }
+
+  async applyManifestMutation<T>(
+    action: string,
+    mutator: (manifest: VFSManifest) => T,
+  ): Promise<T> {
+    return this.mutateManifest(action, mutator);
+  }
+
+  async removeNoteData(nodeId: string): Promise<void> {
+    await this.deleteNoteBytes(nodeId);
+  }
+
   async initialize(): Promise<void> {
     await this.loadManifestImpl();
   }
@@ -89,6 +153,14 @@ export abstract class BaseRepository
   async flushPending(): Promise<void> {}
 
   async dispose(): Promise<void> {}
+
+  protected updateRuntimeStatus(patch: Partial<RepositoryRuntimeStatus>): void {
+    this.runtimeStatus = { ...this.runtimeStatus, ...patch };
+    const snapshot = this.getRuntimeStatus();
+    for (const listener of this.statusListeners) {
+      listener(snapshot);
+    }
+  }
 
   async getNode(nodeId: string): Promise<VFSNode | null> {
     const { manifest } = await this.loadManifestImpl();
