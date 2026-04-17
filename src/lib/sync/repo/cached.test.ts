@@ -1,0 +1,300 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  createNoteState,
+  getRepositoryTestStorage,
+  readNoteText,
+  resetRepositoryTestDoubles,
+} from '@/test/repository-test-utils';
+import { BaseRepository } from './base';
+import { CachedRepository } from './cached';
+import { LocalRepository } from './local';
+import {
+  computeRevision,
+  createEmptyManifest,
+  type VFSManifest,
+} from './shared';
+import type { RepositoryCapabilities } from './types';
+
+class MemoryRemoteRepository extends BaseRepository {
+  public readonly kind = 'memory-remote';
+  public readonly capabilities: RepositoryCapabilities = {
+    polling: false,
+    liveSync: false,
+  };
+
+  private manifest: VFSManifest = createEmptyManifest();
+  private manifestRevision: string | null = null;
+  private readonly notes = new Map<string, Uint8Array>();
+  private noteRevision = 0;
+  private manifestVersion = 0;
+
+  protected async loadManifestImpl(): Promise<{
+    manifest: VFSManifest;
+    revision: string | null;
+  }> {
+    return {
+      manifest: structuredClone(this.manifest),
+      revision: this.manifestRevision,
+    };
+  }
+
+  protected async saveManifestImpl(
+    manifest: VFSManifest,
+    _revision: string | null,
+    _action: string,
+  ): Promise<string> {
+    this.manifest = structuredClone(manifest);
+    this.manifestRevision = `manifest-${++this.manifestVersion}`;
+    return this.manifestRevision;
+  }
+
+  protected async loadNoteBytes(nodeId: string): Promise<{
+    bytes: Uint8Array | null;
+    revision: string | null;
+  }> {
+    const bytes = this.notes.get(nodeId) ?? null;
+    return {
+      bytes: bytes ? new Uint8Array(bytes) : null,
+      revision: bytes ? await computeRevision(bytes) : null,
+    };
+  }
+
+  protected async saveNoteBytes(
+    nodeId: string,
+    bytes: Uint8Array,
+    _revision: string | null,
+    _message: string,
+  ): Promise<string> {
+    this.notes.set(nodeId, new Uint8Array(bytes));
+    return `note-${++this.noteRevision}`;
+  }
+
+  protected async deleteNoteBytes(nodeId: string): Promise<void> {
+    this.notes.delete(nodeId);
+  }
+}
+
+describe('CachedRepository', () => {
+  beforeEach(() => {
+    resetRepositoryTestDoubles();
+  });
+
+  it('serves cache writes immediately and flushes them to remote', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/cached-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/cached-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const fileId = await repository.createFile('Offline note', 'mcanvas', null);
+    const note = createNoteState('hello cached repository');
+
+    await repository.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const [folders, files] = await repository.listDirectory(null);
+    expect(folders).toHaveLength(0);
+    expect(files).toHaveLength(1);
+    expect(files[0]?.id).toBe(fileId);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(2);
+
+    await repository.flushPending();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    expect(remoteSnapshot.manifest.nodes[fileId]?.type).toBe('file');
+    expect(readNoteText(remoteSnapshot.notes[fileId] ?? null)).toBe(
+      'hello cached repository',
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('hydrates the cache from remote state on initialize', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const note = createNoteState('fetched from remote');
+
+    await remote.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/bootstrap-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/bootstrap-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const [folders, files] = await repository.listDirectory(null);
+    expect(folders).toHaveLength(0);
+    expect(files).toHaveLength(1);
+    expect(files[0]?.id).toBe(fileId);
+
+    const snapshot = await repository.loadDocument(fileId);
+    expect(readNoteText(snapshot.update)).toBe('fetched from remote');
+  });
+
+  it('pushes preexisting cache contents to an empty remote on initialize', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/cache-bootstrap-test');
+
+    await cache.initialize();
+
+    const fileId = await cache.createFile('Cached note', 'mcanvas', null);
+    const note = createNoteState('pushed from cache bootstrap');
+
+    await cache.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/cache-bootstrap-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    expect(remoteSnapshot.manifest.nodes[fileId]?.type).toBe('file');
+    expect(readNoteText(remoteSnapshot.notes[fileId] ?? null)).toBe(
+      'pushed from cache bootstrap',
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('collapses create and delete work into a single pending delete before flush', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/pending-delete-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/pending-delete-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const fileId = await repository.createFile('Transient note', 'mcanvas', null);
+    const note = createNoteState('temporary content');
+
+    await repository.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+    await repository.deleteNode(fileId);
+
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+
+    const storage = getRepositoryTestStorage();
+    const outbox = storage.readText('repositories/pending-delete-test/outbox.json');
+    expect(outbox).not.toBeNull();
+    expect(JSON.parse(outbox ?? '[]')).toEqual([
+      {
+        kind: 'delete-manifest-node',
+        nodeId: fileId,
+        deletedFileIds: [fileId],
+      },
+    ]);
+
+    await repository.flushPending();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    expect(remoteSnapshot.manifest.nodes[fileId]).toBeUndefined();
+    expect(fileId in remoteSnapshot.notes).toBe(false);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('propagates synced subtree deletions to the remote repository', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/delete-sync-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/delete-sync-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const folderId = await repository.createFolder('Docs', null);
+    const fileId = await repository.createFile('Nested note', 'mcanvas', folderId);
+    const note = createNoteState('nested remote delete');
+
+    await repository.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+    await repository.flushPending();
+
+    await repository.deleteNode(folderId);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+
+    await repository.flushPending();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    expect(remoteSnapshot.manifest.nodes[folderId]).toBeUndefined();
+    expect(remoteSnapshot.manifest.nodes[fileId]).toBeUndefined();
+    expect(fileId in remoteSnapshot.notes).toBe(false);
+  });
+
+  it('refresh pulls newer remote state into the cache', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/refresh-remote-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/refresh-remote-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const fileId = await remote.createFile('Remote later', 'mcanvas', null);
+    const note = createNoteState('loaded by refresh');
+
+    await remote.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+    await repository.refresh();
+
+    const [folders, files] = await repository.listDirectory(null);
+    expect(folders).toHaveLength(0);
+    expect(files).toHaveLength(1);
+    expect(files[0]?.id).toBe(fileId);
+
+    const snapshot = await repository.loadDocument(fileId);
+    expect(readNoteText(snapshot.update)).toBe('loaded by refresh');
+  });
+
+  it('recovers from a corrupted outbox file during initialize', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/corrupt-outbox-test');
+    const storage = getRepositoryTestStorage();
+
+    await storage.writeTextFile(
+      'repositories/corrupt-outbox-test/outbox.json',
+      'not valid json',
+    );
+
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/corrupt-outbox-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    expect(storage.readText('repositories/corrupt-outbox-test/outbox.json')).toBe(
+      '[]',
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+});

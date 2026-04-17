@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "vitest run",
+    "test:mutation": "stryker run",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "lint": "biome check .",
@@ -52,6 +54,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
     "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.5.0",
@@ -62,6 +66,7 @@
     "tailwindcss": "^4.2.2",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
-    "vite-plugin-svgr": "^4.5.0"
+    "vite-plugin-svgr": "^4.5.0",
+    "vitest": "3.2.4"
   }
 }
