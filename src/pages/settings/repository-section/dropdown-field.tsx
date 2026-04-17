@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 export const FIELD_TRIGGER_CLASS =
-  'group flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-xl bg-input px-3 text-left text-sm text-text-primary outline-none transition-colors hover:bg-hover-tint disabled:cursor-not-allowed disabled:opacity-60 aria-expanded:bg-hover-tint';
+  'group flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-lg bg-transparent px-2.5 text-left text-sm text-text-primary outline-none transition-colors hover:bg-white aria-expanded:bg-white disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:opacity-60';
 
 export function FieldLabel({ children }: { children: React.ReactNode }) {
   return (

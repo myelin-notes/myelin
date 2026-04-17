@@ -263,32 +263,39 @@ export function RepositorySection() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <OwnerField
-                  disabled={!auth.tokenPresent}
-                  loading={selectors.ownersLoading}
-                  user={selectors.user}
-                  orgs={selectors.orgs}
-                  value={config.owner}
-                  onChange={handleOwnerChange}
-                />
-                <RepoField
-                  disabled={!auth.tokenPresent || !config.owner.trim()}
-                  loading={selectors.reposLoading}
-                  repos={selectors.repos}
-                  value={config.repo}
-                  onChange={handleRepoChange}
-                />
-              </div>
-
-              <div className="max-w-[calc(50%-0.5rem)]">
-                <BranchField
-                  disabled={!auth.tokenPresent || !config.repo.trim()}
-                  loading={selectors.branchesLoading}
-                  branches={selectors.branches}
-                  value={config.branch ?? ''}
-                  onChange={handleBranchChange}
-                />
+              <div>
+                <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
+                  Path
+                </p>
+                <div className="flex items-center gap-0.5 rounded-xl bg-input p-1">
+                  <OwnerField
+                    disabled={!auth.tokenPresent}
+                    loading={selectors.ownersLoading}
+                    user={selectors.user}
+                    orgs={selectors.orgs}
+                    value={config.owner}
+                    onChange={handleOwnerChange}
+                    className="min-w-0 flex-1"
+                  />
+                  <PathDivider>/</PathDivider>
+                  <RepoField
+                    disabled={!auth.tokenPresent || !config.owner.trim()}
+                    loading={selectors.reposLoading}
+                    repos={selectors.repos}
+                    value={config.repo}
+                    onChange={handleRepoChange}
+                    className="min-w-0 flex-1"
+                  />
+                  <PathDivider>@</PathDivider>
+                  <BranchField
+                    disabled={!auth.tokenPresent || !config.repo.trim()}
+                    loading={selectors.branchesLoading}
+                    branches={selectors.branches}
+                    value={config.branch ?? ''}
+                    onChange={handleBranchChange}
+                    className="min-w-0 flex-1"
+                  />
+                </div>
               </div>
 
               {(selectors.ownersError ||
@@ -305,6 +312,17 @@ export function RepositorySection() {
         )}
       </AnimatePresence>
     </section>
+  );
+}
+
+function PathDivider({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none select-none font-heading font-light text-lg text-text-muted/60 tabular-nums leading-none"
+    >
+      {children}
+    </span>
   );
 }
 
