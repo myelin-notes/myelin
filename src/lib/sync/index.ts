@@ -16,6 +16,14 @@ export {
   useRepository,
   useRepositoryStatus,
 } from './context';
+export type { PeerSnapshot } from './live/peer-state';
+export type {
+  PeerControlMessage,
+  PeerMessageKind,
+  PeerMode,
+  SyncMessage,
+  YjsUpdateMessage,
+} from './live/protocol';
 export { noopTransport, type Transport } from './live/transport';
 export {
   type ActiveRepository,
@@ -54,6 +62,7 @@ export type {
   VFSNode,
 } from './repo/types';
 export { FileTypes } from './repo/types';
+export type { NoteSessionOptions } from './session';
 export { NoteSession } from './session';
 export type {
   NoteSessionStatus,

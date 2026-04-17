@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
@@ -12,6 +12,8 @@ import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-elem
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
 import type { YDocManager } from '@/pages/free-canvas/ydoc-manager';
+
+const AUTO_SAVE_INTERVAL_MS = 10_000;
 
 function setupCanvasListeners(
   canvas: HTMLCanvasElement,
@@ -146,6 +148,7 @@ export function useCanvasEngine({
   const repository = useRepository();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const noteSessionRef = useRef<NoteSession | null>(null);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
   const pendingEmbedPos = useRef<Vector2 | null>(null);
   const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
   onCanvasPointerDownRef.current = onCanvasPointerDown;
@@ -187,24 +190,55 @@ export function useCanvasEngine({
     }
   };
 
-  const autoSave = async () => {
+  const saveSession = useCallback(
+    async (session: NoteSession) => {
+      const canvas = canvasRef.current;
+      if (!(canvas && id)) {
+        return;
+      }
+
+      if (!session.hasLocalChanges()) {
+        return;
+      }
+
+      await session.push();
+      await new Promise<void>((resolve, reject) => {
+        canvas.toBlob(async (b) => {
+          if (b === null) {
+            console.warn('Failed to generate thumbnail');
+            reject();
+            return;
+          }
+          await ThumbnailCache.save(id, b);
+          resolve();
+        }, 'image/png');
+      });
+    },
+    [canvasRef, id],
+  );
+
+  const autoSave = useCallback(async () => {
     const session = noteSessionRef.current;
-    if (!(drawableCanvasRef.current && canvasRef.current && session && id)) {
+    if (!session) {
       return;
     }
-    await session.push();
-    await new Promise<void>((resolve, reject) => {
-      canvasRef.current!.toBlob(async (b) => {
-        if (b === null) {
-          console.warn('Failed to generate thumbnail');
-          reject();
-          return;
-        }
-        await ThumbnailCache.save(id, b);
-        resolve();
-      }, 'image/png');
+
+    if (savePromiseRef.current) {
+      await savePromiseRef.current;
+    }
+
+    if (!session.hasLocalChanges()) {
+      return;
+    }
+
+    const savePromise = saveSession(session).finally(() => {
+      if (savePromiseRef.current === savePromise) {
+        savePromiseRef.current = null;
+      }
     });
-  };
+    savePromiseRef.current = savePromise;
+    await savePromise;
+  }, [saveSession]);
 
   const back = async () => {
     await autoSave();
@@ -215,6 +249,9 @@ export function useCanvasEngine({
   useEffect(() => {
     if (!id) {
       noteSessionRef.current = null;
+      setNoteSession(null);
+      setYdoc(null);
+      setEditingElement(null);
       setFileName('');
       return;
     }
@@ -230,6 +267,47 @@ export function useCanvasEngine({
       .catch(console.error);
   }, [id, repository]);
 
+  useEffect(() => {
+    if (!noteSession) {
+      return;
+    }
+
+    let timer: number | null = null;
+
+    const stopAutoSave = () => {
+      if (timer === null) {
+        return;
+      }
+
+      window.clearInterval(timer);
+      timer = null;
+    };
+
+    const startAutoSave = () => {
+      if (timer !== null) {
+        return;
+      }
+
+      timer = window.setInterval(() => {
+        void autoSave().catch(console.error);
+      }, AUTO_SAVE_INTERVAL_MS);
+    };
+
+    const unsubscribe = noteSession.subscribePeerSnapshot((snapshot) => {
+      if (snapshot.isWriter) {
+        startAutoSave();
+        return;
+      }
+
+      stopAutoSave();
+    });
+
+    return () => {
+      unsubscribe();
+      stopAutoSave();
+    };
+  }, [autoSave, noteSession]);
+
   // Initialize canvas, event listeners, and animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -240,6 +318,9 @@ export function useCanvasEngine({
     let disposed = false;
     const priorSession = noteSessionRef.current;
     noteSessionRef.current = null;
+    setNoteSession(null);
+    setYdoc(null);
+    setEditingElement(null);
     void priorSession?.close().catch(console.error);
 
     const removeListeners = setupCanvasListeners(
@@ -311,6 +392,9 @@ export function useCanvasEngine({
       disposed = true;
       const session = noteSessionRef.current;
       noteSessionRef.current = null;
+      setNoteSession(null);
+      setYdoc(null);
+      setEditingElement(null);
       void session?.close().catch(console.error);
       stopAnimation();
       removeListeners();

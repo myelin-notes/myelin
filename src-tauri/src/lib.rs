@@ -1,7 +1,7 @@
 use std::fs;
 use tauri::Manager;
 
-mod peer;
+mod iroh_transport;
 
 #[tauri::command]
 fn create_dir_all(path: &str) -> Result<(), String> {
@@ -28,14 +28,13 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_ocr::init())
-        .manage(peer::PeerState::new())
+        .manage(iroh_transport::IrohState::new())
         .invoke_handler(tauri::generate_handler![
             create_dir_all,
-            peer::peer_host,
-            peer::peer_join,
-            peer::peer_send,
-            peer::peer_disconnect,
-            peer::get_local_ip,
+            iroh_transport::iroh_host,
+            iroh_transport::iroh_join,
+            iroh_transport::iroh_send,
+            iroh_transport::iroh_leave,
         ]);
 
     #[cfg(debug_assertions)]

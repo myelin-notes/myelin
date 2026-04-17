@@ -35,6 +35,7 @@ const PREFS = {
     kind: 'local',
   }),
   githubVaultPassword: pref<string>('github-vault-password', ''),
+  peerId: pref<string>('peer-id', ''),
 };
 
 type PrefKey = keyof typeof PREFS;

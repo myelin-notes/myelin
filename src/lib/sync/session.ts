@@ -1,9 +1,34 @@
 import { DEBUG } from '@/lib/debug';
 import { YDocManager } from '@/pages/free-canvas/ydoc-manager';
+import { getOrCreatePeerId } from './identity';
+import {
+  applyPeerMessage,
+  createPeerState,
+  getPeerSnapshot,
+  type PeerSnapshot,
+  pruneStalePeers,
+  resetRemotePeers,
+} from './live/peer-state';
+import {
+  decodeMessage,
+  encodeMessage,
+  type PeerMessageKind,
+  type PeerMode,
+  type SyncMessage,
+} from './live/protocol';
 import { noopTransport, type Transport } from './live/transport';
 import type { NoteSessionStatus, YjsSyncTarget } from './types';
 
 const PEER_ORIGIN = 'remote-peer';
+const HEARTBEAT_INTERVAL_MS = 5_000;
+const PEER_TIMEOUT_MS = 15_000;
+
+export interface NoteSessionOptions {
+  localPeer?: {
+    peerId: string;
+    mode: PeerMode;
+  };
+}
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) {
@@ -18,33 +43,52 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 export class NoteSession {
-  public readonly status: NoteSessionStatus = {
-    phase: 'idle',
-    lastError: null,
-    lastSyncedAt: Date.now(),
-    remoteRevision: this.initialRevision,
-  };
+  public readonly status: NoteSessionStatus;
 
   private closed = false;
   private closing: Promise<void> | null = null;
   private remoteStateVector: Uint8Array;
   private transport: Transport = noopTransport;
+  private readonly localPeer: {
+    peerId: string;
+    mode: PeerMode;
+  };
+  private readonly peerState: ReturnType<typeof createPeerState>;
+  private readonly peerSnapshotListeners = new Set<
+    (snapshot: PeerSnapshot) => void
+  >();
+  private heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null =
+    null;
 
   constructor(
     public readonly id: string,
     public readonly ydoc: YDocManager,
     private readonly syncTarget: YjsSyncTarget,
-    private readonly initialRevision: string | null,
+    initialRevision: string | null,
     initialStateVector: Uint8Array,
+    options?: NoteSessionOptions,
   ) {
+    this.localPeer = options?.localPeer ?? {
+      peerId: getOrCreatePeerId(),
+      mode: 'owner-device',
+    };
+    this.peerState = createPeerState(
+      this.localPeer.peerId,
+      this.localPeer.mode,
+    );
+    this.status = {
+      phase: 'idle',
+      lastError: null,
+      lastSyncedAt: Date.now(),
+      remoteRevision: initialRevision,
+    };
     this.remoteStateVector = initialStateVector;
 
     this.ydoc.doc.on('update', (update: Uint8Array, origin: unknown) => {
       if (origin !== PEER_ORIGIN && this.transport.connected) {
-        this.transport.send(new Uint8Array(update)).catch((err) => {
-          if (DEBUG) {
-            console.error('[NoteSession] transport send error:', err);
-          }
+        this.sendMessage({
+          type: 'yjs-update',
+          data: new Uint8Array(update),
         });
       }
     });
@@ -53,6 +97,7 @@ export class NoteSession {
   static async open(
     nodeId: string,
     syncTarget: YjsSyncTarget,
+    options?: NoteSessionOptions,
   ): Promise<NoteSession> {
     const initial = await syncTarget.loadDocument(nodeId);
     const ydoc = initial.update
@@ -64,6 +109,7 @@ export class NoteSession {
       syncTarget,
       initial.revision,
       initial.stateVector,
+      options,
     );
   }
 
@@ -75,14 +121,37 @@ export class NoteSession {
     return this.hasRemoteChanges();
   }
 
+  getPeerSnapshot(): PeerSnapshot {
+    return getPeerSnapshot(this.peerState);
+  }
+
+  subscribePeerSnapshot(
+    listener: (snapshot: PeerSnapshot) => void,
+  ): () => void {
+    this.peerSnapshotListeners.add(listener);
+    listener(this.getPeerSnapshot());
+
+    return () => {
+      this.peerSnapshotListeners.delete(listener);
+    };
+  }
+
   setTransport(transport: Transport): void {
-    if (this.closed) {
+    if (this.closed || this.transport === transport) {
       return;
     }
 
-    this.transport.off('message', this.onTransportMessage);
-    this.transport.off('disconnected', this.onTransportDisconnected);
-    this.transport.off('connected', this.onTransportConnected);
+    const previousTransport = this.transport;
+
+    if (previousTransport.connected) {
+      this.sendPeerPresence('left', previousTransport);
+    }
+
+    previousTransport.off('message', this.onTransportMessage);
+    previousTransport.off('disconnected', this.onTransportDisconnected);
+    previousTransport.off('connected', this.onTransportConnected);
+    this.stopHeartbeat();
+    this.updatePeerSnapshot(resetRemotePeers(this.peerState));
 
     this.transport = transport;
 
@@ -91,7 +160,7 @@ export class NoteSession {
     transport.on('connected', this.onTransportConnected);
 
     if (transport.connected) {
-      this.sendInitialState();
+      this.onTransportConnected();
     }
   }
 
@@ -179,11 +248,25 @@ export class NoteSession {
   }
 
   private onTransportMessage = (data: Uint8Array) => {
-    this.ydoc.applyUpdate(data, PEER_ORIGIN);
+    const message = decodeMessage(data);
+    if (!message) {
+      return;
+    }
+
+    if (message.type === 'yjs-update') {
+      this.ydoc.applyUpdate(message.data, PEER_ORIGIN);
+      return;
+    }
+
+    this.updatePeerSnapshot(
+      applyPeerMessage(this.peerState, message, Date.now()),
+    );
   };
 
   private onTransportConnected = () => {
     this.sendInitialState();
+    this.sendPeerPresence('hello');
+    this.startHeartbeat();
   };
 
   private onTransportDisconnected = () => {
@@ -191,11 +274,9 @@ export class NoteSession {
   };
 
   private sendInitialState(): void {
-    const state = this.ydoc.encodeDiff();
-    this.transport.send(state).catch((err) => {
-      if (DEBUG) {
-        console.error('[NoteSession] initial sync error:', err);
-      }
+    this.sendMessage({
+      type: 'yjs-update',
+      data: this.ydoc.encodeDiff(),
     });
   }
 
@@ -215,6 +296,7 @@ export class NoteSession {
     }
 
     this.clearTransport();
+    this.stopHeartbeat();
     this.closed = true;
     this.status.phase = 'closed';
 
@@ -242,6 +324,69 @@ export class NoteSession {
         error instanceof Error ? error : new Error(String(error));
       this.status.phase = 'idle';
       throw error;
+    }
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatTimer !== null) {
+      return;
+    }
+
+    this.heartbeatTimer = globalThis.setInterval(() => {
+      this.sendPeerPresence('heartbeat');
+      this.updatePeerSnapshot(
+        pruneStalePeers(this.peerState, Date.now(), PEER_TIMEOUT_MS),
+      );
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer === null) {
+      return;
+    }
+
+    globalThis.clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+  }
+
+  private sendMessage(
+    message: SyncMessage,
+    transport: Transport = this.transport,
+  ): void {
+    if (!transport.connected) {
+      return;
+    }
+
+    transport.send(encodeMessage(message)).catch((err) => {
+      if (DEBUG) {
+        console.error('[NoteSession] transport send error:', err);
+      }
+    });
+  }
+
+  private sendPeerPresence(
+    kind: PeerMessageKind,
+    transport: Transport = this.transport,
+  ): void {
+    this.sendMessage(
+      {
+        type: 'peer',
+        peerId: this.localPeer.peerId,
+        kind,
+        mode: this.localPeer.mode,
+      },
+      transport,
+    );
+  }
+
+  private updatePeerSnapshot(changed: boolean): void {
+    if (!changed) {
+      return;
+    }
+
+    const snapshot = this.getPeerSnapshot();
+    for (const listener of this.peerSnapshotListeners) {
+      listener(snapshot);
     }
   }
 }
