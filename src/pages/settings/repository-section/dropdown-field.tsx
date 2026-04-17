@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const FIELD_TRIGGER_CLASS =
@@ -9,6 +10,19 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
       {children}
     </label>
   );
+}
+
+export function MenuLoadingRow({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-text-muted">
+      <Loader2 className="size-3.5 shrink-0 animate-spin" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+export function MenuEmptyRow({ label }: { label: string }) {
+  return <div className="px-2.5 py-2 text-sm text-text-muted">{label}</div>;
 }
 
 export function Avatar({

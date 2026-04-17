@@ -1,4 +1,4 @@
-import { ChevronDown, GitBranch, Loader2, Lock } from 'lucide-react';
+import { ChevronDown, GitBranch, Lock } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +8,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { GitHubBranch } from '@/lib/sync';
 import { cn } from '@/lib/utils';
-import { FIELD_TRIGGER_CLASS } from './dropdown-field';
+import {
+  FIELD_TRIGGER_CLASS,
+  MenuEmptyRow,
+  MenuLoadingRow,
+} from './dropdown-field';
 
 export function BranchField({
   disabled,
@@ -25,55 +29,48 @@ export function BranchField({
   onChange: (branch: string) => void;
   className?: string;
 }) {
-  const hasBranches = branches.length > 0;
   const selected = branches.find((b) => b.name === value);
-  const triggerDisabled = disabled || loading || !hasBranches;
+  const hasBranches = branches.length > 0;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        disabled={triggerDisabled}
+        disabled={disabled}
         className={cn(FIELD_TRIGGER_CLASS, className)}
       >
-        {loading ? (
+        <GitBranch className="size-4 shrink-0 text-text-muted" />
+        {value ? (
           <>
-            <Loader2 className="size-4 shrink-0 animate-spin text-text-muted" />
-            <span className="text-text-muted">Loading branches…</span>
-          </>
-        ) : value ? (
-          <>
-            <GitBranch className="size-4 shrink-0 text-text-muted" />
             <span className="truncate">{value}</span>
             {selected?.protected && (
               <Lock className="size-3 shrink-0 text-text-muted" />
             )}
           </>
         ) : (
-          <>
-            <GitBranch className="size-4 shrink-0 text-text-muted" />
-            <span className="truncate text-text-muted">
-              {disabled
-                ? 'Pick repo'
-                : hasBranches
-                  ? 'Select branch'
-                  : 'No branches'}
-            </span>
-          </>
+          <span className="truncate text-text-muted">
+            {disabled ? 'Pick repo' : 'Select branch'}
+          </span>
         )}
         <ChevronDown className="ml-auto size-3.5 shrink-0 text-text-muted transition-transform duration-200 group-data-popup-open:rotate-180" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-80 min-w-48">
-        <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
-          {branches.map((branch) => (
-            <DropdownMenuRadioItem key={branch.name} value={branch.name}>
-              <GitBranch className="size-3.5 shrink-0 text-text-muted" />
-              <span className="truncate">{branch.name}</span>
-              {branch.protected && (
-                <Lock className="ml-auto size-3 shrink-0 text-text-muted" />
-              )}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        {loading && !hasBranches ? (
+          <MenuLoadingRow label="Loading branches…" />
+        ) : !hasBranches ? (
+          <MenuEmptyRow label="No branches" />
+        ) : (
+          <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
+            {branches.map((branch) => (
+              <DropdownMenuRadioItem key={branch.name} value={branch.name}>
+                <GitBranch className="size-3.5 shrink-0 text-text-muted" />
+                <span className="truncate">{branch.name}</span>
+                {branch.protected && (
+                  <Lock className="ml-auto size-3 shrink-0 text-text-muted" />
+                )}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -265,7 +265,7 @@ export function RepositorySection() {
 
               <div>
                 <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
-                  Path
+                  Remote Repository
                 </p>
                 <div className="flex items-center gap-0.5 rounded-xl bg-input p-1">
                   <OwnerField
