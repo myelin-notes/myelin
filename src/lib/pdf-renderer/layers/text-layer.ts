@@ -737,18 +737,30 @@ export async function renderTextLayer(
 
   const mctx = getMeasureCtx();
 
-  const resolveFontFamily = (fontName: string, text: string): string => {
+  const resolveFontConfig = (
+    fontName: string,
+    text: string,
+  ): {
+    fontFamily: string;
+    preferScaleX: boolean;
+  } => {
     const style = styles[fontName];
     const fallbackFamily = style?.fontFamily ?? 'sans-serif';
     const riskyChars = riskyFontChars.get(fontName);
     if (riskyChars) {
       for (const ch of riskyChars) {
         if (text.includes(ch)) {
-          return fallbackFamily;
+          return {
+            fontFamily: fallbackFamily,
+            preferScaleX: true,
+          };
         }
       }
     }
-    return `"${fontName}", ${fallbackFamily}`;
+    return {
+      fontFamily: `"${fontName}", ${fallbackFamily}`,
+      preferScaleX: false,
+    };
   };
 
   const renderSpan = (
@@ -764,6 +776,7 @@ export async function renderTextLayer(
     stroke: string,
     mode: number,
     dir: string,
+    preferScaleX = false,
     allowScaleSingleGlyph = false,
   ) => {
     const style = styles[fontName];
@@ -817,7 +830,11 @@ export async function renderTextLayer(
     if (targetWidth > 0 && measured.width > 0) {
       const widthDelta = targetWidth - measured.width;
       const spaceCount = text.match(SPACE_PATTERN)?.length ?? 0;
-      if (spaceCount > 0 && Math.abs(widthDelta) > 0.01) {
+      if (
+        !preferScaleX &&
+        spaceCount > 0 &&
+        Math.abs(widthDelta) > 0.01
+      ) {
         span.style.wordSpacing = `${widthDelta / spaceCount}px`;
       } else if (allowScaleSingleGlyph || text.length > 1) {
         scaleX = targetWidth / measured.width;
@@ -832,7 +849,10 @@ export async function renderTextLayer(
   if (extractedRuns.length > 0) {
     for (const run of extractedRuns) {
       const dir = pickDirection(pickNearestTextItem(run, textItems));
-      const fontFamily = resolveFontFamily(run.fontName, run.text);
+      const { fontFamily, preferScaleX } = resolveFontConfig(
+        run.fontName,
+        run.text,
+      );
       if (run.segments && run.segments.length > 0) {
         for (const segment of run.segments) {
           renderSpan(
@@ -848,6 +868,7 @@ export async function renderTextLayer(
             run.strokeColor,
             run.renderingMode,
             dir,
+            preferScaleX,
             true,
           );
         }
@@ -866,6 +887,7 @@ export async function renderTextLayer(
         run.strokeColor,
         run.renderingMode,
         dir,
+        preferScaleX,
       );
     }
     return container;
@@ -891,7 +913,10 @@ export async function renderTextLayer(
     }
 
     const { fill, stroke, mode } = pickColor(item, events);
-    const fontFamily = resolveFontFamily(item.fontName, item.str);
+    const { fontFamily, preferScaleX } = resolveFontConfig(
+      item.fontName,
+      item.str,
+    );
     renderSpan(
       item.str,
       item.fontName,
@@ -905,6 +930,7 @@ export async function renderTextLayer(
       stroke,
       mode,
       item.dir,
+      preferScaleX,
     );
   }
 
