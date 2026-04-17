@@ -51,4 +51,10 @@ export interface ITool {
   get label(): string;
   getOptions?(): ToolOption[];
   setOption?(key: string, value: unknown): void;
+  /** Push an option change onto the tool's currently-selected elements. */
+  applyOptionToSelection?(
+    canvas: DrawableCanvas,
+    key: string,
+    value: unknown,
+  ): void;
 }

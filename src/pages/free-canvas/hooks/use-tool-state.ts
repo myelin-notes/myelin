@@ -104,6 +104,10 @@ export function useToolState(
   >(() => {});
   applyOptionRef.current = (tool: ITool, key: string, value: unknown) => {
     tool.setOption?.(key, value);
+    const canvas = drawableCanvasRef.current;
+    if (canvas) {
+      tool.applyOptionToSelection?.(canvas, key, value);
+    }
     setOptionsTick((t) => t + 1);
     UserPrefs.update('toolOptions', (all) => ({
       ...all,
@@ -144,6 +148,10 @@ export function useToolState(
     const tool = canvasTools[selectedToolIndex];
     if (tool?.setOption) {
       tool.setOption(key, value);
+      const canvas = drawableCanvasRef.current;
+      if (canvas) {
+        tool.applyOptionToSelection?.(canvas, key, value);
+      }
       setOptionsTick((t) => t + 1);
       UserPrefs.update('toolOptions', (all) => {
         const opts = { ...all[tool.label], [key]: value };

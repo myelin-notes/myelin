@@ -201,6 +201,25 @@ export class TextElement extends DrawableElement {
     this.syncToYMap({ boxWidth: width, boxHeight: height });
   }
 
+  public setStyle(updates: Partial<TextStyle>) {
+    this._style = { ...this._style, ...updates };
+    this.recomputeBox();
+    this.syncToYMap({
+      color: this._style.color,
+      fontSize: this._style.fontSize,
+      fontFamily: this._style.fontFamily,
+    });
+
+    const textarea = this._textarea;
+    if (textarea && this._canvas) {
+      const zoom = this._canvas.viewport.zoom;
+      textarea.style.fontSize = `${this._style.fontSize * zoom}px`;
+      textarea.style.lineHeight = `${this._style.fontSize * 1.3 * zoom}px`;
+      textarea.style.fontFamily = this._style.fontFamily;
+      textarea.style.color = this._style.color;
+    }
+  }
+
   protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
     if (!this._text || this._editing) {
       return;

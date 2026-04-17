@@ -219,4 +219,24 @@ export class TextTool implements ITool {
       this.fontFamily = value;
     }
   }
+
+  applyOptionToSelection(
+    canvas: DrawableCanvas,
+    key: string,
+    value: unknown,
+  ): void {
+    if (key !== 'color' && key !== 'fontSize' && key !== 'fontFamily') {
+      return;
+    }
+    let touched = false;
+    for (const el of canvas.elements) {
+      if (el instanceof TextElement && el.isSelected) {
+        el.setStyle({ [key]: value } as Parameters<TextElement['setStyle']>[0]);
+        touched = true;
+      }
+    }
+    if (touched) {
+      canvas.updateBounding();
+    }
+  }
 }
