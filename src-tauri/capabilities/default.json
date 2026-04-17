@@ -12,6 +12,16 @@
     "fs:allow-appcache-read-recursive",
     "fs:allow-appcache-write-recursive",
     "dialog:default",
-    "mcp-bridge:default"
+    "stronghold:default",
+    "stronghold:allow-remove-store-record",
+    "mcp-bridge:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.github.com/*" },
+        { "url": "https://github.com/login/device/code" },
+        { "url": "https://github.com/login/oauth/access_token" }
+      ]
+    }
   ]
 }

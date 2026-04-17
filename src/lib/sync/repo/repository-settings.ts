@@ -17,7 +17,7 @@ function normalizeRepositoryConfig(config: RepositoryConfig): RepositoryConfig {
 }
 
 export function getRepositoryConfig(): RepositoryConfig {
-  return UserPrefs.get('repositoryConfig');
+  return normalizeRepositoryConfig(UserPrefs.get('repositoryConfig'));
 }
 
 export function setRepositoryConfig(config: RepositoryConfig): void {
@@ -27,5 +27,7 @@ export function setRepositoryConfig(config: RepositoryConfig): void {
 export function subscribeRepositoryConfig(
   fn: (config: RepositoryConfig) => void,
 ): () => void {
-  return UserPrefs.subscribe('repositoryConfig', fn);
+  return UserPrefs.subscribe('repositoryConfig', (config) => {
+    fn(normalizeRepositoryConfig(config));
+  });
 }

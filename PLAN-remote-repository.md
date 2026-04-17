@@ -2,42 +2,86 @@
 
 ## Context
 
-Myelin stores notes locally (`~/.config/myelin/`). This plan adds remote persistence (starting with GitHub) with a local cache layer, so notes are backed up and accessible from multiple devices.
+Myelin currently stores notes in app data through `LocalRepository`. This plan adds a configurable remote backend (starting with GitHub) without regressing local performance, offline editing, or crash recovery.
+
+## Design constraints
+
+- GitHub credentials never live in renderer state or `localStorage`.
+- Repository selection is owned by app-level context, not a hardcoded singleton.
+- The active repository has an explicit lifecycle: initialize, refresh, flush pending work, and dispose.
+- The local cache remains the fast path for reads and writes. Remote sync is asynchronous and resumable.
+- Existing local-only affordances such as "Reveal in Finder" continue to compile by returning `null` on backends that do not support them.
 
 ---
 
-## Phase 1: Repository Abstraction (Factory + Context)
+## Phase 1: Repository Abstraction + Lifecycle
 
-**Why**: `export const repository = new LocalRepository()` is a hardcoded singleton. Need configurable backends before adding GitHub.
+**Why**: `export const repository = new LocalRepository()` is a hardcoded singleton. We need a replaceable active repository and a place to own initialization and flush behavior.
 
 ### New files
 
-**`src/lib/sync/repo/config.ts`** — Repository configuration types:
+**`src/lib/sync/repo/config.ts`** - Repository configuration types:
 ```typescript
 type RepositoryConfig =
   | { kind: 'local' }
-  | { kind: 'github'; owner: string; repo: string; token: string; branch?: string }
+  | {
+      kind: 'github';
+      owner: string;
+      repo: string;
+      branch?: string;
+      credentialId: string;
+    };
+
+interface RepositoryLifecycle {
+  initialize(): Promise<void>;
+  refresh(): Promise<void>;
+  flushPending(): Promise<void>;
+  dispose(): Promise<void>;
+}
+
+type ActiveRepository = Repository & YjsSyncTarget & RepositoryLifecycle;
 ```
 
-**`src/lib/sync/repo/factory.ts`** — Creates repository from config:
+**`src/lib/sync/repo/factory.ts`** - Creates the active repository:
 ```typescript
-function createRepository(config: RepositoryConfig): Repository & YjsSyncTarget
+function createRepository(config: RepositoryConfig): ActiveRepository
 ```
 
-**`src/lib/sync/context.ts`** — React context + provider:
+**`src/lib/sync/context.ts`** - React context + provider:
 ```typescript
-const RepositoryContext = createContext<Repository & YjsSyncTarget>(...)
-function RepositoryProvider({ config, children })
-function useRepository(): Repository & YjsSyncTarget
+interface RepositoryStatus {
+  config: RepositoryConfig;
+  initializing: boolean;
+  online: boolean;
+  pendingRemoteWrites: number;
+  lastRemoteSyncAt: number | null;
+  lastError: Error | null;
+}
+
+interface RepositoryContextValue {
+  repository: ActiveRepository;
+  status: RepositoryStatus;
+}
+
+const RepositoryContext = createContext<RepositoryContextValue>(...);
+
+function RepositoryProvider({ children })
+function useRepository(): ActiveRepository
+function useRepositoryStatus(): RepositoryStatus
 ```
 
 ### Modify
 
+**`src/lib/sync/repo/types.ts`**
+- Add `getRevealPath(nodeId: string): Promise<string | null>` to the base `Repository` interface.
+- `LocalRepository` keeps its current implementation.
+- Remote-backed repositories return `null`.
+
 **`src/lib/sync/index.ts`**
 - Remove: `export const repository = new LocalRepository()`
-- Add: re-export context/factory
+- Add: re-export context/factory hooks and types.
 
-**All repository consumers** — replace `repository` import with `useRepository()` hook:
+**All repository consumers** - replace `repository` imports with `useRepository()`:
 1. `src/pages/free-canvas/hooks/use-canvas-engine.ts`
 2. `src/components/layout/sidebar.tsx`
 3. `src/pages/library/index.tsx`
@@ -48,69 +92,153 @@ function useRepository(): Repository & YjsSyncTarget
 8. `src/pages/library/explorer/use-drop-target.ts`
 9. `src/pages/library/tag-manage-dialog.tsx`
 
-**App root** — wrap in `<RepositoryProvider>`.
+**App root**
+- Wrap the app in `<RepositoryProvider>`.
+- Provider owns repository creation, `initialize()` on mount, and `dispose()` on unmount.
+- Provider installs `beforeunload` and Tauri close handlers that call `flushPending()`.
 
 ### Verify
-- App behaves identically with default `{ kind: 'local' }` config.
+
+- App behavior is unchanged with default `{ kind: 'local' }`.
+- Debug "Reveal in Finder" still works locally and safely no-ops on non-local backends.
 
 ---
 
-## Phase 2: GitHub Repository Backend
+## Phase 2: Secure GitHub Configuration + Settings Integration
 
-**Why**: Remote persistence. Notes stored in a user-owned GitHub repo.
+**Why**: The app needs a real source of repository configuration, and GitHub credentials must not be exposed to the renderer.
 
-### New file: `src/lib/sync/repo/github.ts`
+### New Rust module
+
+**`src-tauri/src/github_credentials.rs`**
+
+Owns secure credential access for GitHub tokens.
+
+Suggested commands:
+- `github_store_token(credential_id, token) -> ()`
+- `github_clear_token(credential_id) -> ()`
+- `github_has_token(credential_id) -> bool`
+
+### Storage rules
+
+- Non-secret settings (`kind`, `owner`, `repo`, `branch`, `credentialId`) live in `UserPrefs`.
+- The GitHub token is stored only in OS secure storage via Rust.
+- If secure storage is unavailable, GitHub auth setup fails closed and the GitHub backend cannot be enabled on that device.
+
+### Modify
+
+**`src/lib/user-prefs.ts`**
+- Add repository config preference entries for non-secret settings only.
+- Do not add token storage.
+
+**Settings UI**
+- Add backend selection (`local` / `github`).
+- Add owner/repo/branch inputs.
+- Add token connect/disconnect controls that call secure Rust commands.
+- Surface `github_has_token()` so the UI can show connected vs missing credentials without reading the token.
+- If secure storage is unavailable, show GitHub sync as unavailable instead of degrading to plaintext storage.
+
+### Verify
+
+- User can switch between local and GitHub backends in Settings.
+- Restart preserves backend selection and repo coordinates.
+- Restart does not require re-entering the token if secure storage still has it.
+
+---
+
+## Phase 3: GitHub Repository Backend (Rust-bridged)
+
+**Why**: Remote persistence should use GitHub without exposing tokens to the webview.
+
+### New frontend file
+
+**`src/lib/sync/repo/github.ts`**
 
 ```typescript
 class GitHubRepository implements Repository, YjsSyncTarget {
   readonly kind = 'github';
   readonly capabilities = { polling: true, liveSync: false };
 
-  constructor(config: { owner: string; repo: string; token: string; branch: string });
+  constructor(config: {
+    owner: string;
+    repo: string;
+    branch: string;
+    credentialId: string;
+  });
 }
 ```
 
-**GitHub repo structure:**
+This class is a thin adapter over Rust commands. It does not call `fetch()` directly.
+
+### New Rust file
+
+**`src-tauri/src/github_repo.rs`**
+
+Responsibilities:
+- Load the GitHub token from secure storage using `credentialId`
+- Make authenticated GitHub API calls with `reqwest`
+- Return typed results to the frontend without ever returning the raw token
+
+Suggested command surface:
+- `github_get_contents(path) -> { sha: string | null, bytes: number[] | null }`
+- `github_put_contents(path, bytes, sha, message) -> { sha: string }`
+- `github_delete_contents(path, sha, message) -> ()`
+
+### GitHub repo structure
+
 ```
 manifest.json
 files/
   {uuid}.myelin
 ```
 
-**Implementation details:**
-- VFS operations → read/write `manifest.json` via GitHub Contents API
-- Note data → read/write `files/*.myelin` via Contents API (base64 encoded)
-- Optimistic concurrency via SHA (Contents API requires blob SHA for updates)
-- `pushUpdates()`: fetch current SHA → load into temp Y.Doc → apply update → encode → PUT with SHA → retry on 409
-- `openSession()`: same pattern as LocalRepository — load doc, create NoteSession with `this` as sync target
+### Implementation details
 
-**GitHub API surface used:**
-- `GET /repos/:owner/:repo/contents/:path` — read file
-- `PUT /repos/:owner/:repo/contents/:path` — create/update file (with SHA)
-- `DELETE /repos/:owner/:repo/contents/:path` — delete file (with SHA)
-- Auth: `Authorization: Bearer {token}` header
-- All via `fetch()` from the webview
+- VFS operations mutate `manifest.json`.
+- Note data reads/writes `files/*.myelin`.
+- Optimistic concurrency uses GitHub blob SHA.
+- On SHA mismatch:
+  1. refetch remote content
+  2. apply the requested mutation against the fresh state
+  3. retry
+- `openSession()` mirrors `LocalRepository` by loading the note and creating a `NoteSession`.
+- `getRevealPath()` returns `null`.
 
 ### Modify
 
-**`src-tauri/tauri.conf.json`** — CSP: allow `https://api.github.com` in connect-src.
+**`src-tauri/src/lib.rs`**
+- Register the secure credential and GitHub repository commands.
 
-**`src/lib/sync/repo/factory.ts`** — Add github case.
+**`src/lib/sync/repo/factory.ts`**
+- Add the GitHub case.
+
+### CSP note
+
+No webview CSP change is required if GitHub traffic stays in Rust.
 
 ### Verify
-- Configure GitHub PAT + repo. Create a note. See `manifest.json` and `files/{id}.myelin` in GitHub.
-- Edit and save. File updated in GitHub.
+
+- Configure GitHub backend in Settings.
+- Create a note and observe `manifest.json` plus `files/{id}.myelin` in the target repo.
+- Edit a note and observe the corresponding file update in GitHub.
 
 ---
 
-## Phase 3: Local Cache Layer
+## Phase 4: Cached Repository + Persistent Outbox
 
-**Why**: GitHub API is slow and has rate limits. Local cache provides fast reads, offline resilience, and crash recovery.
+**Why**: GitHub is slower and less reliable than the local filesystem. The app needs a cache-backed repository that stays responsive offline and can resume pending work after restart.
 
-### New file: `src/lib/sync/repo/cached.ts`
+### New file
+
+**`src/lib/sync/repo/cached.ts`**
 
 ```typescript
-class CachedRepository implements Repository, YjsSyncTarget {
+type PendingOp =
+  | { kind: 'upsert-manifest-node'; nodeId: string }
+  | { kind: 'delete-manifest-node'; nodeId: string }
+  | { kind: 'push-note'; noteId: string };
+
+class CachedRepository implements Repository, YjsSyncTarget, RepositoryLifecycle {
   constructor(
     private remote: Repository & YjsSyncTarget,
     private cache: LocalRepository,
@@ -118,27 +246,63 @@ class CachedRepository implements Repository, YjsSyncTarget {
 }
 ```
 
-**Strategy:**
-- **Reads**: serve from cache. Background-sync from remote periodically or on explicit refresh.
-- **Writes (VFS ops)**: write to remote first, then update cache. If remote fails, operation fails (don't silently diverge).
-- **YjsSyncTarget**:
-  - `loadDocument()`: load from cache. Pull from remote, merge via CRDT, update cache.
-  - `pushUpdates()`: push to cache immediately (fast). Push to remote (may be slower). If remote push fails, cache is still up-to-date — retry remote later.
-  - `pullUpdates()`: pull from remote, merge into cache, return merged result.
-- **On app launch**: pull manifest from remote, reconcile with local cache (remote wins for metadata, CRDT merge for note content).
-- **Flush on close**: if cache has unpushed changes, push to remote before exit.
+### Strategy
+
+- **Reads**: serve from cache immediately.
+- **VFS writes**: apply to cache immediately, then enqueue a semantic manifest operation in a persistent outbox.
+- **Yjs note writes**: apply to cache immediately, then enqueue a `push-note` operation keyed by note ID. Coalesce repeated pushes for the same note.
+- **Outbox persistence**: store pending operations in app data so a force-quit does not lose unsynced work.
+- **Replay**: run on `initialize()`, periodic background sync, manual `refresh()`, and `flushPending()`.
+- **Refresh behavior**: `refresh()` is an immediate reconciliation action, not a persisted outbox job.
+- **Conflict handling**:
+  - Manifest conflicts refetch the latest remote manifest and replay pending semantic operations.
+  - Note conflicts still use CRDT merge through the existing `pushUpdates()` / `pullUpdates()` flow.
+
+### Behavioral rules
+
+- Offline create/rename/move/tag/delete should continue to work against the cache.
+- Remote status is eventual, not blocking, for normal editing.
+- `flushPending()` is the "drain the outbox now" entry point used during app close.
 
 ### Modify
 
-**`src/lib/sync/repo/factory.ts`** — GitHub config returns `new CachedRepository(new GitHubRepository(config), new LocalRepository())`.
+**`src/lib/sync/repo/factory.ts`**
+- GitHub config returns `new CachedRepository(new GitHubRepository(config), new LocalRepository())`.
 
-**`src/pages/free-canvas/hooks/use-canvas-engine.ts`** — Add `beforeunload` / Tauri `close-requested` listener to ensure session flush on unexpected close.
+**`src/lib/sync/repo/local.ts`**
+- Keep as the cache implementation and reference VFS/Yjs behavior.
 
 ### Verify
-- Configure GitHub backend. Create and edit notes. Works as before but backed by GitHub.
-- Disconnect network. App continues working from cache.
-- Reconnect. Changes sync to GitHub.
-- Force-kill app. Restart. Local cache has latest state. Pushes diff to GitHub on next session open.
+
+- Configure GitHub backend. Create, rename, move, tag, and edit notes while online.
+- Disconnect the network. The same actions continue to work locally.
+- Reconnect. Pending manifest and note operations replay to GitHub.
+- Force-kill the app. Restart. The outbox replays and GitHub catches up.
+
+---
+
+## Phase 5: Session + App Lifecycle Wiring
+
+**Why**: Repository lifecycle and note-session lifecycle have to meet cleanly at route changes and app shutdown.
+
+### Modify
+
+**`src/lib/sync/session.ts`**
+- `close()` should push dirty local Yjs state before marking the session closed.
+- Keep transport cleanup after push so in-memory peers do not keep sending updates during shutdown.
+
+**`src/pages/free-canvas/hooks/use-canvas-engine.ts`**
+- Close the previous `NoteSession` on file changes and unmount, awaiting the close where practical.
+- Register a close handler that closes the active session before app shutdown.
+
+**`src/lib/sync/context.ts`**
+- Provider calls `flushPending()` during `beforeunload` and Tauri close requests.
+- Expose repository status so the UI can surface pending remote writes later if desired.
+
+### Verify
+
+- Navigating away from a canvas flushes the current note session.
+- Closing the window flushes both the active note session and the repository outbox.
 
 ---
 
@@ -148,8 +312,12 @@ class CachedRepository implements Repository, YjsSyncTarget {
 |------|------|
 | `src/lib/sync/repo/types.ts` | Repository + VFS type definitions |
 | `src/lib/sync/types.ts` | YjsSyncTarget interface |
-| `src/lib/sync/session.ts` | NoteSession — ties sync target + transport |
-| `src/lib/sync/repo/local.ts` | LocalRepository (reference implementation) |
-| `src/lib/sync/index.ts` | Current singleton export → becomes re-exports |
-| `src/lib/user-prefs.ts` | User preferences (localStorage) |
-| `src/pages/free-canvas/hooks/use-canvas-engine.ts` | Wires session + canvas + auto-save |
+| `src/lib/sync/session.ts` | NoteSession - ties sync target + transport |
+| `src/lib/sync/repo/local.ts` | LocalRepository - cache and local backend |
+| `src/lib/sync/repo/github.ts` | Frontend adapter for GitHub backend |
+| `src/lib/sync/repo/cached.ts` | Cache-backed repository with outbox |
+| `src/lib/sync/context.ts` | Active repository provider + lifecycle owner |
+| `src/lib/user-prefs.ts` | Non-secret repository preferences |
+| `src-tauri/src/github_credentials.rs` | Secure credential commands |
+| `src-tauri/src/github_repo.rs` | Rust-side GitHub API client |
+| `src/pages/free-canvas/hooks/use-canvas-engine.ts` | Session lifecycle wiring |

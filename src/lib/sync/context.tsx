@@ -134,21 +134,18 @@ export function RepositoryProvider({
 
     if (isTauriWindowAvailable()) {
       const currentWindow = getCurrentWindow();
-      unlistenPromise = currentWindow.onCloseRequested(async (event) => {
+      unlistenPromise = currentWindow.onCloseRequested(async () => {
         if (closing) {
           return;
         }
 
         closing = true;
-        event.preventDefault();
 
         try {
           await repository.flushPending();
         } catch (error) {
           console.error(error);
         }
-
-        await currentWindow.destroy();
       });
     }
 

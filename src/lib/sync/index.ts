@@ -12,11 +12,19 @@ export {
   type RepositoryLifecycle,
 } from './repo/config';
 export { createRepository } from './repo/factory';
+export type { GitHubDeviceAuthPollResult } from './repo/github-credentials';
 export {
+  beginGitHubDeviceAuth,
+  cancelGitHubDeviceAuth,
   clearGitHubToken,
   hasGitHubToken,
+  isGitHubDeviceAuthAvailable,
   isGitHubSecureStorageAvailable,
+  openGitHubDeviceAuth,
+  pollGitHubDeviceAuth,
+  startGitHubDeviceAuth,
   storeGitHubToken,
+  waitForGitHubDeviceAuth,
 } from './repo/github-credentials';
 export {
   getRepositoryConfig,

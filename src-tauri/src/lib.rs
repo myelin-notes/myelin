@@ -1,7 +1,6 @@
 use std::fs;
+use tauri::Manager;
 
-mod github_credentials;
-mod github_repo;
 mod peer;
 
 #[tauri::command]
@@ -13,20 +12,25 @@ fn create_dir_all(path: &str) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
+        .setup(|app| {
+            let salt_path = app
+                .path()
+                .app_local_data_dir()
+                .expect("could not resolve app local data path")
+                .join("stronghold-salt.txt");
+            app.handle().plugin(
+                tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build(),
+            )?;
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_ocr::init())
         .manage(peer::PeerState::new())
         .invoke_handler(tauri::generate_handler![
             create_dir_all,
-            github_credentials::github_clear_token,
-            github_credentials::github_has_token,
-            github_credentials::github_secure_storage_available,
-            github_credentials::github_store_token,
-            github_repo::github_delete_contents,
-            github_repo::github_get_contents,
-            github_repo::github_put_contents,
             peer::peer_host,
             peer::peer_join,
             peer::peer_send,

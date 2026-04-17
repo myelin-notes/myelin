@@ -1,34 +1,29 @@
-import { useCallback, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check,
+  ClipboardCopy,
   ExternalLink,
   Github,
   HardDrive,
-  KeyRound,
   Loader2,
   LogOut,
   X,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
+  beginGitHubDeviceAuth,
+  cancelGitHubDeviceAuth,
   clearGitHubToken,
-  hasGitHubToken,
-  isGitHubSecureStorageAvailable,
-  storeGitHubToken,
-  type RepositoryConfig,
   getRepositoryConfig,
+  hasGitHubToken,
+  isGitHubDeviceAuthAvailable,
+  openGitHubDeviceAuth,
+  type RepositoryConfig,
   setRepositoryConfig,
   subscribeRepositoryConfig,
+  waitForGitHubDeviceAuth,
 } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
@@ -79,13 +74,13 @@ function KindCard({
         <div className="min-w-0">
           <span
             className={cn(
-              'block text-sm font-medium transition-colors',
+              'block font-medium text-sm transition-colors',
               selected ? 'text-accent-navy' : 'text-text-primary',
             )}
           >
             {label}
           </span>
-          <span className="mt-0.5 block text-xs leading-relaxed text-text-muted">
+          <span className="mt-0.5 block text-text-muted text-xs leading-relaxed">
             {description}
           </span>
         </div>
@@ -94,25 +89,36 @@ function KindCard({
   );
 }
 
-function TokenStatusBadge({
+function AuthStatusBadge({
   hasToken,
   checking,
+  polling,
 }: {
   hasToken: boolean;
   checking: boolean;
+  polling: boolean;
 }) {
   if (checking) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] uppercase tracking-widest text-text-muted">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] text-text-muted uppercase tracking-widest">
         <Loader2 className="size-3 animate-spin" />
         Checking
       </span>
     );
   }
 
+  if (polling) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] text-text-muted uppercase tracking-widest">
+        <Loader2 className="size-3 animate-spin" />
+        Authorizing
+      </span>
+    );
+  }
+
   if (hasToken) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-green/20 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-text-green">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-green/20 px-2.5 py-1 font-medium text-[10px] text-text-green uppercase tracking-widest">
         <span className="size-1.5 rounded-full bg-current" />
         Connected
       </span>
@@ -120,101 +126,61 @@ function TokenStatusBadge({
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] uppercase tracking-widest text-text-muted">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] text-text-muted uppercase tracking-widest">
       <span className="size-1.5 rounded-full bg-current" />
       Not connected
     </span>
   );
 }
 
-function TokenDialog({
-  open,
-  onOpenChange,
-  onSubmit,
+function DeviceCodeDisplay({
+  userCode,
+  onCopy,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (token: string) => void;
+  userCode: string;
+  onCopy: () => void;
 }) {
-  const [token, setToken] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const handleSubmit = async () => {
-    const trimmed = token.trim();
-    if (!trimmed) return;
-
-    setSaving(true);
-    setError(null);
-    try {
-      onSubmit(trimmed);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save token');
-    } finally {
-      setSaving(false);
-    }
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(userCode);
+    setCopied(true);
+    onCopy();
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  useEffect(() => {
-    if (!open) {
-      setToken('');
-      setError(null);
-    }
-  }, [open]);
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>GitHub Personal Access Token</DialogTitle>
-          <DialogDescription>
-            Create a{' '}
-            <a
-              href="https://github.com/settings/tokens/new?scopes=repo&description=Myelin"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-0.5 text-accent-navy underline underline-offset-3"
-            >
-              fine-grained token
-              <ExternalLink className="size-3" />
-            </a>{' '}
-            with <strong>Contents</strong> read &amp; write access to your
-            repository. The token is stored securely in your system keychain.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 pt-1">
-          <div className="relative">
-            <KeyRound className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-text-muted" />
-            <Input
-              type="password"
-              placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleSubmit();
-              }}
-              className="pl-8"
-              autoFocus
-            />
-          </div>
-          {error && (
-            <p className="flex items-center gap-1.5 text-xs text-destructive">
-              <X className="size-3" />
-              {error}
-            </p>
-          )}
+    <motion.div
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: 'auto', opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{ duration: 0.15, ease: 'easeInOut' }}
+      className="overflow-hidden"
+    >
+      <div className="flex items-center justify-between rounded-xl bg-white px-5 py-4 shadow-ambient ring-1 ring-border-subtle">
+        <div>
+          <p className="text-[10px] text-text-muted uppercase tracking-widest">
+            Enter this code on GitHub
+          </p>
+          <p className="mt-1.5 font-mono font-semibold text-2xl text-accent-navy tracking-[0.25em]">
+            {userCode}
+          </p>
         </div>
-        <DialogFooter>
-          <Button
-            onClick={() => void handleSubmit()}
-            disabled={!token.trim() || saving}
-          >
-            {saving && <Loader2 className="size-3.5 animate-spin" />}
-            Save token
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void handleCopy()}
+          className="shrink-0"
+        >
+          {copied ? (
+            <Check className="size-3.5" />
+          ) : (
+            <ClipboardCopy className="size-3.5" />
+          )}
+          {copied ? 'Copied' : 'Copy'}
+        </Button>
+      </div>
+    </motion.div>
   );
 }
 
@@ -222,11 +188,17 @@ export function RepositorySection() {
   const [config, setConfig] = useState<RepositoryConfig>(getRepositoryConfig);
   const [tokenPresent, setTokenPresent] = useState(false);
   const [checkingToken, setCheckingToken] = useState(false);
-  const [secureAvailable, setSecureAvailable] = useState(true);
-  const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
+  const [authAvailable, setAuthAvailable] = useState(true);
+  const [polling, setPolling] = useState(false);
+  const [userCode, setUserCode] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const abortRef = useRef<AbortController | null>(null);
 
   const credentialId =
-    config.kind === 'github' ? config.credentialId || 'default' : 'default';
+    config.kind === 'github'
+      ? config.credentialId.trim() || 'default'
+      : 'default';
 
   useEffect(() => {
     return subscribeRepositoryConfig(setConfig);
@@ -235,14 +207,23 @@ export function RepositorySection() {
   const checkToken = useCallback(async () => {
     setCheckingToken(true);
     try {
-      const available = await isGitHubSecureStorageAvailable();
-      setSecureAvailable(available);
-      if (available) {
-        const has = await hasGitHubToken(credentialId);
-        setTokenPresent(has);
+      const [available, has] = await Promise.all([
+        isGitHubDeviceAuthAvailable(),
+        hasGitHubToken(credentialId),
+      ]);
+
+      setAuthAvailable(available);
+      setTokenPresent(has);
+      if (has) {
+        setAuthError(null);
       }
-    } catch {
+    } catch (error) {
       setTokenPresent(false);
+      setAuthError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to read GitHub authentication state',
+      );
     } finally {
       setCheckingToken(false);
     }
@@ -251,6 +232,12 @@ export function RepositorySection() {
   useEffect(() => {
     void checkToken();
   }, [checkToken]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const handleKindChange = (kind: RepoKind) => {
     if (kind === 'local') {
@@ -270,26 +257,87 @@ export function RepositorySection() {
     field: 'owner' | 'repo' | 'branch',
     value: string,
   ) => {
-    if (config.kind !== 'github') return;
+    if (config.kind !== 'github') {
+      return;
+    }
     setRepositoryConfig({ ...config, [field]: value });
   };
 
-  const handleTokenSubmit = async (token: string) => {
-    await storeGitHubToken(credentialId, token);
-    setTokenPresent(true);
-    setTokenDialogOpen(false);
+  const handleSignIn = async () => {
+    setAuthError(null);
+
+    const abort = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = abort;
+
+    try {
+      const payload = await beginGitHubDeviceAuth(credentialId);
+      if (abort.signal.aborted) {
+        return;
+      }
+
+      setUserCode(payload.userCode);
+      setPolling(true);
+      await openGitHubDeviceAuth(payload);
+
+      const result = await waitForGitHubDeviceAuth(credentialId, {
+        signal: abort.signal,
+      });
+
+      if (abort.signal.aborted) {
+        return;
+      }
+
+      if (result.status === 'complete') {
+        setTokenPresent(true);
+        setAuthError(null);
+      } else {
+        setAuthError(result.error);
+      }
+    } catch (e) {
+      if (abort.signal.aborted) {
+        return;
+      }
+      setAuthError(e instanceof Error ? e.message : 'Failed to sign in');
+    } finally {
+      if (!abort.signal.aborted) {
+        setPolling(false);
+        setUserCode(null);
+      }
+    }
+  };
+
+  const handleCancelAuth = async () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setPolling(false);
+    setUserCode(null);
+    try {
+      await cancelGitHubDeviceAuth(credentialId);
+    } catch {
+      // best-effort cancel
+    }
   };
 
   const handleSignOut = async () => {
     await clearGitHubToken(credentialId);
     setTokenPresent(false);
+    setAuthError(null);
   };
+
+  const authDescription = polling
+    ? 'Enter the code on GitHub to finish signing in'
+    : tokenPresent
+      ? 'Signed in via GitHub'
+      : !authAvailable
+        ? 'GitHub authentication is unavailable'
+        : 'Sign in with your GitHub account';
 
   return (
     <section>
       <div className="mb-6 flex items-baseline justify-between">
         <h3 className="font-heading text-xl">Repository</h3>
-        <span className="text-[10px] uppercase tracking-widest text-text-muted">
+        <span className="text-[10px] text-text-muted uppercase tracking-widest">
           Sync
         </span>
       </div>
@@ -320,28 +368,24 @@ export function RepositorySection() {
             transition={{ duration: 0.2, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-5 space-y-5">
-              {/* Token / Auth */}
+            <div className="mt-5 space-y-4">
               <div className="flex items-center justify-between rounded-xl bg-input px-5 py-4">
                 <div className="flex items-center gap-3">
                   <Github className="size-5 text-text-secondary" />
                   <div>
-                    <p className="text-sm font-medium text-text-primary">
+                    <p className="font-medium text-sm text-text-primary">
                       GitHub Authentication
                     </p>
-                    <p className="mt-0.5 text-xs text-text-muted">
-                      {!secureAvailable
-                        ? 'Secure storage unavailable on this device'
-                        : tokenPresent
-                          ? 'Personal access token stored in keychain'
-                          : 'Sign in to connect your repository'}
+                    <p className="mt-0.5 text-text-muted text-xs">
+                      {authDescription}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <TokenStatusBadge
+                  <AuthStatusBadge
                     hasToken={tokenPresent}
                     checking={checkingToken}
+                    polling={polling}
                   />
                   {tokenPresent ? (
                     <Button
@@ -353,69 +397,78 @@ export function RepositorySection() {
                       <LogOut className="size-3.5" />
                       Sign out
                     </Button>
+                  ) : polling ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleCancelAuth()}
+                      className="text-text-muted"
+                    >
+                      <X className="size-3.5" />
+                      Cancel
+                    </Button>
                   ) : (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setTokenDialogOpen(true)}
-                      disabled={!secureAvailable}
+                      onClick={() => void handleSignIn()}
+                      disabled={!authAvailable}
                     >
-                      <KeyRound className="size-3.5" />
+                      <ExternalLink className="size-3.5" />
                       Sign in
                     </Button>
                   )}
                 </div>
               </div>
 
-              {/* Repo fields */}
+              <AnimatePresence>
+                {userCode && (
+                  <DeviceCodeDisplay userCode={userCode} onCopy={() => {}} />
+                )}
+              </AnimatePresence>
+
+              {authError && (
+                <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                  {authError}
+                </p>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-[10px] uppercase tracking-widest text-text-muted">
+                  <label className="mb-1.5 block text-[10px] text-text-muted uppercase tracking-widest">
                     Owner
                   </label>
                   <Input
                     placeholder="username"
                     value={config.owner}
-                    onChange={(e) =>
-                      updateGitHubField('owner', e.target.value)
-                    }
+                    onChange={(e) => updateGitHubField('owner', e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-[10px] uppercase tracking-widest text-text-muted">
+                  <label className="mb-1.5 block text-[10px] text-text-muted uppercase tracking-widest">
                     Repository
                   </label>
                   <Input
                     placeholder="my-notes"
                     value={config.repo}
-                    onChange={(e) =>
-                      updateGitHubField('repo', e.target.value)
-                    }
+                    onChange={(e) => updateGitHubField('repo', e.target.value)}
                   />
                 </div>
               </div>
               <div className="max-w-[calc(50%-0.5rem)]">
-                <label className="mb-1.5 block text-[10px] uppercase tracking-widest text-text-muted">
+                <label className="mb-1.5 block text-[10px] text-text-muted uppercase tracking-widest">
                   Branch
                 </label>
                 <Input
                   placeholder="main"
                   value={config.branch ?? ''}
-                  onChange={(e) =>
-                    updateGitHubField('branch', e.target.value)
-                  }
+                  onChange={(e) => updateGitHubField('branch', e.target.value)}
                 />
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      <TokenDialog
-        open={tokenDialogOpen}
-        onOpenChange={setTokenDialogOpen}
-        onSubmit={(token) => void handleTokenSubmit(token)}
-      />
     </section>
   );
 }

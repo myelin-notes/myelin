@@ -172,10 +172,7 @@ pub async fn peer_join(
 }
 
 #[tauri::command]
-pub async fn peer_send(
-    state: tauri::State<'_, PeerState>,
-    data: Vec<u8>,
-) -> Result<(), String> {
+pub async fn peer_send(state: tauri::State<'_, PeerState>, data: Vec<u8>) -> Result<(), String> {
     let mut guard = state.writer.lock().await;
     let writer = guard
         .as_mut()

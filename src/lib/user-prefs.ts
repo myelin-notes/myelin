@@ -34,6 +34,7 @@ const PREFS = {
   repositoryConfig: pref<RepositoryConfig>('repository-config', {
     kind: 'local',
   }),
+  githubVaultPassword: pref<string>('github-vault-password', ''),
 };
 
 type PrefKey = keyof typeof PREFS;

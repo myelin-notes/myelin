@@ -1,54 +1,22 @@
-import * as Y from 'yjs';
-import { invoke } from '@tauri-apps/api/core';
-import { ThumbnailCache } from '@/lib/thumbnail-cache';
-import { NoteSession } from '../session';
-import type {
-  YjsSyncPushOptions,
-  YjsSyncPushResult,
-  YjsSyncSnapshot,
-  YjsSyncTarget,
-} from '../types';
-import type { RepositoryLifecycle } from './config';
+import { fetch } from '@tauri-apps/plugin-http';
+import { BaseRepository } from './base';
+import { getGitHubToken } from './github-credentials';
 import {
-  addChild,
-  createDocFromBytes,
   createEmptyManifest,
-  createFileNode,
-  createFolderNode,
-  createNodeId,
-  deleteNodeFromManifest,
-  getFolderChain,
-  getNodesByAnyTag,
   getNotePath,
-  getRecentFiles,
-  getStats,
-  getUniqueFileName,
-  listDirectoryNodes,
-  listTags,
   MANIFEST_PATH,
   migrateManifest,
-  moveNodeInManifest,
-  searchNodes,
   type VFSManifest,
 } from './shared';
-import type {
-  FileType,
-  Repository,
-  RepositoryCapabilities,
-  RepositoryStats,
-  RepositoryTag,
-  VFSFileNode,
-  VFSFolderNode,
-  VFSNode,
-} from './types';
+import type { RepositoryCapabilities } from './types';
 
-interface GitHubContentPayload {
-  sha: string | null;
-  bytes: number[] | null;
+interface GitHubContentsResponse {
+  sha: string;
+  content?: string | null;
 }
 
-interface GitHubWritePayload {
-  sha: string;
+interface GitHubWriteResponse {
+  content: { sha: string };
 }
 
 interface GitHubRepositoryConfig {
@@ -58,314 +26,71 @@ interface GitHubRepositoryConfig {
   credentialId: string;
 }
 
+const GITHUB_API_BASE = 'https://api.github.com';
+const GITHUB_API_VERSION = '2022-11-28';
 const MAX_MANIFEST_RETRIES = 4;
 
-function isGitHubConflictError(error: unknown): boolean {
-  const message = String(error);
-  return (
-    message.includes('(409)') ||
-    message.includes(' 409 ') ||
-    message.includes('(422)')
-  );
+function base64EncodeBytes(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
-export class GitHubRepository
-  implements Repository, YjsSyncTarget, RepositoryLifecycle
-{
+function base64DecodeToBytes(content: string): Uint8Array {
+  const normalized = content.replace(/\n/g, '');
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export class GitHubRepository extends BaseRepository {
   public readonly kind = 'github';
   public readonly capabilities: RepositoryCapabilities = {
     polling: true,
     liveSync: false,
   };
 
-  constructor(private readonly config: GitHubRepositoryConfig) {}
-
-  async initialize(): Promise<void> {
-    await this.loadManifest();
+  constructor(private readonly config: GitHubRepositoryConfig) {
+    super();
   }
 
-  async refresh(): Promise<void> {}
-
-  async flushPending(): Promise<void> {}
-
-  async dispose(): Promise<void> {}
-
-  async getNode(nodeId: string): Promise<VFSNode | null> {
-    const { manifest } = await this.loadManifest();
-    return manifest.nodes[nodeId] ?? null;
+  protected manifestMaxRetries(): number {
+    return MAX_MANIFEST_RETRIES;
   }
 
-  async listDirectory(
-    folderId: string | null,
-  ): Promise<[VFSFolderNode[], VFSFileNode[]]> {
-    const { manifest } = await this.loadManifest();
-    return listDirectoryNodes(manifest, folderId);
-  }
-
-  async getFolderChain(folderId: string | null): Promise<VFSFolderNode[]> {
-    const { manifest } = await this.loadManifest();
-    return getFolderChain(manifest, folderId);
-  }
-
-  async searchNodes(query: string): Promise<VFSNode[]> {
-    const { manifest } = await this.loadManifest();
-    return searchNodes(manifest, query);
-  }
-
-  async getNodesByAnyTag(tags: string[]): Promise<VFSNode[]> {
-    const { manifest } = await this.loadManifest();
-    return getNodesByAnyTag(manifest, tags);
-  }
-
-  async listTags(): Promise<RepositoryTag[]> {
-    const { manifest } = await this.loadManifest();
-    return listTags(manifest);
-  }
-
-  async getStats(): Promise<RepositoryStats> {
-    const { manifest } = await this.loadManifest();
-    return getStats(manifest);
-  }
-
-  async getRecentFiles(limit: number = 3): Promise<VFSFileNode[]> {
-    const { manifest } = await this.loadManifest();
-    return getRecentFiles(manifest, limit);
-  }
-
-  async getUniqueFileName(
-    baseName: string,
-    parentId: string | null,
-  ): Promise<string> {
-    const { manifest } = await this.loadManifest();
-    return getUniqueFileName(manifest, baseName, parentId);
-  }
-
-  async createFolder(name: string, parentId: string | null): Promise<string> {
-    return this.withManifestMutation('Create folder', (manifest) => {
-      const id = createNodeId();
-      const now = Date.now();
-
-      manifest.nodes[id] = createFolderNode(id, name, parentId, now);
-
-      addChild(manifest, parentId, id);
-      return id;
-    });
-  }
-
-  async createFile(
-    name: string,
-    fileType: FileType,
-    parentId: string | null,
-  ): Promise<string> {
-    return this.withManifestMutation('Create file', (manifest) => {
-      const id = createNodeId();
-      const now = Date.now();
-
-      manifest.nodes[id] = createFileNode(id, name, fileType, parentId, now);
-
-      addChild(manifest, parentId, id);
-      return id;
-    });
-  }
-
-  async renameNode(nodeId: string, newName: string): Promise<void> {
-    await this.withManifestMutation('Rename node', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (!node) {
-        return;
-      }
-
-      node.name = newName;
-      node.modifiedAt = Date.now();
-    });
-  }
-
-  async deleteNode(nodeId: string): Promise<void> {
-    const deletedFileIds = await this.withManifestMutation(
-      'Delete node',
-      (manifest) => deleteNodeFromManifest(manifest, nodeId),
-    );
-
-    await Promise.all(
-      deletedFileIds.map(async (fileId) => {
-        await this.deleteNoteData(fileId);
-        await ThumbnailCache.remove(fileId);
-      }),
+  protected isConflictError(error: unknown): boolean {
+    const message = String(error);
+    return (
+      message.includes('(409)') ||
+      message.includes(' 409 ') ||
+      message.includes('(422)')
     );
   }
 
-  async moveNode(nodeId: string, newParentId: string | null): Promise<void> {
-    await this.withManifestMutation('Move node', (manifest) => {
-      moveNodeInManifest(manifest, nodeId, newParentId);
-    });
-  }
-
-  async setTags(nodeId: string, tags: string[]): Promise<void> {
-    await this.withManifestMutation('Set node tags', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (!node) {
-        return;
-      }
-
-      node.tags = tags;
-      node.modifiedAt = Date.now();
-    });
-  }
-
-  async addTag(nodeId: string, tag: string): Promise<void> {
-    await this.withManifestMutation('Add node tag', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (!node || node.tags.includes(tag)) {
-        return;
-      }
-
-      manifest.nodes[nodeId] = {
-        ...node,
-        tags: [...node.tags, tag],
-        modifiedAt: Date.now(),
-      };
-    });
-  }
-
-  async removeTag(nodeId: string, tag: string): Promise<void> {
-    await this.withManifestMutation('Remove node tag', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (!node) {
-        return;
-      }
-
-      manifest.nodes[nodeId] = {
-        ...node,
-        tags: node.tags.filter((currentTag) => currentTag !== tag),
-        modifiedAt: Date.now(),
-      };
-    });
-  }
-
-  async getRevealPath(_nodeId: string): Promise<string | null> {
-    return null;
-  }
-
-  async openSession(nodeId: string): Promise<NoteSession> {
-    return NoteSession.open(nodeId, this);
-  }
-
-  async loadDocument(nodeId: string): Promise<YjsSyncSnapshot> {
-    const remote = await this.readYjsSyncState(nodeId);
-    return {
-      update: remote.bytes,
-      stateVector: remote.stateVector,
-      revision: remote.revision,
-    };
-  }
-
-  async pullUpdates(
-    nodeId: string,
-    stateVector?: Uint8Array | null,
-  ): Promise<YjsSyncSnapshot> {
-    const remote = await this.readYjsSyncState(nodeId);
-    return {
-      update: stateVector
-        ? Y.encodeStateAsUpdate(remote.doc, stateVector)
-        : remote.bytes,
-      stateVector: remote.stateVector,
-      revision: remote.revision,
-    };
-  }
-
-  async pushUpdates(
-    nodeId: string,
-    update: Uint8Array,
-    options: YjsSyncPushOptions,
-  ): Promise<YjsSyncPushResult> {
-    const remote = await this.readYjsSyncState(nodeId);
-
-    if (options.baseRevision !== remote.revision) {
-      return {
-        accepted: false,
-        remoteUpdate: options.localStateVector
-          ? Y.encodeStateAsUpdate(remote.doc, options.localStateVector)
-          : remote.bytes,
-        stateVector: remote.stateVector,
-        revision: remote.revision,
-        update: remote.bytes,
-      };
-    }
-
-    if (update.byteLength > 0) {
-      Y.applyUpdate(remote.doc, update);
-    }
-
-    const mergedBytes = Y.encodeStateAsUpdate(remote.doc);
-    const revision = await this.saveNoteData(
-      nodeId,
-      mergedBytes,
-      remote.revision,
-      `Update note ${nodeId}`,
-    );
-
-    return {
-      accepted: true,
-      remoteUpdate: null,
-      stateVector: Y.encodeStateVector(remote.doc),
-      revision,
-      update: mergedBytes,
-    };
-  }
-
-  private async withManifestMutation<T>(
-    action: string,
-    mutator: (manifest: VFSManifest) => T,
-  ): Promise<T> {
-    for (let attempt = 0; attempt < MAX_MANIFEST_RETRIES; attempt++) {
-      const { manifest, revision } = await this.loadManifest();
-      const nextManifest = structuredClone(manifest);
-      const result = mutator(nextManifest);
-
-      try {
-        await this.saveManifest(nextManifest, revision, action);
-        return result;
-      } catch (error) {
-        if (
-          attempt < MAX_MANIFEST_RETRIES - 1 &&
-          isGitHubConflictError(error)
-        ) {
-          continue;
-        }
-        throw error;
-      }
-    }
-
-    throw new Error(
-      `Failed to ${action.toLowerCase()} after retrying GitHub conflicts.`,
-    );
-  }
-
-  private async loadManifest(): Promise<{
+  protected async loadManifestImpl(): Promise<{
     manifest: VFSManifest;
     revision: string | null;
   }> {
     const payload = await this.getContents(MANIFEST_PATH);
     if (!payload.bytes || payload.bytes.byteLength === 0) {
-      return {
-        manifest: createEmptyManifest(),
-        revision: payload.sha,
-      };
+      return { manifest: createEmptyManifest(), revision: payload.sha };
     }
 
     const text = new TextDecoder().decode(payload.bytes);
     const parsed = JSON.parse(text) as VFSManifest;
-    return {
-      manifest: migrateManifest(parsed),
-      revision: payload.sha,
-    };
+    return { manifest: migrateManifest(parsed), revision: payload.sha };
   }
 
-  private async saveManifest(
+  protected async saveManifestImpl(
     manifest: VFSManifest,
     revision: string | null,
     action: string,
-  ): Promise<string> {
+  ): Promise<string | null> {
     const bytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
     return this.putContents(
       MANIFEST_PATH,
@@ -375,22 +100,79 @@ export class GitHubRepository
     );
   }
 
+  protected async loadNoteBytes(nodeId: string): Promise<{
+    bytes: Uint8Array | null;
+    revision: string | null;
+  }> {
+    const payload = await this.getContents(getNotePath(nodeId));
+    return { bytes: payload.bytes, revision: payload.sha };
+  }
+
+  protected async saveNoteBytes(
+    nodeId: string,
+    bytes: Uint8Array,
+    revision: string | null,
+    message: string,
+  ): Promise<string | null> {
+    return this.putContents(getNotePath(nodeId), bytes, revision, message);
+  }
+
+  protected async deleteNoteBytes(nodeId: string): Promise<void> {
+    const payload = await this.getContents(getNotePath(nodeId));
+    if (!payload.sha) {
+      return;
+    }
+
+    await this.deleteContents(
+      getNotePath(nodeId),
+      payload.sha,
+      `Delete note ${nodeId}`,
+    );
+  }
+
+  private contentsUrl(path: string): string {
+    return `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}/contents/${path}`;
+  }
+
+  private async authHeaders(): Promise<Record<string, string>> {
+    const accessToken = await getGitHubToken(this.config.credentialId);
+    return {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${accessToken}`,
+      'User-Agent': 'myelin',
+      'X-GitHub-Api-Version': GITHUB_API_VERSION,
+    };
+  }
+
+  private async failureError(
+    label: string,
+    response: Response,
+  ): Promise<Error> {
+    const body = await response.text().catch(() => '<no response body>');
+    return new Error(`${label} (${response.status}): ${body}`);
+  }
+
   private async getContents(path: string): Promise<{
     sha: string | null;
     bytes: Uint8Array | null;
   }> {
-    const payload = await invoke<GitHubContentPayload>('github_get_contents', {
-      owner: this.config.owner,
-      repo: this.config.repo,
-      branch: this.config.branch,
-      credentialId: this.config.credentialId,
-      path,
+    const url = `${this.contentsUrl(path)}?ref=${encodeURIComponent(this.config.branch)}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: await this.authHeaders(),
     });
 
-    return {
-      sha: payload.sha,
-      bytes: payload.bytes ? new Uint8Array(payload.bytes) : null,
-    };
+    if (response.status === 404) {
+      return { sha: null, bytes: null };
+    }
+
+    if (!response.ok) {
+      throw await this.failureError('GitHub contents request failed', response);
+    }
+
+    const payload = (await response.json()) as GitHubContentsResponse;
+    const bytes = payload.content ? base64DecodeToBytes(payload.content) : null;
+    return { sha: payload.sha, bytes };
   }
 
   private async putContents(
@@ -399,17 +181,26 @@ export class GitHubRepository
     sha: string | null,
     message: string,
   ): Promise<string> {
-    const payload = await invoke<GitHubWritePayload>('github_put_contents', {
-      owner: this.config.owner,
-      repo: this.config.repo,
-      branch: this.config.branch,
-      credentialId: this.config.credentialId,
-      path,
-      bytes: Array.from(bytes),
-      sha,
-      message,
+    const response = await fetch(this.contentsUrl(path), {
+      method: 'PUT',
+      headers: {
+        ...(await this.authHeaders()),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        content: base64EncodeBytes(bytes),
+        branch: this.config.branch,
+        ...(sha ? { sha } : {}),
+      }),
     });
-    return payload.sha;
+
+    if (!response.ok) {
+      throw await this.failureError('GitHub write request failed', response);
+    }
+
+    const payload = (await response.json()) as GitHubWriteResponse;
+    return payload.content.sha;
   }
 
   private async deleteContents(
@@ -417,67 +208,21 @@ export class GitHubRepository
     sha: string,
     message: string,
   ): Promise<void> {
-    await invoke('github_delete_contents', {
-      owner: this.config.owner,
-      repo: this.config.repo,
-      branch: this.config.branch,
-      credentialId: this.config.credentialId,
-      path,
-      sha,
-      message,
+    const response = await fetch(this.contentsUrl(path), {
+      method: 'DELETE',
+      headers: {
+        ...(await this.authHeaders()),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message, sha, branch: this.config.branch }),
     });
-  }
 
-  private async loadNoteData(nodeId: string): Promise<{
-    bytes: Uint8Array | null;
-    revision: string | null;
-  }> {
-    const payload = await this.getContents(this.notePath(nodeId));
-    return {
-      bytes: payload.bytes,
-      revision: payload.sha,
-    };
-  }
-
-  private async saveNoteData(
-    nodeId: string,
-    bytes: Uint8Array,
-    revision: string | null,
-    message: string,
-  ): Promise<string> {
-    return this.putContents(this.notePath(nodeId), bytes, revision, message);
-  }
-
-  private async deleteNoteData(nodeId: string): Promise<void> {
-    const payload = await this.getContents(this.notePath(nodeId));
-    if (!payload.sha) {
+    if (response.status === 404) {
       return;
     }
 
-    await this.deleteContents(
-      this.notePath(nodeId),
-      payload.sha,
-      `Delete note ${nodeId}`,
-    );
-  }
-
-  private notePath(nodeId: string): string {
-    return getNotePath(nodeId);
-  }
-
-  private async readYjsSyncState(nodeId: string): Promise<{
-    bytes: Uint8Array | null;
-    doc: Y.Doc;
-    stateVector: Uint8Array;
-    revision: string | null;
-  }> {
-    const { bytes, revision } = await this.loadNoteData(nodeId);
-    const doc = createDocFromBytes(bytes);
-    return {
-      bytes,
-      doc,
-      stateVector: Y.encodeStateVector(doc),
-      revision,
-    };
+    if (!response.ok) {
+      throw await this.failureError('GitHub delete request failed', response);
+    }
   }
 }
