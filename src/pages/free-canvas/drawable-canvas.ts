@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import { loadDocument } from '@/lib/pdf-renderer';
 import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasViewport } from './canvas-viewport';
@@ -6,6 +7,7 @@ import type { DrawableElement } from './elements/drawable-element';
 import { ElementType } from './elements/element-type';
 import { ImageElement } from './elements/image-element';
 import { PageFrameElement } from './elements/page-frame-element';
+import { PdfElement } from './elements/pdf-element';
 import { StrokeElement } from './elements/stroke-element';
 import { TextElement } from './elements/text-element';
 import { EmbedTool } from './tools/embed-tool';
@@ -18,6 +20,10 @@ import type { ITool } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type Vector2 = { x: number; y: number };
+
+function isBackgroundElement(type: ElementType): boolean {
+  return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
+}
 
 export class DrawableCanvas {
   public readonly ctx: CanvasRenderingContext2D;
@@ -35,6 +41,7 @@ export class DrawableCanvas {
 
   private _elements: DrawableElement[] = [];
   private _ydoc: YDocManager;
+  private _domOverlayHost: HTMLElement | null = null;
   /** Maps Y.Map instances to their DrawableElement wrappers. */
   private _yMapToElement = new Map<Y.Map<unknown>, DrawableElement>();
   private toolSelected: ITool;
@@ -105,11 +112,11 @@ export class DrawableCanvas {
         this._yMapToElement.set(yMap, element);
       }
     }
-    // Sort: page frames first
+    // Sort: backgrounds (page frames, PDFs) first so other elements render on top.
     this._elements.sort((a, b) => {
-      const aIsFrame = a.type === ElementType.PAGE_FRAME ? 0 : 1;
-      const bIsFrame = b.type === ElementType.PAGE_FRAME ? 0 : 1;
-      return aIsFrame - bIsFrame;
+      const aBg = isBackgroundElement(a.type) ? 0 : 1;
+      const bBg = isBackgroundElement(b.type) ? 0 : 1;
+      return aBg - bBg;
     });
     // Sync nextIndex
     if (this._elements.length > 0) {
@@ -148,6 +155,9 @@ export class DrawableCanvas {
         element = pf;
         break;
       }
+      case ElementType.PDF:
+        element = new PdfElement(index);
+        break;
       default:
         return null;
     }
@@ -202,6 +212,7 @@ export class DrawableCanvas {
     this._elements = this._elements.filter((el) => {
       if (el.yMap && !currentYMaps.has(el.yMap)) {
         this._yMapToElement.delete(el.yMap);
+        el.disposeDOM();
         return false;
       }
       return true;
@@ -214,6 +225,10 @@ export class DrawableCanvas {
     this.bgCanvas = canvas;
     this.bgCtx = canvas.getContext('2d', { alpha: true });
     this.resizeBgCanvas(window.innerWidth, window.innerHeight);
+  }
+
+  public setDomOverlayHost(host: HTMLElement): void {
+    this._domOverlayHost = host;
   }
 
   public setOnElementEdit(callback: (element: DrawableElement | null) => void) {
@@ -240,7 +255,10 @@ export class DrawableCanvas {
     this._editingElement = element;
     // Drop foreground canvas below DOM layer (z:5) so editing UI receives events
     this.canvas.style.pointerEvents = 'none';
-    if (this.editingElement instanceof PageFrameElement) {
+    if (
+      this.editingElement instanceof PageFrameElement ||
+      this.editingElement instanceof PdfElement
+    ) {
       this.canvas.style.zIndex = '2';
     }
 
@@ -349,6 +367,13 @@ export class DrawableCanvas {
     const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
     this.toolSelected.drawCursor(this.ctx, mouseWorld);
     this.ctx.restore();
+
+    const host = this._domOverlayHost;
+    if (host) {
+      for (const element of this._elements) {
+        element.syncDOM(this.viewport, host);
+      }
+    }
   }
 
   public get elements(): DrawableElement[] {
@@ -452,9 +477,10 @@ export class DrawableCanvas {
       ...element.getYMapProps(),
     };
 
-    // Create Y.Map and add to array (page frames go first)
+    // Create Y.Map and add to array (backgrounds go first so other elements
+    // render on top of them).
     let yMap: Y.Map<unknown>;
-    if (element.type === ElementType.PAGE_FRAME) {
+    if (isBackgroundElement(element.type)) {
       yMap = this._ydoc.insertElementMap(0, element.type, index, props);
       this._elements.unshift(element);
     } else {
@@ -490,6 +516,7 @@ export class DrawableCanvas {
     if (idx >= 0) {
       this._elements.splice(idx, 1);
     }
+    element.disposeDOM();
   }
 
   public deleteSelected() {
@@ -510,6 +537,9 @@ export class DrawableCanvas {
         }
       }
     });
+    for (const e of selected) {
+      e.disposeDOM();
+    }
     this._elements = this._elements.filter((e) => !selected.includes(e));
     this.updateBounding();
   }
@@ -533,6 +563,28 @@ export class DrawableCanvas {
       world.y - img.naturalHeight / 2,
     );
     img.updateBounds();
+    this.updateBounding();
+  }
+
+  public async addPdfFromBlob(blob: Blob, screenX?: number, screenY?: number) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const doc = await loadDocument(bytes);
+    const pageSizes: { w: number; h: number }[] = [];
+    for (let i = 0; i < doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale: 1 });
+      pageSizes.push({ w: viewport.width, h: viewport.height });
+    }
+
+    const pdf = this.addElement((i) => new PdfElement(i));
+    pdf.setInitialPdfData(bytes, pageSizes, doc);
+
+    const dpr = window.devicePixelRatio || 1;
+    const cx = screenX ?? this.canvas.width / dpr / 2;
+    const cy = screenY ?? this.canvas.height / dpr / 2;
+    const world = this.viewport.screenToWorld({ x: cx, y: cy });
+    pdf.setOffset(world.x - pdf.totalWidth / 2, world.y - pdf.totalHeight / 2);
+    pdf.updateBounds();
     this.updateBounding();
   }
 

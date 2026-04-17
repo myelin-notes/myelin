@@ -20,11 +20,13 @@ export function CanvasView() {
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
+  const domOverlayRef = useRef<HTMLDivElement>(null);
   const toolState = useToolState(drawableCanvasRef);
   const engine = useCanvasEngine({
     id,
     canvasRef,
     bgCanvasRef,
+    domOverlayRef,
     wheelRef,
     drawableCanvasRef,
     canvasTools: toolState.canvasTools,
@@ -45,6 +47,14 @@ export function CanvasView() {
       <PageFrameDomLayer
         canvasRef={engine.drawableCanvasRef}
         editingElement={engine.editingElement}
+      />
+
+      {/* Element-owned DOM overlay (PDF pages, future DOM-rendered elements) */}
+      <div
+        ref={domOverlayRef}
+        id="dom-overlay"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        style={{ zIndex: 5 }}
       />
 
       {/* Foreground canvas: strokes, images, selection (z-index toggled by DrawableCanvas) */}

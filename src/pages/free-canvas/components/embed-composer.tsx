@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  FileText as FileTextIcon,
   ImagePlus as ImagePlusIcon,
   Link as LinkIcon,
   Loader2 as LoaderIcon,
@@ -15,10 +16,14 @@ interface EmbedComposerProps {
 type UrlState =
   | { kind: 'idle' }
   | { kind: 'loading'; url: string }
-  | { kind: 'ready'; url: string; previewSrc: string }
+  | { kind: 'ready'; url: string; previewSrc: string; mime: string }
   | { kind: 'error'; url: string; message: string };
 
 const URL_PATTERN = /^https?:\/\/\S+/i;
+
+function isSupportedFile(file: File): boolean {
+  return file.type.startsWith('image/') || file.type === 'application/pdf';
+}
 
 export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
   const [urlInput, setUrlInput] = useState('');
@@ -50,8 +55,8 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
   const handleBrowse = () => fileInputRef.current?.click();
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.currentTarget.files ?? []).filter((f) =>
-      f.type.startsWith('image/'),
+    const files = Array.from(e.currentTarget.files ?? []).filter(
+      isSupportedFile,
     );
     embedBlobs(files);
     e.currentTarget.value = '';
@@ -61,8 +66,8 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-    const files = Array.from(e.dataTransfer?.files ?? []).filter((f) =>
-      f.type.startsWith('image/'),
+    const files = Array.from(e.dataTransfer?.files ?? []).filter(
+      isSupportedFile,
     );
     embedBlobs(files);
   };
@@ -75,11 +80,11 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
         throw new Error(`HTTP ${res.status}`);
       }
       const blob = await res.blob();
-      if (!blob.type.startsWith('image/')) {
-        throw new Error("That link doesn't point to an image.");
+      if (!blob.type.startsWith('image/') && blob.type !== 'application/pdf') {
+        throw new Error("That link doesn't point to an image or PDF.");
       }
       const previewSrc = URL.createObjectURL(blob);
-      setUrlState({ kind: 'ready', url, previewSrc });
+      setUrlState({ kind: 'ready', url, previewSrc, mime: blob.type });
     } catch (err) {
       const message =
         err instanceof Error && err.message.includes('HTTP')
@@ -106,8 +111,10 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
     try {
       const res = await fetch(urlState.url, { mode: 'cors' });
       const blob = await res.blob();
-      const ext = blob.type.split('/')[1] || 'png';
-      const file = new File([blob], `embed.${ext}`, { type: blob.type });
+      const isPdf = blob.type === 'application/pdf';
+      const ext = isPdf ? 'pdf' : blob.type.split('/')[1] || 'png';
+      const name = isPdf ? `embed.pdf` : `embed.${ext}`;
+      const file = new File([blob], name, { type: blob.type });
       embedBlobs([file]);
       URL.revokeObjectURL(urlState.previewSrc);
       setUrlInput('');
@@ -187,7 +194,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
               Add media
             </span>
             <span className="mt-0.5 font-medium text-[11px] text-text-muted tracking-[0.02em]">
-              Paste, drop, or pick an image.
+              Paste, drop, or pick an image or PDF.
             </span>
           </div>
           <button
@@ -218,12 +225,19 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                 className="overflow-hidden"
               >
                 <div className="flex items-center gap-2.5 rounded-xl border border-border-divider bg-card p-2 pr-3">
-                  <div className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-surface">
-                    <img
-                      src={urlState.previewSrc}
-                      alt=""
-                      className="size-full object-cover"
-                    />
+                  <div className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface">
+                    {urlState.mime === 'application/pdf' ? (
+                      <FileTextIcon
+                        className="size-5 text-text-secondary"
+                        strokeWidth={1.5}
+                      />
+                    ) : (
+                      <img
+                        src={urlState.previewSrc}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    )}
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-medium text-text-primary text-xs">
@@ -245,7 +259,9 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                   onClick={handleUrlEmbed}
                   className="mt-2 w-full cursor-pointer rounded-xl border-none bg-accent-dark px-3 py-2 font-medium text-[13px] text-white tracking-[0.005em] transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
                 >
-                  Embed image
+                  {urlState.mime === 'application/pdf'
+                    ? 'Embed PDF'
+                    : 'Embed image'}
                 </button>
               </motion.div>
             ) : (
@@ -278,7 +294,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                         handleUrlSubmit();
                       }
                     }}
-                    placeholder="Paste an image URL"
+                    placeholder="Paste an image or PDF URL"
                     className="w-full rounded-xl border border-border-divider bg-card py-2 pr-[68px] pl-8 font-normal text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-accent-dark/50 focus:bg-white"
                   />
                   <button
@@ -386,7 +402,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         multiple
         className="hidden"
         onChange={handleFileInput}

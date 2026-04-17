@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { bindYFields, writeYMap } from '../y-fields';
 import type { ElementType } from './element-type';
@@ -197,6 +198,16 @@ export abstract class DrawableElement {
   }
   /** Called when the element exits inline edit mode. */
   public exitEditMode(): void {}
+
+  /**
+   * Hook for elements that render as DOM rather than on the 2D canvas.
+   * Called once per frame from `DrawableCanvas.redraw()` after the 2D pass,
+   * with the shared DOM overlay host. Default: no-op.
+   */
+  public syncDOM(_viewport: CanvasViewport, _host: HTMLElement): void {}
+
+  /** Detach any DOM this element created. Called on removal. Default: no-op. */
+  public disposeDOM(): void {}
 
   public updateBounds() {
     this.updateBoundingBox();

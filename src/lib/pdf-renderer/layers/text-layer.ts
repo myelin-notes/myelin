@@ -330,7 +330,8 @@ function getTextAdvance(
     const glyph = glyphs[i];
     const unicode = glyph.unicode ?? '';
     const glyphWidth = ((glyph.width ?? 0) / 1000) * fontSize;
-    advance += (glyphWidth + charSpacing + (unicode === ' ' ? wordSpacing : 0)) * hScale;
+    advance +=
+      (glyphWidth + charSpacing + (unicode === ' ' ? wordSpacing : 0)) * hScale;
   }
   return advance;
 }
@@ -409,7 +410,7 @@ function extractTextRuns(
       if (typeof part !== 'number') {
         return sum;
       }
-      return sum + (-(part / 1000) * fontSize) * hScale;
+      return sum + -(part / 1000) * fontSize * hScale;
     }, 0);
     const advance =
       getTextAdvance(glyphs, fontSize, charSpacing, wordSpacing, hScale) +
@@ -426,8 +427,12 @@ function extractTextRuns(
 
     const textSpaceToPdf = multiply(ctm, textMatrix);
     const textSpaceToViewport = multiply(viewportTransform, textSpaceToPdf);
-    const baselineScale = Math.hypot(textSpaceToViewport[0], textSpaceToViewport[1]);
-    const fontHeight = fontSize * Math.hypot(textSpaceToViewport[2], textSpaceToViewport[3]);
+    const baselineScale = Math.hypot(
+      textSpaceToViewport[0],
+      textSpaceToViewport[1],
+    );
+    const fontHeight =
+      fontSize * Math.hypot(textSpaceToViewport[2], textSpaceToViewport[3]);
     if (fontHeight < 0.1) {
       advanceTextMatrix(advance);
       return;
@@ -443,12 +448,14 @@ function extractTextRuns(
 
     for (const part of parts) {
       if (typeof part === 'number') {
-        cursor += (-(part / 1000) * fontSize) * hScale;
+        cursor += -(part / 1000) * fontSize * hScale;
         continue;
       }
       const glyphText = part.unicode ?? '';
       if (!glyphText) {
-        cursor += getGlyphWidth(part, fontSize, hScale) + getGlyphSpacing(part, charSpacing, wordSpacing, hScale);
+        cursor +=
+          getGlyphWidth(part, fontSize, hScale) +
+          getGlyphSpacing(part, charSpacing, wordSpacing, hScale);
         continue;
       }
 
@@ -460,7 +467,12 @@ function extractTextRuns(
       const glyphWidth = getGlyphWidth(part, fontSize, hScale);
       if (preciseSpacing) {
         const glyphOrigin = multiply(textSpaceToViewport, [
-          1, 0, 0, 1, cursor, textRise,
+          1,
+          0,
+          0,
+          1,
+          cursor,
+          textRise,
         ]);
         segments.push({
           text: glyphText,
@@ -471,7 +483,8 @@ function extractTextRuns(
       }
 
       visibleWidth = cursor + glyphWidth - visibleStart;
-      cursor += glyphWidth + getGlyphSpacing(part, charSpacing, wordSpacing, hScale);
+      cursor +=
+        glyphWidth + getGlyphSpacing(part, charSpacing, wordSpacing, hScale);
     }
 
     if (!sawGlyph) {
@@ -480,7 +493,12 @@ function extractTextRuns(
     }
 
     const viewportOrigin = multiply(textSpaceToViewport, [
-      1, 0, 0, 1, visibleStart, textRise,
+      1,
+      0,
+      0,
+      1,
+      visibleStart,
+      textRise,
     ]);
     const pdfOrigin = multiply(textSpaceToPdf, [1, 0, 0, 1, visibleStart, 0]);
 
@@ -709,7 +727,9 @@ export async function renderTextLayer(
     opList.fnArray as number[],
     opList.argsArray as unknown[],
   );
-  const hasVerticalStyles = Object.values(styles).some((style) => style.vertical);
+  const hasVerticalStyles = Object.values(styles).some(
+    (style) => style.vertical,
+  );
   const extractedRuns = hasVerticalStyles
     ? []
     : extractTextRuns(
@@ -789,11 +809,7 @@ export async function renderTextLayer(
 
     mctx.font = `${fontHeight}px ${fontFamily}`;
     const measured = mctx.measureText(text);
-    const ascent = getCssAscent(
-      fontFamily,
-      fontHeight,
-      fallbackAscentRatio,
-    );
+    const ascent = getCssAscent(fontFamily, fontHeight, fallbackAscentRatio);
 
     const left = x - (angle === 0 ? 0 : ascent * Math.sin(angle));
     const top = y - (angle === 0 ? ascent : ascent * Math.cos(angle));
@@ -830,11 +846,7 @@ export async function renderTextLayer(
     if (targetWidth > 0 && measured.width > 0) {
       const widthDelta = targetWidth - measured.width;
       const spaceCount = text.match(SPACE_PATTERN)?.length ?? 0;
-      if (
-        !preferScaleX &&
-        spaceCount > 0 &&
-        Math.abs(widthDelta) > 0.01
-      ) {
+      if (!preferScaleX && spaceCount > 0 && Math.abs(widthDelta) > 0.01) {
         span.style.wordSpacing = `${widthDelta / spaceCount}px`;
       } else if (allowScaleSingleGlyph || text.length > 1) {
         scaleX = targetWidth / measured.width;

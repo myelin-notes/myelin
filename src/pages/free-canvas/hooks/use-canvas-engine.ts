@@ -63,8 +63,9 @@ function setupCanvasListeners(
     }
     const blobs: File[] = [];
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith('image/')) {
-        const file = items[i].getAsFile();
+      const it = items[i];
+      if (it.type.startsWith('image/') || it.type === 'application/pdf') {
+        const file = it.getAsFile();
         if (file) {
           blobs.push(file);
         }
@@ -125,6 +126,7 @@ interface UseCanvasEngineArgs {
   id: string | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  domOverlayRef: React.RefObject<HTMLDivElement | null>;
   wheelRef: React.RefObject<WheelPickerHandle | null>;
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
@@ -136,6 +138,7 @@ export function useCanvasEngine({
   id,
   canvasRef,
   bgCanvasRef,
+  domOverlayRef,
   wheelRef,
   drawableCanvasRef,
   canvasTools,
@@ -179,8 +182,10 @@ export function useCanvasEngine({
       return;
     }
     for (const file of files) {
-      if (file.type.startsWith('image/')) {
-        dc.addImageFromBlob(file, screenX, screenY);
+      if (file.type === 'application/pdf') {
+        void dc.addPdfFromBlob(file, screenX, screenY);
+      } else if (file.type.startsWith('image/')) {
+        void dc.addImageFromBlob(file, screenX, screenY);
       }
     }
   };
@@ -344,6 +349,9 @@ export function useCanvasEngine({
 
         if (bgCanvasRef.current) {
           dc.setBackgroundCanvas(bgCanvasRef.current);
+        }
+        if (domOverlayRef.current) {
+          dc.setDomOverlayHost(domOverlayRef.current);
         }
 
         dc.viewport.setOnZoomChange((zoom) =>
