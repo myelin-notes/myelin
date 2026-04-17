@@ -71,6 +71,10 @@ export class NoteSession {
     return this.transport.connected;
   }
 
+  hasLocalChanges(): boolean {
+    return this.hasRemoteChanges();
+  }
+
   setTransport(transport: Transport): void {
     if (this.closed) {
       return;

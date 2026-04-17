@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
-import { type NoteSession, useRepository } from '@/lib/sync';
+import { type NoteSession, useBeforeShutdown, useRepository } from '@/lib/sync';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import {
   DrawableCanvas,
@@ -158,6 +158,17 @@ export function useCanvasEngine({
   const [ydoc, setYdoc] = useState<YDocManager | null>(null);
   const [editingElement, setEditingElement] = useState<DrawableElement | null>(
     null,
+  );
+
+  useBeforeShutdown(
+    async () => {
+      const session = noteSessionRef.current;
+      noteSessionRef.current = null;
+      await session?.close();
+    },
+    {
+      shouldBlock: () => noteSessionRef.current?.hasLocalChanges() ?? false,
+    },
   );
 
   const embedFiles = (

@@ -1,6 +1,18 @@
+export {
+  fetchGitHubBranches,
+  fetchGitHubOrgs,
+  fetchGitHubReposForOrg,
+  fetchGitHubReposForUser,
+  fetchGitHubUser,
+  type GitHubBranch,
+  type GitHubOrg,
+  type GitHubRepo,
+  type GitHubUser,
+} from '../utils/github-api';
 export type { RepositoryStatus } from './context';
 export {
   RepositoryProvider,
+  useBeforeShutdown,
   useRepository,
   useRepositoryStatus,
 } from './context';
@@ -12,17 +24,6 @@ export {
   type RepositoryLifecycle,
 } from './repo/config';
 export { createRepository } from './repo/factory';
-export {
-  fetchGitHubBranches,
-  fetchGitHubOrgs,
-  fetchGitHubReposForOrg,
-  fetchGitHubReposForUser,
-  fetchGitHubUser,
-  type GitHubBranch,
-  type GitHubOrg,
-  type GitHubRepo,
-  type GitHubUser,
-} from './repo/github-api';
 export type { GitHubDeviceAuthPollResult } from './repo/github-credentials';
 export {
   beginGitHubDeviceAuth,

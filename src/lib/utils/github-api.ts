@@ -1,5 +1,5 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { getGitHubToken } from './github-credentials';
+import { getGitHubToken } from '../sync/repo/github-credentials';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
