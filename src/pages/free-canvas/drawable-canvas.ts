@@ -40,7 +40,6 @@ export class DrawableCanvas {
   private toolSelected: ITool;
   private _toolCursor: string = 'default';
 
-  private onRequestFilePick?: (screenPos: Vector2) => void;
   private onElementEdit?: (element: DrawableElement | null) => void;
 
   // Event handlers (stored for cleanup in destroy())
@@ -217,20 +216,12 @@ export class DrawableCanvas {
     this.resizeBgCanvas(window.innerWidth, window.innerHeight);
   }
 
-  public setOnRequestFilePick(callback: (screenPos: Vector2) => void) {
-    this.onRequestFilePick = callback;
-  }
-
   public setOnElementEdit(callback: (element: DrawableElement | null) => void) {
     this.onElementEdit = callback;
   }
 
   public getElementsByType(type: ElementType): DrawableElement[] {
     return this._elements.filter((e) => e.type === type);
-  }
-
-  public requestFilePick(screenPos: Vector2) {
-    this.onRequestFilePick?.(screenPos);
   }
 
   public get editingElement(): DrawableElement | null {

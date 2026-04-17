@@ -11,10 +11,7 @@ export class EmbedTool implements ITool {
     _position: Vector2,
   ): void {}
 
-  finish(canvas: DrawableCanvas, event: PointerEvent): void {
-    const screenPos = { x: event.pageX, y: event.pageY };
-    canvas.requestFilePick(screenPos);
-  }
+  finish(_canvas: DrawableCanvas, _event: PointerEvent): void {}
 
   interrupt(_canvas: DrawableCanvas): void {}
 

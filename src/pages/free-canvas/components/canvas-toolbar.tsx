@@ -25,6 +25,7 @@ interface CanvasToolbarProps {
   onToggleShelf: () => void;
   onCloseShelf: () => void;
   onToggleWheelTool: (index: number) => void;
+  embedComposer?: React.ReactNode;
 }
 
 export function CanvasToolbar({
@@ -41,6 +42,7 @@ export function CanvasToolbar({
   onToggleShelf,
   onCloseShelf,
   onToggleWheelTool,
+  embedComposer,
 }: CanvasToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
@@ -168,6 +170,15 @@ export function CanvasToolbar({
               onClose={onCloseShelf}
               containerRef={toolbarRef}
             />
+          </div>
+        )}
+
+        {!shelfOpen && embedComposer && (
+          <div
+            className="absolute top-0 left-full"
+            style={{ paddingTop: optionsPanelOffset }}
+          >
+            {embedComposer}
           </div>
         )}
       </motion.div>

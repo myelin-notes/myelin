@@ -1,10 +1,12 @@
 import { useRef } from 'react';
 import { X as XIcon } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
 import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { DEBUG } from '@/lib/debug';
 import type { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
 import { CanvasToolbar } from './components/canvas-toolbar';
+import { EmbedComposer } from './components/embed-composer';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
@@ -51,15 +53,6 @@ export function CanvasView() {
         className="absolute inset-0 block h-full w-full"
       />
 
-      <input
-        ref={engine.fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={engine.handleFileInputChange}
-      />
-
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} noteId={id} />
       {DEBUG && <PeerSyncPanel session={engine.noteSession} />}
       <TitleBar fileName={engine.fileName} onBack={engine.back} />
@@ -78,6 +71,18 @@ export function CanvasView() {
         onToggleShelf={toolState.toggleShelf}
         onCloseShelf={toolState.closeShelf}
         onToggleWheelTool={toolState.handleToggleWheelTool}
+        embedComposer={
+          <AnimatePresence>
+            {toolState.canvasTools[toolState.selectedToolIndex]?.label ===
+              'Embed' && (
+              <EmbedComposer
+                key="embed-composer"
+                onEmbedFiles={engine.embedFiles}
+                onClose={() => toolState.selectTool(0)}
+              />
+            )}
+          </AnimatePresence>
+        }
       />
 
       <div

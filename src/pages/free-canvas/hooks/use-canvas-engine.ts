@@ -4,10 +4,7 @@ import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { type NoteSession, useBeforeShutdown, useRepository } from '@/lib/sync';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
-import {
-  DrawableCanvas,
-  type Vector2,
-} from '@/pages/free-canvas/drawable-canvas';
+import { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
 import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-element';
 import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
@@ -146,10 +143,8 @@ export function useCanvasEngine({
   onCanvasPointerDown,
 }: UseCanvasEngineArgs) {
   const repository = useRepository();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const noteSessionRef = useRef<NoteSession | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
-  const pendingEmbedPos = useRef<Vector2 | null>(null);
   const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
   onCanvasPointerDownRef.current = onCanvasPointerDown;
 
@@ -355,11 +350,6 @@ export function useCanvasEngine({
           setZoomLevel(Math.round(zoom * 100)),
         );
 
-        dc.setOnRequestFilePick((screenPos) => {
-          pendingEmbedPos.current = screenPos;
-          fileInputRef.current?.click();
-        });
-
         dc.setOnElementEdit((element) => {
           setEditingElement(element);
         });
@@ -429,21 +419,7 @@ export function useCanvasEngine({
     },
   ]);
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.currentTarget.files;
-    if (files?.length) {
-      embedFiles(
-        Array.from(files),
-        pendingEmbedPos.current?.x,
-        pendingEmbedPos.current?.y,
-      );
-    }
-    e.currentTarget.value = '';
-    pendingEmbedPos.current = null;
-  };
-
   return {
-    fileInputRef,
     drawableCanvasRef,
     noteSession,
     ydoc,
@@ -452,6 +428,6 @@ export function useCanvasEngine({
     fileName,
     editingElement,
     back,
-    handleFileInputChange,
+    embedFiles,
   };
 }
