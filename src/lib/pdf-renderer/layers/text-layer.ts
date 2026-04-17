@@ -67,6 +67,65 @@ interface ExtractedTextSegment {
   targetWidth: number;
 }
 
+function extractRiskyFontChars(
+  fnArray: number[],
+  argsArray: unknown[],
+): Map<string, Set<string>> {
+  const riskyFontChars = new Map<string, Set<string>>();
+  let fontName = '';
+
+  const markRiskyGlyphs = (parts: Array<OperatorGlyph | number>) => {
+    if (!fontName) {
+      return;
+    }
+    for (const part of parts) {
+      if (typeof part === 'number') {
+        continue;
+      }
+      const unicode = part.unicode ?? '';
+      if (unicode.length <= 1) {
+        continue;
+      }
+      let chars = riskyFontChars.get(fontName);
+      if (!chars) {
+        chars = new Set<string>();
+        riskyFontChars.set(fontName, chars);
+      }
+      for (const ch of unicode) {
+        chars.add(ch);
+      }
+    }
+  };
+
+  for (let i = 0; i < fnArray.length; i++) {
+    const fn = fnArray[i];
+    const args = argsArray[i] as unknown[] | null;
+    switch (fn) {
+      case OPS.setFont:
+        fontName = (args?.[0] as string) ?? fontName;
+        break;
+      case OPS.showText:
+      case OPS.nextLineShowText:
+        markRiskyGlyphs(readGlyphsFromShowTextArg(args?.[0]));
+        break;
+      case OPS.showSpacedText:
+        markRiskyGlyphs(
+          Array.isArray(args?.[0])
+            ? (args?.[0] as Array<OperatorGlyph | number>)
+            : [],
+        );
+        break;
+      case OPS.nextLineSetSpacingShowText:
+        markRiskyGlyphs(readGlyphsFromShowTextArg(args?.[2]));
+        break;
+      default:
+        break;
+    }
+  }
+
+  return riskyFontChars;
+}
+
 /**
  * Walk the operator list and emit a TextEvent for every text-showing op,
  * capturing fill/stroke color + position at the moment of the op. We later
@@ -646,6 +705,10 @@ export async function renderTextLayer(
   const viewportTransform = ctx.viewport.transform as Matrix;
 
   const opList = await ctx.page.getOperatorList();
+  const riskyFontChars = extractRiskyFontChars(
+    opList.fnArray as number[],
+    opList.argsArray as unknown[],
+  );
   const hasVerticalStyles = Object.values(styles).some((style) => style.vertical);
   const extractedRuns = hasVerticalStyles
     ? []
@@ -674,9 +737,24 @@ export async function renderTextLayer(
 
   const mctx = getMeasureCtx();
 
+  const resolveFontFamily = (fontName: string, text: string): string => {
+    const style = styles[fontName];
+    const fallbackFamily = style?.fontFamily ?? 'sans-serif';
+    const riskyChars = riskyFontChars.get(fontName);
+    if (riskyChars) {
+      for (const ch of riskyChars) {
+        if (text.includes(ch)) {
+          return fallbackFamily;
+        }
+      }
+    }
+    return `"${fontName}", ${fallbackFamily}`;
+  };
+
   const renderSpan = (
     text: string,
     fontName: string,
+    fontFamily: string,
     fontHeight: number,
     angle: number,
     x: number,
@@ -689,7 +767,6 @@ export async function renderTextLayer(
     allowScaleSingleGlyph = false,
   ) => {
     const style = styles[fontName];
-    const fontFamily = `"${fontName}", ${style?.fontFamily ?? 'sans-serif'}`;
     const fallbackAscentRatio =
       style?.ascent && style.ascent > 0
         ? style.ascent
@@ -755,11 +832,13 @@ export async function renderTextLayer(
   if (extractedRuns.length > 0) {
     for (const run of extractedRuns) {
       const dir = pickDirection(pickNearestTextItem(run, textItems));
+      const fontFamily = resolveFontFamily(run.fontName, run.text);
       if (run.segments && run.segments.length > 0) {
         for (const segment of run.segments) {
           renderSpan(
             segment.text,
             run.fontName,
+            fontFamily,
             run.fontHeight,
             run.angle,
             segment.x,
@@ -777,6 +856,7 @@ export async function renderTextLayer(
       renderSpan(
         run.text,
         run.fontName,
+        fontFamily,
         run.fontHeight,
         run.angle,
         run.x,
@@ -811,9 +891,11 @@ export async function renderTextLayer(
     }
 
     const { fill, stroke, mode } = pickColor(item, events);
+    const fontFamily = resolveFontFamily(item.fontName, item.str);
     renderSpan(
       item.str,
       item.fontName,
+      fontFamily,
       fontHeight,
       Math.atan2(m01, m00),
       tx,
