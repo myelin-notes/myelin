@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, str::FromStr};
+use std::{collections::{HashMap, HashSet}, str::FromStr, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use iroh::{
@@ -17,6 +17,9 @@ use tokio::sync::{Mutex, oneshot};
 
 use crate::rendezvous::Rendezvous;
 
+const RENDEZVOUS_POLL_INTERVAL: Duration = Duration::from_secs(5);
+const RENDEZVOUS_REPUBLISH_INTERVAL: Duration = Duration::from_secs(600);
+
 pub struct IrohState {
     runtime: Mutex<Option<IrohRuntime>>,
 }
@@ -34,7 +37,7 @@ struct IrohRuntime {
     _router: Router,
     gossip: Gossip,
     memory_lookup: MemoryLookup,
-    rendezvous: Rendezvous,
+    rendezvous: Arc<Rendezvous>,
     topics: HashMap<String, ActiveTopic>,
 }
 
@@ -42,6 +45,7 @@ struct ActiveTopic {
     transport_id: String,
     sender: GossipSender,
     cancel: Option<oneshot::Sender<()>>,
+    rendezvous_cancel: Option<oneshot::Sender<()>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -88,7 +92,7 @@ impl IrohRuntime {
         let router = Router::builder(endpoint.clone())
             .accept(iroh_gossip::ALPN, gossip.clone())
             .spawn();
-        let rendezvous = Rendezvous::new()?;
+        let rendezvous = Arc::new(Rendezvous::new()?);
 
         Ok(Self {
             endpoint,
@@ -136,21 +140,34 @@ impl IrohRuntime {
         transport_id: &str,
     ) -> Result<(), String> {
         self.endpoint.online().await;
+        let own_endpoint_id = self.endpoint.id();
+        eprintln!(
+            "[iroh] auto_sync note={note_id} own_id={own_endpoint_id}"
+        );
 
         let mut bootstrap = Vec::new();
         match self.rendezvous.resolve(note_id).await {
             Ok(Some(ticket_str)) => {
+                eprintln!("[iroh] rendezvous resolved ticket for note {note_id}");
                 if let Ok(ticket) = EndpointTicket::from_str(ticket_str.trim()) {
                     let addr = ticket.endpoint_addr().clone();
                     let peer_id = addr.id;
-                    if peer_id != self.endpoint.id() {
+                    if peer_id != own_endpoint_id {
+                        eprintln!("[iroh] bootstrapping with peer {peer_id}");
                         self.memory_lookup.add_endpoint_info(addr);
                         bootstrap.push(peer_id);
+                    } else {
+                        eprintln!("[iroh] resolved ticket was our own, ignoring");
                     }
+                } else {
+                    eprintln!("[iroh] failed to parse resolved ticket");
                 }
             }
-            Ok(None) => {}
+            Ok(None) => {
+                eprintln!("[iroh] rendezvous empty for note {note_id}");
+            }
             Err(err) => {
+                eprintln!("[iroh] rendezvous resolve failed: {err}");
                 let _ = emit_error(
                     app,
                     note_id,
@@ -163,14 +180,20 @@ impl IrohRuntime {
         self.attach_topic(app, note_id, transport_id, bootstrap).await?;
 
         let own_ticket = EndpointTicket::new(self.endpoint.addr()).to_string();
-        if let Err(err) = self.rendezvous.publish(note_id, &own_ticket).await {
-            let _ = emit_error(
-                app,
-                note_id,
-                transport_id,
-                format!("Rendezvous publish failed: {err}"),
-            );
+        match self.rendezvous.publish(note_id, &own_ticket).await {
+            Ok(()) => eprintln!("[iroh] rendezvous published for note {note_id}"),
+            Err(err) => {
+                eprintln!("[iroh] rendezvous publish failed: {err}");
+                let _ = emit_error(
+                    app,
+                    note_id,
+                    transport_id,
+                    format!("Rendezvous publish failed: {err}"),
+                );
+            }
         }
+
+        self.spawn_rendezvous_poller(note_id, own_endpoint_id, own_ticket);
 
         Ok(())
     }
@@ -311,16 +334,92 @@ impl IrohRuntime {
                 transport_id: transport_id.to_string(),
                 sender,
                 cancel: Some(cancel_tx),
+                rendezvous_cancel: None,
             },
         );
 
         Ok(())
     }
 
+    fn spawn_rendezvous_poller(
+        &mut self,
+        note_id: &str,
+        own_endpoint_id: EndpointId,
+        own_ticket: String,
+    ) {
+        let Some(topic) = self.topics.get_mut(note_id) else {
+            return;
+        };
+
+        let (cancel_tx, mut cancel_rx) = oneshot::channel();
+        topic.rendezvous_cancel = Some(cancel_tx);
+
+        let sender = topic.sender.clone();
+        let rendezvous = Arc::clone(&self.rendezvous);
+        let memory_lookup = self.memory_lookup.clone();
+        let note_id_owned = note_id.to_string();
+
+        tauri::async_runtime::spawn(async move {
+            let mut known: HashSet<EndpointId> = HashSet::new();
+            known.insert(own_endpoint_id);
+
+            let mut poll = tokio::time::interval(RENDEZVOUS_POLL_INTERVAL);
+            poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            let mut republish = tokio::time::interval(RENDEZVOUS_REPUBLISH_INTERVAL);
+            republish.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            // First tick fires immediately; skip it so we don't republish right after auto_sync did.
+            republish.tick().await;
+
+            loop {
+                tokio::select! {
+                    _ = &mut cancel_rx => break,
+                    _ = poll.tick() => {
+                        match rendezvous.resolve(&note_id_owned).await {
+                            Ok(Some(ticket_str)) => {
+                                match EndpointTicket::from_str(ticket_str.trim()) {
+                                    Ok(ticket) => {
+                                        let addr = ticket.endpoint_addr().clone();
+                                        let peer_id = addr.id;
+                                        if known.insert(peer_id) {
+                                            eprintln!(
+                                                "[iroh] rendezvous discovered peer {peer_id} for note {note_id_owned}"
+                                            );
+                                            memory_lookup.add_endpoint_info(addr);
+                                            if let Err(err) = sender.join_peers(vec![peer_id]).await {
+                                                eprintln!(
+                                                    "[iroh] join_peers failed: {err}"
+                                                );
+                                            }
+                                        }
+                                    }
+                                    Err(err) => {
+                                        eprintln!("[iroh] bad rendezvous ticket: {err}");
+                                    }
+                                }
+                            }
+                            Ok(None) => {}
+                            Err(err) => {
+                                eprintln!("[iroh] rendezvous resolve error: {err}");
+                            }
+                        }
+                    }
+                    _ = republish.tick() => {
+                        if let Err(err) = rendezvous.publish(&note_id_owned, &own_ticket).await {
+                            eprintln!("[iroh] rendezvous republish error: {err}");
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     fn leave_note(&mut self, note_id: &str) {
         if let Some(mut topic) = self.topics.remove(note_id) {
             drop(topic.sender);
             if let Some(cancel) = topic.cancel.take() {
+                let _ = cancel.send(());
+            }
+            if let Some(cancel) = topic.rendezvous_cancel.take() {
                 let _ = cancel.send(());
             }
         }

@@ -42,7 +42,7 @@ impl Rendezvous {
         let keypair = derive_keypair(note_id);
         let public_key = keypair.public_key();
 
-        let Some(packet) = self.client.resolve(&public_key).await else {
+        let Some(packet) = self.client.resolve_most_recent(&public_key).await else {
             return Ok(None);
         };
 
