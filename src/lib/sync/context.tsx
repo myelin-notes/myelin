@@ -4,10 +4,8 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import type {
   ActiveRepository,
   RepositoryConfig,
@@ -28,15 +26,9 @@ export interface RepositoryStatus {
   lastError: Error | null;
 }
 
-interface BeforeShutdownTask {
-  run(): Promise<void>;
-  shouldBlock(): boolean;
-}
-
 interface RepositoryContextValue {
   repository: ActiveRepository;
   status: RepositoryStatus;
-  registerBeforeShutdown(task: BeforeShutdownTask): () => void;
 }
 
 const RepositoryContext = createContext<RepositoryContextValue | null>(null);
@@ -80,15 +72,10 @@ function getConfigKey(config: RepositoryConfig): string {
   }
 }
 
-function isTauriWindowAvailable(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
-
 export function RepositoryProvider({
   children,
   config,
 }: PropsWithChildren<{ config?: RepositoryConfig }>) {
-  const beforeShutdownTasksRef = useRef(new Set<BeforeShutdownTask>());
   const [resolvedConfig, setResolvedConfig] = useState<RepositoryConfig>(
     () => config ?? getRepositoryConfig(),
   );
@@ -104,12 +91,6 @@ export function RepositoryProvider({
     () => ({
       repository,
       status,
-      registerBeforeShutdown(task) {
-        beforeShutdownTasksRef.current.add(task);
-        return () => {
-          beforeShutdownTasksRef.current.delete(task);
-        };
-      },
     }),
     [repository, status],
   );
@@ -172,86 +153,6 @@ export function RepositoryProvider({
     };
   }, [configKey, resolvedConfig, repository]);
 
-  useEffect(() => {
-    const runBeforeShutdownTasks = async (tasks?: BeforeShutdownTask[]) => {
-      const tasksToRun = tasks ?? Array.from(beforeShutdownTasksRef.current);
-      for (const task of tasksToRun) {
-        try {
-          await task.run();
-        } catch (error) {
-          console.error(error);
-        }
-      }
-    };
-
-    const handleBeforeUnload = () => {
-      void runBeforeShutdownTasks();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    let closing = false;
-    let allowNextClose = false;
-    let unlistenPromise: Promise<() => void> | null = null;
-
-    if (isTauriWindowAvailable()) {
-      const currentWindow = getCurrentWindow();
-      unlistenPromise = currentWindow.onCloseRequested(async (event) => {
-        if (allowNextClose) {
-          allowNextClose = false;
-          return;
-        }
-
-        if (closing) {
-          event.preventDefault();
-          return;
-        }
-
-        const blockingTasks = Array.from(beforeShutdownTasksRef.current).filter(
-          (task) => {
-            try {
-              return task.shouldBlock();
-            } catch (error) {
-              console.error(error);
-              return true;
-            }
-          },
-        );
-
-        if (blockingTasks.length === 0) {
-          return;
-        }
-
-        event.preventDefault();
-        closing = true;
-
-        try {
-          await runBeforeShutdownTasks(blockingTasks);
-          allowNextClose = true;
-          window.setTimeout(() => {
-            void currentWindow.close().catch((error) => {
-              console.error(error);
-              allowNextClose = false;
-              closing = false;
-            });
-          }, 0);
-        } catch (error) {
-          console.error(error);
-          closing = false;
-        }
-      });
-    }
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (unlistenPromise) {
-        void unlistenPromise.then((unlisten) => {
-          unlisten();
-        });
-      }
-    };
-  }, [repository]);
-
   return (
     <RepositoryContext.Provider value={contextValue}>
       {children}
@@ -277,30 +178,4 @@ export function useRepositoryStatus(): RepositoryStatus {
   }
 
   return context.status;
-}
-
-export function useBeforeShutdown(
-  task: () => Promise<void>,
-  options?: {
-    shouldBlock?: () => boolean;
-  },
-): void {
-  const context = useContext(RepositoryContext);
-  const taskRef = useRef(task);
-  const shouldBlockRef = useRef(options?.shouldBlock ?? (() => true));
-  taskRef.current = task;
-  shouldBlockRef.current = options?.shouldBlock ?? (() => true);
-
-  useEffect(() => {
-    if (!context) {
-      throw new Error(
-        'useBeforeShutdown must be used within a RepositoryProvider.',
-      );
-    }
-
-    return context.registerBeforeShutdown({
-      run: () => taskRef.current(),
-      shouldBlock: () => shouldBlockRef.current(),
-    });
-  }, [context]);
 }

@@ -19,6 +19,7 @@ use crate::rendezvous::Rendezvous;
 
 const RENDEZVOUS_POLL_INTERVAL: Duration = Duration::from_secs(5);
 const RENDEZVOUS_REPUBLISH_INTERVAL: Duration = Duration::from_secs(600);
+const GOSSIP_MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
 
 pub struct IrohState {
     runtime: Mutex<Option<IrohRuntime>>,
@@ -88,7 +89,9 @@ impl IrohRuntime {
             .bind()
             .await
             .map_err(|err| format!("Failed to bind iroh endpoint: {err}"))?;
-        let gossip = Gossip::builder().spawn(endpoint.clone());
+        let gossip = Gossip::builder()
+            .max_message_size(GOSSIP_MAX_MESSAGE_SIZE)
+            .spawn(endpoint.clone());
         let router = Router::builder(endpoint.clone())
             .accept(iroh_gossip::ALPN, gossip.clone())
             .spawn();
@@ -213,10 +216,17 @@ impl IrohRuntime {
             return Err("Transport instance is no longer active".to_string());
         }
 
-        topic.sender
-            .broadcast(Bytes::from(data))
-            .await
-            .map_err(|err| format!("Failed to broadcast iroh message: {err}"))
+        let size = data.len();
+        match topic.sender.broadcast(Bytes::from(data)).await {
+            Ok(()) => {
+                eprintln!("[iroh] broadcast {size} bytes on note {note_id}");
+                Ok(())
+            }
+            Err(err) => {
+                eprintln!("[iroh] broadcast failed ({size} bytes): {err}");
+                Err(format!("Failed to broadcast iroh message: {err}"))
+            }
+        }
     }
 
     fn leave(&mut self, note_id: &str, transport_id: &str) {

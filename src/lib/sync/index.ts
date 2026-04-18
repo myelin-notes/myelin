@@ -12,7 +12,6 @@ export {
 export type { RepositoryStatus } from './context';
 export {
   RepositoryProvider,
-  useBeforeShutdown,
   useRepository,
   useRepositoryStatus,
 } from './context';

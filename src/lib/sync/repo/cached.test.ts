@@ -361,6 +361,47 @@ describe('CachedRepository', () => {
     await session.close();
   });
 
+  it('writes pending note changes to the outbox on session close without flushing the remote', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const initialNote = createNoteState('remote baseline');
+
+    await remote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/close-outbox-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/close-outbox-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const session = await repository.openSession(fileId);
+    session.ydoc.doc.getText('content').insert(15, ' plus local close edit');
+
+    expect(session.hasLocalChanges()).toBe(true);
+
+    await session.close();
+
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'remote baseline plus local close edit',
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+
+    const storage = getRepositoryTestStorage();
+    expect(storage.readText('repositories/close-outbox-test/outbox.json')).toBe(
+      JSON.stringify([{ kind: 'push-note', nodeId: fileId }]),
+    );
+
+    expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
+      'remote baseline',
+    );
+  });
+
   it('recovers from a corrupted outbox file during initialize', async () => {
     const remote = new MemoryRemoteRepository();
     const cache = new LocalRepository('repositories/corrupt-outbox-test');
