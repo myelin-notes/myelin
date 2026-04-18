@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TimeAgo } from '@/components/time-ago';
-import { formatNumber } from '@/lib/i18n/format';
-import { useLocale, useStrings, type Messages } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
+import { type Messages, useLocale, useStrings } from '@/lib/i18n';
+import { formatNumber } from '@/lib/i18n/format';
 import {
   getRepositoryConfig,
   type RepositoryConfig,

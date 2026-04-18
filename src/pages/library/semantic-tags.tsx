@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { formatNumber } from '@/lib/i18n/format';
 import { useLocale, useStrings } from '@/lib/i18n';
+import { formatNumber } from '@/lib/i18n/format';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 

@@ -3,13 +3,13 @@ import { SlidersHorizontal as SlidersIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
-import { useStrings } from '@/lib/i18n';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useStrings } from '@/lib/i18n';
 import type { ITool, ToolOption } from '@/pages/free-canvas/tools/tool';
 
 interface CanvasToolbarProps {

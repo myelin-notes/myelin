@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Radio, X } from 'lucide-react';
 import { TimeAgo } from '@/components/time-ago';
-import { formatNumber } from '@/lib/i18n/format';
 import { useLocale, useStrings } from '@/lib/i18n';
+import { formatNumber } from '@/lib/i18n/format';
 import {
   type NoteSession,
   type PeerSnapshot,

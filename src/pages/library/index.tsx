@@ -10,8 +10,8 @@ import {
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/sidebar';
-import { formatRelativeTime } from '@/lib/i18n/format';
 import { useLocale, useStrings } from '@/lib/i18n';
+import { formatRelativeTime } from '@/lib/i18n/format';
 import {
   useRepository,
   type VFSFileNode,

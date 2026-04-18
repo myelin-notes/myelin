@@ -7,8 +7,8 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useStrings } from '@/lib/i18n';
 import { DEBUG } from '@/lib/debug';
+import { useStrings } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 

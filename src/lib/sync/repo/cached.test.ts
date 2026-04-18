@@ -183,7 +183,11 @@ describe('CachedRepository', () => {
 
     await repository.initialize();
 
-    const fileId = await repository.createFile('Transient note', 'mcanvas', null);
+    const fileId = await repository.createFile(
+      'Transient note',
+      'mcanvas',
+      null,
+    );
     const note = createNoteState('temporary content');
 
     await repository.pushUpdates(fileId, note.update, {
@@ -195,7 +199,9 @@ describe('CachedRepository', () => {
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
 
     const storage = getRepositoryTestStorage();
-    const outbox = storage.readText('repositories/pending-delete-test/outbox.json');
+    const outbox = storage.readText(
+      'repositories/pending-delete-test/outbox.json',
+    );
     expect(outbox).not.toBeNull();
     expect(JSON.parse(outbox ?? '[]')).toEqual([
       {
@@ -225,7 +231,11 @@ describe('CachedRepository', () => {
     await repository.initialize();
 
     const folderId = await repository.createFolder('Docs', null);
-    const fileId = await repository.createFile('Nested note', 'mcanvas', folderId);
+    const fileId = await repository.createFile(
+      'Nested note',
+      'mcanvas',
+      folderId,
+    );
     const note = createNoteState('nested remote delete');
 
     await repository.pushUpdates(fileId, note.update, {
@@ -292,9 +302,9 @@ describe('CachedRepository', () => {
 
     await repository.initialize();
 
-    expect(storage.readText('repositories/corrupt-outbox-test/outbox.json')).toBe(
-      '[]',
-    );
+    expect(
+      storage.readText('repositories/corrupt-outbox-test/outbox.json'),
+    ).toBe('[]');
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 });

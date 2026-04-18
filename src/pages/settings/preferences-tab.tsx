@@ -9,9 +9,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   localeLabels,
+  type SupportedLocale,
   useI18n,
   useStrings,
-  type SupportedLocale,
 } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';

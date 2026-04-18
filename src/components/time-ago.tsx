@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useLocale } from '@/lib/i18n';
 import {
   formatRelativeTime,
   getRelativeTimeUpdateInterval,
 } from '@/lib/i18n/format';
-import { useLocale } from '@/lib/i18n';
 
 interface TimeAgoProps {
   date: Date | string | number;

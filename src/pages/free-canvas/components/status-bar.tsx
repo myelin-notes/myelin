@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
-import { formatNumber } from '@/lib/i18n/format';
-import { useLocale, useStrings } from '@/lib/i18n';
 import { DEBUG } from '@/lib/debug';
+import { useLocale, useStrings } from '@/lib/i18n';
+import { formatNumber } from '@/lib/i18n/format';
 
 interface StatusBarProps {
   zoomLevel: number;
