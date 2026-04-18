@@ -50,6 +50,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
     }
     onEmbedFiles(blobs);
     setPulseKey((k) => k + 1);
+    onClose();
   };
 
   const handleBrowse = () => fileInputRef.current?.click();
@@ -294,7 +295,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                         handleUrlSubmit();
                       }
                     }}
-                    placeholder="Paste an image or PDF URL"
+                    placeholder="Paste an URL"
                     className="w-full rounded-xl border border-border-divider bg-card py-2 pr-[68px] pl-8 font-normal text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-accent-dark/50 focus:bg-white"
                   />
                   <button

@@ -6,7 +6,7 @@ import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
-export const PDF_PAGE_GAP = 40;
+const PDF_PAGE_GAP = 40;
 
 export type PdfPageEntry =
   | { kind: 'pdf'; originalIndex: number }
@@ -51,18 +51,12 @@ export class PdfElement extends DrawableElement {
   private _pdfDocLoad: Promise<PdfDocument> | null = null;
   private _pageOrder: PdfPageEntry[] = [];
   private _pageSizes: PdfPageSize[] = [];
-  private _pageGap: number = PDF_PAGE_GAP;
-  private _gapExtras: number[] = [];
   private _editing: boolean = false;
 
   private _frameDiv: HTMLDivElement | null = null;
   private _viewportDiv: HTMLDivElement | null = null;
   private _pageHost: HTMLDivElement | null = null;
   private _slots: Map<number, PageSlot> = new Map();
-  private _gapStrips: HTMLDivElement[] = [];
-  private _yShiftPreview: { gapIdx: number; dy: number } | null = null;
-
-  private _canvasRef: DrawableCanvas | null = null;
 
   constructor(index: number) {
     super(index, ElementType.PDF);
@@ -72,8 +66,6 @@ export class PdfElement extends DrawableElement {
     return {
       pageOrder: this._pageOrder as unknown,
       pageSizes: this._pageSizes as unknown,
-      pageGap: this._pageGap,
-      gapExtras: this._gapExtras as unknown,
     };
   }
 
@@ -89,12 +81,6 @@ export class PdfElement extends DrawableElement {
       },
       pageSizes: (v) => {
         this._pageSizes = v as PdfPageSize[];
-      },
-      pageGap: (v) => {
-        this._pageGap = v as number;
-      },
-      gapExtras: (v) => {
-        this._gapExtras = v as number[];
       },
     });
   }
@@ -128,15 +114,11 @@ export class PdfElement extends DrawableElement {
       kind: 'pdf',
       originalIndex: i,
     }));
-    this._gapExtras = new Array(Math.max(0, pageSizes.length - 1)).fill(0);
-    this._pageGap = PDF_PAGE_GAP;
 
     this.syncToYMap({
       pdfData: new Uint8Array(bytes),
       pageSizes: this._pageSizes as unknown,
       pageOrder: this._pageOrder as unknown,
-      pageGap: this._pageGap,
-      gapExtras: this._gapExtras as unknown,
     });
   }
 
@@ -144,16 +126,8 @@ export class PdfElement extends DrawableElement {
     return this._editing;
   }
 
-  public get pageOrder(): readonly PdfPageEntry[] {
-    return this._pageOrder;
-  }
-
-  public get pageSizes(): readonly PdfPageSize[] {
-    return this._pageSizes;
-  }
-
   /** y/height/w for each rendered page in local space, plus `gapAfter`. */
-  public pageLayout(): Array<{
+  private pageLayout(): Array<{
     y: number;
     w: number;
     h: number;
@@ -172,7 +146,7 @@ export class PdfElement extends DrawableElement {
       const entry = this._pageOrder[i];
       const { w, h } = entrySize(entry, this._pageSizes);
       const isLast = i === this._pageOrder.length - 1;
-      const gapAfter = isLast ? 0 : this._pageGap + (this._gapExtras[i] ?? 0);
+      const gapAfter = isLast ? 0 : PDF_PAGE_GAP;
       out.push({ y, w, h, gapAfter, entry });
       y += h + gapAfter;
     }
@@ -234,16 +208,24 @@ export class PdfElement extends DrawableElement {
 
   public override enterEditMode(
     canvas: DrawableCanvas,
-    _screenX?: number,
-    _screenY?: number,
+    screenX?: number,
+    screenY?: number,
   ): HTMLElement | null {
     this._editing = true;
-    this._canvasRef = canvas;
 
     const sx = Math.abs(this._scale.x);
+    const sy = Math.abs(this._scale.y);
+    const firstPage = this.pageLayout()[0];
+    const firstPageMiddle = firstPage
+      ? this.offset.y + (firstPage.y + firstPage.h / 2) * sy
+      : this.offset.y;
+    const focusWorldY =
+      screenX != null && screenY != null
+        ? canvas.viewport.screenToWorld({ x: screenX, y: screenY }).y
+        : firstPageMiddle;
     const focusRect = new DOMRect(
       this.offset.x,
-      this.offset.y + this.totalHeight / 2,
+      focusWorldY,
       this.totalWidth * sx,
       0,
     );
@@ -262,18 +244,10 @@ export class PdfElement extends DrawableElement {
     }
     const nextOrder = this._pageOrder.slice();
     nextOrder.splice(orderIdx, 1);
-    const nextGaps = this._gapExtras.slice();
-    if (orderIdx < nextGaps.length) {
-      nextGaps.splice(orderIdx, 1);
-    } else if (nextGaps.length > 0) {
-      nextGaps.pop();
-    }
     this.syncToYMap({
       pageOrder: nextOrder as unknown,
-      gapExtras: nextGaps as unknown,
     });
     this._pageOrder = nextOrder;
-    this._gapExtras = nextGaps;
   }
 
   public insertBlankAfter(orderIdx: number): void {
@@ -288,44 +262,10 @@ export class PdfElement extends DrawableElement {
     const insertAt = neighborIdx + 1;
     const nextOrder = this._pageOrder.slice();
     nextOrder.splice(insertAt, 0, { kind: 'blank', w, h });
-    const nextGaps = this._gapExtras.slice();
-    nextGaps.splice(neighborIdx, 0, 0);
     this.syncToYMap({
       pageOrder: nextOrder as unknown,
-      gapExtras: nextGaps as unknown,
     });
     this._pageOrder = nextOrder;
-    this._gapExtras = nextGaps;
-  }
-
-  public applyYShift(canvas: DrawableCanvas, gapIdx: number, dy: number): void {
-    if (dy === 0 || gapIdx < 0 || gapIdx >= this._gapExtras.length) {
-      return;
-    }
-    const layout = this.pageLayout();
-    const gapWorldY =
-      this.offset.y +
-      layout[gapIdx].y +
-      layout[gapIdx].h +
-      (layout[gapIdx].gapAfter - (this._gapExtras[gapIdx] ?? 0)) / 2;
-    const nextGaps = this._gapExtras.slice();
-    nextGaps[gapIdx] = (nextGaps[gapIdx] ?? 0) + dy;
-
-    canvas.ydoc.transact(() => {
-      this.syncToYMap({ gapExtras: nextGaps as unknown });
-      this._gapExtras = nextGaps;
-      for (const el of canvas.elements) {
-        if (el === this) {
-          continue;
-        }
-        if (el.type === ElementType.PDF || el.type === ElementType.PAGE_FRAME) {
-          continue;
-        }
-        if (el.boundingBox.top >= gapWorldY) {
-          el.translate(0, dy);
-        }
-      }
-    });
   }
 
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
@@ -357,7 +297,6 @@ export class PdfElement extends DrawableElement {
     viewportDiv.style.transform = `scale(${zoom / dpr})`;
 
     this.syncPages();
-    this.syncGapStrips(zoom);
   }
 
   public override disposeDOM(): void {
@@ -368,7 +307,6 @@ export class PdfElement extends DrawableElement {
     this._viewportDiv = null;
     this._pageHost = null;
     this._slots.clear();
-    this._gapStrips = [];
     this._pdfDoc?.destroy();
     this._pdfDoc = null;
   }
@@ -441,12 +379,7 @@ export class PdfElement extends DrawableElement {
 
       slot.div.style.width = `${page.w}px`;
       slot.div.style.height = `${page.h}px`;
-
-      let offsetY = page.y;
-      if (this._yShiftPreview && this._yShiftPreview.gapIdx < i) {
-        offsetY += this._yShiftPreview.dy;
-      }
-      slot.div.style.transform = `translate(0px, ${offsetY}px)`;
+      slot.div.style.transform = `translate(0px, ${page.y}px)`;
 
       if (this._editing) {
         this.ensureActionStrip(slot, i);
@@ -588,111 +521,5 @@ export class PdfElement extends DrawableElement {
       btn.style.background = 'rgba(25,28,30,0.06)';
     };
     return btn;
-  }
-
-  private syncGapStrips(zoom: number): void {
-    const frameDiv = this._frameDiv;
-    if (!frameDiv) {
-      return;
-    }
-    const layout = this.pageLayout();
-    const gapCount = Math.max(0, layout.length - 1);
-
-    while (this._gapStrips.length < gapCount) {
-      const strip = this.createGapStrip(this._gapStrips.length);
-      frameDiv.appendChild(strip);
-      this._gapStrips.push(strip);
-    }
-    while (this._gapStrips.length > gapCount) {
-      this._gapStrips.pop()!.remove();
-    }
-
-    const stripHeight = 16;
-    for (let i = 0; i < gapCount; i++) {
-      const page = layout[i];
-      const gapCenterLocalY = page.y + page.h + page.gapAfter / 2;
-      const screenY = gapCenterLocalY * zoom - stripHeight / 2;
-      const strip = this._gapStrips[i];
-      strip.style.width = `${this.totalWidth * zoom}px`;
-      strip.style.height = `${stripHeight}px`;
-      strip.style.transform = `translate(0px, ${screenY}px)`;
-      strip.dataset.gapIdx = String(i);
-    }
-  }
-
-  private createGapStrip(gapIdx: number): HTMLDivElement {
-    const strip = document.createElement('div');
-    Object.assign(strip.style, {
-      position: 'absolute',
-      left: '0px',
-      top: '0px',
-      cursor: 'ns-resize',
-      pointerEvents: 'auto',
-      background: 'transparent',
-      zIndex: '3',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    } as Partial<CSSStyleDeclaration>);
-    strip.dataset.gapIdx = String(gapIdx);
-
-    const handle = document.createElement('div');
-    Object.assign(handle.style, {
-      width: '72px',
-      height: '4px',
-      borderRadius: '2px',
-      background: 'rgba(25,28,30,0.3)',
-      opacity: '0.6',
-      transition: 'opacity 150ms ease, background 150ms ease, width 150ms ease',
-    } as Partial<CSSStyleDeclaration>);
-    strip.appendChild(handle);
-
-    strip.onmouseenter = () => {
-      handle.style.opacity = '1';
-      handle.style.background = 'rgba(25,28,30,0.6)';
-      handle.style.width = '96px';
-    };
-    strip.onmouseleave = () => {
-      if (!this._yShiftPreview || this._yShiftPreview.gapIdx !== gapIdx) {
-        handle.style.opacity = '0.6';
-        handle.style.background = 'rgba(25,28,30,0.3)';
-        handle.style.width = '72px';
-      }
-    };
-
-    strip.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const canvas = this._canvasRef;
-      if (!canvas) {
-        return;
-      }
-      strip.setPointerCapture(e.pointerId);
-      handle.style.opacity = '1';
-      const startScreenY = e.clientY;
-      const zoom = canvas.viewport.zoom;
-
-      const handleMove = (moveEvt: PointerEvent) => {
-        const dyScreen = moveEvt.clientY - startScreenY;
-        const dy = dyScreen / zoom;
-        this._yShiftPreview = { gapIdx, dy };
-      };
-      const handleUp = (upEvt: PointerEvent) => {
-        strip.releasePointerCapture(e.pointerId);
-        strip.removeEventListener('pointermove', handleMove);
-        strip.removeEventListener('pointerup', handleUp);
-        const dyScreen = upEvt.clientY - startScreenY;
-        const dy = dyScreen / zoom;
-        this._yShiftPreview = null;
-        if (Math.abs(dy) > 0.5) {
-          this.applyYShift(canvas, gapIdx, dy);
-        }
-        handle.style.opacity = '0';
-      };
-      strip.addEventListener('pointermove', handleMove);
-      strip.addEventListener('pointerup', handleUp);
-    });
-
-    return strip;
   }
 }
