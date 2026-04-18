@@ -420,6 +420,14 @@ export class CachedRepository
   }
 
   async openSession(nodeId: string): Promise<NoteSession> {
+    try {
+      await this.refresh();
+    } catch (error) {
+      console.error(
+        '[CachedRepository] Failed to refresh before opening session:',
+        error,
+      );
+    }
     return NoteSession.open(nodeId, this);
   }
 

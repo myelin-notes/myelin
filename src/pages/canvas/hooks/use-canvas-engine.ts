@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { type NoteSession, useBeforeShutdown, useRepository } from '@/lib/sync';
+import { IrohTransport } from '@/lib/sync/live/iroh';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { DrawableElement } from '@/pages/canvas/elements/drawable-element';
@@ -147,6 +148,7 @@ export function useCanvasEngine({
 }: UseCanvasEngineArgs) {
   const repository = useRepository();
   const noteSessionRef = useRef<NoteSession | null>(null);
+  const autoSyncTransportRef = useRef<IrohTransport | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
   const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
   onCanvasPointerDownRef.current = onCanvasPointerDown;
@@ -317,11 +319,14 @@ export function useCanvasEngine({
 
     let disposed = false;
     const priorSession = noteSessionRef.current;
+    const priorAutoSyncTransport = autoSyncTransportRef.current;
     noteSessionRef.current = null;
+    autoSyncTransportRef.current = null;
     setNoteSession(null);
     setYdoc(null);
     setEditingElement(null);
     void priorSession?.close().catch(console.error);
+    void priorAutoSyncTransport?.destroy().catch(console.error);
 
     const removeListeners = setupCanvasListeners(
       canvas,
@@ -343,6 +348,19 @@ export function useCanvasEngine({
         noteSessionRef.current = session;
         setNoteSession(session);
         setYdoc(session.ydoc);
+
+        const autoSyncTransport = new IrohTransport(session.id);
+        autoSyncTransportRef.current = autoSyncTransport;
+        session.setTransport(autoSyncTransport);
+        autoSyncTransport.autoSync().catch((err) => {
+          console.error('[canvas] auto-sync failed', err);
+        });
+        const currentNode = await repository.getNode(id);
+        if (disposed) {
+          await session.close();
+          return;
+        }
+        setFileName(currentNode?.type === 'file' ? currentNode.name : '');
 
         const dc = new DrawableCanvas(canvas, session.ydoc, canvasTools);
         drawableCanvasRef.current = dc;
@@ -390,10 +408,13 @@ export function useCanvasEngine({
       disposed = true;
       const session = noteSessionRef.current;
       noteSessionRef.current = null;
+      const autoSyncTransport = autoSyncTransportRef.current;
+      autoSyncTransportRef.current = null;
       setNoteSession(null);
       setYdoc(null);
       setEditingElement(null);
       void session?.close().catch(console.error);
+      void autoSyncTransport?.destroy().catch(console.error);
       stopAnimation();
       removeListeners();
       drawableCanvasRef.current?.destroy();

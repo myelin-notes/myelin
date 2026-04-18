@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import * as Y from 'yjs';
 import {
   createNoteState,
   getRepositoryTestStorage,
@@ -74,9 +75,38 @@ class MemoryRemoteRepository extends BaseRepository {
   }
 }
 
+function installMemoryLocalStorage(): void {
+  const storage = new Map<string, string>();
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem(key: string) {
+        return storage.get(key) ?? null;
+      },
+      setItem(key: string, value: string) {
+        storage.set(key, value);
+      },
+      removeItem(key: string) {
+        storage.delete(key);
+      },
+      clear() {
+        storage.clear();
+      },
+      key(index: number) {
+        return Array.from(storage.keys())[index] ?? null;
+      },
+      get length() {
+        return storage.size;
+      },
+    } satisfies Storage,
+  });
+}
+
 describe('CachedRepository', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
+    installMemoryLocalStorage();
   });
 
   it('serves cache writes immediately and flushes them to remote', async () => {
@@ -282,6 +312,53 @@ describe('CachedRepository', () => {
 
     const snapshot = await repository.loadDocument(fileId);
     expect(readNoteText(snapshot.update)).toBe('loaded by refresh');
+  });
+
+  it('pulls newer remote note state when opening a session', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote later', 'mcanvas', null);
+    const initialNote = createNoteState('stale cache copy');
+
+    await remote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/open-session-refresh-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/open-session-refresh-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const remoteSnapshot = await remote.loadDocument(fileId);
+    const doc = new Y.Doc();
+    if (remoteSnapshot.update) {
+      Y.applyUpdate(doc, remoteSnapshot.update);
+    }
+    const text = doc.getText('content');
+    text.delete(0, text.length);
+    text.insert(0, 'opened latest remote');
+
+    await remote.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(doc, remoteSnapshot.stateVector),
+      {
+        baseRevision: remoteSnapshot.revision,
+        localStateVector: Y.encodeStateVector(doc),
+      },
+    );
+
+    const session = await repository.openSession(fileId);
+
+    expect(readNoteText(session.encodeUpdate())).toBe('opened latest remote');
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'opened latest remote',
+    );
+
+    await session.close();
   });
 
   it('recovers from a corrupted outbox file during initialize', async () => {

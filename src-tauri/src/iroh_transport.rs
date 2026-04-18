@@ -1,7 +1,12 @@
 use std::{collections::{HashMap, HashSet}, str::FromStr};
 
 use bytes::Bytes;
-use iroh::{Endpoint, EndpointId, address_lookup::memory::MemoryLookup, endpoint::presets, protocol::Router};
+use iroh::{
+    Endpoint, EndpointId,
+    address_lookup::{mdns::MdnsAddressLookup, memory::MemoryLookup},
+    endpoint::presets,
+    protocol::Router,
+};
 use iroh_gossip::{Gossip, TopicId, api::{Event as GossipEvent, GossipSender}};
 use iroh_tickets::endpoint::EndpointTicket;
 use n0_future::StreamExt;
@@ -9,6 +14,8 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{Mutex, oneshot};
+
+use crate::rendezvous::Rendezvous;
 
 pub struct IrohState {
     runtime: Mutex<Option<IrohRuntime>>,
@@ -27,6 +34,7 @@ struct IrohRuntime {
     _router: Router,
     gossip: Gossip,
     memory_lookup: MemoryLookup,
+    rendezvous: Rendezvous,
     topics: HashMap<String, ActiveTopic>,
 }
 
@@ -72,6 +80,7 @@ impl IrohRuntime {
         let memory_lookup = MemoryLookup::new();
         let endpoint = Endpoint::builder(presets::N0)
             .address_lookup(memory_lookup.clone())
+            .address_lookup(MdnsAddressLookup::builder())
             .bind()
             .await
             .map_err(|err| format!("Failed to bind iroh endpoint: {err}"))?;
@@ -79,12 +88,14 @@ impl IrohRuntime {
         let router = Router::builder(endpoint.clone())
             .accept(iroh_gossip::ALPN, gossip.clone())
             .spawn();
+        let rendezvous = Rendezvous::new()?;
 
         Ok(Self {
             endpoint,
             _router: router,
             gossip,
             memory_lookup,
+            rendezvous,
             topics: HashMap::new(),
         })
     }
@@ -116,6 +127,52 @@ impl IrohRuntime {
         self.memory_lookup.add_endpoint_info(endpoint_addr);
 
         self.attach_topic(app, note_id, transport_id, bootstrap).await
+    }
+
+    async fn auto_sync(
+        &mut self,
+        app: &AppHandle,
+        note_id: &str,
+        transport_id: &str,
+    ) -> Result<(), String> {
+        self.endpoint.online().await;
+
+        let mut bootstrap = Vec::new();
+        match self.rendezvous.resolve(note_id).await {
+            Ok(Some(ticket_str)) => {
+                if let Ok(ticket) = EndpointTicket::from_str(ticket_str.trim()) {
+                    let addr = ticket.endpoint_addr().clone();
+                    let peer_id = addr.id;
+                    if peer_id != self.endpoint.id() {
+                        self.memory_lookup.add_endpoint_info(addr);
+                        bootstrap.push(peer_id);
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(err) => {
+                let _ = emit_error(
+                    app,
+                    note_id,
+                    transport_id,
+                    format!("Rendezvous resolve failed: {err}"),
+                );
+            }
+        }
+
+        self.attach_topic(app, note_id, transport_id, bootstrap).await?;
+
+        let own_ticket = EndpointTicket::new(self.endpoint.addr()).to_string();
+        if let Err(err) = self.rendezvous.publish(note_id, &own_ticket).await {
+            let _ = emit_error(
+                app,
+                note_id,
+                transport_id,
+                format!("Rendezvous publish failed: {err}"),
+            );
+        }
+
+        Ok(())
     }
 
     async fn send(
@@ -375,6 +432,25 @@ pub async fn iroh_join(
         .as_mut()
         .expect("runtime initialized")
         .join(&app, &note_id, &transport_id, &ticket)
+        .await
+}
+
+#[tauri::command]
+pub async fn iroh_auto_sync(
+    app: AppHandle,
+    state: tauri::State<'_, IrohState>,
+    note_id: String,
+    transport_id: String,
+) -> Result<(), String> {
+    let mut runtime = state.runtime.lock().await;
+    if runtime.is_none() {
+        *runtime = Some(IrohRuntime::start().await?);
+    }
+
+    runtime
+        .as_mut()
+        .expect("runtime initialized")
+        .auto_sync(&app, &note_id, &transport_id)
         .await
 }
 

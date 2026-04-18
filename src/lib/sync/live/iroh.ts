@@ -84,6 +84,17 @@ export class IrohTransport implements Transport {
     }
   }
 
+  async autoSync(): Promise<void> {
+    await this.setupTauriListeners();
+    await invoke('iroh_auto_sync', {
+      noteId: this.noteId,
+      transportId: this.transportId,
+    });
+    if (DEBUG) {
+      console.log(`[IrohTransport] auto-syncing ${this.noteId}`);
+    }
+  }
+
   async destroy(): Promise<void> {
     for (const unlisten of this.unlisteners) {
       unlisten();

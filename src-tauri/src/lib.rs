@@ -2,6 +2,7 @@ use std::fs;
 use tauri::Manager;
 
 mod iroh_transport;
+mod rendezvous;
 
 #[tauri::command]
 fn create_dir_all(path: &str) -> Result<(), String> {
@@ -33,6 +34,7 @@ pub fn run() {
             create_dir_all,
             iroh_transport::iroh_host,
             iroh_transport::iroh_join,
+            iroh_transport::iroh_auto_sync,
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
         ]);
