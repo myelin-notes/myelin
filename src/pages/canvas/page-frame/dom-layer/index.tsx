@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
+import { FrameChrome } from '../../elements/frame-chrome';
 import {
   PAGE_CORNER_RADIUS,
   PAGE_GAP,
@@ -41,6 +42,7 @@ const CONTENT_STYLE: Record<string, string> = {
 };
 
 interface FrameRefs {
+  chrome: FrameChrome;
   frameDiv: HTMLDivElement;
   viewportDiv: HTMLDivElement;
   contentDiv: HTMLDivElement;
@@ -83,6 +85,9 @@ function createFrameRefs(
   frame: PageFrameElement,
   container: HTMLDivElement,
 ): FrameRefs {
+  const chrome = new FrameChrome({ kindLabel: 'NOTE' });
+  chrome.root.dataset.frameIndex = String(frame.index);
+
   const frameDiv = document.createElement('div');
   Object.assign(frameDiv.style, FRAME_STYLE);
   frameDiv.dataset.frameIndex = String(frame.index);
@@ -96,14 +101,15 @@ function createFrameRefs(
 
   viewportDiv.appendChild(contentDiv);
   frameDiv.appendChild(viewportDiv);
-  container.appendChild(frameDiv);
+  chrome.contentSlot.appendChild(frameDiv);
+  container.appendChild(chrome.root);
 
   frame.mountDOM(frameDiv, contentDiv);
   frame.pmEditor?.createView(contentDiv, (pageCount) => {
     frame.numPages = pageCount;
   });
 
-  return { frameDiv, viewportDiv, contentDiv, pageChromeDivs: [] };
+  return { chrome, frameDiv, viewportDiv, contentDiv, pageChromeDivs: [] };
 }
 
 function removeStaleFrames(
@@ -112,7 +118,7 @@ function removeStaleFrames(
 ): void {
   for (const [index, refs] of frameMap) {
     if (!activeIndices.has(index)) {
-      refs.frameDiv.remove();
+      refs.chrome.dispose();
       frameMap.delete(index);
     }
   }
@@ -166,10 +172,19 @@ export function PageFrameDomLayer({
         const screenX = snapToDevicePixel((frame.offset.x + offset.x) * zoom);
         const screenY = snapToDevicePixel((frame.offset.y + offset.y) * zoom);
 
-        // Outer frame: screen-sized clip box, translate only (no scale)
+        refs.chrome.sync({
+          screenX,
+          screenY,
+          contentWidth: PAGE_WIDTH,
+          contentHeight: frame.totalHeight,
+          zoom,
+        });
+
+        // Inner frame: screen-sized clip box, lives inside chrome contentSlot
+        // so no extra translate needed — contentSlot positions it.
         refs.frameDiv.style.width = `${PAGE_WIDTH * zoom}px`;
         refs.frameDiv.style.height = `${frame.totalHeight * zoom}px`;
-        refs.frameDiv.style.transform = `translate(${screenX}px, ${screenY}px)`;
+        refs.frameDiv.style.transform = '';
 
         // Inner viewport: world-sized. A fixed CSS zoom of devicePixelRatio
         // tells WebKit to rasterise the compositing-layer backing store at

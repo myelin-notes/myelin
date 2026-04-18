@@ -5,6 +5,11 @@ import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
+import {
+  CHROME_BOTTOM_PADDING,
+  CHROME_HEADER_HEIGHT,
+  CHROME_SIDE_PADDING,
+} from './frame-chrome';
 
 export const PAGE_WIDTH = 680;
 export const PAGE_HEIGHT = 880;
@@ -92,7 +97,12 @@ export class PageFrameElement extends DrawableElement {
   }
 
   public get localBoundingBox(): DOMRect {
-    return new DOMRect(0, 0, this._pageWidth, this.totalHeight);
+    return new DOMRect(
+      -CHROME_SIDE_PADDING,
+      -CHROME_HEADER_HEIGHT,
+      this._pageWidth + CHROME_SIDE_PADDING * 2,
+      this.totalHeight + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
+    );
   }
 
   protected isOverLocal(
@@ -101,6 +111,15 @@ export class PageFrameElement extends DrawableElement {
     _radius: number,
     _ctx: CanvasRenderingContext2D,
   ): boolean {
+    // Chrome (surrounding frame + header) hit area
+    if (
+      x >= -CHROME_SIDE_PADDING &&
+      x <= this._pageWidth + CHROME_SIDE_PADDING &&
+      y >= -CHROME_HEADER_HEIGHT &&
+      y <= this.totalHeight + CHROME_BOTTOM_PADDING
+    ) {
+      return true;
+    }
     if (x < 0 || x > this._pageWidth) {
       return false;
     }

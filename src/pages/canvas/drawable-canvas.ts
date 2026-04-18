@@ -578,7 +578,8 @@ export class DrawableCanvas {
     }
 
     const pdf = this.addElement((i) => new PdfElement(i));
-    pdf.setInitialPdfData(bytes, pageSizes, doc);
+    const fileName = blob instanceof File ? blob.name : '';
+    pdf.setInitialPdfData(bytes, pageSizes, fileName, doc);
 
     const dpr = window.devicePixelRatio || 1;
     const cx = screenX ?? this.canvas.width / dpr / 2;

@@ -63,6 +63,15 @@ export function CanvasView() {
         className="absolute inset-0 block h-full w-full"
       />
 
+      {/* Frame chrome controls (hamburger buttons). Sits above the foreground
+          canvas so clicks reach the buttons first. Pointer-events-none by
+          default; individual buttons opt in. */}
+      <div
+        id="canvas-chrome-controls"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        style={{ zIndex: 15 }}
+      />
+
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} noteId={id} />
       {DEBUG && <PeerSyncPanel session={engine.noteSession} />}
       <TitleBar fileName={engine.fileName} onBack={engine.back} />

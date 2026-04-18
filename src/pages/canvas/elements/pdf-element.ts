@@ -5,6 +5,12 @@ import type { DrawableCanvas } from '../drawable-canvas';
 import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
+import {
+  CHROME_BOTTOM_PADDING,
+  CHROME_HEADER_HEIGHT,
+  CHROME_SIDE_PADDING,
+  FrameChrome,
+} from './frame-chrome';
 
 const PDF_PAGE_GAP = 40;
 
@@ -51,8 +57,10 @@ export class PdfElement extends DrawableElement {
   private _pdfDocLoad: Promise<PdfDocument> | null = null;
   private _pageOrder: PdfPageEntry[] = [];
   private _pageSizes: PdfPageSize[] = [];
+  private _fileName: string = '';
   private _editing: boolean = false;
 
+  private _chrome: FrameChrome | null = null;
   private _frameDiv: HTMLDivElement | null = null;
   private _viewportDiv: HTMLDivElement | null = null;
   private _pageHost: HTMLDivElement | null = null;
@@ -66,6 +74,7 @@ export class PdfElement extends DrawableElement {
     return {
       pageOrder: this._pageOrder as unknown,
       pageSizes: this._pageSizes as unknown,
+      fileName: this._fileName,
     };
   }
 
@@ -81,6 +90,10 @@ export class PdfElement extends DrawableElement {
       },
       pageSizes: (v) => {
         this._pageSizes = v as PdfPageSize[];
+      },
+      fileName: (v) => {
+        this._fileName = (v as string) ?? '';
+        this._chrome?.setFileName(this._fileName || null);
       },
     });
   }
@@ -103,6 +116,7 @@ export class PdfElement extends DrawableElement {
   public setInitialPdfData(
     bytes: Uint8Array,
     pageSizes: PdfPageSize[],
+    fileName: string,
     preloaded?: PdfDocument,
   ): void {
     if (preloaded) {
@@ -114,12 +128,19 @@ export class PdfElement extends DrawableElement {
       kind: 'pdf',
       originalIndex: i,
     }));
+    this._fileName = fileName;
+    this._chrome?.setFileName(fileName || null);
 
     this.syncToYMap({
       pdfData: new Uint8Array(bytes),
       pageSizes: this._pageSizes as unknown,
       pageOrder: this._pageOrder as unknown,
+      fileName,
     });
+  }
+
+  public get fileName(): string {
+    return this._fileName;
   }
 
   public get editing(): boolean {
@@ -178,7 +199,12 @@ export class PdfElement extends DrawableElement {
   }
 
   public get localBoundingBox(): DOMRect {
-    return new DOMRect(0, 0, this.totalWidth, this.totalHeight);
+    return new DOMRect(
+      -CHROME_SIDE_PADDING,
+      -CHROME_HEADER_HEIGHT,
+      this.totalWidth + CHROME_SIDE_PADDING * 2,
+      this.totalHeight + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
+    );
   }
 
   protected isOverLocal(
@@ -187,6 +213,16 @@ export class PdfElement extends DrawableElement {
     _radius: number,
     _ctx: CanvasRenderingContext2D,
   ): boolean {
+    // Chrome (frame + header) hit area — lets users select/drag by the
+    // surrounding paper backing.
+    if (
+      x >= -CHROME_SIDE_PADDING &&
+      x <= this.totalWidth + CHROME_SIDE_PADDING &&
+      y >= -CHROME_HEADER_HEIGHT &&
+      y <= this.totalHeight + CHROME_BOTTOM_PADDING
+    ) {
+      return true;
+    }
     for (const page of this.pageLayout()) {
       if (x < 0 || x > page.w) {
         continue;
@@ -277,6 +313,7 @@ export class PdfElement extends DrawableElement {
 
     const frameDiv = this._frameDiv!;
     const viewportDiv = this._viewportDiv!;
+    const chrome = this._chrome!;
 
     const zoom = viewport.zoom;
     const offset = viewport.offset;
@@ -286,9 +323,19 @@ export class PdfElement extends DrawableElement {
 
     const screenX = snapToDevicePixel((this.offset.x + offset.x) * zoom);
     const screenY = snapToDevicePixel((this.offset.y + offset.y) * zoom);
+
+    chrome.sync({
+      screenX,
+      screenY,
+      contentWidth: totalWidth,
+      contentHeight: totalHeight,
+      zoom,
+    });
+
+    // frameDiv lives inside chrome.contentSlot — sized in screen pixels like
+    // the old standalone frame. No translate needed; position via its parent.
     frameDiv.style.width = `${totalWidth * zoom}px`;
     frameDiv.style.height = `${totalHeight * zoom}px`;
-    frameDiv.style.transform = `translate(${screenX}px, ${screenY}px)`;
     frameDiv.style.pointerEvents = this._editing ? 'auto' : 'none';
 
     viewportDiv.style.width = `${totalWidth}px`;
@@ -300,9 +347,8 @@ export class PdfElement extends DrawableElement {
   }
 
   public override disposeDOM(): void {
-    if (this._frameDiv) {
-      this._frameDiv.remove();
-    }
+    this._chrome?.dispose();
+    this._chrome = null;
     this._frameDiv = null;
     this._viewportDiv = null;
     this._pageHost = null;
@@ -312,6 +358,11 @@ export class PdfElement extends DrawableElement {
   }
 
   private createDom(host: HTMLElement): void {
+    const chrome = new FrameChrome({ kindLabel: 'PDF' });
+    chrome.setFileName(this._fileName || null);
+    chrome.root.dataset.elementIndex = String(this.index);
+    chrome.root.dataset.elementType = 'pdf';
+
     const frameDiv = document.createElement('div');
     Object.assign(frameDiv.style, {
       position: 'absolute',
@@ -320,8 +371,6 @@ export class PdfElement extends DrawableElement {
       transformOrigin: '0 0',
       overflow: 'visible',
     } as Partial<CSSStyleDeclaration>);
-    frameDiv.dataset.elementIndex = String(this.index);
-    frameDiv.dataset.elementType = 'pdf';
 
     const viewportDiv = document.createElement('div');
     Object.assign(viewportDiv.style, {
@@ -342,8 +391,10 @@ export class PdfElement extends DrawableElement {
 
     viewportDiv.appendChild(pageHost);
     frameDiv.appendChild(viewportDiv);
-    host.appendChild(frameDiv);
+    chrome.contentSlot.appendChild(frameDiv);
+    host.appendChild(chrome.root);
 
+    this._chrome = chrome;
     this._frameDiv = frameDiv;
     this._viewportDiv = viewportDiv;
     this._pageHost = pageHost;
