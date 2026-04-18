@@ -57,6 +57,7 @@ export class NoteSession {
   private readonly peerSnapshotListeners = new Set<
     (snapshot: PeerSnapshot) => void
   >();
+  private readonly localChangeListeners = new Set<() => void>();
   private heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null =
     null;
 
@@ -90,6 +91,12 @@ export class NoteSession {
           type: 'yjs-update',
           data: new Uint8Array(update),
         });
+      }
+
+      if (origin !== undefined && origin !== null && origin !== PEER_ORIGIN) {
+        for (const listener of this.localChangeListeners) {
+          listener();
+        }
       }
     });
   }
@@ -133,6 +140,13 @@ export class NoteSession {
 
     return () => {
       this.peerSnapshotListeners.delete(listener);
+    };
+  }
+
+  subscribeLocalChanges(listener: () => void): () => void {
+    this.localChangeListeners.add(listener);
+    return () => {
+      this.localChangeListeners.delete(listener);
     };
   }
 

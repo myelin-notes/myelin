@@ -12,6 +12,7 @@ import type { ITool } from '@/pages/canvas/tools/tool';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;
+const LOCAL_PERSIST_DEBOUNCE_MS = 250;
 
 function setupCanvasListeners(
   canvas: HTMLCanvasElement,
@@ -149,7 +150,10 @@ export function useCanvasEngine({
   const repository = useRepository();
   const noteSessionRef = useRef<NoteSession | null>(null);
   const autoSyncTransportRef = useRef<IrohTransport | null>(null);
+  const persistPromiseRef = useRef<Promise<void> | null>(null);
+  const persistTimerRef = useRef<number | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
+  const needsThumbnailSaveRef = useRef(false);
   const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
   onCanvasPointerDownRef.current = onCanvasPointerDown;
 
@@ -181,21 +185,59 @@ export function useCanvasEngine({
     }
   };
 
+  const persistSession = useCallback(async (session: NoteSession) => {
+    if (persistPromiseRef.current) {
+      await persistPromiseRef.current;
+    }
+
+    if (!session.hasLocalChanges()) {
+      return;
+    }
+
+    const persistPromise = session.push().finally(() => {
+      if (persistPromiseRef.current === persistPromise) {
+        persistPromiseRef.current = null;
+      }
+    });
+
+    persistPromiseRef.current = persistPromise;
+    await persistPromise;
+  }, []);
+
+  const scheduleLocalPersist = useCallback(() => {
+    if (persistTimerRef.current !== null) {
+      window.clearTimeout(persistTimerRef.current);
+    }
+
+    persistTimerRef.current = window.setTimeout(() => {
+      persistTimerRef.current = null;
+      const session = noteSessionRef.current;
+      if (!session) {
+        return;
+      }
+
+      void persistSession(session).catch(console.error);
+    }, LOCAL_PERSIST_DEBOUNCE_MS);
+  }, [persistSession]);
+
   const saveSession = useCallback(
     async (session: NoteSession) => {
       const canvas = canvasRef.current;
-      if (!(canvas && id)) {
+      if (!canvas || !id) {
         return;
       }
 
-      if (!session.hasLocalChanges()) {
+      await persistSession(session);
+
+      if (!needsThumbnailSaveRef.current) {
         return;
       }
 
-      await session.push();
+      needsThumbnailSaveRef.current = false;
       await new Promise<void>((resolve, reject) => {
         canvas.toBlob(async (b) => {
           if (b === null) {
+            needsThumbnailSaveRef.current = true;
             console.warn('Failed to generate thumbnail');
             reject();
             return;
@@ -205,7 +247,7 @@ export function useCanvasEngine({
         }, 'image/png');
       });
     },
-    [canvasRef, id],
+    [canvasRef, id, persistSession],
   );
 
   const autoSave = useCallback(async () => {
@@ -218,7 +260,7 @@ export function useCanvasEngine({
       await savePromiseRef.current;
     }
 
-    if (!session.hasLocalChanges()) {
+    if (!session.hasLocalChanges() && !needsThumbnailSaveRef.current) {
       return;
     }
 
@@ -299,6 +341,26 @@ export function useCanvasEngine({
     };
   }, [autoSave, noteSession]);
 
+  useEffect(() => {
+    if (!noteSession) {
+      needsThumbnailSaveRef.current = false;
+      return;
+    }
+
+    const unsubscribe = noteSession.subscribeLocalChanges(() => {
+      needsThumbnailSaveRef.current = true;
+      scheduleLocalPersist();
+    });
+
+    return () => {
+      unsubscribe();
+      if (persistTimerRef.current !== null) {
+        window.clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+    };
+  }, [noteSession, scheduleLocalPersist]);
+
   // Initialize canvas, event listeners, and animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -309,8 +371,13 @@ export function useCanvasEngine({
     let disposed = false;
     const priorSession = noteSessionRef.current;
     const priorAutoSyncTransport = autoSyncTransportRef.current;
+    if (persistTimerRef.current !== null) {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
     noteSessionRef.current = null;
     autoSyncTransportRef.current = null;
+    needsThumbnailSaveRef.current = false;
     setNoteSession(null);
     setYdoc(null);
     setEditingElement(null);
@@ -399,6 +466,11 @@ export function useCanvasEngine({
       noteSessionRef.current = null;
       const autoSyncTransport = autoSyncTransportRef.current;
       autoSyncTransportRef.current = null;
+      if (persistTimerRef.current !== null) {
+        window.clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+      needsThumbnailSaveRef.current = false;
       setNoteSession(null);
       setYdoc(null);
       setEditingElement(null);
