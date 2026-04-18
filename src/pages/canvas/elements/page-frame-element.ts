@@ -1,6 +1,9 @@
+import { Download as DownloadIcon } from 'lucide-react';
 import { Selection } from 'prosemirror-state';
 import type * as Y from 'yjs';
+import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
+import { serializeDocToMarkdown } from '../page-frame/markdown-serializer';
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
@@ -197,6 +200,35 @@ export class PageFrameElement extends DrawableElement {
     this.pmEditor?.setEditable(false);
     this.pmEditor?.blur();
     // Yjs UndoManager captures PM changes automatically — no snapshot needed
+  }
+
+  public getMenuItems(): ChromeMenuItem[] {
+    return [
+      {
+        id: 'export-markdown',
+        label: 'Export to Markdown',
+        icon: DownloadIcon,
+        onSelect: () => this.exportMarkdown(),
+      },
+    ];
+  }
+
+  private exportMarkdown(): void {
+    const view = this.pmEditor?.view;
+    if (!view) {
+      return;
+    }
+    const md = serializeDocToMarkdown(view.state.doc);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `note-${this.index}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Defer revoke so the browser has a moment to start the download.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}

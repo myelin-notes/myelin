@@ -22,9 +22,16 @@ const MENU_BUTTON_SIZE = 32;
 const MENU_BUTTON_TOP = (CHROME_HEADER_HEIGHT - MENU_BUTTON_SIZE) / 2;
 const CONTROLS_LAYER_ID = 'canvas-chrome-controls';
 
+import { type ChromeMenuItem, openChromeMenu } from '../chrome-menu';
+
 export interface FrameChromeOptions {
   kindLabel: string;
-  onMenuClick?: (anchorRect: DOMRect, event: MouseEvent) => void;
+  /**
+   * Called when the hamburger button is clicked. Returning an empty array
+   * suppresses the menu. Called lazily (per click) so items can reflect
+   * current state.
+   */
+  getMenuItems?: () => ChromeMenuItem[];
 }
 
 export class FrameChrome {
@@ -150,11 +157,15 @@ export class FrameChrome {
     this.root.appendChild(this.contentSlot);
 
     this.menuButton = this.createMenuButton();
-    if (options.onMenuClick) {
-      const handler = options.onMenuClick;
+    const getItems = options.getMenuItems;
+    if (getItems) {
       this.menuButton.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        handler(this.menuButton.getBoundingClientRect(), ev);
+        const items = getItems();
+        if (items.length === 0) {
+          return;
+        }
+        openChromeMenu(this.menuButton.getBoundingClientRect(), items);
       });
     }
     // The button lives in its own top-layer overlay so it's above the

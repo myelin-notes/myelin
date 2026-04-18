@@ -85,7 +85,10 @@ function createFrameRefs(
   frame: PageFrameElement,
   container: HTMLDivElement,
 ): FrameRefs {
-  const chrome = new FrameChrome({ kindLabel: 'NOTE' });
+  const chrome = new FrameChrome({
+    kindLabel: 'NOTE',
+    getMenuItems: () => frame.getMenuItems(),
+  });
   chrome.root.dataset.frameIndex = String(frame.index);
 
   const frameDiv = document.createElement('div');

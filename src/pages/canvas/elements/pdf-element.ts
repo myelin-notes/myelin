@@ -1,6 +1,7 @@
 import type * as Y from 'yjs';
 import { loadDocument, type PdfDocument, renderPage } from '@/lib/pdf-renderer';
 import type { CanvasViewport } from '../canvas-viewport';
+import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
@@ -141,6 +142,10 @@ export class PdfElement extends DrawableElement {
 
   public get fileName(): string {
     return this._fileName;
+  }
+
+  public getMenuItems(): ChromeMenuItem[] {
+    return [];
   }
 
   public get editing(): boolean {
@@ -358,7 +363,10 @@ export class PdfElement extends DrawableElement {
   }
 
   private createDom(host: HTMLElement): void {
-    const chrome = new FrameChrome({ kindLabel: 'PDF' });
+    const chrome = new FrameChrome({
+      kindLabel: 'PDF',
+      getMenuItems: () => this.getMenuItems(),
+    });
     chrome.setFileName(this._fileName || null);
     chrome.root.dataset.elementIndex = String(this.index);
     chrome.root.dataset.elementType = 'pdf';
