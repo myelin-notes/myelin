@@ -28,7 +28,7 @@ const zhHans: typeof en = {
   },
   library: {
     title: '数字资料库',
-    emptyState: '你的个人知识工作区。创建画布以开始收集想法、笔记和研究。',
+    emptyState: '你的个人知识工作区，创建画布即可开始收集想法、笔记与研究',
     recentlyOpened: '最近打开',
     searchPlaceholder: '搜索工作室...',
     explorer: '资源管理器',
@@ -51,7 +51,7 @@ const zhHans: typeof en = {
     },
     semanticTags: {
       title: '语义标签',
-      empty: '还没有标签。右键点击文件并选择“管理标签”以开始。',
+      empty: '还没有标签，右键点击文件并选择“管理标签”即可开始',
       insights: '工作室洞察',
       stats: {
         totalFiles: '文件总数',
@@ -83,7 +83,7 @@ const zhHans: typeof en = {
   settings: {
     title: '偏好设置',
     description:
-      '定制你的创作圣地。这些设置将调整无限画布的视觉氛围与功能深度。',
+      '定制你的创作圣地，这些设置可调整无限画布的视觉氛围与功能深度',
     canvasStyle: {
       title: '画布样式',
       eyebrow: '视觉外观',
@@ -119,8 +119,8 @@ const zhHans: typeof en = {
           signIn: '使用你的 GitHub 账户登录',
         },
         errors: {
-          readState: '无法读取 GitHub 身份验证状态。',
-          signIn: '登录失败。',
+          readState: '无法读取 GitHub 身份验证状态',
+          signIn: '登录失败',
         },
         buttons: {
           signIn: '登录',
@@ -142,28 +142,28 @@ const zhHans: typeof en = {
         status: {
           setupRequired: {
             label: '需要设置',
-            description: '登录并选择一个仓库以启用同步。',
+            description: '登录并选择一个仓库以启用同步',
           },
           loading: {
             label: '加载中',
-            description: '正在加载缓存的仓库并检查远程状态。',
+            description: '正在加载缓存的仓库并检查远程状态',
           },
           pending: {
             label: '待处理',
             description: (count: number, online: boolean) =>
               online
-                ? `${count} 项更改正在排队上传。`
-                : `${count} 项更改已在本地排队，直到恢复远程同步。`,
+                ? `${count} 项更改正在排队上传`
+                : `${count} 项更改已在本地排队，直到恢复远程同步`,
           },
           issue: {
             label: '异常',
-            onlineDescription: '仓库已配置，但上次同步尝试失败。',
-            offlineDescription: '远程同步不可用。本地仍可访问缓存数据。',
+            onlineDescription: '仓库已配置，但上次同步尝试失败',
+            offlineDescription: '远程同步不可用，本地仍可访问缓存数据',
           },
           synced: {
             label: '已同步',
-            upToDate: '远程仓库已是最新。',
-            ready: '仓库已准备好同步。',
+            upToDate: '远程仓库已是最新',
+            ready: '仓库已准备好同步',
           },
         },
       },
@@ -171,7 +171,7 @@ const zhHans: typeof en = {
         owner: {
           select: '选择拥有者',
           loading: '正在加载账户...',
-          error: '无法加载 GitHub 账户。',
+          error: '无法加载 GitHub 账户',
           you: '你',
           org: '组织',
         },
@@ -179,14 +179,14 @@ const zhHans: typeof en = {
           pickOwner: '选择拥有者',
           select: '选择仓库',
           loading: '正在加载仓库...',
-          error: '无法加载仓库。',
+          error: '无法加载仓库',
           empty: '没有仓库',
         },
         branch: {
           pickRepo: '选择仓库',
           select: '选择分支',
           loading: '正在加载分支...',
-          error: '无法加载分支。',
+          error: '无法加载分支',
           empty: '没有分支',
         },
       },
@@ -196,7 +196,7 @@ const zhHans: typeof en = {
       resetAll: '全部重置',
       pressKey: '按下一个键...',
       unbound: '未绑定',
-      empty: '还没有注册快捷键。打开画布后即可查看。',
+      empty: '还没有注册快捷键，打开画布后即可查看',
       categories: {
         canvas: '画布',
         editor: '编辑器',
@@ -248,7 +248,7 @@ const zhHans: typeof en = {
     },
     toolShelf: {
       title: '工具盘',
-      empty: '轮盘已停用 — 右键点击将不会打开它。',
+      empty: '轮盘已停用，右键点击将不会打开',
     },
     tools: {
       select: '选择',
@@ -331,7 +331,7 @@ const zhHans: typeof en = {
   },
   debug: {
     uploadPdf: '上传 PDF',
-    empty: '选择一个 PDF 进行渲染。',
+    empty: '选择一个 PDF 进行渲染',
   },
   dialogs: {
     closeSrOnly: '关闭',

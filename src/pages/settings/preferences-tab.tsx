@@ -168,7 +168,7 @@ export function PreferencesTab() {
             <DropdownMenuTrigger className="group flex w-full max-w-xs cursor-pointer items-center justify-between rounded-xl bg-input px-4 py-3 text-sm transition-colors hover:bg-hover-tint">
               <div className="flex items-center gap-3">
                 <span className="font-medium text-[10px] text-text-muted uppercase tracking-widest">
-                  {selectedLang.code}
+                  {selectedLang.code.split('-')[0]}
                 </span>
                 <span className="text-text-primary">{selectedLang.label}</span>
               </div>
@@ -186,7 +186,7 @@ export function PreferencesTab() {
                 {languages.map((lang) => (
                   <DropdownMenuRadioItem key={lang.code} value={lang.code}>
                     <span className="w-7 font-medium text-[10px] text-text-muted uppercase tracking-widest">
-                      {lang.code}
+                      {lang.code.split('-')[0]}
                     </span>
                     <span>{lang.label}</span>
                   </DropdownMenuRadioItem>
