@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useStrings } from '@/lib/i18n';
 import { type Action, type KeyCombo, registry } from '@/lib/keybinds';
+import { getActionCategory, getActionCopy } from '@/lib/keybinds/messages';
 import { cn } from '@/lib/utils';
-
-function categoryOf(action: string): string {
-  const ns = action.split(':')[0];
-  return ns.charAt(0).toUpperCase() + ns.slice(1);
-}
 
 const isMac =
   typeof navigator !== 'undefined' &&
@@ -41,6 +38,7 @@ function KeyCapture({
   onCapture: (combo: KeyCombo) => void;
   onCancel: () => void;
 }) {
+  const strings = useStrings();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,7 +89,7 @@ function KeyCapture({
       transition={{ duration: 0.1 }}
       className="flex h-8 min-w-20 items-center justify-center rounded-lg bg-accent-navy px-4 font-semibold text-[10px] text-white uppercase tracking-widest outline-none"
     >
-      Press a key&hellip;
+      {strings.settings.keybinds.pressKey}
     </motion.div>
   );
 }
@@ -104,9 +102,10 @@ function KeybindRow({
   combo: KeyCombo | undefined;
   isRebound: boolean;
 }) {
+  const strings = useStrings();
   const [capturing, setCapturing] = useState(false);
   const [currentCombo, setCurrentCombo] = useState(combo);
-  const meta = registry.getMeta(action);
+  const copy = getActionCopy(strings, action);
 
   useEffect(() => {
     const onReset = () => setCurrentCombo(registry.getCombo(action));
@@ -127,10 +126,10 @@ function KeybindRow({
     >
       <div className="flex-1">
         <span className="text-sm text-text-primary">
-          {meta?.label ?? action}
+          {copy?.label ?? action}
         </span>
-        {meta?.description && (
-          <p className="text-text-muted text-xs">{meta.description}</p>
+        {copy?.description && (
+          <p className="text-text-muted text-xs">{copy.description}</p>
         )}
       </div>
 
@@ -164,7 +163,9 @@ function KeybindRow({
                   </span>
                 ))
               ) : (
-                <span className="text-text-muted text-xs">Unbound</span>
+                <span className="text-text-muted text-xs">
+                  {strings.settings.keybinds.unbound}
+                </span>
               )}
             </motion.div>
           )}
@@ -175,6 +176,7 @@ function KeybindRow({
 }
 
 export function KeybindsSection() {
+  const strings = useStrings();
   const actions = registry.actions;
 
   const grouped = new Map<
@@ -182,7 +184,7 @@ export function KeybindsSection() {
     { action: Action; combo: KeyCombo | undefined; isRebound: boolean }[]
   >();
   for (const action of actions) {
-    const category = categoryOf(action);
+    const category = getActionCategory(strings, action);
     if (!grouped.has(category)) {
       grouped.set(category, []);
     }
@@ -201,14 +203,16 @@ export function KeybindsSection() {
   return (
     <>
       <div className="mb-6 flex items-baseline justify-between">
-        <h3 className="font-heading text-xl">Keybinds</h3>
+        <h3 className="font-heading text-xl">
+          {strings.settings.keybinds.title}
+        </h3>
         <button
           type="button"
           onClick={handleResetAll}
           className="flex items-center gap-1.5 text-text-muted text-xs transition-colors hover:text-text-secondary"
         >
           <RotateCcw className="size-3" />
-          Reset all
+          {strings.settings.keybinds.resetAll}
         </button>
       </div>
 
@@ -236,7 +240,7 @@ export function KeybindsSection() {
 
         {actions.length === 0 && (
           <p className="py-8 text-center text-sm text-text-muted">
-            No keybindings registered yet. They appear once you open a canvas.
+            {strings.settings.keybinds.empty}
           </p>
         )}
       </div>

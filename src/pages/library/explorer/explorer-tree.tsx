@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { useStrings } from '@/lib/i18n';
 import { type FileType, useRepository, type VFSNode } from '@/lib/sync';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
@@ -37,6 +38,7 @@ export function ExplorerTree({
   searchQuery,
   filterTags,
 }: ExplorerTreeProps) {
+  const strings = useStrings();
   const repository = useRepository();
   const [nodes, setNodes] = useState<VFSNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +70,7 @@ export function ExplorerTree({
 
   const startNewFolder = useCallback(async () => {
     const name = await repository.getUniqueFileName(
-      'Unnamed Folder',
+      strings.library.createNew.unnamedFolder,
       currentFolderId,
     );
     const id = await repository.createFolder(name, currentFolderId);
@@ -88,7 +90,7 @@ export function ExplorerTree({
       ...prev,
     ]);
     requestAnimationFrame(() => setRenamingNewId(null));
-  }, [currentFolderId]);
+  }, [currentFolderId, repository, strings.library.createNew.unnamedFolder]);
 
   const startNewFile = useCallback(
     async (title: string, type: FileType) => {
@@ -192,10 +194,10 @@ export function ExplorerTree({
       {nodes.length === 0 && (
         <span className="px-4 py-3 text-sm text-text-muted">
           {isSearching
-            ? 'No results found'
+            ? strings.library.explorerTree.emptySearch
             : isFiltering
-              ? 'No items match the selected tags'
-              : 'No files yet'}
+              ? strings.library.explorerTree.emptyFilter
+              : strings.library.explorerTree.emptyDefault}
         </span>
       )}
     </div>

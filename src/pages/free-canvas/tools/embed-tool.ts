@@ -1,8 +1,14 @@
 import { ImagePlus as ImagePlusIcon } from 'lucide-react';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import type { ITool, SvgIcon } from './tool';
+import type { CanvasStringsGetter, ITool, SvgIcon, ToolId } from './tool';
 
 export class EmbedTool implements ITool {
+  public constructor(private readonly getStrings: CanvasStringsGetter) {}
+
+  get id(): ToolId {
+    return 'embed';
+  }
+
   start(_canvas: DrawableCanvas, _event: PointerEvent): void {}
 
   update(
@@ -22,6 +28,6 @@ export class EmbedTool implements ITool {
   }
 
   get label(): string {
-    return 'Embed';
+    return this.getStrings().tools.embed;
   }
 }

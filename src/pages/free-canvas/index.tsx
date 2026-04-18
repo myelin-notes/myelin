@@ -83,8 +83,8 @@ export function CanvasView() {
         onToggleWheelTool={toolState.handleToggleWheelTool}
         embedComposer={
           <AnimatePresence>
-            {toolState.canvasTools[toolState.selectedToolIndex]?.label ===
-              'Embed' && (
+            {toolState.canvasTools[toolState.selectedToolIndex]?.id ===
+              'embed' && (
               <EmbedComposer
                 key="embed-composer"
                 onEmbedFiles={engine.embedFiles}

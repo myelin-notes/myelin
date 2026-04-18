@@ -10,6 +10,8 @@ import {
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/sidebar';
+import { formatRelativeTime } from '@/lib/i18n/format';
+import { useLocale, useStrings } from '@/lib/i18n';
 import {
   useRepository,
   type VFSFileNode,
@@ -24,35 +26,9 @@ import {
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
-function formatRelativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) {
-    return 'Just now';
-  }
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-  const days = Math.floor(hours / 24);
-  if (days === 1) {
-    return 'Yesterday';
-  }
-  if (days < 30) {
-    return `${days}d ago`;
-  }
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
-
-const fileTypeLabel: Record<string, string> = {
-  mcanvas: 'Canvas',
-};
-
 export function LibraryPage() {
+  const strings = useStrings();
+  const locale = useLocale();
   const repository = useRepository();
   const navigate = useNavigate();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
@@ -177,13 +153,12 @@ export function LibraryPage() {
           transition={{ duration: 0.15 }}
         >
           <h1 className="font-extralight font-heading text-5xl text-text-primary leading-[48px]">
-            Digital Library
+            {strings.library.title}
           </h1>
 
           {recentFiles.length === 0 && (
             <p className="mt-3 max-w-lg font-normal text-sm text-text-muted leading-relaxed">
-              Your personal knowledge workspace. Create a canvas to start
-              collecting ideas, notes, and research.
+              {strings.library.emptyState}
             </p>
           )}
 
@@ -192,7 +167,7 @@ export function LibraryPage() {
             <section className="mt-6">
               <div className="mb-6 flex items-center justify-between">
                 <h3 className="font-heading font-normal text-2xl text-text-primary leading-8">
-                  Recently Opened
+                  {strings.library.recentlyOpened}
                 </h3>
               </div>
 
@@ -210,8 +185,14 @@ export function LibraryPage() {
                     }}
                   >
                     <RecentCard
-                      category={fileTypeLabel[file.fileType] ?? file.fileType}
-                      time={formatRelativeTime(file.modifiedAt)}
+                      category={
+                        strings.library.fileTypes[
+                          file.fileType as keyof typeof strings.library.fileTypes
+                        ] ?? file.fileType
+                      }
+                      time={formatRelativeTime(file.modifiedAt, locale, {
+                        style: 'short',
+                      })}
                       title={file.name}
                       tags={file.tags}
                       featured={i === 0}
@@ -232,7 +213,7 @@ export function LibraryPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search studio..."
+                  placeholder={strings.library.searchPlaceholder}
                   className="w-full bg-transparent px-3 py-2 font-medium text-sm text-text-primary outline-none placeholder:text-text-muted"
                 />
               </div>
@@ -253,7 +234,7 @@ export function LibraryPage() {
                     }`}
                     {...makeBreadcrumbDragHandlers(null, -1)}
                   >
-                    Explorer
+                    {strings.library.explorer}
                   </h3>
                   {breadcrumbs.length > 0 && (
                     <div className="flex items-center gap-1 text-sm text-text-muted">
@@ -291,7 +272,9 @@ export function LibraryPage() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={cycleSortMode}
-                    title={`Sort: ${sortMode}`}
+                    title={strings.library.sortLabel(
+                      strings.library.sortModes[sortMode],
+                    )}
                     className="cursor-pointer text-text-secondary transition-colors hover:text-text-primary"
                   >
                     {sortMode === 'name-asc' && (

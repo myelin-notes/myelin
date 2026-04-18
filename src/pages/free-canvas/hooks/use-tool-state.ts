@@ -5,30 +5,41 @@ import {
   saveWheelToolIndices,
 } from '@/components/tool-shelf';
 import type { WheelItem } from '@/components/wheel-picker';
+import { useStrings } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
-import type { ITool, ToolOption } from '@/pages/free-canvas/tools/tool';
+import type { ITool, ToolId, ToolOption } from '@/pages/free-canvas/tools/tool';
+
+const LEGACY_TOOL_STORAGE_KEYS: Record<ToolId, string> = {
+  select: 'Select',
+  pen: 'Pen',
+  highlighter: 'Highlighter',
+  eraser: 'Eraser',
+  text: 'Text',
+  embed: 'Embed',
+};
 
 function makeSizeChildren(
   tool: ITool,
   sizeOpt: Extract<ToolOption, { type: 'size' }>,
   applyRef: { current: (tool: ITool, key: string, value: unknown) => void },
+  strings: ReturnType<typeof useStrings>,
 ): WheelItem[] {
   const { min, max, key } = sizeOpt;
   const mid = Math.round((min + max) / 2);
   return [
     {
-      label: `Fine (${min})`,
+      label: strings.canvas.toolOptions.fine(min),
       dot: 4,
       command: () => applyRef.current(tool, key, min),
     },
     {
-      label: `Medium (${mid})`,
+      label: strings.canvas.toolOptions.medium(mid),
       dot: 8,
       command: () => applyRef.current(tool, key, mid),
     },
     {
-      label: `Bold (${max})`,
+      label: strings.canvas.toolOptions.bold(max),
       dot: 14,
       command: () => applyRef.current(tool, key, max),
     },
@@ -41,6 +52,7 @@ function toolToWheelItem(
   toolIndex: number,
   setSelectedToolIndex: (i: number) => void,
   applyRef: { current: (tool: ITool, key: string, value: unknown) => void },
+  strings: ReturnType<typeof useStrings>,
 ): WheelItem {
   const options = tool.getOptions?.() ?? [];
   const colorOpt = options.find(
@@ -57,10 +69,12 @@ function toolToWheelItem(
       label: hex,
       color: hex,
       command: () => applyRef.current(tool, colorOpt.key, hex),
-      children: sizeOpt ? makeSizeChildren(tool, sizeOpt, applyRef) : undefined,
+      children: sizeOpt
+        ? makeSizeChildren(tool, sizeOpt, applyRef, strings)
+        : undefined,
     }));
   } else if (sizeOpt) {
-    children = makeSizeChildren(tool, sizeOpt, applyRef);
+    children = makeSizeChildren(tool, sizeOpt, applyRef, strings);
   }
 
   return {
@@ -77,16 +91,19 @@ function toolToWheelItem(
 export function useToolState(
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>,
 ) {
+  const strings = useStrings();
+  const toolStringsRef = useRef(strings.canvas);
+  toolStringsRef.current = strings.canvas;
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsTick, setOptionsTick] = useState(0);
   const [shelfOpen, setShelfOpen] = useState(false);
 
   const [canvasTools] = useState(() => {
-    const tools = DrawableCanvas.makeTools();
+    const tools = DrawableCanvas.makeTools(() => toolStringsRef.current);
     const saved = UserPrefs.get('toolOptions');
     for (const tool of tools) {
-      const opts = saved[tool.label];
+      const opts = saved[tool.id] ?? saved[LEGACY_TOOL_STORAGE_KEYS[tool.id]];
       if (opts && tool.setOption) {
         for (const [key, value] of Object.entries(opts)) {
           tool.setOption(key, value);
@@ -111,19 +128,18 @@ export function useToolState(
     setOptionsTick((t) => t + 1);
     UserPrefs.update('toolOptions', (all) => ({
       ...all,
-      [tool.label]: { ...all[tool.label], [key]: value },
+      [tool.id]: { ...all[tool.id], [key]: value },
     }));
   };
 
-  const [allWheelItems] = useState<WheelItem[]>(() =>
-    canvasTools.map((tool, index) =>
-      toolToWheelItem(
-        () => drawableCanvasRef.current,
-        tool,
-        index,
-        setSelectedToolIndex,
-        applyOptionRef,
-      ),
+  const allWheelItems = canvasTools.map((tool, index) =>
+    toolToWheelItem(
+      () => drawableCanvasRef.current,
+      tool,
+      index,
+      setSelectedToolIndex,
+      applyOptionRef,
+      strings,
     ),
   );
 
@@ -154,8 +170,8 @@ export function useToolState(
       }
       setOptionsTick((t) => t + 1);
       UserPrefs.update('toolOptions', (all) => {
-        const opts = { ...all[tool.label], [key]: value };
-        return { ...all, [tool.label]: opts };
+        const opts = { ...all[tool.id], [key]: value };
+        return { ...all, [tool.id]: opts };
       });
     }
   };

@@ -1,7 +1,13 @@
 import { PenTool as PenIcon } from 'lucide-react';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { StrokeElement } from '../elements/stroke-element';
-import type { ITool, SvgIcon, ToolOption } from './tool';
+import type {
+  CanvasStringsGetter,
+  ITool,
+  SvgIcon,
+  ToolId,
+  ToolOption,
+} from './tool';
 
 const PEN_COLORS = [
   '#191c1e',
@@ -15,9 +21,15 @@ const PEN_COLORS = [
 ];
 
 export class PenTool implements ITool {
+  public constructor(protected readonly getStrings: CanvasStringsGetter) {}
+
   protected currentStroke: StrokeElement | null = null;
   protected color: string = '#191c1e';
   protected size: number = 8;
+
+  get id(): ToolId {
+    return 'pen';
+  }
 
   public start(canvas: DrawableCanvas, _event: PointerEvent): void {
     this.currentStroke = canvas.addElement(
@@ -51,22 +63,23 @@ export class PenTool implements ITool {
   }
 
   get label(): string {
-    return 'Pen';
+    return this.getStrings().tools.pen;
   }
 
   getOptions(): ToolOption[] {
+    const strings = this.getStrings();
     return [
       {
         type: 'color',
         key: 'color',
-        label: 'Color',
+        label: strings.toolOptions.color,
         value: this.color,
         palette: PEN_COLORS,
       },
       {
         type: 'size',
         key: 'size',
-        label: 'Stroke',
+        label: strings.toolOptions.stroke,
         value: this.size,
         min: 1,
         max: 40,

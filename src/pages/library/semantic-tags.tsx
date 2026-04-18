@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { formatNumber } from '@/lib/i18n/format';
+import { useLocale, useStrings } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +15,8 @@ export function SemanticTags({
   activeTags,
   onActiveTagsChanged,
 }: SemanticTagsProps) {
+  const strings = useStrings();
+  const locale = useLocale();
   const repository = useRepository();
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [stats, setStats] = useState({
@@ -60,14 +64,14 @@ export function SemanticTags({
       {/* Heading */}
       <div className="flex items-center justify-between">
         <h3 className="font-heading font-normal text-text-primary text-xl leading-7">
-          Semantic Tags
+          {strings.library.semanticTags.title}
         </h3>
         {activeTags.size > 0 && (
           <button
             onClick={clearAll}
             className="cursor-pointer font-bold text-[10px] text-text-muted uppercase tracking-[1px] transition-colors hover:text-text-secondary"
           >
-            Clear
+            {strings.common.clear}
           </button>
         )}
       </div>
@@ -76,8 +80,7 @@ export function SemanticTags({
       <div className="flex min-h-[36px] flex-wrap gap-2">
         {tags.length === 0 && (
           <p className="text-text-muted text-xs italic">
-            No tags yet. Right-click a file and choose &ldquo;Manage Tags&rdquo;
-            to start.
+            {strings.library.semanticTags.empty}
           </p>
         )}
         {tags.map(({ tag, count }) => {
@@ -101,7 +104,7 @@ export function SemanticTags({
                   isActive ? 'text-text-on-dark/60' : 'text-text-muted',
                 )}
               >
-                {count}
+                {formatNumber(count, locale)}
               </span>
             </button>
           );
@@ -111,32 +114,32 @@ export function SemanticTags({
       {/* Insights */}
       <div className="flex flex-col gap-4 rounded-lg bg-page p-4">
         <h4 className="font-bold text-[10px] text-text-secondary uppercase tracking-[1px]">
-          Studio Insights
+          {strings.library.semanticTags.insights}
         </h4>
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="font-normal text-sm text-text-secondary">
-              Total Files
+              {strings.library.semanticTags.stats.totalFiles}
             </span>
             <span className="font-medium text-sm text-text-primary tabular-nums">
-              {stats.totalFiles}
+              {formatNumber(stats.totalFiles, locale)}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="font-normal text-sm text-text-secondary">
-              Folders
+              {strings.library.semanticTags.stats.folders}
             </span>
             <span className="font-medium text-sm text-text-primary tabular-nums">
-              {stats.totalFolders}
+              {formatNumber(stats.totalFolders, locale)}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="font-normal text-sm text-text-secondary">
-              Unique Tags
+              {strings.library.semanticTags.stats.uniqueTags}
             </span>
             <span className="font-medium text-sm text-text-primary tabular-nums">
-              {stats.totalTags}
+              {formatNumber(stats.totalTags, locale)}
             </span>
           </div>
         </div>

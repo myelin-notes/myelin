@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useStrings } from '@/lib/i18n';
 import { PdfDocumentView } from '@/lib/pdf-renderer';
 
 export function DebugPage() {
+  const strings = useStrings();
   const [data, setData] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -19,7 +21,7 @@ export function DebugPage() {
     <div className="flex h-full flex-col bg-page">
       <div className="flex items-center gap-3 border-border border-b bg-surface px-4 py-3">
         <label className="cursor-pointer rounded-lg bg-primary px-3 py-2 font-medium text-sm text-white transition-colors hover:bg-primary/90">
-          Upload PDF
+          {strings.debug.uploadPdf}
           <input
             type="file"
             accept="application/pdf"
@@ -45,7 +47,7 @@ export function DebugPage() {
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-text-secondary">
-            Select a PDF to render.
+            {strings.debug.empty}
           </div>
         )}
       </div>

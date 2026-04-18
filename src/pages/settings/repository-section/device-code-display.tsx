@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useStrings } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 
 export function DeviceCodeDisplay({
@@ -10,6 +11,7 @@ export function DeviceCodeDisplay({
   userCode: string;
   onCopy: () => void;
 }) {
+  const strings = useStrings();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -30,7 +32,7 @@ export function DeviceCodeDisplay({
       <div className="flex items-center justify-between rounded-xl bg-white px-5 py-4 shadow-ambient ring-1 ring-border-subtle">
         <div>
           <p className="text-[10px] text-text-muted uppercase tracking-widest">
-            Enter this code on GitHub
+            {strings.settings.repository.auth.deviceCode}
           </p>
           <p className="mt-1.5 font-mono font-semibold text-2xl text-accent-navy tracking-[0.25em]">
             {userCode}
@@ -47,7 +49,7 @@ export function DeviceCodeDisplay({
           ) : (
             <ClipboardCopy className="size-3.5" />
           )}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? strings.common.copied : strings.common.copy}
         </Button>
       </div>
     </motion.div>

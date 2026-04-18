@@ -2,7 +2,7 @@ import { Highlighter as HighlighterIcon } from 'lucide-react';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { StrokeElement } from '../elements/stroke-element';
 import { PenTool } from './pen-tool';
-import type { SvgIcon, ToolOption } from './tool';
+import type { CanvasStringsGetter, SvgIcon, ToolId, ToolOption } from './tool';
 
 const HIGHLIGHT_COLORS = [
   '#facc15',
@@ -20,10 +20,14 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 export class HighlighterTool extends PenTool {
-  constructor() {
-    super();
+  constructor(getStrings: CanvasStringsGetter) {
+    super(getStrings);
     this.color = '#facc15';
     this.size = 36;
+  }
+
+  get id(): ToolId {
+    return 'highlighter';
   }
 
   public start(canvas: DrawableCanvas, _event: PointerEvent): void {
@@ -41,22 +45,23 @@ export class HighlighterTool extends PenTool {
   }
 
   get label(): string {
-    return 'Highlighter';
+    return this.getStrings().tools.highlighter;
   }
 
   getOptions(): ToolOption[] {
+    const strings = this.getStrings();
     return [
       {
         type: 'color',
         key: 'color',
-        label: 'Color',
+        label: strings.toolOptions.color,
         value: this.color,
         palette: HIGHLIGHT_COLORS,
       },
       {
         type: 'size',
         key: 'size',
-        label: 'Stroke',
+        label: strings.toolOptions.stroke,
         value: this.size,
         min: 12,
         max: 60,

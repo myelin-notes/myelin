@@ -6,7 +6,13 @@ import {
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
-import type { ITool, SvgIcon, ToolOption } from './tool';
+import type {
+  CanvasStringsGetter,
+  ITool,
+  SvgIcon,
+  ToolId,
+  ToolOption,
+} from './tool';
 
 const HANDLE_HIT_RADIUS = 10;
 const MIN_SCALE = 0.05;
@@ -20,6 +26,8 @@ enum SelectMode {
 }
 
 export class SelectTool implements ITool {
+  public constructor(private readonly getStrings: CanvasStringsGetter) {}
+
   private mode: SelectMode = SelectMode.None;
   private startPoint: Vector2 = { x: 0, y: 0 };
   private selectionStyle: 'rectangle' | 'lasso' = 'rectangle';
@@ -49,6 +57,10 @@ export class SelectTool implements ITool {
   // Click-to-edit state: clicking an already-selected page frame without
   // dragging re-enters edit mode (file-rename pattern). Resolved on finish().
   private clickToEditCandidate: DrawableElement | null = null;
+
+  get id(): ToolId {
+    return 'select';
+  }
 
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
     if (this.mode === SelectMode.Marquee) {
@@ -416,15 +428,24 @@ export class SelectTool implements ITool {
   }
 
   public getOptions(): ToolOption[] {
+    const strings = this.getStrings();
     return [
       {
         type: 'choice',
         key: 'selectionStyle',
-        label: 'Mode',
+        label: strings.toolOptions.mode,
         value: this.selectionStyle,
         choices: [
-          { value: 'rectangle', label: 'Rectangle', icon: BoxSelectIcon },
-          { value: 'lasso', label: 'Lasso', icon: LassoIcon },
+          {
+            value: 'rectangle',
+            label: strings.toolOptions.rectangle,
+            icon: BoxSelectIcon,
+          },
+          {
+            value: 'lasso',
+            label: strings.toolOptions.lasso,
+            icon: LassoIcon,
+          },
         ],
       },
     ];
@@ -441,6 +462,6 @@ export class SelectTool implements ITool {
   }
 
   public get label(): string {
-    return 'Select';
+    return this.getStrings().tools.select;
   }
 }

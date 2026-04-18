@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import { catalogs } from '@/lib/i18n/messages';
 import { loadDocument } from '@/lib/pdf-renderer';
 import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
@@ -16,7 +17,7 @@ import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
-import type { ITool } from './tools/tool';
+import type { CanvasStringsGetter, ITool } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type Vector2 = { x: number; y: number };
@@ -74,7 +75,7 @@ export class DrawableCanvas {
     this.ctx = ctx!;
     this.viewport = new CanvasViewport(canvas);
     this.state = new StateMachine(InteractState.Idle);
-    this.tools = tools ?? DrawableCanvas.makeTools();
+    this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en.canvas);
     this.toolSelected = this.tools[0];
     this._ydoc = ydoc;
 
@@ -700,14 +701,14 @@ export class DrawableCanvas {
     this.updateBounding();
   }
 
-  public static makeTools(): ITool[] {
+  public static makeTools(getStrings: CanvasStringsGetter): ITool[] {
     return [
-      new SelectTool(),
-      new PenTool(),
-      new HighlighterTool(),
-      new EraserTool(),
-      new TextTool(),
-      new EmbedTool(),
+      new SelectTool(getStrings),
+      new PenTool(getStrings),
+      new HighlighterTool(getStrings),
+      new EraserTool(getStrings),
+      new TextTool(getStrings),
+      new EmbedTool(getStrings),
     ];
   }
 }

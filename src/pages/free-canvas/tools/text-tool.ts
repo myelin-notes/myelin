@@ -2,7 +2,14 @@ import { Type as TypeIcon } from 'lucide-react';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { TextElement } from '../elements/text-element';
-import type { FontEntry, ITool, SvgIcon, ToolOption } from './tool';
+import type {
+  CanvasStringsGetter,
+  FontEntry,
+  ITool,
+  SvgIcon,
+  ToolId,
+  ToolOption,
+} from './tool';
 
 const TEXT_COLORS = [
   '#191c1e',
@@ -36,12 +43,18 @@ const DEFAULT_BOX_HEIGHT = 80;
 const CLICK_THRESHOLD = 5;
 
 export class TextTool implements ITool {
+  public constructor(private readonly getStrings: CanvasStringsGetter) {}
+
   private color: string = '#191c1e';
   private fontSize: number = 24;
   private fontFamily: string = 'Inter';
 
   private dragStart: Vector2 | null = null;
   private dragCurrent: Vector2 | null = null;
+
+  get id(): ToolId {
+    return 'text';
+  }
 
   start(canvas: DrawableCanvas, event: PointerEvent): void {
     this.dragStart = canvas.viewport.getPoint(event);
@@ -177,29 +190,30 @@ export class TextTool implements ITool {
   }
 
   get label(): string {
-    return 'Text';
+    return this.getStrings().tools.text;
   }
 
   getOptions(): ToolOption[] {
+    const strings = this.getStrings();
     return [
       {
         type: 'font',
         key: 'fontFamily',
-        label: 'Font',
+        label: strings.toolOptions.font,
         value: this.fontFamily,
         fonts: TEXT_FONTS,
       },
       {
         type: 'color',
         key: 'color',
-        label: 'Color',
+        label: strings.toolOptions.color,
         value: this.color,
         palette: TEXT_COLORS,
       },
       {
         type: 'size',
         key: 'fontSize',
-        label: 'Font Size',
+        label: strings.toolOptions.fontSize,
         value: this.fontSize,
         min: 12,
         max: 72,

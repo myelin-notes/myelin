@@ -4,6 +4,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
+import { useStrings } from '@/lib/i18n';
 
 interface ItemContextMenuProps {
   onRename: () => void;
@@ -18,6 +19,8 @@ export function ItemContextMenu({
   onReveal,
   onManageTags,
 }: ItemContextMenuProps) {
+  const strings = useStrings();
+
   return (
     <ContextMenuContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
       <ContextMenuItem
@@ -25,7 +28,7 @@ export function ItemContextMenu({
         onClick={onRename}
       >
         <Pencil className="size-4" />
-        Rename
+        {strings.library.itemMenu.rename}
       </ContextMenuItem>
       {onManageTags && (
         <ContextMenuItem
@@ -33,7 +36,7 @@ export function ItemContextMenu({
           onClick={onManageTags}
         >
           <Tag className="size-4" />
-          Manage Tags
+          {strings.library.itemMenu.manageTags}
         </ContextMenuItem>
       )}
       {onReveal && (
@@ -42,7 +45,7 @@ export function ItemContextMenu({
           onClick={onReveal}
         >
           <FolderOpen className="size-4" />
-          Reveal in File Manager
+          {strings.library.itemMenu.revealInFileManager}
         </ContextMenuItem>
       )}
       <ContextMenuSeparator />
@@ -51,7 +54,7 @@ export function ItemContextMenu({
         onClick={onRemove}
       >
         <Trash2 className="size-4" />
-        Remove
+        {strings.library.itemMenu.remove}
       </ContextMenuItem>
     </ContextMenuContent>
   );

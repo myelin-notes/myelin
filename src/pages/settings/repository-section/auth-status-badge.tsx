@@ -1,4 +1,5 @@
 import { Loader2 } from 'lucide-react';
+import { useStrings } from '@/lib/i18n';
 
 export function AuthStatusBadge({
   hasToken,
@@ -9,11 +10,13 @@ export function AuthStatusBadge({
   checking: boolean;
   polling: boolean;
 }) {
+  const strings = useStrings();
+
   if (checking) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] text-text-muted uppercase tracking-widest">
         <Loader2 className="size-3 animate-spin" />
-        Checking
+        {strings.settings.repository.authStatus.checking}
       </span>
     );
   }
@@ -22,7 +25,7 @@ export function AuthStatusBadge({
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] text-text-muted uppercase tracking-widest">
         <Loader2 className="size-3 animate-spin" />
-        Authorizing
+        {strings.settings.repository.authStatus.authorizing}
       </span>
     );
   }
@@ -31,7 +34,7 @@ export function AuthStatusBadge({
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-green/20 px-2.5 py-1 font-medium text-[10px] text-text-green uppercase tracking-widest">
         <span className="size-1.5 rounded-full bg-current" />
-        Connected
+        {strings.settings.repository.authStatus.connected}
       </span>
     );
   }
@@ -39,7 +42,7 @@ export function AuthStatusBadge({
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] text-text-muted uppercase tracking-widest">
       <span className="size-1.5 rounded-full bg-current" />
-      Not connected
+      {strings.settings.repository.authStatus.disconnected}
     </span>
   );
 }

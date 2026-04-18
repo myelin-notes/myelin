@@ -44,48 +44,32 @@ registry.defineDefaults(
 registry.defineDefaults({
   'canvas:pan': {
     key: ' ',
-    label: 'Pan',
-    description: 'Hold to drag the canvas',
   },
   'canvas:delete': {
     key: 'Backspace',
-    label: 'Delete',
-    description: 'Remove selected elements',
   },
   'canvas:tool-text': {
     key: 't',
-    label: 'Text Tool',
-    description: 'Create a new text node',
   },
   'editor:bold': {
     key: 'b',
     mod: true,
-    label: 'Bold',
-    description: 'Toggle bold formatting',
   },
   'editor:italic': {
     key: 'i',
     mod: true,
-    label: 'Italic',
-    description: 'Toggle italic formatting',
   },
   'editor:underline': {
     key: 'u',
     mod: true,
-    label: 'Underline',
-    description: 'Toggle underline formatting',
   },
   'editor:strikethrough': {
     key: 's',
     mod: true,
     shift: true,
-    label: 'Strikethrough',
-    description: 'Toggle strikethrough formatting',
   },
   'editor:code': {
     key: 'e',
     mod: true,
-    label: 'Code',
-    description: 'Toggle inline code formatting',
   },
 });

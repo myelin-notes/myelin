@@ -1,7 +1,17 @@
 import type { LucideIcon } from 'lucide-react';
+import type { Messages } from '@/lib/i18n';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 
 export type SvgIcon = LucideIcon;
+export type ToolId =
+  | 'select'
+  | 'pen'
+  | 'highlighter'
+  | 'eraser'
+  | 'text'
+  | 'embed';
+export type CanvasStrings = Messages['canvas'];
+export type CanvasStringsGetter = () => CanvasStrings;
 
 export interface FontEntry {
   family: string;
@@ -41,6 +51,7 @@ export type ToolOption =
     };
 
 export interface ITool {
+  get id(): ToolId;
   start(canvas: DrawableCanvas, event: PointerEvent): void;
   update(canvas: DrawableCanvas, event: PointerEvent, position: Vector2): void;
   finish(canvas: DrawableCanvas, event: PointerEvent): void;

@@ -7,6 +7,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useStrings } from '@/lib/i18n';
 import { DEBUG } from '@/lib/debug';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
@@ -17,42 +18,6 @@ interface NavItem {
   active?: boolean;
   navTo: string;
 }
-
-const mainNav: NavItem[] = [
-  {
-    label: 'Library',
-    icon: <BookOpen className="size-4" />,
-    active: true,
-    navTo: '/library',
-  },
-  {
-    label: 'Graph',
-    icon: <Waypoints className="size-5" />,
-    navTo: '/graph',
-  },
-];
-
-const bottomNav: NavItem[] = [
-  ...(DEBUG
-    ? [
-        {
-          label: 'Debug',
-          icon: <Bug className="size-4" />,
-          navTo: '/debug',
-        },
-      ]
-    : []),
-  {
-    label: 'Settings',
-    icon: <Settings className="size-4" />,
-    navTo: '/settings',
-  },
-  {
-    label: 'Help',
-    icon: <HelpCircle className="size-4" />,
-    navTo: '/help',
-  },
-];
 
 function NavButton({
   item,
@@ -97,12 +62,52 @@ function NavButton({
 }
 
 export function Sidebar() {
+  const strings = useStrings();
   const repository = useRepository();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const mainNav: NavItem[] = [
+    {
+      label: strings.sidebar.nav.library,
+      icon: <BookOpen className="size-4" />,
+      active: true,
+      navTo: '/library',
+    },
+    {
+      label: strings.sidebar.nav.graph,
+      icon: <Waypoints className="size-5" />,
+      navTo: '/graph',
+    },
+  ];
+
+  const bottomNav: NavItem[] = [
+    ...(DEBUG
+      ? [
+          {
+            label: strings.sidebar.nav.debug,
+            icon: <Bug className="size-4" />,
+            navTo: '/debug',
+          },
+        ]
+      : []),
+    {
+      label: strings.sidebar.nav.settings,
+      icon: <Settings className="size-4" />,
+      navTo: '/settings',
+    },
+    {
+      label: strings.sidebar.nav.help,
+      icon: <HelpCircle className="size-4" />,
+      navTo: '/help',
+    },
+  ];
+
   const handleNewCanvas = async () => {
-    const name = await repository.getUniqueFileName('Untitled Canvas', null);
+    const name = await repository.getUniqueFileName(
+      strings.library.createNew.untitledCanvas,
+      null,
+    );
     const id = await repository.createFile(name, 'mcanvas', null);
     navigate(`/mcanvas/${id}`);
   };
@@ -111,9 +116,11 @@ export function Sidebar() {
     <aside className="fixed top-0 bottom-0 left-0 z-20 flex w-64 flex-col bg-sidebar-bg p-6">
       {/* Brand */}
       <div className="flex flex-col gap-1 pb-4">
-        <h2 className="font-heading text-text-brand text-xl italic">Myelin</h2>
+        <h2 className="font-heading text-text-brand text-xl italic">
+          {strings.app.name}
+        </h2>
         <span className="font-normal text-text-secondary text-xs uppercase tracking-[0.6px]">
-          Digital Studio
+          {strings.app.tagline}
         </span>
       </div>
 
@@ -125,7 +132,7 @@ export function Sidebar() {
       >
         <Plus className="size-3.5 text-text-on-dark transition-transform duration-150 group-hover:rotate-90" />
         <span className="font-medium text-text-on-dark text-xs uppercase tracking-[0.6px]">
-          New Canvas
+          {strings.sidebar.newCanvas}
         </span>
       </button>
 

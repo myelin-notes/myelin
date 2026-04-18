@@ -7,23 +7,18 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  localeLabels,
+  useI18n,
+  useStrings,
+  type SupportedLocale,
+} from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { KeybindsSection } from './keybinds-tab';
 import { RepositorySection } from './repository-section';
 
 type CanvasBg = 'grid' | 'dots' | 'blank';
-
-const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'es', label: 'Espa\u00f1ol' },
-  { code: 'fr', label: 'Fran\u00e7ais' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'ja', label: '\u65e5\u672c\u8a9e' },
-  { code: 'zh', label: '\u4e2d\u6587' },
-  { code: 'ko', label: '\ud55c\uad6d\uc5b4' },
-  { code: 'pt', label: 'Portugu\u00eas' },
-];
 
 function CanvasPreview({
   type,
@@ -34,11 +29,8 @@ function CanvasPreview({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const labels: Record<CanvasBg, string> = {
-    grid: 'Grid',
-    dots: 'Dots',
-    blank: 'Blank',
-  };
+  const strings = useStrings();
+  const labels: Record<CanvasBg, string> = strings.settings.canvasStyle.options;
 
   return (
     <button
@@ -98,10 +90,16 @@ function CanvasPreview({
 }
 
 export function PreferencesTab() {
+  const strings = useStrings();
+  const { setLocale } = useI18n();
   const [canvasBg, setCanvasBg] = useState<CanvasBg>(
     UserPrefs.get('canvasBackground'),
   );
   const [language, setLanguage] = useState(UserPrefs.get('language'));
+  const languages = Object.entries(localeLabels).map(([code, label]) => ({
+    code: code as SupportedLocale,
+    label,
+  }));
 
   useEffect(() => {
     return UserPrefs.subscribe('canvasBackground', setCanvasBg);
@@ -116,21 +114,20 @@ export function PreferencesTab() {
   };
 
   const handleLanguage = (code: string) => {
-    UserPrefs.set('language', code);
+    setLocale(code as SupportedLocale);
   };
 
   const selectedLang =
-    LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
+    languages.find((item) => item.code === language) ?? languages[0];
 
   return (
     <div className="max-w-3xl">
       <header className="mb-14">
         <h1 className="font-extralight font-heading text-[2.75rem] text-text-primary tracking-tight">
-          Preferences
+          {strings.settings.title}
         </h1>
         <p className="mt-3 text-text-muted leading-relaxed">
-          Customize your creative sanctuary. These settings adjust the visual
-          atmosphere and functional depth of your infinite canvas.
+          {strings.settings.description}
         </p>
       </header>
 
@@ -138,9 +135,11 @@ export function PreferencesTab() {
         {/* Canvas Background */}
         <section>
           <div className="mb-6 flex items-baseline justify-between">
-            <h3 className="font-heading text-xl">Canvas Style</h3>
+            <h3 className="font-heading text-xl">
+              {strings.settings.canvasStyle.title}
+            </h3>
             <span className="text-[10px] text-text-muted uppercase tracking-widest">
-              Surface Layer
+              {strings.settings.canvasStyle.eyebrow}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-5">
@@ -158,9 +157,11 @@ export function PreferencesTab() {
         {/* Language */}
         <section>
           <div className="mb-6 flex items-baseline justify-between">
-            <h3 className="font-heading text-xl">Language</h3>
+            <h3 className="font-heading text-xl">
+              {strings.settings.language.title}
+            </h3>
             <span className="text-[10px] text-text-muted uppercase tracking-widest">
-              Interface
+              {strings.settings.language.eyebrow}
             </span>
           </div>
           <DropdownMenu>
@@ -182,7 +183,7 @@ export function PreferencesTab() {
                 value={language}
                 onValueChange={handleLanguage}
               >
-                {LANGUAGES.map((lang) => (
+                {languages.map((lang) => (
                   <DropdownMenuRadioItem key={lang.code} value={lang.code}>
                     <span className="w-7 font-medium text-[10px] text-text-muted uppercase tracking-widest">
                       {lang.code}

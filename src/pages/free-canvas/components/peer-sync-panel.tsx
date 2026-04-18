@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Radio, X } from 'lucide-react';
 import { TimeAgo } from '@/components/time-ago';
+import { formatNumber } from '@/lib/i18n/format';
+import { useLocale, useStrings } from '@/lib/i18n';
 import {
   type NoteSession,
   type PeerSnapshot,
@@ -22,44 +24,38 @@ function formatPeerId(peerId: string): string {
   return `${peerId.slice(0, 8)}...${peerId.slice(-4)}`;
 }
 
-function formatPeerMode(mode: PeerSnapshot['localMode']): string {
-  switch (mode) {
-    case 'owner-device':
-      return 'Owner device';
-    case 'guest-editor':
-      return 'Guest editor';
-    case 'guest-viewer':
-      return 'Guest viewer';
-  }
-}
-
 function getRepositorySyncLabel(
+  strings: ReturnType<typeof useStrings>,
   status: ReturnType<typeof useRepositoryStatus>,
 ) {
   if (status.config.kind === 'local') {
-    return 'Local only';
+    return strings.canvas.peerSync.repositoryStatus.localOnly;
   }
 
   if (status.initializing) {
-    return 'Initializing';
+    return strings.canvas.peerSync.repositoryStatus.initializing;
   }
 
   if (!status.online) {
-    return 'Offline';
+    return strings.canvas.peerSync.repositoryStatus.offline;
   }
 
   if (status.pendingRemoteWrites > 0) {
-    return `${status.pendingRemoteWrites} queued`;
+    return strings.canvas.peerSync.repositoryStatus.queued(
+      status.pendingRemoteWrites,
+    );
   }
 
   if (status.lastRemoteSyncAt !== null) {
-    return 'Remote synced';
+    return strings.canvas.peerSync.repositoryStatus.remoteSynced;
   }
 
-  return 'Idle';
+  return strings.canvas.peerSync.repositoryStatus.idle;
 }
 
 export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
+  const strings = useStrings();
+  const locale = useLocale();
   const repositoryStatus = useRepositoryStatus();
   const [phase, setPhase] = useState<Phase>('idle');
   const [joinToken, setJoinToken] = useState('');
@@ -173,16 +169,17 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
 
   const writerLabel = peerSnapshot?.currentWriter
     ? peerSnapshot.currentWriter === peerSnapshot.localPeerId
-      ? 'You'
+      ? strings.common.you
       : formatPeerId(peerSnapshot.currentWriter)
-    : 'None';
+    : strings.common.none;
 
   const peerCount = peerSnapshot?.connectedPeers.length ?? 0;
+  const phaseLabel = strings.canvas.peerSync.sessionPhase[session.status.phase];
   const syncStatus =
     phase === 'connected'
-      ? `Live / ${session.status.phase}`
-      : session.status.phase;
-  const repositorySyncLabel = getRepositorySyncLabel(repositoryStatus);
+      ? strings.canvas.peerSync.sessionPhase.live(phaseLabel)
+      : phaseLabel;
+  const repositorySyncLabel = getRepositorySyncLabel(strings, repositoryStatus);
 
   return (
     <div className="absolute bottom-6 left-6 z-10 flex w-72 flex-col gap-2 rounded-xl bg-white/90 p-3 shadow-ambient backdrop-blur-[24px]">
@@ -190,7 +187,7 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
         <div className="flex items-center gap-1.5">
           <Radio className="size-3.5 text-text-muted" />
           <span className="font-medium text-text-secondary text-xs">
-            Peer Sync
+            {strings.canvas.peerSync.title}
           </span>
         </div>
         {phase !== 'idle' && (
@@ -217,7 +214,7 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
             onClick={host}
             className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white text-xs hover:bg-primary/90"
           >
-            Host with iroh
+            {strings.canvas.peerSync.host}
           </button>
           <div className="flex gap-2">
             <input
@@ -225,7 +222,7 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
               value={joinToken}
               onChange={(e) => setJoinToken(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && join()}
-              placeholder="Share code"
+              placeholder={strings.canvas.peerSync.joinPlaceholder}
               className="min-w-0 flex-1 rounded-lg bg-surface px-2 py-1.5 font-mono text-[10px] text-text-secondary outline-none placeholder:text-text-muted"
             />
             <button
@@ -234,7 +231,7 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
               disabled={!joinToken.trim()}
               className="rounded-lg bg-surface px-3 py-1.5 font-medium text-text-secondary text-xs hover:bg-hover-tint disabled:opacity-40"
             >
-              Join
+              {strings.canvas.peerSync.join}
             </button>
           </div>
         </>
@@ -244,7 +241,7 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-text-muted">
-              Waiting for peer...
+              {strings.canvas.peerSync.waitingForPeer}
             </span>
             <button
               type="button"
@@ -256,35 +253,37 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
               ) : (
                 <Copy className="size-3" />
               )}
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? strings.common.copied : strings.common.copy}
             </button>
           </div>
           <div className="break-all rounded-md bg-surface px-2 py-1.5 text-center font-mono text-[10px] text-text-primary">
             {shareToken}
           </div>
           <span className="text-center text-[10px] text-text-muted">
-            Share this code with a peer
+            {strings.canvas.peerSync.shareCode}
           </span>
         </div>
       )}
 
       {phase === 'joining' && (
         <span className="text-center text-[10px] text-text-muted">
-          Connecting...
+          {strings.canvas.peerSync.connecting}
         </span>
       )}
 
       {phase === 'connected' && (
         <div className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5">
           <div className="size-1.5 rounded-full bg-green-500" />
-          <span className="font-medium text-green-700 text-xs">Connected</span>
+          <span className="font-medium text-green-700 text-xs">
+            {strings.canvas.peerSync.connected}
+          </span>
         </div>
       )}
 
       {peerSnapshot && (
         <div className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2">
           <div className="flex items-center justify-between text-[10px] text-text-muted">
-            <span>Sync</span>
+            <span>{strings.canvas.peerSync.sync}</span>
             <span className="font-medium text-text-secondary">
               {syncStatus}
             </span>
@@ -292,29 +291,37 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
 
           <div className="grid grid-cols-2 gap-2 text-[10px]">
             <div className="rounded-md bg-white/80 px-2 py-1.5">
-              <div className="text-text-muted">Local peer</div>
+              <div className="text-text-muted">
+                {strings.canvas.peerSync.localPeer}
+              </div>
               <div className="font-mono text-text-secondary">
                 {formatPeerId(peerSnapshot.localPeerId)}
               </div>
               <div className="text-text-muted">
-                {formatPeerMode(peerSnapshot.localMode)}
+                {strings.canvas.peerSync.peerModes[peerSnapshot.localMode]}
               </div>
             </div>
 
             <div className="rounded-md bg-white/80 px-2 py-1.5">
-              <div className="text-text-muted">Writer</div>
+              <div className="text-text-muted">
+                {strings.canvas.peerSync.writer}
+              </div>
               <div className="font-medium text-text-secondary">
                 {writerLabel}
               </div>
               <div className="text-text-muted">
-                {peerSnapshot.isWriter ? 'Writer active' : 'Standby'}
+                {peerSnapshot.isWriter
+                  ? strings.canvas.peerSync.writerActive
+                  : strings.canvas.peerSync.standby}
               </div>
             </div>
           </div>
 
           <div className="rounded-md bg-white/80 px-2 py-1.5 text-[10px]">
             <div className="flex items-center justify-between">
-              <span className="text-text-muted">Repository</span>
+              <span className="text-text-muted">
+                {strings.canvas.peerSync.repository}
+              </span>
               <span className="font-medium text-text-secondary">
                 {repositorySyncLabel}
               </span>
@@ -322,7 +329,7 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
             {repositoryStatus.lastRemoteSyncAt !== null &&
               repositoryStatus.config.kind !== 'local' && (
                 <div className="text-text-muted">
-                  Last remote sync{' '}
+                  {strings.canvas.peerSync.lastRemoteSync}{' '}
                   <TimeAgo date={repositoryStatus.lastRemoteSyncAt} />
                 </div>
               )}
@@ -335,13 +342,13 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
 
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between text-[10px] text-text-muted">
-              <span>Remote peers</span>
-              <span>{peerCount}</span>
+              <span>{strings.canvas.peerSync.remotePeers}</span>
+              <span>{formatNumber(peerCount, locale)}</span>
             </div>
 
             {peerCount === 0 ? (
               <div className="rounded-md bg-white/80 px-2 py-1.5 text-[10px] text-text-muted">
-                No remote peers
+                {strings.canvas.peerSync.noRemotePeers}
               </div>
             ) : (
               peerSnapshot.connectedPeers.map((peer) => (
@@ -353,7 +360,7 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
                     {formatPeerId(peer.peerId)}
                   </span>
                   <span className="text-text-muted">
-                    {formatPeerMode(peer.mode)}
+                    {strings.canvas.peerSync.peerModes[peer.mode]}
                   </span>
                 </div>
               ))

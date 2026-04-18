@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useStrings } from '@/lib/i18n';
 import {
   fetchGitHubBranches,
   fetchGitHubOrgs,
@@ -35,6 +36,7 @@ export function useGitHubSelectors({
   credentialId: string;
   config: RepositoryConfig;
 }): GitHubSelectorsState {
+  const strings = useStrings();
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [orgs, setOrgs] = useState<GitHubOrg[]>([]);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -79,7 +81,7 @@ export function useGitHubSelectors({
           setOwnersError(
             error instanceof Error
               ? error.message
-              : 'Failed to load GitHub account.',
+              : strings.settings.repository.fields.owner.error,
           );
         }
       } finally {
@@ -92,7 +94,12 @@ export function useGitHubSelectors({
     return () => {
       abort.abort();
     };
-  }, [tokenPresent, credentialId, config.kind]);
+  }, [
+    config.kind,
+    credentialId,
+    strings.settings.repository.fields.owner.error,
+    tokenPresent,
+  ]);
 
   useEffect(() => {
     if (!tokenPresent || config.kind !== 'github' || !user || !owner.trim()) {
@@ -120,7 +127,7 @@ export function useGitHubSelectors({
           setReposError(
             error instanceof Error
               ? error.message
-              : 'Failed to load repositories.',
+              : strings.settings.repository.fields.repo.error,
           );
         }
       } finally {
@@ -133,7 +140,14 @@ export function useGitHubSelectors({
     return () => {
       abort.abort();
     };
-  }, [tokenPresent, credentialId, config.kind, owner, user]);
+  }, [
+    config.kind,
+    credentialId,
+    owner,
+    strings.settings.repository.fields.repo.error,
+    tokenPresent,
+    user,
+  ]);
 
   useEffect(() => {
     if (
@@ -167,7 +181,9 @@ export function useGitHubSelectors({
       } catch (error) {
         if (!abort.signal.aborted) {
           setBranchesError(
-            error instanceof Error ? error.message : 'Failed to load branches.',
+            error instanceof Error
+              ? error.message
+              : strings.settings.repository.fields.branch.error,
           );
         }
       } finally {
@@ -180,7 +196,14 @@ export function useGitHubSelectors({
     return () => {
       abort.abort();
     };
-  }, [tokenPresent, credentialId, config.kind, owner, repo]);
+  }, [
+    config.kind,
+    credentialId,
+    owner,
+    repo,
+    strings.settings.repository.fields.branch.error,
+    tokenPresent,
+  ]);
 
   useEffect(() => {
     if (config.kind !== 'github' || !user || config.owner.trim().length > 0) {

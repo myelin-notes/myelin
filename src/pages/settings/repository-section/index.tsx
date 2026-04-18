@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TimeAgo } from '@/components/time-ago';
+import { formatNumber } from '@/lib/i18n/format';
+import { useLocale, useStrings, type Messages } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import {
   getRepositoryConfig,
@@ -23,6 +25,8 @@ import { useGitHubSelectors } from './use-github-selectors';
 type RepoKind = RepositoryConfig['kind'];
 
 export function RepositorySection() {
+  const strings = useStrings();
+  const locale = useLocale();
   const [config, setConfig] = useState<RepositoryConfig>(getRepositoryConfig);
   const repositoryStatus = useRepositoryStatus();
 
@@ -88,12 +92,12 @@ export function RepositorySection() {
   };
 
   const authDescription = auth.polling
-    ? 'Enter the code on GitHub to finish signing in'
+    ? strings.settings.repository.auth.descriptions.polling
     : auth.tokenPresent
-      ? 'Signed in via GitHub'
+      ? strings.settings.repository.auth.descriptions.connected
       : !auth.authAvailable
-        ? 'GitHub authentication is unavailable'
-        : 'Sign in with your GitHub account';
+        ? strings.settings.repository.auth.descriptions.unavailable
+        : strings.settings.repository.auth.descriptions.signIn;
 
   const githubConfigReady =
     config.kind === 'github' &&
@@ -106,14 +110,16 @@ export function RepositorySection() {
     label: syncBadgeLabel,
     tone: syncBadgeTone,
     description: syncDescription,
-  } = computeSyncStatus(githubConfigReady, repositoryStatus);
+  } = computeSyncStatus(strings, githubConfigReady, repositoryStatus);
 
   return (
     <section>
       <div className="mb-6 flex items-baseline justify-between">
-        <h3 className="font-heading text-xl">Repository</h3>
+        <h3 className="font-heading text-xl">
+          {strings.settings.repository.title}
+        </h3>
         <span className="text-[10px] text-text-muted uppercase tracking-widest">
-          Sync
+          {strings.settings.repository.eyebrow}
         </span>
       </div>
 
@@ -122,15 +128,15 @@ export function RepositorySection() {
           selected={config.kind === 'local'}
           onSelect={() => handleKindChange('local')}
           icon={HardDrive}
-          label="Local"
-          description="Notes stored on this device only"
+          label={strings.settings.repository.kinds.local.label}
+          description={strings.settings.repository.kinds.local.description}
         />
         <KindCard
           selected={config.kind === 'github'}
           onSelect={() => handleKindChange('github')}
           icon={Github}
-          label="GitHub"
-          description="Sync to a private GitHub repository"
+          label={strings.settings.repository.kinds.github.label}
+          description={strings.settings.repository.kinds.github.description}
         />
       </div>
 
@@ -149,7 +155,7 @@ export function RepositorySection() {
                   <Github className="size-5 text-text-secondary" />
                   <div>
                     <p className="font-medium text-sm text-text-primary">
-                      GitHub Authentication
+                      {strings.settings.repository.auth.title}
                     </p>
                     <p className="mt-0.5 text-text-muted text-xs">
                       {authDescription}
@@ -170,7 +176,7 @@ export function RepositorySection() {
                       className="text-text-muted hover:text-destructive"
                     >
                       <LogOut className="size-3.5" />
-                      Sign out
+                      {strings.settings.repository.auth.buttons.signOut}
                     </Button>
                   ) : auth.polling ? (
                     <Button
@@ -180,7 +186,7 @@ export function RepositorySection() {
                       className="text-text-muted"
                     >
                       <X className="size-3.5" />
-                      Cancel
+                      {strings.common.cancel}
                     </Button>
                   ) : (
                     <Button
@@ -190,7 +196,7 @@ export function RepositorySection() {
                       disabled={!auth.authAvailable}
                     >
                       <ExternalLink className="size-3.5" />
-                      Sign in
+                      {strings.settings.repository.auth.buttons.signIn}
                     </Button>
                   )}
                 </div>
@@ -215,7 +221,7 @@ export function RepositorySection() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-medium text-sm text-text-primary">
-                      Repository Sync
+                      {strings.settings.repository.sync.title}
                     </p>
                     <p className="mt-0.5 text-text-muted text-xs">
                       {syncDescription}
@@ -230,24 +236,27 @@ export function RepositorySection() {
                 <div className="mt-4 grid grid-cols-2 gap-4 rounded-lg bg-white/70 px-4 py-3 ring-1 ring-border-subtle">
                   <div>
                     <p className="text-[10px] text-text-muted uppercase tracking-widest">
-                      Queued changes
+                      {strings.settings.repository.sync.queuedChanges}
                     </p>
                     <p className="mt-1 font-medium text-sm text-text-primary">
                       {githubConfigReady
-                        ? repositoryStatus.pendingRemoteWrites
+                        ? formatNumber(
+                            repositoryStatus.pendingRemoteWrites,
+                            locale,
+                          )
                         : '—'}
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] text-text-muted uppercase tracking-widest">
-                      Last sync
+                      {strings.settings.repository.sync.lastSync}
                     </p>
                     <p className="mt-1 font-medium text-sm text-text-primary">
                       {githubConfigReady ? (
                         repositoryStatus.lastRemoteSyncAt ? (
                           <TimeAgo date={repositoryStatus.lastRemoteSyncAt} />
                         ) : (
-                          'Never'
+                          strings.common.never
                         )
                       ) : (
                         '—'
@@ -265,7 +274,7 @@ export function RepositorySection() {
 
               <div>
                 <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
-                  Remote Repository
+                  {strings.settings.repository.sync.remoteRepository}
                 </p>
                 <div className="flex items-center gap-0.5 rounded-xl bg-input p-1">
                   <OwnerField
@@ -327,51 +336,54 @@ function PathDivider({ children }: { children: React.ReactNode }) {
 }
 
 function computeSyncStatus(
+  strings: Messages,
   githubConfigReady: boolean,
   status: ReturnType<typeof useRepositoryStatus>,
 ): { label: string; tone: SyncStatusTone; description: string } {
+  const copy = strings.settings.repository.sync.status;
+
   if (!githubConfigReady) {
     return {
-      label: 'Setup required',
+      label: copy.setupRequired.label,
       tone: 'neutral',
-      description: 'Sign in and choose a repository to enable sync.',
+      description: copy.setupRequired.description,
     };
   }
 
   if (status.initializing) {
     return {
-      label: 'Loading',
+      label: copy.loading.label,
       tone: 'neutral',
-      description: 'Loading the cached repository and checking the remote.',
+      description: copy.loading.description,
     };
   }
 
   if (status.pendingRemoteWrites > 0) {
-    const plural = status.pendingRemoteWrites === 1 ? '' : 's';
     return {
-      label: 'Pending',
+      label: copy.pending.label,
       tone: 'neutral',
-      description: status.online
-        ? `${status.pendingRemoteWrites} change${plural} queued for upload.`
-        : `${status.pendingRemoteWrites} change${plural} queued locally until remote sync recovers.`,
+      description: copy.pending.description(
+        status.pendingRemoteWrites,
+        status.online,
+      ),
     };
   }
 
   if (!status.online || status.lastError) {
     return {
-      label: 'Issue',
+      label: copy.issue.label,
       tone: 'danger',
       description: status.online
-        ? 'The repository is configured, but the last sync attempt failed.'
-        : 'Remote sync is unavailable. Cached data remains available locally.',
+        ? copy.issue.onlineDescription
+        : copy.issue.offlineDescription,
     };
   }
 
   return {
-    label: 'Synced',
+    label: copy.synced.label,
     tone: 'success',
     description: status.lastRemoteSyncAt
-      ? 'Remote repository is up to date.'
-      : 'Repository is ready to sync.',
+      ? copy.synced.upToDate
+      : copy.synced.ready,
   };
 }

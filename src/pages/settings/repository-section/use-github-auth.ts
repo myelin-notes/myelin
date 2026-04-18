@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useStrings } from '@/lib/i18n';
 import {
   beginGitHubDeviceAuth,
   cancelGitHubDeviceAuth,
@@ -22,6 +23,7 @@ export interface GitHubAuthState {
 }
 
 export function useGitHubAuth(credentialId: string): GitHubAuthState {
+  const strings = useStrings();
   const [tokenPresent, setTokenPresent] = useState(false);
   const [checkingToken, setCheckingToken] = useState(false);
   const [authAvailable, setAuthAvailable] = useState(true);
@@ -49,12 +51,12 @@ export function useGitHubAuth(credentialId: string): GitHubAuthState {
       setAuthError(
         error instanceof Error
           ? error.message
-          : 'Failed to read GitHub authentication state',
+          : strings.settings.repository.auth.errors.readState,
       );
     } finally {
       setCheckingToken(false);
     }
-  }, [credentialId]);
+  }, [credentialId, strings.settings.repository.auth.errors.readState]);
 
   useEffect(() => {
     void checkToken();
@@ -101,14 +103,18 @@ export function useGitHubAuth(credentialId: string): GitHubAuthState {
       if (abort.signal.aborted) {
         return;
       }
-      setAuthError(e instanceof Error ? e.message : 'Failed to sign in');
+      setAuthError(
+        e instanceof Error
+          ? e.message
+          : strings.settings.repository.auth.errors.signIn,
+      );
     } finally {
       if (!abort.signal.aborted) {
         setPolling(false);
         setUserCode(null);
       }
     }
-  }, [credentialId]);
+  }, [credentialId, strings.settings.repository.auth.errors.signIn]);
 
   const cancelAuth = useCallback(async () => {
     abortRef.current?.abort();

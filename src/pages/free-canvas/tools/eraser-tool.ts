@@ -1,12 +1,24 @@
 import { Eraser as EraserIcon } from 'lucide-react';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import type { ITool, SvgIcon, ToolOption } from './tool';
+import type {
+  CanvasStringsGetter,
+  ITool,
+  SvgIcon,
+  ToolId,
+  ToolOption,
+} from './tool';
 
 export class EraserTool implements ITool {
   private radius: number;
+  private readonly getStrings: CanvasStringsGetter;
 
-  public constructor() {
+  public constructor(getStrings: CanvasStringsGetter) {
+    this.getStrings = getStrings;
     this.radius = 20;
+  }
+
+  get id(): ToolId {
+    return 'eraser';
   }
 
   public start(_canvas: DrawableCanvas, _event: PointerEvent): void {}
@@ -45,7 +57,7 @@ export class EraserTool implements ITool {
   }
 
   get label(): string {
-    return 'Eraser';
+    return this.getStrings().tools.eraser;
   }
 
   getOptions(): ToolOption[] {
@@ -53,7 +65,7 @@ export class EraserTool implements ITool {
       {
         type: 'size',
         key: 'size',
-        label: 'Size',
+        label: this.getStrings().toolOptions.size,
         value: this.radius,
         min: 5,
         max: 60,

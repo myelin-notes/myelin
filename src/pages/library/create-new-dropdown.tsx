@@ -6,6 +6,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useStrings } from '@/lib/i18n';
 import type { FileType } from '@/lib/sync';
 
 const itemClass =
@@ -20,11 +21,15 @@ export function CreateNewDropdown({
   onNewFolder,
   onNewFile,
 }: CreateNewDropdownProps) {
+  const strings = useStrings();
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-md bg-accent-dark px-2.5 py-1 text-text-on-dark outline-none transition-colors hover:bg-accent-dark/90">
         <Plus className="size-3" />
-        <span className="font-medium text-xs">New</span>
+        <span className="font-medium text-xs">
+          {strings.library.createNew.button}
+        </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -33,15 +38,17 @@ export function CreateNewDropdown({
       >
         <DropdownMenuItem className={itemClass} onClick={() => onNewFolder?.()}>
           <FolderPlus className="size-4" />
-          New Folder
+          {strings.library.createNew.folder}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className={itemClass}
-          onClick={() => onNewFile?.('Untitled Canvas', 'mcanvas')}
+          onClick={() =>
+            onNewFile?.(strings.library.createNew.untitledCanvas, 'mcanvas')
+          }
         >
           <LayoutGrid className="size-4" />
-          New Canvas
+          {strings.library.createNew.canvas}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

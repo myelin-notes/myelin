@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useStrings } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { ITool } from '@/pages/free-canvas/tools/tool';
 
@@ -17,6 +18,8 @@ export function ToolShelf({
   onClose,
   containerRef,
 }: ToolShelfProps) {
+  const strings = useStrings();
+
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
       const target = e.target as Node;
@@ -33,7 +36,7 @@ export function ToolShelf({
     <div className="fade-in slide-in-from-left-2 w-56 animate-in overflow-hidden rounded-xl bg-white/85 shadow-ambient backdrop-blur-[24px] duration-200">
       <div className="flex items-center justify-between px-4 py-3">
         <span className="font-bold text-[10px] text-text-primary uppercase tracking-[0.1em]">
-          Tool Shelf
+          {strings.canvas.toolShelf.title}
         </span>
         <button
           onClick={onClose}
@@ -92,7 +95,7 @@ export function ToolShelf({
       </div>
       {enabledIndices.size === 0 && (
         <p className="px-4 pb-3 text-[11px] text-text-muted">
-          Wheel disabled — right-click won't open it.
+          {strings.canvas.toolShelf.empty}
         </p>
       )}
     </div>

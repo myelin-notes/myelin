@@ -6,6 +6,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useStrings } from '@/lib/i18n';
 import type { GitHubOrg, GitHubUser } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 import { Avatar, FIELD_TRIGGER_CLASS, MenuLoadingRow } from './dropdown-field';
@@ -27,6 +28,7 @@ export function OwnerField({
   onChange: (owner: string) => void;
   className?: string;
 }) {
+  const strings = useStrings();
   const selectedIsUser = Boolean(user) && value === user?.login;
   const selectedOrg = orgs.find((org) => org.login === value);
   const hasOrgs = orgs.length > 0;
@@ -52,7 +54,9 @@ export function OwnerField({
   ) : (
     <>
       {selectedIcon}
-      <span className="truncate text-text-muted">Select owner</span>
+      <span className="truncate text-text-muted">
+        {strings.settings.repository.fields.owner.select}
+      </span>
     </>
   );
 
@@ -88,7 +92,9 @@ export function OwnerField({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-80 min-w-52">
         {loading && !user ? (
-          <MenuLoadingRow label="Loading account…" />
+          <MenuLoadingRow
+            label={strings.settings.repository.fields.owner.loading}
+          />
         ) : (
           <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
             {user && (
@@ -99,7 +105,7 @@ export function OwnerField({
                 />
                 <span className="truncate">{user.login}</span>
                 <span className="ml-auto shrink-0 text-[10px] text-text-muted uppercase tracking-widest">
-                  You
+                  {strings.settings.repository.fields.owner.you}
                 </span>
               </DropdownMenuRadioItem>
             )}
@@ -111,7 +117,7 @@ export function OwnerField({
                 />
                 <span className="truncate">{org.login}</span>
                 <span className="ml-auto shrink-0 text-[10px] text-text-muted uppercase tracking-widest">
-                  Org
+                  {strings.settings.repository.fields.owner.org}
                 </span>
               </DropdownMenuRadioItem>
             ))}

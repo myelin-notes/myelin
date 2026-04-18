@@ -3,6 +3,7 @@ import { SlidersHorizontal as SlidersIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
+import { useStrings } from '@/lib/i18n';
 import {
   Tooltip,
   TooltipContent,
@@ -44,6 +45,7 @@ export function CanvasToolbar({
   onToggleWheelTool,
   embedComposer,
 }: CanvasToolbarProps) {
+  const strings = useStrings();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
@@ -110,7 +112,9 @@ export function CanvasToolbar({
                 <TooltipContent side="right">
                   <p>
                     {tool.label}
-                    {isActive && toolHasOptions ? ' — click for options' : ''}
+                    {isActive && toolHasOptions
+                      ? ` - ${strings.canvas.toolbar.clickForOptions}`
+                      : ''}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -134,7 +138,7 @@ export function CanvasToolbar({
               <SlidersIcon className="size-4" />
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>Customize wheel</p>
+              <p>{strings.canvas.toolbar.customizeWheel}</p>
             </TooltipContent>
           </Tooltip>
         </div>

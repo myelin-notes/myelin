@@ -1,4 +1,6 @@
 import { motion } from 'motion/react';
+import { formatNumber } from '@/lib/i18n/format';
+import { useLocale, useStrings } from '@/lib/i18n';
 import { DEBUG } from '@/lib/debug';
 
 interface StatusBarProps {
@@ -8,6 +10,9 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ zoomLevel, fps, noteId }: StatusBarProps) {
+  const strings = useStrings();
+  const locale = useLocale();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -16,11 +21,11 @@ export function StatusBar({ zoomLevel, fps, noteId }: StatusBarProps) {
       className="absolute right-6 bottom-6 z-10 rounded-xl bg-white/80 px-4 py-3 shadow-ambient backdrop-blur-[24px]"
     >
       <span className="font-medium text-text-secondary text-xs tabular-nums">
-        {zoomLevel}%
+        {formatNumber(zoomLevel, locale)}%
       </span>
       <span className="mx-2 text-text-muted/30">|</span>
       <span className="font-medium text-text-muted text-xs tabular-nums">
-        {fps} fps
+        {strings.canvas.statusBar.fps(fps)}
       </span>
       {DEBUG && noteId && (
         <>

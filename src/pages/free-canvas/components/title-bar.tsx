@@ -1,5 +1,6 @@
 import { ChevronLeft as ChevronLeftIcon } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useStrings } from '@/lib/i18n';
 
 interface TitleBarProps {
   fileName: string;
@@ -7,6 +8,8 @@ interface TitleBarProps {
 }
 
 export function TitleBar({ fileName, onBack }: TitleBarProps) {
+  const strings = useStrings();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -24,7 +27,7 @@ export function TitleBar({ fileName, onBack }: TitleBarProps) {
         {fileName}
       </h2>
       <span className="font-bold text-[10px] text-text-muted uppercase tracking-[0.05em]">
-        Canvas
+        {strings.canvas.kind}
       </span>
     </motion.div>
   );

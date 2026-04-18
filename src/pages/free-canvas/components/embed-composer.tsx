@@ -7,6 +7,7 @@ import {
   X as XIcon,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useStrings } from '@/lib/i18n';
 
 interface EmbedComposerProps {
   onEmbedFiles: (files: File[]) => void;
@@ -26,6 +27,7 @@ function isSupportedFile(file: File): boolean {
 }
 
 export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
+  const strings = useStrings();
   const [urlInput, setUrlInput] = useState('');
   const [urlState, setUrlState] = useState<UrlState>({ kind: 'idle' });
   const [isDragOver, setIsDragOver] = useState(false);
@@ -82,17 +84,17 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
       }
       const blob = await res.blob();
       if (!blob.type.startsWith('image/') && blob.type !== 'application/pdf') {
-        throw new Error("That link doesn't point to an image or PDF.");
+        throw new Error(strings.canvas.embedComposer.errors.unsupportedUrl);
       }
       const previewSrc = URL.createObjectURL(blob);
       setUrlState({ kind: 'ready', url, previewSrc, mime: blob.type });
     } catch (err) {
       const message =
         err instanceof Error && err.message.includes('HTTP')
-          ? "Couldn't fetch that link."
+          ? strings.canvas.embedComposer.errors.fetchFailed
           : err instanceof Error
             ? err.message
-            : "Couldn't fetch that link.";
+            : strings.canvas.embedComposer.errors.fetchFailed;
       setUrlState({ kind: 'error', url, message });
     }
   };
@@ -176,7 +178,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
             <div className="flex flex-col items-center gap-2 text-text-primary">
               <ImagePlusIcon className="size-6" strokeWidth={1.5} />
               <span className="font-heading text-base italic">
-                Drop to embed
+                {strings.canvas.embedComposer.dropToEmbed}
               </span>
             </div>
           </div>
@@ -192,16 +194,16 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
         >
           <div className="flex flex-col">
             <span className="font-heading text-[20px] text-text-primary leading-tight tracking-[-0.01em]">
-              Add media
+              {strings.canvas.embedComposer.title}
             </span>
             <span className="mt-0.5 font-medium text-[11px] text-text-muted tracking-[0.02em]">
-              Paste, drop, or pick an image or PDF.
+              {strings.canvas.embedComposer.subtitle}
             </span>
           </div>
           <button
             onClick={onClose}
             className="-mt-1 -mr-1 cursor-pointer rounded-lg border-none bg-transparent p-1.5 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
-            aria-label="Close"
+            aria-label={strings.common.close}
           >
             <XIcon className="size-3.5" />
           </button>
@@ -242,7 +244,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate font-medium text-text-primary text-xs">
-                      Ready to embed
+                      {strings.canvas.embedComposer.readyToEmbed}
                     </span>
                     <span className="truncate text-[10px] text-text-muted">
                       {new URL(urlState.url).hostname}
@@ -251,7 +253,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                   <button
                     onClick={resetUrl}
                     className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint"
-                    aria-label="Clear"
+                    aria-label={strings.common.clear}
                   >
                     <XIcon className="size-3" />
                   </button>
@@ -261,8 +263,8 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                   className="mt-2 w-full cursor-pointer rounded-xl border-none bg-accent-dark px-3 py-2 font-medium text-[13px] text-white tracking-[0.005em] transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
                 >
                   {urlState.mime === 'application/pdf'
-                    ? 'Embed PDF'
-                    : 'Embed image'}
+                    ? strings.canvas.embedComposer.embedPdf
+                    : strings.canvas.embedComposer.embedImage}
                 </button>
               </motion.div>
             ) : (
@@ -295,7 +297,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                         handleUrlSubmit();
                       }
                     }}
-                    placeholder="Paste an URL"
+                    placeholder={strings.canvas.embedComposer.urlPlaceholder}
                     className="w-full rounded-xl border border-border-divider bg-card py-2 pr-[68px] pl-8 font-normal text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-accent-dark/50 focus:bg-white"
                   />
                   <button
@@ -306,7 +308,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                     {urlState.kind === 'loading' ? (
                       <LoaderIcon className="size-3 animate-spin" />
                     ) : (
-                      'Fetch'
+                      strings.canvas.embedComposer.fetch
                     )}
                   </button>
                 </div>
@@ -334,7 +336,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
         >
           <div className="h-px flex-1 bg-border-divider" />
           <span className="font-medium text-[10px] text-text-muted uppercase tracking-[0.18em]">
-            or
+            {strings.common.or}
           </span>
           <div className="h-px flex-1 bg-border-divider" />
         </motion.div>
@@ -360,10 +362,10 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
             </div>
             <div className="relative flex flex-col items-center gap-0.5">
               <span className="font-medium text-[12.5px] text-text-primary">
-                Click to browse
+                {strings.canvas.embedComposer.browse}
               </span>
               <span className="text-[10.5px] text-text-muted">
-                or drop files here
+                {strings.canvas.embedComposer.dropFiles}
               </span>
             </div>
           </button>
@@ -381,7 +383,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
             <kbd className="flex min-w-[20px] items-center justify-center rounded-[5px] border border-border-divider bg-white px-1 py-[1px] font-sans font-semibold text-[9.5px] text-text-secondary">
               ⌘V
             </kbd>
-            <span>paste from clipboard</span>
+            <span>{strings.canvas.embedComposer.pasteFromClipboard}</span>
           </div>
           <AnimatePresence>
             {pulseKey > 0 && (
@@ -393,7 +395,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                 transition={{ duration: 0.22 }}
                 className="font-medium text-[10px] text-text-green italic"
               >
-                embedded ✓
+                {strings.canvas.embedComposer.embedded}
               </motion.span>
             )}
           </AnimatePresence>

@@ -6,6 +6,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useStrings } from '@/lib/i18n';
 import type { GitHubRepo } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 import {
@@ -29,6 +30,7 @@ export function RepoField({
   onChange: (repo: string) => void;
   className?: string;
 }) {
+  const strings = useStrings();
   const selected = repos.find((r) => r.name === value);
   const hasRepos = repos.length > 0;
 
@@ -48,16 +50,20 @@ export function RepoField({
           </>
         ) : (
           <span className="truncate text-text-muted">
-            {disabled ? 'Pick owner' : 'Select repository'}
+            {disabled
+              ? strings.settings.repository.fields.repo.pickOwner
+              : strings.settings.repository.fields.repo.select}
           </span>
         )}
         <ChevronDown className="ml-auto size-3.5 shrink-0 text-text-muted transition-transform duration-200 group-data-popup-open:rotate-180" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-80 min-w-56">
         {loading && !hasRepos ? (
-          <MenuLoadingRow label="Loading repositories…" />
+          <MenuLoadingRow
+            label={strings.settings.repository.fields.repo.loading}
+          />
         ) : !hasRepos ? (
-          <MenuEmptyRow label="No repositories" />
+          <MenuEmptyRow label={strings.settings.repository.fields.repo.empty} />
         ) : (
           <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
             {repos.map((repo) => (

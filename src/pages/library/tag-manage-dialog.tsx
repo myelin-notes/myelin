@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useStrings } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +26,7 @@ export function TagManageDialog({
   nodeName,
   onChanged,
 }: TagManageDialogProps) {
+  const strings = useStrings();
   const repository = useRepository();
   const [allTags, setAllTags] = useState<string[]>([]);
   const [nodeTags, setNodeTags] = useState<string[]>([]);
@@ -88,23 +90,24 @@ export function TagManageDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Tag className="size-5 text-text-muted" />
-            Manage Tags
+            {strings.library.tagDialog.title}
           </DialogTitle>
           <DialogDescription>
-            Tags on{' '}
-            <span className="font-medium text-text-primary">{nodeName}</span>
+            <span className="font-medium text-text-primary">
+              {strings.library.tagDialog.description(nodeName)}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
         {/* Current tags on this node */}
         <div className="flex flex-col gap-3">
           <span className="font-bold text-[10px] text-text-muted uppercase tracking-[1px]">
-            Active Tags
+            {strings.library.tagDialog.activeTags}
           </span>
           <div className="flex min-h-[32px] flex-wrap gap-1.5">
             {nodeTags.length === 0 && (
               <span className="text-text-muted text-xs italic">
-                No tags yet
+                {strings.library.tagDialog.noTags}
               </span>
             )}
             {nodeTags.map((tag) => (
@@ -124,7 +127,7 @@ export function TagManageDialog({
         {unusedTags.length > 0 && (
           <div className="flex flex-col gap-3">
             <span className="font-bold text-[10px] text-text-muted uppercase tracking-[1px]">
-              Available
+              {strings.library.tagDialog.available}
             </span>
             <div className="flex flex-wrap gap-1.5">
               {unusedTags.map((tag) => (
@@ -162,7 +165,7 @@ export function TagManageDialog({
                     setIsAdding(false);
                   }
                 }}
-                placeholder="Tag name..."
+                placeholder={strings.library.tagDialog.placeholder}
                 className="flex-1 border-primary border-b-2 bg-transparent pb-0.5 text-sm text-text-primary outline-none placeholder:text-text-muted"
               />
             </div>
@@ -172,7 +175,7 @@ export function TagManageDialog({
               className="flex cursor-pointer items-center gap-2 font-medium text-text-muted text-xs transition-colors hover:text-text-secondary"
             >
               <Plus className="size-3.5" />
-              Create new tag
+              {strings.library.tagDialog.createNew}
             </button>
           )}
         </div>

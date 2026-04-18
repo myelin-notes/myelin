@@ -9,7 +9,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useStrings } from '@/lib/i18n';
 import { type Action, formatKeyCombo, registry } from '@/lib/keybinds';
+import { getActionCopy } from '@/lib/keybinds/messages';
 import { PM_UPDATE_EVENT } from './constants';
 import { schema } from './schema';
 
@@ -26,34 +28,30 @@ interface ToolbarPosition {
 interface MarkButton {
   mark: MarkType;
   icon: React.FC<{ className?: string }>;
-  label: string;
   action: Action;
 }
 
 const TYPOGRAPHY_MARKS: MarkButton[] = [
-  { mark: schema.marks.bold, icon: Bold, label: 'Bold', action: 'editor:bold' },
+  { mark: schema.marks.bold, icon: Bold, action: 'editor:bold' },
   {
     mark: schema.marks.italic,
     icon: Italic,
-    label: 'Italic',
     action: 'editor:italic',
   },
   {
     mark: schema.marks.underline,
     icon: Underline,
-    label: 'Underline',
     action: 'editor:underline',
   },
   {
     mark: schema.marks.strikethrough,
     icon: Strikethrough,
-    label: 'Strikethrough',
     action: 'editor:strikethrough',
   },
 ];
 
 const STRUCTURAL_MARKS: MarkButton[] = [
-  { mark: schema.marks.code, icon: Code, label: 'Code', action: 'editor:code' },
+  { mark: schema.marks.code, icon: Code, action: 'editor:code' },
 ];
 
 const ALL_MARKS = [...TYPOGRAPHY_MARKS, ...STRUCTURAL_MARKS];
@@ -67,6 +65,7 @@ function isMarkActive(state: EditorView['state'], markType: MarkType): boolean {
 }
 
 export function FloatingToolbar({ view }: FloatingToolbarProps) {
+  const strings = useStrings();
   const [pos, setPos] = useState<ToolbarPosition>({
     x: 0,
     y: 0,
@@ -179,9 +178,10 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     return null;
   }
 
-  const renderButton = ({ mark, icon: Icon, label, action }: MarkButton) => {
+  const renderButton = ({ mark, icon: Icon, action }: MarkButton) => {
     const active = activeMarks.has(mark);
     const combo = registry.getCombo(action);
+    const label = getActionCopy(strings, action)?.label ?? action;
     return (
       <Tooltip key={label}>
         <TooltipTrigger
