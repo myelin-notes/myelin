@@ -297,7 +297,7 @@ Behavior:
 - `close()` always flushes dirty local state before transport teardown.
 - `NoteSession` exposes `isWriter` via the peer snapshot, but it does not own an auto-save timer.
 
-### Modify: `src/pages/free-canvas/hooks/use-canvas-engine.ts`
+### Modify: `src/pages/canvas/hooks/use-canvas-engine.ts`
 
 - Keep periodic save logic in the hook, alongside thumbnail generation.
 - Start auto-save only while `session.getPeerSnapshot().isWriter` is true.
@@ -310,7 +310,7 @@ Behavior:
   - repository-backed save cadence
 - Do not force guest pages through this hook unchanged; split out shared canvas/session primitives if guest mode needs most of the same UI.
 
-### Modify: `src/pages/free-canvas/components/peer-sync-panel.tsx`
+### Modify: `src/pages/canvas/components/peer-sync-panel.tsx`
 
 - Keep the panel behind a debug or experimental flag until iroh is stable.
 - Extend the existing panel directly rather than building a generic transport picker.
@@ -467,6 +467,6 @@ Phases 3 and 4 can proceed in parallel after Phases 1 and 2 are stable enough to
 | `src/lib/sync/guest/ephemeral-sync-target.ts` | In-memory sync target for guest sessions |
 | `src-tauri/src/peer.rs` | Current Rust TCP peer |
 | `src-tauri/src/iroh_transport.rs` | New Rust iroh module |
-| `src/pages/free-canvas/hooks/use-canvas-engine.ts` | Canvas <-> session wiring |
-| `src/pages/free-canvas/components/peer-sync-panel.tsx` | Sync UI |
+| `src/pages/canvas/hooks/use-canvas-engine.ts` | Canvas <-> session wiring |
+| `src/pages/canvas/components/peer-sync-panel.tsx` | Sync UI |
 | `src/pages/guest/index.tsx` | Guest join flow |

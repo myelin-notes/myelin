@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown as ChevronDownIcon } from 'lucide-react';
-import type { FontEntry, ToolOption } from '@/pages/free-canvas/tools/tool';
+import type { FontEntry, ToolOption } from '@/pages/canvas/tools/tool';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];

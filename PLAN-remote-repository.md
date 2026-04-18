@@ -82,7 +82,7 @@ function useRepositoryStatus(): RepositoryStatus
 - Add: re-export context/factory hooks and types.
 
 **All repository consumers** - replace `repository` imports with `useRepository()`:
-1. `src/pages/free-canvas/hooks/use-canvas-engine.ts`
+1. `src/pages/canvas/hooks/use-canvas-engine.ts`
 2. `src/components/layout/sidebar.tsx`
 3. `src/pages/library/index.tsx`
 4. `src/pages/library/semantic-tags.tsx`
@@ -291,7 +291,7 @@ class CachedRepository implements Repository, YjsSyncTarget, RepositoryLifecycle
 - `close()` should push dirty local Yjs state before marking the session closed.
 - Keep transport cleanup after push so in-memory peers do not keep sending updates during shutdown.
 
-**`src/pages/free-canvas/hooks/use-canvas-engine.ts`**
+**`src/pages/canvas/hooks/use-canvas-engine.ts`**
 - Close the previous `NoteSession` on file changes and unmount, awaiting the close where practical.
 - Register a close handler that closes the active session before app shutdown.
 
@@ -320,4 +320,4 @@ class CachedRepository implements Repository, YjsSyncTarget, RepositoryLifecycle
 | `src/lib/user-prefs.ts` | Non-secret repository preferences |
 | `src-tauri/src/github_credentials.rs` | Secure credential commands |
 | `src-tauri/src/github_repo.rs` | Rust-side GitHub API client |
-| `src/pages/free-canvas/hooks/use-canvas-engine.ts` | Session lifecycle wiring |
+| `src/pages/canvas/hooks/use-canvas-engine.ts` | Session lifecycle wiring |

@@ -13,12 +13,6 @@ const en = {
   app: {
     name: 'Myelin',
     tagline: 'Digital Studio',
-    floatingToolbar: {
-      library: 'Library',
-      write: 'Write',
-      shuffle: 'Shuffle',
-      cloud: 'Cloud',
-    },
   },
   sidebar: {
     newCanvas: 'New Canvas',

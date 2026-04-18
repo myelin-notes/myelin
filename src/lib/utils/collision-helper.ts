@@ -1,4 +1,4 @@
-import type { Vector2 } from '../../pages/free-canvas/drawable-canvas';
+import type { Vector2 } from '../../pages/canvas/drawable-canvas';
 
 export namespace CollisionHelper {
   export function overlappingAreaOf2Rect(rect1: DOMRect, rect2: DOMRect) {

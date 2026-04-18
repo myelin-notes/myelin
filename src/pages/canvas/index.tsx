@@ -4,7 +4,7 @@ import { AnimatePresence } from 'motion/react';
 import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { DEBUG } from '@/lib/debug';
-import type { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
+import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { EmbedComposer } from './components/embed-composer';
 import { PeerSyncPanel } from './components/peer-sync-panel';

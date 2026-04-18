@@ -4,11 +4,11 @@ import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { type NoteSession, useBeforeShutdown, useRepository } from '@/lib/sync';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
-import { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
-import type { DrawableElement } from '@/pages/free-canvas/elements/drawable-element';
-import { PageFrameElement } from '@/pages/free-canvas/elements/page-frame-element';
-import type { ITool } from '@/pages/free-canvas/tools/tool';
-import type { YDocManager } from '@/pages/free-canvas/ydoc-manager';
+import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import type { DrawableElement } from '@/pages/canvas/elements/drawable-element';
+import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
+import type { ITool } from '@/pages/canvas/tools/tool';
+import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;
 

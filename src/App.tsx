@@ -1,8 +1,8 @@
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { useTheme } from '@/hooks/useTheme';
+import { CanvasView } from '@/pages/canvas';
 import { DebugPage } from '@/pages/debug';
-import { CanvasView } from '@/pages/free-canvas';
 import { LibraryPage } from '@/pages/library';
 import { SettingsPage } from '@/pages/settings';
 

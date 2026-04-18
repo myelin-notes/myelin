@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useStrings } from '@/lib/i18n';
-import type { ITool, ToolOption } from '@/pages/free-canvas/tools/tool';
+import type { ITool, ToolOption } from '@/pages/canvas/tools/tool';
 
 interface CanvasToolbarProps {
   tools: ITool[];

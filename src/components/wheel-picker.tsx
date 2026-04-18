@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { SvgIcon } from '@/pages/free-canvas/tools/tool';
+import type { SvgIcon } from '@/pages/canvas/tools/tool';
 
 const TWO_PI = 2 * Math.PI;
 const CENTER_ZONE = 40;

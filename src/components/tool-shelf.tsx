@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useStrings } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
-import type { ITool } from '@/pages/free-canvas/tools/tool';
+import type { ITool } from '@/pages/canvas/tools/tool';
 
 interface ToolShelfProps {
   tools: ITool[];

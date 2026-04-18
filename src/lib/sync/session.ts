@@ -1,5 +1,5 @@
 import { DEBUG } from '@/lib/debug';
-import { YDocManager } from '@/pages/free-canvas/ydoc-manager';
+import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { getOrCreatePeerId } from './identity';
 import {
   applyPeerMessage,

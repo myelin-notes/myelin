@@ -7,8 +7,8 @@ import {
 import type { WheelItem } from '@/components/wheel-picker';
 import { useStrings } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
-import { DrawableCanvas } from '@/pages/free-canvas/drawable-canvas';
-import type { ITool, ToolId, ToolOption } from '@/pages/free-canvas/tools/tool';
+import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import type { ITool, ToolId, ToolOption } from '@/pages/canvas/tools/tool';
 
 const LEGACY_TOOL_STORAGE_KEYS: Record<ToolId, string> = {
   select: 'Select',
