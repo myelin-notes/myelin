@@ -15,11 +15,58 @@ export function serializeDocToMarkdown(doc: PMNode): string {
       parts.push(block);
     }
   });
+  return finalize(parts);
+}
+
+/**
+ * Chunked variant — yields to the event loop every {@link BATCH_SIZE}
+ * blocks so large documents don't freeze the UI while serializing. Use
+ * this from interactive paths (export menu, etc.).
+ */
+export async function serializeDocToMarkdownChunked(
+  doc: PMNode,
+): Promise<string> {
+  const children: PMNode[] = [];
+  doc.forEach((c) => {
+    children.push(c);
+  });
+
+  const parts: string[] = [];
+  for (let i = 0; i < children.length; i++) {
+    const block = serializeBlock(children[i]);
+    if (block !== null) {
+      parts.push(block);
+    }
+    if ((i + 1) % BATCH_SIZE === 0 && i + 1 < children.length) {
+      await yieldToEventLoop();
+    }
+  }
+  return finalize(parts);
+}
+
+const BATCH_SIZE = 64;
+
+function finalize(parts: string[]): string {
   // Collapse runs of blank lines down to at most one, then trim trailing.
   return `${parts
     .join('\n\n')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/\s+$/, '')}\n`;
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => {
+    // `requestIdleCallback` is available in most Chromium/WebKit webviews
+    // and yields until the browser has idle time; fall back to a macrotask.
+    const w = window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts: { timeout: number }) => void;
+    };
+    if (typeof w.requestIdleCallback === 'function') {
+      w.requestIdleCallback(() => resolve(), { timeout: 16 });
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
 }
 
 function serializeBlock(node: PMNode): string | null {
@@ -44,10 +91,11 @@ function serializeBlock(node: PMNode): string | null {
         .split('\n')
         .map((line) => `> ${line}`)
         .join('\n');
-    case 'codeBlock': {
-      const text = node.textContent;
-      return `\`\`\`\n${text}\n\`\`\``;
-    }
+    case 'codeBlock':
+      // The page-frame schema stores fence delimiters (```lang / ```) as
+      // part of the code block's own text content — the editor renders
+      // them as visual fences. Emit the text verbatim to avoid nesting.
+      return node.textContent;
     case 'horizontalRule':
       return '---';
     default:

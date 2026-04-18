@@ -1,9 +1,12 @@
 import { Download as DownloadIcon } from 'lucide-react';
 import { Selection } from 'prosemirror-state';
+import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
-import { serializeDocToMarkdown } from '../page-frame/markdown-serializer';
+import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
@@ -208,27 +211,39 @@ export class PageFrameElement extends DrawableElement {
         id: 'export-markdown',
         label: 'Export to Markdown',
         icon: DownloadIcon,
-        onSelect: () => this.exportMarkdown(),
+        onSelect: () => {
+          void this.exportMarkdown();
+        },
       },
     ];
   }
 
-  private exportMarkdown(): void {
+  private async exportMarkdown(): Promise<void> {
     const view = this.pmEditor?.view;
     if (!view) {
       return;
     }
-    const md = serializeDocToMarkdown(view.state.doc);
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `note-${this.index}.md`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    // Defer revoke so the browser has a moment to start the download.
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    // Kick off serialization in the background — it runs in chunked async
+    // batches that yield to the event loop, so the save dialog animation
+    // and menu close both paint smoothly while the doc is processed.
+    const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
+    try {
+      const path = await save({
+        defaultPath: `note-${this.index}.md`,
+        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+      });
+      if (!path) {
+        return;
+      }
+      const md = await mdPromise;
+      await writeTextFile(path, md);
+      toast.success('Exported to Markdown');
+    } catch (err) {
+      console.error('[page-frame] export failed', err);
+      toast.error('Export failed', {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}

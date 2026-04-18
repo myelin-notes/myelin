@@ -14,6 +14,13 @@ import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 const AUTO_SAVE_INTERVAL_MS = 10_000;
 const LOCAL_PERSIST_DEBOUNCE_MS = 250;
 
+function isMarkdownFile(file: File): boolean {
+  if (file.type === 'text/markdown' || file.type === 'text/x-markdown') {
+    return true;
+  }
+  return /\.(md|markdown|mdx)$/i.test(file.name);
+}
+
 function setupCanvasListeners(
   canvas: HTMLCanvasElement,
   wheelRef: React.RefObject<WheelPickerHandle | null>,
@@ -181,6 +188,8 @@ export function useCanvasEngine({
         void dc.addPdfFromBlob(file, screenX, screenY);
       } else if (file.type.startsWith('image/')) {
         void dc.addImageFromBlob(file, screenX, screenY);
+      } else if (isMarkdownFile(file)) {
+        void dc.addMarkdownFromBlob(file, screenX, screenY);
       }
     }
   };

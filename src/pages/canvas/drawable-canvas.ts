@@ -1,3 +1,4 @@
+import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { catalogs } from '@/lib/i18n/messages';
 import { loadDocument } from '@/lib/pdf-renderer';
@@ -11,6 +12,8 @@ import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
 import { StrokeElement } from './elements/stroke-element';
 import { TextElement } from './elements/text-element';
+import { parseMarkdownToDoc } from './page-frame/markdown-parser';
+import { schema as pageFrameSchema } from './page-frame/pm/schema';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
@@ -564,6 +567,30 @@ export class DrawableCanvas {
       world.y - img.naturalHeight / 2,
     );
     img.updateBounds();
+    this.updateBounding();
+  }
+
+  public async addMarkdownFromBlob(
+    blob: Blob,
+    screenX?: number,
+    screenY?: number,
+  ) {
+    const text = await blob.text();
+    const pf = this.addElement((i) => new PageFrameElement(i));
+    const frag = pf.yXmlFragment;
+    if (frag) {
+      const doc = parseMarkdownToDoc(text, pageFrameSchema);
+      this._ydoc.transact(() => {
+        prosemirrorToYXmlFragment(doc, frag);
+      });
+    }
+
+    const dpr = window.devicePixelRatio || 1;
+    const cx = screenX ?? this.canvas.width / dpr / 2;
+    const cy = screenY ?? this.canvas.height / dpr / 2;
+    const world = this.viewport.screenToWorld({ x: cx, y: cy });
+    pf.setOffset(world.x - pf.pageWidth / 2, world.y - pf.pageHeight / 2);
+    pf.updateBounds();
     this.updateBounding();
   }
 

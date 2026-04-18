@@ -1,0 +1,381 @@
+/**
+ * Minimal Markdown → ProseMirror parser for the page-frame schema.
+ *
+ * The schema is bespoke (flat list items with indent attrs, custom
+ * mentions) so we skip the standard `prosemirror-markdown` package and
+ * hand-roll a focused parser. Supports: headings, paragraphs, bullet and
+ * ordered lists (with indent), blockquote, fenced code blocks, hr, and
+ * inline marks (bold, italic, strikethrough, code, link, image).
+ */
+
+import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
+
+export function parseMarkdownToDoc(md: string, schema: Schema): PMNode {
+  const blocks = parseBlocks(md.replace(/\r\n/g, '\n'));
+  return buildDoc(blocks, schema);
+}
+
+// -- Block tokens --------------------------------------------------------
+
+interface BaseToken {
+  content?: string;
+  text?: string;
+  level?: number;
+  indent?: number;
+  order?: number;
+}
+type BlockToken = BaseToken &
+  (
+    | { type: 'heading' }
+    | { type: 'paragraph' }
+    | { type: 'bullet' }
+    | { type: 'ordered' }
+    | { type: 'blockquote' }
+    | { type: 'codeBlock' }
+    | { type: 'hr' }
+  );
+
+const HEADING_RE = /^(#{1,6})\s+(.*)$/;
+const BULLET_RE = /^(\s*)[-*+]\s+(.*)$/;
+const ORDERED_RE = /^(\s*)(\d+)\.\s+(.*)$/;
+const QUOTE_RE = /^>\s?(.*)$/;
+const HR_RE = /^(?:-{3,}|\*{3,}|_{3,})$/;
+const FENCE_RE = /^```/;
+
+function parseBlocks(md: string): BlockToken[] {
+  const lines = md.split('\n');
+  const out: BlockToken[] = [];
+  let i = 0;
+
+  const isBlockStart = (line: string): boolean => {
+    const t = line.trim();
+    return (
+      FENCE_RE.test(t) ||
+      HR_RE.test(t) ||
+      HEADING_RE.test(line) ||
+      BULLET_RE.test(line) ||
+      ORDERED_RE.test(line) ||
+      QUOTE_RE.test(line)
+    );
+  };
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed === '') {
+      i++;
+      continue;
+    }
+
+    if (FENCE_RE.test(trimmed)) {
+      // The page-frame's codeBlock stores fence delimiters as part of its
+      // text content (see fenceMarkdownNormalizationPlugin). The opening
+      // fence must match /^```(\w+)?$/ and the closing must be exactly
+      // "```" — otherwise the plugin unwraps the block back to paragraphs.
+      const langMatch = trimmed.match(/^```(\w+)?/);
+      const openFence = langMatch?.[1] ? `\`\`\`${langMatch[1]}` : '```';
+      i++;
+      const codeLines: string[] = [];
+      while (i < lines.length && !FENCE_RE.test(lines[i].trim())) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) {
+        i++; // consume closing fence
+      }
+      const text = [openFence, ...codeLines, '```'].join('\n');
+      out.push({ type: 'codeBlock', text });
+      continue;
+    }
+
+    if (HR_RE.test(trimmed)) {
+      out.push({ type: 'hr' });
+      i++;
+      continue;
+    }
+
+    const h = line.match(HEADING_RE);
+    if (h) {
+      out.push({
+        type: 'heading',
+        level: Math.min(3, h[1].length),
+        content: h[2],
+      });
+      i++;
+      continue;
+    }
+
+    const b = line.match(BULLET_RE);
+    if (b) {
+      out.push({
+        type: 'bullet',
+        indent: Math.min(4, Math.floor(b[1].length / 2)),
+        content: b[2],
+      });
+      i++;
+      continue;
+    }
+
+    const o = line.match(ORDERED_RE);
+    if (o) {
+      out.push({
+        type: 'ordered',
+        indent: Math.min(4, Math.floor(o[1].length / 2)),
+        order: Number(o[2]),
+        content: o[3],
+      });
+      i++;
+      continue;
+    }
+
+    const q = line.match(QUOTE_RE);
+    if (q) {
+      const parts = [q[1]];
+      i++;
+      while (i < lines.length) {
+        const m = lines[i].match(QUOTE_RE);
+        if (!m) {
+          break;
+        }
+        parts.push(m[1]);
+        i++;
+      }
+      out.push({ type: 'blockquote', content: parts.join(' ') });
+      continue;
+    }
+
+    // Paragraph: consume consecutive non-blank lines that don't start a block.
+    const paraLines = [line];
+    i++;
+    while (i < lines.length) {
+      const next = lines[i];
+      if (next.trim() === '' || isBlockStart(next)) {
+        break;
+      }
+      paraLines.push(next);
+      i++;
+    }
+    out.push({ type: 'paragraph', content: paraLines.join(' ') });
+  }
+
+  return out;
+}
+
+// -- Inline parser -------------------------------------------------------
+
+function parseInline(text: string, schema: Schema): PMNode[] {
+  return scanInline(text, schema, []);
+}
+
+function scanInline(
+  text: string,
+  schema: Schema,
+  baseMarks: readonly Mark[],
+): PMNode[] {
+  const nodes: PMNode[] = [];
+  let buf = '';
+  let i = 0;
+
+  const pushText = () => {
+    if (buf.length > 0) {
+      nodes.push(schema.text(buf, baseMarks.slice()));
+      buf = '';
+    }
+  };
+
+  while (i < text.length) {
+    const ch = text[i];
+
+    if (ch === '\\' && i + 1 < text.length) {
+      buf += text[i + 1];
+      i += 2;
+      continue;
+    }
+
+    // Image: ![alt](src)
+    if (ch === '!' && text[i + 1] === '[') {
+      const m = text
+        .slice(i)
+        .match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/);
+      if (m) {
+        pushText();
+        if (schema.nodes.image) {
+          nodes.push(
+            schema.nodes.image.create({ src: m[2], alt: m[1] || null }),
+          );
+        }
+        i += m[0].length;
+        continue;
+      }
+    }
+
+    // Link: [text](url)
+    if (ch === '[') {
+      const m = text
+        .slice(i)
+        .match(/^\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/);
+      if (m) {
+        pushText();
+        const linkMark = schema.marks.link.create({
+          href: m[2],
+          title: m[3] ?? null,
+        });
+        for (const child of scanInline(m[1], schema, [
+          ...baseMarks,
+          linkMark,
+        ])) {
+          nodes.push(child);
+        }
+        i += m[0].length;
+        continue;
+      }
+    }
+
+    // Inline code: `...`
+    if (ch === '`') {
+      const end = text.indexOf('`', i + 1);
+      if (end !== -1) {
+        pushText();
+        const codeText = text.slice(i + 1, end);
+        if (codeText.length > 0) {
+          nodes.push(
+            schema.text(codeText, [...baseMarks, schema.marks.code.create()]),
+          );
+        }
+        i = end + 1;
+        continue;
+      }
+    }
+
+    // Bold: **...** or __...__
+    if (
+      (ch === '*' && text[i + 1] === '*') ||
+      (ch === '_' && text[i + 1] === '_')
+    ) {
+      const delim = text.slice(i, i + 2);
+      const end = text.indexOf(delim, i + 2);
+      if (end !== -1) {
+        pushText();
+        const inner = text.slice(i + 2, end);
+        for (const child of scanInline(inner, schema, [
+          ...baseMarks,
+          schema.marks.bold.create(),
+        ])) {
+          nodes.push(child);
+        }
+        i = end + 2;
+        continue;
+      }
+    }
+
+    // Italic: *...* or _..._
+    if (ch === '*' || ch === '_') {
+      // Match up to the next unescaped delimiter of the same kind that
+      // isn't part of a bold (**) pair.
+      let j = i + 1;
+      while (j < text.length) {
+        if (text[j] === '\\') {
+          j += 2;
+          continue;
+        }
+        if (text[j] === ch && text[j + 1] !== ch && text[j - 1] !== ch) {
+          break;
+        }
+        j++;
+      }
+      if (j < text.length && j > i + 1) {
+        pushText();
+        const inner = text.slice(i + 1, j);
+        for (const child of scanInline(inner, schema, [
+          ...baseMarks,
+          schema.marks.italic.create(),
+        ])) {
+          nodes.push(child);
+        }
+        i = j + 1;
+        continue;
+      }
+    }
+
+    // Strikethrough: ~~...~~
+    if (ch === '~' && text[i + 1] === '~') {
+      const end = text.indexOf('~~', i + 2);
+      if (end !== -1) {
+        pushText();
+        const inner = text.slice(i + 2, end);
+        for (const child of scanInline(inner, schema, [
+          ...baseMarks,
+          schema.marks.strikethrough.create(),
+        ])) {
+          nodes.push(child);
+        }
+        i = end + 2;
+        continue;
+      }
+    }
+
+    buf += ch;
+    i++;
+  }
+
+  pushText();
+  return nodes;
+}
+
+// -- Assembly ------------------------------------------------------------
+
+function buildDoc(blocks: BlockToken[], schema: Schema): PMNode {
+  const nodes: PMNode[] = [];
+  for (const block of blocks) {
+    const node = blockToNode(block, schema);
+    if (node) {
+      nodes.push(node);
+    }
+  }
+  if (nodes.length === 0) {
+    nodes.push(schema.nodes.paragraph.create());
+  }
+  return schema.nodes.doc.create(null, nodes);
+}
+
+function blockToNode(block: BlockToken, schema: Schema): PMNode | null {
+  switch (block.type) {
+    case 'heading':
+      return schema.nodes.heading.create(
+        { level: block.level ?? 1 },
+        parseInline(block.content ?? '', schema),
+      );
+    case 'paragraph':
+      return schema.nodes.paragraph.create(
+        null,
+        parseInline(block.content ?? '', schema),
+      );
+    case 'bullet':
+      return schema.nodes.bulletListItem.create(
+        { indent: block.indent ?? 0 },
+        parseInline(block.content ?? '', schema),
+      );
+    case 'ordered':
+      return schema.nodes.orderedListItem.create(
+        { indent: block.indent ?? 0, order: block.order ?? 1 },
+        parseInline(block.content ?? '', schema),
+      );
+    case 'blockquote':
+      return schema.nodes.blockquote.create(
+        null,
+        parseInline(block.content ?? '', schema),
+      );
+    case 'codeBlock': {
+      const text = block.text ?? '';
+      return schema.nodes.codeBlock.create(
+        null,
+        text.length > 0 ? [schema.text(text)] : [],
+      );
+    }
+    case 'hr':
+      return schema.nodes.horizontalRule.create();
+    default:
+      return null;
+  }
+}
