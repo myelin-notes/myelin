@@ -8,33 +8,71 @@ import type { WheelItem } from '@/components/wheel-picker';
 import { useMessages } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import type { ITool, ToolOption } from '@/pages/canvas/tools/tool';
+import {
+  type ITool,
+  setToolOption,
+  setToolOptionValue,
+  type ToolOption,
+} from '@/pages/canvas/tools/tool';
 
 function makeSizeChildren(
   tool: ITool,
   sizeOpt: Extract<ToolOption, { type: 'size' }>,
-  applyRef: { current: (tool: ITool, key: string, value: unknown) => void },
+  applyRef: {
+    current: (tool: ITool, option: ToolOption, value: unknown) => void;
+  },
   strings: ReturnType<typeof useMessages>,
 ): WheelItem[] {
-  const { min, max, key } = sizeOpt;
+  const { min, max } = sizeOpt;
   const mid = Math.round((min + max) / 2);
   return [
     {
       label: strings.canvas.toolOptions.fine(min),
       dot: 4,
-      command: () => applyRef.current(tool, key, min),
+      command: () => applyRef.current(tool, sizeOpt, min),
     },
     {
       label: strings.canvas.toolOptions.medium(mid),
       dot: 8,
-      command: () => applyRef.current(tool, key, mid),
+      command: () => applyRef.current(tool, sizeOpt, mid),
     },
     {
       label: strings.canvas.toolOptions.bold(max),
       dot: 14,
-      command: () => applyRef.current(tool, key, max),
+      command: () => applyRef.current(tool, sizeOpt, max),
     },
   ];
+}
+
+function bindToolOption(
+  tool: ITool,
+  option: ToolOption,
+  applyRef: {
+    current: (tool: ITool, option: ToolOption, value: unknown) => void;
+  },
+): ToolOption {
+  switch (option.type) {
+    case 'color':
+      return {
+        ...option,
+        set: (value: string) => applyRef.current(tool, option, value),
+      };
+    case 'size':
+      return {
+        ...option,
+        set: (value: number) => applyRef.current(tool, option, value),
+      };
+    case 'font':
+      return {
+        ...option,
+        set: (value: string) => applyRef.current(tool, option, value),
+      };
+    case 'choice':
+      return {
+        ...option,
+        set: (value: string) => applyRef.current(tool, option, value),
+      };
+  }
 }
 
 function toolToWheelItem(
@@ -42,7 +80,9 @@ function toolToWheelItem(
   tool: ITool,
   toolIndex: number,
   setSelectedToolIndex: (i: number) => void,
-  applyRef: { current: (tool: ITool, key: string, value: unknown) => void },
+  applyRef: {
+    current: (tool: ITool, option: ToolOption, value: unknown) => void;
+  },
   strings: ReturnType<typeof useMessages>,
 ): WheelItem {
   const options = tool.getOptions?.() ?? [];
@@ -59,7 +99,7 @@ function toolToWheelItem(
     children = colorOpt.palette.map((hex) => ({
       label: hex,
       color: hex,
-      command: () => applyRef.current(tool, colorOpt.key, hex),
+      command: () => applyRef.current(tool, colorOpt, hex),
       children: sizeOpt
         ? makeSizeChildren(tool, sizeOpt, applyRef, strings)
         : undefined,
@@ -93,9 +133,11 @@ export function useToolState(
     const saved = UserPrefs.get('toolOptions');
     for (const tool of tools) {
       const opts = saved[tool.id];
-      if (opts && tool.setOption) {
+      if (opts) {
         for (const [key, value] of Object.entries(opts)) {
-          tool.setOption(key, value);
+          if (!setToolOption(tool, key, value)) {
+            continue;
+          }
           if (key === 'fontFamily' && typeof value === 'string') {
             loadGoogleFont(value);
           }
@@ -106,18 +148,24 @@ export function useToolState(
   });
 
   const applyOptionRef = useRef<
-    (tool: ITool, key: string, value: unknown) => void
+    (tool: ITool, option: ToolOption, value: unknown) => void
   >(() => {});
-  applyOptionRef.current = (tool: ITool, key: string, value: unknown) => {
-    tool.setOption?.(key, value);
+  applyOptionRef.current = (
+    tool: ITool,
+    option: ToolOption,
+    value: unknown,
+  ) => {
+    if (!setToolOptionValue(option, value)) {
+      return;
+    }
     const canvas = drawableCanvasRef.current;
     if (canvas) {
-      tool.applyOptionToSelection?.(canvas, key, value);
+      tool.applyOptionToSelection?.(canvas, option.key, value);
     }
     setOptionsTick((t) => t + 1);
     UserPrefs.update('toolOptions', (all) => ({
       ...all,
-      [tool.id]: { ...all[tool.id], [key]: value },
+      [tool.id]: { ...all[tool.id], [option.key]: value },
     }));
   };
 
@@ -145,25 +193,13 @@ export function useToolState(
 
   void optionsTick;
   const tool = canvasTools[selectedToolIndex];
-  const activeOptions = tool?.getOptions?.() ?? [];
+  const activeOptions = tool
+    ? (tool.getOptions?.() ?? []).map((option) =>
+        bindToolOption(tool, option, applyOptionRef),
+      )
+    : [];
 
   const hasOptions = activeOptions.length > 0;
-
-  const handleSetOption = (key: string, value: unknown) => {
-    const tool = canvasTools[selectedToolIndex];
-    if (tool?.setOption) {
-      tool.setOption(key, value);
-      const canvas = drawableCanvasRef.current;
-      if (canvas) {
-        tool.applyOptionToSelection?.(canvas, key, value);
-      }
-      setOptionsTick((t) => t + 1);
-      UserPrefs.update('toolOptions', (all) => {
-        const opts = { ...all[tool.id], [key]: value };
-        return { ...all, [tool.id]: opts };
-      });
-    }
-  };
 
   const handleToggleWheelTool = (index: number) => {
     setWheelEnabledIndices((prev) => {
@@ -217,7 +253,6 @@ export function useToolState(
     shelfOpen,
     activeOptions,
     hasOptions,
-    handleSetOption,
     hideOptions,
     wheelItems,
     wheelEnabledIndices,

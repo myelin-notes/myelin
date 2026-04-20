@@ -196,6 +196,9 @@ export class TextTool implements ITool {
         label: strings.toolOptions.font,
         value: this.fontFamily,
         fonts: TEXT_FONTS,
+        set: (fontFamily) => {
+          this.fontFamily = fontFamily;
+        },
       },
       {
         type: 'color',
@@ -203,6 +206,9 @@ export class TextTool implements ITool {
         label: strings.toolOptions.color,
         value: this.color,
         palette: TEXT_COLORS,
+        set: (color) => {
+          this.color = color;
+        },
       },
       {
         type: 'size',
@@ -212,20 +218,11 @@ export class TextTool implements ITool {
         min: 12,
         max: 72,
         step: 2,
+        set: (fontSize) => {
+          this.fontSize = fontSize;
+        },
       },
     ];
-  }
-
-  setOption(key: string, value: unknown): void {
-    if (key === 'color' && typeof value === 'string') {
-      this.color = value;
-    }
-    if (key === 'fontSize' && typeof value === 'number') {
-      this.fontSize = value;
-    }
-    if (key === 'fontFamily' && typeof value === 'string') {
-      this.fontFamily = value;
-    }
   }
 
   applyOptionToSelection(

@@ -22,7 +22,6 @@ interface CanvasToolbarProps {
   wheelEnabledIndices: Set<number>;
   onSelectTool: (index: number) => void;
   onToggleOptions: () => void;
-  onSetOption: (key: string, value: unknown) => void;
   onToggleShelf: () => void;
   onCloseShelf: () => void;
   onToggleWheelTool: (index: number) => void;
@@ -39,7 +38,6 @@ export function CanvasToolbar({
   wheelEnabledIndices,
   onSelectTool,
   onToggleOptions,
-  onSetOption,
   onToggleShelf,
   onCloseShelf,
   onToggleWheelTool,
@@ -154,10 +152,7 @@ export function CanvasToolbar({
               className="absolute top-0 left-full ml-2"
               style={{ paddingTop: optionsPanelOffset }}
             >
-              <ToolOptionsPanel
-                options={activeOptions}
-                onSetOption={onSetOption}
-              />
+              <ToolOptionsPanel options={activeOptions} />
             </motion.div>
           )}
         </AnimatePresence>

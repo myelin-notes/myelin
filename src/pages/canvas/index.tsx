@@ -99,7 +99,6 @@ export function CanvasView() {
         wheelEnabledIndices={toolState.wheelEnabledIndices}
         onSelectTool={toolState.selectTool}
         onToggleOptions={toolState.toggleOptions}
-        onSetOption={toolState.handleSetOption}
         onToggleShelf={toolState.toggleShelf}
         onCloseShelf={toolState.closeShelf}
         onToggleWheelTool={toolState.handleToggleWheelTool}

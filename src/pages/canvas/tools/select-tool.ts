@@ -430,6 +430,9 @@ export class SelectTool implements ITool {
         key: 'selectionStyle',
         label: strings.toolOptions.mode,
         value: this.selectionStyle,
+        set: (selectionStyle) => {
+          this.selectionStyle = selectionStyle as 'rectangle' | 'lasso';
+        },
         choices: [
           {
             value: 'rectangle',
@@ -444,12 +447,6 @@ export class SelectTool implements ITool {
         ],
       },
     ];
-  }
-
-  public setOption(key: string, value: unknown): void {
-    if (key === 'selectionStyle') {
-      this.selectionStyle = value as 'rectangle' | 'lasso';
-    }
   }
 
   public get icon(): SvgIcon {

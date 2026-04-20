@@ -15,37 +15,29 @@ export interface FontEntry {
   category: string;
 }
 
+type ToolOptionBase<TType extends string, TValue> = {
+  type: TType;
+  key: string;
+  label: string;
+  value: TValue;
+  set: (value: TValue) => void;
+};
+
 export type ToolOption =
-  | {
-      type: 'color';
-      key: string;
-      label: string;
-      value: string;
+  | (ToolOptionBase<'color', string> & {
       palette: string[];
-    }
-  | {
-      type: 'size';
-      key: string;
-      label: string;
-      value: number;
+    })
+  | (ToolOptionBase<'size', number> & {
       min: number;
       max: number;
       step: number;
-    }
-  | {
-      type: 'font';
-      key: string;
-      label: string;
-      value: string;
+    })
+  | (ToolOptionBase<'font', string> & {
       fonts: FontEntry[];
-    }
-  | {
-      type: 'choice';
-      key: string;
-      label: string;
-      value: string;
+    })
+  | (ToolOptionBase<'choice', string> & {
       choices: { value: string; label: string; icon?: LucideIcon }[];
-    };
+    });
 
 export interface ITool {
   get id(): ToolId;
@@ -58,11 +50,44 @@ export interface ITool {
   get icon(): SvgIcon;
   get label(): string;
   getOptions?(): ToolOption[];
-  setOption?(key: string, value: unknown): void;
   /** Push an option change onto the tool's currently-selected elements. */
   applyOptionToSelection?(
     canvas: DrawableCanvas,
     key: string,
     value: unknown,
   ): void;
+}
+
+export function setToolOptionValue(
+  option: ToolOption,
+  value: unknown,
+): boolean {
+  switch (option.type) {
+    case 'color':
+    case 'font':
+    case 'choice':
+      if (typeof value !== 'string') {
+        return false;
+      }
+      option.set(value);
+      return true;
+    case 'size':
+      if (typeof value !== 'number') {
+        return false;
+      }
+      option.set(value);
+      return true;
+  }
+}
+
+export function setToolOption(
+  tool: ITool,
+  key: string,
+  value: unknown,
+): boolean {
+  const option = tool.getOptions?.().find((candidate) => candidate.key === key);
+  if (!option) {
+    return false;
+  }
+  return setToolOptionValue(option, value);
 }

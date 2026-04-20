@@ -58,6 +58,9 @@ export class HighlighterTool extends PenTool {
         label: strings.toolOptions.color,
         value: this.color,
         palette: HIGHLIGHT_COLORS,
+        set: (color) => {
+          this.color = color;
+        },
       },
       {
         type: 'size',
@@ -67,6 +70,9 @@ export class HighlighterTool extends PenTool {
         min: 12,
         max: 60,
         step: 2,
+        set: (size) => {
+          this.size = size;
+        },
       },
     ];
   }

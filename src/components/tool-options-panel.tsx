@@ -4,7 +4,6 @@ import type { FontEntry, ToolOption } from '@/pages/canvas/tools/tool';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];
-  onSetOption: (key: string, value: unknown) => void;
 }
 
 /* ── Font loading ───────────────────────────────────────── */
@@ -108,10 +107,7 @@ function FontPicker({
 
 /* ── Main panel ─────────────────────────────────────────── */
 
-export function ToolOptionsPanel({
-  options,
-  onSetOption,
-}: ToolOptionsPanelProps) {
+export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
   if (options.length === 0) {
     return null;
   }
@@ -131,7 +127,7 @@ export function ToolOptionsPanel({
                   return (
                     <button
                       key={color}
-                      onClick={() => onSetOption(option.key, color)}
+                      onClick={() => option.set(color)}
                       className="size-5 cursor-pointer rounded-lg border-none p-0 transition-transform duration-150"
                       style={{
                         backgroundColor: color,
@@ -161,9 +157,7 @@ export function ToolOptionsPanel({
                   max={option.max}
                   step={option.step}
                   value={option.value}
-                  onChange={(e) =>
-                    onSetOption(option.key, Number(e.target.value))
-                  }
+                  onChange={(e) => option.set(Number(e.target.value))}
                   className="tool-slider w-20"
                 />
                 <span className="w-5 select-none text-right font-medium text-[10px] text-text-secondary tabular-nums">
@@ -187,7 +181,7 @@ export function ToolOptionsPanel({
                   return (
                     <button
                       key={choice.value}
-                      onClick={() => onSetOption(option.key, choice.value)}
+                      onClick={() => option.set(choice.value)}
                       className={`flex cursor-pointer items-center gap-1.5 rounded-md border-none px-2 py-1 font-medium text-xs transition-all duration-150 ${
                         active
                           ? 'bg-white text-text-primary shadow-sm'
@@ -215,7 +209,7 @@ export function ToolOptionsPanel({
                 fonts={option.fonts}
                 onChange={(family) => {
                   loadGoogleFont(family);
-                  onSetOption(option.key, family);
+                  option.set(family);
                 }}
               />
             </div>

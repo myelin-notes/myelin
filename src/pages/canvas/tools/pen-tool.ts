@@ -70,6 +70,9 @@ export class PenTool implements ITool {
         label: strings.canvas.toolOptions.color,
         value: this.color,
         palette: PEN_COLORS,
+        set: (color) => {
+          this.color = color;
+        },
       },
       {
         type: 'size',
@@ -79,16 +82,10 @@ export class PenTool implements ITool {
         min: 1,
         max: 40,
         step: 1,
+        set: (size) => {
+          this.size = size;
+        },
       },
     ];
-  }
-
-  setOption(key: string, value: unknown): void {
-    if (key === 'color' && typeof value === 'string') {
-      this.color = value;
-    }
-    if (key === 'size' && typeof value === 'number') {
-      this.size = value;
-    }
   }
 }

@@ -63,13 +63,10 @@ export class EraserTool implements ITool {
         min: 5,
         max: 60,
         step: 1,
+        set: (size) => {
+          this.radius = size;
+        },
       },
     ];
-  }
-
-  setOption(key: string, value: unknown): void {
-    if (key === 'size' && typeof value === 'number') {
-      this.radius = value;
-    }
   }
 }
