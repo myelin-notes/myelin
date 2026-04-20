@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import svgr from 'vite-plugin-svgr';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
@@ -16,11 +17,19 @@ export default defineConfig(async () => ({
     }),
     tailwindcss(),
     svgr(),
+    sentryVitePlugin({
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      org: 'zihuan-zhang',
+      project: 'myelin',
+    }),
   ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  build: {
+    sourcemap: true,
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
