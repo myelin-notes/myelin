@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 
 export function AuthStatusBadge({
   hasToken,
@@ -10,7 +10,7 @@ export function AuthStatusBadge({
   checking: boolean;
   polling: boolean;
 }) {
-  const strings = useStrings();
+  const strings = useMessages();
 
   if (checking) {
     return (

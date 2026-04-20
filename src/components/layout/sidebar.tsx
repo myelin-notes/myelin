@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DEBUG } from '@/lib/debug';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
@@ -62,7 +62,7 @@ function NavButton({
 }
 
 export function Sidebar() {
-  const strings = useStrings();
+  const strings = useMessages();
   const repository = useRepository();
   const navigate = useNavigate();
   const location = useLocation();

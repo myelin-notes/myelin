@@ -1,7 +1,5 @@
-import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import { catalogs } from '@/lib/i18n/messages';
-import { loadDocument } from '@/lib/pdf-renderer';
+import { catalogs, type MessageGetter } from '@/lib/i18n/messages';
 import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasViewport } from './canvas-viewport';
@@ -12,15 +10,13 @@ import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
 import { StrokeElement } from './elements/stroke-element';
 import { TextElement } from './elements/text-element';
-import { parseMarkdownToDoc } from './page-frame/markdown-parser';
-import { schema as pageFrameSchema } from './page-frame/pm/schema';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
-import type { CanvasStringsGetter, ITool } from './tools/tool';
+import type { ITool } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type Vector2 = { x: number; y: number };
@@ -48,8 +44,8 @@ export class DrawableCanvas {
   private _domOverlayHost: HTMLElement | null = null;
   /** Maps Y.Map instances to their DrawableElement wrappers. */
   private _yMapToElement = new Map<Y.Map<unknown>, DrawableElement>();
-  private toolSelected: ITool;
   private _toolCursor: string = 'default';
+  private toolSelected: ITool;
 
   private onElementEdit?: (element: DrawableElement | null) => void;
 
@@ -78,7 +74,7 @@ export class DrawableCanvas {
     this.ctx = ctx!;
     this.viewport = new CanvasViewport(canvas);
     this.state = new StateMachine(InteractState.Idle);
-    this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en.canvas);
+    this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
     this._ydoc = ydoc;
 
@@ -548,75 +544,6 @@ export class DrawableCanvas {
     this.updateBounding();
   }
 
-  public async addImageFromBlob(
-    blob: Blob,
-    screenX?: number,
-    screenY?: number,
-  ) {
-    const data = await blob.arrayBuffer();
-    const img = this.addElement((i) => new ImageElement(i));
-    await img.setImageData(data);
-
-    // Place at given screen position (or center of viewport)
-    const dpr = window.devicePixelRatio || 1;
-    const cx = screenX ?? this.canvas.width / dpr / 2;
-    const cy = screenY ?? this.canvas.height / dpr / 2;
-    const world = this.viewport.screenToWorld({ x: cx, y: cy });
-    img.setOffset(
-      world.x - img.naturalWidth / 2,
-      world.y - img.naturalHeight / 2,
-    );
-    img.updateBounds();
-    this.updateBounding();
-  }
-
-  public async addMarkdownFromBlob(
-    blob: Blob,
-    screenX?: number,
-    screenY?: number,
-  ) {
-    const text = await blob.text();
-    const pf = this.addElement((i) => new PageFrameElement(i));
-    const frag = pf.yXmlFragment;
-    if (frag) {
-      const doc = parseMarkdownToDoc(text, pageFrameSchema);
-      this._ydoc.transact(() => {
-        prosemirrorToYXmlFragment(doc, frag);
-      });
-    }
-
-    const dpr = window.devicePixelRatio || 1;
-    const cx = screenX ?? this.canvas.width / dpr / 2;
-    const cy = screenY ?? this.canvas.height / dpr / 2;
-    const world = this.viewport.screenToWorld({ x: cx, y: cy });
-    pf.setOffset(world.x - pf.pageWidth / 2, world.y - pf.pageHeight / 2);
-    pf.updateBounds();
-    this.updateBounding();
-  }
-
-  public async addPdfFromBlob(blob: Blob, screenX?: number, screenY?: number) {
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    const doc = await loadDocument(bytes);
-    const pageSizes: { w: number; h: number }[] = [];
-    for (let i = 0; i < doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: 1 });
-      pageSizes.push({ w: viewport.width, h: viewport.height });
-    }
-
-    const pdf = this.addElement((i) => new PdfElement(i));
-    const fileName = blob instanceof File ? blob.name : '';
-    pdf.setInitialPdfData(bytes, pageSizes, fileName, doc);
-
-    const dpr = window.devicePixelRatio || 1;
-    const cx = screenX ?? this.canvas.width / dpr / 2;
-    const cy = screenY ?? this.canvas.height / dpr / 2;
-    const world = this.viewport.screenToWorld({ x: cx, y: cy });
-    pdf.setOffset(world.x - pdf.totalWidth / 2, world.y - pdf.totalHeight / 2);
-    pdf.updateBounds();
-    this.updateBounding();
-  }
-
   public setCursor(cursor: string) {
     this._toolCursor = cursor;
   }
@@ -729,7 +656,7 @@ export class DrawableCanvas {
     this.updateBounding();
   }
 
-  public static makeTools(getStrings: CanvasStringsGetter): ITool[] {
+  public static makeTools(getStrings: MessageGetter): ITool[] {
     return [
       new SelectTool(getStrings),
       new PenTool(getStrings),

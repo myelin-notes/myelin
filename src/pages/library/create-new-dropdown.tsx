@@ -6,7 +6,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import type { FileType } from '@/lib/sync';
 
 const itemClass =
@@ -21,7 +21,7 @@ export function CreateNewDropdown({
   onNewFolder,
   onNewFile,
 }: CreateNewDropdownProps) {
-  const strings = useStrings();
+  const strings = useMessages();
 
   return (
     <DropdownMenu>

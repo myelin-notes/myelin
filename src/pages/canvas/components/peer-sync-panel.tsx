@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Radio, X } from 'lucide-react';
 import { TimeAgo } from '@/components/time-ago';
-import { useLocale, useStrings } from '@/lib/i18n';
+import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import {
   type NoteSession,
@@ -25,7 +25,7 @@ function formatPeerId(peerId: string): string {
 }
 
 function getRepositorySyncLabel(
-  strings: ReturnType<typeof useStrings>,
+  strings: ReturnType<typeof useMessages>,
   status: ReturnType<typeof useRepositoryStatus>,
 ) {
   if (status.config.kind === 'local') {
@@ -54,7 +54,7 @@ function getRepositorySyncLabel(
 }
 
 export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
-  const strings = useStrings();
+  const strings = useMessages();
   const locale = useLocale();
   const repositoryStatus = useRepositoryStatus();
   const [phase, setPhase] = useState<Phase>('idle');

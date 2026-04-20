@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { DEBUG } from '@/lib/debug';
-import { useLocale, useStrings } from '@/lib/i18n';
+import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 
 interface StatusBarProps {
@@ -10,7 +10,7 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ zoomLevel, fps, noteId }: StatusBarProps) {
-  const strings = useStrings();
+  const strings = useMessages();
   const locale = useLocale();
 
   return (

@@ -1,14 +1,7 @@
-use std::fs;
 use tauri::Manager;
 
 mod iroh_transport;
 mod rendezvous;
-
-#[tauri::command]
-fn create_dir_all(path: &str) -> Result<(), String> {
-    fs::create_dir_all(path).map_err(|e| format!("{}", e))?;
-    Ok(())
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -31,7 +24,6 @@ pub fn run() {
         .plugin(tauri_plugin_ocr::init())
         .manage(iroh_transport::IrohState::new())
         .invoke_handler(tauri::generate_handler![
-            create_dir_all,
             iroh_transport::iroh_host,
             iroh_transport::iroh_join,
             iroh_transport::iroh_auto_sync,

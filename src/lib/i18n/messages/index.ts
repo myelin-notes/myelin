@@ -10,6 +10,7 @@ export const localeLabels = {
 
 export type SupportedLocale = keyof typeof localeLabels;
 export type Messages = typeof en;
+export type MessageGetter = () => Messages;
 
 export const defaultLocale: SupportedLocale = 'en';
 export const catalogs: Record<SupportedLocale, Messages> = {

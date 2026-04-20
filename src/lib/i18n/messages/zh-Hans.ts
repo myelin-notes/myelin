@@ -82,8 +82,7 @@ const zhHans: typeof en = {
   },
   settings: {
     title: '偏好设置',
-    description:
-      '定制你的创作圣地，这些设置可调整无限画布的视觉氛围与功能深度',
+    description: '定制你的创作圣地，这些设置可调整无限画布的视觉氛围与功能深度',
     canvasStyle: {
       title: '画布样式',
       eyebrow: '视觉外观',
@@ -287,6 +286,10 @@ const zhHans: typeof en = {
       errors: {
         unsupportedUrl: '该链接指向的不是图片或 PDF',
         fetchFailed: '无法获取该链接',
+        unsupportedType: '',
+        unsupportedDesc: () => {
+          throw new Error('not yet implemented language');
+        },
       },
     },
     peerSync: {

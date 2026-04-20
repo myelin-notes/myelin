@@ -6,7 +6,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import type { GitHubOrg, GitHubUser } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 import { Avatar, FIELD_TRIGGER_CLASS, MenuLoadingRow } from './dropdown-field';
@@ -28,7 +28,7 @@ export function OwnerField({
   onChange: (owner: string) => void;
   className?: string;
 }) {
-  const strings = useStrings();
+  const strings = useMessages();
   const selectedIsUser = Boolean(user) && value === user?.login;
   const selectedOrg = orgs.find((org) => org.login === value);
   const hasOrgs = orgs.length > 0;

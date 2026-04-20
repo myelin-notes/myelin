@@ -6,7 +6,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import type { GitHubRepo } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 import {
@@ -30,7 +30,7 @@ export function RepoField({
   onChange: (repo: string) => void;
   className?: string;
 }) {
-  const strings = useStrings();
+  const strings = useMessages();
   const selected = repos.find((r) => r.name === value);
   const hasRepos = repos.length > 0;
 

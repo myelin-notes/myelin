@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import {
   beginGitHubDeviceAuth,
   cancelGitHubDeviceAuth,
@@ -23,7 +23,7 @@ export interface GitHubAuthState {
 }
 
 export function useGitHubAuth(credentialId: string): GitHubAuthState {
-  const strings = useStrings();
+  const strings = useMessages();
   const [tokenPresent, setTokenPresent] = useState(false);
   const [checkingToken, setCheckingToken] = useState(false);
   const [authAvailable, setAuthAvailable] = useState(true);

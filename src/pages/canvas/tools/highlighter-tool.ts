@@ -1,8 +1,9 @@
 import { Highlighter as HighlighterIcon } from 'lucide-react';
+import type { MessageGetter } from '@/lib/i18n';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { StrokeElement } from '../elements/stroke-element';
 import { PenTool } from './pen-tool';
-import type { CanvasStringsGetter, SvgIcon, ToolId, ToolOption } from './tool';
+import type { SvgIcon, ToolId, ToolOption } from './tool';
 
 const HIGHLIGHT_COLORS = [
   '#facc15',
@@ -20,7 +21,7 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 export class HighlighterTool extends PenTool {
-  constructor(getStrings: CanvasStringsGetter) {
+  constructor(getStrings: MessageGetter) {
     super(getStrings);
     this.color = '#facc15';
     this.size = 36;
@@ -45,11 +46,11 @@ export class HighlighterTool extends PenTool {
   }
 
   get label(): string {
-    return this.getStrings().tools.highlighter;
+    return this.getStrings().canvas.tools.highlighter;
   }
 
   getOptions(): ToolOption[] {
-    const strings = this.getStrings();
+    const strings = this.getStrings().canvas;
     return [
       {
         type: 'color',

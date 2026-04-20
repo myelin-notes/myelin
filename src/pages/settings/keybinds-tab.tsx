@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import { type Action, type KeyCombo, registry } from '@/lib/keybinds';
 import { getActionCategory, getActionCopy } from '@/lib/keybinds/messages';
 import { cn } from '@/lib/utils';
@@ -38,7 +38,7 @@ function KeyCapture({
   onCapture: (combo: KeyCombo) => void;
   onCancel: () => void;
 }) {
-  const strings = useStrings();
+  const strings = useMessages();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ function KeybindRow({
   combo: KeyCombo | undefined;
   isRebound: boolean;
 }) {
-  const strings = useStrings();
+  const strings = useMessages();
   const [capturing, setCapturing] = useState(false);
   const [currentCombo, setCurrentCombo] = useState(combo);
   const copy = getActionCopy(strings, action);
@@ -176,7 +176,7 @@ function KeybindRow({
 }
 
 export function KeybindsSection() {
-  const strings = useStrings();
+  const strings = useMessages();
   const actions = registry.actions;
 
   const grouped = new Map<

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocale, useStrings } from '@/lib/i18n';
+import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
@@ -15,7 +15,7 @@ export function SemanticTags({
   activeTags,
   onActiveTagsChanged,
 }: SemanticTagsProps) {
-  const strings = useStrings();
+  const strings = useMessages();
   const locale = useLocale();
   const repository = useRepository();
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);

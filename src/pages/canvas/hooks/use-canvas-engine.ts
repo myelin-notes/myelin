@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
+import { useMessages } from '@/lib/i18n';
 import { type NoteSession, useRepository } from '@/lib/sync';
 import { IrohTransport } from '@/lib/sync/live/iroh';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
@@ -10,16 +12,10 @@ import type { DrawableElement } from '@/pages/canvas/elements/drawable-element';
 import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
+import { SUPPORTED_MEDIA } from '../media';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;
 const LOCAL_PERSIST_DEBOUNCE_MS = 250;
-
-function isMarkdownFile(file: File): boolean {
-  if (file.type === 'text/markdown' || file.type === 'text/x-markdown') {
-    return true;
-  }
-  return /\.(md|markdown|mdx)$/i.test(file.name);
-}
 
 function setupCanvasListeners(
   canvas: HTMLCanvasElement,
@@ -154,6 +150,7 @@ export function useCanvasEngine({
   setSelectedToolIndex,
   onCanvasPointerDown,
 }: UseCanvasEngineArgs) {
+  const messages = useMessages();
   const repository = useRepository();
   const noteSessionRef = useRef<NoteSession | null>(null);
   const autoSyncTransportRef = useRef<IrohTransport | null>(null);
@@ -183,13 +180,17 @@ export function useCanvasEngine({
     if (!dc) {
       return;
     }
+
     for (const file of files) {
-      if (file.type === 'application/pdf') {
-        void dc.addPdfFromBlob(file, screenX, screenY);
-      } else if (file.type.startsWith('image/')) {
-        void dc.addImageFromBlob(file, screenX, screenY);
-      } else if (isMarkdownFile(file)) {
-        void dc.addMarkdownFromBlob(file, screenX, screenY);
+      const handler = SUPPORTED_MEDIA[file.type];
+      if (!handler) {
+        toast.error(messages.canvas.embedComposer.errors.unsupportedType, {
+          description: messages.canvas.embedComposer.errors.unsupportedDesc(
+            file.type,
+          ),
+        });
+      } else {
+        handler(file, dc, screenX, screenY);
       }
     }
   };

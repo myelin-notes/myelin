@@ -6,7 +6,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import type { GitHubBranch } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 import {
@@ -30,7 +30,7 @@ export function BranchField({
   onChange: (branch: string) => void;
   className?: string;
 }) {
-  const strings = useStrings();
+  const strings = useMessages();
   const selected = branches.find((b) => b.name === value);
   const hasBranches = branches.length > 0;
 

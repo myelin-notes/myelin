@@ -10,7 +10,7 @@ import {
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/sidebar';
-import { useLocale, useStrings } from '@/lib/i18n';
+import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import {
   useRepository,
@@ -27,7 +27,7 @@ import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
 export function LibraryPage() {
-  const strings = useStrings();
+  const strings = useMessages();
   const locale = useLocale();
   const repository = useRepository();
   const navigate = useNavigate();

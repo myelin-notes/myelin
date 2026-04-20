@@ -1,5 +1,4 @@
 import type { LucideIcon } from 'lucide-react';
-import type { Messages } from '@/lib/i18n';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 
 export type SvgIcon = LucideIcon;
@@ -10,8 +9,6 @@ export type ToolId =
   | 'eraser'
   | 'text'
   | 'embed';
-export type CanvasStrings = Messages['canvas'];
-export type CanvasStringsGetter = () => CanvasStrings;
 
 export interface FontEntry {
   family: string;

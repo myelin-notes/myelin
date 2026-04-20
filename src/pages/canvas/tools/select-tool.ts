@@ -3,16 +3,11 @@ import {
   Lasso as LassoIcon,
   MousePointer2 as PointerIcon,
 } from 'lucide-react';
+import type { MessageGetter } from '@/lib/i18n';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
-import type {
-  CanvasStringsGetter,
-  ITool,
-  SvgIcon,
-  ToolId,
-  ToolOption,
-} from './tool';
+import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const HANDLE_HIT_RADIUS = 10;
 const MIN_SCALE = 0.05;
@@ -26,7 +21,7 @@ enum SelectMode {
 }
 
 export class SelectTool implements ITool {
-  public constructor(private readonly getStrings: CanvasStringsGetter) {}
+  public constructor(private readonly getStrings: MessageGetter) {}
 
   private mode: SelectMode = SelectMode.None;
   private startPoint: Vector2 = { x: 0, y: 0 };
@@ -428,7 +423,7 @@ export class SelectTool implements ITool {
   }
 
   public getOptions(): ToolOption[] {
-    const strings = this.getStrings();
+    const strings = this.getStrings().canvas;
     return [
       {
         type: 'choice',
@@ -462,6 +457,6 @@ export class SelectTool implements ITool {
   }
 
   public get label(): string {
-    return this.getStrings().tools.select;
+    return this.getStrings().canvas.tools.select;
   }
 }

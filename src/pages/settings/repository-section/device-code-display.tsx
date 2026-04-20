@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 
 export function DeviceCodeDisplay({
   userCode,
@@ -11,7 +11,7 @@ export function DeviceCodeDisplay({
   userCode: string;
   onCopy: () => void;
 }) {
-  const strings = useStrings();
+  const strings = useMessages();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import { PdfDocumentView } from '@/lib/pdf-renderer';
 
 export function DebugPage() {
-  const strings = useStrings();
+  const strings = useMessages();
   const [data, setData] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 

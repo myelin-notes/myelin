@@ -4,6 +4,7 @@ import {
   catalogs,
   defaultLocale,
   localeLabels,
+  type MessageGetter,
   type Messages,
   type SupportedLocale,
 } from './messages';
@@ -87,8 +88,18 @@ export function useLocale() {
   return useI18n().locale;
 }
 
-export function useStrings() {
+export function useMessages() {
   return useI18n().messages;
 }
 
-export { localeLabels, type Messages, type SupportedLocale };
+export function useMessagesGetter() {
+  const result = useMessages();
+  return () => result;
+}
+
+export {
+  localeLabels,
+  type MessageGetter,
+  type Messages,
+  type SupportedLocale,
+};

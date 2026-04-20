@@ -4,7 +4,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 
 interface ItemContextMenuProps {
   onRename: () => void;
@@ -19,7 +19,7 @@ export function ItemContextMenu({
   onReveal,
   onManageTags,
 }: ItemContextMenuProps) {
-  const strings = useStrings();
+  const strings = useMessages();
 
   return (
     <ContextMenuContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">

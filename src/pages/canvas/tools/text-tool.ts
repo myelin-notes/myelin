@@ -1,15 +1,9 @@
 import { Type as TypeIcon } from 'lucide-react';
+import type { MessageGetter } from '@/lib/i18n';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { TextElement } from '../elements/text-element';
-import type {
-  CanvasStringsGetter,
-  FontEntry,
-  ITool,
-  SvgIcon,
-  ToolId,
-  ToolOption,
-} from './tool';
+import type { FontEntry, ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const TEXT_COLORS = [
   '#191c1e',
@@ -43,7 +37,7 @@ const DEFAULT_BOX_HEIGHT = 80;
 const CLICK_THRESHOLD = 5;
 
 export class TextTool implements ITool {
-  public constructor(private readonly getStrings: CanvasStringsGetter) {}
+  public constructor(private readonly getStrings: MessageGetter) {}
 
   private color: string = '#191c1e';
   private fontSize: number = 24;
@@ -190,11 +184,11 @@ export class TextTool implements ITool {
   }
 
   get label(): string {
-    return this.getStrings().tools.text;
+    return this.getStrings().canvas.tools.text;
   }
 
   getOptions(): ToolOption[] {
-    const strings = this.getStrings();
+    const strings = this.getStrings().canvas;
     return [
       {
         type: 'font',

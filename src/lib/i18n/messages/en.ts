@@ -291,6 +291,8 @@ const en = {
       errors: {
         unsupportedUrl: 'That link does not point to an image or PDF.',
         fetchFailed: "Couldn't fetch that link.",
+        unsupportedType: 'Unsupported media type',
+        unsupportedDesc: (type: string) => `${type} is not currently supported`,
       },
     },
     peerSync: {

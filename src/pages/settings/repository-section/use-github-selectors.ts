@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import {
   fetchGitHubBranches,
   fetchGitHubOrgs,
@@ -36,7 +36,7 @@ export function useGitHubSelectors({
   credentialId: string;
   config: RepositoryConfig;
 }): GitHubSelectorsState {
-  const strings = useStrings();
+  const strings = useMessages();
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [orgs, setOrgs] = useState<GitHubOrg[]>([]);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);

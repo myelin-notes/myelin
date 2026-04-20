@@ -5,25 +5,16 @@ import {
   saveWheelToolIndices,
 } from '@/components/tool-shelf';
 import type { WheelItem } from '@/components/wheel-picker';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import type { ITool, ToolId, ToolOption } from '@/pages/canvas/tools/tool';
-
-const LEGACY_TOOL_STORAGE_KEYS: Record<ToolId, string> = {
-  select: 'Select',
-  pen: 'Pen',
-  highlighter: 'Highlighter',
-  eraser: 'Eraser',
-  text: 'Text',
-  embed: 'Embed',
-};
+import type { ITool, ToolOption } from '@/pages/canvas/tools/tool';
 
 function makeSizeChildren(
   tool: ITool,
   sizeOpt: Extract<ToolOption, { type: 'size' }>,
   applyRef: { current: (tool: ITool, key: string, value: unknown) => void },
-  strings: ReturnType<typeof useStrings>,
+  strings: ReturnType<typeof useMessages>,
 ): WheelItem[] {
   const { min, max, key } = sizeOpt;
   const mid = Math.round((min + max) / 2);
@@ -52,7 +43,7 @@ function toolToWheelItem(
   toolIndex: number,
   setSelectedToolIndex: (i: number) => void,
   applyRef: { current: (tool: ITool, key: string, value: unknown) => void },
-  strings: ReturnType<typeof useStrings>,
+  strings: ReturnType<typeof useMessages>,
 ): WheelItem {
   const options = tool.getOptions?.() ?? [];
   const colorOpt = options.find(
@@ -91,19 +82,17 @@ function toolToWheelItem(
 export function useToolState(
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>,
 ) {
-  const strings = useStrings();
-  const toolStringsRef = useRef(strings.canvas);
-  toolStringsRef.current = strings.canvas;
+  const strings = useMessages();
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsTick, setOptionsTick] = useState(0);
   const [shelfOpen, setShelfOpen] = useState(false);
 
   const [canvasTools] = useState(() => {
-    const tools = DrawableCanvas.makeTools(() => toolStringsRef.current);
+    const tools = DrawableCanvas.makeTools(() => strings);
     const saved = UserPrefs.get('toolOptions');
     for (const tool of tools) {
-      const opts = saved[tool.id] ?? saved[LEGACY_TOOL_STORAGE_KEYS[tool.id]];
+      const opts = saved[tool.id];
       if (opts && tool.setOption) {
         for (const [key, value] of Object.entries(opts)) {
           tool.setOption(key, value);

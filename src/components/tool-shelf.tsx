@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { ITool } from '@/pages/canvas/tools/tool';
 
@@ -18,7 +18,7 @@ export function ToolShelf({
   onClose,
   containerRef,
 }: ToolShelfProps) {
-  const strings = useStrings();
+  const strings = useMessages();
 
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {

@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import type { ITool, ToolOption } from '@/pages/canvas/tools/tool';
 
 interface CanvasToolbarProps {
@@ -45,7 +45,7 @@ export function CanvasToolbar({
   onToggleWheelTool,
   embedComposer,
 }: CanvasToolbarProps) {
-  const strings = useStrings();
+  const strings = useMessages();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);

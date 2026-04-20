@@ -1,6 +1,6 @@
 import { ChevronLeft as ChevronLeftIcon } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 
 interface TitleBarProps {
   fileName: string;
@@ -8,7 +8,7 @@ interface TitleBarProps {
 }
 
 export function TitleBar({ fileName, onBack }: TitleBarProps) {
-  const strings = useStrings();
+  const strings = useMessages();
 
   return (
     <motion.div

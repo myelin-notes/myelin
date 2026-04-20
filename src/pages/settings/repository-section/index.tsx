@@ -3,7 +3,7 @@ import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TimeAgo } from '@/components/time-ago';
 import { Button } from '@/components/ui/button';
-import { type Messages, useLocale, useStrings } from '@/lib/i18n';
+import { type Messages, useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import {
   getRepositoryConfig,
@@ -25,7 +25,7 @@ import { useGitHubSelectors } from './use-github-selectors';
 type RepoKind = RepositoryConfig['kind'];
 
 export function RepositorySection() {
-  const strings = useStrings();
+  const strings = useMessages();
   const locale = useLocale();
   const [config, setConfig] = useState<RepositoryConfig>(getRepositoryConfig);
   const repositoryStatus = useRepositoryStatus();

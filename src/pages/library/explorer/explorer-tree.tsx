@@ -5,7 +5,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import { type FileType, useRepository, type VFSNode } from '@/lib/sync';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
@@ -38,7 +38,7 @@ export function ExplorerTree({
   searchQuery,
   filterTags,
 }: ExplorerTreeProps) {
-  const strings = useStrings();
+  const strings = useMessages();
   const repository = useRepository();
   const [nodes, setNodes] = useState<VFSNode[]>([]);
   const [loading, setLoading] = useState(true);

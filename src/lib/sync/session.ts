@@ -6,6 +6,7 @@ import {
   createPeerState,
   getPeerSnapshot,
   type PeerSnapshot,
+  type PeerState,
   pruneStalePeers,
   resetRemotePeers,
 } from './live/peer-state';
@@ -22,13 +23,6 @@ import type { NoteSessionStatus, YjsSyncTarget } from './types';
 const PEER_ORIGIN = 'remote-peer';
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
-
-export interface NoteSessionOptions {
-  localPeer?: {
-    peerId: string;
-    mode: PeerMode;
-  };
-}
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) {
@@ -53,7 +47,7 @@ export class NoteSession {
     peerId: string;
     mode: PeerMode;
   };
-  private readonly peerState: ReturnType<typeof createPeerState>;
+  private readonly peerState: PeerState;
   private readonly peerSnapshotListeners = new Set<
     (snapshot: PeerSnapshot) => void
   >();
@@ -67,9 +61,8 @@ export class NoteSession {
     private readonly syncTarget: YjsSyncTarget,
     initialRevision: string | null,
     initialStateVector: Uint8Array,
-    options?: NoteSessionOptions,
   ) {
-    this.localPeer = options?.localPeer ?? {
+    this.localPeer = {
       peerId: getOrCreatePeerId(),
       mode: 'owner-device',
     };
@@ -104,7 +97,6 @@ export class NoteSession {
   static async open(
     nodeId: string,
     syncTarget: YjsSyncTarget,
-    options?: NoteSessionOptions,
   ): Promise<NoteSession> {
     const initial = await syncTarget.loadDocument(nodeId);
     const ydoc = initial.update
@@ -116,7 +108,6 @@ export class NoteSession {
       syncTarget,
       initial.revision,
       initial.stateVector,
-      options,
     );
   }
 

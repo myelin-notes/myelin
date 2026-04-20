@@ -11,7 +11,7 @@ import {
   localeLabels,
   type SupportedLocale,
   useI18n,
-  useStrings,
+  useMessages,
 } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
@@ -29,7 +29,7 @@ function CanvasPreview({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const strings = useStrings();
+  const strings = useMessages();
   const labels: Record<CanvasBg, string> = strings.settings.canvasStyle.options;
 
   return (
@@ -90,7 +90,7 @@ function CanvasPreview({
 }
 
 export function PreferencesTab() {
-  const strings = useStrings();
+  const strings = useMessages();
   const { setLocale } = useI18n();
   const [canvasBg, setCanvasBg] = useState<CanvasBg>(
     UserPrefs.get('canvasBackground'),

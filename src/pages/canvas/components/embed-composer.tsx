@@ -7,7 +7,7 @@ import {
   X as XIcon,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 
 interface EmbedComposerProps {
   onEmbedFiles: (files: File[]) => void;
@@ -34,7 +34,7 @@ function isSupportedFile(file: File): boolean {
 }
 
 export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
-  const strings = useStrings();
+  const strings = useMessages();
   const [urlInput, setUrlInput] = useState('');
   const [urlState, setUrlState] = useState<UrlState>({ kind: 'idle' });
   const [isDragOver, setIsDragOver] = useState(false);

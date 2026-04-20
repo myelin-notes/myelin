@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useStrings } from '@/lib/i18n';
+import { useMessages } from '@/lib/i18n';
 import { type Action, formatKeyCombo, registry } from '@/lib/keybinds';
 import { getActionCopy } from '@/lib/keybinds/messages';
 import { PM_UPDATE_EVENT } from './constants';
@@ -65,7 +65,7 @@ function isMarkActive(state: EditorView['state'], markType: MarkType): boolean {
 }
 
 export function FloatingToolbar({ view }: FloatingToolbarProps) {
-  const strings = useStrings();
+  const strings = useMessages();
   const [pos, setPos] = useState<ToolbarPosition>({
     x: 0,
     y: 0,
