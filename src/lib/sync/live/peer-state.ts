@@ -17,128 +17,112 @@ export interface PeerSnapshot {
   isWriter: boolean;
 }
 
-export interface PeerState {
-  localPeerId: string;
-  localMode: PeerMode;
-  connectedPeers: Map<string, ConnectedPeer>;
-}
-
 function sortPeerIds(a: { peerId: string }, b: { peerId: string }): number {
   return a.peerId.localeCompare(b.peerId);
 }
 
-function getCurrentWriter(state: PeerState): string | null {
-  const eligiblePeerIds: string[] = [];
+export class PeerState {
+  private readonly connectedPeers = new Map<string, ConnectedPeer>();
 
-  if (state.localMode === 'owner-device') {
-    eligiblePeerIds.push(state.localPeerId);
-  }
+  constructor(
+    private readonly localPeerId: string,
+    private readonly localMode: PeerMode,
+  ) {}
 
-  for (const peer of state.connectedPeers.values()) {
-    if (peer.mode === 'owner-device') {
-      eligiblePeerIds.push(peer.peerId);
+  public applyMessage(message: SyncMessage, now: number): boolean {
+    if (message.type !== 'peer') {
+      return false;
     }
+
+    if (message.peerId === this.localPeerId) {
+      return false;
+    }
+
+    if (message.kind === 'left') {
+      return this.removePeer(message.peerId);
+    }
+
+    const existing = this.connectedPeers.get(message.peerId);
+    if (!existing) {
+      this.connectedPeers.set(message.peerId, {
+        peerId: message.peerId,
+        mode: message.mode,
+        lastSeenAt: now,
+      });
+      return true;
+    }
+
+    const modeChanged = existing.mode !== message.mode;
+    existing.mode = message.mode;
+    existing.lastSeenAt = now;
+    return modeChanged;
   }
 
-  if (eligiblePeerIds.length === 0) {
-    return null;
+  public removePeer(peerId: string): boolean {
+    if (peerId === this.localPeerId) {
+      return false;
+    }
+
+    return this.connectedPeers.delete(peerId);
   }
 
-  eligiblePeerIds.sort((a, b) => a.localeCompare(b));
-  return eligiblePeerIds[0];
-}
-
-export function createPeerState(
-  localPeerId: string,
-  localMode: PeerMode,
-): PeerState {
-  return {
-    localPeerId,
-    localMode,
-    connectedPeers: new Map(),
-  };
-}
-
-export function applyPeerMessage(
-  state: PeerState,
-  message: SyncMessage,
-  now: number,
-): boolean {
-  if (message.type !== 'peer') {
-    return false;
+  public pruneStalePeers(now: number, timeoutMs: number): boolean {
+    let changed = false;
+    for (const [peerId, peer] of this.connectedPeers.entries()) {
+      if (now - peer.lastSeenAt > timeoutMs) {
+        this.connectedPeers.delete(peerId);
+        changed = true;
+      }
+    }
+    return changed;
   }
 
-  if (message.peerId === state.localPeerId) {
-    return false;
-  }
+  public resetRemotePeers(): boolean {
+    if (this.connectedPeers.size === 0) {
+      return false;
+    }
 
-  if (message.kind === 'left') {
-    return removePeer(state, message.peerId);
-  }
-
-  const existing = state.connectedPeers.get(message.peerId);
-  if (!existing) {
-    state.connectedPeers.set(message.peerId, {
-      peerId: message.peerId,
-      mode: message.mode,
-      lastSeenAt: now,
-    });
+    this.connectedPeers.clear();
     return true;
   }
 
-  const modeChanged = existing.mode !== message.mode;
-  existing.mode = message.mode;
-  existing.lastSeenAt = now;
-  return modeChanged;
-}
+  public getSnapshot(): PeerSnapshot {
+    const connectedPeers = Array.from(this.connectedPeers.values())
+      .map((peer) => ({
+        peerId: peer.peerId,
+        mode: peer.mode,
+      }))
+      .sort(sortPeerIds);
 
-export function removePeer(state: PeerState, peerId: string): boolean {
-  if (peerId === state.localPeerId) {
-    return false;
+    const currentWriter = this.getCurrentWriter();
+
+    return {
+      localPeerId: this.localPeerId,
+      localMode: this.localMode,
+      connectedPeers,
+      currentWriter,
+      isWriter: currentWriter === this.localPeerId,
+    };
   }
 
-  return state.connectedPeers.delete(peerId);
-}
+  private getCurrentWriter(): string | null {
+    const eligiblePeerIds: string[] = [];
 
-export function pruneStalePeers(
-  state: PeerState,
-  now: number,
-  timeoutMs: number,
-): boolean {
-  let changed = false;
-  for (const [peerId, peer] of state.connectedPeers.entries()) {
-    if (now - peer.lastSeenAt > timeoutMs) {
-      state.connectedPeers.delete(peerId);
-      changed = true;
+    if (this.localMode === 'owner-device') {
+      eligiblePeerIds.push(this.localPeerId);
     }
+
+    for (const peer of this.connectedPeers.values()) {
+      if (peer.mode === 'owner-device') {
+        eligiblePeerIds.push(peer.peerId);
+      }
+    }
+
+    if (eligiblePeerIds.length === 0) {
+      return null;
+    }
+
+    eligiblePeerIds.sort((a, b) => a.localeCompare(b));
+    return eligiblePeerIds[0];
   }
-  return changed;
-}
-
-export function resetRemotePeers(state: PeerState): boolean {
-  if (state.connectedPeers.size === 0) {
-    return false;
-  }
-
-  state.connectedPeers.clear();
-  return true;
-}
-
-export function getPeerSnapshot(state: PeerState): PeerSnapshot {
-  const connectedPeers = Array.from(state.connectedPeers.values())
-    .map((peer) => ({
-      peerId: peer.peerId,
-      mode: peer.mode,
-    }))
-    .sort(sortPeerIds);
-
-  const currentWriter = getCurrentWriter(state);
-
-  return {
-    localPeerId: state.localPeerId,
-    localMode: state.localMode,
-    connectedPeers,
-    currentWriter,
-    isWriter: currentWriter === state.localPeerId,
-  };
 }

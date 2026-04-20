@@ -2,15 +2,7 @@ import { DEBUG } from '@/lib/debug';
 import { Logger } from '@/lib/logger';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { getOrCreatePeerId } from './identity';
-import {
-  applyPeerMessage,
-  createPeerState,
-  getPeerSnapshot,
-  type PeerSnapshot,
-  type PeerState,
-  pruneStalePeers,
-  resetRemotePeers,
-} from './live/peer-state';
+import { type PeerSnapshot, PeerState } from './live/peer-state';
 import {
   decodeMessage,
   encodeMessage,
@@ -68,10 +60,7 @@ export class NoteSession {
       peerId: getOrCreatePeerId(),
       mode: 'owner-device',
     };
-    this.peerState = createPeerState(
-      this.localPeer.peerId,
-      this.localPeer.mode,
-    );
+    this.peerState = new PeerState(this.localPeer.peerId, this.localPeer.mode);
     this.status = {
       phase: 'idle',
       lastError: null,
@@ -122,7 +111,7 @@ export class NoteSession {
   }
 
   getPeerSnapshot(): PeerSnapshot {
-    return getPeerSnapshot(this.peerState);
+    return this.peerState.getSnapshot();
   }
 
   subscribePeerSnapshot(
@@ -158,7 +147,7 @@ export class NoteSession {
     previousTransport.off('disconnected', this.onTransportDisconnected);
     previousTransport.off('connected', this.onTransportConnected);
     this.stopHeartbeat();
-    this.updatePeerSnapshot(resetRemotePeers(this.peerState));
+    this.updatePeerSnapshot(this.peerState.resetRemotePeers());
 
     this.transport = transport;
 
@@ -265,9 +254,7 @@ export class NoteSession {
       return;
     }
 
-    this.updatePeerSnapshot(
-      applyPeerMessage(this.peerState, message, Date.now()),
-    );
+    this.updatePeerSnapshot(this.peerState.applyMessage(message, Date.now()));
   };
 
   private onTransportConnected = () => {
@@ -342,7 +329,7 @@ export class NoteSession {
     this.heartbeatTimer = globalThis.setInterval(() => {
       this.sendPeerPresence('heartbeat');
       this.updatePeerSnapshot(
-        pruneStalePeers(this.peerState, Date.now(), PEER_TIMEOUT_MS),
+        this.peerState.pruneStalePeers(Date.now(), PEER_TIMEOUT_MS),
       );
     }, HEARTBEAT_INTERVAL_MS);
   }
