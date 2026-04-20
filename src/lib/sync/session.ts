@@ -118,8 +118,8 @@ export class NoteSession {
     return this.transport.connected;
   }
 
-  hasLocalChanges(): boolean {
-    return this.hasRemoteChanges();
+  hasUnsyncedChanges(): boolean {
+    return !bytesEqual(this.ydoc.encodeStateVector(), this.remoteStateVector);
   }
 
   getPeerSnapshot(): PeerSnapshot {
@@ -286,15 +286,11 @@ export class NoteSession {
     });
   }
 
-  private hasRemoteChanges(): boolean {
-    return !bytesEqual(this.ydoc.encodeStateVector(), this.remoteStateVector);
-  }
-
   private async closeInternal(): Promise<void> {
     let closeError: unknown = null;
 
     try {
-      if (this.hasRemoteChanges()) {
+      if (this.hasUnsyncedChanges()) {
         await this.push();
       }
     } catch (error) {

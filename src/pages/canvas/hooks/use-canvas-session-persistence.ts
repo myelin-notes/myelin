@@ -35,7 +35,7 @@ export function useCanvasSessionPersistence({
       await persistPromiseRef.current;
     }
 
-    if (!session.hasLocalChanges()) {
+    if (!session.hasUnsyncedChanges()) {
       return;
     }
 
@@ -107,7 +107,7 @@ export function useCanvasSessionPersistence({
       await savePromiseRef.current;
     }
 
-    if (!session.hasLocalChanges() && !needsThumbnailSaveRef.current) {
+    if (!session.hasUnsyncedChanges() && !needsThumbnailSaveRef.current) {
       return;
     }
 

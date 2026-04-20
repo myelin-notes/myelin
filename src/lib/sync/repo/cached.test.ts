@@ -383,7 +383,7 @@ describe('CachedRepository', () => {
     const session = await repository.openSession(fileId);
     session.ydoc.doc.getText('content').insert(15, ' plus local close edit');
 
-    expect(session.hasLocalChanges()).toBe(true);
+    expect(session.hasUnsyncedChanges()).toBe(true);
 
     await session.close();
 
