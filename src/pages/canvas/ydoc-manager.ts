@@ -1,8 +1,12 @@
 import * as Y from 'yjs';
 import type { ElementType } from './elements/element-type';
 
-/** Origin used for local mutations — tracked by UndoManager. */
-export const LOCAL_ORIGIN = 'local';
+/** Origins used to label Yjs updates flowing through the canvas sync layer. */
+export const LOCAL_ORIGIN = 'local' as const;
+export type LocalOrigin = typeof LOCAL_ORIGIN;
+export const PEER_ORIGIN = 'remote-peer' as const;
+export type PeerOrigin = typeof PEER_ORIGIN;
+export type SyncOrigin = LocalOrigin | PeerOrigin;
 
 /**
  * Owns a Y.Doc for a single canvas file and provides typed access

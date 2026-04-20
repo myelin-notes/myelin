@@ -1,6 +1,11 @@
 import { DEBUG } from '@/lib/debug';
 import { Logger } from '@/lib/logger';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import {
+  LOCAL_ORIGIN,
+  PEER_ORIGIN,
+  type SyncOrigin,
+  YDocManager,
+} from '@/pages/canvas/ydoc-manager';
 import { getOrCreatePeerId } from './identity';
 import { type PeerSnapshot, PeerState } from './live/peer-state';
 import {
@@ -13,7 +18,6 @@ import {
 import { noopTransport, type Transport } from './live/transport';
 import type { NoteSessionStatus, YjsSyncTarget } from './types';
 
-const PEER_ORIGIN = 'remote-peer';
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
 const logger = new Logger('NoteSession');
@@ -72,14 +76,20 @@ export class NoteSession {
     this.remoteStateVector = initialStateVector;
 
     this.ydoc.doc.on('update', (update: Uint8Array, origin: unknown) => {
-      if (origin !== PEER_ORIGIN && this.transport.connected) {
+      const syncOrigin = isSyncOrigin(origin) ? origin : null;
+
+      if (syncOrigin !== PEER_ORIGIN && this.transport.connected) {
         this.sendMessage({
           type: 'yjs-update',
           data: new Uint8Array(update),
         });
       }
 
-      if (origin !== undefined && origin !== null && origin !== PEER_ORIGIN) {
+      if (
+        syncOrigin !== PEER_ORIGIN &&
+        origin !== undefined &&
+        origin !== null
+      ) {
         for (const listener of this.localChangeListeners) {
           listener();
         }
@@ -174,7 +184,7 @@ export class NoteSession {
     return this.ydoc.encodeDiff(stateVector);
   }
 
-  applyUpdate(update: Uint8Array, origin?: unknown): void {
+  applyUpdate(update: Uint8Array, origin?: SyncOrigin): void {
     this.ydoc.applyUpdate(update, origin);
   }
 
@@ -385,4 +395,8 @@ export class NoteSession {
       listener(snapshot);
     }
   }
+}
+
+function isSyncOrigin(origin: unknown): origin is SyncOrigin {
+  return origin === LOCAL_ORIGIN || origin === PEER_ORIGIN;
 }
