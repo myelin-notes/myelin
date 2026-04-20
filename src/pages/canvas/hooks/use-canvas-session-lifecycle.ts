@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { Logger } from '@/lib/logger';
 import { type NoteSession, useRepository } from '@/lib/sync';
@@ -14,7 +14,7 @@ const logger = new Logger('CanvasSessionLifecycle');
 function setupCanvasListeners(
   canvas: HTMLCanvasElement,
   wheelRef: React.RefObject<WheelPickerHandle | null>,
-  onCanvasPointerDownRef: React.RefObject<() => void>,
+  onCanvasPointerDown: () => void,
   embedFiles: (
     files: FileList | File[],
     screenX?: number,
@@ -30,7 +30,7 @@ function setupCanvasListeners(
   canvas.addEventListener('contextmenu', handleContextMenu);
 
   const handlePointerDown = (evt: PointerEvent) => {
-    onCanvasPointerDownRef.current();
+    onCanvasPointerDown();
     if (evt.shiftKey) {
       return;
     }
@@ -134,7 +134,7 @@ interface UseCanvasSessionLifecycleArgs {
     screenX?: number,
     screenY?: number,
   ) => void;
-  onCanvasPointerDownRef: React.RefObject<() => void>;
+  onCanvasPointerDown: () => void;
 }
 
 export function useCanvasSessionLifecycle({
@@ -146,11 +146,19 @@ export function useCanvasSessionLifecycle({
   drawableCanvasRef,
   canvasTools,
   embedFiles,
-  onCanvasPointerDownRef,
+  onCanvasPointerDown,
 }: UseCanvasSessionLifecycleArgs) {
   const repository = useRepository();
   const noteSessionRef = useRef<NoteSession | null>(null);
   const autoSyncTransportRef = useRef<IrohTransport | null>(null);
+  const handleCanvasPointerDown = useEffectEvent(() => {
+    onCanvasPointerDown();
+  });
+  const handleEmbedFiles = useEffectEvent(
+    (files: FileList | File[], screenX?: number, screenY?: number) => {
+      embedFiles(files, screenX, screenY);
+    },
+  );
 
   const [zoomLevel, setZoomLevel] = useState(100);
   const [fps, setFps] = useState(0);
@@ -208,8 +216,8 @@ export function useCanvasSessionLifecycle({
     const removeListeners = setupCanvasListeners(
       canvas,
       wheelRef,
-      onCanvasPointerDownRef,
-      embedFiles,
+      handleCanvasPointerDown,
+      handleEmbedFiles,
     );
 
     let stopAnimation = () => {};
@@ -313,8 +321,6 @@ export function useCanvasSessionLifecycle({
     wheelRef,
     drawableCanvasRef,
     canvasTools,
-    embedFiles,
-    onCanvasPointerDownRef,
   ]);
 
   return {

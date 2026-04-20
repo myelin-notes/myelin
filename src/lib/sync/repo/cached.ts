@@ -49,6 +49,49 @@ interface DeletedSubtree {
 
 const BACKGROUND_SYNC_INTERVAL_MS = 15_000;
 const logger = new Logger('CachedRepository');
+interface RepositoryOperationLockState {
+  active: boolean;
+  waiters: Array<() => void>;
+}
+
+const repositoryOperationLocks = new Map<
+  string,
+  RepositoryOperationLockState
+>();
+
+async function withRepositoryOperationLock<T>(
+  key: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  let state = repositoryOperationLocks.get(key);
+  if (!state) {
+    state = {
+      active: false,
+      waiters: [],
+    };
+    repositoryOperationLocks.set(key, state);
+  }
+
+  if (state.active) {
+    await new Promise<void>((resolve) => {
+      state.waiters.push(resolve);
+    });
+  }
+
+  state.active = true;
+
+  try {
+    return await operation();
+  } finally {
+    const next = state.waiters.shift();
+    if (next) {
+      next();
+    } else {
+      state.active = false;
+      repositoryOperationLocks.delete(key);
+    }
+  }
+}
 
 function getParentPath(path: string): string {
   const normalized = path.replace(/\/+/g, '/').replace(/\/$/, '');
@@ -242,6 +285,12 @@ export class CachedRepository
   }
 
   async initialize(): Promise<void> {
+    await withRepositoryOperationLock(this.outboxPath(), async () => {
+      await this.initializeImpl();
+    });
+  }
+
+  private async initializeImpl(): Promise<void> {
     await this.cache.initialize();
     await this.loadOutbox();
 
@@ -267,7 +316,7 @@ export class CachedRepository
     this.startBackgroundSync();
 
     try {
-      await this.flushPending();
+      await this.flushPendingInternal();
       await this.syncCacheFromRemote({
         preserveLocalIfRemoteEmpty: true,
       });
@@ -277,13 +326,25 @@ export class CachedRepository
   }
 
   async refresh(): Promise<void> {
-    await this.flushPending();
+    await withRepositoryOperationLock(this.outboxPath(), async () => {
+      await this.refreshImpl();
+    });
+  }
+
+  async flushPending(): Promise<void> {
+    await withRepositoryOperationLock(this.outboxPath(), async () => {
+      await this.flushPendingInternal();
+    });
+  }
+
+  private async refreshImpl(): Promise<void> {
+    await this.flushPendingInternal();
     await this.syncCacheFromRemote({
       preserveLocalIfRemoteEmpty: true,
     });
   }
 
-  async flushPending(): Promise<void> {
+  private async flushPendingInternal(): Promise<void> {
     if (!this.flushPromise) {
       this.flushPromise = this.flushPendingImpl()
         .catch((error) => {
@@ -467,6 +528,8 @@ export class CachedRepository
   }
 
   private async flushPendingImpl(): Promise<void> {
+    await this.loadOutbox();
+
     while (this.pendingOps.length > 0) {
       const op = this.pendingOps[0];
       await this.applyPendingOp(op);
@@ -569,6 +632,19 @@ export class CachedRepository
   private async mutatePendingOps(
     mutator: (ops: PendingOp[]) => void,
   ): Promise<void> {
+    await withRepositoryOperationLock(this.outboxPath(), async () => {
+      await this.mutatePendingOpsInternal(mutator, true);
+    });
+  }
+
+  private async mutatePendingOpsInternal(
+    mutator: (ops: PendingOp[]) => void,
+    reloadFromDisk: boolean,
+  ): Promise<void> {
+    if (reloadFromDisk) {
+      await this.loadOutbox();
+    }
+
     mutator(this.pendingOps);
     await this.saveOutbox();
     this.updateRuntimeStatus({
@@ -579,14 +655,14 @@ export class CachedRepository
   private async queueFullCacheSync(
     snapshot: RepositorySnapshot,
   ): Promise<void> {
-    await this.mutatePendingOps((ops) => {
+    await this.mutatePendingOpsInternal((ops) => {
       for (const node of Object.values(snapshot.manifest.nodes)) {
         enqueueUpsertManifestNode(ops, node.id);
         if (node.type === 'file') {
           enqueuePushNote(ops, node.id);
         }
       }
-    });
+    }, false);
   }
 
   private async ensureOutboxDir(): Promise<void> {

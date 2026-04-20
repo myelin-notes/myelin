@@ -8,6 +8,7 @@ import {
 } from '@/test/repository-test-utils';
 import { BaseRepository } from './base';
 import { CachedRepository } from './cached';
+import { GitHubRepository } from './github';
 import { LocalRepository } from './local';
 import {
   computeRevision,
@@ -424,5 +425,73 @@ describe('CachedRepository', () => {
       storage.readText('repositories/corrupt-outbox-test/outbox.json'),
     ).toBe('[]');
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('serializes concurrent initialize calls that target the same outbox', async () => {
+    const createRemote = () =>
+      new GitHubRepository({
+        owner: 'myelin',
+        repo: 'cached-concurrent-init',
+        branch: 'main',
+        credentialId: 'test-credential',
+      });
+
+    const seedRemote = createRemote();
+    const fileId = await seedRemote.createFile('Remote note', 'mcanvas', null);
+    const initialNote = createNoteState('remote baseline');
+
+    await seedRemote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cacheRoot = 'repositories/concurrent-init-test';
+    const outboxPath = `${cacheRoot}/outbox.json`;
+    const cacheSeed = new LocalRepository(cacheRoot);
+    await cacheSeed.replaceSnapshot(await seedRemote.exportSnapshot());
+
+    const cacheSnapshot = await cacheSeed.loadDocument(fileId);
+    const doc = new Y.Doc();
+    if (cacheSnapshot.update) {
+      Y.applyUpdate(doc, cacheSnapshot.update);
+    }
+    const text = doc.getText('content');
+    text.delete(0, text.length);
+    text.insert(0, 'local pending edit');
+
+    await cacheSeed.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(doc, cacheSnapshot.stateVector),
+      {
+        baseRevision: cacheSnapshot.revision,
+        localStateVector: Y.encodeStateVector(doc),
+      },
+    );
+
+    const storage = getRepositoryTestStorage();
+    await storage.writeTextFile(
+      outboxPath,
+      JSON.stringify([{ kind: 'push-note', nodeId: fileId }]),
+    );
+
+    const first = new CachedRepository(
+      createRemote(),
+      new LocalRepository(cacheRoot),
+      outboxPath,
+    );
+    const second = new CachedRepository(
+      createRemote(),
+      new LocalRepository(cacheRoot),
+      outboxPath,
+    );
+
+    await Promise.all([first.initialize(), second.initialize()]);
+
+    expect(first.getRuntimeStatus().lastError).toBeNull();
+    expect(second.getRuntimeStatus().lastError).toBeNull();
+    expect(
+      readNoteText((await createRemote().loadDocument(fileId)).update),
+    ).toBe('local pending edit');
+    expect(storage.readText(outboxPath)).toBe('[]');
   });
 });

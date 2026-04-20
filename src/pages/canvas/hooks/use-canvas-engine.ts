@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { toast } from 'sonner';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
@@ -33,8 +32,6 @@ export function useCanvasEngine({
   onCanvasPointerDown,
 }: UseCanvasEngineArgs) {
   const messages = useMessages();
-  const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
-  onCanvasPointerDownRef.current = onCanvasPointerDown;
 
   const embedFiles = (
     files: FileList | File[],
@@ -70,7 +67,7 @@ export function useCanvasEngine({
       drawableCanvasRef,
       canvasTools,
       embedFiles,
-      onCanvasPointerDownRef,
+      onCanvasPointerDown,
     });
   const { back } = useCanvasSessionPersistence({
     id,
