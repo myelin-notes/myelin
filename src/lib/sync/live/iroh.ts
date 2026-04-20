@@ -24,6 +24,8 @@ interface ErrorPayload extends NoteTransportPayload {
 }
 
 function createTransportId(): string {
+  // Use globalThis so the fallback works in both the Tauri webview and the
+  // Node-based test environment without assuming a window global.
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 

@@ -46,6 +46,8 @@ export class NoteSession {
     (snapshot: PeerSnapshot) => void
   >();
   private readonly localChangeListeners = new Set<() => void>();
+  // NoteSession is exercised in a Node test environment as well as the
+  // browser/Tauri runtime, so timers intentionally go through globalThis.
   private heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null =
     null;
 
