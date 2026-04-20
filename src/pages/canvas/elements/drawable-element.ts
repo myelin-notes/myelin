@@ -21,6 +21,13 @@ export abstract class DrawableElement {
   protected _yMap: Y.Map<unknown> | null = null;
 
   protected constructor(
+    /**
+     * Stable element identity within a canvas document.
+     *
+     * This is not just the current array position: it survives reordering
+     * and is used to key element-owned Yjs state such as page-frame
+     * ProseMirror fragments.
+     */
     public readonly index: number,
     public readonly type: ElementType,
   ) {}

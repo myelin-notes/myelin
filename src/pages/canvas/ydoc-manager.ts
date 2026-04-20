@@ -13,7 +13,7 @@ export const LOCAL_ORIGIN = 'local';
  * Y.Doc
  * ├── Y.Map('meta')          → { nextIndex: number }
  * ├── Y.Array('elements')    → [ Y.Map, ... ]  per element
- * └── Y.XmlFragment('pf-N')  → one per PageFrameElement
+ * └── Y.XmlFragment('pf-N')  → one per PageFrameElement, keyed by element index
  * ```
  */
 export class YDocManager {
@@ -95,7 +95,13 @@ export class YDocManager {
     }, LOCAL_ORIGIN);
   }
 
-  /** Get or create the Y.XmlFragment for a PageFrame's ProseMirror content. */
+  /**
+   * Get or create the Y.XmlFragment for a PageFrame's ProseMirror content.
+   *
+   * The fragment key uses the stable element index rather than the element's
+   * current position in the Y.Array, so page content stays attached across
+   * reordering and deletion of other elements.
+   */
   getXmlFragment(elementIndex: number): Y.XmlFragment {
     return this.doc.getXmlFragment(`pf-${elementIndex}`);
   }

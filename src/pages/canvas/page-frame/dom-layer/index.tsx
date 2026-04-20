@@ -89,11 +89,9 @@ function createFrameRefs(
     kindLabel: 'NOTE',
     getMenuItems: () => frame.getMenuItems(),
   });
-  chrome.root.dataset.frameIndex = String(frame.index);
 
   const frameDiv = document.createElement('div');
   Object.assign(frameDiv.style, FRAME_STYLE);
-  frameDiv.dataset.frameIndex = String(frame.index);
 
   const viewportDiv = document.createElement('div');
   Object.assign(viewportDiv.style, VIEWPORT_STYLE);
