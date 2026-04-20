@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Logger } from '@/lib/logger';
 import type { NoteSession } from '@/lib/sync';
 import { ThumbnailCache } from '@/lib/thumbnail-cache';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;
 const LOCAL_PERSIST_DEBOUNCE_MS = 250;
+const logger = new Logger('CanvasSessionPersistence');
 
 interface UseCanvasSessionPersistenceArgs {
   id: string | undefined;
@@ -59,7 +61,9 @@ export function useCanvasSessionPersistence({
         return;
       }
 
-      void persistSession(session).catch(console.error);
+      void persistSession(session).catch((error) => {
+        logger.error('Failed to persist session', error, { id });
+      });
     }, LOCAL_PERSIST_DEBOUNCE_MS);
   }, [persistSession]);
 
@@ -81,7 +85,7 @@ export function useCanvasSessionPersistence({
         canvas.toBlob(async (blob) => {
           if (blob === null) {
             needsThumbnailSaveRef.current = true;
-            console.warn('Failed to generate thumbnail');
+            logger.warn('Failed to generate thumbnail', { id });
             reject();
             return;
           }
@@ -167,7 +171,9 @@ export function useCanvasSessionPersistence({
       }
 
       timer = window.setInterval(() => {
-        void autoSave().catch(console.error);
+        void autoSave().catch((error) => {
+          logger.error('Auto-save failed', error, { id });
+        });
       }, AUTO_SAVE_INTERVAL_MS);
     };
 

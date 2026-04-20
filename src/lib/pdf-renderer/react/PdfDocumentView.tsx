@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Logger } from '@/lib/logger';
 import { loadDocument, type PdfDocument } from '../document';
 import type { PdfSource } from '../types';
 import { PdfPage } from './PdfPage';
@@ -9,6 +10,8 @@ interface Props {
   className?: string;
   pageClassName?: string;
 }
+
+const logger = new Logger('PdfDocumentView');
 
 export function PdfDocumentView({
   src,
@@ -37,9 +40,10 @@ export function PdfDocumentView({
         if (cancelled) {
           return;
         }
-        console.error(
-          `[pdf-renderer] load document failed: ${err?.name ?? 'Error'}: ${err?.message ?? String(err)}\n${err?.stack ?? ''}`,
-        );
+        logger.error('Load document failed', {
+          error: `${err?.name ?? 'Error'}: ${err?.message ?? String(err)}`,
+          stack: err?.stack ?? '',
+        });
         setError(err instanceof Error ? err : new Error(String(err)));
       },
     );

@@ -43,6 +43,9 @@ type PrefValue<K extends PrefKey> = (typeof PREFS)[K]['defaultValue'];
 type Listener<K extends PrefKey> = (value: PrefValue<K>) => void;
 const listeners = new Map<PrefKey, Set<Listener<never>>>();
 
+// Keep this as a plain module export rather than a TypeScript namespace:
+// namespaces emit extra runtime JS in our ESM setup, while this object keeps
+// the API grouped without adding another compiled wrapper.
 export const UserPrefs = {
   get<K extends PrefKey>(key: K): PrefValue<K> {
     const { storageKey, defaultValue } = PREFS[key];
@@ -71,7 +74,8 @@ export const UserPrefs = {
     key: K,
     updater: (current: PrefValue<K>) => PrefValue<K>,
   ): void {
-    this.set(key, updater(this.get(key)));
+    const current = UserPrefs.get(key);
+    UserPrefs.set(key, updater(current));
   },
 
   subscribe<K extends PrefKey>(key: K, fn: Listener<K>): () => void {

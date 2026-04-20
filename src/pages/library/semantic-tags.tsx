@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
+import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
+
+const logger = new Logger('SemanticTags');
 
 interface SemanticTagsProps {
   refreshKey: number;
@@ -42,7 +45,9 @@ export function SemanticTags({
           }
         }
       })
-      .catch(console.error);
+      .catch((error) => {
+        logger.error('Failed to load semantic tags', error);
+      });
   }, [refreshKey, activeTags, onActiveTagsChanged, repository]);
 
   const toggleTag = (tag: string) => {

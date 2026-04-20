@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Logger } from '@/lib/logger';
 import type { PdfDocument } from '../document';
 import { renderPage } from '../page';
 
@@ -8,6 +9,8 @@ interface Props {
   scale?: number;
   className?: string;
 }
+
+const logger = new Logger('PdfPage');
 
 export function PdfPage({
   document: doc,
@@ -36,9 +39,11 @@ export function PdfPage({
         if (cancelled) {
           return;
         }
-        console.error(
-          `[pdf-renderer] render page ${pageIndex + 1} failed: ${err?.name ?? 'Error'}: ${err?.message ?? String(err)}\n${err?.stack ?? ''}`,
-        );
+        logger.error('Render page failed', {
+          pageIndex: pageIndex + 1,
+          error: `${err?.name ?? 'Error'}: ${err?.message ?? String(err)}`,
+          stack: err?.stack ?? '',
+        });
         setError(err instanceof Error ? err : new Error(String(err)));
       },
     );

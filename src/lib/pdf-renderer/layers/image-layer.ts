@@ -1,6 +1,9 @@
 import { OPS } from 'pdfjs-dist';
+import { Logger } from '@/lib/logger';
 import { type Matrix, multiply, toCssMatrix } from '../transform';
 import type { RenderContext } from '../types';
+
+const logger = new Logger('PdfRendererImageLayer');
 
 interface ImageDataLike {
   width: number;
@@ -72,9 +75,10 @@ function getImageObject(
       pool.get(objId, (data: ImageDataLike | null) => resolve(data));
     } catch (err) {
       const e = err as { name?: string; message?: string } | null;
-      console.error(
-        `[pdf-renderer] image object ${objId} fetch failed: ${e?.name ?? 'Error'}: ${e?.message ?? String(err)}`,
-      );
+      logger.error('Image object fetch failed', {
+        objId,
+        error: `${e?.name ?? 'Error'}: ${e?.message ?? String(err)}`,
+      });
       resolve(null);
     }
   });

@@ -1,5 +1,8 @@
 import { OPS, type PDFPageProxy } from 'pdfjs-dist';
+import { Logger } from '@/lib/logger';
 import type { PdfDocument } from './document';
+
+const logger = new Logger('PdfRendererFonts');
 
 interface FontLike {
   loadedName?: string;
@@ -66,9 +69,11 @@ export async function injectPageFonts(
       face.load().then(
         () => undefined,
         (err) => {
-          console.error(
-            `[pdf-renderer] font load failed ${font.loadedName} (${family}): ${err?.name ?? 'Error'}: ${err?.message ?? String(err)}`,
-          );
+          logger.error('Font load failed', {
+            loadedName: font.loadedName,
+            family,
+            error: `${err?.name ?? 'Error'}: ${err?.message ?? String(err)}`,
+          });
           document.fonts.delete(face);
           doc.injectedFontIds.delete(font.loadedName!);
         },

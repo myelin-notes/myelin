@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { DEBUG } from '@/lib/debug';
+import { Logger } from '@/lib/logger';
 import type { Transport, TransportEvents } from './transport';
 
 type EventName = keyof TransportEvents;
@@ -25,6 +26,8 @@ interface ErrorPayload extends NoteTransportPayload {
 function createTransportId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
+
+const logger = new Logger('IrohTransport');
 
 export class IrohTransport implements Transport {
   private readonly transportId = createTransportId();
@@ -67,7 +70,7 @@ export class IrohTransport implements Transport {
       transportId: this.transportId,
     });
     if (DEBUG) {
-      console.log(`[IrohTransport] hosting ${this.noteId}`);
+      logger.debug('Hosting note transport', { noteId: this.noteId });
     }
     return ticket;
   }
@@ -80,7 +83,7 @@ export class IrohTransport implements Transport {
       ticket,
     });
     if (DEBUG) {
-      console.log(`[IrohTransport] joining ${this.noteId}`);
+      logger.debug('Joining note transport', { noteId: this.noteId });
     }
   }
 
@@ -91,7 +94,7 @@ export class IrohTransport implements Transport {
       transportId: this.transportId,
     });
     if (DEBUG) {
-      console.log(`[IrohTransport] auto-syncing ${this.noteId}`);
+      logger.debug('Auto-syncing note transport', { noteId: this.noteId });
     }
   }
 
@@ -137,7 +140,10 @@ export class IrohTransport implements Transport {
 
       const data = new Uint8Array(event.payload.data);
       if (DEBUG) {
-        console.log(`[IrohTransport] received ${data.byteLength} bytes`);
+        logger.debug('Received transport payload', {
+          noteId: this.noteId,
+          byteLength: data.byteLength,
+        });
       }
       this.emit('message', data);
     });
@@ -150,7 +156,10 @@ export class IrohTransport implements Transport {
         }
 
         if (DEBUG) {
-          console.log(`[IrohTransport] connected to ${event.payload.peerId}`);
+          logger.debug('Connected to peer', {
+            noteId: this.noteId,
+            peerId: event.payload.peerId,
+          });
         }
         this._connected = true;
         this.emit('connected');
@@ -165,7 +174,7 @@ export class IrohTransport implements Transport {
         }
 
         if (DEBUG) {
-          console.log('[IrohTransport] disconnected');
+          logger.debug('Disconnected transport', { noteId: this.noteId });
         }
         this._connected = false;
         this.emit('disconnected');
@@ -178,7 +187,10 @@ export class IrohTransport implements Transport {
       }
 
       if (DEBUG) {
-        console.error(`[IrohTransport] ${event.payload.message}`);
+        logger.error('Transport error', {
+          noteId: this.noteId,
+          message: event.payload.message,
+        });
       }
     });
 

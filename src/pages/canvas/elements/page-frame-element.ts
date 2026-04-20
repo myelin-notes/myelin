@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { Logger } from '@/lib/logger';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
@@ -22,6 +23,8 @@ export const PAGE_HEIGHT = 880;
 export const PAGE_PADDING = 48;
 export const PAGE_GAP = 40;
 export const PAGE_CORNER_RADIUS = 3;
+
+const logger = new Logger('PageFrameElement');
 
 export class PageFrameElement extends DrawableElement {
   private _pageWidth = PAGE_WIDTH;
@@ -239,7 +242,7 @@ export class PageFrameElement extends DrawableElement {
       await writeTextFile(path, md);
       toast.success('Exported to Markdown');
     } catch (err) {
-      console.error('[page-frame] export failed', err);
+      logger.error('Export to Markdown failed', err, { index: this.index });
       toast.error('Export failed', {
         description: err instanceof Error ? err.message : String(err),
       });

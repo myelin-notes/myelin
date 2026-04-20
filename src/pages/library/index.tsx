@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
+import { Logger } from '@/lib/logger';
 import {
   useRepository,
   type VFSFileNode,
@@ -25,6 +26,8 @@ import {
 } from './explorer/explorer-tree';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
+
+const logger = new Logger('LibraryPage');
 
 export function LibraryPage() {
   const strings = useMessages();
@@ -62,7 +65,12 @@ export function LibraryPage() {
   };
 
   useEffect(() => {
-    repository.getRecentFiles(3).then(setRecentFiles).catch(console.error);
+    repository
+      .getRecentFiles(3)
+      .then(setRecentFiles)
+      .catch((error) => {
+        logger.error('Failed to load recent files', error);
+      });
   }, [refreshKey, repository]);
 
   // Update breadcrumbs when folder changes
@@ -74,7 +82,9 @@ export function LibraryPage() {
     repository
       .getFolderChain(currentFolderId)
       .then(setBreadcrumbs)
-      .catch(console.error);
+      .catch((error) => {
+        logger.error('Failed to load breadcrumbs', error, { currentFolderId });
+      });
   }, [currentFolderId, repository]);
 
   const clearDragTimer = () => {
@@ -105,7 +115,10 @@ export function LibraryPage() {
       setCurrentFolderId(targetFolderId);
       triggerRefresh();
     } catch (err) {
-      console.error('Failed to move item:', err);
+      logger.error('Failed to move item from breadcrumb', err, {
+        nodeId,
+        targetFolderId,
+      });
     }
   };
 

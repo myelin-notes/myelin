@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { Logger } from '@/lib/logger';
 import type {
   ActiveRepository,
   RepositoryConfig,
@@ -32,6 +33,7 @@ interface RepositoryContextValue {
 }
 
 const RepositoryContext = createContext<RepositoryContextValue | null>(null);
+const logger = new Logger('RepositoryProvider');
 
 function createRepositoryStatus(config: RepositoryConfig): RepositoryStatus {
   return {
@@ -149,7 +151,9 @@ export function RepositoryProvider({
     return () => {
       disposed = true;
       unsubscribeStatus();
-      void repository.dispose().catch(console.error);
+      void repository.dispose().catch((error) => {
+        logger.error('Failed to dispose repository', error);
+      });
     };
   }, [configKey, resolvedConfig, repository]);
 

@@ -1,5 +1,8 @@
 import { useRef, useState } from 'react';
+import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
+
+const logger = new Logger('ExplorerDropTarget');
 
 interface UseDropTargetOptions {
   targetFolderId: string | null;
@@ -62,7 +65,7 @@ export function useDropTarget({
       await repository.moveNode(nodeId, targetFolderId);
       onMoved();
     } catch (err) {
-      console.error('Failed to move item:', err);
+      logger.error('Failed to move node', err, { nodeId, targetFolderId });
     }
   };
 

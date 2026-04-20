@@ -1,4 +1,5 @@
 import { DEBUG } from '@/lib/debug';
+import { Logger } from '@/lib/logger';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { getOrCreatePeerId } from './identity';
 import {
@@ -23,6 +24,7 @@ import type { NoteSessionStatus, YjsSyncTarget } from './types';
 const PEER_ORIGIN = 'remote-peer';
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
+const logger = new Logger('NoteSession');
 
 function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) {
@@ -364,7 +366,7 @@ export class NoteSession {
 
     transport.send(encodeMessage(message)).catch((err) => {
       if (DEBUG) {
-        console.error('[NoteSession] transport send error:', err);
+        logger.error('Transport send error', err);
       }
     });
   }

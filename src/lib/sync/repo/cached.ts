@@ -6,6 +6,7 @@ import {
   readTextFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
+import { Logger } from '@/lib/logger';
 import { NoteSession } from '../session';
 import type {
   YjsSyncPushOptions,
@@ -47,6 +48,7 @@ interface DeletedSubtree {
 }
 
 const BACKGROUND_SYNC_INTERVAL_MS = 15_000;
+const logger = new Logger('CachedRepository');
 
 function getParentPath(path: string): string {
   const normalized = path.replace(/\/+/g, '/').replace(/\/$/, '');
@@ -259,10 +261,7 @@ export class CachedRepository
         online: false,
         lastError: error instanceof Error ? error : new Error(String(error)),
       });
-      console.error(
-        '[CachedRepository] Initial remote bootstrap failed:',
-        error,
-      );
+      logger.error('Initial remote bootstrap failed', error);
     }
 
     this.startBackgroundSync();
@@ -273,7 +272,7 @@ export class CachedRepository
         preserveLocalIfRemoteEmpty: true,
       });
     } catch (error) {
-      console.error('[CachedRepository] Initial outbox flush failed:', error);
+      logger.error('Initial outbox flush failed', error);
     }
   }
 
@@ -423,10 +422,9 @@ export class CachedRepository
     try {
       await this.refresh();
     } catch (error) {
-      console.error(
-        '[CachedRepository] Failed to refresh before opening session:',
-        error,
-      );
+      logger.error('Failed to refresh before opening session', error, {
+        nodeId,
+      });
     }
     return NoteSession.open(nodeId, this);
   }
@@ -463,7 +461,7 @@ export class CachedRepository
 
     this.flushTimer = window.setInterval(() => {
       void this.flushPending().catch((error) => {
-        console.error('[CachedRepository] Background flush failed:', error);
+        logger.error('Background flush failed', error);
       });
     }, BACKGROUND_SYNC_INTERVAL_MS);
   }

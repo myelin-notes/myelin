@@ -1,5 +1,6 @@
 import type * as Y from 'yjs';
 import { catalogs, type MessageGetter } from '@/lib/i18n/messages';
+import { Logger } from '@/lib/logger';
 import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasViewport } from './canvas-viewport';
@@ -20,6 +21,8 @@ import type { ITool } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type Vector2 = { x: number; y: number };
+
+const logger = new Logger('DrawableCanvas');
 
 function isBackgroundElement(type: ElementType): boolean {
   return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
@@ -66,7 +69,7 @@ export class DrawableCanvas {
   ) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {
-      console.error('Failed to get canvas context');
+      logger.error('Failed to get canvas context');
     }
 
     this.canvas = canvas;

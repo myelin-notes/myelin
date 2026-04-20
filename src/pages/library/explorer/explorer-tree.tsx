@@ -6,10 +6,13 @@ import {
   useState,
 } from 'react';
 import { useMessages } from '@/lib/i18n';
+import { Logger } from '@/lib/logger';
 import { type FileType, useRepository, type VFSNode } from '@/lib/sync';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
 import { useDropTarget } from './use-drop-target';
+
+const logger = new Logger('ExplorerTree');
 
 export interface ExplorerTreeHandle {
   reload: () => Promise<void>;
@@ -63,7 +66,11 @@ export function ExplorerTree({
         setNodes([...dirs, ...files]);
       }
     } catch (err) {
-      console.error('Failed to load directory:', err);
+      logger.error('Failed to load explorer nodes', err, {
+        currentFolderId,
+        isFiltering,
+        isSearching,
+      });
     }
     setLoading(false);
   }, [currentFolderId, isFiltering, filterTags, isSearching, searchQuery]);

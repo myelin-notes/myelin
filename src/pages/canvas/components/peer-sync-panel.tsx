@@ -3,12 +3,15 @@ import { Check, Copy, Radio, X } from 'lucide-react';
 import { TimeAgo } from '@/components/time-ago';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
+import { Logger } from '@/lib/logger';
 import {
   type NoteSession,
   type PeerSnapshot,
   useRepositoryStatus,
 } from '@/lib/sync';
 import { IrohTransport } from '@/lib/sync/live/iroh';
+
+const logger = new Logger('PeerSyncPanel');
 
 type Phase = 'idle' | 'hosting' | 'joining' | 'connected';
 
@@ -87,7 +90,9 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
     return () => {
       const transport = transportRef.current;
       transportRef.current = null;
-      void transport?.destroy().catch(console.error);
+      void transport?.destroy().catch((error) => {
+        logger.error('Failed to destroy transport on unmount', error);
+      });
     };
   }, [session]);
 
@@ -118,7 +123,9 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
       setShareToken(ticket);
       setPhase('hosting');
     } catch (err) {
-      void transport.destroy().catch(console.error);
+      void transport.destroy().catch((error) => {
+        logger.error('Failed to destroy transport after host error', error);
+      });
       if (transportRef.current === transport) {
         transportRef.current = null;
       }
@@ -144,7 +151,9 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
       setPhase('joining');
       await transport.join(joinToken.trim());
     } catch (err) {
-      void transport.destroy().catch(console.error);
+      void transport.destroy().catch((error) => {
+        logger.error('Failed to destroy transport after join error', error);
+      });
       if (transportRef.current === transport) {
         transportRef.current = null;
       }

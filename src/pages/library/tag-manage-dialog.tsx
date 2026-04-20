@@ -8,8 +8,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useMessages } from '@/lib/i18n';
+import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
+
+const logger = new Logger('TagManageDialog');
 
 interface TagManageDialogProps {
   open: boolean;
@@ -43,7 +46,9 @@ export function TagManageDialog({
         setAllTags(tags.map((entry) => entry.tag));
         setNodeTags(node ? [...node.tags] : []);
       })
-      .catch(console.error);
+      .catch((error) => {
+        logger.error('Failed to load tag dialog data', error, { nodeId });
+      });
   }, [open, nodeId]);
 
   useEffect(() => {

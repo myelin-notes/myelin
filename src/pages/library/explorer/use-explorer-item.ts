@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
+
+const logger = new Logger('ExplorerItem');
 
 interface UseExplorerItemOptions {
   nodeId: string;
@@ -45,7 +48,7 @@ export function useExplorerItem({
     try {
       await repository.renameNode(nodeId, trimmed);
     } catch (err) {
-      console.error('Failed to rename:', err);
+      logger.error('Failed to rename node', err, { nodeId, trimmed });
     }
     setRenaming(false);
     onChanged();
@@ -56,7 +59,7 @@ export function useExplorerItem({
       await repository.deleteNode(nodeId);
       onChanged();
     } catch (err) {
-      console.error('Failed to delete:', err);
+      logger.error('Failed to delete node', err, { nodeId });
     }
   };
 

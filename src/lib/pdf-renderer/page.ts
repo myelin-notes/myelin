@@ -1,3 +1,4 @@
+import { Logger } from '@/lib/logger';
 import type { PdfDocument } from './document';
 import { injectPageFonts } from './fonts';
 import { renderAnnotationLayer } from './layers/annotation-layer';
@@ -5,6 +6,8 @@ import { renderImageLayer } from './layers/image-layer';
 import { renderPathLayer } from './layers/path-layer';
 import { renderTextLayer } from './layers/text-layer';
 import type { RenderContext } from './types';
+
+const logger = new Logger('PdfRendererPage');
 
 function formatError(err: unknown): string {
   const e = err as { name?: string; message?: string; stack?: string } | null;
@@ -19,9 +22,10 @@ async function runLayer<T extends Node>(
   try {
     return await fn();
   } catch (err) {
-    console.error(
-      `[pdf-renderer] layer '${name}' on page ${pageIndex + 1} failed: ${formatError(err)}`,
-    );
+    logger.error(`Layer '${name}' failed`, {
+      page: pageIndex + 1,
+      error: formatError(err),
+    });
     return null;
   }
 }
@@ -46,17 +50,19 @@ export async function renderPage(
   try {
     await page.getOperatorList();
   } catch (err) {
-    console.error(
-      `[pdf-renderer] getOperatorList page ${pageIndex + 1} failed: ${formatError(err)}`,
-    );
+    logger.error('getOperatorList failed', {
+      page: pageIndex + 1,
+      error: formatError(err),
+    });
     throw err;
   }
   try {
     await injectPageFonts(doc, page);
   } catch (err) {
-    console.error(
-      `[pdf-renderer] injectPageFonts page ${pageIndex + 1} failed: ${formatError(err)}`,
-    );
+    logger.error('injectPageFonts failed', {
+      page: pageIndex + 1,
+      error: formatError(err),
+    });
   }
 
   const [paths, images, text, annotations] = await Promise.all([

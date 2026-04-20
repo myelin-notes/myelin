@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import { Logger } from '@/lib/logger';
 import { loadDocument, type PdfDocument, renderPage } from '@/lib/pdf-renderer';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
@@ -14,6 +15,7 @@ import {
 } from './frame-chrome';
 
 const PDF_PAGE_GAP = 40;
+const logger = new Logger('PdfElement');
 
 export type PdfPageEntry =
   | { kind: 'pdf'; originalIndex: number }
@@ -109,7 +111,7 @@ export class PdfElement extends DrawableElement {
       return doc;
     });
     this._pdfDocLoad.catch((err) => {
-      console.error('[pdf-element] failed to load document', err);
+      logger.error('Failed to load document', err, { index: this.index });
       this._pdfDocLoad = null;
     });
   }
@@ -505,7 +507,10 @@ export class PdfElement extends DrawableElement {
       rendered.style.top = '0';
       slot.contentDiv.replaceChildren(rendered);
     } catch (err) {
-      console.error('[pdf-element] render page failed', err);
+      logger.error('Failed to render page', err, {
+        index: this.index,
+        originalIndex,
+      });
     }
   }
 
