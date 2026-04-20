@@ -65,7 +65,7 @@ export function SemanticTags({
   };
 
   return (
-    <div className="flex flex-col gap-6 rounded-xl bg-surface p-8">
+    <div className="flex flex-col gap-6 rounded-xl bg-surface p-6 sm:p-8">
       {/* Heading */}
       <div className="flex items-center justify-between">
         <h3 className="font-heading font-normal text-text-primary text-xl leading-7">

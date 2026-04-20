@@ -123,16 +123,23 @@ export function WheelPicker({
       if (items.length === 0) {
         return;
       }
+      // Clamp center within viewport so outermost ring (R2) stays on-screen.
+      // Pointer still tracks absolute motion against the clamped center.
+      const outer = radius + 60 + 55 + 24;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const cx = Math.min(Math.max(event.clientX, outer), vw - outer);
+      const cy = Math.min(Math.max(event.clientY, outer), vh - outer);
       if (groupRef.current) {
-        groupRef.current.style.left = `${event.clientX}px`;
-        groupRef.current.style.top = `${event.clientY}px`;
+        groupRef.current.style.left = `${cx}px`;
+        groupRef.current.style.top = `${cy}px`;
       }
       setVisible(true);
-      centerRef.current = [event.clientX, event.clientY];
+      centerRef.current = [cx, cy];
       focusPathRef.current = [];
       setFocusPath([]);
     },
-    [items.length],
+    [items.length, radius],
   );
 
   const hide = useCallback(() => {

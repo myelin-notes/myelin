@@ -176,7 +176,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
       onDrop={handlePanelDrop}
     >
       <div
-        className={`relative w-[296px] overflow-hidden rounded-2xl bg-white/85 shadow-ambient backdrop-blur-[24px] transition-colors duration-200 ${
+        className={`relative w-[min(296px,calc(100vw-5rem))] overflow-hidden rounded-2xl bg-white/85 shadow-ambient backdrop-blur-[24px] transition-colors duration-200 ${
           isDragOver ? 'ring-2 ring-accent-dark/40' : ''
         }`}
       >

@@ -85,7 +85,7 @@ export function CanvasView() {
         style={{ zIndex: 15 }}
       />
 
-      <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} noteId={id} />
+      <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
       {DEBUG && <PeerSyncPanel session={engine.noteSession} />}
       <TitleBar fileName={engine.fileName} onBack={engine.back} />
 

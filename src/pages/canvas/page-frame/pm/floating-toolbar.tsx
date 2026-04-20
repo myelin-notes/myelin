@@ -122,10 +122,21 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
       }
 
       const toolbarWidth = toolbarRef.current?.offsetWidth ?? 220;
-      const x = rect.left + rect.width / 2 - toolbarWidth / 2;
-      const y = rect.top - 64;
+      const toolbarHeight = toolbarRef.current?.offsetHeight ?? 40;
+      const margin = 8;
+      const rawX = rect.left + rect.width / 2 - toolbarWidth / 2;
+      // Keep the toolbar within the viewport on narrow windows.
+      const x = Math.min(
+        Math.max(rawX, margin),
+        window.innerWidth - toolbarWidth - margin,
+      );
+      // Flip below the selection if there isn't room above.
+      const yAbove = rect.top - 64;
+      const y =
+        yAbove < margin ? rect.bottom + margin : Math.max(yAbove, margin);
+      const clampedY = Math.min(y, window.innerHeight - toolbarHeight - margin);
 
-      setPos({ x, y, visible: true });
+      setPos({ x, y: clampedY, visible: true });
     }
 
     // pm-update fires after every ProseMirror transaction — this is the

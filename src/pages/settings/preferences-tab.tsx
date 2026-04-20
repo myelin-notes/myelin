@@ -122,8 +122,11 @@ export function PreferencesTab() {
 
   return (
     <div className="max-w-3xl">
-      <header className="mb-14">
-        <h1 className="font-extralight font-heading text-[2.75rem] text-text-primary tracking-tight">
+      <header className="mb-10 md:mb-14">
+        <h1
+          className="font-extralight font-heading text-text-primary tracking-tight"
+          style={{ fontSize: 'var(--fluid-display)' }}
+        >
           {strings.settings.title}
         </h1>
         <p className="mt-3 text-text-muted leading-relaxed">
@@ -131,10 +134,10 @@ export function PreferencesTab() {
         </p>
       </header>
 
-      <div className="space-y-16">
+      <div className="space-y-12 md:space-y-16">
         {/* Canvas Background */}
         <section>
-          <div className="mb-6 flex items-baseline justify-between">
+          <div className="mb-6 flex items-baseline justify-between gap-3">
             <h3 className="font-heading text-xl">
               {strings.settings.canvasStyle.title}
             </h3>
@@ -142,7 +145,7 @@ export function PreferencesTab() {
               {strings.settings.canvasStyle.eyebrow}
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
             {(['grid', 'dots', 'blank'] as const).map((type) => (
               <CanvasPreview
                 key={type}

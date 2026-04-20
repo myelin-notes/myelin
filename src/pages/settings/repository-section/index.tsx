@@ -123,7 +123,7 @@ export function RepositorySection() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <KindCard
           selected={config.kind === 'local'}
           onSelect={() => handleKindChange('local')}
@@ -150,10 +150,10 @@ export function RepositorySection() {
             className="overflow-hidden"
           >
             <div className="mt-5 space-y-4">
-              <div className="flex items-center justify-between rounded-xl bg-input px-5 py-4">
+              <div className="flex flex-col gap-3 rounded-xl bg-input px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                  <Github className="size-5 text-text-secondary" />
-                  <div>
+                  <Github className="size-5 shrink-0 text-text-secondary" />
+                  <div className="min-w-0">
                     <p className="font-medium text-sm text-text-primary">
                       {strings.settings.repository.auth.title}
                     </p>
@@ -162,7 +162,7 @@ export function RepositorySection() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
                   <AuthStatusBadge
                     hasToken={auth.tokenPresent}
                     checking={auth.checkingToken}
@@ -233,7 +233,7 @@ export function RepositorySection() {
                   />
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-4 rounded-lg bg-white/70 px-4 py-3 ring-1 ring-border-subtle">
+                <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-white/70 px-4 py-3 ring-1 ring-border-subtle sm:grid-cols-2 sm:gap-4">
                   <div>
                     <p className="text-[10px] text-text-muted uppercase tracking-widest">
                       {strings.settings.repository.sync.queuedChanges}
@@ -276,7 +276,7 @@ export function RepositorySection() {
                 <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
                   {strings.settings.repository.sync.remoteRepository}
                 </p>
-                <div className="flex items-center gap-0.5 rounded-xl bg-input p-1">
+                <div className="flex flex-wrap items-center gap-0.5 rounded-xl bg-input p-1 sm:flex-nowrap">
                   <OwnerField
                     disabled={!auth.tokenPresent}
                     loading={selectors.ownersLoading}

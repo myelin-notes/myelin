@@ -122,9 +122,9 @@ function KeybindRow({
   return (
     <button
       onClick={() => !capturing && setCapturing(true)}
-      className="group flex w-full cursor-pointer items-center gap-4 rounded-xl bg-input/40 px-4 py-2.5 text-left transition-colors hover:bg-hover-tint"
+      className="group flex w-full cursor-pointer items-center gap-3 rounded-xl bg-input/40 px-3 py-2.5 text-left transition-colors hover:bg-hover-tint sm:gap-4 sm:px-4"
     >
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <span className="text-sm text-text-primary">
           {copy?.label ?? action}
         </span>
@@ -133,7 +133,7 @@ function KeybindRow({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         <AnimatePresence mode="wait">
           {capturing ? (
             <KeyCapture

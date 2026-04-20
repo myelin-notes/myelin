@@ -41,12 +41,6 @@ describe('NoteSession local change listeners', () => {
       createSyncTarget(),
       null,
       ydoc.encodeStateVector(),
-      {
-        localPeer: {
-          peerId: 'test-peer',
-          mode: 'owner-device',
-        },
-      },
     );
     const listener = vi.fn();
     const unsubscribe = session.subscribeLocalChanges(listener);

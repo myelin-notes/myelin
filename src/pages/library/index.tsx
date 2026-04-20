@@ -157,15 +157,24 @@ export function LibraryPage() {
 
   return (
     <div className="relative flex h-full w-full bg-page">
+      <a href="#library-main" data-skip-link className="skip-link">
+        {strings.library.title}
+      </a>
       <Sidebar />
 
-      <main className="ml-64 flex-1 overflow-y-auto px-12 pt-12 pb-12">
+      <main
+        id="library-main"
+        className="ml-16 flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:ml-64 md:px-10 md:pt-12 lg:px-12"
+      >
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
         >
-          <h1 className="font-extralight font-heading text-5xl text-text-primary leading-[48px]">
+          <h1
+            className="font-extralight font-heading text-text-primary leading-[1.05]"
+            style={{ fontSize: 'var(--fluid-display)' }}
+          >
             {strings.library.title}
           </h1>
 
@@ -184,7 +193,7 @@ export function LibraryPage() {
                 </h3>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {recentFiles.map((file, i) => (
                   <motion.div
                     key={file.id}
@@ -218,8 +227,8 @@ export function LibraryPage() {
           )}
 
           {/* Explorer + Tags */}
-          <section className="mt-12 grid grid-cols-12 gap-12">
-            <div className="col-span-8 flex flex-col gap-8">
+          <section className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-12">
+            <div className="flex flex-col gap-8 lg:col-span-8">
               <div className="flex items-center gap-3 rounded-xl bg-input px-4 py-1.5 transition-shadow duration-200 focus-within:shadow-ambient hover:bg-hover-tint">
                 <Search className="size-3.5 shrink-0 text-text-muted" />
                 <input
@@ -285,6 +294,9 @@ export function LibraryPage() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={cycleSortMode}
+                    aria-label={strings.library.sortLabel(
+                      strings.library.sortModes[sortMode],
+                    )}
                     title={strings.library.sortLabel(
                       strings.library.sortModes[sortMode],
                     )}
@@ -321,7 +333,7 @@ export function LibraryPage() {
               />
             </div>
 
-            <div className="col-span-4">
+            <div className="lg:col-span-4">
               <SemanticTags
                 refreshKey={refreshKey}
                 activeTags={activeTags}

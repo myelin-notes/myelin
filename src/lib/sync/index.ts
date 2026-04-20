@@ -61,7 +61,6 @@ export type {
   VFSNode,
 } from './repo/types';
 export { FileTypes } from './repo/types';
-export type { NoteSessionOptions } from './session';
 export { NoteSession } from './session';
 export type {
   NoteSessionStatus,

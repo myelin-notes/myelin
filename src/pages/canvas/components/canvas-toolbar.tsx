@@ -67,11 +67,13 @@ export function CanvasToolbar({
         initial={{ opacity: 0, x: -12 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-        className="absolute top-1/2 left-6 z-10 -translate-y-1/2"
+        className="absolute top-1/2 left-6 z-10 max-h-[calc(100dvh-6rem)] -translate-y-1/2"
+        role="toolbar"
+        aria-label="Canvas tools"
       >
         <div
           ref={toolbarInnerRef}
-          className="flex flex-col items-center gap-1 rounded-xl bg-white/80 px-2 py-3 shadow-ambient backdrop-blur-[24px]"
+          className="flex max-h-[calc(100dvh-6rem)] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-white/80 px-2 py-3 shadow-ambient backdrop-blur-[24px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {tools.map((tool, index) => {
             const Icon = tool.icon;

@@ -1,15 +1,13 @@
 import { motion } from 'motion/react';
-import { DEBUG } from '@/lib/debug';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 
 interface StatusBarProps {
   zoomLevel: number;
   fps: number;
-  noteId?: string;
 }
 
-export function StatusBar({ zoomLevel, fps, noteId }: StatusBarProps) {
+export function StatusBar({ zoomLevel, fps }: StatusBarProps) {
   const strings = useMessages();
   const locale = useLocale();
 
@@ -27,14 +25,6 @@ export function StatusBar({ zoomLevel, fps, noteId }: StatusBarProps) {
       <span className="font-medium text-text-muted text-xs tabular-nums">
         {strings.canvas.statusBar.fps(fps)}
       </span>
-      {DEBUG && noteId && (
-        <>
-          <span className="mx-2 text-text-muted/30">|</span>
-          <span className="font-mono text-[10px] text-text-muted">
-            {noteId}
-          </span>
-        </>
-      )}
     </motion.div>
   );
 }

@@ -24,7 +24,7 @@ export function RecentCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative flex h-[204px] w-full cursor-pointer flex-col overflow-hidden rounded-xl p-6 text-left transition-all duration-300 hover:scale-[1.01] hover:bg-card hover:shadow-ambient',
+        'group relative flex aspect-[16/10] min-h-[180px] w-full cursor-pointer flex-col overflow-hidden rounded-xl p-5 text-left transition-all duration-300 hover:scale-[1.01] hover:bg-card hover:shadow-ambient sm:aspect-auto sm:h-[204px] sm:p-6',
         featured ? 'bg-card-active' : 'bg-surface',
       )}
     >

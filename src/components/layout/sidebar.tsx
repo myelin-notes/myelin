@@ -32,8 +32,11 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
+      aria-label={item.label}
+      aria-current={isActive ? 'page' : undefined}
+      title={item.label}
       className={cn(
-        'group flex cursor-pointer items-center gap-3 border-l-2 px-2 py-2 pl-2.5 text-left transition-all duration-150 active:translate-x-px active:opacity-70',
+        'group flex cursor-pointer items-center justify-center gap-3 border-l-2 px-2 py-2 text-left transition-all duration-150 active:translate-x-px active:opacity-70 md:justify-start md:pl-2.5',
         isActive ? 'border-accent-navy' : 'border-transparent',
       )}
     >
@@ -49,7 +52,7 @@ function NavButton({
       </span>
       <span
         className={cn(
-          'text-xs uppercase tracking-[0.6px] transition-colors duration-150',
+          'hidden text-xs uppercase tracking-[0.6px] transition-colors duration-150 md:inline',
           isActive
             ? 'font-semibold text-accent-navy tracking-[0.8px]'
             : 'font-normal text-text-muted group-hover:text-text-primary',
@@ -113,13 +116,22 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="fixed top-0 bottom-0 left-0 z-20 flex w-64 flex-col bg-sidebar-bg p-6">
-      {/* Brand */}
-      <div className="flex flex-col gap-1 pb-4">
-        <h2 className="font-heading text-text-brand text-xl italic">
-          {strings.app.name}
+    <aside
+      aria-label={strings.sidebar.nav.library}
+      className="fixed top-0 bottom-0 left-0 z-20 flex w-16 flex-col bg-sidebar-bg p-3 md:w-64 md:p-6"
+    >
+      {/* Brand — collapses to monogram below md */}
+      <div className="flex flex-col items-center gap-1 pb-4 md:items-start">
+        <h2
+          className="font-heading text-text-brand text-xl italic"
+          title={strings.app.name}
+        >
+          <span className="md:hidden" aria-hidden="true">
+            {strings.app.name.charAt(0)}
+          </span>
+          <span className="hidden md:inline">{strings.app.name}</span>
         </h2>
-        <span className="font-normal text-text-secondary text-xs uppercase tracking-[0.6px]">
+        <span className="hidden font-normal text-text-secondary text-xs uppercase tracking-[0.6px] md:inline">
           {strings.app.tagline}
         </span>
       </div>
@@ -128,10 +140,12 @@ export function Sidebar() {
       <button
         type="button"
         onClick={handleNewCanvas}
-        className="group flex cursor-pointer items-center justify-center gap-2 rounded-md bg-gradient-to-b from-primary-container to-accent-dark px-4 py-2.5 transition-all duration-150 hover:brightness-125"
+        aria-label={strings.sidebar.newCanvas}
+        title={strings.sidebar.newCanvas}
+        className="group flex cursor-pointer items-center justify-center gap-2 rounded-md bg-gradient-to-b from-primary-container to-accent-dark px-2 py-2.5 transition-all duration-150 hover:brightness-125 md:px-4"
       >
         <Plus className="size-3.5 text-text-on-dark transition-transform duration-150 group-hover:rotate-90" />
-        <span className="font-medium text-text-on-dark text-xs uppercase tracking-[0.6px]">
+        <span className="hidden font-medium text-text-on-dark text-xs uppercase tracking-[0.6px] md:inline">
           {strings.sidebar.newCanvas}
         </span>
       </button>

@@ -145,6 +145,13 @@
     @apply border-border outline-ring/50;
   }
 
+  :root {
+    /* Fluid type — bends with viewport but stays legible at both extremes */
+    --fluid-display: clamp(2rem, 1.4rem + 2.4vw, 3rem);
+    --fluid-section: clamp(1.25rem, 1rem + 1vw, 1.5rem);
+    --fluid-pad: clamp(1rem, 0.5rem + 2vw, 3rem);
+  }
+
   body {
     @apply font-sans bg-page text-text-primary;
     margin: 0;
@@ -156,6 +163,50 @@
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* Honor reduced-motion preference — scope to off so page loads still feel alive by default */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Consistent focus-visible ring — uses the ring token for aesthetic parity with Soft Studio */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  [data-skip-link]:focus-visible {
+    outline-offset: 4px;
+  }
+
+  /* Keyboard-only skip link — hidden visually until focused */
+  .skip-link {
+    position: fixed;
+    top: 0.75rem;
+    left: 50%;
+    display: inline-block;
+    transform: translate(-50%, -200%);
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    background: var(--accent-dark);
+    color: var(--text-on-dark);
+    border-radius: 0.75rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: transform 0.2s ease;
+  }
+  .skip-link:focus,
+  .skip-link:focus-visible {
+    transform: translate(-50%, 0);
   }
 
   input, textarea, [contenteditable="true"] {
