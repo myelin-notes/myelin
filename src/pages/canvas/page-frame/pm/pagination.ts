@@ -6,12 +6,17 @@ import {
   prepareWithSegments,
 } from '@chenglou/pretext';
 import { PM_ADD_TO_HISTORY } from './constants';
+import {
+  type PaginationRunMetrics,
+  paginationProfiler,
+} from './pagination-profiler';
 
 const PAGE_HEIGHT = 880;
 const PAGE_PADDING = 48;
 const PAGE_GAP = 40;
 const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 784
 const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
+const SETTLE_PASS_COUNT = 4;
 
 type BreakKind = 'block' | 'inline';
 
@@ -104,6 +109,58 @@ interface DomLineFragment {
   top: number;
 }
 
+interface CachedTextLineFragments {
+  rectSignature: Array<{ left: number; width: number }>;
+  startOffsets: number[];
+  text: string;
+}
+
+interface CachedParagraphTextLineFragments {
+  textNodes: CachedTextLineFragments[];
+}
+
+interface CollectedDomLineFragments {
+  cacheEntry: CachedTextLineFragments;
+  fragments: DomLineFragment[];
+}
+
+interface TextOnlyParagraphInfo {
+  contentSize: number;
+  text: string;
+}
+
+interface VisibleTextNodeRects {
+  rects: DOMRect[];
+  textNode: Text;
+  textOffsetBase: number;
+}
+
+interface MergedTextLineRect {
+  bottom: number;
+  left: number;
+  right: number;
+  startCharOffset: number | null;
+  top: number;
+}
+
+interface CachedTextOnlyParagraphLines {
+  contentSize: number;
+  lineStartOffsets: number[];
+  rectSignature: Array<{ left: number; width: number }>;
+  text: string;
+  width: number;
+}
+
+const domLineFragmentCache = new WeakMap<
+  HTMLElement,
+  CachedParagraphTextLineFragments
+>();
+const textOnlyParagraphLineCache = new Map<
+  number,
+  CachedTextOnlyParagraphLines
+>();
+const MAX_TEXT_ONLY_PARAGRAPH_CACHE_ENTRIES = 200;
+
 function countVisibleRects(rects: DOMRectList | DOMRect[]): number {
   let count = 0;
   for (let i = 0; i < rects.length; i++) {
@@ -115,29 +172,259 @@ function countVisibleRects(rects: DOMRectList | DOMRect[]): number {
   return count;
 }
 
+function canReuseCachedDomLineFragments(
+  text: string,
+  fullRects: DOMRect[],
+  cached: CachedTextLineFragments | undefined,
+): cached is CachedTextLineFragments {
+  if (!cached || cached.text !== text) {
+    return false;
+  }
+  if (
+    cached.startOffsets.length !== fullRects.length ||
+    cached.rectSignature.length !== fullRects.length
+  ) {
+    return false;
+  }
+  for (let i = 0; i < fullRects.length; i++) {
+    const rect = fullRects[i];
+    const signature = cached.rectSignature[i];
+    if (
+      Math.abs(rect.left - signature.left) > 0.5 ||
+      Math.abs(rect.width - signature.width) > 0.5
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getTextOnlyParagraphInfo(
+  view: EditorView,
+  blockPos: number,
+): TextOnlyParagraphInfo | null {
+  const paragraphNode = view.state.doc.nodeAt(blockPos);
+  if (!paragraphNode) {
+    return null;
+  }
+
+  let hasNonText = false;
+  paragraphNode.forEach((child) => {
+    if (!child.isText) {
+      hasNonText = true;
+    }
+  });
+  if (hasNonText) {
+    return null;
+  }
+
+  return {
+    text: paragraphNode.textContent,
+    contentSize: paragraphNode.content.size,
+  };
+}
+
+function collectVisibleTextNodeRects(
+  blockDom: HTMLElement,
+  metrics: PaginationRunMetrics | null,
+): VisibleTextNodeRects[] {
+  const fullRange = document.createRange();
+  const result: VisibleTextNodeRects[] = [];
+  const walker = document.createTreeWalker(blockDom, NodeFilter.SHOW_TEXT);
+  let textOffsetBase = 0;
+  let textNode = walker.nextNode();
+
+  while (textNode) {
+    if (textNode instanceof Text && textNode.length > 0) {
+      if (metrics) {
+        metrics.domTextNodeCount++;
+      }
+      fullRange.selectNodeContents(textNode);
+      const rects = Array.from(fullRange.getClientRects()).filter(
+        (rect) => rect.width > 0 && rect.height > 0,
+      );
+      if (metrics) {
+        metrics.domFragmentCount += rects.length;
+      }
+      if (rects.length > 0) {
+        result.push({
+          textNode,
+          textOffsetBase,
+          rects,
+        });
+      }
+      textOffsetBase += textNode.data.length;
+    }
+    textNode = walker.nextNode();
+  }
+
+  return result;
+}
+
+function mergeVisibleTextLineRects(
+  textNodeRects: VisibleTextNodeRects[],
+  startOffsetsByEntry?: number[][],
+): MergedTextLineRect[] {
+  const result: MergedTextLineRect[] = [];
+
+  for (let entryIndex = 0; entryIndex < textNodeRects.length; entryIndex++) {
+    const entry = textNodeRects[entryIndex];
+    for (let rectIndex = 0; rectIndex < entry.rects.length; rectIndex++) {
+      const rect = entry.rects[rectIndex];
+      const last = result[result.length - 1];
+      const startCharOffset = startOffsetsByEntry
+        ? entry.textOffsetBase + startOffsetsByEntry[entryIndex][rectIndex]
+        : null;
+      if (last && Math.abs(rect.top - last.top) < 1) {
+        if (rect.bottom > last.bottom) {
+          last.bottom = rect.bottom;
+        }
+        if (rect.left < last.left) {
+          last.left = rect.left;
+        }
+        const right = rect.left + rect.width;
+        if (right > last.right) {
+          last.right = right;
+        }
+      } else {
+        result.push({
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.left + rect.width,
+          startCharOffset,
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+function computeVisibleTextLineStartOffsets(
+  entry: VisibleTextNodeRects,
+  metrics: PaginationRunMetrics | null,
+): number[] {
+  const prefixRange = document.createRange();
+  prefixRange.setStart(entry.textNode, 0);
+  const startOffsets: number[] = [];
+  let searchStart = 1;
+
+  for (let rectIndex = 0; rectIndex < entry.rects.length; rectIndex++) {
+    const targetRectCount = rectIndex + 1;
+    let low = searchStart;
+    let high = entry.textNode.length;
+    let firstVisibleEnd = entry.textNode.length;
+
+    while (low <= high) {
+      if (metrics) {
+        metrics.domBinarySearchStepCount++;
+      }
+      const mid = Math.floor((low + high) / 2);
+      prefixRange.setEnd(entry.textNode, mid);
+      if (countVisibleRects(prefixRange.getClientRects()) >= targetRectCount) {
+        firstVisibleEnd = mid;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    const startOffset = Math.max(0, firstVisibleEnd - 1);
+    startOffsets.push(startOffset);
+    searchStart = Math.min(entry.textNode.length, firstVisibleEnd + 1);
+  }
+
+  return startOffsets;
+}
+
+function canReuseTextOnlyParagraphLineCache(
+  cached: CachedTextOnlyParagraphLines | undefined,
+  paragraph: TextOnlyParagraphInfo,
+  width: number,
+  rects: MergedTextLineRect[],
+): cached is CachedTextOnlyParagraphLines {
+  if (!cached || cached.text !== paragraph.text) {
+    return false;
+  }
+  if (Math.abs(cached.width - width) > 0.5) {
+    return false;
+  }
+  if (
+    cached.lineStartOffsets.length !== rects.length ||
+    cached.rectSignature.length !== rects.length
+  ) {
+    return false;
+  }
+  for (let i = 0; i < rects.length; i++) {
+    const rect = rects[i];
+    const signature = cached.rectSignature[i];
+    if (
+      Math.abs(rect.left - signature.left) > 0.5 ||
+      Math.abs(rect.right - rect.left - signature.width) > 0.5
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function rememberTextOnlyParagraphLineCache(
+  blockPos: number,
+  cacheEntry: CachedTextOnlyParagraphLines,
+): void {
+  textOnlyParagraphLineCache.delete(blockPos);
+  textOnlyParagraphLineCache.set(blockPos, cacheEntry);
+  if (
+    textOnlyParagraphLineCache.size <= MAX_TEXT_ONLY_PARAGRAPH_CACHE_ENTRIES
+  ) {
+    return;
+  }
+  const oldestKey = textOnlyParagraphLineCache.keys().next().value;
+  if (oldestKey !== undefined) {
+    textOnlyParagraphLineCache.delete(oldestKey);
+  }
+}
+
 /**
  * `Range#getClientRects()` tells us which visual line fragments a text node
  * occupies, but not which character starts each fragment. To recover a stable
  * doc position we binary-search the prefix length where the rect count grows:
  * that's the first visible character on the next wrapped line.
  */
-function collectDomLineFragments(textNode: Text): DomLineFragment[] {
-  if (textNode.length === 0) {
-    return [];
+function collectDomLineFragments(
+  textNode: Text,
+  metrics: PaginationRunMetrics | null,
+  cachedEntry: CachedTextLineFragments | undefined,
+): CollectedDomLineFragments {
+  if (metrics) {
+    metrics.domTextNodeCount++;
   }
 
+  const text = textNode.data;
   const fullRange = document.createRange();
   fullRange.selectNodeContents(textNode);
   const fullRects = Array.from(fullRange.getClientRects()).filter(
     (rect) => rect.width > 0 && rect.height > 0,
   );
-  if (fullRects.length === 0) {
-    return [];
+  if (canReuseCachedDomLineFragments(text, fullRects, cachedEntry)) {
+    const fragments = fullRects.map((rect, index) => ({
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      startNode: textNode,
+      startOffset: cachedEntry.startOffsets[index],
+    }));
+    if (metrics) {
+      metrics.domFragmentCount += fragments.length;
+    }
+    return { fragments, cacheEntry: cachedEntry };
   }
 
   const prefixRange = document.createRange();
   prefixRange.setStart(textNode, 0);
   const fragments: DomLineFragment[] = [];
+  const startOffsets: number[] = [];
   let searchStart = 1;
 
   for (let rectIndex = 0; rectIndex < fullRects.length; rectIndex++) {
@@ -147,6 +434,9 @@ function collectDomLineFragments(textNode: Text): DomLineFragment[] {
     let firstVisibleEnd = textNode.length;
 
     while (low <= high) {
+      if (metrics) {
+        metrics.domBinarySearchStepCount++;
+      }
       const mid = Math.floor((low + high) / 2);
       prefixRange.setEnd(textNode, mid);
       if (countVisibleRects(prefixRange.getClientRects()) >= targetRectCount) {
@@ -158,17 +448,35 @@ function collectDomLineFragments(textNode: Text): DomLineFragment[] {
     }
 
     const rect = fullRects[rectIndex];
+    const startOffset = Math.max(0, firstVisibleEnd - 1);
     fragments.push({
       top: rect.top,
       bottom: rect.bottom,
       left: rect.left,
       startNode: textNode,
-      startOffset: Math.max(0, firstVisibleEnd - 1),
+      startOffset,
     });
+    startOffsets.push(startOffset);
     searchStart = Math.min(textNode.length, firstVisibleEnd + 1);
   }
 
-  return fragments;
+  // Cache only the horizontal line signature and the recovered start offsets.
+  // The next pass still reads live rect tops/bottoms, so spacer widgets can
+  // move lines vertically without invalidating the cached char positions.
+  const nextCacheEntry = {
+    text: textNode.data,
+    startOffsets,
+    rectSignature: fullRects.map((rect) => ({
+      left: rect.left,
+      width: rect.width,
+    })),
+  };
+
+  if (metrics) {
+    metrics.domFragmentCount += fragments.length;
+  }
+
+  return { fragments, cacheEntry: nextCacheEntry };
 }
 
 /**
@@ -268,7 +576,13 @@ function measureLinesWithPretext(
   block: BlockInfo,
   view: EditorView,
   blockNaturalTop: number,
+  metrics: PaginationRunMetrics | null,
 ): ParagraphLine[] | null {
+  const startedAt = metrics ? performance.now() : 0;
+  if (metrics) {
+    metrics.pretextMeasurementAttemptCount++;
+  }
+
   const paragraphNode = view.state.doc.nodeAt(block.pos);
   if (!paragraphNode) {
     return null;
@@ -332,6 +646,10 @@ function measureLinesWithPretext(
       },
     };
   }
+  if (metrics) {
+    metrics.pretextMeasurementSuccessCount++;
+    metrics.pretextMeasurementMs += performance.now() - startedAt;
+  }
   return lines;
 }
 
@@ -350,13 +668,134 @@ function measureLinesWithDom(
   editorScreenTop: number,
   invScale: number,
   blockShift: number,
+  metrics: PaginationRunMetrics | null,
 ): ParagraphLine[] {
+  const startedAt = metrics ? performance.now() : 0;
+  if (metrics) {
+    metrics.domMeasurementAttemptCount++;
+  }
+
+  const textOnlyParagraph = getTextOnlyParagraphInfo(view, block.pos);
+  if (textOnlyParagraph) {
+    const textNodeRects = collectVisibleTextNodeRects(block.dom, metrics);
+    if (textNodeRects.length === 0) {
+      if (metrics) {
+        metrics.domMeasurementMs += performance.now() - startedAt;
+      }
+      return [];
+    }
+
+    const mergedRects = mergeVisibleTextLineRects(textNodeRects);
+    const width = block.dom.clientWidth;
+    let lineStartOffsets: number[];
+    const cached = textOnlyParagraphLineCache.get(block.pos);
+    if (
+      width > 0 &&
+      canReuseTextOnlyParagraphLineCache(
+        cached,
+        textOnlyParagraph,
+        width,
+        mergedRects,
+      )
+    ) {
+      lineStartOffsets = cached.lineStartOffsets;
+    } else {
+      const startOffsetsByEntry = textNodeRects.map((entry) =>
+        computeVisibleTextLineStartOffsets(entry, metrics),
+      );
+      lineStartOffsets = mergeVisibleTextLineRects(
+        textNodeRects,
+        startOffsetsByEntry,
+      ).map((rect) => rect.startCharOffset ?? 0);
+      if (width > 0 && lineStartOffsets.length === mergedRects.length) {
+        // Text-only paragraphs can safely reuse PM char offsets even when
+        // ProseMirror recreates the DOM text nodes between pagination passes.
+        rememberTextOnlyParagraphLineCache(block.pos, {
+          text: textOnlyParagraph.text,
+          contentSize: textOnlyParagraph.contentSize,
+          width,
+          lineStartOffsets,
+          rectSignature: mergedRects.map((rect) => ({
+            left: rect.left,
+            width: rect.right - rect.left,
+          })),
+        });
+      }
+    }
+
+    let lineSpacing = 0;
+    if (mergedRects.length >= 3) {
+      let min = Number.POSITIVE_INFINITY;
+      for (let i = 1; i < mergedRects.length; i++) {
+        const gap = mergedRects[i].top - mergedRects[i - 1].top;
+        if (gap > 0 && gap < min) {
+          min = gap;
+        }
+      }
+      if (Number.isFinite(min)) {
+        lineSpacing = min;
+      }
+    }
+    if (lineSpacing <= 0) {
+      const cs = getComputedStyle(block.dom);
+      const parsed = Number.parseFloat(cs.lineHeight);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        lineSpacing = parsed / invScale;
+      } else {
+        lineSpacing = mergedRects[0].bottom - mergedRects[0].top;
+      }
+    }
+    const tolerance = 1;
+
+    const lines: ParagraphLine[] = new Array(mergedRects.length);
+    let innerShiftViewport = 0;
+    let prevTop = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < mergedRects.length; i++) {
+      const rect = mergedRects[i];
+      if (prevTop !== Number.NEGATIVE_INFINITY) {
+        const excess = rect.top - prevTop - lineSpacing;
+        if (excess > tolerance) {
+          innerShiftViewport += excess;
+        }
+      }
+      prevTop = rect.top;
+
+      const measuredTop = (rect.top - editorScreenTop) * invScale;
+      const measuredBottom = (rect.bottom - editorScreenTop) * invScale;
+      const totalExistingShift = blockShift + innerShiftViewport * invScale;
+      const charOffset = lineStartOffsets[i] ?? 0;
+
+      lines[i] = {
+        naturalTop: measuredTop - totalExistingShift,
+        naturalBottom: measuredBottom - totalExistingShift,
+        getPos: () =>
+          block.pos +
+          1 +
+          Math.max(0, Math.min(charOffset, textOnlyParagraph.contentSize)),
+      };
+    }
+    if (metrics) {
+      metrics.domMeasurementSuccessCount++;
+      metrics.domMeasurementMs += performance.now() - startedAt;
+    }
+    return lines;
+  }
+
+  const cachedParagraph = domLineFragmentCache.get(block.dom);
+  const nextCacheEntries: CachedTextLineFragments[] = [];
   const rects: DomLineFragment[] = [];
   const walker = document.createTreeWalker(block.dom, NodeFilter.SHOW_TEXT);
+  let textNodeIndex = 0;
   let textNode = walker.nextNode();
   while (textNode) {
-    if (textNode instanceof Text) {
-      const fragments = collectDomLineFragments(textNode);
+    if (textNode instanceof Text && textNode.length > 0) {
+      const { fragments, cacheEntry } = collectDomLineFragments(
+        textNode,
+        metrics,
+        cachedParagraph?.textNodes[textNodeIndex],
+      );
+      nextCacheEntries.push(cacheEntry);
+      textNodeIndex++;
       for (const fragment of fragments) {
         const last = rects[rects.length - 1];
         if (last && Math.abs(fragment.top - last.top) < 1) {
@@ -374,7 +813,16 @@ function measureLinesWithDom(
     textNode = walker.nextNode();
   }
 
+  if (nextCacheEntries.length > 0) {
+    domLineFragmentCache.set(block.dom, { textNodes: nextCacheEntries });
+  } else {
+    domLineFragmentCache.delete(block.dom);
+  }
+
   if (rects.length === 0) {
+    if (metrics) {
+      metrics.domMeasurementMs += performance.now() - startedAt;
+    }
     return [];
   }
 
@@ -435,6 +883,10 @@ function measureLinesWithDom(
       },
     };
   }
+  if (metrics) {
+    metrics.domMeasurementSuccessCount++;
+    metrics.domMeasurementMs += performance.now() - startedAt;
+  }
   return lines;
 }
 
@@ -450,17 +902,22 @@ function measureParagraphLines(
   invScale: number,
   blockNaturalTop: number,
   blockShift: number,
+  metrics: PaginationRunMetrics | null,
 ): ParagraphLine[] {
+  if (metrics) {
+    metrics.paragraphMeasurementCount++;
+  }
   const fromDom = measureLinesWithDom(
     block,
     view,
     editorScreenTop,
     invScale,
     blockShift,
+    metrics,
   );
   return fromDom.length > 0
     ? fromDom
-    : (measureLinesWithPretext(block, view, blockNaturalTop) ?? []);
+    : (measureLinesWithPretext(block, view, blockNaturalTop, metrics) ?? []);
 }
 
 /**
@@ -476,6 +933,7 @@ function calculateLayout(
   editorScreenTop: number,
   invScale: number,
   existingBreaks: Break[],
+  metrics: PaginationRunMetrics | null,
 ): { breaks: Break[]; pageCount: number } {
   const sorted = [...existingBreaks].sort((a, b) => a.pos - b.pos);
 
@@ -510,6 +968,9 @@ function calculateLayout(
     }
 
     if (block.isParagraph && blockEffectiveTop < pageBoundary) {
+      if (metrics) {
+        metrics.overflowingParagraphCount++;
+      }
       const lines = measureParagraphLines(
         block,
         view,
@@ -517,7 +978,12 @@ function calculateLayout(
         invScale,
         blockNaturalTop,
         blockShift,
+        metrics,
       );
+      if (metrics) {
+        metrics.measuredLineCount += lines.length;
+      }
+      const paragraphStartedAt = metrics ? performance.now() : 0;
       const result = paginateParagraph(
         lines,
         block.pos,
@@ -526,6 +992,10 @@ function calculateLayout(
         pageBoundary,
         cumulativeShift,
       );
+      if (metrics) {
+        metrics.paragraphPaginationCount++;
+        metrics.paragraphPaginationMs += performance.now() - paragraphStartedAt;
+      }
       newBreaks.push(...result.breaks);
       cumulativeShift = result.cumulativeShift;
       pageStart = result.pageStart;
@@ -536,6 +1006,9 @@ function calculateLayout(
 
     // Whole-block break for non-paragraphs (or paragraphs already on a new
     // page, which can be pushed atomically without splitting).
+    if (metrics) {
+      metrics.overflowingBlockCount++;
+    }
     let spacerApplied = 0;
     if (blockEffectiveTop > pageStart) {
       const spacer = pageBoundary + PAGE_BREAK_GAP - blockEffectiveTop;
@@ -606,15 +1079,21 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
 
 function observeLayoutInvalidations(
   view: EditorView,
-  schedule: (followUp?: boolean) => void,
+  schedule: (followUpPasses?: number) => void,
+  shouldIgnoreResizeInvalidation: () => boolean,
 ): () => void {
   const cleanup: Array<() => void> = [];
   const requestFollowUpPagination = () => {
-    schedule(true);
+    schedule(SETTLE_PASS_COUNT);
   };
 
   if (typeof ResizeObserver !== 'undefined') {
-    const resizeObserver = new ResizeObserver(requestFollowUpPagination);
+    const resizeObserver = new ResizeObserver(() => {
+      if (shouldIgnoreResizeInvalidation()) {
+        return;
+      }
+      requestFollowUpPagination();
+    });
     resizeObserver.observe(view.dom);
     cleanup.push(() => {
       resizeObserver.disconnect();
@@ -691,68 +1170,123 @@ export function paginationPlugin(
     view(editorView) {
       let rafId = 0;
       let destroyed = false;
-      let shouldRunFollowUp = false;
+      let pendingFollowUpPasses = 0;
+      let suppressResizeInvalidation = false;
+      let clearSuppressResizeRafId = 0;
 
       function paginate() {
         if (destroyed) {
           return;
         }
         rafId = 0;
-        const shouldQueueFollowUp = shouldRunFollowUp;
-        shouldRunFollowUp = false;
+        const remainingFollowUpPasses = pendingFollowUpPasses;
+        pendingFollowUpPasses = 0;
 
         const prev = paginationKey.getState(editorView.state);
         const prevBreaks = prev?.breaks ?? [];
         const prevPageCount = prev?.pageCount ?? 1;
-        const editorOffsetTop = editorView.dom.offsetTop;
-        const blocks = collectBlocks(editorView, editorOffsetTop);
-        if (blocks.length === 0) {
-          return;
-        }
-
-        // CSS↔viewport scale: ancestor `transform: scale(zoom)` makes
-        // viewport coords from getClientRects scaled. offsetWidth is the
-        // unscaled CSS width. Width is used (not height) to avoid
-        // divide-by-zero on a 0-height empty doc.
-        const screenRect = editorView.dom.getBoundingClientRect();
-        const cssWidth = editorView.dom.offsetWidth;
-        const invScale = cssWidth > 0 ? cssWidth / screenRect.width : 1;
-        const editorScreenTop = screenRect.top;
-
-        const { breaks, pageCount } = calculateLayout(
-          blocks,
-          editorView,
-          editorScreenTop,
-          invScale,
-          prevBreaks,
+        const run = paginationProfiler.startRun(
+          prevBreaks.length,
+          prevPageCount,
+          remainingFollowUpPasses > 0,
         );
+        const metrics = run?.metrics ?? null;
 
-        const changed =
-          !breaksEqual(breaks, prevBreaks) || pageCount !== prevPageCount;
-        if (!changed) {
-          return;
-        }
+        try {
+          const editorOffsetTop = editorView.dom.offsetTop;
+          const collectBlocksStartedAt = metrics ? performance.now() : 0;
+          const blocks = collectBlocks(editorView, editorOffsetTop);
+          if (metrics) {
+            metrics.collectBlocksMs =
+              performance.now() - collectBlocksStartedAt;
+            metrics.blocks = blocks.length;
+          }
+          if (blocks.length === 0) {
+            return;
+          }
 
-        if (pageCount !== prevPageCount) {
-          onPageCount?.(pageCount);
-        }
+          // CSS↔viewport scale: ancestor `transform: scale(zoom)` makes
+          // viewport coords from getClientRects scaled. offsetWidth is the
+          // unscaled CSS width. Width is used (not height) to avoid
+          // divide-by-zero on a 0-height empty doc.
+          const screenRect = editorView.dom.getBoundingClientRect();
+          const cssWidth = editorView.dom.offsetWidth;
+          const invScale = cssWidth > 0 ? cssWidth / screenRect.width : 1;
+          const editorScreenTop = screenRect.top;
 
-        const decos = buildDecorationSet(editorView, breaks);
-        const tr = editorView.state.tr;
-        tr.setMeta(paginationKey, { decos, breaks, pageCount });
-        tr.setMeta(PM_ADD_TO_HISTORY, false);
-        editorView.dispatch(tr);
+          const calculateLayoutStartedAt = metrics ? performance.now() : 0;
+          const { breaks, pageCount } = calculateLayout(
+            blocks,
+            editorView,
+            editorScreenTop,
+            invScale,
+            prevBreaks,
+            metrics,
+          );
+          if (metrics) {
+            metrics.calculateLayoutMs =
+              performance.now() - calculateLayoutStartedAt;
+            metrics.breakCount = breaks.length;
+            metrics.pageCount = pageCount;
+          }
 
-        // The first pass often measures an unpaginated DOM and then mutates it
-        // by inserting spacer widgets. Run one more frame against that new DOM
-        // so reopen-time layout can converge without waiting for a keystroke.
-        if (shouldQueueFollowUp) {
-          schedule();
+          const changed =
+            !breaksEqual(breaks, prevBreaks) || pageCount !== prevPageCount;
+          if (metrics) {
+            metrics.changed = changed;
+          }
+          if (!changed) {
+            return;
+          }
+
+          if (pageCount !== prevPageCount) {
+            onPageCount?.(pageCount);
+          }
+
+          const buildDecorationsStartedAt = metrics ? performance.now() : 0;
+          const decos = buildDecorationSet(editorView, breaks);
+          if (metrics) {
+            metrics.buildDecorationsMs =
+              performance.now() - buildDecorationsStartedAt;
+          }
+
+          const tr = editorView.state.tr;
+          tr.setMeta(paginationKey, { decos, breaks, pageCount });
+          tr.setMeta(PM_ADD_TO_HISTORY, false);
+
+          // Spacer widgets mutate the editor height and can trip the
+          // ResizeObserver. Ignore that self-induced resize for one frame and
+          // rely on the bounded settle loop below instead of reopening a fresh
+          // full repagination chain on every dispatch.
+          suppressResizeInvalidation = true;
+          if (clearSuppressResizeRafId !== 0) {
+            cancelAnimationFrame(clearSuppressResizeRafId);
+          }
+          clearSuppressResizeRafId = requestAnimationFrame(() => {
+            clearSuppressResizeRafId = 0;
+            suppressResizeInvalidation = false;
+          });
+
+          const dispatchStartedAt = metrics ? performance.now() : 0;
+          editorView.dispatch(tr);
+          if (metrics) {
+            metrics.dispatchMs = performance.now() - dispatchStartedAt;
+          }
+
+          // The first pass often measures an unpaginated DOM and then mutates it
+          // by inserting spacer widgets. Run a bounded number of follow-up
+          // frames against that new DOM so reopen-time layout can converge
+          // without waiting for a keystroke.
+          if (remainingFollowUpPasses > 0) {
+            schedule(remainingFollowUpPasses - 1);
+          }
+        } finally {
+          run?.finish();
         }
       }
 
-      function schedule(followUp = false) {
-        shouldRunFollowUp = shouldRunFollowUp || followUp;
+      function schedule(followUpPasses = 0) {
+        pendingFollowUpPasses = Math.max(pendingFollowUpPasses, followUpPasses);
         if (!destroyed && rafId === 0) {
           rafId = requestAnimationFrame(paginate);
         }
@@ -765,17 +1299,18 @@ export function paginationPlugin(
       const stopObservingLayout = observeLayoutInvalidations(
         editorView,
         schedule,
+        () => suppressResizeInvalidation,
       );
 
       // Initial pagination after first paint.
-      schedule(true);
+      schedule(SETTLE_PASS_COUNT);
 
       return {
         update(view, prevState) {
           // Skip selection-only state changes — they don't affect layout
           // and the previous pagination is still valid.
           if (view.state.doc !== prevState.doc) {
-            schedule(true);
+            schedule(SETTLE_PASS_COUNT);
           }
         },
         destroy() {
@@ -783,6 +1318,9 @@ export function paginationPlugin(
           stopObservingLayout();
           if (rafId !== 0) {
             cancelAnimationFrame(rafId);
+          }
+          if (clearSuppressResizeRafId !== 0) {
+            cancelAnimationFrame(clearSuppressResizeRafId);
           }
         },
       };

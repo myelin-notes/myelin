@@ -18,3 +18,7 @@ export const GITHUB_CLIENT_ID = (
 export const PERSIST_DEBUG_LOGS =
   String(import.meta.env.VITE_PERSIST_DEBUG_LOGS ?? '').toLowerCase() ===
   'true';
+
+export const PAGINATION_PROFILING =
+  String(import.meta.env.VITE_PAGINATION_PROFILING ?? '').toLowerCase() ===
+  'true';
