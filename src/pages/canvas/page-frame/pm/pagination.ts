@@ -1,4 +1,3 @@
-import type { Node as PMNode } from 'prosemirror-model';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import {
@@ -51,8 +50,7 @@ interface BlockInfo {
  */
 function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
   const result: BlockInfo[] = [];
-
-  function walk(node: PMNode, pos: number) {
+  view.state.doc.forEach((node, pos) => {
     if (!node.isBlock) {
       return;
     }
@@ -72,10 +70,6 @@ function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
       nodeSize: node.nodeSize,
       isParagraph: node.type.name === 'paragraph',
     });
-  }
-
-  view.state.doc.forEach((child, offset) => {
-    walk(child, offset);
   });
 
   return result;
@@ -464,10 +458,9 @@ function measureParagraphLines(
     invScale,
     blockShift,
   );
-  if (fromDom.length > 0) {
-    return fromDom;
-  }
-  return measureLinesWithPretext(block, view, blockNaturalTop) ?? [];
+  return fromDom.length > 0
+    ? fromDom
+    : (measureLinesWithPretext(block, view, blockNaturalTop) ?? []);
 }
 
 /**
@@ -485,20 +478,6 @@ function calculateLayout(
   existingBreaks: Break[],
 ): { breaks: Break[]; pageCount: number } {
   const sorted = [...existingBreaks].sort((a, b) => a.pos - b.pos);
-  function existingShiftAt(pos: number): number {
-    // We measure against a DOM that still contains the previous pass's spacer
-    // widgets. Subtract their accumulated height to recover each block's
-    // "natural" top before deciding where the next pass should break.
-    let shift = 0;
-    for (const b of sorted) {
-      if (b.pos <= pos) {
-        shift += b.spacer;
-      } else {
-        break;
-      }
-    }
-    return shift;
-  }
 
   const newBreaks: Break[] = [];
   let pageStart = 0;
@@ -507,9 +486,21 @@ function calculateLayout(
   // Accumulates only the spacers chosen in this pass. This is distinct from
   // `blockShift`, which removes the previous pass's widgets from measurements.
   let cumulativeShift = 0;
+  let previousPassShift = 0;
+  let nextPreviousBreakIndex = 0;
 
   for (const block of blocks) {
-    const blockShift = existingShiftAt(block.pos);
+    // `collectBlocks` yields document order, so previous-pass widget shift can
+    // be accumulated once instead of rescanning every prior break per block.
+    while (
+      nextPreviousBreakIndex < sorted.length &&
+      sorted[nextPreviousBreakIndex].pos <= block.pos
+    ) {
+      previousPassShift += sorted[nextPreviousBreakIndex].spacer;
+      nextPreviousBreakIndex++;
+    }
+
+    const blockShift = previousPassShift;
     const blockNaturalTop = block.measuredTop - blockShift;
     const blockEffectiveTop = blockNaturalTop + cumulativeShift;
     const blockEffectiveBottom = blockEffectiveTop + block.height;
@@ -570,9 +561,9 @@ function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
   if (breaks.length === 0) {
     return DecorationSet.empty;
   }
-  const decos: Decoration[] = [];
-  for (const { pos, spacer, kind } of breaks) {
-    decos.push(
+  return DecorationSet.create(
+    view.state.doc,
+    breaks.map(({ pos, spacer, kind }) =>
       Decoration.widget(
         pos,
         () => {
@@ -591,9 +582,8 @@ function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
           key: `pb-${kind}-${pos}-${spacer}`,
         },
       ),
-    );
-  }
-  return DecorationSet.create(view.state.doc, decos);
+    ),
+  );
 }
 
 function breaksEqual(a: Break[], b: Break[]): boolean {
@@ -619,11 +609,12 @@ function observeLayoutInvalidations(
   schedule: (followUp?: boolean) => void,
 ): () => void {
   const cleanup: Array<() => void> = [];
+  const requestFollowUpPagination = () => {
+    schedule(true);
+  };
 
   if (typeof ResizeObserver !== 'undefined') {
-    const resizeObserver = new ResizeObserver(() => {
-      schedule(true);
-    });
+    const resizeObserver = new ResizeObserver(requestFollowUpPagination);
     resizeObserver.observe(view.dom);
     cleanup.push(() => {
       resizeObserver.disconnect();
@@ -631,27 +622,15 @@ function observeLayoutInvalidations(
   }
 
   const fontSet = document.fonts;
-  const onFontsReady = () => {
-    schedule(true);
-  };
-  const onFontLoadingDone = () => {
-    schedule(true);
-  };
-  const onFontLoadingError = () => {
-    schedule(true);
-  };
-  const onFocusIn = () => {
-    schedule(true);
-  };
 
-  void fontSet.ready.then(onFontsReady);
-  fontSet.addEventListener('loadingdone', onFontLoadingDone);
-  fontSet.addEventListener('loadingerror', onFontLoadingError);
-  view.dom.addEventListener('focusin', onFocusIn);
+  void fontSet.ready.then(requestFollowUpPagination);
+  fontSet.addEventListener('loadingdone', requestFollowUpPagination);
+  fontSet.addEventListener('loadingerror', requestFollowUpPagination);
+  view.dom.addEventListener('focusin', requestFollowUpPagination);
   cleanup.push(() => {
-    fontSet.removeEventListener('loadingdone', onFontLoadingDone);
-    fontSet.removeEventListener('loadingerror', onFontLoadingError);
-    view.dom.removeEventListener('focusin', onFocusIn);
+    fontSet.removeEventListener('loadingdone', requestFollowUpPagination);
+    fontSet.removeEventListener('loadingerror', requestFollowUpPagination);
+    view.dom.removeEventListener('focusin', requestFollowUpPagination);
   });
 
   return () => {
