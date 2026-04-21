@@ -1,4 +1,34 @@
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
+
+const memoryLocalStorage = new Map<string, string>();
+
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: {
+    getItem(key: string) {
+      return memoryLocalStorage.get(key) ?? null;
+    },
+    setItem(key: string, value: string) {
+      memoryLocalStorage.set(key, value);
+    },
+    removeItem(key: string) {
+      memoryLocalStorage.delete(key);
+    },
+    clear() {
+      memoryLocalStorage.clear();
+    },
+    key(index: number) {
+      return Array.from(memoryLocalStorage.keys())[index] ?? null;
+    },
+    get length() {
+      return memoryLocalStorage.size;
+    },
+  } satisfies Storage,
+});
+
+beforeEach(() => {
+  memoryLocalStorage.clear();
+});
 
 vi.mock('@/lib/thumbnail-cache', () => ({
   ThumbnailCache: {

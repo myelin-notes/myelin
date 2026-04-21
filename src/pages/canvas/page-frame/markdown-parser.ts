@@ -15,8 +15,6 @@ export function parseMarkdownToDoc(md: string, schema: Schema): PMNode {
   return buildDoc(blocks, schema);
 }
 
-// -- Block tokens --------------------------------------------------------
-
 interface BaseToken {
   content?: string;
   text?: string;

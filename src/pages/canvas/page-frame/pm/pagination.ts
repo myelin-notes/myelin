@@ -7,24 +7,16 @@ import {
 } from '@chenglou/pretext';
 import { PM_ADD_TO_HISTORY } from './constants';
 import {
+  type Break,
+  calculateBreakLayout,
+  type ParagraphLine,
+} from './pagination-core';
+import {
   type PaginationRunMetrics,
   paginationProfiler,
 } from './pagination-profiler';
 
-const PAGE_HEIGHT = 880;
-const PAGE_PADDING = 48;
-const PAGE_GAP = 40;
-const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 784
-const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
 const SETTLE_PASS_COUNT = 4;
-
-type BreakKind = 'block' | 'inline';
-
-interface Break {
-  pos: number;
-  spacer: number;
-  kind: BreakKind;
-}
 
 interface PaginationState {
   decos: DecorationSet;
@@ -78,27 +70,6 @@ function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
   });
 
   return result;
-}
-
-interface ParagraphPaginationResult {
-  breaks: Break[];
-  cumulativeShift: number;
-  pageStart: number;
-  pageBoundary: number;
-  pageAdvances: number;
-}
-
-/**
- * One visual line inside a paragraph, in CSS pixels relative to the editor
- * content top, as if no pagination decorations existed. `getPos` is lazy —
- * it's only called when the pagination loop actually decides to emit a
- * break at this line, so measurers can defer any expensive DOM lookups until
- * they're actually needed.
- */
-interface ParagraphLine {
-  naturalTop: number;
-  naturalBottom: number;
-  getPos: () => number | null;
 }
 
 interface DomLineFragment {
@@ -477,68 +448,6 @@ function collectDomLineFragments(
   }
 
   return { fragments, cacheEntry: nextCacheEntry };
-}
-
-/**
- * Walk a paragraph's line list and emit page breaks.
- *
- * This is the *only* pagination algorithm for paragraphs. It doesn't know
- * or care how the lines were measured — Pretext or DOM — it just walks
- * them in order, checks whether each one crosses the current page boundary
- * in effective coordinates (natural + accumulated shift), and emits a
- * widget break when one does.
- */
-function paginateParagraph(
-  lines: ParagraphLine[],
-  blockPos: number,
-  blockEnd: number,
-  initialPageStart: number,
-  initialPageBoundary: number,
-  initialCumulativeShift: number,
-): ParagraphPaginationResult {
-  const breaks: Break[] = [];
-  let pageStart = initialPageStart;
-  let pageBoundary = initialPageBoundary;
-  let cumulativeShift = initialCumulativeShift;
-  let pageAdvances = 0;
-
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const line = lines[lineIndex];
-    const lineEffectiveTop = line.naturalTop + cumulativeShift;
-    const lineEffectiveBottom = line.naturalBottom + cumulativeShift;
-
-    if (lineEffectiveBottom <= pageBoundary) {
-      continue;
-    }
-
-    // Crosses the boundary. Emit a break unless the line is already at
-    // the top of the current page (oversized/first-line case).
-    if (lineEffectiveTop > pageStart) {
-      const spacer = pageBoundary + PAGE_BREAK_GAP - lineEffectiveTop;
-      if (spacer > 0) {
-        if (lineIndex === 0) {
-          // If the paragraph's first visual line doesn't fit, move the whole
-          // paragraph with a block break. An inline widget at char 0 creates
-          // unstable layout inside the paragraph itself.
-          breaks.push({ pos: blockPos, spacer, kind: 'block' });
-          cumulativeShift += spacer;
-        } else {
-          const pos = line.getPos();
-          if (pos !== null) {
-            const clamped = Math.max(blockPos + 2, Math.min(pos, blockEnd - 1));
-            breaks.push({ pos: clamped, spacer, kind: 'inline' });
-            cumulativeShift += spacer;
-          }
-        }
-      }
-    }
-
-    pageStart = pageBoundary + PAGE_BREAK_GAP;
-    pageBoundary = pageStart + CONTENT_HEIGHT;
-    pageAdvances++;
-  }
-
-  return { breaks, cumulativeShift, pageStart, pageBoundary, pageAdvances };
 }
 
 /**
@@ -935,99 +844,42 @@ function calculateLayout(
   existingBreaks: Break[],
   metrics: PaginationRunMetrics | null,
 ): { breaks: Break[]; pageCount: number } {
-  const sorted = [...existingBreaks].sort((a, b) => a.pos - b.pos);
-
-  const newBreaks: Break[] = [];
-  let pageStart = 0;
-  let pageBoundary = CONTENT_HEIGHT;
-  let pageCount = 1;
-  // Accumulates only the spacers chosen in this pass. This is distinct from
-  // `blockShift`, which removes the previous pass's widgets from measurements.
-  let cumulativeShift = 0;
-  let previousPassShift = 0;
-  let nextPreviousBreakIndex = 0;
-
-  for (const block of blocks) {
-    // `collectBlocks` yields document order, so previous-pass widget shift can
-    // be accumulated once instead of rescanning every prior break per block.
-    while (
-      nextPreviousBreakIndex < sorted.length &&
-      sorted[nextPreviousBreakIndex].pos <= block.pos
-    ) {
-      previousPassShift += sorted[nextPreviousBreakIndex].spacer;
-      nextPreviousBreakIndex++;
-    }
-
-    const blockShift = previousPassShift;
-    const blockNaturalTop = block.measuredTop - blockShift;
-    const blockEffectiveTop = blockNaturalTop + cumulativeShift;
-    const blockEffectiveBottom = blockEffectiveTop + block.height;
-
-    if (blockEffectiveBottom <= pageBoundary) {
-      continue;
-    }
-
-    if (block.isParagraph && blockEffectiveTop < pageBoundary) {
-      if (metrics) {
-        metrics.overflowingParagraphCount++;
-      }
-      const lines = measureParagraphLines(
+  return calculateBreakLayout({
+    blocks,
+    existingBreaks,
+    measureParagraphLines: (block, state) =>
+      measureParagraphLines(
         block,
         view,
         editorScreenTop,
         invScale,
-        blockNaturalTop,
-        blockShift,
+        state.blockNaturalTop,
+        state.blockShift,
         metrics,
-      );
+      ),
+    now: metrics ? () => performance.now() : undefined,
+    onOverflowingParagraph: () => {
+      if (metrics) {
+        metrics.overflowingParagraphCount++;
+      }
+    },
+    onParagraphMeasured: (_block, lines) => {
       if (metrics) {
         metrics.measuredLineCount += lines.length;
       }
-      const paragraphStartedAt = metrics ? performance.now() : 0;
-      const result = paginateParagraph(
-        lines,
-        block.pos,
-        block.pos + block.nodeSize,
-        pageStart,
-        pageBoundary,
-        cumulativeShift,
-      );
+    },
+    onParagraphPaginated: (_block, _result, elapsedMs) => {
       if (metrics) {
         metrics.paragraphPaginationCount++;
-        metrics.paragraphPaginationMs += performance.now() - paragraphStartedAt;
+        metrics.paragraphPaginationMs += elapsedMs;
       }
-      newBreaks.push(...result.breaks);
-      cumulativeShift = result.cumulativeShift;
-      pageStart = result.pageStart;
-      pageBoundary = result.pageBoundary;
-      pageCount += result.pageAdvances;
-      continue;
-    }
-
-    // Whole-block break for non-paragraphs (or paragraphs already on a new
-    // page, which can be pushed atomically without splitting).
-    if (metrics) {
-      metrics.overflowingBlockCount++;
-    }
-    let spacerApplied = 0;
-    if (blockEffectiveTop > pageStart) {
-      const spacer = pageBoundary + PAGE_BREAK_GAP - blockEffectiveTop;
-      if (spacer > 0) {
-        newBreaks.push({ pos: block.pos, spacer, kind: 'block' });
-        cumulativeShift += spacer;
-        spacerApplied = spacer;
+    },
+    onOverflowingBlock: () => {
+      if (metrics) {
+        metrics.overflowingBlockCount++;
       }
-    }
-
-    const finalBottom = blockEffectiveTop + spacerApplied + block.height;
-    do {
-      pageStart = pageBoundary + PAGE_BREAK_GAP;
-      pageBoundary = pageStart + CONTENT_HEIGHT;
-      pageCount++;
-    } while (finalBottom > pageBoundary);
-  }
-
-  return { breaks: newBreaks, pageCount };
+    },
+  });
 }
 
 function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
