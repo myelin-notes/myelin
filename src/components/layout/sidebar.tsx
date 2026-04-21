@@ -7,7 +7,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { DEBUG } from '@/lib/debug';
+import { IS_DEV } from '@/lib/env';
 import { useMessages } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
@@ -85,7 +85,7 @@ export function Sidebar() {
   ];
 
   const bottomNav: NavItem[] = [
-    ...(DEBUG
+    ...(IS_DEV
       ? [
           {
             label: strings.sidebar.nav.debug,

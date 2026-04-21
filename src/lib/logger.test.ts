@@ -6,7 +6,6 @@ import {
 import {
   flushLogs,
   getLogFilePath,
-  initializeLogging,
   Logger,
   resetLoggingForTests,
 } from './logger';
@@ -141,32 +140,4 @@ describe('Logger', () => {
     expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('captures global errors and unhandled rejections', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const target = new EventTarget();
-    initializeLogging(target);
-
-    const errorEvent = new Event('error');
-    Object.assign(errorEvent, {
-      message: 'window boom',
-      error: new Error('window boom'),
-      filename: '/test.ts',
-      lineno: 4,
-      colno: 2,
-    });
-    target.dispatchEvent(errorEvent);
-
-    const rejectionEvent = new Event('unhandledrejection');
-    Object.assign(rejectionEvent, {
-      reason: new Error('rejected'),
-    });
-    target.dispatchEvent(rejectionEvent);
-
-    await flushLogs();
-
-    const raw = getRepositoryTestStorage().readText(getLogFilePath()) ?? '';
-    expect(raw).toContain('"subsystem":"GlobalError"');
-    expect(raw).toContain('"subsystem":"UnhandledRejection"');
-    expect(errorSpy).toHaveBeenCalled();
-  });
 });

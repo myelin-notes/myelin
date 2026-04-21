@@ -1,4 +1,3 @@
-import { DEBUG } from '@/lib/debug';
 import { Logger } from '@/lib/logger';
 import {
   LOCAL_ORIGIN,
@@ -360,9 +359,7 @@ export class NoteSession {
     }
 
     transport.send(encodeMessage(message)).catch((err) => {
-      if (DEBUG) {
-        logger.error('Transport send error', err);
-      }
+      logger.error('Transport send error', err);
     });
   }
 

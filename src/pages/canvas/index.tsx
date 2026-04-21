@@ -3,7 +3,7 @@ import { X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
-import { DEBUG } from '@/lib/debug';
+import { IS_DEV } from '@/lib/env';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
@@ -86,7 +86,7 @@ export function CanvasView() {
       />
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
-      {DEBUG && <PeerSyncPanel session={engine.noteSession} />}
+      {IS_DEV && <PeerSyncPanel session={engine.noteSession} />}
       <TitleBar fileName={engine.fileName} onBack={engine.back} />
 
       <CanvasToolbar

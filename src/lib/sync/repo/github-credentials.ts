@@ -6,6 +6,7 @@ import {
   type Client as StrongholdClient,
   type Store as StrongholdStore,
 } from '@tauri-apps/plugin-stronghold';
+import { GITHUB_CLIENT_ID } from '@/lib/env';
 import { UserPrefs } from '@/lib/user-prefs';
 
 const SECURE_STORAGE_UNAVAILABLE_ERROR =
@@ -19,12 +20,10 @@ const GITHUB_OAUTH_SCOPE = 'repo';
 const GITHUB_DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code';
 
 function getGitHubClientId(): string {
-  const value = import.meta.env.VITE_GITHUB_CLIENT_ID;
-  const trimmed = typeof value === 'string' ? value.trim() : '';
-  if (!trimmed) {
+  if (!GITHUB_CLIENT_ID) {
     throw new Error('VITE_GITHUB_CLIENT_ID is not configured.');
   }
-  return trimmed;
+  return GITHUB_CLIENT_ID;
 }
 
 function normalizeCredentialId(credentialId?: string | null): string {

@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { DEBUG } from '@/lib/debug';
 import { Logger } from '@/lib/logger';
 import type { Transport, TransportEvents } from './transport';
 
@@ -71,9 +70,7 @@ export class IrohTransport implements Transport {
       noteId: this.noteId,
       transportId: this.transportId,
     });
-    if (DEBUG) {
-      logger.debug('Hosting note transport', { noteId: this.noteId });
-    }
+    logger.debug('Hosting note transport', { noteId: this.noteId });
     return ticket;
   }
 
@@ -84,9 +81,7 @@ export class IrohTransport implements Transport {
       transportId: this.transportId,
       ticket,
     });
-    if (DEBUG) {
-      logger.debug('Joining note transport', { noteId: this.noteId });
-    }
+    logger.debug('Joining note transport', { noteId: this.noteId });
   }
 
   async autoSync(): Promise<void> {
@@ -95,9 +90,7 @@ export class IrohTransport implements Transport {
       noteId: this.noteId,
       transportId: this.transportId,
     });
-    if (DEBUG) {
-      logger.debug('Auto-syncing note transport', { noteId: this.noteId });
-    }
+    logger.debug('Auto-syncing note transport', { noteId: this.noteId });
   }
 
   async destroy(): Promise<void> {
@@ -141,12 +134,10 @@ export class IrohTransport implements Transport {
       }
 
       const data = new Uint8Array(event.payload.data);
-      if (DEBUG) {
-        logger.debug('Received transport payload', {
-          noteId: this.noteId,
-          byteLength: data.byteLength,
-        });
-      }
+      logger.debug('Received transport payload', {
+        noteId: this.noteId,
+        byteLength: data.byteLength,
+      });
       this.emit('message', data);
     });
 
@@ -157,12 +148,10 @@ export class IrohTransport implements Transport {
           return;
         }
 
-        if (DEBUG) {
-          logger.debug('Connected to peer', {
-            noteId: this.noteId,
-            peerId: event.payload.peerId,
-          });
-        }
+        logger.debug('Connected to peer', {
+          noteId: this.noteId,
+          peerId: event.payload.peerId,
+        });
         this._connected = true;
         this.emit('connected');
       },
@@ -175,9 +164,7 @@ export class IrohTransport implements Transport {
           return;
         }
 
-        if (DEBUG) {
-          logger.debug('Disconnected transport', { noteId: this.noteId });
-        }
+        logger.debug('Disconnected transport', { noteId: this.noteId });
         this._connected = false;
         this.emit('disconnected');
       },
@@ -188,12 +175,10 @@ export class IrohTransport implements Transport {
         return;
       }
 
-      if (DEBUG) {
-        logger.error('Transport error', {
-          noteId: this.noteId,
-          message: event.payload.message,
-        });
-      }
+      logger.error('Transport error', {
+        noteId: this.noteId,
+        message: event.payload.message,
+      });
     });
 
     this.unlisteners = [onMessage, onConnected, onDisconnected, onError];

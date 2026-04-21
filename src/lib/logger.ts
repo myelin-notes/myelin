@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import {
   BaseDirectory,
   exists,
@@ -5,19 +6,9 @@ import {
   readTextFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
+import { IS_DEV, PERSIST_DEBUG_LOGS } from '@/lib/env';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-interface LogEventTarget {
-  addEventListener(
-    type: 'error' | 'unhandledrejection',
-    listener: EventListener,
-  ): void;
-  removeEventListener(
-    type: 'error' | 'unhandledrejection',
-    listener: EventListener,
-  ): void;
-}
 
 interface SerializedError {
   name: string;
@@ -49,11 +40,8 @@ const SENSITIVE_KEY_PATTERN =
 
 function getDefaultRuntimeOptions(): LoggerRuntimeOptions {
   return {
-    mode: import.meta.env.DEV ? 'development' : 'production',
-    persistDebug:
-      import.meta.env.DEV &&
-      String(import.meta.env.VITE_PERSIST_DEBUG_LOGS ?? '').toLowerCase() ===
-        'true',
+    mode: IS_DEV ? 'development' : 'production',
+    persistDebug: IS_DEV && PERSIST_DEBUG_LOGS,
     maxFileBytes: DEFAULT_MAX_FILE_BYTES,
   };
 }
@@ -61,11 +49,8 @@ function getDefaultRuntimeOptions(): LoggerRuntimeOptions {
 let runtimeOptions: LoggerRuntimeOptions = getDefaultRuntimeOptions();
 let queue: string[] = [];
 let flushPromise: Promise<void> | null = null;
-let flushScheduled = false;
 let logDirectoryReady = false;
-let globalCaptureInstalled = false;
 let internalError = false;
-let globalCaptureTarget: LogEventTarget | null = null;
 
 function consoleEnabled(level: LogLevel): boolean {
   if (runtimeOptions.mode === 'development') {
@@ -247,69 +232,41 @@ function trimLogText(text: string, maxBytes: number): string {
   return trimmed;
 }
 
-async function flushQueuedEntries(): Promise<void> {
-  if (queue.length === 0) {
-    flushScheduled = false;
-    return;
-  }
-
-  const entries = queue;
-  queue = [];
-  flushScheduled = false;
-  const payload = `${entries.join('\n')}\n`;
-
-  try {
-    await ensureLogDirectory();
-    const existing = (await exists(LOG_FILE, {
-      baseDir: BaseDirectory.AppData,
-    }))
-      ? await readTextFile(LOG_FILE, { baseDir: BaseDirectory.AppData })
-      : '';
-    let next = trimLogText(
-      `${existing}${payload}`,
-      runtimeOptions.maxFileBytes,
-    );
-    while (
-      new TextEncoder().encode(next).byteLength > runtimeOptions.maxFileBytes
-    ) {
-      const firstNewline = next.indexOf('\n');
-      if (firstNewline === -1) {
-        next = '';
-        break;
-      }
-      next = next.slice(firstNewline + 1);
-    }
-    await writeTextFile(LOG_FILE, next, { baseDir: BaseDirectory.AppData });
-  } catch (error) {
-    if (internalError) {
-      return;
-    }
-    internalError = true;
-    try {
-      console.error('[Logger] failed to flush logs', error);
-    } finally {
-      internalError = false;
-    }
-  }
+async function writeBatch(batch: string[]): Promise<void> {
+  await ensureLogDirectory();
+  const existing = (await exists(LOG_FILE, { baseDir: BaseDirectory.AppData }))
+    ? await readTextFile(LOG_FILE, { baseDir: BaseDirectory.AppData })
+    : '';
+  const next = trimLogText(
+    `${existing}${batch.join('\n')}\n`,
+    runtimeOptions.maxFileBytes,
+  );
+  await writeTextFile(LOG_FILE, next, { baseDir: BaseDirectory.AppData });
 }
 
 function scheduleFlush(): void {
-  if (flushScheduled) {
-    return;
-  }
+  if (flushPromise) return;
 
-  flushScheduled = true;
-  queueMicrotask(() => {
-    const current = flushPromise ?? Promise.resolve();
-    const nextFlush = current
-      .catch(() => {})
-      .then(() => flushQueuedEntries())
-      .finally(() => {
-        if (flushPromise === nextFlush) {
-          flushPromise = null;
+  flushPromise = (async () => {
+    while (queue.length > 0) {
+      const batch = queue;
+      queue = [];
+      try {
+        await writeBatch(batch);
+      } catch (error) {
+        if (!internalError) {
+          internalError = true;
+          try {
+            console.error('[Logger] failed to flush logs', error);
+          } finally {
+            internalError = false;
+          }
         }
-      });
-    flushPromise = nextFlush;
+      }
+    }
+  })().finally(() => {
+    flushPromise = null;
+    if (queue.length > 0) scheduleFlush();
   });
 }
 
@@ -362,60 +319,35 @@ function createEntry(
   };
 }
 
-function captureGlobalError(event: Event): void {
-  const errorEvent = event as ErrorEvent & {
-    error?: unknown;
-    filename?: string;
-    lineno?: number;
-    colno?: number;
-    message?: string;
-  };
-  const error =
-    errorEvent.error instanceof Error ? errorEvent.error : undefined;
-  const metadata = {
-    filename: errorEvent.filename,
-    lineno: errorEvent.lineno,
-    colno: errorEvent.colno,
-  };
-  emitEntry(
-    createEntry(
-      'error',
-      'GlobalError',
-      errorEvent.message || 'Uncaught window error',
-      error ?? metadata,
-      error ? metadata : undefined,
-    ),
-  );
-}
+function reportErrorToSentry(
+  subsystem: string,
+  message: string,
+  errorOrMeta?: unknown,
+  maybeMeta?: Record<string, unknown>,
+): void {
+  try {
+    if (isErrorLike(errorOrMeta)) {
+      Sentry.captureException(errorOrMeta, {
+        level: 'error',
+        tags: { subsystem },
+        contexts: {
+          logger: { subsystem, message, ...(maybeMeta ?? {}) },
+        },
+      });
+      return;
+    }
 
-function captureUnhandledRejection(event: Event): void {
-  const rejectionEvent = event as PromiseRejectionEvent & { reason?: unknown };
-  const reason = rejectionEvent.reason;
-  emitEntry(
-    createEntry(
-      'error',
-      'UnhandledRejection',
-      'Unhandled promise rejection',
-      reason,
-    ),
-  );
-}
-
-export function initializeLogging(target?: LogEventTarget): void {
-  const resolvedTarget =
-    target ??
-    (typeof window !== 'undefined' ? (window as LogEventTarget) : null);
-  if (globalCaptureInstalled || !resolvedTarget) {
-    return;
+    const extra = isPlainObject(errorOrMeta) ? errorOrMeta : {};
+    Sentry.captureMessage(message, {
+      level: 'error',
+      tags: { subsystem },
+      contexts: {
+        logger: { subsystem, ...extra, ...(maybeMeta ?? {}) },
+      },
+    });
+  } catch {
+    // Swallow Sentry failures. Logging must not break app code.
   }
-
-  resolvedTarget.addEventListener('error', captureGlobalError);
-  resolvedTarget.addEventListener(
-    'unhandledrejection',
-    captureUnhandledRejection,
-  );
-  globalCaptureInstalled = true;
-  globalCaptureTarget = resolvedTarget;
 }
 
 export class Logger {
@@ -447,14 +379,12 @@ export class Logger {
     emitEntry(
       createEntry('error', this.subsystem, message, errorOrMeta, maybeMeta),
     );
+    reportErrorToSentry(this.subsystem, message, errorOrMeta, maybeMeta);
   }
 }
 
 export async function flushLogs(): Promise<void> {
-  if (flushScheduled) {
-    await Promise.resolve();
-  }
-  if (flushPromise) {
+  while (flushPromise) {
     await flushPromise;
   }
 }
@@ -470,16 +400,6 @@ export function resetLoggingForTests(options?: Partial<LoggerRuntimeOptions>) {
   };
   queue = [];
   flushPromise = null;
-  flushScheduled = false;
   logDirectoryReady = false;
   internalError = false;
-  if (globalCaptureInstalled && globalCaptureTarget) {
-    globalCaptureTarget.removeEventListener('error', captureGlobalError);
-    globalCaptureTarget.removeEventListener(
-      'unhandledrejection',
-      captureUnhandledRejection,
-    );
-  }
-  globalCaptureInstalled = false;
-  globalCaptureTarget = null;
 }
