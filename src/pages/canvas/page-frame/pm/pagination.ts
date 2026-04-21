@@ -13,7 +13,6 @@ const PAGE_PADDING = 48;
 const PAGE_GAP = 40;
 const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 784
 const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
-const CONTAINER_NODE_NAMES = new Set<string>([]);
 
 type BreakKind = 'block' | 'inline';
 
@@ -54,14 +53,6 @@ function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
   const result: BlockInfo[] = [];
 
   function walk(node: PMNode, pos: number) {
-    if (CONTAINER_NODE_NAMES.has(node.type.name)) {
-      let childPos = pos + 1;
-      node.forEach((child) => {
-        walk(child, childPos);
-        childPos += child.nodeSize;
-      });
-      return;
-    }
     if (!node.isBlock) {
       return;
     }
@@ -102,13 +93,88 @@ interface ParagraphPaginationResult {
  * One visual line inside a paragraph, in CSS pixels relative to the editor
  * content top, as if no pagination decorations existed. `getPos` is lazy —
  * it's only called when the pagination loop actually decides to emit a
- * break at this line, so measurers can defer any expensive DOM lookups
- * (e.g. `view.posAtCoords`) until they're needed.
+ * break at this line, so measurers can defer any expensive DOM lookups until
+ * they're actually needed.
  */
 interface ParagraphLine {
   naturalTop: number;
   naturalBottom: number;
   getPos: () => number | null;
+}
+
+interface DomLineFragment {
+  bottom: number;
+  left: number;
+  startNode: Text;
+  startOffset: number;
+  top: number;
+}
+
+function countVisibleRects(rects: DOMRectList | DOMRect[]): number {
+  let count = 0;
+  for (let i = 0; i < rects.length; i++) {
+    const rect = rects[i];
+    if (rect.width > 0 && rect.height > 0) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * `Range#getClientRects()` tells us which visual line fragments a text node
+ * occupies, but not which character starts each fragment. To recover a stable
+ * doc position we binary-search the prefix length where the rect count grows:
+ * that's the first visible character on the next wrapped line.
+ */
+function collectDomLineFragments(textNode: Text): DomLineFragment[] {
+  if (textNode.length === 0) {
+    return [];
+  }
+
+  const fullRange = document.createRange();
+  fullRange.selectNodeContents(textNode);
+  const fullRects = Array.from(fullRange.getClientRects()).filter(
+    (rect) => rect.width > 0 && rect.height > 0,
+  );
+  if (fullRects.length === 0) {
+    return [];
+  }
+
+  const prefixRange = document.createRange();
+  prefixRange.setStart(textNode, 0);
+  const fragments: DomLineFragment[] = [];
+  let searchStart = 1;
+
+  for (let rectIndex = 0; rectIndex < fullRects.length; rectIndex++) {
+    const targetRectCount = rectIndex + 1;
+    let low = searchStart;
+    let high = textNode.length;
+    let firstVisibleEnd = textNode.length;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      prefixRange.setEnd(textNode, mid);
+      if (countVisibleRects(prefixRange.getClientRects()) >= targetRectCount) {
+        firstVisibleEnd = mid;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    const rect = fullRects[rectIndex];
+    fragments.push({
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      startNode: textNode,
+      startOffset: Math.max(0, firstVisibleEnd - 1),
+    });
+    searchStart = Math.min(textNode.length, firstVisibleEnd + 1);
+  }
+
+  return fragments;
 }
 
 /**
@@ -279,9 +345,10 @@ function measureLinesWithPretext(
  * Measure a paragraph's lines using DOM range rects — the fallback when
  * Pretext can't handle the paragraph (contains mentions, images, etc.).
  *
- * Walks text descendants, collects one rect per visual line, and detects
- * widget gaps from rect spacing so `posAtCoords` is only called at the
- * break point (lazy `getPos`) rather than per line.
+ * Walks text descendants, collects one rect per visual line, and remembers
+ * the text node/offset that starts each fragment. That keeps split positions
+ * tied to the rendered DOM instead of caret hit-testing, which changes when
+ * the editor flips between editable and read-only modes.
  */
 function measureLinesWithDom(
   block: BlockInfo,
@@ -290,33 +357,24 @@ function measureLinesWithDom(
   invScale: number,
   blockShift: number,
 ): ParagraphLine[] {
-  interface Rect {
-    top: number;
-    bottom: number;
-    left: number;
-  }
-  const rects: Rect[] = [];
+  const rects: DomLineFragment[] = [];
   const walker = document.createTreeWalker(block.dom, NodeFilter.SHOW_TEXT);
   let textNode = walker.nextNode();
   while (textNode) {
-    const range = document.createRange();
-    range.selectNodeContents(textNode);
-    const domRects = range.getClientRects();
-    for (let i = 0; i < domRects.length; i++) {
-      const r = domRects[i];
-      if (r.width <= 0 || r.height <= 0) {
-        continue;
-      }
-      const last = rects[rects.length - 1];
-      if (last && Math.abs(r.top - last.top) < 1) {
-        if (r.bottom > last.bottom) {
-          last.bottom = r.bottom;
+    if (textNode instanceof Text) {
+      const fragments = collectDomLineFragments(textNode);
+      for (const fragment of fragments) {
+        const last = rects[rects.length - 1];
+        if (last && Math.abs(fragment.top - last.top) < 1) {
+          if (fragment.bottom > last.bottom) {
+            last.bottom = fragment.bottom;
+          }
+          if (fragment.left < last.left) {
+            last.left = fragment.left;
+          }
+        } else {
+          rects.push(fragment);
         }
-        if (r.left < last.left) {
-          last.left = r.left;
-        }
-      } else {
-        rects.push({ top: r.top, bottom: r.bottom, left: r.left });
       }
     }
     textNode = walker.nextNode();
@@ -371,18 +429,15 @@ function measureLinesWithDom(
     const measuredBottom = (rect.bottom - editorScreenTop) * invScale;
     const totalExistingShift = blockShift + innerShiftViewport * invScale;
 
-    // Capture rect for the lazy getPos closure.
-    const rectLeft = rect.left;
-    const rectCenterY = rect.top + (rect.bottom - rect.top) / 2;
     lines[i] = {
       naturalTop: measuredTop - totalExistingShift,
       naturalBottom: measuredBottom - totalExistingShift,
       getPos: () => {
-        const result = view.posAtCoords({
-          left: rectLeft + 1,
-          top: rectCenterY,
-        });
-        return result?.pos ?? null;
+        try {
+          return view.posAtDOM(rect.startNode, rect.startOffset, 1);
+        } catch {
+          return null;
+        }
       },
     };
   }
@@ -431,6 +486,9 @@ function calculateLayout(
 ): { breaks: Break[]; pageCount: number } {
   const sorted = [...existingBreaks].sort((a, b) => a.pos - b.pos);
   function existingShiftAt(pos: number): number {
+    // We measure against a DOM that still contains the previous pass's spacer
+    // widgets. Subtract their accumulated height to recover each block's
+    // "natural" top before deciding where the next pass should break.
     let shift = 0;
     for (const b of sorted) {
       if (b.pos <= pos) {
@@ -446,6 +504,8 @@ function calculateLayout(
   let pageStart = 0;
   let pageBoundary = CONTENT_HEIGHT;
   let pageCount = 1;
+  // Accumulates only the spacers chosen in this pass. This is distinct from
+  // `blockShift`, which removes the previous pass's widgets from measurements.
   let cumulativeShift = 0;
 
   for (const block of blocks) {
@@ -475,9 +535,7 @@ function calculateLayout(
         pageBoundary,
         cumulativeShift,
       );
-      for (const b of result.breaks) {
-        newBreaks.push(b);
-      }
+      newBreaks.push(...result.breaks);
       cumulativeShift = result.cumulativeShift;
       pageStart = result.pageStart;
       pageBoundary = result.pageBoundary;
@@ -514,14 +572,13 @@ function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
   }
   const decos: Decoration[] = [];
   for (const { pos, spacer, kind } of breaks) {
-    const widgetSpacer = spacer;
     decos.push(
       Decoration.widget(
         pos,
         () => {
           const div = document.createElement('div');
           div.style.display = 'block';
-          div.style.height = `${widgetSpacer}px`;
+          div.style.height = `${spacer}px`;
           div.style.userSelect = 'none';
           div.style.pointerEvents = 'none';
           div.contentEditable = 'false';
@@ -531,7 +588,7 @@ function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
         {
           side: -1,
           ignoreSelection: true,
-          key: `pb-${kind}-${pos}-${widgetSpacer}`,
+          key: `pb-${kind}-${pos}-${spacer}`,
         },
       ),
     );
@@ -555,6 +612,53 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
     }
   }
   return true;
+}
+
+function observeLayoutInvalidations(
+  view: EditorView,
+  schedule: (followUp?: boolean) => void,
+): () => void {
+  const cleanup: Array<() => void> = [];
+
+  if (typeof ResizeObserver !== 'undefined') {
+    const resizeObserver = new ResizeObserver(() => {
+      schedule(true);
+    });
+    resizeObserver.observe(view.dom);
+    cleanup.push(() => {
+      resizeObserver.disconnect();
+    });
+  }
+
+  const fontSet = document.fonts;
+  const onFontsReady = () => {
+    schedule(true);
+  };
+  const onFontLoadingDone = () => {
+    schedule(true);
+  };
+  const onFontLoadingError = () => {
+    schedule(true);
+  };
+  const onFocusIn = () => {
+    schedule(true);
+  };
+
+  void fontSet.ready.then(onFontsReady);
+  fontSet.addEventListener('loadingdone', onFontLoadingDone);
+  fontSet.addEventListener('loadingerror', onFontLoadingError);
+  view.dom.addEventListener('focusin', onFocusIn);
+  cleanup.push(() => {
+    fontSet.removeEventListener('loadingdone', onFontLoadingDone);
+    fontSet.removeEventListener('loadingerror', onFontLoadingError);
+    view.dom.removeEventListener('focusin', onFocusIn);
+  });
+
+  return () => {
+    for (const fn of cleanup) {
+      fn();
+    }
+  };
 }
 
 export function paginationPlugin(
@@ -607,11 +711,20 @@ export function paginationPlugin(
     },
     view(editorView) {
       let rafId = 0;
+      let destroyed = false;
+      let shouldRunFollowUp = false;
 
       function paginate() {
+        if (destroyed) {
+          return;
+        }
         rafId = 0;
+        const shouldQueueFollowUp = shouldRunFollowUp;
+        shouldRunFollowUp = false;
 
         const prev = paginationKey.getState(editorView.state);
+        const prevBreaks = prev?.breaks ?? [];
+        const prevPageCount = prev?.pageCount ?? 1;
         const editorOffsetTop = editorView.dom.offsetTop;
         const blocks = collectBlocks(editorView, editorOffsetTop);
         if (blocks.length === 0) {
@@ -632,12 +745,12 @@ export function paginationPlugin(
           editorView,
           editorScreenTop,
           invScale,
-          prev?.breaks ?? [],
+          prevBreaks,
         );
 
-        const prevBreaks = prev?.breaks ?? [];
-        const prevPageCount = prev?.pageCount ?? 1;
-        if (breaksEqual(breaks, prevBreaks) && pageCount === prevPageCount) {
+        const changed =
+          !breaksEqual(breaks, prevBreaks) || pageCount !== prevPageCount;
+        if (!changed) {
           return;
         }
 
@@ -650,26 +763,45 @@ export function paginationPlugin(
         tr.setMeta(paginationKey, { decos, breaks, pageCount });
         tr.setMeta(PM_ADD_TO_HISTORY, false);
         editorView.dispatch(tr);
+
+        // The first pass often measures an unpaginated DOM and then mutates it
+        // by inserting spacer widgets. Run one more frame against that new DOM
+        // so reopen-time layout can converge without waiting for a keystroke.
+        if (shouldQueueFollowUp) {
+          schedule();
+        }
       }
 
-      function schedule() {
-        if (rafId === 0) {
+      function schedule(followUp = false) {
+        shouldRunFollowUp = shouldRunFollowUp || followUp;
+        if (!destroyed && rafId === 0) {
           rafId = requestAnimationFrame(paginate);
         }
       }
 
+      // Reopen-time bug source: the doc can stay unchanged while the DOM keeps
+      // settling underneath it (web fonts swap in, Monaco/node views resize,
+      // etc.). If we only repaginate on PM transactions, those stale breaks
+      // survive until the next edit.
+      const stopObservingLayout = observeLayoutInvalidations(
+        editorView,
+        schedule,
+      );
+
       // Initial pagination after first paint.
-      schedule();
+      schedule(true);
 
       return {
         update(view, prevState) {
           // Skip selection-only state changes — they don't affect layout
           // and the previous pagination is still valid.
           if (view.state.doc !== prevState.doc) {
-            schedule();
+            schedule(true);
           }
         },
         destroy() {
+          destroyed = true;
+          stopObservingLayout();
           if (rafId !== 0) {
             cancelAnimationFrame(rafId);
           }

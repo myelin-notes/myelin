@@ -550,7 +550,9 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
 
+    const scale = window.devicePixelRatio || 1;
     const height = Math.max(72, Math.ceil(this.editor.getContentHeight()));
+    this.dom.style.height = `${height / scale}px`;
     this.editorEl.style.height = `${height}px`;
     this.editor.layout({ height, width: this.editorEl.clientWidth });
   }
