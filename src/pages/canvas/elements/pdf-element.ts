@@ -5,7 +5,7 @@ import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { bindYFields } from '../y-fields';
-import { DrawableElement } from './drawable-element';
+import { DrawableElement, ResizeHandles } from './drawable-element';
 import { ElementType } from './element-type';
 import {
   CHROME_BOTTOM_PADDING,
@@ -71,6 +71,14 @@ export class PdfElement extends DrawableElement {
 
   constructor(index: number) {
     super(index, ElementType.PDF);
+  }
+
+  public override get resizeHandles(): ResizeHandles {
+    return ResizeHandles.Corners;
+  }
+
+  public override get maintainAspectRatio(): boolean {
+    return true;
   }
 
   public override getYMapProps(): Record<string, unknown> {

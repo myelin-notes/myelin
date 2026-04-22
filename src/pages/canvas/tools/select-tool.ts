@@ -6,7 +6,10 @@ import {
 import type { MessageGetter } from '@/lib/i18n';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import type { DrawableElement } from '../elements/drawable-element';
+import type {
+  DrawableElement,
+  ResizeHandle,
+} from '../elements/drawable-element';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const HANDLE_HIT_RADIUS = 10;
@@ -37,9 +40,10 @@ export class SelectTool implements ITool {
 
   // Scale state
   private scalingElement: DrawableElement | null = null;
-  private handleIndex: number = -1;
+  private scalingHandle: ResizeHandle | null = null;
   private anchorWorld: Vector2 = { x: 0, y: 0 };
   private originalScale: Vector2 = { x: 1, y: 1 };
+  private originalOffset: Vector2 = { x: 0, y: 0 };
   private originalDraggedWorld: Vector2 = { x: 0, y: 0 };
 
   // Lasso state
@@ -107,17 +111,15 @@ export class SelectTool implements ITool {
       if (!e.isSelected) {
         continue;
       }
-      const handleIdx = this.hitHandle(e, point, canvas.viewport.zoom);
-      if (handleIdx >= 0) {
+      const handle = this.hitHandle(e, point, canvas.viewport.zoom);
+      if (handle) {
         this.mode = SelectMode.Scaling;
         this.scalingElement = e;
-        this.handleIndex = handleIdx;
+        this.scalingHandle = handle;
         this.originalScale = { ...e.scale };
-
-        const handles = e.getHandles();
-        const anchorIdx = 3 - handleIdx;
-        this.anchorWorld = handles[anchorIdx];
-        this.originalDraggedWorld = handles[handleIdx];
+        this.originalOffset = { ...e.offset };
+        this.anchorWorld = handle.anchor;
+        this.originalDraggedWorld = handle.position;
         return;
       }
     }
@@ -217,10 +219,11 @@ export class SelectTool implements ITool {
         break;
       }
       case SelectMode.Scaling: {
-        if (!this.scalingElement) {
+        if (!this.scalingElement || !this.scalingHandle) {
           break;
         }
         const e = this.scalingElement;
+        const h = this.scalingHandle;
         const localBox = e.localBoundingBox;
         if (localBox.width === 0 || localBox.height === 0) {
           break;
@@ -235,38 +238,39 @@ export class SelectTool implements ITool {
           y: position.y - this.anchorWorld.y,
         };
 
-        let ratioX = origDist.x !== 0 ? curDist.x / origDist.x : 1;
-        let ratioY = origDist.y !== 0 ? curDist.y / origDist.y : 1;
+        let ratioX = h.scaleX && origDist.x !== 0 ? curDist.x / origDist.x : 1;
+        let ratioY = h.scaleY && origDist.y !== 0 ? curDist.y / origDist.y : 1;
 
-        if (_event.shiftKey) {
+        const uniformScale =
+          h.scaleX && h.scaleY && (_event.shiftKey || e.maintainAspectRatio);
+        if (uniformScale) {
           const uniform = Math.abs(ratioX) > Math.abs(ratioY) ? ratioX : ratioY;
           ratioX = uniform;
           ratioY = uniform;
         }
 
         const newScale = {
-          x: Math.max(MIN_SCALE, this.originalScale.x * ratioX),
-          y: Math.max(MIN_SCALE, this.originalScale.y * ratioY),
+          x: h.scaleX
+            ? Math.max(MIN_SCALE, this.originalScale.x * ratioX)
+            : this.originalScale.x,
+          y: h.scaleY
+            ? Math.max(MIN_SCALE, this.originalScale.y * ratioY)
+            : this.originalScale.y,
         };
 
         e.setScale(newScale.x, newScale.y);
 
-        // Re-derive offset from CURRENT localBBox so elements with
-        // changing local bounds (e.g. text reflow) stay anchored.
-        const pad = 4; // SELECTION_PADDING
-        const padX = (3 - this.handleIndex) % 2 === 0 ? -pad : pad;
-        const padY = 3 - this.handleIndex < 2 ? -pad : pad;
+        // Re-read local bbox post-scale: elements like text reflow on resize.
         const local = e.localBoundingBox;
-        const localCorners = [
-          { x: local.x, y: local.y },
-          { x: local.right, y: local.y },
-          { x: local.x, y: local.bottom },
-          { x: local.right, y: local.bottom },
-        ];
-        const anchorLocal = localCorners[3 - this.handleIndex];
+        const localAnchorX = local.x + local.width * h.anchorFx;
+        const localAnchorY = local.y + local.height * h.anchorFy;
         const newOffset = {
-          x: this.anchorWorld.x - padX - anchorLocal.x * newScale.x,
-          y: this.anchorWorld.y - padY - anchorLocal.y * newScale.y,
+          x: h.scaleX
+            ? this.anchorWorld.x - h.anchorPad.x - localAnchorX * newScale.x
+            : this.originalOffset.x,
+          y: h.scaleY
+            ? this.anchorWorld.y - h.anchorPad.y - localAnchorY * newScale.y
+            : this.originalOffset.y,
         };
         e.setOffset(newOffset.x, newOffset.y);
         break;
@@ -359,8 +363,8 @@ export class SelectTool implements ITool {
       canvas.setCursor('move');
       return;
     }
-    if (this.mode === SelectMode.Scaling) {
-      canvas.setCursor(SelectTool.resizeCursor(this.handleIndex));
+    if (this.mode === SelectMode.Scaling && this.scalingHandle) {
+      canvas.setCursor(this.scalingHandle.cursor);
       return;
     }
 
@@ -370,9 +374,9 @@ export class SelectTool implements ITool {
       if (!e.isSelected) {
         continue;
       }
-      const handleIdx = this.hitHandle(e, position, canvas.viewport.zoom);
-      if (handleIdx >= 0) {
-        canvas.setCursor(SelectTool.resizeCursor(handleIdx));
+      const handle = this.hitHandle(e, position, canvas.viewport.zoom);
+      if (handle) {
+        canvas.setCursor(handle.cursor);
         return;
       }
     }
@@ -389,18 +393,11 @@ export class SelectTool implements ITool {
     canvas.setCursor('default');
   }
 
-  private static resizeCursor(handleIndex: number): string {
-    // 0: top-left, 3: bottom-right → nwse
-    // 1: top-right, 2: bottom-left → nesw
-    return handleIndex === 0 || handleIndex === 3
-      ? 'nwse-resize'
-      : 'nesw-resize';
-  }
-
   private reset() {
     this.mode = SelectMode.None;
     this.movingElements = [];
     this.scalingElement = null;
+    this.scalingHandle = null;
     this.lassoPath = [];
     this.clickToEditCandidate = null;
   }
@@ -409,17 +406,17 @@ export class SelectTool implements ITool {
     element: DrawableElement,
     point: Vector2,
     zoom: number,
-  ): number {
+  ): ResizeHandle | null {
     const handles = element.getHandles();
     const hitRadius = HANDLE_HIT_RADIUS / zoom;
-    for (let i = 0; i < handles.length; i++) {
-      const dx = point.x - handles[i].x;
-      const dy = point.y - handles[i].y;
+    for (const h of handles) {
+      const dx = point.x - h.position.x;
+      const dy = point.y - h.position.y;
       if (dx * dx + dy * dy <= hitRadius * hitRadius) {
-        return i;
+        return h;
       }
     }
-    return -1;
+    return null;
   }
 
   public getOptions(): ToolOption[] {

@@ -11,7 +11,7 @@ import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
-import { DrawableElement } from './drawable-element';
+import { DrawableElement, ResizeHandles } from './drawable-element';
 import { ElementType } from './element-type';
 import {
   CHROME_BOTTOM_PADDING,
@@ -54,6 +54,10 @@ export class PageFrameElement extends DrawableElement {
 
   constructor(index: number) {
     super(index, ElementType.PAGE_FRAME);
+  }
+
+  public override get resizeHandles(): ResizeHandles {
+    return ResizeHandles.HorizontalSides;
   }
 
   public override getYMapProps(): Record<string, unknown> {

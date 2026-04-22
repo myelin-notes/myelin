@@ -11,6 +11,57 @@ const SELECTION_PADDING = 4;
 const SELECTION_RADIUS = 4;
 const SELECTION_ANIM_SPEED = 8;
 
+export enum ResizeHandles {
+  None = 0,
+  TopLeft = 1 << 0,
+  Top = 1 << 1,
+  TopRight = 1 << 2,
+  Left = 1 << 3,
+  Right = 1 << 4,
+  BottomLeft = 1 << 5,
+  Bottom = 1 << 6,
+  BottomRight = 1 << 7,
+  Corners = TopLeft | TopRight | BottomLeft | BottomRight,
+  HorizontalSides = Left | Right,
+  VerticalSides = Top | Bottom,
+  Sides = HorizontalSides | VerticalSides,
+  All = Corners | Sides,
+}
+
+export interface ResizeHandle {
+  /** World-space handle position (for drawing & hit-test). */
+  position: Vector2;
+  /** World-space fixed point on the opposite side of the element. */
+  anchor: Vector2;
+  /** Selection-padding baked into `anchor`, subtracted during offset re-derivation. */
+  anchorPad: Vector2;
+  /** Anchor fraction along width (0/0.5/1) — used to re-read local bbox mid-drag. */
+  anchorFx: number;
+  /** Anchor fraction along height (0/0.5/1). */
+  anchorFy: number;
+  scaleX: boolean;
+  scaleY: boolean;
+  cursor: string;
+}
+
+interface HandleSpec {
+  flag: ResizeHandles;
+  fx: number;
+  fy: number;
+  cursor: string;
+}
+
+const HANDLE_SPECS: readonly HandleSpec[] = [
+  { flag: ResizeHandles.TopLeft, fx: 0, fy: 0, cursor: 'nwse-resize' },
+  { flag: ResizeHandles.Top, fx: 0.5, fy: 0, cursor: 'ns-resize' },
+  { flag: ResizeHandles.TopRight, fx: 1, fy: 0, cursor: 'nesw-resize' },
+  { flag: ResizeHandles.Left, fx: 0, fy: 0.5, cursor: 'ew-resize' },
+  { flag: ResizeHandles.Right, fx: 1, fy: 0.5, cursor: 'ew-resize' },
+  { flag: ResizeHandles.BottomLeft, fx: 0, fy: 1, cursor: 'nesw-resize' },
+  { flag: ResizeHandles.Bottom, fx: 0.5, fy: 1, cursor: 'ns-resize' },
+  { flag: ResizeHandles.BottomRight, fx: 1, fy: 1, cursor: 'nwse-resize' },
+];
+
 export abstract class DrawableElement {
   protected _scale: Vector2 = { x: 1, y: 1 };
   private _offset: Vector2 = { x: 0, y: 0 };
@@ -155,27 +206,29 @@ export abstract class DrawableElement {
     ctx.roundRect(x, y, w, h, r);
     ctx.stroke();
 
-    // Corner handles
+    // Resize handles
+    const flags = this.resizeHandles;
     const handleScale = eased;
     const size = HANDLE_SIZE * handleScale;
     const half = size / 2;
-    const corners: [number, number][] = [
-      [x - half, y - half],
-      [x + w - half, y - half],
-      [x - half, y + h - half],
-      [x + w - half, y + h - half],
-    ];
+    const radius = 1.5 * handleScale;
 
-    for (const [cx, cy] of corners) {
+    for (const spec of HANDLE_SPECS) {
+      if (!(flags & spec.flag)) {
+        continue;
+      }
+      const cx = x + w * spec.fx - half;
+      const cy = y + h * spec.fy - half;
+
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.roundRect(cx, cy, size, size, 1.5 * handleScale);
+      ctx.roundRect(cx, cy, size, size, radius);
       ctx.fill();
 
       ctx.strokeStyle = SELECTION_STROKE;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(cx, cy, size, size, 1.5 * handleScale);
+      ctx.roundRect(cx, cy, size, size, radius);
       ctx.stroke();
     }
 
@@ -268,16 +321,57 @@ export abstract class DrawableElement {
     return this.isOverLocal(localX, localY, localRadius, ctx);
   }
 
-  /** Handle corner positions in world space (includes selection padding) */
-  public getHandles(): Vector2[] {
+  /**
+   * Which resize handles this element exposes. Default: all 8.
+   * Override per element type to disable axes that don't make sense
+   * (e.g. page frames don't scale vertically).
+   */
+  public get resizeHandles(): ResizeHandles {
+    return ResizeHandles.All;
+  }
+
+  /** Force uniform scaling on corner drags (shift-key behavior, always on). */
+  public get maintainAspectRatio(): boolean {
+    return false;
+  }
+
+  /** Enabled resize handles in world space, with anchor & axis info. */
+  public getHandles(): ResizeHandle[] {
+    const flags = this.resizeHandles;
+    if (flags === ResizeHandles.None) {
+      return [];
+    }
     const box = this.boundingBox;
     const p = SELECTION_PADDING;
-    return [
-      { x: box.x - p, y: box.y - p },
-      { x: box.right + p, y: box.y - p },
-      { x: box.x - p, y: box.bottom + p },
-      { x: box.right + p, y: box.bottom + p },
-    ];
+    const result: ResizeHandle[] = [];
+
+    for (const spec of HANDLE_SPECS) {
+      if (!(flags & spec.flag)) {
+        continue;
+      }
+      const fxA = 1 - spec.fx;
+      const fyA = 1 - spec.fy;
+      result.push({
+        position: {
+          x: box.x + box.width * spec.fx + (2 * spec.fx - 1) * p,
+          y: box.y + box.height * spec.fy + (2 * spec.fy - 1) * p,
+        },
+        anchor: {
+          x: box.x + box.width * fxA + (2 * fxA - 1) * p,
+          y: box.y + box.height * fyA + (2 * fyA - 1) * p,
+        },
+        anchorPad: {
+          x: (2 * fxA - 1) * p,
+          y: (2 * fyA - 1) * p,
+        },
+        anchorFx: fxA,
+        anchorFy: fyA,
+        scaleX: spec.fx !== 0.5,
+        scaleY: spec.fy !== 0.5,
+        cursor: spec.cursor,
+      });
+    }
+    return result;
   }
 
   /** Return type-specific Y.Map properties for initial serialization. */
