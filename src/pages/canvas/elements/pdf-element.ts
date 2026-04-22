@@ -339,6 +339,10 @@ export class PdfElement extends DrawableElement {
     const dpr = window.devicePixelRatio || 1;
     const totalWidth = this.totalWidth;
     const totalHeight = this.totalHeight;
+    const sX = this._scale.x;
+    const sY = this._scale.y;
+    const scaledWidth = totalWidth * sX;
+    const scaledHeight = totalHeight * sY;
 
     const screenX = snapToDevicePixel((this.offset.x + offset.x) * zoom);
     const screenY = snapToDevicePixel((this.offset.y + offset.y) * zoom);
@@ -346,21 +350,23 @@ export class PdfElement extends DrawableElement {
     chrome.sync({
       screenX,
       screenY,
-      contentWidth: totalWidth,
-      contentHeight: totalHeight,
+      contentWidth: scaledWidth,
+      contentHeight: scaledHeight,
       zoom,
     });
 
     // frameDiv lives inside chrome.contentSlot — sized in screen pixels like
     // the old standalone frame. No translate needed; position via its parent.
-    frameDiv.style.width = `${totalWidth * zoom}px`;
-    frameDiv.style.height = `${totalHeight * zoom}px`;
+    frameDiv.style.width = `${scaledWidth * zoom}px`;
+    frameDiv.style.height = `${scaledHeight * zoom}px`;
     frameDiv.style.pointerEvents = this._editing ? 'auto' : 'none';
 
+    // viewportDiv holds pages at intrinsic size; element scale + canvas zoom
+    // are both applied via transform so page rasters don't need reflowing.
     viewportDiv.style.width = `${totalWidth}px`;
     viewportDiv.style.height = `${totalHeight}px`;
     viewportDiv.style.zoom = `${dpr}`;
-    viewportDiv.style.transform = `scale(${zoom / dpr})`;
+    viewportDiv.style.transform = `scale(${(zoom * sX) / dpr}, ${(zoom * sY) / dpr})`;
 
     this.syncPages();
   }

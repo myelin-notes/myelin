@@ -14,6 +14,7 @@ interface UseCanvasEngineArgs {
   id: string | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   domOverlayRef: React.RefObject<HTMLDivElement | null>;
   wheelRef: React.RefObject<WheelPickerHandle | null>;
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
@@ -26,6 +27,7 @@ export function useCanvasEngine({
   id,
   canvasRef,
   bgCanvasRef,
+  overlayCanvasRef,
   domOverlayRef,
   wheelRef,
   drawableCanvasRef,
@@ -64,6 +66,7 @@ export function useCanvasEngine({
       id,
       canvasRef,
       bgCanvasRef,
+      overlayCanvasRef,
       domOverlayRef,
       wheelRef,
       drawableCanvasRef,

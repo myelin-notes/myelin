@@ -21,6 +21,7 @@ export function CanvasView() {
   const { id } = useParams<{ id: string }>();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
@@ -39,6 +40,7 @@ export function CanvasView() {
     id,
     canvasRef,
     bgCanvasRef,
+    overlayCanvasRef,
     domOverlayRef,
     wheelRef,
     drawableCanvasRef,
@@ -70,10 +72,18 @@ export function CanvasView() {
         style={{ zIndex: 5 }}
       />
 
-      {/* Foreground canvas: strokes, images, selection (z-index toggled by DrawableCanvas) */}
+      {/* Foreground canvas: strokes, images, element content (z-index toggled by DrawableCanvas during edit) */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full"
+      />
+
+      {/* Selection overlay canvas: outline + handles. Always above DOM chrome
+          so selection stays visible while editing a page-frame/PDF. */}
+      <canvas
+        ref={overlayCanvasRef}
+        className="pointer-events-none absolute inset-0 block h-full w-full"
+        style={{ zIndex: 12 }}
       />
 
       {/* Frame chrome controls (hamburger buttons). Sits above the foreground

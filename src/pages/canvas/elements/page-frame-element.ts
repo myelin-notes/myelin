@@ -11,7 +11,7 @@ import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
-import { DrawableElement, ResizeHandles } from './drawable-element';
+import { DrawableElement, type ResizeHandle, ResizeHandles } from './drawable-element';
 import { ElementType } from './element-type';
 import {
   CHROME_BOTTOM_PADDING,
@@ -24,6 +24,7 @@ export const PAGE_HEIGHT = 880;
 export const PAGE_PADDING = 48;
 export const PAGE_GAP = 40;
 export const PAGE_CORNER_RADIUS = 3;
+const MIN_PAGE_WIDTH = 240;
 
 const logger = new Logger('PageFrameElement');
 
@@ -58,6 +59,42 @@ export class PageFrameElement extends DrawableElement {
 
   public override get resizeHandles(): ResizeHandles {
     return ResizeHandles.HorizontalSides;
+  }
+
+  private _resizeOriginalPageWidth: number = PAGE_WIDTH;
+
+  public override beginResize(): void {
+    this._resizeOriginalPageWidth = this._pageWidth;
+  }
+
+  public override applyResize(opts: {
+    handle: ResizeHandle;
+    originalScale: { x: number; y: number };
+    originalOffset: { x: number; y: number };
+    ratioX: number;
+    ratioY: number;
+    anchorWorld: { x: number; y: number };
+  }): void {
+    const { handle: h, originalOffset, ratioX, anchorWorld } = opts;
+    if (!h.scaleX) {
+      return;
+    }
+
+    const newWidth = Math.max(
+      MIN_PAGE_WIDTH,
+      this._resizeOriginalPageWidth * ratioX,
+    );
+    if (newWidth !== this._pageWidth) {
+      this._pageWidth = newWidth;
+      this.syncToYMap({ pageWidth: newWidth });
+    }
+
+    // _scale stays at 1, so re-derive offset without a scale multiplier.
+    // Anchor side of the frame (incl. chrome padding) must stay at anchorWorld.
+    const local = this.localBoundingBox;
+    const localAnchorX = local.x + local.width * h.anchorFx;
+    const newOffsetX = anchorWorld.x - h.anchorPad.x - localAnchorX;
+    this.setOffset(newOffsetX, originalOffset.y);
   }
 
   public override getYMapProps(): Record<string, unknown> {

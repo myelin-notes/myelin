@@ -8,7 +8,6 @@ import {
   PAGE_GAP,
   PAGE_HEIGHT,
   PAGE_PADDING,
-  PAGE_WIDTH,
   type PageFrameElement,
 } from '../../elements/page-frame-element';
 import { PM_EDITOR_CLASS, PM_UPDATE_EVENT } from '../pm/constants';
@@ -26,7 +25,6 @@ const VIEWPORT_STYLE: Record<string, string> = {
   position: 'absolute',
   left: '0px',
   top: '0px',
-  width: `${PAGE_WIDTH}px`,
   overflow: 'hidden',
 };
 
@@ -51,7 +49,6 @@ interface FrameRefs {
 const PAGE_CHROME_STYLE: Record<string, string> = {
   position: 'absolute',
   left: '0px',
-  width: `${PAGE_WIDTH}px`,
   height: `${PAGE_HEIGHT}px`,
   background: '#ffffff',
   borderRadius: `${PAGE_CORNER_RADIUS}px`,
@@ -65,7 +62,11 @@ function snapToDevicePixel(value: number): number {
   return Math.round(value * dpr) / dpr;
 }
 
-function syncPageChrome(refs: FrameRefs, numPages: number): void {
+function syncPageChrome(
+  refs: FrameRefs,
+  numPages: number,
+  pageWidth: number,
+): void {
   while (refs.pageChromeDivs.length < numPages) {
     const div = document.createElement('div');
     Object.assign(div.style, PAGE_CHROME_STYLE);
@@ -77,6 +78,7 @@ function syncPageChrome(refs: FrameRefs, numPages: number): void {
   }
   for (let p = 0; p < numPages; p++) {
     refs.pageChromeDivs[p].style.top = `${p * (PAGE_HEIGHT + PAGE_GAP)}px`;
+    refs.pageChromeDivs[p].style.width = `${pageWidth}px`;
   }
 }
 
@@ -171,17 +173,18 @@ export function PageFrameDomLayer({
         const screenX = snapToDevicePixel((frame.offset.x + offset.x) * zoom);
         const screenY = snapToDevicePixel((frame.offset.y + offset.y) * zoom);
 
+        const pageWidth = frame.pageWidth;
         refs.chrome.sync({
           screenX,
           screenY,
-          contentWidth: PAGE_WIDTH,
+          contentWidth: pageWidth,
           contentHeight: frame.totalHeight,
           zoom,
         });
 
         // Inner frame: screen-sized clip box, lives inside chrome contentSlot
         // so no extra translate needed — contentSlot positions it.
-        refs.frameDiv.style.width = `${PAGE_WIDTH * zoom}px`;
+        refs.frameDiv.style.width = `${pageWidth * zoom}px`;
         refs.frameDiv.style.height = `${frame.totalHeight * zoom}px`;
         refs.frameDiv.style.transform = '';
 
@@ -192,13 +195,14 @@ export function PageFrameDomLayer({
         // never change — the variable canvas zoom is handled entirely by
         // transform: scale(), which is a post-layout GPU operation.
         const dpr = window.devicePixelRatio || 1;
+        refs.viewportDiv.style.width = `${pageWidth}px`;
         refs.viewportDiv.style.height = `${frame.totalHeight}px`;
         refs.viewportDiv.style.zoom = `${dpr}`;
         refs.viewportDiv.style.setProperty('--vp-zoom', `${dpr}`);
         refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
 
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
-        syncPageChrome(refs, frame.numPages);
+        syncPageChrome(refs, frame.numPages, pageWidth);
       }
 
       removeStaleFrames(frameMap.current, existingIndices);

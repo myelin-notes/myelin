@@ -13,7 +13,6 @@ import type {
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const HANDLE_HIT_RADIUS = 10;
-const MIN_SCALE = 0.05;
 
 enum SelectMode {
   None,
@@ -120,6 +119,7 @@ export class SelectTool implements ITool {
         this.originalOffset = { ...e.offset };
         this.anchorWorld = handle.anchor;
         this.originalDraggedWorld = handle.position;
+        e.beginResize();
         return;
       }
     }
@@ -249,30 +249,14 @@ export class SelectTool implements ITool {
           ratioY = uniform;
         }
 
-        const newScale = {
-          x: h.scaleX
-            ? Math.max(MIN_SCALE, this.originalScale.x * ratioX)
-            : this.originalScale.x,
-          y: h.scaleY
-            ? Math.max(MIN_SCALE, this.originalScale.y * ratioY)
-            : this.originalScale.y,
-        };
-
-        e.setScale(newScale.x, newScale.y);
-
-        // Re-read local bbox post-scale: elements like text reflow on resize.
-        const local = e.localBoundingBox;
-        const localAnchorX = local.x + local.width * h.anchorFx;
-        const localAnchorY = local.y + local.height * h.anchorFy;
-        const newOffset = {
-          x: h.scaleX
-            ? this.anchorWorld.x - h.anchorPad.x - localAnchorX * newScale.x
-            : this.originalOffset.x,
-          y: h.scaleY
-            ? this.anchorWorld.y - h.anchorPad.y - localAnchorY * newScale.y
-            : this.originalOffset.y,
-        };
-        e.setOffset(newOffset.x, newOffset.y);
+        e.applyResize({
+          handle: h,
+          originalScale: this.originalScale,
+          originalOffset: this.originalOffset,
+          ratioX,
+          ratioY,
+          anchorWorld: this.anchorWorld,
+        });
         break;
       }
       case SelectMode.Marquee: {
@@ -327,7 +311,8 @@ export class SelectTool implements ITool {
         break;
       }
       case SelectMode.Scaling: {
-        // Yjs captures setScale/setOffset mutations automatically — no command needed
+        // Yjs captures mutations automatically — no command needed
+        this.scalingElement?.endResize();
         break;
       }
     }
@@ -347,10 +332,13 @@ export class SelectTool implements ITool {
     }
     if (this.mode === SelectMode.Scaling && this.scalingElement) {
       const e = this.scalingElement;
-      if (
+      const changed =
         e.scale.x !== this.originalScale.x ||
-        e.scale.y !== this.originalScale.y
-      ) {
+        e.scale.y !== this.originalScale.y ||
+        e.offset.x !== this.originalOffset.x ||
+        e.offset.y !== this.originalOffset.y;
+      e.endResize();
+      if (changed) {
         canvas.undo();
       }
     }

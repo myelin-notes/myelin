@@ -124,6 +124,7 @@ interface UseCanvasSessionLifecycleArgs {
   id: string | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   domOverlayRef: React.RefObject<HTMLDivElement | null>;
   wheelRef: React.RefObject<WheelPickerHandle | null>;
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
@@ -140,6 +141,7 @@ export function useCanvasSessionLifecycle({
   id,
   canvasRef,
   bgCanvasRef,
+  overlayCanvasRef,
   domOverlayRef,
   wheelRef,
   drawableCanvasRef,
@@ -239,6 +241,9 @@ export function useCanvasSessionLifecycle({
 
         if (bgCanvasRef.current) {
           dc.setBackgroundCanvas(bgCanvasRef.current);
+        }
+        if (overlayCanvasRef.current) {
+          dc.setOverlayCanvas(overlayCanvasRef.current);
         }
         if (domOverlayRef.current) {
           dc.setDomOverlayHost(domOverlayRef.current);

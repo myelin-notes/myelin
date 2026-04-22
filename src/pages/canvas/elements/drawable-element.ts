@@ -11,6 +11,8 @@ const SELECTION_PADDING = 4;
 const SELECTION_RADIUS = 4;
 const SELECTION_ANIM_SPEED = 8;
 
+export const MIN_SCALE = 0.05;
+
 export enum ResizeHandles {
   None = 0,
   TopLeft = 1 << 0,
@@ -150,34 +152,46 @@ export abstract class DrawableElement {
     this._hidden = value;
   }
 
+  /** Draw element content. Selection outline is drawn separately by `drawSelectionOverlay`. */
   public draw(ctx: CanvasRenderingContext2D, deltaTime: number): void {
     if (this._hidden) {
       return;
     }
-    ctx.save();
-
-    ctx.translate(this._offset.x, this._offset.y);
-    ctx.scale(this._scale.x, this._scale.y);
-    this.draw2D(ctx, deltaTime);
-
     if (this.selected) {
       this.selectionT = Math.min(
         1,
         this.selectionT + deltaTime * SELECTION_ANIM_SPEED,
       );
     }
-
-    // Draw selection outside the element's scale transform
+    ctx.save();
+    ctx.translate(this._offset.x, this._offset.y);
+    ctx.scale(this._scale.x, this._scale.y);
+    this.draw2D(ctx, deltaTime);
     ctx.restore();
-    if (this.selectionT > 0) {
-      ctx.save();
-      ctx.translate(this._offset.x, this._offset.y);
-      this.drawSelection(ctx, this.selectionT);
-      ctx.restore();
-    }
   }
 
-  private drawSelection(ctx: CanvasRenderingContext2D, t: number): void {
+  /**
+   * Draw the selection outline + handles. Lives on a separate always-on-top
+   * canvas so it's visible above DOM-backed editing chrome.
+   */
+  public drawSelectionOverlay(
+    ctx: CanvasRenderingContext2D,
+    isEditing: boolean,
+  ): void {
+    if (this._hidden || this.selectionT <= 0) {
+      return;
+    }
+    ctx.save();
+    ctx.translate(this._offset.x, this._offset.y);
+    this.drawSelection(ctx, this.selectionT, isEditing);
+    ctx.restore();
+  }
+
+  private drawSelection(
+    ctx: CanvasRenderingContext2D,
+    t: number,
+    isEditing: boolean,
+  ): void {
     const local = this.localBoundingBox;
     const eased = 1 - (1 - t) * (1 - t);
 
@@ -192,11 +206,13 @@ export abstract class DrawableElement {
 
     ctx.globalAlpha = eased;
 
-    // Selection fill
-    ctx.fillStyle = `rgba(208, 225, 251, 0.12)`;
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, r);
-    ctx.fill();
+    // Selection fill — skipped while editing to keep the editing surface clean.
+    if (!isEditing) {
+      ctx.fillStyle = `rgba(208, 225, 251, 0.12)`;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+      ctx.fill();
+    }
 
     // Selection border
     ctx.strokeStyle = SELECTION_STROKE;
@@ -250,8 +266,9 @@ export abstract class DrawableElement {
   }
 
   /**
-   * Whether entering edit mode requires the foreground canvas to sit under
-   * DOM-backed editing chrome owned by the element.
+   * Whether the foreground canvas should drop below the DOM chrome while this
+   * element is in edit mode (so strokes don't bleed onto the editing surface).
+   * The selection outline still renders on the overlay canvas above chrome.
    */
   public get lowersCanvasWhileEditing(): boolean {
     return false;
@@ -373,6 +390,48 @@ export abstract class DrawableElement {
     }
     return result;
   }
+
+  /** Called once when a resize drag begins. Snapshot any baseline state here. */
+  public beginResize(): void {}
+
+  /**
+   * Apply a resize drag update. Default implementation scales the element
+   * (setScale) and re-derives offset so the anchor side stays fixed. Override
+   * to interpret the drag differently (e.g. page frame changing page width
+   * rather than scale).
+   */
+  public applyResize(opts: {
+    handle: ResizeHandle;
+    originalScale: Vector2;
+    originalOffset: Vector2;
+    ratioX: number;
+    ratioY: number;
+    anchorWorld: Vector2;
+  }): void {
+    const { handle: h, originalScale, originalOffset, ratioX, ratioY, anchorWorld } = opts;
+    const newScaleX = h.scaleX
+      ? Math.max(MIN_SCALE, originalScale.x * ratioX)
+      : originalScale.x;
+    const newScaleY = h.scaleY
+      ? Math.max(MIN_SCALE, originalScale.y * ratioY)
+      : originalScale.y;
+    this.setScale(newScaleX, newScaleY);
+
+    // Re-read local bbox post-scale: elements like text reflow on resize.
+    const local = this.localBoundingBox;
+    const localAnchorX = local.x + local.width * h.anchorFx;
+    const localAnchorY = local.y + local.height * h.anchorFy;
+    const newOffsetX = h.scaleX
+      ? anchorWorld.x - h.anchorPad.x - localAnchorX * newScaleX
+      : originalOffset.x;
+    const newOffsetY = h.scaleY
+      ? anchorWorld.y - h.anchorPad.y - localAnchorY * newScaleY
+      : originalOffset.y;
+    this.setOffset(newOffsetX, newOffsetY);
+  }
+
+  /** Called once when a resize drag ends (commit or interrupt). */
+  public endResize(): void {}
 
   /** Return type-specific Y.Map properties for initial serialization. */
   public abstract getYMapProps(): Record<string, unknown>;

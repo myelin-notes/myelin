@@ -34,6 +34,8 @@ export class DrawableCanvas {
   private readonly canvas: HTMLCanvasElement;
   private bgCtx: CanvasRenderingContext2D | null = null;
   private bgCanvas: HTMLCanvasElement | null = null;
+  private overlayCtx: CanvasRenderingContext2D | null = null;
+  private overlayCanvas: HTMLCanvasElement | null = null;
   private readonly state: StateMachine<InteractState>;
   public readonly tools: ITool[];
   private bgPattern: CanvasPattern | null = null;
@@ -218,6 +220,17 @@ export class DrawableCanvas {
     this.resizeBgCanvas(window.innerWidth, window.innerHeight);
   }
 
+  /**
+   * Always-on-top canvas used to render selection outline + handles, so they
+   * remain visible above DOM-backed editing chrome (where the main canvas is
+   * lowered to z=2 to avoid strokes bleeding onto edited text).
+   */
+  public setOverlayCanvas(canvas: HTMLCanvasElement): void {
+    this.overlayCanvas = canvas;
+    this.overlayCtx = canvas.getContext('2d', { alpha: true });
+    this.resizeOverlayCanvas(window.innerWidth, window.innerHeight);
+  }
+
   public setDomOverlayHost(host: HTMLElement): void {
     this._domOverlayHost = host;
   }
@@ -244,8 +257,13 @@ export class DrawableCanvas {
     event?.stopPropagation();
 
     this._editingElement = element;
-    // Drop foreground canvas below DOM layer (z:5) so editing UI receives events
+    // Canvas stops intercepting pointer events so the DOM editor (chrome
+    // contentEditable / inline text input) receives them.
     this.canvas.style.pointerEvents = 'none';
+    // For elements with DOM-backed editing chrome (page frame, PDF), drop the
+    // foreground canvas below the chrome so strokes don't bleed onto the
+    // editing surface. The selection outline lives on a separate overlay
+    // canvas (z=12) so it stays visible above chrome.
     if (element.lowersCanvasWhileEditing) {
       this.canvas.style.zIndex = '2';
     }
@@ -291,7 +309,6 @@ export class DrawableCanvas {
     // Yjs captures changes automatically — no command to push
     this._editingElement = null;
     this.viewport.editMode = false;
-    // Restore foreground canvas above DOM layer (z:5)
     this.canvas.style.pointerEvents = '';
     this.canvas.style.zIndex = '10';
     this.onElementEdit?.(null);
@@ -339,7 +356,7 @@ export class DrawableCanvas {
       }
     }
 
-    // Foreground canvas
+    // Foreground canvas: element content + tool cursor
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.clearRect(0, 0, logicalW, logicalH);
 
@@ -355,6 +372,24 @@ export class DrawableCanvas {
     const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
     this.toolSelected.drawCursor(this.ctx, mouseWorld);
     this.ctx.restore();
+
+    // Overlay canvas: selection outline + handles. Always above DOM chrome
+    // so selection stays visible while a page-frame/PDF is being edited (the
+    // foreground canvas is lowered below chrome in that mode).
+    if (this.overlayCtx && this.overlayCanvas) {
+      const overlayW = this.overlayCanvas.width / dpr;
+      const overlayH = this.overlayCanvas.height / dpr;
+      this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.overlayCtx.clearRect(0, 0, overlayW, overlayH);
+      this.overlayCtx.save();
+      this.overlayCtx.scale(zoom, zoom);
+      this.overlayCtx.translate(offset.x, offset.y);
+      const editing = this._editingElement;
+      for (const element of this._elements) {
+        element.drawSelectionOverlay(this.overlayCtx, element === editing);
+      }
+      this.overlayCtx.restore();
+    }
 
     const host = this._domOverlayHost;
     if (host) {
@@ -444,6 +479,7 @@ export class DrawableCanvas {
     this._handleResize = () => {
       this.resizeCanvas(window.innerWidth, window.innerHeight);
       this.resizeBgCanvas(window.innerWidth, window.innerHeight);
+      this.resizeOverlayCanvas(window.innerWidth, window.innerHeight);
     };
     window.addEventListener('resize', this._handleResize);
   }
@@ -622,6 +658,17 @@ export class DrawableCanvas {
     this.bgCanvas.height = height * dpr;
     this.bgCanvas.style.width = `${width}px`;
     this.bgCanvas.style.height = `${height}px`;
+  }
+
+  private resizeOverlayCanvas(width: number, height: number) {
+    if (!this.overlayCanvas) {
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    this.overlayCanvas.width = width * dpr;
+    this.overlayCanvas.height = height * dpr;
+    this.overlayCanvas.style.width = `${width}px`;
+    this.overlayCanvas.style.height = `${height}px`;
   }
 
   public setSpaceDown(value: boolean) {
