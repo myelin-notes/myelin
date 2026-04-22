@@ -207,6 +207,7 @@ export function LibraryPage() {
                     }}
                   >
                     <RecentCard
+                      nodeId={file.id}
                       category={
                         strings.library.fileTypes[
                           file.fileType as keyof typeof strings.library.fileTypes

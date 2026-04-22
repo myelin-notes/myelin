@@ -2,7 +2,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { appCacheDir, join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
-  exists,
+  exists as fsExists,
   mkdir,
   open,
   remove as removeFile,
@@ -10,7 +10,7 @@ import {
 
 const THUMBNAILS_DIR = 'Thumbnails';
 async function ensureThumbnailDir(): Promise<void> {
-  if (!(await exists(THUMBNAILS_DIR, { baseDir: BaseDirectory.AppCache }))) {
+  if (!(await fsExists(THUMBNAILS_DIR, { baseDir: BaseDirectory.AppCache }))) {
     await mkdir(THUMBNAILS_DIR, {
       baseDir: BaseDirectory.AppCache,
       recursive: true,
@@ -44,8 +44,13 @@ export namespace ThumbnailCache {
 
   export async function remove(nodeId: string): Promise<void> {
     const thumbPath = await join(THUMBNAILS_DIR, `${nodeId}.png`);
-    if (await exists(thumbPath, { baseDir: BaseDirectory.AppCache })) {
+    if (await fsExists(thumbPath, { baseDir: BaseDirectory.AppCache })) {
       await removeFile(thumbPath, { baseDir: BaseDirectory.AppCache });
     }
+  }
+
+  export async function exists(nodeId: string): Promise<boolean> {
+    const thumbPath = await join(THUMBNAILS_DIR, `${nodeId}.png`);
+    return await fsExists(thumbPath, { baseDir: BaseDirectory.AppCache });
   }
 }
