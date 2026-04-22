@@ -2,7 +2,6 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { Logger } from '@/lib/logger';
 import { type NoteSession, useRepository } from '@/lib/sync';
-import { IrohTransport } from '@/lib/sync/live/iroh';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { DrawableElement } from '@/pages/canvas/elements/drawable-element';
 import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
@@ -150,7 +149,6 @@ export function useCanvasSessionLifecycle({
 }: UseCanvasSessionLifecycleArgs) {
   const repository = useRepository();
   const noteSessionRef = useRef<NoteSession | null>(null);
-  const autoSyncTransportRef = useRef<IrohTransport | null>(null);
   const handleCanvasPointerDown = useEffectEvent(() => {
     onCanvasPointerDown();
   });
@@ -200,17 +198,12 @@ export function useCanvasSessionLifecycle({
 
     let disposed = false;
     const priorSession = noteSessionRef.current;
-    const priorAutoSyncTransport = autoSyncTransportRef.current;
     noteSessionRef.current = null;
-    autoSyncTransportRef.current = null;
     setNoteSession(null);
     setYdoc(null);
     setEditingElement(null);
     void priorSession?.close().catch((error) => {
       logger.error('Failed to close prior session', error, { id });
-    });
-    void priorAutoSyncTransport?.destroy().catch((error) => {
-      logger.error('Failed to destroy prior transport', error, { id });
     });
 
     const removeListeners = setupCanvasListeners(
@@ -233,13 +226,6 @@ export function useCanvasSessionLifecycle({
         noteSessionRef.current = session;
         setNoteSession(session);
         setYdoc(session.ydoc);
-
-        const autoSyncTransport = new IrohTransport(session.id);
-        autoSyncTransportRef.current = autoSyncTransport;
-        session.setTransport(autoSyncTransport);
-        autoSyncTransport.autoSync().catch((err) => {
-          logger.error('Auto-sync failed', err, { id });
-        });
 
         const currentNode = await repository.getNode(id);
         if (disposed) {
@@ -295,18 +281,11 @@ export function useCanvasSessionLifecycle({
       disposed = true;
       const session = noteSessionRef.current;
       noteSessionRef.current = null;
-      const autoSyncTransport = autoSyncTransportRef.current;
-      autoSyncTransportRef.current = null;
       setNoteSession(null);
       setYdoc(null);
       setEditingElement(null);
       void session?.close().catch((error) => {
         logger.error('Failed to close session during cleanup', error, { id });
-      });
-      void autoSyncTransport?.destroy().catch((error) => {
-        logger.error('Failed to destroy transport during cleanup', error, {
-          id,
-        });
       });
       stopAnimation();
       removeListeners();

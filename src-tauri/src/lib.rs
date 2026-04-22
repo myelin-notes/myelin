@@ -1,7 +1,6 @@
 use tauri::Manager;
 
 mod iroh_transport;
-mod rendezvous;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,9 +11,8 @@ pub fn run() {
                 .app_local_data_dir()
                 .expect("could not resolve app local data path")
                 .join("stronghold-salt.txt");
-            app.handle().plugin(
-                tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build(),
-            )?;
+            app.handle()
+                .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
@@ -26,7 +24,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
             iroh_transport::iroh_join,
-            iroh_transport::iroh_auto_sync,
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
         ]);

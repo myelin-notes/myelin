@@ -245,7 +245,9 @@ async function writeBatch(batch: string[]): Promise<void> {
 }
 
 function scheduleFlush(): void {
-  if (flushPromise) return;
+  if (flushPromise) {
+    return;
+  }
 
   flushPromise = (async () => {
     while (queue.length > 0) {
@@ -266,7 +268,9 @@ function scheduleFlush(): void {
     }
   })().finally(() => {
     flushPromise = null;
-    if (queue.length > 0) scheduleFlush();
+    if (queue.length > 0) {
+      scheduleFlush();
+    }
   });
 }
 

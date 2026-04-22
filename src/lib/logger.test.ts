@@ -139,5 +139,4 @@ describe('Logger', () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledTimes(1);
   });
-
 });
