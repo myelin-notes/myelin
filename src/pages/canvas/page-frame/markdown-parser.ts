@@ -166,6 +166,38 @@ function parseInline(text: string, schema: Schema): PMNode[] {
   return scanInline(text, schema, []);
 }
 
+function isExactDelimiterRun(
+  text: string,
+  index: number,
+  delimiter: string,
+): boolean {
+  if (!text.startsWith(delimiter, index)) {
+    return false;
+  }
+
+  const char = delimiter[0];
+  const before = index > 0 ? text[index - 1] : '';
+  const after = text[index + delimiter.length] ?? '';
+  return before !== char && after !== char;
+}
+
+function findClosingDelimiterRun(
+  text: string,
+  from: number,
+  delimiter: string,
+): number {
+  for (let i = from; i <= text.length - delimiter.length; i++) {
+    if (text[i] === '\\') {
+      i++;
+      continue;
+    }
+    if (isExactDelimiterRun(text, i, delimiter)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 function scanInline(
   text: string,
   schema: Schema,
@@ -242,6 +274,29 @@ function scanInline(
           );
         }
         i = end + 1;
+        continue;
+      }
+    }
+
+    // Bold + italic: ***...***
+    if (
+      ch === '*' &&
+      text[i + 1] === '*' &&
+      text[i + 2] === '*' &&
+      isExactDelimiterRun(text, i, '***')
+    ) {
+      const end = findClosingDelimiterRun(text, i + 3, '***');
+      if (end !== -1) {
+        pushText();
+        const inner = text.slice(i + 3, end);
+        for (const child of scanInline(inner, schema, [
+          ...baseMarks,
+          schema.marks.bold.create(),
+          schema.marks.italic.create(),
+        ])) {
+          nodes.push(child);
+        }
+        i = end + 3;
         continue;
       }
     }
