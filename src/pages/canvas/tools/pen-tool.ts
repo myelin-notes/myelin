@@ -4,15 +4,15 @@ import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { StrokeElement } from '../elements/stroke-element';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
-const PEN_COLORS = [
-  '#191c1e',
-  '#64748b',
-  '#1c2738',
-  '#3b82f6',
-  '#ef4444',
-  '#059669',
-  '#f59e0b',
-  '#8b5cf6',
+export const PEN_COLORS = [
+  '#191c1e', // black
+  '#64748b', // slate
+  '#ef4444', // red
+  '#f59e0b', // orange
+  '#eab308', // yellow
+  '#059669', // green
+  '#3b82f6', // blue
+  '#8b5cf6', // purple
 ];
 
 export class PenTool implements ITool {

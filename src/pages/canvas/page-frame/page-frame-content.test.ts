@@ -131,8 +131,7 @@ describe('page-frame content shape', () => {
   });
 
   it('keeps bold italics, normal bold, and normal italics distinct when they appear side by side', () => {
-    const markdown =
-      '***bold italics*** **normal bold** *normal italics*';
+    const markdown = '***bold italics*** **normal bold** *normal italics*';
     const doc = parseMarkdownToDoc(markdown, schema);
     const ydoc = prosemirrorToYDoc(doc, 'page-frame');
     const roundTripped = yXmlFragmentToProseMirrorRootNode(

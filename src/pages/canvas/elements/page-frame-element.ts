@@ -11,7 +11,11 @@ import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
-import { DrawableElement, type ResizeHandle, ResizeHandles } from './drawable-element';
+import {
+  DrawableElement,
+  type ResizeHandle,
+  ResizeHandles,
+} from './drawable-element';
 import { ElementType } from './element-type';
 import {
   CHROME_BOTTOM_PADDING,

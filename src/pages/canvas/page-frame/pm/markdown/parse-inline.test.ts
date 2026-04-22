@@ -24,9 +24,7 @@ describe('parseInlineMarkdown', () => {
   });
 
   it('keeps bold italics, normal bold, and normal italics separate when they are side by side', () => {
-    expect(
-      parseInlineMarkdown('***both*** **bold** *italic*'),
-    ).toEqual({
+    expect(parseInlineMarkdown('***both*** **bold** *italic*')).toEqual({
       ranges: [
         {
           kind: 'italic',

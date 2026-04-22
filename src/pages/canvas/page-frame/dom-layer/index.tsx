@@ -11,6 +11,7 @@ import {
   type PageFrameElement,
 } from '../../elements/page-frame-element';
 import { PM_EDITOR_CLASS, PM_UPDATE_EVENT } from '../pm/constants';
+import { FloatingToolbar } from '../pm/floating-toolbar';
 
 const FRAME_STYLE: Record<string, string> = {
   transformOrigin: '0 0',
@@ -142,6 +143,10 @@ export function PageFrameDomLayer({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const frameMap = useRef<Map<number, FrameRefs>>(new Map());
+  // Views are created eagerly inside createFrameRefs when a page frame first
+  // appears on the canvas — so by the time editingElement is set, the view
+  // already exists. Read it inline rather than tracking in state.
+  const activeView = editingElement?.pmEditor?.view ?? null;
 
   // Sync loop — create/remove/position frame containers each frame
   useEffect(() => {
@@ -294,16 +299,19 @@ export function PageFrameDomLayer({
   }, [editingElement, canvasRef]);
 
   return (
-    <div
-      id="page-frame-overlay"
-      ref={containerRef}
-      style={{
-        position: 'absolute',
-        inset: 0,
-        pointerEvents: 'none',
-        overflow: 'hidden',
-        zIndex: 5,
-      }}
-    />
+    <>
+      <div
+        id="page-frame-overlay"
+        ref={containerRef}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+          zIndex: 5,
+        }}
+      />
+      {activeView && <FloatingToolbar view={activeView} />}
+    </>
   );
 }

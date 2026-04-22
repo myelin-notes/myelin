@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown as ChevronDownIcon } from 'lucide-react';
 import type { FontEntry, ToolOption } from '@/pages/canvas/tools/tool';
+import { ColorSwatch } from './color-swatch';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];
@@ -122,23 +123,14 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
                 {option.label}
               </span>
               <div className="flex max-w-[120px] flex-wrap items-center gap-1.5">
-                {option.palette.map((color) => {
-                  const active = option.value === color;
-                  return (
-                    <button
-                      key={color}
-                      onClick={() => option.set(color)}
-                      className="size-5 cursor-pointer rounded-lg border-none p-0 transition-transform duration-150"
-                      style={{
-                        backgroundColor: color,
-                        boxShadow: active
-                          ? '0 0 0 2px rgba(255,255,255,0.9), 0 0 0 3.5px rgba(25,28,30,0.25)'
-                          : 'inset 0 0 0 1px rgba(25,28,30,0.06)',
-                        transform: active ? 'scale(1.15)' : undefined,
-                      }}
-                    />
-                  );
-                })}
+                {option.palette.map((color) => (
+                  <ColorSwatch
+                    key={color}
+                    color={color}
+                    active={option.value === color}
+                    onClick={() => option.set(color)}
+                  />
+                ))}
               </div>
             </div>
           );

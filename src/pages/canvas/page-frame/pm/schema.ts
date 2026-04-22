@@ -239,6 +239,42 @@ const code: MarkSpec = {
   parseDOM: [{ tag: 'code' }],
 };
 
+const fontFamily: MarkSpec = {
+  attrs: { family: {} },
+  toDOM(mark) {
+    return ['span', { style: `font-family: ${mark.attrs.family}` }, 0];
+  },
+  parseDOM: [
+    {
+      style: 'font-family',
+      getAttrs: (value) => {
+        if (typeof value !== 'string' || !value) {
+          return false;
+        }
+        return { family: value };
+      },
+    },
+  ],
+};
+
+const textColor: MarkSpec = {
+  attrs: { color: {} },
+  toDOM(mark) {
+    return ['span', { style: `color: ${mark.attrs.color}` }, 0];
+  },
+  parseDOM: [
+    {
+      style: 'color',
+      getAttrs: (value) => {
+        if (typeof value !== 'string' || !value) {
+          return false;
+        }
+        return { color: value };
+      },
+    },
+  ],
+};
+
 const link: MarkSpec = {
   attrs: { href: {}, title: { default: null } },
   inclusive: false,
@@ -283,6 +319,8 @@ export const schema = new Schema({
     underline,
     strikethrough,
     code,
+    fontFamily,
+    textColor,
     link,
   },
 });

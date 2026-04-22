@@ -409,7 +409,14 @@ export abstract class DrawableElement {
     ratioY: number;
     anchorWorld: Vector2;
   }): void {
-    const { handle: h, originalScale, originalOffset, ratioX, ratioY, anchorWorld } = opts;
+    const {
+      handle: h,
+      originalScale,
+      originalOffset,
+      ratioX,
+      ratioY,
+      anchorWorld,
+    } = opts;
     const newScaleX = h.scaleX
       ? Math.max(MIN_SCALE, originalScale.x * ratioX)
       : originalScale.x;
