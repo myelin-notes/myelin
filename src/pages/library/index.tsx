@@ -5,6 +5,8 @@ import {
   CalendarPlus,
   ChevronRight,
   Clock,
+  LayoutGrid,
+  List,
   Search,
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -18,11 +20,13 @@ import {
   type VFSFileNode,
   type VFSFolderNode,
 } from '@/lib/sync';
+import { UserPrefs } from '@/lib/user-prefs';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
   type ExplorerTreeHandle,
   type SortMode,
+  type ViewMode,
 } from './explorer/explorer-tree';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
@@ -57,6 +61,16 @@ export function LibraryPage() {
     setSortMode(
       (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
     );
+  };
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    UserPrefs.get('explorerViewMode'),
+  );
+  useEffect(
+    () => UserPrefs.subscribe('explorerViewMode', setViewMode),
+    [],
+  );
+  const toggleViewMode = () => {
+    UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
   };
 
   const triggerRefresh = () => {
@@ -314,6 +328,22 @@ export function LibraryPage() {
                       <CalendarPlus className="size-4" />
                     )}
                   </button>
+                  <button
+                    onClick={toggleViewMode}
+                    aria-label={strings.library.viewModeLabel(
+                      strings.library.viewModes[viewMode],
+                    )}
+                    title={strings.library.viewModeLabel(
+                      strings.library.viewModes[viewMode],
+                    )}
+                    className="cursor-pointer text-text-secondary transition-colors hover:text-text-primary"
+                  >
+                    {viewMode === 'tree' ? (
+                      <List className="size-4" />
+                    ) : (
+                      <LayoutGrid className="size-4" />
+                    )}
+                  </button>
                   <CreateNewDropdown
                     onNewFolder={() => explorerRef.current?.startNewFolder()}
                     onNewFile={(title, type) =>
@@ -329,6 +359,7 @@ export function LibraryPage() {
                 onNavigate={setCurrentFolderId}
                 onTagsChanged={() => setRefreshKey((k) => k + 1)}
                 sortMode={sortMode}
+                viewMode={viewMode}
                 searchQuery={searchQuery}
                 filterTags={filterTagsArr}
               />

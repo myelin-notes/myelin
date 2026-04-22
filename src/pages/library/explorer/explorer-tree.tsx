@@ -8,8 +8,11 @@ import {
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { type FileType, useRepository, type VFSNode } from '@/lib/sync';
+import { cn } from '@/lib/utils';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
+import { GridFileItem } from './grid-file-item';
+import { GridFolderItem } from './grid-folder-item';
 import { useDropTarget } from './use-drop-target';
 
 const logger = new Logger('ExplorerTree');
@@ -21,6 +24,7 @@ export interface ExplorerTreeHandle {
 }
 
 export type SortMode = 'name-asc' | 'name-desc' | 'modified' | 'created';
+export type ViewMode = 'tree' | 'grid';
 
 interface ExplorerTreeProps {
   ref?: React.Ref<ExplorerTreeHandle>;
@@ -28,6 +32,7 @@ interface ExplorerTreeProps {
   onNavigate: (folderId: string) => void;
   onTagsChanged?: () => void;
   sortMode?: SortMode;
+  viewMode?: ViewMode;
   searchQuery?: string;
   filterTags?: string[];
 }
@@ -38,6 +43,7 @@ export function ExplorerTree({
   ref,
   onTagsChanged,
   sortMode = 'name-asc',
+  viewMode = 'tree',
   searchQuery,
   filterTags,
 }: ExplorerTreeProps) {
@@ -171,15 +177,41 @@ export function ExplorerTree({
     );
   }
 
+  const containerClass =
+    viewMode === 'grid'
+      ? 'grid min-h-[80px] grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 rounded-xl p-1 transition-colors'
+      : 'flex min-h-[80px] flex-col gap-1 rounded-xl transition-colors';
+
   return (
     <div
       {...(isFiltering || isSearching ? {} : dropTargetProps)}
-      className={`flex min-h-[80px] flex-col gap-1 rounded-xl transition-colors ${
-        dragOver && !isFiltering && !isSearching ? 'bg-accent/10' : ''
-      }`}
+      className={cn(
+        containerClass,
+        dragOver && !isFiltering && !isSearching ? 'bg-accent/10' : '',
+      )}
     >
-      {sortedNodes.map((node) =>
-        node.type === 'folder' ? (
+      {sortedNodes.map((node) => {
+        if (viewMode === 'grid') {
+          return node.type === 'folder' ? (
+            <GridFolderItem
+              key={node.id}
+              id={node.id}
+              name={node.name}
+              tags={node.tags}
+              autoRename={node.id === renamingNewId}
+              onNavigate={() => onNavigate(node.id)}
+              onMoved={reloadAndNotify}
+            />
+          ) : (
+            <GridFileItem
+              key={node.id}
+              file={node}
+              autoRename={node.id === renamingNewId}
+              onChanged={reloadAndNotify}
+            />
+          );
+        }
+        return node.type === 'folder' ? (
           <FolderItem
             key={node.id}
             id={node.id}
@@ -196,10 +228,15 @@ export function ExplorerTree({
             autoRename={node.id === renamingNewId}
             onChanged={reloadAndNotify}
           />
-        ),
-      )}
+        );
+      })}
       {nodes.length === 0 && (
-        <span className="px-4 py-3 text-sm text-text-muted">
+        <span
+          className={cn(
+            'px-4 py-3 text-sm text-text-muted',
+            viewMode === 'grid' ? 'col-span-full' : '',
+          )}
+        >
           {isSearching
             ? strings.library.explorerTree.emptySearch
             : isFiltering
