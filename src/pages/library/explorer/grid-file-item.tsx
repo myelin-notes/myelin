@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
@@ -51,7 +50,7 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
                 }
               }}
               onDragStart={handleDragStart}
-              className="group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl bg-surface text-left transition-all duration-200 hover:bg-card hover:shadow-ambient"
+              className="group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl bg-surface text-left transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient"
             />
           }
         >
@@ -63,7 +62,7 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
                 aria-hidden
                 onLoad={() => setImgLoaded(true)}
                 className={cn(
-                  'h-full w-full object-cover object-top transition-[opacity,transform] duration-500 ease-out group-hover:scale-[1.03]',
+                  'h-full w-full object-cover object-top transition-opacity duration-500 ease-out',
                   imgLoaded ? 'opacity-100' : 'opacity-0',
                 )}
               />
@@ -73,28 +72,44 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
                 style={{
                   backgroundImage:
                     'radial-gradient(circle, rgba(28, 39, 56, 0.12) 1px, transparent 1px)',
-                  backgroundSize: '12px 12px',
+                  backgroundSize: '14px 14px',
                 }}
               />
             )}
           </div>
 
-          <div className="flex-none px-3 py-2.5">
+          <div className="flex min-w-0 flex-col gap-1.5 px-3 py-3">
             {renaming ? (
               <input
                 {...renameInputProps}
-                className="w-full border-primary border-b-2 bg-transparent font-medium text-[13px] text-text-primary outline-none"
+                className="w-full border-primary border-b-2 bg-transparent font-normal text-sm text-text-primary outline-none"
               />
             ) : (
-              <div className="flex min-w-0 items-center gap-1.5">
-                <FileText className="size-3 shrink-0 text-text-muted transition-colors duration-200 group-hover:text-text-secondary" />
+              <>
                 <span
-                  className="truncate font-medium text-[13px] text-text-secondary transition-colors duration-200 group-hover:text-text-primary"
+                  className="block truncate font-normal text-sm text-text-secondary transition-colors duration-200 group-hover:text-text-primary"
                   title={file.name}
                 >
                   {file.name}
                 </span>
-              </div>
+                {file.tags.length > 0 && (
+                  <div className="flex min-w-0 flex-wrap items-center gap-1">
+                    {file.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                    {file.tags.length > 2 && (
+                      <span className="text-[9px] text-text-muted">
+                        +{file.tags.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </ContextMenuTrigger>

@@ -19,6 +19,7 @@ interface Props {
 export function GridFolderItem({
   id,
   name,
+  tags,
   autoRename,
   onNavigate,
   onMoved,
@@ -58,34 +59,50 @@ export function GridFolderItem({
               onDragStart={handleDragStart}
               {...dropTargetProps}
               className={cn(
-                'group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl text-left transition-all duration-200',
+                'group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl text-left transition-all duration-200 ease-out',
                 dragOver
                   ? 'bg-accent/15 ring-1 ring-accent/40'
-                  : 'bg-surface hover:bg-card hover:shadow-ambient',
+                  : 'bg-surface hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient',
               )}
             />
           }
         >
           <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-200/40 via-transparent to-amber-50/30" />
-            <Folder className="relative size-12 fill-amber-400/90 text-amber-500 transition-transform duration-300 group-hover:scale-105" />
+            <Folder className="size-14 shrink-0 fill-amber-400 text-amber-400 transition-colors duration-200 group-hover:fill-amber-500 group-hover:text-amber-500" />
           </div>
 
-          <div className="flex-none px-3 py-2.5">
+          <div className="flex min-w-0 flex-col gap-1.5 px-3 py-3">
             {renaming ? (
               <input
                 {...renameInputProps}
-                className="w-full border-primary border-b-2 bg-transparent font-semibold text-[13px] text-text-primary outline-none"
+                className="w-full border-primary border-b-2 bg-transparent font-medium text-sm text-text-primary outline-none"
               />
             ) : (
-              <div className="flex min-w-0 items-center gap-1.5">
+              <>
                 <span
-                  className="truncate font-semibold text-[13px] text-text-primary"
+                  className="block truncate font-medium text-sm text-text-primary"
                   title={name}
                 >
                   {name}
                 </span>
-              </div>
+                {tags.length > 0 && (
+                  <div className="flex min-w-0 flex-wrap items-center gap-1">
+                    {tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                    {tags.length > 2 && (
+                      <span className="text-[9px] text-text-muted">
+                        +{tags.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </ContextMenuTrigger>
