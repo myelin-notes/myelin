@@ -10,9 +10,7 @@ import {
   type ElementFactory,
 } from './elements/element-factories';
 import { ElementType } from './elements/element-type';
-import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
-import { FrameTool } from './tools/frame-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
@@ -21,6 +19,13 @@ import type { ITool } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type Vector2 = { x: number; y: number };
+
+export interface PlacementGhost {
+  /** Bounds of the ghost rectangle, relative to the pointer's world position. */
+  getBounds(): { x: number; y: number; width: number; height: number };
+  /** Called when the user clicks to finalize placement. */
+  onPlace(worldPos: Vector2): void;
+}
 
 const logger = new Logger('DrawableCanvas');
 
@@ -63,6 +68,12 @@ export class DrawableCanvas {
   // Element editing state (e.g., page frame inline editing)
   private _editingElement: DrawableElement | null = null;
   private _cleanupEditListeners: (() => void) | null = null;
+
+  // One-shot placement state — orthogonal to tools. When set, the next
+  // primary-button click finalizes placement and the state clears.
+  private _placement: PlacementGhost | null = null;
+  private _placementCleanup: (() => void) | null = null;
+  private onPlacementEnd?: () => void;
 
   public constructor(
     canvas: HTMLCanvasElement,
@@ -239,6 +250,52 @@ export class DrawableCanvas {
     this.onElementEdit = callback;
   }
 
+  public setOnPlacementEnd(callback: (() => void) | undefined) {
+    this.onPlacementEnd = callback;
+  }
+
+  public get isPlacing(): boolean {
+    return this._placement !== null;
+  }
+
+  public startPlacement(ghost: PlacementGhost): void {
+    if (this._editingElement) {
+      this.exitElementEdit();
+    }
+    if (this._placement) {
+      this.endPlacement();
+    }
+    this._placement = ghost;
+    this._toolCursor = 'copy';
+    this.updateCursor();
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.endPlacement();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    this._placementCleanup = () => {
+      document.removeEventListener('keydown', handleKey);
+    };
+  }
+
+  public cancelPlacement(): void {
+    if (this._placement) {
+      this.endPlacement();
+    }
+  }
+
+  private endPlacement(): void {
+    this._placement = null;
+    this._placementCleanup?.();
+    this._placementCleanup = null;
+    this._toolCursor = 'default';
+    this.updateCursor();
+    this.onPlacementEnd?.();
+  }
+
   public getElementsByType(type: ElementType): DrawableElement[] {
     return this._elements.filter((e) => e.type === type);
   }
@@ -318,6 +375,9 @@ export class DrawableCanvas {
     if (this._editingElement) {
       this.exitElementEdit();
     }
+    if (this._placement) {
+      this.endPlacement();
+    }
     this.unsubBgPref?.();
     this.viewport.destroy();
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
@@ -370,7 +430,11 @@ export class DrawableCanvas {
     // Cursor: compute fresh from screen position so it's correct even if
     // the user wheel-zoomed without moving the mouse since.
     const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
-    this.toolSelected.drawCursor(this.ctx, mouseWorld);
+    if (this._placement) {
+      this.drawPlacementGhost(this.ctx, mouseWorld);
+    } else {
+      this.toolSelected.drawCursor(this.ctx, mouseWorld);
+    }
     this.ctx.restore();
 
     // Overlay canvas: selection outline + handles. Always above DOM chrome
@@ -445,6 +509,16 @@ export class DrawableCanvas {
     canvas.addEventListener('pointermove', this._handlePointerMove);
 
     this._handlePointerDown = (evt) => {
+      // One-shot placement intercepts primary-button clicks regardless of tool.
+      if (this._placement) {
+        if (evt.button === 0) {
+          const worldPos = this.viewport.getPoint(evt);
+          this._placement.onPlace(worldPos);
+        }
+        this.endPlacement();
+        return;
+      }
+
       switch (evt.pointerType) {
         case 'touch':
           this.state.change(InteractState.Moving, evt);
@@ -610,6 +684,28 @@ export class DrawableCanvas {
     });
   }
 
+  private drawPlacementGhost(ctx: CanvasRenderingContext2D, worldPos: Vector2) {
+    if (!this._placement) {
+      return;
+    }
+    const b = this._placement.getBounds();
+    const x = worldPos.x + b.x;
+    const y = worldPos.y + b.y;
+
+    ctx.fillStyle = 'rgba(208, 225, 251, 0.18)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, b.width, b.height, 6);
+    ctx.fill();
+
+    ctx.strokeStyle = '#2f3e46';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.roundRect(x, y, b.width, b.height, 6);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
   private buildBgPattern(style: 'grid' | 'dots' | 'blank') {
     if (style === 'blank') {
       this.bgPattern = null;
@@ -693,8 +789,6 @@ export class DrawableCanvas {
       new HighlighterTool(getStrings),
       new EraserTool(getStrings),
       new TextTool(getStrings),
-      new EmbedTool(getStrings),
-      new FrameTool(getStrings),
     ];
   }
 }

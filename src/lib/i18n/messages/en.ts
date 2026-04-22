@@ -234,13 +234,13 @@ const en = {
           label: 'Text Tool',
           description: 'Create a new text node',
         },
-        'canvas:tool-embed': {
-          label: 'Embed Tool',
-          description: 'Insert an image, PDF, or file',
+        'canvas:insert-frame': {
+          label: 'Insert Page Frame',
+          description: 'Place a new page frame on the canvas',
         },
-        'canvas:tool-frame': {
-          label: 'Page Frame Tool',
-          description: 'Add a new page frame on the canvas',
+        'canvas:insert-embed': {
+          label: 'Insert Media',
+          description: 'Insert an image, PDF, or file',
         },
         'editor:bold': {
           label: 'Bold',
@@ -273,6 +273,23 @@ const en = {
     toolbar: {
       clickForOptions: 'click for options',
       customizeWheel: 'Customize wheel',
+      insert: 'Insert',
+    },
+    insert: {
+      title: 'Insert',
+      soon: 'Soon',
+      frame: {
+        label: 'Page frame',
+        description: 'A new page to write in',
+      },
+      embed: {
+        label: 'Image or PDF',
+        description: 'Drop in files or paste a URL',
+      },
+      link: {
+        label: 'Note link',
+        description: 'Link or embed another note',
+      },
     },
     toolShelf: {
       title: 'Tool Shelf',
@@ -284,8 +301,6 @@ const en = {
       highlighter: 'Highlighter',
       eraser: 'Eraser',
       text: 'Text',
-      embed: 'Embed',
-      frame: 'Page Frame',
     },
     toolOptions: {
       color: 'Color',

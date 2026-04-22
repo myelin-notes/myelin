@@ -1,5 +1,8 @@
 import { useRef } from 'react';
-import { SlidersHorizontal as SlidersIcon } from 'lucide-react';
+import {
+  Plus as PlusIcon,
+  SlidersHorizontal as SlidersIcon,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
@@ -18,6 +21,7 @@ interface CanvasToolbarProps {
   selectedToolIndex: number;
   optionsVisible: boolean;
   shelfOpen: boolean;
+  insertOpen: boolean;
   activeOptions: ToolOption[];
   hasOptions: boolean;
   wheelEnabledIndices: Set<number>;
@@ -25,7 +29,9 @@ interface CanvasToolbarProps {
   onToggleOptions: () => void;
   onToggleShelf: () => void;
   onCloseShelf: () => void;
+  onToggleInsert: () => void;
   onToggleWheelTool: (index: number) => void;
+  insertPopover?: React.ReactNode;
   embedComposer?: React.ReactNode;
 }
 
@@ -34,6 +40,7 @@ export function CanvasToolbar({
   selectedToolIndex,
   optionsVisible,
   shelfOpen,
+  insertOpen,
   activeOptions,
   hasOptions,
   wheelEnabledIndices,
@@ -41,7 +48,9 @@ export function CanvasToolbar({
   onToggleOptions,
   onToggleShelf,
   onCloseShelf,
+  onToggleInsert,
   onToggleWheelTool,
+  insertPopover,
   embedComposer,
 }: CanvasToolbarProps) {
   const strings = useMessages();
@@ -49,6 +58,7 @@ export function CanvasToolbar({
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
   const shelfButtonRef = useRef<HTMLElement | null>(null);
+  const insertButtonRef = useRef<HTMLElement | null>(null);
 
   const getButtonOffset = (btn: HTMLElement | null) => {
     if (!(btn && toolbarInnerRef.current)) {
@@ -60,6 +70,7 @@ export function CanvasToolbar({
     toolButtonRefs.current[selectedToolIndex],
   );
   const shelfPanelOffset = getButtonOffset(shelfButtonRef.current);
+  const insertPanelOffset = getButtonOffset(insertButtonRef.current);
 
   return (
     <TooltipProvider>
@@ -76,6 +87,28 @@ export function CanvasToolbar({
           ref={toolbarInnerRef}
           className="flex max-h-[calc(100dvh-6rem)] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-white/80 px-2 py-3 shadow-ambient backdrop-blur-[24px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
+          <Tooltip>
+            <TooltipTrigger
+              ref={(el) => {
+                insertButtonRef.current = el;
+              }}
+              data-insert-trigger
+              className={`cursor-pointer rounded-xl p-2.5 transition-colors ${
+                insertOpen
+                  ? 'bg-accent-dark text-white'
+                  : 'bg-transparent text-text-secondary hover:bg-hover-tint'
+              }`}
+              onClick={onToggleInsert}
+            >
+              <PlusIcon className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{strings.canvas.toolbar.insert}</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <div className="my-1 h-px w-4 bg-border-divider" />
+
           {tools.map((tool, index) => {
             const Icon = tool.icon;
             const isActive = selectedToolIndex === index;
@@ -186,11 +219,23 @@ export function CanvasToolbar({
         {!shelfOpen && embedComposer && (
           <div
             className="absolute top-0 left-full"
-            style={{ paddingTop: optionsPanelOffset }}
+            style={{ paddingTop: insertPanelOffset }}
           >
             {embedComposer}
           </div>
         )}
+
+        <AnimatePresence>
+          {insertOpen && !shelfOpen && (
+            <div
+              key="insert-popover"
+              className="absolute top-0 left-full"
+              style={{ paddingTop: insertPanelOffset }}
+            >
+              {insertPopover}
+            </div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </TooltipProvider>
   );

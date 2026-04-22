@@ -229,13 +229,13 @@ const zhHans: typeof en = {
           label: '文本工具',
           description: '创建新的文本节点',
         },
-        'canvas:tool-embed': {
-          label: '嵌入工具',
-          description: '插入图片、PDF 或文件',
+        'canvas:insert-frame': {
+          label: '插入页面框架',
+          description: '在画布上放置新的页面框架',
         },
-        'canvas:tool-frame': {
-          label: '页面框架工具',
-          description: '在画布上添加新的页面框架',
+        'canvas:insert-embed': {
+          label: '插入媒体',
+          description: '插入图片、PDF 或文件',
         },
         'editor:bold': {
           label: '粗体',
@@ -268,6 +268,23 @@ const zhHans: typeof en = {
     toolbar: {
       clickForOptions: '点击查看选项',
       customizeWheel: '自定义轮盘',
+      insert: '插入',
+    },
+    insert: {
+      title: '插入',
+      soon: '即将推出',
+      frame: {
+        label: '页面框架',
+        description: '可书写的新页面',
+      },
+      embed: {
+        label: '图片或 PDF',
+        description: '拖入文件或粘贴链接',
+      },
+      link: {
+        label: '笔记链接',
+        description: '链接或嵌入其他笔记',
+      },
     },
     toolShelf: {
       title: '工具盘',
@@ -279,8 +296,6 @@ const zhHans: typeof en = {
       highlighter: '荧光笔',
       eraser: '橡皮擦',
       text: '文本',
-      embed: '嵌入',
-      frame: '页面框架',
     },
     toolOptions: {
       color: '颜色',

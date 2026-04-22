@@ -2,14 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 
 export type SvgIcon = LucideIcon;
-export type ToolId =
-  | 'select'
-  | 'pen'
-  | 'highlighter'
-  | 'eraser'
-  | 'text'
-  | 'embed'
-  | 'frame';
+export type ToolId = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text';
 
 export interface FontEntry {
   family: string;

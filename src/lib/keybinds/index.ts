@@ -29,8 +29,8 @@ declare module './registry' {
     'canvas:tool-highlighter': true;
     'canvas:tool-eraser': true;
     'canvas:tool-text': true;
-    'canvas:tool-embed': true;
-    'canvas:tool-frame': true;
+    'canvas:insert-frame': true;
+    'canvas:insert-embed': true;
     'editor:bold': true;
     'editor:italic': true;
     'editor:underline': true;
@@ -69,11 +69,11 @@ registry.defineDefaults({
   'canvas:tool-text': {
     key: 't',
   },
-  'canvas:tool-embed': {
-    key: 'm',
-  },
-  'canvas:tool-frame': {
+  'canvas:insert-frame': {
     key: 'f',
+  },
+  'canvas:insert-embed': {
+    key: 'm',
   },
   'editor:bold': {
     key: 'b',

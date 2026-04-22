@@ -21,6 +21,8 @@ interface UseCanvasEngineArgs {
   canvasTools: ITool[];
   setSelectedToolIndex: (i: number) => void;
   onCanvasPointerDown: () => void;
+  onInsertFrame: () => void;
+  onInsertEmbed: () => void;
 }
 
 export function useCanvasEngine({
@@ -34,6 +36,8 @@ export function useCanvasEngine({
   canvasTools,
   setSelectedToolIndex,
   onCanvasPointerDown,
+  onInsertFrame,
+  onInsertEmbed,
 }: UseCanvasEngineArgs) {
   const messages = useMessages();
 
@@ -105,6 +109,14 @@ export function useCanvasEngine({
     {
       action: 'canvas:delete',
       onDown: () => drawableCanvasRef.current?.deleteSelected(),
+    },
+    {
+      action: 'canvas:insert-frame',
+      onDown: () => onInsertFrame(),
+    },
+    {
+      action: 'canvas:insert-embed',
+      onDown: () => onInsertEmbed(),
     },
     ...toolBindings,
   ]);

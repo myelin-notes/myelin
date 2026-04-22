@@ -7,10 +7,19 @@ export const TOOL_ACTIONS: Record<ToolId, Action> = {
   highlighter: 'canvas:tool-highlighter',
   eraser: 'canvas:tool-eraser',
   text: 'canvas:tool-text',
-  embed: 'canvas:tool-embed',
-  frame: 'canvas:tool-frame',
 };
 
 export function getToolHotkey(toolId: ToolId): string {
   return registry.format(TOOL_ACTIONS[toolId]);
+}
+
+export type InsertActionId = 'frame' | 'embed';
+
+export const INSERT_ACTIONS: Record<InsertActionId, Action> = {
+  frame: 'canvas:insert-frame',
+  embed: 'canvas:insert-embed',
+};
+
+export function getInsertHotkey(id: InsertActionId): string {
+  return registry.format(INSERT_ACTIONS[id]);
 }

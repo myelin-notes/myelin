@@ -238,13 +238,13 @@ const es: typeof en = {
           label: 'Herramienta de texto',
           description: 'Crear un nuevo nodo de texto',
         },
-        'canvas:tool-embed': {
-          label: 'Herramienta de inserción',
-          description: 'Insertar una imagen, PDF o archivo',
+        'canvas:insert-frame': {
+          label: 'Insertar marco de página',
+          description: 'Colocar un nuevo marco de página en el lienzo',
         },
-        'canvas:tool-frame': {
-          label: 'Herramienta de marco de página',
-          description: 'Añadir un nuevo marco de página al lienzo',
+        'canvas:insert-embed': {
+          label: 'Insertar medios',
+          description: 'Insertar una imagen, PDF o archivo',
         },
         'editor:bold': {
           label: 'Negrita',
@@ -277,6 +277,23 @@ const es: typeof en = {
     toolbar: {
       clickForOptions: 'clic para opciones',
       customizeWheel: 'Personalizar rueda',
+      insert: 'Insertar',
+    },
+    insert: {
+      title: 'Insertar',
+      soon: 'Pronto',
+      frame: {
+        label: 'Marco de página',
+        description: 'Una nueva página para escribir',
+      },
+      embed: {
+        label: 'Imagen o PDF',
+        description: 'Arrastra archivos o pega una URL',
+      },
+      link: {
+        label: 'Enlace a nota',
+        description: 'Enlaza o inserta otra nota',
+      },
     },
     toolShelf: {
       title: 'Menú de herramientas',
@@ -288,8 +305,6 @@ const es: typeof en = {
       highlighter: 'Resaltador',
       eraser: 'Borrador',
       text: 'Texto',
-      embed: 'Insertar',
-      frame: 'Marco de página',
     },
     toolOptions: {
       color: 'Color',

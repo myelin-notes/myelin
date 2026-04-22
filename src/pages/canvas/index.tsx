@@ -1,15 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { IS_DEV } from '@/lib/env';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import {
+  CHROME_BOTTOM_PADDING,
+  CHROME_HEADER_HEIGHT,
+  CHROME_SIDE_PADDING,
+} from '@/pages/canvas/elements/frame-chrome';
+import {
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+  PageFrameElement,
+} from '@/pages/canvas/elements/page-frame-element';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
+import { InsertPopover } from './components/insert-popover';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
@@ -31,6 +42,38 @@ export function CanvasView() {
     anchor: DOMRect;
     items: ChromeMenuItem[];
   } | null>(null);
+  const [insertOpen, setInsertOpen] = useState(false);
+  const [embedOpen, setEmbedOpen] = useState(false);
+
+  const handleInsertFrame = useCallback(() => {
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
+    }
+    setInsertOpen(false);
+    setEmbedOpen(false);
+    dc.startPlacement({
+      getBounds: () => ({
+        x: -CHROME_SIDE_PADDING,
+        y: -CHROME_HEADER_HEIGHT,
+        width: PAGE_WIDTH + CHROME_SIDE_PADDING * 2,
+        height: PAGE_HEIGHT + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
+      }),
+      onPlace: (worldPos) => {
+        const frame = dc.addElement((i) => new PageFrameElement(i));
+        frame.setOffset(worldPos.x, worldPos.y);
+        frame.updateBounds();
+        dc.updateBounding();
+        frame.select();
+      },
+    });
+  }, []);
+
+  const handleInsertEmbed = useCallback(() => {
+    setInsertOpen(false);
+    drawableCanvasRef.current?.cancelPlacement();
+    setEmbedOpen(true);
+  }, []);
 
   useEffect(() => {
     setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
@@ -47,6 +90,8 @@ export function CanvasView() {
     canvasTools: toolState.canvasTools,
     setSelectedToolIndex: toolState.setSelectedToolIndex,
     onCanvasPointerDown: toolState.hideOptions,
+    onInsertFrame: handleInsertFrame,
+    onInsertEmbed: handleInsertEmbed,
   });
 
   return (
@@ -104,6 +149,7 @@ export function CanvasView() {
         selectedToolIndex={toolState.selectedToolIndex}
         optionsVisible={toolState.optionsVisible}
         shelfOpen={toolState.shelfOpen}
+        insertOpen={insertOpen}
         activeOptions={toolState.activeOptions}
         hasOptions={toolState.hasOptions}
         wheelEnabledIndices={toolState.wheelEnabledIndices}
@@ -111,15 +157,34 @@ export function CanvasView() {
         onToggleOptions={toolState.toggleOptions}
         onToggleShelf={toolState.toggleShelf}
         onCloseShelf={toolState.closeShelf}
+        onToggleInsert={() =>
+          setInsertOpen((v) => {
+            const next = !v;
+            if (next) {
+              setEmbedOpen(false);
+              drawableCanvasRef.current?.cancelPlacement();
+            }
+            return next;
+          })
+        }
         onToggleWheelTool={toolState.handleToggleWheelTool}
+        insertPopover={
+          <InsertPopover
+            onInsertFrame={handleInsertFrame}
+            onInsertEmbed={handleInsertEmbed}
+            onClose={() => setInsertOpen(false)}
+          />
+        }
         embedComposer={
           <AnimatePresence>
-            {toolState.canvasTools[toolState.selectedToolIndex]?.id ===
-              'embed' && (
+            {embedOpen && (
               <EmbedComposer
                 key="embed-composer"
-                onEmbedFiles={engine.embedFiles}
-                onClose={() => toolState.selectTool(0)}
+                onEmbedFiles={(files) => {
+                  engine.embedFiles(files);
+                  setEmbedOpen(false);
+                }}
+                onClose={() => setEmbedOpen(false)}
               />
             )}
           </AnimatePresence>

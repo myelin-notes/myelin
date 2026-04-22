@@ -1,0 +1,151 @@
+import { useEffect, useRef } from 'react';
+import {
+  FilePlus2 as FilePlusIcon,
+  ImagePlus as ImagePlusIcon,
+  Link as LinkIcon,
+  type LucideIcon,
+} from 'lucide-react';
+import { motion } from 'motion/react';
+import { useMessages } from '@/lib/i18n';
+import { getInsertHotkey } from '@/pages/canvas/tools/tool-keybinds';
+
+interface InsertPopoverProps {
+  onInsertFrame: () => void;
+  onInsertEmbed: () => void;
+  onClose: () => void;
+}
+
+interface InsertItem {
+  key: string;
+  icon: LucideIcon;
+  label: string;
+  description: string;
+  hotkey: string;
+  disabled?: boolean;
+  comingSoon?: boolean;
+  onSelect?: () => void;
+}
+
+export function InsertPopover({
+  onInsertFrame,
+  onInsertEmbed,
+  onClose,
+}: InsertPopoverProps) {
+  const strings = useMessages();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (panelRef.current?.contains(target)) {
+        return;
+      }
+      // Clicking the trigger ("+") is handled by its onClick toggle; ignore it
+      // here so we don't fight the toggle.
+      if (target?.closest('[data-insert-trigger]')) {
+        return;
+      }
+      onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [onClose]);
+
+  const items: InsertItem[] = [
+    {
+      key: 'frame',
+      icon: FilePlusIcon,
+      label: strings.canvas.insert.frame.label,
+      description: strings.canvas.insert.frame.description,
+      hotkey: getInsertHotkey('frame'),
+      onSelect: onInsertFrame,
+    },
+    {
+      key: 'embed',
+      icon: ImagePlusIcon,
+      label: strings.canvas.insert.embed.label,
+      description: strings.canvas.insert.embed.description,
+      hotkey: getInsertHotkey('embed'),
+      onSelect: onInsertEmbed,
+    },
+    {
+      key: 'link',
+      icon: LinkIcon,
+      label: strings.canvas.insert.link.label,
+      description: strings.canvas.insert.link.description,
+      hotkey: '',
+      disabled: true,
+      comingSoon: true,
+    },
+  ];
+
+  return (
+    <motion.div
+      ref={panelRef}
+      initial={{ opacity: 0, x: -8, scale: 0.98 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: -8, scale: 0.98 }}
+      transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
+      className="ml-2 w-[260px] overflow-hidden rounded-2xl bg-white/85 shadow-ambient backdrop-blur-[24px]"
+    >
+      <div className="px-4 pt-3 pb-1">
+        <span className="font-medium text-[10px] text-text-muted uppercase tracking-[0.18em]">
+          {strings.canvas.insert.title}
+        </span>
+      </div>
+      <div className="flex flex-col px-1.5 pb-1.5">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              disabled={item.disabled}
+              onClick={() => {
+                item.onSelect?.();
+              }}
+              className={`group flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                item.disabled
+                  ? 'cursor-default opacity-50'
+                  : 'cursor-pointer hover:bg-hover-tint'
+              }`}
+            >
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface/70 text-text-primary transition-colors group-hover:bg-white">
+                <Icon className="size-4" strokeWidth={1.6} />
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-medium text-[13px] text-text-primary leading-tight">
+                  {item.label}
+                </span>
+                <span className="truncate text-[11px] text-text-muted">
+                  {item.description}
+                </span>
+              </div>
+              {item.comingSoon ? (
+                <span className="rounded-md bg-surface px-1.5 py-0.5 font-medium text-[9.5px] text-text-muted uppercase tracking-[0.08em]">
+                  {strings.canvas.insert.soon}
+                </span>
+              ) : (
+                item.hotkey && (
+                  <kbd className="flex min-w-[20px] items-center justify-center rounded-[5px] border border-border-divider bg-white px-1 py-[1px] font-sans font-semibold text-[10px] text-text-secondary">
+                    {item.hotkey}
+                  </kbd>
+                )
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
