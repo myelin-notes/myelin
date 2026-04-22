@@ -12,6 +12,7 @@ import {
 import { ElementType } from './elements/element-type';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
+import { FrameTool } from './tools/frame-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
@@ -646,6 +647,7 @@ export class DrawableCanvas {
       new EraserTool(getStrings),
       new TextTool(getStrings),
       new EmbedTool(getStrings),
+      new FrameTool(getStrings),
     ];
   }
 }

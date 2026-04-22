@@ -25,6 +25,7 @@ declare module './registry' {
     'canvas:redo': true;
     'canvas:delete': true;
     'canvas:tool-text': true;
+    'canvas:tool-frame': true;
     'editor:bold': true;
     'editor:italic': true;
     'editor:underline': true;
@@ -50,6 +51,9 @@ registry.defineDefaults({
   },
   'canvas:tool-text': {
     key: 't',
+  },
+  'canvas:tool-frame': {
+    key: 'f',
   },
   'editor:bold': {
     key: 'b',

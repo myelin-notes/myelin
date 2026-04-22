@@ -96,8 +96,23 @@ export function useCanvasEngine({
     {
       action: 'canvas:tool-text',
       onDown: () => {
-        drawableCanvasRef.current?.switchTool(4);
-        setSelectedToolIndex(4);
+        const index = canvasTools.findIndex((t) => t.id === 'text');
+        if (index < 0) {
+          return;
+        }
+        drawableCanvasRef.current?.switchTool(index);
+        setSelectedToolIndex(index);
+      },
+    },
+    {
+      action: 'canvas:tool-frame',
+      onDown: () => {
+        const index = canvasTools.findIndex((t) => t.id === 'frame');
+        if (index < 0) {
+          return;
+        }
+        drawableCanvasRef.current?.switchTool(index);
+        setSelectedToolIndex(index);
       },
     },
   ]);

@@ -8,7 +8,8 @@ export type ToolId =
   | 'highlighter'
   | 'eraser'
   | 'text'
-  | 'embed';
+  | 'embed'
+  | 'frame';
 
 export interface FontEntry {
   family: string;

@@ -222,6 +222,10 @@ const es: typeof en = {
           label: 'Herramienta de texto',
           description: 'Crear un nuevo nodo de texto',
         },
+        'canvas:tool-frame': {
+          label: 'Herramienta de marco de página',
+          description: 'Añadir un nuevo marco de página al lienzo',
+        },
         'editor:bold': {
           label: 'Negrita',
           description: 'Alternar formato negrita',
@@ -265,6 +269,7 @@ const es: typeof en = {
       eraser: 'Borrador',
       text: 'Texto',
       embed: 'Insertar',
+      frame: 'Marco de página',
     },
     toolOptions: {
       color: 'Color',

@@ -218,6 +218,10 @@ const en = {
           label: 'Text Tool',
           description: 'Create a new text node',
         },
+        'canvas:tool-frame': {
+          label: 'Page Frame Tool',
+          description: 'Add a new page frame on the canvas',
+        },
         'editor:bold': {
           label: 'Bold',
           description: 'Toggle bold formatting',
@@ -261,6 +265,7 @@ const en = {
       eraser: 'Eraser',
       text: 'Text',
       embed: 'Embed',
+      frame: 'Page Frame',
     },
     toolOptions: {
       color: 'Color',

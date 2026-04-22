@@ -213,6 +213,10 @@ const zhHans: typeof en = {
           label: '文本工具',
           description: '创建新的文本节点',
         },
+        'canvas:tool-frame': {
+          label: '页面框架工具',
+          description: '在画布上添加新的页面框架',
+        },
         'editor:bold': {
           label: '粗体',
           description: '切换粗体格式',
@@ -256,6 +260,7 @@ const zhHans: typeof en = {
       eraser: '橡皮擦',
       text: '文本',
       embed: '嵌入',
+      frame: '页面框架',
     },
     toolOptions: {
       color: '颜色',
