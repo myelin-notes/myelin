@@ -91,7 +91,7 @@ export function CanvasView() {
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full"
-        onDoubleClick={inserts.onCanvasDoubleClick}
+        onClick={inserts.onCanvasClick}
       />
 
       {/* Selection overlay canvas: outline + handles. Always above DOM chrome

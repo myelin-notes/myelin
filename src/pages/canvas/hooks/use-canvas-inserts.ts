@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useState } from 'react';
+import { type RefObject, useCallback, useRef, useState } from 'react';
 import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
 import {
   CHROME_BOTTOM_PADDING,
@@ -123,7 +123,9 @@ export function useCanvasInserts({
     setEmbedOpen(true);
   }, [contextInsert]);
 
-  const onCanvasDoubleClick = useCallback(
+  const lastClickRef = useRef<{ t: number; x: number; y: number } | null>(null);
+
+  const onCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const dc = drawableCanvasRef.current;
       if (!dc) {
@@ -136,6 +138,16 @@ export function useCanvasInserts({
       if (dc.editingElement || dc.isPlacing) {
         return;
       }
+      const now = performance.now();
+      const prev = lastClickRef.current;
+      lastClickRef.current = { t: now, x: e.pageX, y: e.pageY };
+      if (
+        !prev ||
+        now - prev.t > 250 ||
+        Math.hypot(e.pageX - prev.x, e.pageY - prev.y) > 4
+      ) {
+        return;
+      }
       const worldPos = dc.viewport.screenToWorld({
         x: e.pageX,
         y: e.pageY,
@@ -146,6 +158,7 @@ export function useCanvasInserts({
       if (hit) {
         return;
       }
+      lastClickRef.current = null;
       setInsertOpen(false);
       setEmbedOpen(false);
       setContextInsert({
@@ -182,7 +195,7 @@ export function useCanvasInserts({
     onInsertEmbed,
     onContextInsertFrame,
     onContextInsertEmbed,
-    onCanvasDoubleClick,
+    onCanvasClick,
     submitEmbed,
     closeEmbed,
   };
