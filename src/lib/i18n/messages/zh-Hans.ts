@@ -309,6 +309,7 @@ const zhHans: typeof en = {
       fine: (value: number) => `细（${value}）`,
       medium: (value: number) => `中（${value}）`,
       bold: (value: number) => `粗（${value}）`,
+      addCustomColor: '添加自定义颜色',
     },
     embedComposer: {
       dropToEmbed: '拖放以嵌入',

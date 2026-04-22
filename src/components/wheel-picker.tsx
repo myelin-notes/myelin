@@ -345,6 +345,7 @@ export function WheelPicker({
             const [x, y] = pos(cAngle, R1);
             const focused = focusPath[1] === j;
             const isColor = !!child.color;
+            const ChildIcon = child.icon;
 
             return (
               <button
@@ -371,7 +372,12 @@ export function WheelPicker({
                 }}
                 title={child.label}
               >
-                {child.dot != null && (
+                {ChildIcon && (
+                  <ChildIcon
+                    className={`size-4 ${focused ? 'text-text-primary' : 'text-text-secondary'}`}
+                  />
+                )}
+                {ChildIcon == null && child.dot != null && (
                   <span
                     className={`block rounded-full ${focused ? 'bg-text-primary' : 'bg-text-secondary'}`}
                     style={{ width: child.dot, height: child.dot }}

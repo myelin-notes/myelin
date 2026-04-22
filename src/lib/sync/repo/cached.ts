@@ -40,7 +40,8 @@ import type {
 type PendingOp =
   | { kind: 'upsert-manifest-node'; nodeId: string }
   | { kind: 'delete-manifest-node'; nodeId: string; deletedFileIds: string[] }
-  | { kind: 'push-note'; nodeId: string };
+  | { kind: 'push-note'; nodeId: string }
+  | { kind: 'sync-custom-colors' };
 
 interface DeletedSubtree {
   nodeIds: string[];
@@ -479,6 +480,20 @@ export class CachedRepository
     return this.cache.getRevealPath(nodeId);
   }
 
+  async getCustomColors(): Promise<string[]> {
+    return this.cache.getCustomColors();
+  }
+
+  async addCustomColor(color: string): Promise<string[]> {
+    const result = await this.cache.addCustomColor(color);
+    await this.mutatePendingOps((ops) => {
+      if (!ops.some((op) => op.kind === 'sync-custom-colors')) {
+        ops.push({ kind: 'sync-custom-colors' });
+      }
+    });
+    return result;
+  }
+
   async openSession(nodeId: string): Promise<NoteSession> {
     try {
       await this.refresh();
@@ -555,7 +570,24 @@ export class CachedRepository
       case 'push-note':
         await this.applyNotePush(op.nodeId);
         return;
+      case 'sync-custom-colors':
+        await this.applyCustomColorsSync();
+        return;
     }
+  }
+
+  private async applyCustomColorsSync(): Promise<void> {
+    const cacheColors = await this.cache.getCustomColors();
+    await this.remote.applyManifestMutation(
+      'Sync custom colors',
+      (remoteManifest) => {
+        const merged = new Set<string>(remoteManifest.customColors);
+        for (const color of cacheColors) {
+          merged.add(color);
+        }
+        remoteManifest.customColors = Array.from(merged);
+      },
+    );
   }
 
   private async applyManifestUpsert(nodeId: string): Promise<void> {

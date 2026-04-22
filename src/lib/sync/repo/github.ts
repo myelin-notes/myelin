@@ -5,7 +5,6 @@ import {
   createEmptyManifest,
   getNotePath,
   MANIFEST_PATH,
-  migrateManifest,
   type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities } from './types';
@@ -83,7 +82,7 @@ export class GitHubRepository extends BaseRepository {
 
     const text = new TextDecoder().decode(payload.bytes);
     const parsed = JSON.parse(text) as VFSManifest;
-    return { manifest: migrateManifest(parsed), revision: payload.sha };
+    return { manifest: parsed, revision: payload.sha };
   }
 
   protected async saveManifestImpl(

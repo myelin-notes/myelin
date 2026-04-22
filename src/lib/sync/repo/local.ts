@@ -17,7 +17,6 @@ import {
   FILES_DIR,
   getNoteFileName,
   MANIFEST_PATH,
-  migrateManifest,
   type RepositorySnapshot,
   type VFSManifest,
 } from './shared';
@@ -91,7 +90,7 @@ export class LocalRepository extends BaseRepository {
       await file.close();
     }
 
-    const manifest = migrateManifest(structuredClone(snapshot.manifest));
+    const manifest = structuredClone(snapshot.manifest);
     await this.writeManifestToDisk(manifest);
     this.manifest = manifest;
   }
@@ -135,9 +134,7 @@ export class LocalRepository extends BaseRepository {
       const text = await readTextFile(manifestPath, {
         baseDir: BaseDirectory.AppData,
       });
-      const parsed = JSON.parse(text) as VFSManifest;
-      this.manifest = migrateManifest(parsed);
-      await this.writeManifestToDisk(this.manifest);
+      this.manifest = JSON.parse(text) as VFSManifest;
       return { manifest: this.manifest, revision: null };
     }
 

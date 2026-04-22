@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { Plus as PlusIcon } from 'lucide-react';
 import { loadGoogleFont } from '@/components/tool-options-panel';
 import {
   loadWheelToolIndices,
   saveWheelToolIndices,
 } from '@/components/tool-shelf';
 import type { WheelItem } from '@/components/wheel-picker';
+import { useCustomColors } from '@/lib/custom-colors';
 import { useMessages } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
@@ -84,6 +86,8 @@ function toolToWheelItem(
     current: (tool: ITool, option: ToolOption, value: unknown) => void;
   },
   strings: ReturnType<typeof useMessages>,
+  customColors: string[],
+  promptAddColor: () => void,
 ): WheelItem {
   const options = tool.getOptions?.() ?? [];
   const colorOpt = options.find(
@@ -96,7 +100,10 @@ function toolToWheelItem(
   let children: WheelItem[] | undefined;
 
   if (colorOpt) {
-    children = colorOpt.palette.map((hex) => ({
+    const colorChildren: WheelItem[] = [
+      ...colorOpt.palette,
+      ...customColors,
+    ].map((hex) => ({
       label: hex,
       color: hex,
       command: () => applyRef.current(tool, colorOpt, hex),
@@ -104,6 +111,12 @@ function toolToWheelItem(
         ? makeSizeChildren(tool, sizeOpt, applyRef, strings)
         : undefined,
     }));
+    colorChildren.push({
+      label: strings.canvas.toolOptions.addCustomColor,
+      icon: PlusIcon,
+      command: promptAddColor,
+    });
+    children = colorChildren;
   } else if (sizeOpt) {
     children = makeSizeChildren(tool, sizeOpt, applyRef, strings);
   }
@@ -123,6 +136,7 @@ export function useToolState(
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>,
 ) {
   const strings = useMessages();
+  const { colors: customColors, promptAddColor } = useCustomColors();
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsTick, setOptionsTick] = useState(0);
@@ -177,6 +191,8 @@ export function useToolState(
       setSelectedToolIndex,
       applyOptionRef,
       strings,
+      customColors,
+      promptAddColor,
     ),
   );
 

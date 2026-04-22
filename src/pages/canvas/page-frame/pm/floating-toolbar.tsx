@@ -19,7 +19,9 @@ import type { MarkType } from 'prosemirror-model';
 import type { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
+import { AddColorSwatch } from '@/components/add-color-swatch';
 import { ColorSwatch } from '@/components/color-swatch';
+import { useCustomColors } from '@/lib/custom-colors';
 import { PEN_COLORS } from '../../tools/pen-tool';
 import { PM_UPDATE_EVENT } from './constants';
 import { schema } from './schema';
@@ -146,6 +148,13 @@ function selectionScreenRect(
 }
 
 export function FloatingToolbar({ view }: FloatingToolbarProps) {
+  const {
+    colors: customColors,
+    promptAddColor,
+    pickerOpen,
+  } = useCustomColors();
+  const pickerOpenRef = useRef(pickerOpen);
+  pickerOpenRef.current = pickerOpen;
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [style, setStyle] = useState<CSSProperties>({});
@@ -248,8 +257,13 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   }, [visible]);
 
   // Pointer outside the toolbar + outside the editor: dismiss + clear menu.
+  // Suspended while the custom-color picker is open — it portals outside the
+  // toolbar's subtree, so clicks inside it would otherwise trigger dismiss.
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
+      if (pickerOpenRef.current) {
+        return;
+      }
       const t = e.target as Node | null;
       if (!t) {
         return;
@@ -388,6 +402,22 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
                   onPointerDown={(e) => e.preventDefault()}
                 />
               ))}
+              {customColors.map((color) => (
+                <ColorSwatch
+                  key={color}
+                  color={color}
+                  active={currentColor === color}
+                  onClick={() => onPickColor(color)}
+                  onPointerDown={(e) => e.preventDefault()}
+                />
+              ))}
+              <AddColorSwatch
+                onClick={() => {
+                  setOpenMenu(null);
+                  promptAddColor();
+                }}
+                onPointerDown={(e) => e.preventDefault()}
+              />
             </div>
           </Popover>
         )}

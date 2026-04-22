@@ -3,6 +3,7 @@ import { X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
+import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
@@ -21,6 +22,14 @@ import { useToolState } from './hooks/use-tool-state';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
 
 export function CanvasView() {
+  return (
+    <CustomColorsProvider>
+      <CanvasViewInner />
+    </CustomColorsProvider>
+  );
+}
+
+function CanvasViewInner() {
   const { id } = useParams<{ id: string }>();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);

@@ -27,6 +27,7 @@ import {
   listDirectoryNodes,
   listTags,
   moveNodeInManifest,
+  normalizeCustomColor,
   type RepositorySnapshot,
   searchNodes,
   type VFSManifest,
@@ -316,6 +317,24 @@ export abstract class BaseRepository
 
   async getRevealPath(_nodeId: string): Promise<string | null> {
     return null;
+  }
+
+  async getCustomColors(): Promise<string[]> {
+    const { manifest } = await this.loadManifestImpl();
+    return [...manifest.customColors];
+  }
+
+  async addCustomColor(color: string): Promise<string[]> {
+    const normalized = normalizeCustomColor(color);
+    if (!normalized) {
+      throw new Error(`Invalid color: ${color}`);
+    }
+    return this.mutateManifest('Add custom color', (manifest) => {
+      if (!manifest.customColors.includes(normalized)) {
+        manifest.customColors = [...manifest.customColors, normalized];
+      }
+      return [...manifest.customColors];
+    });
   }
 
   async openSession(nodeId: string): Promise<NoteSession> {

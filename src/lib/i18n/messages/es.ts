@@ -318,6 +318,7 @@ const es: typeof en = {
       fine: (value: number) => `Fino (${value})`,
       medium: (value: number) => `Medio (${value})`,
       bold: (value: number) => `Grueso (${value})`,
+      addCustomColor: 'Añadir color personalizado',
     },
     embedComposer: {
       dropToEmbed: 'Soltar para insertar',

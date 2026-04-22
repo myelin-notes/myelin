@@ -314,6 +314,7 @@ const en = {
       fine: (value: number) => `Fine (${value})`,
       medium: (value: number) => `Medium (${value})`,
       bold: (value: number) => `Bold (${value})`,
+      addCustomColor: 'Add custom color',
     },
     embedComposer: {
       dropToEmbed: 'Drop to embed',

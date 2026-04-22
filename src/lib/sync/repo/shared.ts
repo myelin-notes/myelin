@@ -12,6 +12,7 @@ export interface VFSManifest {
   version: number;
   children: string[];
   nodes: Record<string, VFSNode>;
+  customColors: string[];
 }
 
 export interface RepositorySnapshot {
@@ -29,6 +30,7 @@ export function createEmptyManifest(): VFSManifest {
     version: CURRENT_MANIFEST_VERSION,
     children: [],
     nodes: {},
+    customColors: [],
   };
 }
 
@@ -92,19 +94,6 @@ export function createDocFromBytes(bytes: Uint8Array | null): Y.Doc {
     Y.applyUpdate(doc, bytes);
   }
   return doc;
-}
-
-export function migrateManifest(manifest: VFSManifest): VFSManifest {
-  const now = Date.now();
-  for (const node of Object.values(manifest.nodes)) {
-    if (node.createdAt == null) {
-      node.createdAt = now;
-    }
-    if (node.modifiedAt == null) {
-      node.modifiedAt = now;
-    }
-  }
-  return manifest;
 }
 
 export function getChildren(
@@ -356,6 +345,15 @@ export function moveNodeInManifest(
   node.parentId = newParentId;
   node.modifiedAt = Date.now();
   addChild(manifest, newParentId, nodeId);
+}
+
+export function normalizeCustomColor(color: string): string | null {
+  const trimmed = color.trim();
+  const match = /^#?([0-9a-fA-F]{6})$/.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+  return `#${match[1].toLowerCase()}`;
 }
 
 export function getNoteFileName(nodeId: string): string {

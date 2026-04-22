@@ -72,6 +72,9 @@ export interface Repository {
   removeTag(nodeId: string, tag: string): Promise<void>;
   getRevealPath(nodeId: string): Promise<string | null>;
 
+  getCustomColors(): Promise<string[]>;
+  addCustomColor(color: string): Promise<string[]>;
+
   openSession(nodeId: string): Promise<NoteSession>;
 }
 

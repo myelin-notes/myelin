@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { useCustomColors } from '@/lib/custom-colors';
 import type { FontEntry, ToolOption } from '@/pages/canvas/tools/tool';
+import { AddColorSwatch } from './add-color-swatch';
 import { ColorSwatch } from './color-swatch';
 
 interface ToolOptionsPanelProps {
@@ -109,6 +111,8 @@ function FontPicker({
 /* ── Main panel ─────────────────────────────────────────── */
 
 export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
+  const { colors: customColors, promptAddColor } = useCustomColors();
+
   if (options.length === 0) {
     return null;
   }
@@ -131,6 +135,15 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
                     onClick={() => option.set(color)}
                   />
                 ))}
+                {customColors.map((color) => (
+                  <ColorSwatch
+                    key={color}
+                    color={color}
+                    active={option.value === color}
+                    onClick={() => option.set(color)}
+                  />
+                ))}
+                <AddColorSwatch onClick={promptAddColor} />
               </div>
             </div>
           );
