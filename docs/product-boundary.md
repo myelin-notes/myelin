@@ -26,7 +26,7 @@ It should not become a general-purpose B2B workspace product unless that happens
 If no better information emerges, the default position should be:
 
 - free core note-taking stays generous
-- BYO sync remains available
+- bring-your-own sync remains available (GitHub, Google Drive, or self-hosted)
 - paid plans monetize managed convenience, retrieval, and workflow polish
 - launch audience is serious students, researchers, and technical prosumers
 - team and enterprise features stay out of the first paid launch
@@ -35,17 +35,19 @@ If no better information emerges, the default position should be:
 
 | Boundary | Recommendation | Why | Status |
 | --- | --- | --- | --- |
-| Free vs paid | Keep creation, editing, import/export, local-first usage, and BYO sync free | Trust and adoption depend on ownership staying real | Proposed |
+| Free vs paid | Keep creation, editing, import/export, local-first usage, and bring-your-own sync (GitHub, Google Drive, self-hosted) free | Trust and adoption depend on ownership staying real | Proposed |
 | Paid value | Charge for managed cloud sync, history, OCR/search, and premium workflows | These save time and reduce anxiety without feeling extractive | Proposed |
 | Myelin accounts | Require Myelin accounts only for first-party cloud and payments, not for local/BYO users | This preserves the low-friction local-first adoption path | Decided |
 | Audience | Launch for serious students, graduate researchers, and technical readers/writers, with a strong but non-exclusive research/study wedge | They genuinely need typed + handwritten notes in one live note | Decided |
 | Teams | Keep team admin and enterprise features out of the first paid launch, but include lightweight shared lab/notebook exploration in the next 12 months | This allows limited expansion without turning Myelin into an enterprise product | Decided |
 | AI | Keep AI optional and secondary | AI is expensive, generic, and not the core reason Myelin is special | Proposed |
-| BYO sync | Keep GitHub or similar BYO sync available, including private repos | It reinforces the local-first trust model without making free sync artificially useless | Decided |
-| Search claim | Do not market "knowledge management" aggressively until full-content search ships | Title/tag search alone is too shallow | Proposed |
-| OCR claim | Do not sell OCR as premium until it is cross-platform and user-visible | Current state is not strong enough for a headline promise | Proposed |
+| Bring-your-own sync | Keep free bring-your-own sync across GitHub, Google Drive, and self-hosted servers | It reinforces the local-first trust model and avoids lock-in to a single backend | Decided |
+| Search claim | Full-content search ships at paid launch; knowledge-management framing is allowed once it does | Shipped retrieval makes the claim honest | Decided |
+| Semantic search | Semantic search is valuable, but it follows search foundation rather than replacing it | Users trust semantic retrieval only after exact retrieval works well | Decided |
+| OCR claim | Cross-platform, user-visible OCR ships at paid launch; OCR-backed retrieval is a legitimate premium headline | Shipped state supports the promise | Decided |
 | Pricing floor | Do not price managed sync at commodity throwaway levels | Underpricing makes the business fragile and devalues the product | Proposed |
 | Public promise | Promise note ownership and a useful free plan | Trust is part of the product | Proposed |
+| Patron tier | Offer an optional recurring supporter tier at $15/month or $144/year, above Pro, with ongoing perks (beta access, monthly founder log, name credit, roadmap input) | Voluntary supporter revenue aligned with indie-first trajectory, without locking critical features behind it | Decided |
 
 ## Detailed Boundaries
 
@@ -68,7 +70,7 @@ The following should remain available on the free plan:
 - PDF/image/Markdown import and export
 - hybrid typed + ink workflows
 - offline use
-- BYO sync path
+- bring-your-own sync path (GitHub, Google Drive, or self-hosted)
 
 The following should **not** be included on the free plan at launch:
 
@@ -96,7 +98,7 @@ Myelin accounts should be required only for:
 Myelin accounts should **not** be required for:
 
 - local-only usage
-- BYO sync usage
+- bring-your-own sync usage
 - trying the core product
 
 #### Why this matters
@@ -128,7 +130,7 @@ Do not charge for:
 - local note access
 - basic import/export
 
-Do not create artificial paid pressure by making BYO sync practically unusable for normal personal notes.
+Do not create artificial paid pressure by making bring-your-own sync practically unusable for normal personal notes.
 
 #### Why this matters
 
@@ -225,19 +227,52 @@ This keeps the decision pointed at a narrow extension of the research wedge rath
 
 #### Recommendation
 
-Myelin should not lean heavily on "knowledge management" messaging until it supports:
+Full-content search, PDF text search, and OCR text search all ship as part of the first paid launch. Knowledge-management framing is therefore allowed in public messaging from that point on.
+
+Scope that must be working at launch:
 
 - full-content note search
 - PDF text search
 - OCR text search
-- a retrieval experience that beats title/tag-only organization
+- retrieval that clearly beats title/tag-only organization
 
 #### Why this matters
 
 Knowledge management lives or dies on retrieval.
 
-Without strong retrieval, Myelin is primarily a note-creation environment.
-With strong retrieval, it becomes a system users can rely on long-term.
+Because strong retrieval ships at launch, Myelin can credibly be positioned as a system users rely on long-term, not just a note-creation environment.
+
+### 5.25. Semantic Search Boundary
+
+#### Recommendation
+
+Semantic search is useful and should be built, but only after standard retrieval is solid.
+
+Build order:
+
+1. full-text search
+2. PDF/OCR indexing
+3. filters, ranking, and result snippets
+4. semantic search on top of that foundation
+
+#### What semantic search is for
+
+Semantic search should help users:
+
+- find notes by concept, not just exact wording
+- discover related notes and papers
+- surface semantically similar sources
+- recover ideas when they only remember the topic loosely
+
+#### Product rule
+
+Do not position semantic search as a replacement for normal search.
+
+It should be:
+
+- a second-layer retrieval tool
+- especially valuable for research/study workflows
+- additive to deterministic search, not a substitute for it
 
 ### 5.5. Version History Boundary
 
@@ -277,20 +312,18 @@ Version history is one of the cleanest premium convenience features Myelin can o
 
 #### Recommendation
 
-OCR should be treated as:
+OCR ships cross-platform at the first paid launch and is a legitimate Pro headline alongside search.
 
-- an important enabling feature
-- a paid convenience candidate
-- not a core headline until it works well across platforms
-
-#### Product rule
-
-Do not make OCR a monetization pillar until users can clearly see:
+At launch, users must be able to see:
 
 - when OCR ran
 - what text was extracted
 - how it affects search
 - what happens when it fails
+
+#### Product rule
+
+Do not market OCR separately from retrieval. Frame it as what makes search work across handwriting and scanned PDFs, not as a standalone feature.
 
 ### 7. AI Boundary
 
@@ -360,13 +393,42 @@ Myelin should publicly promise:
 - local-first principles
 - note ownership
 - useful free plan
-- BYO sync remains available
+- bring-your-own sync remains available (GitHub, Google Drive, or self-hosted)
 
 Myelin should not publicly promise:
 
 - enterprise readiness on a near timeline
 - becoming a universal workplace platform
 - AI as the center of the roadmap
+
+### 11. Patron Boundary
+
+#### Recommendation
+
+Offer an optional Patron subscription above Pro for users who want to back Myelin beyond the standard paid plan.
+
+- Price: `$15/month` or `$144/year`
+- Entitlements: everything in Pro, plus early-access beta channel, monthly founder build log (by email), name credit on a supporters page (opt-in), quarterly roadmap-input survey, in-app Patron badge
+- Lapse behavior: on cancellation, the account drops to Free. If the user wants Pro features back, they subscribe to Pro separately
+
+#### Why this matters
+
+Patron provides:
+
+- voluntary additional revenue from the most committed users
+- a credible indie-first story — users can directly back the product
+- a forcing function for founder transparency (monthly build log)
+- a way to route roadmap input from the highest-commitment users
+
+#### What Patron must not be
+
+- a premium version of Pro — critical features must never live behind Patron
+- a one-time onboarding reward bundle — perks should feel ongoing (monthly log, quarterly survey)
+- part of the core plan grid — Patron is presented separately from Free/Pro/Student so the main pricing decision stays a binary
+
+#### Positioning
+
+Frame Patron as "back the product beyond Pro," not as the next rung on the pricing ladder. Visual treatment on the pricing page should be a distinct block below the three main plans, with its own CTA.
 
 ## Remaining Open Decisions
 
@@ -431,13 +493,17 @@ Use this section to convert open boundaries into explicit calls.
 | Date | Boundary | Decision | Notes |
 | --- | --- | --- | --- |
 | 2026-04-20 | Free-forever boundary | Undo/redo is core; meaningful persistent version history is paid | Version history means persistent restore, not basic undo |
-| 2026-04-20 | BYO sync boundary | BYO sync stays free, including private repos | Do not sabotage BYO by forcing public repos |
+| 2026-04-20 | Bring-your-own sync boundary | Bring-your-own sync stays free across GitHub, Google Drive, and self-hosted targets | Multiple backends reinforce ownership and avoid lock-in to any single provider |
 | 2026-04-20 | Student plan timing | Same entitlement as Pro; launch same time if operationally easy | If not, ship immediately after Pro |
 | 2026-04-20 | Research wedge strength | Strong wedge, but non-exclusive identity | Position around serious study, reading, and research |
 | 2026-04-20 | Team expansion timing | Include lightweight shared lab/notebook features within 12 months | Keep scope explicitly small and non-enterprise |
-| 2026-04-20 | Free first-party cloud boundary | No free first-party cloud repos at launch | Free = local-first + BYO sync |
+| 2026-04-20 | Free first-party cloud boundary | No free first-party cloud repos at launch | Free = local-first + bring-your-own sync (GitHub, Google Drive, self-hosted) |
 | 2026-04-20 | Account requirement boundary | Accounts required only for cloud/payments | Do not require accounts for local/BYO users |
 | 2026-04-20 | Lab scope boundary | Allow narrow shared notebook features only | Invites, notebook permissions, basic shared activity, simple group billing if needed |
+| 2026-04-20 | Search + OCR launch scope | Full-content search (notes + PDF text + OCR) and cross-platform OCR both ship at first paid launch | Unlocks "knowledge management" and OCR-backed retrieval as public headlines |
+| 2026-04-21 | Semantic search launch scope | Semantic search ships as a Pro feature at paid launch | Previously planned as post-launch; moved forward so retrieval story is complete at launch |
+| 2026-04-21 | Patron tier | Ship an optional Patron subscription at $15/month or $144/year above Pro | Patreon-style recurring support; voluntary, visually separate from the Free/Pro/Student grid; perks are ongoing (monthly log, beta, survey), never critical features |
+| 2026-04-21 | Billing model | All billing on the web via Stripe, no Apple IAP / Google Play Billing | One subscription travels with the Myelin account across platforms; on mobile, app uses reader-app pattern (no in-app subscribe UI) |
 
 ## Next Step
 

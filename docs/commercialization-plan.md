@@ -78,18 +78,18 @@ That is much less true for:
 The current repo already supports the core shape of the product:
 
 - Tauri multi-platform shell and bundle targets: `src-tauri/tauri.conf.json`
-- local-first repositories with optional GitHub-backed sync: `src/lib/sync/repo/config.ts`, `src/lib/sync/repo/factory.ts`, `src/lib/sync/repo/github.ts`, `src/lib/sync/repo/local.ts`
+- local-first repositories with optional GitHub-backed sync today (`src/lib/sync/repo/config.ts`, `src/lib/sync/repo/factory.ts`, `src/lib/sync/repo/github.ts`, `src/lib/sync/repo/local.ts`); Google Drive and self-hosted server targets are planned extensions of the same repository abstraction for free bring-your-own sync
 - cached outbox-based remote sync rather than a heavy centralized backend: `src/lib/sync/repo/cached.ts`
 - Yjs-backed note sessions and live peer sync: `src/lib/sync/session.ts`, `src/lib/sync/live/iroh.ts`, `src-tauri/src/iroh_transport.rs`
 - hybrid canvas model with strokes + structured page frames: `src/pages/canvas/elements/stroke-element.ts`, `src/pages/canvas/elements/page-frame-element.ts`
 - Markdown/PDF/image import: `src/pages/canvas/media/index.ts`, `src/pages/canvas/media/markdown.ts`, `src/pages/canvas/media/pdf.ts`
 
+Full-content search (notes + PDF + OCR) and cross-platform OCR are being built to ship at the first paid launch, so both become legitimate public claims at that point.
+
 The codebase does **not** yet justify claiming:
 
 - enterprise collaboration
-- deep knowledge management search
 - polished end-user sync UX
-- cross-platform OCR as a shipped product feature
 - fully managed cloud sync
 - institution-grade administration
 
@@ -162,6 +162,7 @@ Charge for:
 | Free | Everyone | Free | Adoption, habit, trust |
 | Pro | Serious students, researchers, prosumers | $8/month or $72/year | Primary revenue |
 | Student/Educator Pro | Price-sensitive academic users | $4/month or $36/year | Accessibility without destroying ARPU |
+| Patron | Users who want to back Myelin beyond Pro | $15/month or $144/year | Voluntary supporter revenue + community bond |
 | Lab | Small research groups, later | $12/user/month or $120/user/year | Optional expansion, not required for viability |
 
 ### Free plan
@@ -173,7 +174,7 @@ Free should include:
 - handwritten ink and typed content in the same note
 - PDF, image, and Markdown import/export
 - local search over titles, tags, and indexed local content once search ships
-- BYO sync path such as GitHub-backed sync
+- bring-your-own sync path — GitHub, Google Drive, or a self-hosted server
 - local-first offline use
 
 Free should **not** be crippled by artificial note limits.
@@ -216,6 +217,32 @@ It should be:
 The purpose is not maximizing revenue per user.
 
 The purpose is maximizing adoption in the segment most likely to love and evangelize the product.
+
+### Patron plan
+
+Patron is an optional recurring supporter tier priced above Pro, aligned with the Patreon model of directly backing an indie product.
+
+It should include:
+
+- everything in Pro
+- early-access beta channel (prereleases before general Pro)
+- a monthly founder build log sent by email
+- a name credit on a public supporters page (opt-in)
+- a quarterly roadmap-input survey that actually influences priorities
+- a Patron badge inside the app
+
+Positioning rules:
+
+- Patron is **not** a premium version of Pro. Critical features must never land behind Patron
+- Patron perks should feel ongoing (monthly log, quarterly survey) rather than one-time onboarding goodies
+- Patron should be visually separate from the core Free/Pro/Student plan grid on the pricing page — presented as a "back the product beyond Pro" block, not another tier on the ladder
+- If Patron lapses, the account drops to Free (the user must separately subscribe to Pro if they want Pro features back)
+
+Purpose:
+
+- voluntary additional revenue from the most committed users
+- a forcing function for transparent development (the monthly log)
+- a direct signal of indie-first trajectory — "you can back this product"
 
 ### Lab plan
 
@@ -504,12 +531,12 @@ Mitigation:
 - store compact note state efficiently
 - meter or limit high-cost workloads like OCR/storage if necessary
 
-### Risk: GitHub BYO sync reduces paid conversion
+### Risk: Bring-your-own sync reduces paid conversion
 
 Mitigation:
 
-- keep it free anyway
-- accept that BYO sync is part of the trust story
+- keep free sync options (GitHub, Google Drive, self-hosted) free anyway
+- accept that free bring-your-own sync is part of the trust story
 - win on frictionless onboarding and better recovery, not lock-in
 
 ## Immediate Next Actions
@@ -587,7 +614,7 @@ Myelin should publicly promise:
 
 - your notes remain yours
 - local-first is a core principle
-- BYO sync will remain available
+- bring-your-own sync (GitHub, Google Drive, or self-hosted) will remain available
 - the free plan will stay genuinely useful
 
 Myelin should not publicly promise:

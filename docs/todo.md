@@ -1,49 +1,56 @@
-1. Cloud foundation
-- add first-party Myelin cloud repo type
-- hosted note storage + metadata
-- accounts only for cloud/paying users
-- billing + entitlements
-- 14-day paid feature trial
+# Myelin Todo
 
-2. Sync and recovery UX
-- second-device pairing flow
-- clear sync status
-- reconnect/conflict handling
-- persistent version history
-- restore note from older state
+1. Lock the launch boundaries
+- Keep free forever: unlimited local notes, local-first editing, import/export, offline use, and bring-your-own sync.
+- Keep paid launch scope narrow: Myelin Cloud sync, accounts, billing, version history, full-content search, and OCR-backed retrieval.
+- Resolve the remaining launch decisions: Pro workflow extras, a 14-day cloud trial, and whether publish/share stays post-launch.
 
-3. Search and OCR
-- full-text note search
-- PDF text extraction/indexing
-- cross-platform OCR pipeline
-- searchable OCR results
-- clear OCR status/failure UX
+2. Lock the audience and messaging
+- Position Myelin for serious study, reading, and research.
+- Lead with the core promise: typed notes and handwriting in the same live note across devices.
+- Avoid generic team, enterprise, and AI-first messaging.
 
-4. Paid launch feature set
-- managed cloud sync
-- version history/restore
-- stronger search
-- OCR-backed retrieval
-- clear free vs Pro gating
-- no free first-party cloud repos
+3. Finalize the note model UX
+- Keep one note model: a canvas with page frames.
+- Make the default experience a single centered page frame, with Document and Board as view presets.
+- Define multi-frame behavior clearly: focus, scrolling, resizing/layouts, and note previews.
 
-5. Research/study polish
-- better PDF annotation workflows
-- source-linked highlights/excerpts
-- citation support
-- Zotero integration
-- math/LaTeX support
+4. Build Myelin Cloud on the existing sync architecture
+- Add a `cloud` repository type without breaking the local-first, outbox-based sync model.
+- Implement auth, storage, metadata, snapshots/version history, and storage accounting.
+- Require Myelin accounts only for cloud features and billing.
 
-6. Lightweight lab sharing
-- shared notebooks/shared spaces
-- invite collaborators
-- notebook-level permissions
-- basic shared activity/history
-- simple group billing if needed
+5. Ship production-grade sync UX
+- Add device pairing and second-device onboarding.
+- Show sync status, offline/reconnect states, and useful diagnostics.
+- Build conflict recovery and restore flows normal users can understand.
 
-7. Later, not first paid launch
-- read-only publish/share
-- comments/mentions
-- org admin console
-- SSO/compliance
-- broad team collaboration features
+6. Ship real search and retrieval
+- Index note text, PDF text, and OCR text locally.
+- Improve ranking, filters, and result snippets so retrieval is clearly better than title/tag search.
+- Add semantic search only after the standard search foundation is solid.
+
+7. Turn OCR into a real product feature
+- Build a cross-platform OCR pipeline.
+- Show when OCR ran, what text was extracted, and what failed.
+- Tie OCR directly into search instead of marketing it as a standalone feature.
+
+8. Launch paid plans and entitlements
+- Implement Stripe-backed entitlements, monthly/annual billing, restore purchases, and grace periods.
+- Launch Free, Pro, and Student/Educator Pro together if operationally simple.
+- Add Patron as a separate supporter option, not as a core plan tier.
+
+9. Run a focused paid beta
+- Validate that users will pay for managed sync, restore, search, and OCR.
+- Track second-device activation, trial-to-paid conversion, 8-week retention, paid churn, and support load.
+- Do not add a free first-party cloud tier during this phase.
+
+10. Add research workflow differentiation after paid validation
+- Polish PDF annotation, split-view reading/writing, and source-linked highlights/excerpts.
+- Add citations, Zotero integration, math support, and better technical diagram workflows.
+- Keep AI optional and secondary to retrieval and note-taking.
+
+11. Explore small-group features only after individual traction
+- Add shared notebooks, lightweight permissions, collaborator history, and simple lab billing.
+- Keep the scope small and avoid comments/mentions, admin consoles, SSO, and compliance work.
+- Skip this until individual retention and support burden look healthy.

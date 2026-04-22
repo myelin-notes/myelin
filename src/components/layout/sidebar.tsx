@@ -7,6 +7,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Logo } from '@/components/logo';
 import { IS_DEV } from '@/lib/env';
 import { useMessages } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
@@ -120,15 +121,13 @@ export function Sidebar() {
       aria-label={strings.sidebar.nav.library}
       className="fixed top-0 bottom-0 left-0 z-20 flex w-16 flex-col bg-sidebar-bg p-3 md:w-64 md:p-6"
     >
-      {/* Brand — collapses to monogram below md */}
+      {/* Brand — collapses to logo mark below md */}
       <div className="flex flex-col items-center gap-1 pb-4 md:items-start">
         <h2
           className="font-heading text-text-brand text-xl italic"
           title={strings.app.name}
         >
-          <span className="md:hidden" aria-hidden="true">
-            {strings.app.name.charAt(0)}
-          </span>
+          <Logo size={28} className="md:hidden" />
           <span className="hidden md:inline">{strings.app.name}</span>
         </h2>
         <span className="hidden font-normal text-text-secondary text-xs uppercase tracking-[0.6px] md:inline">
