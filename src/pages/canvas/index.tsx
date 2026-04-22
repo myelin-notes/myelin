@@ -1,20 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { IS_DEV } from '@/lib/env';
-import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
-import {
-  CHROME_BOTTOM_PADDING,
-  CHROME_HEADER_HEIGHT,
-  CHROME_SIDE_PADDING,
-} from '@/pages/canvas/elements/frame-chrome';
-import {
-  PAGE_HEIGHT,
-  PAGE_WIDTH,
-  PageFrameElement,
-} from '@/pages/canvas/elements/page-frame-element';
+import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { CanvasToolbar } from './components/canvas-toolbar';
@@ -25,6 +15,8 @@ import { PeerSyncPanel } from './components/peer-sync-panel';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
 import { useCanvasEngine } from './hooks/use-canvas-engine';
+import { useCanvasInserts } from './hooks/use-canvas-inserts';
+import { useEmbedFiles } from './hooks/use-embed-files';
 import { useToolState } from './hooks/use-tool-state';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
 
@@ -42,111 +34,20 @@ export function CanvasView() {
     anchor: DOMRect;
     items: ChromeMenuItem[];
   } | null>(null);
-  const [insertOpen, setInsertOpen] = useState(false);
-  const [embedOpen, setEmbedOpen] = useState(false);
-  const [embedAnchor, setEmbedAnchor] = useState<{
-    screenX: number;
-    screenY: number;
-  } | null>(null);
-  const [contextInsert, setContextInsert] = useState<{
-    screenX: number;
-    screenY: number;
-    worldPos: Vector2;
-  } | null>(null);
-
-  const placeFrameAt = useCallback((worldPos: Vector2) => {
-    const dc = drawableCanvasRef.current;
-    if (!dc) {
-      return;
-    }
-    const frame = dc.addElement((i) => new PageFrameElement(i));
-    frame.setOffset(worldPos.x, worldPos.y);
-    frame.updateBounds();
-    dc.updateBounding();
-    frame.select();
-  }, []);
-
-  const handleInsertFrame = useCallback(() => {
-    const dc = drawableCanvasRef.current;
-    if (!dc) {
-      return;
-    }
-    setInsertOpen(false);
-    setEmbedOpen(false);
-    dc.startPlacement({
-      getBounds: () => ({
-        x: -CHROME_SIDE_PADDING,
-        y: -CHROME_HEADER_HEIGHT,
-        width: PAGE_WIDTH + CHROME_SIDE_PADDING * 2,
-        height: PAGE_HEIGHT + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
-      }),
-      onPlace: placeFrameAt,
-    });
-  }, [placeFrameAt]);
-
-  const handleInsertEmbed = useCallback(() => {
-    setInsertOpen(false);
-    drawableCanvasRef.current?.cancelPlacement();
-    setEmbedAnchor(null);
-    setEmbedOpen(true);
-  }, []);
-
-  const handleContextInsertFrame = useCallback(() => {
-    if (!contextInsert) {
-      return;
-    }
-    placeFrameAt(contextInsert.worldPos);
-    setContextInsert(null);
-  }, [contextInsert, placeFrameAt]);
-
-  const handleContextInsertEmbed = useCallback(() => {
-    if (!contextInsert) {
-      return;
-    }
-    setEmbedAnchor({
-      screenX: contextInsert.screenX,
-      screenY: contextInsert.screenY,
-    });
-    setContextInsert(null);
-    setEmbedOpen(true);
-  }, [contextInsert]);
-
-  const handleCanvasDoubleClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const dc = drawableCanvasRef.current;
-      if (!dc) {
-        return;
-      }
-      const activeTool = toolState.canvasTools[toolState.selectedToolIndex];
-      if (activeTool?.id !== 'select') {
-        return;
-      }
-      if (dc.editingElement || dc.isPlacing) {
-        return;
-      }
-      const worldPos = dc.viewport.screenToWorld({ x: e.clientX, y: e.clientY });
-      // Only fire on truly empty canvas — don't steal dblclick from elements
-      const hit = dc.elements.some((el) =>
-        el.isOver(worldPos.x, worldPos.y, 0, dc.ctx),
-      );
-      if (hit) {
-        return;
-      }
-      setInsertOpen(false);
-      setEmbedOpen(false);
-      setContextInsert({
-        screenX: e.clientX,
-        screenY: e.clientY,
-        worldPos,
-      });
-    },
-    [toolState.canvasTools, toolState.selectedToolIndex],
-  );
 
   useEffect(() => {
     setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
     return () => setChromeMenuOpener(() => {});
   }, []);
+
+  const embedFiles = useEmbedFiles(drawableCanvasRef);
+  const inserts = useCanvasInserts({
+    drawableCanvasRef,
+    canvasTools: toolState.canvasTools,
+    selectedToolIndex: toolState.selectedToolIndex,
+    embedFiles,
+  });
+
   const engine = useCanvasEngine({
     id,
     canvasRef,
@@ -158,8 +59,9 @@ export function CanvasView() {
     canvasTools: toolState.canvasTools,
     setSelectedToolIndex: toolState.setSelectedToolIndex,
     onCanvasPointerDown: toolState.hideOptions,
-    onInsertFrame: handleInsertFrame,
-    onInsertEmbed: handleInsertEmbed,
+    onInsertFrame: inserts.onInsertFrame,
+    onInsertEmbed: inserts.onInsertEmbed,
+    embedFiles,
   });
 
   return (
@@ -189,7 +91,7 @@ export function CanvasView() {
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full"
-        onDoubleClick={handleCanvasDoubleClick}
+        onDoubleClick={inserts.onCanvasDoubleClick}
       />
 
       {/* Selection overlay canvas: outline + handles. Always above DOM chrome
@@ -218,7 +120,7 @@ export function CanvasView() {
         selectedToolIndex={toolState.selectedToolIndex}
         optionsVisible={toolState.optionsVisible}
         shelfOpen={toolState.shelfOpen}
-        insertOpen={insertOpen}
+        insertOpen={inserts.insertOpen}
         activeOptions={toolState.activeOptions}
         hasOptions={toolState.hasOptions}
         wheelEnabledIndices={toolState.wheelEnabledIndices}
@@ -226,43 +128,22 @@ export function CanvasView() {
         onToggleOptions={toolState.toggleOptions}
         onToggleShelf={toolState.toggleShelf}
         onCloseShelf={toolState.closeShelf}
-        onToggleInsert={() =>
-          setInsertOpen((v) => {
-            const next = !v;
-            if (next) {
-              setEmbedOpen(false);
-              setContextInsert(null);
-              drawableCanvasRef.current?.cancelPlacement();
-            }
-            return next;
-          })
-        }
+        onToggleInsert={inserts.toggleInsert}
         onToggleWheelTool={toolState.handleToggleWheelTool}
         insertPopover={
           <InsertPopover
-            onInsertFrame={handleInsertFrame}
-            onInsertEmbed={handleInsertEmbed}
-            onClose={() => setInsertOpen(false)}
+            onInsertFrame={inserts.onInsertFrame}
+            onInsertEmbed={inserts.onInsertEmbed}
+            onClose={inserts.closeInsert}
           />
         }
         embedComposer={
           <AnimatePresence>
-            {embedOpen && (
+            {inserts.embedOpen && (
               <EmbedComposer
                 key="embed-composer"
-                onEmbedFiles={(files) => {
-                  engine.embedFiles(
-                    files,
-                    embedAnchor?.screenX,
-                    embedAnchor?.screenY,
-                  );
-                  setEmbedOpen(false);
-                  setEmbedAnchor(null);
-                }}
-                onClose={() => {
-                  setEmbedOpen(false);
-                  setEmbedAnchor(null);
-                }}
+                onEmbedFiles={inserts.submitEmbed}
+                onClose={inserts.closeEmbed}
               />
             )}
           </AnimatePresence>
@@ -270,19 +151,19 @@ export function CanvasView() {
       />
 
       <AnimatePresence>
-        {contextInsert && (
+        {inserts.contextInsert && (
           <div
             key="context-insert"
             className="pointer-events-auto absolute z-20"
             style={{
-              left: contextInsert.screenX,
-              top: contextInsert.screenY,
+              left: inserts.contextInsert.screenX,
+              top: inserts.contextInsert.screenY,
             }}
           >
             <InsertPopover
-              onInsertFrame={handleContextInsertFrame}
-              onInsertEmbed={handleContextInsertEmbed}
-              onClose={() => setContextInsert(null)}
+              onInsertFrame={inserts.onContextInsertFrame}
+              onInsertEmbed={inserts.onContextInsertEmbed}
+              onClose={inserts.closeContextInsert}
             />
           </div>
         )}

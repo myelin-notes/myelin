@@ -1,14 +1,12 @@
-import { toast } from 'sonner';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
-import { useMessages } from '@/lib/i18n';
 import type { ActionBinding } from '@/lib/keybinds';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
-import { SUPPORTED_MEDIA } from '../media';
 import { useCanvasSessionLifecycle } from './use-canvas-session-lifecycle';
 import { useCanvasSessionPersistence } from './use-canvas-session-persistence';
+import type { EmbedFilesFn } from './use-embed-files';
 
 interface UseCanvasEngineArgs {
   id: string | undefined;
@@ -23,6 +21,7 @@ interface UseCanvasEngineArgs {
   onCanvasPointerDown: () => void;
   onInsertFrame: () => void;
   onInsertEmbed: () => void;
+  embedFiles: EmbedFilesFn;
 }
 
 export function useCanvasEngine({
@@ -38,33 +37,8 @@ export function useCanvasEngine({
   onCanvasPointerDown,
   onInsertFrame,
   onInsertEmbed,
+  embedFiles,
 }: UseCanvasEngineArgs) {
-  const messages = useMessages();
-
-  const embedFiles = (
-    files: FileList | File[],
-    screenX?: number,
-    screenY?: number,
-  ) => {
-    const dc = drawableCanvasRef.current;
-    if (!dc) {
-      return;
-    }
-
-    for (const file of files) {
-      const handler = SUPPORTED_MEDIA[file.type];
-      if (!handler) {
-        toast.error(messages.canvas.embedComposer.errors.unsupportedType, {
-          description: messages.canvas.embedComposer.errors.unsupportedDesc(
-            file.type,
-          ),
-        });
-      } else {
-        handler(file, dc, screenX, screenY);
-      }
-    }
-  };
-
   const { noteSession, ydoc, zoomLevel, fps, fileName, editingElement } =
     useCanvasSessionLifecycle({
       id,
@@ -130,6 +104,5 @@ export function useCanvasEngine({
     fileName,
     editingElement,
     back,
-    embedFiles,
   };
 }
