@@ -222,6 +222,25 @@ export class PdfElement extends DrawableElement {
     );
   }
 
+  /**
+   * Content scales with `_scale`; chrome padding is fixed world units (the
+   * paper backing is a constant visual size regardless of how the PDF is
+   * resized). Override so selection outline + handles track the visible
+   * chrome — the base implementation would scale chrome padding too.
+   */
+  public override get boundingBox(): DOMRect {
+    const sX = this._scale.x;
+    const sY = this._scale.y;
+    const contentW = this.totalWidth * sX;
+    const contentH = this.totalHeight * sY;
+    return new DOMRect(
+      this.offset.x - CHROME_SIDE_PADDING,
+      this.offset.y - CHROME_HEADER_HEIGHT,
+      contentW + CHROME_SIDE_PADDING * 2,
+      contentH + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
+    );
+  }
+
   protected isOverLocal(
     x: number,
     y: number,

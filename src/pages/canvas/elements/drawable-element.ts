@@ -192,16 +192,17 @@ export abstract class DrawableElement {
     t: number,
     isEditing: boolean,
   ): void {
-    const local = this.localBoundingBox;
+    // Derive from boundingBox (world, less offset) so element-specific
+    // overrides — e.g. PDF mixing scaled content with unscaled chrome padding —
+    // flow through consistently.
+    const box = this.boundingBox;
     const eased = 1 - (1 - t) * (1 - t);
 
     const pad = SELECTION_PADDING * eased;
-    const sx = this._scale.x;
-    const sy = this._scale.y;
-    const x = local.x * sx - pad;
-    const y = local.y * sy - pad;
-    const w = local.width * sx + pad * 2;
-    const h = local.height * sy + pad * 2;
+    const x = box.x - this._offset.x - pad;
+    const y = box.y - this._offset.y - pad;
+    const w = box.width + pad * 2;
+    const h = box.height + pad * 2;
     const r = SELECTION_RADIUS * eased;
 
     ctx.globalAlpha = eased;
