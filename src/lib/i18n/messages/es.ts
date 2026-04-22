@@ -218,9 +218,29 @@ const es: typeof en = {
           label: 'Eliminar',
           description: 'Quitar los elementos seleccionados',
         },
+        'canvas:tool-select': {
+          label: 'Herramienta de selección',
+          description: 'Seleccionar y mover elementos',
+        },
+        'canvas:tool-pen': {
+          label: 'Herramienta de pluma',
+          description: 'Dibujar con la pluma',
+        },
+        'canvas:tool-highlighter': {
+          label: 'Herramienta de resaltador',
+          description: 'Resaltar con tinta traslúcida',
+        },
+        'canvas:tool-eraser': {
+          label: 'Herramienta de borrador',
+          description: 'Borrar trazos',
+        },
         'canvas:tool-text': {
           label: 'Herramienta de texto',
           description: 'Crear un nuevo nodo de texto',
+        },
+        'canvas:tool-embed': {
+          label: 'Herramienta de inserción',
+          description: 'Insertar una imagen, PDF o archivo',
         },
         'canvas:tool-frame': {
           label: 'Herramienta de marco de página',

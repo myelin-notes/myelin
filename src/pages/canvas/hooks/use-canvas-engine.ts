@@ -2,8 +2,10 @@ import { toast } from 'sonner';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { useMessages } from '@/lib/i18n';
+import type { ActionBinding } from '@/lib/keybinds';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ITool } from '@/pages/canvas/tools/tool';
+import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
 import { SUPPORTED_MEDIA } from '../media';
 import { useCanvasSessionLifecycle } from './use-canvas-session-lifecycle';
 import { useCanvasSessionPersistence } from './use-canvas-session-persistence';
@@ -75,6 +77,14 @@ export function useCanvasEngine({
     noteSession,
   });
 
+  const toolBindings: ActionBinding[] = canvasTools.map((tool, index) => ({
+    action: TOOL_ACTIONS[tool.id],
+    onDown: () => {
+      drawableCanvasRef.current?.switchTool(index);
+      setSelectedToolIndex(index);
+    },
+  }));
+
   useKeybindings([
     {
       action: 'canvas:pan',
@@ -93,28 +103,7 @@ export function useCanvasEngine({
       action: 'canvas:delete',
       onDown: () => drawableCanvasRef.current?.deleteSelected(),
     },
-    {
-      action: 'canvas:tool-text',
-      onDown: () => {
-        const index = canvasTools.findIndex((t) => t.id === 'text');
-        if (index < 0) {
-          return;
-        }
-        drawableCanvasRef.current?.switchTool(index);
-        setSelectedToolIndex(index);
-      },
-    },
-    {
-      action: 'canvas:tool-frame',
-      onDown: () => {
-        const index = canvasTools.findIndex((t) => t.id === 'frame');
-        if (index < 0) {
-          return;
-        }
-        drawableCanvasRef.current?.switchTool(index);
-        setSelectedToolIndex(index);
-      },
-    },
+    ...toolBindings,
   ]);
 
   return {

@@ -24,7 +24,12 @@ declare module './registry' {
     'canvas:undo': true;
     'canvas:redo': true;
     'canvas:delete': true;
+    'canvas:tool-select': true;
+    'canvas:tool-pen': true;
+    'canvas:tool-highlighter': true;
+    'canvas:tool-eraser': true;
     'canvas:tool-text': true;
+    'canvas:tool-embed': true;
     'canvas:tool-frame': true;
     'editor:bold': true;
     'editor:italic': true;
@@ -49,8 +54,23 @@ registry.defineDefaults({
   'canvas:delete': {
     key: 'Backspace',
   },
+  'canvas:tool-select': {
+    key: 'v',
+  },
+  'canvas:tool-pen': {
+    key: 'p',
+  },
+  'canvas:tool-highlighter': {
+    key: 'h',
+  },
+  'canvas:tool-eraser': {
+    key: 'e',
+  },
   'canvas:tool-text': {
     key: 't',
+  },
+  'canvas:tool-embed': {
+    key: 'm',
   },
   'canvas:tool-frame': {
     key: 'f',

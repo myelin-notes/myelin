@@ -214,9 +214,29 @@ const en = {
           label: 'Delete',
           description: 'Remove selected elements',
         },
+        'canvas:tool-select': {
+          label: 'Select Tool',
+          description: 'Select and move elements',
+        },
+        'canvas:tool-pen': {
+          label: 'Pen Tool',
+          description: 'Draw with the pen',
+        },
+        'canvas:tool-highlighter': {
+          label: 'Highlighter Tool',
+          description: 'Highlight with translucent ink',
+        },
+        'canvas:tool-eraser': {
+          label: 'Eraser Tool',
+          description: 'Erase strokes',
+        },
         'canvas:tool-text': {
           label: 'Text Tool',
           description: 'Create a new text node',
+        },
+        'canvas:tool-embed': {
+          label: 'Embed Tool',
+          description: 'Insert an image, PDF, or file',
         },
         'canvas:tool-frame': {
           label: 'Page Frame Tool',

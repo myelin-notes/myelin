@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
 import type { ITool, ToolOption } from '@/pages/canvas/tools/tool';
+import { getToolHotkey } from '@/pages/canvas/tools/tool-keybinds';
 
 interface CanvasToolbarProps {
   tools: ITool[];
@@ -79,6 +80,7 @@ export function CanvasToolbar({
             const Icon = tool.icon;
             const isActive = selectedToolIndex === index;
             const toolHasOptions = (tool.getOptions?.()?.length ?? 0) > 0;
+            const hotkey = getToolHotkey(tool.id);
             return (
               <Tooltip key={index}>
                 <TooltipTrigger
@@ -110,12 +112,19 @@ export function CanvasToolbar({
                   )}
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p>
-                    {tool.label}
-                    {isActive && toolHasOptions
-                      ? ` - ${strings.canvas.toolbar.clickForOptions}`
-                      : ''}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {tool.label}
+                      {isActive && toolHasOptions
+                        ? ` - ${strings.canvas.toolbar.clickForOptions}`
+                        : ''}
+                    </span>
+                    {hotkey && (
+                      <kbd className="flex min-w-[18px] items-center justify-center rounded-[4px] border border-white/20 bg-white/10 px-1 py-[1px] font-sans font-semibold text-[10px] text-white/80">
+                        {hotkey}
+                      </kbd>
+                    )}
+                  </div>
                 </TooltipContent>
               </Tooltip>
             );

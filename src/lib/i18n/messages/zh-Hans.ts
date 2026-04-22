@@ -209,9 +209,29 @@ const zhHans: typeof en = {
           label: '删除',
           description: '移除所选元素',
         },
+        'canvas:tool-select': {
+          label: '选择工具',
+          description: '选择并移动元素',
+        },
+        'canvas:tool-pen': {
+          label: '钢笔工具',
+          description: '使用钢笔绘制',
+        },
+        'canvas:tool-highlighter': {
+          label: '荧光笔工具',
+          description: '使用半透明墨水高亮',
+        },
+        'canvas:tool-eraser': {
+          label: '橡皮擦工具',
+          description: '擦除笔画',
+        },
         'canvas:tool-text': {
           label: '文本工具',
           description: '创建新的文本节点',
+        },
+        'canvas:tool-embed': {
+          label: '嵌入工具',
+          description: '插入图片、PDF 或文件',
         },
         'canvas:tool-frame': {
           label: '页面框架工具',
