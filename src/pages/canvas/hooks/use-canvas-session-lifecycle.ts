@@ -54,34 +54,11 @@ function setupCanvasListeners(
   };
   canvas.addEventListener('drop', handleDrop);
 
-  const handlePaste = (evt: ClipboardEvent) => {
-    const items = evt.clipboardData?.items;
-    if (!items) {
-      return;
-    }
-    const blobs: File[] = [];
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.type.startsWith('image/') || item.type === 'application/pdf') {
-        const file = item.getAsFile();
-        if (file) {
-          blobs.push(file);
-        }
-      }
-    }
-    if (blobs.length > 0) {
-      evt.preventDefault();
-      embedFiles(blobs);
-    }
-  };
-  document.addEventListener('paste', handlePaste);
-
   return () => {
     canvas.removeEventListener('contextmenu', handleContextMenu);
     canvas.removeEventListener('pointerdown', handlePointerDown);
     canvas.removeEventListener('dragover', handleDragOver);
     canvas.removeEventListener('drop', handleDrop);
-    document.removeEventListener('paste', handlePaste);
   };
 }
 

@@ -87,6 +87,14 @@ export class YDocManager {
     return yMap;
   }
 
+  /** Insert a pre-built detached Y.Map into the elements array. */
+  insertExistingElementMap(position: number, yMap: Y.Map<unknown>): void {
+    const clamped = Math.max(0, Math.min(position, this.elements.length));
+    this.doc.transact(() => {
+      this.elements.insert(clamped, [yMap]);
+    }, LOCAL_ORIGIN);
+  }
+
   /** Remove an element's Y.Map from the elements array. */
   removeElementMap(yMap: Y.Map<unknown>): void {
     this.doc.transact(() => {

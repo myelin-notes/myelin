@@ -467,6 +467,56 @@ export class DrawableCanvas {
     return this._elements;
   }
 
+  public getSelectedElements(): DrawableElement[] {
+    return this._elements.filter((element) => element.isSelected);
+  }
+
+  public clearSelection(): void {
+    for (const element of this._elements) {
+      element.unselect();
+    }
+  }
+
+  public selectElementsByIndex(indices: number[]): void {
+    const selected = new Set(indices);
+    this.clearSelection();
+    for (const element of this._elements) {
+      if (selected.has(element.index)) {
+        element.select();
+      }
+    }
+  }
+
+  public insertElementMap(
+    yMap: Y.Map<unknown>,
+    options?: { background?: boolean; position?: number },
+  ): DrawableElement | null {
+    const background =
+      options?.background ??
+      isBackgroundElement(
+        (yMap.get('type') as ElementType | undefined) ?? ElementType.STROKE,
+      );
+    const position = Math.max(
+      0,
+      Math.min(
+        options?.position ?? (background ? 0 : this._elements.length),
+        this._elements.length,
+      ),
+    );
+
+    this._ydoc.insertExistingElementMap(position, yMap);
+
+    const element = this.createElementFromYMap(yMap);
+    if (!element) {
+      this._ydoc.removeElementMap(yMap);
+      return null;
+    }
+
+    this._elements.splice(position, 0, element);
+    this._yMapToElement.set(yMap, element);
+    return element;
+  }
+
   private initStates() {
     this.state.addEnd(InteractState.UsingTool, (event) => {
       this.toolSelected.finish(this, event);

@@ -4,6 +4,7 @@ import type { ActionBinding } from '@/lib/keybinds';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
+import { useCanvasClipboard } from './use-canvas-clipboard';
 import { useCanvasSessionLifecycle } from './use-canvas-session-lifecycle';
 import { useCanvasSessionPersistence } from './use-canvas-session-persistence';
 import { useCanvasThumbnailProducer } from './use-canvas-thumbnail-producer';
@@ -58,6 +59,11 @@ export function useCanvasEngine({
     noteSession,
   });
   useCanvasThumbnailProducer({ id, canvasRef });
+  useCanvasClipboard({
+    id,
+    drawableCanvasRef,
+    embedFiles,
+  });
 
   const toolBindings: ActionBinding[] = canvasTools.map((tool, index) => ({
     action: TOOL_ACTIONS[tool.id],
