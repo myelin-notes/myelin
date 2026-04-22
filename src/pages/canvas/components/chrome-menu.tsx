@@ -47,7 +47,7 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -2, scale: 0.98 }}
       transition={{ duration: 0.14, ease: [0.25, 0.1, 0.25, 1] }}
-      className="pointer-events-auto fixed z-[20] min-w-[200px] origin-top-right overflow-hidden rounded-xl bg-popover/90 p-1.5 shadow-ambient outline-none backdrop-blur-2xl"
+      className="pointer-events-auto fixed z-[100] min-w-[200px] origin-top-right overflow-hidden rounded-xl bg-popover/90 p-1.5 shadow-ambient outline-none backdrop-blur-2xl"
       style={{ top: pos.top, left: pos.left, minWidth: MENU_MIN_WIDTH }}
       role="menu"
     >

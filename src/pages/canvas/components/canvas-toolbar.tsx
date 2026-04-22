@@ -79,7 +79,7 @@ export function CanvasToolbar({
         initial={{ opacity: 0, x: -12 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-        className="absolute top-1/2 left-6 z-10 max-h-[calc(100dvh-6rem)] -translate-y-1/2"
+        className="absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2"
         role="toolbar"
         aria-label="Canvas tools"
       >

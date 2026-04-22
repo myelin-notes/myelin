@@ -191,7 +191,7 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
   const repositorySyncLabel = getRepositorySyncLabel(strings, repositoryStatus);
 
   return (
-    <div className="absolute bottom-6 left-6 z-10 flex max-h-[calc(100dvh-4rem)] w-72 flex-col gap-2 overflow-y-auto rounded-xl bg-white/90 p-3 shadow-ambient backdrop-blur-[24px]">
+    <div className="absolute bottom-6 left-6 z-[100] flex max-h-[calc(100dvh-4rem)] w-72 flex-col gap-2 overflow-y-auto rounded-xl bg-white/90 p-3 shadow-ambient backdrop-blur-[24px]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Radio className="size-3.5 text-text-muted" />

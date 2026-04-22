@@ -4,7 +4,7 @@ import { AnimatePresence } from 'motion/react';
 import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { IS_DEV } from '@/lib/env';
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
 import {
   CHROME_BOTTOM_PADDING,
   CHROME_HEADER_HEIGHT,
@@ -44,6 +44,27 @@ export function CanvasView() {
   } | null>(null);
   const [insertOpen, setInsertOpen] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
+  const [embedAnchor, setEmbedAnchor] = useState<{
+    screenX: number;
+    screenY: number;
+  } | null>(null);
+  const [contextInsert, setContextInsert] = useState<{
+    screenX: number;
+    screenY: number;
+    worldPos: Vector2;
+  } | null>(null);
+
+  const placeFrameAt = useCallback((worldPos: Vector2) => {
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
+    }
+    const frame = dc.addElement((i) => new PageFrameElement(i));
+    frame.setOffset(worldPos.x, worldPos.y);
+    frame.updateBounds();
+    dc.updateBounding();
+    frame.select();
+  }, []);
 
   const handleInsertFrame = useCallback(() => {
     const dc = drawableCanvasRef.current;
@@ -59,21 +80,68 @@ export function CanvasView() {
         width: PAGE_WIDTH + CHROME_SIDE_PADDING * 2,
         height: PAGE_HEIGHT + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
       }),
-      onPlace: (worldPos) => {
-        const frame = dc.addElement((i) => new PageFrameElement(i));
-        frame.setOffset(worldPos.x, worldPos.y);
-        frame.updateBounds();
-        dc.updateBounding();
-        frame.select();
-      },
+      onPlace: placeFrameAt,
     });
-  }, []);
+  }, [placeFrameAt]);
 
   const handleInsertEmbed = useCallback(() => {
     setInsertOpen(false);
     drawableCanvasRef.current?.cancelPlacement();
+    setEmbedAnchor(null);
     setEmbedOpen(true);
   }, []);
+
+  const handleContextInsertFrame = useCallback(() => {
+    if (!contextInsert) {
+      return;
+    }
+    placeFrameAt(contextInsert.worldPos);
+    setContextInsert(null);
+  }, [contextInsert, placeFrameAt]);
+
+  const handleContextInsertEmbed = useCallback(() => {
+    if (!contextInsert) {
+      return;
+    }
+    setEmbedAnchor({
+      screenX: contextInsert.screenX,
+      screenY: contextInsert.screenY,
+    });
+    setContextInsert(null);
+    setEmbedOpen(true);
+  }, [contextInsert]);
+
+  const handleCanvasDoubleClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const dc = drawableCanvasRef.current;
+      if (!dc) {
+        return;
+      }
+      const activeTool = toolState.canvasTools[toolState.selectedToolIndex];
+      if (activeTool?.id !== 'select') {
+        return;
+      }
+      if (dc.editingElement || dc.isPlacing) {
+        return;
+      }
+      const worldPos = dc.viewport.screenToWorld({ x: e.clientX, y: e.clientY });
+      // Only fire on truly empty canvas — don't steal dblclick from elements
+      const hit = dc.elements.some((el) =>
+        el.isOver(worldPos.x, worldPos.y, 0, dc.ctx),
+      );
+      if (hit) {
+        return;
+      }
+      setInsertOpen(false);
+      setEmbedOpen(false);
+      setContextInsert({
+        screenX: e.clientX,
+        screenY: e.clientY,
+        worldPos,
+      });
+    },
+    [toolState.canvasTools, toolState.selectedToolIndex],
+  );
 
   useEffect(() => {
     setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
@@ -121,6 +189,7 @@ export function CanvasView() {
       <canvas
         ref={canvasRef}
         className="absolute inset-0 block h-full w-full"
+        onDoubleClick={handleCanvasDoubleClick}
       />
 
       {/* Selection overlay canvas: outline + handles. Always above DOM chrome
@@ -137,7 +206,7 @@ export function CanvasView() {
       <div
         id="canvas-chrome-controls"
         className="pointer-events-none absolute inset-0 overflow-hidden"
-        style={{ zIndex: 15 }}
+        style={{ zIndex: 100 }}
       />
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
@@ -162,6 +231,7 @@ export function CanvasView() {
             const next = !v;
             if (next) {
               setEmbedOpen(false);
+              setContextInsert(null);
               drawableCanvasRef.current?.cancelPlacement();
             }
             return next;
@@ -181,18 +251,45 @@ export function CanvasView() {
               <EmbedComposer
                 key="embed-composer"
                 onEmbedFiles={(files) => {
-                  engine.embedFiles(files);
+                  engine.embedFiles(
+                    files,
+                    embedAnchor?.screenX,
+                    embedAnchor?.screenY,
+                  );
                   setEmbedOpen(false);
+                  setEmbedAnchor(null);
                 }}
-                onClose={() => setEmbedOpen(false)}
+                onClose={() => {
+                  setEmbedOpen(false);
+                  setEmbedAnchor(null);
+                }}
               />
             )}
           </AnimatePresence>
         }
       />
 
+      <AnimatePresence>
+        {contextInsert && (
+          <div
+            key="context-insert"
+            className="pointer-events-auto absolute z-20"
+            style={{
+              left: contextInsert.screenX,
+              top: contextInsert.screenY,
+            }}
+          >
+            <InsertPopover
+              onInsertFrame={handleContextInsertFrame}
+              onInsertEmbed={handleContextInsertEmbed}
+              onClose={() => setContextInsert(null)}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+
       <div
-        style={{ zIndex: 20 }}
+        style={{ zIndex: 100 }}
         className="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto"
       >
         <WheelPicker ref={wheelRef} radius={100} items={toolState.wheelItems}>
