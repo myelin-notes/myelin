@@ -102,6 +102,75 @@ describe('page-frame content shape', () => {
     );
   });
 
+  it('round-trips triple-asterisk bold italics through page-frame markdown', () => {
+    const markdown = '***bold italics***';
+    const doc = parseMarkdownToDoc(markdown, schema);
+    const ydoc = prosemirrorToYDoc(doc, 'page-frame');
+    const roundTripped = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment('page-frame'),
+      schema,
+    );
+
+    expect(doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'bold italics',
+              marks: [{ type: 'bold' }, { type: 'italic' }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(roundTripped.toJSON()).toEqual(doc.toJSON());
+    expect(serializeDocToMarkdown(roundTripped)).toBe(`${markdown}\n`);
+  });
+
+  it('keeps bold italics, normal bold, and normal italics distinct when they appear side by side', () => {
+    const markdown =
+      '***bold italics*** **normal bold** *normal italics*';
+    const doc = parseMarkdownToDoc(markdown, schema);
+    const ydoc = prosemirrorToYDoc(doc, 'page-frame');
+    const roundTripped = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment('page-frame'),
+      schema,
+    );
+
+    expect(doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'bold italics',
+              marks: [{ type: 'bold' }, { type: 'italic' }],
+            },
+            { type: 'text', text: ' ' },
+            {
+              type: 'text',
+              text: 'normal bold',
+              marks: [{ type: 'bold' }],
+            },
+            { type: 'text', text: ' ' },
+            {
+              type: 'text',
+              text: 'normal italics',
+              marks: [{ type: 'italic' }],
+            },
+          ],
+        },
+      ],
+    });
+    expect(roundTripped.toJSON()).toEqual(doc.toJSON());
+    expect(serializeDocToMarkdown(roundTripped)).toBe(`${markdown}\n`);
+  });
+
   it('preserves fenced code blocks through the Yjs-backed editor state and markdown export', () => {
     const markdown = ['```ts', 'const answer = 42;', '```'].join('\n');
     const doc = parseMarkdownToDoc(markdown, schema);
