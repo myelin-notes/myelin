@@ -249,6 +249,10 @@ export class PdfElement extends DrawableElement {
     return true;
   }
 
+  public override get lowersCanvasWhileEditing(): boolean {
+    return true;
+  }
+
   public override enterEditMode(
     canvas: DrawableCanvas,
     screenX?: number,

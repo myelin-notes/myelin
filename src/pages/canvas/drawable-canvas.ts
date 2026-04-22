@@ -5,12 +5,11 @@ import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasViewport } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
+import {
+  ELEMENT_FACTORIES,
+  type ElementFactory,
+} from './elements/element-factories';
 import { ElementType } from './elements/element-type';
-import { ImageElement } from './elements/image-element';
-import { PageFrameElement } from './elements/page-frame-element';
-import { PdfElement } from './elements/pdf-element';
-import { StrokeElement } from './elements/stroke-element';
-import { TextElement } from './elements/text-element';
 import { EmbedTool } from './tools/embed-tool';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
@@ -134,39 +133,27 @@ export class DrawableCanvas {
    * Create a DrawableElement from a Y.Map, bind it, and return it.
    */
   private createElementFromYMap(yMap: Y.Map<unknown>): DrawableElement | null {
-    const type = yMap.get('type') as ElementType;
-    const index = yMap.get('index') as number;
-
-    let element: DrawableElement;
-    switch (type) {
-      case ElementType.STROKE:
-        element = new StrokeElement(index, [], false, {
-          color: 'black',
-          size: 12,
-        });
-        break;
-      case ElementType.TEXT:
-        element = new TextElement(index);
-        break;
-      case ElementType.IMAGE:
-        element = new ImageElement(index);
-        break;
-      case ElementType.PAGE_FRAME: {
-        const pf = new PageFrameElement(index);
-        const frag = this._ydoc.getXmlFragment(index);
-        pf.bindYProseMirror(frag);
-        element = pf;
-        break;
-      }
-      case ElementType.PDF:
-        element = new PdfElement(index);
-        break;
-      default:
-        return null;
+    const type = yMap.get('type');
+    const index = yMap.get('index');
+    if (typeof type !== 'number' || typeof index !== 'number') {
+      return null;
     }
 
+    const factory = (
+      ELEMENT_FACTORIES as Partial<Record<number, ElementFactory>>
+    )[type];
+    if (!factory) {
+      return null;
+    }
+
+    const element = factory(index);
     element.bindToYMap(yMap);
+    this.bindElementSharedYState(element);
     return element;
+  }
+
+  private bindElementSharedYState(element: DrawableElement): void {
+    element.bindSharedYState(this._ydoc);
   }
 
   /**
@@ -258,10 +245,7 @@ export class DrawableCanvas {
     this._editingElement = element;
     // Drop foreground canvas below DOM layer (z:5) so editing UI receives events
     this.canvas.style.pointerEvents = 'none';
-    if (
-      this.editingElement instanceof PageFrameElement ||
-      this.editingElement instanceof PdfElement
-    ) {
+    if (element.lowersCanvasWhileEditing) {
       this.canvas.style.zIndex = '2';
     }
 
@@ -494,12 +478,7 @@ export class DrawableCanvas {
     // Bind element to its Y.Map
     element.bindToYMap(yMap);
     this._yMapToElement.set(yMap, element);
-
-    // For PageFrames, also bind the XmlFragment
-    if (element instanceof PageFrameElement) {
-      const frag = this._ydoc.getXmlFragment(index);
-      element.bindYProseMirror(frag);
-    }
+    this.bindElementSharedYState(element);
 
     // Increment nextIndex
     this._ydoc.transact(() => {

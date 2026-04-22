@@ -10,6 +10,7 @@ import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
+import type { YDocManager } from '../ydoc-manager';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 import {
@@ -63,7 +64,7 @@ export class PageFrameElement extends DrawableElement {
   }
 
   /** Bind Yjs shared types. Must be called after bindToYMap. */
-  public bindYProseMirror(yXmlFragment: Y.XmlFragment): void {
+  private bindYProseMirror(yXmlFragment: Y.XmlFragment): void {
     this._yXmlFragment = yXmlFragment;
     this.pmEditor = new PageFrameEditorState(yXmlFragment);
   }
@@ -145,6 +146,14 @@ export class PageFrameElement extends DrawableElement {
 
   public override get editable(): boolean {
     return true;
+  }
+
+  public override get lowersCanvasWhileEditing(): boolean {
+    return true;
+  }
+
+  public override bindSharedYState(ydoc: YDocManager): void {
+    this.bindYProseMirror(ydoc.getXmlFragment(this.index));
   }
 
   public override enterEditMode(

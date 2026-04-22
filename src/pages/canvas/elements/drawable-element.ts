@@ -2,6 +2,7 @@ import type * as Y from 'yjs';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { bindYFields, writeYMap } from '../y-fields';
+import type { YDocManager } from '../ydoc-manager';
 import type { ElementType } from './element-type';
 
 const SELECTION_STROKE = '#2f3e46';
@@ -194,6 +195,20 @@ export abstract class DrawableElement {
   public get editable(): boolean {
     return false;
   }
+
+  /**
+   * Whether entering edit mode requires the foreground canvas to sit under
+   * DOM-backed editing chrome owned by the element.
+   */
+  public get lowersCanvasWhileEditing(): boolean {
+    return false;
+  }
+
+  /**
+   * Hook for binding extra shared Yjs state that does not live on the
+   * element's main Y.Map.
+   */
+  public bindSharedYState(_ydoc: YDocManager): void {}
 
   /** Called when the element enters inline edit mode. Returns the root DOM element of the editing UI, if any. */
   public enterEditMode(
