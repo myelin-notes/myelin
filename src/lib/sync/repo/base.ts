@@ -337,6 +337,19 @@ export abstract class BaseRepository
     });
   }
 
+  async removeCustomColor(color: string): Promise<string[]> {
+    const normalized = normalizeCustomColor(color);
+    if (!normalized) {
+      throw new Error(`Invalid color: ${color}`);
+    }
+    return this.mutateManifest('Remove custom color', (manifest) => {
+      manifest.customColors = manifest.customColors.filter(
+        (c) => c !== normalized,
+      );
+      return [...manifest.customColors];
+    });
+  }
+
   async openSession(nodeId: string): Promise<NoteSession> {
     return NoteSession.open(nodeId, this);
   }

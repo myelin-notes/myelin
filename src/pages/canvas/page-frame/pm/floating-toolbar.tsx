@@ -21,6 +21,7 @@ import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
 import { AddColorSwatch } from '@/components/add-color-swatch';
 import { ColorSwatch } from '@/components/color-swatch';
+import { CustomColorSwatch } from '@/components/custom-color-swatch';
 import { useCustomColors } from '@/lib/custom-colors';
 import { PEN_COLORS } from '../../tools/pen-tool';
 import { PM_UPDATE_EVENT } from './constants';
@@ -151,6 +152,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   const {
     colors: customColors,
     promptAddColor,
+    removeColor,
     pickerOpen,
   } = useCustomColors();
   const pickerOpenRef = useRef(pickerOpen);
@@ -403,11 +405,17 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
                 />
               ))}
               {customColors.map((color) => (
-                <ColorSwatch
+                <CustomColorSwatch
                   key={color}
                   color={color}
                   active={currentColor === color}
                   onClick={() => onPickColor(color)}
+                  onDelete={() => {
+                    if (currentColor === color) {
+                      setAttributedMark(view, schema.marks.textColor, null);
+                    }
+                    void removeColor(color);
+                  }}
                   onPointerDown={(e) => e.preventDefault()}
                 />
               ))}

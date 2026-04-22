@@ -36,6 +36,7 @@ const PREFS = {
   }),
   githubVaultPassword: pref<string>('github-vault-password', ''),
   peerId: pref<string>('peer-id', ''),
+  explorerViewMode: pref<'tree' | 'grid'>('explorer-view-mode', 'tree'),
 };
 
 type PrefKey = keyof typeof PREFS;

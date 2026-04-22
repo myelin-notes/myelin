@@ -17,6 +17,7 @@ import { useRepository } from './sync';
 interface CustomColorsContextValue {
   colors: string[];
   addColor: (color: string) => Promise<void>;
+  removeColor: (color: string) => Promise<void>;
   // Opens the color picker; on confirm, persists the chosen color to the repo
   // manifest and broadcasts it to every color menu in the app.
   promptAddColor: () => void;
@@ -64,6 +65,14 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
     [repository],
   );
 
+  const removeColor = useCallback(
+    async (color: string) => {
+      const updated = await repository.removeCustomColor(color);
+      setColors(updated);
+    },
+    [repository],
+  );
+
   const promptAddColor = useCallback(() => {
     setPickerOpen(true);
   }, []);
@@ -83,8 +92,8 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
   }, []);
 
   const value = useMemo(
-    () => ({ colors, addColor, promptAddColor, pickerOpen }),
-    [colors, addColor, promptAddColor, pickerOpen],
+    () => ({ colors, addColor, removeColor, promptAddColor, pickerOpen }),
+    [colors, addColor, removeColor, promptAddColor, pickerOpen],
   );
 
   return (

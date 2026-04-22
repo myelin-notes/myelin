@@ -486,12 +486,22 @@ export class CachedRepository
 
   async addCustomColor(color: string): Promise<string[]> {
     const result = await this.cache.addCustomColor(color);
+    await this.enqueueCustomColorsSync();
+    return result;
+  }
+
+  async removeCustomColor(color: string): Promise<string[]> {
+    const result = await this.cache.removeCustomColor(color);
+    await this.enqueueCustomColorsSync();
+    return result;
+  }
+
+  private async enqueueCustomColorsSync(): Promise<void> {
     await this.mutatePendingOps((ops) => {
       if (!ops.some((op) => op.kind === 'sync-custom-colors')) {
         ops.push({ kind: 'sync-custom-colors' });
       }
     });
-    return result;
   }
 
   async openSession(nodeId: string): Promise<NoteSession> {
@@ -577,15 +587,13 @@ export class CachedRepository
   }
 
   private async applyCustomColorsSync(): Promise<void> {
+    // Cache is the source of truth — overwriting remote is what lets deletes
+    // propagate (a merge-only strategy could never remove).
     const cacheColors = await this.cache.getCustomColors();
     await this.remote.applyManifestMutation(
       'Sync custom colors',
       (remoteManifest) => {
-        const merged = new Set<string>(remoteManifest.customColors);
-        for (const color of cacheColors) {
-          merged.add(color);
-        }
-        remoteManifest.customColors = Array.from(merged);
+        remoteManifest.customColors = [...cacheColors];
       },
     );
   }

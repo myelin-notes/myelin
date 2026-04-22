@@ -40,6 +40,11 @@ const es: typeof en = {
       modified: 'Modificado recientemente',
       created: 'Creado recientemente',
     },
+    viewModeLabel: (label: string) => `Vista: ${label}`,
+    viewModes: {
+      tree: 'Lista',
+      grid: 'Cuadrícula',
+    },
     fileTypes: {
       mcanvas: 'Lienzo',
     },

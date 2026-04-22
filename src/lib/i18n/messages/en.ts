@@ -38,6 +38,11 @@ const en = {
       modified: 'Recently modified',
       created: 'Recently created',
     },
+    viewModeLabel: (label: string) => `View: ${label}`,
+    viewModes: {
+      tree: 'List',
+      grid: 'Grid',
+    },
     fileTypes: {
       mcanvas: 'Canvas',
     },

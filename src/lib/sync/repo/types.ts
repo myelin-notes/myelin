@@ -74,6 +74,7 @@ export interface Repository {
 
   getCustomColors(): Promise<string[]>;
   addCustomColor(color: string): Promise<string[]>;
+  removeCustomColor(color: string): Promise<string[]>;
 
   openSession(nodeId: string): Promise<NoteSession>;
 }

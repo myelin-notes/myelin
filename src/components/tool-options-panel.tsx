@@ -4,6 +4,7 @@ import { useCustomColors } from '@/lib/custom-colors';
 import type { FontEntry, ToolOption } from '@/pages/canvas/tools/tool';
 import { AddColorSwatch } from './add-color-swatch';
 import { ColorSwatch } from './color-swatch';
+import { CustomColorSwatch } from './custom-color-swatch';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];
@@ -111,7 +112,11 @@ function FontPicker({
 /* ── Main panel ─────────────────────────────────────────── */
 
 export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
-  const { colors: customColors, promptAddColor } = useCustomColors();
+  const {
+    colors: customColors,
+    promptAddColor,
+    removeColor,
+  } = useCustomColors();
 
   if (options.length === 0) {
     return null;
@@ -136,11 +141,17 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
                   />
                 ))}
                 {customColors.map((color) => (
-                  <ColorSwatch
+                  <CustomColorSwatch
                     key={color}
                     color={color}
                     active={option.value === color}
                     onClick={() => option.set(color)}
+                    onDelete={() => {
+                      if (option.value === color && option.palette.length > 0) {
+                        option.set(option.palette[0]);
+                      }
+                      void removeColor(color);
+                    }}
                   />
                 ))}
                 <AddColorSwatch onClick={promptAddColor} />

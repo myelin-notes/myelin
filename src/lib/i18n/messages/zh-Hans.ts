@@ -39,6 +39,11 @@ const zhHans: typeof en = {
       modified: '最近修改',
       created: '最近创建',
     },
+    viewModeLabel: (label: string) => `视图：${label}`,
+    viewModes: {
+      tree: '列表',
+      grid: '网格',
+    },
     fileTypes: {
       mcanvas: '画布',
     },
