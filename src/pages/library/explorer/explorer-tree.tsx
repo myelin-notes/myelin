@@ -179,7 +179,7 @@ export function ExplorerTree({
 
   const containerClass =
     viewMode === 'grid'
-      ? 'grid min-h-[80px] grid-cols-[repeat(auto-fill,minmax(172px,1fr))] gap-3 rounded-xl transition-colors'
+      ? 'grid min-h-[80px] grid-cols-[repeat(auto-fill,minmax(198px,1fr))] gap-4 rounded-xl transition-colors'
       : 'flex min-h-[80px] flex-col gap-1 rounded-xl transition-colors';
 
   return (

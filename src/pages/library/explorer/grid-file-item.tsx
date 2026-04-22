@@ -7,6 +7,18 @@ import { useRepository, type VFSFileNode } from '@/lib/sync';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
 import { TagManageDialog } from '../tag-manage-dialog';
+import {
+  explorerGridBodyClass,
+  explorerGridCardClass,
+  explorerGridFadeMask,
+  explorerGridMediaClass,
+  explorerGridPlaceholderStyle,
+  explorerGridRenameInputClass,
+  explorerGridTagClass,
+  explorerGridTagOverflowClass,
+  explorerGridTagsClass,
+  explorerGridTitleClass,
+} from './grid-item-styles';
 import { ItemContextMenu } from './item-context-menu';
 import { useExplorerItem } from './use-explorer-item';
 
@@ -50,60 +62,56 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
                 }
               }}
               onDragStart={handleDragStart}
-              className="group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl bg-surface text-left transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient"
+              className={explorerGridCardClass}
             />
           }
         >
-          <div className="relative aspect-[4/3] w-full overflow-hidden">
-            {hasThumb ? (
+          <div
+            className={`pointer-events-none ${explorerGridMediaClass}`}
+            style={explorerGridFadeMask}
+          >
+            <div
+              className="absolute inset-0 opacity-90"
+              style={explorerGridPlaceholderStyle}
+            />
+            {hasThumb && (
               <img
                 src={thumbUrl}
                 alt=""
                 aria-hidden
+                draggable={false}
                 onLoad={() => setImgLoaded(true)}
                 className={cn(
-                  'h-full w-full object-cover object-top transition-opacity duration-500 ease-out',
+                  'relative h-full w-full object-cover object-top transition-[opacity,transform] duration-500 ease-out group-hover:scale-[1.03]',
                   imgLoaded ? 'opacity-100' : 'opacity-0',
                 )}
-              />
-            ) : (
-              <div
-                className="h-full w-full"
-                style={{
-                  backgroundImage:
-                    'radial-gradient(circle, rgba(28, 39, 56, 0.12) 1px, transparent 1px)',
-                  backgroundSize: '14px 14px',
-                }}
               />
             )}
           </div>
 
-          <div className="flex min-w-0 flex-col gap-1.5 px-3 py-3">
+          <div className={explorerGridBodyClass}>
             {renaming ? (
               <input
                 {...renameInputProps}
-                className="w-full border-primary border-b-2 bg-transparent font-normal text-sm text-text-primary outline-none"
+                className={explorerGridRenameInputClass}
               />
             ) : (
               <>
                 <span
-                  className="block truncate font-normal text-sm text-text-secondary transition-colors duration-200 group-hover:text-text-primary"
+                  className={cn('block', explorerGridTitleClass)}
                   title={file.name}
                 >
                   {file.name}
                 </span>
                 {file.tags.length > 0 && (
-                  <div className="flex min-w-0 flex-wrap items-center gap-1">
+                  <div className={explorerGridTagsClass}>
                     {file.tags.slice(0, 2).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
-                      >
+                      <span key={tag} className={explorerGridTagClass}>
                         #{tag}
                       </span>
                     ))}
                     {file.tags.length > 2 && (
-                      <span className="text-[9px] text-text-muted">
+                      <span className={explorerGridTagOverflowClass}>
                         +{file.tags.length - 2}
                       </span>
                     )}

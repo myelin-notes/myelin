@@ -3,6 +3,18 @@ import { Folder } from 'lucide-react';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { TagManageDialog } from '../tag-manage-dialog';
+import {
+  explorerGridBodyClass,
+  explorerGridCardClass,
+  explorerGridCardDragOverClass,
+  explorerGridMediaClass,
+  explorerGridPlaceholderStyle,
+  explorerGridRenameInputClass,
+  explorerGridTagClass,
+  explorerGridTagOverflowClass,
+  explorerGridTagsClass,
+  explorerGridTitleClass,
+} from './grid-item-styles';
 import { ItemContextMenu } from './item-context-menu';
 import { useDropTarget } from './use-drop-target';
 import { useExplorerItem } from './use-explorer-item';
@@ -59,44 +71,47 @@ export function GridFolderItem({
               onDragStart={handleDragStart}
               {...dropTargetProps}
               className={cn(
-                'group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl text-left transition-all duration-200 ease-out',
-                dragOver
-                  ? 'bg-accent/15 ring-1 ring-accent/40'
-                  : 'bg-surface hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient',
+                explorerGridCardClass,
+                dragOver && explorerGridCardDragOverClass,
               )}
             />
           }
         >
-          <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden">
-            <Folder className="size-14 shrink-0 fill-amber-400 text-amber-400 transition-colors duration-200 group-hover:fill-amber-500 group-hover:text-amber-500" />
+          <div className={explorerGridMediaClass}>
+            <div
+              className="absolute inset-0 opacity-95"
+              style={explorerGridPlaceholderStyle}
+            />
+            <div className="relative flex h-full items-center justify-center">
+              <div className="flex size-[4.75rem] items-center justify-center rounded-[1.35rem] bg-card/80 shadow-[0_18px_40px_-24px_rgba(28,39,56,0.7)] ring-1 ring-white/55 backdrop-blur-sm transition-transform duration-300 group-hover:scale-[1.03]">
+                <Folder className="size-12 shrink-0 fill-amber-400 text-amber-400 transition-colors duration-200 group-hover:fill-amber-500 group-hover:text-amber-500" />
+              </div>
+            </div>
           </div>
 
-          <div className="flex min-w-0 flex-col gap-1.5 px-3 py-3">
+          <div className={explorerGridBodyClass}>
             {renaming ? (
               <input
                 {...renameInputProps}
-                className="w-full border-primary border-b-2 bg-transparent font-medium text-sm text-text-primary outline-none"
+                className={explorerGridRenameInputClass}
               />
             ) : (
               <>
                 <span
-                  className="block truncate font-medium text-sm text-text-primary"
+                  className={cn('block', explorerGridTitleClass)}
                   title={name}
                 >
                   {name}
                 </span>
                 {tags.length > 0 && (
-                  <div className="flex min-w-0 flex-wrap items-center gap-1">
+                  <div className={explorerGridTagsClass}>
                     {tags.slice(0, 2).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
-                      >
+                      <span key={tag} className={explorerGridTagClass}>
                         #{tag}
                       </span>
                     ))}
                     {tags.length > 2 && (
-                      <span className="text-[9px] text-text-muted">
+                      <span className={explorerGridTagOverflowClass}>
                         +{tags.length - 2}
                       </span>
                     )}
