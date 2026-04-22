@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ThumbnailCache } from './thumbnail-cache';
+import { getThumbnailUrl, subscribeThumbnail } from './thumbnails';
 
 export function useThumbnailUrl(nodeId: string): string | null | undefined {
   const [url, setUrl] = useState<string | null | undefined>(undefined);
@@ -7,23 +7,22 @@ export function useThumbnailUrl(nodeId: string): string | null | undefined {
   useEffect(() => {
     let cancelled = false;
     setUrl(undefined);
-    (async () => {
-      const has = await ThumbnailCache.exists(nodeId);
-      if (cancelled) {
-        return;
+
+    const refresh = async () => {
+      const next = await getThumbnailUrl(nodeId);
+      if (!cancelled) {
+        setUrl(next);
       }
-      if (!has) {
-        setUrl(null);
-        return;
-      }
-      const resolved = await ThumbnailCache.getUrl(nodeId);
-      if (cancelled) {
-        return;
-      }
-      setUrl(resolved);
-    })();
+    };
+
+    void refresh();
+    const unsubscribe = subscribeThumbnail(nodeId, () => {
+      void refresh();
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [nodeId]);
 

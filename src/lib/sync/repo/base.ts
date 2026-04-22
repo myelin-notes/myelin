@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import { ThumbnailCache } from '@/lib/thumbnail-cache';
+import { removeThumbnail } from '@/lib/thumbnails';
 import { NoteSession } from '../session';
 import type {
   YjsSyncPushOptions,
@@ -264,7 +264,7 @@ export abstract class BaseRepository
     await Promise.all(
       deletedFileIds.map(async (fileId) => {
         await this.deleteNoteBytes(fileId);
-        await ThumbnailCache.remove(fileId);
+        await removeThumbnail(fileId);
       }),
     );
   }

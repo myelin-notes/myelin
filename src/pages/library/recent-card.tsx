@@ -92,7 +92,7 @@ export function RecentCard({
         {category} &bull; {time}
       </span>
 
-      <div className="relative flex flex-1 flex-col px-5 pt-1 pb-5 sm:px-6 sm:pb-6">
+      <div className="relative flex flex-1 flex-col px-5 pt-4 pb-5 sm:px-6 sm:pb-6">
         <h4 className="font-heading font-normal text-text-primary text-xl leading-7 transition-colors duration-200 group-hover:text-accent-dark">
           {title}
         </h4>

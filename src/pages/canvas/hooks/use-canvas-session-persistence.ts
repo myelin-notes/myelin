@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logger } from '@/lib/logger';
 import type { NoteSession } from '@/lib/sync';
-import { ThumbnailCache } from '@/lib/thumbnail-cache';
+import {
+  regenerateThumbnailNow,
+  requestThumbnailRegeneration,
+} from '@/lib/thumbnails';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;
 const LOCAL_PERSIST_DEBOUNCE_MS = 250;
@@ -10,13 +13,11 @@ const logger = new Logger('CanvasSessionPersistence');
 
 interface UseCanvasSessionPersistenceArgs {
   id: string | undefined;
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   noteSession: NoteSession | null;
 }
 
 export function useCanvasSessionPersistence({
   id,
-  canvasRef,
   noteSession,
 }: UseCanvasSessionPersistenceArgs) {
   const navigate = useNavigate();
@@ -24,7 +25,6 @@ export function useCanvasSessionPersistence({
   const persistPromiseRef = useRef<Promise<void> | null>(null);
   const persistTimerRef = useRef<number | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
-  const needsThumbnailSaveRef = useRef(false);
 
   useEffect(() => {
     noteSessionRef.current = noteSession;
@@ -65,37 +65,7 @@ export function useCanvasSessionPersistence({
         logger.error('Failed to persist session', error, { id });
       });
     }, LOCAL_PERSIST_DEBOUNCE_MS);
-  }, [persistSession]);
-
-  const saveSession = useCallback(
-    async (session: NoteSession) => {
-      const canvas = canvasRef.current;
-      if (!canvas || !id) {
-        return;
-      }
-
-      await persistSession(session);
-
-      if (!needsThumbnailSaveRef.current) {
-        return;
-      }
-
-      needsThumbnailSaveRef.current = false;
-      await new Promise<void>((resolve, reject) => {
-        canvas.toBlob(async (blob) => {
-          if (blob === null) {
-            needsThumbnailSaveRef.current = true;
-            logger.warn('Failed to generate thumbnail', { id });
-            reject();
-            return;
-          }
-          await ThumbnailCache.save(id, blob);
-          resolve();
-        }, 'image/png');
-      });
-    },
-    [canvasRef, id, persistSession],
-  );
+  }, [persistSession, id]);
 
   const autoSave = useCallback(async () => {
     const session = noteSessionRef.current;
@@ -107,27 +77,33 @@ export function useCanvasSessionPersistence({
       await savePromiseRef.current;
     }
 
-    if (!session.hasUnsyncedChanges() && !needsThumbnailSaveRef.current) {
+    if (!session.hasUnsyncedChanges()) {
       return;
     }
 
-    const savePromise = saveSession(session).finally(() => {
+    const savePromise = persistSession(session).finally(() => {
       if (savePromiseRef.current === savePromise) {
         savePromiseRef.current = null;
       }
     });
     savePromiseRef.current = savePromise;
     await savePromise;
-  }, [saveSession]);
+  }, [persistSession]);
 
   const back = useCallback(async () => {
     await autoSave();
+    if (id !== undefined) {
+      try {
+        await regenerateThumbnailNow(id);
+      } catch (error) {
+        logger.error('Failed to regenerate thumbnail on back', error, { id });
+      }
+    }
     navigate('/library');
-  }, [autoSave, navigate]);
+  }, [autoSave, id, navigate]);
 
   useEffect(() => {
     if (!noteSession) {
-      needsThumbnailSaveRef.current = false;
       if (persistTimerRef.current !== null) {
         window.clearTimeout(persistTimerRef.current);
         persistTimerRef.current = null;
@@ -136,7 +112,9 @@ export function useCanvasSessionPersistence({
     }
 
     const unsubscribe = noteSession.subscribeLocalChanges(() => {
-      needsThumbnailSaveRef.current = true;
+      if (id !== undefined) {
+        requestThumbnailRegeneration(id);
+      }
       scheduleLocalPersist();
     });
 
@@ -147,7 +125,7 @@ export function useCanvasSessionPersistence({
         persistTimerRef.current = null;
       }
     };
-  }, [noteSession, scheduleLocalPersist]);
+  }, [noteSession, scheduleLocalPersist, id]);
 
   useEffect(() => {
     if (!noteSession) {
@@ -190,7 +168,7 @@ export function useCanvasSessionPersistence({
       unsubscribe();
       stopAutoSave();
     };
-  }, [autoSave, noteSession]);
+  }, [autoSave, noteSession, id]);
 
   return {
     autoSave,
@@ -200,7 +178,6 @@ export function useCanvasSessionPersistence({
         window.clearTimeout(persistTimerRef.current);
         persistTimerRef.current = null;
       }
-      needsThumbnailSaveRef.current = false;
     },
   };
 }

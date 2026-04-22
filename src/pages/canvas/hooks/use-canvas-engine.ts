@@ -6,6 +6,7 @@ import type { ITool } from '@/pages/canvas/tools/tool';
 import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
 import { useCanvasSessionLifecycle } from './use-canvas-session-lifecycle';
 import { useCanvasSessionPersistence } from './use-canvas-session-persistence';
+import { useCanvasThumbnailProducer } from './use-canvas-thumbnail-producer';
 import type { EmbedFilesFn } from './use-embed-files';
 
 interface UseCanvasEngineArgs {
@@ -54,9 +55,9 @@ export function useCanvasEngine({
     });
   const { back } = useCanvasSessionPersistence({
     id,
-    canvasRef,
     noteSession,
   });
+  useCanvasThumbnailProducer({ id, canvasRef });
 
   const toolBindings: ActionBinding[] = canvasTools.map((tool, index) => ({
     action: TOOL_ACTIONS[tool.id],

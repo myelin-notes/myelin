@@ -30,12 +30,13 @@ beforeEach(() => {
   memoryLocalStorage.clear();
 });
 
-vi.mock('@/lib/thumbnail-cache', () => ({
-  ThumbnailCache: {
-    remove: async () => {},
-    save: async () => {},
-    getUrl: async () => null,
-  },
+vi.mock('@/lib/thumbnails', () => ({
+  getThumbnailUrl: async () => null,
+  regenerateThumbnailNow: async () => {},
+  registerThumbnailProducer: () => () => {},
+  removeThumbnail: async () => {},
+  requestThumbnailRegeneration: () => {},
+  subscribeThumbnail: () => () => {},
 }));
 
 vi.mock('@/lib/sync/repo/github-credentials', () => ({
