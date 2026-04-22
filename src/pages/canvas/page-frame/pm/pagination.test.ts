@@ -20,20 +20,20 @@ function block({
   measuredTop,
   height,
   nodeSize = 10,
-  isParagraph = false,
+  isBreakableTextBlock = false,
 }: {
   pos: number;
   measuredTop: number;
   height: number;
   nodeSize?: number;
-  isParagraph?: boolean;
+  isBreakableTextBlock?: boolean;
 }): PaginationBlock {
   return {
     pos,
     measuredTop,
     height,
     nodeSize,
-    isParagraph,
+    isBreakableTextBlock,
   };
 }
 
@@ -98,7 +98,7 @@ describe('calculateBreakLayout', () => {
       measuredTop: 760,
       height: 40,
       nodeSize: 20,
-      isParagraph: true,
+      isBreakableTextBlock: true,
     });
     let measurementCount = 0;
 
@@ -141,7 +141,7 @@ describe('calculateBreakLayout', () => {
           measuredTop: 760,
           height: 40,
           nodeSize: 20,
-          isParagraph: true,
+          isBreakableTextBlock: true,
         }),
         block({ pos: 30, measuredTop: 820, height: 20 }),
       ],
@@ -166,6 +166,7 @@ describe('calculateBreakLayout', () => {
             pos: 20,
             measuredTop: 760,
             height: 80,
+            isBreakableTextBlock: true,
           }),
         ],
         existingBreaks: [],

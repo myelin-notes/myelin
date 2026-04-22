@@ -367,10 +367,22 @@ input[type="range"].tool-slider::-moz-range-track {
 }
 
 .pm-editor .ProseMirror blockquote {
+  --pm-blockquote-rule-color: rgba(195, 199, 202, 0.5);
+  --pm-blockquote-rule-width: 2px;
   margin: 1.15em 0;
-  padding-left: 1rem;
-  border-left: 2px solid rgba(195, 199, 202, 0.5);
+  padding-left: calc(1rem + var(--pm-blockquote-rule-width));
   color: var(--text-secondary);
+  background-image: var(
+    --pm-blockquote-rule-images,
+    linear-gradient(
+      var(--pm-blockquote-rule-color),
+      var(--pm-blockquote-rule-color)
+    )
+  );
+  background-position: var(--pm-blockquote-rule-positions, 0 0);
+  background-size: var(--pm-blockquote-rule-sizes, var(--pm-blockquote-rule-width) 100%);
+  background-repeat: var(--pm-blockquote-rule-repeats, no-repeat);
+  background-origin: border-box;
 }
 
 .pm-editor .ProseMirror pre {

@@ -34,15 +34,15 @@ interface BlockInfo {
   /** offsetTop relative to the editor's content top, in CSS px. */
   measuredTop: number;
   nodeSize: number;
-  isParagraph: boolean;
+  isBreakableTextBlock: boolean;
 }
 
 /**
  * Walk the doc and emit one BlockInfo per leaf block.
  *
- * This is the *only* DOM measurement done up-front. Paragraphs are NOT
+ * This is the *only* DOM measurement done up-front. Breakable text blocks are NOT
  * expanded into per-line points here — that expensive work is deferred to
- * `paginateParagraph`, which is only called for paragraphs that actually
+ * `paginateParagraph`, which is only called for text blocks that actually
  * cross a page boundary.
  */
 function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
@@ -59,13 +59,15 @@ function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
     if (height <= 0) {
       return;
     }
+    const isBreakableTextBlock =
+      node.isTextblock && node.type.name !== 'codeBlock';
     result.push({
       pos,
       dom,
       height,
       measuredTop: dom.offsetTop - editorOffsetTop,
       nodeSize: node.nodeSize,
-      isParagraph: node.type.name === 'paragraph',
+      isBreakableTextBlock,
     });
   });
 
@@ -469,16 +471,16 @@ function cursorToCharOffset(
 }
 
 /**
- * Measure a paragraph's lines using Pretext's canvas-based layout.
+ * Measure a text block's lines using Pretext's canvas-based layout.
  *
  * Pure arithmetic after a single `prepareWithSegments` call — no DOM reads
  * for line positions, no `view.posAtCoords`. Character offsets come from
  * each `LayoutLine.start` cursor and map directly to PM doc positions via
- * `block.pos + 1 + charOffset` (only valid when the paragraph contains no
+ * `block.pos + 1 + charOffset` (only valid when the text block contains no
  * inline atoms — mentions/images inflate node size without contributing to
  * `textContent`, which would break the mapping).
  *
- * Returns `null` for paragraphs Pretext can't handle (non-text children,
+ * Returns `null` for text blocks Pretext can't handle (non-text children,
  * empty text, missing CSS inputs, or Pretext itself throwing).
  */
 function measureLinesWithPretext(
@@ -563,8 +565,8 @@ function measureLinesWithPretext(
 }
 
 /**
- * Measure a paragraph's lines using DOM range rects — the fallback when
- * Pretext can't handle the paragraph (contains mentions, images, etc.).
+ * Measure a text block's lines using DOM range rects — the fallback when
+ * Pretext can't handle the block (contains mentions, images, etc.).
  *
  * Walks text descendants, collects one rect per visual line, and remembers
  * the text node/offset that starts each fragment. That keeps split positions
@@ -800,7 +802,7 @@ function measureLinesWithDom(
 }
 
 /**
- * Measure a paragraph's lines. Prefer DOM rects so pagination follows the
+ * Measure a text block's lines. Prefer DOM rects so pagination follows the
  * browser's actual wrapped lines. Fall back to Pretext if the DOM path can't
  * produce line boxes.
  */
@@ -833,7 +835,7 @@ function measureParagraphLines(
  * Walk blocks in document order and emit page breaks.
  *
  * Cheap by default: per-block this only reads `offsetTop` / `offsetHeight`
- * (which are cached layout values, not reflows). Paragraphs are only
+ * (which are cached layout values, not reflows). Breakable text blocks are only
  * line-expanded when they actually overflow the current page boundary.
  */
 function calculateLayout(
@@ -909,6 +911,87 @@ function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
       ),
     ),
   );
+}
+
+interface BlockquoteRuleSegment {
+  height: number;
+  top: number;
+}
+
+function clearBlockquoteRuleStyle(blockquote: HTMLElement): void {
+  blockquote.style.removeProperty('--pm-blockquote-rule-images');
+  blockquote.style.removeProperty('--pm-blockquote-rule-positions');
+  blockquote.style.removeProperty('--pm-blockquote-rule-sizes');
+  blockquote.style.removeProperty('--pm-blockquote-rule-repeats');
+}
+
+function collectBlockquoteRuleSegments(
+  blockquote: HTMLElement,
+): BlockquoteRuleSegment[] | null {
+  const breakWidgets = Array.from(
+    blockquote.querySelectorAll<HTMLElement>(
+      ':scope > .ProseMirror-widget[data-page-break="inline"]',
+    ),
+  );
+  if (breakWidgets.length === 0) {
+    return null;
+  }
+
+  const segments: BlockquoteRuleSegment[] = [];
+  let currentTop = 0;
+
+  for (const widget of breakWidgets) {
+    const widgetTop = widget.offsetTop;
+    if (widgetTop > currentTop) {
+      segments.push({ top: currentTop, height: widgetTop - currentTop });
+    }
+    currentTop = widgetTop + widget.offsetHeight;
+  }
+
+  const blockHeight = blockquote.offsetHeight;
+  if (blockHeight > currentTop) {
+    segments.push({ top: currentTop, height: blockHeight - currentTop });
+  }
+
+  return segments.filter((segment) => segment.height > 0);
+}
+
+function syncBlockquoteRuleStyles(view: EditorView): void {
+  const blockquotes = view.dom.querySelectorAll<HTMLElement>('blockquote');
+
+  for (const blockquote of blockquotes) {
+    clearBlockquoteRuleStyle(blockquote);
+
+    const segments = collectBlockquoteRuleSegments(blockquote);
+    if (segments === null) {
+      continue;
+    }
+    if (segments.length === 0) {
+      blockquote.style.setProperty('--pm-blockquote-rule-images', 'none');
+      continue;
+    }
+
+    const image =
+      'linear-gradient(var(--pm-blockquote-rule-color), var(--pm-blockquote-rule-color))';
+    blockquote.style.setProperty(
+      '--pm-blockquote-rule-images',
+      segments.map(() => image).join(', '),
+    );
+    blockquote.style.setProperty(
+      '--pm-blockquote-rule-positions',
+      segments.map((segment) => `0 ${segment.top}px`).join(', '),
+    );
+    blockquote.style.setProperty(
+      '--pm-blockquote-rule-sizes',
+      segments
+        .map((segment) => `var(--pm-blockquote-rule-width) ${segment.height}px`)
+        .join(', '),
+    );
+    blockquote.style.setProperty(
+      '--pm-blockquote-rule-repeats',
+      segments.map(() => 'no-repeat').join(', '),
+    );
+  }
 }
 
 function breaksEqual(a: Break[], b: Break[]): boolean {
@@ -999,7 +1082,10 @@ export function paginationPlugin(
           } else {
             try {
               const $pos = tr.doc.resolve(mapped);
-              if ($pos.parent.type.name === 'paragraph') {
+              if (
+                $pos.parent.isTextblock &&
+                $pos.parent.type.name !== 'codeBlock'
+              ) {
                 mappedBreaks.push({ ...b, pos: mapped });
               }
             } catch {
@@ -1088,6 +1174,7 @@ export function paginationPlugin(
             metrics.changed = changed;
           }
           if (!changed) {
+            syncBlockquoteRuleStyles(editorView);
             return;
           }
 
@@ -1121,6 +1208,7 @@ export function paginationPlugin(
 
           const dispatchStartedAt = metrics ? performance.now() : 0;
           editorView.dispatch(tr);
+          syncBlockquoteRuleStyles(editorView);
           if (metrics) {
             metrics.dispatchMs = performance.now() - dispatchStartedAt;
           }

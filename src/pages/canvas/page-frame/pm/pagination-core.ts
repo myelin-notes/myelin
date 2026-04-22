@@ -38,7 +38,7 @@ export interface PaginationBlock {
   measuredTop: number;
   height: number;
   nodeSize: number;
-  isParagraph: boolean;
+  isBreakableTextBlock: boolean;
 }
 
 export interface ParagraphMeasurementState {
@@ -170,7 +170,7 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
       continue;
     }
 
-    if (block.isParagraph && blockEffectiveTop < pageBoundary) {
+    if (block.isBreakableTextBlock && blockEffectiveTop < pageBoundary) {
       onOverflowingParagraph?.(block);
       const lines = measureParagraphLines(block, {
         blockNaturalTop,
