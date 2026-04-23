@@ -410,6 +410,7 @@ input[type="range"].tool-slider::-moz-range-track {
   --z: var(--vp-zoom, 1);
   margin: 1.15em 0;
   overflow: hidden;
+  overflow: clip;
   border-radius: var(--radius-lg);
   background: rgba(230, 234, 240, 0.52);
   border-left: 2.5px solid color-mix(in srgb, var(--accent-navy) 18%, transparent);
