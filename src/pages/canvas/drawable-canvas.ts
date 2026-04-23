@@ -487,6 +487,15 @@ export class DrawableCanvas {
     }
   }
 
+  public selectAllElements(): void {
+    if (this._editingElement || this._placement) {
+      return;
+    }
+    for (const element of this._elements) {
+      element.select();
+    }
+  }
+
   public insertElementMap(
     yMap: Y.Map<unknown>,
     options?: { background?: boolean; position?: number },

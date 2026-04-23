@@ -88,6 +88,13 @@ export function useCanvasEngine({
       onDown: () => drawableCanvasRef.current?.redo(),
     },
     {
+      action: 'canvas:select-all',
+      onDown: (event) => {
+        event.preventDefault();
+        drawableCanvasRef.current?.selectAllElements();
+      },
+    },
+    {
       action: 'canvas:delete',
       onDown: () => drawableCanvasRef.current?.deleteSelected(),
     },

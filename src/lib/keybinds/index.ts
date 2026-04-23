@@ -23,6 +23,7 @@ declare module './registry' {
     'canvas:pan': true;
     'canvas:undo': true;
     'canvas:redo': true;
+    'canvas:select-all': true;
     'canvas:delete': true;
     'canvas:tool-select': true;
     'canvas:tool-pen': true;
@@ -43,6 +44,7 @@ registry.defineDefaults(
   {
     'canvas:undo': { key: 'z', mod: true },
     'canvas:redo': { key: 'z', mod: true, shift: true },
+    'canvas:select-all': { key: 'a', mod: true },
   },
   { locked: true },
 );
