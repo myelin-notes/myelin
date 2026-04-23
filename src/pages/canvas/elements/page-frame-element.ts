@@ -22,12 +22,16 @@ import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
 } from './frame-chrome';
+import { PAGE_GAP, PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
 
-export const PAGE_WIDTH = 680;
-export const PAGE_HEIGHT = 880;
-export const PAGE_PADDING = 48;
-export const PAGE_GAP = 40;
-export const PAGE_CORNER_RADIUS = 3;
+export {
+  PAGE_CORNER_RADIUS,
+  PAGE_GAP,
+  PAGE_HEIGHT,
+  PAGE_PADDING,
+  PAGE_WIDTH,
+} from './page-frame-constants';
+
 const MIN_PAGE_WIDTH = 240;
 
 const logger = new Logger('PageFrameElement');

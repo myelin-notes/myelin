@@ -1,8 +1,6 @@
-import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameElement } from '../elements/page-frame-element';
-import { parseMarkdownToDoc } from '../page-frame/markdown-parser';
-import { schema } from '../page-frame/pm/schema';
+import { writeMarkdownToPageFrameFragment } from '../page-frame/markdown-import';
 
 export async function markdownImportHandler(
   blob: Blob,
@@ -14,9 +12,8 @@ export async function markdownImportHandler(
   const pf = canvas.addElement((i) => new PageFrameElement(i));
   const frag = pf.yXmlFragment;
   if (frag) {
-    const doc = parseMarkdownToDoc(text, schema);
     canvas.ydoc.transact(() => {
-      prosemirrorToYXmlFragment(doc, frag);
+      writeMarkdownToPageFrameFragment(text, frag);
     });
   }
 

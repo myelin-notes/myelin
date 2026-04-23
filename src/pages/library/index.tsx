@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import {
   ArrowDownAZ,
   ArrowDownZA,
@@ -12,16 +12,19 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import {
+  type NoteSession,
   useRepository,
   type VFSFileNode,
   type VFSFolderNode,
 } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
+import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
@@ -33,6 +36,19 @@ import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
 const logger = new Logger('LibraryPage');
+const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
+const MARKDOWN_MIME_TYPES = new Set(['text/markdown', 'text/x-markdown']);
+
+function isMarkdownFile(file: File): boolean {
+  return (
+    MARKDOWN_EXTENSION_RE.test(file.name) || MARKDOWN_MIME_TYPES.has(file.type)
+  );
+}
+
+function getMarkdownCanvasTitle(fileName: string, fallback: string): string {
+  const title = fileName.replace(MARKDOWN_EXTENSION_RE, '').trim();
+  return title.length > 0 ? title : fallback;
+}
 
 export function LibraryPage() {
   const strings = useMessages();
@@ -40,6 +56,7 @@ export function LibraryPage() {
   const repository = useRepository();
   const navigate = useNavigate();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
+  const markdownInputRef = useRef<HTMLInputElement>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,6 +75,7 @@ export function LibraryPage() {
     'created',
   ];
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
+  const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
   const cycleSortMode = () => {
     setSortMode(
       (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
@@ -74,6 +92,80 @@ export function LibraryPage() {
   const triggerRefresh = () => {
     setRefreshKey((k) => k + 1);
     explorerRef.current?.reload();
+  };
+
+  const handleImportMarkdown = async (file: File) => {
+    if (!isMarkdownFile(file)) {
+      toast.error(strings.library.importMarkdown.unsupportedFile);
+      return;
+    }
+
+    setIsImportingMarkdown(true);
+    let createdId: string | null = null;
+    let session: NoteSession | null = null;
+
+    try {
+      const markdown = await file.text();
+      const baseTitle = getMarkdownCanvasTitle(
+        file.name,
+        strings.library.createNew.untitledCanvas,
+      );
+      const title = await repository.getUniqueFileName(
+        baseTitle,
+        currentFolderId,
+      );
+      createdId = await repository.createFile(
+        title,
+        'mcanvas',
+        currentFolderId,
+      );
+      session = await repository.openSession(createdId);
+      addMarkdownPageFrameToYDoc(session.ydoc, markdown);
+      await session.push();
+      await session.close();
+      session = null;
+
+      triggerRefresh();
+      const importedId = createdId;
+      if (!importedId) {
+        throw new Error('Markdown import did not create a canvas.');
+      }
+      createdId = null;
+      navigate(`/mcanvas/${importedId}`);
+    } catch (error) {
+      logger.error('Failed to import Markdown', error, {
+        fileName: file.name,
+        createdId,
+      });
+      if (session) {
+        await session.close().catch(() => {});
+      }
+      if (createdId) {
+        await repository.deleteNode(createdId).catch((deleteError) => {
+          logger.error(
+            'Failed to clean up failed Markdown import',
+            deleteError,
+            {
+              createdId,
+            },
+          );
+        });
+      }
+      toast.error(strings.library.importMarkdown.failed, {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsImportingMarkdown(false);
+    }
+  };
+
+  const handleMarkdownInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file || isImportingMarkdown) {
+      return;
+    }
+    void handleImportMarkdown(file);
   };
 
   useEffect(() => {
@@ -360,6 +452,14 @@ export function LibraryPage() {
                     onNewFile={(title, type) =>
                       explorerRef.current?.startNewFile(title, type)
                     }
+                    onImportMarkdown={() => markdownInputRef.current?.click()}
+                  />
+                  <input
+                    ref={markdownInputRef}
+                    type="file"
+                    accept="text/markdown,text/x-markdown,.md,.markdown,.mdx"
+                    className="hidden"
+                    onChange={handleMarkdownInputChange}
                   />
                 </div>
               </div>

@@ -50,8 +50,13 @@ const en = {
       button: 'New',
       folder: 'New Folder',
       canvas: 'New Canvas',
+      importMarkdown: 'Import Markdown',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
+    },
+    importMarkdown: {
+      unsupportedFile: 'Choose a Markdown file (.md, .markdown, or .mdx).',
+      failed: 'Markdown import failed',
     },
     semanticTags: {
       title: 'Semantic Tags',

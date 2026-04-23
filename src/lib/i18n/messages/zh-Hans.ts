@@ -51,8 +51,13 @@ const zhHans: typeof en = {
       button: '新建',
       folder: '新建文件夹',
       canvas: '新建画布',
+      importMarkdown: '导入 Markdown',
       untitledCanvas: '未命名画布',
       unnamedFolder: '未命名文件夹',
+    },
+    importMarkdown: {
+      unsupportedFile: '请选择 Markdown 文件（.md、.markdown 或 .mdx）',
+      failed: 'Markdown 导入失败',
     },
     semanticTags: {
       title: '语义标签',

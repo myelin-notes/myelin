@@ -52,8 +52,13 @@ const es: typeof en = {
       button: 'Nuevo',
       folder: 'Nueva carpeta',
       canvas: 'Nuevo lienzo',
+      importMarkdown: 'Importar Markdown',
       untitledCanvas: 'Lienzo sin título',
       unnamedFolder: 'Carpeta sin nombre',
+    },
+    importMarkdown: {
+      unsupportedFile: 'Elige un archivo Markdown (.md, .markdown o .mdx).',
+      failed: 'No se pudo importar el Markdown',
     },
     semanticTags: {
       title: 'Etiquetas semánticas',
