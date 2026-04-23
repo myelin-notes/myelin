@@ -299,7 +299,7 @@ export class SelectTool implements ITool {
     }
   }
 
-  public finish(canvas: DrawableCanvas, _event: PointerEvent): void {
+  public finish(canvas: DrawableCanvas, event: PointerEvent): void {
     switch (this.mode) {
       case SelectMode.Moving: {
         if (this.totalDelta.x === 0 && this.totalDelta.y === 0) {
