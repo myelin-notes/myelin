@@ -36,6 +36,10 @@ export class SelectTool implements ITool {
 
   // Cycle-through state
   private lastCycledElement: DrawableElement | null = null;
+  private pendingCycle: {
+    hits: DrawableElement[];
+    from: DrawableElement;
+  } | null = null;
 
   // Scale state
   private scalingElement: DrawableElement | null = null;
@@ -158,23 +162,41 @@ export class SelectTool implements ITool {
     }
 
     if (hits.length > 0) {
-      let pick = hits[0];
-      if (
-        hits.length > 1 &&
-        this.lastCycledElement &&
-        hits.includes(this.lastCycledElement)
-      ) {
-        const idx = hits.indexOf(this.lastCycledElement);
-        pick = hits[(idx + 1) % hits.length];
+      const selectedHit = hits.find((e) => e.isSelected);
+      let pick = selectedHit ?? hits[0];
+      this.pendingCycle = null;
+
+      if (selectedHit) {
+        if (
+          hits.length > 1 &&
+          this.lastCycledElement &&
+          hits.includes(this.lastCycledElement)
+        ) {
+          this.pendingCycle = { hits, from: this.lastCycledElement };
+        } else {
+          this.lastCycledElement = pick;
+        }
+      } else {
+        if (
+          hits.length > 1 &&
+          this.lastCycledElement &&
+          hits.includes(this.lastCycledElement)
+        ) {
+          const idx = hits.indexOf(this.lastCycledElement);
+          pick = hits[(idx + 1) % hits.length];
+        }
+        this.lastCycledElement = pick;
       }
-      this.lastCycledElement = pick;
 
       const wasAlreadySelected = pick.isSelected;
 
-      for (const e of canvas.elements) {
-        e.unselect();
+      if (!wasAlreadySelected) {
+        for (const e of canvas.elements) {
+          e.unselect();
+        }
+        pick.select();
       }
-      pick.select();
+
       this.mode = SelectMode.Moving;
       this.lastPoint = point;
       this.totalDelta = { x: 0, y: 0 };
@@ -182,7 +204,7 @@ export class SelectTool implements ITool {
 
       // Clicking an already-selected editable element (without dragging)
       // re-enters edit mode.
-      if (pick.editable && wasAlreadySelected) {
+      if (pick.editable && wasAlreadySelected && !this.pendingCycle) {
         this.clickToEditCandidate = pick;
       }
       return;
@@ -303,7 +325,9 @@ export class SelectTool implements ITool {
     switch (this.mode) {
       case SelectMode.Moving: {
         if (this.totalDelta.x === 0 && this.totalDelta.y === 0) {
-          if (this.clickToEditCandidate) {
+          if (this.pendingCycle) {
+            this.cyclePendingSelection(canvas);
+          } else if (this.clickToEditCandidate) {
             canvas.enterElementEdit(this.clickToEditCandidate, event);
           }
         }
@@ -387,7 +411,27 @@ export class SelectTool implements ITool {
     this.scalingElement = null;
     this.scalingHandle = null;
     this.lassoPath = [];
+    this.pendingCycle = null;
     this.clickToEditCandidate = null;
+  }
+
+  private cyclePendingSelection(canvas: DrawableCanvas): void {
+    if (!this.pendingCycle) {
+      return;
+    }
+    const hits = this.pendingCycle.hits.filter((hit) =>
+      canvas.elements.includes(hit),
+    );
+    if (hits.length === 0) {
+      return;
+    }
+    const idx = hits.indexOf(this.pendingCycle.from);
+    const pick = hits[(idx + 1) % hits.length] ?? hits[0];
+    for (const e of canvas.elements) {
+      e.unselect();
+    }
+    pick.select();
+    this.lastCycledElement = pick;
   }
 
   private hitHandle(

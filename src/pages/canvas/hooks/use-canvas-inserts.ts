@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useRef, useState } from 'react';
+import { CollisionHelper } from '@/lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
 import {
   CHROME_BOTTOM_PADDING,
@@ -138,6 +139,17 @@ export function useCanvasInserts({
       if (dc.editingElement || dc.isPlacing) {
         return;
       }
+      const worldPos = dc.viewport.screenToWorld({
+        x: e.pageX,
+        y: e.pageY,
+      });
+      const hit = dc.elements.some(
+        (el) => !el.hidden && CollisionHelper.inBox(worldPos, el.boundingBox),
+      );
+      if (hit) {
+        lastClickRef.current = null;
+        return;
+      }
       const now = performance.now();
       const prev = lastClickRef.current;
       lastClickRef.current = { t: now, x: e.pageX, y: e.pageY };
@@ -146,16 +158,6 @@ export function useCanvasInserts({
         now - prev.t > 250 ||
         Math.hypot(e.pageX - prev.x, e.pageY - prev.y) > 4
       ) {
-        return;
-      }
-      const worldPos = dc.viewport.screenToWorld({
-        x: e.pageX,
-        y: e.pageY,
-      });
-      const hit = dc.elements.some((el) =>
-        el.isOver(worldPos.x, worldPos.y, 0, dc.ctx),
-      );
-      if (hit) {
         return;
       }
       lastClickRef.current = null;
