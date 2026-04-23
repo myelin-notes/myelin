@@ -28,6 +28,12 @@ export function RecentCard({
   const [imgLoaded, setImgLoaded] = useState(false);
 
   const fadeMask = 'linear-gradient(to bottom, black 72%, transparent 100%)';
+  const placeholderStyle = {
+    backgroundImage:
+      'linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 48%), radial-gradient(circle, rgba(28, 39, 56, 0.12) 1px, transparent 1px)',
+    backgroundPosition: '0 0, 0 0',
+    backgroundSize: '100% 100%, 14px 14px',
+  };
 
   return (
     <button
@@ -40,12 +46,13 @@ export function RecentCard({
     >
       {/* Thumbnail region */}
       <div
-        className="relative h-[56%] w-full overflow-hidden"
+        className="relative h-[56%] w-full overflow-hidden bg-surface/80"
         style={{
           maskImage: fadeMask,
           WebkitMaskImage: fadeMask,
         }}
       >
+        <div className="absolute inset-0 opacity-90" style={placeholderStyle} />
         {hasThumb ? (
           <img
             src={thumbUrl}
@@ -53,21 +60,11 @@ export function RecentCard({
             aria-hidden
             onLoad={() => setImgLoaded(true)}
             className={cn(
-              'h-full w-full object-cover object-top transition-[opacity,transform] duration-500 ease-out group-hover:scale-[1.04]',
+              'h-full w-full object-cover object-top transition-opacity duration-500 ease-out',
               imgLoaded ? 'opacity-100' : 'opacity-0',
             )}
           />
-        ) : (
-          <div
-            className="h-full w-full"
-            style={{
-              backgroundImage:
-                'radial-gradient(circle, rgba(28, 39, 56, 0.12) 1px, transparent 1px)',
-              backgroundSize: '14px 14px',
-              backgroundPosition: '0 0',
-            }}
-          />
-        )}
+        ) : null}
       </div>
 
       {featured && (

@@ -1,11 +1,4 @@
-import {
-  BookOpen,
-  Bug,
-  HelpCircle,
-  Plus,
-  Settings,
-  Waypoints,
-} from 'lucide-react';
+import { BookOpen, Bug, HelpCircle, Plus, Settings } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/logo';
 import { IS_DEV } from '@/lib/env';
@@ -78,11 +71,11 @@ export function Sidebar() {
       active: true,
       navTo: '/library',
     },
-    {
-      label: strings.sidebar.nav.graph,
-      icon: <Waypoints className="size-5" />,
-      navTo: '/graph',
-    },
+    // {
+    //   label: strings.sidebar.nav.graph,
+    //   icon: <Waypoints className="size-5" />,
+    //   navTo: '/graph',
+    // },
   ];
 
   const bottomNav: NavItem[] = [

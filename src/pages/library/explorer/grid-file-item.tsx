@@ -82,7 +82,7 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
                 draggable={false}
                 onLoad={() => setImgLoaded(true)}
                 className={cn(
-                  'relative h-full w-full object-cover object-top transition-[opacity,transform] duration-500 ease-out group-hover:scale-[1.03]',
+                  'relative h-full w-full object-cover object-top transition-opacity duration-500 ease-out',
                   imgLoaded ? 'opacity-100' : 'opacity-0',
                 )}
               />

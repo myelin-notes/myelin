@@ -7,6 +7,7 @@ import {
   explorerGridBodyClass,
   explorerGridCardClass,
   explorerGridCardDragOverClass,
+  explorerGridFadeMask,
   explorerGridMediaClass,
   explorerGridPlaceholderStyle,
   explorerGridRenameInputClass,
@@ -77,7 +78,7 @@ export function GridFolderItem({
             />
           }
         >
-          <div className={explorerGridMediaClass}>
+          <div className={explorerGridMediaClass} style={explorerGridFadeMask}>
             <div
               className="absolute inset-0 opacity-95"
               style={explorerGridPlaceholderStyle}
