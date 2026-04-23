@@ -284,6 +284,8 @@ export class FrameChrome {
 
     btn.addEventListener('pointerdown', (ev) => {
       // prevent canvas from starting a pan/draw when user presses the button
+      // and keep any active page-frame editor from losing DOM focus.
+      ev.preventDefault();
       ev.stopPropagation();
     });
     btn.addEventListener('pointerenter', () => {

@@ -252,7 +252,19 @@ export class PageFrameElement extends DrawableElement {
       view.dispatch(tr);
     }
 
+    requestAnimationFrame(() => {
+      if (this._editing) {
+        this.pmEditor?.ensureFocused();
+      }
+    });
+
     return this.frameDiv;
+  }
+
+  public ensureEditorFocused(): void {
+    if (this._editing) {
+      this.pmEditor?.ensureFocused();
+    }
   }
 
   public override exitEditMode(): void {

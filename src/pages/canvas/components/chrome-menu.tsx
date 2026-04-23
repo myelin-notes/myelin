@@ -59,6 +59,11 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
             key={item.id}
             type="button"
             role="menuitem"
+            onPointerDown={(e) => {
+              // Mouse menu interaction should not steal focus from an active
+              // page-frame editor; the click still fires normally.
+              e.preventDefault();
+            }}
             onClick={() => {
               item.onSelect();
               onClose();

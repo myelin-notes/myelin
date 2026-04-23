@@ -127,6 +127,16 @@ function removeStaleFrames(
   }
 }
 
+function shouldPreserveExternalFocus(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return (
+    target.closest('[role="dialog"]') !== null ||
+    target.closest('[data-page-frame-preserve-focus]') !== null
+  );
+}
+
 interface PageFrameDomLayerProps {
   canvasRef: React.RefObject<DrawableCanvas | null>;
   editingElement: DrawableElement | null;
@@ -297,6 +307,43 @@ export function PageFrameDomLayer({
       document.removeEventListener('selectionchange', schedule);
     };
   }, [editingElement, canvasRef]);
+
+  useEffect(() => {
+    if (!editingElement) {
+      return;
+    }
+
+    let pendingRaf = 0;
+    const scheduleFocusCheck = () => {
+      if (pendingRaf !== 0) {
+        return;
+      }
+      pendingRaf = requestAnimationFrame(() => {
+        pendingRaf = 0;
+        if (!document.hasFocus()) {
+          return;
+        }
+        if (shouldPreserveExternalFocus(document.activeElement)) {
+          return;
+        }
+        editingElement.ensureEditorFocused();
+      });
+    };
+
+    scheduleFocusCheck();
+    document.addEventListener('focusin', scheduleFocusCheck, true);
+    document.addEventListener('pointerup', scheduleFocusCheck, true);
+    window.addEventListener('focus', scheduleFocusCheck);
+
+    return () => {
+      if (pendingRaf !== 0) {
+        cancelAnimationFrame(pendingRaf);
+      }
+      document.removeEventListener('focusin', scheduleFocusCheck, true);
+      document.removeEventListener('pointerup', scheduleFocusCheck, true);
+      window.removeEventListener('focus', scheduleFocusCheck);
+    };
+  }, [editingElement]);
 
   return (
     <>

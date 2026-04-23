@@ -23,6 +23,18 @@ export class PageFrameEditorState {
     return this._view;
   }
 
+  get editable(): boolean {
+    return this._editable;
+  }
+
+  hasFocus(): boolean {
+    const activeElement = document.activeElement;
+    return (
+      activeElement instanceof HTMLElement &&
+      this._view?.dom.contains(activeElement) === true
+    );
+  }
+
   /**
    * Create a persistent EditorView mounted into the given container.
    * Starts non-editable. Call `setEditable(true)` to enable editing.
@@ -91,6 +103,16 @@ export class PageFrameEditorState {
   setEditable(editable: boolean): void {
     this._editable = editable;
     this._view?.setProps({ editable: (_state) => this._editable });
+  }
+
+  focus(): void {
+    this._view?.focus();
+  }
+
+  ensureFocused(): void {
+    if (this._editable && !this.hasFocus()) {
+      this.focus();
+    }
   }
 
   blur(): void {
