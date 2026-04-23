@@ -428,8 +428,8 @@ input[type="range"].tool-slider::-moz-range-track {
 
 .pm-editor .ProseMirror .pm-monaco-code-block__editor {
   overflow: hidden;
-  transform: scale(calc(1 / var(--z)));
-  transform-origin: top left;
+  /* Monaco mouse hit-testing follows CSS zoom here, but not transform scale. */
+  zoom: calc(1 / var(--z));
   width: calc(100% * var(--z));
 }
 
