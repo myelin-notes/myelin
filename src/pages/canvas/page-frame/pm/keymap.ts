@@ -14,7 +14,7 @@ import {
 import { undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
-import { type Command, Selection } from 'prosemirror-state';
+import { AllSelection, type Command, Selection } from 'prosemirror-state';
 import { redo, undo } from 'y-prosemirror';
 import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
@@ -154,6 +154,11 @@ const clearBlockFormatting: Command = (state, dispatch) => {
   return true;
 };
 
+const selectAllPageFrame: Command = (state, dispatch) => {
+  dispatch?.(state.tr.setSelection(new AllSelection(state.doc)));
+  return true;
+};
+
 export function buildKeymap(s: Schema) {
   const isMac =
     typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
@@ -173,6 +178,7 @@ export function buildKeymap(s: Schema) {
     [`${mod}-z`]: undo,
     [`${mod}-shift-z`]: redo,
     ...(isMac ? {} : { [`${mod}-y`]: redo }),
+    [`${mod}-a`]: selectAllPageFrame,
 
     Enter: chainCommands(
       exitFencedCodeBlock,

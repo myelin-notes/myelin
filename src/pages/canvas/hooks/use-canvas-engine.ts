@@ -1,7 +1,10 @@
+import { AllSelection } from 'prosemirror-state';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import type { ActionBinding } from '@/lib/keybinds';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import { ElementType } from '@/pages/canvas/elements/element-type';
+import type { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
 import { useCanvasClipboard } from './use-canvas-clipboard';
@@ -91,6 +94,16 @@ export function useCanvasEngine({
       action: 'canvas:select-all',
       onDown: (event) => {
         event.preventDefault();
+        if (editingElement?.type === ElementType.PAGE_FRAME) {
+          const view = (editingElement as PageFrameElement).pmEditor?.view;
+          if (view) {
+            view.dispatch(
+              view.state.tr.setSelection(new AllSelection(view.state.doc)),
+            );
+            view.focus();
+            return;
+          }
+        }
         drawableCanvasRef.current?.selectAllElements();
       },
     },

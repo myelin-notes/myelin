@@ -4,6 +4,7 @@ import type {
   CodeBlockEditorCursorPosition,
   CodeBlockEditorDirection,
   CodeBlockEditorEscapeUnit,
+  CodeBlockEditorExternalSelection,
   CodeBlockEditorLayout,
   CodeBlockEditorSelection,
 } from './code-block-editor-adapter';
@@ -66,8 +67,9 @@ function resolveMonacoLanguage(language: string | null): string {
 }
 
 class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
-  private readonly decorations: import('monaco-editor').editor.IEditorDecorationsCollection;
+  private readonly delimiterDecorations: import('monaco-editor').editor.IEditorDecorationsCollection;
   private readonly editor: import('monaco-editor').editor.IStandaloneCodeEditor;
+  private readonly externalSelectionDecorations: import('monaco-editor').editor.IEditorDecorationsCollection;
   private readonly model: import('monaco-editor').editor.ITextModel;
 
   constructor(
@@ -114,10 +116,16 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
       theme: 'myelin-code-block',
       wordWrap: 'off',
     });
-    this.decorations = this.editor.createDecorationsCollection();
+    this.delimiterDecorations = this.editor.createDecorationsCollection();
+    this.externalSelectionDecorations =
+      this.editor.createDecorationsCollection();
 
-    this.editor.onDidChangeModelContent(() => options.callbacks.onUpdate());
-    this.editor.onDidChangeCursorSelection(() => options.callbacks.onUpdate());
+    this.editor.onDidChangeModelContent(() =>
+      options.callbacks.onContentChange(),
+    );
+    this.editor.onDidChangeCursorSelection(() =>
+      options.callbacks.onSelectionChange(),
+    );
     this.editor.onDidContentSizeChange(() =>
       options.callbacks.onContentSizeChange(),
     );
@@ -131,6 +139,12 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
         preventDefault: () => event.preventDefault(),
         stopPropagation: () => event.stopPropagation(),
       });
+    });
+    this.editor.onMouseDown(() => {
+      requestAnimationFrame(() => options.callbacks.onSelectionChange());
+    });
+    this.editor.onMouseUp(() => {
+      requestAnimationFrame(() => options.callbacks.onSelectionChange());
     });
 
     this.addEscapeCommand(
@@ -224,10 +238,6 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
     this.editor.focus();
   }
 
-  hasTextFocus(): boolean {
-    return this.editor.hasTextFocus();
-  }
-
   setLanguage(language: string | null): void {
     const nextLanguage = resolveMonacoLanguage(language);
     if (this.model.getLanguageId() !== nextLanguage) {
@@ -236,7 +246,7 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
   }
 
   setDelimiterLines(lineNumbers: readonly number[]): void {
-    this.decorations.set(
+    this.delimiterDecorations.set(
       lineNumbers.map((lineNumber) => ({
         options: {
           inlineClassName: 'pm-monaco-code-block__delimiter',
@@ -249,6 +259,39 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
         ),
       })),
     );
+  }
+
+  setExternalSelection(
+    selection: CodeBlockEditorExternalSelection | null,
+  ): void {
+    if (!selection || selection.from === selection.to) {
+      this.externalSelectionDecorations.clear();
+      return;
+    }
+
+    const maxOffset = this.model.getValueLength();
+    const from = clamp(Math.min(selection.from, selection.to), 0, maxOffset);
+    const to = clamp(Math.max(selection.from, selection.to), 0, maxOffset);
+    if (from === to) {
+      this.externalSelectionDecorations.clear();
+      return;
+    }
+
+    const start = this.model.getPositionAt(from);
+    const end = this.model.getPositionAt(to);
+    this.externalSelectionDecorations.set([
+      {
+        options: {
+          inlineClassName: 'pm-monaco-code-block__external-selection',
+        },
+        range: new this.monaco.Range(
+          start.lineNumber,
+          start.column,
+          end.lineNumber,
+          end.column,
+        ),
+      },
+    ]);
   }
 
   getCursorPosition(): CodeBlockEditorCursorPosition | null {
@@ -291,7 +334,8 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
   }
 
   dispose(): void {
-    this.decorations.clear();
+    this.delimiterDecorations.clear();
+    this.externalSelectionDecorations.clear();
     this.editor.dispose();
     this.model.dispose();
   }

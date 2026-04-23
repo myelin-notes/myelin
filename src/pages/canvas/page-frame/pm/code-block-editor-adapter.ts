@@ -8,6 +8,11 @@ export interface CodeBlockEditorSelection {
   to: number;
 }
 
+export interface CodeBlockEditorExternalSelection {
+  from: number;
+  to: number;
+}
+
 export interface CodeBlockEditorCursorPosition {
   column: number;
   lineNumber: number;
@@ -29,6 +34,7 @@ export interface CodeBlockEditorLayout {
 
 export interface CodeBlockEditorCallbacks {
   onBoundaryInput: (event: CodeBlockEditorBoundaryInput) => void;
+  onContentChange: () => void;
   onContentSizeChange: () => void;
   onEscapeRequest: (
     unit: CodeBlockEditorEscapeUnit,
@@ -36,8 +42,8 @@ export interface CodeBlockEditorCallbacks {
   ) => boolean;
   onExitCodeBlock: () => void;
   onRedo: () => void;
+  onSelectionChange: () => void;
   onUndo: () => void;
-  onUpdate: () => void;
 }
 
 export interface CodeBlockEditorAdapter {
@@ -47,12 +53,14 @@ export interface CodeBlockEditorAdapter {
   getLineMaxColumn: (lineNumber: number) => number | null;
   getSelection: () => CodeBlockEditorSelection | null;
   getValue: () => string;
-  hasTextFocus: () => boolean;
   isCursorAtBoundary: (
     unit: CodeBlockEditorEscapeUnit,
     dir: CodeBlockEditorDirection,
   ) => boolean;
   setDelimiterLines: (lineNumbers: readonly number[]) => void;
+  setExternalSelection: (
+    selection: CodeBlockEditorExternalSelection | null,
+  ) => void;
   setLanguage: (language: string | null) => void;
   setSelection: (anchor: number, head: number) => void;
   setValue: (value: string) => void;

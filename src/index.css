@@ -408,12 +408,22 @@ input[type="range"].tool-slider::-moz-range-track {
      coordinates as neighboring paragraphs. Only the inner Monaco surface is
      counter-scaled against the ancestor viewport zoom. */
   --z: var(--vp-zoom, 1);
+  position: relative;
   margin: 1.15em 0;
   overflow: hidden;
   overflow: clip;
   border-radius: var(--radius-lg);
   background: rgba(230, 234, 240, 0.52);
   border-left: 2.5px solid color-mix(in srgb, var(--accent-navy) 18%, transparent);
+}
+
+.pm-editor .ProseMirror .pm-monaco-code-block.pm-monaco-code-block--externally-selected {
+  outline: 2px solid color-mix(in srgb, Highlight 42%, transparent);
+  outline-offset: 2px;
+}
+
+.pm-editor .ProseMirror .pm-monaco-code-block__external-selection {
+  background: Highlight;
 }
 
 .pm-editor .ProseMirror .pm-monaco-code-block__editor {

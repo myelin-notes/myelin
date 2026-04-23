@@ -8,11 +8,17 @@ import type {
   CodeBlockEditorBoundaryInput,
   CodeBlockEditorDirection,
   CodeBlockEditorEscapeUnit,
+  CodeBlockEditorExternalSelection,
 } from './code-block-editor-adapter';
+import {
+  CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
+  type CodeBlockExternalSelectionDetail,
+} from './code-block-selection-sync';
 import { createMonacoCodeBlockEditorAdapter } from './monaco-code-block-editor-adapter';
 import { schema } from './schema';
 
 const OPENING_FENCE_RE = /^```(\w+)?$/;
+const EXTERNAL_SELECTION_CLASS = 'pm-monaco-code-block--externally-selected';
 
 interface FenceSource {
   closingFenceLine: number | null;
@@ -108,6 +114,10 @@ export class CodeBlockNodeView implements NodeView {
   private editor: CodeBlockEditorAdapter | null = null;
   private destroyed = false;
   private updating = false;
+  private readonly handleExternalSelection = (event: Event): void => {
+    const { detail } = event as CustomEvent<CodeBlockExternalSelectionDetail>;
+    this.setExternalSelection(detail);
+  };
 
   constructor(
     private node: PMNode,
@@ -116,6 +126,10 @@ export class CodeBlockNodeView implements NodeView {
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'pm-monaco-code-block';
+    this.dom.addEventListener(
+      CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
+      this.handleExternalSelection,
+    );
 
     this.editorEl = document.createElement('div');
     this.editorEl.className = 'pm-monaco-code-block__editor';
@@ -171,6 +185,10 @@ export class CodeBlockNodeView implements NodeView {
 
   destroy(): void {
     this.destroyed = true;
+    this.dom.removeEventListener(
+      CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
+      this.handleExternalSelection,
+    );
     this.editor?.dispose();
     this.editor = null;
   }
@@ -180,12 +198,13 @@ export class CodeBlockNodeView implements NodeView {
     const editor = await createMonacoCodeBlockEditorAdapter(this.editorEl, {
       callbacks: {
         onBoundaryInput: (event) => this.handleBoundaryKeyDown(event),
+        onContentChange: () => this.forwardContentUpdate(),
         onContentSizeChange: () => this.syncHeight(),
         onEscapeRequest: (unit, dir) => this.maybeEscape(unit, dir),
         onExitCodeBlock: () => this.exitCodeBlock(),
         onRedo: () => redo(this.view.state, this.view.dispatch),
+        onSelectionChange: () => this.forwardSelectionUpdate(),
         onUndo: () => undo(this.view.state, this.view.dispatch),
-        onUpdate: () => this.forwardUpdate(),
       },
       initialLanguage: source.language,
       initialValue: this.node.textContent,
@@ -206,10 +225,11 @@ export class CodeBlockNodeView implements NodeView {
     this.syncPresentation(latestSource);
     this.syncHeight();
     this.syncSelectionFromView();
+    this.syncExternalSelectionFromView();
   }
 
-  private forwardUpdate(): void {
-    if (this.updating || !this.editor || !this.editor.hasTextFocus()) {
+  private forwardContentUpdate(): void {
+    if (this.updating || !this.editor) {
       return;
     }
 
@@ -243,6 +263,36 @@ export class CodeBlockNodeView implements NodeView {
     }
     tr.setSelection(TextSelection.create(tr.doc, selFrom, selTo));
     this.view.dispatch(tr);
+  }
+
+  private forwardSelectionUpdate(): void {
+    if (this.updating || !this.editor) {
+      return;
+    }
+
+    if (this.editor.getValue() !== this.node.textContent) {
+      this.forwardContentUpdate();
+      return;
+    }
+
+    const selection = this.editor.getSelection();
+    if (!selection) {
+      return;
+    }
+
+    const offset = this.getPos() + 1;
+    const selFrom = offset + selection.from;
+    const selTo = offset + selection.to;
+    const pmSelection = this.view.state.selection;
+    if (pmSelection.from === selFrom && pmSelection.to === selTo) {
+      return;
+    }
+
+    this.view.dispatch(
+      this.view.state.tr.setSelection(
+        TextSelection.create(this.view.state.doc, selFrom, selTo),
+      ),
+    );
   }
 
   private handleBoundaryKeyDown(event: CodeBlockEditorBoundaryInput): void {
@@ -362,6 +412,35 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
     this.setSelection(from - start, to - start);
+  }
+
+  private setExternalSelection(
+    selection: CodeBlockEditorExternalSelection | null,
+  ): void {
+    this.dom.classList.toggle(
+      EXTERNAL_SELECTION_CLASS,
+      selection != null && selection.from !== selection.to,
+    );
+    this.editor?.setExternalSelection(selection);
+  }
+
+  private syncExternalSelectionFromView(): void {
+    if (!this.editor) {
+      return;
+    }
+
+    const start = this.getPos() + 1;
+    const end = start + this.node.content.size;
+    const { from, to } = this.view.state.selection;
+    if (from === to || to <= start || from >= end) {
+      this.setExternalSelection(null);
+      return;
+    }
+
+    this.setExternalSelection({
+      from: Math.max(from, start) - start,
+      to: Math.min(to, end) - start,
+    });
   }
 
   private syncHeight(): void {
