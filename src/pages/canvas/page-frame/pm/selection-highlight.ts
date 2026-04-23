@@ -3,6 +3,7 @@ import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import {
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
   type CodeBlockExternalSelectionDetail,
+  getCodeBlockExternalSelection,
 } from './code-block-selection-sync';
 
 const CODE_BLOCK_NODE_NAME = 'codeBlock';
@@ -29,14 +30,17 @@ function syncCodeBlockExternalSelections(view: EditorView): void {
 
       const contentStart = pos + 1;
       const contentEnd = contentStart + node.content.size;
-      if (to > contentStart && from < contentEnd) {
+      const externalSelection = getCodeBlockExternalSelection(
+        from,
+        to,
+        contentStart,
+        contentEnd,
+      );
+      if (externalSelection) {
         const dom = view.nodeDOM(pos);
         if (dom instanceof HTMLElement) {
           active.add(dom);
-          dispatchExternalSelection(dom, {
-            from: Math.max(from, contentStart) - contentStart,
-            to: Math.min(to, contentEnd) - contentStart,
-          });
+          dispatchExternalSelection(dom, externalSelection);
         }
       }
 

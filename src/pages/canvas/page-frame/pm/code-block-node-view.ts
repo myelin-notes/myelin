@@ -13,6 +13,7 @@ import type {
 import {
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
   type CodeBlockExternalSelectionDetail,
+  getCodeBlockExternalSelection,
 } from './code-block-selection-sync';
 import { createMonacoCodeBlockEditorAdapter } from './monaco-code-block-editor-adapter';
 import { schema } from './schema';
@@ -22,37 +23,31 @@ const EXTERNAL_SELECTION_CLASS = 'pm-monaco-code-block--externally-selected';
 
 interface FenceSource {
   closingFenceLine: number | null;
+  delimiterLines: readonly number[];
   language: string | null;
-  openingFenceLine: number | null;
-  usesFence: boolean;
 }
 
 function parseFenceSource(text: string): FenceSource {
   const lines = text.split('\n');
-  const openingFence = lines[0] ?? null;
-  const closingFence =
-    lines.length > 1 ? (lines[lines.length - 1] ?? null) : null;
-  const hasFence =
-    openingFence != null &&
-    closingFence === '```' &&
-    OPENING_FENCE_RE.test(openingFence);
+  const closingFenceLine = lines.length;
+  const openingFenceMatch = OPENING_FENCE_RE.exec(lines[0]);
 
-  if (!hasFence || !openingFence || !closingFence) {
+  if (
+    !openingFenceMatch ||
+    closingFenceLine <= 1 ||
+    lines[closingFenceLine - 1] !== '```'
+  ) {
     return {
       closingFenceLine: null,
+      delimiterLines: [],
       language: null,
-      openingFenceLine: null,
-      usesFence: false,
     };
   }
 
-  const language = OPENING_FENCE_RE.exec(openingFence)?.[1] ?? null;
-
   return {
-    closingFenceLine: lines.length,
-    language,
-    openingFenceLine: 1,
-    usesFence: true,
+    closingFenceLine,
+    delimiterLines: [1, closingFenceLine],
+    language: openingFenceMatch[1] ?? null,
   };
 }
 
@@ -87,24 +82,6 @@ function findTextDiff(current: string, next: string) {
     insert: next.slice(start, nextEnd),
     to: currentEnd,
   };
-}
-
-function delimiterLinesFor(source: FenceSource): number[] {
-  if (!source.usesFence) {
-    return [];
-  }
-
-  const lines: number[] = [];
-  if (source.openingFenceLine) {
-    lines.push(source.openingFenceLine);
-  }
-  if (
-    source.closingFenceLine &&
-    source.closingFenceLine !== source.openingFenceLine
-  ) {
-    lines.push(source.closingFenceLine);
-  }
-  return lines;
 }
 
 export class CodeBlockNodeView implements NodeView {
@@ -337,7 +314,7 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     const source = parseFenceSource(this.node.textContent);
-    if (!source.usesFence || !source.closingFenceLine) {
+    if (source.closingFenceLine == null) {
       return false;
     }
 
@@ -401,7 +378,7 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     this.editor.setLanguage(source.language);
-    this.editor.setDelimiterLines(delimiterLinesFor(source));
+    this.editor.setDelimiterLines(source.delimiterLines);
   }
 
   private syncSelectionFromView(): void {
@@ -432,15 +409,9 @@ export class CodeBlockNodeView implements NodeView {
     const start = this.getPos() + 1;
     const end = start + this.node.content.size;
     const { from, to } = this.view.state.selection;
-    if (from === to || to <= start || from >= end) {
-      this.setExternalSelection(null);
-      return;
-    }
-
-    this.setExternalSelection({
-      from: Math.max(from, start) - start,
-      to: Math.min(to, end) - start,
-    });
+    this.setExternalSelection(
+      getCodeBlockExternalSelection(from, to, start, end),
+    );
   }
 
   private syncHeight(): void {
