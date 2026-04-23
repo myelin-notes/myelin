@@ -409,7 +409,7 @@ export function LibraryPage() {
           {/* Explorer + Tags */}
           <section className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-12">
             <div className="flex flex-col gap-8 lg:col-span-8">
-              <div className="group flex items-center gap-1 rounded-2xl bg-card/75 px-3 py-2 transition-all duration-200 focus-within:bg-card focus-within:shadow-ambient hover:bg-card">
+              <div className="group flex items-center gap-1 rounded-2xl bg-card/75 px-3 py-2 ring-1 ring-border-subtle/70 transition-all duration-200 focus-within:bg-card focus-within:shadow-ambient focus-within:ring-accent-dark/15 hover:bg-card">
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-xl text-text-muted transition-colors duration-200 group-focus-within:text-accent-dark">
                   <Search className="size-3.5" />
                 </span>

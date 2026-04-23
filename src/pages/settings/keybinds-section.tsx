@@ -126,7 +126,7 @@ function KeybindRow({
   };
 
   return (
-    <div className="group flex w-full items-center gap-3 rounded-xl bg-input/40 px-3 py-2.5 text-left transition-colors hover:bg-hover-tint sm:gap-4 sm:px-4">
+    <div className="group flex w-full items-center gap-3 rounded-xl bg-input/40 px-3 py-2.5 text-left ring-1 ring-border-subtle/70 transition-colors hover:bg-hover-tint sm:gap-4 sm:px-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary">
           <Icon className="size-4" />
@@ -223,7 +223,7 @@ export function KeybindsSection() {
           type="button"
           onClick={handleResetAll}
           disabled={!hasAnyRebind}
-          className="flex items-center gap-1.5 text-text-muted text-xs transition-colors hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-text-muted text-xs ring-1 ring-border-subtle/70 transition-colors hover:bg-hover-tint hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RotateCcw className="size-3" />
           {strings.settings.keybinds.resetAll}

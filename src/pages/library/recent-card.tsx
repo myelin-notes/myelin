@@ -47,7 +47,7 @@ export function RecentCard({
           : undefined
       }
       className={cn(
-        'group relative flex aspect-[16/10] min-h-[180px] w-full cursor-pointer flex-col overflow-hidden rounded-xl text-left transition-all duration-300 hover:scale-[1.01] hover:shadow-ambient sm:aspect-auto sm:h-[204px]',
+        'group relative flex aspect-[16/10] min-h-[180px] w-full cursor-pointer flex-col overflow-hidden rounded-xl text-left ring-1 ring-border-subtle/70 transition-all duration-300 hover:scale-[1.01] hover:shadow-ambient sm:aspect-auto sm:h-[204px]',
         featured ? 'bg-card-active hover:bg-card' : 'bg-surface hover:bg-card',
       )}
     >
