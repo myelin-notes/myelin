@@ -416,11 +416,6 @@ input[type="range"].tool-slider::-moz-range-track {
   border-left: 2.5px solid color-mix(in srgb, var(--accent-navy) 18%, transparent);
 }
 
-.pm-editor .ProseMirror .pm-monaco-code-block.pm-monaco-code-block--externally-selected {
-  outline: 2px solid color-mix(in srgb, Highlight 42%, transparent);
-  outline-offset: 2px;
-}
-
 .pm-editor .ProseMirror .pm-monaco-code-block__external-selection {
   background: Highlight;
 }

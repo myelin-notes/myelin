@@ -19,7 +19,6 @@ import { createMonacoCodeBlockEditorAdapter } from './monaco-code-block-editor-a
 import { schema } from './schema';
 
 const OPENING_FENCE_RE = /^```(\w+)?$/;
-const EXTERNAL_SELECTION_CLASS = 'pm-monaco-code-block--externally-selected';
 
 interface FenceSource {
   closingFenceLine: number | null;
@@ -394,11 +393,24 @@ export class CodeBlockNodeView implements NodeView {
   private setExternalSelection(
     selection: CodeBlockEditorExternalSelection | null,
   ): void {
-    this.dom.classList.toggle(
-      EXTERNAL_SELECTION_CLASS,
-      selection != null && selection.from !== selection.to,
+    const visibleSelection = this.isEditorOwnedSelection(selection)
+      ? null
+      : selection;
+    this.editor?.setExternalSelection(visibleSelection);
+  }
+
+  private isEditorOwnedSelection(
+    selection: CodeBlockEditorExternalSelection | null,
+  ): boolean {
+    if (!selection || !this.editor?.hasTextFocus()) {
+      return false;
+    }
+
+    const editorSelection = this.editor.getSelection();
+    return (
+      editorSelection?.from === selection.from &&
+      editorSelection.to === selection.to
     );
-    this.editor?.setExternalSelection(selection);
   }
 
   private syncExternalSelectionFromView(): void {

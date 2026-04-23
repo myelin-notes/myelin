@@ -238,6 +238,10 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
     this.editor.focus();
   }
 
+  hasTextFocus(): boolean {
+    return this.editor.hasTextFocus();
+  }
+
   setLanguage(language: string | null): void {
     const nextLanguage = resolveMonacoLanguage(language);
     if (this.model.getLanguageId() !== nextLanguage) {

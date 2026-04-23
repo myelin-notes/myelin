@@ -53,6 +53,7 @@ export interface CodeBlockEditorAdapter {
   getLineMaxColumn: (lineNumber: number) => number | null;
   getSelection: () => CodeBlockEditorSelection | null;
   getValue: () => string;
+  hasTextFocus: () => boolean;
   isCursorAtBoundary: (
     unit: CodeBlockEditorEscapeUnit,
     dir: CodeBlockEditorDirection,
