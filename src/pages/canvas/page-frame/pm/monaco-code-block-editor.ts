@@ -109,6 +109,16 @@ export class MonacoCodeBlockEditor {
   private readonly editor: import('monaco-editor').editor.IStandaloneCodeEditor;
   private readonly externalSelectionDecorations: import('monaco-editor').editor.IEditorDecorationsCollection;
   private readonly model: import('monaco-editor').editor.ITextModel;
+  private readonly handleWheel = (event: WheelEvent): void => {
+    if (event.ctrlKey || !this.editor.hasTextFocus()) {
+      return;
+    }
+    if (!this.hasVerticalOverflow()) {
+      return;
+    }
+
+    event.stopPropagation();
+  };
 
   constructor(
     private readonly monaco: MonacoApi,
@@ -157,6 +167,7 @@ export class MonacoCodeBlockEditor {
     this.delimiterDecorations = this.editor.createDecorationsCollection();
     this.externalSelectionDecorations =
       this.editor.createDecorationsCollection();
+    this.editorEl.addEventListener('wheel', this.handleWheel);
 
     this.editor.onDidChangeModelContent(() =>
       options.callbacks.onContentChange(),
@@ -400,6 +411,7 @@ export class MonacoCodeBlockEditor {
   }
 
   dispose(): void {
+    this.editorEl.removeEventListener('wheel', this.handleWheel);
     this.delimiterDecorations.clear();
     this.externalSelectionDecorations.clear();
     this.editor.dispose();
@@ -418,6 +430,12 @@ export class MonacoCodeBlockEditor {
         this.editor.trigger('keyboard', fallbackCommand, null);
       }
     });
+  }
+
+  private hasVerticalOverflow(): boolean {
+    return (
+      this.editor.getScrollHeight() > this.editor.getLayoutInfo().height + 1
+    );
   }
 }
 
