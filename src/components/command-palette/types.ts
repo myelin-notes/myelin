@@ -2,6 +2,12 @@ import type { KeyboardEvent, RefObject } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 export type CommandPaletteMode = 'commands' | 'notes';
+export type CommandPalettePage =
+  | 'canvas'
+  | 'debug'
+  | 'library'
+  | 'settings'
+  | 'unknown';
 
 export interface CommandPaletteEntry {
   id: string;
@@ -15,6 +21,7 @@ export interface CommandPaletteItem extends CommandPaletteEntry {
   icon: LucideIcon;
   shortcut?: string;
   disabled?: boolean;
+  visibleOn?: readonly CommandPalettePage[];
   onSelect: () => void | Promise<void>;
 }
 

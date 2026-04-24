@@ -20,7 +20,11 @@ import {
   importMarkdownFile,
   isMarkdownFile,
 } from '@/pages/library/import-markdown';
-import { commandPaletteShortcut, createCommandPaletteItems } from './items';
+import {
+  commandPalettePageFromPathname,
+  commandPaletteShortcut,
+  createCommandPaletteItems,
+} from './items';
 import { useCommandMode, useNotesMode } from './modes';
 import type {
   CommandPaletteDialogProps,
@@ -47,6 +51,7 @@ export function useCommandPalette(): {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
+  const currentPage = commandPalettePageFromPathname(location.pathname);
 
   const closePalette = useCallback(() => {
     setOpen(false);
@@ -135,6 +140,7 @@ export function useCommandPalette(): {
   const commandItems = useMemo(
     () =>
       createCommandPaletteItems({
+        currentPage,
         strings,
         isImportingMarkdown,
         createNote,
@@ -144,6 +150,7 @@ export function useCommandPalette(): {
       }),
     [
       createNote,
+      currentPage,
       isImportingMarkdown,
       openPalette,
       strings,

@@ -1,9 +1,14 @@
 import { BookOpen, FileText, Grid2X2, Link, Plus } from 'lucide-react';
 import type { Messages } from '@/lib/i18n';
 import { registry } from '@/lib/keybinds';
-import type { CommandPaletteItem, CommandPaletteMode } from './types';
+import type {
+  CommandPaletteItem,
+  CommandPaletteMode,
+  CommandPalettePage,
+} from './types';
 
 export interface CommandPaletteItemContext {
+  currentPage: CommandPalettePage;
   strings: Messages;
   isImportingMarkdown: boolean;
   createNote: () => Promise<void>;
@@ -13,6 +18,7 @@ export interface CommandPaletteItemContext {
 }
 
 export function createCommandPaletteItems({
+  currentPage,
   strings,
   isImportingMarkdown,
   createNote,
@@ -20,7 +26,7 @@ export function createCommandPaletteItems({
   toggleLibraryView,
   triggerMarkdownImport,
 }: CommandPaletteItemContext): CommandPaletteItem[] {
-  return [
+  const items: CommandPaletteItem[] = [
     {
       id: 'open-note',
       label: strings.commandPalette.commands.openNote.label,
@@ -56,6 +62,7 @@ export function createCommandPaletteItems({
       keywords: ['grid', 'list', 'tree'],
       section: strings.commandPalette.sections.commands,
       icon: Grid2X2,
+      visibleOn: ['library'],
       onSelect: toggleLibraryView,
     },
     {
@@ -66,11 +73,43 @@ export function createCommandPaletteItems({
       section: strings.commandPalette.sections.commands,
       icon: Link,
       disabled: true,
+      visibleOn: ['canvas'],
       onSelect: () => {},
     },
   ];
+
+  return items.filter((item) => isCommandPaletteItemVisible(item, currentPage));
 }
 
 export function commandPaletteShortcut(): string {
   return registry.format('app:command-palette');
+}
+
+export function commandPalettePageFromPathname(
+  pathname: string,
+): CommandPalettePage {
+  if (pathname === '/' || isRoute(pathname, '/library')) {
+    return 'library';
+  }
+  if (isRoute(pathname, '/mcanvas')) {
+    return 'canvas';
+  }
+  if (isRoute(pathname, '/settings')) {
+    return 'settings';
+  }
+  if (isRoute(pathname, '/debug')) {
+    return 'debug';
+  }
+  return 'unknown';
+}
+
+function isCommandPaletteItemVisible(
+  item: CommandPaletteItem,
+  currentPage: CommandPalettePage,
+): boolean {
+  return !item.visibleOn || item.visibleOn.includes(currentPage);
+}
+
+function isRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
 }
