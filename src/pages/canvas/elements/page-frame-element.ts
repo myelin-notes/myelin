@@ -33,6 +33,8 @@ export {
 } from './page-frame-constants';
 
 const MIN_PAGE_WIDTH = 240;
+const EDIT_MODE_WIDTH_RATIO = 0.65;
+const EDIT_MODE_HEIGHT_RATIO = 0.86;
 
 const logger = new Logger('PageFrameElement');
 
@@ -213,26 +215,32 @@ export class PageFrameElement extends DrawableElement {
     this._editing = true;
     this.pmEditor?.setEditable(true);
 
-    // Horizontally: center the page (zoom fits page width to 65% of viewport).
-    // Vertically: center on the click's world Y so the user lands on exactly
-    // the line they tapped. Fall back to the first page's middle when entered
-    // with no pointer location.
+    // Center the clicked page and zoom far enough out that one whole page is
+    // visible vertically. Fall back to the first page when entered with no
+    // pointer location.
     const sx = Math.abs(this._scale.x);
     const sy = Math.abs(this._scale.y);
     const focusWorldY =
       screenX != null && screenY != null
         ? canvas.viewport.screenToWorld({ x: screenX, y: screenY }).y
         : this.offset.y + (this._pageHeight * sy) / 2;
-    // Zero-height rect: animateViewToFitRect uses width for zoom and the
-    // rect's center as the focal point, so a 0-height rect at focusWorldY
-    // gives us "fit page width, vertical center = focusWorldY".
+    const pageStride = this._pageHeight + PAGE_GAP;
+    const localFocusY = (focusWorldY - this.offset.y) / sy;
+    const pageIndex = Math.min(
+      Math.max(0, this._numPages - 1),
+      Math.max(0, Math.floor(localFocusY / pageStride)),
+    );
+    const pageTop = pageIndex * pageStride;
     const focusRect = new DOMRect(
       this.offset.x,
-      focusWorldY,
+      this.offset.y + pageTop * sy,
       this._pageWidth * sx,
-      0,
+      this._pageHeight * sy,
     );
-    canvas.viewport.animateViewToFitRect(focusRect, 0.65);
+    canvas.viewport.animateViewToFitRect(focusRect, {
+      widthRatio: EDIT_MODE_WIDTH_RATIO,
+      heightRatio: EDIT_MODE_HEIGHT_RATIO,
+    });
 
     const view = this.pmEditor?.view;
     if (view) {

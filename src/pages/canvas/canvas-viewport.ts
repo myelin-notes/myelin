@@ -195,7 +195,7 @@ export class CanvasViewport {
 
   /**
    * Animate pan & zoom so the given world-space rect is centered in the
-   * viewport and its width occupies `widthRatio` of the window width.
+   * viewport and fits the requested screen ratios.
    *
    * Lerps the SCREEN-SPACE position of the rect's center (not offset
    * directly) so the focal point traces a straight line on the screen.
@@ -204,16 +204,30 @@ export class CanvasViewport {
    */
   public animateViewToFitRect(
     worldRect: DOMRect,
-    widthRatio: number = 0.8,
+    fit: number | { widthRatio?: number; heightRatio?: number } = 0.8,
   ): void {
     const dpr = window.devicePixelRatio || 1;
     const screenW = this.canvas.width / dpr;
     const screenH = this.canvas.height / dpr;
+    const fitOptions = typeof fit === 'number' ? { widthRatio: fit } : fit;
+    const targetZoomCandidates: number[] = [];
 
-    const targetZoom = Math.min(
-      3,
-      Math.max(0.2, (widthRatio * screenW) / worldRect.width),
-    );
+    if (fitOptions.widthRatio != null && worldRect.width > 0) {
+      targetZoomCandidates.push(
+        (fitOptions.widthRatio * screenW) / worldRect.width,
+      );
+    }
+    if (fitOptions.heightRatio != null && worldRect.height > 0) {
+      targetZoomCandidates.push(
+        (fitOptions.heightRatio * screenH) / worldRect.height,
+      );
+    }
+
+    const unclampedTargetZoom =
+      targetZoomCandidates.length > 0
+        ? Math.min(...targetZoomCandidates)
+        : this._zoom;
+    const targetZoom = Math.min(3, Math.max(0.2, unclampedTargetZoom));
 
     const worldFocus: Vector2 = {
       x: worldRect.x + worldRect.width / 2,
