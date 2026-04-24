@@ -1,14 +1,48 @@
-import type {
-  CodeBlockEditorAdapter,
-  CodeBlockEditorCallbacks,
-  CodeBlockEditorCursorPosition,
-  CodeBlockEditorDirection,
-  CodeBlockEditorEscapeUnit,
-  CodeBlockEditorExternalSelection,
-  CodeBlockEditorLayout,
-  CodeBlockEditorSelection,
-} from './code-block-editor-adapter';
+import type { CodeBlockExternalSelection } from './code-block-selection-sync';
 import type { MonacoApi } from './monaco-runtime';
+
+export type CodeBlockEditorDirection = -1 | 1;
+
+export type CodeBlockEditorEscapeUnit = 'char' | 'line';
+
+interface CodeBlockEditorSelection {
+  empty: boolean;
+  from: number;
+  to: number;
+}
+
+interface CodeBlockEditorCursorPosition {
+  column: number;
+  lineNumber: number;
+}
+
+export interface CodeBlockEditorBoundaryInput {
+  altKey: boolean;
+  ctrlKey: boolean;
+  isComposing: boolean;
+  key: string;
+  metaKey: boolean;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+}
+
+interface CodeBlockEditorLayout {
+  outerHeightPx: number;
+}
+
+interface CodeBlockEditorCallbacks {
+  onBoundaryInput: (event: CodeBlockEditorBoundaryInput) => void;
+  onContentChange: () => void;
+  onContentSizeChange: () => void;
+  onEscapeRequest: (
+    unit: CodeBlockEditorEscapeUnit,
+    dir: CodeBlockEditorDirection,
+  ) => boolean;
+  onExitCodeBlock: () => void;
+  onRedo: () => void;
+  onSelectionChange: () => void;
+  onUndo: () => void;
+}
 
 const MONACO_LANGUAGE_BY_FENCE: Record<string, string> = {
   c: 'c',
@@ -39,7 +73,7 @@ type MonacoModule = typeof import('./monaco-runtime');
 
 let monacoPromise: Promise<MonacoApi> | null = null;
 
-interface MonacoCodeBlockEditorAdapterOptions {
+interface MonacoCodeBlockEditorOptions {
   callbacks: CodeBlockEditorCallbacks;
   initialLanguage: string | null;
   initialValue: string;
@@ -66,7 +100,7 @@ function resolveMonacoLanguage(language: string | null): string {
   return MONACO_LANGUAGE_BY_FENCE[normalized] ?? normalized;
 }
 
-class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
+export class MonacoCodeBlockEditor {
   private readonly delimiterDecorations: import('monaco-editor').editor.IEditorDecorationsCollection;
   private readonly editor: import('monaco-editor').editor.IStandaloneCodeEditor;
   private readonly externalSelectionDecorations: import('monaco-editor').editor.IEditorDecorationsCollection;
@@ -75,7 +109,7 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
   constructor(
     private readonly monaco: MonacoApi,
     private readonly editorEl: HTMLDivElement,
-    options: MonacoCodeBlockEditorAdapterOptions,
+    options: MonacoCodeBlockEditorOptions,
   ) {
     this.model = monaco.editor.createModel(
       options.initialValue,
@@ -265,9 +299,7 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
     );
   }
 
-  setExternalSelection(
-    selection: CodeBlockEditorExternalSelection | null,
-  ): void {
+  setExternalSelection(selection: CodeBlockExternalSelection | null): void {
     if (!selection || selection.from === selection.to) {
       this.externalSelectionDecorations.clear();
       return;
@@ -354,7 +386,7 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
     unit: CodeBlockEditorEscapeUnit,
     dir: CodeBlockEditorDirection,
     fallbackCommand: string,
-    options: MonacoCodeBlockEditorAdapterOptions,
+    options: MonacoCodeBlockEditorOptions,
   ): void {
     this.editor.addCommand(keyCode, () => {
       if (!options.callbacks.onEscapeRequest(unit, dir)) {
@@ -364,10 +396,10 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
   }
 }
 
-export async function createMonacoCodeBlockEditorAdapter(
+export async function createMonacoCodeBlockEditor(
   editorEl: HTMLDivElement,
-  options: MonacoCodeBlockEditorAdapterOptions,
-): Promise<CodeBlockEditorAdapter> {
+  options: MonacoCodeBlockEditorOptions,
+): Promise<MonacoCodeBlockEditor> {
   const monaco = await loadMonaco();
-  return new MonacoCodeBlockEditorAdapter(monaco, editorEl, options);
+  return new MonacoCodeBlockEditor(monaco, editorEl, options);
 }

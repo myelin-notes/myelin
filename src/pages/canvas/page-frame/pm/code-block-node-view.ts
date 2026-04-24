@@ -3,19 +3,19 @@ import { redo, undo } from 'prosemirror-history';
 import type { Node as PMNode } from 'prosemirror-model';
 import { Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
-import type {
-  CodeBlockEditorAdapter,
-  CodeBlockEditorBoundaryInput,
-  CodeBlockEditorDirection,
-  CodeBlockEditorEscapeUnit,
-  CodeBlockEditorExternalSelection,
-} from './code-block-editor-adapter';
 import {
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
+  type CodeBlockExternalSelection,
   type CodeBlockExternalSelectionDetail,
   getCodeBlockExternalSelection,
 } from './code-block-selection-sync';
-import { createMonacoCodeBlockEditorAdapter } from './monaco-code-block-editor-adapter';
+import {
+  type CodeBlockEditorBoundaryInput,
+  type CodeBlockEditorDirection,
+  type CodeBlockEditorEscapeUnit,
+  createMonacoCodeBlockEditor,
+  type MonacoCodeBlockEditor,
+} from './monaco-code-block-editor';
 import { schema } from './schema';
 
 const OPENING_FENCE_RE = /^```(\w+)?$/;
@@ -87,7 +87,7 @@ export class CodeBlockNodeView implements NodeView {
   public readonly dom: HTMLDivElement;
 
   private readonly editorEl: HTMLDivElement;
-  private editor: CodeBlockEditorAdapter | null = null;
+  private editor: MonacoCodeBlockEditor | null = null;
   private destroyed = false;
   private selectionDragStartedOutside = false;
   private updating = false;
@@ -223,7 +223,7 @@ export class CodeBlockNodeView implements NodeView {
 
   private async initEditor(): Promise<void> {
     const source = parseFenceSource(this.node.textContent);
-    const editor = await createMonacoCodeBlockEditorAdapter(this.editorEl, {
+    const editor = await createMonacoCodeBlockEditor(this.editorEl, {
       callbacks: {
         onBoundaryInput: (event) => this.handleBoundaryKeyDown(event),
         onContentChange: () => this.forwardContentUpdate(),
@@ -459,7 +459,7 @@ export class CodeBlockNodeView implements NodeView {
   }
 
   private setExternalSelection(
-    selection: CodeBlockEditorExternalSelection | null,
+    selection: CodeBlockExternalSelection | null,
   ): void {
     const visibleSelection = this.isEditorOwnedSelection(selection)
       ? null
@@ -468,7 +468,7 @@ export class CodeBlockNodeView implements NodeView {
   }
 
   private isEditorOwnedSelection(
-    selection: CodeBlockEditorExternalSelection | null,
+    selection: CodeBlockExternalSelection | null,
   ): boolean {
     if (!selection || !this.editor?.hasTextFocus()) {
       return false;
