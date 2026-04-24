@@ -89,7 +89,45 @@ export class CodeBlockNodeView implements NodeView {
   private readonly editorEl: HTMLDivElement;
   private editor: CodeBlockEditorAdapter | null = null;
   private destroyed = false;
+  private selectionDragStartedOutside = false;
   private updating = false;
+  private readonly handleViewMouseDown = (event: MouseEvent): void => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    this.selectionDragStartedOutside = !this.dom.contains(event.target as Node);
+  };
+  private readonly handleCodeBlockMouseUp = (event: MouseEvent): void => {
+    if (!this.selectionDragStartedOutside || event.button !== 0) {
+      return;
+    }
+
+    this.selectionDragStartedOutside = false;
+    if (!this.selectThroughMousePoint(event.clientX, event.clientY)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  private readonly handleCodeBlockMouseMove = (event: MouseEvent): void => {
+    if (!this.selectionDragStartedOutside) {
+      return;
+    }
+
+    if ((event.buttons & 1) === 0) {
+      this.selectionDragStartedOutside = false;
+      return;
+    }
+
+    if (!this.selectThroughMousePoint(event.clientX, event.clientY)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+  };
   private readonly handleExternalSelection = (event: Event): void => {
     const { detail } = event as CustomEvent<CodeBlockExternalSelectionDetail>;
     this.setExternalSelection(detail);
@@ -106,6 +144,9 @@ export class CodeBlockNodeView implements NodeView {
       CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
       this.handleExternalSelection,
     );
+    this.dom.addEventListener('mouseup', this.handleCodeBlockMouseUp, true);
+    this.dom.addEventListener('mousemove', this.handleCodeBlockMouseMove, true);
+    this.view.dom.addEventListener('mousedown', this.handleViewMouseDown, true);
 
     this.editorEl = document.createElement('div');
     this.editorEl.className = 'pm-monaco-code-block__editor';
@@ -164,6 +205,17 @@ export class CodeBlockNodeView implements NodeView {
     this.dom.removeEventListener(
       CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
       this.handleExternalSelection,
+    );
+    this.dom.removeEventListener('mouseup', this.handleCodeBlockMouseUp, true);
+    this.dom.removeEventListener(
+      'mousemove',
+      this.handleCodeBlockMouseMove,
+      true,
+    );
+    this.view.dom.removeEventListener(
+      'mousedown',
+      this.handleViewMouseDown,
+      true,
     );
     this.editor?.dispose();
     this.editor = null;
@@ -269,6 +321,22 @@ export class CodeBlockNodeView implements NodeView {
         TextSelection.create(this.view.state.doc, selFrom, selTo),
       ),
     );
+  }
+
+  private selectThroughMousePoint(clientX: number, clientY: number): boolean {
+    const offset = this.editor?.getOffsetAtClientPoint(clientX, clientY);
+    if (offset == null) {
+      return false;
+    }
+
+    const endPos = this.getPos() + 1 + offset;
+    const anchor = this.view.state.selection.anchor;
+    this.view.dispatch(
+      this.view.state.tr.setSelection(
+        TextSelection.create(this.view.state.doc, anchor, endPos),
+      ),
+    );
+    return true;
   }
 
   private handleBoundaryKeyDown(event: CodeBlockEditorBoundaryInput): void {

@@ -310,6 +310,11 @@ class MonacoCodeBlockEditorAdapter implements CodeBlockEditorAdapter {
     return this.model.getLineMaxColumn(lineNumber);
   }
 
+  getOffsetAtClientPoint(left: number, top: number): number | null {
+    const position = this.editor.getTargetAtClientPoint(left, top)?.position;
+    return position ? this.model.getOffsetAt(position) : null;
+  }
+
   isCursorAtBoundary(
     unit: CodeBlockEditorEscapeUnit,
     dir: CodeBlockEditorDirection,

@@ -1,4 +1,4 @@
-import { EditorState, type Transaction } from 'prosemirror-state';
+import { EditorState, Selection, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import { PM_UPDATE_EVENT } from './constants';
@@ -122,6 +122,28 @@ export class PageFrameEditorState {
       this._view?.dom.contains(activeElement)
     ) {
       activeElement.blur();
+    }
+  }
+
+  clearSelection(): void {
+    const view = this._view;
+    if (!view) {
+      return;
+    }
+
+    const { state } = view;
+    if (!state.selection.empty) {
+      view.dispatch(
+        state.tr.setSelection(
+          Selection.near(state.doc.resolve(state.selection.head)),
+        ),
+      );
+    }
+
+    const nativeSelection = view.dom.ownerDocument.getSelection();
+    const anchorNode = nativeSelection?.anchorNode;
+    if (anchorNode && view.dom.contains(anchorNode)) {
+      nativeSelection?.removeAllRanges();
     }
   }
 

@@ -273,6 +273,7 @@ export class PageFrameElement extends DrawableElement {
 
   public override exitEditMode(): void {
     this._editing = false;
+    this.pmEditor?.clearSelection();
     this.pmEditor?.setEditable(false);
     this.pmEditor?.blur();
     // Yjs UndoManager captures PM changes automatically — no snapshot needed

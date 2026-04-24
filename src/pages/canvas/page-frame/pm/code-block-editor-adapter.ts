@@ -51,6 +51,7 @@ export interface CodeBlockEditorAdapter {
   focus: () => void;
   getCursorPosition: () => CodeBlockEditorCursorPosition | null;
   getLineMaxColumn: (lineNumber: number) => number | null;
+  getOffsetAtClientPoint: (left: number, top: number) => number | null;
   getSelection: () => CodeBlockEditorSelection | null;
   getValue: () => string;
   hasTextFocus: () => boolean;
