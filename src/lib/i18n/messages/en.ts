@@ -107,6 +107,15 @@ const en = {
       title: 'Language',
       eyebrow: 'Interface',
     },
+    pageFrameEditing: {
+      title: 'Page Frame Editing',
+      eyebrow: 'Document View',
+      fitWholePage: {
+        label: 'Fit whole page when editing',
+        description:
+          'Zoom out to show the full page height when entering page-frame edit mode.',
+      },
+    },
     repository: {
       title: 'Repository',
       eyebrow: 'Sync',

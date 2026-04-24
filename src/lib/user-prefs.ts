@@ -30,6 +30,10 @@ const PREFS = {
     'canvas-background',
     'dots',
   ),
+  pageFrameEditFitWholePage: pref<boolean>(
+    'page-frame-edit-fit-whole-page',
+    true,
+  ),
   language: pref<string>('language', 'en'),
   repositoryConfig: pref<RepositoryConfig>('repository-config', {
     kind: 'local',

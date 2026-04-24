@@ -106,6 +106,14 @@ const zhHans: typeof en = {
       title: '语言',
       eyebrow: '界面语言',
     },
+    pageFrameEditing: {
+      title: '页面框编辑',
+      eyebrow: '文档视图',
+      fitWholePage: {
+        label: '编辑时适配整页',
+        description: '进入页面框编辑模式时缩小视图，显示完整页面高度。',
+      },
+    },
     repository: {
       title: '仓库',
       eyebrow: '数据同步',

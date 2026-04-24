@@ -5,6 +5,7 @@ import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
+import { UserPrefs } from '@/lib/user-prefs';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
@@ -215,32 +216,32 @@ export class PageFrameElement extends DrawableElement {
     this._editing = true;
     this.pmEditor?.setEditable(true);
 
-    // Center the clicked page and zoom far enough out that one whole page is
-    // visible vertically. Fall back to the first page when entered with no
-    // pointer location.
-    const sx = Math.abs(this._scale.x);
-    const sy = Math.abs(this._scale.y);
-    const focusWorldY =
-      screenX != null && screenY != null
-        ? canvas.viewport.screenToWorld({ x: screenX, y: screenY }).y
-        : this.offset.y + (this._pageHeight * sy) / 2;
-    const pageStride = this._pageHeight + PAGE_GAP;
-    const localFocusY = (focusWorldY - this.offset.y) / sy;
-    const pageIndex = Math.min(
-      Math.max(0, this._numPages - 1),
-      Math.max(0, Math.floor(localFocusY / pageStride)),
-    );
-    const pageTop = pageIndex * pageStride;
-    const focusRect = new DOMRect(
-      this.offset.x,
-      this.offset.y + pageTop * sy,
-      this._pageWidth * sx,
-      this._pageHeight * sy,
-    );
-    canvas.viewport.animateViewToFitRect(focusRect, {
-      widthRatio: EDIT_MODE_WIDTH_RATIO,
-      heightRatio: EDIT_MODE_HEIGHT_RATIO,
-    });
+    if (UserPrefs.get('pageFrameEditFitWholePage')) {
+      const sx = Math.abs(this._scale.x);
+      const sy = Math.abs(this._scale.y);
+      const focusWorldY =
+        screenX != null && screenY != null
+          ? canvas.viewport.screenToWorld({ x: screenX, y: screenY }).y
+          : this.offset.y + (this._pageHeight * sy) / 2;
+
+      const pageStride = this._pageHeight + PAGE_GAP;
+      const localFocusY = (focusWorldY - this.offset.y) / sy;
+      const pageIndex = Math.min(
+        Math.max(0, this._numPages - 1),
+        Math.max(0, Math.floor(localFocusY / pageStride)),
+      );
+      const pageTop = pageIndex * pageStride;
+      const focusRect = new DOMRect(
+        this.offset.x,
+        this.offset.y + pageTop * sy,
+        this._pageWidth * sx,
+        this._pageHeight * sy,
+      );
+      canvas.viewport.animateViewToFitRect(focusRect, {
+        widthRatio: EDIT_MODE_WIDTH_RATIO,
+        heightRatio: EDIT_MODE_HEIGHT_RATIO,
+      });
+    }
 
     const view = this.pmEditor?.view;
     if (view) {

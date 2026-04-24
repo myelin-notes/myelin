@@ -96,6 +96,9 @@ export function PreferencesTab() {
     UserPrefs.get('canvasBackground'),
   );
   const [language, setLanguage] = useState(UserPrefs.get('language'));
+  const [pageFrameEditFitWholePage, setPageFrameEditFitWholePage] = useState(
+    UserPrefs.get('pageFrameEditFitWholePage'),
+  );
   const languages = Object.entries(localeLabels).map(([code, label]) => ({
     code: code as SupportedLocale,
     label,
@@ -109,8 +112,19 @@ export function PreferencesTab() {
     return UserPrefs.subscribe('language', setLanguage);
   }, []);
 
+  useEffect(() => {
+    return UserPrefs.subscribe(
+      'pageFrameEditFitWholePage',
+      setPageFrameEditFitWholePage,
+    );
+  }, []);
+
   const handleCanvasBg = (bg: CanvasBg) => {
     UserPrefs.set('canvasBackground', bg);
+  };
+
+  const handlePageFrameEditFitWholePage = () => {
+    UserPrefs.set('pageFrameEditFitWholePage', !pageFrameEditFitWholePage);
   };
 
   const handleLanguage = (code: string) => {
@@ -197,6 +211,48 @@ export function PreferencesTab() {
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+        </section>
+
+        <section>
+          <div className="mb-6 flex items-baseline justify-between">
+            <h3 className="font-heading text-xl">
+              {strings.settings.pageFrameEditing.title}
+            </h3>
+            <span className="text-[10px] text-text-muted uppercase tracking-widest">
+              {strings.settings.pageFrameEditing.eyebrow}
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={pageFrameEditFitWholePage}
+            onClick={handlePageFrameEditFitWholePage}
+            className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 text-left transition-colors hover:bg-hover-tint"
+          >
+            <span className="min-w-0">
+              <span className="block font-medium text-sm text-text-primary">
+                {strings.settings.pageFrameEditing.fitWholePage.label}
+              </span>
+              <span className="mt-1 block text-text-muted text-xs leading-relaxed">
+                {strings.settings.pageFrameEditing.fitWholePage.description}
+              </span>
+            </span>
+            <span
+              className={cn(
+                'relative flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors',
+                pageFrameEditFitWholePage
+                  ? 'bg-accent-dark'
+                  : 'bg-text-muted/20',
+              )}
+            >
+              <span
+                className={cn(
+                  'size-4 rounded-full bg-white shadow-sm transition-transform',
+                  pageFrameEditFitWholePage ? 'translate-x-4' : 'translate-x-0',
+                )}
+              />
+            </span>
+          </button>
         </section>
 
         {/* Repository */}

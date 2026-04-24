@@ -109,6 +109,15 @@ const es: typeof en = {
       title: 'Idioma',
       eyebrow: 'Interfaz',
     },
+    pageFrameEditing: {
+      title: 'Edición de marcos de página',
+      eyebrow: 'Vista de documento',
+      fitWholePage: {
+        label: 'Ajustar página completa al editar',
+        description:
+          'Alejar la vista para mostrar toda la altura de la página al entrar en la edición del marco.',
+      },
+    },
     repository: {
       title: 'Repositorio',
       eyebrow: 'Sincronización',
