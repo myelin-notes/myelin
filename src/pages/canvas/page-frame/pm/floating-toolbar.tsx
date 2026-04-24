@@ -381,7 +381,6 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
       <div className="relative">
         <ToolbarButton
           label="Color"
-          active={openMenu === 'color' || !!currentColor}
           onClick={() => setOpenMenu(openMenu === 'color' ? null : 'color')}
         >
           <div className="flex size-4 flex-col items-center justify-center">
