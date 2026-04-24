@@ -28,10 +28,11 @@ const es: typeof en = {
   },
   commandPalette: {
     title: 'Paleta de comandos',
-    placeholder: 'Buscar comandos y notas...',
+    placeholder: 'Buscar comandos...',
     searchPlaceholder: 'Buscar notas...',
     loading: 'Cargando...',
-    noResults: 'No hay comandos ni notas coincidentes',
+    noCommandResults: 'No hay comandos coincidentes',
+    noNoteResults: 'No hay notas coincidentes',
     noteResultDescription: 'Nota de lienzo',
     footer: 'Flechas para navegar, Enter para ejecutar',
     sections: {

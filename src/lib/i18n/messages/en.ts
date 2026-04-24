@@ -26,10 +26,11 @@ const en = {
   },
   commandPalette: {
     title: 'Command Palette',
-    placeholder: 'Search commands and notes...',
+    placeholder: 'Search commands...',
     searchPlaceholder: 'Search notes...',
     loading: 'Loading...',
-    noResults: 'No matching commands or notes',
+    noCommandResults: 'No matching commands',
+    noNoteResults: 'No matching notes',
     noteResultDescription: 'Canvas note',
     footer: 'Arrow keys to navigate, Enter to run',
     sections: {

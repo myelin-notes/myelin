@@ -28,10 +28,11 @@ const zhHans: typeof en = {
   },
   commandPalette: {
     title: '命令面板',
-    placeholder: '搜索命令和笔记...',
+    placeholder: '搜索命令...',
     searchPlaceholder: '搜索笔记...',
     loading: '正在加载...',
-    noResults: '没有匹配的命令或笔记',
+    noCommandResults: '没有匹配的命令',
+    noNoteResults: '没有匹配的笔记',
     noteResultDescription: '画布笔记',
     footer: '使用方向键导航，按 Enter 执行',
     sections: {

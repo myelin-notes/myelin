@@ -8,32 +8,28 @@ import {
   useRef,
   useState,
 } from 'react';
-import { FileText } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { useMessages } from '@/lib/i18n';
 import type { ActionBinding } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
-import { useRepository, type VFSFileNode, type VFSNode } from '@/lib/sync';
+import { useRepository } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import {
   importMarkdownFile,
   isMarkdownFile,
 } from '@/pages/library/import-markdown';
 import { commandPaletteShortcut, createCommandPaletteItems } from './items';
+import { useCommandMode, useNotesMode } from './modes';
 import type {
   CommandPaletteDialogProps,
   CommandPaletteItem,
   CommandPaletteMode,
 } from './types';
-import { errorDescription, filterCommandPaletteEntries } from './utils';
+import { errorDescription } from './utils';
 
 const logger = new Logger('CommandPalette');
-
-function isFileNode(node: VFSNode): node is VFSFileNode {
-  return node.type === 'file';
-}
 
 export function useCommandPalette(): {
   dialogProps: CommandPaletteDialogProps;
@@ -50,8 +46,6 @@ export function useCommandPalette(): {
   const [mode, setMode] = useState<CommandPaletteMode>('commands');
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const [noteResults, setNoteResults] = useState<VFSFileNode[]>([]);
-  const [loadingNotes, setLoadingNotes] = useState(false);
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
 
   const closePalette = useCallback(() => {
@@ -183,91 +177,17 @@ export function useCommandPalette(): {
     setActiveIndex(0);
   }, [mode, open, query]);
 
-  const shouldLoadNotes = open && (mode === 'notes' || query.trim().length > 0);
-
-  useEffect(() => {
-    if (!shouldLoadNotes) {
-      setNoteResults([]);
-      setLoadingNotes(false);
-      return;
-    }
-
-    let disposed = false;
-    const trimmed = query.trim();
-
-    setLoadingNotes(true);
-    void (
-      trimmed ? repository.searchNodes(trimmed) : repository.getRecentFiles(6)
-    )
-      .then((nodes) => {
-        if (disposed) {
-          return;
-        }
-        setNoteResults(nodes.filter(isFileNode));
-      })
-      .catch((error) => {
-        if (disposed) {
-          return;
-        }
-        logger.error('Failed to load command palette notes', error, {
-          query: trimmed,
-        });
-        setNoteResults([]);
-      })
-      .finally(() => {
-        if (!disposed) {
-          setLoadingNotes(false);
-        }
-      });
-
-    return () => {
-      disposed = true;
-    };
-  }, [mode, query, repository, shouldLoadNotes]);
-
-  const filteredCommandItems = useMemo(
-    () =>
-      mode === 'notes' ? [] : filterCommandPaletteEntries(commandItems, query),
-    [commandItems, mode, query],
-  );
-
-  const noteItems = useMemo<CommandPaletteItem[]>(() => {
-    const trimmed = query.trim();
-    return noteResults.map((note) => ({
-      id: `note:${note.id}`,
-      label: note.name,
-      description:
-        note.tags.length > 0
-          ? note.tags.map((tag) => `#${tag}`).join(' ')
-          : strings.commandPalette.noteResultDescription,
-      section: trimmed
-        ? strings.commandPalette.sections.notes
-        : strings.commandPalette.sections.recent,
-      icon: FileText,
-      onSelect: () => {
-        closePalette();
-        navigate(`/${note.fileType}/${note.id}`);
-      },
-    }));
-  }, [
+  const commandMode = useCommandMode({ commandItems, query, strings });
+  const notesMode = useNotesMode({
+    active: open && mode === 'notes',
     closePalette,
     navigate,
-    noteResults,
     query,
-    strings.commandPalette.noteResultDescription,
-    strings.commandPalette.sections.notes,
-    strings.commandPalette.sections.recent,
-  ]);
-
-  const visibleItems = useMemo(() => {
-    if (mode === 'notes') {
-      return noteItems;
-    }
-    if (query.trim()) {
-      return [...filteredCommandItems, ...noteItems];
-    }
-    return filteredCommandItems;
-  }, [filteredCommandItems, mode, noteItems, query]);
+    repository,
+    strings,
+  });
+  const activeMode = mode === 'notes' ? notesMode : commandMode;
+  const visibleItems = activeMode.items;
 
   useEffect(() => {
     if (activeIndex >= visibleItems.length) {
@@ -320,12 +240,13 @@ export function useCommandPalette(): {
     handleMarkdownInputChange,
     dialogProps: {
       activeIndex,
+      emptyMessage: activeMode.emptyMessage,
       footerShortcut: commandPaletteShortcut(),
       inputRef,
       items: visibleItems,
-      loading: loadingNotes,
-      mode,
+      loading: activeMode.loading,
       open,
+      placeholder: activeMode.placeholder,
       query,
       onActiveIndexChange: setActiveIndex,
       onClose: closePalette,

@@ -6,12 +6,13 @@ import type { CommandPaletteDialogProps } from './types';
 
 export function CommandPaletteDialog({
   activeIndex,
+  emptyMessage,
   footerShortcut,
   inputRef,
   items,
   loading,
-  mode,
   open,
+  placeholder,
   query,
   onActiveIndexChange,
   onClose,
@@ -55,11 +56,7 @@ export function CommandPaletteDialog({
                 value={query}
                 onChange={(event) => onQueryChange(event.target.value)}
                 onKeyDown={onInputKeyDown}
-                placeholder={
-                  mode === 'notes'
-                    ? strings.commandPalette.searchPlaceholder
-                    : strings.commandPalette.placeholder
-                }
+                placeholder={placeholder}
                 className="min-w-0 flex-1 bg-transparent py-2 font-normal text-lg text-text-primary outline-none placeholder:text-text-muted"
               />
               <kbd className="hidden rounded-md border border-border-divider bg-surface px-2 py-1 font-semibold text-[10px] text-text-muted uppercase tracking-[0.08em] sm:inline">
@@ -77,9 +74,7 @@ export function CommandPaletteDialog({
                 />
               ) : (
                 <div className="px-4 py-8 text-center text-sm text-text-muted">
-                  {loading
-                    ? strings.commandPalette.loading
-                    : strings.commandPalette.noResults}
+                  {loading ? strings.commandPalette.loading : emptyMessage}
                 </div>
               )}
             </div>

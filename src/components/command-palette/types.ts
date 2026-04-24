@@ -18,14 +18,22 @@ export interface CommandPaletteItem extends CommandPaletteEntry {
   onSelect: () => void | Promise<void>;
 }
 
+export interface CommandPaletteModeState {
+  emptyMessage: string;
+  items: CommandPaletteItem[];
+  loading: boolean;
+  placeholder: string;
+}
+
 export interface CommandPaletteDialogProps {
   activeIndex: number;
   footerShortcut: string;
   inputRef: RefObject<HTMLInputElement | null>;
   items: CommandPaletteItem[];
+  emptyMessage: string;
   loading: boolean;
-  mode: CommandPaletteMode;
   open: boolean;
+  placeholder: string;
   query: string;
   onActiveIndexChange: (index: number) => void;
   onClose: () => void;
