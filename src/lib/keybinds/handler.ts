@@ -2,6 +2,8 @@ import { type Action, comboMatches, type KeybindingRegistry } from './registry';
 
 export interface ActionBinding {
   action: Action;
+  /** Opt in for app-level shortcuts that should still work while typing. */
+  allowEditable?: boolean;
   onDown?: (e: KeyboardEvent) => void;
   onUp?: (e: KeyboardEvent) => void;
 }
@@ -61,10 +63,10 @@ export class KeybindingHandler {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
-    if (!this.filter(e)) {
-      return;
-    }
     for (const b of this.bindings) {
+      if (!b.allowEditable && isEditableTarget(e)) {
+        continue;
+      }
       const combo = this.registry.getCombo(b.action);
       if (combo && comboMatches(e, combo)) {
         b.onDown?.(e);
@@ -73,10 +75,10 @@ export class KeybindingHandler {
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
-    if (!this.filter(e)) {
-      return;
-    }
     for (const b of this.bindings) {
+      if (!b.allowEditable && !this.filter(e)) {
+        continue;
+      }
       const combo = this.registry.getCombo(b.action);
       if (combo && comboMatches(e, combo)) {
         b.onUp?.(e);

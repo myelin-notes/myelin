@@ -1,5 +1,6 @@
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { CommandPalette } from '@/components/command-palette';
 import { useTheme } from '@/hooks/useTheme';
 import { CanvasView } from '@/pages/canvas';
 import { DebugPage } from '@/pages/debug';
@@ -12,6 +13,7 @@ function App() {
   return (
     <MemoryRouter>
       <Toaster position="bottom-right" />
+      <CommandPalette />
       <Routes>
         <Route path="/" element={<Navigate to="/library" replace />} />
         <Route path="/library" element={<LibraryPage />} />

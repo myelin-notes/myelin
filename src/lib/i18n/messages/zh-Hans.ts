@@ -26,6 +26,45 @@ const zhHans: typeof en = {
       help: '帮助',
     },
   },
+  commandPalette: {
+    title: '命令面板',
+    placeholder: '搜索命令和笔记...',
+    searchPlaceholder: '搜索笔记...',
+    loading: '正在加载...',
+    noResults: '没有匹配的命令或笔记',
+    noteResultDescription: '画布笔记',
+    footer: '使用方向键导航，按 Enter 执行',
+    sections: {
+      commands: '命令',
+      notes: '笔记',
+      recent: '最近笔记',
+    },
+    commands: {
+      openNote: {
+        label: '打开笔记',
+        description: '跳转到最近或匹配的画布',
+      },
+      createNote: {
+        label: '创建笔记',
+        description: '在资料库根目录创建新画布',
+      },
+      importMarkdown: {
+        label: '导入 Markdown',
+        description: '从 Markdown 文件创建画布',
+      },
+      insertLink: {
+        label: '插入笔记链接',
+        description: '需要路线图第 2 项的内部笔记链接',
+      },
+      switchView: {
+        label: '切换资料库视图',
+        description: '在列表和网格之间切换资料库',
+      },
+    },
+    errors: {
+      createNote: '无法创建笔记',
+    },
+  },
   library: {
     title: '数字资料库',
     emptyState: '你的个人知识工作区，创建画布即可开始收集想法、笔记与研究',
@@ -207,10 +246,15 @@ const zhHans: typeof en = {
       unbound: '未绑定',
       empty: '还没有注册快捷键，打开画布后即可查看',
       categories: {
+        app: '应用',
         canvas: '画布',
         editor: '编辑器',
       },
       actions: {
+        'app:command-palette': {
+          label: '命令面板',
+          description: '打开应用命令和笔记导航',
+        },
         'canvas:pan': {
           label: '平移',
           description: '按住以拖动画布',

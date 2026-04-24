@@ -18,13 +18,11 @@ import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import {
-  type NoteSession,
   useRepository,
   type VFSFileNode,
   type VFSFolderNode,
 } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
-import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
@@ -32,23 +30,15 @@ import {
   type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
+import {
+  importMarkdownFile,
+  isMarkdownFile,
+  MARKDOWN_FILE_ACCEPT,
+} from './import-markdown';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
 const logger = new Logger('LibraryPage');
-const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
-const MARKDOWN_MIME_TYPES = new Set(['text/markdown', 'text/x-markdown']);
-
-function isMarkdownFile(file: File): boolean {
-  return (
-    MARKDOWN_EXTENSION_RE.test(file.name) || MARKDOWN_MIME_TYPES.has(file.type)
-  );
-}
-
-function getMarkdownCanvasTitle(fileName: string, fallback: string): string {
-  const title = fileName.replace(MARKDOWN_EXTENSION_RE, '').trim();
-  return title.length > 0 ? title : fallback;
-}
 
 export function LibraryPage() {
   const strings = useMessages();
@@ -101,56 +91,17 @@ export function LibraryPage() {
     }
 
     setIsImportingMarkdown(true);
-    let createdId: string | null = null;
-    let session: NoteSession | null = null;
 
     try {
-      const markdown = await file.text();
-      const baseTitle = getMarkdownCanvasTitle(
-        file.name,
-        strings.library.createNew.untitledCanvas,
-      );
-      const title = await repository.getUniqueFileName(
-        baseTitle,
-        currentFolderId,
-      );
-      createdId = await repository.createFile(
-        title,
-        'mcanvas',
-        currentFolderId,
-      );
-      session = await repository.openSession(createdId);
-      addMarkdownPageFrameToYDoc(session.ydoc, markdown);
-      await session.push();
-      await session.close();
-      session = null;
-
+      const importedId = await importMarkdownFile({
+        file,
+        repository,
+        parentId: currentFolderId,
+        fallbackTitle: strings.library.createNew.untitledCanvas,
+      });
       triggerRefresh();
-      const importedId = createdId;
-      if (!importedId) {
-        throw new Error('Markdown import did not create a canvas.');
-      }
-      createdId = null;
       navigate(`/mcanvas/${importedId}`);
     } catch (error) {
-      logger.error('Failed to import Markdown', error, {
-        fileName: file.name,
-        createdId,
-      });
-      if (session) {
-        await session.close().catch(() => {});
-      }
-      if (createdId) {
-        await repository.deleteNode(createdId).catch((deleteError) => {
-          logger.error(
-            'Failed to clean up failed Markdown import',
-            deleteError,
-            {
-              createdId,
-            },
-          );
-        });
-      }
       toast.error(strings.library.importMarkdown.failed, {
         description: error instanceof Error ? error.message : String(error),
       });
@@ -457,7 +408,7 @@ export function LibraryPage() {
                   <input
                     ref={markdownInputRef}
                     type="file"
-                    accept="text/markdown,text/x-markdown,.md,.markdown,.mdx"
+                    accept={MARKDOWN_FILE_ACCEPT}
                     className="hidden"
                     onChange={handleMarkdownInputChange}
                   />

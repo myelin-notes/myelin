@@ -24,6 +24,45 @@ const en = {
       help: 'Help',
     },
   },
+  commandPalette: {
+    title: 'Command Palette',
+    placeholder: 'Search commands and notes...',
+    searchPlaceholder: 'Search notes...',
+    loading: 'Loading...',
+    noResults: 'No matching commands or notes',
+    noteResultDescription: 'Canvas note',
+    footer: 'Arrow keys to navigate, Enter to run',
+    sections: {
+      commands: 'Commands',
+      notes: 'Notes',
+      recent: 'Recent notes',
+    },
+    commands: {
+      openNote: {
+        label: 'Open note',
+        description: 'Jump to a recent or matching canvas',
+      },
+      createNote: {
+        label: 'Create note',
+        description: 'Start a new canvas in the library root',
+      },
+      importMarkdown: {
+        label: 'Import Markdown',
+        description: 'Create a canvas from a Markdown file',
+      },
+      insertLink: {
+        label: 'Insert note link',
+        description: 'Requires internal note links from roadmap item 2',
+      },
+      switchView: {
+        label: 'Switch library view',
+        description: 'Toggle the library between list and grid',
+      },
+    },
+    errors: {
+      createNote: 'Could not create note',
+    },
+  },
   library: {
     title: 'Digital Library',
     emptyState:
@@ -212,10 +251,15 @@ const en = {
       empty:
         'No keybindings registered yet. They appear once you open a canvas.',
       categories: {
+        app: 'App',
         canvas: 'Canvas',
         editor: 'Editor',
       },
       actions: {
+        'app:command-palette': {
+          label: 'Command Palette',
+          description: 'Open app commands and note navigation',
+        },
         'canvas:pan': {
           label: 'Pan',
           description: 'Hold to drag the canvas',

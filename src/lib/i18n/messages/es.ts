@@ -26,6 +26,46 @@ const es: typeof en = {
       help: 'Ayuda',
     },
   },
+  commandPalette: {
+    title: 'Paleta de comandos',
+    placeholder: 'Buscar comandos y notas...',
+    searchPlaceholder: 'Buscar notas...',
+    loading: 'Cargando...',
+    noResults: 'No hay comandos ni notas coincidentes',
+    noteResultDescription: 'Nota de lienzo',
+    footer: 'Flechas para navegar, Enter para ejecutar',
+    sections: {
+      commands: 'Comandos',
+      notes: 'Notas',
+      recent: 'Notas recientes',
+    },
+    commands: {
+      openNote: {
+        label: 'Abrir nota',
+        description: 'Ir a un lienzo reciente o coincidente',
+      },
+      createNote: {
+        label: 'Crear nota',
+        description: 'Crear un lienzo en la raíz de la biblioteca',
+      },
+      importMarkdown: {
+        label: 'Importar Markdown',
+        description: 'Crear un lienzo desde un archivo Markdown',
+      },
+      insertLink: {
+        label: 'Insertar enlace de nota',
+        description:
+          'Requiere enlaces internos de notas del punto 2 del roadmap',
+      },
+      switchView: {
+        label: 'Cambiar vista de biblioteca',
+        description: 'Alternar la biblioteca entre lista y cuadrícula',
+      },
+    },
+    errors: {
+      createNote: 'No se pudo crear la nota',
+    },
+  },
   library: {
     title: 'Biblioteca Digital',
     emptyState:
@@ -216,10 +256,15 @@ const es: typeof en = {
       empty:
         'Aún no hay atajos registrados. Aparecerán cuando abras un lienzo.',
       categories: {
+        app: 'Aplicación',
         canvas: 'Lienzo',
         editor: 'Editor',
       },
       actions: {
+        'app:command-palette': {
+          label: 'Paleta de comandos',
+          description: 'Abrir comandos de la app y navegación de notas',
+        },
         'canvas:pan': {
           label: 'Desplazar',
           description: 'Mantén pulsado para arrastrar el lienzo',

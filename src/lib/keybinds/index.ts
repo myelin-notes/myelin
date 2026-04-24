@@ -20,6 +20,7 @@ export const keybindings = new KeybindingHandler(registry);
 
 declare module './registry' {
   interface ActionMap {
+    'app:command-palette': true;
     'canvas:pan': true;
     'canvas:undo': true;
     'canvas:redo': true;
@@ -39,6 +40,13 @@ declare module './registry' {
     'editor:code': true;
   }
 }
+
+registry.defineDefaults({
+  'app:command-palette': {
+    key: 'p',
+    mod: true,
+  },
+});
 
 registry.defineDefaults(
   {
