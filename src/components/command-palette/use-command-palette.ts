@@ -1,7 +1,5 @@
 import {
-  type ChangeEvent,
   type KeyboardEvent,
-  type RefObject,
   useCallback,
   useEffect,
   useMemo,
@@ -16,9 +14,11 @@ import type { ActionBinding } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
+import { useCanvasCommandContext } from '@/pages/canvas/command-context';
 import {
   importMarkdownFile,
   isMarkdownFile,
+  MARKDOWN_FILE_ACCEPT,
 } from '@/pages/library/import-markdown';
 import {
   commandPalettePageFromPathname,
@@ -35,17 +35,49 @@ import { errorDescription } from './utils';
 
 const logger = new Logger('CommandPalette');
 
+function pickMarkdownFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = MARKDOWN_FILE_ACCEPT;
+    input.style.display = 'none';
+
+    const cleanup = () => {
+      input.remove();
+    };
+
+    input.addEventListener(
+      'change',
+      () => {
+        const file = input.files?.[0] ?? null;
+        cleanup();
+        resolve(file);
+      },
+      { once: true },
+    );
+    input.addEventListener(
+      'cancel',
+      () => {
+        cleanup();
+        resolve(null);
+      },
+      { once: true },
+    );
+
+    document.body.append(input);
+    input.click();
+  });
+}
+
 export function useCommandPalette(): {
   dialogProps: CommandPaletteDialogProps;
-  handleMarkdownInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  markdownInputRef: RefObject<HTMLInputElement | null>;
 } {
   const strings = useMessages();
   const repository = useRepository();
+  const { getHandlers: getCanvasCommandHandlers } = useCanvasCommandContext();
   const navigate = useNavigate();
   const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
-  const markdownInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<CommandPaletteMode>('commands');
   const [query, setQuery] = useState('');
@@ -86,11 +118,6 @@ export function useCommandPalette(): {
     strings.library.createNew.untitledCanvas,
   ]);
 
-  const triggerMarkdownImport = useCallback(() => {
-    closePalette();
-    markdownInputRef.current?.click();
-  }, [closePalette]);
-
   const toggleLibraryView = useCallback(() => {
     closePalette();
     const current = UserPrefs.get('explorerViewMode');
@@ -100,42 +127,77 @@ export function useCommandPalette(): {
     }
   }, [closePalette, location.pathname, navigate]);
 
-  const handleMarkdownInputChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.currentTarget.files?.[0];
-      event.currentTarget.value = '';
-      if (!file || isImportingMarkdown) {
-        return;
-      }
-      if (!isMarkdownFile(file)) {
-        toast.error(strings.library.importMarkdown.unsupportedFile);
-        return;
-      }
+  const triggerLibraryMarkdownImport = useCallback(async () => {
+    closePalette();
+    const file = await pickMarkdownFile();
+    if (!file || isImportingMarkdown) {
+      return;
+    }
+    if (!isMarkdownFile(file)) {
+      toast.error(strings.library.importMarkdown.unsupportedFile);
+      return;
+    }
 
-      setIsImportingMarkdown(true);
-      void importMarkdownFile({
+    setIsImportingMarkdown(true);
+    try {
+      const id = await importMarkdownFile({
         file,
         repository,
         parentId: null,
         fallbackTitle: strings.library.createNew.untitledCanvas,
-      })
-        .then((id) => navigate(`/mcanvas/${id}`))
-        .catch((error) => {
-          toast.error(strings.library.importMarkdown.failed, {
-            description: errorDescription(error),
-          });
-        })
-        .finally(() => setIsImportingMarkdown(false));
-    },
-    [
-      isImportingMarkdown,
-      navigate,
-      repository,
-      strings.library.createNew.untitledCanvas,
-      strings.library.importMarkdown.failed,
-      strings.library.importMarkdown.unsupportedFile,
-    ],
-  );
+      });
+      navigate(`/mcanvas/${id}`);
+    } catch (error) {
+      toast.error(strings.library.importMarkdown.failed, {
+        description: errorDescription(error),
+      });
+    } finally {
+      setIsImportingMarkdown(false);
+    }
+  }, [
+    closePalette,
+    isImportingMarkdown,
+    navigate,
+    repository,
+    strings.library.createNew.untitledCanvas,
+    strings.library.importMarkdown.failed,
+    strings.library.importMarkdown.unsupportedFile,
+  ]);
+
+  const triggerCanvasMarkdownImport = useCallback(async () => {
+    closePalette();
+    const file = await pickMarkdownFile();
+    if (!file || isImportingMarkdown) {
+      return;
+    }
+    if (!isMarkdownFile(file)) {
+      toast.error(strings.library.importMarkdown.unsupportedFile);
+      return;
+    }
+
+    const command = getCanvasCommandHandlers()?.importMarkdownFile;
+    if (!command) {
+      toast.error(strings.library.importMarkdown.failed);
+      return;
+    }
+
+    setIsImportingMarkdown(true);
+    try {
+      await command(file);
+    } catch (error) {
+      toast.error(strings.library.importMarkdown.failed, {
+        description: errorDescription(error),
+      });
+    } finally {
+      setIsImportingMarkdown(false);
+    }
+  }, [
+    closePalette,
+    getCanvasCommandHandlers,
+    isImportingMarkdown,
+    strings.library.importMarkdown.failed,
+    strings.library.importMarkdown.unsupportedFile,
+  ]);
 
   const commandItems = useMemo(
     () =>
@@ -146,7 +208,8 @@ export function useCommandPalette(): {
         createNote,
         openPalette,
         toggleLibraryView,
-        triggerMarkdownImport,
+        triggerCanvasMarkdownImport,
+        triggerLibraryMarkdownImport,
       }),
     [
       createNote,
@@ -155,7 +218,8 @@ export function useCommandPalette(): {
       openPalette,
       strings,
       toggleLibraryView,
-      triggerMarkdownImport,
+      triggerCanvasMarkdownImport,
+      triggerLibraryMarkdownImport,
     ],
   );
 
@@ -243,8 +307,6 @@ export function useCommandPalette(): {
   };
 
   return {
-    markdownInputRef,
-    handleMarkdownInputChange,
     dialogProps: {
       activeIndex,
       emptyMessage: activeMode.emptyMessage,

@@ -14,7 +14,8 @@ export interface CommandPaletteItemContext {
   createNote: () => Promise<void>;
   openPalette: (mode: CommandPaletteMode) => void;
   toggleLibraryView: () => void;
-  triggerMarkdownImport: () => void;
+  triggerCanvasMarkdownImport: () => void;
+  triggerLibraryMarkdownImport: () => void;
 }
 
 export function createCommandPaletteItems({
@@ -24,7 +25,8 @@ export function createCommandPaletteItems({
   createNote,
   openPalette,
   toggleLibraryView,
-  triggerMarkdownImport,
+  triggerCanvasMarkdownImport,
+  triggerLibraryMarkdownImport,
 }: CommandPaletteItemContext): CommandPaletteItem[] {
   const items: CommandPaletteItem[] = [
     {
@@ -46,14 +48,27 @@ export function createCommandPaletteItems({
       onSelect: createNote,
     },
     {
-      id: 'import-markdown',
+      id: 'import-markdown-library',
       label: strings.commandPalette.commands.importMarkdown.label,
       description: strings.commandPalette.commands.importMarkdown.description,
       keywords: ['markdown', 'md', 'file'],
       section: strings.commandPalette.sections.commands,
       icon: FileText,
       disabled: isImportingMarkdown,
-      onSelect: triggerMarkdownImport,
+      visibleOn: ['library'],
+      onSelect: triggerLibraryMarkdownImport,
+    },
+    {
+      id: 'import-markdown-canvas',
+      label: strings.commandPalette.commands.importMarkdownToCanvas.label,
+      description:
+        strings.commandPalette.commands.importMarkdownToCanvas.description,
+      keywords: ['markdown', 'md', 'file', 'page', 'frame'],
+      section: strings.commandPalette.sections.commands,
+      icon: FileText,
+      disabled: isImportingMarkdown,
+      visibleOn: ['canvas'],
+      onSelect: triggerCanvasMarkdownImport,
     },
     {
       id: 'switch-library-view',

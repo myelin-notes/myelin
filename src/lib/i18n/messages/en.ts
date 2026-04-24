@@ -51,6 +51,10 @@ const en = {
         label: 'Import Markdown',
         description: 'Create a canvas from a Markdown file',
       },
+      importMarkdownToCanvas: {
+        label: 'Import Markdown',
+        description: 'Add a Markdown page frame to this canvas',
+      },
       insertLink: {
         label: 'Insert note link',
         description: 'Requires internal note links from roadmap item 2',

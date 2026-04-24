@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useParams } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { IS_DEV } from '@/lib/env';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
+import { useCanvasCommandContext } from './command-context';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
@@ -19,6 +20,7 @@ import { useCanvasEngine } from './hooks/use-canvas-engine';
 import { useCanvasInserts } from './hooks/use-canvas-inserts';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useToolState } from './hooks/use-tool-state';
+import { markdownImportHandler } from './media/markdown';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
 
 export function CanvasView() {
@@ -37,6 +39,7 @@ function CanvasViewInner() {
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
+  const { registerHandlers } = useCanvasCommandContext();
   const toolState = useToolState(drawableCanvasRef);
 
   const [chromeMenu, setChromeMenu] = useState<{
@@ -72,6 +75,24 @@ function CanvasViewInner() {
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
   });
+
+  const importMarkdownFile = useCallback(
+    async (file: File) => {
+      const dc = drawableCanvasRef.current;
+      if (!dc) {
+        throw new Error('Canvas is still loading.');
+      }
+      await markdownImportHandler(file, dc);
+    },
+    [drawableCanvasRef],
+  );
+  useEffect(() => {
+    if (!engine.noteSession) {
+      return;
+    }
+
+    return registerHandlers({ importMarkdownFile });
+  }, [engine.noteSession, importMarkdownFile, registerHandlers]);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">

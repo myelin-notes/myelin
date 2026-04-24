@@ -53,6 +53,10 @@ const es: typeof en = {
         label: 'Importar Markdown',
         description: 'Crear un lienzo desde un archivo Markdown',
       },
+      importMarkdownToCanvas: {
+        label: 'Importar Markdown',
+        description: 'Agregar un marco de página Markdown a este lienzo',
+      },
       insertLink: {
         label: 'Insertar enlace de nota',
         description:

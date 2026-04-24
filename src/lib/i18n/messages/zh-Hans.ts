@@ -53,6 +53,10 @@ const zhHans: typeof en = {
         label: '导入 Markdown',
         description: '从 Markdown 文件创建画布',
       },
+      importMarkdownToCanvas: {
+        label: '导入 Markdown',
+        description: '向当前画布添加 Markdown 页面框',
+      },
       insertLink: {
         label: '插入笔记链接',
         description: '需要路线图第 2 项的内部笔记链接',

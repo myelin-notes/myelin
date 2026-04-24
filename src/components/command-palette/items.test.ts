@@ -14,7 +14,8 @@ function commandIdsForPage(currentPage: CommandPalettePage): string[] {
     createNote: async () => {},
     openPalette: () => {},
     toggleLibraryView: () => {},
-    triggerMarkdownImport: () => {},
+    triggerCanvasMarkdownImport: () => {},
+    triggerLibraryMarkdownImport: () => {},
   }).map((item) => item.id);
 }
 
@@ -31,20 +32,24 @@ describe('commandPalettePageFromPathname', () => {
 
 describe('createCommandPaletteItems', () => {
   it('keeps global commands available on every page', () => {
-    expect(commandIdsForPage('settings')).toEqual([
-      'open-note',
-      'create-note',
-      'import-markdown',
-    ]);
+    expect(commandIdsForPage('settings')).toEqual(['open-note', 'create-note']);
   });
 
   it('shows library commands only on the library page', () => {
+    expect(commandIdsForPage('library')).toContain('import-markdown-library');
     expect(commandIdsForPage('library')).toContain('switch-library-view');
+    expect(commandIdsForPage('canvas')).not.toContain(
+      'import-markdown-library',
+    );
     expect(commandIdsForPage('canvas')).not.toContain('switch-library-view');
   });
 
   it('shows canvas commands only on the canvas page', () => {
+    expect(commandIdsForPage('canvas')).toContain('import-markdown-canvas');
     expect(commandIdsForPage('canvas')).toContain('insert-note-link');
+    expect(commandIdsForPage('library')).not.toContain(
+      'import-markdown-canvas',
+    );
     expect(commandIdsForPage('library')).not.toContain('insert-note-link');
   });
 });
