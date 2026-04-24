@@ -3,7 +3,6 @@ import { Logger } from '@/lib/logger';
 import { loadDocument, type PdfDocument, renderPage } from '@/lib/pdf-renderer';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
-import type { DrawableCanvas } from '../drawable-canvas';
 import { bindYFields } from '../y-fields';
 import { DrawableElement, ResizeHandles } from './drawable-element';
 import { ElementType } from './element-type';
@@ -30,7 +29,6 @@ interface PageSlot {
   key: string;
   div: HTMLDivElement;
   contentDiv: HTMLDivElement;
-  action: HTMLDivElement | null;
 }
 
 function snapToDevicePixel(value: number): number {
@@ -61,7 +59,6 @@ export class PdfElement extends DrawableElement {
   private _pageOrder: PdfPageEntry[] = [];
   private _pageSizes: PdfPageSize[] = [];
   private _fileName: string = '';
-  private _editing: boolean = false;
 
   private _chrome: FrameChrome | null = null;
   private _frameDiv: HTMLDivElement | null = null;
@@ -156,10 +153,6 @@ export class PdfElement extends DrawableElement {
 
   public getMenuItems(): ChromeMenuItem[] {
     return [];
-  }
-
-  public get editing(): boolean {
-    return this._editing;
   }
 
   /** y/height/w for each rendered page in local space, plus `gapAfter`. */
@@ -272,76 +265,6 @@ export class PdfElement extends DrawableElement {
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
-  public override get editable(): boolean {
-    return true;
-  }
-
-  public override get lowersCanvasWhileEditing(): boolean {
-    return true;
-  }
-
-  public override enterEditMode(
-    canvas: DrawableCanvas,
-    screenX?: number,
-    screenY?: number,
-  ): HTMLElement | null {
-    this._editing = true;
-
-    const sx = Math.abs(this._scale.x);
-    const sy = Math.abs(this._scale.y);
-    const firstPage = this.pageLayout()[0];
-    const firstPageMiddle = firstPage
-      ? this.offset.y + (firstPage.y + firstPage.h / 2) * sy
-      : this.offset.y;
-    const focusWorldY =
-      screenX != null && screenY != null
-        ? canvas.viewport.screenToWorld({ x: screenX, y: screenY }).y
-        : firstPageMiddle;
-    const focusRect = new DOMRect(
-      this.offset.x,
-      focusWorldY,
-      this.totalWidth * sx,
-      0,
-    );
-    canvas.viewport.animateViewToFitRect(focusRect, 0.65);
-
-    return this._frameDiv;
-  }
-
-  public override exitEditMode(): void {
-    this._editing = false;
-  }
-
-  public deletePage(orderIdx: number): void {
-    if (orderIdx < 0 || orderIdx >= this._pageOrder.length) {
-      return;
-    }
-    const nextOrder = this._pageOrder.slice();
-    nextOrder.splice(orderIdx, 1);
-    this.syncToYMap({
-      pageOrder: nextOrder as unknown,
-    });
-    this._pageOrder = nextOrder;
-  }
-
-  public insertBlankAfter(orderIdx: number): void {
-    if (this._pageOrder.length === 0) {
-      return;
-    }
-    const neighborIdx = Math.max(
-      0,
-      Math.min(orderIdx, this._pageOrder.length - 1),
-    );
-    const { w, h } = entrySize(this._pageOrder[neighborIdx], this._pageSizes);
-    const insertAt = neighborIdx + 1;
-    const nextOrder = this._pageOrder.slice();
-    nextOrder.splice(insertAt, 0, { kind: 'blank', w, h });
-    this.syncToYMap({
-      pageOrder: nextOrder as unknown,
-    });
-    this._pageOrder = nextOrder;
-  }
-
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
     this.ensurePdfDoc();
 
@@ -378,7 +301,7 @@ export class PdfElement extends DrawableElement {
     // the old standalone frame. No translate needed; position via its parent.
     frameDiv.style.width = `${scaledWidth * zoom}px`;
     frameDiv.style.height = `${scaledHeight * zoom}px`;
-    frameDiv.style.pointerEvents = this._editing ? 'auto' : 'none';
+    frameDiv.style.pointerEvents = 'none';
 
     // viewportDiv holds pages at intrinsic size; element scale + canvas zoom
     // are both applied via transform so page rasters don't need reflowing.
@@ -479,13 +402,6 @@ export class PdfElement extends DrawableElement {
       slot.div.style.height = `${page.h}px`;
       slot.div.style.transform = `translate(0px, ${page.y}px)`;
 
-      if (this._editing) {
-        this.ensureActionStrip(slot, i);
-      } else if (slot.action) {
-        slot.action.remove();
-        slot.action = null;
-      }
-
       kept.add(i);
     }
 
@@ -520,7 +436,7 @@ export class PdfElement extends DrawableElement {
     } as Partial<CSSStyleDeclaration>);
     div.appendChild(contentDiv);
 
-    return { key, div, contentDiv, action: null };
+    return { key, div, contentDiv };
   }
 
   private async renderPdfPageInto(
@@ -558,69 +474,5 @@ export class PdfElement extends DrawableElement {
       }
     }
     return -1;
-  }
-
-  private ensureActionStrip(slot: PageSlot, orderIdx: number): void {
-    if (slot.action) {
-      return;
-    }
-    const action = document.createElement('div');
-    Object.assign(action.style, {
-      position: 'absolute',
-      top: '8px',
-      right: '8px',
-      display: 'flex',
-      gap: '6px',
-      padding: '4px',
-      borderRadius: '10px',
-      background: 'rgba(255,255,255,0.92)',
-      boxShadow: '0 1px 6px rgba(25,28,30,0.12)',
-      backdropFilter: 'blur(16px)',
-      zIndex: '3',
-      pointerEvents: 'auto',
-    } as Partial<CSSStyleDeclaration>);
-
-    const deleteBtn = this.makeActionButton('Delete page', '×');
-    deleteBtn.onclick = (e) => {
-      e.stopPropagation();
-      this.deletePage(orderIdx);
-    };
-    const addBtn = this.makeActionButton('Insert blank below', '+');
-    addBtn.onclick = (e) => {
-      e.stopPropagation();
-      this.insertBlankAfter(orderIdx);
-    };
-    action.appendChild(addBtn);
-    action.appendChild(deleteBtn);
-    slot.div.appendChild(action);
-    slot.action = action;
-  }
-
-  private makeActionButton(title: string, label: string): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.title = title;
-    btn.textContent = label;
-    Object.assign(btn.style, {
-      width: '24px',
-      height: '24px',
-      border: 'none',
-      borderRadius: '6px',
-      background: 'rgba(25,28,30,0.06)',
-      color: '#191c1e',
-      fontSize: '14px',
-      lineHeight: '1',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    } as Partial<CSSStyleDeclaration>);
-    btn.onmouseenter = () => {
-      btn.style.background = 'rgba(25,28,30,0.12)';
-    };
-    btn.onmouseleave = () => {
-      btn.style.background = 'rgba(25,28,30,0.06)';
-    };
-    return btn;
   }
 }

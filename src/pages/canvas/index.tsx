@@ -104,7 +104,7 @@ function CanvasViewInner() {
       />
 
       {/* Selection overlay canvas: outline + handles. Always above DOM chrome
-          so selection stays visible while editing a page-frame/PDF. */}
+          so selection stays visible while editing. */}
       <canvas
         ref={overlayCanvasRef}
         className="pointer-events-none absolute inset-0 block h-full w-full"

@@ -317,7 +317,7 @@ export class DrawableCanvas {
     // Canvas stops intercepting pointer events so the DOM editor (chrome
     // contentEditable / inline text input) receives them.
     this.canvas.style.pointerEvents = 'none';
-    // For elements with DOM-backed editing chrome (page frame, PDF), drop the
+    // For elements with DOM-backed editing chrome, drop the
     // foreground canvas below the chrome so strokes don't bleed onto the
     // editing surface. The selection outline lives on a separate overlay
     // canvas (z=12) so it stays visible above chrome.
@@ -438,7 +438,7 @@ export class DrawableCanvas {
     this.ctx.restore();
 
     // Overlay canvas: selection outline + handles. Always above DOM chrome
-    // so selection stays visible while a page-frame/PDF is being edited (the
+    // so selection stays visible while a page frame is being edited (the
     // foreground canvas is lowered below chrome in that mode).
     if (this.overlayCtx && this.overlayCanvas) {
       const overlayW = this.overlayCanvas.width / dpr;
