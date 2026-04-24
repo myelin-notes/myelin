@@ -39,6 +39,7 @@ export interface PaginationBlock {
   height: number;
   nodeSize: number;
   isBreakableTextBlock: boolean;
+  isPageHeightConstrained: boolean;
 }
 
 export interface ParagraphMeasurementState {
@@ -164,7 +165,10 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
     const blockShift = previousPassShift;
     const blockNaturalTop = block.measuredTop - blockShift;
     const blockEffectiveTop = blockNaturalTop + cumulativeShift;
-    const blockEffectiveBottom = blockEffectiveTop + block.height;
+    const blockHeight = block.isPageHeightConstrained
+      ? Math.min(block.height, CONTENT_HEIGHT)
+      : block.height;
+    const blockEffectiveBottom = blockEffectiveTop + blockHeight;
 
     if (blockEffectiveBottom <= pageBoundary) {
       continue;
@@ -213,7 +217,7 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
       }
     }
 
-    const finalBottom = blockEffectiveTop + spacerApplied + block.height;
+    const finalBottom = blockEffectiveTop + spacerApplied + blockHeight;
     do {
       pageStart = pageBoundary + PAGE_BREAK_GAP;
       pageBoundary = pageStart + CONTENT_HEIGHT;

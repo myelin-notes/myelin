@@ -21,12 +21,14 @@ function block({
   height,
   nodeSize = 10,
   isBreakableTextBlock = false,
+  isPageHeightConstrained = false,
 }: {
   pos: number;
   measuredTop: number;
   height: number;
   nodeSize?: number;
   isBreakableTextBlock?: boolean;
+  isPageHeightConstrained?: boolean;
 }): PaginationBlock {
   return {
     pos,
@@ -34,6 +36,7 @@ function block({
     height,
     nodeSize,
     isBreakableTextBlock,
+    isPageHeightConstrained,
   };
 }
 
@@ -187,6 +190,7 @@ describe('calculateBreakLayout', () => {
           pos: 30,
           measuredTop: 0,
           height: CONTENT_HEIGHT + 240,
+          isPageHeightConstrained: true,
         }),
       ],
       existingBreaks: [],

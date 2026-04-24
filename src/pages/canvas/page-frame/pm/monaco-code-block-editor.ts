@@ -30,6 +30,10 @@ interface CodeBlockEditorLayout {
   outerHeightPx: number;
 }
 
+interface CodeBlockEditorLayoutOptions {
+  maxOuterHeightPx?: number;
+}
+
 interface CodeBlockEditorCallbacks {
   onBoundaryInput: (event: CodeBlockEditorBoundaryInput) => void;
   onContentChange: () => void;
@@ -143,9 +147,9 @@ export class MonacoCodeBlockEditor {
       scrollBeyondLastLine: false,
       scrollbar: {
         alwaysConsumeMouseWheel: false,
-        handleMouseWheel: false,
+        handleMouseWheel: true,
         horizontal: 'hidden',
-        vertical: 'hidden',
+        vertical: 'auto',
       },
       theme: 'myelin-code-block',
       wordWrap: 'off',
@@ -377,9 +381,19 @@ export class MonacoCodeBlockEditor {
     return dir < 0 ? offset === 0 : offset === this.model.getValueLength();
   }
 
-  syncLayout(): CodeBlockEditorLayout {
+  syncLayout(
+    options: CodeBlockEditorLayoutOptions = {},
+  ): CodeBlockEditorLayout {
     const scale = window.devicePixelRatio || 1;
-    const height = Math.max(72, Math.ceil(this.editor.getContentHeight()));
+    const contentHeight = Math.max(
+      72,
+      Math.ceil(this.editor.getContentHeight()),
+    );
+    const maxHeight =
+      options.maxOuterHeightPx === undefined
+        ? contentHeight
+        : Math.max(72, Math.floor(options.maxOuterHeightPx * scale));
+    const height = Math.min(contentHeight, maxHeight);
     this.editorEl.style.height = `${height}px`;
     this.editor.layout({ height, width: this.editorEl.clientWidth });
     return { outerHeightPx: height / scale };

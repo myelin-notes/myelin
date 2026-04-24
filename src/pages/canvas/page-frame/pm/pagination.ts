@@ -35,6 +35,7 @@ interface BlockInfo {
   measuredTop: number;
   nodeSize: number;
   isBreakableTextBlock: boolean;
+  isPageHeightConstrained: boolean;
 }
 
 /**
@@ -68,6 +69,7 @@ function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
       measuredTop: dom.offsetTop - editorOffsetTop,
       nodeSize: node.nodeSize,
       isBreakableTextBlock,
+      isPageHeightConstrained: node.type.name === 'codeBlock',
     });
   });
 

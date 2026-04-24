@@ -17,6 +17,7 @@ import {
   createMonacoCodeBlockEditor,
   type MonacoCodeBlockEditor,
 } from './monaco-code-block-editor';
+import { CONTENT_HEIGHT } from './pagination-core';
 import { schema } from './schema';
 
 const OPENING_FENCE_RE = /^```(\w+)?$/;
@@ -523,7 +524,7 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
 
-    const layout = this.editor.syncLayout();
+    const layout = this.editor.syncLayout({ maxOuterHeightPx: CONTENT_HEIGHT });
     this.dom.style.height = `${layout.outerHeightPx}px`;
   }
 }
