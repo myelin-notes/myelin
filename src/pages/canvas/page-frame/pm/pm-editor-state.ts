@@ -1,10 +1,13 @@
 import { EditorState, Selection, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type * as Y from 'yjs';
+import { CODE_BLOCK_CLEAR_SELECTION_EVENT } from './code-block-selection-sync';
 import { PM_UPDATE_EVENT } from './constants';
 import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
+
+const CODE_BLOCK_NODE_VIEW_SELECTOR = '.pm-monaco-code-block';
 
 /**
  * Manages ProseMirror document state for a single PageFrameElement.
@@ -139,6 +142,12 @@ export class PageFrameEditorState {
         ),
       );
     }
+
+    view.dom
+      .querySelectorAll<HTMLElement>(CODE_BLOCK_NODE_VIEW_SELECTOR)
+      .forEach((dom) => {
+        dom.dispatchEvent(new CustomEvent(CODE_BLOCK_CLEAR_SELECTION_EVENT));
+      });
 
     const nativeSelection = view.dom.ownerDocument.getSelection();
     const anchorNode = nativeSelection?.anchorNode;

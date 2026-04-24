@@ -4,6 +4,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import { Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import {
+  CODE_BLOCK_CLEAR_SELECTION_EVENT,
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
   type CodeBlockExternalSelection,
   type CodeBlockExternalSelectionDetail,
@@ -132,6 +133,11 @@ export class CodeBlockNodeView implements NodeView {
     const { detail } = event as CustomEvent<CodeBlockExternalSelectionDetail>;
     this.setExternalSelection(detail);
   };
+  private readonly handleClearSelection = (): void => {
+    this.updating = true;
+    this.editor?.clearSelection();
+    this.updating = false;
+  };
 
   constructor(
     private node: PMNode,
@@ -143,6 +149,10 @@ export class CodeBlockNodeView implements NodeView {
     this.dom.addEventListener(
       CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
       this.handleExternalSelection,
+    );
+    this.dom.addEventListener(
+      CODE_BLOCK_CLEAR_SELECTION_EVENT,
+      this.handleClearSelection,
     );
     this.dom.addEventListener('mouseup', this.handleCodeBlockMouseUp, true);
     this.dom.addEventListener('mousemove', this.handleCodeBlockMouseMove, true);
@@ -205,6 +215,10 @@ export class CodeBlockNodeView implements NodeView {
     this.dom.removeEventListener(
       CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
       this.handleExternalSelection,
+    );
+    this.dom.removeEventListener(
+      CODE_BLOCK_CLEAR_SELECTION_EVENT,
+      this.handleClearSelection,
     );
     this.dom.removeEventListener('mouseup', this.handleCodeBlockMouseUp, true);
     this.dom.removeEventListener(

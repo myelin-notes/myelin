@@ -268,6 +268,17 @@ export class MonacoCodeBlockEditor {
     this.editor.revealPositionInCenterIfOutsideViewport(headPos);
   }
 
+  clearSelection(): void {
+    this.externalSelectionDecorations.clear();
+
+    const selection = this.editor.getSelection();
+    if (!selection || selection.isEmpty()) {
+      return;
+    }
+
+    this.editor.setPosition(selection.getPosition());
+  }
+
   focus(): void {
     this.editor.focus();
   }

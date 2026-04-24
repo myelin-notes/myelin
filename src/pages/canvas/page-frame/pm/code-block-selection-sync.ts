@@ -1,5 +1,7 @@
 export const CODE_BLOCK_EXTERNAL_SELECTION_EVENT =
   'myelin:code-block-external-selection';
+export const CODE_BLOCK_CLEAR_SELECTION_EVENT =
+  'myelin:code-block-clear-selection';
 
 export interface CodeBlockExternalSelection {
   from: number;
