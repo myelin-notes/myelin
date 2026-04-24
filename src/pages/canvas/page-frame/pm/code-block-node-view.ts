@@ -98,6 +98,9 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     this.selectionDragStartedOutside = !this.dom.contains(event.target as Node);
+    if (this.selectionDragStartedOutside) {
+      this.clearEditorSelection();
+    }
   };
   private readonly handleCodeBlockMouseUp = (event: MouseEvent): void => {
     if (!this.selectionDragStartedOutside || event.button !== 0) {
@@ -134,9 +137,7 @@ export class CodeBlockNodeView implements NodeView {
     this.setExternalSelection(detail);
   };
   private readonly handleClearSelection = (): void => {
-    this.updating = true;
-    this.editor?.clearSelection();
-    this.updating = false;
+    this.clearEditorSelection();
   };
 
   constructor(
@@ -351,6 +352,15 @@ export class CodeBlockNodeView implements NodeView {
       ),
     );
     return true;
+  }
+
+  private clearEditorSelection(): void {
+    this.updating = true;
+    try {
+      this.editor?.clearSelection();
+    } finally {
+      this.updating = false;
+    }
   }
 
   private handleBoundaryKeyDown(event: CodeBlockEditorBoundaryInput): void {

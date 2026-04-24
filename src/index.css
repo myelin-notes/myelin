@@ -420,6 +420,31 @@ input[type="range"].tool-slider::-moz-range-track {
   background: Highlight;
 }
 
+/* Monaco's text layers must stay selectable for reliable caret hit-testing. */
+.pm-editor .ProseMirror .pm-monaco-code-block .monaco-editor-background,
+.pm-editor .ProseMirror .pm-monaco-code-block .margin,
+.pm-editor .ProseMirror .pm-monaco-code-block .margin *,
+.pm-editor .ProseMirror .pm-monaco-code-block .margin-view-overlays,
+.pm-editor .ProseMirror .pm-monaco-code-block .margin-view-overlays *,
+.pm-editor .ProseMirror .pm-monaco-code-block .view-overlays,
+.pm-editor .ProseMirror .pm-monaco-code-block .view-overlays *,
+.pm-editor .ProseMirror .pm-monaco-code-block .cdr,
+.pm-editor .ProseMirror .pm-monaco-code-block .cldr {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.pm-editor .ProseMirror .pm-monaco-code-block .monaco-editor-background::selection,
+.pm-editor .ProseMirror .pm-monaco-code-block .margin::selection,
+.pm-editor .ProseMirror .pm-monaco-code-block .margin *::selection,
+.pm-editor .ProseMirror .pm-monaco-code-block .view-overlays::selection,
+.pm-editor .ProseMirror .pm-monaco-code-block .view-overlays *::selection,
+.pm-editor .ProseMirror .pm-monaco-code-block .view-line::selection,
+.pm-editor .ProseMirror .pm-monaco-code-block .view-line *::selection,
+.pm-editor .ProseMirror .pm-monaco-code-block .line-numbers::selection {
+  background: transparent !important;
+}
+
 .pm-editor .ProseMirror .pm-monaco-code-block__editor {
   overflow: hidden;
   /* Monaco mouse hit-testing follows CSS zoom here, but not transform scale. */
