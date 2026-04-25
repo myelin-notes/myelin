@@ -1,4 +1,6 @@
 import * as Y from 'yjs';
+import { Logger } from '@/lib/logger';
+import { summarizeYDoc } from '@/lib/note-state-summary';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { NoteSession } from '../session';
 import type {
@@ -42,6 +44,8 @@ import type {
   VFSFolderNode,
   VFSNode,
 } from './types';
+
+const logger = new Logger('BaseRepository');
 
 export abstract class BaseRepository
   implements
@@ -351,11 +355,23 @@ export abstract class BaseRepository
   }
 
   async openSession(nodeId: string): Promise<NoteSession> {
+    logger.debug('Opening repository-backed note session', {
+      repositoryKind: this.kind,
+      nodeId,
+    });
     return NoteSession.open(nodeId, this);
   }
 
   async loadDocument(nodeId: string): Promise<YjsSyncSnapshot> {
     const remote = await this.readYjsSyncState(nodeId);
+    logger.debug('Loaded repository document snapshot', {
+      repositoryKind: this.kind,
+      nodeId,
+      revision: remote.revision,
+      byteLength: remote.bytes?.byteLength ?? 0,
+      stateVectorByteLength: remote.stateVector.byteLength,
+      ...summarizeYDoc(remote.doc),
+    });
     return {
       update: remote.bytes,
       stateVector: remote.stateVector,
@@ -368,6 +384,15 @@ export abstract class BaseRepository
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot> {
     const remote = await this.readYjsSyncState(nodeId);
+    logger.debug('Pulled repository document snapshot', {
+      repositoryKind: this.kind,
+      nodeId,
+      revision: remote.revision,
+      requestedStateVectorByteLength: stateVector?.byteLength ?? 0,
+      byteLength: remote.bytes?.byteLength ?? 0,
+      stateVectorByteLength: remote.stateVector.byteLength,
+      ...summarizeYDoc(remote.doc),
+    });
     return {
       update: stateVector
         ? Y.encodeStateAsUpdate(remote.doc, stateVector)
@@ -383,8 +408,26 @@ export abstract class BaseRepository
     options: YjsSyncPushOptions,
   ): Promise<YjsSyncPushResult> {
     const remote = await this.readYjsSyncState(nodeId);
+    logger.debug('Pushing repository document updates', {
+      repositoryKind: this.kind,
+      nodeId,
+      baseRevision: options.baseRevision,
+      remoteRevision: remote.revision,
+      updateByteLength: update.byteLength,
+      localStateVectorByteLength: options.localStateVector?.byteLength ?? 0,
+      remoteStateVectorByteLength: remote.stateVector.byteLength,
+      ...summarizeYDoc(remote.doc),
+    });
 
     if (options.baseRevision !== remote.revision) {
+      logger.debug('Rejected repository document push because revision changed', {
+        repositoryKind: this.kind,
+        nodeId,
+        baseRevision: options.baseRevision,
+        remoteRevision: remote.revision,
+        remoteStateVectorByteLength: remote.stateVector.byteLength,
+        ...summarizeYDoc(remote.doc),
+      });
       return {
         accepted: false,
         remoteUpdate: options.localStateVector
@@ -410,6 +453,14 @@ export abstract class BaseRepository
     if (revision !== null) {
       await this.onNoteSaved(nodeId);
     }
+
+    logger.debug('Accepted repository document push', {
+      repositoryKind: this.kind,
+      nodeId,
+      revision,
+      stateVectorByteLength: Y.encodeStateVector(remote.doc).byteLength,
+      ...summarizeYDoc(remote.doc),
+    });
 
     return {
       accepted: true,

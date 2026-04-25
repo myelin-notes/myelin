@@ -1,4 +1,5 @@
 import { Logger } from '@/lib/logger';
+import { summarizeYDocManager } from '@/lib/note-state-summary';
 import {
   LOCAL_ORIGIN,
   PEER_ORIGIN,
@@ -21,24 +22,14 @@ const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
 const logger = new Logger('NoteSession');
 
-function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
 export class NoteSession {
   public readonly status: NoteSessionStatus;
 
   private closed = false;
   private closing: Promise<void> | null = null;
+  private changeEpoch = 0;
   private remoteStateVector: Uint8Array;
+  private flushedEpoch = 0;
   private transport: Transport = noopTransport;
   private readonly localPeer: {
     peerId: string;
@@ -89,6 +80,7 @@ export class NoteSession {
         origin !== undefined &&
         origin !== null
       ) {
+        this.changeEpoch += 1;
         for (const listener of this.localChangeListeners) {
           listener();
         }
@@ -104,13 +96,21 @@ export class NoteSession {
     const ydoc = initial.update
       ? YDocManager.fromUpdate(initial.update)
       : new YDocManager();
-    return new NoteSession(
+    const session = new NoteSession(
       nodeId,
       ydoc,
       syncTarget,
       initial.revision,
       initial.stateVector,
     );
+    logger.info('Opened note session', {
+      nodeId,
+      revision: initial.revision,
+      updateByteLength: initial.update?.byteLength ?? 0,
+      stateVectorByteLength: initial.stateVector.byteLength,
+      ...summarizeYDocManager(session.ydoc),
+    });
+    return session;
   }
 
   get transportConnected(): boolean {
@@ -118,7 +118,7 @@ export class NoteSession {
   }
 
   hasUnsyncedChanges(): boolean {
-    return !bytesEqual(this.ydoc.encodeStateVector(), this.remoteStateVector);
+    return this.changeEpoch !== this.flushedEpoch;
   }
 
   getPeerSnapshot(): PeerSnapshot {
@@ -189,6 +189,13 @@ export class NoteSession {
 
   async pull(): Promise<Uint8Array | null> {
     let pulledUpdate: Uint8Array | null = null;
+    let pulledUpdateByteLength = 0;
+    logger.debug('Pulling note session updates', {
+      nodeId: this.id,
+      remoteRevision: this.status.remoteRevision,
+      localStateVectorByteLength: this.ydoc.encodeStateVector().byteLength,
+      ...summarizeYDocManager(this.ydoc),
+    });
     await this.runWithPhase('pulling', async () => {
       const result = await this.syncTarget.pullUpdates(
         this.id,
@@ -198,23 +205,60 @@ export class NoteSession {
       if (result.update && result.update.byteLength > 0) {
         this.ydoc.applyUpdate(result.update);
         pulledUpdate = result.update;
+        pulledUpdateByteLength = result.update.byteLength;
       }
 
       this.remoteStateVector = result.stateVector;
       this.status.remoteRevision = result.revision;
     });
+    logger.debug('Pulled note session updates', {
+      nodeId: this.id,
+      remoteRevision: this.status.remoteRevision,
+      pulledUpdateByteLength,
+      remoteStateVectorByteLength: this.remoteStateVector.byteLength,
+      ...summarizeYDocManager(this.ydoc),
+    });
     return pulledUpdate;
   }
 
   async push(): Promise<void> {
+    const targetChangeEpoch = this.changeEpoch;
+    logger.debug('Pushing note session updates', {
+      nodeId: this.id,
+      changeEpoch: this.changeEpoch,
+      flushedEpoch: this.flushedEpoch,
+      remoteRevision: this.status.remoteRevision,
+      remoteStateVectorByteLength: this.remoteStateVector.byteLength,
+      ...summarizeYDocManager(this.ydoc),
+    });
     await this.runWithPhase('pushing', async () => {
       for (let attempt = 0; attempt < 4; attempt++) {
-        const localStateVector = this.ydoc.encodeStateVector();
-        if (bytesEqual(localStateVector, this.remoteStateVector)) {
+        if (targetChangeEpoch === this.flushedEpoch) {
+          logger.debug('Skipped note session push; already synced', {
+            nodeId: this.id,
+            attempt: attempt + 1,
+            changeEpoch: this.changeEpoch,
+            flushedEpoch: this.flushedEpoch,
+            remoteRevision: this.status.remoteRevision,
+            targetChangeEpoch,
+            ...summarizeYDocManager(this.ydoc),
+          });
           return;
         }
 
+        const localStateVector = this.ydoc.encodeStateVector();
         const pendingUpdate = this.ydoc.encodeDiff(this.remoteStateVector);
+        logger.debug('Attempting note session push', {
+          nodeId: this.id,
+          attempt: attempt + 1,
+          baseRevision: this.status.remoteRevision,
+          localStateVectorByteLength: localStateVector.byteLength,
+          changeEpoch: this.changeEpoch,
+          flushedEpoch: this.flushedEpoch,
+          pendingUpdateByteLength: pendingUpdate.byteLength,
+          targetChangeEpoch,
+          ...summarizeYDocManager(this.ydoc),
+        });
         const result = await this.syncTarget.pushUpdates(
           this.id,
           pendingUpdate,
@@ -228,9 +272,27 @@ export class NoteSession {
         this.status.remoteRevision = result.revision;
 
         if (result.accepted) {
+          this.flushedEpoch = Math.max(this.flushedEpoch, targetChangeEpoch);
+          logger.info('Accepted note session push', {
+            nodeId: this.id,
+            attempt: attempt + 1,
+            changeEpoch: this.changeEpoch,
+            flushedEpoch: this.flushedEpoch,
+            remoteRevision: this.status.remoteRevision,
+            remoteStateVectorByteLength: this.remoteStateVector.byteLength,
+            targetChangeEpoch,
+            ...summarizeYDocManager(this.ydoc),
+          });
           return;
         }
 
+        logger.debug('Rejected note session push; merging remote state', {
+          nodeId: this.id,
+          attempt: attempt + 1,
+          remoteRevision: this.status.remoteRevision,
+          remoteUpdateByteLength: result.remoteUpdate?.byteLength ?? 0,
+          remoteStateVectorByteLength: this.remoteStateVector.byteLength,
+        });
         if (result.remoteUpdate && result.remoteUpdate.byteLength > 0) {
           this.ydoc.applyUpdate(result.remoteUpdate);
         }
@@ -287,6 +349,14 @@ export class NoteSession {
 
   private async closeInternal(): Promise<void> {
     let closeError: unknown = null;
+    logger.debug('Closing note session', {
+      nodeId: this.id,
+      changeEpoch: this.changeEpoch,
+      flushedEpoch: this.flushedEpoch,
+      hasUnsyncedChanges: this.hasUnsyncedChanges(),
+      remoteRevision: this.status.remoteRevision,
+      ...summarizeYDocManager(this.ydoc),
+    });
 
     try {
       if (this.hasUnsyncedChanges()) {
@@ -300,6 +370,14 @@ export class NoteSession {
     this.stopHeartbeat();
     this.closed = true;
     this.status.phase = 'closed';
+    logger.info('Closed note session', {
+      nodeId: this.id,
+      changeEpoch: this.changeEpoch,
+      flushedEpoch: this.flushedEpoch,
+      hadCloseError: closeError !== null,
+      remoteRevision: this.status.remoteRevision,
+      ...summarizeYDocManager(this.ydoc),
+    });
 
     if (closeError) {
       throw closeError;

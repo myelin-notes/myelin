@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { Logger } from '@/lib/logger';
+import { summarizeYDocManager } from '@/lib/note-state-summary';
 import { type NoteSession, useRepository } from '@/lib/sync';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { DrawableElement } from '@/pages/canvas/elements/drawable-element';
@@ -181,6 +182,11 @@ export function useCanvasSessionLifecycle({
     setNoteSession(null);
     setYdoc(null);
     setEditingElement(null);
+    logger.debug('Opening canvas session', {
+      id,
+      repositoryKind: repository.kind,
+      hadPriorSession: priorSession !== null,
+    });
     void priorSession?.close().catch((error) => {
       logger.error('Failed to close prior session', error, { id });
     });
@@ -205,6 +211,12 @@ export function useCanvasSessionLifecycle({
         noteSessionRef.current = session;
         setNoteSession(session);
         setYdoc(session.ydoc);
+        logger.debug('Opened canvas session', {
+          id,
+          repositoryKind: repository.kind,
+          remoteRevision: session.status.remoteRevision,
+          ...summarizeYDocManager(session.ydoc),
+        });
 
         const currentNode = await repository.getNode(id);
         if (disposed) {
@@ -248,6 +260,10 @@ export function useCanvasSessionLifecycle({
           );
           frame.updateBounds();
           dc.updateBounding();
+          logger.debug('Seeded empty canvas with initial page frame', {
+            id,
+            ...summarizeYDocManager(session.ydoc),
+          });
         }
 
         session.push().catch((error) => {
@@ -266,6 +282,11 @@ export function useCanvasSessionLifecycle({
       setNoteSession(null);
       setYdoc(null);
       setEditingElement(null);
+      logger.debug('Cleaning up canvas session', {
+        id,
+        hasSession: session !== null,
+        hasUnsyncedChanges: session?.hasUnsyncedChanges() ?? false,
+      });
       void session?.close().catch((error) => {
         logger.error('Failed to close session during cleanup', error, { id });
       });

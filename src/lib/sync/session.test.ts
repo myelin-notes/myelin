@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import { ElementType } from '@/pages/canvas/elements/element-type';
 import { NoteSession } from './session';
 import type {
   YjsSyncPushOptions,
@@ -56,5 +57,51 @@ describe('NoteSession local change listeners', () => {
     expect(listener).toHaveBeenCalledTimes(1);
 
     unsubscribe();
+  });
+
+  it('treats delete-only canvas changes as unsynced and pushes them', async () => {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 0, {
+      offsetX: 0,
+      offsetY: 0,
+      scaleX: 1,
+      scaleY: 1,
+      pageWidth: 100,
+      pageHeight: 100,
+    });
+
+    const pushUpdates = vi.fn<
+      (
+        nodeId: string,
+        update: Uint8Array,
+        options: YjsSyncPushOptions,
+      ) => Promise<YjsSyncPushResult>
+    >(async (_nodeId, _update, _options) => ({
+      accepted: true,
+      remoteUpdate: null,
+      update: ydoc.encodeState(),
+      stateVector: ydoc.encodeStateVector(),
+      revision: 'rev-1',
+    }));
+
+    const session = new NoteSession(
+      'note-1',
+      ydoc,
+      {
+        ...createSyncTarget(),
+        pushUpdates,
+      },
+      null,
+      ydoc.encodeStateVector(),
+    );
+
+    ydoc.removeElementMap(yMap);
+
+    expect(session.hasUnsyncedChanges()).toBe(true);
+
+    await session.push();
+
+    expect(pushUpdates).toHaveBeenCalledTimes(1);
+    expect(session.hasUnsyncedChanges()).toBe(false);
   });
 });

@@ -10,6 +10,8 @@ import {
   writeFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
+import { Logger } from '@/lib/logger';
+import { summarizeNoteBytes } from '@/lib/note-state-summary';
 import { BaseRepository } from './base';
 import {
   computeRevision,
@@ -21,6 +23,8 @@ import {
   type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities } from './types';
+
+const logger = new Logger('LocalRepository');
 
 export class LocalRepository extends BaseRepository {
   public readonly kind = 'local-storage';
@@ -93,6 +97,11 @@ export class LocalRepository extends BaseRepository {
     const manifest = structuredClone(snapshot.manifest);
     await this.writeManifestToDisk(manifest);
     this.manifest = manifest;
+    logger.debug('Replaced local repository snapshot', {
+      storageRoot: this.storageRoot,
+      nodeCount: Object.keys(snapshot.manifest.nodes).length,
+      noteCount: Object.keys(snapshot.notes).length,
+    });
   }
 
   protected async onFileCreated(nodeId: string): Promise<void> {
@@ -169,12 +178,25 @@ export class LocalRepository extends BaseRepository {
       getNoteFileName(nodeId),
     );
     if (!(await exists(filePath, { baseDir: BaseDirectory.AppData }))) {
+      logger.debug('Local note bytes missing on disk', {
+        nodeId,
+        storageRoot: this.storageRoot,
+        filePath,
+      });
       return { bytes: null, revision: null };
     }
 
     const data = await readFile(filePath, { baseDir: BaseDirectory.AppData });
     const bytes = data.length > 0 ? data : null;
-    return { bytes, revision: await computeRevision(bytes) };
+    const revision = await computeRevision(bytes);
+    logger.debug('Loaded local note bytes from disk', {
+      nodeId,
+      storageRoot: this.storageRoot,
+      filePath,
+      revision,
+      ...summarizeNoteBytes(bytes),
+    });
+    return { bytes, revision };
   }
 
   protected async saveNoteBytes(
@@ -192,9 +214,27 @@ export class LocalRepository extends BaseRepository {
         getNoteFileName(nodeId),
       );
       await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+      const revision = await computeRevision(bytes);
+      logger.debug('Saved local note bytes to disk', {
+        nodeId,
+        storageRoot: this.storageRoot,
+        filePath,
+        revision,
+        ...summarizeNoteBytes(bytes),
+      });
+      return revision;
     }
 
-    return computeRevision(bytes);
+    const revision = await computeRevision(bytes);
+    logger.debug('Skipped local note byte write', {
+      nodeId,
+      storageRoot: this.storageRoot,
+      revision,
+      byteLength: bytes.byteLength,
+      nodeExists: Boolean(node),
+      isFile: node?.type === 'file',
+    });
+    return revision;
   }
 
   protected async deleteNoteBytes(nodeId: string): Promise<void> {
@@ -204,6 +244,11 @@ export class LocalRepository extends BaseRepository {
     );
     if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
       await remove(filePath, { baseDir: BaseDirectory.AppData });
+      logger.debug('Deleted local note bytes from disk', {
+        nodeId,
+        storageRoot: this.storageRoot,
+        filePath,
+      });
     }
   }
 

@@ -7,6 +7,7 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
+import { summarizeNoteBytes } from '@/lib/note-state-summary';
 import { NoteSession } from '../session';
 import type {
   YjsSyncPushOptions,
@@ -294,6 +295,11 @@ export class CachedRepository
   private async initializeImpl(): Promise<void> {
     await this.cache.initialize();
     await this.loadOutbox();
+    logger.debug('Initialized cached repository cache state', {
+      repositoryKind: this.kind,
+      outboxPath: this.outboxPath(),
+      pendingOps: this.pendingOps.length,
+    });
 
     try {
       const cacheSnapshot = await this.cache.exportSnapshot();
@@ -505,6 +511,11 @@ export class CachedRepository
   }
 
   async openSession(nodeId: string): Promise<NoteSession> {
+    logger.debug('Opening cached repository session', {
+      repositoryKind: this.kind,
+      nodeId,
+      pendingOps: this.pendingOps.length,
+    });
     try {
       await this.refresh();
     } catch (error) {
@@ -512,6 +523,11 @@ export class CachedRepository
         nodeId,
       });
     }
+    logger.debug('Opening cached repository local session after refresh', {
+      repositoryKind: this.kind,
+      nodeId,
+      pendingOps: this.pendingOps.length,
+    });
     return NoteSession.open(nodeId, this);
   }
 
@@ -536,6 +552,12 @@ export class CachedRepository
       await this.mutatePendingOps((ops) => {
         enqueuePushNote(ops, nodeId);
       });
+      logger.debug('Queued cached note push for remote sync', {
+        repositoryKind: this.kind,
+        nodeId,
+        updateByteLength: update.byteLength,
+        pendingOps: this.pendingOps.length,
+      });
     }
     return result;
   }
@@ -554,9 +576,20 @@ export class CachedRepository
 
   private async flushPendingImpl(): Promise<void> {
     await this.loadOutbox();
+    logger.debug('Flushing cached repository pending ops', {
+      repositoryKind: this.kind,
+      pendingOps: this.pendingOps.length,
+      outboxPath: this.outboxPath(),
+    });
 
     while (this.pendingOps.length > 0) {
       const op = this.pendingOps[0];
+      logger.debug('Applying cached repository pending op', {
+        repositoryKind: this.kind,
+        opKind: op.kind,
+        nodeId: 'nodeId' in op ? op.nodeId : null,
+        pendingOps: this.pendingOps.length,
+      });
       await this.applyPendingOp(op);
       this.pendingOps.shift();
       await this.saveOutbox();
@@ -567,6 +600,11 @@ export class CachedRepository
         lastError: null,
       });
     }
+
+    logger.debug('Flushed cached repository pending ops', {
+      repositoryKind: this.kind,
+      pendingOps: this.pendingOps.length,
+    });
   }
 
   private async applyPendingOp(op: PendingOp): Promise<void> {
@@ -606,6 +644,11 @@ export class CachedRepository
         applyManifestUpsert(remoteManifest, cacheSnapshot.manifest, nodeId);
       },
     );
+    logger.debug('Applied cached manifest upsert to remote', {
+      repositoryKind: this.kind,
+      nodeId,
+      cacheNodeCount: Object.keys(cacheSnapshot.manifest.nodes).length,
+    });
   }
 
   private async applyManifestDelete(
@@ -623,16 +666,32 @@ export class CachedRepository
         await this.remote.removeNoteData(nodeId);
       }),
     );
+    logger.debug('Applied cached manifest delete to remote', {
+      repositoryKind: this.kind,
+      nodeId: op.nodeId,
+      deletedFileIds: op.deletedFileIds,
+    });
   }
 
   private async applyNotePush(nodeId: string): Promise<void> {
     const node = await this.cache.getNode(nodeId);
     if (!node || node.type !== 'file') {
+      logger.debug('Skipped cached note push because file no longer exists', {
+        repositoryKind: this.kind,
+        nodeId,
+      });
       return;
     }
 
     const localSnapshot = await this.cache.loadDocument(nodeId);
     const update = localSnapshot.update ?? this.emptyDocUpdate;
+    logger.debug('Applying cached note push to remote', {
+      repositoryKind: this.kind,
+      nodeId,
+      revision: localSnapshot.revision,
+      stateVectorByteLength: localSnapshot.stateVector.byteLength,
+      ...summarizeNoteBytes(localSnapshot.update),
+    });
 
     for (let attempt = 0; attempt < 4; attempt++) {
       const remoteSnapshot = await this.remote.loadDocument(nodeId);
@@ -642,8 +701,24 @@ export class CachedRepository
       });
 
       if (result.accepted) {
+        logger.debug('Applied cached note push to remote', {
+          repositoryKind: this.kind,
+          nodeId,
+          attempt: attempt + 1,
+          revision: result.revision,
+          stateVectorByteLength: result.stateVector.byteLength,
+          ...summarizeNoteBytes(result.update),
+        });
         return;
       }
+
+      logger.debug('Remote rejected cached note push; retrying', {
+        repositoryKind: this.kind,
+        nodeId,
+        attempt: attempt + 1,
+        revision: result.revision,
+        remoteUpdateByteLength: result.remoteUpdate?.byteLength ?? 0,
+      });
     }
 
     throw new Error(`Failed to sync note ${nodeId} after retrying conflicts.`);
@@ -733,6 +808,11 @@ export class CachedRepository
       const raw = await readTextFile(path, { baseDir: BaseDirectory.AppData });
       this.pendingOps = JSON.parse(raw) as PendingOp[];
       this.updateRuntimeStatus({ pendingRemoteWrites: this.pendingOps.length });
+      logger.debug('Loaded cached repository outbox', {
+        repositoryKind: this.kind,
+        outboxPath: path,
+        pendingOps: this.pendingOps.length,
+      });
     } catch {
       this.pendingOps = [];
       await this.saveOutbox();
@@ -743,6 +823,11 @@ export class CachedRepository
     await this.ensureOutboxDir();
     await writeTextFile(this.outboxPath(), JSON.stringify(this.pendingOps), {
       baseDir: BaseDirectory.AppData,
+    });
+    logger.debug('Saved cached repository outbox', {
+      repositoryKind: this.kind,
+      outboxPath: this.outboxPath(),
+      pendingOps: this.pendingOps.length,
     });
   }
 
@@ -755,12 +840,23 @@ export class CachedRepository
   }): Promise<void> {
     const cacheSnapshot = await this.cache.exportSnapshot();
     const remoteSnapshot = await this.remote.exportSnapshot();
+    logger.debug('Syncing cache from remote snapshot', {
+      repositoryKind: this.kind,
+      preserveLocalIfRemoteEmpty: options?.preserveLocalIfRemoteEmpty ?? false,
+      cacheNodeCount: Object.keys(cacheSnapshot.manifest.nodes).length,
+      cacheNoteCount: Object.keys(cacheSnapshot.notes).length,
+      remoteNodeCount: Object.keys(remoteSnapshot.manifest.nodes).length,
+      remoteNoteCount: Object.keys(remoteSnapshot.notes).length,
+    });
 
     if (
       options?.preserveLocalIfRemoteEmpty &&
       isSnapshotEmpty(remoteSnapshot) &&
       !isSnapshotEmpty(cacheSnapshot)
     ) {
+      logger.debug('Preserved local cache because remote snapshot is empty', {
+        repositoryKind: this.kind,
+      });
       return;
     }
 
@@ -775,6 +871,11 @@ export class CachedRepository
       online: true,
       lastRemoteSyncAt: Date.now(),
       lastError: null,
+    });
+    logger.debug('Replaced cache from remote snapshot', {
+      repositoryKind: this.kind,
+      remoteNodeCount: Object.keys(remoteSnapshot.manifest.nodes).length,
+      remoteNoteCount: Object.keys(remoteSnapshot.notes).length,
     });
   }
 

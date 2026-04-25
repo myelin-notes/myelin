@@ -1,6 +1,10 @@
 import type * as Y from 'yjs';
 import { catalogs, type MessageGetter } from '@/lib/i18n/messages';
 import { Logger } from '@/lib/logger';
+import {
+  describeElementType,
+  summarizeDrawableElements,
+} from '@/lib/note-state-summary';
 import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasViewport } from './canvas-viewport';
@@ -104,6 +108,10 @@ export class DrawableCanvas {
 
     // Hydrate existing elements from Y.Doc (for loaded documents)
     this.hydrateFromYDoc();
+    logger.debug(
+      'Hydrated canvas from Y.Doc',
+      summarizeDrawableElements(this._elements),
+    );
 
     // Observe Y.Array for future add/remove (handles undo/redo + remote changes)
     this._ydoc.elements.observe((event) => {
@@ -223,6 +231,10 @@ export class DrawableCanvas {
     });
 
     this.updateBounding();
+    logger.debug('Applied external canvas element change', {
+      origin: String(event.transaction.origin ?? 'unknown'),
+      ...summarizeDrawableElements(this._elements),
+    });
   }
 
   public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
@@ -314,6 +326,11 @@ export class DrawableCanvas {
     event?.stopPropagation();
 
     this._editingElement = element;
+    logger.debug('Entering canvas element edit mode', {
+      index: element.index,
+      type: describeElementType(element.type),
+      ...summarizeDrawableElements(this._elements),
+    });
     // Canvas stops intercepting pointer events so the DOM editor (chrome
     // contentEditable / inline text input) receives them.
     this.canvas.style.pointerEvents = 'none';
@@ -369,6 +386,10 @@ export class DrawableCanvas {
     this.canvas.style.pointerEvents = '';
     this.canvas.style.zIndex = '10';
     this.onElementEdit?.(null);
+    logger.debug('Exited canvas element edit mode', {
+      index: element.index,
+      type: describeElementType(element.type),
+    });
   }
 
   public destroy(): void {
@@ -655,6 +676,12 @@ export class DrawableCanvas {
       this._ydoc.nextIndex = index + 1;
     });
 
+    logger.debug('Added canvas element', {
+      index: element.index,
+      type: describeElementType(element.type),
+      ...summarizeDrawableElements(this._elements),
+    });
+
     return element;
   }
 
@@ -669,6 +696,11 @@ export class DrawableCanvas {
       this._elements.splice(idx, 1);
     }
     element.disposeDOM();
+    logger.debug('Removed canvas element', {
+      index: element.index,
+      type: describeElementType(element.type),
+      ...summarizeDrawableElements(this._elements),
+    });
   }
 
   public deleteSelected() {
@@ -694,6 +726,13 @@ export class DrawableCanvas {
     }
     this._elements = this._elements.filter((e) => !selected.includes(e));
     this.updateBounding();
+    logger.debug('Deleted selected canvas elements', {
+      deletedElements: selected.map((element) => ({
+        index: element.index,
+        type: describeElementType(element.type),
+      })),
+      ...summarizeDrawableElements(this._elements),
+    });
   }
 
   public setCursor(cursor: string) {

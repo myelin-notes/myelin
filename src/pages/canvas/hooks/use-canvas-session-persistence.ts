@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logger } from '@/lib/logger';
+import { summarizeYDocManager } from '@/lib/note-state-summary';
 import type { NoteSession } from '@/lib/sync';
 import {
   regenerateThumbnailNow,
@@ -39,6 +40,11 @@ export function useCanvasSessionPersistence({
       return;
     }
 
+    logger.debug('Persisting canvas session', {
+      id,
+      remoteRevision: session.status.remoteRevision,
+      ...summarizeYDocManager(session.ydoc),
+    });
     const persistPromise = session.push().finally(() => {
       if (persistPromiseRef.current === persistPromise) {
         persistPromiseRef.current = null;
@@ -47,7 +53,12 @@ export function useCanvasSessionPersistence({
 
     persistPromiseRef.current = persistPromise;
     await persistPromise;
-  }, []);
+    logger.debug('Persisted canvas session', {
+      id,
+      remoteRevision: session.status.remoteRevision,
+      ...summarizeYDocManager(session.ydoc),
+    });
+  }, [id]);
 
   const scheduleLocalPersist = useCallback(() => {
     if (persistTimerRef.current !== null) {
@@ -88,9 +99,16 @@ export function useCanvasSessionPersistence({
     });
     savePromiseRef.current = savePromise;
     await savePromise;
-  }, [persistSession]);
+  }, [persistSession, id]);
 
   const back = useCallback(async () => {
+    const session = noteSessionRef.current;
+    logger.debug('Back navigation requested from canvas', {
+      id,
+      hasSession: session !== null,
+      hasUnsyncedChanges: session?.hasUnsyncedChanges() ?? false,
+      ...(session ? summarizeYDocManager(session.ydoc) : {}),
+    });
     await autoSave();
     if (id !== undefined) {
       try {
@@ -99,6 +117,7 @@ export function useCanvasSessionPersistence({
         logger.error('Failed to regenerate thumbnail on back', error, { id });
       }
     }
+    logger.debug('Navigating back to library from canvas', { id });
     navigate('/library');
   }, [autoSave, id, navigate]);
 
