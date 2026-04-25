@@ -279,6 +279,18 @@ const es: typeof en = {
           label: 'Paleta de comandos',
           description: 'Abrir comandos de la app y navegación de notas',
         },
+        'canvas:undo': {
+          label: 'Deshacer',
+          description: 'Revertir el último cambio del lienzo',
+        },
+        'canvas:redo': {
+          label: 'Rehacer',
+          description: 'Reaplicar el último cambio revertido del lienzo',
+        },
+        'canvas:select-all': {
+          label: 'Seleccionar todo',
+          description: 'Seleccionar todo en el lienzo',
+        },
         'canvas:pan': {
           label: 'Desplazar',
           description: 'Mantén pulsado para arrastrar el lienzo',

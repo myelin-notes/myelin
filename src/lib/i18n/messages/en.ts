@@ -274,6 +274,18 @@ const en = {
           label: 'Command Palette',
           description: 'Open app commands and note navigation',
         },
+        'canvas:undo': {
+          label: 'Undo',
+          description: 'Revert the last canvas change',
+        },
+        'canvas:redo': {
+          label: 'Redo',
+          description: 'Reapply the last reverted canvas change',
+        },
+        'canvas:select-all': {
+          label: 'Select All',
+          description: 'Select everything on the canvas',
+        },
         'canvas:pan': {
           label: 'Pan',
           description: 'Hold to drag the canvas',

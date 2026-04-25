@@ -268,6 +268,18 @@ const zhHans: typeof en = {
           label: '命令面板',
           description: '打开应用命令和笔记导航',
         },
+        'canvas:undo': {
+          label: '撤销',
+          description: '撤销上一次画布更改',
+        },
+        'canvas:redo': {
+          label: '重做',
+          description: '重新应用上一次撤销的画布更改',
+        },
+        'canvas:select-all': {
+          label: '全选',
+          description: '选中画布上的全部内容',
+        },
         'canvas:pan': {
           label: '平移',
           description: '按住以拖动画布',

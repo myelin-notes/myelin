@@ -13,13 +13,6 @@ export interface KeyCombo {
   alt?: boolean;
 }
 
-export interface ActionMeta {
-  label: string;
-  description?: string;
-}
-
-export type ActionDef = KeyCombo & ActionMeta;
-
 const isMac =
   typeof navigator !== 'undefined' &&
   /Mac|iPhone|iPad/.test(navigator.platform);
@@ -82,33 +75,24 @@ export class KeybindingRegistry {
   private defaults = new Map<string, KeyCombo>();
   private overrides = new Map<string, KeyCombo>();
   private locked = new Set<string>();
-  private meta = new Map<string, ActionMeta>();
 
   constructor() {
     this.loadOverrides();
   }
 
   defineDefaults(
-    defaults: Partial<Record<Action, KeyCombo | ActionDef>>,
+    defaults: Partial<Record<Action, KeyCombo>>,
     options?: { locked?: boolean },
   ) {
     for (const [action, def] of Object.entries(defaults)) {
       if (!def) {
         continue;
       }
-      const { label, description, ...combo } = def as ActionDef;
-      this.defaults.set(action, combo);
-      if (label) {
-        this.meta.set(action, { label, description });
-      }
+      this.defaults.set(action, def);
       if (options?.locked) {
         this.locked.add(action);
       }
     }
-  }
-
-  getMeta(action: Action): ActionMeta | undefined {
-    return this.meta.get(action);
   }
 
   getCombo(action: Action): KeyCombo | undefined {

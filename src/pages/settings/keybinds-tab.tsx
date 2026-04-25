@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { Keyboard, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
 import { type Action, type KeyCombo, registry } from '@/lib/keybinds';
-import { getActionCategory, getActionCopy } from '@/lib/keybinds/messages';
+import {
+  getActionCategory,
+  getActionCopy,
+  getActionIcon,
+} from '@/lib/keybinds/messages';
 import { cn } from '@/lib/utils';
 
 const isMac =
@@ -106,6 +110,7 @@ function KeybindRow({
   const [capturing, setCapturing] = useState(false);
   const [currentCombo, setCurrentCombo] = useState(combo);
   const copy = getActionCopy(strings, action);
+  const Icon = getActionIcon(action) ?? Keyboard;
 
   useEffect(() => {
     const onReset = () => setCurrentCombo(registry.getCombo(action));
@@ -124,13 +129,18 @@ function KeybindRow({
       onClick={() => !capturing && setCapturing(true)}
       className="group flex w-full cursor-pointer items-center gap-3 rounded-xl bg-input/40 px-3 py-2.5 text-left transition-colors hover:bg-hover-tint sm:gap-4 sm:px-4"
     >
-      <div className="min-w-0 flex-1">
-        <span className="text-sm text-text-primary">
-          {copy?.label ?? action}
-        </span>
-        {copy?.description && (
-          <p className="text-text-muted text-xs">{copy.description}</p>
-        )}
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary">
+          <Icon className="size-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="text-sm text-text-primary">
+            {copy?.label ?? action}
+          </span>
+          {copy?.description && (
+            <p className="text-text-muted text-xs">{copy.description}</p>
+          )}
+        </div>
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">

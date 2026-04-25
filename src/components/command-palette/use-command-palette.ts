@@ -10,7 +10,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { useMessages } from '@/lib/i18n';
-import type { ActionBinding } from '@/lib/keybinds';
+import { type Action, type ActionBinding, keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -83,6 +83,9 @@ export function useCommandPalette(): {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
+  const [activeKeybindingActions, setActiveKeybindingActions] = useState<
+    Action[]
+  >(() => keybindings.getCommandPaletteActions());
   const currentPage = commandPalettePageFromPathname(location.pathname);
 
   const closePalette = useCallback(() => {
@@ -94,6 +97,14 @@ export function useCommandPalette(): {
     setQuery('');
     setOpen(true);
   }, []);
+
+  useEffect(
+    () =>
+      keybindings.subscribe(() => {
+        setActiveKeybindingActions(keybindings.getCommandPaletteActions());
+      }),
+    [],
+  );
 
   const createNote = useCallback(async () => {
     closePalette();
@@ -199,19 +210,30 @@ export function useCommandPalette(): {
     strings.library.importMarkdown.unsupportedFile,
   ]);
 
+  const triggerKeybindingAction = useCallback(
+    (action: Action) => {
+      closePalette();
+      keybindings.runAction(action);
+    },
+    [closePalette],
+  );
+
   const commandItems = useMemo(
     () =>
       createCommandPaletteItems({
+        activeKeybindingActions,
         currentPage,
         strings,
         isImportingMarkdown,
         createNote,
         openPalette,
         toggleLibraryView,
+        triggerKeybindingAction,
         triggerCanvasMarkdownImport,
         triggerLibraryMarkdownImport,
       }),
     [
+      activeKeybindingActions,
       createNote,
       currentPage,
       isImportingMarkdown,
@@ -219,6 +241,7 @@ export function useCommandPalette(): {
       strings,
       toggleLibraryView,
       triggerCanvasMarkdownImport,
+      triggerKeybindingAction,
       triggerLibraryMarkdownImport,
     ],
   );

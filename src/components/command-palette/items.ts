@@ -1,6 +1,18 @@
-import { BookOpen, FileText, Grid2X2, Link, Plus } from 'lucide-react';
+import {
+  BookOpen,
+  FileText,
+  Grid2X2,
+  Keyboard,
+  Link,
+  Plus,
+} from 'lucide-react';
 import type { Messages } from '@/lib/i18n';
-import { registry } from '@/lib/keybinds';
+import { type Action, registry } from '@/lib/keybinds';
+import {
+  getActionCategory,
+  getActionCopy,
+  getActionIcon,
+} from '@/lib/keybinds/messages';
 import type {
   CommandPaletteItem,
   CommandPaletteMode,
@@ -8,23 +20,27 @@ import type {
 } from './types';
 
 export interface CommandPaletteItemContext {
+  activeKeybindingActions: Action[];
   currentPage: CommandPalettePage;
   strings: Messages;
   isImportingMarkdown: boolean;
   createNote: () => Promise<void>;
   openPalette: (mode: CommandPaletteMode) => void;
   toggleLibraryView: () => void;
+  triggerKeybindingAction: (action: Action) => void;
   triggerCanvasMarkdownImport: () => void;
   triggerLibraryMarkdownImport: () => void;
 }
 
 export function createCommandPaletteItems({
+  activeKeybindingActions,
   currentPage,
   strings,
   isImportingMarkdown,
   createNote,
   openPalette,
   toggleLibraryView,
+  triggerKeybindingAction,
   triggerCanvasMarkdownImport,
   triggerLibraryMarkdownImport,
 }: CommandPaletteItemContext): CommandPaletteItem[] {
@@ -91,6 +107,11 @@ export function createCommandPaletteItems({
       visibleOn: ['canvas'],
       onSelect: () => {},
     },
+    ...createKeybindingCommandPaletteItems({
+      actions: activeKeybindingActions,
+      strings,
+      triggerKeybindingAction,
+    }),
   ];
 
   return items.filter((item) => isCommandPaletteItemVisible(item, currentPage));
@@ -123,6 +144,39 @@ function isCommandPaletteItemVisible(
   currentPage: CommandPalettePage,
 ): boolean {
   return !item.visibleOn || item.visibleOn.includes(currentPage);
+}
+
+function createKeybindingCommandPaletteItems({
+  actions,
+  strings,
+  triggerKeybindingAction,
+}: {
+  actions: Action[];
+  strings: Messages;
+  triggerKeybindingAction: (action: Action) => void;
+}): CommandPaletteItem[] {
+  return actions
+    .filter((action) => action !== 'app:command-palette')
+    .flatMap((action) => {
+      const copy = getActionCopy(strings, action);
+      if (!copy) {
+        return [];
+      }
+      const icon = getActionIcon(action) ?? Keyboard;
+
+      return [
+        {
+          id: `action:${action}`,
+          label: copy.label,
+          description: copy.description ?? action,
+          keywords: [...action.split(':'), action],
+          section: getActionCategory(strings, action),
+          icon,
+          shortcut: registry.format(action) || undefined,
+          onSelect: () => triggerKeybindingAction(action),
+        },
+      ];
+    });
 }
 
 function isRoute(pathname: string, route: string): boolean {

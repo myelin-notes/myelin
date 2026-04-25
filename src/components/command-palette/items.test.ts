@@ -1,5 +1,7 @@
+import { Undo2 } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import en from '@/lib/i18n/messages/en';
+import { registry } from '@/lib/keybinds';
 import {
   commandPalettePageFromPathname,
   createCommandPaletteItems,
@@ -8,12 +10,14 @@ import type { CommandPalettePage } from './types';
 
 function commandIdsForPage(currentPage: CommandPalettePage): string[] {
   return createCommandPaletteItems({
+    activeKeybindingActions: [],
     currentPage,
     strings: en,
     isImportingMarkdown: false,
     createNote: async () => {},
     openPalette: () => {},
     toggleLibraryView: () => {},
+    triggerKeybindingAction: () => {},
     triggerCanvasMarkdownImport: () => {},
     triggerLibraryMarkdownImport: () => {},
   }).map((item) => item.id);
@@ -51,5 +55,40 @@ describe('createCommandPaletteItems', () => {
       'import-markdown-canvas',
     );
     expect(commandIdsForPage('library')).not.toContain('insert-note-link');
+  });
+
+  it('adds live keybinding actions as runnable command items', () => {
+    const triggered: string[] = [];
+    const items = createCommandPaletteItems({
+      activeKeybindingActions: [
+        'app:command-palette',
+        'canvas:undo',
+        'canvas:tool-pen',
+      ],
+      currentPage: 'canvas',
+      strings: en,
+      isImportingMarkdown: false,
+      createNote: async () => {},
+      openPalette: () => {},
+      toggleLibraryView: () => {},
+      triggerKeybindingAction: (action) => triggered.push(action),
+      triggerCanvasMarkdownImport: () => {},
+      triggerLibraryMarkdownImport: () => {},
+    });
+
+    expect(items.map((item) => item.id)).toContain('action:canvas:undo');
+    expect(items.map((item) => item.id)).toContain('action:canvas:tool-pen');
+    expect(items.map((item) => item.id)).not.toContain(
+      'action:app:command-palette',
+    );
+    expect(
+      items.find((item) => item.id === 'action:canvas:undo')?.shortcut,
+    ).toBe(registry.format('canvas:undo'));
+    expect(items.find((item) => item.id === 'action:canvas:undo')?.icon).toBe(
+      Undo2,
+    );
+
+    items.find((item) => item.id === 'action:canvas:undo')?.onSelect();
+    expect(triggered).toEqual(['canvas:undo']);
   });
 });

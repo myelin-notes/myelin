@@ -2,9 +2,7 @@ export type { ActionBinding } from './handler';
 export { KeybindingHandler } from './handler';
 export {
   type Action,
-  type ActionDef,
   type ActionMap,
-  type ActionMeta,
   comboMatches,
   comboToPMKey,
   formatKeyCombo,
