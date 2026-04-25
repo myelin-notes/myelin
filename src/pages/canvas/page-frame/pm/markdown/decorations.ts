@@ -8,6 +8,7 @@ const INLINE_CLASS_BY_KIND: Record<InlinePreviewKind, string> = {
   bold: 'pm-md-bold',
   italic: 'pm-md-italic',
   inlineCode: 'pm-md-inline-code',
+  noteLink: 'pm-md-note-link',
 };
 
 interface TextOffsetMap {
@@ -48,7 +49,7 @@ function addInlineDecorations(
   decorations: Decoration[],
 ): void {
   const { text, posAt } = buildTextOffsetMap(node, pos);
-  if (!text.includes('`') && !text.includes('*')) {
+  if (!text.includes('`') && !text.includes('*') && !text.includes('[')) {
     return;
   }
 
