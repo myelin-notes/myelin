@@ -92,12 +92,12 @@ function CanvasViewInner() {
     [drawableCanvasRef, repository],
   );
   useEffect(() => {
-    if (!engine.noteSession) {
+    if (!engine.ready) {
       return;
     }
 
     return registerHandlers({ importMarkdownFile });
-  }, [engine.noteSession, importMarkdownFile, registerHandlers]);
+  }, [engine.ready, importMarkdownFile, registerHandlers]);
 
   const activeEditorView =
     engine.editingElement?.type === ElementType.PAGE_FRAME
@@ -158,7 +158,9 @@ function CanvasViewInner() {
       />
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
-      {IS_DEV && <PeerSyncPanel session={engine.noteSession} />}
+      {IS_DEV && (
+        <PeerSyncPanel session={engine.noteSession} status={engine.status} />
+      )}
       <TitleBar fileName={engine.fileName} onBack={engine.back} />
 
       <CanvasToolbar

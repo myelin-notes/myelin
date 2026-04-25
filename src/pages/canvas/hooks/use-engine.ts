@@ -7,10 +7,13 @@ import { ElementType } from '@/pages/canvas/elements/element-type';
 import type { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
+import { useNavigate } from 'react-router-dom';
 import { useCanvasClipboard } from './use-clipboard';
+import { useDrawableCanvasViewState } from './use-drawable-canvas-view-state';
 import type { EmbedFilesFn } from './use-embed-files';
-import { useCanvasSessionLifecycle } from './use-session-lifecycle';
-import { useCanvasSessionPersistence } from './use-session-persistence';
+import { usePageCanvasBindings } from './use-page-canvas-bindings';
+import { useCanvasSessionController } from './use-session-controller';
+import { useCanvasSessionSaving } from './use-session-saving';
 import { useCanvasThumbnailProducer } from './use-thumbnail-producer';
 
 interface UseCanvasEngineArgs {
@@ -44,24 +47,34 @@ export function useCanvasEngine({
   onInsertEmbed,
   embedFiles,
 }: UseCanvasEngineArgs) {
-  const { noteSession, ydoc, zoomLevel, fps, fileName, editingElement } =
-    useCanvasSessionLifecycle({
-      id,
-      canvasRef,
-      bgCanvasRef,
-      overlayCanvasRef,
-      domOverlayRef,
-      wheelRef,
-      drawableCanvasRef,
-      canvasTools,
-      embedFiles,
-      onCanvasPointerDown,
-    });
-  const { back } = useCanvasSessionPersistence({
-    id,
-    noteSession,
+  const navigate = useNavigate();
+
+  usePageCanvasBindings({
+    canvasRef,
+    wheelRef,
+    onCanvasPointerDown,
+    embedFiles,
   });
-  useCanvasThumbnailProducer({ id, canvasRef });
+  useCanvasThumbnailProducer({
+    id,
+    canvasRef,
+  });
+
+  const sessionController = useCanvasSessionController({
+    id,
+    canvasRef,
+    bgCanvasRef,
+    overlayCanvasRef,
+    domOverlayRef,
+    drawableCanvasRef,
+    canvasTools,
+  });
+  const canvasViewState = useDrawableCanvasViewState(drawableCanvasRef.current);
+  const saving = useCanvasSessionSaving({
+    noteId: id,
+    noteSession: sessionController.noteSession,
+  });
+
   useCanvasClipboard({
     id,
     drawableCanvasRef,
@@ -94,8 +107,10 @@ export function useCanvasEngine({
       action: 'canvas:select-all',
       onDown: (event) => {
         event.preventDefault();
-        if (editingElement?.type === ElementType.PAGE_FRAME) {
-          const view = (editingElement as PageFrameElement).pmEditor?.view;
+        if (canvasViewState.editingElement?.type === ElementType.PAGE_FRAME) {
+          const view = (
+            canvasViewState.editingElement as PageFrameElement
+          ).pmEditor?.view;
           if (view) {
             view.dispatch(
               view.state.tr.setSelection(new AllSelection(view.state.doc)),
@@ -124,12 +139,12 @@ export function useCanvasEngine({
 
   return {
     drawableCanvasRef,
-    noteSession,
-    ydoc,
-    zoomLevel,
-    fps,
-    fileName,
-    editingElement,
-    back,
+    ...canvasViewState,
+    ...sessionController,
+    ...saving,
+    back: async () => {
+      await saving.saveBeforeExit();
+      navigate('/library');
+    },
   };
 }

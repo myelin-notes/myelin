@@ -40,7 +40,7 @@ export async function importMarkdownFile({
     createdId = await repository.createFile(title, 'mcanvas', parentId);
     session = await repository.openSession(createdId);
     await addMarkdownPageFrameToYDoc(session.ydoc, markdown, { repository });
-    await session.push();
+    await session.save();
     await session.close();
     session = null;
 

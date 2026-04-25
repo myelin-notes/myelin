@@ -1,16 +1,20 @@
 import { useEffect } from 'react';
 import { registerThumbnailProducer } from '@/lib/thumbnails';
 
-interface Args {
+interface UseCanvasThumbnailProducerArgs {
   id: string | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 
-export function useCanvasThumbnailProducer({ id, canvasRef }: Args) {
+export function useCanvasThumbnailProducer({
+  id,
+  canvasRef,
+}: UseCanvasThumbnailProducerArgs) {
   useEffect(() => {
     if (id === undefined) {
       return;
     }
+
     return registerThumbnailProducer(id, {
       async render(maxSize) {
         const source = canvasRef.current;
@@ -20,7 +24,7 @@ export function useCanvasThumbnailProducer({ id, canvasRef }: Args) {
         return downscaleToBlob(source, maxSize);
       },
     });
-  }, [id, canvasRef]);
+  }, [canvasRef, id]);
 }
 
 async function downscaleToBlob(
@@ -29,30 +33,30 @@ async function downscaleToBlob(
 ): Promise<Blob | null> {
   const longest = Math.max(source.width, source.height);
   const scale = Math.min(1, maxSize / longest);
-  const w = Math.max(1, Math.round(source.width * scale));
-  const h = Math.max(1, Math.round(source.height * scale));
+  const width = Math.max(1, Math.round(source.width * scale));
+  const height = Math.max(1, Math.round(source.height * scale));
 
   if (typeof OffscreenCanvas !== 'undefined') {
-    const off = new OffscreenCanvas(w, h);
-    const ctx = off.getContext('2d');
-    if (ctx === null) {
+    const offscreen = new OffscreenCanvas(width, height);
+    const context = offscreen.getContext('2d');
+    if (context === null) {
       return null;
     }
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(source, 0, 0, w, h);
-    return await off.convertToBlob({ type: 'image/png' });
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(source, 0, 0, width, height);
+    return await offscreen.convertToBlob({ type: 'image/png' });
   }
 
-  const tmp = document.createElement('canvas');
-  tmp.width = w;
-  tmp.height = h;
-  const ctx = tmp.getContext('2d');
-  if (ctx === null) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (context === null) {
     return null;
   }
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(source, 0, 0, w, h);
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(source, 0, 0, width, height);
   return await new Promise<Blob | null>((resolve) => {
-    tmp.toBlob((blob) => resolve(blob), 'image/png');
+    canvas.toBlob((blob) => resolve(blob), 'image/png');
   });
 }

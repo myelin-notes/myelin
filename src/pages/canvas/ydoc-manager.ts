@@ -6,7 +6,9 @@ export const LOCAL_ORIGIN = 'local' as const;
 export type LocalOrigin = typeof LOCAL_ORIGIN;
 export const PEER_ORIGIN = 'remote-peer' as const;
 export type PeerOrigin = typeof PEER_ORIGIN;
-export type SyncOrigin = LocalOrigin | PeerOrigin;
+export const REPOSITORY_SYNC_ORIGIN = 'repository-sync' as const;
+export type RepositorySyncOrigin = typeof REPOSITORY_SYNC_ORIGIN;
+export type SyncOrigin = LocalOrigin | PeerOrigin | RepositorySyncOrigin;
 
 /**
  * Owns a Y.Doc for a single canvas file and provides typed access

@@ -1,0 +1,203 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const {
+  drawableCanvasCtor,
+  resolveNoteLinkIdByTitleMock,
+} = vi.hoisted(() => ({
+  drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
+    return {
+      elements: [{ id: 'existing-element' }],
+      setBackgroundCanvas: vi.fn(),
+      setOverlayCanvas: vi.fn(),
+      setDomOverlayHost: vi.fn(),
+      destroy: vi.fn(),
+    };
+  }),
+  resolveNoteLinkIdByTitleMock: vi.fn(),
+}));
+
+vi.mock('@/pages/canvas/drawable-canvas', () => ({
+  DrawableCanvas: drawableCanvasCtor,
+}));
+
+vi.mock('@/pages/canvas/elements/page-frame-element', () => ({
+  PageFrameElement: class PageFrameElement {},
+}));
+
+vi.mock('@/pages/canvas/page-frame/note-link-resolution', () => ({
+  resolveNoteLinkIdByTitle: resolveNoteLinkIdByTitleMock,
+}));
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function createSession(id: string) {
+  return {
+    id,
+    ydoc: { kind: `ydoc:${id}` },
+    subscribeStatus: vi.fn((listener) => {
+      listener({
+        phase: 'idle',
+        remoteRevision: null,
+        lastError: null,
+      });
+      return vi.fn();
+    }),
+    close: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe('CanvasSessionController', () => {
+  it('opens the latest note without waiting for a stale open to finish', async () => {
+    const { CanvasSessionController } = await import('./use-session-controller');
+    const noteAOpen = createDeferred<ReturnType<typeof createSession>>();
+    const noteBOpen = createDeferred<ReturnType<typeof createSession>>();
+    const noteASession = createSession('note-a');
+    const noteBSession = createSession('note-b');
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn((noteId: string) => {
+        if (noteId === 'note-a') {
+          return noteAOpen.promise;
+        }
+        if (noteId === 'note-b') {
+          return noteBOpen.promise;
+        }
+        throw new Error(`Unexpected note id: ${noteId}`);
+      }),
+      getNode: vi.fn(async (noteId: string) => ({
+        type: 'file',
+        name: `${noteId}.mcanvas`,
+      })),
+      searchNodes: vi.fn(),
+    };
+    const drawableCanvasRef = { current: null };
+    const controller = new CanvasSessionController(
+      repository as any,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      drawableCanvasRef as any,
+      { current: [] },
+    );
+
+    const openAPromise = controller.open('note-a');
+    await vi.waitFor(() =>
+      expect(repository.openSession).toHaveBeenCalledWith('note-a'),
+    );
+
+    const openBPromise = controller.open('note-b');
+    await vi.waitFor(() =>
+      expect(repository.openSession).toHaveBeenCalledWith('note-b'),
+    );
+
+    expect(repository.openSession).toHaveBeenNthCalledWith(2, 'note-b');
+
+    noteBOpen.resolve(noteBSession);
+    await openBPromise;
+
+    expect(controller.getSnapshot().noteSession).toBe(noteBSession);
+    expect(controller.getSnapshot().fileName).toBe('note-b.mcanvas');
+    expect(drawableCanvasCtor).toHaveBeenCalledTimes(1);
+    expect(drawableCanvasRef.current).toBe(drawableCanvasCtor.mock.results[0]?.value);
+
+    noteAOpen.resolve(noteASession);
+    await openAPromise;
+
+    expect(noteASession.close).toHaveBeenCalledTimes(1);
+    expect(controller.getSnapshot().noteSession).toBe(noteBSession);
+    expect(controller.getSnapshot().fileName).toBe('note-b.mcanvas');
+    expect(drawableCanvasCtor).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the note link resolver into DrawableCanvas', async () => {
+    const { CanvasSessionController } = await import('./use-session-controller');
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn().mockResolvedValue(createSession('note-1')),
+      getNode: vi.fn().mockResolvedValue(undefined),
+      searchNodes: vi.fn(),
+    };
+    const controller = new CanvasSessionController(
+      repository as any,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: [] },
+    );
+
+    resolveNoteLinkIdByTitleMock.mockResolvedValue('resolved-note-id');
+
+    await controller.open('note-1');
+
+    expect(drawableCanvasCtor).toHaveBeenCalledTimes(1);
+    const resolveNoteLinkId = drawableCanvasCtor.mock.calls[0]?.[3];
+    expect(resolveNoteLinkId).toEqual(expect.any(Function));
+
+    const resolved = await resolveNoteLinkId('Alpha Note');
+    expect(resolved).toBe('resolved-note-id');
+    expect(resolveNoteLinkIdByTitleMock).toHaveBeenCalledWith(
+      repository,
+      'Alpha Note',
+    );
+
+    await controller.dispose();
+  });
+
+  it('does not attach a late session after dispose', async () => {
+    const { CanvasSessionController } = await import('./use-session-controller');
+    const pendingOpen = createDeferred<ReturnType<typeof createSession>>();
+    const noteSession = createSession('note-1');
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn().mockReturnValue(pendingOpen.promise),
+      getNode: vi.fn(),
+      searchNodes: vi.fn(),
+    };
+    const drawableCanvasRef = { current: null };
+    const controller = new CanvasSessionController(
+      repository as any,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      drawableCanvasRef as any,
+      { current: [] },
+    );
+
+    const openPromise = controller.open('note-1');
+    await vi.waitFor(() =>
+      expect(repository.openSession).toHaveBeenCalledWith('note-1'),
+    );
+    const disposePromise = controller.dispose();
+
+    pendingOpen.resolve(noteSession);
+    await openPromise;
+    await disposePromise;
+
+    expect(noteSession.close).toHaveBeenCalledTimes(1);
+    expect(repository.getNode).not.toHaveBeenCalled();
+    expect(drawableCanvasCtor).not.toHaveBeenCalled();
+    expect(drawableCanvasRef.current).toBeNull();
+    expect(controller.getSnapshot()).toMatchObject({
+      noteSession: null,
+      ready: false,
+    });
+  });
+});

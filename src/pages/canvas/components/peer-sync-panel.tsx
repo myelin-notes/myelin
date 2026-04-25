@@ -6,6 +6,7 @@ import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import {
   type NoteSession,
+  type NoteSessionStatus,
   type PeerSnapshot,
   useRepositoryStatus,
 } from '@/lib/sync';
@@ -17,6 +18,7 @@ type Phase = 'idle' | 'hosting' | 'joining' | 'connected';
 
 interface PeerSyncPanelProps {
   session: NoteSession | null;
+  status: NoteSessionStatus | null;
 }
 
 function formatPeerId(peerId: string): string {
@@ -56,7 +58,7 @@ function getRepositorySyncLabel(
   return strings.canvas.peerSync.repositoryStatus.idle;
 }
 
-export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
+export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
   const strings = useMessages();
   const locale = useLocale();
   const repositoryStatus = useRepositoryStatus();
@@ -183,7 +185,9 @@ export function PeerSyncPanel({ session }: PeerSyncPanelProps) {
     : strings.common.none;
 
   const peerCount = peerSnapshot?.connectedPeers.length ?? 0;
-  const phaseLabel = strings.canvas.peerSync.sessionPhase[session.status.phase];
+  const phaseLabel = strings.canvas.peerSync.sessionPhase[
+    status?.phase ?? 'idle'
+  ];
   const syncStatus =
     phase === 'connected'
       ? strings.canvas.peerSync.sessionPhase.live(phaseLabel)
