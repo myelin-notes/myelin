@@ -13,7 +13,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "tauri": "tauri"
+    "tauri": "node ./scripts/tauri.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
