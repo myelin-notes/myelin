@@ -145,6 +145,10 @@ export function ExplorerTree({
   }, [reload, onTagsChanged]);
 
   const sortedNodes = useMemo(() => {
+    if (isSearching) {
+      return nodes;
+    }
+
     return [...nodes].sort((a, b) => {
       if (a.type !== b.type) {
         return a.type === 'folder' ? -1 : 1;
@@ -162,7 +166,7 @@ export function ExplorerTree({
           return 0;
       }
     });
-  }, [nodes, sortMode]);
+  }, [isSearching, nodes, sortMode]);
 
   const { dragOver, dropTargetProps } = useDropTarget({
     targetFolderId: currentFolderId,

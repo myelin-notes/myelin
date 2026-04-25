@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { searchItems } from '@/lib/search';
 import type {
   FileType,
   RepositoryStats,
@@ -194,12 +195,18 @@ export function getFolderChain(
 }
 
 export function searchNodes(manifest: VFSManifest, query: string): VFSNode[] {
-  const lowerQuery = query.toLowerCase();
-  return Object.values(manifest.nodes).filter(
-    (node) =>
-      node.name.toLowerCase().includes(lowerQuery) ||
-      node.tags.some((tag) => tag.toLowerCase().includes(lowerQuery)),
-  );
+  return searchItems(Object.values(manifest.nodes), query, {
+    getId: (node) => node.id,
+    fields: [
+      { name: 'name', weight: 4, getValue: (node) => node.name },
+      { name: 'tags', weight: 3, getValue: (node) => node.tags },
+      { name: 'kind', getValue: (node) => node.type },
+      {
+        name: 'fileType',
+        getValue: (node) => (node.type === 'file' ? node.fileType : ''),
+      },
+    ],
+  }).map((hit) => hit.item);
 }
 
 export function getNodesByAnyTag(

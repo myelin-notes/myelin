@@ -45,4 +45,8 @@ describe('filterCommandPaletteEntries', () => {
     ]);
     expect(filterCommandPaletteEntries(entries, 'create grid')).toEqual([]);
   });
+
+  it('supports fuzzy command matching', () => {
+    expect(filterCommandPaletteEntries(entries, 'layot')).toEqual([entries[1]]);
+  });
 });
