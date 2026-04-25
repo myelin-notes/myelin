@@ -370,6 +370,10 @@ export function buildResolvedNoteLinkTransaction(
   let changed = false;
 
   for (const target of collectDocumentNoteLinks(state.doc, schema)) {
+    if (target.noteId !== null) {
+      continue;
+    }
+
     const resolvedNoteId = noteIdsByTitle.get(target.title) ?? null;
     if (resolvedNoteId === target.noteId) {
       continue;

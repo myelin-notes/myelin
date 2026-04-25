@@ -17,12 +17,15 @@ import { InsertPopover } from './components/insert-popover';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
+import { ElementType } from './elements/element-type';
+import type { PageFrameElement } from './elements/page-frame-element';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
 import { useToolState } from './hooks/use-tool-state';
 import { markdownImportHandler } from './media/markdown';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
+import { useNoteLinkAutocomplete } from './page-frame/use-note-link-autocomplete';
 
 export function CanvasView() {
   return (
@@ -96,6 +99,15 @@ function CanvasViewInner() {
     return registerHandlers({ importMarkdownFile });
   }, [engine.noteSession, importMarkdownFile, registerHandlers]);
 
+  const activeEditorView =
+    engine.editingElement?.type === ElementType.PAGE_FRAME
+      ? ((engine.editingElement as PageFrameElement).pmEditor?.view ?? null)
+      : null;
+  const noteLinkAutocomplete = useNoteLinkAutocomplete({
+    repository,
+    view: activeEditorView,
+  });
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
       {/* Background canvas: dot grid */}
@@ -109,6 +121,8 @@ function CanvasViewInner() {
       <PageFrameDomLayer
         canvasRef={engine.drawableCanvasRef}
         editingElement={engine.editingElement}
+        autocompleteController={noteLinkAutocomplete.controller}
+        onAutocompleteSelect={noteLinkAutocomplete.onSelectItem}
       />
 
       {/* Element-owned DOM overlay (PDF pages, future DOM-rendered elements) */}
