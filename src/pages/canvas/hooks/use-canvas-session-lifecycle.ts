@@ -5,6 +5,7 @@ import { type NoteSession, useRepository } from '@/lib/sync';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { DrawableElement } from '@/pages/canvas/elements/drawable-element';
 import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
+import { resolveNoteLinkIdByTitle } from '@/pages/canvas/page-frame/note-link-resolution';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 
@@ -213,7 +214,12 @@ export function useCanvasSessionLifecycle({
         }
         setFileName(currentNode?.type === 'file' ? currentNode.name : '');
 
-        const dc = new DrawableCanvas(canvas, session.ydoc, canvasTools);
+        const dc = new DrawableCanvas(
+          canvas,
+          session.ydoc,
+          canvasTools,
+          async (title) => resolveNoteLinkIdByTitle(repository, title),
+        );
         drawableCanvasRef.current = dc;
 
         if (bgCanvasRef.current) {

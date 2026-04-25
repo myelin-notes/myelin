@@ -131,7 +131,9 @@ function serializeInline(node: PMNode): string {
     if (child.isText) {
       closeMarks(child.marks);
       openMarks(child.marks);
-      out += escapeMarkdown(child.text ?? '');
+      out += child.marks.some((mark) => mark.type.name === 'noteLink')
+        ? child.text ?? ''
+        : escapeMarkdown(child.text ?? '');
     } else {
       closeMarks([]);
       out += renderInlineAtom(child);

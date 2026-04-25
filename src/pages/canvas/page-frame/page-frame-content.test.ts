@@ -5,6 +5,7 @@ import {
 } from 'y-prosemirror';
 import { parseMarkdownToDoc } from './markdown-parser';
 import { serializeDocToMarkdown } from './markdown-serializer';
+import { normalizeAndResolveNoteLinksDoc } from './pm/markdown/note-links';
 import { schema } from './pm/schema';
 
 describe('page-frame content shape', () => {
@@ -100,6 +101,56 @@ describe('page-frame content shape', () => {
         ]),
       }),
     );
+  });
+
+  it('resolves note links to note ids in the ProseMirror state and markdown export', async () => {
+    const markdown = 'See [[Alpha Note]] and [[Missing Note]].';
+    const doc = await normalizeAndResolveNoteLinksDoc(
+      parseMarkdownToDoc(markdown, schema),
+      schema,
+      async (title) => (title === 'Alpha Note' ? 'note-1' : null),
+    );
+    const ydoc = prosemirrorToYDoc(doc, 'page-frame');
+    const roundTripped = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment('page-frame'),
+      schema,
+    );
+
+    expect(doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'See ' },
+            {
+              type: 'text',
+              text: '[[Alpha Note]]',
+              marks: [
+                {
+                  type: 'noteLink',
+                  attrs: { title: 'Alpha Note', noteId: 'note-1' },
+                },
+              ],
+            },
+            { type: 'text', text: ' and ' },
+            {
+              type: 'text',
+              text: '[[Missing Note]]',
+              marks: [
+                {
+                  type: 'noteLink',
+                  attrs: { title: 'Missing Note', noteId: null },
+                },
+              ],
+            },
+            { type: 'text', text: '.' },
+          ],
+        },
+      ],
+    });
+    expect(roundTripped.toJSON()).toEqual(doc.toJSON());
+    expect(serializeDocToMarkdown(roundTripped)).toBe(`${markdown}\n`);
   });
 
   it('round-trips triple-asterisk bold italics through page-frame markdown', () => {

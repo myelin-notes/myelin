@@ -1,9 +1,15 @@
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
+import type { Node as PMNode } from 'prosemirror-model';
 import type * as Y from 'yjs';
 import { ElementType } from '../elements/element-type';
 import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
 import type { YDocManager } from '../ydoc-manager';
+import {
+  type NoteLinkSearchSource,
+  resolveNoteLinkIdByTitle,
+} from './note-link-resolution';
 import { parseMarkdownToDoc } from './markdown-parser';
+import { normalizeAndResolveNoteLinksDoc } from './pm/markdown/note-links';
 import { schema } from './pm/schema';
 
 export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
@@ -11,27 +17,59 @@ export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
   y: 80,
 } as const;
 
-interface AddMarkdownPageFrameOptions {
+interface MarkdownPageFrameImportOptions {
+  repository?: NoteLinkSearchSource;
+}
+
+interface AddMarkdownPageFrameOptions extends MarkdownPageFrameImportOptions {
   offsetX?: number;
   offsetY?: number;
 }
 
-export function writeMarkdownToPageFrameFragment(
+async function buildMarkdownPageFrameDoc(
   markdown: string,
-  fragment: Y.XmlFragment,
-): void {
+  options: MarkdownPageFrameImportOptions = {},
+): Promise<PMNode> {
   const doc = parseMarkdownToDoc(markdown, schema);
+  const repository = options.repository;
+  const resolveNoteLinkId = repository
+    ? async (title: string) => resolveNoteLinkIdByTitle(repository, title)
+    : undefined;
+  return normalizeAndResolveNoteLinksDoc(doc, schema, resolveNoteLinkId);
+}
+
+function replacePageFrameFragmentDoc(
+  fragment: Y.XmlFragment,
+  doc: PMNode,
+): void {
   if (fragment.length > 0) {
     fragment.delete(0, fragment.length);
   }
   prosemirrorToYXmlFragment(doc, fragment);
 }
 
-export function addMarkdownPageFrameToYDoc(
+export async function writeMarkdownToPageFrameFragment(
+  markdown: string,
+  fragment: Y.XmlFragment,
+  options: MarkdownPageFrameImportOptions = {},
+): Promise<void> {
+  const doc = await buildMarkdownPageFrameDoc(markdown, options);
+  const ydoc = fragment.doc;
+  if (ydoc) {
+    ydoc.transact(() => {
+      replacePageFrameFragmentDoc(fragment, doc);
+    });
+    return;
+  }
+  replacePageFrameFragmentDoc(fragment, doc);
+}
+
+export async function addMarkdownPageFrameToYDoc(
   ydoc: YDocManager,
   markdown: string,
   options: AddMarkdownPageFrameOptions = {},
-): number {
+): Promise<number> {
+  const doc = await buildMarkdownPageFrameDoc(markdown, options);
   const index = ydoc.nextIndex;
   ydoc.insertElementMap(0, ElementType.PAGE_FRAME, index, {
     offsetX: options.offsetX ?? DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET.x,
@@ -44,7 +82,7 @@ export function addMarkdownPageFrameToYDoc(
 
   const fragment = ydoc.getXmlFragment(index);
   ydoc.transact(() => {
-    writeMarkdownToPageFrameFragment(markdown, fragment);
+    replacePageFrameFragmentDoc(fragment, doc);
     ydoc.nextIndex = Math.max(ydoc.nextIndex, index + 1);
   });
 

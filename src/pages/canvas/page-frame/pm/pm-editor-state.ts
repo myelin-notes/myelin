@@ -3,6 +3,7 @@ import { EditorView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import { CODE_BLOCK_CLEAR_SELECTION_EVENT } from './code-block-selection-sync';
 import { PM_UPDATE_EVENT } from './constants';
+import type { ResolveNoteLinkId } from './markdown/note-links';
 import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
@@ -20,7 +21,10 @@ export class PageFrameEditorState {
   private _view: EditorView | null = null;
   private _editable = false;
 
-  constructor(private readonly _yXmlFragment: Y.XmlFragment) {}
+  constructor(
+    private readonly _yXmlFragment: Y.XmlFragment,
+    private readonly _resolveNoteLinkId?: ResolveNoteLinkId,
+  ) {}
 
   get view(): EditorView | null {
     return this._view;
@@ -55,7 +59,11 @@ export class PageFrameEditorState {
 
     const state = EditorState.create({
       schema,
-      plugins: buildPlugins(this._yXmlFragment, onPageCount),
+      plugins: buildPlugins(
+        this._yXmlFragment,
+        onPageCount,
+        this._resolveNoteLinkId,
+      ),
     });
 
     this._editable = false;
