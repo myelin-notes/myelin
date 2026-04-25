@@ -2,11 +2,7 @@ export const MARKDOWN_ATOM_CHAR = '\uFFFC';
 
 export type BlockPrefixMatch = 'h1' | 'h2' | 'h3' | 'blockquote';
 
-export type InlinePreviewKind =
-  | 'bold'
-  | 'italic'
-  | 'inlineCode'
-  | 'noteLink';
+export type InlinePreviewKind = 'bold' | 'italic' | 'inlineCode' | 'noteLink';
 
 export interface DelimiterRange {
   from: number;

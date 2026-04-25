@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { ElementType } from '@/pages/canvas/elements/element-type';
+import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { NoteSession } from './session';
 import type {
   YjsSyncPushOptions,

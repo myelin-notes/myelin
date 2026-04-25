@@ -1,14 +1,14 @@
-import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type { Node as PMNode } from 'prosemirror-model';
+import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { ElementType } from '../elements/element-type';
 import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
 import type { YDocManager } from '../ydoc-manager';
+import { parseMarkdownToDoc } from './markdown-parser';
 import {
   type NoteLinkSearchSource,
   resolveNoteLinkIdByTitle,
 } from './note-link-resolution';
-import { parseMarkdownToDoc } from './markdown-parser';
 import { normalizeAndResolveNoteLinksDoc } from './pm/markdown/note-links';
 import { schema } from './pm/schema';
 

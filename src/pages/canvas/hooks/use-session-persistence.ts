@@ -31,34 +31,37 @@ export function useCanvasSessionPersistence({
     noteSessionRef.current = noteSession;
   }, [noteSession]);
 
-  const persistSession = useCallback(async (session: NoteSession) => {
-    if (persistPromiseRef.current) {
-      await persistPromiseRef.current;
-    }
-
-    if (!session.hasUnsyncedChanges()) {
-      return;
-    }
-
-    logger.debug('Persisting canvas session', {
-      id,
-      remoteRevision: session.status.remoteRevision,
-      ...summarizeYDocManager(session.ydoc),
-    });
-    const persistPromise = session.push().finally(() => {
-      if (persistPromiseRef.current === persistPromise) {
-        persistPromiseRef.current = null;
+  const persistSession = useCallback(
+    async (session: NoteSession) => {
+      if (persistPromiseRef.current) {
+        await persistPromiseRef.current;
       }
-    });
 
-    persistPromiseRef.current = persistPromise;
-    await persistPromise;
-    logger.debug('Persisted canvas session', {
-      id,
-      remoteRevision: session.status.remoteRevision,
-      ...summarizeYDocManager(session.ydoc),
-    });
-  }, [id]);
+      if (!session.hasUnsyncedChanges()) {
+        return;
+      }
+
+      logger.debug('Persisting canvas session', {
+        id,
+        remoteRevision: session.status.remoteRevision,
+        ...summarizeYDocManager(session.ydoc),
+      });
+      const persistPromise = session.push().finally(() => {
+        if (persistPromiseRef.current === persistPromise) {
+          persistPromiseRef.current = null;
+        }
+      });
+
+      persistPromiseRef.current = persistPromise;
+      await persistPromise;
+      logger.debug('Persisted canvas session', {
+        id,
+        remoteRevision: session.status.remoteRevision,
+        ...summarizeYDocManager(session.ydoc),
+      });
+    },
+    [id],
+  );
 
   const scheduleLocalPersist = useCallback(() => {
     if (persistTimerRef.current !== null) {

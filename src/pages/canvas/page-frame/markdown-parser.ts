@@ -10,10 +10,7 @@
 
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
 
-export function parseMarkdownToDoc(
-  md: string,
-  schema: Schema,
-): PMNode {
+export function parseMarkdownToDoc(md: string, schema: Schema): PMNode {
   const blocks = parseBlocks(md.replace(/\r\n/g, '\n'));
   return buildDoc(blocks, schema);
 }
@@ -165,10 +162,7 @@ function parseBlocks(md: string): BlockToken[] {
 
 // -- Inline parser -------------------------------------------------------
 
-function parseInline(
-  text: string,
-  schema: Schema,
-): PMNode[] {
+function parseInline(text: string, schema: Schema): PMNode[] {
   return scanInline(text, schema, []);
 }
 
@@ -384,10 +378,7 @@ function scanInline(
 
 // -- Assembly ------------------------------------------------------------
 
-function buildDoc(
-  blocks: BlockToken[],
-  schema: Schema,
-): PMNode {
+function buildDoc(blocks: BlockToken[], schema: Schema): PMNode {
   const nodes: PMNode[] = [];
   for (const block of blocks) {
     const node = blockToNode(block, schema);
@@ -401,10 +392,7 @@ function buildDoc(
   return schema.nodes.doc.create(null, nodes);
 }
 
-function blockToNode(
-  block: BlockToken,
-  schema: Schema,
-): PMNode | null {
+function blockToNode(block: BlockToken, schema: Schema): PMNode | null {
   switch (block.type) {
     case 'heading':
       return schema.nodes.heading.create(

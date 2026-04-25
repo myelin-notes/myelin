@@ -7,8 +7,8 @@ import {
   fenceMarkdownNormalizationPlugin,
 } from './markdown/fence-commands';
 import {
-  type ResolveNoteLinkId,
   noteLinkMarkdownPlugin,
+  type ResolveNoteLinkId,
 } from './markdown/note-links';
 import { markdownPreviewPlugin } from './markdown/plugin';
 import { prefixMarkdownInputRules } from './markdown/prefix-rules';

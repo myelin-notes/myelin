@@ -420,14 +420,17 @@ export abstract class BaseRepository
     });
 
     if (options.baseRevision !== remote.revision) {
-      logger.debug('Rejected repository document push because revision changed', {
-        repositoryKind: this.kind,
-        nodeId,
-        baseRevision: options.baseRevision,
-        remoteRevision: remote.revision,
-        remoteStateVectorByteLength: remote.stateVector.byteLength,
-        ...summarizeYDoc(remote.doc),
-      });
+      logger.debug(
+        'Rejected repository document push because revision changed',
+        {
+          repositoryKind: this.kind,
+          nodeId,
+          baseRevision: options.baseRevision,
+          remoteRevision: remote.revision,
+          remoteStateVectorByteLength: remote.stateVector.byteLength,
+          ...summarizeYDoc(remote.doc),
+        },
+      );
       return {
         accepted: false,
         remoteUpdate: options.localStateVector

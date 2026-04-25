@@ -20,7 +20,9 @@ function createEditorState(doc = schema.nodes.doc.createAndFill()!) {
 describe('noteLinkMarkdownPlugin', () => {
   it('adds note-link metadata when raw note-link markdown is typed', () => {
     const state = createEditorState();
-    const result = state.applyTransaction(state.tr.insertText('[[Alpha Note]]', 1));
+    const result = state.applyTransaction(
+      state.tr.insertText('[[Alpha Note]]', 1),
+    );
 
     expect(result.state.doc.toJSON()).toEqual({
       type: 'doc',
@@ -45,10 +47,10 @@ describe('noteLinkMarkdownPlugin', () => {
   });
 
   it('updates note-link title metadata when typed title changes', () => {
-    const state = createEditorState(parseMarkdownToDoc('[[Alpha Note]]', schema));
-    const result = state.applyTransaction(
-      state.tr.insertText(' Revised', 13),
+    const state = createEditorState(
+      parseMarkdownToDoc('[[Alpha Note]]', schema),
     );
+    const result = state.applyTransaction(state.tr.insertText(' Revised', 13));
 
     expect(result.state.doc.toJSON()).toEqual({
       type: 'doc',
@@ -73,7 +75,9 @@ describe('noteLinkMarkdownPlugin', () => {
   });
 
   it('updates note ids from resolved title matches', () => {
-    const state = createEditorState(parseMarkdownToDoc('[[Alpha Note]]', schema));
+    const state = createEditorState(
+      parseMarkdownToDoc('[[Alpha Note]]', schema),
+    );
     const tr = buildResolvedNoteLinkTransaction(
       state,
       schema,

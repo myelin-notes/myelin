@@ -8,10 +8,10 @@ import type { PageFrameElement } from '@/pages/canvas/elements/page-frame-elemen
 import type { ITool } from '@/pages/canvas/tools/tool';
 import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
 import { useCanvasClipboard } from './use-clipboard';
+import type { EmbedFilesFn } from './use-embed-files';
 import { useCanvasSessionLifecycle } from './use-session-lifecycle';
 import { useCanvasSessionPersistence } from './use-session-persistence';
 import { useCanvasThumbnailProducer } from './use-thumbnail-producer';
-import type { EmbedFilesFn } from './use-embed-files';
 
 interface UseCanvasEngineArgs {
   id: string | undefined;

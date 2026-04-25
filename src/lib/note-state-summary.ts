@@ -42,7 +42,10 @@ function appendIndexSample(samples: number[], index: number | null): void {
 
 function summarizeElements(
   elementCount: number,
-  readElement: (position: number) => { index: number | null; type: number | null },
+  readElement: (position: number) => {
+    index: number | null;
+    type: number | null;
+  },
 ) {
   const counts = createEmptyCounts();
   const sampledElements: ElementDescriptor[] = [];

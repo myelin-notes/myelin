@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
 import type { NavigateFunction } from 'react-router-dom';
+import { describe, expect, it, vi } from 'vitest';
 import { getNotePath, openNote } from './note-navigation';
 
 describe('note navigation', () => {

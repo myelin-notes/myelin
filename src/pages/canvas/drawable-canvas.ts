@@ -15,13 +15,13 @@ import {
 } from './elements/element-factories';
 import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
+import type { ResolveNoteLinkId } from './page-frame/pm/markdown/note-links';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
 import type { ITool } from './tools/tool';
-import type { ResolveNoteLinkId } from './page-frame/pm/markdown/note-links';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type Vector2 = { x: number; y: number };

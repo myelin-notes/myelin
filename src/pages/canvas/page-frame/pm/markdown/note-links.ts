@@ -2,11 +2,11 @@ import type { MarkType, Node as PMNode, Schema } from 'prosemirror-model';
 import { EditorState, Plugin } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { PM_ADD_TO_HISTORY } from '../constants';
+import { parseInlineMarkdown } from './parse-inline';
 import {
   collectAffectedTextblocks,
   getChangedRangesForTransactions,
 } from './range-tracking';
-import { parseInlineMarkdown } from './parse-inline';
 import { MARKDOWN_ATOM_CHAR } from './types';
 
 export type ResolveNoteLinkId = (title: string) => Promise<string | null>;
@@ -48,15 +48,15 @@ function hasClosest(value: unknown): value is NoteLinkElementLike {
   );
 }
 
-function findNoteLinkElement(target: EventTarget | null): NoteLinkElementLike | null {
+function findNoteLinkElement(
+  target: EventTarget | null,
+): NoteLinkElementLike | null {
   if (hasClosest(target)) {
     return target.closest(NOTE_LINK_SELECTOR);
   }
 
   const parentElement =
-    typeof target === 'object' &&
-    target !== null &&
-    'parentElement' in target
+    typeof target === 'object' && target !== null && 'parentElement' in target
       ? (target as { parentElement?: unknown }).parentElement
       : null;
   if (hasClosest(parentElement)) {
@@ -144,7 +144,9 @@ function collectExistingNoteLinkIds(
       return;
     }
 
-    const mark = child.marks.find((candidate) => candidate.type === noteLinkType);
+    const mark = child.marks.find(
+      (candidate) => candidate.type === noteLinkType,
+    );
     if (!mark) {
       return;
     }
@@ -174,8 +176,8 @@ function collectNoteLinkTargets(
   }
 
   const existingIds = collectExistingNoteLinkIds(node, noteLinkType);
-  return parseInlineMarkdown(text).ranges
-    .filter((range) => range.kind === 'noteLink')
+  return parseInlineMarkdown(text)
+    .ranges.filter((range) => range.kind === 'noteLink')
     .map((range) => {
       const title = text.slice(range.contentFrom, range.contentTo);
       return {
@@ -260,9 +262,10 @@ function collectNormalizableTextblocks(
 export function buildNormalizedNoteLinkTransaction(
   state: EditorState,
   schema: Schema,
-  changedTargets: Array<{ pos: number; node: PMNode }> = collectNormalizableTextblocks(
-    state.doc,
-  ),
+  changedTargets: Array<{
+    pos: number;
+    node: PMNode;
+  }> = collectNormalizableTextblocks(state.doc),
 ) {
   const noteLinkType = schema.marks.noteLink;
   if (!noteLinkType) {
