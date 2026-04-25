@@ -7,10 +7,10 @@ import { ElementType } from '@/pages/canvas/elements/element-type';
 import type { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
-import { useCanvasClipboard } from './use-canvas-clipboard';
-import { useCanvasSessionLifecycle } from './use-canvas-session-lifecycle';
-import { useCanvasSessionPersistence } from './use-canvas-session-persistence';
-import { useCanvasThumbnailProducer } from './use-canvas-thumbnail-producer';
+import { useCanvasClipboard } from './use-clipboard';
+import { useCanvasSessionLifecycle } from './use-session-lifecycle';
+import { useCanvasSessionPersistence } from './use-session-persistence';
+import { useCanvasThumbnailProducer } from './use-thumbnail-producer';
 import type { EmbedFilesFn } from './use-embed-files';
 
 interface UseCanvasEngineArgs {
