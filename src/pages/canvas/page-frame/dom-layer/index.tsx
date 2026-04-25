@@ -10,6 +10,11 @@ import {
   PAGE_PADDING,
   type PageFrameElement,
 } from '../../elements/page-frame-element';
+import type {
+  PageFrameAutocompleteController,
+  PageFrameAutocompleteItem,
+} from '../pm/autocomplete';
+import { PageFrameAutocompletePopup } from '../pm/autocomplete-popup';
 import { PM_EDITOR_CLASS, PM_UPDATE_EVENT } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 
@@ -140,11 +145,15 @@ function shouldPreserveExternalFocus(target: EventTarget | null): boolean {
 interface PageFrameDomLayerProps {
   canvasRef: React.RefObject<DrawableCanvas | null>;
   editingElement: DrawableElement | null;
+  autocompleteController?: PageFrameAutocompleteController | null;
+  onAutocompleteSelect?: (item: PageFrameAutocompleteItem) => void;
 }
 
 export function PageFrameDomLayer({
   canvasRef,
   editingElement: rawEditingElement,
+  autocompleteController = null,
+  onAutocompleteSelect,
 }: PageFrameDomLayerProps) {
   const editingElement =
     rawEditingElement?.type === ElementType.PAGE_FRAME
@@ -359,6 +368,13 @@ export function PageFrameDomLayer({
         }}
       />
       {activeView && <FloatingToolbar view={activeView} />}
+      {activeView && autocompleteController && (
+        <PageFrameAutocompletePopup
+          controller={autocompleteController}
+          view={activeView}
+          onSelectItem={onAutocompleteSelect}
+        />
+      )}
     </>
   );
 }
