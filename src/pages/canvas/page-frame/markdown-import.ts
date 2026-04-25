@@ -6,7 +6,7 @@ import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
 import type { YDocManager } from '../ydoc-manager';
 import { parseMarkdownToDoc } from './markdown-parser';
 import {
-  type NoteLinkSearchSource,
+  type NoteLinkResolveSource,
   resolveNoteLinkIdByTitle,
 } from './note-link-resolution';
 import { normalizeAndResolveNoteLinksDoc } from './pm/markdown/note-links';
@@ -18,7 +18,7 @@ export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
 } as const;
 
 interface MarkdownPageFrameImportOptions {
-  repository?: NoteLinkSearchSource;
+  repository?: NoteLinkResolveSource;
 }
 
 interface AddMarkdownPageFrameOptions extends MarkdownPageFrameImportOptions {
