@@ -17,6 +17,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
+import { openNote } from '@/lib/note-navigation';
 import {
   useRepository,
   type VFSFileNode,
@@ -274,7 +275,7 @@ export function LibraryPage() {
                       title={file.name}
                       tags={file.tags}
                       featured={i === 0}
-                      onClick={() => navigate(`/${file.fileType}/${file.id}`)}
+                      onClick={() => openNote(navigate, file)}
                     />
                   </motion.div>
                 ))}

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { IS_DEV } from '@/lib/env';
+import { openNote } from '@/lib/note-navigation';
 import { useRepository, type VFSFileNode } from '@/lib/sync';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
@@ -42,7 +43,7 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
               draggable={!renaming}
               onClick={() => {
                 if (!renaming) {
-                  navigate(`/${file.fileType}/${file.id}`);
+                  openNote(navigate, file);
                 }
               }}
               onDragStart={handleDragStart}

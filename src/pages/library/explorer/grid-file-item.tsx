@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { IS_DEV } from '@/lib/env';
+import { openNote } from '@/lib/note-navigation';
 import { useRepository, type VFSFileNode } from '@/lib/sync';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
@@ -58,7 +59,7 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
               draggable={!renaming}
               onClick={() => {
                 if (!renaming) {
-                  navigate(`/${file.fileType}/${file.id}`);
+                  openNote(navigate, file);
                 }
               }}
               onDragStart={handleDragStart}

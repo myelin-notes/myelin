@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FileText } from 'lucide-react';
+import type { NavigateFunction } from 'react-router-dom';
 import type { Messages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
+import { openNote } from '@/lib/note-navigation';
 import type { Repository, VFSFileNode, VFSNode } from '@/lib/sync';
 import type { CommandPaletteItem, CommandPaletteModeState } from './types';
 import { filterCommandPaletteEntries } from './utils';
@@ -47,7 +49,7 @@ export function useNotesMode({
 }: {
   active: boolean;
   closePalette: () => void;
-  navigate: (path: string) => void;
+  navigate: NavigateFunction;
   query: string;
   repository: Repository;
   strings: Messages;
@@ -110,7 +112,7 @@ export function useNotesMode({
       icon: FileText,
       onSelect: () => {
         closePalette();
-        navigate(`/${note.fileType}/${note.id}`);
+        openNote(navigate, note);
       },
     }));
   }, [
