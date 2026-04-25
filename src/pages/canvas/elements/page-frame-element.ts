@@ -9,6 +9,7 @@ import { UserPrefs } from '@/lib/user-prefs';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
+import type { ResolveNoteLinkId as NoteLinkIdResolver } from '../page-frame/pm/markdown/note-links';
 import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
@@ -44,6 +45,7 @@ export class PageFrameElement extends DrawableElement {
   private _pageHeight = PAGE_HEIGHT;
   private _editing = false;
   private _numPages = 1;
+  private _noteLinkIdResolver?: NoteLinkIdResolver;
 
   /** Set externally by DrawableCanvas after binding to Y.Doc. */
   private _yXmlFragment: Y.XmlFragment | null = null;
@@ -66,6 +68,10 @@ export class PageFrameElement extends DrawableElement {
 
   constructor(index: number) {
     super(index, ElementType.PAGE_FRAME);
+  }
+
+  public setNoteLinkResolver(resolveNoteLinkId?: NoteLinkIdResolver): void {
+    this._noteLinkIdResolver = resolveNoteLinkId;
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -118,7 +124,10 @@ export class PageFrameElement extends DrawableElement {
   /** Bind Yjs shared types. Must be called after bindToYMap. */
   private bindYProseMirror(yXmlFragment: Y.XmlFragment): void {
     this._yXmlFragment = yXmlFragment;
-    this.pmEditor = new PageFrameEditorState(yXmlFragment);
+    this.pmEditor = new PageFrameEditorState(
+      yXmlFragment,
+      this._noteLinkIdResolver,
+    );
   }
 
   public get yXmlFragment(): Y.XmlFragment | null {

@@ -563,14 +563,79 @@ input[type="range"].tool-slider::-moz-range-track {
   font-style: italic;
 }
 
-.pm-editor .ProseMirror .pm-md-inline-code {
-  padding: 0.02em 0.22em;
+.pm-editor .ProseMirror .pm-md-inline-code,
+.pm-editor .ProseMirror .pm-md-note-link {
+  position: relative;
+  z-index: 0;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code::before,
+.pm-editor .ProseMirror .pm-md-note-link::before {
+  content: "";
+  position: absolute;
+  inset-block: -0.08em;
+  pointer-events: none;
   border-radius: 0.35rem;
-  background: rgba(28, 39, 56, 0.08);
+  z-index: -1;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code {
+  border-radius: 0.35rem;
   font-family:
     "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
     "Source Code Pro", Menlo, Consolas, monospace;
-  font-size: 0.94em;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code::before {
+  inset-inline: -0.22em;
+  background: rgba(28, 39, 56, 0.08);
+}
+
+.pm-editor .ProseMirror .pm-md-note-link {
+  color: var(--accent-dark);
+  border-radius: 0.35rem;
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--accent-dark) 45%,
+    transparent
+  );
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+.pm-editor .ProseMirror .pm-md-note-link::before {
+  inset-inline: -0.14em;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code.pm-selection::before,
+.pm-editor .ProseMirror .pm-md-note-link.pm-selection::before,
+.pm-editor .ProseMirror .pm-selection .pm-md-inline-code::before,
+.pm-editor .ProseMirror .pm-selection .pm-md-note-link::before,
+.pm-editor .ProseMirror .pm-md-inline-code:has(.pm-selection)::before,
+.pm-editor .ProseMirror .pm-md-note-link:has(.pm-selection)::before {
+  opacity: 0;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code.pm-selection,
+.pm-editor .ProseMirror .pm-md-note-link.pm-selection,
+.pm-editor .ProseMirror .pm-selection .pm-md-inline-code,
+.pm-editor .ProseMirror .pm-selection .pm-md-note-link,
+.pm-editor .ProseMirror .pm-md-inline-code:has(.pm-selection),
+.pm-editor .ProseMirror .pm-md-note-link:has(.pm-selection),
+.pm-editor .ProseMirror .pm-md-inline-code .pm-selection,
+.pm-editor .ProseMirror .pm-md-note-link .pm-selection {
+  border-radius: 0;
+  color: HighlightText;
+}
+
+.pm-editor .ProseMirror .pm-md-note-link.pm-selection,
+.pm-editor .ProseMirror .pm-selection .pm-md-note-link,
+.pm-editor .ProseMirror .pm-md-note-link .pm-selection {
+  text-decoration-color: currentColor;
 }
 
 .pm-editor .ProseMirror .pm-md-code-fence {

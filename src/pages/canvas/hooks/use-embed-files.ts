@@ -1,6 +1,7 @@
 import { type RefObject, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useMessages } from '@/lib/i18n';
+import { useRepository } from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { SUPPORTED_MEDIA } from '../media';
 
@@ -14,6 +15,7 @@ export function useEmbedFiles(
   drawableCanvasRef: RefObject<DrawableCanvas | null>,
 ): EmbedFilesFn {
   const messages = useMessages();
+  const repository = useRepository();
 
   return useCallback(
     (files, screenX, screenY) => {
@@ -30,10 +32,10 @@ export function useEmbedFiles(
             ),
           });
         } else {
-          handler(file, dc, screenX, screenY);
+          handler(file, dc, { repository, screenX, screenY });
         }
       }
     },
-    [drawableCanvasRef, messages],
+    [drawableCanvasRef, messages, repository],
   );
 }

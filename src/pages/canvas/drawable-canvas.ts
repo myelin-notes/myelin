@@ -14,12 +14,14 @@ import {
   type ElementFactory,
 } from './elements/element-factories';
 import { ElementType } from './elements/element-type';
+import { PageFrameElement } from './elements/page-frame-element';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
 import type { ITool } from './tools/tool';
+import type { ResolveNoteLinkId } from './page-frame/pm/markdown/note-links';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type Vector2 = { x: number; y: number };
@@ -60,6 +62,7 @@ export class DrawableCanvas {
   private _yMapToElement = new Map<Y.Map<unknown>, DrawableElement>();
   private _toolCursor: string = 'default';
   private toolSelected: ITool;
+  private readonly resolveNoteLinkId?: ResolveNoteLinkId;
 
   private onElementEdit?: (element: DrawableElement | null) => void;
 
@@ -83,6 +86,7 @@ export class DrawableCanvas {
     canvas: HTMLCanvasElement,
     ydoc: YDocManager,
     tools?: ITool[],
+    resolveNoteLinkId?: ResolveNoteLinkId,
   ) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {
@@ -97,6 +101,7 @@ export class DrawableCanvas {
     this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
     this._ydoc = ydoc;
+    this.resolveNoteLinkId = resolveNoteLinkId;
 
     this.initEventListeners(canvas);
     this.initStates();
@@ -169,6 +174,9 @@ export class DrawableCanvas {
     }
 
     const element = factory(index);
+    if (element instanceof PageFrameElement) {
+      element.setNoteLinkResolver(this.resolveNoteLinkId);
+    }
     element.bindToYMap(yMap);
     this.bindElementSharedYState(element);
     return element;
@@ -645,6 +653,9 @@ export class DrawableCanvas {
   public addElement<T extends DrawableElement>(factory: (i: number) => T): T {
     const index = this._ydoc.nextIndex;
     const element = factory(index);
+    if (element instanceof PageFrameElement) {
+      element.setNoteLinkResolver(this.resolveNoteLinkId);
+    }
 
     // Build the Y.Map properties from the element's current state
     const props: Record<string, unknown> = {

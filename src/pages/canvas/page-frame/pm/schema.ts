@@ -275,6 +275,32 @@ const textColor: MarkSpec = {
   ],
 };
 
+const noteLink: MarkSpec = {
+  attrs: { title: {}, noteId: { default: null } },
+  inclusive: false,
+  toDOM(mark) {
+    const attrs: Record<string, string> = {
+      'data-note-link-title': mark.attrs.title,
+    };
+    if (typeof mark.attrs.noteId === 'string' && mark.attrs.noteId.length > 0) {
+      attrs['data-note-id'] = mark.attrs.noteId;
+    }
+    return ['span', attrs, 0];
+  },
+  parseDOM: [
+    {
+      tag: 'span[data-note-link-title]',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        return {
+          title: el.getAttribute('data-note-link-title') ?? '',
+          noteId: el.getAttribute('data-note-id') || null,
+        };
+      },
+    },
+  ],
+};
+
 const link: MarkSpec = {
   attrs: { href: {}, title: { default: null } },
   inclusive: false,
@@ -321,6 +347,7 @@ export const schema = new Schema({
     code,
     fontFamily,
     textColor,
+    noteLink,
     link,
   },
 });

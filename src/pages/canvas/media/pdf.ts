@@ -1,12 +1,12 @@
 import { loadDocument } from '@/lib/pdf-renderer';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PdfElement } from '../elements/pdf-element';
+import type { MediaImportOptions } from './index';
 
 export async function pdfImportHandler(
   blob: Blob,
   canvas: DrawableCanvas,
-  screenX?: number,
-  screenY?: number,
+  options: MediaImportOptions = {},
 ) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const doc = await loadDocument(bytes);
@@ -22,8 +22,8 @@ export async function pdfImportHandler(
   pdf.setInitialPdfData(bytes, pageSizes, fileName, doc);
 
   const dpr = window.devicePixelRatio || 1;
-  const cx = screenX ?? canvas.ctx.canvas.width / dpr / 2;
-  const cy = screenY ?? canvas.ctx.canvas.height / dpr / 2;
+  const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
+  const cy = options.screenY ?? canvas.ctx.canvas.height / dpr / 2;
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });
   pdf.setOffset(world.x - pdf.totalWidth / 2, world.y - pdf.totalHeight / 2);
   pdf.updateBounds();

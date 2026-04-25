@@ -1,25 +1,25 @@
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameElement } from '../elements/page-frame-element';
 import { writeMarkdownToPageFrameFragment } from '../page-frame/markdown-import';
+import type { MediaImportOptions } from './index';
 
 export async function markdownImportHandler(
   blob: Blob,
   canvas: DrawableCanvas,
-  screenX?: number,
-  screenY?: number,
+  options: MediaImportOptions = {},
 ) {
   const text = await blob.text();
   const pf = canvas.addElement((i) => new PageFrameElement(i));
   const frag = pf.yXmlFragment;
   if (frag) {
-    canvas.ydoc.transact(() => {
-      writeMarkdownToPageFrameFragment(text, frag);
+    await writeMarkdownToPageFrameFragment(text, frag, {
+      repository: options.repository,
     });
   }
 
   const dpr = window.devicePixelRatio || 1;
-  const cx = screenX ?? canvas.ctx.canvas.width / dpr / 2;
-  const cy = screenY ?? canvas.ctx.canvas.height / dpr / 2;
+  const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
+  const cy = options.screenY ?? canvas.ctx.canvas.height / dpr / 2;
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });
   pf.setOffset(world.x - pf.pageWidth / 2, world.y - pf.pageHeight / 2);
   pf.updateBounds();

@@ -106,6 +106,49 @@ function parseInlineCode(
   }
 }
 
+function parseDoubleBracketDelimited(
+  text: string,
+  blocked: boolean[],
+  ranges: InlinePreviewRange[],
+): void {
+  for (let i = 0; i <= text.length - 2; i++) {
+    if (rangeHasBlocked(blocked, i, i + 2)) {
+      continue;
+    }
+    if (!isExactDelimiterRun(text, i, '[[')) {
+      continue;
+    }
+
+    let close = -1;
+    for (let j = i + 2; j <= text.length - 2; j++) {
+      if (rangeHasBlocked(blocked, j, j + 2)) {
+        continue;
+      }
+      if (!isExactDelimiterRun(text, j, ']]')) {
+        continue;
+      }
+      close = j;
+      break;
+    }
+
+    if (close === -1) {
+      continue;
+    }
+
+    if (
+      hasBarrier(text, i + 2, close) ||
+      !hasVisibleContent(text, i + 2, close) ||
+      rangeHasBlocked(blocked, i, close + 2)
+    ) {
+      continue;
+    }
+
+    pushRange(ranges, 'noteLink', i, i + 2, i + 2, close, close, close + 2);
+    markBlocked(blocked, i, close + 2);
+    i = close + 1;
+  }
+}
+
 function parseTripleAsteriskDelimited(
   text: string,
   blocked: boolean[],
@@ -213,6 +256,7 @@ export function parseInlineMarkdown(text: string): ParsedInlineMarkdown {
   const ranges: InlinePreviewRange[] = [];
 
   parseInlineCode(text, blocked, ranges);
+  parseDoubleBracketDelimited(text, blocked, ranges);
   parseTripleAsteriskDelimited(text, blocked, ranges);
   parseAsteriskDelimited(text, blocked, ranges, '**', 'bold');
   parseAsteriskDelimited(text, blocked, ranges, '*', 'italic');

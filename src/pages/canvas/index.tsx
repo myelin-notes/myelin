@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
+import { useRepository } from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
@@ -33,6 +34,7 @@ export function CanvasView() {
 
 function CanvasViewInner() {
   const { id } = useParams<{ id: string }>();
+  const repository = useRepository();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,9 +84,9 @@ function CanvasViewInner() {
       if (!dc) {
         throw new Error('Canvas is still loading.');
       }
-      await markdownImportHandler(file, dc);
+      await markdownImportHandler(file, dc, { repository });
     },
-    [drawableCanvasRef],
+    [drawableCanvasRef, repository],
   );
   useEffect(() => {
     if (!engine.noteSession) {

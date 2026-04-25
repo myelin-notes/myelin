@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
+import type { Repository } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
 import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
 import { YDocManager } from '../ydoc-manager';
@@ -10,9 +11,9 @@ import {
 import { schema } from './pm/schema';
 
 describe('markdown canvas import', () => {
-  it('creates a page frame populated with parsed markdown', () => {
+  it('creates a page frame populated with parsed markdown', async () => {
     const ydoc = new YDocManager();
-    const index = addMarkdownPageFrameToYDoc(
+    const index = await addMarkdownPageFrameToYDoc(
       ydoc,
       ['# Imported Note', '', 'Hello **library** import.'].join('\n'),
     );
@@ -42,6 +43,83 @@ describe('markdown canvas import', () => {
       type: 'heading',
       attrs: { level: 1 },
       content: [{ type: 'text', text: 'Imported Note' }],
+    });
+  });
+
+  it('resolves note links by title and keeps missing note ids null', async () => {
+    const ydoc = new YDocManager();
+    const repository = {
+      searchNodes: async (query: string) => {
+        if (query === 'Alpha Note') {
+          return [
+            {
+              id: 'note-1',
+              name: 'Alpha Note',
+              type: 'file',
+              fileType: 'mcanvas',
+              parentId: null,
+              tags: [],
+              createdAt: 0,
+              modifiedAt: 0,
+            },
+            {
+              id: 'note-2',
+              name: 'Alpha Note',
+              type: 'file',
+              fileType: 'mcanvas',
+              parentId: null,
+              tags: [],
+              createdAt: 0,
+              modifiedAt: 0,
+            },
+          ];
+        }
+        return [];
+      },
+    } satisfies Pick<Repository, 'searchNodes'>;
+
+    const index = await addMarkdownPageFrameToYDoc(
+      ydoc,
+      'See [[Alpha Note]] and [[Missing Note]].',
+      { repository },
+    );
+    const doc = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment(index),
+      schema,
+    );
+
+    expect(doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'See ' },
+            {
+              type: 'text',
+              text: '[[Alpha Note]]',
+              marks: [
+                {
+                  type: 'noteLink',
+                  attrs: { title: 'Alpha Note', noteId: 'note-1' },
+                },
+              ],
+            },
+            { type: 'text', text: ' and ' },
+            {
+              type: 'text',
+              text: '[[Missing Note]]',
+              marks: [
+                {
+                  type: 'noteLink',
+                  attrs: { title: 'Missing Note', noteId: null },
+                },
+              ],
+            },
+            { type: 'text', text: '.' },
+          ],
+        },
+      ],
     });
   });
 });

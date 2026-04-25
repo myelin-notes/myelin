@@ -6,6 +6,10 @@ import {
   fenceMarkdownInputRules,
   fenceMarkdownNormalizationPlugin,
 } from './markdown/fence-commands';
+import {
+  type ResolveNoteLinkId,
+  noteLinkMarkdownPlugin,
+} from './markdown/note-links';
 import { markdownPreviewPlugin } from './markdown/plugin';
 import { prefixMarkdownInputRules } from './markdown/prefix-rules';
 import { paginationPlugin } from './pagination';
@@ -15,6 +19,7 @@ import { selectionHighlightPlugin } from './selection-highlight';
 export function buildPlugins(
   yXmlFragment: Y.XmlFragment,
   onPageCount?: (pageCount: number) => void,
+  resolveNoteLinkId?: ResolveNoteLinkId,
 ): Plugin[] {
   const plugins: Plugin[] = [
     ySyncPlugin(yXmlFragment),
@@ -22,6 +27,7 @@ export function buildPlugins(
     prefixMarkdownInputRules(schema),
     fenceMarkdownInputRules(schema),
     fenceMarkdownNormalizationPlugin(schema),
+    noteLinkMarkdownPlugin(schema, resolveNoteLinkId),
     markdownPreviewPlugin(),
     buildKeymap(schema),
     paginationPlugin(onPageCount),
