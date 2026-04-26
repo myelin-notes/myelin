@@ -1,7 +1,7 @@
 import {
   type CSSProperties,
-  useCallback,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
 } from 'react';
@@ -76,8 +76,7 @@ export function PageFrameAutocompletePopup({
   const [style, setStyle] = useState<CSSProperties>({});
 
   const open = state.open && state.anchorPosition !== null;
-
-  const syncPosition = useCallback(() => {
+  const syncPosition = useEffectEvent(() => {
     if (!open || state.anchorPosition === null) {
       return;
     }
@@ -110,7 +109,24 @@ export function PageFrameAutocompletePopup({
       }
       return { left, top };
     });
-  }, [open, state.anchorPosition, view]);
+  });
+  const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
+    if (!(open && controller)) {
+      return;
+    }
+
+    const target = event.target as Node | null;
+    if (!target) {
+      return;
+    }
+    if (rootRef.current?.contains(target)) {
+      return;
+    }
+    if (view.dom.contains(target)) {
+      return;
+    }
+    controller.close();
+  });
 
   useEffect(() => {
     if (!open) {
@@ -128,32 +144,22 @@ export function PageFrameAutocompletePopup({
     return () => {
       cancelAnimationFrame(rafId);
     };
-  }, [open, syncPosition]);
+  }, [open]);
 
   useEffect(() => {
-    if (!(open && controller)) {
+    if (!open) {
       return;
     }
 
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!target) {
-        return;
-      }
-      if (rootRef.current?.contains(target)) {
-        return;
-      }
-      if (view.dom.contains(target)) {
-        return;
-      }
-      controller.close();
+      handleDocumentPointerDown(event);
     };
 
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => {
       document.removeEventListener('pointerdown', onPointerDown, true);
     };
-  }, [controller, open, view]);
+  }, [open]);
 
   useEffect(() => {
     const root = rootRef.current;

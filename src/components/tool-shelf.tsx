@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import { useMessages } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { ITool } from '@/pages/canvas/tools/tool';
@@ -19,18 +19,21 @@ export function ToolShelf({
   containerRef,
 }: ToolShelfProps) {
   const strings = useMessages();
+  const handleWindowPointerDown = useEffectEvent((event: PointerEvent) => {
+    const target = event.target as Node;
+    if (containerRef?.current?.contains(target)) {
+      return;
+    }
+    onClose();
+  });
 
   useEffect(() => {
-    function handlePointerDown(e: PointerEvent) {
-      const target = e.target as Node;
-      if (containerRef?.current?.contains(target)) {
-        return;
-      }
-      onClose();
-    }
-    window.addEventListener('pointerdown', handlePointerDown);
-    return () => window.removeEventListener('pointerdown', handlePointerDown);
-  }, [onClose, containerRef]);
+    const onPointerDown = (event: PointerEvent) => {
+      handleWindowPointerDown(event);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, []);
 
   return (
     <div className="fade-in slide-in-from-left-2 w-56 animate-in overflow-hidden rounded-xl bg-white/85 shadow-ambient backdrop-blur-[24px] duration-200">

@@ -58,3 +58,9 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+## 5. React Hooks
+
+- Use `useEffect` only to synchronize with external systems like DOM listeners, subscriptions, timers, or imperative APIs.
+- When an effect-owned callback needs fresh props or state, prefer `useEffectEvent` over mutable refs or widening the effect dependency list just to keep the callback fresh.
+- Use `useMemo` and `useCallback` only when identity stability is required by an API/effect or the computation is meaningfully expensive. Do not wrap ordinary render-time handlers by default.

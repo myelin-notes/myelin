@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import type { EmbedFilesFn } from './use-embed-files';
 
@@ -15,11 +15,30 @@ export function usePageCanvasBindings({
   onCanvasPointerDown,
   embedFiles,
 }: UsePageCanvasBindingsArgs) {
-  const onCanvasPointerDownRef = useRef(onCanvasPointerDown);
-  onCanvasPointerDownRef.current = onCanvasPointerDown;
+  const handleCanvasPointerDown = useEffectEvent((event: PointerEvent) => {
+    onCanvasPointerDown();
+    if (event.shiftKey) {
+      return;
+    }
+    if (event.pointerType === 'mouse') {
+      if (event.button === 2) {
+        wheelRef.current?.show(event);
+      } else {
+        wheelRef.current?.hide();
+      }
+    }
+  });
 
-  const embedFilesRef = useRef(embedFiles);
-  embedFilesRef.current = embedFiles;
+  const handleCanvasDrop = useEffectEvent((event: DragEvent) => {
+    event.preventDefault();
+    if (event.dataTransfer?.files?.length) {
+      embedFiles(
+        Array.from(event.dataTransfer.files),
+        event.pageX,
+        event.pageY,
+      );
+    }
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -36,17 +55,7 @@ export function usePageCanvasBindings({
     canvas.addEventListener('contextmenu', handleContextMenu);
 
     const handlePointerDown = (event: PointerEvent) => {
-      onCanvasPointerDownRef.current();
-      if (event.shiftKey) {
-        return;
-      }
-      if (event.pointerType === 'mouse') {
-        if (event.button === 2) {
-          wheelRef.current?.show(event);
-        } else {
-          wheelRef.current?.hide();
-        }
-      }
+      handleCanvasPointerDown(event);
     };
     canvas.addEventListener('pointerdown', handlePointerDown);
 
@@ -54,14 +63,7 @@ export function usePageCanvasBindings({
     canvas.addEventListener('dragover', handleDragOver);
 
     const handleDrop = (event: DragEvent) => {
-      event.preventDefault();
-      if (event.dataTransfer?.files?.length) {
-        embedFilesRef.current(
-          Array.from(event.dataTransfer.files),
-          event.pageX,
-          event.pageY,
-        );
-      }
+      handleCanvasDrop(event);
     };
     canvas.addEventListener('drop', handleDrop);
 
@@ -71,5 +73,5 @@ export function usePageCanvasBindings({
       canvas.removeEventListener('dragover', handleDragOver);
       canvas.removeEventListener('drop', handleDrop);
     };
-  }, [canvasRef, wheelRef]);
+  }, [canvasRef]);
 }

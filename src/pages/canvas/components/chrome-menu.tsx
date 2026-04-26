@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { motion } from 'motion/react';
 import type { ChromeMenuItem } from '../chrome-menu';
 
@@ -15,6 +21,16 @@ const VIEWPORT_PAD = 12;
 export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState(() => computePosition(anchor, 0, 0));
+  const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
+    if (!menuRef.current?.contains(event.target as Node)) {
+      onClose();
+    }
+  });
+  const handleDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      onClose();
+    }
+  });
 
   useLayoutEffect(() => {
     const rect = menuRef.current?.getBoundingClientRect();
@@ -22,23 +38,19 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
   }, [anchor]);
 
   useEffect(() => {
-    const onDocPointerDown = (e: PointerEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) {
-        onClose();
-      }
+    const onDocPointerDown = (event: PointerEvent) => {
+      handleDocumentPointerDown(event);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+    const onKeyDown = (event: KeyboardEvent) => {
+      handleDocumentKeyDown(event);
     };
     document.addEventListener('pointerdown', onDocPointerDown);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('pointerdown', onDocPointerDown);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <motion.div

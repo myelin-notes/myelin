@@ -1,7 +1,7 @@
 import {
   type CSSProperties,
-  useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -155,8 +155,6 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     removeColor,
     pickerOpen,
   } = useCustomColors();
-  const pickerOpenRef = useRef(pickerOpen);
-  pickerOpenRef.current = pickerOpen;
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [style, setStyle] = useState<CSSProperties>({});
@@ -170,7 +168,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     null,
   );
 
-  const sync = useCallback(() => {
+  const sync = useEffectEvent(() => {
     const rect = selectionScreenRect(view);
     if (!rect) {
       setVisible(false);
@@ -206,7 +204,24 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
 
     setStyle({ left, top });
     setVisible(true);
-  }, [view]);
+  });
+  const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
+    if (pickerOpen) {
+      return;
+    }
+    const target = event.target as Node | null;
+    if (!target) {
+      return;
+    }
+    if (ref.current?.contains(target)) {
+      return;
+    }
+    if (view.dom.contains(target)) {
+      return;
+    }
+    setOpenMenu(null);
+    setVisible(false);
+  });
 
   // Re-sync on every PM transaction (covers typing, selection, mark toggles).
   useEffect(() => {
@@ -228,7 +243,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
         cancelAnimationFrame(raf);
       }
     };
-  }, [view, sync]);
+  }, [view]);
 
   useLayoutEffect(() => {
     const toolbar = ref.current;
@@ -245,7 +260,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     return () => {
       observer.disconnect();
     };
-  }, [sync, visible]);
+  }, [visible]);
 
   // Native pointerdown listener on the toolbar DOM node. This stops the
   // event from bubbling to the canvas's document-level exit-edit handler,
@@ -274,27 +289,13 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   // Suspended while the custom-color picker is open — it portals outside the
   // toolbar's subtree, so clicks inside it would otherwise trigger dismiss.
   useEffect(() => {
-    const onPointerDown = (e: PointerEvent) => {
-      if (pickerOpenRef.current) {
-        return;
-      }
-      const t = e.target as Node | null;
-      if (!t) {
-        return;
-      }
-      if (ref.current?.contains(t)) {
-        return;
-      }
-      if (view.dom.contains(t)) {
-        return;
-      }
-      setOpenMenu(null);
-      setVisible(false);
+    const onPointerDown = (event: PointerEvent) => {
+      handleDocumentPointerDown(event);
     };
     document.addEventListener('pointerdown', onPointerDown, true);
     return () =>
       document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [view]);
+  }, []);
 
   if (!visible) {
     return null;

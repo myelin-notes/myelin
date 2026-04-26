@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   FileText as FileTextIcon,
   ImagePlus as ImagePlusIcon,
@@ -41,17 +41,20 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
   const [pulseKey, setPulseKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const handleDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+    }
+  });
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
+    const onKeyDown = (event: KeyboardEvent) => {
+      handleDocumentKeyDown(event);
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const embedBlobs = (blobs: File[]) => {
     if (blobs.length === 0) {

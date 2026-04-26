@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import {
   FilePlus2 as FilePlusIcon,
   ImagePlus as ImagePlusIcon,
@@ -33,33 +33,39 @@ export function InsertPopover({
 }: InsertPopoverProps) {
   const strings = useMessages();
   const panelRef = useRef<HTMLDivElement>(null);
+  const handleDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+    }
+  });
+  const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (panelRef.current?.contains(target)) {
+      return;
+    }
+    // Clicking the trigger ("+") is handled by its onClick toggle; ignore it
+    // here so we don't fight the toggle.
+    if (target?.closest('[data-insert-trigger]')) {
+      return;
+    }
+    onClose();
+  });
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
+    const onKeyDown = (event: KeyboardEvent) => {
+      handleDocumentKeyDown(event);
     };
-    const onPointerDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (panelRef.current?.contains(target)) {
-        return;
-      }
-      // Clicking the trigger ("+") is handled by its onClick toggle; ignore it
-      // here so we don't fight the toggle.
-      if (target?.closest('[data-insert-trigger]')) {
-        return;
-      }
-      onClose();
+    const onPointerDown = (event: PointerEvent) => {
+      handleDocumentPointerDown(event);
     };
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKeyDown);
     document.addEventListener('pointerdown', onPointerDown);
     return () => {
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('pointerdown', onPointerDown);
     };
-  }, [onClose]);
+  }, []);
 
   const items: InsertItem[] = [
     {

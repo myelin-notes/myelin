@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -130,31 +131,37 @@ function ColorPickerDialog({
   const ref = useRef<HTMLDivElement>(null);
   const [hex, setHex] = useState<string>(initialColor);
   const [hexInput, setHexInput] = useState<string>(initialColor);
+  const handleDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      onCancel();
+    } else if (event.key === 'Enter') {
+      onConfirm(hex);
+    }
+  });
+  const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
+    if (!ref.current?.contains(event.target as Node)) {
+      onCancel();
+    }
+  });
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel();
-      } else if (e.key === 'Enter') {
-        onConfirm(hex);
-      }
+    const onKeyDown = (event: KeyboardEvent) => {
+      handleDocumentKeyDown(event);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onCancel, onConfirm, hex]);
+  }, []);
 
   // Click outside the panel dismisses. Capture phase so we beat other
   // document-level pointerdown listeners (e.g. the floating toolbar's).
   useEffect(() => {
-    const onPointerDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) {
-        onCancel();
-      }
+    const onPointerDown = (event: PointerEvent) => {
+      handleDocumentPointerDown(event);
     };
     document.addEventListener('pointerdown', onPointerDown, true);
     return () =>
       document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [onCancel]);
+  }, []);
 
   const onPickerChange = useCallback((next: string) => {
     setHex(next);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChevronDown as ChevronDownIcon } from 'lucide-react';
 import { useCustomColors } from '@/lib/custom-colors';
 import type { FontEntry, ToolOption } from '@/pages/canvas/tools/tool';
@@ -44,18 +44,21 @@ function FontPicker({
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const handleWindowPointerDown = useEffectEvent((event: PointerEvent) => {
+    if (!containerRef.current?.contains(event.target as Node)) {
+      setOpen(false);
+    }
+  });
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    function handlePointerDown(e: PointerEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    window.addEventListener('pointerdown', handlePointerDown);
-    return () => window.removeEventListener('pointerdown', handlePointerDown);
+    const onPointerDown = (event: PointerEvent) => {
+      handleWindowPointerDown(event);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
   }, [open]);
 
   return (
