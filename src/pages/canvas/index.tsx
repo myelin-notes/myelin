@@ -25,7 +25,7 @@ import { useCanvasInserts } from './hooks/use-inserts';
 import { useToolState } from './hooks/use-tool-state';
 import { markdownImportHandler } from './media/markdown';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
-import { useNoteLinkAutocomplete } from './page-frame/use-note-link-autocomplete';
+import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomplete';
 
 export function CanvasView() {
   return (
@@ -103,7 +103,7 @@ function CanvasViewInner() {
     engine.editingElement?.type === ElementType.PAGE_FRAME
       ? ((engine.editingElement as PageFrameElement).pmEditor?.view ?? null)
       : null;
-  const noteLinkAutocomplete = useNoteLinkAutocomplete({
+  const pageFrameAutocomplete = usePageFrameAutocomplete({
     repository,
     view: activeEditorView,
   });
@@ -121,8 +121,8 @@ function CanvasViewInner() {
       <PageFrameDomLayer
         canvasRef={engine.drawableCanvasRef}
         editingElement={engine.editingElement}
-        autocompleteController={noteLinkAutocomplete.controller}
-        onAutocompleteSelect={noteLinkAutocomplete.onSelectItem}
+        autocompleteController={pageFrameAutocomplete.controller}
+        onAutocompleteSelect={pageFrameAutocomplete.onSelectItem}
       />
 
       {/* Element-owned DOM overlay (PDF pages, future DOM-rendered elements) */}

@@ -67,8 +67,8 @@ export function PageFrameAutocompletePopup({
   controller,
   view,
   onSelectItem,
-  loadingLabel = 'Searching notes…',
-  emptyLabel = 'No note titles match.',
+  loadingLabel = 'Searching...',
+  emptyLabel = 'No matches.',
   errorLabel = 'Could not load suggestions.',
 }: PageFrameAutocompletePopupProps) {
   const state = useAutocompleteState(controller);
