@@ -242,4 +242,28 @@ describe('page-frame content shape', () => {
     expect(roundTripped.toJSON()).toEqual(doc.toJSON());
     expect(serializeDocToMarkdown(roundTripped)).toBe(`${markdown}\n`);
   });
+
+  it('preserves markdown tables through the Yjs-backed editor state and markdown export', () => {
+    const markdown = [
+      '| Name | Score |',
+      '| --- | --- |',
+      '| Ada | 42 |',
+      '| Grace | 99 |',
+    ].join('\n');
+    const doc = parseMarkdownToDoc(markdown, schema);
+    const ydoc = prosemirrorToYDoc(doc, 'page-frame');
+    const roundTripped = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment('page-frame'),
+      schema,
+    );
+    const table = doc.firstChild;
+
+    expect(table?.type.name).toBe('table');
+    expect(table?.childCount).toBe(3);
+    expect(table?.child(0).child(0).type.name).toBe('table_header');
+    expect(table?.child(1).child(0).textContent).toBe('Ada');
+    expect(table?.child(2).child(1).textContent).toBe('99');
+    expect(roundTripped.toJSON()).toEqual(doc.toJSON());
+    expect(serializeDocToMarkdown(roundTripped)).toBe(`${markdown}\n`);
+  });
 });

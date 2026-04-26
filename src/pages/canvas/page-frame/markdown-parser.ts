@@ -4,8 +4,8 @@
  * The schema is bespoke (flat list items with indent attrs, custom
  * mentions) so we skip the standard `prosemirror-markdown` package and
  * hand-roll a focused parser. Supports: headings, paragraphs, bullet and
- * ordered lists (with indent), blockquote, fenced code blocks, hr, and
- * inline marks (bold, italic, strikethrough, code, link, image).
+ * ordered lists (with indent), blockquote, fenced code blocks, tables, hr,
+ * and inline marks (bold, italic, strikethrough, code, link, image).
  */
 
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
@@ -17,10 +17,15 @@ export function parseMarkdownToDoc(md: string, schema: Schema): PMNode {
 
 interface BaseToken {
   content?: string;
+  rows?: TableRowToken[];
   text?: string;
   level?: number;
   indent?: number;
   order?: number;
+}
+interface TableRowToken {
+  cells: string[];
+  isHeader: boolean;
 }
 type BlockToken = BaseToken &
   (
@@ -30,6 +35,7 @@ type BlockToken = BaseToken &
     | { type: 'ordered' }
     | { type: 'blockquote' }
     | { type: 'codeBlock' }
+    | { type: 'table' }
     | { type: 'hr' }
   );
 
@@ -39,13 +45,93 @@ const ORDERED_RE = /^(\s*)(\d+)\.\s+(.*)$/;
 const QUOTE_RE = /^>\s?(.*)$/;
 const HR_RE = /^(?:-{3,}|\*{3,}|_{3,})$/;
 const FENCE_RE = /^```/;
+const TABLE_DIVIDER_RE = /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/;
+
+function splitTableRow(line: string): string[] {
+  const trimmed = line.trim();
+  const source = trimmed.replace(/^\|/, '').replace(/\|$/, '');
+  const cells: string[] = [];
+  let current = '';
+
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i];
+    if (char === '\\' && i + 1 < source.length) {
+      current += source[i + 1];
+      i += 1;
+      continue;
+    }
+    if (char === '|') {
+      cells.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+function isTableRow(line: string): boolean {
+  return line.includes('|') && splitTableRow(line).length >= 2;
+}
+
+function isTableDivider(line: string): boolean {
+  return TABLE_DIVIDER_RE.test(line);
+}
+
+function parseTable(
+  lines: string[],
+  startIndex: number,
+): { nextIndex: number; token: BlockToken } | null {
+  if (
+    startIndex + 1 >= lines.length ||
+    !isTableRow(lines[startIndex]) ||
+    !isTableDivider(lines[startIndex + 1])
+  ) {
+    return null;
+  }
+
+  const headerCells = splitTableRow(lines[startIndex]);
+  const dividerCells = splitTableRow(lines[startIndex + 1]);
+  const columnCount = Math.max(headerCells.length, dividerCells.length);
+  const rows: TableRowToken[] = [
+    {
+      isHeader: true,
+      cells: headerCells,
+    },
+  ];
+
+  let index = startIndex + 2;
+  while (index < lines.length && isTableRow(lines[index])) {
+    rows.push({
+      isHeader: false,
+      cells: splitTableRow(lines[index]),
+    });
+    index += 1;
+  }
+
+  for (const row of rows) {
+    while (row.cells.length < columnCount) {
+      row.cells.push('');
+    }
+  }
+
+  return {
+    nextIndex: index,
+    token: {
+      type: 'table',
+      rows,
+    },
+  };
+}
 
 function parseBlocks(md: string): BlockToken[] {
   const lines = md.split('\n');
   const out: BlockToken[] = [];
   let i = 0;
 
-  const isBlockStart = (line: string): boolean => {
+  const isBlockStart = (line: string, index: number): boolean => {
     const t = line.trim();
     return (
       FENCE_RE.test(t) ||
@@ -53,7 +139,9 @@ function parseBlocks(md: string): BlockToken[] {
       HEADING_RE.test(line) ||
       BULLET_RE.test(line) ||
       ORDERED_RE.test(line) ||
-      QUOTE_RE.test(line)
+      QUOTE_RE.test(line) ||
+      isTableDivider(line) ||
+      parseTable(lines, index) !== null
     );
   };
 
@@ -84,6 +172,13 @@ function parseBlocks(md: string): BlockToken[] {
       }
       const text = [openFence, ...codeLines, '```'].join('\n');
       out.push({ type: 'codeBlock', text });
+      continue;
+    }
+
+    const table = parseTable(lines, i);
+    if (table) {
+      out.push(table.token);
+      i = table.nextIndex;
       continue;
     }
 
@@ -148,7 +243,7 @@ function parseBlocks(md: string): BlockToken[] {
     i++;
     while (i < lines.length) {
       const next = lines[i];
-      if (next.trim() === '' || isBlockStart(next)) {
+      if (next.trim() === '' || isBlockStart(next, i)) {
         break;
       }
       paraLines.push(next);
@@ -424,6 +519,30 @@ function blockToNode(block: BlockToken, schema: Schema): PMNode | null {
       return schema.nodes.codeBlock.create(
         null,
         text.length > 0 ? [schema.text(text)] : [],
+      );
+    }
+    case 'table': {
+      const tableRows = block.rows ?? [];
+      if (tableRows.length === 0) {
+        return null;
+      }
+
+      return schema.nodes.table.create(
+        null,
+        tableRows.map((row) =>
+          schema.nodes.table_row.create(
+            null,
+            row.cells.map((cell) =>
+              (row.isHeader
+                ? schema.nodes.table_header
+                : schema.nodes.table_cell
+              ).create(
+                null,
+                schema.nodes.paragraph.create(null, parseInline(cell, schema)),
+              ),
+            ),
+          ),
+        ),
       );
     }
     case 'hr':

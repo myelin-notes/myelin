@@ -64,6 +64,9 @@ describe('searchSlashInsertAutocompleteItems', () => {
     expect(searchSlashInsertAutocompleteItems('h2', 5)[0]?.id).toBe(
       'slash-heading-2',
     );
+    expect(searchSlashInsertAutocompleteItems('table', 5)[0]?.id).toBe(
+      'slash-table',
+    );
     expect(searchSlashInsertAutocompleteItems('code', 5)[0]?.id).toBe(
       'slash-inline-code',
     );
@@ -133,5 +136,32 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
     });
     expect(selectedState.selection.from).toBe(2);
     expect(selectedState.selection.to).toBe(2);
+  });
+
+  it('replaces the current block with a table and places the caret in the first cell', () => {
+    const markdown = '/table';
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+    const activeRequest = findActiveSlashInsertAutocomplete(state);
+
+    expect(activeRequest).not.toBeNull();
+
+    const tr = buildSelectSlashInsertAutocompleteTransaction(
+      state,
+      schema,
+      activeRequest!,
+      findItem('slash-table'),
+    );
+
+    expect(tr).not.toBeNull();
+
+    const selectedState = state.apply(tr!);
+    const table = selectedState.doc.firstChild;
+
+    expect(table?.type.name).toBe('table');
+    expect(table?.childCount).toBe(2);
+    expect(table?.child(0).child(0).type.name).toBe('table_header');
+    expect(table?.child(1).child(0).type.name).toBe('table_cell');
+    expect(selectedState.selection.$from.parent.type.name).toBe('paragraph');
   });
 });

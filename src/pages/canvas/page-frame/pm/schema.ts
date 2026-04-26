@@ -1,4 +1,5 @@
 import { type MarkSpec, type NodeSpec, Schema } from 'prosemirror-model';
+import { tableNodes } from 'prosemirror-tables';
 
 const doc: NodeSpec = {
   content: 'block+',
@@ -6,7 +7,7 @@ const doc: NodeSpec = {
 
 const paragraph: NodeSpec = {
   content: 'inline*',
-  group: 'block',
+  group: 'block textblock',
   toDOM() {
     return ['p', 0];
   },
@@ -15,7 +16,7 @@ const paragraph: NodeSpec = {
 
 const heading: NodeSpec = {
   content: 'inline*',
-  group: 'block',
+  group: 'block textblock',
   attrs: { level: { default: 1 } },
   defining: true,
   toDOM(node) {
@@ -30,7 +31,7 @@ const heading: NodeSpec = {
 
 const bulletListItem: NodeSpec = {
   content: 'inline*',
-  group: 'block',
+  group: 'block textblock',
   defining: true,
   attrs: { indent: { default: 0 } },
   toDOM(node) {
@@ -64,7 +65,7 @@ const bulletListItem: NodeSpec = {
 
 const orderedListItem: NodeSpec = {
   content: 'inline*',
-  group: 'block',
+  group: 'block textblock',
   defining: true,
   attrs: { order: { default: 1 }, indent: { default: 0 } },
   toDOM(node) {
@@ -108,7 +109,7 @@ const orderedListItem: NodeSpec = {
 
 const blockquote: NodeSpec = {
   content: 'inline*',
-  group: 'block',
+  group: 'block textblock',
   defining: true,
   toDOM() {
     return ['blockquote', 0];
@@ -118,7 +119,7 @@ const blockquote: NodeSpec = {
 
 const codeBlock: NodeSpec = {
   content: 'text*',
-  group: 'block',
+  group: 'block textblock',
   marks: '',
   code: true,
   defining: true,
@@ -325,6 +326,12 @@ const link: MarkSpec = {
   ],
 };
 
+const tableSpecs = tableNodes({
+  tableGroup: 'block',
+  cellContent: 'textblock+',
+  cellAttributes: {},
+});
+
 export const schema = new Schema({
   nodes: {
     doc,
@@ -337,6 +344,7 @@ export const schema = new Schema({
     horizontalRule,
     image,
     mention,
+    ...tableSpecs,
     text: { group: 'inline' },
   },
   marks: {

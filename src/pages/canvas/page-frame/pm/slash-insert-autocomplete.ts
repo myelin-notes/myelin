@@ -10,6 +10,7 @@ import type {
   PageFrameAutocompleteRequest,
 } from './autocomplete';
 import { MARKDOWN_ATOM_CHAR } from './markdown/types';
+import { createTableNode, setSelectionInsideTableCell } from './table-commands';
 
 interface TextOffsetMap {
   text: string;
@@ -31,6 +32,11 @@ type SlashInsertAction =
       kind: 'inline';
       open: string;
       close: string;
+    }
+  | {
+      kind: 'table';
+      rows: number;
+      columns: number;
     };
 
 export interface SlashInsertAutocompleteItem extends PageFrameAutocompleteItem {
@@ -124,6 +130,18 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
     slashAction: {
       kind: 'block',
       nodeType: 'paragraph',
+    },
+  },
+  {
+    id: 'slash-table',
+    title: 'Table',
+    subtitle: 'Insert a table with header and body rows',
+    detail: '2x2',
+    keywords: ['table', 'grid', 'rows', 'columns'],
+    slashAction: {
+      kind: 'table',
+      rows: 2,
+      columns: 2,
     },
   },
   {
@@ -302,6 +320,39 @@ export function buildSelectSlashInsertAutocompleteTransaction(
       TextSelection.create(tr.doc, from + slashAction.open.length),
     );
     return tr;
+  }
+
+  if (slashAction.kind === 'table') {
+    const tableNode = createTableNode(
+      schema,
+      slashAction.rows,
+      slashAction.columns,
+    );
+    const blockDepth = state.selection.$from.depth;
+    const containerDepth = blockDepth - 1;
+    const containerNode = state.selection.$from.node(containerDepth);
+    const indexInContainer = state.selection.$from.index(containerDepth);
+
+    if (
+      containerDepth < 0 ||
+      !containerNode.canReplaceWith(
+        indexInContainer,
+        indexInContainer + 1,
+        tableNode.type,
+      )
+    ) {
+      return null;
+    }
+
+    const blockPos = state.selection.$from.before();
+    const blockNode = state.selection.$from.parent;
+    const tr = state.tr.replaceWith(
+      blockPos,
+      blockPos + blockNode.nodeSize,
+      tableNode,
+    );
+
+    return setSelectionInsideTableCell(tr, blockPos, 0, 0);
   }
 
   const nodeType = schema.nodes[slashAction.nodeType];

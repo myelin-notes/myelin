@@ -96,6 +96,8 @@ function serializeBlock(node: PMNode): string | null {
       // part of the code block's own text content — the editor renders
       // them as visual fences. Emit the text verbatim to avoid nesting.
       return node.textContent;
+    case 'table':
+      return serializeTable(node);
     case 'horizontalRule':
       return '---';
     default:
@@ -160,6 +162,61 @@ function renderInlineAtom(node: PMNode): string {
   }
 }
 
+function serializeTable(table: PMNode): string {
+  const rows = table.content.content;
+  if (rows.length === 0) {
+    return '';
+  }
+
+  const headerRow = rows[0];
+  const headerCells = serializeTableRow(headerRow);
+  const divider = headerCells.map(() => '---');
+  const bodyRows = rows.slice(1).map(serializeTableRow);
+
+  return [
+    renderTableRow(headerCells),
+    renderTableRow(divider),
+    ...bodyRows.map(renderTableRow),
+  ].join('\n');
+}
+
+function serializeTableRow(row: PMNode): string[] {
+  const cells: string[] = [];
+  row.forEach((cell) => {
+    cells.push(serializeTableCell(cell));
+  });
+  return cells;
+}
+
+function serializeTableCell(cell: PMNode): string {
+  const parts: string[] = [];
+
+  cell.forEach((block) => {
+    if (block.type.name === 'paragraph') {
+      parts.push(serializeInline(block));
+      return;
+    }
+
+    if (block.isTextblock) {
+      parts.push(serializeInline(block));
+      return;
+    }
+
+    if (block.type.name === 'horizontalRule') {
+      parts.push('---');
+      return;
+    }
+
+    parts.push(block.textContent);
+  });
+
+  return escapeTableCell(parts.join('<br>'));
+}
+
+function renderTableRow(cells: readonly string[]): string {
+  return `| ${cells.join(' | ')} |`;
+}
+
 function markOpen(mark: Mark): string {
   switch (mark.type.name) {
     case 'bold':
@@ -206,4 +263,8 @@ function textTail(s: string): string {
 
 function escapeMarkdown(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/([*_`[\]])/g, '\\$1');
+}
+
+function escapeTableCell(text: string): string {
+  return escapeMarkdown(text).replace(/\|/g, '\\|');
 }
