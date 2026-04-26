@@ -479,6 +479,114 @@ input[type="range"].tool-slider::-moz-range-track {
   background-origin: border-box;
 }
 
+.pm-editor .ProseMirror .pm-table-node {
+  position: relative;
+  margin: 1.2em 0;
+  overflow: visible;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  border: 1px solid rgba(195, 199, 202, 0.5);
+  border-radius: 18px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th,
+.pm-editor .ProseMirror .pm-table-node__table td {
+  position: relative;
+  min-width: var(--default-cell-min-width, 120px);
+  padding: 0.72rem 0.8rem;
+  border-right: 1px solid rgba(195, 199, 202, 0.38);
+  border-bottom: 1px solid rgba(195, 199, 202, 0.38);
+  vertical-align: top;
+  background: #ffffff;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th {
+  background: rgba(244, 247, 250, 0.95);
+  font-weight: 620;
+  color: var(--text-primary);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th:last-child,
+.pm-editor .ProseMirror .pm-table-node__table td:last-child {
+  border-right: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child th,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child td {
+  border-bottom: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th > *:first-child,
+.pm-editor .ProseMirror .pm-table-node__table td > *:first-child {
+  margin-top: 0;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th > *:last-child,
+.pm-editor .ProseMirror .pm-table-node__table td > *:last-child {
+  margin-bottom: 0;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(149, 157, 165, 0.4);
+  background: #ffffff;
+  color: var(--accent-dark);
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(25, 28, 30, 0.12);
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.pm-editor .ProseMirror .pm-table-node:hover .pm-table-node__handle,
+.pm-editor .ProseMirror .pm-table-node:focus-within .pm-table-node__handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle--column {
+  transform: translate(-50%, 35%);
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle--row {
+  transform: translate(35%, -50%);
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle:hover {
+  box-shadow: 0 12px 22px rgba(25, 28, 30, 0.18);
+}
+
 .pm-editor .ProseMirror pre {
   margin: 1.15em 0;
   padding: 0.95rem 1rem;

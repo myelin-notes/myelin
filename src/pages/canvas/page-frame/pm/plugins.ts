@@ -1,4 +1,5 @@
 import type { Plugin } from 'prosemirror-state';
+import { tableEditing } from 'prosemirror-tables';
 import { ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { buildKeymap } from './keymap';
@@ -32,6 +33,7 @@ export function buildPlugins(
     buildKeymap(schema),
     paginationPlugin(onPageCount),
     selectionHighlightPlugin(),
+    tableEditing(),
   ];
   return plugins;
 }

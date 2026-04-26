@@ -15,6 +15,7 @@ import { undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import type { MarkType, Schema } from 'prosemirror-model';
 import { AllSelection, type Command, Selection } from 'prosemirror-state';
+import { goToNextCell } from 'prosemirror-tables';
 import { redo, undo } from 'y-prosemirror';
 import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
@@ -195,8 +196,8 @@ export function buildKeymap(s: Schema) {
       selectNodeBackward,
     ),
     Delete: chainCommands(deleteSelection, joinForward, selectNodeForward),
-    Tab: indentListItem,
-    'Shift-Tab': dedentListItem,
+    Tab: chainCommands(goToNextCell(1), indentListItem),
+    'Shift-Tab': chainCommands(goToNextCell(-1), dedentListItem),
     'Shift-Enter': exitCode,
     ArrowLeft: arrowHandler('left', s),
     ArrowRight: arrowHandler('right', s),
