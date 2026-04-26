@@ -1,6 +1,7 @@
 # Conventions
 - This repo uses `yarn` not npm.
 - Avoid `// ------ CATEGORY -------` style comments in the code. 3+ of these in a single file may indicate that the file should be split up further — but use critical thinking, sometimes keeping them together is still the right call.
+- This is a tauri app, you must test using tauri mcp or computer use, not playwright mcp in browser.
 
 # Guidelines
 ## 1. Think Before Coding
