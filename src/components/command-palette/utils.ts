@@ -4,11 +4,18 @@ import type { CommandPaletteEntry } from './types';
 interface ScrollViewport {
   clientHeight: number;
   scrollTop: number;
+  getBoundingClientRect?: () => Pick<DOMRect, 'top'>;
 }
 
 interface ScrollItem {
   offsetHeight: number;
   offsetTop: number;
+  getBoundingClientRect?: () => Pick<DOMRect, 'top' | 'bottom'>;
+}
+
+export interface PointerPosition {
+  clientX: number;
+  clientY: number;
 }
 
 export function filterCommandPaletteEntries<T extends CommandPaletteEntry>(
@@ -41,8 +48,13 @@ export function getScrollTopForVisibleItem(
   viewport: ScrollViewport,
   item: ScrollItem,
 ): number {
-  const itemTop = item.offsetTop;
-  const itemBottom = item.offsetTop + item.offsetHeight;
+  const itemTop =
+    viewport.getBoundingClientRect && item.getBoundingClientRect
+      ? item.getBoundingClientRect().top -
+        viewport.getBoundingClientRect().top +
+        viewport.scrollTop
+      : item.offsetTop;
+  const itemBottom = itemTop + item.offsetHeight;
   const viewportTop = viewport.scrollTop;
   const viewportBottom = viewportTop + viewport.clientHeight;
 
@@ -53,4 +65,15 @@ export function getScrollTopForVisibleItem(
     return itemBottom - viewport.clientHeight;
   }
   return viewport.scrollTop;
+}
+
+export function shouldActivatePointerSelection(
+  previous: PointerPosition | null,
+  next: PointerPosition,
+  suspended: boolean,
+): boolean {
+  if (previous === null) {
+    return !suspended;
+  }
+  return previous.clientX !== next.clientX || previous.clientY !== next.clientY;
 }

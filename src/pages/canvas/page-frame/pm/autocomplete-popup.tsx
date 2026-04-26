@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -27,6 +28,28 @@ interface PageFrameAutocompletePopupProps {
 
 const EDGE_MARGIN = 12;
 const ANCHOR_GAP = 8;
+
+export function getAutocompleteScrollTop(
+  container: Pick<HTMLElement, 'clientHeight' | 'scrollTop'>,
+  item: Pick<HTMLElement, 'offsetHeight' | 'offsetTop'>,
+): number {
+  if (container.clientHeight <= 0) {
+    return container.scrollTop;
+  }
+
+  const itemTop = item.offsetTop;
+  const itemBottom = itemTop + item.offsetHeight;
+  const viewTop = container.scrollTop;
+  const viewBottom = viewTop + container.clientHeight;
+
+  if (itemTop < viewTop) {
+    return itemTop;
+  }
+  if (itemBottom > viewBottom) {
+    return itemBottom - container.clientHeight;
+  }
+  return viewTop;
+}
 
 function createClosedState(): PageFrameAutocompleteState {
   return {
@@ -73,6 +96,7 @@ export function PageFrameAutocompletePopup({
 }: PageFrameAutocompletePopupProps) {
   const state = useAutocompleteState(controller);
   const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>({});
 
   const open = state.open && state.anchorPosition !== null;
@@ -177,6 +201,25 @@ export function PageFrameAutocompletePopup({
     };
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!(open && state.activeIndex >= 0)) {
+      return;
+    }
+
+    const list = listRef.current;
+    const activeItem = list?.querySelector<HTMLElement>(
+      '[data-autocomplete-active="true"]',
+    );
+    if (!(list && activeItem)) {
+      return;
+    }
+
+    const nextScrollTop = getAutocompleteScrollTop(list, activeItem);
+    if (nextScrollTop !== list.scrollTop) {
+      list.scrollTop = nextScrollTop;
+    }
+  }, [open, state.activeIndex]);
+
   if (!(open && controller)) {
     return null;
   }
@@ -195,6 +238,7 @@ export function PageFrameAutocompletePopup({
       }}
     >
       <div
+        ref={listRef}
         role="listbox"
         aria-label="Autocomplete suggestions"
         className="flex max-h-[280px] flex-col gap-1 overflow-y-auto"
@@ -225,11 +269,14 @@ export function PageFrameAutocompletePopup({
               type="button"
               role="option"
               aria-selected={active}
+              data-autocomplete-active={active ? 'true' : undefined}
               onPointerDown={(event) => {
                 event.preventDefault();
               }}
-              onMouseEnter={() => {
-                controller.setActiveIndex(index);
+              onMouseMove={() => {
+                if (!active) {
+                  controller.setActiveIndex(index);
+                }
               }}
               onClick={() => {
                 const selected = controller.select(index);
