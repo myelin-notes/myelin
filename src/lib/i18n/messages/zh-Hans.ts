@@ -170,24 +170,28 @@ const zhHans: typeof en = {
           label: 'GitHub',
           description: '同步到私有 GitHub 仓库',
         },
+        googleDrive: {
+          label: 'Google Drive',
+          description: '同步到你 Google Drive 中的专用文件夹',
+        },
       },
       auth: {
-        title: 'GitHub 身份验证',
+        title: '仓库身份验证',
         descriptions: {
-          polling: '在 GitHub 上输入代码以完成登录',
-          connected: '已通过 GitHub 登录',
-          unavailable: 'GitHub 身份验证不可用',
-          signIn: '使用你的 GitHub 账户登录',
+          polling: '在浏览器中输入代码以完成登录',
+          connected: '已完成登录',
+          unavailable: '身份验证不可用',
+          signIn: '登录以连接此仓库',
         },
         errors: {
-          readState: '无法读取 GitHub 身份验证状态',
+          readState: '无法读取身份验证状态',
           signIn: '登录失败',
         },
         buttons: {
           signIn: '登录',
           signOut: '退出登录',
         },
-        deviceCode: '在 GitHub 上输入此代码',
+        deviceCode: '在浏览器中输入此代码',
       },
       authStatus: {
         checking: '检查中',

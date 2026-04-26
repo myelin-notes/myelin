@@ -13,6 +13,11 @@ function normalizeRepositoryConfig(config: RepositoryConfig): RepositoryConfig {
         branch: config.branch?.trim() || 'main',
         credentialId: config.credentialId.trim() || 'default',
       };
+    case 'googleDrive':
+      return {
+        kind: 'googleDrive',
+        credentialId: config.credentialId.trim() || 'default',
+      };
   }
 }
 

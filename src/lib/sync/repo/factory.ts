@@ -1,6 +1,7 @@
 import { CachedRepository } from './cached';
 import type { ActiveRepository, RepositoryConfig } from './config';
 import { GitHubRepository } from './github';
+import { GoogleDriveRepository } from './google-drive';
 import { LocalRepository } from './local';
 
 function normalizeOutboxKeyPart(value: string): string {
@@ -29,6 +30,17 @@ export function createRepository(config: RepositoryConfig): ActiveRepository {
           owner: config.owner,
           repo: config.repo,
           branch: config.branch ?? 'main',
+          credentialId: config.credentialId,
+        }),
+        new LocalRepository(cacheRoot),
+        `${cacheRoot}/outbox.json`,
+      );
+    }
+    case 'googleDrive': {
+      const storageKey = normalizeOutboxKeyPart(config.credentialId);
+      const cacheRoot = `repositories/google-drive/${storageKey}`;
+      return new CachedRepository(
+        new GoogleDriveRepository({
           credentialId: config.credentialId,
         }),
         new LocalRepository(cacheRoot),

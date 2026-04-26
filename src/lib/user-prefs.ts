@@ -39,6 +39,7 @@ const PREFS = {
     kind: 'local',
   }),
   githubVaultPassword: pref<string>('github-vault-password', ''),
+  googleDriveVaultPassword: pref<string>('google-drive-vault-password', ''),
   peerId: pref<string>('peer-id', ''),
   explorerViewMode: pref<'tree' | 'grid'>('explorer-view-mode', 'tree'),
 };

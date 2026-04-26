@@ -16,6 +16,10 @@ export const GITHUB_CLIENT_ID = (
   import.meta.env.VITE_GITHUB_CLIENT_ID ?? ''
 ).trim();
 
+export const GOOGLE_CLIENT_ID = (
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+).trim();
+
 export const PERSIST_DEBUG_LOGS =
   String(import.meta.env.VITE_PERSIST_DEBUG_LOGS ?? '').toLowerCase() ===
   'true';

@@ -172,24 +172,28 @@ const en = {
           label: 'GitHub',
           description: 'Sync to a private GitHub repository',
         },
+        googleDrive: {
+          label: 'Google Drive',
+          description: 'Sync to a dedicated folder in your Google Drive',
+        },
       },
       auth: {
-        title: 'GitHub Authentication',
+        title: 'Repository Authentication',
         descriptions: {
-          polling: 'Enter the code on GitHub to finish signing in',
-          connected: 'Signed in via GitHub',
-          unavailable: 'GitHub authentication is unavailable',
-          signIn: 'Sign in with your GitHub account',
+          polling: 'Enter the code in your browser to finish signing in',
+          connected: 'Sign-in is complete',
+          unavailable: 'Authentication is unavailable',
+          signIn: 'Sign in to connect this repository',
         },
         errors: {
-          readState: 'Failed to read GitHub authentication state.',
+          readState: 'Failed to read authentication state.',
           signIn: 'Failed to sign in.',
         },
         buttons: {
           signIn: 'Sign in',
           signOut: 'Sign out',
         },
-        deviceCode: 'Enter this code on GitHub',
+        deviceCode: 'Enter this code in your browser',
       },
       authStatus: {
         checking: 'Checking',

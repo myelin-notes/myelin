@@ -9,6 +9,10 @@ export type RepositoryConfig =
       repo: string;
       branch?: string;
       credentialId: string;
+    }
+  | {
+      kind: 'googleDrive';
+      credentialId: string;
     };
 
 export interface RepositoryLifecycle {

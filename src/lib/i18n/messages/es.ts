@@ -175,15 +175,20 @@ const es: typeof en = {
           label: 'GitHub',
           description: 'Sincronizar con un repositorio privado de GitHub',
         },
+        googleDrive: {
+          label: 'Google Drive',
+          description:
+            'Sincronizar con una carpeta dedicada en tu Google Drive',
+        },
       },
       auth: {
-        title: 'Autenticación de GitHub',
+        title: 'Autenticación del repositorio',
         descriptions: {
           polling:
-            'Introduce el código en GitHub para completar el inicio de sesión',
-          connected: 'Sesión iniciada con GitHub',
-          unavailable: 'La autenticación de GitHub no está disponible',
-          signIn: 'Inicia sesión con tu cuenta de GitHub',
+            'Introduce el código en tu navegador para completar el inicio de sesión',
+          connected: 'El inicio de sesión se completó',
+          unavailable: 'La autenticación no está disponible',
+          signIn: 'Inicia sesión para conectar este repositorio',
         },
         errors: {
           readState: 'No se pudo leer el estado de autenticación.',
@@ -193,7 +198,7 @@ const es: typeof en = {
           signIn: 'Iniciar sesión',
           signOut: 'Cerrar sesión',
         },
-        deviceCode: 'Introduce este código en GitHub',
+        deviceCode: 'Introduce este código en tu navegador',
       },
       authStatus: {
         checking: 'Comprobando',
