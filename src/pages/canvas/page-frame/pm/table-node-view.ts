@@ -104,7 +104,9 @@ export class PageFrameTableNodeView implements NodeView {
   private renderHandles(): void {
     this.handleLayer.replaceChildren();
 
-    const rows = Array.from(this.contentDOM.rows);
+    const rows = Array.from(this.contentDOM.rows).filter(
+      (row) => row.getAttribute('data-page-break') !== 'table-row',
+    );
     if (rows.length === 0) {
       return;
     }

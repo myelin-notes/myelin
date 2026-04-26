@@ -4,7 +4,7 @@ export const PAGE_GAP = 40;
 export const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 784
 export const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
 
-export type BreakKind = 'block' | 'inline';
+export type BreakKind = 'block' | 'inline' | 'table-row';
 
 export interface Break {
   pos: number;
@@ -39,6 +39,7 @@ export interface PaginationBlock {
   height: number;
   nodeSize: number;
   isBreakableTextBlock: boolean;
+  isBreakableTableBlock: boolean;
   isPageHeightConstrained: boolean;
 }
 
@@ -54,6 +55,10 @@ interface CalculateBreakLayoutOptions<Block extends PaginationBlock> {
   blocks: readonly Block[];
   existingBreaks: readonly Break[];
   measureParagraphLines: (
+    block: Block,
+    state: ParagraphMeasurementState,
+  ) => ParagraphLine[];
+  measureTableRows?: (
     block: Block,
     state: ParagraphMeasurementState,
   ) => ParagraphLine[];
@@ -130,10 +135,72 @@ export function paginateParagraph(
   return { breaks, cumulativeShift, pageStart, pageBoundary, pageAdvances };
 }
 
+export function paginateTableRows(
+  rows: ParagraphLine[],
+  tablePos: number,
+  tableEnd: number,
+  initialPageStart: number,
+  initialPageBoundary: number,
+  initialCumulativeShift: number,
+): ParagraphPaginationResult {
+  const breaks: Break[] = [];
+  let pageStart = initialPageStart;
+  let pageBoundary = initialPageBoundary;
+  let cumulativeShift = initialCumulativeShift;
+  let pageAdvances = 0;
+  let segmentStartRowIndex = 0;
+
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    const row = rows[rowIndex];
+    const rowEffectiveTop = row.naturalTop + cumulativeShift;
+    const rowEffectiveBottom = row.naturalBottom + cumulativeShift;
+
+    if (rowEffectiveBottom <= pageBoundary) {
+      continue;
+    }
+
+    if (rowEffectiveTop <= pageStart) {
+      do {
+        pageStart = pageBoundary + PAGE_BREAK_GAP;
+        pageBoundary = pageStart + CONTENT_HEIGHT;
+        pageAdvances++;
+      } while (rowEffectiveBottom > pageBoundary);
+      segmentStartRowIndex = rowIndex;
+      continue;
+    }
+
+    const spacer = pageBoundary + PAGE_BREAK_GAP - rowEffectiveTop;
+    if (spacer > 0) {
+      const shouldMoveWholeTable =
+        segmentStartRowIndex === 0 && rowIndex - segmentStartRowIndex < 2;
+
+      if (shouldMoveWholeTable) {
+        breaks.push({ pos: tablePos, spacer, kind: 'block' });
+      } else {
+        const pos = row.getPos();
+        if (pos !== null) {
+          const clamped = Math.max(tablePos + 1, Math.min(pos, tableEnd - 1));
+          breaks.push({ pos: clamped, spacer, kind: 'table-row' });
+          segmentStartRowIndex = rowIndex;
+        }
+      }
+
+      cumulativeShift += spacer;
+    }
+
+    pageStart = pageBoundary + PAGE_BREAK_GAP;
+    pageBoundary = pageStart + CONTENT_HEIGHT;
+    pageAdvances++;
+  }
+
+  return { breaks, cumulativeShift, pageStart, pageBoundary, pageAdvances };
+}
+
 export function calculateBreakLayout<Block extends PaginationBlock>({
   blocks,
   existingBreaks,
   measureParagraphLines,
+  measureTableRows,
   now,
   onOverflowingBlock,
   onOverflowingParagraph,
@@ -198,6 +265,36 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
         result,
         now ? now() - paragraphStartedAt : 0,
       );
+      newBreaks.push(...result.breaks);
+      cumulativeShift = result.cumulativeShift;
+      pageStart = result.pageStart;
+      pageBoundary = result.pageBoundary;
+      pageCount += result.pageAdvances;
+      continue;
+    }
+
+    if (
+      block.isBreakableTableBlock &&
+      blockEffectiveTop < pageBoundary &&
+      measureTableRows
+    ) {
+      const rows = measureTableRows(block, {
+        blockNaturalTop,
+        blockShift,
+        cumulativeShift,
+        pageStart,
+        pageBoundary,
+      });
+      const tableStartedAt = now?.() ?? 0;
+      const result = paginateTableRows(
+        rows,
+        block.pos,
+        block.pos + block.nodeSize,
+        pageStart,
+        pageBoundary,
+        cumulativeShift,
+      );
+      onParagraphPaginated?.(block, result, now ? now() - tableStartedAt : 0);
       newBreaks.push(...result.breaks);
       cumulativeShift = result.cumulativeShift;
       pageStart = result.pageStart;
