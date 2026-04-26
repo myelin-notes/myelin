@@ -8,13 +8,11 @@ import { cn } from '@/lib/utils';
 const logger = new Logger('SemanticTags');
 
 interface SemanticTagsProps {
-  refreshKey: number;
   activeTags: Set<string>;
   onActiveTagsChanged: (tags: Set<string>) => void;
 }
 
 export function SemanticTags({
-  refreshKey,
   activeTags,
   onActiveTagsChanged,
 }: SemanticTagsProps) {
@@ -27,28 +25,46 @@ export function SemanticTags({
     totalFolders: 0,
     totalTags: 0,
   });
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    setLoaded(false);
     Promise.all([repository.listTags(), repository.getStats()])
       .then(([allTags, nextStats]) => {
+        if (cancelled) {
+          return;
+        }
+
         setTags(allTags);
         setStats(nextStats);
-
-        // Prune any active tags that no longer exist
-        if (activeTags.size > 0) {
-          const existing = new Set(allTags.map((t) => t.tag));
-          const pruned = new Set(
-            [...activeTags].filter((t) => existing.has(t)),
-          );
-          if (pruned.size !== activeTags.size) {
-            onActiveTagsChanged(pruned);
-          }
-        }
+        setLoaded(true);
       })
       .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
         logger.error('Failed to load semantic tags', error);
       });
-  }, [refreshKey, activeTags, onActiveTagsChanged, repository]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repository]);
+
+  useEffect(() => {
+    if (!(loaded && activeTags.size > 0)) {
+      return;
+    }
+
+    const existing = new Set(tags.map((entry) => entry.tag));
+    const pruned = new Set([...activeTags].filter((tag) => existing.has(tag)));
+    if (pruned.size !== activeTags.size) {
+      onActiveTagsChanged(pruned);
+    }
+  }, [activeTags, loaded, onActiveTagsChanged, tags]);
 
   const toggleTag = (tag: string) => {
     const next = new Set(activeTags);

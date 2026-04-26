@@ -79,7 +79,14 @@ export function ExplorerTree({
       });
     }
     setLoading(false);
-  }, [currentFolderId, isFiltering, filterTags, isSearching, searchQuery]);
+  }, [
+    currentFolderId,
+    filterTags,
+    isFiltering,
+    isSearching,
+    repository,
+    searchQuery,
+  ]);
 
   const startNewFolder = useCallback(async () => {
     const name = await repository.getUniqueFileName(
@@ -126,7 +133,7 @@ export function ExplorerTree({
       ]);
       requestAnimationFrame(() => setRenamingNewId(null));
     },
-    [currentFolderId],
+    [currentFolderId, repository],
   );
 
   useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [

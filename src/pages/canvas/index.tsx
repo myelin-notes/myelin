@@ -89,7 +89,7 @@ function CanvasViewInner() {
       }
       await markdownImportHandler(file, dc, { repository });
     },
-    [drawableCanvasRef, repository],
+    [repository],
   );
   useEffect(() => {
     if (!engine.ready) {

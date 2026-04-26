@@ -230,14 +230,22 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     };
   }, [view, sync]);
 
-  // After first render (and any size change from opening a submenu), re-clamp
-  // position against the now-known toolbar size.
   useLayoutEffect(() => {
-    if (visible) {
-      sync();
+    const toolbar = ref.current;
+    if (!(visible && toolbar)) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openMenu]);
+
+    sync();
+    const observer = new ResizeObserver(() => {
+      sync();
+    });
+
+    observer.observe(toolbar);
+    return () => {
+      observer.disconnect();
+    };
+  }, [sync, visible]);
 
   // Native pointerdown listener on the toolbar DOM node. This stops the
   // event from bubbling to the canvas's document-level exit-edit handler,
@@ -247,6 +255,10 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   // and the native event reaches document through the DOM, not React's
   // fiber tree.
   useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
     const el = ref.current;
     if (!el) {
       return;

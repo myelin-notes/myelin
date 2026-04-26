@@ -82,6 +82,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
     return session.subscribePeerSnapshot(setPeerSnapshot);
   }, [session]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the panel when the session instance changes, even though the effect body only mutates local UI state.
   useEffect(() => {
     setPhase('idle');
     setJoinToken('');
@@ -185,9 +186,8 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
     : strings.common.none;
 
   const peerCount = peerSnapshot?.connectedPeers.length ?? 0;
-  const phaseLabel = strings.canvas.peerSync.sessionPhase[
-    status?.phase ?? 'idle'
-  ];
+  const phaseLabel =
+    strings.canvas.peerSync.sessionPhase[status?.phase ?? 'idle'];
   const syncStatus =
     phase === 'connected'
       ? strings.canvas.peerSync.sessionPhase.live(phaseLabel)

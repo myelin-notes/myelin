@@ -93,9 +93,15 @@ export function useCommandPalette(): {
   }, []);
 
   const openPalette = useCallback((nextMode: CommandPaletteMode) => {
+    setActiveIndex(0);
     setMode(nextMode);
     setQuery('');
     setOpen(true);
+  }, []);
+
+  const handleQueryChange = useCallback((nextQuery: string) => {
+    setActiveIndex(0);
+    setQuery(nextQuery);
   }, []);
 
   useEffect(
@@ -267,10 +273,6 @@ export function useCommandPalette(): {
     }
   }, [open]);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [mode, open, query]);
-
   const commandMode = useCommandMode({ commandItems, query, strings });
   const notesMode = useNotesMode({
     active: open && mode === 'notes',
@@ -343,7 +345,7 @@ export function useCommandPalette(): {
       onActiveIndexChange: setActiveIndex,
       onClose: closePalette,
       onInputKeyDown: handleInputKeyDown,
-      onQueryChange: setQuery,
+      onQueryChange: handleQueryChange,
       onRunItem: runItem,
     },
   };

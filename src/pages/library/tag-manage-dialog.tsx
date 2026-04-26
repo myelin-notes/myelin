@@ -49,7 +49,7 @@ export function TagManageDialog({
       .catch((error) => {
         logger.error('Failed to load tag dialog data', error, { nodeId });
       });
-  }, [open, nodeId]);
+  }, [open, nodeId, repository]);
 
   useEffect(() => {
     if (isAdding) {

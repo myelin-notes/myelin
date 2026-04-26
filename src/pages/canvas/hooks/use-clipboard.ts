@@ -70,5 +70,5 @@ export function useCanvasClipboard({
       document.removeEventListener('cut', handleCut);
       document.removeEventListener('paste', handlePaste);
     };
-  }, [controller, drawableCanvasRef, handleMediaPaste, id]);
+  }, [controller, drawableCanvasRef, id]);
 }

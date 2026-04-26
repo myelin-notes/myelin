@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Logger } from '@/lib/logger';
 import type { NoteSession } from '@/lib/sync';
 import {
@@ -29,7 +29,7 @@ export function useCanvasSessionSaving({
   const autoSaveTimerRef = useRef<number | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
 
-  async function saveNow(): Promise<void> {
+  const saveNow = useCallback(async (): Promise<void> => {
     const session = noteSessionRef.current;
     if (!session) {
       return;
@@ -49,27 +49,27 @@ export function useCanvasSessionSaving({
     });
     savePromiseRef.current = savePromise;
     await savePromise;
-  }
+  }, []);
 
-  function clearScheduledSave(): void {
+  const clearScheduledSave = useCallback((): void => {
     if (saveTimerRef.current === null) {
       return;
     }
 
     window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
-  }
+  }, []);
 
-  function stopAutoSave(): void {
+  const stopAutoSave = useCallback((): void => {
     if (autoSaveTimerRef.current === null) {
       return;
     }
 
     window.clearInterval(autoSaveTimerRef.current);
     autoSaveTimerRef.current = null;
-  }
+  }, []);
 
-  function scheduleSave(): void {
+  const scheduleSave = useCallback((): void => {
     clearScheduledSave();
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
@@ -79,9 +79,9 @@ export function useCanvasSessionSaving({
         });
       });
     }, SAVE_DEBOUNCE_MS);
-  }
+  }, [clearScheduledSave, saveNow]);
 
-  function startAutoSave(): void {
+  const startAutoSave = useCallback((): void => {
     if (autoSaveTimerRef.current !== null) {
       return;
     }
@@ -93,9 +93,9 @@ export function useCanvasSessionSaving({
         });
       });
     }, AUTO_SAVE_INTERVAL_MS);
-  }
+  }, [saveNow]);
 
-  async function saveBeforeExit(): Promise<void> {
+  const saveBeforeExit = useCallback(async (): Promise<void> => {
     clearScheduledSave();
     await saveNow();
 
@@ -110,7 +110,7 @@ export function useCanvasSessionSaving({
         id: noteIdRef.current,
       });
     }
-  }
+  }, [clearScheduledSave, saveNow]);
 
   useEffect(() => {
     clearScheduledSave();
@@ -143,7 +143,13 @@ export function useCanvasSessionSaving({
       unsubscribeLocalChanges();
       unsubscribePeerSnapshot();
     };
-  }, [noteSession]);
+  }, [
+    clearScheduledSave,
+    noteSession,
+    scheduleSave,
+    startAutoSave,
+    stopAutoSave,
+  ]);
 
   return {
     saveNow,

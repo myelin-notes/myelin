@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { getScrollTopForVisibleItem } from './utils';
 import type { CommandPaletteItem } from './types';
+import { getScrollTopForVisibleItem } from './utils';
 
 export function CommandPaletteList({
   items,
@@ -16,17 +16,18 @@ export function CommandPaletteList({
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const activeItemId = items[activeIndex]?.id;
   let previousSection = '';
 
   useEffect(() => {
     const viewport = viewportRef.current;
     const item = itemRefs.current[activeIndex];
-    if (!viewport || !item) {
+    if (!(viewport && item && activeItemId)) {
       return;
     }
 
     viewport.scrollTop = getScrollTopForVisibleItem(viewport, item);
-  }, [activeIndex, items]);
+  }, [activeIndex, activeItemId]);
 
   return (
     <div

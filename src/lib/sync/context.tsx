@@ -1,6 +1,7 @@
 import {
   createContext,
   type PropsWithChildren,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -81,10 +82,19 @@ export function RepositoryProvider({
   const [resolvedConfig, setResolvedConfig] = useState<RepositoryConfig>(
     () => config ?? getRepositoryConfig(),
   );
-  const configKey = getConfigKey(resolvedConfig);
+  const setResolvedConfigIfChanged = useCallback(
+    (nextConfig: RepositoryConfig) => {
+      setResolvedConfig((current) =>
+        getConfigKey(current) === getConfigKey(nextConfig)
+          ? current
+          : nextConfig,
+      );
+    },
+    [],
+  );
   const repository = useMemo(
     () => createRepository(resolvedConfig),
-    [configKey, resolvedConfig],
+    [resolvedConfig],
   );
   const [status, setStatus] = useState<RepositoryStatus>(() =>
     createRepositoryStatus(resolvedConfig),
@@ -99,13 +109,13 @@ export function RepositoryProvider({
 
   useEffect(() => {
     if (config) {
-      setResolvedConfig(config);
+      setResolvedConfigIfChanged(config);
       return;
     }
 
-    setResolvedConfig(getRepositoryConfig());
-    return subscribeRepositoryConfig(setResolvedConfig);
-  }, [config]);
+    setResolvedConfigIfChanged(getRepositoryConfig());
+    return subscribeRepositoryConfig(setResolvedConfigIfChanged);
+  }, [config, setResolvedConfigIfChanged]);
 
   useEffect(() => {
     setStatus(
@@ -155,7 +165,7 @@ export function RepositoryProvider({
         logger.error('Failed to dispose repository', error);
       });
     };
-  }, [configKey, resolvedConfig, repository]);
+  }, [resolvedConfig, repository]);
 
   return (
     <RepositoryContext.Provider value={contextValue}>

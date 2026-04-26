@@ -202,7 +202,7 @@ export function usePageFrameAutocomplete({
       view.dom.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('selectionchange', handleSelectionChange);
     };
-  }, [applySelectedItem, controller, syncAutocomplete, view]);
+  }, [controller, view]);
 
   return {
     controller: view ? controller : null,

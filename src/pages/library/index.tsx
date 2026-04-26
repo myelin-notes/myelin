@@ -1,4 +1,10 @@
-import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   ArrowDownAZ,
   ArrowDownZA,
@@ -54,7 +60,7 @@ export function LibraryPage() {
   const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(
     null,
   );
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [semanticTagsVersion, setSemanticTagsVersion] = useState(0);
   const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = [...activeTags];
@@ -80,10 +86,19 @@ export function LibraryPage() {
     UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
   };
 
-  const triggerRefresh = () => {
-    setRefreshKey((k) => k + 1);
+  const loadRecentFiles = useCallback(async () => {
+    try {
+      setRecentFiles(await repository.getRecentFiles(3));
+    } catch (error) {
+      logger.error('Failed to load recent files', error);
+    }
+  }, [repository]);
+
+  const triggerRefresh = useCallback(() => {
+    setSemanticTagsVersion((version) => version + 1);
     explorerRef.current?.reload();
-  };
+    void loadRecentFiles();
+  }, [loadRecentFiles]);
 
   const handleImportMarkdown = async (file: File) => {
     if (!isMarkdownFile(file)) {
@@ -121,13 +136,8 @@ export function LibraryPage() {
   };
 
   useEffect(() => {
-    repository
-      .getRecentFiles(3)
-      .then(setRecentFiles)
-      .catch((error) => {
-        logger.error('Failed to load recent files', error);
-      });
-  }, [refreshKey, repository]);
+    void loadRecentFiles();
+  }, [loadRecentFiles]);
 
   // Update breadcrumbs when folder changes
   useEffect(() => {
@@ -420,7 +430,9 @@ export function LibraryPage() {
                 ref={explorerRef}
                 currentFolderId={currentFolderId}
                 onNavigate={setCurrentFolderId}
-                onTagsChanged={() => setRefreshKey((k) => k + 1)}
+                onTagsChanged={() =>
+                  setSemanticTagsVersion((version) => version + 1)
+                }
                 sortMode={sortMode}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
@@ -430,7 +442,7 @@ export function LibraryPage() {
 
             <div className="lg:col-span-4">
               <SemanticTags
-                refreshKey={refreshKey}
+                key={semanticTagsVersion}
                 activeTags={activeTags}
                 onActiveTagsChanged={(tags) => {
                   setActiveTags(tags);
