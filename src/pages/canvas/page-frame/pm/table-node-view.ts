@@ -11,6 +11,7 @@ import {
 } from './table-commands';
 
 const DEFAULT_CELL_MIN_WIDTH = 120;
+const HANDLE_HOVER_STRIP_THICKNESS = 14;
 
 export class PageFrameTableNodeView implements NodeView {
   public readonly dom: HTMLDivElement;
@@ -108,42 +109,74 @@ export class PageFrameTableNodeView implements NodeView {
       return;
     }
 
+    const handleLayerRect = this.handleLayer.getBoundingClientRect();
     const tableRect = this.tableView.table.getBoundingClientRect();
-    if (tableRect.width <= 0 || tableRect.height <= 0) {
+    if (
+      tableRect.width <= 0 ||
+      tableRect.height <= 0 ||
+      handleLayerRect.width <= 0 ||
+      handleLayerRect.height <= 0
+    ) {
       return;
     }
+
+    const localXFromScreenX = (screenX: number): number =>
+      ((screenX - handleLayerRect.left) / handleLayerRect.width) *
+      this.handleLayer.clientWidth;
+    const localYFromScreenY = (screenY: number): number =>
+      ((screenY - handleLayerRect.top) / handleLayerRect.height) *
+      this.handleLayer.clientHeight;
+    const tableLeft = localXFromScreenX(tableRect.left);
+    const tableRight = localXFromScreenX(tableRect.right);
+    const tableTop = localYFromScreenY(tableRect.top);
+    const tableBottom = localYFromScreenY(tableRect.bottom);
+    const tableWidth = tableRight - tableLeft;
+    const tableHeight = tableBottom - tableTop;
+    const tableCenterX = localXFromScreenX(
+      tableRect.left + tableRect.width / 2,
+    );
+    const tableCenterY = localYFromScreenY(
+      tableRect.top + tableRect.height / 2,
+    );
 
     let columnIndex = 0;
     for (const cell of Array.from(rows[0].cells)) {
       const cellRect = cell.getBoundingClientRect();
       const columnWidth = cellRect.width / Math.max(1, cell.colSpan);
-      const left = cellRect.left - tableRect.left;
 
       for (
         let spanIndex = 0;
         spanIndex < cell.colSpan;
         spanIndex += 1, columnIndex += 1
       ) {
-        const boundaryLeft = left + columnWidth * (spanIndex + 1);
+        const boundaryScreenX = cellRect.left + columnWidth * (spanIndex + 1);
+        const boundaryLeft = localXFromScreenX(boundaryScreenX);
         this.handleLayer.appendChild(
           this.createHandle({
             kind: 'column',
             index: columnIndex,
-            left: boundaryLeft,
-            top: tableRect.height,
+            targetLeft: boundaryLeft,
+            targetTop: tableTop,
+            targetWidth: HANDLE_HOVER_STRIP_THICKNESS,
+            targetHeight: tableHeight,
+            bubbleLeft: HANDLE_HOVER_STRIP_THICKNESS / 2,
+            bubbleTop: tableCenterY - tableTop,
           }),
         );
       }
     }
 
     rows.forEach((row, rowIndex) => {
-      const rowRect = row.getBoundingClientRect();
       this.handleLayer.appendChild(
         this.createHandle({
           kind: 'row',
           index: rowIndex,
-          left: tableRect.width,
-          top: rowRect.bottom - tableRect.top,
+          targetLeft: tableLeft,
+          targetTop: localYFromScreenY(row.getBoundingClientRect().bottom),
+          targetWidth: tableWidth,
+          targetHeight: HANDLE_HOVER_STRIP_THICKNESS,
+          bubbleLeft: tableCenterX - tableLeft,
+          bubbleTop: HANDLE_HOVER_STRIP_THICKNESS / 2,
         }),
       );
     });
@@ -152,19 +185,34 @@ export class PageFrameTableNodeView implements NodeView {
   private createHandle(options: {
     kind: 'column' | 'row';
     index: number;
-    left: number;
-    top: number;
+    targetLeft: number;
+    targetTop: number;
+    targetWidth: number;
+    targetHeight: number;
+    bubbleLeft: number;
+    bubbleTop: number;
   }): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `pm-table-node__handle pm-table-node__handle--${options.kind}`;
+    button.className = `pm-table-node__handle-target pm-table-node__handle-target--${options.kind}`;
     button.setAttribute(
       'aria-label',
       options.kind === 'column' ? 'Add column after' : 'Add row after',
     );
-    button.textContent = '+';
-    button.style.left = `${options.left}px`;
-    button.style.top = `${options.top}px`;
+    button.tabIndex = -1;
+    button.style.left = `${options.targetLeft}px`;
+    button.style.top = `${options.targetTop}px`;
+    button.style.width = `${options.targetWidth}px`;
+    button.style.height = `${options.targetHeight}px`;
+
+    const bubble = document.createElement('span');
+    bubble.className = `pm-table-node__handle pm-table-node__handle--${options.kind}`;
+    bubble.setAttribute('aria-hidden', 'true');
+    bubble.textContent = '+';
+    bubble.style.left = `${options.bubbleLeft}px`;
+    bubble.style.top = `${options.bubbleTop}px`;
+    button.appendChild(bubble);
+
     button.addEventListener('mousedown', (event) => {
       event.preventDefault();
     });
