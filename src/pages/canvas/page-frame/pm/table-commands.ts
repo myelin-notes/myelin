@@ -1,10 +1,20 @@
 import type { Node as PMNode, Schema } from 'prosemirror-model';
 import {
+  type Command,
   type EditorState,
   Selection,
+  TextSelection,
   type Transaction,
 } from 'prosemirror-state';
-import { addColumn, addRow, TableMap } from 'prosemirror-tables';
+import {
+  addColumn,
+  addRow,
+  findCell,
+  findTable,
+  isInTable,
+  selectionCell,
+  TableMap,
+} from 'prosemirror-tables';
 
 function requireTableNodeAt(state: EditorState, tablePos: number): PMNode {
   const table = state.doc.nodeAt(tablePos);
@@ -24,6 +34,25 @@ function buildTableRect(table: PMNode, tablePos: number) {
     map,
     table,
     tableStart: tablePos + 1,
+  };
+}
+
+function getTableSelectionContext(state: EditorState) {
+  if (!state.selection.empty || !isInTable(state)) {
+    return null;
+  }
+
+  const $cell = selectionCell(state);
+  const table = findTable($cell);
+  if (!table) {
+    return null;
+  }
+
+  return {
+    cellRect: findCell($cell),
+    table: table.node,
+    tablePos: table.pos,
+    tableMap: TableMap.get(table.node),
   };
 }
 
@@ -80,12 +109,13 @@ export function buildAddTableRowTransaction(
   state: EditorState,
   tablePos: number,
   rowIndex: number,
+  columnIndex = 0,
 ): Transaction {
   const table = requireTableNodeAt(state, tablePos);
   const rect = buildTableRect(table, tablePos);
   const insertRowIndex = Math.max(0, Math.min(rowIndex + 1, rect.map.height));
   const tr = addRow(state.tr, rect, insertRowIndex);
-  return setSelectionInsideTableCell(tr, tablePos, insertRowIndex, 0);
+  return setSelectionInsideTableCell(tr, tablePos, insertRowIndex, columnIndex);
 }
 
 export function buildAddTableColumnTransaction(
@@ -102,3 +132,58 @@ export function buildAddTableColumnTransaction(
   const tr = addColumn(state.tr, rect, insertColumnIndex);
   return setSelectionInsideTableCell(tr, tablePos, 0, insertColumnIndex);
 }
+
+export const goToNextTableRow: Command = (state, dispatch) => {
+  const context = getTableSelectionContext(state);
+  if (!context) {
+    return false;
+  }
+
+  const nextRowIndex = context.cellRect.bottom;
+  const columnIndex = context.cellRect.left;
+  const tr =
+    nextRowIndex < context.tableMap.height
+      ? setSelectionInsideTableCell(
+          state.tr,
+          context.tablePos,
+          nextRowIndex,
+          columnIndex,
+        )
+      : buildAddTableRowTransaction(
+          state,
+          context.tablePos,
+          context.tableMap.height - 1,
+          columnIndex,
+        );
+
+  dispatch?.(tr.scrollIntoView());
+  return true;
+};
+
+export const exitTableOnLastRow: Command = (state, dispatch) => {
+  const context = getTableSelectionContext(state);
+  if (!context || context.cellRect.bottom < context.tableMap.height) {
+    return false;
+  }
+
+  const insertPos = context.tablePos + context.table.nodeSize;
+  let tr = state.tr;
+  const nextNode = tr.doc.resolve(insertPos).nodeAfter;
+
+  if (nextNode?.isTextblock) {
+    tr = tr.setSelection(TextSelection.create(tr.doc, insertPos + 1));
+    dispatch?.(tr.scrollIntoView());
+    return true;
+  }
+
+  const paragraph = state.schema.nodes.paragraph.createAndFill();
+  if (!paragraph) {
+    return false;
+  }
+
+  tr = tr
+    .insert(insertPos, paragraph)
+    .setSelection(TextSelection.create(tr.doc, insertPos + 1));
+  dispatch?.(tr.scrollIntoView());
+  return true;
+};

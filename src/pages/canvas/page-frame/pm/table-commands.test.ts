@@ -1,4 +1,5 @@
-import { EditorState } from 'prosemirror-state';
+import type { Node as PMNode } from 'prosemirror-model';
+import { EditorState, type Transaction } from 'prosemirror-state';
 import { cellAround, findCell } from 'prosemirror-tables';
 import { describe, expect, it } from 'vitest';
 import { schema } from './schema';
@@ -6,15 +7,42 @@ import {
   buildAddTableColumnTransaction,
   buildAddTableRowTransaction,
   createTableNode,
+  exitTableOnLastRow,
+  goToNextTableRow,
+  setSelectionInsideTableCell,
 } from './table-commands';
 
-function createTableState(rows = 2, columns = 2) {
+function createTableState(
+  rows = 2,
+  columns = 2,
+  trailingNodes: readonly PMNode[] = [],
+) {
   return EditorState.create({
     schema,
     doc: schema.nodes.doc.create(null, [
       createTableNode(schema, rows, columns),
+      ...trailingNodes,
     ]),
   });
+}
+
+function selectCell(state: EditorState, rowIndex: number, columnIndex: number) {
+  return state.apply(
+    setSelectionInsideTableCell(state.tr, 0, rowIndex, columnIndex),
+  );
+}
+
+function applyCommand(state: EditorState, command: typeof goToNextTableRow) {
+  let appliedTransaction: Transaction | null = null;
+  const handled = command(state, (tr) => {
+    appliedTransaction = tr;
+  });
+
+  return {
+    handled,
+    transaction: appliedTransaction,
+    state: appliedTransaction ? state.apply(appliedTransaction) : state,
+  };
 }
 
 describe('table commands', () => {
@@ -51,5 +79,57 @@ describe('table commands', () => {
       right: 2,
       bottom: 1,
     });
+  });
+
+  it('moves selection into the next row in the same column', () => {
+    const state = selectCell(createTableState(3, 3), 0, 1);
+    const result = applyCommand(state, goToNextTableRow);
+
+    expect(result.handled).toBe(true);
+    expect(result.state.doc.toJSON()).toEqual(state.doc.toJSON());
+    expect(findCell(cellAround(result.state.selection.$from)!)).toEqual({
+      left: 1,
+      top: 1,
+      right: 2,
+      bottom: 2,
+    });
+  });
+
+  it('adds a row at the end when moving past the last table row', () => {
+    const state = selectCell(createTableState(2, 3), 1, 2);
+    const result = applyCommand(state, goToNextTableRow);
+    const table = result.state.doc.firstChild;
+
+    expect(result.handled).toBe(true);
+    expect(table?.type.name).toBe('table');
+    expect(table?.childCount).toBe(3);
+    expect(findCell(cellAround(result.state.selection.$from)!)).toEqual({
+      left: 2,
+      top: 2,
+      right: 3,
+      bottom: 3,
+    });
+  });
+
+  it('exits the table from the last row by inserting a paragraph after it', () => {
+    const state = selectCell(createTableState(2, 2), 1, 0);
+    const result = applyCommand(state, exitTableOnLastRow);
+
+    expect(result.handled).toBe(true);
+    expect(result.state.doc.childCount).toBe(2);
+    expect(result.state.doc.child(1).type).toBe(schema.nodes.paragraph);
+    expect(result.state.selection.$from.parent.type).toBe(
+      schema.nodes.paragraph,
+    );
+    expect(result.state.selection.$from.parentOffset).toBe(0);
+  });
+
+  it('does not exit the table when a lower row still exists', () => {
+    const state = selectCell(createTableState(3, 2), 1, 0);
+    const result = applyCommand(state, exitTableOnLastRow);
+
+    expect(result.handled).toBe(false);
+    expect(result.transaction).toBeNull();
+    expect(result.state).toBe(state);
   });
 });

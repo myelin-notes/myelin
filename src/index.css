@@ -490,9 +490,9 @@ input[type="range"].tool-slider::-moz-range-track {
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  border: 1px solid rgba(195, 199, 202, 0.5);
-  border-radius: 18px;
-  background: #ffffff;
+  border: 1px solid rgba(195, 199, 202, 0.22);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
   overflow: hidden;
 }
 
@@ -500,17 +500,20 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-table-node__table td {
   position: relative;
   min-width: var(--default-cell-min-width, 120px);
-  padding: 0.72rem 0.8rem;
-  border-right: 1px solid rgba(195, 199, 202, 0.38);
-  border-bottom: 1px solid rgba(195, 199, 202, 0.38);
+  padding: 0.78rem 1rem;
+  border-right: 1px solid rgba(195, 199, 202, 0.22);
+  border-bottom: 1px solid rgba(195, 199, 202, 0.22);
   vertical-align: top;
-  background: #ffffff;
+  background: var(--bg-card);
+  transition: background-color 90ms ease;
 }
 
 .pm-editor .ProseMirror .pm-table-node__table th {
-  background: rgba(244, 247, 250, 0.95);
-  font-weight: 620;
-  color: var(--text-primary);
+  background: var(--bg-surface);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+  border-bottom-color: rgba(195, 199, 202, 0.32);
 }
 
 .pm-editor .ProseMirror .pm-table-node__table th:last-child,
@@ -521,6 +524,10 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child th,
 .pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child td {
   border-bottom: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:hover > td {
+  background: var(--bg-hover-tint);
 }
 
 .pm-editor .ProseMirror .pm-table-node__table th > *:first-child,
@@ -537,7 +544,7 @@ input[type="range"].tool-slider::-moz-range-track {
   content: "";
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  background: rgba(28, 39, 56, 0.08);
   pointer-events: none;
 }
 
@@ -573,8 +580,8 @@ input[type="range"].tool-slider::-moz-range-track {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  border: 1px solid rgba(149, 157, 165, 0.4);
-  background: #ffffff;
+  border: 1px solid rgba(149, 157, 165, 0.28);
+  background: var(--bg-card);
   color: var(--accent-dark);
   font-size: 15px;
   line-height: 1;

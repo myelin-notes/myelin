@@ -20,6 +20,7 @@ import { redo, undo } from 'y-prosemirror';
 import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { schema } from './schema';
+import { exitTableOnLastRow, goToNextTableRow } from './table-commands';
 
 const EDITOR_MARK_ACTIONS: Record<string, { type: MarkType }> = {
   'editor:bold': { type: schema.marks.bold },
@@ -184,6 +185,7 @@ export function buildKeymap(s: Schema) {
     Enter: chainCommands(
       exitFencedCodeBlock,
       newlineInCode,
+      goToNextTableRow,
       splitFlatListItem,
       liftEmptyBlock,
       splitBlock,
@@ -198,6 +200,7 @@ export function buildKeymap(s: Schema) {
     Delete: chainCommands(deleteSelection, joinForward, selectNodeForward),
     Tab: chainCommands(goToNextCell(1), indentListItem),
     'Shift-Tab': chainCommands(goToNextCell(-1), dedentListItem),
+    [`${mod}-Enter`]: exitTableOnLastRow,
     'Shift-Enter': exitCode,
     ArrowLeft: arrowHandler('left', s),
     ArrowRight: arrowHandler('right', s),
