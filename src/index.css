@@ -597,15 +597,7 @@ input[type="range"].tool-slider::-moz-range-track {
 
 .pm-editor .ProseMirror .pm-table-node__handle-target {
   position: absolute;
-  border: 0;
-  padding: 0;
-  background: transparent;
   pointer-events: auto;
-  cursor: pointer;
-}
-
-.pm-editor .ProseMirror .pm-table-node__handle-target:focus-visible {
-  outline: none;
 }
 
 .pm-editor .ProseMirror .pm-table-node__handle-target--column {
@@ -620,8 +612,9 @@ input[type="range"].tool-slider::-moz-range-track {
   position: absolute;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
   border: 1px solid rgba(149, 157, 165, 0.28);
+  padding: 0;
+  border-radius: 999px;
   background: var(--bg-card);
   color: var(--accent-dark);
   font-size: 15px;
@@ -630,7 +623,8 @@ input[type="range"].tool-slider::-moz-range-track {
   align-items: center;
   justify-content: center;
   box-shadow: 0 8px 18px rgba(25, 28, 30, 0.12);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.96);
   transition:
@@ -645,14 +639,20 @@ input[type="range"].tool-slider::-moz-range-track {
   .pm-table-node__handle,
 .pm-editor
   .ProseMirror
-  .pm-table-node__handle-target:focus-visible
+  .pm-table-node__handle-target:focus-within
   .pm-table-node__handle,
 .pm-editor
   .ProseMirror
-  .pm-table-node__handle-target:active
-  .pm-table-node__handle {
+  .pm-table-node__handle:focus-visible,
+.pm-editor
+  .ProseMirror
+  .pm-table-node__handle:active {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle:focus-visible {
+  outline: none;
 }
 
 .pm-editor .ProseMirror .pm-table-node__handle:hover {

@@ -193,28 +193,29 @@ export class PageFrameTableNodeView implements NodeView {
     targetHeight: number;
     bubbleLeft: number;
     bubbleTop: number;
-  }): HTMLButtonElement {
+  }): HTMLDivElement {
+    const target = document.createElement('div');
+    target.className = `pm-table-node__handle-target pm-table-node__handle-target--${options.kind}`;
+    target.style.left = `${options.targetLeft}px`;
+    target.style.top = `${options.targetTop}px`;
+    target.style.width = `${options.targetWidth}px`;
+    target.style.height = `${options.targetHeight}px`;
+
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `pm-table-node__handle-target pm-table-node__handle-target--${options.kind}`;
+    button.className = `pm-table-node__handle pm-table-node__handle--${options.kind}`;
     button.setAttribute(
       'aria-label',
       options.kind === 'column' ? 'Add column after' : 'Add row after',
     );
     button.tabIndex = -1;
-    button.style.left = `${options.targetLeft}px`;
-    button.style.top = `${options.targetTop}px`;
-    button.style.width = `${options.targetWidth}px`;
-    button.style.height = `${options.targetHeight}px`;
+    button.textContent = '+';
+    button.style.left = `${options.bubbleLeft}px`;
+    button.style.top = `${options.bubbleTop}px`;
 
-    const bubble = document.createElement('span');
-    bubble.className = `pm-table-node__handle pm-table-node__handle--${options.kind}`;
-    bubble.setAttribute('aria-hidden', 'true');
-    bubble.textContent = '+';
-    bubble.style.left = `${options.bubbleLeft}px`;
-    bubble.style.top = `${options.bubbleTop}px`;
-    button.appendChild(bubble);
-
+    target.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+    });
     button.addEventListener('mousedown', (event) => {
       event.preventDefault();
     });
@@ -240,6 +241,7 @@ export class PageFrameTableNodeView implements NodeView {
       this.view.focus();
     });
 
-    return button;
+    target.appendChild(button);
+    return target;
   }
 }
