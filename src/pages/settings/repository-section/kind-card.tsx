@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
 export function KindCard({
@@ -18,45 +18,58 @@ export function KindCard({
     <button
       type="button"
       onClick={onSelect}
-      className="group cursor-pointer text-left"
+      aria-pressed={selected}
+      className={cn(
+        'group relative flex w-full cursor-pointer items-center gap-4 px-4 py-3.5 text-left transition-colors',
+        selected
+          ? 'bg-white'
+          : 'bg-transparent hover:bg-hover-tint focus-visible:bg-hover-tint',
+      )}
     >
-      <div
+      {selected && (
+        <motion.span
+          layoutId="repo-kind-rail"
+          className="absolute inset-y-2 left-0 w-[2px] rounded-r-full bg-accent-navy"
+          transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+        />
+      )}
+      <span
         className={cn(
-          'relative flex items-start gap-4 overflow-hidden rounded-xl p-5 transition-all duration-200',
+          'flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors',
           selected
-            ? 'bg-white shadow-ambient ring-2 ring-accent-navy/20'
-            : 'bg-input hover:bg-white hover:shadow-ambient',
+            ? 'bg-accent-navy/8 text-accent-navy'
+            : 'bg-hover-tint text-text-secondary group-hover:text-text-primary',
         )}
       >
-        {selected && (
-          <div className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-full bg-accent-navy">
-            <Check className="size-2.5 text-white" />
-          </div>
-        )}
-        <div
+        <Icon className="size-[18px]" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
           className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors',
-            selected
-              ? 'bg-accent-navy/10 text-accent-navy'
-              : 'bg-hover-tint text-text-muted',
+            'block font-heading text-[15px] leading-tight transition-colors',
+            selected ? 'text-accent-navy' : 'text-text-primary',
           )}
         >
-          <Icon className="size-[18px]" />
-        </div>
-        <div className="min-w-0">
-          <span
-            className={cn(
-              'block font-medium text-sm transition-colors',
-              selected ? 'text-accent-navy' : 'text-text-primary',
-            )}
-          >
-            {label}
-          </span>
-          <span className="mt-0.5 block text-text-muted text-xs leading-relaxed">
-            {description}
-          </span>
-        </div>
-      </div>
+          {label}
+        </span>
+        <span className="mt-1 block text-text-muted text-xs leading-relaxed">
+          {description}
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          'relative flex size-[18px] shrink-0 items-center justify-center rounded-full border transition-colors',
+          selected ? 'border-accent-navy' : 'border-border-divider',
+        )}
+      >
+        <motion.span
+          initial={false}
+          animate={{ scale: selected ? 1 : 0, opacity: selected ? 1 : 0 }}
+          transition={{ type: 'spring', stiffness: 480, damping: 32 }}
+          className="size-[8px] rounded-full bg-accent-navy"
+        />
+      </span>
     </button>
   );
 }

@@ -1,4 +1,5 @@
 import { AllSelection } from 'prosemirror-state';
+import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import type { ActionBinding } from '@/lib/keybinds';
@@ -7,7 +8,6 @@ import { ElementType } from '@/pages/canvas/elements/element-type';
 import type { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import { TOOL_ACTIONS } from '@/pages/canvas/tools/tool-keybinds';
-import { useNavigate } from 'react-router-dom';
 import { useCanvasClipboard } from './use-clipboard';
 import { useDrawableCanvasViewState } from './use-drawable-canvas-view-state';
 import type { EmbedFilesFn } from './use-embed-files';
@@ -108,9 +108,8 @@ export function useCanvasEngine({
       onDown: (event) => {
         event.preventDefault();
         if (canvasViewState.editingElement?.type === ElementType.PAGE_FRAME) {
-          const view = (
-            canvasViewState.editingElement as PageFrameElement
-          ).pmEditor?.view;
+          const view = (canvasViewState.editingElement as PageFrameElement)
+            .pmEditor?.view;
           if (view) {
             view.dispatch(
               view.state.tr.setSelection(new AllSelection(view.state.doc)),

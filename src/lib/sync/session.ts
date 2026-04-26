@@ -332,10 +332,7 @@ export class NoteSession {
           remoteStateVectorByteLength: this.remoteStateVector.byteLength,
         });
         if (result.remoteUpdate && result.remoteUpdate.byteLength > 0) {
-          this.ydoc.applyUpdate(
-            result.remoteUpdate,
-            REPOSITORY_SYNC_ORIGIN,
-          );
+          this.ydoc.applyUpdate(result.remoteUpdate, REPOSITORY_SYNC_ORIGIN);
         }
       }
 

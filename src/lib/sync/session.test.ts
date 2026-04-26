@@ -106,11 +106,13 @@ describe('NoteSession local change listeners', () => {
     const ydoc = new YDocManager();
     const remoteDoc = new Y.Doc();
     remoteDoc.getText('content').insert(0, 'from remote');
-    const pullUpdates = vi.fn(async (): Promise<YjsSyncSnapshot> => ({
-      update: Y.encodeStateAsUpdate(remoteDoc),
-      stateVector: Y.encodeStateVector(remoteDoc),
-      revision: 'rev-2',
-    }));
+    const pullUpdates = vi.fn(
+      async (): Promise<YjsSyncSnapshot> => ({
+        update: Y.encodeStateAsUpdate(remoteDoc),
+        stateVector: Y.encodeStateVector(remoteDoc),
+        revision: 'rev-2',
+      }),
+    );
 
     const session = new NoteSession(
       'note-1',

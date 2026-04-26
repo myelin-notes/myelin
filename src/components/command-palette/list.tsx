@@ -3,8 +3,8 @@ import { cn } from '@/lib/utils';
 import type { CommandPaletteItem } from './types';
 import {
   getScrollTopForVisibleItem,
-  shouldActivatePointerSelection,
   type PointerPosition,
+  shouldActivatePointerSelection,
 } from './utils';
 
 export function CommandPaletteList({
@@ -114,9 +114,7 @@ export function CommandPaletteList({
               className={cn(
                 'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors',
                 (active || hovered) && 'bg-hover-tint',
-                item.disabled
-                  ? 'cursor-default opacity-50'
-                  : 'cursor-pointer',
+                item.disabled ? 'cursor-default opacity-50' : 'cursor-pointer',
               )}
             >
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary">

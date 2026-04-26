@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  drawableCanvasCtor,
-  resolveNoteLinkIdByTitleMock,
-} = vi.hoisted(() => ({
+const { drawableCanvasCtor, resolveNoteLinkIdByTitleMock } = vi.hoisted(() => ({
   drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
     return {
       elements: [{ id: 'existing-element' }],
@@ -27,6 +24,13 @@ vi.mock('@/pages/canvas/elements/page-frame-element', () => ({
 vi.mock('@/pages/canvas/page-frame/note-link-resolution', () => ({
   resolveNoteLinkIdByTitle: resolveNoteLinkIdByTitleMock,
 }));
+
+type ControllerRepository = ConstructorParameters<
+  typeof import('./use-session-controller').CanvasSessionController
+>[0];
+type ControllerDrawableCanvasRef = ConstructorParameters<
+  typeof import('./use-session-controller').CanvasSessionController
+>[5];
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -62,7 +66,9 @@ afterEach(() => {
 
 describe('CanvasSessionController', () => {
   it('opens the latest note without waiting for a stale open to finish', async () => {
-    const { CanvasSessionController } = await import('./use-session-controller');
+    const { CanvasSessionController } = await import(
+      './use-session-controller'
+    );
     const noteAOpen = createDeferred<ReturnType<typeof createSession>>();
     const noteBOpen = createDeferred<ReturnType<typeof createSession>>();
     const noteASession = createSession('note-a');
@@ -84,14 +90,14 @@ describe('CanvasSessionController', () => {
       })),
       searchNodes: vi.fn(),
     };
-    const drawableCanvasRef = { current: null };
+    const drawableCanvasRef: ControllerDrawableCanvasRef = { current: null };
     const controller = new CanvasSessionController(
-      repository as any,
+      repository as unknown as ControllerRepository,
       { current: {} as HTMLCanvasElement },
       { current: null },
       { current: null },
       { current: null },
-      drawableCanvasRef as any,
+      drawableCanvasRef,
       { current: [] },
     );
 
@@ -113,7 +119,9 @@ describe('CanvasSessionController', () => {
     expect(controller.getSnapshot().noteSession).toBe(noteBSession);
     expect(controller.getSnapshot().fileName).toBe('note-b.mcanvas');
     expect(drawableCanvasCtor).toHaveBeenCalledTimes(1);
-    expect(drawableCanvasRef.current).toBe(drawableCanvasCtor.mock.results[0]?.value);
+    expect(drawableCanvasRef.current).toBe(
+      drawableCanvasCtor.mock.results[0]?.value,
+    );
 
     noteAOpen.resolve(noteASession);
     await openAPromise;
@@ -125,7 +133,9 @@ describe('CanvasSessionController', () => {
   });
 
   it('passes the note link resolver into DrawableCanvas', async () => {
-    const { CanvasSessionController } = await import('./use-session-controller');
+    const { CanvasSessionController } = await import(
+      './use-session-controller'
+    );
     const repository = {
       kind: 'local',
       openSession: vi.fn().mockResolvedValue(createSession('note-1')),
@@ -133,7 +143,7 @@ describe('CanvasSessionController', () => {
       searchNodes: vi.fn(),
     };
     const controller = new CanvasSessionController(
-      repository as any,
+      repository as unknown as ControllerRepository,
       { current: {} as HTMLCanvasElement },
       { current: null },
       { current: null },
@@ -161,7 +171,9 @@ describe('CanvasSessionController', () => {
   });
 
   it('does not attach a late session after dispose', async () => {
-    const { CanvasSessionController } = await import('./use-session-controller');
+    const { CanvasSessionController } = await import(
+      './use-session-controller'
+    );
     const pendingOpen = createDeferred<ReturnType<typeof createSession>>();
     const noteSession = createSession('note-1');
     const repository = {
@@ -170,14 +182,14 @@ describe('CanvasSessionController', () => {
       getNode: vi.fn(),
       searchNodes: vi.fn(),
     };
-    const drawableCanvasRef = { current: null };
+    const drawableCanvasRef: ControllerDrawableCanvasRef = { current: null };
     const controller = new CanvasSessionController(
-      repository as any,
+      repository as unknown as ControllerRepository,
       { current: {} as HTMLCanvasElement },
       { current: null },
       { current: null },
       { current: null },
-      drawableCanvasRef as any,
+      drawableCanvasRef,
       { current: [] },
     );
 

@@ -1,11 +1,12 @@
 import {
+  type RefObject,
   useEffect,
   useMemo,
   useRef,
   useSyncExternalStore,
-  type RefObject,
 } from 'react';
 import { Logger } from '@/lib/logger';
+import type { NoteSession } from '@/lib/sync';
 import {
   type ActiveRepository,
   type NoteSessionStatus,
@@ -16,7 +17,6 @@ import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
 import { resolveNoteLinkIdByTitle } from '@/pages/canvas/page-frame/note-link-resolution';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
-import type { NoteSession } from '@/lib/sync';
 
 const logger = new Logger('CanvasSessionController');
 
