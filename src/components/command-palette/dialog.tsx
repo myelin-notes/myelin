@@ -64,7 +64,7 @@ export function CommandPaletteDialog({
               </kbd>
             </div>
 
-            <div className="max-h-[min(26rem,56vh)] overflow-y-auto p-2">
+            <div className="p-2">
               {items.length > 0 ? (
                 <CommandPaletteList
                   items={items}

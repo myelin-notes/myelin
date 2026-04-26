@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { getScrollTopForVisibleItem } from './utils';
 import type { CommandPaletteItem } from './types';
 
 export function CommandPaletteList({
@@ -12,10 +14,25 @@ export function CommandPaletteList({
   onActiveIndexChange: (index: number) => void;
   onRunItem: (item: CommandPaletteItem) => void;
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   let previousSection = '';
 
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const item = itemRefs.current[activeIndex];
+    if (!viewport || !item) {
+      return;
+    }
+
+    viewport.scrollTop = getScrollTopForVisibleItem(viewport, item);
+  }, [activeIndex, items]);
+
   return (
-    <div className="space-y-1">
+    <div
+      ref={viewportRef}
+      className="max-h-[min(26rem,56vh)] space-y-1 overflow-y-auto"
+    >
       {items.map((item, index) => {
         const Icon = item.icon;
         const showSection = item.section !== previousSection;
@@ -29,6 +46,9 @@ export function CommandPaletteList({
               </div>
             )}
             <button
+              ref={(node) => {
+                itemRefs.current[index] = node;
+              }}
               type="button"
               disabled={item.disabled}
               onMouseEnter={() => onActiveIndexChange(index)}

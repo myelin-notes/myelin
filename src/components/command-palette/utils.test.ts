@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { filterCommandPaletteEntries } from './utils';
+import {
+  filterCommandPaletteEntries,
+  getScrollTopForVisibleItem,
+} from './utils';
 
 const entries = [
   {
@@ -48,5 +51,34 @@ describe('filterCommandPaletteEntries', () => {
 
   it('supports fuzzy command matching', () => {
     expect(filterCommandPaletteEntries(entries, 'layot')).toEqual([entries[1]]);
+  });
+});
+
+describe('getScrollTopForVisibleItem', () => {
+  it('keeps the current scroll position when the item is already visible', () => {
+    expect(
+      getScrollTopForVisibleItem(
+        { clientHeight: 200, scrollTop: 100 },
+        { offsetHeight: 40, offsetTop: 180 },
+      ),
+    ).toBe(100);
+  });
+
+  it('scrolls up when the item is above the viewport', () => {
+    expect(
+      getScrollTopForVisibleItem(
+        { clientHeight: 200, scrollTop: 100 },
+        { offsetHeight: 40, offsetTop: 60 },
+      ),
+    ).toBe(60);
+  });
+
+  it('scrolls down when the item is below the viewport', () => {
+    expect(
+      getScrollTopForVisibleItem(
+        { clientHeight: 200, scrollTop: 100 },
+        { offsetHeight: 40, offsetTop: 320 },
+      ),
+    ).toBe(160);
   });
 });
