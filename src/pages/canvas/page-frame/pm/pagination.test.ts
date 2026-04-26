@@ -5,6 +5,7 @@ import {
   type PaginationBlock,
   type ParagraphLine,
   paginateParagraph,
+  paginateTableRows,
 } from './pagination-core';
 
 function line(
@@ -21,6 +22,7 @@ function block({
   height,
   nodeSize = 10,
   isBreakableTextBlock = false,
+  isBreakableTableBlock = false,
   isPageHeightConstrained = false,
 }: {
   pos: number;
@@ -28,6 +30,7 @@ function block({
   height: number;
   nodeSize?: number;
   isBreakableTextBlock?: boolean;
+  isBreakableTableBlock?: boolean;
   isPageHeightConstrained?: boolean;
 }): PaginationBlock {
   return {
@@ -36,6 +39,7 @@ function block({
     height,
     nodeSize,
     isBreakableTextBlock,
+    isBreakableTableBlock,
     isPageHeightConstrained,
   };
 }
@@ -136,6 +140,57 @@ describe('calculateBreakLayout', () => {
     });
   });
 
+  it('splits overflowing tables before the first row that crosses the page boundary', () => {
+    const result = calculateBreakLayout({
+      blocks: [
+        block({
+          pos: 20,
+          measuredTop: 720,
+          height: 140,
+          nodeSize: 60,
+          isBreakableTableBlock: true,
+        }),
+      ],
+      existingBreaks: [],
+      measureParagraphLines: () => [],
+      measureTableRows: () => [
+        line(680, 712, () => 21),
+        line(720, 752, () => 31),
+        line(760, 800, () => 41),
+      ],
+    });
+
+    expect(result).toEqual({
+      breaks: [{ pos: 41, spacer: 160, kind: 'table-row' }],
+      pageCount: 2,
+    });
+  });
+
+  it('moves a table wholesale when only its header row fits on the current page', () => {
+    const result = calculateBreakLayout({
+      blocks: [
+        block({
+          pos: 20,
+          measuredTop: 720,
+          height: 100,
+          nodeSize: 60,
+          isBreakableTableBlock: true,
+        }),
+      ],
+      existingBreaks: [],
+      measureParagraphLines: () => [],
+      measureTableRows: () => [
+        line(720, 752, () => 21),
+        line(760, 800, () => 31),
+      ],
+    });
+
+    expect(result).toEqual({
+      breaks: [{ pos: 20, spacer: 160, kind: 'block' }],
+      pageCount: 2,
+    });
+  });
+
   it('keeps following blocks on the continuation page after an earlier paragraph split', () => {
     const result = calculateBreakLayout({
       blocks: [
@@ -201,5 +256,41 @@ describe('calculateBreakLayout', () => {
       breaks: [],
       pageCount: 1,
     });
+  });
+});
+
+describe('paginateTableRows', () => {
+  it('emits table-row breaks for rows after the opening segment', () => {
+    const result = paginateTableRows(
+      [
+        line(680, 712, () => 21),
+        line(720, 752, () => 31),
+        line(760, 800, () => 41),
+      ],
+      20,
+      80,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([
+      { pos: 41, spacer: 160, kind: 'table-row' },
+    ]);
+    expect(result.pageAdvances).toBe(1);
+  });
+
+  it('moves the whole table when the header would be orphaned', () => {
+    const result = paginateTableRows(
+      [line(720, 752, () => 21), line(760, 800, () => 31)],
+      20,
+      80,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([{ pos: 20, spacer: 160, kind: 'block' }]);
+    expect(result.pageAdvances).toBe(1);
   });
 });

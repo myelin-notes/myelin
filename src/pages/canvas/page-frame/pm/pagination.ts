@@ -1,4 +1,5 @@
 import { Plugin, PluginKey } from 'prosemirror-state';
+import { TableMap } from 'prosemirror-tables';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import {
   type LayoutCursor,
@@ -35,6 +36,7 @@ interface BlockInfo {
   measuredTop: number;
   nodeSize: number;
   isBreakableTextBlock: boolean;
+  isBreakableTableBlock: boolean;
   isPageHeightConstrained: boolean;
 }
 
@@ -69,6 +71,7 @@ function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
       measuredTop: dom.offsetTop - editorOffsetTop,
       nodeSize: node.nodeSize,
       isBreakableTextBlock,
+      isBreakableTableBlock: node.type.name === 'table',
       isPageHeightConstrained: node.type.name === 'codeBlock',
     });
   });
@@ -833,6 +836,69 @@ function measureParagraphLines(
     : (measureLinesWithPretext(block, view, blockNaturalTop, metrics) ?? []);
 }
 
+function isTableRowBreakElement(element: Element): boolean {
+  return (
+    element instanceof HTMLTableRowElement &&
+    element.getAttribute('data-page-break') === 'table-row'
+  );
+}
+
+function measureTableRows(
+  block: BlockInfo,
+  view: EditorView,
+  editorScreenTop: number,
+  invScale: number,
+  blockShift: number,
+): ParagraphLine[] {
+  const tableNode = view.state.doc.nodeAt(block.pos);
+  if (!tableNode || tableNode.type.name !== 'table') {
+    return [];
+  }
+
+  const tbody = block.dom.querySelector('tbody');
+  if (!(tbody instanceof HTMLTableSectionElement)) {
+    return [];
+  }
+
+  const rowPositions: number[] = [];
+  tableNode.forEach((_row, offset) => {
+    rowPositions.push(block.pos + 1 + offset);
+  });
+
+  const rows: ParagraphLine[] = [];
+  let contentRowIndex = 0;
+  let innerShift = 0;
+
+  for (const child of Array.from(tbody.children)) {
+    if (!(child instanceof HTMLTableRowElement)) {
+      continue;
+    }
+    if (isTableRowBreakElement(child)) {
+      innerShift += child.offsetHeight;
+      continue;
+    }
+
+    const rowPos = rowPositions[contentRowIndex];
+    contentRowIndex++;
+    if (rowPos === undefined) {
+      continue;
+    }
+
+    const rect = child.getBoundingClientRect();
+    const measuredTop = (rect.top - editorScreenTop) * invScale;
+    const measuredBottom = (rect.bottom - editorScreenTop) * invScale;
+    const totalExistingShift = blockShift + innerShift;
+
+    rows.push({
+      naturalTop: measuredTop - totalExistingShift,
+      naturalBottom: measuredBottom - totalExistingShift,
+      getPos: () => rowPos,
+    });
+  }
+
+  return rows;
+}
+
 /**
  * Walk blocks in document order and emit page breaks.
  *
@@ -861,6 +927,14 @@ function calculateLayout(
         state.blockShift,
         metrics,
       ),
+    measureTableRows: (block, state) =>
+      measureTableRows(
+        block,
+        view,
+        editorScreenTop,
+        invScale,
+        state.blockShift,
+      ),
     now: metrics ? () => performance.now() : undefined,
     onOverflowingParagraph: () => {
       if (metrics) {
@@ -886,6 +960,53 @@ function calculateLayout(
   });
 }
 
+function createStandardBreakWidget(spacer: number, kind: Break['kind']): Node {
+  const div = document.createElement('div');
+  div.style.display = 'block';
+  div.style.height = `${spacer}px`;
+  div.style.userSelect = 'none';
+  div.style.pointerEvents = 'none';
+  div.contentEditable = 'false';
+  div.setAttribute('data-page-break', kind);
+  return div;
+}
+
+function getTableColumnCountAtPos(view: EditorView, pos: number): number {
+  const $pos = view.state.doc.resolve(pos);
+  for (let depth = $pos.depth; depth >= 0; depth--) {
+    const node = $pos.node(depth);
+    if (node.type.name === 'table') {
+      return TableMap.get(node).width;
+    }
+  }
+  return 1;
+}
+
+function createTableRowBreakWidget(
+  view: EditorView,
+  pos: number,
+  spacer: number,
+): Node {
+  const row = document.createElement('tr');
+  row.className = 'pm-table-node__page-break-row';
+  row.contentEditable = 'false';
+  row.setAttribute('data-page-break', 'table-row');
+
+  const cell = document.createElement('td');
+  cell.className = 'pm-table-node__page-break-cell';
+  cell.colSpan = getTableColumnCountAtPos(view, pos);
+  cell.contentEditable = 'false';
+
+  const gap = document.createElement('div');
+  gap.className = 'pm-table-node__page-break-spacer';
+  gap.style.height = `${spacer}px`;
+  gap.setAttribute('aria-hidden', 'true');
+
+  cell.appendChild(gap);
+  row.appendChild(cell);
+  return row;
+}
+
 function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
   if (breaks.length === 0) {
     return DecorationSet.empty;
@@ -895,16 +1016,10 @@ function buildDecorationSet(view: EditorView, breaks: Break[]): DecorationSet {
     breaks.map(({ pos, spacer, kind }) =>
       Decoration.widget(
         pos,
-        () => {
-          const div = document.createElement('div');
-          div.style.display = 'block';
-          div.style.height = `${spacer}px`;
-          div.style.userSelect = 'none';
-          div.style.pointerEvents = 'none';
-          div.contentEditable = 'false';
-          div.setAttribute('data-page-break', kind);
-          return div;
-        },
+        () =>
+          kind === 'table-row'
+            ? createTableRowBreakWidget(view, pos, spacer)
+            : createStandardBreakWidget(spacer, kind),
         {
           side: -1,
           ignoreSelection: true,
@@ -1080,6 +1195,15 @@ export function paginationPlugin(
           if (b.kind === 'block') {
             if (tr.doc.nodeAt(mapped)) {
               mappedBreaks.push({ ...b, pos: mapped });
+            }
+          } else if (b.kind === 'table-row') {
+            try {
+              const $pos = tr.doc.resolve(mapped);
+              if ($pos.nodeAfter?.type.name === 'table_row') {
+                mappedBreaks.push({ ...b, pos: mapped });
+              }
+            } catch {
+              // dropped
             }
           } else {
             try {

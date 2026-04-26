@@ -490,10 +490,6 @@ input[type="range"].tool-slider::-moz-range-track {
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  border: 1px solid rgba(195, 199, 202, 0.5);
-  border-radius: 18px;
-  background: #ffffff;
-  overflow: hidden;
 }
 
 .pm-editor .ProseMirror .pm-table-node__table th,
@@ -513,14 +509,48 @@ input[type="range"].tool-slider::-moz-range-track {
   color: var(--text-primary);
 }
 
-.pm-editor .ProseMirror .pm-table-node__table th:last-child,
-.pm-editor .ProseMirror .pm-table-node__table td:last-child {
-  border-right: none;
+.pm-editor .ProseMirror .pm-table-node__table tr > th:first-child,
+.pm-editor .ProseMirror .pm-table-node__table tr > td:first-child {
+  border-left: 1px solid rgba(195, 199, 202, 0.38);
 }
 
-.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child th,
-.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child td {
-  border-bottom: none;
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > th,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > td,
+.pm-editor
+  .ProseMirror
+  .pm-table-node__table
+  tbody
+  > tr[data-page-break="table-row"]
+  + tr
+  > th,
+.pm-editor
+  .ProseMirror
+  .pm-table-node__table
+  tbody
+  > tr[data-page-break="table-row"]
+  + tr
+  > td {
+  border-top: 1px solid rgba(195, 199, 202, 0.38);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > th:first-child,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > td:first-child {
+  border-top-left-radius: 18px;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > th:last-child,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > td:last-child {
+  border-top-right-radius: 18px;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child > th:first-child,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child > td:first-child {
+  border-bottom-left-radius: 18px;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child > th:last-child,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child > td:last-child {
+  border-bottom-right-radius: 18px;
 }
 
 .pm-editor .ProseMirror .pm-table-node__table th > *:first-child,
@@ -531,6 +561,22 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-table-node__table th > *:last-child,
 .pm-editor .ProseMirror .pm-table-node__table td > *:last-child {
   margin-bottom: 0;
+}
+
+.pm-editor .ProseMirror .pm-table-node__page-break-row {
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__page-break-cell {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.pm-editor .ProseMirror .pm-table-node__page-break-spacer {
+  display: block;
+  width: 100%;
+  pointer-events: none;
 }
 
 .pm-editor .ProseMirror .pm-table-node__table .selectedCell::after {
