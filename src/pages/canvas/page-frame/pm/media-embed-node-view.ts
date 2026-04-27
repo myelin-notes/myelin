@@ -19,6 +19,17 @@ function applyEmbedDimensions(
   }
 }
 
+export function shouldPreserveMediaEmbedFocus(kind: string): boolean {
+  return kind === 'video';
+}
+
+export function shouldStopMediaEmbedEvent(
+  kind: string,
+  containsTarget: boolean,
+): boolean {
+  return containsTarget && shouldPreserveMediaEmbedFocus(kind);
+}
+
 export class MediaEmbedNodeView implements NodeView {
   public readonly dom = document.createElement('div');
 
@@ -43,6 +54,15 @@ export class MediaEmbedNodeView implements NodeView {
     return true;
   }
 
+  public stopEvent(event: Event): boolean {
+    const target = event.target;
+    const containsTarget = target instanceof Node && this.dom.contains(target);
+    return shouldStopMediaEmbedEvent(
+      (this.node.attrs.kind as string) ?? 'image',
+      containsTarget,
+    );
+  }
+
   private render(): void {
     const kind = (this.node.attrs.kind as string) ?? 'image';
     const src = (this.node.attrs.src as string) ?? '';
@@ -52,6 +72,13 @@ export class MediaEmbedNodeView implements NodeView {
     const height = (this.node.attrs.height as number | null) ?? null;
 
     this.dom.className = `pm-media-embed pm-media-embed--${kind}`;
+    if (shouldPreserveMediaEmbedFocus(kind)) {
+      this.dom.setAttribute('data-page-frame-preserve-focus', 'true');
+      this.dom.setAttribute('contenteditable', 'false');
+    } else {
+      this.dom.removeAttribute('data-page-frame-preserve-focus');
+      this.dom.removeAttribute('contenteditable');
+    }
     this.dom.replaceChildren();
 
     const body = document.createElement(kind === 'video' ? 'video' : 'img');
@@ -63,6 +90,8 @@ export class MediaEmbedNodeView implements NodeView {
     }
 
     if (kind === 'video' && body instanceof HTMLVideoElement) {
+      body.setAttribute('data-page-frame-preserve-focus', 'true');
+      body.setAttribute('contenteditable', 'false');
       body.controls = true;
       body.preload = 'metadata';
       body.playsInline = true;
