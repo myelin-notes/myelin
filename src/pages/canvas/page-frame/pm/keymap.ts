@@ -19,6 +19,7 @@ import { goToNextCell } from 'prosemirror-tables';
 import { redo, undo } from 'y-prosemirror';
 import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
+import { expandMarkdownLinkCommand } from './markdown/links';
 import { schema } from './schema';
 import { exitTableOnLastRow, goToNextTableRow } from './table-commands';
 
@@ -194,6 +195,7 @@ export function buildKeymap(s: Schema) {
       deleteSelection,
       undoInputRule,
       clearBlockFormatting,
+      expandMarkdownLinkCommand,
       joinBackward,
       selectNodeBackward,
     ),

@@ -7,6 +7,7 @@ import {
   fenceMarkdownInputRules,
   fenceMarkdownNormalizationPlugin,
 } from './markdown/fence-commands';
+import { linkMarkdownPlugin } from './markdown/links';
 import {
   noteLinkMarkdownPlugin,
   type ResolveNoteLinkId,
@@ -29,6 +30,7 @@ export function buildPlugins(
     fenceMarkdownInputRules(schema),
     fenceMarkdownNormalizationPlugin(schema),
     noteLinkMarkdownPlugin(schema, resolveNoteLinkId),
+    linkMarkdownPlugin(schema),
     markdownPreviewPlugin(),
     buildKeymap(schema),
     paginationPlugin(onPageCount),

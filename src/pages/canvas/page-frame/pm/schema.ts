@@ -308,7 +308,12 @@ const link: MarkSpec = {
   toDOM(mark) {
     return [
       'a',
-      { href: mark.attrs.href, title: mark.attrs.title, rel: 'noopener' },
+      {
+        href: mark.attrs.href,
+        title: mark.attrs.title,
+        rel: 'noopener',
+        class: 'pm-link',
+      },
       0,
     ];
   },

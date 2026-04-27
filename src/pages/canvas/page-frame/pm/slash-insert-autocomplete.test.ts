@@ -60,9 +60,12 @@ describe('findActiveSlashInsertAutocomplete', () => {
 });
 
 describe('searchSlashInsertAutocompleteItems', () => {
-  it('matches aliases like h2 and inline code', () => {
+  it('matches aliases like h2, links, and inline code', () => {
     expect(searchSlashInsertAutocompleteItems('h2', 5)[0]?.id).toBe(
       'slash-heading-2',
+    );
+    expect(searchSlashInsertAutocompleteItems('hyperlink', 5)[0]?.id).toBe(
+      'slash-link',
     );
     expect(searchSlashInsertAutocompleteItems('table', 5)[0]?.id).toBe(
       'slash-table',
@@ -131,6 +134,38 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
         {
           type: 'paragraph',
           content: [{ type: 'text', text: '**' }],
+        },
+      ],
+    });
+    expect(selectedState.selection.from).toBe(2);
+    expect(selectedState.selection.to).toBe(2);
+  });
+
+  it('inserts link markdown and places the caret between the brackets', () => {
+    const markdown = '/link';
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+    const activeRequest = findActiveSlashInsertAutocomplete(state);
+
+    expect(activeRequest).not.toBeNull();
+
+    const tr = buildSelectSlashInsertAutocompleteTransaction(
+      state,
+      schema,
+      activeRequest!,
+      findItem('slash-link'),
+    );
+
+    expect(tr).not.toBeNull();
+
+    const selectedState = state.apply(tr!);
+
+    expect(selectedState.doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: '[]()' }],
         },
       ],
     });

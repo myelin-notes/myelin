@@ -811,6 +811,23 @@ input[type="range"].tool-slider::-moz-range-track {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+.pm-editor .ProseMirror a.pm-link {
+  color: var(--accent-dark);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--accent-dark) 45%,
+    transparent
+  );
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+.pm-editor .ProseMirror a.pm-link:hover {
+  text-decoration-color: currentColor;
+}
+
 .pm-editor .ProseMirror .pm-md-inline-code.pm-selection::before,
 .pm-editor .ProseMirror .pm-md-note-link.pm-selection::before,
 .pm-editor .ProseMirror .pm-selection .pm-md-inline-code::before,
@@ -824,17 +841,21 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-md-note-link.pm-selection,
 .pm-editor .ProseMirror .pm-selection .pm-md-inline-code,
 .pm-editor .ProseMirror .pm-selection .pm-md-note-link,
+.pm-editor .ProseMirror .pm-selection a.pm-link,
 .pm-editor .ProseMirror .pm-md-inline-code:has(.pm-selection),
 .pm-editor .ProseMirror .pm-md-note-link:has(.pm-selection),
 .pm-editor .ProseMirror .pm-md-inline-code .pm-selection,
-.pm-editor .ProseMirror .pm-md-note-link .pm-selection {
+.pm-editor .ProseMirror .pm-md-note-link .pm-selection,
+.pm-editor .ProseMirror a.pm-link .pm-selection {
   border-radius: 0;
   color: HighlightText;
 }
 
 .pm-editor .ProseMirror .pm-md-note-link.pm-selection,
 .pm-editor .ProseMirror .pm-selection .pm-md-note-link,
-.pm-editor .ProseMirror .pm-md-note-link .pm-selection {
+.pm-editor .ProseMirror .pm-md-note-link .pm-selection,
+.pm-editor .ProseMirror .pm-selection a.pm-link,
+.pm-editor .ProseMirror a.pm-link .pm-selection {
   text-decoration-color: currentColor;
 }
 
