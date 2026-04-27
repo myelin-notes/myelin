@@ -32,6 +32,7 @@ export function shouldStopMediaEmbedEvent(
 
 export class MediaEmbedNodeView implements NodeView {
   public readonly dom = document.createElement('div');
+  private body: HTMLImageElement | HTMLVideoElement | null = null;
 
   constructor(
     private node: PMNode,
@@ -71,7 +72,10 @@ export class MediaEmbedNodeView implements NodeView {
     const width = (this.node.attrs.width as number | null) ?? null;
     const height = (this.node.attrs.height as number | null) ?? null;
 
-    this.dom.className = `pm-media-embed pm-media-embed--${kind}`;
+    const className = `pm-media-embed pm-media-embed--${kind}`;
+    if (this.dom.className !== className) {
+      this.dom.className = className;
+    }
     if (shouldPreserveMediaEmbedFocus(kind)) {
       this.dom.setAttribute('data-page-frame-preserve-focus', 'true');
       this.dom.setAttribute('contenteditable', 'false');
@@ -79,31 +83,50 @@ export class MediaEmbedNodeView implements NodeView {
       this.dom.removeAttribute('data-page-frame-preserve-focus');
       this.dom.removeAttribute('contenteditable');
     }
-    this.dom.replaceChildren();
 
-    const body = document.createElement(kind === 'video' ? 'video' : 'img');
-    body.className = 'pm-media-embed__body';
-    body.setAttribute('draggable', 'false');
-    body.setAttribute('data-embed-src', src);
-    if (title) {
-      body.setAttribute('title', title);
+    const expectedTag = kind === 'video' ? 'video' : 'img';
+    let body = this.body;
+    if (!body || body.tagName.toLowerCase() !== expectedTag) {
+      this.dom.replaceChildren();
+      body = document.createElement(expectedTag) as
+        | HTMLImageElement
+        | HTMLVideoElement;
+      body.className = 'pm-media-embed__body';
+      body.setAttribute('draggable', 'false');
+      if (body instanceof HTMLVideoElement) {
+        body.setAttribute('data-page-frame-preserve-focus', 'true');
+        body.setAttribute('contenteditable', 'false');
+        body.controls = true;
+        body.preload = 'metadata';
+        body.playsInline = true;
+      } else if (body instanceof HTMLImageElement) {
+        body.loading = 'lazy';
+        body.decoding = 'async';
+      }
+      this.dom.appendChild(body);
+      this.body = body;
     }
 
-    if (kind === 'video' && body instanceof HTMLVideoElement) {
-      body.setAttribute('data-page-frame-preserve-focus', 'true');
-      body.setAttribute('contenteditable', 'false');
-      body.controls = true;
-      body.preload = 'metadata';
-      body.playsInline = true;
+    // Setting .src to the same value reloads the media (and resets video
+    // playback); gate on data-embed-src so unrelated attr changes don't
+    // restart it.
+    if (body.getAttribute('data-embed-src') !== src) {
+      body.setAttribute('data-embed-src', src);
       body.src = src;
-    } else if (body instanceof HTMLImageElement) {
+    }
+
+    if (title) {
+      if (body.getAttribute('title') !== title) {
+        body.setAttribute('title', title);
+      }
+    } else if (body.hasAttribute('title')) {
+      body.removeAttribute('title');
+    }
+
+    if (body instanceof HTMLImageElement && body.alt !== alt) {
       body.alt = alt;
-      body.loading = 'lazy';
-      body.decoding = 'async';
-      body.src = src;
     }
 
     applyEmbedDimensions(body, width, height);
-    this.dom.appendChild(body);
   }
 }

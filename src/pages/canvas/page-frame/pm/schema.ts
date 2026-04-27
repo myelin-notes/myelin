@@ -175,13 +175,18 @@ const mediaEmbed: NodeSpec = {
       tag: 'div.pm-media-embed[data-media-src][data-media-kind]',
       getAttrs(dom) {
         const el = dom as HTMLElement;
+        const src = el.getAttribute('data-media-src');
+        const kind = el.getAttribute('data-media-kind');
+        if (!src || (kind !== 'image' && kind !== 'video')) {
+          return false;
+        }
         const rawWidth = el.getAttribute('data-media-width');
         const rawHeight = el.getAttribute('data-media-height');
         return {
-          src: el.getAttribute('data-media-src'),
+          src,
+          kind,
           alt: el.getAttribute('data-media-alt'),
           title: el.getAttribute('data-media-title'),
-          kind: el.getAttribute('data-media-kind'),
           width: rawWidth ? Number(rawWidth) || null : null,
           height: rawHeight ? Number(rawHeight) || null : null,
         };
@@ -231,11 +236,16 @@ const noteEmbed: NodeSpec = {
       tag: 'div.pm-note-embed[data-note-embed-target][data-note-embed-title]',
       getAttrs(dom) {
         const el = dom as HTMLElement;
+        const target = el.getAttribute('data-note-embed-target');
+        const title = el.getAttribute('data-note-embed-title');
+        if (target === null || title === null) {
+          return false;
+        }
         const rawWidth = el.getAttribute('data-note-embed-width');
         const rawHeight = el.getAttribute('data-note-embed-height');
         return {
-          target: el.getAttribute('data-note-embed-target'),
-          title: el.getAttribute('data-note-embed-title'),
+          target,
+          title,
           fragment: el.getAttribute('data-note-embed-fragment'),
           noteId: el.getAttribute('data-note-embed-id') || null,
           width: rawWidth ? Number(rawWidth) || null : null,

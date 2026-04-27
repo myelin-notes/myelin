@@ -30,6 +30,7 @@ export class NoteEmbedNodeView implements NodeView {
   private readonly subtitle = document.createElement('div');
   private unsubscribeThumbnail: (() => void) | null = null;
   private destroyed = false;
+  private subscribedNoteId: string | null = null;
 
   constructor(
     private node: PMNode,
@@ -87,18 +88,30 @@ export class NoteEmbedNodeView implements NodeView {
     this.dom.classList.toggle('pm-note-embed--missing', noteId === null);
     applyEmbedDimensions(this.dom, width, height);
 
-    this.title.textContent = title.length > 0 ? title : 'Untitled note';
-    this.subtitle.textContent =
+    const titleText = title.length > 0 ? title : 'Untitled note';
+    if (this.title.textContent !== titleText) {
+      this.title.textContent = titleText;
+    }
+
+    const subtitleText =
       fragment && fragment.length > 0
         ? fragment
         : noteId
           ? 'Preview'
           : 'Note not found';
+    if (this.subtitle.textContent !== subtitleText) {
+      this.subtitle.textContent = subtitleText;
+    }
 
-    this.thumbnailImage.removeAttribute('src');
-    this.thumbnail.classList.remove('pm-note-embed__thumb--loaded');
+    if (noteId === this.subscribedNoteId) {
+      return;
+    }
+
     this.unsubscribeThumbnail?.();
     this.unsubscribeThumbnail = null;
+    this.subscribedNoteId = noteId;
+    this.thumbnailImage.removeAttribute('src');
+    this.thumbnail.classList.remove('pm-note-embed__thumb--loaded');
 
     if (!noteId) {
       return;
@@ -106,7 +119,7 @@ export class NoteEmbedNodeView implements NodeView {
 
     const refresh = async () => {
       const url = await getThumbnailUrl(noteId);
-      if (this.destroyed) {
+      if (this.destroyed || this.subscribedNoteId !== noteId) {
         return;
       }
 
