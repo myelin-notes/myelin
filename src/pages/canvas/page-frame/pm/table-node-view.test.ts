@@ -10,6 +10,7 @@ class MockElement extends EventTarget {
   public textContent: string | null = null;
   public tabIndex = 0;
   public type = '';
+  public readonly dataset: Record<string, string> = {};
   public readonly style: Record<string, string> = {};
   public readonly children: MockElement[] = [];
   private readonly attributes = new Map<string, string>();
@@ -50,26 +51,55 @@ function createMockView(state: EditorState) {
   };
 }
 
-function createHandle(options: { kind: 'column' | 'row'; index: number }) {
+function createHandle(options: {
+  action: 'add' | 'delete';
+  kind: 'column' | 'row';
+  index: number;
+  placement:
+    | 'column-boundary'
+    | 'column-delete'
+    | 'row-boundary'
+    | 'row-delete';
+}) {
   const state = createTableState();
   const { view, readDispatchedTransaction } = createMockView(state);
   const target = (
     PageFrameTableNodeView.prototype as unknown as {
       createHandle: (options: {
+        action: 'add' | 'delete';
         kind: 'column' | 'row';
         index: number;
+        placement:
+          | 'column-boundary'
+          | 'column-delete'
+          | 'row-boundary'
+          | 'row-delete';
         targetLeft: number;
         targetTop: number;
         targetWidth: number;
         targetHeight: number;
-        bubbleLeft: number;
-        bubbleTop: number;
+        buttonLeft: number;
+        buttonTop: number;
       }) => MockElement;
+      createHandleButton: (
+        kind: 'column' | 'row',
+        action: 'add' | 'delete',
+        index: number,
+      ) => MockElement;
     }
   ).createHandle.call(
     {
       view,
       readTablePos: () => 0,
+      createHandleButton: (
+        PageFrameTableNodeView.prototype as unknown as {
+          createHandleButton: (
+            kind: 'column' | 'row',
+            action: 'add' | 'delete',
+            index: number,
+          ) => MockElement;
+        }
+      ).createHandleButton,
     },
     {
       ...options,
@@ -77,15 +107,15 @@ function createHandle(options: { kind: 'column' | 'row'; index: number }) {
       targetTop: 20,
       targetWidth: 30,
       targetHeight: 40,
-      bubbleLeft: 15,
-      bubbleTop: 25,
+      buttonLeft: 15,
+      buttonTop: 25,
     },
   );
 
   return {
     state,
     target,
-    button: target.children[0],
+    button: target.children[0]!,
     view,
     readDispatchedTransaction,
   };
@@ -102,11 +132,15 @@ describe('table node view handles', () => {
     } as unknown as Document);
 
     const { target, view, readDispatchedTransaction } = createHandle({
+      action: 'add',
       kind: 'row',
       index: 0,
+      placement: 'row-boundary',
     });
 
-    target.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+    target.dispatchEvent(
+      new Event('click', { bubbles: true, cancelable: true }),
+    );
 
     expect(view.dispatch).not.toHaveBeenCalled();
     expect(view.focus).not.toHaveBeenCalled();
@@ -119,11 +153,15 @@ describe('table node view handles', () => {
     } as unknown as Document);
 
     const { state, button, view, readDispatchedTransaction } = createHandle({
+      action: 'add',
       kind: 'row',
       index: 0,
+      placement: 'row-boundary',
     });
 
-    button.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }));
+    button.dispatchEvent(
+      new Event('click', { bubbles: true, cancelable: true }),
+    );
 
     expect(view.dispatch).toHaveBeenCalledTimes(1);
     expect(view.focus).toHaveBeenCalledTimes(1);
@@ -133,5 +171,31 @@ describe('table node view handles', () => {
 
     const nextState = state.apply(transaction!);
     expect(nextState.doc.firstChild?.childCount).toBe(3);
+  });
+
+  it('dispatches deletion when the delete button is clicked', () => {
+    vi.stubGlobal('document', {
+      createElement: () => new MockElement(),
+    } as unknown as Document);
+
+    const { state, button, view, readDispatchedTransaction } = createHandle({
+      action: 'delete',
+      kind: 'row',
+      index: 0,
+      placement: 'row-delete',
+    });
+
+    button.dispatchEvent(
+      new Event('click', { bubbles: true, cancelable: true }),
+    );
+
+    expect(view.dispatch).toHaveBeenCalledTimes(1);
+    expect(view.focus).toHaveBeenCalledTimes(1);
+
+    const transaction = readDispatchedTransaction();
+    expect(transaction).not.toBeNull();
+
+    const nextState = state.apply(transaction!);
+    expect(nextState.doc.firstChild?.childCount).toBe(1);
   });
 });

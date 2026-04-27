@@ -6,6 +6,8 @@ import { schema } from './schema';
 import {
   buildAddTableColumnTransaction,
   buildAddTableRowTransaction,
+  buildDeleteTableColumnTransaction,
+  buildDeleteTableRowTransaction,
   createTableNode,
   exitTableOnLastRow,
   goToNextTableRow,
@@ -79,6 +81,73 @@ describe('table commands', () => {
       right: 2,
       bottom: 1,
     });
+  });
+
+  it('deletes a row and moves selection into the nearest remaining row', () => {
+    const state = selectCell(createTableState(3, 3), 1, 2);
+    const tr = buildDeleteTableRowTransaction(state, 0, 1, 2);
+
+    expect(tr).not.toBeNull();
+
+    const nextState = state.apply(tr!);
+    const table = nextState.doc.firstChild;
+
+    expect(table?.type.name).toBe('table');
+    expect(table?.childCount).toBe(2);
+    expect(findCell(cellAround(nextState.selection.$from)!)).toEqual({
+      left: 2,
+      top: 1,
+      right: 3,
+      bottom: 2,
+    });
+  });
+
+  it('deletes a column and moves selection into the nearest remaining column', () => {
+    const state = selectCell(createTableState(3, 3), 2, 1);
+    const tr = buildDeleteTableColumnTransaction(state, 0, 1, 2);
+
+    expect(tr).not.toBeNull();
+
+    const nextState = state.apply(tr!);
+    const table = nextState.doc.firstChild;
+
+    expect(table?.type.name).toBe('table');
+    expect(table?.child(0).childCount).toBe(2);
+    expect(findCell(cellAround(nextState.selection.$from)!)).toEqual({
+      left: 1,
+      top: 2,
+      right: 2,
+      bottom: 3,
+    });
+  });
+
+  it('deletes the table when removing its last remaining row', () => {
+    const state = createTableState(1, 3);
+    const tr = buildDeleteTableRowTransaction(state, 0, 0);
+
+    expect(tr).not.toBeNull();
+
+    const nextState = state.apply(tr!);
+    expect(nextState.doc.childCount).toBe(1);
+    expect(nextState.doc.firstChild?.type).toBe(schema.nodes.paragraph);
+    expect(nextState.selection.$from.parent.type).toBe(schema.nodes.paragraph);
+  });
+
+  it('deletes the table when removing its last remaining column', () => {
+    const paragraph = schema.nodes.paragraph.createAndFill();
+    if (!paragraph) {
+      throw new Error('Expected paragraph.createAndFill() to succeed');
+    }
+
+    const state = createTableState(3, 1, [paragraph]);
+    const tr = buildDeleteTableColumnTransaction(state, 0, 0);
+
+    expect(tr).not.toBeNull();
+
+    const nextState = state.apply(tr!);
+    expect(nextState.doc.childCount).toBe(1);
+    expect(nextState.doc.firstChild?.type).toBe(schema.nodes.paragraph);
+    expect(nextState.selection.$from.parent.type).toBe(schema.nodes.paragraph);
   });
 
   it('moves selection into the next row in the same column', () => {

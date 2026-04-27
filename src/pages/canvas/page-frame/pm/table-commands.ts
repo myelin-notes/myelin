@@ -12,6 +12,8 @@ import {
   findCell,
   findTable,
   isInTable,
+  removeColumn,
+  removeRow,
   selectionCell,
   TableMap,
 } from 'prosemirror-tables';
@@ -35,6 +37,32 @@ function buildTableRect(table: PMNode, tablePos: number) {
     table,
     tableStart: tablePos + 1,
   };
+}
+
+function buildDeleteWholeTableTransaction(
+  state: EditorState,
+  tablePos: number,
+): Transaction {
+  const table = requireTableNodeAt(state, tablePos);
+  let tr = state.tr.delete(tablePos, tablePos + table.nodeSize);
+
+  if (tr.doc.childCount === 0) {
+    const paragraph = state.schema.nodes.paragraph.createAndFill();
+    if (!paragraph) {
+      throw new Error('Unable to create a paragraph after deleting a table');
+    }
+
+    tr = tr.insert(0, paragraph).setSelection(TextSelection.create(tr.doc, 1));
+    return tr;
+  }
+
+  const selectionPos = Math.min(tablePos, tr.doc.content.size);
+  const nextSelection =
+    Selection.findFrom(tr.doc.resolve(selectionPos), 1, true) ??
+    Selection.findFrom(tr.doc.resolve(selectionPos), -1, true) ??
+    Selection.near(tr.doc.resolve(selectionPos), 1);
+
+  return tr.setSelection(nextSelection);
 }
 
 function getTableSelectionContext(state: EditorState) {
@@ -131,6 +159,57 @@ export function buildAddTableColumnTransaction(
   );
   const tr = addColumn(state.tr, rect, insertColumnIndex);
   return setSelectionInsideTableCell(tr, tablePos, 0, insertColumnIndex);
+}
+
+export function buildDeleteTableRowTransaction(
+  state: EditorState,
+  tablePos: number,
+  rowIndex: number,
+  columnIndex = 0,
+): Transaction | null {
+  const table = requireTableNodeAt(state, tablePos);
+  const rect = buildTableRect(table, tablePos);
+  if (rect.map.height <= 1) {
+    return buildDeleteWholeTableTransaction(state, tablePos);
+  }
+
+  const deleteRowIndex = Math.max(0, Math.min(rowIndex, rect.map.height - 1));
+  const tr = state.tr;
+  removeRow(tr, rect, deleteRowIndex);
+
+  return setSelectionInsideTableCell(
+    tr,
+    tablePos,
+    Math.min(deleteRowIndex, rect.map.height - 2),
+    columnIndex,
+  );
+}
+
+export function buildDeleteTableColumnTransaction(
+  state: EditorState,
+  tablePos: number,
+  columnIndex: number,
+  rowIndex = 0,
+): Transaction | null {
+  const table = requireTableNodeAt(state, tablePos);
+  const rect = buildTableRect(table, tablePos);
+  if (rect.map.width <= 1) {
+    return buildDeleteWholeTableTransaction(state, tablePos);
+  }
+
+  const deleteColumnIndex = Math.max(
+    0,
+    Math.min(columnIndex, rect.map.width - 1),
+  );
+  const tr = state.tr;
+  removeColumn(tr, rect, deleteColumnIndex);
+
+  return setSelectionInsideTableCell(
+    tr,
+    tablePos,
+    rowIndex,
+    Math.min(deleteColumnIndex, rect.map.width - 2),
+  );
 }
 
 export const goToNextTableRow: Command = (state, dispatch) => {
