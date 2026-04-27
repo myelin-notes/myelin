@@ -3,6 +3,7 @@ import { tableEditing } from 'prosemirror-tables';
 import { ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { buildKeymap } from './keymap';
+import { embedMarkdownPlugin } from './markdown/embed-blocks';
 import {
   fenceMarkdownInputRules,
   fenceMarkdownNormalizationPlugin,
@@ -29,6 +30,7 @@ export function buildPlugins(
     prefixMarkdownInputRules(schema),
     fenceMarkdownInputRules(schema),
     fenceMarkdownNormalizationPlugin(schema),
+    embedMarkdownPlugin(schema, resolveNoteLinkId),
     noteLinkMarkdownPlugin(schema, resolveNoteLinkId),
     linkMarkdownPlugin(schema),
     markdownPreviewPlugin(),

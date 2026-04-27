@@ -217,6 +217,7 @@
 
   --accent-dark: #1c2738;
   --accent-navy: #2f3e46;
+  --text-link: #2563eb;
 
   --bg-hover-tint: rgba(25, 28, 30, 0.05);
   --bg-secondary-container: #dce4ed;
@@ -477,6 +478,106 @@ input[type="range"].tool-slider::-moz-range-track {
   background-size: var(--pm-blockquote-rule-sizes, var(--pm-blockquote-rule-width) 100%);
   background-repeat: var(--pm-blockquote-rule-repeats, no-repeat);
   background-origin: border-box;
+}
+
+.pm-editor .ProseMirror .pm-media-embed,
+.pm-editor .ProseMirror .pm-note-embed {
+  max-width: 100%;
+  margin: 1.15em 0;
+}
+
+.pm-editor .ProseMirror .pm-media-embed__body {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid rgba(195, 199, 202, 0.28);
+  border-radius: 20px;
+  background: rgba(242, 244, 246, 0.7);
+  box-shadow: 0 8px 22px rgba(25, 28, 30, 0.08);
+  object-fit: contain;
+  overflow: hidden;
+}
+
+.pm-editor .ProseMirror .pm-media-embed--video .pm-media-embed__body {
+  width: 100%;
+  background: rgba(17, 24, 39, 0.92);
+  object-fit: cover;
+}
+
+.pm-editor .ProseMirror .pm-note-embed {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(195, 199, 202, 0.26);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.58)),
+    radial-gradient(circle at top left, rgba(86, 126, 222, 0.12), transparent 42%);
+  box-shadow: 0 12px 32px rgba(25, 28, 30, 0.08);
+}
+
+.pm-editor .ProseMirror .pm-note-embed__thumb {
+  position: relative;
+  min-height: 152px;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 48%),
+    radial-gradient(circle, rgba(28, 39, 56, 0.12) 1px, transparent 1px);
+  background-position: 0 0, 0 0;
+  background-size: 100% 100%, 14px 14px;
+}
+
+.pm-editor .ProseMirror .pm-note-embed__thumb-image {
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.pm-editor .ProseMirror .pm-note-embed__thumb--loaded .pm-note-embed__thumb-image {
+  display: block;
+}
+
+.pm-editor .ProseMirror .pm-note-embed__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  padding: 1rem 1.15rem 1.1rem;
+}
+
+.pm-editor .ProseMirror .pm-note-embed__eyebrow {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pm-editor .ProseMirror .pm-note-embed__title {
+  min-width: 0;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.pm-editor .ProseMirror .pm-note-embed__subtitle {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.pm-editor .ProseMirror .pm-note-embed--missing .pm-note-embed__subtitle {
+  color: #b42318;
+}
+
+.pm-editor .ProseMirror .ProseMirror-selectednode.pm-media-embed,
+.pm-editor .ProseMirror .ProseMirror-selectednode.pm-note-embed {
+  outline: 2px solid color-mix(in srgb, var(--accent-dark) 28%, transparent);
+  outline-offset: 4px;
 }
 
 .pm-editor .ProseMirror .pm-table-node {
@@ -812,20 +913,16 @@ input[type="range"].tool-slider::-moz-range-track {
 }
 
 .pm-editor .ProseMirror a.pm-link {
-  color: var(--accent-dark);
+  color: var(--text-link);
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: color-mix(
-    in srgb,
-    var(--accent-dark) 45%,
-    transparent
-  );
+  text-decoration-color: currentColor;
   text-decoration-thickness: 0.08em;
   text-underline-offset: 0.16em;
 }
 
 .pm-editor .ProseMirror a.pm-link:hover {
-  text-decoration-color: currentColor;
+  text-decoration-thickness: 0.12em;
 }
 
 .pm-editor .ProseMirror .pm-md-inline-code.pm-selection::before,

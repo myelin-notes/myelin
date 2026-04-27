@@ -137,6 +137,115 @@ const horizontalRule: NodeSpec = {
   parseDOM: [{ tag: 'hr' }],
 };
 
+const mediaEmbed: NodeSpec = {
+  group: 'block',
+  atom: true,
+  draggable: true,
+  selectable: true,
+  attrs: {
+    src: {},
+    alt: { default: null },
+    title: { default: null },
+    kind: {},
+    width: { default: null },
+    height: { default: null },
+  },
+  toDOM(node) {
+    const attrs: Record<string, string> = {
+      class: 'pm-media-embed',
+      'data-media-kind': node.attrs.kind as string,
+      'data-media-src': node.attrs.src as string,
+    };
+    if (typeof node.attrs.alt === 'string' && node.attrs.alt.length > 0) {
+      attrs['data-media-alt'] = node.attrs.alt;
+    }
+    if (typeof node.attrs.title === 'string' && node.attrs.title.length > 0) {
+      attrs['data-media-title'] = node.attrs.title;
+    }
+    if (typeof node.attrs.width === 'number' && node.attrs.width > 0) {
+      attrs['data-media-width'] = String(node.attrs.width);
+    }
+    if (typeof node.attrs.height === 'number' && node.attrs.height > 0) {
+      attrs['data-media-height'] = String(node.attrs.height);
+    }
+    return ['div', attrs];
+  },
+  parseDOM: [
+    {
+      tag: 'div.pm-media-embed[data-media-src][data-media-kind]',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        const rawWidth = el.getAttribute('data-media-width');
+        const rawHeight = el.getAttribute('data-media-height');
+        return {
+          src: el.getAttribute('data-media-src'),
+          alt: el.getAttribute('data-media-alt'),
+          title: el.getAttribute('data-media-title'),
+          kind: el.getAttribute('data-media-kind'),
+          width: rawWidth ? Number(rawWidth) || null : null,
+          height: rawHeight ? Number(rawHeight) || null : null,
+        };
+      },
+    },
+  ],
+};
+
+const noteEmbed: NodeSpec = {
+  group: 'block',
+  atom: true,
+  draggable: true,
+  selectable: true,
+  attrs: {
+    target: {},
+    title: {},
+    fragment: { default: null },
+    noteId: { default: null },
+    width: { default: null },
+    height: { default: null },
+  },
+  toDOM(node) {
+    const attrs: Record<string, string> = {
+      class: 'pm-note-embed',
+      'data-note-embed-target': node.attrs.target as string,
+      'data-note-embed-title': node.attrs.title as string,
+    };
+    if (
+      typeof node.attrs.fragment === 'string' &&
+      node.attrs.fragment.length > 0
+    ) {
+      attrs['data-note-embed-fragment'] = node.attrs.fragment;
+    }
+    if (typeof node.attrs.noteId === 'string' && node.attrs.noteId.length > 0) {
+      attrs['data-note-embed-id'] = node.attrs.noteId;
+    }
+    if (typeof node.attrs.width === 'number' && node.attrs.width > 0) {
+      attrs['data-note-embed-width'] = String(node.attrs.width);
+    }
+    if (typeof node.attrs.height === 'number' && node.attrs.height > 0) {
+      attrs['data-note-embed-height'] = String(node.attrs.height);
+    }
+    return ['div', attrs];
+  },
+  parseDOM: [
+    {
+      tag: 'div.pm-note-embed[data-note-embed-target][data-note-embed-title]',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        const rawWidth = el.getAttribute('data-note-embed-width');
+        const rawHeight = el.getAttribute('data-note-embed-height');
+        return {
+          target: el.getAttribute('data-note-embed-target'),
+          title: el.getAttribute('data-note-embed-title'),
+          fragment: el.getAttribute('data-note-embed-fragment'),
+          noteId: el.getAttribute('data-note-embed-id') || null,
+          width: rawWidth ? Number(rawWidth) || null : null,
+          height: rawHeight ? Number(rawHeight) || null : null,
+        };
+      },
+    },
+  ],
+};
+
 const image: NodeSpec = {
   inline: true,
   group: 'inline',
@@ -347,6 +456,8 @@ export const schema = new Schema({
     blockquote,
     codeBlock,
     horizontalRule,
+    mediaEmbed,
+    noteEmbed,
     image,
     mention,
     ...tableSpecs,

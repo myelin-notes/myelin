@@ -18,6 +18,7 @@ import { AllSelection, type Command, Selection } from 'prosemirror-state';
 import { goToNextCell } from 'prosemirror-tables';
 import { redo, undo } from 'y-prosemirror';
 import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
+import { expandMarkdownEmbedCommand } from './markdown/embed-blocks';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { expandMarkdownLinkCommand } from './markdown/links';
 import { schema } from './schema';
@@ -192,6 +193,7 @@ export function buildKeymap(s: Schema) {
       splitBlock,
     ),
     Backspace: chainCommands(
+      expandMarkdownEmbedCommand,
       deleteSelection,
       undoInputRule,
       clearBlockFormatting,

@@ -5,6 +5,7 @@ import {
 } from 'y-prosemirror';
 import { parseMarkdownToDoc } from './markdown-parser';
 import { serializeDocToMarkdown } from './markdown-serializer';
+import { normalizeAndResolveNoteEmbedsDoc } from './pm/markdown/embed-blocks';
 import { normalizeAndResolveNoteLinksDoc } from './pm/markdown/note-links';
 import { schema } from './pm/schema';
 
@@ -146,6 +147,68 @@ describe('page-frame content shape', () => {
             },
             { type: 'text', text: '.' },
           ],
+        },
+      ],
+    });
+    expect(roundTripped.toJSON()).toEqual(doc.toJSON());
+    expect(serializeDocToMarkdown(roundTripped)).toBe(`${markdown}\n`);
+  });
+
+  it('round-trips standalone note and media embeds through the page-frame schema', async () => {
+    const markdown = [
+      '![[Alpha Note]]',
+      '',
+      '![Diagram|320](https://example.com/diagram.png)',
+      '',
+      '![](https://example.com/demo.mp4)',
+    ].join('\n');
+
+    const doc = await normalizeAndResolveNoteEmbedsDoc(
+      parseMarkdownToDoc(markdown, schema),
+      schema,
+      async (title) => (title === 'Alpha Note' ? 'note-1' : null),
+    );
+    const ydoc = prosemirrorToYDoc(doc, 'page-frame');
+    const roundTripped = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment('page-frame'),
+      schema,
+    );
+
+    expect(doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'noteEmbed',
+          attrs: {
+            target: 'Alpha Note',
+            title: 'Alpha Note',
+            fragment: null,
+            noteId: 'note-1',
+            width: null,
+            height: null,
+          },
+        },
+        {
+          type: 'mediaEmbed',
+          attrs: {
+            src: 'https://example.com/diagram.png',
+            alt: 'Diagram',
+            title: null,
+            kind: 'image',
+            width: 320,
+            height: null,
+          },
+        },
+        {
+          type: 'mediaEmbed',
+          attrs: {
+            src: 'https://example.com/demo.mp4',
+            alt: null,
+            title: null,
+            kind: 'video',
+            width: null,
+            height: null,
+          },
         },
       ],
     });
