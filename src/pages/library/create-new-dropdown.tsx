@@ -1,4 +1,4 @@
-import { FileText, FolderPlus, LayoutGrid, Plus } from 'lucide-react';
+import { FolderPlus, Import, LayoutGrid, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,13 +15,13 @@ const itemClass =
 interface CreateNewDropdownProps {
   onNewFolder?: () => void;
   onNewFile?: (title: string, type: FileType) => void;
-  onImportMarkdown?: () => void;
+  onImportFiles?: () => void;
 }
 
 export function CreateNewDropdown({
   onNewFolder,
   onNewFile,
-  onImportMarkdown,
+  onImportFiles,
 }: CreateNewDropdownProps) {
   const strings = useMessages();
 
@@ -54,10 +54,10 @@ export function CreateNewDropdown({
         </DropdownMenuItem>
         <DropdownMenuItem
           className={itemClass}
-          onClick={() => onImportMarkdown?.()}
+          onClick={() => onImportFiles?.()}
         >
-          <FileText className="size-4" />
-          {strings.library.createNew.importMarkdown}
+          <Import className="size-4" />
+          {strings.library.createNew.importFiles}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

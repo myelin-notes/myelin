@@ -64,6 +64,7 @@ export {
   setRepositoryConfig,
   subscribeRepositoryConfig,
 } from './repo/repository-settings';
+export { getFileTypeForName } from './repo/shared';
 export type {
   FileType,
   Repository,
@@ -74,7 +75,7 @@ export type {
   VFSFolderNode,
   VFSNode,
 } from './repo/types';
-export { FileTypes } from './repo/types';
+export { FileTypes, ImageFileTypes, VideoFileTypes } from './repo/types';
 export { NoteSession } from './session';
 export type {
   NoteSessionStatus,

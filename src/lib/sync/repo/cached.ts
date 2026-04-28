@@ -23,7 +23,12 @@ import type {
 } from './config';
 import type { LocalRepository } from './local';
 import {
+  addChild,
+  computeRevision,
+  createFileNode,
+  createNodeId,
   deleteNodeFromManifest,
+  getUniqueFileName,
   type RepositorySnapshot,
   type VFSManifest,
 } from './shared';
@@ -41,7 +46,7 @@ import type {
 type PendingOp =
   | { kind: 'upsert-manifest-node'; nodeId: string }
   | { kind: 'delete-manifest-node'; nodeId: string; deletedFileIds: string[] }
-  | { kind: 'push-note'; nodeId: string }
+  | { kind: 'push-note'; nodeId: string; baseFileRevision?: string | null }
   | { kind: 'sync-custom-colors' };
 
 interface DeletedSubtree {
@@ -172,6 +177,34 @@ function applyManifestUpsert(
   restoreNodePlacement(remoteManifest, cacheManifest, nodeId);
 }
 
+function getExistingParentId(
+  manifest: VFSManifest,
+  parentId: string | null,
+): string | null {
+  if (parentId === null) {
+    return null;
+  }
+  return manifest.nodes[parentId]?.type === 'folder' ? parentId : null;
+}
+
+function getConflictedFileName(name: string, timestamp: Date): string {
+  const timestampLabel = [
+    timestamp.getFullYear(),
+    String(timestamp.getMonth() + 1).padStart(2, '0'),
+    String(timestamp.getDate()).padStart(2, '0'),
+    String(timestamp.getHours()).padStart(2, '0'),
+    String(timestamp.getMinutes()).padStart(2, '0'),
+  ].join('');
+  const dotIndex = name.lastIndexOf('.');
+  const suffix = ` (Conflicted copy ${timestampLabel})`;
+
+  if (dotIndex <= 0 || dotIndex === name.length - 1) {
+    return `${name}${suffix}`;
+  }
+
+  return `${name.slice(0, dotIndex)}${suffix}${name.slice(dotIndex)}`;
+}
+
 function enqueueUpsertManifestNode(ops: PendingOp[], nodeId: string): void {
   const alreadyDeleted = ops.some(
     (op) => op.kind === 'delete-manifest-node' && op.nodeId === nodeId,
@@ -187,7 +220,11 @@ function enqueueUpsertManifestNode(ops: PendingOp[], nodeId: string): void {
   ops.splice(0, ops.length, ...filtered);
 }
 
-function enqueuePushNote(ops: PendingOp[], nodeId: string): void {
+function enqueuePushNote(
+  ops: PendingOp[],
+  nodeId: string,
+  baseFileRevision?: string | null,
+): void {
   const alreadyDeleted = ops.some(
     (op) =>
       op.kind === 'delete-manifest-node' && op.deletedFileIds.includes(nodeId),
@@ -200,7 +237,11 @@ function enqueuePushNote(ops: PendingOp[], nodeId: string): void {
     return;
   }
 
-  ops.push({ kind: 'push-note', nodeId });
+  ops.push({
+    kind: 'push-note',
+    nodeId,
+    ...(baseFileRevision !== undefined ? { baseFileRevision } : {}),
+  });
 }
 
 function enqueueDeleteManifestNode(
@@ -430,13 +471,26 @@ export class CachedRepository
     name: string,
     fileType: FileType,
     parentId: string | null,
+    bytes?: Uint8Array,
   ): Promise<string> {
-    const nodeId = await this.cache.createFile(name, fileType, parentId);
+    const nodeId = await this.cache.createFile(name, fileType, parentId, bytes);
     await this.mutatePendingOps((ops) => {
       enqueueUpsertManifestNode(ops, nodeId);
-      enqueuePushNote(ops, nodeId);
+      enqueuePushNote(ops, nodeId, fileType === 'mcanvas' ? undefined : null);
     });
     return nodeId;
+  }
+
+  async readFileBytes(nodeId: string): Promise<Uint8Array | null> {
+    return this.cache.readFileBytes(nodeId);
+  }
+
+  async writeFileBytes(nodeId: string, bytes: Uint8Array): Promise<void> {
+    const baseFileRevision = await this.getRawFileBaseRevision(nodeId);
+    await this.cache.writeFileBytes(nodeId, bytes);
+    await this.mutatePendingOps((ops) => {
+      enqueuePushNote(ops, nodeId, baseFileRevision);
+    });
   }
 
   async renameNode(nodeId: string, newName: string): Promise<void> {
@@ -508,6 +562,16 @@ export class CachedRepository
         ops.push({ kind: 'sync-custom-colors' });
       }
     });
+  }
+
+  private async getRawFileBaseRevision(
+    nodeId: string,
+  ): Promise<string | null | undefined> {
+    const node = await this.cache.getNode(nodeId);
+    if (!node || node.type !== 'file' || node.fileType === 'mcanvas') {
+      return undefined;
+    }
+    return computeRevision(await this.cache.readFileBytes(nodeId));
   }
 
   async openSession(nodeId: string): Promise<NoteSession> {
@@ -616,7 +680,7 @@ export class CachedRepository
         await this.applyManifestDelete(op);
         return;
       case 'push-note':
-        await this.applyNotePush(op.nodeId);
+        await this.applyNotePush(op);
         return;
       case 'sync-custom-colors':
         await this.applyCustomColorsSync();
@@ -654,17 +718,17 @@ export class CachedRepository
   private async applyManifestDelete(
     op: Extract<PendingOp, { kind: 'delete-manifest-node' }>,
   ): Promise<void> {
+    await Promise.all(
+      op.deletedFileIds.map(async (nodeId) => {
+        await this.remote.removeNoteData(nodeId);
+      }),
+    );
+
     await this.remote.applyManifestMutation(
       `Delete manifest node ${op.nodeId}`,
       (remoteManifest) => {
         deleteNodeFromManifest(remoteManifest, op.nodeId);
       },
-    );
-
-    await Promise.all(
-      op.deletedFileIds.map(async (nodeId) => {
-        await this.remote.removeNoteData(nodeId);
-      }),
     );
     logger.debug('Applied cached manifest delete to remote', {
       repositoryKind: this.kind,
@@ -673,12 +737,47 @@ export class CachedRepository
     });
   }
 
-  private async applyNotePush(nodeId: string): Promise<void> {
+  private async applyNotePush(
+    op: Extract<PendingOp, { kind: 'push-note' }>,
+  ): Promise<void> {
+    const nodeId = op.nodeId;
     const node = await this.cache.getNode(nodeId);
     if (!node || node.type !== 'file') {
       logger.debug('Skipped cached note push because file no longer exists', {
         repositoryKind: this.kind,
         nodeId,
+      });
+      return;
+    }
+
+    if (node.fileType !== 'mcanvas') {
+      const bytes = await this.cache.readFileBytes(nodeId);
+      if (op.baseFileRevision !== undefined) {
+        const remoteBytes = await this.remote.readFileBytes(nodeId);
+        const remoteRevision = await computeRevision(remoteBytes);
+        if (remoteRevision !== op.baseFileRevision) {
+          await this.createRawFileConflictCopy(
+            node,
+            bytes ?? new Uint8Array(),
+            remoteBytes,
+          );
+          logger.debug('Created raw file conflict copy', {
+            repositoryKind: this.kind,
+            nodeId,
+            fileType: node.fileType,
+            baseFileRevision: op.baseFileRevision,
+            remoteRevision,
+          });
+          return;
+        }
+      }
+
+      await this.remote.writeFileBytes(nodeId, bytes ?? new Uint8Array());
+      logger.debug('Applied cached file push to remote', {
+        repositoryKind: this.kind,
+        nodeId,
+        fileType: node.fileType,
+        byteLength: bytes?.byteLength ?? 0,
       });
       return;
     }
@@ -722,6 +821,88 @@ export class CachedRepository
     }
 
     throw new Error(`Failed to sync note ${nodeId} after retrying conflicts.`);
+  }
+
+  private async createRawFileConflictCopy(
+    localNode: VFSFileNode,
+    localBytes: Uint8Array,
+    remoteBytes: Uint8Array | null,
+  ): Promise<void> {
+    const remoteNode = await this.remote.getNode(localNode.id);
+    const originalRemoteNode =
+      remoteNode?.type === 'file' ? structuredClone(remoteNode) : null;
+    const conflictId = createNodeId();
+    const now = Date.now();
+    const timestamp = new Date(now);
+    let conflictNode: VFSFileNode | null = null;
+
+    await this.remote.applyManifestMutation(
+      `Create conflict copy for file ${localNode.id}`,
+      (manifest) => {
+        const parentId = getExistingParentId(
+          manifest,
+          originalRemoteNode?.parentId ?? localNode.parentId,
+        );
+        const name = getUniqueFileName(
+          manifest,
+          getConflictedFileName(localNode.name, timestamp),
+          parentId,
+        );
+        conflictNode = {
+          ...createFileNode(
+            conflictId,
+            name,
+            localNode.fileType,
+            parentId,
+            now,
+          ),
+          tags: [...localNode.tags],
+        };
+        manifest.nodes[conflictId] = conflictNode;
+        addChild(manifest, parentId, conflictId);
+      },
+    );
+
+    await this.remote.writeFileBytes(conflictId, localBytes);
+
+    if (!conflictNode) {
+      return;
+    }
+
+    await this.cache.applyManifestMutation(
+      `Apply conflict copy for file ${localNode.id}`,
+      (manifest) => {
+        if (originalRemoteNode) {
+          const parentId = getExistingParentId(
+            manifest,
+            originalRemoteNode.parentId,
+          );
+          detachNodeFromAllContainers(manifest, originalRemoteNode.id);
+          manifest.nodes[originalRemoteNode.id] = {
+            ...originalRemoteNode,
+            parentId,
+          };
+          addChild(manifest, parentId, originalRemoteNode.id);
+        } else {
+          deleteNodeFromManifest(manifest, localNode.id);
+        }
+
+        const parentId = getExistingParentId(manifest, conflictNode!.parentId);
+        manifest.nodes[conflictId] = {
+          ...conflictNode!,
+          parentId,
+        };
+        addChild(manifest, parentId, conflictId);
+      },
+    );
+
+    if (originalRemoteNode) {
+      await this.cache.writeFileBytes(
+        originalRemoteNode.id,
+        remoteBytes ?? new Uint8Array(),
+      );
+    }
+    await this.cache.writeFileBytes(conflictId, localBytes);
   }
 
   private async collectDeletedSubtree(nodeId: string): Promise<DeletedSubtree> {
@@ -774,7 +955,11 @@ export class CachedRepository
       for (const node of Object.values(snapshot.manifest.nodes)) {
         enqueueUpsertManifestNode(ops, node.id);
         if (node.type === 'file') {
-          enqueuePushNote(ops, node.id);
+          enqueuePushNote(
+            ops,
+            node.id,
+            node.fileType === 'mcanvas' ? undefined : null,
+          );
         }
       }
     }, false);

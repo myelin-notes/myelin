@@ -10,6 +10,7 @@ import {
   createEmptyManifest,
   createFileNode,
   getNoteFileName,
+  getStoredFileName,
   MANIFEST_PATH,
 } from './shared';
 
@@ -76,6 +77,39 @@ describe('LocalRepository', () => {
 
     expect(storedBytes).not.toBeNull();
     expect(readNoteText(storedBytes)).toBe('persisted bytes');
+  });
+
+  it('stores image files as regular VFS file nodes', async () => {
+    const repository = new LocalRepository('repositories/image-file-test');
+    await repository.initialize();
+
+    const bytes = new Uint8Array([137, 80, 78, 71]);
+    const fileId = await repository.createFile('Photo.png', 'png', null, bytes);
+
+    const node = await repository.getNode(fileId);
+    expect(node).toMatchObject({
+      id: fileId,
+      name: 'Photo.png',
+      type: 'file',
+      fileType: 'png',
+    });
+
+    const storage = getRepositoryTestStorage();
+    const storedName = getStoredFileName({ id: fileId, fileType: 'png' });
+    const storedPath = `repositories/image-file-test/files/${storedName}`;
+    const storedBytes = storage.readBinary(storedPath);
+
+    expect(Array.from(storedBytes ?? [])).toEqual(Array.from(bytes));
+    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual(
+      Array.from(bytes),
+    );
+    expect(await repository.getRevealPath(fileId)).toBe(
+      `/app-data/repositories/image-file-test/files/${fileId}.png`,
+    );
+
+    await repository.deleteNode(fileId);
+
+    expect(storage.readBinary(storedPath)).toBeNull();
   });
 
   it('removes stored note bytes when a file is deleted', async () => {

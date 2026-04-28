@@ -38,14 +38,21 @@ import {
   type ViewMode,
 } from './explorer/explorer-tree';
 import {
+  importStorageFile,
+  isStorageFile,
+  STORAGE_FILE_ACCEPT,
+} from './import-files';
+import {
   importMarkdownFile,
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
 } from './import-markdown';
+import { importPdfFile, isPdfFile, PDF_FILE_ACCEPT } from './import-pdf';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
 const logger = new Logger('LibraryPage');
+const LIBRARY_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
 
 export function LibraryPage() {
   const strings = useMessages();
@@ -53,7 +60,7 @@ export function LibraryPage() {
   const repository = useRepository();
   const navigate = useNavigate();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
-  const markdownInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,7 +79,7 @@ export function LibraryPage() {
     'created',
   ];
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
-  const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
+  const [isImportingFiles, setIsImportingFiles] = useState(false);
   const cycleSortMode = () => {
     setSortMode(
       (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
@@ -100,39 +107,62 @@ export function LibraryPage() {
     void loadRecentFiles();
   }, [loadRecentFiles]);
 
-  const handleImportMarkdown = async (file: File) => {
-    if (!isMarkdownFile(file)) {
-      toast.error(strings.library.importMarkdown.unsupportedFile);
+  const handleImportStorageFiles = async (files: File[]) => {
+    const supportedFiles = files.filter(
+      (file) => isMarkdownFile(file) || isPdfFile(file) || isStorageFile(file),
+    );
+    if (supportedFiles.length === 0) {
+      toast.error(strings.library.importFiles.unsupportedFile);
       return;
     }
 
-    setIsImportingMarkdown(true);
+    setIsImportingFiles(true);
 
     try {
-      const importedId = await importMarkdownFile({
-        file,
-        repository,
-        parentId: currentFolderId,
-        fallbackTitle: strings.library.createNew.untitledCanvas,
-      });
+      for (const file of supportedFiles) {
+        if (isMarkdownFile(file)) {
+          await importMarkdownFile({
+            file,
+            repository,
+            parentId: currentFolderId,
+            fallbackTitle: strings.library.createNew.untitledCanvas,
+          });
+        } else if (isPdfFile(file)) {
+          await importPdfFile({
+            file,
+            repository,
+            parentId: currentFolderId,
+            fallbackTitle: strings.library.createNew.untitledCanvas,
+          });
+        } else {
+          await importStorageFile({
+            file,
+            repository,
+            parentId: currentFolderId,
+          });
+        }
+      }
       triggerRefresh();
-      navigate(`/mcanvas/${importedId}`);
+
+      if (supportedFiles.length !== files.length) {
+        toast.error(strings.library.importFiles.someUnsupported);
+      }
     } catch (error) {
-      toast.error(strings.library.importMarkdown.failed, {
+      toast.error(strings.library.importFiles.failed, {
         description: error instanceof Error ? error.message : String(error),
       });
     } finally {
-      setIsImportingMarkdown(false);
+      setIsImportingFiles(false);
     }
   };
 
-  const handleMarkdownInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
+  const handleStorageInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.currentTarget.files ?? []);
     event.currentTarget.value = '';
-    if (!file || isImportingMarkdown) {
+    if (files.length === 0 || isImportingFiles) {
       return;
     }
-    void handleImportMarkdown(file);
+    void handleImportStorageFiles(files);
   };
 
   useEffect(() => {
@@ -414,14 +444,15 @@ export function LibraryPage() {
                     onNewFile={(title, type) =>
                       explorerRef.current?.startNewFile(title, type)
                     }
-                    onImportMarkdown={() => markdownInputRef.current?.click()}
+                    onImportFiles={() => importInputRef.current?.click()}
                   />
                   <input
-                    ref={markdownInputRef}
+                    ref={importInputRef}
                     type="file"
-                    accept={MARKDOWN_FILE_ACCEPT}
+                    multiple
+                    accept={LIBRARY_IMPORT_ACCEPT}
                     className="hidden"
-                    onChange={handleMarkdownInputChange}
+                    onChange={handleStorageInputChange}
                   />
                 </div>
               </div>

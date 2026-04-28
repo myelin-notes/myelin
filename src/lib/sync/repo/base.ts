@@ -78,19 +78,22 @@ export abstract class BaseRepository
     action: string,
   ): Promise<string | null>;
 
-  protected abstract loadNoteBytes(nodeId: string): Promise<{
+  protected abstract loadFileBytes(nodeId: string): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }>;
 
-  protected abstract saveNoteBytes(
+  protected abstract saveFileBytes(
     nodeId: string,
     bytes: Uint8Array,
     revision: string | null,
     message: string,
   ): Promise<string | null>;
 
-  protected abstract deleteNoteBytes(nodeId: string): Promise<void>;
+  protected abstract deleteFileBytes(
+    nodeId: string,
+    fileType?: FileType,
+  ): Promise<void>;
 
   protected isConflictError(_error: unknown): boolean {
     return false;
@@ -102,7 +105,7 @@ export abstract class BaseRepository
 
   protected async onFileCreated(_nodeId: string): Promise<void> {}
 
-  protected async onNoteSaved(_nodeId: string): Promise<void> {}
+  protected async onFileSaved(_nodeId: string): Promise<void> {}
 
   getRuntimeStatus(): RepositoryRuntimeStatus {
     return { ...this.runtimeStatus };
@@ -127,7 +130,7 @@ export abstract class BaseRepository
 
     const noteEntries = await Promise.all(
       fileNodes.map(async (node) => {
-        const { bytes } = await this.loadNoteBytes(node.id);
+        const { bytes } = await this.loadFileBytes(node.id);
         return [node.id, bytes ? new Uint8Array(bytes) : null] as const;
       }),
     );
@@ -145,8 +148,8 @@ export abstract class BaseRepository
     return this.mutateManifest(action, mutator);
   }
 
-  async removeNoteData(nodeId: string): Promise<void> {
-    await this.deleteNoteBytes(nodeId);
+  async removeNoteData(nodeId: string, fileType?: FileType): Promise<void> {
+    await this.deleteFileBytes(nodeId, fileType);
   }
 
   async initialize(): Promise<void> {
@@ -231,6 +234,7 @@ export abstract class BaseRepository
     name: string,
     fileType: FileType,
     parentId: string | null,
+    bytes?: Uint8Array,
   ): Promise<string> {
     const id = await this.mutateManifest('Create file', (manifest) => {
       const newId = createNodeId();
@@ -246,7 +250,28 @@ export abstract class BaseRepository
       return newId;
     });
     await this.onFileCreated(id);
+    if (bytes !== undefined) {
+      await this.writeFileBytes(id, bytes);
+    }
     return id;
+  }
+
+  async readFileBytes(nodeId: string): Promise<Uint8Array | null> {
+    const { bytes } = await this.loadFileBytes(nodeId);
+    return bytes ? new Uint8Array(bytes) : null;
+  }
+
+  async writeFileBytes(nodeId: string, bytes: Uint8Array): Promise<void> {
+    const { revision } = await this.loadFileBytes(nodeId);
+    const nextRevision = await this.saveFileBytes(
+      nodeId,
+      bytes,
+      revision,
+      `Update file ${nodeId}`,
+    );
+    if (nextRevision !== null) {
+      await this.onFileSaved(nodeId);
+    }
   }
 
   async renameNode(nodeId: string, newName: string): Promise<void> {
@@ -261,15 +286,14 @@ export abstract class BaseRepository
   }
 
   async deleteNode(nodeId: string): Promise<void> {
-    const deletedFileIds = await this.mutateManifest(
-      'Delete node',
-      (manifest) => deleteNodeFromManifest(manifest, nodeId),
+    const deletedFiles = await this.mutateManifest('Delete node', (manifest) =>
+      deleteNodeFromManifest(manifest, nodeId),
     );
 
     await Promise.all(
-      deletedFileIds.map(async (fileId) => {
-        await this.deleteNoteBytes(fileId);
-        await removeThumbnail(fileId);
+      deletedFiles.map(async (file) => {
+        await this.deleteFileBytes(file.id, file.fileType);
+        await removeThumbnail(file.id);
       }),
     );
   }
@@ -447,14 +471,14 @@ export abstract class BaseRepository
     }
 
     const mergedBytes = Y.encodeStateAsUpdate(remote.doc);
-    const revision = await this.saveNoteBytes(
+    const revision = await this.saveFileBytes(
       nodeId,
       mergedBytes,
       remote.revision,
       `Update note ${nodeId}`,
     );
     if (revision !== null) {
-      await this.onNoteSaved(nodeId);
+      await this.onFileSaved(nodeId);
     }
 
     logger.debug('Accepted repository document push', {
@@ -505,7 +529,12 @@ export abstract class BaseRepository
     stateVector: Uint8Array;
     revision: string | null;
   }> {
-    const { bytes, revision } = await this.loadNoteBytes(nodeId);
+    const node = await this.getNode(nodeId);
+    if (node?.type === 'file' && node.fileType !== 'mcanvas') {
+      throw new Error(`Cannot open ${node.fileType} files as canvas sessions.`);
+    }
+
+    const { bytes, revision } = await this.loadFileBytes(nodeId);
     const doc = createDocFromBytes(bytes);
     return {
       bytes,

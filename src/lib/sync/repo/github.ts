@@ -3,11 +3,11 @@ import { BaseRepository } from './base';
 import { getGitHubToken } from './github-credentials';
 import {
   createEmptyManifest,
-  getNotePath,
+  getStoredFilePath,
   MANIFEST_PATH,
   type VFSManifest,
 } from './shared';
-import type { RepositoryCapabilities } from './types';
+import type { FileType, RepositoryCapabilities, VFSFileNode } from './types';
 
 interface GitHubContentsResponse {
   sha: string;
@@ -99,34 +99,60 @@ export class GitHubRepository extends BaseRepository {
     );
   }
 
-  protected async loadNoteBytes(nodeId: string): Promise<{
+  protected async loadFileBytes(nodeId: string): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
-    const payload = await this.getContents(getNotePath(nodeId));
+    const node = await this.getFileNode(nodeId);
+    if (!node) {
+      return { bytes: null, revision: null };
+    }
+
+    const payload = await this.getContents(getStoredFilePath(node));
     return { bytes: payload.bytes, revision: payload.sha };
   }
 
-  protected async saveNoteBytes(
+  protected async saveFileBytes(
     nodeId: string,
     bytes: Uint8Array,
     revision: string | null,
     message: string,
   ): Promise<string | null> {
-    return this.putContents(getNotePath(nodeId), bytes, revision, message);
+    const node = await this.getFileNode(nodeId);
+    if (!node) {
+      return null;
+    }
+    return this.putContents(getStoredFilePath(node), bytes, revision, message);
   }
 
-  protected async deleteNoteBytes(nodeId: string): Promise<void> {
-    const payload = await this.getContents(getNotePath(nodeId));
+  protected async deleteFileBytes(
+    nodeId: string,
+    fileType?: FileType,
+  ): Promise<void> {
+    const node = await this.getFileNode(nodeId, fileType);
+    if (!node) {
+      return;
+    }
+
+    const path = getStoredFilePath(node);
+    const payload = await this.getContents(path);
     if (!payload.sha) {
       return;
     }
 
-    await this.deleteContents(
-      getNotePath(nodeId),
-      payload.sha,
-      `Delete note ${nodeId}`,
-    );
+    await this.deleteContents(path, payload.sha, `Delete file ${nodeId}`);
+  }
+
+  private async getFileNode(
+    nodeId: string,
+    fileType?: FileType,
+  ): Promise<Pick<VFSFileNode, 'id' | 'fileType'> | null> {
+    const { manifest } = await this.loadManifestImpl();
+    const node = manifest.nodes[nodeId];
+    if (node?.type === 'file') {
+      return node;
+    }
+    return fileType ? { id: nodeId, fileType } : null;
   }
 
   private contentsUrl(path: string): string {
