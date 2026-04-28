@@ -35,6 +35,10 @@ import { useCanvasInserts } from './hooks/use-inserts';
 import { useToolState } from './hooks/use-tool-state';
 import { markdownImportHandler } from './media/markdown';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
+import {
+  getNoteLinkPreview,
+  type NoteLinkPreviewTarget,
+} from './page-frame/note-link-preview';
 import type { NoteLinkOpenRequestDetail } from './page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomplete';
 
@@ -157,6 +161,11 @@ function CanvasViewInner() {
     repository,
     view: activeEditorView,
   });
+  const loadNoteLinkPreview = useCallback(
+    (target: NoteLinkPreviewTarget, signal: AbortSignal) =>
+      getNoteLinkPreview(repository, target, signal),
+    [repository],
+  );
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
@@ -173,6 +182,7 @@ function CanvasViewInner() {
         editingElement={engine.editingElement}
         autocompleteController={pageFrameAutocomplete.controller}
         onAutocompleteSelect={pageFrameAutocomplete.onSelectItem}
+        loadNoteLinkPreview={loadNoteLinkPreview}
       />
 
       {/* Element-owned DOM overlay (PDF pages, future DOM-rendered elements) */}

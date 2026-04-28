@@ -35,7 +35,7 @@ interface NoteLinkTarget {
   noteId: string | null;
 }
 
-const NOTE_LINK_SELECTOR = '[data-note-link-title]';
+export const NOTE_LINK_SELECTOR = '[data-note-link-title]';
 
 export interface NoteLinkOpenRequestDetail {
   title: string;

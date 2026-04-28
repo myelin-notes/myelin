@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { PM_UPDATE_EVENT } from '@/lib/events';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
@@ -12,12 +12,21 @@ import {
   type PageFrameElement,
 } from '../../elements/page-frame-element';
 import type {
+  NoteLinkPreview,
+  NoteLinkPreviewTarget,
+} from '../note-link-preview';
+import {
+  type NoteLinkPreviewHit,
+  NoteLinkPreviewPopover,
+} from '../note-link-preview-popover';
+import type {
   PageFrameAutocompleteController,
   PageFrameAutocompleteItem,
 } from '../pm/autocomplete';
 import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
+import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
 
 const FRAME_STYLE: Record<string, string> = {
   transformOrigin: '0 0',
@@ -156,11 +165,100 @@ function shouldPreserveExternalFocus(target: EventTarget | null): boolean {
   );
 }
 
+function rectContainsPoint(
+  rect: DOMRect,
+  clientX: number,
+  clientY: number,
+): boolean {
+  return (
+    clientX >= rect.left &&
+    clientX <= rect.right &&
+    clientY >= rect.top &&
+    clientY <= rect.bottom
+  );
+}
+
+function getVisualRectForContentRect(refs: FrameRefs, rect: DOMRect): DOMRect {
+  const contentRect = refs.contentDiv.getBoundingClientRect();
+  const frameRect = refs.frameDiv.getBoundingClientRect();
+  const scaleX =
+    contentRect.width > 0 ? frameRect.width / contentRect.width : 1;
+  const scaleY =
+    contentRect.height > 0 ? frameRect.height / contentRect.height : 1;
+
+  return new DOMRect(
+    frameRect.left + (rect.left - contentRect.left) * scaleX,
+    frameRect.top + (rect.top - contentRect.top) * scaleY,
+    rect.width * scaleX,
+    rect.height * scaleY,
+  );
+}
+
+function unionRects(rects: DOMRect[]): DOMRect {
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const rect of rects) {
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.right);
+    bottom = Math.max(bottom, rect.bottom);
+  }
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
+function getNoteLinkPreviewTargetAtPoint(
+  frameMap: ReadonlyMap<number, FrameRefs>,
+  clientX: number,
+  clientY: number,
+): NoteLinkPreviewHit | null {
+  for (const refs of frameMap.values()) {
+    const contentRect = getVisualRectForContentRect(
+      refs,
+      refs.contentDiv.getBoundingClientRect(),
+    );
+    if (!rectContainsPoint(contentRect, clientX, clientY)) {
+      continue;
+    }
+
+    for (const link of refs.contentDiv.querySelectorAll<HTMLElement>(
+      NOTE_LINK_SELECTOR,
+    )) {
+      const linkRects = Array.from(link.getClientRects()).map((rect) =>
+        getVisualRectForContentRect(refs, rect),
+      );
+      if (
+        !linkRects.some((rect) => rectContainsPoint(rect, clientX, clientY))
+      ) {
+        continue;
+      }
+
+      const title = link.getAttribute('data-note-link-title');
+      if (title === null) {
+        continue;
+      }
+
+      const target: NoteLinkPreviewTarget = {
+        title,
+        noteId: link.getAttribute('data-note-id') || null,
+      };
+      return { target, rect: unionRects(linkRects) };
+    }
+  }
+
+  return null;
+}
+
 interface PageFrameDomLayerProps {
   canvasRef: React.RefObject<DrawableCanvas | null>;
   editingElement: DrawableElement | null;
   autocompleteController?: PageFrameAutocompleteController | null;
   onAutocompleteSelect?: (item: PageFrameAutocompleteItem) => void;
+  loadNoteLinkPreview?: (
+    target: NoteLinkPreviewTarget,
+    signal: AbortSignal,
+  ) => Promise<NoteLinkPreview | null>;
 }
 
 export function PageFrameDomLayer({
@@ -168,6 +266,7 @@ export function PageFrameDomLayer({
   editingElement: rawEditingElement,
   autocompleteController = null,
   onAutocompleteSelect,
+  loadNoteLinkPreview,
 }: PageFrameDomLayerProps) {
   const editingElement =
     rawEditingElement?.type === ElementType.PAGE_FRAME
@@ -176,6 +275,11 @@ export function PageFrameDomLayer({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const frameMap = useRef<Map<number, FrameRefs>>(new Map());
+  const getPreviewTargetAtPoint = useCallback(
+    (clientX: number, clientY: number) =>
+      getNoteLinkPreviewTargetAtPoint(frameMap.current, clientX, clientY),
+    [],
+  );
   // Views are created eagerly inside createFrameRefs when a page frame first
   // appears on the canvas — so by the time editingElement is set, the view
   // already exists. Read it inline rather than tracking in state.
@@ -400,6 +504,10 @@ export function PageFrameDomLayer({
           onSelectItem={onAutocompleteSelect}
         />
       )}
+      <NoteLinkPreviewPopover
+        getTargetAtPoint={getPreviewTargetAtPoint}
+        loadPreview={loadNoteLinkPreview}
+      />
     </>
   );
 }
