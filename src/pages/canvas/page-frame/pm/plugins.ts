@@ -12,6 +12,7 @@ import {
   noteLinkMarkdownPlugin,
   type ResolveNoteLinkId,
 } from './markdown/note-links';
+import { markdownPastePlugin } from './markdown/paste';
 import { markdownPreviewPlugin } from './markdown/plugin';
 import { prefixMarkdownInputRules } from './markdown/prefix-rules';
 import { paginationPlugin } from './pagination/plugin';
@@ -31,6 +32,7 @@ export function buildPlugins(
     fenceMarkdownNormalizationPlugin(schema),
     noteLinkMarkdownPlugin(schema, resolveNoteLinkId),
     linkMarkdownPlugin(schema),
+    markdownPastePlugin(),
     markdownPreviewPlugin(),
     buildKeymap(schema),
     paginationPlugin(onPageCount),
