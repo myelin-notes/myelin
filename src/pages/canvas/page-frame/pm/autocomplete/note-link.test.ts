@@ -112,4 +112,53 @@ describe('buildSelectNoteLinkAutocompleteTransaction', () => {
       ),
     ).toBeNull();
   });
+
+  it('uses autocomplete insert text as the durable note-link target', () => {
+    const markdown = 'See [[Projects/Al';
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+    const activeRequest = findActiveNoteLinkAutocomplete(state);
+
+    expect(activeRequest).not.toBeNull();
+
+    const tr = buildSelectNoteLinkAutocompleteTransaction(
+      state,
+      schema,
+      activeRequest!,
+      {
+        id: 'note-2',
+        title: 'Alpha Note',
+        insertText: 'Projects/Alpha Note',
+      },
+    );
+
+    expect(tr).not.toBeNull();
+
+    const selectedState = state.apply(tr!);
+
+    expect(selectedState.doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'See ' },
+            {
+              type: 'text',
+              text: '[[Projects/Alpha Note]]',
+              marks: [
+                {
+                  type: 'noteLink',
+                  attrs: {
+                    title: 'Projects/Alpha Note',
+                    noteId: 'note-2',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
 });

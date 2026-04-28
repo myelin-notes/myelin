@@ -96,6 +96,7 @@ const zhHans: typeof en = {
       folder: '新建文件夹',
       canvas: '新建画布',
       importFiles: '导入文件',
+      importObsidianVault: '导入 Obsidian 仓库',
       untitledCanvas: '未命名画布',
       unnamedFolder: '未命名文件夹',
     },
@@ -107,6 +108,12 @@ const zhHans: typeof en = {
       unsupportedFile: '请选择 Markdown、PDF、图片或视频文件',
       someUnsupported: '部分文件不受支持',
       failed: '导入失败',
+    },
+    importObsidianVault: {
+      failed: 'Obsidian 仓库导入失败',
+      skipped: (count: number) => `已跳过 ${count} 个不受支持的文件`,
+      succeeded: (notes: number, media: number) =>
+        `已导入 ${notes} 个笔记和 ${media} 个媒体文件`,
     },
     semanticTags: {
       title: '语义标签',
@@ -161,6 +168,15 @@ const zhHans: typeof en = {
       fitWholePage: {
         label: '编辑时适配整页',
         description: '进入页面框编辑模式时缩小视图，显示完整页面高度。',
+      },
+      hoverPreview: {
+        label: '显示笔记链接的悬停预览',
+        description: '将光标悬停在链接的笔记上时显示缩略图和标题。',
+      },
+      requireModifier: {
+        label: (key: string) => `需要按住 ${key} 才能打开链接`,
+        description: (key: string) =>
+          `关闭时，单击即可打开笔记链接和超链接。开启时，需按住 ${key} 才能打开，普通单击仅用于定位光标。`,
       },
     },
     repository: {

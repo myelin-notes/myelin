@@ -19,6 +19,7 @@ export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
 
 interface MarkdownPageFrameImportOptions {
   repository?: NoteLinkResolveSource;
+  resolveNoteLinkId?: (title: string) => Promise<string | null>;
 }
 
 interface AddMarkdownPageFrameOptions extends MarkdownPageFrameImportOptions {
@@ -32,9 +33,11 @@ async function buildMarkdownPageFrameDoc(
 ): Promise<PMNode> {
   const doc = parseMarkdownToDoc(markdown, schema);
   const repository = options.repository;
-  const resolveNoteLinkId = repository
-    ? async (title: string) => resolveNoteLinkIdByTitle(repository, title)
-    : undefined;
+  const resolveNoteLinkId = options.resolveNoteLinkId
+    ? options.resolveNoteLinkId
+    : repository
+      ? async (title: string) => resolveNoteLinkIdByTitle(repository, title)
+      : undefined;
   return normalizeAndResolveNoteLinksDoc(doc, schema, resolveNoteLinkId);
 }
 

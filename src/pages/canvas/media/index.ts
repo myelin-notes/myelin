@@ -1,11 +1,11 @@
-import type { Repository } from '@/lib/sync';
 import type { DrawableCanvas } from '../drawable-canvas';
+import type { NoteLinkResolveSource } from '../page-frame/note-link-resolution';
 import { imageImportHandler } from './images';
 import { markdownImportHandler } from './markdown';
 import { pdfImportHandler } from './pdf';
 
 export interface MediaImportOptions {
-  repository?: Pick<Repository, 'searchNodes'>;
+  repository?: NoteLinkResolveSource;
   screenX?: number;
   screenY?: number;
 }

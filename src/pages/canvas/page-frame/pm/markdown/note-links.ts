@@ -1,6 +1,7 @@
 import type { MarkType, Node as PMNode, Schema } from 'prosemirror-model';
 import { EditorState, Plugin } from 'prosemirror-state';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
+import { UserPrefs } from '@/lib/user-prefs';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   buildResolvedTitleLookup,
@@ -35,7 +36,7 @@ interface NoteLinkTarget {
   noteId: string | null;
 }
 
-const NOTE_LINK_SELECTOR = '[data-note-link-title]';
+export const NOTE_LINK_SELECTOR = '[data-note-link-title]';
 
 export interface NoteLinkOpenRequestDetail {
   title: string;
@@ -143,31 +144,31 @@ function buildCurrentNoteLinkCoverage(
   return coverage;
 }
 
-function collectExistingNoteLinkIds(
-  node: PMNode,
-  noteLinkType: MarkType,
-): Map<string, string | null> {
-  const ids = new Map<string, string | null>();
+function findExistingNoteLinkCoverage(
+  coverage: readonly (NoteLinkCoverage | null)[],
+  from: number,
+  to: number,
+  title: string,
+): NoteLinkCoverage | null {
+  let match: NoteLinkCoverage | null = null;
 
-  node.forEach((child) => {
-    if (!child.isText) {
-      return;
+  for (let index = from; index < to; index++) {
+    const value = coverage[index] ?? null;
+    if (value?.title !== title) {
+      return null;
     }
 
-    const mark = child.marks.find(
-      (candidate) => candidate.type === noteLinkType,
-    );
-    if (!mark) {
-      return;
+    if (match === null) {
+      match = value;
+      continue;
     }
 
-    const title = mark.attrs.title as string;
-    if (!ids.has(title)) {
-      ids.set(title, (mark.attrs.noteId as string | null) ?? null);
+    if (!sameCoverage(match, value)) {
+      return null;
     }
-  });
+  }
 
-  return ids;
+  return match;
 }
 
 function collectNoteLinkTargets(
@@ -185,18 +186,24 @@ function collectNoteLinkTargets(
     return [];
   }
 
-  const existingIds = collectExistingNoteLinkIds(node, noteLinkType);
+  const currentCoverage = buildCurrentNoteLinkCoverage(node, noteLinkType);
   return parseInlineMarkdown(text)
     .ranges.filter((range) => range.kind === 'noteLink')
     .map((range) => {
       const title = text.slice(range.contentFrom, range.contentTo);
+      const existingCoverage = findExistingNoteLinkCoverage(
+        currentCoverage,
+        range.open.from,
+        range.close.to,
+        title,
+      );
       return {
         from: posAt[range.open.from],
         to: posAt[range.close.to],
         textFrom: range.open.from,
         textTo: range.close.to,
         title,
-        noteId: existingIds.get(title) ?? null,
+        noteId: existingCoverage?.noteId ?? null,
       };
     });
 }
@@ -400,7 +407,11 @@ export function noteLinkMarkdownPlugin(
   return new Plugin({
     props: {
       handleClick(view, _pos, event) {
-        if (!event.metaKey && !event.ctrlKey) {
+        if (
+          UserPrefs.get('linkRequireModifier') &&
+          !event.metaKey &&
+          !event.ctrlKey
+        ) {
           return false;
         }
 

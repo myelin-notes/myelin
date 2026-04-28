@@ -98,6 +98,7 @@ const es: typeof en = {
       folder: 'Nueva carpeta',
       canvas: 'Nuevo lienzo',
       importFiles: 'Importar archivos',
+      importObsidianVault: 'Importar bóveda de Obsidian',
       untitledCanvas: 'Lienzo sin título',
       unnamedFolder: 'Carpeta sin nombre',
     },
@@ -109,6 +110,13 @@ const es: typeof en = {
       unsupportedFile: 'Elige un archivo Markdown, PDF, de imagen o video.',
       someUnsupported: 'Algunos archivos no son compatibles.',
       failed: 'No se pudo importar',
+    },
+    importObsidianVault: {
+      failed: 'No se pudo importar la bóveda de Obsidian',
+      skipped: (count: number) =>
+        `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} omitido${count === 1 ? '' : 's'}.`,
+      succeeded: (notes: number, media: number) =>
+        `Se importaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
     },
     semanticTags: {
       title: 'Etiquetas semánticas',
@@ -166,6 +174,16 @@ const es: typeof en = {
         label: 'Ajustar página completa al editar',
         description:
           'Alejar la vista para mostrar toda la altura de la página al entrar en la edición del marco.',
+      },
+      hoverPreview: {
+        label: 'Mostrar vistas previas para enlaces de nota',
+        description:
+          'Muestra una miniatura y el título al pasar el cursor sobre una nota enlazada.',
+      },
+      requireModifier: {
+        label: (key: string) => `Requerir ${key}-clic para abrir enlaces`,
+        description: (key: string) =>
+          `Cuando está desactivado, un clic simple abre enlaces de nota e hipervínculos. Cuando está activado, mantén ${key} para abrir; el clic normal coloca el cursor.`,
       },
     },
     repository: {

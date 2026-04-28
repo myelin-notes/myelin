@@ -16,6 +16,7 @@ import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { Logger } from '@/lib/logger';
 import { openNoteLink } from '@/lib/note-navigation';
 import { useRepository } from '@/lib/sync';
+import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
@@ -35,6 +36,10 @@ import { useCanvasInserts } from './hooks/use-inserts';
 import { useToolState } from './hooks/use-tool-state';
 import { markdownImportHandler } from './media/markdown';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
+import {
+  getNoteLinkPreview,
+  type NoteLinkPreviewTarget,
+} from './page-frame/note-link-preview';
 import type { NoteLinkOpenRequestDetail } from './page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomplete';
 
@@ -157,6 +162,17 @@ function CanvasViewInner() {
     repository,
     view: activeEditorView,
   });
+  const [hoverPreviewEnabled, setHoverPreviewEnabled] = useState(
+    UserPrefs.get('noteLinkHoverPreview'),
+  );
+  useEffect(() => {
+    return UserPrefs.subscribe('noteLinkHoverPreview', setHoverPreviewEnabled);
+  }, []);
+  const loadNoteLinkPreview = useCallback(
+    (target: NoteLinkPreviewTarget, signal: AbortSignal) =>
+      getNoteLinkPreview(repository, target, signal),
+    [repository],
+  );
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
@@ -172,7 +188,11 @@ function CanvasViewInner() {
         canvasRef={engine.drawableCanvasRef}
         editingElement={engine.editingElement}
         autocompleteController={pageFrameAutocomplete.controller}
+        autocompleteKind={pageFrameAutocomplete.activeKind}
         onAutocompleteSelect={pageFrameAutocomplete.onSelectItem}
+        loadNoteLinkPreview={
+          hoverPreviewEnabled ? loadNoteLinkPreview : undefined
+        }
       />
 
       {/* Element-owned DOM overlay (PDF pages, future DOM-rendered elements) */}

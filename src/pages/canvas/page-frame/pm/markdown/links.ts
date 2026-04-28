@@ -6,6 +6,7 @@ import {
   TextSelection,
 } from 'prosemirror-state';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { UserPrefs } from '@/lib/user-prefs';
 import {
   collectAffectedTextblocks,
   getChangedRangesForTransactions,
@@ -388,7 +389,11 @@ export const expandMarkdownLinkCommand: Command = (state, dispatch) => {
 };
 
 function handleModifiedLinkInteraction(event: MouseEvent): boolean {
-  if (!event.metaKey && !event.ctrlKey) {
+  if (
+    UserPrefs.get('linkRequireModifier') &&
+    !event.metaKey &&
+    !event.ctrlKey
+  ) {
     return false;
   }
 

@@ -10,6 +10,11 @@ import { FileText, LoaderCircle } from 'lucide-react';
 import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
+import type {
+  NoteLinkPreview,
+  NoteLinkPreviewTarget,
+} from '../../note-link-preview';
+import { NoteLinkPreviewCard } from '../../note-link-preview-card';
 import {
   getPageFrameAutocompleteAnchorRect,
   type PageFrameAutocompleteController,
@@ -24,10 +29,26 @@ interface PageFrameAutocompletePopupProps {
   loadingLabel?: string;
   emptyLabel?: string;
   errorLabel?: string;
+  enablePreview?: boolean;
+  loadPreview?: (
+    target: NoteLinkPreviewTarget,
+    signal: AbortSignal,
+  ) => Promise<NoteLinkPreview | null>;
 }
 
 const EDGE_MARGIN = 12;
 const ANCHOR_GAP = 8;
+const LIST_WIDTH = 320;
+const PREVIEW_WIDTH = 320;
+const PREVIEW_DEBOUNCE_MS = 80;
+// list + preview + viewport margins. Below this width we drop the side panel.
+const PREVIEW_MIN_VIEWPORT_WIDTH =
+  LIST_WIDTH + PREVIEW_WIDTH + EDGE_MARGIN * 2 + 32;
+
+interface ActivePreviewState {
+  itemId: string | null;
+  body: string | null;
+}
 
 export function getAutocompleteScrollTop(
   container: Pick<HTMLElement, 'clientHeight' | 'scrollTop'>,
@@ -93,11 +114,69 @@ export function PageFrameAutocompletePopup({
   loadingLabel = 'Searching...',
   emptyLabel = 'No matches.',
   errorLabel = 'Could not load suggestions.',
+  enablePreview = false,
+  loadPreview,
 }: PageFrameAutocompletePopupProps) {
   const state = useAutocompleteState(controller);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>({});
+
+  const activeItem =
+    state.activeIndex >= 0 ? (state.items[state.activeIndex] ?? null) : null;
+  const previewable =
+    enablePreview && loadPreview !== undefined && state.items.length > 0;
+  const previewVisible =
+    previewable && window.innerWidth >= PREVIEW_MIN_VIEWPORT_WIDTH;
+
+  const [activePreview, setActivePreview] = useState<ActivePreviewState>({
+    itemId: null,
+    body: null,
+  });
+
+  const loadPreviewEvent = useEffectEvent(
+    async (target: NoteLinkPreviewTarget, signal: AbortSignal) => {
+      return loadPreview ? loadPreview(target, signal) : null;
+    },
+  );
+
+  useEffect(() => {
+    if (!previewVisible || !activeItem) {
+      setActivePreview({ itemId: null, body: null });
+      return;
+    }
+
+    const itemId = activeItem.id;
+    const itemTitle = activeItem.title;
+    setActivePreview((prev) =>
+      prev.itemId === itemId ? prev : { itemId, body: null },
+    );
+
+    const abortController = new AbortController();
+    const timer = window.setTimeout(() => {
+      void loadPreviewEvent(
+        { noteId: itemId, title: itemTitle },
+        abortController.signal,
+      )
+        .then((preview) => {
+          if (abortController.signal.aborted) {
+            return;
+          }
+          setActivePreview({
+            itemId,
+            body: preview?.body ?? null,
+          });
+        })
+        .catch(() => {
+          // Swallow — leave existing body as-is.
+        });
+    }, PREVIEW_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      abortController.abort();
+    };
+  }, [activeItem?.id, previewVisible]);
 
   const open = state.open && state.anchorPosition !== null;
   const syncPosition = useEffectEvent(() => {
@@ -228,7 +307,7 @@ export function PageFrameAutocompletePopup({
     <div
       ref={rootRef}
       data-page-frame-preserve-focus
-      className="fade-in-0 zoom-in-95 fixed z-[52] w-[320px] animate-in overflow-hidden rounded-2xl bg-popover/95 p-1.5 shadow-ambient backdrop-blur-2xl duration-100"
+      className="fade-in-0 zoom-in-95 fixed z-[52] flex animate-in items-stretch overflow-hidden rounded-2xl bg-popover/95 shadow-ambient backdrop-blur-2xl duration-100"
       style={{
         ...style,
         border: '0.5px solid var(--border-ghost)',
@@ -241,7 +320,7 @@ export function PageFrameAutocompletePopup({
         ref={listRef}
         role="listbox"
         aria-label="Autocomplete suggestions"
-        className="flex max-h-[280px] flex-col gap-1 overflow-y-auto"
+        className="flex max-h-[280px] w-[320px] flex-col gap-1 overflow-y-auto p-1.5"
       >
         {state.status === 'loading' && (
           <AutocompleteStatusRow
@@ -314,6 +393,24 @@ export function PageFrameAutocompletePopup({
           );
         })}
       </div>
+      {previewVisible && activeItem && (
+        <div
+          className="w-[320px] shrink-0"
+          style={{
+            borderLeft: '0.5px solid var(--border-ghost)',
+          }}
+        >
+          <NoteLinkPreviewCard
+            title={activeItem.title}
+            body={
+              activePreview.itemId === activeItem.id
+                ? activePreview.body
+                : null
+            }
+            noteId={activeItem.id}
+          />
+        </div>
+      )}
     </div>,
     document.body,
   );

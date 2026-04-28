@@ -76,7 +76,8 @@ describe('markdown canvas import', () => {
         }
         return [];
       },
-    } satisfies Pick<Repository, 'searchNodes'>;
+      getFolderChain: async () => [],
+    } satisfies Pick<Repository, 'searchNodes' | 'getFolderChain'>;
 
     const index = await addMarkdownPageFrameToYDoc(
       ydoc,

@@ -95,6 +95,7 @@ const en = {
       folder: 'New Folder',
       canvas: 'New Canvas',
       importFiles: 'Import Files',
+      importObsidianVault: 'Import Obsidian Vault',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
     },
@@ -106,6 +107,13 @@ const en = {
       unsupportedFile: 'Choose a Markdown, PDF, image, or video file.',
       someUnsupported: 'Some files were not supported.',
       failed: 'Import failed',
+    },
+    importObsidianVault: {
+      failed: 'Obsidian vault import failed',
+      skipped: (count: number) =>
+        `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
+      succeeded: (notes: number, media: number) =>
+        `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
     },
     semanticTags: {
       title: 'Semantic Tags',
@@ -163,6 +171,16 @@ const en = {
         label: 'Fit whole page when editing',
         description:
           'Zoom out to show the full page height when entering page-frame edit mode.',
+      },
+      hoverPreview: {
+        label: 'Show hover previews for note links',
+        description:
+          'Reveal a thumbnail and title when you hover a linked note.',
+      },
+      requireModifier: {
+        label: (key: string) => `Require ${key}-click to follow links`,
+        description: (key: string) =>
+          `When off, a plain click follows note links and hyperlinks. When on, hold ${key} to follow, so single clicks place the cursor.`,
       },
     },
     repository: {
