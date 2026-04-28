@@ -170,6 +170,7 @@ function createPrintPages({
       width: `${pageWidth}px`,
     } as Partial<CSSStyleDeclaration>);
 
+    const viewportClone = createViewportClone(pageWidth, totalHeight);
     const contentClone = contentDiv.cloneNode(true) as HTMLDivElement;
     prepareContentClone(contentClone, {
       pageHeight,
@@ -177,9 +178,31 @@ function createPrintPages({
       pageWidth,
       totalHeight,
     });
-    page.appendChild(contentClone);
+    viewportClone.appendChild(contentClone);
+    page.appendChild(viewportClone);
     return page;
   });
+}
+
+function createViewportClone(
+  pageWidth: number,
+  totalHeight: number,
+): HTMLDivElement {
+  const zoom = window.devicePixelRatio || 1;
+  const viewportClone = document.createElement('div');
+  viewportClone.className = 'page-frame-print-viewport';
+  Object.assign(viewportClone.style, {
+    height: `${totalHeight}px`,
+    left: '0',
+    position: 'absolute',
+    top: '0',
+    transform: `scale(${1 / zoom})`,
+    transformOrigin: '0 0',
+    width: `${pageWidth}px`,
+    zoom: `${zoom}`,
+  } as Partial<CSSStyleDeclaration>);
+  viewportClone.style.setProperty('--vp-zoom', `${zoom}`);
+  return viewportClone;
 }
 
 function prepareContentClone(
