@@ -14,7 +14,7 @@ import {
 } from './markdown/note-links';
 import { markdownPreviewPlugin } from './markdown/plugin';
 import { prefixMarkdownInputRules } from './markdown/prefix-rules';
-import { paginationPlugin } from './pagination';
+import { paginationPlugin } from './pagination/plugin';
 import { schema } from './schema';
 import { selectionHighlightPlugin } from './selection-highlight';
 

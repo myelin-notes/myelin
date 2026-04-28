@@ -1,13 +1,13 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
-import { parseMarkdownToDoc } from '../markdown-parser';
-import type { PageFrameAutocompleteItem } from './autocomplete';
-import { schema } from './schema';
+import { parseMarkdownToDoc } from '../../markdown-parser';
+import { schema } from '../schema';
+import type { PageFrameAutocompleteItem } from './index';
 import {
   buildSelectSlashInsertAutocompleteTransaction,
   findActiveSlashInsertAutocomplete,
   searchSlashInsertAutocompleteItems,
-} from './slash-insert-autocomplete';
+} from './slash-insert';
 
 function createState(markdown: string, head: number) {
   const state = EditorState.create({

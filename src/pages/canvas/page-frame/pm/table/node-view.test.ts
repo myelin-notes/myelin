@@ -1,9 +1,9 @@
 import { EditorState, type Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { schema } from './schema';
-import { createTableNode } from './table-commands';
-import { PageFrameTableNodeView } from './table-node-view';
+import { schema } from '../schema';
+import { createTableNode } from './commands';
+import { PageFrameTableNodeView } from './node-view';
 
 class MockElement extends EventTarget {
   public className = '';

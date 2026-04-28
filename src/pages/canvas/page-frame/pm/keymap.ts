@@ -21,7 +21,7 @@ import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { expandMarkdownLinkCommand } from './markdown/links';
 import { schema } from './schema';
-import { exitTableOnLastRow, goToNextTableRow } from './table-commands';
+import { exitTableOnLastRow, goToNextTableRow } from './table/commands';
 
 const EDITOR_MARK_ACTIONS: Record<string, { type: MarkType }> = {
   'editor:bold': { type: schema.marks.bold },

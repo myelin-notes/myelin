@@ -6,16 +6,9 @@ import {
   layoutWithLines,
   prepareWithSegments,
 } from '@chenglou/pretext';
-import { PM_ADD_TO_HISTORY } from './constants';
-import {
-  type Break,
-  calculateBreakLayout,
-  type ParagraphLine,
-} from './pagination-core';
-import {
-  type PaginationRunMetrics,
-  paginationProfiler,
-} from './pagination-profiler';
+import { PM_ADD_TO_HISTORY } from '../constants';
+import { type Break, calculateBreakLayout, type ParagraphLine } from './core';
+import { type PaginationRunMetrics, paginationProfiler } from './profiler';
 
 const SETTLE_PASS_COUNT = 4;
 

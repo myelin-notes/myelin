@@ -3,7 +3,7 @@ import {
   PageFrameAutocompleteController,
   type PageFrameAutocompleteItem,
   scalePageFrameAutocompleteAnchorRect,
-} from './autocomplete';
+} from './index';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

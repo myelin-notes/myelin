@@ -9,8 +9,8 @@ import { UserPrefs } from '@/lib/user-prefs';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
+import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLinkId as NoteLinkIdResolver } from '../page-frame/pm/markdown/note-links';
-import { PageFrameEditorState } from '../page-frame/pm/pm-editor-state';
 import { bindYFields } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
 import {

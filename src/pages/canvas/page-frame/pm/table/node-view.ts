@@ -10,7 +10,7 @@ import {
   buildAddTableRowTransaction,
   buildDeleteTableColumnTransaction,
   buildDeleteTableRowTransaction,
-} from './table-commands';
+} from './commands';
 
 const DEFAULT_CELL_MIN_WIDTH = 120;
 const HANDLE_HOVER_STRIP_THICKNESS = 14;

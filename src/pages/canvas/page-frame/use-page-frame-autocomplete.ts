@@ -9,20 +9,20 @@ import {
   PageFrameAutocompleteController,
   type PageFrameAutocompleteItem,
 } from './pm/autocomplete';
-import { PM_UPDATE_EVENT } from './pm/constants';
 import {
   type ActiveNoteLinkAutocomplete,
   buildSelectNoteLinkAutocompleteTransaction,
   findActiveNoteLinkAutocomplete,
   hasSameAutocompleteRequest,
-} from './pm/note-link-autocomplete';
-import { schema } from './pm/schema';
+} from './pm/autocomplete/note-link';
 import {
   type ActiveSlashInsertAutocomplete,
   buildSelectSlashInsertAutocompleteTransaction,
   findActiveSlashInsertAutocomplete,
   searchSlashInsertAutocompleteItems,
-} from './pm/slash-insert-autocomplete';
+} from './pm/autocomplete/slash-insert';
+import { PM_UPDATE_EVENT } from './pm/constants';
+import { schema } from './pm/schema';
 
 interface UsePageFrameAutocompleteArgs {
   repository: NoteLinkSearchSource;

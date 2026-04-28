@@ -1,12 +1,12 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
-import { parseMarkdownToDoc } from '../markdown-parser';
-import { buildResolvedNoteLinkTransaction } from './markdown/note-links';
+import { parseMarkdownToDoc } from '../../markdown-parser';
+import { buildResolvedNoteLinkTransaction } from '../markdown/note-links';
+import { schema } from '../schema';
 import {
   buildSelectNoteLinkAutocompleteTransaction,
   findActiveNoteLinkAutocomplete,
-} from './note-link-autocomplete';
-import { schema } from './schema';
+} from './note-link';
 
 function createState(markdown: string, head: number) {
   const state = EditorState.create({

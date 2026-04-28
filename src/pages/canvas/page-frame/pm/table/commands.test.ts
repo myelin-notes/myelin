@@ -2,7 +2,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import { EditorState, type Transaction } from 'prosemirror-state';
 import { cellAround, findCell } from 'prosemirror-tables';
 import { describe, expect, it } from 'vitest';
-import { schema } from './schema';
+import { schema } from '../schema';
 import {
   buildAddTableColumnTransaction,
   buildAddTableRowTransaction,
@@ -12,7 +12,7 @@ import {
   exitTableOnLastRow,
   goToNextTableRow,
   setSelectionInsideTableCell,
-} from './table-commands';
+} from './commands';
 
 function createTableState(
   rows = 2,

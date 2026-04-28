@@ -1,6 +1,6 @@
 import type { NodeViewConstructor } from 'prosemirror-view';
-import { CodeBlockNodeView } from './code-block-node-view';
-import { PageFrameTableNodeView } from './table-node-view';
+import { CodeBlockNodeView } from './code-block/node-view';
+import { PageFrameTableNodeView } from './table/node-view';
 
 export function buildNodeViews(): Record<string, NodeViewConstructor> {
   return {

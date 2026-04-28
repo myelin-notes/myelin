@@ -4,7 +4,7 @@ import {
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
   type CodeBlockExternalSelectionDetail,
   getCodeBlockExternalSelection,
-} from './code-block-selection-sync';
+} from './code-block/selection-sync';
 
 const CODE_BLOCK_NODE_NAME = 'codeBlock';
 const CODE_BLOCK_NODE_VIEW_SELECTOR = '.pm-monaco-code-block';

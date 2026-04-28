@@ -15,7 +15,7 @@ import {
   type PageFrameAutocompleteController,
   type PageFrameAutocompleteItem,
   type PageFrameAutocompleteState,
-} from './autocomplete';
+} from './index';
 
 interface PageFrameAutocompletePopupProps {
   controller: PageFrameAutocompleteController | null;

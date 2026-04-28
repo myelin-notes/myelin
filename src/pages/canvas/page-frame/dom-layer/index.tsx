@@ -14,7 +14,7 @@ import type {
   PageFrameAutocompleteController,
   PageFrameAutocompleteItem,
 } from '../pm/autocomplete';
-import { PageFrameAutocompletePopup } from '../pm/autocomplete-popup';
+import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS, PM_UPDATE_EVENT } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 

@@ -1,7 +1,7 @@
 import { EditorState, Selection, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type * as Y from 'yjs';
-import { CODE_BLOCK_CLEAR_SELECTION_EVENT } from './code-block-selection-sync';
+import { CODE_BLOCK_CLEAR_SELECTION_EVENT } from './code-block/selection-sync';
 import { PM_UPDATE_EVENT } from './constants';
 import type { ResolveNoteLinkId } from './markdown/note-links';
 import { buildNodeViews } from './node-views';

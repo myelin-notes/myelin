@@ -6,7 +6,7 @@ import {
   type ParagraphLine,
   paginateParagraph,
   paginateTableRows,
-} from './pagination-core';
+} from './core';
 
 function line(
   naturalTop: number,

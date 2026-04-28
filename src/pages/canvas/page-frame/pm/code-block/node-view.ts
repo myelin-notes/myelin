@@ -3,22 +3,22 @@ import { redo, undo } from 'prosemirror-history';
 import type { Node as PMNode } from 'prosemirror-model';
 import { Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
-import {
-  CODE_BLOCK_CLEAR_SELECTION_EVENT,
-  CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
-  type CodeBlockExternalSelection,
-  type CodeBlockExternalSelectionDetail,
-  getCodeBlockExternalSelection,
-} from './code-block-selection-sync';
+import { CONTENT_HEIGHT } from '../pagination/core';
+import { schema } from '../schema';
 import {
   type CodeBlockEditorBoundaryInput,
   type CodeBlockEditorDirection,
   type CodeBlockEditorEscapeUnit,
   createMonacoCodeBlockEditor,
   type MonacoCodeBlockEditor,
-} from './monaco-code-block-editor';
-import { CONTENT_HEIGHT } from './pagination-core';
-import { schema } from './schema';
+} from './monaco-editor';
+import {
+  CODE_BLOCK_CLEAR_SELECTION_EVENT,
+  CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
+  type CodeBlockExternalSelection,
+  type CodeBlockExternalSelectionDetail,
+  getCodeBlockExternalSelection,
+} from './selection-sync';
 
 const OPENING_FENCE_RE = /^```(\w+)?$/;
 

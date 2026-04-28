@@ -1,5 +1,5 @@
-import type { CodeBlockExternalSelection } from './code-block-selection-sync';
 import type { MonacoApi } from './monaco-runtime';
+import type { CodeBlockExternalSelection } from './selection-sync';
 
 export type CodeBlockEditorDirection = -1 | 1;
 

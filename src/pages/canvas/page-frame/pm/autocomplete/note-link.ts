@@ -4,12 +4,12 @@ import {
   TextSelection,
   type Transaction,
 } from 'prosemirror-state';
+import { MARKDOWN_ATOM_CHAR } from '../markdown/types';
 import type {
   PageFrameAutocompleteItem,
   PageFrameAutocompleteRange,
   PageFrameAutocompleteRequest,
-} from './autocomplete';
-import { MARKDOWN_ATOM_CHAR } from './markdown/types';
+} from './index';
 
 interface TextOffsetMap {
   text: string;

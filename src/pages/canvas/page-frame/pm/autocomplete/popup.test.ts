@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getAutocompleteScrollTop } from './autocomplete-popup';
+import { getAutocompleteScrollTop } from './popup';
 
 describe('getAutocompleteScrollTop', () => {
   it('keeps the current scroll position when the active item is already visible', () => {
