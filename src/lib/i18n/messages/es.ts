@@ -97,7 +97,6 @@ const es: typeof en = {
       button: 'Nuevo',
       folder: 'Nueva carpeta',
       canvas: 'Nuevo lienzo',
-      importMarkdown: 'Importar Markdown',
       importFiles: 'Importar archivos',
       untitledCanvas: 'Lienzo sin título',
       unnamedFolder: 'Carpeta sin nombre',
@@ -107,9 +106,9 @@ const es: typeof en = {
       failed: 'No se pudo importar el Markdown',
     },
     importFiles: {
-      unsupportedFile: 'Elige un archivo de imagen o video.',
+      unsupportedFile: 'Elige un archivo Markdown, de imagen o video.',
       someUnsupported: 'Algunos archivos no son compatibles.',
-      failed: 'No se pudo importar el archivo',
+      failed: 'No se pudo importar',
     },
     semanticTags: {
       title: 'Etiquetas semánticas',

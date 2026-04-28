@@ -94,7 +94,6 @@ const en = {
       button: 'New',
       folder: 'New Folder',
       canvas: 'New Canvas',
-      importMarkdown: 'Import Markdown',
       importFiles: 'Import Files',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
@@ -104,9 +103,9 @@ const en = {
       failed: 'Markdown import failed',
     },
     importFiles: {
-      unsupportedFile: 'Choose an image or video file.',
+      unsupportedFile: 'Choose a Markdown, image, or video file.',
       someUnsupported: 'Some files were not supported.',
-      failed: 'File import failed',
+      failed: 'Import failed',
     },
     semanticTags: {
       title: 'Semantic Tags',

@@ -95,7 +95,6 @@ const zhHans: typeof en = {
       button: '新建',
       folder: '新建文件夹',
       canvas: '新建画布',
-      importMarkdown: '导入 Markdown',
       importFiles: '导入文件',
       untitledCanvas: '未命名画布',
       unnamedFolder: '未命名文件夹',
@@ -105,9 +104,9 @@ const zhHans: typeof en = {
       failed: 'Markdown 导入失败',
     },
     importFiles: {
-      unsupportedFile: '请选择图片或视频文件',
+      unsupportedFile: '请选择 Markdown、图片或视频文件',
       someUnsupported: '部分文件不受支持',
-      failed: '文件导入失败',
+      failed: '导入失败',
     },
     semanticTags: {
       title: '语义标签',
