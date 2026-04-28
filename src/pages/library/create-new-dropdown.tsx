@@ -1,4 +1,10 @@
-import { FolderPlus, Import, LayoutGrid, Plus } from 'lucide-react';
+import {
+  FolderInput,
+  FolderPlus,
+  Import,
+  LayoutGrid,
+  Plus,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,12 +22,16 @@ interface CreateNewDropdownProps {
   onNewFolder?: () => void;
   onNewFile?: (title: string, type: FileType) => void;
   onImportFiles?: () => void;
+  onImportObsidianVault?: () => void;
+  importDisabled?: boolean;
 }
 
 export function CreateNewDropdown({
   onNewFolder,
   onNewFile,
   onImportFiles,
+  onImportObsidianVault,
+  importDisabled = false,
 }: CreateNewDropdownProps) {
   const strings = useMessages();
 
@@ -54,10 +64,19 @@ export function CreateNewDropdown({
         </DropdownMenuItem>
         <DropdownMenuItem
           className={itemClass}
+          disabled={importDisabled}
           onClick={() => onImportFiles?.()}
         >
           <Import className="size-4" />
           {strings.library.createNew.importFiles}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={itemClass}
+          disabled={importDisabled}
+          onClick={() => onImportObsidianVault?.()}
+        >
+          <FolderInput className="size-4" />
+          {strings.library.createNew.importObsidianVault}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

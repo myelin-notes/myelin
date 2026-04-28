@@ -47,6 +47,7 @@ import {
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
 } from './import-markdown';
+import { importObsidianVaultFromPicker } from './import-obsidian-vault';
 import { importPdfFile, isPdfFile, PDF_FILE_ACCEPT } from './import-pdf';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
@@ -80,6 +81,8 @@ export function LibraryPage() {
   ];
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingFiles, setIsImportingFiles] = useState(false);
+  const [isImportingObsidianVault, setIsImportingObsidianVault] =
+    useState(false);
   const cycleSortMode = () => {
     setSortMode(
       (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
@@ -163,6 +166,44 @@ export function LibraryPage() {
       return;
     }
     void handleImportStorageFiles(files);
+  };
+
+  const handleImportObsidianVault = async () => {
+    if (isImportingFiles || isImportingObsidianVault) {
+      return;
+    }
+
+    setIsImportingObsidianVault(true);
+    try {
+      const result = await importObsidianVaultFromPicker({
+        repository,
+        parentId: currentFolderId,
+      });
+      if (!result) {
+        return;
+      }
+
+      setCurrentFolderId(result.rootFolderId);
+      triggerRefresh();
+      toast.success(
+        strings.library.importObsidianVault.succeeded(
+          result.notesImported,
+          result.mediaImported,
+        ),
+        {
+          description:
+            result.skippedFiles > 0
+              ? strings.library.importObsidianVault.skipped(result.skippedFiles)
+              : undefined,
+        },
+      );
+    } catch (error) {
+      toast.error(strings.library.importObsidianVault.failed, {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsImportingObsidianVault(false);
+    }
   };
 
   useEffect(() => {
@@ -445,6 +486,10 @@ export function LibraryPage() {
                       explorerRef.current?.startNewFile(title, type)
                     }
                     onImportFiles={() => importInputRef.current?.click()}
+                    onImportObsidianVault={handleImportObsidianVault}
+                    importDisabled={
+                      isImportingFiles || isImportingObsidianVault
+                    }
                   />
                   <input
                     ref={importInputRef}

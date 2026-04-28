@@ -85,10 +85,19 @@ export interface MemoryStorage {
       truncate?: boolean;
     },
   ): Promise<{ close(): Promise<void> }>;
+  readDir(path: string): Promise<
+    Array<{
+      name: string;
+      isDirectory: boolean;
+      isFile: boolean;
+      isSymlink: boolean;
+    }>
+  >;
   readFile(path: string): Promise<Uint8Array>;
   readTextFile(path: string): Promise<string>;
   remove(path: string, options?: { recursive?: boolean }): Promise<void>;
   writeFile(path: string, bytes: Uint8Array): Promise<void>;
+  writeSymlink(path: string): void;
   writeTextFile(path: string, text: string): Promise<void>;
   readBinary(path: string): Uint8Array | null;
   readText(path: string): string | null;
@@ -99,6 +108,7 @@ function createMemoryStorage(root: string = '/app-data'): MemoryStorage {
   const directories = new Set<string>(['', '/', rootPath]);
   const textFiles = new Map<string, string>();
   const binaryFiles = new Map<string, Uint8Array>();
+  const symlinks = new Set<string>();
 
   function resolve(path: string): string {
     if (path === '') {
@@ -138,6 +148,61 @@ function createMemoryStorage(root: string = '/app-data'): MemoryStorage {
         binaryFiles.delete(key);
       }
     }
+    for (const key of [...symlinks]) {
+      if (key === resolved || key.startsWith(prefix)) {
+        symlinks.delete(key);
+      }
+    }
+  }
+
+  function collectDirectEntries(resolved: string) {
+    const prefix = resolved === '/' ? '/' : `${resolved}/`;
+    const entries = new Map<
+      string,
+      {
+        name: string;
+        isDirectory: boolean;
+        isFile: boolean;
+        isSymlink: boolean;
+      }
+    >();
+
+    const addEntry = (path: string, kind: 'directory' | 'file' | 'symlink') => {
+      if (path === resolved || !path.startsWith(prefix)) {
+        return;
+      }
+      const rest = path.slice(prefix.length);
+      if (!rest || rest.includes('/')) {
+        return;
+      }
+      const existing = entries.get(rest) ?? {
+        name: rest,
+        isDirectory: false,
+        isFile: false,
+        isSymlink: false,
+      };
+      existing.isDirectory ||= kind === 'directory';
+      existing.isFile ||= kind === 'file';
+      existing.isSymlink ||= kind === 'symlink';
+      entries.set(rest, existing);
+    };
+
+    for (const path of directories) {
+      addEntry(path, 'directory');
+    }
+    for (const path of textFiles.keys()) {
+      addEntry(path, 'file');
+    }
+    for (const path of binaryFiles.keys()) {
+      addEntry(path, 'file');
+    }
+    for (const path of symlinks) {
+      addEntry(path, 'symlink');
+    }
+
+    return [...entries.values()].sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
   }
 
   return {
@@ -148,7 +213,8 @@ function createMemoryStorage(root: string = '/app-data'): MemoryStorage {
       return (
         directories.has(resolved) ||
         textFiles.has(resolved) ||
-        binaryFiles.has(resolved)
+        binaryFiles.has(resolved) ||
+        symlinks.has(resolved)
       );
     },
     mkdir: async (path, options) => {
@@ -162,6 +228,7 @@ function createMemoryStorage(root: string = '/app-data'): MemoryStorage {
       const resolved = resolve(path);
       ensureParents(resolved);
       if (options.create || options.truncate) {
+        symlinks.delete(resolved);
         textFiles.delete(resolved);
         binaryFiles.set(resolved, new Uint8Array());
       }
@@ -169,6 +236,7 @@ function createMemoryStorage(root: string = '/app-data'): MemoryStorage {
         async close() {},
       };
     },
+    readDir: async (path) => collectDirectEntries(resolve(path)),
     readFile: async (path) => {
       const resolved = resolve(path);
       return new Uint8Array(binaryFiles.get(resolved) ?? []);
@@ -189,12 +257,21 @@ function createMemoryStorage(root: string = '/app-data'): MemoryStorage {
     writeFile: async (path, bytes) => {
       const resolved = resolve(path);
       ensureParents(resolved);
+      symlinks.delete(resolved);
       textFiles.delete(resolved);
       binaryFiles.set(resolved, new Uint8Array(bytes));
+    },
+    writeSymlink(path) {
+      const resolved = resolve(path);
+      ensureParents(resolved);
+      textFiles.delete(resolved);
+      binaryFiles.delete(resolved);
+      symlinks.add(resolved);
     },
     writeTextFile: async (path, text) => {
       const resolved = resolve(path);
       ensureParents(resolved);
+      symlinks.delete(resolved);
       binaryFiles.delete(resolved);
       textFiles.set(resolved, text);
     },
@@ -588,6 +665,7 @@ export function createPluginFsModule() {
         truncate?: boolean;
       },
     ) => currentStorage.open(path, options),
+    readDir: async (path: string) => currentStorage.readDir(path),
     readFile: async (path: string) => currentStorage.readFile(path),
     readTextFile: async (path: string) => currentStorage.readTextFile(path),
     remove: async (

@@ -26,7 +26,9 @@ function getPdfCanvasTitle(fileName: string, fallback: string): string {
   return title.length > 0 ? title : fallback;
 }
 
-async function loadPdfPageSizes(bytes: Uint8Array): Promise<PdfPageSize[]> {
+export async function loadPdfPageSizes(
+  bytes: Uint8Array,
+): Promise<PdfPageSize[]> {
   const doc = await loadDocument(bytes);
   try {
     const pageSizes: PdfPageSize[] = [];
