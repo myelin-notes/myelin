@@ -1,4 +1,7 @@
-import { Download as DownloadIcon } from 'lucide-react';
+import {
+  Download as DownloadIcon,
+  FileText as FileTextIcon,
+} from 'lucide-react';
 import { Selection } from 'prosemirror-state';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
@@ -9,6 +12,7 @@ import { UserPrefs } from '@/lib/user-prefs';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
+import { printPageFrameToPdf } from '../page-frame/pdf-export';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLinkId as NoteLinkIdResolver } from '../page-frame/pm/markdown/note-links';
 import { bindYFields } from '../y-fields';
@@ -307,7 +311,36 @@ export class PageFrameElement extends DrawableElement {
           void this.exportMarkdown();
         },
       },
+      {
+        id: 'export-pdf',
+        label: 'Export to PDF',
+        icon: FileTextIcon,
+        onSelect: () => {
+          void this.exportPdf();
+        },
+      },
     ];
+  }
+
+  private async exportPdf(): Promise<void> {
+    const contentDiv = this.contentDiv;
+    if (!contentDiv) {
+      return;
+    }
+
+    try {
+      await printPageFrameToPdf({
+        contentDiv,
+        pageCount: this._numPages,
+        pageHeight: this._pageHeight,
+        pageWidth: this._pageWidth,
+      });
+    } catch (err) {
+      logger.error('Export to PDF failed', err, { index: this.index });
+      toast.error('Export failed', {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private async exportMarkdown(): Promise<void> {
