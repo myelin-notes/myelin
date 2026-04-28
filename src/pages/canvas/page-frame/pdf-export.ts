@@ -209,7 +209,13 @@ function prepareContentClone(
     width: `${pageWidth}px`,
     zoom: '1',
   } as Partial<CSSStyleDeclaration>);
-  contentClone.style.setProperty('--vp-zoom', '1');
+
+  // Monaco code blocks are DPR-scaled internally and counter-scaled by the
+  // page-frame viewport, so the print clone needs the same custom property.
+  contentClone.style.setProperty(
+    '--vp-zoom',
+    `${window.devicePixelRatio || 1}`,
+  );
 
   for (const el of contentClone.querySelectorAll('[contenteditable]')) {
     el.removeAttribute('contenteditable');
