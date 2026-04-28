@@ -162,6 +162,15 @@ const zhHans: typeof en = {
         label: '编辑时适配整页',
         description: '进入页面框编辑模式时缩小视图，显示完整页面高度。',
       },
+      hoverPreview: {
+        label: '显示笔记链接的悬停预览',
+        description: '将光标悬停在链接的笔记上时显示缩略图和标题。',
+      },
+      requireModifier: {
+        label: (key: string) => `需要按住 ${key} 才能打开链接`,
+        description: (key: string) =>
+          `关闭时，单击即可打开笔记链接和超链接。开启时，需按住 ${key} 才能打开，普通单击仅用于定位光标。`,
+      },
     },
     repository: {
       title: '仓库',

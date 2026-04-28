@@ -1,6 +1,7 @@
 import type { MarkType, Node as PMNode, Schema } from 'prosemirror-model';
 import { EditorState, Plugin } from 'prosemirror-state';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
+import { UserPrefs } from '@/lib/user-prefs';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   buildResolvedTitleLookup,
@@ -400,7 +401,11 @@ export function noteLinkMarkdownPlugin(
   return new Plugin({
     props: {
       handleClick(view, _pos, event) {
-        if (!event.metaKey && !event.ctrlKey) {
+        if (
+          UserPrefs.get('linkRequireModifier') &&
+          !event.metaKey &&
+          !event.ctrlKey
+        ) {
           return false;
         }
 

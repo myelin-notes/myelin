@@ -16,6 +16,7 @@ import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { Logger } from '@/lib/logger';
 import { openNoteLink } from '@/lib/note-navigation';
 import { useRepository } from '@/lib/sync';
+import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
@@ -161,6 +162,12 @@ function CanvasViewInner() {
     repository,
     view: activeEditorView,
   });
+  const [hoverPreviewEnabled, setHoverPreviewEnabled] = useState(
+    UserPrefs.get('noteLinkHoverPreview'),
+  );
+  useEffect(() => {
+    return UserPrefs.subscribe('noteLinkHoverPreview', setHoverPreviewEnabled);
+  }, []);
   const loadNoteLinkPreview = useCallback(
     (target: NoteLinkPreviewTarget, signal: AbortSignal) =>
       getNoteLinkPreview(repository, target, signal),
@@ -182,7 +189,9 @@ function CanvasViewInner() {
         editingElement={engine.editingElement}
         autocompleteController={pageFrameAutocomplete.controller}
         onAutocompleteSelect={pageFrameAutocomplete.onSelectItem}
-        loadNoteLinkPreview={loadNoteLinkPreview}
+        loadNoteLinkPreview={
+          hoverPreviewEnabled ? loadNoteLinkPreview : undefined
+        }
       />
 
       {/* Element-owned DOM overlay (PDF pages, future DOM-rendered elements) */}

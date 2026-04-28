@@ -164,6 +164,16 @@ const en = {
         description:
           'Zoom out to show the full page height when entering page-frame edit mode.',
       },
+      hoverPreview: {
+        label: 'Show hover previews for note links',
+        description:
+          'Reveal a thumbnail and title when you hover a linked note.',
+      },
+      requireModifier: {
+        label: (key: string) => `Require ${key}-click to follow links`,
+        description: (key: string) =>
+          `When off, a plain click follows note links and hyperlinks. When on, hold ${key} to follow, so single clicks place the cursor.`,
+      },
     },
     repository: {
       title: 'Repository',

@@ -167,6 +167,16 @@ const es: typeof en = {
         description:
           'Alejar la vista para mostrar toda la altura de la página al entrar en la edición del marco.',
       },
+      hoverPreview: {
+        label: 'Mostrar vistas previas para enlaces de nota',
+        description:
+          'Muestra una miniatura y el título al pasar el cursor sobre una nota enlazada.',
+      },
+      requireModifier: {
+        label: (key: string) => `Requerir ${key}-clic para abrir enlaces`,
+        description: (key: string) =>
+          `Cuando está desactivado, un clic simple abre enlaces de nota e hipervínculos. Cuando está activado, mantén ${key} para abrir; el clic normal coloca el cursor.`,
+      },
     },
     repository: {
       title: 'Repositorio',

@@ -34,6 +34,8 @@ const PREFS = {
     'page-frame-edit-fit-whole-page',
     true,
   ),
+  noteLinkHoverPreview: pref<boolean>('note-link-hover-preview', true),
+  linkRequireModifier: pref<boolean>('link-require-modifier', true),
   language: pref<string>('language', 'en'),
   repositoryConfig: pref<RepositoryConfig>('repository-config', {
     kind: 'local',

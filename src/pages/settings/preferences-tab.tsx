@@ -20,6 +20,12 @@ import { RepositorySection } from './repository-section';
 
 type CanvasBg = 'grid' | 'dots' | 'blank';
 
+const MODIFIER_KEY_LABEL =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad/.test(navigator.platform)
+    ? '⌘'
+    : 'Ctrl';
+
 function CanvasPreview({
   type,
   selected,
@@ -99,6 +105,12 @@ export function PreferencesTab() {
   const [pageFrameEditFitWholePage, setPageFrameEditFitWholePage] = useState(
     UserPrefs.get('pageFrameEditFitWholePage'),
   );
+  const [noteLinkHoverPreview, setNoteLinkHoverPreview] = useState(
+    UserPrefs.get('noteLinkHoverPreview'),
+  );
+  const [linkRequireModifier, setLinkRequireModifier] = useState(
+    UserPrefs.get('linkRequireModifier'),
+  );
   const languages = Object.entries(localeLabels).map(([code, label]) => ({
     code: code as SupportedLocale,
     label,
@@ -119,12 +131,34 @@ export function PreferencesTab() {
     );
   }, []);
 
+  useEffect(() => {
+    return UserPrefs.subscribe(
+      'noteLinkHoverPreview',
+      setNoteLinkHoverPreview,
+    );
+  }, []);
+
+  useEffect(() => {
+    return UserPrefs.subscribe(
+      'linkRequireModifier',
+      setLinkRequireModifier,
+    );
+  }, []);
+
   const handleCanvasBg = (bg: CanvasBg) => {
     UserPrefs.set('canvasBackground', bg);
   };
 
   const handlePageFrameEditFitWholePage = () => {
     UserPrefs.set('pageFrameEditFitWholePage', !pageFrameEditFitWholePage);
+  };
+
+  const handleNoteLinkHoverPreview = () => {
+    UserPrefs.set('noteLinkHoverPreview', !noteLinkHoverPreview);
+  };
+
+  const handleLinkRequireModifier = () => {
+    UserPrefs.set('linkRequireModifier', !linkRequireModifier);
   };
 
   const handleLanguage = (code: string) => {
@@ -222,37 +256,34 @@ export function PreferencesTab() {
               {strings.settings.pageFrameEditing.eyebrow}
             </span>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={pageFrameEditFitWholePage}
-            onClick={handlePageFrameEditFitWholePage}
-            className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 text-left transition-colors hover:bg-hover-tint"
-          >
-            <span className="min-w-0">
-              <span className="block font-medium text-sm text-text-primary">
-                {strings.settings.pageFrameEditing.fitWholePage.label}
-              </span>
-              <span className="mt-1 block text-text-muted text-xs leading-relaxed">
-                {strings.settings.pageFrameEditing.fitWholePage.description}
-              </span>
-            </span>
-            <span
-              className={cn(
-                'relative flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors',
-                pageFrameEditFitWholePage
-                  ? 'bg-accent-dark'
-                  : 'bg-text-muted/20',
+          <div className="space-y-2">
+            <ToggleRow
+              checked={pageFrameEditFitWholePage}
+              onToggle={handlePageFrameEditFitWholePage}
+              label={strings.settings.pageFrameEditing.fitWholePage.label}
+              description={
+                strings.settings.pageFrameEditing.fitWholePage.description
+              }
+            />
+            <ToggleRow
+              checked={noteLinkHoverPreview}
+              onToggle={handleNoteLinkHoverPreview}
+              label={strings.settings.pageFrameEditing.hoverPreview.label}
+              description={
+                strings.settings.pageFrameEditing.hoverPreview.description
+              }
+            />
+            <ToggleRow
+              checked={linkRequireModifier}
+              onToggle={handleLinkRequireModifier}
+              label={strings.settings.pageFrameEditing.requireModifier.label(
+                MODIFIER_KEY_LABEL,
               )}
-            >
-              <span
-                className={cn(
-                  'size-4 rounded-full bg-white shadow-sm transition-transform',
-                  pageFrameEditFitWholePage ? 'translate-x-4' : 'translate-x-0',
-                )}
-              />
-            </span>
-          </button>
+              description={strings.settings.pageFrameEditing.requireModifier.description(
+                MODIFIER_KEY_LABEL,
+              )}
+            />
+          </div>
         </section>
 
         {/* Repository */}
@@ -266,5 +297,49 @@ export function PreferencesTab() {
         </section>
       </div>
     </div>
+  );
+}
+
+function ToggleRow({
+  checked,
+  onToggle,
+  label,
+  description,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  label: string;
+  description: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onToggle}
+      className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 text-left transition-colors hover:bg-hover-tint"
+    >
+      <span className="min-w-0">
+        <span className="block font-medium text-sm text-text-primary">
+          {label}
+        </span>
+        <span className="mt-1 block text-text-muted text-xs leading-relaxed">
+          {description}
+        </span>
+      </span>
+      <span
+        className={cn(
+          'relative flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors',
+          checked ? 'bg-accent-dark' : 'bg-text-muted/20',
+        )}
+      >
+        <span
+          className={cn(
+            'size-4 rounded-full bg-white shadow-sm transition-transform',
+            checked ? 'translate-x-4' : 'translate-x-0',
+          )}
+        />
+      </span>
+    </button>
   );
 }
