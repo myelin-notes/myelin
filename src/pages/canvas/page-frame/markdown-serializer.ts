@@ -111,13 +111,13 @@ function serializeBlock(node: PMNode): string | null {
         width: (node.attrs.width as number | null) ?? null,
         height: (node.attrs.height as number | null) ?? null,
         title: (node.attrs.title as string | null) ?? null,
-      });
+      }).text;
     case 'noteEmbed':
       return serializeNoteEmbed({
         target: ((node.attrs.target as string | null) ?? '').trim(),
         width: (node.attrs.width as number | null) ?? null,
         height: (node.attrs.height as number | null) ?? null,
-      });
+      }).text;
     default:
       return serializeInline(node);
   }

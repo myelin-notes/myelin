@@ -6,15 +6,19 @@ import {
   Plugin,
   TextSelection,
 } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   parseRawMarkdownMediaEmbed,
   parseRawNoteEmbed,
+  type SerializedEmbed,
   serializeMarkdownMediaEmbed,
   serializeNoteEmbed,
 } from './embeds';
-import type { ResolveNoteLinkId } from './note-links';
+import {
+  buildResolvedTitleLookup,
+  createTitleResolverView,
+  type ResolveNoteLinkId,
+} from './note-id-resolver';
 import {
   collectAffectedTextblocks,
   getChangedRangesForTransactions,
@@ -187,27 +191,10 @@ function collectDocumentNoteEmbeds(
   return targets;
 }
 
-async function buildResolvedNoteEmbedLookup(
-  doc: PMNode,
-  schema: Schema,
-  resolveNoteLinkId: ResolveNoteLinkId,
-): Promise<Map<string, string | null>> {
-  const titles = Array.from(
-    new Set(
-      collectDocumentNoteEmbeds(doc, schema)
-        .map((target) => target.title.trim())
-        .filter((title) => title.length > 0),
-    ),
-  );
-  const noteIdsByTitle = new Map<string, string | null>();
-
-  await Promise.all(
-    titles.map(async (title) => {
-      noteIdsByTitle.set(title, await resolveNoteLinkId(title));
-    }),
-  );
-
-  return noteIdsByTitle;
+function collectNoteEmbedTitles(doc: PMNode, schema: Schema): string[] {
+  return collectDocumentNoteEmbeds(doc, schema)
+    .map((target) => target.title.trim())
+    .filter((title) => title.length > 0);
 }
 
 export function buildResolvedNoteEmbedTransaction(
@@ -265,9 +252,10 @@ export async function normalizeAndResolveNoteEmbedsDoc(
     return state.doc;
   }
 
-  const noteIdsByTitle = await buildResolvedNoteEmbedLookup(
+  const noteIdsByTitle = await buildResolvedTitleLookup(
     state.doc,
     schema,
+    collectNoteEmbedTitles,
     resolveNoteLinkId,
   );
   const resolveTr = buildResolvedNoteEmbedTransaction(
@@ -282,63 +270,6 @@ export async function normalizeAndResolveNoteEmbedsDoc(
   return state.doc;
 }
 
-class NoteEmbedResolverView {
-  private destroyed = false;
-  private lastDoc: PMNode;
-  private requestId = 0;
-
-  constructor(
-    private view: EditorView,
-    private readonly schema: Schema,
-    private readonly resolveNoteLinkId?: ResolveNoteLinkId,
-  ) {
-    this.lastDoc = view.state.doc;
-    void this.resolve();
-  }
-
-  update(view: EditorView): void {
-    const docChanged = view.state.doc !== this.lastDoc;
-    this.view = view;
-    if (!docChanged) {
-      return;
-    }
-
-    this.lastDoc = view.state.doc;
-    void this.resolve();
-  }
-
-  destroy(): void {
-    this.destroyed = true;
-    this.requestId += 1;
-  }
-
-  private async resolve(): Promise<void> {
-    if (!this.resolveNoteLinkId) {
-      return;
-    }
-
-    const currentRequestId = ++this.requestId;
-    const noteIdsByTitle = await buildResolvedNoteEmbedLookup(
-      this.view.state.doc,
-      this.schema,
-      this.resolveNoteLinkId,
-    );
-
-    if (this.destroyed || currentRequestId !== this.requestId) {
-      return;
-    }
-
-    const tr = buildResolvedNoteEmbedTransaction(
-      this.view.state,
-      this.schema,
-      noteIdsByTitle,
-    );
-    if (tr) {
-      this.view.dispatch(tr);
-    }
-  }
-}
-
 function buildRawEmbedParagraph(state: EditorState, rawText: string): PMNode {
   return state.schema.nodes.paragraph.create(null, state.schema.text(rawText));
 }
@@ -349,28 +280,25 @@ export const expandMarkdownEmbedCommand: Command = (state, dispatch) => {
   }
 
   const node = state.selection.node;
-  let rawText: string | null = null;
-  let cursorOffset = 0;
+  let serialized: SerializedEmbed | null = null;
 
   if (node.type === state.schema.nodes.noteEmbed) {
-    rawText = serializeNoteEmbed({
+    serialized = serializeNoteEmbed({
       target: (node.attrs.target as string) ?? '',
       width: (node.attrs.width as number | null) ?? null,
       height: (node.attrs.height as number | null) ?? null,
     });
-    cursorOffset = 3;
   } else if (node.type === state.schema.nodes.mediaEmbed) {
-    rawText = serializeMarkdownMediaEmbed({
+    serialized = serializeMarkdownMediaEmbed({
       src: (node.attrs.src as string) ?? '',
       alt: (node.attrs.alt as string | null) ?? null,
       width: (node.attrs.width as number | null) ?? null,
       height: (node.attrs.height as number | null) ?? null,
       title: (node.attrs.title as string | null) ?? null,
     });
-    cursorOffset = Math.max(2, rawText.indexOf('](') + 2);
   }
 
-  if (!rawText) {
+  if (!serialized) {
     return false;
   }
 
@@ -379,9 +307,11 @@ export const expandMarkdownEmbedCommand: Command = (state, dispatch) => {
     const tr = state.tr.replaceWith(
       from,
       to,
-      buildRawEmbedParagraph(state, rawText),
+      buildRawEmbedParagraph(state, serialized.text),
     );
-    tr.setSelection(TextSelection.create(tr.doc, from + 1 + cursorOffset));
+    tr.setSelection(
+      TextSelection.create(tr.doc, from + 1 + serialized.editCaret),
+    );
     dispatch(tr);
   }
 
@@ -416,7 +346,12 @@ export function embedMarkdownPlugin(
       });
     },
     view(view) {
-      return new NoteEmbedResolverView(view, schema, resolveNoteLinkId);
+      return createTitleResolverView(view, {
+        schema,
+        collectTitles: collectNoteEmbedTitles,
+        buildResolveTransaction: buildResolvedNoteEmbedTransaction,
+        resolveNoteLinkId,
+      });
     },
   });
 }

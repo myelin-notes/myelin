@@ -193,12 +193,22 @@ function buildSizeSuffix(width: number | null, height: number | null): string {
   return height ? `|${width}x${height}` : `|${width}`;
 }
 
-export function serializeMarkdownMediaEmbed(
+export interface SerializedEmbed {
+  text: string;
+  /**
+   * Caret offset to use when expanding this embed back into raw markdown for
+   * editing — points at the start of the user-meaningful field (note title or
+   * media URL).
+   */
+  editCaret: number;
+}
+
+function buildMediaEmbedParts(
   embed: Pick<
     ParsedMarkdownMediaEmbed,
     'alt' | 'height' | 'src' | 'title' | 'width'
   >,
-): string {
+): { prefix: string; body: string; suffix: string } {
   const altText = embed.alt?.trim() ?? '';
   const sizeSuffix = buildSizeSuffix(embed.width, embed.height);
   const label = altText.length > 0 ? `${altText}${sizeSuffix}` : sizeSuffix;
@@ -206,11 +216,45 @@ export function serializeMarkdownMediaEmbed(
     typeof embed.title === 'string' && embed.title.length > 0
       ? ` "${embed.title}"`
       : '';
-  return `![${label}](${embed.src}${titleSuffix})`;
+  return {
+    prefix: `![${label}](`,
+    body: embed.src,
+    suffix: `${titleSuffix})`,
+  };
+}
+
+function buildNoteEmbedParts(
+  embed: Pick<ParsedNoteEmbed, 'height' | 'target' | 'width'>,
+): { prefix: string; body: string; suffix: string } {
+  return {
+    prefix: '![[',
+    body: `${embed.target}${buildSizeSuffix(embed.width, embed.height)}`,
+    suffix: ']]',
+  };
+}
+
+function joinEmbedParts(parts: {
+  prefix: string;
+  body: string;
+  suffix: string;
+}): SerializedEmbed {
+  return {
+    text: parts.prefix + parts.body + parts.suffix,
+    editCaret: parts.prefix.length,
+  };
+}
+
+export function serializeMarkdownMediaEmbed(
+  embed: Pick<
+    ParsedMarkdownMediaEmbed,
+    'alt' | 'height' | 'src' | 'title' | 'width'
+  >,
+): SerializedEmbed {
+  return joinEmbedParts(buildMediaEmbedParts(embed));
 }
 
 export function serializeNoteEmbed(
   embed: Pick<ParsedNoteEmbed, 'height' | 'target' | 'width'>,
-): string {
-  return `![[${embed.target}${buildSizeSuffix(embed.width, embed.height)}]]`;
+): SerializedEmbed {
+  return joinEmbedParts(buildNoteEmbedParts(embed));
 }

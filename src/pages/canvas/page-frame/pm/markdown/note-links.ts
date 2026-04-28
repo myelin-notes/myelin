@@ -1,7 +1,11 @@
 import type { MarkType, Node as PMNode, Schema } from 'prosemirror-model';
 import { EditorState, Plugin } from 'prosemirror-state';
-import type { EditorView } from 'prosemirror-view';
 import { PM_ADD_TO_HISTORY } from '../constants';
+import {
+  buildResolvedTitleLookup,
+  createTitleResolverView,
+  type ResolveNoteLinkId,
+} from './note-id-resolver';
 import { parseInlineMarkdown } from './parse-inline';
 import {
   collectAffectedTextblocks,
@@ -9,7 +13,7 @@ import {
 } from './range-tracking';
 import { MARKDOWN_ATOM_CHAR } from './types';
 
-export type ResolveNoteLinkId = (title: string) => Promise<string | null>;
+export type { ResolveNoteLinkId };
 
 interface TextOffsetMap {
   text: string;
@@ -302,25 +306,8 @@ export function buildNormalizedNoteLinkTransaction(
   return changed ? tr : null;
 }
 
-async function buildResolvedNoteLinkLookup(
-  doc: PMNode,
-  schema: Schema,
-  resolveNoteLinkId: ResolveNoteLinkId,
-): Promise<Map<string, string | null>> {
-  const titles = Array.from(
-    new Set(
-      collectDocumentNoteLinks(doc, schema).map((target) => target.title),
-    ),
-  );
-  const noteIdsByTitle = new Map<string, string | null>();
-
-  await Promise.all(
-    titles.map(async (title) => {
-      noteIdsByTitle.set(title, await resolveNoteLinkId(title));
-    }),
-  );
-
-  return noteIdsByTitle;
+function collectNoteLinkTitles(doc: PMNode, schema: Schema): string[] {
+  return collectDocumentNoteLinks(doc, schema).map((target) => target.title);
 }
 
 export async function normalizeAndResolveNoteLinksDoc(
@@ -339,9 +326,10 @@ export async function normalizeAndResolveNoteLinksDoc(
     return state.doc;
   }
 
-  const noteIdsByTitle = await buildResolvedNoteLinkLookup(
+  const noteIdsByTitle = await buildResolvedTitleLookup(
     state.doc,
     schema,
+    collectNoteLinkTitles,
     resolveNoteLinkId,
   );
   const resolveTr = buildResolvedNoteLinkTransaction(
@@ -399,64 +387,6 @@ export function buildResolvedNoteLinkTransaction(
   return tr;
 }
 
-class NoteLinkResolverView {
-  private requestId = 0;
-  private destroyed = false;
-  private lastDoc: PMNode;
-
-  constructor(
-    private view: EditorView,
-    private readonly schema: Schema,
-    private readonly resolveNoteLinkId?: ResolveNoteLinkId,
-  ) {
-    this.lastDoc = view.state.doc;
-    void this.resolve();
-  }
-
-  update(view: EditorView): void {
-    const docChanged = view.state.doc !== this.lastDoc;
-    this.view = view;
-    if (!docChanged) {
-      return;
-    }
-
-    this.lastDoc = view.state.doc;
-    void this.resolve();
-  }
-
-  destroy(): void {
-    this.destroyed = true;
-    this.requestId += 1;
-  }
-
-  private async resolve(): Promise<void> {
-    if (!this.resolveNoteLinkId) {
-      return;
-    }
-    const resolveNoteLinkId = this.resolveNoteLinkId;
-
-    const currentRequestId = ++this.requestId;
-    const noteIdsByTitle = await buildResolvedNoteLinkLookup(
-      this.view.state.doc,
-      this.schema,
-      resolveNoteLinkId,
-    );
-
-    if (this.destroyed || currentRequestId !== this.requestId) {
-      return;
-    }
-
-    const tr = buildResolvedNoteLinkTransaction(
-      this.view.state,
-      this.schema,
-      noteIdsByTitle,
-    );
-    if (tr) {
-      this.view.dispatch(tr);
-    }
-  }
-}
-
 export function noteLinkMarkdownPlugin(
   schema: Schema,
   resolveNoteLinkId?: ResolveNoteLinkId,
@@ -502,7 +432,12 @@ export function noteLinkMarkdownPlugin(
       );
     },
     view(view) {
-      return new NoteLinkResolverView(view, schema, resolveNoteLinkId);
+      return createTitleResolverView(view, {
+        schema,
+        collectTitles: collectNoteLinkTitles,
+        buildResolveTransaction: buildResolvedNoteLinkTransaction,
+        resolveNoteLinkId,
+      });
     },
   });
 }
