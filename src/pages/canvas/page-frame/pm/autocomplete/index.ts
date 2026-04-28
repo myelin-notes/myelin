@@ -1,5 +1,7 @@
 import type { EditorView } from 'prosemirror-view';
 
+export type PageFrameAutocompleteKind = 'note-link' | 'slash';
+
 export interface PageFrameAutocompleteItem {
   id: string;
   title: string;
@@ -17,6 +19,7 @@ export interface PageFrameAutocompleteRequest {
   range: PageFrameAutocompleteRange;
   anchorPosition?: number;
   limit?: number;
+  kind?: PageFrameAutocompleteKind;
 }
 
 export interface PageFrameAutocompleteSourceRequest
@@ -46,6 +49,7 @@ export interface PageFrameAutocompleteState {
   activeIndex: number;
   status: PageFrameAutocompleteStatus;
   error: Error | null;
+  kind: PageFrameAutocompleteKind | null;
 }
 
 export type PageFrameAutocompleteKeyResult =
@@ -86,6 +90,7 @@ function createClosedState(): PageFrameAutocompleteState {
     activeIndex: -1,
     status: 'closed',
     error: null,
+    kind: null,
   };
 }
 
@@ -180,6 +185,7 @@ export class PageFrameAutocompleteController {
       activeIndex: -1,
       status: 'loading',
       error: null,
+      kind: request.kind ?? null,
     });
 
     void this.loadItems({

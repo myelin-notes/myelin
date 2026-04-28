@@ -502,11 +502,13 @@ export function PageFrameDomLayer({
           controller={autocompleteController}
           view={activeView}
           onSelectItem={onAutocompleteSelect}
+          loadPreview={loadNoteLinkPreview}
         />
       )}
       <NoteLinkPreviewPopover
         getTargetAtPoint={getPreviewTargetAtPoint}
         loadPreview={loadNoteLinkPreview}
+        autocompleteController={autocompleteController}
       />
     </>
   );

@@ -158,7 +158,7 @@ export function usePageFrameAutocomplete({
     }
 
     activeSourceRef.current = activeRequest.kind;
-    controller.show(activeRequest.request);
+    controller.show({ ...activeRequest.request, kind: activeRequest.kind });
   });
 
   useEffect(() => {
