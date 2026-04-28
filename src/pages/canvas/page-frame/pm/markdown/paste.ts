@@ -1,54 +1,30 @@
-import { type Schema, Slice } from 'prosemirror-model';
+import { type Node as PMNode, type Schema, Slice } from 'prosemirror-model';
 import { type EditorState, Plugin, type Transaction } from 'prosemirror-state';
 import { parseMarkdownToDoc } from '../../markdown-parser';
 
-const HEADING_RE = /^(#{1,6})\s+\S/;
-const BULLET_RE = /^\s*[-*+]\s+\S/;
-const ORDERED_RE = /^\s*\d+\.\s+\S/;
-const QUOTE_RE = /^>\s?\S/;
-const HR_RE = /^(?:-{3,}|\*{3,}|_{3,})$/;
-const FENCE_RE = /^```/;
-const TABLE_ROW_RE = /\|/;
-const TABLE_DIVIDER_RE = /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/;
-
-function isTableStart(lines: readonly string[], index: number): boolean {
-  return (
-    index + 1 < lines.length &&
-    TABLE_ROW_RE.test(lines[index]) &&
-    TABLE_DIVIDER_RE.test(lines[index + 1])
-  );
-}
-
-export function isBlockMarkdownPaste(text: string): boolean {
-  const normalized = text.replace(/\r\n?/g, '\n');
-  if (normalized.trim().length === 0) {
-    return false;
-  }
-
-  const lines = normalized.split('\n');
-  return lines.some((line, index) => {
-    const trimmed = line.trim();
-    return (
-      FENCE_RE.test(trimmed) ||
-      HR_RE.test(trimmed) ||
-      HEADING_RE.test(line) ||
-      BULLET_RE.test(line) ||
-      ORDERED_RE.test(line) ||
-      QUOTE_RE.test(line) ||
-      isTableStart(lines, index)
-    );
+export function hasParsedMarkdownBlock(doc: PMNode): boolean {
+  let hasBlock = false;
+  doc.forEach((node) => {
+    if (node.type.name !== 'paragraph') {
+      hasBlock = true;
+    }
   });
+  return hasBlock;
 }
 
 export function buildMarkdownPasteSlice(
   text: string,
   schema: Schema,
 ): Slice | null {
-  if (!isBlockMarkdownPaste(text)) {
+  if (text.trim().length === 0) {
     return null;
   }
 
   const doc = parseMarkdownToDoc(text, schema);
+  if (!hasParsedMarkdownBlock(doc)) {
+    return null;
+  }
+
   return new Slice(doc.content, 0, 0);
 }
 

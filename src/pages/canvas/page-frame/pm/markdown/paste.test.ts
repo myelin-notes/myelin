@@ -2,23 +2,42 @@ import { EditorState } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
 import { parseMarkdownToDoc } from '../../markdown-parser';
 import { schema } from '../schema';
-import { buildMarkdownPasteTransaction, isBlockMarkdownPaste } from './paste';
+import {
+  buildMarkdownPasteSlice,
+  buildMarkdownPasteTransaction,
+  hasParsedMarkdownBlock,
+} from './paste';
 
 describe('markdown paste', () => {
-  it('recognizes block-level markdown paste', () => {
-    expect(isBlockMarkdownPaste('# Heading')).toBe(true);
-    expect(isBlockMarkdownPaste('- Item')).toBe(true);
-    expect(isBlockMarkdownPaste('1. Item')).toBe(true);
+  it('uses the markdown parser output to decide when paste should handle blocks', () => {
     expect(
-      isBlockMarkdownPaste(['```ts', 'const value = 1;', '```'].join('\n')),
+      hasParsedMarkdownBlock(parseMarkdownToDoc('# Heading', schema)),
+    ).toBe(true);
+    expect(hasParsedMarkdownBlock(parseMarkdownToDoc('- Item', schema))).toBe(
+      true,
+    );
+    expect(hasParsedMarkdownBlock(parseMarkdownToDoc('1. Item', schema))).toBe(
+      true,
+    );
+    expect(
+      hasParsedMarkdownBlock(
+        parseMarkdownToDoc(
+          ['```ts', 'const value = 1;', '```'].join('\n'),
+          schema,
+        ),
+      ),
     ).toBe(true);
     expect(
-      isBlockMarkdownPaste(['| A | B |', '| --- | --- |'].join('\n')),
+      hasParsedMarkdownBlock(
+        parseMarkdownToDoc(['| A | B |', '| --- | --- |'].join('\n'), schema),
+      ),
     ).toBe(true);
   });
 
   it('leaves inline-only markdown paste on the default paste path', () => {
-    expect(isBlockMarkdownPaste('Plain **bold** and `code`.')).toBe(false);
+    expect(buildMarkdownPasteSlice('Plain **bold** and `code`.', schema)).toBe(
+      null,
+    );
   });
 
   it('inserts parsed markdown blocks instead of plain paragraphs', () => {
