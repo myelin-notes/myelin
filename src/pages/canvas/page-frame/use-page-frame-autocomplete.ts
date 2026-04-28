@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import type { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { PM_UPDATE_EVENT } from '@/lib/events';
@@ -29,7 +29,8 @@ interface UsePageFrameAutocompleteArgs {
   view: EditorView | null;
 }
 
-type AutocompleteSourceKind = 'note-link' | 'slash' | null;
+export type PageFrameAutocompleteKind = 'note-link' | 'slash';
+
 type ActiveAutocompleteRequest =
   | {
       kind: 'slash';
@@ -66,7 +67,9 @@ export function usePageFrameAutocomplete({
   repository,
   view,
 }: UsePageFrameAutocompleteArgs) {
-  const activeSourceRef = useRef<AutocompleteSourceKind>(null);
+  const activeSourceRef = useRef<PageFrameAutocompleteKind | null>(null);
+  const [activeKind, setActiveKind] =
+    useState<PageFrameAutocompleteKind | null>(null);
 
   const controller = useMemo(
     () =>
@@ -88,6 +91,17 @@ export function usePageFrameAutocomplete({
   );
 
   useEffect(() => () => controller.dispose(), [controller]);
+
+  // Mirror controller open-state into React state so consumers can react to
+  // which kind (if any) is currently active. The hook is the only layer that
+  // knows about kinds; the controller stays generic.
+  useEffect(() => {
+    return controller.subscribe(() => {
+      if (!controller.getState().open) {
+        setActiveKind(null);
+      }
+    });
+  }, [controller]);
 
   const applySelectedItem = useEffectEvent(
     (item: PageFrameAutocompleteItem) => {
@@ -127,6 +141,7 @@ export function usePageFrameAutocomplete({
   const syncAutocomplete = useEffectEvent(() => {
     if (!view) {
       activeSourceRef.current = null;
+      setActiveKind(null);
       controller.close();
       return;
     }
@@ -134,6 +149,7 @@ export function usePageFrameAutocomplete({
     const activeRequest = findActiveAutocompleteRequest(view.state);
     if (!activeRequest) {
       activeSourceRef.current = null;
+      setActiveKind(null);
       if (controller.getState().open) {
         controller.close();
       }
@@ -158,12 +174,14 @@ export function usePageFrameAutocomplete({
     }
 
     activeSourceRef.current = activeRequest.kind;
-    controller.show({ ...activeRequest.request, kind: activeRequest.kind });
+    setActiveKind(activeRequest.kind);
+    controller.show(activeRequest.request);
   });
 
   useEffect(() => {
     if (!view) {
       activeSourceRef.current = null;
+      setActiveKind(null);
       controller.close();
       return;
     }
@@ -197,6 +215,7 @@ export function usePageFrameAutocomplete({
 
     return () => {
       activeSourceRef.current = null;
+      setActiveKind(null);
       controller.close();
       view.dom.removeEventListener(PM_UPDATE_EVENT, handleUpdate);
       view.dom.removeEventListener('keydown', handleKeyDown, true);
@@ -207,5 +226,6 @@ export function usePageFrameAutocomplete({
   return {
     controller: view ? controller : null,
     onSelectItem: applySelectedItem,
+    activeKind: view ? activeKind : null,
   };
 }

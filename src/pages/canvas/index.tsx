@@ -188,6 +188,7 @@ function CanvasViewInner() {
         canvasRef={engine.drawableCanvasRef}
         editingElement={engine.editingElement}
         autocompleteController={pageFrameAutocomplete.controller}
+        autocompleteKind={pageFrameAutocomplete.activeKind}
         onAutocompleteSelect={pageFrameAutocomplete.onSelectItem}
         loadNoteLinkPreview={
           hoverPreviewEnabled ? loadNoteLinkPreview : undefined

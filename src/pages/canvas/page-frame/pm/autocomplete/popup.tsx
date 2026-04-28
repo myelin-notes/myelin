@@ -29,6 +29,7 @@ interface PageFrameAutocompletePopupProps {
   loadingLabel?: string;
   emptyLabel?: string;
   errorLabel?: string;
+  enablePreview?: boolean;
   loadPreview?: (
     target: NoteLinkPreviewTarget,
     signal: AbortSignal,
@@ -81,7 +82,6 @@ function createClosedState(): PageFrameAutocompleteState {
     activeIndex: -1,
     status: 'closed',
     error: null,
-    kind: null,
   };
 }
 
@@ -114,6 +114,7 @@ export function PageFrameAutocompletePopup({
   loadingLabel = 'Searching...',
   emptyLabel = 'No matches.',
   errorLabel = 'Could not load suggestions.',
+  enablePreview = false,
   loadPreview,
 }: PageFrameAutocompletePopupProps) {
   const state = useAutocompleteState(controller);
@@ -124,9 +125,7 @@ export function PageFrameAutocompletePopup({
   const activeItem =
     state.activeIndex >= 0 ? (state.items[state.activeIndex] ?? null) : null;
   const previewable =
-    state.kind === 'note-link' &&
-    loadPreview !== undefined &&
-    state.items.length > 0;
+    enablePreview && loadPreview !== undefined && state.items.length > 0;
   const previewVisible =
     previewable && window.innerWidth >= PREVIEW_MIN_VIEWPORT_WIDTH;
 

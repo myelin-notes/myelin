@@ -5,7 +5,6 @@ import type {
   NoteLinkPreview,
   NoteLinkPreviewTarget,
 } from './note-link-preview';
-import type { PageFrameAutocompleteController } from './pm/autocomplete';
 
 const PREVIEW_WIDTH = 320;
 const PREVIEW_MARGIN = 12;
@@ -46,7 +45,7 @@ interface NoteLinkPreviewPopoverProps {
     target: NoteLinkPreviewTarget,
     signal: AbortSignal,
   ) => Promise<NoteLinkPreview | null>;
-  autocompleteController?: PageFrameAutocompleteController | null;
+  suppressed?: boolean;
 }
 
 function computePosition(rect: DOMRect): PopoverPosition {
@@ -81,7 +80,7 @@ function targetKeyOf(target: NoteLinkPreviewTarget): string {
 export function NoteLinkPreviewPopover({
   getTargetAtPoint,
   loadPreview,
-  autocompleteController,
+  suppressed = false,
 }: NoteLinkPreviewPopoverProps) {
   const previewEnabled = loadPreview !== undefined;
   const [state, setState] = useState<NoteLinkPreviewState>({
@@ -93,6 +92,8 @@ export function NoteLinkPreviewPopover({
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const suppressedRef = useRef(suppressed);
+  suppressedRef.current = suppressed;
 
   const getTargetAtPointEvent = useEffectEvent(getTargetAtPoint);
   const loadPreviewEvent = useEffectEvent(
@@ -163,7 +164,7 @@ export function NoteLinkPreviewPopover({
     };
 
     const handlePointerMove = (event: PointerEvent) => {
-      if (autocompleteController?.getState().open) {
+      if (suppressedRef.current) {
         closePreview();
         return;
       }
@@ -211,23 +212,13 @@ export function NoteLinkPreviewPopover({
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerleave', handlePointerLeave);
     };
-  }, [previewEnabled, autocompleteController]);
+  }, [previewEnabled]);
 
   useEffect(() => {
-    if (!autocompleteController) {
-      return;
-    }
-
-    if (autocompleteController.getState().open) {
+    if (suppressed) {
       closePreview();
     }
-
-    return autocompleteController.subscribe(() => {
-      if (autocompleteController.getState().open) {
-        closePreview();
-      }
-    });
-  }, [autocompleteController]);
+  }, [suppressed]);
 
   if (state.status === 'closed') {
     return null;

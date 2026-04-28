@@ -27,6 +27,7 @@ import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
+import type { PageFrameAutocompleteKind } from '../use-page-frame-autocomplete';
 
 const FRAME_STYLE: Record<string, string> = {
   transformOrigin: '0 0',
@@ -254,6 +255,7 @@ interface PageFrameDomLayerProps {
   canvasRef: React.RefObject<DrawableCanvas | null>;
   editingElement: DrawableElement | null;
   autocompleteController?: PageFrameAutocompleteController | null;
+  autocompleteKind?: PageFrameAutocompleteKind | null;
   onAutocompleteSelect?: (item: PageFrameAutocompleteItem) => void;
   loadNoteLinkPreview?: (
     target: NoteLinkPreviewTarget,
@@ -265,6 +267,7 @@ export function PageFrameDomLayer({
   canvasRef,
   editingElement: rawEditingElement,
   autocompleteController = null,
+  autocompleteKind = null,
   onAutocompleteSelect,
   loadNoteLinkPreview,
 }: PageFrameDomLayerProps) {
@@ -502,13 +505,14 @@ export function PageFrameDomLayer({
           controller={autocompleteController}
           view={activeView}
           onSelectItem={onAutocompleteSelect}
+          enablePreview={autocompleteKind === 'note-link'}
           loadPreview={loadNoteLinkPreview}
         />
       )}
       <NoteLinkPreviewPopover
         getTargetAtPoint={getPreviewTargetAtPoint}
         loadPreview={loadNoteLinkPreview}
-        autocompleteController={autocompleteController}
+        suppressed={autocompleteKind !== null}
       />
     </>
   );
