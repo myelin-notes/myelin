@@ -33,6 +33,12 @@ export interface ParagraphLine {
   getPos: () => number | null;
 }
 
+export interface TableRowLine extends ParagraphLine {
+  isHeaderRow?: boolean;
+  splitLines?: ParagraphLine[];
+  measureSplitLines?: () => ParagraphLine[];
+}
+
 export interface PaginationBlock {
   pos: number;
   measuredTop: number;
@@ -61,7 +67,7 @@ interface CalculateBreakLayoutOptions<Block extends PaginationBlock> {
   measureTableRows?: (
     block: Block,
     state: ParagraphMeasurementState,
-  ) => ParagraphLine[];
+  ) => TableRowLine[];
   now?: () => number;
   onOverflowingBlock?: (block: Block) => void;
   onOverflowingParagraph?: (block: Block) => void;
@@ -136,12 +142,13 @@ export function paginateParagraph(
 }
 
 export function paginateTableRows(
-  rows: ParagraphLine[],
+  rows: TableRowLine[],
   tablePos: number,
   tableEnd: number,
   initialPageStart: number,
   initialPageBoundary: number,
   initialCumulativeShift: number,
+  tableNaturalTop: number = rows[0]?.naturalTop ?? 0,
 ): ParagraphPaginationResult {
   const breaks: Break[] = [];
   let pageStart = initialPageStart;
@@ -149,6 +156,94 @@ export function paginateTableRows(
   let cumulativeShift = initialCumulativeShift;
   let pageAdvances = 0;
   let segmentStartRowIndex = 0;
+  let headerRowCount = 0;
+  const splitLineCache = new Map<TableRowLine, ParagraphLine[]>();
+
+  while (
+    headerRowCount < rows.length &&
+    rows[headerRowCount].isHeaderRow === true
+  ) {
+    headerRowCount++;
+  }
+  if (headerRowCount === rows.length) {
+    headerRowCount = 0;
+  }
+
+  const advancePage = () => {
+    pageStart = pageBoundary + PAGE_BREAK_GAP;
+    pageBoundary = pageStart + CONTENT_HEIGHT;
+    pageAdvances++;
+  };
+
+  const getSplitLines = (row: TableRowLine): ParagraphLine[] => {
+    const cached = splitLineCache.get(row);
+    if (cached) {
+      return cached;
+    }
+
+    const splitLines = row.splitLines ?? row.measureSplitLines?.() ?? [];
+    splitLineCache.set(row, splitLines);
+    return splitLines;
+  };
+
+  const splitInsideRow = (row: TableRowLine): boolean => {
+    const splitLines = getSplitLines(row);
+    if (splitLines.length === 0) {
+      return false;
+    }
+
+    let didSplit = false;
+    let segmentHasFittingLine = false;
+
+    for (const line of splitLines) {
+      const lineEffectiveTop = line.naturalTop + cumulativeShift;
+      const lineEffectiveBottom = line.naturalBottom + cumulativeShift;
+
+      if (lineEffectiveBottom <= pageBoundary) {
+        if (lineEffectiveBottom > pageStart) {
+          segmentHasFittingLine = true;
+        }
+        continue;
+      }
+
+      let appliedSpacer = 0;
+      if (lineEffectiveTop > pageStart && segmentHasFittingLine) {
+        const spacer = pageBoundary + PAGE_BREAK_GAP - lineEffectiveTop;
+        if (spacer > 0) {
+          const pos = line.getPos();
+          if (pos !== null) {
+            const clamped = Math.max(tablePos + 1, Math.min(pos, tableEnd - 1));
+            breaks.push({ pos: clamped, spacer, kind: 'inline' });
+            cumulativeShift += spacer;
+            appliedSpacer = spacer;
+            didSplit = true;
+          }
+        }
+      }
+
+      if (!didSplit) {
+        return false;
+      }
+
+      const shiftedLineBottom = lineEffectiveBottom + appliedSpacer;
+      do {
+        advancePage();
+      } while (shiftedLineBottom > pageBoundary);
+
+      segmentHasFittingLine = shiftedLineBottom > pageStart;
+    }
+
+    if (!didSplit) {
+      return false;
+    }
+
+    const shiftedRowBottom = row.naturalBottom + cumulativeShift;
+    while (shiftedRowBottom > pageBoundary) {
+      advancePage();
+    }
+
+    return true;
+  };
 
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
     const row = rows[rowIndex];
@@ -159,21 +254,36 @@ export function paginateTableRows(
       continue;
     }
 
+    const rowHeight = row.naturalBottom - row.naturalTop;
+    const canSplitInsideRow =
+      row.splitLines !== undefined || row.measureSplitLines !== undefined;
+    if (
+      canSplitInsideRow &&
+      (rowHeight > CONTENT_HEIGHT || rowEffectiveTop < pageBoundary) &&
+      splitInsideRow(row)
+    ) {
+      segmentStartRowIndex = rowIndex;
+      continue;
+    }
+
     if (rowEffectiveTop <= pageStart) {
       do {
-        pageStart = pageBoundary + PAGE_BREAK_GAP;
-        pageBoundary = pageStart + CONTENT_HEIGHT;
-        pageAdvances++;
+        advancePage();
       } while (rowEffectiveBottom > pageBoundary);
       segmentStartRowIndex = rowIndex;
       continue;
     }
 
-    const spacer = pageBoundary + PAGE_BREAK_GAP - rowEffectiveTop;
+    const shouldMoveWholeTable =
+      headerRowCount > 0 &&
+      segmentStartRowIndex === 0 &&
+      rowIndex <= headerRowCount &&
+      tableNaturalTop + cumulativeShift > pageStart;
+    const breakTop = shouldMoveWholeTable
+      ? tableNaturalTop + cumulativeShift
+      : rowEffectiveTop;
+    const spacer = pageBoundary + PAGE_BREAK_GAP - breakTop;
     if (spacer > 0) {
-      const shouldMoveWholeTable =
-        segmentStartRowIndex === 0 && rowIndex - segmentStartRowIndex < 2;
-
       if (shouldMoveWholeTable) {
         breaks.push({ pos: tablePos, spacer, kind: 'block' });
       } else {
@@ -188,9 +298,10 @@ export function paginateTableRows(
       cumulativeShift += spacer;
     }
 
-    pageStart = pageBoundary + PAGE_BREAK_GAP;
-    pageBoundary = pageStart + CONTENT_HEIGHT;
-    pageAdvances++;
+    const shiftedRowBottom = rowEffectiveBottom + Math.max(spacer, 0);
+    do {
+      advancePage();
+    } while (shiftedRowBottom > pageBoundary);
   }
 
   return { breaks, cumulativeShift, pageStart, pageBoundary, pageAdvances };
@@ -293,6 +404,7 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
         pageStart,
         pageBoundary,
         cumulativeShift,
+        blockNaturalTop,
       );
       onParagraphPaginated?.(block, result, now ? now() - tableStartedAt : 0);
       newBreaks.push(...result.breaks);

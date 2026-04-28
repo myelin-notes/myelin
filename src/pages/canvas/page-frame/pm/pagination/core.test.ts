@@ -6,6 +6,7 @@ import {
   type ParagraphLine,
   paginateParagraph,
   paginateTableRows,
+  type TableRowLine,
 } from './core';
 
 function line(
@@ -14,6 +15,21 @@ function line(
   getPos: () => number | null = () => null,
 ): ParagraphLine {
   return { naturalTop, naturalBottom, getPos };
+}
+
+function tableRow(
+  naturalTop: number,
+  naturalBottom: number,
+  getPos: () => number | null = () => null,
+  options: { isHeaderRow?: boolean; splitLines?: ParagraphLine[] } = {},
+): TableRowLine {
+  return {
+    naturalTop,
+    naturalBottom,
+    getPos,
+    isHeaderRow: options.isHeaderRow,
+    splitLines: options.splitLines,
+  };
 }
 
 function block({
@@ -180,13 +196,13 @@ describe('calculateBreakLayout', () => {
       existingBreaks: [],
       measureParagraphLines: () => [],
       measureTableRows: () => [
-        line(720, 752, () => 21),
-        line(760, 800, () => 31),
+        tableRow(720, 752, () => 21, { isHeaderRow: true }),
+        tableRow(760, 800, () => 31),
       ],
     });
 
     expect(result).toEqual({
-      breaks: [{ pos: 20, spacer: 160, kind: 'block' }],
+      breaks: [{ pos: 20, spacer: 200, kind: 'block' }],
       pageCount: 2,
     });
   });
@@ -263,9 +279,9 @@ describe('paginateTableRows', () => {
   it('emits table-row breaks for rows after the opening segment', () => {
     const result = paginateTableRows(
       [
-        line(680, 712, () => 21),
-        line(720, 752, () => 31),
-        line(760, 800, () => 41),
+        tableRow(680, 712, () => 21, { isHeaderRow: true }),
+        tableRow(720, 752, () => 31),
+        tableRow(760, 800, () => 41),
       ],
       20,
       80,
@@ -282,7 +298,10 @@ describe('paginateTableRows', () => {
 
   it('moves the whole table when the header would be orphaned', () => {
     const result = paginateTableRows(
-      [line(720, 752, () => 21), line(760, 800, () => 31)],
+      [
+        tableRow(720, 752, () => 21, { isHeaderRow: true }),
+        tableRow(760, 800, () => 31),
+      ],
       20,
       80,
       0,
@@ -290,7 +309,112 @@ describe('paginateTableRows', () => {
       0,
     );
 
-    expect(result.breaks).toEqual([{ pos: 20, spacer: 160, kind: 'block' }]);
+    expect(result.breaks).toEqual([{ pos: 20, spacer: 200, kind: 'block' }]);
     expect(result.pageAdvances).toBe(1);
+  });
+
+  it('does not move a non-header table wholesale when only the first row fits', () => {
+    const result = paginateTableRows(
+      [tableRow(720, 752, () => 21), tableRow(760, 800, () => 31)],
+      20,
+      80,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([
+      { pos: 31, spacer: 160, kind: 'table-row' },
+    ]);
+    expect(result.pageAdvances).toBe(1);
+  });
+
+  it('splits a splittable row that partially fits in the remaining page', () => {
+    const result = paginateTableRows(
+      [
+        tableRow(720, 860, () => 21, {
+          splitLines: [
+            line(720, 744, () => 101),
+            line(760, 784, () => 201),
+            line(800, 824, () => 301),
+          ],
+        }),
+      ],
+      20,
+      400,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([{ pos: 301, spacer: 120, kind: 'inline' }]);
+    expect(result.pageAdvances).toBe(1);
+  });
+
+  it('moves a splittable row when no line fits before the page boundary', () => {
+    const result = paginateTableRows(
+      [
+        tableRow(776, 860, () => 21, {
+          splitLines: [line(790, 814, () => 101), line(820, 844, () => 201)],
+        }),
+      ],
+      20,
+      400,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([
+      { pos: 21, spacer: 144, kind: 'table-row' },
+    ]);
+    expect(result.pageAdvances).toBe(1);
+  });
+
+  it('splits an oversized single-cell row at cell text lines', () => {
+    const result = paginateTableRows(
+      [
+        tableRow(0, 1000, () => 21, {
+          splitLines: [
+            line(0, 24, () => 101),
+            line(720, 744, () => 201),
+            line(780, 804, () => 301),
+          ],
+        }),
+      ],
+      20,
+      400,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([{ pos: 301, spacer: 140, kind: 'inline' }]);
+    expect(result.pageAdvances).toBe(1);
+  });
+
+  it('continues splitting an oversized single-cell row across later pages', () => {
+    const result = paginateTableRows(
+      [
+        tableRow(0, 1800, () => 21, {
+          splitLines: [
+            line(720, 744, () => 101),
+            line(780, 804, () => 201),
+            line(1540, 1580, () => 301),
+          ],
+        }),
+      ],
+      20,
+      400,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([
+      { pos: 201, spacer: 140, kind: 'inline' },
+      { pos: 301, spacer: 160, kind: 'inline' },
+    ]);
+    expect(result.pageAdvances).toBe(2);
   });
 });

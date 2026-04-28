@@ -582,6 +582,68 @@ input[type="range"].tool-slider::-moz-range-track {
   pointer-events: none;
 }
 
+.pm-editor .ProseMirror .pm-table-node__cell-page-break {
+  --pm-table-cell-break-mask-left: 0px;
+  --pm-table-cell-break-mask-width: 100%;
+  --pm-table-cell-break-border-left: 0px;
+  --pm-table-cell-break-border-width: 100%;
+  --pm-table-cell-break-gap-start: 0px;
+  --pm-table-cell-break-gap-end: 0px;
+  --pm-table-cell-break-border: rgba(195, 199, 202, 0.22);
+  --pm-table-cell-break-dot-color: rgba(164, 168, 172, 0.35);
+  position: relative;
+  z-index: 2;
+}
+
+.pm-editor .ProseMirror .pm-table-node__cell-page-break::before,
+.pm-editor .ProseMirror .pm-table-node__cell-page-break::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  height: var(--pm-table-cell-break-height);
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__cell-page-break::before {
+  left: var(--pm-table-cell-break-mask-left);
+  width: var(--pm-table-cell-break-mask-width);
+  z-index: 1;
+  background:
+    linear-gradient(
+      to bottom,
+      #fff 0,
+      #fff var(--pm-table-cell-break-gap-start),
+      transparent var(--pm-table-cell-break-gap-start),
+      transparent var(--pm-table-cell-break-gap-end),
+      #fff var(--pm-table-cell-break-gap-end),
+      #fff 100%
+    ),
+    radial-gradient(
+        circle,
+        var(--pm-table-cell-break-dot-color) 0 0.75px,
+        transparent 0.8px
+      )
+      12px 12px / 24px 24px,
+    var(--background);
+}
+
+.pm-editor .ProseMirror .pm-table-node__cell-page-break::after {
+  left: var(--pm-table-cell-break-border-left);
+  width: var(--pm-table-cell-break-border-width);
+  z-index: 2;
+  background:
+    linear-gradient(
+      var(--pm-table-cell-break-border),
+      var(--pm-table-cell-break-border)
+    )
+    0 0 / 100% 1px no-repeat,
+    linear-gradient(
+      var(--pm-table-cell-break-border),
+      var(--pm-table-cell-break-border)
+    )
+    0 100% / 100% 1px no-repeat;
+}
+
 .pm-editor .ProseMirror .pm-table-node__table .selectedCell::after {
   content: "";
   position: absolute;
