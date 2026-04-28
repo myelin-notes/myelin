@@ -74,4 +74,23 @@ describe('GoogleDriveRepository', () => {
       readNoteText(noteFile ? driveApi.readBytes(noteFile.id) : null),
     ).toBe('hello google drive repository');
   });
+
+  it('stores image file bytes with image metadata through the transport', async () => {
+    const repository = createRepository();
+    const driveApi = getRepositoryTestGoogleDriveApi();
+    const bytes = new Uint8Array([137, 80, 78, 71]);
+
+    const fileId = await repository.createFile('Photo.png', 'png', null, bytes);
+
+    const file = driveApi.readFileByAppProperty('myelin_note_id', fileId);
+
+    expect(file?.name).toBe(`${fileId}.png`);
+    expect(file?.mimeType).toBe('image/png');
+    expect(Array.from(file ? (driveApi.readBytes(file.id) ?? []) : [])).toEqual(
+      Array.from(bytes),
+    );
+    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual(
+      Array.from(bytes),
+    );
+  });
 });

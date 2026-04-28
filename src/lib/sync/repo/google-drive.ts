@@ -3,7 +3,8 @@ import { BaseRepository } from './base';
 import { getGoogleDriveAccessToken } from './google-drive-credentials';
 import {
   createEmptyManifest,
-  getNoteFileName,
+  getMimeTypeForFileType,
+  getStoredFileName,
   type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities } from './types';
@@ -93,7 +94,7 @@ export class GoogleDriveRepository extends BaseRepository {
     _action: string,
   ): Promise<string | null> {
     const bytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
-    return this.saveFileBytes(
+    return this.upsertFileBytes(
       await this.findManifestFile(),
       {
         name: 'manifest.json',
@@ -108,10 +109,16 @@ export class GoogleDriveRepository extends BaseRepository {
     );
   }
 
-  protected async loadNoteBytes(nodeId: string): Promise<{
+  protected async loadFileBytes(nodeId: string): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
+    const { manifest } = await this.loadManifestImpl();
+    const node = manifest.nodes[nodeId];
+    if (!node || node.type !== 'file') {
+      return { bytes: null, revision: null };
+    }
+
     const noteFile = await this.findNoteFile(nodeId);
     if (!noteFile) {
       return { bytes: null, revision: null };
@@ -123,17 +130,23 @@ export class GoogleDriveRepository extends BaseRepository {
     };
   }
 
-  protected async saveNoteBytes(
+  protected async saveFileBytes(
     nodeId: string,
     bytes: Uint8Array,
     revision: string | null,
     _message: string,
   ): Promise<string | null> {
-    return this.saveFileBytes(
+    const { manifest } = await this.loadManifestImpl();
+    const node = manifest.nodes[nodeId];
+    if (!node || node.type !== 'file') {
+      return null;
+    }
+
+    return this.upsertFileBytes(
       await this.findNoteFile(nodeId),
       {
-        name: getNoteFileName(nodeId),
-        mimeType: 'application/octet-stream',
+        name: getStoredFileName(node),
+        mimeType: getMimeTypeForFileType(node.fileType),
         parents: [await this.ensureRootFolderId()],
         appProperties: {
           [FILE_ROLE_PROPERTY_KEY]: FILE_ROLE_NOTE,
@@ -145,7 +158,7 @@ export class GoogleDriveRepository extends BaseRepository {
     );
   }
 
-  protected async deleteNoteBytes(nodeId: string): Promise<void> {
+  protected async deleteFileBytes(nodeId: string): Promise<void> {
     const noteFile = await this.findNoteFile(nodeId);
     if (!noteFile) {
       return;
@@ -330,7 +343,7 @@ export class GoogleDriveRepository extends BaseRepository {
     return (await response.json()) as GoogleDriveFile;
   }
 
-  private async saveFileBytes(
+  private async upsertFileBytes(
     existingFile: GoogleDriveFile | null,
     metadata: {
       name: string;

@@ -95,12 +95,18 @@ const en = {
       folder: 'New Folder',
       canvas: 'New Canvas',
       importMarkdown: 'Import Markdown',
+      importFiles: 'Import Files',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
     },
     importMarkdown: {
       unsupportedFile: 'Choose a Markdown file (.md, .markdown, or .mdx).',
       failed: 'Markdown import failed',
+    },
+    importFiles: {
+      unsupportedFile: 'Choose an image or video file.',
+      someUnsupported: 'Some files were not supported.',
+      failed: 'File import failed',
     },
     semanticTags: {
       title: 'Semantic Tags',

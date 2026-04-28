@@ -1,12 +1,15 @@
 import * as Y from 'yjs';
 import { searchItems } from '@/lib/search';
-import type {
-  FileType,
-  RepositoryStats,
-  RepositoryTag,
-  VFSFileNode,
-  VFSFolderNode,
-  VFSNode,
+import {
+  type FileType,
+  FileTypes,
+  ImageFileTypes,
+  type RepositoryStats,
+  type RepositoryTag,
+  type VFSFileNode,
+  type VFSFolderNode,
+  type VFSNode,
+  VideoFileTypes,
 } from './types';
 
 export interface VFSManifest {
@@ -25,6 +28,27 @@ export const CURRENT_MANIFEST_VERSION = 1;
 export const MANIFEST_PATH = 'manifest.json';
 export const FILES_DIR = 'files';
 export const FILE_EXT = '.myelin';
+const FILE_TYPE_SET = new Set<string>(FileTypes);
+const IMAGE_FILE_TYPE_SET = new Set<string>(ImageFileTypes);
+const VIDEO_FILE_TYPE_SET = new Set<string>(VideoFileTypes);
+
+const MIME_TYPE_BY_FILE_TYPE: Record<FileType, string> = {
+  mcanvas: 'application/octet-stream',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  avif: 'image/avif',
+  svg: 'image/svg+xml',
+  bmp: 'image/bmp',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  m4v: 'video/x-m4v',
+  webm: 'video/webm',
+  avi: 'video/x-msvideo',
+  mkv: 'video/x-matroska',
+};
 
 export function createEmptyManifest(): VFSManifest {
   return {
@@ -290,7 +314,7 @@ export function getUniqueFileName(
 export function deleteNodeFromManifest(
   manifest: VFSManifest,
   nodeId: string,
-): string[] {
+): VFSFileNode[] {
   const node = manifest.nodes[nodeId];
   if (!node) {
     return [];
@@ -298,7 +322,7 @@ export function deleteNodeFromManifest(
 
   removeChild(manifest, node.parentId, nodeId);
 
-  const fileIds: string[] = [];
+  const files: VFSFileNode[] = [];
   const collect = (currentId: string) => {
     const current = manifest.nodes[currentId];
     if (!current) {
@@ -310,14 +334,14 @@ export function deleteNodeFromManifest(
         collect(childId);
       }
     } else {
-      fileIds.push(currentId);
+      files.push(structuredClone(current));
     }
 
     delete manifest.nodes[currentId];
   };
 
   collect(nodeId);
-  return fileIds;
+  return files;
 }
 
 export function moveNodeInManifest(
@@ -361,6 +385,45 @@ export function normalizeCustomColor(color: string): string | null {
     return null;
   }
   return `#${match[1].toLowerCase()}`;
+}
+
+export function isSupportedFileType(value: string): value is FileType {
+  return FILE_TYPE_SET.has(value);
+}
+
+export function isImageFileType(fileType: FileType): boolean {
+  return IMAGE_FILE_TYPE_SET.has(fileType);
+}
+
+export function isVideoFileType(fileType: FileType): boolean {
+  return VIDEO_FILE_TYPE_SET.has(fileType);
+}
+
+export function getFileTypeForName(name: string): FileType | null {
+  const extension = name.split('.').pop()?.toLowerCase();
+  if (!extension || !isSupportedFileType(extension)) {
+    return null;
+  }
+  return extension;
+}
+
+export function getMimeTypeForFileType(fileType: FileType): string {
+  return MIME_TYPE_BY_FILE_TYPE[fileType];
+}
+
+export function getStoredFileName(
+  node: Pick<VFSFileNode, 'id' | 'fileType'>,
+): string {
+  if (node.fileType === 'mcanvas') {
+    return getNoteFileName(node.id);
+  }
+  return `${node.id}.${node.fileType}`;
+}
+
+export function getStoredFilePath(
+  node: Pick<VFSFileNode, 'id' | 'fileType'>,
+): string {
+  return `${FILES_DIR}/${getStoredFileName(node)}`;
 }
 
 export function getNoteFileName(nodeId: string): string {

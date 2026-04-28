@@ -1,6 +1,28 @@
 import type { NoteSession } from '../session';
 
-export const FileTypes = ['mcanvas'] as const;
+export const ImageFileTypes = [
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'avif',
+  'svg',
+  'bmp',
+] as const;
+export const VideoFileTypes = [
+  'mp4',
+  'mov',
+  'm4v',
+  'webm',
+  'avi',
+  'mkv',
+] as const;
+export const FileTypes = [
+  'mcanvas',
+  ...ImageFileTypes,
+  ...VideoFileTypes,
+] as const;
 export type FileType = (typeof FileTypes)[number];
 
 export interface VFSFileNode {
@@ -63,7 +85,10 @@ export interface Repository {
     name: string,
     fileType: FileType,
     parentId: string | null,
+    bytes?: Uint8Array,
   ): Promise<string>;
+  readFileBytes(nodeId: string): Promise<Uint8Array | null>;
+  writeFileBytes(nodeId: string, bytes: Uint8Array): Promise<void>;
   renameNode(nodeId: string, newName: string): Promise<void>;
   deleteNode(nodeId: string): Promise<void>;
   moveNode(nodeId: string, newParentId: string | null): Promise<void>;

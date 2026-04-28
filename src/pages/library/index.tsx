@@ -38,6 +38,11 @@ import {
   type ViewMode,
 } from './explorer/explorer-tree';
 import {
+  importStorageFile,
+  isStorageFile,
+  STORAGE_FILE_ACCEPT,
+} from './import-files';
+import {
   importMarkdownFile,
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
@@ -54,6 +59,7 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
   const markdownInputRef = useRef<HTMLInputElement>(null);
+  const storageInputRef = useRef<HTMLInputElement>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,6 +79,7 @@ export function LibraryPage() {
   ];
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
+  const [isImportingFiles, setIsImportingFiles] = useState(false);
   const cycleSortMode = () => {
     setSortMode(
       (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
@@ -133,6 +140,46 @@ export function LibraryPage() {
       return;
     }
     void handleImportMarkdown(file);
+  };
+
+  const handleImportStorageFiles = async (files: File[]) => {
+    const supportedFiles = files.filter(isStorageFile);
+    if (supportedFiles.length === 0) {
+      toast.error(strings.library.importFiles.unsupportedFile);
+      return;
+    }
+
+    setIsImportingFiles(true);
+
+    try {
+      for (const file of supportedFiles) {
+        await importStorageFile({
+          file,
+          repository,
+          parentId: currentFolderId,
+        });
+      }
+      triggerRefresh();
+
+      if (supportedFiles.length !== files.length) {
+        toast.error(strings.library.importFiles.someUnsupported);
+      }
+    } catch (error) {
+      toast.error(strings.library.importFiles.failed, {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsImportingFiles(false);
+    }
+  };
+
+  const handleStorageInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = '';
+    if (files.length === 0 || isImportingFiles) {
+      return;
+    }
+    void handleImportStorageFiles(files);
   };
 
   useEffect(() => {
@@ -414,6 +461,7 @@ export function LibraryPage() {
                     onNewFile={(title, type) =>
                       explorerRef.current?.startNewFile(title, type)
                     }
+                    onImportFiles={() => storageInputRef.current?.click()}
                     onImportMarkdown={() => markdownInputRef.current?.click()}
                   />
                   <input
@@ -422,6 +470,14 @@ export function LibraryPage() {
                     accept={MARKDOWN_FILE_ACCEPT}
                     className="hidden"
                     onChange={handleMarkdownInputChange}
+                  />
+                  <input
+                    ref={storageInputRef}
+                    type="file"
+                    multiple
+                    accept={STORAGE_FILE_ACCEPT}
+                    className="hidden"
+                    onChange={handleStorageInputChange}
                   />
                 </div>
               </div>

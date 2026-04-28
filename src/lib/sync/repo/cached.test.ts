@@ -15,7 +15,7 @@ import {
   createEmptyManifest,
   type VFSManifest,
 } from './shared';
-import type { RepositoryCapabilities } from './types';
+import type { RepositoryCapabilities, VFSFileNode } from './types';
 
 class MemoryRemoteRepository extends BaseRepository {
   public readonly kind = 'memory-remote';
@@ -50,7 +50,7 @@ class MemoryRemoteRepository extends BaseRepository {
     return this.manifestRevision;
   }
 
-  protected async loadNoteBytes(nodeId: string): Promise<{
+  protected async loadFileBytes(nodeId: string): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
@@ -61,7 +61,7 @@ class MemoryRemoteRepository extends BaseRepository {
     };
   }
 
-  protected async saveNoteBytes(
+  protected async saveFileBytes(
     nodeId: string,
     bytes: Uint8Array,
     _revision: string | null,
@@ -71,7 +71,7 @@ class MemoryRemoteRepository extends BaseRepository {
     return `note-${++this.noteRevision}`;
   }
 
-  protected async deleteNoteBytes(nodeId: string): Promise<void> {
+  protected async deleteFileBytes(nodeId: string): Promise<void> {
     this.notes.delete(nodeId);
   }
 }
@@ -142,6 +142,170 @@ describe('CachedRepository', () => {
     expect(readNoteText(remoteSnapshot.notes[fileId] ?? null)).toBe(
       'hello cached repository',
     );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('flushes raw video file bytes to remote storage', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/cached-video-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/cached-video-test/outbox.json',
+    );
+    const bytes = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112]);
+
+    await repository.initialize();
+
+    const fileId = await repository.createFile('Clip.mp4', 'mp4', null, bytes);
+
+    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual(
+      Array.from(bytes),
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(2);
+
+    await repository.flushPending();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    expect(remoteSnapshot.manifest.nodes[fileId]).toMatchObject({
+      type: 'file',
+      fileType: 'mp4',
+      name: 'Clip.mp4',
+    });
+    expect(Array.from(remoteSnapshot.notes[fileId] ?? [])).toEqual(
+      Array.from(bytes),
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('updates the original raw file when the remote has not changed', async () => {
+    const remote = new MemoryRemoteRepository();
+    const initialBytes = new Uint8Array([1, 2, 3]);
+    const updatedBytes = new Uint8Array([4, 5, 6]);
+    const fileId = await remote.createFile(
+      'Clip.mp4',
+      'mp4',
+      null,
+      initialBytes,
+    );
+
+    const cache = new LocalRepository('repositories/raw-update-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/raw-update-test/outbox.json',
+    );
+
+    await repository.initialize();
+    await repository.writeFileBytes(fileId, updatedBytes);
+    await repository.flushPending();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    const remoteFiles = Object.values(remoteSnapshot.manifest.nodes).filter(
+      (node): node is VFSFileNode => node.type === 'file',
+    );
+
+    expect(remoteFiles).toHaveLength(1);
+    expect(remoteFiles[0]).toMatchObject({
+      id: fileId,
+      fileType: 'mp4',
+      name: 'Clip.mp4',
+    });
+    expect(Array.from(remoteSnapshot.notes[fileId] ?? [])).toEqual(
+      Array.from(updatedBytes),
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('pulls newer raw file state when there are no local changes', async () => {
+    const remote = new MemoryRemoteRepository();
+    const initialBytes = new Uint8Array([1, 2, 3]);
+    const remoteBytes = new Uint8Array([4, 5, 6]);
+    const fileId = await remote.createFile(
+      'Clip.mp4',
+      'mp4',
+      null,
+      initialBytes,
+    );
+
+    const cache = new LocalRepository('repositories/raw-refresh-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/raw-refresh-test/outbox.json',
+    );
+
+    await repository.initialize();
+    await remote.writeFileBytes(fileId, remoteBytes);
+    await repository.refresh();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    const remoteFiles = Object.values(remoteSnapshot.manifest.nodes).filter(
+      (node): node is VFSFileNode => node.type === 'file',
+    );
+
+    expect(remoteFiles).toHaveLength(1);
+    expect(remoteFiles[0]?.id).toBe(fileId);
+    expect(Array.from(remoteSnapshot.notes[fileId] ?? [])).toEqual(
+      Array.from(remoteBytes),
+    );
+    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual(
+      Array.from(remoteBytes),
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('preserves remote raw file changes by creating a conflict copy', async () => {
+    const remote = new MemoryRemoteRepository();
+    const initialBytes = new Uint8Array([1, 2, 3]);
+    const remoteBytes = new Uint8Array([4, 5, 6]);
+    const localBytes = new Uint8Array([7, 8, 9]);
+    const fileId = await remote.createFile(
+      'Clip.mp4',
+      'mp4',
+      null,
+      initialBytes,
+    );
+
+    const cache = new LocalRepository('repositories/raw-conflict-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/raw-conflict-test/outbox.json',
+    );
+
+    await repository.initialize();
+    await remote.writeFileBytes(fileId, remoteBytes);
+    await repository.writeFileBytes(fileId, localBytes);
+
+    await repository.flushPending();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    const remoteFiles = Object.values(remoteSnapshot.manifest.nodes).filter(
+      (node): node is VFSFileNode => node.type === 'file',
+    );
+    const conflictNode = remoteFiles.find((node) =>
+      node.name.startsWith('Clip (Conflicted copy '),
+    );
+
+    expect(Array.from(remoteSnapshot.notes[fileId] ?? [])).toEqual(
+      Array.from(remoteBytes),
+    );
+    expect(conflictNode).toMatchObject({
+      fileType: 'mp4',
+      parentId: null,
+    });
+    expect(
+      Array.from(remoteSnapshot.notes[conflictNode?.id ?? ''] ?? []),
+    ).toEqual(Array.from(localBytes));
+    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual(
+      Array.from(remoteBytes),
+    );
+    expect(
+      Array.from(
+        (await repository.readFileBytes(conflictNode?.id ?? '')) ?? [],
+      ),
+    ).toEqual(Array.from(localBytes));
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 

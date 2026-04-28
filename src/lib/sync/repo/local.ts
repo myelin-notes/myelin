@@ -17,14 +17,27 @@ import {
   computeRevision,
   createEmptyManifest,
   FILES_DIR,
-  getNoteFileName,
+  getStoredFileName,
   MANIFEST_PATH,
   type RepositorySnapshot,
   type VFSManifest,
 } from './shared';
-import type { RepositoryCapabilities } from './types';
+import type { FileType, RepositoryCapabilities } from './types';
 
 const logger = new Logger('LocalRepository');
+
+function summarizeStoredBytes(
+  fileType: FileType,
+  bytes: Uint8Array | null,
+): Record<string, unknown> {
+  if (fileType === 'mcanvas') {
+    return summarizeNoteBytes(bytes);
+  }
+  return {
+    byteLength: bytes?.byteLength ?? 0,
+    hasBytes: Boolean(bytes && bytes.byteLength > 0),
+  };
+}
 
 export class LocalRepository extends BaseRepository {
   public readonly kind = 'local-storage';
@@ -54,7 +67,7 @@ export class LocalRepository extends BaseRepository {
       await appDataDir(),
       ...(this.storageRoot ? [this.storageRoot] : []),
       FILES_DIR,
-      getNoteFileName(nodeId),
+      getStoredFileName(node),
     );
   }
 
@@ -77,7 +90,7 @@ export class LocalRepository extends BaseRepository {
 
       const filePath = await this.resolveStoragePath(
         FILES_DIR,
-        getNoteFileName(node.id),
+        getStoredFileName(node),
       );
       const bytes = snapshot.notes[node.id] ?? null;
       if (bytes && bytes.byteLength > 0) {
@@ -105,10 +118,16 @@ export class LocalRepository extends BaseRepository {
   }
 
   protected async onFileCreated(nodeId: string): Promise<void> {
+    const { manifest } = await this.loadManifestImpl();
+    const node = manifest.nodes[nodeId];
+    if (!node || node.type !== 'file') {
+      return;
+    }
+
     await this.ensureDirs();
     const filePath = await this.resolveStoragePath(
       FILES_DIR,
-      getNoteFileName(nodeId),
+      getStoredFileName(node),
     );
     const file = await open(filePath, {
       write: true,
@@ -118,8 +137,8 @@ export class LocalRepository extends BaseRepository {
     await file.close();
   }
 
-  protected async onNoteSaved(nodeId: string): Promise<void> {
-    await this.mutateManifest('Touch note', (manifest) => {
+  protected async onFileSaved(nodeId: string): Promise<void> {
+    await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
@@ -163,7 +182,7 @@ export class LocalRepository extends BaseRepository {
     return null;
   }
 
-  protected async loadNoteBytes(nodeId: string): Promise<{
+  protected async loadFileBytes(nodeId: string): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
@@ -175,7 +194,7 @@ export class LocalRepository extends BaseRepository {
 
     const filePath = await this.resolveStoragePath(
       FILES_DIR,
-      getNoteFileName(nodeId),
+      getStoredFileName(node),
     );
     if (!(await exists(filePath, { baseDir: BaseDirectory.AppData }))) {
       logger.debug('Local note bytes missing on disk', {
@@ -194,12 +213,12 @@ export class LocalRepository extends BaseRepository {
       storageRoot: this.storageRoot,
       filePath,
       revision,
-      ...summarizeNoteBytes(bytes),
+      ...summarizeStoredBytes(node.fileType, bytes),
     });
     return { bytes, revision };
   }
 
-  protected async saveNoteBytes(
+  protected async saveFileBytes(
     nodeId: string,
     bytes: Uint8Array,
     _revision: string | null,
@@ -207,11 +226,12 @@ export class LocalRepository extends BaseRepository {
   ): Promise<string | null> {
     const { manifest } = await this.loadManifestImpl();
     const node = manifest.nodes[nodeId];
-    if (node && node.type === 'file' && bytes.byteLength > 0) {
+    const nodeType = node?.type;
+    if (node && node.type === 'file') {
       await this.ensureDirs();
       const filePath = await this.resolveStoragePath(
         FILES_DIR,
-        getNoteFileName(nodeId),
+        getStoredFileName(node),
       );
       await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
       const revision = await computeRevision(bytes);
@@ -220,7 +240,7 @@ export class LocalRepository extends BaseRepository {
         storageRoot: this.storageRoot,
         filePath,
         revision,
-        ...summarizeNoteBytes(bytes),
+        ...summarizeStoredBytes(node.fileType, bytes),
       });
       return revision;
     }
@@ -232,15 +252,26 @@ export class LocalRepository extends BaseRepository {
       revision,
       byteLength: bytes.byteLength,
       nodeExists: Boolean(node),
-      isFile: node?.type === 'file',
+      isFile: nodeType === 'file',
     });
     return revision;
   }
 
-  protected async deleteNoteBytes(nodeId: string): Promise<void> {
+  protected async deleteFileBytes(
+    nodeId: string,
+    fileType?: FileType,
+  ): Promise<void> {
+    const { manifest } = await this.loadManifestImpl();
+    const node = manifest.nodes[nodeId];
+    if ((!node || node.type !== 'file') && !fileType) {
+      return;
+    }
+
     const filePath = await this.resolveStoragePath(
       FILES_DIR,
-      getNoteFileName(nodeId),
+      getStoredFileName(
+        node?.type === 'file' ? node : { id: nodeId, fileType: fileType! },
+      ),
     );
     if (await exists(filePath, { baseDir: BaseDirectory.AppData })) {
       await remove(filePath, { baseDir: BaseDirectory.AppData });

@@ -6,7 +6,7 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { GitHubRepository } from './github';
-import { getNotePath, MANIFEST_PATH } from './shared';
+import { getNotePath, getStoredFilePath, MANIFEST_PATH } from './shared';
 
 function createRepository() {
   return new GitHubRepository({
@@ -60,6 +60,31 @@ describe('GitHubRepository', () => {
     expect(manifest?.nodes[fileId]?.parentId).toBe(folderId);
     expect(readNoteText(githubApi.readBytes(getNotePath(fileId)))).toBe(
       'hello github repository',
+    );
+  });
+
+  it('stores video file bytes at their typed storage path', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+    const bytes = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112]);
+
+    const fileId = await repository.createFile('Clip.mp4', 'mp4', null, bytes);
+
+    const manifest = githubApi.readJson<{
+      nodes: Record<string, { name: string; fileType: string; type: string }>;
+    }>(MANIFEST_PATH);
+    const storedBytes = githubApi.readBytes(
+      getStoredFilePath({ id: fileId, fileType: 'mp4' }),
+    );
+
+    expect(manifest?.nodes[fileId]).toMatchObject({
+      name: 'Clip.mp4',
+      type: 'file',
+      fileType: 'mp4',
+    });
+    expect(Array.from(storedBytes ?? [])).toEqual(Array.from(bytes));
+    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual(
+      Array.from(bytes),
     );
   });
 
