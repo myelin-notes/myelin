@@ -3,6 +3,10 @@ import { redo, undo } from 'prosemirror-history';
 import type { Node as PMNode } from 'prosemirror-model';
 import { Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
+import {
+  CODE_BLOCK_CLEAR_SELECTION_EVENT,
+  CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
+} from '@/lib/events';
 import { CONTENT_HEIGHT } from '../pagination/core';
 import { schema } from '../schema';
 import {
@@ -13,8 +17,6 @@ import {
   type MonacoCodeBlockEditor,
 } from './monaco-editor';
 import {
-  CODE_BLOCK_CLEAR_SELECTION_EVENT,
-  CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
   type CodeBlockExternalSelection,
   type CodeBlockExternalSelectionDetail,
   getCodeBlockExternalSelection,

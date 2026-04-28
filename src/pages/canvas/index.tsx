@@ -1,10 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import { X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
+import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
+import { Logger } from '@/lib/logger';
+import { openNoteLink } from '@/lib/note-navigation';
 import { useRepository } from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
@@ -25,7 +35,10 @@ import { useCanvasInserts } from './hooks/use-inserts';
 import { useToolState } from './hooks/use-tool-state';
 import { markdownImportHandler } from './media/markdown';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
+import type { NoteLinkOpenRequestDetail } from './page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomplete';
+
+const logger = new Logger('CanvasView');
 
 export function CanvasView() {
   return (
@@ -37,6 +50,7 @@ export function CanvasView() {
 
 function CanvasViewInner() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const repository = useRepository();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -103,6 +117,42 @@ function CanvasViewInner() {
     engine.editingElement?.type === ElementType.PAGE_FRAME
       ? ((engine.editingElement as PageFrameElement).pmEditor?.view ?? null)
       : null;
+  const openPageFrameNoteLink = useEffectEvent(
+    async (detail: NoteLinkOpenRequestDetail) => {
+      if (!id) {
+        return;
+      }
+
+      await engine.saveBeforeExit();
+      await openNoteLink(navigate, repository, id, detail);
+    },
+  );
+  useEffect(() => {
+    if (!activeEditorView) {
+      return;
+    }
+
+    const handleOpenRequest = (event: Event) => {
+      const { detail } = event as CustomEvent<NoteLinkOpenRequestDetail>;
+      void openPageFrameNoteLink(detail).catch((error) => {
+        logger.error('Failed to open note link', error);
+        toast.error('Failed to open note link', {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      });
+    };
+
+    activeEditorView.dom.addEventListener(
+      NOTE_LINK_OPEN_REQUEST_EVENT,
+      handleOpenRequest,
+    );
+    return () => {
+      activeEditorView.dom.removeEventListener(
+        NOTE_LINK_OPEN_REQUEST_EVENT,
+        handleOpenRequest,
+      );
+    };
+  }, [activeEditorView]);
   const pageFrameAutocomplete = usePageFrameAutocomplete({
     repository,
     view: activeEditorView,

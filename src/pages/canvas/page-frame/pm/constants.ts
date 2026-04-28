@@ -1,6 +1,3 @@
-/** Custom DOM event fired after every ProseMirror transaction. */
-export const PM_UPDATE_EVENT = 'pm-update';
-
 /** CSS class applied to ProseMirror editor containers. */
 export const PM_EDITOR_CLASS = 'pm-editor';
 

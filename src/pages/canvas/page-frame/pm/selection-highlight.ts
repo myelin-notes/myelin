@@ -1,7 +1,7 @@
 import { Plugin } from 'prosemirror-state';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
+import { CODE_BLOCK_EXTERNAL_SELECTION_EVENT } from '@/lib/events';
 import {
-  CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
   type CodeBlockExternalSelectionDetail,
   getCodeBlockExternalSelection,
 } from './code-block/selection-sync';

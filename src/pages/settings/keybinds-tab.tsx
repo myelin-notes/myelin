@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { KEYBINDS_RESET_EVENT } from '@/lib/events';
 import { useMessages } from '@/lib/i18n';
 import { type Action, type KeyCombo, registry } from '@/lib/keybinds';
 import {
@@ -114,8 +115,8 @@ function KeybindRow({
 
   useEffect(() => {
     const onReset = () => setCurrentCombo(registry.getCombo(action));
-    window.addEventListener('keybinds-reset', onReset);
-    return () => window.removeEventListener('keybinds-reset', onReset);
+    window.addEventListener(KEYBINDS_RESET_EVENT, onReset);
+    return () => window.removeEventListener(KEYBINDS_RESET_EVENT, onReset);
   }, [action]);
 
   const handleCapture = (newCombo: KeyCombo) => {
@@ -207,7 +208,7 @@ export function KeybindsSection() {
 
   const handleResetAll = () => {
     registry.resetAll();
-    window.dispatchEvent(new Event('keybinds-reset'));
+    window.dispatchEvent(new Event(KEYBINDS_RESET_EVENT));
   };
 
   return (

@@ -23,8 +23,8 @@ import { AddColorSwatch } from '@/components/add-color-swatch';
 import { ColorSwatch } from '@/components/color-swatch';
 import { CustomColorSwatch } from '@/components/custom-color-swatch';
 import { useCustomColors } from '@/lib/custom-colors';
+import { PM_UPDATE_EVENT } from '@/lib/events';
 import { PEN_COLORS } from '../../tools/pen-tool';
-import { PM_UPDATE_EVENT } from './constants';
 import { schema } from './schema';
 
 interface FloatingToolbarProps {

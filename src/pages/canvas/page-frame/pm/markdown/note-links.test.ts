@@ -1,6 +1,7 @@
 import { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { describe, expect, it, vi } from 'vitest';
+import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { parseMarkdownToDoc } from '../../markdown-parser';
 import { schema } from '../schema';
 import {
@@ -136,27 +137,44 @@ describe('noteLinkMarkdownPlugin', () => {
     });
   });
 
-  it('logs the resolved note id on cmd-click', () => {
+  it('requests navigation to the note link on cmd-click', () => {
     const plugin = noteLinkMarkdownPlugin(schema);
     const handleClick = plugin.props.handleClick;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const dispatchedEvents: CustomEvent[] = [];
+    const view = {
+      dom: {
+        dispatchEvent: vi.fn((event: Event) => {
+          dispatchedEvents.push(event as CustomEvent);
+          return true;
+        }),
+      },
+    } as unknown as EditorView;
     const target = {
       closest(selector: string) {
         return selector === '[data-note-link-title]' ? this : null;
       },
       getAttribute(name: string) {
+        if (name === 'data-note-link-title') {
+          return 'Alpha Note';
+        }
         return name === 'data-note-id' ? 'note-1' : null;
       },
     };
+    const preventDefault = vi.fn();
     const event = {
       metaKey: true,
       ctrlKey: false,
       target,
+      preventDefault,
     } as unknown as MouseEvent;
 
-    expect(handleClick?.call(plugin, {} as EditorView, 1, event)).toBe(true);
-    expect(logSpy).toHaveBeenCalledWith('note-1');
-
-    logSpy.mockRestore();
+    expect(handleClick?.call(plugin, view, 1, event)).toBe(true);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(view.dom.dispatchEvent).toHaveBeenCalledOnce();
+    expect(dispatchedEvents[0]?.type).toBe(NOTE_LINK_OPEN_REQUEST_EVENT);
+    expect(dispatchedEvents[0]?.detail).toEqual({
+      title: 'Alpha Note',
+      noteId: 'note-1',
+    });
   });
 });

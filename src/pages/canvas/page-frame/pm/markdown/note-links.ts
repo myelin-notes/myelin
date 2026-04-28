@@ -1,5 +1,6 @@
 import type { MarkType, Node as PMNode, Schema } from 'prosemirror-model';
 import { EditorState, Plugin } from 'prosemirror-state';
+import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   buildResolvedTitleLookup,
@@ -35,6 +36,11 @@ interface NoteLinkTarget {
 }
 
 const NOTE_LINK_SELECTOR = '[data-note-link-title]';
+
+export interface NoteLinkOpenRequestDetail {
+  title: string;
+  noteId: string | null;
+}
 
 type NoteLinkElementLike = {
   closest(selector: string): NoteLinkElementLike | null;
@@ -393,7 +399,7 @@ export function noteLinkMarkdownPlugin(
 ): Plugin {
   return new Plugin({
     props: {
-      handleClick(_view, _pos, event) {
+      handleClick(view, _pos, event) {
         if (!event.metaKey && !event.ctrlKey) {
           return false;
         }
@@ -403,7 +409,23 @@ export function noteLinkMarkdownPlugin(
           return false;
         }
 
-        console.log(noteLinkElement.getAttribute('data-note-id'));
+        const title = noteLinkElement.getAttribute('data-note-link-title');
+        if (title === null) {
+          return false;
+        }
+
+        event.preventDefault();
+        view.dom.dispatchEvent(
+          new CustomEvent<NoteLinkOpenRequestDetail>(
+            NOTE_LINK_OPEN_REQUEST_EVENT,
+            {
+              detail: {
+                title,
+                noteId: noteLinkElement.getAttribute('data-note-id') || null,
+              },
+            },
+          ),
+        );
         return true;
       },
     },

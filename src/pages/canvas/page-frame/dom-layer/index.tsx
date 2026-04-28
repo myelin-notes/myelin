@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { PM_UPDATE_EVENT } from '@/lib/events';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
@@ -15,7 +16,7 @@ import type {
   PageFrameAutocompleteItem,
 } from '../pm/autocomplete';
 import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
-import { PM_EDITOR_CLASS, PM_UPDATE_EVENT } from '../pm/constants';
+import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 
 const FRAME_STYLE: Record<string, string> = {
@@ -45,6 +46,7 @@ const CONTENT_STYLE: Record<string, string> = {
 };
 
 interface FrameRefs {
+  frame: PageFrameElement;
   chrome: FrameChrome;
   frameDiv: HTMLDivElement;
   viewportDiv: HTMLDivElement;
@@ -117,16 +119,28 @@ function createFrameRefs(
     frame.numPages = pageCount;
   });
 
-  return { chrome, frameDiv, viewportDiv, contentDiv, pageChromeDivs: [] };
+  return {
+    frame,
+    chrome,
+    frameDiv,
+    viewportDiv,
+    contentDiv,
+    pageChromeDivs: [],
+  };
+}
+
+function disposeFrameRefs(refs: FrameRefs): void {
+  refs.frame.pmEditor?.destroyView();
+  refs.chrome.dispose();
 }
 
 function removeStaleFrames(
   frameMap: Map<number, FrameRefs>,
-  activeIndices: Set<number>,
+  activeFrames: ReadonlyMap<number, PageFrameElement>,
 ): void {
   for (const [index, refs] of frameMap) {
-    if (!activeIndices.has(index)) {
-      refs.chrome.dispose();
+    if (activeFrames.get(index) !== refs.frame) {
+      disposeFrameRefs(refs);
       frameMap.delete(index);
     }
   }
@@ -184,16 +198,21 @@ export function PageFrameDomLayer({
       const frames = dc.getElementsByType(
         ElementType.PAGE_FRAME,
       ) as PageFrameElement[];
-      const existingIndices = new Set<number>();
+      const activeFrames = new Map<number, PageFrameElement>();
 
       for (const frame of frames) {
-        existingIndices.add(frame.index);
+        activeFrames.set(frame.index, frame);
 
-        if (!frameMap.current.has(frame.index)) {
-          frameMap.current.set(frame.index, createFrameRefs(frame, container));
+        let refs = frameMap.current.get(frame.index);
+        if (refs && refs.frame !== frame) {
+          disposeFrameRefs(refs);
+          frameMap.current.delete(frame.index);
+          refs = undefined;
         }
-
-        const refs = frameMap.current.get(frame.index)!;
+        if (!refs) {
+          refs = createFrameRefs(frame, container);
+          frameMap.current.set(frame.index, refs);
+        }
         const screenX = snapToDevicePixel((frame.offset.x + offset.x) * zoom);
         const screenY = snapToDevicePixel((frame.offset.y + offset.y) * zoom);
 
@@ -229,7 +248,7 @@ export function PageFrameDomLayer({
         syncPageChrome(refs, frame.numPages, pageWidth);
       }
 
-      removeStaleFrames(frameMap.current, existingIndices);
+      removeStaleFrames(frameMap.current, activeFrames);
 
       // The browser may try to scrollIntoView the focused contentEditable on
       // its own. Zero those out so they don't accumulate, but DON'T convert
@@ -244,7 +263,13 @@ export function PageFrameDomLayer({
     }
 
     rafId = requestAnimationFrame(sync);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      cancelAnimationFrame(rafId);
+      for (const refs of frameMap.current.values()) {
+        disposeFrameRefs(refs);
+      }
+      frameMap.current.clear();
+    };
   }, [canvasRef]);
 
   // Follow-cursor: keep the caret inside a margin-padded viewport while

@@ -797,6 +797,7 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-md-note-link {
   color: var(--accent-dark);
   border-radius: 0.35rem;
+  cursor: pointer;
   text-decoration: underline;
   text-decoration-color: color-mix(
     in srgb,

@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import type { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
+import { PM_UPDATE_EVENT } from '@/lib/events';
 import {
   type NoteLinkSearchSource,
   searchNoteLinkAutocompleteItems,
@@ -21,7 +22,6 @@ import {
   findActiveSlashInsertAutocomplete,
   searchSlashInsertAutocompleteItems,
 } from './pm/autocomplete/slash-insert';
-import { PM_UPDATE_EVENT } from './pm/constants';
 import { schema } from './pm/schema';
 
 interface UsePageFrameAutocompleteArgs {
