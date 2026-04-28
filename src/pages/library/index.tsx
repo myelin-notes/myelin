@@ -47,11 +47,12 @@ import {
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
 } from './import-markdown';
+import { importPdfFile, isPdfFile, PDF_FILE_ACCEPT } from './import-pdf';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
 const logger = new Logger('LibraryPage');
-const LIBRARY_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
+const LIBRARY_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
 
 export function LibraryPage() {
   const strings = useMessages();
@@ -108,7 +109,7 @@ export function LibraryPage() {
 
   const handleImportStorageFiles = async (files: File[]) => {
     const supportedFiles = files.filter(
-      (file) => isMarkdownFile(file) || isStorageFile(file),
+      (file) => isMarkdownFile(file) || isPdfFile(file) || isStorageFile(file),
     );
     if (supportedFiles.length === 0) {
       toast.error(strings.library.importFiles.unsupportedFile);
@@ -118,17 +119,21 @@ export function LibraryPage() {
     setIsImportingFiles(true);
 
     try {
-      const importedMarkdownIds: string[] = [];
       for (const file of supportedFiles) {
         if (isMarkdownFile(file)) {
-          importedMarkdownIds.push(
-            await importMarkdownFile({
-              file,
-              repository,
-              parentId: currentFolderId,
-              fallbackTitle: strings.library.createNew.untitledCanvas,
-            }),
-          );
+          await importMarkdownFile({
+            file,
+            repository,
+            parentId: currentFolderId,
+            fallbackTitle: strings.library.createNew.untitledCanvas,
+          });
+        } else if (isPdfFile(file)) {
+          await importPdfFile({
+            file,
+            repository,
+            parentId: currentFolderId,
+            fallbackTitle: strings.library.createNew.untitledCanvas,
+          });
         } else {
           await importStorageFile({
             file,

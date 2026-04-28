@@ -104,7 +104,7 @@ const zhHans: typeof en = {
       failed: 'Markdown 导入失败',
     },
     importFiles: {
-      unsupportedFile: '请选择 Markdown、图片或视频文件',
+      unsupportedFile: '请选择 Markdown、PDF、图片或视频文件',
       someUnsupported: '部分文件不受支持',
       failed: '导入失败',
     },

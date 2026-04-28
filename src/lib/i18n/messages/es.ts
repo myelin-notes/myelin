@@ -106,7 +106,7 @@ const es: typeof en = {
       failed: 'No se pudo importar el Markdown',
     },
     importFiles: {
-      unsupportedFile: 'Elige un archivo Markdown, de imagen o video.',
+      unsupportedFile: 'Elige un archivo Markdown, PDF, de imagen o video.',
       someUnsupported: 'Algunos archivos no son compatibles.',
       failed: 'No se pudo importar',
     },

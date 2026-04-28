@@ -103,7 +103,7 @@ const en = {
       failed: 'Markdown import failed',
     },
     importFiles: {
-      unsupportedFile: 'Choose a Markdown, image, or video file.',
+      unsupportedFile: 'Choose a Markdown, PDF, image, or video file.',
       someUnsupported: 'Some files were not supported.',
       failed: 'Import failed',
     },
