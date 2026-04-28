@@ -18,7 +18,6 @@ interface TextOffsetMap {
 
 export interface ActiveNoteLinkAutocomplete
   extends PageFrameAutocompleteRequest {
-  embed: boolean;
   replaceRange: PageFrameAutocompleteRange;
 }
 
@@ -165,18 +164,14 @@ export function findActiveNoteLinkAutocomplete(
       return null;
     }
 
-    const embed = openIndex > 0 && text[openIndex - 1] === '!';
-    const replaceFromIndex = embed ? openIndex - 1 : openIndex;
-
     return {
-      embed,
       query,
       range: {
         from: posAt[openIndex + 2],
         to: posAt[queryEnd],
       },
       replaceRange: {
-        from: posAt[replaceFromIndex],
+        from: posAt[openIndex],
         to: closeIndex === -1 ? posAt[cursorOffset] : posAt[closeIndex + 2],
       },
       anchorPosition: state.selection.head,
@@ -192,22 +187,15 @@ export function buildSelectNoteLinkAutocompleteTransaction(
   activeRequest: ActiveNoteLinkAutocomplete,
   item: Pick<PageFrameAutocompleteItem, 'id' | 'title'>,
 ): Transaction | null {
-  const text = activeRequest.embed
-    ? `![[${item.title}]]`
-    : `[[${item.title}]]`;
-  const { from, to } = activeRequest.replaceRange;
-  const tr = state.tr.insertText(text, from, to);
-  const insertedTo = from + text.length;
-
-  if (activeRequest.embed) {
-    tr.setSelection(TextSelection.create(tr.doc, insertedTo));
-    return tr;
-  }
-
   const noteLinkType = schema.marks.noteLink;
   if (!noteLinkType) {
     return null;
   }
+
+  const text = `[[${item.title}]]`;
+  const { from, to } = activeRequest.replaceRange;
+  const tr = state.tr.insertText(text, from, to);
+  const insertedTo = from + text.length;
 
   tr.addMark(
     from,

@@ -1,7 +1,6 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
 import { parseMarkdownToDoc } from '../markdown-parser';
-import { embedMarkdownPlugin } from './markdown/embed-blocks';
 import { buildResolvedNoteLinkTransaction } from './markdown/note-links';
 import {
   buildSelectNoteLinkAutocompleteTransaction,
@@ -28,7 +27,6 @@ describe('findActiveNoteLinkAutocomplete', () => {
     const state = createState(markdown, head);
 
     expect(findActiveNoteLinkAutocomplete(state)).toEqual({
-      embed: false,
       query: 'Al',
       range: {
         from: openFrom + 2,
@@ -50,7 +48,6 @@ describe('findActiveNoteLinkAutocomplete', () => {
     const state = createState(markdown, head);
 
     expect(findActiveNoteLinkAutocomplete(state)).toEqual({
-      embed: false,
       query: title,
       range: {
         from: openFrom + 2,
@@ -59,26 +56,6 @@ describe('findActiveNoteLinkAutocomplete', () => {
       replaceRange: {
         from: openFrom,
         to: openFrom + 2 + title.length + 2,
-      },
-      anchorPosition: head,
-    });
-  });
-
-  it('detects unfinished note-embed titles at caret', () => {
-    const markdown = '![[Al';
-    const head = 1 + markdown.length;
-    const state = createState(markdown, head);
-
-    expect(findActiveNoteLinkAutocomplete(state)).toEqual({
-      embed: true,
-      query: 'Al',
-      range: {
-        from: 4,
-        to: head,
-      },
-      replaceRange: {
-        from: 1,
-        to: head,
       },
       anchorPosition: head,
     });
@@ -134,54 +111,5 @@ describe('buildSelectNoteLinkAutocompleteTransaction', () => {
         new Map([['Alpha Note', 'note-1']]),
       ),
     ).toBeNull();
-  });
-
-  it('inserts selected note embeds as raw embed markdown so they normalize immediately', () => {
-    const markdown = '![[Al';
-    const head = 1 + markdown.length;
-    const baseState = EditorState.create({
-      schema,
-      doc: parseMarkdownToDoc(markdown, schema),
-      plugins: [embedMarkdownPlugin(schema)],
-    });
-    const state = baseState.apply(
-      baseState.tr.setSelection(TextSelection.create(baseState.doc, head)),
-    );
-    const activeRequest = findActiveNoteLinkAutocomplete(state);
-
-    expect(activeRequest).not.toBeNull();
-
-    const tr = buildSelectNoteLinkAutocompleteTransaction(
-      state,
-      schema,
-      activeRequest!,
-      { id: 'note-2', title: 'Alpha Note' },
-    );
-
-    expect(tr).not.toBeNull();
-
-    const result = state.applyTransaction(tr!);
-
-    expect(result.state.doc.toJSON()).toEqual({
-      type: 'doc',
-      content: [
-        {
-          type: 'noteEmbed',
-          attrs: {
-            target: 'Alpha Note',
-            title: 'Alpha Note',
-            fragment: null,
-            noteId: null,
-            width: null,
-            height: null,
-          },
-        },
-        {
-          type: 'paragraph',
-        },
-      ],
-    });
-    expect(result.state.selection.from).toBe(2);
-    expect(result.state.selection.to).toBe(2);
   });
 });

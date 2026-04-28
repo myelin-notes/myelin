@@ -5,15 +5,10 @@
  * mentions) so we skip the standard `prosemirror-markdown` package and
  * hand-roll a focused parser. Supports: headings, paragraphs, bullet and
  * ordered lists (with indent), blockquote, fenced code blocks, tables, hr,
- * note/media embeds, and inline marks (bold, italic, strikethrough, code,
- * link, image).
+ * and inline marks (bold, italic, strikethrough, code, link, image).
  */
 
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
-import {
-  parseRawMarkdownMediaEmbed,
-  parseRawNoteEmbed,
-} from './pm/markdown/embeds';
 
 export function parseMarkdownToDoc(md: string, schema: Schema): PMNode {
   const blocks = parseBlocks(md.replace(/\r\n/g, '\n'));
@@ -21,21 +16,12 @@ export function parseMarkdownToDoc(md: string, schema: Schema): PMNode {
 }
 
 interface BaseToken {
-  alt?: string | null;
   content?: string;
-  embedKind?: 'image' | 'video';
-  fragment?: string | null;
-  height?: number | null;
-  markdownTitle?: string | null;
-  noteTitle?: string;
   rows?: TableRowToken[];
-  src?: string;
-  target?: string;
   text?: string;
   level?: number;
   indent?: number;
   order?: number;
-  width?: number | null;
 }
 interface TableRowToken {
   cells: string[];
@@ -51,8 +37,6 @@ type BlockToken = BaseToken &
     | { type: 'codeBlock' }
     | { type: 'table' }
     | { type: 'hr' }
-    | { type: 'mediaEmbed' }
-    | { type: 'noteEmbed' }
   );
 
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
@@ -150,8 +134,6 @@ function parseBlocks(md: string): BlockToken[] {
   const isBlockStart = (line: string, index: number): boolean => {
     const t = line.trim();
     return (
-      parseRawNoteEmbed(t) !== null ||
-      parseRawMarkdownMediaEmbed(t) !== null ||
       FENCE_RE.test(t) ||
       HR_RE.test(t) ||
       HEADING_RE.test(line) ||
@@ -168,35 +150,6 @@ function parseBlocks(md: string): BlockToken[] {
     const trimmed = line.trim();
 
     if (trimmed === '') {
-      i++;
-      continue;
-    }
-
-    const noteEmbed = parseRawNoteEmbed(trimmed);
-    if (noteEmbed) {
-      out.push({
-        type: 'noteEmbed',
-        noteTitle: noteEmbed.title,
-        target: noteEmbed.target,
-        fragment: noteEmbed.fragment,
-        width: noteEmbed.width,
-        height: noteEmbed.height,
-      });
-      i++;
-      continue;
-    }
-
-    const mediaEmbed = parseRawMarkdownMediaEmbed(trimmed);
-    if (mediaEmbed) {
-      out.push({
-        type: 'mediaEmbed',
-        src: mediaEmbed.src,
-        alt: mediaEmbed.alt,
-        embedKind: mediaEmbed.kind,
-        width: mediaEmbed.width,
-        height: mediaEmbed.height,
-        markdownTitle: mediaEmbed.title,
-      });
       i++;
       continue;
     }
@@ -594,24 +547,6 @@ function blockToNode(block: BlockToken, schema: Schema): PMNode | null {
     }
     case 'hr':
       return schema.nodes.horizontalRule.create();
-    case 'mediaEmbed':
-      return schema.nodes.mediaEmbed.create({
-        src: block.src ?? '',
-        alt: block.alt ?? null,
-        kind: block.embedKind ?? 'image',
-        width: block.width ?? null,
-        height: block.height ?? null,
-        title: block.markdownTitle ?? null,
-      });
-    case 'noteEmbed':
-      return schema.nodes.noteEmbed.create({
-        target: block.target ?? '',
-        title: block.noteTitle ?? '',
-        fragment: block.fragment ?? null,
-        noteId: null,
-        width: block.width ?? null,
-        height: block.height ?? null,
-      });
     default:
       return null;
   }

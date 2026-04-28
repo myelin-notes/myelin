@@ -1,7 +1,5 @@
 import type { NodeViewConstructor } from 'prosemirror-view';
 import { CodeBlockNodeView } from './code-block-node-view';
-import { MediaEmbedNodeView } from './media-embed-node-view';
-import { NoteEmbedNodeView } from './note-embed-node-view';
 import { PageFrameTableNodeView } from './table-node-view';
 
 export function buildNodeViews(): Record<string, NodeViewConstructor> {
@@ -29,12 +27,6 @@ export function buildNodeViews(): Record<string, NodeViewConstructor> {
         }
         return pos;
       });
-    },
-    mediaEmbed(node, view) {
-      return new MediaEmbedNodeView(node, view);
-    },
-    noteEmbed(node, view) {
-      return new NoteEmbedNodeView(node, view);
     },
   };
 }

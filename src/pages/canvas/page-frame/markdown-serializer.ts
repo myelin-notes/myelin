@@ -6,10 +6,6 @@
  */
 
 import type { Mark, Node as PMNode } from 'prosemirror-model';
-import {
-  serializeMarkdownMediaEmbed,
-  serializeNoteEmbed,
-} from './pm/markdown/embeds';
 
 export function serializeDocToMarkdown(doc: PMNode): string {
   const parts: string[] = [];
@@ -104,20 +100,6 @@ function serializeBlock(node: PMNode): string | null {
       return serializeTable(node);
     case 'horizontalRule':
       return '---';
-    case 'mediaEmbed':
-      return serializeMarkdownMediaEmbed({
-        src: ((node.attrs.src as string | null) ?? '').trim(),
-        alt: (node.attrs.alt as string | null) ?? null,
-        width: (node.attrs.width as number | null) ?? null,
-        height: (node.attrs.height as number | null) ?? null,
-        title: (node.attrs.title as string | null) ?? null,
-      }).text;
-    case 'noteEmbed':
-      return serializeNoteEmbed({
-        target: ((node.attrs.target as string | null) ?? '').trim(),
-        width: (node.attrs.width as number | null) ?? null,
-        height: (node.attrs.height as number | null) ?? null,
-      }).text;
     default:
       return serializeInline(node);
   }

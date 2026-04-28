@@ -115,9 +115,6 @@ function parseDoubleBracketDelimited(
     if (rangeHasBlocked(blocked, i, i + 2)) {
       continue;
     }
-    if (i > 0 && text[i - 1] === '!') {
-      continue;
-    }
     if (!isExactDelimiterRun(text, i, '[[')) {
       continue;
     }

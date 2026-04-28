@@ -9,7 +9,6 @@ import {
   type NoteLinkResolveSource,
   resolveNoteLinkIdByTitle,
 } from './note-link-resolution';
-import { normalizeAndResolveNoteEmbedsDoc } from './pm/markdown/embed-blocks';
 import { normalizeAndResolveNoteLinksDoc } from './pm/markdown/note-links';
 import { schema } from './pm/schema';
 
@@ -31,12 +30,11 @@ async function buildMarkdownPageFrameDoc(
   markdown: string,
   options: MarkdownPageFrameImportOptions = {},
 ): Promise<PMNode> {
-  let doc = parseMarkdownToDoc(markdown, schema);
+  const doc = parseMarkdownToDoc(markdown, schema);
   const repository = options.repository;
   const resolveNoteLinkId = repository
     ? async (title: string) => resolveNoteLinkIdByTitle(repository, title)
     : undefined;
-  doc = await normalizeAndResolveNoteEmbedsDoc(doc, schema, resolveNoteLinkId);
   return normalizeAndResolveNoteLinksDoc(doc, schema, resolveNoteLinkId);
 }
 

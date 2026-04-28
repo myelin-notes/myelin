@@ -1,15 +1,10 @@
 /**
  * Shared infrastructure for resolving note titles to ids in the page-frame
- * editor. Both note-link marks and note-embed nodes need the same async
- * lookup + dispatch flow; this module provides one implementation.
+ * editor.
  */
 
 import type { Node as PMNode, Schema } from 'prosemirror-model';
-import type {
-  EditorState,
-  PluginView,
-  Transaction,
-} from 'prosemirror-state';
+import type { EditorState, PluginView, Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
 export type ResolveNoteLinkId = (title: string) => Promise<string | null>;

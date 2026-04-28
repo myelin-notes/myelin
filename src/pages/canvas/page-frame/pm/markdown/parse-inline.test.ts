@@ -92,10 +92,4 @@ describe('parseInlineMarkdown', () => {
       ],
     });
   });
-
-  it('does not treat note embeds as note-link preview ranges', () => {
-    expect(parseInlineMarkdown('![[note]]')).toEqual({
-      ranges: [],
-    });
-  });
 });
