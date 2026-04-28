@@ -5,6 +5,7 @@ export interface PageFrameAutocompleteItem {
   title: string;
   subtitle?: string;
   detail?: string;
+  insertText?: string;
 }
 
 export interface PageFrameAutocompleteRange {

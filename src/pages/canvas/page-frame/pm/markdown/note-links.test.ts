@@ -5,6 +5,7 @@ import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { parseMarkdownToDoc } from '../../markdown-parser';
 import { schema } from '../schema';
 import {
+  buildNormalizedNoteLinkTransaction,
   buildResolvedNoteLinkTransaction,
   normalizeAndResolveNoteLinksDoc,
   noteLinkMarkdownPlugin,
@@ -106,6 +107,25 @@ describe('noteLinkMarkdownPlugin', () => {
         },
       ],
     });
+  });
+
+  it('preserves distinct autocomplete-selected note ids for identical link text', () => {
+    const noteLinkMark = schema.marks.noteLink;
+    const title = 'Projects/Alpha Note';
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, [
+        schema.text('[[Projects/Alpha Note]]', [
+          noteLinkMark.create({ title, noteId: 'note-1' }),
+        ]),
+        schema.text(' and '),
+        schema.text('[[Projects/Alpha Note]]', [
+          noteLinkMark.create({ title, noteId: 'note-2' }),
+        ]),
+      ]),
+    ]);
+    const state = createEditorState(doc);
+
+    expect(buildNormalizedNoteLinkTransaction(state, schema)).toBeNull();
   });
 
   it('normalizes and resolves imported note links through shared helper', async () => {

@@ -144,31 +144,31 @@ function buildCurrentNoteLinkCoverage(
   return coverage;
 }
 
-function collectExistingNoteLinkIds(
-  node: PMNode,
-  noteLinkType: MarkType,
-): Map<string, string | null> {
-  const ids = new Map<string, string | null>();
+function findExistingNoteLinkCoverage(
+  coverage: readonly (NoteLinkCoverage | null)[],
+  from: number,
+  to: number,
+  title: string,
+): NoteLinkCoverage | null {
+  let match: NoteLinkCoverage | null = null;
 
-  node.forEach((child) => {
-    if (!child.isText) {
-      return;
+  for (let index = from; index < to; index++) {
+    const value = coverage[index] ?? null;
+    if (value?.title !== title) {
+      return null;
     }
 
-    const mark = child.marks.find(
-      (candidate) => candidate.type === noteLinkType,
-    );
-    if (!mark) {
-      return;
+    if (match === null) {
+      match = value;
+      continue;
     }
 
-    const title = mark.attrs.title as string;
-    if (!ids.has(title)) {
-      ids.set(title, (mark.attrs.noteId as string | null) ?? null);
+    if (!sameCoverage(match, value)) {
+      return null;
     }
-  });
+  }
 
-  return ids;
+  return match;
 }
 
 function collectNoteLinkTargets(
@@ -186,18 +186,24 @@ function collectNoteLinkTargets(
     return [];
   }
 
-  const existingIds = collectExistingNoteLinkIds(node, noteLinkType);
+  const currentCoverage = buildCurrentNoteLinkCoverage(node, noteLinkType);
   return parseInlineMarkdown(text)
     .ranges.filter((range) => range.kind === 'noteLink')
     .map((range) => {
       const title = text.slice(range.contentFrom, range.contentTo);
+      const existingCoverage = findExistingNoteLinkCoverage(
+        currentCoverage,
+        range.open.from,
+        range.close.to,
+        title,
+      );
       return {
         from: posAt[range.open.from],
         to: posAt[range.close.to],
         textFrom: range.open.from,
         textTo: range.close.to,
         title,
-        noteId: existingIds.get(title) ?? null,
+        noteId: existingCoverage?.noteId ?? null,
       };
     });
 }

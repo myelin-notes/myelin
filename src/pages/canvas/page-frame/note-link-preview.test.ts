@@ -60,6 +60,7 @@ describe('getNoteLinkPreview', () => {
     const repository = {
       getNode: vi.fn(async () => createFileNode('note-1', 'Alpha Note')),
       searchNodes: vi.fn(async () => [] as VFSNode[]),
+      getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(update)),
     } satisfies NoteLinkPreviewSource;
 
@@ -85,6 +86,7 @@ describe('getNoteLinkPreview', () => {
         createFolderNode('folder-1', 'Folder'),
         createFileNode('note-2', 'Resolved Note'),
       ]),
+      getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(update)),
     } satisfies NoteLinkPreviewSource;
 
@@ -102,6 +104,7 @@ describe('getNoteLinkPreview', () => {
     const repository = {
       getNode: vi.fn(async () => createFileNode('image-1', 'Image', 'png')),
       searchNodes: vi.fn(async () => []),
+      getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(null)),
     } satisfies NoteLinkPreviewSource;
 

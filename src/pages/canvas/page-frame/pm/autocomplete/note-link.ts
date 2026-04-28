@@ -185,14 +185,15 @@ export function buildSelectNoteLinkAutocompleteTransaction(
   state: EditorState,
   schema: Schema,
   activeRequest: ActiveNoteLinkAutocomplete,
-  item: Pick<PageFrameAutocompleteItem, 'id' | 'title'>,
+  item: Pick<PageFrameAutocompleteItem, 'id' | 'title' | 'insertText'>,
 ): Transaction | null {
   const noteLinkType = schema.marks.noteLink;
   if (!noteLinkType) {
     return null;
   }
 
-  const text = `[[${item.title}]]`;
+  const linkTarget = item.insertText ?? item.title;
+  const text = `[[${linkTarget}]]`;
   const { from, to } = activeRequest.replaceRange;
   const tr = state.tr.insertText(text, from, to);
   const insertedTo = from + text.length;
@@ -201,7 +202,7 @@ export function buildSelectNoteLinkAutocompleteTransaction(
     from,
     insertedTo,
     noteLinkType.create({
-      title: item.title,
+      title: linkTarget,
       noteId: item.id,
     }),
   );
