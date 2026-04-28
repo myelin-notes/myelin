@@ -1,4 +1,8 @@
-import { inputRules, textblockTypeInputRule } from 'prosemirror-inputrules';
+import {
+  InputRule,
+  inputRules,
+  textblockTypeInputRule,
+} from 'prosemirror-inputrules';
 import type { Schema } from 'prosemirror-model';
 import type { Plugin } from 'prosemirror-state';
 import type { BlockPrefixMatch } from './types';
@@ -23,6 +27,19 @@ export function buildPrefixMarkdownRules(schema: Schema) {
     }),
     textblockTypeInputRule(/^>\s$/, schema.nodes.blockquote),
     textblockTypeInputRule(/^[-*]\s$/, schema.nodes.bulletListItem),
+    new InputRule(/^\[([ xX])\]\s$/, (state, match, start, end) => {
+      const { $from } = state.selection;
+      const node = $from.parent;
+      if (node.type !== schema.nodes.bulletListItem) {
+        return null;
+      }
+      return state.tr
+        .delete(start, end)
+        .setNodeMarkup($from.before(), schema.nodes.checkListItem, {
+          checked: match[1].toLowerCase() === 'x',
+          indent: node.attrs.indent ?? 0,
+        });
+    }),
     textblockTypeInputRule(
       /^(\d+)\.\s$/,
       schema.nodes.orderedListItem,

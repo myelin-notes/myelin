@@ -3,8 +3,9 @@
  *
  * The schema is bespoke (flat list items with indent attrs, custom
  * mentions) so we skip the standard `prosemirror-markdown` package and
- * hand-roll a focused parser. Supports: headings, paragraphs, bullet and
- * ordered lists (with indent), blockquote, fenced code blocks, tables, hr,
+ * hand-roll a focused parser. Supports: headings, paragraphs, bullet,
+ * ordered, and checklist items (with indent), blockquote, fenced code blocks,
+ * tables, hr,
  * and inline marks (bold, italic, strikethrough, code, link, image).
  */
 
@@ -22,6 +23,7 @@ interface BaseToken {
   level?: number;
   indent?: number;
   order?: number;
+  checked?: boolean;
 }
 interface TableRowToken {
   cells: string[];
@@ -33,6 +35,7 @@ type BlockToken = BaseToken &
     | { type: 'paragraph' }
     | { type: 'bullet' }
     | { type: 'ordered' }
+    | { type: 'check' }
     | { type: 'blockquote' }
     | { type: 'codeBlock' }
     | { type: 'table' }
@@ -40,6 +43,7 @@ type BlockToken = BaseToken &
   );
 
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
+const CHECK_RE = /^(\s*)[-*+]\s+\[([ xX])\](?:\s+(.*))?$/;
 const BULLET_RE = /^(\s*)[-*+]\s+(.*)$/;
 const ORDERED_RE = /^(\s*)(\d+)\.\s+(.*)$/;
 const QUOTE_RE = /^>\s?(.*)$/;
@@ -137,6 +141,7 @@ function parseBlocks(md: string): BlockToken[] {
       FENCE_RE.test(t) ||
       HR_RE.test(t) ||
       HEADING_RE.test(line) ||
+      CHECK_RE.test(line) ||
       BULLET_RE.test(line) ||
       ORDERED_RE.test(line) ||
       QUOTE_RE.test(line) ||
@@ -194,6 +199,18 @@ function parseBlocks(md: string): BlockToken[] {
         type: 'heading',
         level: Math.min(3, h[1].length),
         content: h[2],
+      });
+      i++;
+      continue;
+    }
+
+    const c = line.match(CHECK_RE);
+    if (c) {
+      out.push({
+        type: 'check',
+        indent: Math.min(4, Math.floor(c[1].length / 2)),
+        content: c[3] ?? '',
+        checked: c[2].toLowerCase() === 'x',
       });
       i++;
       continue;
@@ -502,6 +519,11 @@ function blockToNode(block: BlockToken, schema: Schema): PMNode | null {
     case 'bullet':
       return schema.nodes.bulletListItem.create(
         { indent: block.indent ?? 0 },
+        parseInline(block.content ?? '', schema),
+      );
+    case 'check':
+      return schema.nodes.checkListItem.create(
+        { checked: block.checked ?? false, indent: block.indent ?? 0 },
         parseInline(block.content ?? '', schema),
       );
     case 'ordered':

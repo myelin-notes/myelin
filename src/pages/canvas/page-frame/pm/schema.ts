@@ -107,6 +107,61 @@ const orderedListItem: NodeSpec = {
   ],
 };
 
+const checkListItem: NodeSpec = {
+  content: 'inline*',
+  group: 'block textblock',
+  defining: true,
+  attrs: { checked: { default: false }, indent: { default: 0 } },
+  toDOM(node) {
+    const checked = node.attrs.checked === true;
+    const indent = node.attrs.indent as number;
+    return [
+      'div',
+      {
+        class: 'check-list-item',
+        'data-checked': checked ? 'true' : 'false',
+        ...(indent > 0 ? { 'data-indent': indent } : {}),
+      },
+      [
+        'input',
+        {
+          type: 'checkbox',
+          'data-check-list-marker': 'true',
+          contenteditable: 'false',
+          ...(checked ? { checked: 'checked' } : {}),
+        },
+      ],
+      ['span', { class: 'check-list-item-content' }, 0],
+    ];
+  },
+  parseDOM: [
+    {
+      tag: 'div.check-list-item',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        return {
+          checked: el.getAttribute('data-checked') === 'true',
+          indent: Number(el.getAttribute('data-indent')) || 0,
+        };
+      },
+    },
+    {
+      tag: 'li',
+      priority: 60,
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        const input = el.querySelector<HTMLInputElement>(
+          'input[type="checkbox"]',
+        );
+        if (!input || el.parentElement?.tagName !== 'UL') {
+          return false;
+        }
+        return { checked: input.checked, indent: 0 };
+      },
+    },
+  ],
+};
+
 const blockquote: NodeSpec = {
   content: 'inline*',
   group: 'block textblock',
@@ -344,6 +399,7 @@ export const schema = new Schema({
     heading,
     bulletListItem,
     orderedListItem,
+    checkListItem,
     blockquote,
     codeBlock,
     horizontalRule,

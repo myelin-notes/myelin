@@ -416,7 +416,8 @@ input[type="range"].tool-slider::-moz-range-track {
 }
 
 .pm-editor .ProseMirror .bullet-list-item,
-.pm-editor .ProseMirror .ordered-list-item {
+.pm-editor .ProseMirror .ordered-list-item,
+.pm-editor .ProseMirror .check-list-item {
   padding-left: 1.5em;
   position: relative;
 }
@@ -431,6 +432,16 @@ input[type="range"].tool-slider::-moz-range-track {
   content: attr(data-order) '.';
   position: absolute;
   left: 0.1em;
+}
+
+.pm-editor .ProseMirror .check-list-item > input[type="checkbox"] {
+  accent-color: var(--accent-dark);
+  height: 1em;
+  left: 0;
+  margin: 0;
+  position: absolute;
+  top: 0.45em;
+  width: 1em;
 }
 
 .pm-editor .ProseMirror [data-indent="1"] { margin-left: 1.5em; }

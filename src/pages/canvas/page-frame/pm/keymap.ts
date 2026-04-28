@@ -45,7 +45,8 @@ const splitFlatListItem: Command = (state, dispatch) => {
   const node = $cursor.parent;
   if (
     node.type !== schema.nodes.bulletListItem &&
-    node.type !== schema.nodes.orderedListItem
+    node.type !== schema.nodes.orderedListItem &&
+    node.type !== schema.nodes.checkListItem
   ) {
     return false;
   }
@@ -65,7 +66,9 @@ const splitFlatListItem: Command = (state, dispatch) => {
     const attrs =
       node.type === schema.nodes.orderedListItem
         ? { order: (node.attrs.order as number) + 1, indent }
-        : { indent };
+        : node.type === schema.nodes.checkListItem
+          ? { checked: false, indent }
+          : { indent };
     const tr = state.tr.split($cursor.pos, 1, [{ type: node.type, attrs }]);
     dispatch(tr);
   }
@@ -84,7 +87,8 @@ const indentListItem: Command = (state, dispatch) => {
   const node = $cursor.parent;
   if (
     node.type !== schema.nodes.bulletListItem &&
-    node.type !== schema.nodes.orderedListItem
+    node.type !== schema.nodes.orderedListItem &&
+    node.type !== schema.nodes.checkListItem
   ) {
     return false;
   }
@@ -114,7 +118,8 @@ const dedentListItem: Command = (state, dispatch) => {
   const node = $cursor.parent;
   if (
     node.type !== schema.nodes.bulletListItem &&
-    node.type !== schema.nodes.orderedListItem
+    node.type !== schema.nodes.orderedListItem &&
+    node.type !== schema.nodes.checkListItem
   ) {
     return false;
   }

@@ -16,6 +16,9 @@ describe('markdown paste', () => {
     expect(hasParsedMarkdownBlock(parseMarkdownToDoc('- Item', schema))).toBe(
       true,
     );
+    expect(
+      hasParsedMarkdownBlock(parseMarkdownToDoc('- [ ] Item', schema)),
+    ).toBe(true);
     expect(hasParsedMarkdownBlock(parseMarkdownToDoc('1. Item', schema))).toBe(
       true,
     );
@@ -49,6 +52,7 @@ describe('markdown paste', () => {
       '# Heading',
       '',
       '- **First**',
+      '- [x] Checked',
       '2. Second',
       '',
       '```ts',
@@ -70,6 +74,11 @@ describe('markdown paste', () => {
           type: 'bulletListItem',
           attrs: { indent: 0 },
           content: [{ type: 'text', text: 'First', marks: [{ type: 'bold' }] }],
+        },
+        {
+          type: 'checkListItem',
+          attrs: { checked: true, indent: 0 },
+          content: [{ type: 'text', text: 'Checked' }],
         },
         {
           type: 'orderedListItem',
