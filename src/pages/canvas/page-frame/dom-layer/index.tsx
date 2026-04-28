@@ -388,7 +388,7 @@ export function PageFrameDomLayer({
           position: 'absolute',
           inset: 0,
           pointerEvents: 'none',
-          overflow: 'hidden',
+          overflow: 'clip',
           zIndex: 5,
         }}
       />
