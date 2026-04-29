@@ -1,6 +1,7 @@
 import type * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
 import { loadDocument, type PdfDocument, renderPage } from '@/lib/pdf-renderer';
+import { timeEnd, timeStart } from '@/lib/pdf-renderer/pdf-perf';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
 import { bindYFields } from '../y-fields';
@@ -14,7 +15,22 @@ import {
 } from './frame-chrome';
 
 const PDF_PAGE_GAP = 40;
+const ZOOM_SETTLE_MS = 150;
 const logger = new Logger('PdfElement');
+
+let pdfStylesInjected = false;
+function injectPdfStyles(): void {
+  if (pdfStylesInjected) {
+    return;
+  }
+  pdfStylesInjected = true;
+  const style = document.createElement('style');
+  // Hide the text layer while the viewport is zooming. Text spans repaint at
+  // every parent scale change; canvas content GPU-resamples for free.
+  // Restored on settle so selection / Cmd+F still work.
+  style.textContent = `.pdf-zooming .pdf-text { visibility: hidden; }`;
+  document.head.appendChild(style);
+}
 
 export type PdfPageEntry =
   | { kind: 'pdf'; originalIndex: number }
@@ -65,6 +81,8 @@ export class PdfElement extends DrawableElement {
   private _viewportDiv: HTMLDivElement | null = null;
   private _pageHost: HTMLDivElement | null = null;
   private _slots: Map<number, PageSlot> = new Map();
+  private _lastZoomXY = { zoom: -1, sX: -1, sY: -1 };
+  private _zoomSettleTimer: number | null = null;
 
   constructor(index: number) {
     super(index, ElementType.PDF);
@@ -266,6 +284,7 @@ export class PdfElement extends DrawableElement {
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
+    const t0 = timeStart();
     this.ensurePdfDoc();
 
     if (!this._frameDiv) {
@@ -310,10 +329,38 @@ export class PdfElement extends DrawableElement {
     viewportDiv.style.zoom = `${dpr}`;
     viewportDiv.style.transform = `scale(${(zoom * sX) / dpr}, ${(zoom * sY) / dpr})`;
 
+    const last = this._lastZoomXY;
+    if (
+      Math.abs(zoom - last.zoom) > 1e-6 ||
+      Math.abs(sX - last.sX) > 1e-6 ||
+      Math.abs(sY - last.sY) > 1e-6
+    ) {
+      last.zoom = zoom;
+      last.sX = sX;
+      last.sY = sY;
+      if (!viewportDiv.classList.contains('pdf-zooming')) {
+        viewportDiv.classList.add('pdf-zooming');
+      }
+      if (this._zoomSettleTimer !== null) {
+        window.clearTimeout(this._zoomSettleTimer);
+      }
+      this._zoomSettleTimer = window.setTimeout(() => {
+        viewportDiv.classList.remove('pdf-zooming');
+        this._zoomSettleTimer = null;
+      }, ZOOM_SETTLE_MS);
+    }
+
+    const sp = timeStart();
     this.syncPages();
+    timeEnd('pdfElement.syncPages', sp);
+    timeEnd('pdfElement.syncDOM', t0);
   }
 
   public override disposeDOM(): void {
+    if (this._zoomSettleTimer !== null) {
+      window.clearTimeout(this._zoomSettleTimer);
+      this._zoomSettleTimer = null;
+    }
     this._chrome?.dispose();
     this._chrome = null;
     this._frameDiv = null;
@@ -325,6 +372,7 @@ export class PdfElement extends DrawableElement {
   }
 
   private createDom(host: HTMLElement): void {
+    injectPdfStyles();
     const chrome = new FrameChrome({
       kindLabel: 'PDF',
       getMenuItems: () => this.getMenuItems(),
@@ -426,6 +474,8 @@ export class PdfElement extends DrawableElement {
       boxShadow: '0 4px 24px rgba(25, 28, 30, 0.08)',
       overflow: 'hidden',
       transformOrigin: '0 0',
+      contain: 'paint',
+      willChange: 'transform',
     } as Partial<CSSStyleDeclaration>);
     div.dataset.pageKey = key;
 

@@ -416,6 +416,7 @@ export class DrawableCanvas {
   }
 
   public redraw(deltaTime: number) {
+    const __t0 = performance.now();
     const dpr = window.devicePixelRatio || 1;
     const logicalW = this.canvas.width / dpr;
     const logicalH = this.canvas.height / dpr;
@@ -484,11 +485,36 @@ export class DrawableCanvas {
       this.overlayCtx.restore();
     }
 
+    const __tDom = performance.now();
     const host = this._domOverlayHost;
     if (host) {
       for (const element of this._elements) {
         element.syncDOM(this.viewport, host);
       }
+    }
+    const __tEnd = performance.now();
+    const __w = window as unknown as {
+      __redrawStats?: {
+        count: number;
+        totalCanvas: number;
+        totalDom: number;
+        totalAll: number;
+        max: number;
+      };
+    };
+    const s = (__w.__redrawStats ??= {
+      count: 0,
+      totalCanvas: 0,
+      totalDom: 0,
+      totalAll: 0,
+      max: 0,
+    });
+    s.count++;
+    s.totalCanvas += __tDom - __t0;
+    s.totalDom += __tEnd - __tDom;
+    s.totalAll += __tEnd - __t0;
+    if (__tEnd - __t0 > s.max) {
+      s.max = __tEnd - __t0;
     }
   }
 
