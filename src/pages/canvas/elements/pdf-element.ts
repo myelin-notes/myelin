@@ -1,11 +1,11 @@
 import type * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
-import { loadDocument, type PdfDocument, renderPage } from '@/lib/pdf-renderer';
-import { fetchTile } from '@/lib/pdf-renderer/tile/fetcher';
 import {
-  TileManager,
-  type ViewportInfo,
-} from '@/lib/pdf-renderer/tile/manager';
+  loadDocument,
+  type PdfDocument,
+  renderPage,
+  renderPageCanvas,
+} from '@/lib/pdf-renderer';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
 import { bindYFields } from '../y-fields';
@@ -19,12 +19,13 @@ import {
 } from './frame-chrome';
 
 const PDF_PAGE_GAP = 40;
-// Cap tile rendering scale. dpr × MAX_TILE_SCALE_FACTOR sets the max device
-// pixels per PDF point. 4 = good for ~2× zoom past pixel-perfect.
-const MAX_TILE_SCALE_FACTOR = 4;
-// Below this device-px-per-PDF-pt scale, the baseline canvas is already
-// pixel-perfect and tiling adds no visual gain.
-const MIN_TILE_SCALE = 2.5;
+const ZOOM_SETTLE_MS = 200;
+// Re-render canvas at higher scale only when target exceeds current by this
+// factor — otherwise the cost isn't worth the small sharpness gain.
+const RENDER_SCALE_HYSTERESIS = 1.25;
+// Cap re-render resolution. With ~5 visible pages at scale 3 + DPR 2, peak
+// memory is ~155MB. Higher caps blow up memory without visible gain.
+const MAX_RENDER_SCALE = 3;
 const logger = new Logger('PdfElement');
 
 export type PdfPageEntry =
@@ -40,15 +41,11 @@ interface PageSlot {
   key: string;
   div: HTMLDivElement;
   contentDiv: HTMLDivElement;
-  /** Holds tile canvases positioned in % within the slot. */
-  tileLayer: HTMLDivElement;
-  /** Page index in pageLayout — needed to map slot → originalIndex. */
-  layoutIndex: number;
   generation: number;
   rendered: boolean;
   pending: boolean;
-  /** True once the tile manager's snapshot callback is registered. */
-  tileSubscribed: boolean;
+  /** Render scale of the current canvas (1 = baseline DPR, larger = upgraded). */
+  renderScale: number;
 }
 
 function snapToDevicePixel(value: number): number {
@@ -85,9 +82,8 @@ export class PdfElement extends DrawableElement {
   private _viewportDiv: HTMLDivElement | null = null;
   private _pageHost: HTMLDivElement | null = null;
   private _slots: Map<number, PageSlot> = new Map();
-  private _tileManager: TileManager | null = null;
-  private _currentViewport: CanvasViewport | null = null;
-  private _currentLayout: ReturnType<typeof this.pageLayout> | null = null;
+  private _lastZoomXY = { zoom: -1, sX: -1, sY: -1 };
+  private _zoomSettleTimer: number | null = null;
 
   constructor(index: number) {
     super(index, ElementType.PDF);
@@ -333,190 +329,97 @@ export class PdfElement extends DrawableElement {
     viewportDiv.style.zoom = `${dpr}`;
     viewportDiv.style.transform = `scale(${(zoom * sX) / dpr}, ${(zoom * sY) / dpr})`;
 
-    this._currentViewport = viewport;
+    const last = this._lastZoomXY;
+    if (
+      Math.abs(zoom - last.zoom) > 1e-6 ||
+      Math.abs(sX - last.sX) > 1e-6 ||
+      Math.abs(sY - last.sY) > 1e-6
+    ) {
+      last.zoom = zoom;
+      last.sX = sX;
+      last.sY = sY;
+      if (this._zoomSettleTimer !== null) {
+        window.clearTimeout(this._zoomSettleTimer);
+      }
+      this._zoomSettleTimer = window.setTimeout(() => {
+        this._zoomSettleTimer = null;
+        const target = Math.min(
+          MAX_RENDER_SCALE,
+          Math.max(1, last.zoom * Math.max(last.sX, last.sY)),
+        );
+        this.upgradeSlotsToScale(target);
+      }, ZOOM_SETTLE_MS);
+    }
+
     const layout = this.pageLayout();
-    this._currentLayout = layout;
     this.syncPages(viewport, layout);
-    this.syncTiles(viewport, layout);
   }
 
-  private ensureTileManager(): TileManager {
-    if (!this._tileManager) {
-      this._tileManager = new TileManager((pageIndex, tile, scale) => {
-        const doc = this._pdfDoc;
-        if (!doc) {
-          return Promise.resolve(undefined);
-        }
-        return fetchTile(doc, pageIndex, tile, scale);
-      });
-      this._tileManager.setViewportSource(() => this.makeViewportInfo());
-    }
-    return this._tileManager;
-  }
-
-  private makeViewportInfo(): ViewportInfo | null {
-    const viewport = this._currentViewport;
-    const layout = this._currentLayout;
-    if (!viewport || !layout) {
-      return null;
-    }
-    const view = viewport.getWorldRect();
-    const elOffX = this.offset.x;
-    const elOffY = this.offset.y;
-    const sX = this._scale.x;
-    const sY = this._scale.y;
-    return {
-      pageViewport: (pageIndex: number) => {
-        // Find the slot for this *originalIndex* (pdfjs page index).
-        let layoutIdx = -1;
-        for (let i = 0; i < layout.length; i++) {
-          const e = layout[i].entry;
-          if (e.kind === 'pdf' && e.originalIndex === pageIndex) {
-            layoutIdx = i;
-            break;
-          }
-        }
-        if (layoutIdx < 0) {
-          return null;
-        }
-        const page = layout[layoutIdx];
-        // Page world bounds.
-        const pageWorldX = elOffX;
-        const pageWorldY = elOffY + page.y * sY;
-        const pageWorldRight = pageWorldX + page.w * sX;
-        const pageWorldBottom = pageWorldY + page.h * sY;
-        // Intersect with view rect; transform to page-local PDF-pt coords.
-        const ix = Math.max(view.left, pageWorldX);
-        const iy = Math.max(view.top, pageWorldY);
-        const ix2 = Math.min(view.right, pageWorldRight);
-        const iy2 = Math.min(view.bottom, pageWorldBottom);
-        if (ix >= ix2 || iy >= iy2) {
-          return null;
-        }
-        return {
-          x: (ix - pageWorldX) / sX,
-          y: (iy - pageWorldY) / sY,
-          width: (ix2 - ix) / sX,
-          height: (iy2 - iy) / sY,
-        };
-      },
-    };
-  }
-
-  private syncTiles(
-    viewport: CanvasViewport,
-    layout: ReturnType<typeof this.pageLayout>,
-  ): void {
-    if (!this._pdfDoc) {
+  private upgradeSlotsToScale(targetScale: number): void {
+    const doc = this._pdfDoc;
+    if (!doc) {
       return;
     }
-    const dpr = window.devicePixelRatio || 1;
-    const sX = this._scale.x;
-    const sY = this._scale.y;
-    const effectiveScale = viewport.zoom * Math.max(sX, sY) * dpr;
-    const tileScale = Math.min(MAX_TILE_SCALE_FACTOR * dpr, effectiveScale);
-    const enabled = tileScale >= MIN_TILE_SCALE && effectiveScale > dpr * 1.25;
-
-    const mgr = this.ensureTileManager();
-
-    for (const [layoutIdx, slot] of this._slots) {
-      const entry = layout[layoutIdx]?.entry;
+    const layout = this.pageLayout();
+    for (const [idx, slot] of this._slots) {
+      if (!slot.rendered || slot.pending) {
+        continue;
+      }
+      if (targetScale <= slot.renderScale * RENDER_SCALE_HYSTERESIS) {
+        continue;
+      }
+      const entry = layout[idx]?.entry;
       if (!entry || entry.kind !== 'pdf') {
         continue;
       }
-      const originalIndex = entry.originalIndex;
-      if (!enabled || !slot.rendered) {
-        if (slot.tileSubscribed) {
-          mgr.removePage(originalIndex);
-          mgr.setOnPageSnapshotChange(originalIndex, null);
-          slot.tileLayer.replaceChildren();
-          slot.tileSubscribed = false;
-        }
-        continue;
-      }
-      if (!slot.tileSubscribed) {
-        mgr.setOnPageSnapshotChange(originalIndex, () => {
-          const fresh = this._currentLayout;
-          if (fresh) {
-            this.repaintSlotTiles(slot, originalIndex, fresh);
-          }
-        });
-        slot.tileSubscribed = true;
-      }
-      const page = layout[layoutIdx];
-      mgr.setPageInputs(originalIndex, {
-        pageWidth: page.w,
-        pageHeight: page.h,
-        scale: tileScale,
-      });
+      this.upgradeSlotCanvas(slot, entry.originalIndex, targetScale);
     }
-    mgr.refresh();
   }
 
-  private repaintSlotTiles(
+  private async upgradeSlotCanvas(
     slot: PageSlot,
-    pageIndex: number,
-    layout: ReturnType<typeof this.pageLayout>,
-  ): void {
-    const mgr = this._tileManager;
-    if (!mgr) {
+    originalIndex: number,
+    targetScale: number,
+  ): Promise<void> {
+    const doc = this._pdfDoc;
+    if (!doc) {
       return;
     }
-    const tiles = mgr.getPageTiles(pageIndex);
-    const page = layout[slot.layoutIndex];
-    if (!page) {
-      return;
-    }
-    const pageW = page.w;
-    const pageH = page.h;
-    if (tiles.length === 0) {
-      slot.tileLayer.replaceChildren();
-      return;
-    }
-    // Diff against existing children by data-tile-key so unchanged tiles
-    // stay mounted (no flicker, no re-decode of the canvas).
-    const existing = new Map<string, HTMLElement>();
-    for (const child of Array.from(slot.tileLayer.children)) {
-      const key = (child as HTMLElement).dataset.tileKey;
-      if (key) {
-        existing.set(key, child as HTMLElement);
+    const gen = ++slot.generation;
+    slot.pending = true;
+    try {
+      const newCanvas = await renderPageCanvas(doc, originalIndex, targetScale);
+      if (slot.generation !== gen) {
+        return;
+      }
+      const wrapper = slot.contentDiv.firstElementChild;
+      if (!wrapper) {
+        return;
+      }
+      const oldCanvas = wrapper.querySelector<HTMLCanvasElement>('.pdf-canvas');
+      if (!oldCanvas) {
+        return;
+      }
+      wrapper.replaceChild(newCanvas, oldCanvas);
+      slot.renderScale = targetScale;
+    } catch (err) {
+      logger.error('Canvas upgrade failed', err, {
+        index: this.index,
+        originalIndex,
+        targetScale,
+      });
+    } finally {
+      if (slot.generation === gen) {
+        slot.pending = false;
       }
     }
-    const fragment = document.createDocumentFragment();
-    for (const tile of tiles) {
-      const key = tile.descriptor.key;
-      let host = existing.get(key);
-      if (host) {
-        existing.delete(key);
-      } else {
-        host = document.createElement('div');
-        host.dataset.tileKey = key;
-        host.style.position = 'absolute';
-        host.style.left = `${(tile.descriptor.x / pageW) * 100}%`;
-        host.style.top = `${(tile.descriptor.y / pageH) * 100}%`;
-        host.style.width = `${(tile.descriptor.width / pageW) * 100}%`;
-        host.style.height = `${(tile.descriptor.height / pageH) * 100}%`;
-        host.style.willChange = 'transform';
-        host.style.transform = 'translateZ(0)';
-        const c = tile.canvas;
-        c.style.width = '100%';
-        c.style.height = '100%';
-        c.style.display = 'block';
-        host.appendChild(c);
-      }
-      fragment.appendChild(host);
-    }
-    for (const [, host] of existing) {
-      host.remove();
-    }
-    slot.tileLayer.appendChild(fragment);
   }
 
   public override disposeDOM(): void {
-    this._tileManager?.destroy();
-    this._tileManager = null;
-    this._currentViewport = null;
-    this._currentLayout = null;
+    if (this._zoomSettleTimer !== null) {
+      window.clearTimeout(this._zoomSettleTimer);
+      this._zoomSettleTimer = null;
+    }
     this._chrome?.dispose();
     this._chrome = null;
     this._frameDiv = null;
@@ -596,11 +499,9 @@ export class PdfElement extends DrawableElement {
       }
 
       if (!slot) {
-        slot = this.createPageSlot(key, page.w, page.h, i);
+        slot = this.createPageSlot(key, page.w, page.h);
         pageHost.appendChild(slot.div);
         this._slots.set(i, slot);
-      } else {
-        slot.layoutIndex = i;
       }
 
       slot.div.style.width = `${page.w}px`;
@@ -620,20 +521,8 @@ export class PdfElement extends DrawableElement {
         slot.generation++;
         slot.rendered = false;
         slot.pending = false;
+        slot.renderScale = 0;
         slot.contentDiv.replaceChildren();
-        slot.tileLayer.replaceChildren();
-        if (
-          slot.tileSubscribed &&
-          page.entry.kind === 'pdf' &&
-          this._tileManager
-        ) {
-          this._tileManager.removePage(page.entry.originalIndex);
-          this._tileManager.setOnPageSnapshotChange(
-            page.entry.originalIndex,
-            null,
-          );
-          slot.tileSubscribed = false;
-        }
       }
 
       kept.add(i);
@@ -686,12 +575,7 @@ export class PdfElement extends DrawableElement {
     return out;
   }
 
-  private createPageSlot(
-    key: string,
-    w: number,
-    h: number,
-    layoutIndex: number,
-  ): PageSlot {
+  private createPageSlot(key: string, w: number, h: number): PageSlot {
     const div = document.createElement('div');
     Object.assign(div.style, {
       position: 'absolute',
@@ -716,25 +600,14 @@ export class PdfElement extends DrawableElement {
     } as Partial<CSSStyleDeclaration>);
     div.appendChild(contentDiv);
 
-    const tileLayer = document.createElement('div');
-    tileLayer.className = 'pdf-tile-layer';
-    Object.assign(tileLayer.style, {
-      position: 'absolute',
-      inset: '0',
-      overflow: 'hidden',
-      pointerEvents: 'none',
-    } as Partial<CSSStyleDeclaration>);
-
     return {
       key,
       div,
       contentDiv,
-      tileLayer,
-      layoutIndex,
       generation: 0,
       rendered: false,
       pending: false,
-      tileSubscribed: false,
+      renderScale: 0,
     };
   }
 
@@ -755,16 +628,9 @@ export class PdfElement extends DrawableElement {
       rendered.style.position = 'absolute';
       rendered.style.left = '0';
       rendered.style.top = '0';
-      // Insert tile layer above the baseline canvas so tiles overlay the
-      // baseline raster as they arrive.
-      const baselineCanvas = rendered.querySelector('canvas');
-      if (baselineCanvas?.nextSibling) {
-        rendered.insertBefore(slot.tileLayer, baselineCanvas.nextSibling);
-      } else {
-        rendered.appendChild(slot.tileLayer);
-      }
       slot.contentDiv.replaceChildren(rendered);
       slot.rendered = true;
+      slot.renderScale = 1;
     } catch (err) {
       logger.error('Failed to render page', err, {
         index: this.index,

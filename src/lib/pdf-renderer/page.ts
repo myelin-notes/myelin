@@ -81,3 +81,15 @@ export async function renderPage(
   }
   return wrapper;
 }
+
+export async function renderPageCanvas(
+  doc: PdfDocument,
+  pageIndex: number,
+  renderScale: number,
+): Promise<HTMLCanvasElement> {
+  const page = await doc.getPage(pageIndex);
+  const viewport = page.getViewport({ scale: 1 });
+  const ctx: RenderContext = { page, viewport, scale: 1 };
+  await page.getOperatorList();
+  return renderCanvasLayer(ctx, renderScale);
+}
