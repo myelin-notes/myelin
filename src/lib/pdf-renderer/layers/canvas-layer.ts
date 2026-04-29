@@ -167,18 +167,31 @@ function drawImageAt(
   cctx.restore();
 }
 
+export interface ClipRect {
+  /** Top-left in viewport (CSS-px) coordinates. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export async function renderCanvasLayer(
   ctx: RenderContext,
+  renderScale = 1,
+  clip?: ClipRect,
 ): Promise<HTMLCanvasElement> {
   const dpr = window.devicePixelRatio || 1;
+  const pixelScale = dpr * renderScale;
+  const cssW = clip ? clip.width : ctx.viewport.width;
+  const cssH = clip ? clip.height : ctx.viewport.height;
   const canvas = document.createElement('canvas');
   canvas.className = 'pdf-canvas';
-  canvas.width = Math.ceil(ctx.viewport.width * dpr);
-  canvas.height = Math.ceil(ctx.viewport.height * dpr);
+  canvas.width = Math.ceil(cssW * pixelScale);
+  canvas.height = Math.ceil(cssH * pixelScale);
   canvas.style.position = 'absolute';
   canvas.style.inset = '0';
-  canvas.style.width = `${ctx.viewport.width}px`;
-  canvas.style.height = `${ctx.viewport.height}px`;
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
   canvas.style.pointerEvents = 'none';
   // Promote to its own GPU layer so parent transform: scale only resamples
   // the texture instead of forcing a re-raster.
@@ -189,7 +202,11 @@ export async function renderCanvasLayer(
   if (!cctx) {
     return canvas;
   }
-  cctx.scale(dpr, dpr);
+  cctx.scale(pixelScale, pixelScale);
+  if (clip) {
+    // Shift origin so the clip rect's top-left lands at canvas (0, 0).
+    cctx.translate(-clip.x, -clip.y);
+  }
   // Apply the page viewport transform once on the context. Subsequent CTM
   // updates (relative to the page) compose on top via cctx.save/transform.
   applyTransform(cctx, ctx.viewport.transform as Matrix);

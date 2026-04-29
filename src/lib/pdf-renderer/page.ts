@@ -4,7 +4,6 @@ import { injectPageFonts } from './fonts';
 import { renderAnnotationLayer } from './layers/annotation-layer';
 import { renderCanvasLayer } from './layers/canvas-layer';
 import { renderTextLayer } from './layers/text-layer';
-import { timed, timeEnd, timeStart } from './pdf-perf';
 import type { RenderContext } from './types';
 
 const logger = new Logger('PdfRendererPage');
@@ -35,7 +34,6 @@ export async function renderPage(
   pageIndex: number,
   scale = 1,
 ): Promise<HTMLElement> {
-  const totalStart = timeStart();
   const page = await doc.getPage(pageIndex);
   const viewport = page.getViewport({ scale });
   const ctx: RenderContext = { page, viewport, scale };
@@ -48,7 +46,6 @@ export async function renderPage(
   wrapper.style.background = '#fff';
   wrapper.style.overflow = 'hidden';
 
-  const opStart = timeStart();
   try {
     await page.getOperatorList();
   } catch (err) {
@@ -58,9 +55,6 @@ export async function renderPage(
     });
     throw err;
   }
-  timeEnd('renderPage.getOperatorList', opStart);
-
-  const fontStart = timeStart();
   try {
     await injectPageFonts(doc, page);
   } catch (err) {
@@ -69,18 +63,11 @@ export async function renderPage(
       error: formatError(err),
     });
   }
-  timeEnd('renderPage.injectFonts', fontStart);
 
   const [raster, text, annotations] = await Promise.all([
-    timed('renderPage.canvas', () =>
-      runLayer('canvas', pageIndex, () => renderCanvasLayer(ctx)),
-    ),
-    timed('renderPage.text', () =>
-      runLayer('text', pageIndex, () => renderTextLayer(ctx)),
-    ),
-    timed('renderPage.annotations', () =>
-      runLayer('annotations', pageIndex, () => renderAnnotationLayer(ctx)),
-    ),
+    runLayer('canvas', pageIndex, () => renderCanvasLayer(ctx)),
+    runLayer('text', pageIndex, () => renderTextLayer(ctx)),
+    runLayer('annotations', pageIndex, () => renderAnnotationLayer(ctx)),
   ]);
 
   if (raster) {
@@ -92,6 +79,5 @@ export async function renderPage(
   if (annotations) {
     wrapper.appendChild(annotations);
   }
-  timeEnd('renderPage.total', totalStart);
   return wrapper;
 }

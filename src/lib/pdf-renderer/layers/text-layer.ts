@@ -714,6 +714,12 @@ export async function renderTextLayer(
   container.style.overflow = 'hidden';
   container.style.userSelect = 'text';
   container.style.lineHeight = '1';
+  // Cache the text layer in its own GPU texture so parent transform: scale
+  // GPU-resamples it (cheap, briefly blurry) instead of forcing a re-paint of
+  // every span. Resampling at scale change is what kept zoom under 60fps.
+  container.style.willChange = 'transform';
+  container.style.transform = 'translateZ(0)';
+  container.style.contain = 'layout style paint';
 
   const content = await ctx.page.getTextContent();
   const items = content.items as (TextItem | { type: string })[];
