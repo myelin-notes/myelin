@@ -1,8 +1,8 @@
 /**
  * Tiny ProseMirror → Markdown serializer for the page-frame schema.
- * The schema is custom (flat bullet/ordered items with an `indent` attr,
- * mentions, etc.) so we can't lean on `prosemirror-markdown`'s default
- * serializer. This walks the doc node-by-node and emits CommonMark.
+ * The schema is custom (flat bullet/ordered/checklist items with an
+ * `indent` attr, mentions, etc.) so we can't lean on `prosemirror-markdown`'s
+ * default serializer. This walks the doc node-by-node and emits CommonMark.
  */
 
 import type { Mark, Node as PMNode } from 'prosemirror-model';
@@ -80,6 +80,12 @@ function serializeBlock(node: PMNode): string | null {
     case 'bulletListItem': {
       const indent = Math.max(0, (node.attrs.indent as number) ?? 0);
       return `${'  '.repeat(indent)}- ${serializeInline(node)}`;
+    }
+    case 'checkListItem': {
+      const indent = Math.max(0, (node.attrs.indent as number) ?? 0);
+      const marker = node.attrs.checked === true ? 'x' : ' ';
+      const content = serializeInline(node);
+      return `${'  '.repeat(indent)}- [${marker}]${content ? ` ${content}` : ''}`;
     }
     case 'orderedListItem': {
       const indent = Math.max(0, (node.attrs.indent as number) ?? 0);

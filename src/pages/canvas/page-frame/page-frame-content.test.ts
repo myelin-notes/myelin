@@ -103,6 +103,58 @@ describe('page-frame content shape', () => {
     );
   });
 
+  it('round-trips checklist items through the Yjs-backed editor state and markdown export', () => {
+    const markdown = [
+      '- [ ] open item',
+      '- [x] done item',
+      '  - [x] nested done',
+      '- [ ]',
+    ].join('\n');
+    const doc = parseMarkdownToDoc(markdown, schema);
+    const ydoc = prosemirrorToYDoc(doc, 'page-frame');
+    const roundTripped = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment('page-frame'),
+      schema,
+    );
+
+    expect(doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'checkListItem',
+          attrs: { checked: false, indent: 0 },
+          content: [{ type: 'text', text: 'open item' }],
+        },
+        {
+          type: 'checkListItem',
+          attrs: { checked: true, indent: 0 },
+          content: [{ type: 'text', text: 'done item' }],
+        },
+        {
+          type: 'checkListItem',
+          attrs: { checked: true, indent: 1 },
+          content: [{ type: 'text', text: 'nested done' }],
+        },
+        {
+          type: 'checkListItem',
+          attrs: { checked: false, indent: 0 },
+        },
+      ],
+    });
+    expect(roundTripped.toJSON()).toEqual(doc.toJSON());
+    expect(serializeDocToMarkdown(roundTripped)).toBe(
+      `${[
+        '- [ ] open item',
+        '',
+        '- [x] done item',
+        '',
+        '  - [x] nested done',
+        '',
+        '- [ ]',
+      ].join('\n')}\n`,
+    );
+  });
+
   it('resolves note links to note ids in the ProseMirror state and markdown export', async () => {
     const markdown = 'See [[Alpha Note]] and [[Missing Note]].';
     const doc = await normalizeAndResolveNoteLinksDoc(
