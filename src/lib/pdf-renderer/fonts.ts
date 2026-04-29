@@ -56,13 +56,7 @@ export async function injectPageFonts(
         descriptors.style = `oblique ${font.cssFontInfo.italicAngle}deg`;
       }
     }
-    const src =
-      font.data instanceof Uint8Array
-        ? font.data.buffer.slice(
-            font.data.byteOffset,
-            font.data.byteOffset + font.data.byteLength,
-          )
-        : (font.data as unknown as ArrayBuffer);
+    const src = font.data as BufferSource;
     const face = new FontFace(family, src, descriptors);
     document.fonts.add(face);
     pending.push(

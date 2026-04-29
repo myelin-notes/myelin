@@ -61,6 +61,11 @@ function createPrintStyle(
 ): HTMLStyleElement {
   const style = document.createElement('style');
   style.id = PRINT_STYLE_ID;
+  // CSS px → inches at the standard 96dpi mapping. macOS Quartz ignores
+  // px-valued @page sizes and falls back to letter; physical units get
+  // forwarded to NSPrintInfo as a custom paper size and honored.
+  const widthIn = pageWidth / 96;
+  const heightIn = pageHeight / 96;
   style.textContent = `
 @media screen {
   #${PRINT_HOST_ID} {
@@ -74,7 +79,7 @@ function createPrintStyle(
 
 @media print {
   @page {
-    size: ${pageWidth}px ${pageHeight}px;
+    size: ${widthIn}in ${heightIn}in;
     margin: 0;
   }
 
