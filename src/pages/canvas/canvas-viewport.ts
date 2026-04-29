@@ -189,6 +189,14 @@ export class CanvasViewport {
     };
   }
 
+  public getWorldRect(): DOMRect {
+    const dpr = window.devicePixelRatio || 1;
+    const screenW = this.canvas.width / dpr;
+    const screenH = this.canvas.height / dpr;
+    const tl = this.screenToWorld({ x: 0, y: 0 });
+    return new DOMRect(tl.x, tl.y, screenW / this._zoom, screenH / this._zoom);
+  }
+
   public getPoint(evt: PointerEvent): Vector2 {
     return this.screenToWorld({ x: evt.pageX, y: evt.pageY });
   }

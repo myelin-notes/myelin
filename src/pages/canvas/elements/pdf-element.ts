@@ -45,6 +45,8 @@ interface PageSlot {
   key: string;
   div: HTMLDivElement;
   contentDiv: HTMLDivElement;
+  generation: number;
+  rendered: boolean;
 }
 
 function snapToDevicePixel(value: number): number {
@@ -351,7 +353,7 @@ export class PdfElement extends DrawableElement {
     }
 
     const sp = timeStart();
-    this.syncPages();
+    this.syncPages(viewport);
     timeEnd('pdfElement.syncPages', sp);
     timeEnd('pdfElement.syncDOM', t0);
   }
@@ -418,13 +420,14 @@ export class PdfElement extends DrawableElement {
     this._pageHost = pageHost;
   }
 
-  private syncPages(): void {
+  private syncPages(viewport: CanvasViewport): void {
     const pageHost = this._pageHost;
     if (!pageHost) {
       return;
     }
     const layout = this.pageLayout();
     const kept = new Set<number>();
+    const visible = this.computeVisiblePages(viewport, layout);
 
     for (let i = 0; i < layout.length; i++) {
       const page = layout[i];
@@ -441,24 +444,74 @@ export class PdfElement extends DrawableElement {
         slot = this.createPageSlot(key, page.w, page.h);
         pageHost.appendChild(slot.div);
         this._slots.set(i, slot);
-        if (page.entry.kind === 'pdf') {
-          this.renderPdfPageInto(slot, page.entry.originalIndex);
-        }
       }
 
       slot.div.style.width = `${page.w}px`;
       slot.div.style.height = `${page.h}px`;
       slot.div.style.transform = `translate(0px, ${page.y}px)`;
 
+      const wantRendered = visible.has(i) && page.entry.kind === 'pdf';
+      if (wantRendered && !slot.rendered) {
+        slot.generation++;
+        const originalIndex =
+          page.entry.kind === 'pdf' ? page.entry.originalIndex : -1;
+        if (originalIndex >= 0) {
+          this.renderPdfPageInto(slot, originalIndex, slot.generation);
+        }
+      } else if (!wantRendered && slot.rendered) {
+        slot.generation++;
+        slot.rendered = false;
+        slot.contentDiv.replaceChildren();
+      }
+
       kept.add(i);
     }
 
     for (const [idx, slot] of this._slots) {
       if (!kept.has(idx)) {
+        slot.generation++;
         slot.div.remove();
         this._slots.delete(idx);
       }
     }
+  }
+
+  private computeVisiblePages(
+    viewport: CanvasViewport,
+    layout: ReturnType<typeof this.pageLayout>,
+  ): Set<number> {
+    const view = viewport.getWorldRect();
+    // 1-viewport buffer beyond visible bounds: pre-render a screen ahead and
+    // keep a screen behind so quick reverse pans don't flash blank.
+    const marginX = view.width;
+    const marginY = view.height;
+    const visMinX = view.left - marginX;
+    const visMaxX = view.right + marginX;
+    const visMinY = view.top - marginY;
+    const visMaxY = view.bottom + marginY;
+
+    const elOffX = this.offset.x;
+    const elOffY = this.offset.y;
+    const sX = this._scale.x;
+    const sY = this._scale.y;
+
+    const out = new Set<number>();
+    for (let i = 0; i < layout.length; i++) {
+      const page = layout[i];
+      const left = elOffX;
+      const right = elOffX + page.w * sX;
+      const top = elOffY + page.y * sY;
+      const bottom = top + page.h * sY;
+      if (
+        right >= visMinX &&
+        left <= visMaxX &&
+        bottom >= visMinY &&
+        top <= visMaxY
+      ) {
+        out.add(i);
+      }
+    }
+    return out;
   }
 
   private createPageSlot(key: string, w: number, h: number): PageSlot {
@@ -486,43 +539,33 @@ export class PdfElement extends DrawableElement {
     } as Partial<CSSStyleDeclaration>);
     div.appendChild(contentDiv);
 
-    return { key, div, contentDiv };
+    return { key, div, contentDiv, generation: 0, rendered: false };
   }
 
   private async renderPdfPageInto(
     slot: PageSlot,
     originalIndex: number,
+    generation: number,
   ): Promise<void> {
     try {
       const doc = this._pdfDoc ?? (await this._pdfDocLoad);
-      if (!doc) {
-        return;
-      }
-      if (!this._slots.has(this.findSlotIndex(slot))) {
+      if (!doc || slot.generation !== generation) {
         return;
       }
       const rendered = await renderPage(doc, originalIndex, 1);
-      if (!this._slots.has(this.findSlotIndex(slot))) {
+      if (slot.generation !== generation) {
         return;
       }
       rendered.style.position = 'absolute';
       rendered.style.left = '0';
       rendered.style.top = '0';
       slot.contentDiv.replaceChildren(rendered);
+      slot.rendered = true;
     } catch (err) {
       logger.error('Failed to render page', err, {
         index: this.index,
         originalIndex,
       });
     }
-  }
-
-  private findSlotIndex(slot: PageSlot): number {
-    for (const [idx, s] of this._slots) {
-      if (s === slot) {
-        return idx;
-      }
-    }
-    return -1;
   }
 }
