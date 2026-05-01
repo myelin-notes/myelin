@@ -64,4 +64,5 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 - Use `useEffect` only to synchronize with external systems like DOM listeners, subscriptions, timers, or imperative APIs.
 - When an effect-owned callback needs fresh props or state, prefer `useEffectEvent` over mutable refs or widening the effect dependency list just to keep the callback fresh.
-- Use `useMemo` and `useCallback` only when identity stability is required by an API/effect or the computation is meaningfully expensive. Do not wrap ordinary render-time handlers by default.
+- Do not rely on React Compiler alone for correctness or dependency stability. Use explicit `useMemo` and `useCallback` when stable identity makes effects, context values, imperative handles, subscriptions, or memoized children easier to reason about.
+- Avoid wrapping ordinary render-time handlers by default. If a callback is only passed to a plain DOM element and not used as a dependency or stable prop, keep it inline.
