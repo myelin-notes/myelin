@@ -19,7 +19,6 @@ const en = {
     nav: {
       library: 'Library',
       graph: 'Graph',
-      debug: 'Debug',
       settings: 'Settings',
       help: 'Help',
     },
@@ -482,10 +481,6 @@ const en = {
         live: (phase: string) => `Live / ${phase}`,
       },
     },
-  },
-  debug: {
-    uploadPdf: 'Upload PDF',
-    empty: 'Select a PDF to render.',
   },
   dialogs: {
     closeSrOnly: 'Close',

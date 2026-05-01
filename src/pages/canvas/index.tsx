@@ -195,7 +195,7 @@ function CanvasViewInner() {
         }
       />
 
-      {/* Element-owned DOM overlay (PDF pages, future DOM-rendered elements) */}
+      {/* Element-owned DOM overlay */}
       <div
         ref={domOverlayRef}
         id="dom-overlay"

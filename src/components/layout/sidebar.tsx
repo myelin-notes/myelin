@@ -1,7 +1,6 @@
-import { BookOpen, Bug, HelpCircle, Plus, Settings } from 'lucide-react';
+import { BookOpen, HelpCircle, Plus, Settings } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/logo';
-import { IS_DEV } from '@/lib/env';
 import { useMessages } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
@@ -79,15 +78,6 @@ export function Sidebar() {
   ];
 
   const bottomNav: NavItem[] = [
-    ...(IS_DEV
-      ? [
-          {
-            label: strings.sidebar.nav.debug,
-            icon: <Bug className="size-4" />,
-            navTo: '/debug',
-          },
-        ]
-      : []),
     {
       label: strings.sidebar.nav.settings,
       icon: <Settings className="size-4" />,

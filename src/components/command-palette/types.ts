@@ -2,12 +2,7 @@ import type { KeyboardEvent, RefObject } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 export type CommandPaletteMode = 'commands' | 'notes';
-export type CommandPalettePage =
-  | 'canvas'
-  | 'debug'
-  | 'library'
-  | 'settings'
-  | 'unknown';
+export type CommandPalettePage = 'canvas' | 'library' | 'settings' | 'unknown';
 
 export interface CommandPaletteEntry {
   id: string;

@@ -21,7 +21,6 @@ const es: typeof en = {
     nav: {
       library: 'Biblioteca',
       graph: 'Grafo',
-      debug: 'Depuración',
       settings: 'Ajustes',
       help: 'Ayuda',
     },
@@ -490,10 +489,6 @@ const es: typeof en = {
         live: (phase: string) => `En vivo / ${phase}`,
       },
     },
-  },
-  debug: {
-    uploadPdf: 'Subir PDF',
-    empty: 'Selecciona un PDF para renderizar.',
   },
   dialogs: {
     closeSrOnly: 'Cerrar',

@@ -21,7 +21,6 @@ const zhHans: typeof en = {
     nav: {
       library: '资料库',
       graph: '关系图',
-      debug: '调试',
       settings: '设置',
       help: '帮助',
     },
@@ -476,10 +475,6 @@ const zhHans: typeof en = {
         live: (phase: string) => `实时 / ${phase}`,
       },
     },
-  },
-  debug: {
-    uploadPdf: '上传 PDF',
-    empty: '选择一个 PDF 进行渲染',
   },
   dialogs: {
     closeSrOnly: '关闭',

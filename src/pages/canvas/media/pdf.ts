@@ -1,4 +1,3 @@
-import { loadDocument } from '@/lib/pdf-renderer';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PdfElement } from '../elements/pdf-element';
 import type { MediaImportOptions } from './index';
@@ -9,17 +8,9 @@ export async function pdfImportHandler(
   options: MediaImportOptions = {},
 ) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  const doc = await loadDocument(bytes);
-  const pageSizes: { w: number; h: number }[] = [];
-  for (let i = 0; i < doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const viewport = page.getViewport({ scale: 1 });
-    pageSizes.push({ w: viewport.width, h: viewport.height });
-  }
-
   const pdf = canvas.addElement((i) => new PdfElement(i));
   const fileName = blob instanceof File ? blob.name : '';
-  pdf.setInitialPdfData(bytes, pageSizes, fileName, doc);
+  pdf.setInitialPdfData(bytes, fileName);
 
   const dpr = window.devicePixelRatio || 1;
   const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;

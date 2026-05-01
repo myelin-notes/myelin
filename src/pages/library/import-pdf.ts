@@ -1,11 +1,10 @@
 import { Logger } from '@/lib/logger';
-import { loadDocument } from '@/lib/pdf-renderer';
 import type { NoteSession, Repository } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
-import type {
-  PdfPageEntry,
-  PdfPageSize,
-} from '@/pages/canvas/elements/pdf-element';
+import {
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+} from '@/pages/canvas/elements/page-frame-constants';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 
 const logger = new Logger('PdfImport');
@@ -26,34 +25,12 @@ function getPdfCanvasTitle(fileName: string, fallback: string): string {
   return title.length > 0 ? title : fallback;
 }
 
-export async function loadPdfPageSizes(
-  bytes: Uint8Array,
-): Promise<PdfPageSize[]> {
-  const doc = await loadDocument(bytes);
-  try {
-    const pageSizes: PdfPageSize[] = [];
-    for (let i = 0; i < doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: 1 });
-      pageSizes.push({ w: viewport.width, h: viewport.height });
-    }
-    return pageSizes;
-  } finally {
-    doc.destroy();
-  }
-}
-
 export function addPdfElementToYDoc(
   ydoc: YDocManager,
   bytes: Uint8Array,
-  pageSizes: PdfPageSize[],
   fileName: string,
 ): number {
   const index = ydoc.nextIndex;
-  const pageOrder: PdfPageEntry[] = pageSizes.map((_, i) => ({
-    kind: 'pdf',
-    originalIndex: i,
-  }));
 
   ydoc.insertElementMap(0, ElementType.PDF, index, {
     offsetX: DEFAULT_PDF_IMPORT_OFFSET.x,
@@ -61,8 +38,8 @@ export function addPdfElementToYDoc(
     scaleX: 1,
     scaleY: 1,
     pdfData: new Uint8Array(bytes),
-    pageSizes,
-    pageOrder,
+    pageSizes: [{ w: PAGE_WIDTH, h: PAGE_HEIGHT }],
+    pageOrder: [{ kind: 'pdf', originalIndex: 0 }],
     fileName,
   });
 
@@ -89,12 +66,11 @@ export async function importPdfFile({
 
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const pageSizes = await loadPdfPageSizes(bytes);
     const baseTitle = getPdfCanvasTitle(file.name, fallbackTitle);
     const title = await repository.getUniqueFileName(baseTitle, parentId);
     createdId = await repository.createFile(title, 'mcanvas', parentId);
     session = await repository.openSession(createdId);
-    addPdfElementToYDoc(session.ydoc, bytes, pageSizes, file.name);
+    addPdfElementToYDoc(session.ydoc, bytes, file.name);
     await session.save();
     await session.close();
     session = null;

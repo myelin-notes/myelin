@@ -29,7 +29,6 @@ describe('commandPalettePageFromPathname', () => {
     expect(commandPalettePageFromPathname('/library')).toBe('library');
     expect(commandPalettePageFromPathname('/mcanvas/note-1')).toBe('canvas');
     expect(commandPalettePageFromPathname('/settings')).toBe('settings');
-    expect(commandPalettePageFromPathname('/debug')).toBe('debug');
     expect(commandPalettePageFromPathname('/missing')).toBe('unknown');
   });
 });

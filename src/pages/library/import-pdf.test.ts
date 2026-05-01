@@ -1,31 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { loadDocument } from '@/lib/pdf-renderer';
 import type { NoteSession, Repository } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
+import {
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+} from '@/pages/canvas/elements/page-frame-constants';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { importPdfFile, isPdfFile } from './import-pdf';
-
-vi.mock('@/lib/pdf-renderer', () => ({
-  loadDocument: vi.fn(),
-}));
-
-function mockPdfDocument(pageSizes: Array<{ w: number; h: number }>) {
-  const destroy = vi.fn();
-  const getPage = vi.fn(async (index: number) => ({
-    getViewport: () => ({
-      width: pageSizes[index].w,
-      height: pageSizes[index].h,
-    }),
-  }));
-
-  vi.mocked(loadDocument).mockResolvedValue({
-    numPages: pageSizes.length,
-    getPage,
-    destroy,
-  } as unknown as Awaited<ReturnType<typeof loadDocument>>);
-
-  return { destroy, getPage };
-}
 
 function createRepository(session: Partial<NoteSession>) {
   return {
@@ -48,10 +29,6 @@ describe('PDF library import', () => {
   });
 
   it('creates a canvas containing one PDF element', async () => {
-    const { destroy, getPage } = mockPdfDocument([
-      { w: 612, h: 792 },
-      { w: 595, h: 842 },
-    ]);
     const ydoc = new YDocManager();
     const session = {
       ydoc,
@@ -82,8 +59,6 @@ describe('PDF library import', () => {
     expect(repository.openSession).toHaveBeenCalledWith('canvas-1');
     expect(session.save).toHaveBeenCalledTimes(1);
     expect(session.close).toHaveBeenCalledTimes(1);
-    expect(destroy).toHaveBeenCalledTimes(1);
-    expect(getPage).toHaveBeenCalledTimes(2);
 
     expect(ydoc.nextIndex).toBe(1);
     expect(ydoc.elements.length).toBe(1);
@@ -99,17 +74,14 @@ describe('PDF library import', () => {
       1, 2, 3,
     ]);
     expect(pdfElement.get('pageSizes')).toEqual([
-      { w: 612, h: 792 },
-      { w: 595, h: 842 },
+      { w: PAGE_WIDTH, h: PAGE_HEIGHT },
     ]);
     expect(pdfElement.get('pageOrder')).toEqual([
       { kind: 'pdf', originalIndex: 0 },
-      { kind: 'pdf', originalIndex: 1 },
     ]);
   });
 
   it('deletes the canvas if saving the imported PDF fails', async () => {
-    mockPdfDocument([{ w: 612, h: 792 }]);
     const error = new Error('save failed');
     const session = {
       ydoc: new YDocManager(),

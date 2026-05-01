@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { LocalRepository } from '@/lib/sync/repo/local';
 import type { FileType } from '@/lib/sync/repo/types';
@@ -9,10 +9,6 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { importObsidianVault } from './import-obsidian-vault';
-
-vi.mock('@/lib/pdf-renderer', () => ({
-  loadDocument: vi.fn(),
-}));
 
 function collectNoteLinks(json: unknown): Array<{
   text: string;

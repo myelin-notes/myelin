@@ -133,9 +133,6 @@ export function commandPalettePageFromPathname(
   if (isRoute(pathname, '/settings')) {
     return 'settings';
   }
-  if (isRoute(pathname, '/debug')) {
-    return 'debug';
-  }
   return 'unknown';
 }
 
