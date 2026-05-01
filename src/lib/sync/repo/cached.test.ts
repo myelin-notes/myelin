@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import {
   createNoteState,
@@ -29,6 +29,20 @@ class MemoryRemoteRepository extends BaseRepository {
   private readonly notes = new Map<string, Uint8Array>();
   private noteRevision = 0;
   private manifestVersion = 0;
+  private loadFileBytesGate: Promise<void> | null = null;
+  private onLoadFileBytesBlocked: (() => void) | null = null;
+  private saveFileBytesGate: Promise<void> | null = null;
+  private onSaveFileBytesBlocked: (() => void) | null = null;
+
+  blockFileLoads(gate: Promise<void>, onBlocked?: () => void): void {
+    this.loadFileBytesGate = gate;
+    this.onLoadFileBytesBlocked = onBlocked ?? null;
+  }
+
+  blockFileSaves(gate: Promise<void>, onBlocked?: () => void): void {
+    this.saveFileBytesGate = gate;
+    this.onSaveFileBytesBlocked = onBlocked ?? null;
+  }
 
   protected async loadManifestImpl(): Promise<{
     manifest: VFSManifest;
@@ -54,6 +68,11 @@ class MemoryRemoteRepository extends BaseRepository {
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
+    if (this.loadFileBytesGate) {
+      this.onLoadFileBytesBlocked?.();
+      await this.loadFileBytesGate;
+    }
+
     const bytes = this.notes.get(nodeId) ?? null;
     return {
       bytes: bytes ? new Uint8Array(bytes) : null,
@@ -67,6 +86,11 @@ class MemoryRemoteRepository extends BaseRepository {
     _revision: string | null,
     _message: string,
   ): Promise<string> {
+    if (this.saveFileBytesGate) {
+      this.onSaveFileBytesBlocked?.();
+      await this.saveFileBytesGate;
+    }
+
     this.notes.set(nodeId, new Uint8Array(bytes));
     return `note-${++this.noteRevision}`;
   }
@@ -74,6 +98,26 @@ class MemoryRemoteRepository extends BaseRepository {
   protected async deleteFileBytes(nodeId: string): Promise<void> {
     this.notes.delete(nodeId);
   }
+}
+
+function createDeferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
+async function expectQuickLocalResult<T>(promise: Promise<T>): Promise<T> {
+  const timedOut = Symbol('timedOut');
+  const result = await Promise.race([
+    promise,
+    new Promise<typeof timedOut>((resolve) => {
+      setTimeout(() => resolve(timedOut), 250);
+    }),
+  ]);
+  expect(result).not.toBe(timedOut);
+  return result as T;
 }
 
 function installMemoryLocalStorage(): void {
@@ -399,11 +443,11 @@ describe('CachedRepository', () => {
     );
     expect(outbox).not.toBeNull();
     expect(JSON.parse(outbox ?? '[]')).toEqual([
-      {
+      expect.objectContaining({
         kind: 'delete-manifest-node',
         nodeId: fileId,
         deletedFileIds: [fileId],
-      },
+      }),
     ]);
 
     await repository.flushPending();
@@ -479,7 +523,7 @@ describe('CachedRepository', () => {
     expect(readNoteText(snapshot.update)).toBe('loaded by refresh');
   });
 
-  it('pulls newer remote note state when opening a session', async () => {
+  it('opens cached note state before pulling newer remote state in the background', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote later', 'mcanvas', null);
     const initialNote = createNoteState('stale cache copy');
@@ -516,14 +560,277 @@ describe('CachedRepository', () => {
       },
     );
 
-    const session = await repository.openSession(fileId);
+    const remoteRefresh = createDeferred();
+    remote.blockFileLoads(remoteRefresh.promise);
 
-    expect(readNoteText(session.encodeUpdate())).toBe('opened latest remote');
-    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
-      'opened latest remote',
+    const session = await expectQuickLocalResult(
+      repository.openSession(fileId),
     );
 
+    expect(readNoteText(session.encodeUpdate())).toBe('stale cache copy');
+
+    remoteRefresh.resolve();
+
+    await vi.waitFor(() => {
+      expect(readNoteText(session.encodeUpdate())).toBe('opened latest remote');
+    });
+    await vi.waitFor(async () => {
+      expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+        'opened latest remote',
+      );
+    });
+
     await session.close();
+  });
+
+  it('preserves local edits saved while open-session refresh is pending', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const initialNote = createNoteState('base');
+
+    await remote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository(
+      'repositories/open-session-local-edit-test',
+    );
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/open-session-local-edit-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const remoteSnapshot = await remote.loadDocument(fileId);
+    const doc = new Y.Doc();
+    if (remoteSnapshot.update) {
+      Y.applyUpdate(doc, remoteSnapshot.update);
+    }
+    doc.getText('content').insert(4, ' remote');
+
+    await remote.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(doc, remoteSnapshot.stateVector),
+      {
+        baseRevision: remoteSnapshot.revision,
+        localStateVector: Y.encodeStateVector(doc),
+      },
+    );
+
+    const remoteRefresh = createDeferred();
+    remote.blockFileLoads(remoteRefresh.promise);
+
+    const session = await expectQuickLocalResult(
+      repository.openSession(fileId),
+    );
+    expect(readNoteText(session.encodeUpdate())).toBe('base');
+
+    session.ydoc.doc.getText('content').insert(4, ' local');
+    await expectQuickLocalResult(session.save());
+
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'base local',
+    );
+
+    remoteRefresh.resolve();
+
+    await repository.flushPending();
+    await repository.refresh();
+    await session.pull();
+
+    const mergedText = readNoteText(
+      (await repository.loadDocument(fileId)).update,
+    );
+    expect(mergedText).toContain('base');
+    expect(mergedText).toContain('remote');
+    expect(mergedText).toContain('local');
+    expect(readNoteText(session.encodeUpdate())).toBe(mergedText);
+
+    await session.close();
+  });
+
+  it('creates files without waiting for a blocked remote refresh', async () => {
+    const remote = new MemoryRemoteRepository();
+    const existingId = await remote.createFile(
+      'Existing remote',
+      'mcanvas',
+      null,
+    );
+    const initialNote = createNoteState('remote baseline');
+
+    await remote.pushUpdates(existingId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository(
+      'repositories/create-during-refresh-test',
+    );
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/create-during-refresh-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const remoteRefresh = createDeferred();
+    const reachedRemoteFileLoad = createDeferred();
+    remote.blockFileLoads(remoteRefresh.promise, reachedRemoteFileLoad.resolve);
+
+    const refreshPromise = repository.refresh();
+    await reachedRemoteFileLoad.promise;
+
+    const createdId = await expectQuickLocalResult(
+      repository.createFile('Fast local note', 'mcanvas', null),
+    );
+
+    expect((await repository.getNode(createdId))?.name).toBe('Fast local note');
+
+    remoteRefresh.resolve();
+    await refreshPromise;
+
+    expect((await repository.getNode(createdId))?.name).toBe('Fast local note');
+  });
+
+  it('keeps same-node note pushes queued when cache changes during remote flush', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const initialNote = createNoteState('base');
+
+    await remote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository(
+      'repositories/same-node-during-flush-test',
+    );
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/same-node-during-flush-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const firstSnapshot = await repository.loadDocument(fileId);
+    const firstDoc = new Y.Doc();
+    if (firstSnapshot.update) {
+      Y.applyUpdate(firstDoc, firstSnapshot.update);
+    }
+    firstDoc.getText('content').insert(4, ' one');
+
+    await repository.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(firstDoc, firstSnapshot.stateVector),
+      {
+        baseRevision: firstSnapshot.revision,
+        localStateVector: Y.encodeStateVector(firstDoc),
+      },
+    );
+
+    const remoteSave = createDeferred();
+    const reachedRemoteSave = createDeferred();
+    remote.blockFileSaves(remoteSave.promise, reachedRemoteSave.resolve);
+
+    const flushPromise = repository.flushPending();
+    await reachedRemoteSave.promise;
+
+    const secondSnapshot = await repository.loadDocument(fileId);
+    const secondDoc = new Y.Doc();
+    if (secondSnapshot.update) {
+      Y.applyUpdate(secondDoc, secondSnapshot.update);
+    }
+    secondDoc.getText('content').insert(8, ' two');
+
+    await repository.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(secondDoc, secondSnapshot.stateVector),
+      {
+        baseRevision: secondSnapshot.revision,
+        localStateVector: Y.encodeStateVector(secondDoc),
+      },
+    );
+
+    remoteSave.resolve();
+    await flushPromise;
+
+    expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
+      'base one',
+    );
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'base one two',
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+
+    await repository.flushPending();
+
+    expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
+      'base one two',
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('continues flushing unrelated tail ops appended during remote flush', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const initialNote = createNoteState('base');
+
+    await remote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/tail-during-flush-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/tail-during-flush-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const snapshot = await repository.loadDocument(fileId);
+    const doc = new Y.Doc();
+    if (snapshot.update) {
+      Y.applyUpdate(doc, snapshot.update);
+    }
+    doc.getText('content').insert(4, ' one');
+
+    await repository.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(doc, snapshot.stateVector),
+      {
+        baseRevision: snapshot.revision,
+        localStateVector: Y.encodeStateVector(doc),
+      },
+    );
+
+    const remoteSave = createDeferred();
+    const reachedRemoteSave = createDeferred();
+    remote.blockFileSaves(remoteSave.promise, reachedRemoteSave.resolve);
+
+    const flushPromise = repository.flushPending();
+    await reachedRemoteSave.promise;
+
+    const createdId = await repository.createFile('Tail note', 'mcanvas', null);
+
+    remoteSave.resolve();
+    await flushPromise;
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    expect(readNoteText(remoteSnapshot.notes[fileId] ?? null)).toBe('base one');
+    expect(remoteSnapshot.manifest.nodes[createdId]?.name).toBe('Tail note');
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect(
+      getRepositoryTestStorage().readText(
+        'repositories/tail-during-flush-test/outbox.json',
+      ),
+    ).toBe('[]');
   });
 
   it('writes pending note changes to the outbox on session close without flushing the remote', async () => {
@@ -558,9 +865,11 @@ describe('CachedRepository', () => {
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
 
     const storage = getRepositoryTestStorage();
-    expect(storage.readText('repositories/close-outbox-test/outbox.json')).toBe(
-      JSON.stringify([{ kind: 'push-note', nodeId: fileId }]),
-    );
+    expect(
+      JSON.parse(
+        storage.readText('repositories/close-outbox-test/outbox.json') ?? '[]',
+      ),
+    ).toEqual([expect.objectContaining({ kind: 'push-note', nodeId: fileId })]);
 
     expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
       'remote baseline',

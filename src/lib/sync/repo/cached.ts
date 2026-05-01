@@ -44,10 +44,24 @@ import type {
 } from './types';
 
 type PendingOp =
-  | { kind: 'upsert-manifest-node'; nodeId: string }
-  | { kind: 'delete-manifest-node'; nodeId: string; deletedFileIds: string[] }
-  | { kind: 'push-note'; nodeId: string; baseFileRevision?: string | null }
-  | { kind: 'sync-custom-colors' };
+  | {
+      kind: 'upsert-manifest-node';
+      nodeId: string;
+      queueRevision?: string;
+    }
+  | {
+      kind: 'delete-manifest-node';
+      nodeId: string;
+      deletedFileIds: string[];
+      queueRevision?: string;
+    }
+  | {
+      kind: 'push-note';
+      nodeId: string;
+      baseFileRevision?: string | null;
+      queueRevision?: string;
+    }
+  | { kind: 'sync-custom-colors'; queueRevision?: string };
 
 interface DeletedSubtree {
   nodeIds: string[];
@@ -205,6 +219,15 @@ function getConflictedFileName(name: string, timestamp: Date): string {
   return `${name.slice(0, dotIndex)}${suffix}${name.slice(dotIndex)}`;
 }
 
+function touchPendingOp(op: PendingOp): void {
+  op.queueRevision = createNodeId();
+}
+
+function withQueueRevision<T extends PendingOp>(op: T): T {
+  touchPendingOp(op);
+  return op;
+}
+
 function enqueueUpsertManifestNode(ops: PendingOp[], nodeId: string): void {
   const alreadyDeleted = ops.some(
     (op) => op.kind === 'delete-manifest-node' && op.nodeId === nodeId,
@@ -213,11 +236,15 @@ function enqueueUpsertManifestNode(ops: PendingOp[], nodeId: string): void {
     return;
   }
 
-  const filtered = ops.filter(
-    (op) => !(op.kind === 'upsert-manifest-node' && op.nodeId === nodeId),
+  const existing = ops.find(
+    (op) => op.kind === 'upsert-manifest-node' && op.nodeId === nodeId,
   );
-  filtered.push({ kind: 'upsert-manifest-node', nodeId });
-  ops.splice(0, ops.length, ...filtered);
+  if (existing) {
+    touchPendingOp(existing);
+    return;
+  }
+
+  ops.push(withQueueRevision({ kind: 'upsert-manifest-node', nodeId }));
 }
 
 function enqueuePushNote(
@@ -233,15 +260,21 @@ function enqueuePushNote(
     return;
   }
 
-  if (ops.some((op) => op.kind === 'push-note' && op.nodeId === nodeId)) {
+  const existing = ops.find(
+    (op) => op.kind === 'push-note' && op.nodeId === nodeId,
+  );
+  if (existing) {
+    touchPendingOp(existing);
     return;
   }
 
-  ops.push({
-    kind: 'push-note',
-    nodeId,
-    ...(baseFileRevision !== undefined ? { baseFileRevision } : {}),
-  });
+  ops.push(
+    withQueueRevision({
+      kind: 'push-note',
+      nodeId,
+      ...(baseFileRevision !== undefined ? { baseFileRevision } : {}),
+    }),
+  );
 }
 
 function enqueueDeleteManifestNode(
@@ -269,15 +302,24 @@ function enqueueDeleteManifestNode(
     }
   });
 
-  filtered.push({
-    kind: 'delete-manifest-node',
-    nodeId,
-    deletedFileIds: Array.from(
-      new Set([...(existingDelete?.deletedFileIds ?? []), ...deleted.fileIds]),
-    ),
-  });
+  filtered.push(
+    withQueueRevision({
+      kind: 'delete-manifest-node',
+      nodeId,
+      deletedFileIds: Array.from(
+        new Set([
+          ...(existingDelete?.deletedFileIds ?? []),
+          ...deleted.fileIds,
+        ]),
+      ),
+    }),
+  );
 
   ops.splice(0, ops.length, ...filtered);
+}
+
+function arePendingOpsEqual(left: PendingOp, right: PendingOp): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export class CachedRepository
@@ -328,14 +370,17 @@ export class CachedRepository
   }
 
   async initialize(): Promise<void> {
-    await withRepositoryOperationLock(this.outboxPath(), async () => {
+    await withRepositoryOperationLock(this.remoteSyncLockKey(), async () => {
       await this.initializeImpl();
     });
   }
 
   private async initializeImpl(): Promise<void> {
-    await this.cache.initialize();
-    await this.loadOutbox();
+    let cacheSnapshot = await this.withLocalStateLock(async () => {
+      await this.cache.initialize();
+      await this.loadOutbox();
+      return this.cache.exportSnapshot();
+    });
     logger.debug('Initialized cached repository cache state', {
       repositoryKind: this.kind,
       outboxPath: this.outboxPath(),
@@ -343,16 +388,21 @@ export class CachedRepository
     });
 
     try {
-      const cacheSnapshot = await this.cache.exportSnapshot();
       const remoteSnapshot = await this.remote.exportSnapshot();
 
-      if (this.pendingOps.length === 0) {
+      await this.withLocalStateLock(async () => {
+        await this.loadOutbox();
+        cacheSnapshot = await this.cache.exportSnapshot();
+        if (this.pendingOps.length !== 0) {
+          return;
+        }
+
         if (!isSnapshotEmpty(remoteSnapshot)) {
           await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
         } else if (!isSnapshotEmpty(cacheSnapshot)) {
           await this.queueFullCacheSync(cacheSnapshot);
         }
-      }
+      });
     } catch (error) {
       this.updateRuntimeStatus({
         online: false,
@@ -374,13 +424,13 @@ export class CachedRepository
   }
 
   async refresh(): Promise<void> {
-    await withRepositoryOperationLock(this.outboxPath(), async () => {
+    await withRepositoryOperationLock(this.remoteSyncLockKey(), async () => {
       await this.refreshImpl();
     });
   }
 
   async flushPending(): Promise<void> {
-    await withRepositoryOperationLock(this.outboxPath(), async () => {
+    await withRepositoryOperationLock(this.remoteSyncLockKey(), async () => {
       await this.flushPendingInternal();
     });
   }
@@ -460,11 +510,13 @@ export class CachedRepository
   }
 
   async createFolder(name: string, parentId: string | null): Promise<string> {
-    const nodeId = await this.cache.createFolder(name, parentId);
-    await this.mutatePendingOps((ops) => {
-      enqueueUpsertManifestNode(ops, nodeId);
+    return this.withLocalStateLock(async () => {
+      const nodeId = await this.cache.createFolder(name, parentId);
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+      }, true);
+      return nodeId;
     });
-    return nodeId;
   }
 
   async createFile(
@@ -473,12 +525,19 @@ export class CachedRepository
     parentId: string | null,
     bytes?: Uint8Array,
   ): Promise<string> {
-    const nodeId = await this.cache.createFile(name, fileType, parentId, bytes);
-    await this.mutatePendingOps((ops) => {
-      enqueueUpsertManifestNode(ops, nodeId);
-      enqueuePushNote(ops, nodeId, fileType === 'mcanvas' ? undefined : null);
+    return this.withLocalStateLock(async () => {
+      const nodeId = await this.cache.createFile(
+        name,
+        fileType,
+        parentId,
+        bytes,
+      );
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+        enqueuePushNote(ops, nodeId, fileType === 'mcanvas' ? undefined : null);
+      }, true);
+      return nodeId;
     });
-    return nodeId;
   }
 
   async readFileBytes(nodeId: string): Promise<Uint8Array | null> {
@@ -486,53 +545,67 @@ export class CachedRepository
   }
 
   async writeFileBytes(nodeId: string, bytes: Uint8Array): Promise<void> {
-    const baseFileRevision = await this.getRawFileBaseRevision(nodeId);
-    await this.cache.writeFileBytes(nodeId, bytes);
-    await this.mutatePendingOps((ops) => {
-      enqueuePushNote(ops, nodeId, baseFileRevision);
+    await this.withLocalStateLock(async () => {
+      const baseFileRevision = await this.getRawFileBaseRevision(nodeId);
+      await this.cache.writeFileBytes(nodeId, bytes);
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueuePushNote(ops, nodeId, baseFileRevision);
+      }, true);
     });
   }
 
   async renameNode(nodeId: string, newName: string): Promise<void> {
-    await this.cache.renameNode(nodeId, newName);
-    await this.mutatePendingOps((ops) => {
-      enqueueUpsertManifestNode(ops, nodeId);
+    await this.withLocalStateLock(async () => {
+      await this.cache.renameNode(nodeId, newName);
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+      }, true);
     });
   }
 
   async deleteNode(nodeId: string): Promise<void> {
-    const deleted = await this.collectDeletedSubtree(nodeId);
-    await this.cache.deleteNode(nodeId);
-    await this.mutatePendingOps((ops) => {
-      enqueueDeleteManifestNode(ops, nodeId, deleted);
+    await this.withLocalStateLock(async () => {
+      const deleted = await this.collectDeletedSubtree(nodeId);
+      await this.cache.deleteNode(nodeId);
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueueDeleteManifestNode(ops, nodeId, deleted);
+      }, true);
     });
   }
 
   async moveNode(nodeId: string, newParentId: string | null): Promise<void> {
-    await this.cache.moveNode(nodeId, newParentId);
-    await this.mutatePendingOps((ops) => {
-      enqueueUpsertManifestNode(ops, nodeId);
+    await this.withLocalStateLock(async () => {
+      await this.cache.moveNode(nodeId, newParentId);
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+      }, true);
     });
   }
 
   async setTags(nodeId: string, tags: string[]): Promise<void> {
-    await this.cache.setTags(nodeId, tags);
-    await this.mutatePendingOps((ops) => {
-      enqueueUpsertManifestNode(ops, nodeId);
+    await this.withLocalStateLock(async () => {
+      await this.cache.setTags(nodeId, tags);
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+      }, true);
     });
   }
 
   async addTag(nodeId: string, tag: string): Promise<void> {
-    await this.cache.addTag(nodeId, tag);
-    await this.mutatePendingOps((ops) => {
-      enqueueUpsertManifestNode(ops, nodeId);
+    await this.withLocalStateLock(async () => {
+      await this.cache.addTag(nodeId, tag);
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+      }, true);
     });
   }
 
   async removeTag(nodeId: string, tag: string): Promise<void> {
-    await this.cache.removeTag(nodeId, tag);
-    await this.mutatePendingOps((ops) => {
-      enqueueUpsertManifestNode(ops, nodeId);
+    await this.withLocalStateLock(async () => {
+      await this.cache.removeTag(nodeId, tag);
+      await this.mutatePendingOpsInternal((ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+      }, true);
     });
   }
 
@@ -545,23 +618,30 @@ export class CachedRepository
   }
 
   async addCustomColor(color: string): Promise<string[]> {
-    const result = await this.cache.addCustomColor(color);
-    await this.enqueueCustomColorsSync();
-    return result;
+    return this.withLocalStateLock(async () => {
+      const result = await this.cache.addCustomColor(color);
+      await this.enqueueCustomColorsSyncInternal();
+      return result;
+    });
   }
 
   async removeCustomColor(color: string): Promise<string[]> {
-    const result = await this.cache.removeCustomColor(color);
-    await this.enqueueCustomColorsSync();
-    return result;
+    return this.withLocalStateLock(async () => {
+      const result = await this.cache.removeCustomColor(color);
+      await this.enqueueCustomColorsSyncInternal();
+      return result;
+    });
   }
 
-  private async enqueueCustomColorsSync(): Promise<void> {
-    await this.mutatePendingOps((ops) => {
-      if (!ops.some((op) => op.kind === 'sync-custom-colors')) {
-        ops.push({ kind: 'sync-custom-colors' });
+  private async enqueueCustomColorsSyncInternal(): Promise<void> {
+    await this.mutatePendingOpsInternal((ops) => {
+      const existing = ops.find((op) => op.kind === 'sync-custom-colors');
+      if (existing) {
+        touchPendingOp(existing);
+      } else {
+        ops.push(withQueueRevision({ kind: 'sync-custom-colors' }));
       }
-    });
+    }, true);
   }
 
   private async getRawFileBaseRevision(
@@ -575,24 +655,32 @@ export class CachedRepository
   }
 
   async openSession(nodeId: string): Promise<NoteSession> {
-    logger.debug('Opening cached repository session', {
+    logger.debug('Opening cached repository local session', {
       repositoryKind: this.kind,
       nodeId,
       pendingOps: this.pendingOps.length,
     });
-    try {
-      await this.refresh();
-    } catch (error) {
-      logger.error('Failed to refresh before opening session', error, {
-        nodeId,
+    const session = await NoteSession.open(nodeId, this);
+    this.refreshOpenSessionInBackground(session);
+    return session;
+  }
+
+  private refreshOpenSessionInBackground(session: NoteSession): void {
+    void this.refreshOpenSession(session).catch((error) => {
+      logger.error('Failed to refresh open cached repository session', error, {
+        nodeId: session.id,
       });
-    }
-    logger.debug('Opening cached repository local session after refresh', {
+    });
+  }
+
+  private async refreshOpenSession(session: NoteSession): Promise<void> {
+    logger.debug('Refreshing open cached repository session in background', {
       repositoryKind: this.kind,
-      nodeId,
+      nodeId: session.id,
       pendingOps: this.pendingOps.length,
     });
-    return NoteSession.open(nodeId, this);
+    await this.refresh();
+    await session.pull();
   }
 
   async loadDocument(nodeId: string): Promise<YjsSyncSnapshot> {
@@ -611,19 +699,21 @@ export class CachedRepository
     update: Uint8Array,
     options: YjsSyncPushOptions,
   ): Promise<YjsSyncPushResult> {
-    const result = await this.cache.pushUpdates(nodeId, update, options);
-    if (result.accepted) {
-      await this.mutatePendingOps((ops) => {
-        enqueuePushNote(ops, nodeId);
-      });
-      logger.debug('Queued cached note push for remote sync', {
-        repositoryKind: this.kind,
-        nodeId,
-        updateByteLength: update.byteLength,
-        pendingOps: this.pendingOps.length,
-      });
-    }
-    return result;
+    return this.withLocalStateLock(async () => {
+      const result = await this.cache.pushUpdates(nodeId, update, options);
+      if (result.accepted) {
+        await this.mutatePendingOpsInternal((ops) => {
+          enqueuePushNote(ops, nodeId);
+        }, true);
+        logger.debug('Queued cached note push for remote sync', {
+          repositoryKind: this.kind,
+          nodeId,
+          updateByteLength: update.byteLength,
+          pendingOps: this.pendingOps.length,
+        });
+      }
+      return result;
+    });
   }
 
   private startBackgroundSync(): void {
@@ -639,35 +729,86 @@ export class CachedRepository
   }
 
   private async flushPendingImpl(): Promise<void> {
-    await this.loadOutbox();
+    let pendingOps = await this.withLocalStateLock(async () => {
+      await this.loadOutbox();
+      return this.pendingOps.length;
+    });
     logger.debug('Flushing cached repository pending ops', {
       repositoryKind: this.kind,
-      pendingOps: this.pendingOps.length,
+      pendingOps,
       outboxPath: this.outboxPath(),
     });
 
-    while (this.pendingOps.length > 0) {
-      const op = this.pendingOps[0];
+    while (true) {
+      const pending = await this.withLocalStateLock(async () => {
+        await this.loadOutbox();
+        const op = this.pendingOps[0];
+        if (!op) {
+          return null;
+        }
+        return {
+          op: structuredClone(op),
+          pendingOps: this.pendingOps.length,
+        };
+      });
+      if (!pending) {
+        break;
+      }
+
       logger.debug('Applying cached repository pending op', {
         repositoryKind: this.kind,
-        opKind: op.kind,
-        nodeId: 'nodeId' in op ? op.nodeId : null,
-        pendingOps: this.pendingOps.length,
+        opKind: pending.op.kind,
+        nodeId: 'nodeId' in pending.op ? pending.op.nodeId : null,
+        pendingOps: pending.pendingOps,
       });
-      await this.applyPendingOp(op);
-      this.pendingOps.shift();
-      await this.saveOutbox();
-      this.updateRuntimeStatus({
-        online: true,
-        pendingRemoteWrites: this.pendingOps.length,
-        lastRemoteSyncAt: Date.now(),
-        lastError: null,
+
+      await this.applyPendingOp(pending.op);
+
+      const removed = await this.withLocalStateLock(async () => {
+        await this.loadOutbox();
+        const currentOp = this.pendingOps[0];
+        if (!currentOp || !arePendingOpsEqual(currentOp, pending.op)) {
+          logger.debug(
+            'Leaving applied cached pending op queued because the head op changed during remote sync',
+            {
+              repositoryKind: this.kind,
+              opKind: pending.op.kind,
+              nodeId: 'nodeId' in pending.op ? pending.op.nodeId : null,
+              pendingOps: this.pendingOps.length,
+            },
+          );
+          this.updateRuntimeStatus({
+            online: true,
+            pendingRemoteWrites: this.pendingOps.length,
+            lastRemoteSyncAt: Date.now(),
+            lastError: null,
+          });
+          return false;
+        }
+
+        this.pendingOps.shift();
+        await this.saveOutbox();
+        this.updateRuntimeStatus({
+          online: true,
+          pendingRemoteWrites: this.pendingOps.length,
+          lastRemoteSyncAt: Date.now(),
+          lastError: null,
+        });
+        return true;
       });
+
+      if (!removed) {
+        break;
+      }
     }
 
+    pendingOps = await this.withLocalStateLock(async () => {
+      await this.loadOutbox();
+      return this.pendingOps.length;
+    });
     logger.debug('Flushed cached repository pending ops', {
       repositoryKind: this.kind,
-      pendingOps: this.pendingOps.length,
+      pendingOps,
     });
   }
 
@@ -691,7 +832,9 @@ export class CachedRepository
   private async applyCustomColorsSync(): Promise<void> {
     // Cache is the source of truth — overwriting remote is what lets deletes
     // propagate (a merge-only strategy could never remove).
-    const cacheColors = await this.cache.getCustomColors();
+    const cacheColors = await this.withLocalStateLock(() =>
+      this.cache.getCustomColors(),
+    );
     await this.remote.applyManifestMutation(
       'Sync custom colors',
       (remoteManifest) => {
@@ -701,7 +844,9 @@ export class CachedRepository
   }
 
   private async applyManifestUpsert(nodeId: string): Promise<void> {
-    const cacheSnapshot = await this.cache.exportSnapshot();
+    const cacheSnapshot = await this.withLocalStateLock(() =>
+      this.cache.exportSnapshot(),
+    );
     await this.remote.applyManifestMutation(
       `Sync manifest node ${nodeId}`,
       (remoteManifest) => {
@@ -741,8 +886,28 @@ export class CachedRepository
     op: Extract<PendingOp, { kind: 'push-note' }>,
   ): Promise<void> {
     const nodeId = op.nodeId;
-    const node = await this.cache.getNode(nodeId);
-    if (!node || node.type !== 'file') {
+    const localState = await this.withLocalStateLock(async () => {
+      const node = await this.cache.getNode(nodeId);
+      if (!node || node.type !== 'file') {
+        return { kind: 'missing' as const };
+      }
+
+      if (node.fileType !== 'mcanvas') {
+        return {
+          kind: 'raw-file' as const,
+          node,
+          bytes: await this.cache.readFileBytes(nodeId),
+        };
+      }
+
+      return {
+        kind: 'canvas-note' as const,
+        node,
+        snapshot: await this.cache.loadDocument(nodeId),
+      };
+    });
+
+    if (localState.kind === 'missing') {
       logger.debug('Skipped cached note push because file no longer exists', {
         repositoryKind: this.kind,
         nodeId,
@@ -750,8 +915,9 @@ export class CachedRepository
       return;
     }
 
+    const node = localState.node;
     if (node.fileType !== 'mcanvas') {
-      const bytes = await this.cache.readFileBytes(nodeId);
+      const bytes = localState.kind === 'raw-file' ? localState.bytes : null;
       if (op.baseFileRevision !== undefined) {
         const remoteBytes = await this.remote.readFileBytes(nodeId);
         const remoteRevision = await computeRevision(remoteBytes);
@@ -782,7 +948,11 @@ export class CachedRepository
       return;
     }
 
-    const localSnapshot = await this.cache.loadDocument(nodeId);
+    if (localState.kind !== 'canvas-note') {
+      return;
+    }
+
+    const localSnapshot = localState.snapshot;
     const update = localSnapshot.update ?? this.emptyDocUpdate;
     logger.debug('Applying cached note push to remote', {
       repositoryKind: this.kind,
@@ -869,40 +1039,45 @@ export class CachedRepository
       return;
     }
 
-    await this.cache.applyManifestMutation(
-      `Apply conflict copy for file ${localNode.id}`,
-      (manifest) => {
-        if (originalRemoteNode) {
+    await this.withLocalStateLock(async () => {
+      await this.cache.applyManifestMutation(
+        `Apply conflict copy for file ${localNode.id}`,
+        (manifest) => {
+          if (originalRemoteNode) {
+            const parentId = getExistingParentId(
+              manifest,
+              originalRemoteNode.parentId,
+            );
+            detachNodeFromAllContainers(manifest, originalRemoteNode.id);
+            manifest.nodes[originalRemoteNode.id] = {
+              ...originalRemoteNode,
+              parentId,
+            };
+            addChild(manifest, parentId, originalRemoteNode.id);
+          } else {
+            deleteNodeFromManifest(manifest, localNode.id);
+          }
+
           const parentId = getExistingParentId(
             manifest,
-            originalRemoteNode.parentId,
+            conflictNode!.parentId,
           );
-          detachNodeFromAllContainers(manifest, originalRemoteNode.id);
-          manifest.nodes[originalRemoteNode.id] = {
-            ...originalRemoteNode,
+          manifest.nodes[conflictId] = {
+            ...conflictNode!,
             parentId,
           };
-          addChild(manifest, parentId, originalRemoteNode.id);
-        } else {
-          deleteNodeFromManifest(manifest, localNode.id);
-        }
-
-        const parentId = getExistingParentId(manifest, conflictNode!.parentId);
-        manifest.nodes[conflictId] = {
-          ...conflictNode!,
-          parentId,
-        };
-        addChild(manifest, parentId, conflictId);
-      },
-    );
-
-    if (originalRemoteNode) {
-      await this.cache.writeFileBytes(
-        originalRemoteNode.id,
-        remoteBytes ?? new Uint8Array(),
+          addChild(manifest, parentId, conflictId);
+        },
       );
-    }
-    await this.cache.writeFileBytes(conflictId, localBytes);
+
+      if (originalRemoteNode) {
+        await this.cache.writeFileBytes(
+          originalRemoteNode.id,
+          remoteBytes ?? new Uint8Array(),
+        );
+      }
+      await this.cache.writeFileBytes(conflictId, localBytes);
+    });
   }
 
   private async collectDeletedSubtree(nodeId: string): Promise<DeletedSubtree> {
@@ -923,14 +1098,6 @@ export class CachedRepository
       nodeIds: [nodeId, ...childEntries.flatMap((entry) => entry.nodeIds)],
       fileIds: childEntries.flatMap((entry) => entry.fileIds),
     };
-  }
-
-  private async mutatePendingOps(
-    mutator: (ops: PendingOp[]) => void,
-  ): Promise<void> {
-    await withRepositoryOperationLock(this.outboxPath(), async () => {
-      await this.mutatePendingOpsInternal(mutator, true);
-    });
   }
 
   private async mutatePendingOpsInternal(
@@ -1020,32 +1187,67 @@ export class CachedRepository
     return this.outboxPathValue;
   }
 
+  private remoteSyncLockKey(): string {
+    return `${this.outboxPath()}::remote-sync`;
+  }
+
+  private async withLocalStateLock<T>(operation: () => Promise<T>): Promise<T> {
+    return withRepositoryOperationLock(this.outboxPath(), operation);
+  }
+
   private async syncCacheFromRemote(options?: {
     preserveLocalIfRemoteEmpty?: boolean;
   }): Promise<void> {
-    const cacheSnapshot = await this.cache.exportSnapshot();
     const remoteSnapshot = await this.remote.exportSnapshot();
-    logger.debug('Syncing cache from remote snapshot', {
-      repositoryKind: this.kind,
-      preserveLocalIfRemoteEmpty: options?.preserveLocalIfRemoteEmpty ?? false,
-      cacheNodeCount: Object.keys(cacheSnapshot.manifest.nodes).length,
-      cacheNoteCount: Object.keys(cacheSnapshot.notes).length,
-      remoteNodeCount: Object.keys(remoteSnapshot.manifest.nodes).length,
-      remoteNoteCount: Object.keys(remoteSnapshot.notes).length,
-    });
 
-    if (
-      options?.preserveLocalIfRemoteEmpty &&
-      isSnapshotEmpty(remoteSnapshot) &&
-      !isSnapshotEmpty(cacheSnapshot)
-    ) {
-      logger.debug('Preserved local cache because remote snapshot is empty', {
+    await this.withLocalStateLock(async () => {
+      await this.loadOutbox();
+      const cacheSnapshot = await this.cache.exportSnapshot();
+      logger.debug('Syncing cache from remote snapshot', {
         repositoryKind: this.kind,
+        preserveLocalIfRemoteEmpty:
+          options?.preserveLocalIfRemoteEmpty ?? false,
+        pendingOps: this.pendingOps.length,
+        cacheNodeCount: Object.keys(cacheSnapshot.manifest.nodes).length,
+        cacheNoteCount: Object.keys(cacheSnapshot.notes).length,
+        remoteNodeCount: Object.keys(remoteSnapshot.manifest.nodes).length,
+        remoteNoteCount: Object.keys(remoteSnapshot.notes).length,
       });
-      return;
-    }
 
-    await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
+      if (this.pendingOps.length !== 0) {
+        logger.debug(
+          'Skipped replacing cache from remote because local pending ops exist',
+          {
+            repositoryKind: this.kind,
+            pendingOps: this.pendingOps.length,
+          },
+        );
+        this.updateRuntimeStatus({
+          online: true,
+          lastRemoteSyncAt: Date.now(),
+          lastError: null,
+        });
+        return;
+      }
+
+      if (
+        options?.preserveLocalIfRemoteEmpty &&
+        isSnapshotEmpty(remoteSnapshot) &&
+        !isSnapshotEmpty(cacheSnapshot)
+      ) {
+        logger.debug('Preserved local cache because remote snapshot is empty', {
+          repositoryKind: this.kind,
+        });
+        this.updateRuntimeStatus({
+          online: true,
+          lastRemoteSyncAt: Date.now(),
+          lastError: null,
+        });
+        return;
+      }
+
+      await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
+    });
   }
 
   private async replaceCacheFromRemoteSnapshot(
