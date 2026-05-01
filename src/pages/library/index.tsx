@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -71,7 +72,7 @@ export function LibraryPage() {
   const [semanticTagsVersion, setSemanticTagsVersion] = useState(0);
   const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
-  const filterTagsArr = [...activeTags];
+  const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
   const [searchQuery, setSearchQuery] = useState('');
   const sortModes: SortMode[] = [
     'name-asc',
@@ -83,6 +84,7 @@ export function LibraryPage() {
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [isImportingObsidianVault, setIsImportingObsidianVault] =
     useState(false);
+  const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
     setSortMode(
       (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
@@ -97,18 +99,30 @@ export function LibraryPage() {
   };
 
   const loadRecentFiles = useCallback(async () => {
+    const requestId = recentFilesRequestRef.current + 1;
+    recentFilesRequestRef.current = requestId;
+
     try {
-      setRecentFiles(await repository.getRecentFiles(3));
+      const files = await repository.getRecentFiles(3);
+      if (requestId === recentFilesRequestRef.current) {
+        setRecentFiles(files);
+      }
     } catch (error) {
-      logger.error('Failed to load recent files', error);
+      if (requestId === recentFilesRequestRef.current) {
+        logger.error('Failed to load recent files', error);
+      }
     }
   }, [repository]);
 
-  const triggerRefresh = useCallback(() => {
+  const refreshLibraryData = useCallback(() => {
     setSemanticTagsVersion((version) => version + 1);
-    explorerRef.current?.reload();
     void loadRecentFiles();
   }, [loadRecentFiles]);
+
+  const triggerRefresh = useCallback(() => {
+    refreshLibraryData();
+    explorerRef.current?.reload();
+  }, [refreshLibraryData]);
 
   const handleImportStorageFiles = async (files: File[]) => {
     const supportedFiles = files.filter(
@@ -216,12 +230,25 @@ export function LibraryPage() {
       setBreadcrumbs([]);
       return;
     }
+    let cancelled = false;
     repository
       .getFolderChain(currentFolderId)
-      .then(setBreadcrumbs)
+      .then((nextBreadcrumbs) => {
+        if (!cancelled) {
+          setBreadcrumbs(nextBreadcrumbs);
+        }
+      })
       .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
         logger.error('Failed to load breadcrumbs', error, { currentFolderId });
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentFolderId, repository]);
 
   const clearDragTimer = () => {
@@ -506,9 +533,7 @@ export function LibraryPage() {
                 ref={explorerRef}
                 currentFolderId={currentFolderId}
                 onNavigate={setCurrentFolderId}
-                onTagsChanged={() =>
-                  setSemanticTagsVersion((version) => version + 1)
-                }
+                onChanged={refreshLibraryData}
                 sortMode={sortMode}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
@@ -520,11 +545,7 @@ export function LibraryPage() {
               <SemanticTags
                 key={semanticTagsVersion}
                 activeTags={activeTags}
-                onActiveTagsChanged={(tags) => {
-                  setActiveTags(tags);
-                  // Force explorer reload when tags change
-                  setTimeout(() => explorerRef.current?.reload(), 0);
-                }}
+                onActiveTagsChanged={setActiveTags}
               />
             </div>
           </section>

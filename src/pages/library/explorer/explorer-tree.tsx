@@ -3,6 +3,7 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useMessages } from '@/lib/i18n';
@@ -30,7 +31,7 @@ interface ExplorerTreeProps {
   ref?: React.Ref<ExplorerTreeHandle>;
   currentFolderId: string | null;
   onNavigate: (folderId: string) => void;
-  onTagsChanged?: () => void;
+  onChanged?: () => void;
   sortMode?: SortMode;
   viewMode?: ViewMode;
   searchQuery?: string;
@@ -41,7 +42,7 @@ export function ExplorerTree({
   currentFolderId,
   onNavigate,
   ref,
-  onTagsChanged,
+  onChanged,
   sortMode = 'name-asc',
   viewMode = 'tree',
   searchQuery,
@@ -52,33 +53,47 @@ export function ExplorerTree({
   const [nodes, setNodes] = useState<VFSNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [renamingNewId, setRenamingNewId] = useState<string | null>(null);
+  const loadRequestRef = useRef(0);
   const isFiltering = filterTags && filterTags.length > 0;
   const isSearching = !!searchQuery?.trim();
 
   const reload = useCallback(async () => {
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
     setLoading(true);
     try {
+      let nextNodes: VFSNode[];
       if (isSearching) {
-        let results = await repository.searchNodes(searchQuery!.trim());
+        nextNodes = await repository.searchNodes(searchQuery!.trim());
         if (isFiltering) {
           const tagSet = new Set(filterTags);
-          results = results.filter((n) => n.tags.some((t) => tagSet.has(t)));
+          nextNodes = nextNodes.filter((n) =>
+            n.tags.some((t) => tagSet.has(t)),
+          );
         }
-        setNodes(results);
       } else if (isFiltering) {
-        setNodes(await repository.getNodesByAnyTag(filterTags));
+        nextNodes = await repository.getNodesByAnyTag(filterTags);
       } else {
         const [dirs, files] = await repository.listDirectory(currentFolderId);
-        setNodes([...dirs, ...files]);
+        nextNodes = [...dirs, ...files];
+      }
+
+      if (requestId === loadRequestRef.current) {
+        setNodes(nextNodes);
       }
     } catch (err) {
-      logger.error('Failed to load explorer nodes', err, {
-        currentFolderId,
-        isFiltering,
-        isSearching,
-      });
+      if (requestId === loadRequestRef.current) {
+        logger.error('Failed to load explorer nodes', err, {
+          currentFolderId,
+          isFiltering,
+          isSearching,
+        });
+      }
+    } finally {
+      if (requestId === loadRequestRef.current) {
+        setLoading(false);
+      }
     }
-    setLoading(false);
   }, [
     currentFolderId,
     filterTags,
@@ -94,6 +109,7 @@ export function ExplorerTree({
       currentFolderId,
     );
     const id = await repository.createFolder(name, currentFolderId);
+    loadRequestRef.current++;
     setRenamingNewId(id);
     const now = Date.now();
     setNodes((prev) => [
@@ -109,13 +125,20 @@ export function ExplorerTree({
       },
       ...prev,
     ]);
+    onChanged?.();
     requestAnimationFrame(() => setRenamingNewId(null));
-  }, [currentFolderId, repository, strings.library.createNew.unnamedFolder]);
+  }, [
+    currentFolderId,
+    onChanged,
+    repository,
+    strings.library.createNew.unnamedFolder,
+  ]);
 
   const startNewFile = useCallback(
     async (title: string, type: FileType) => {
       const name = await repository.getUniqueFileName(title, currentFolderId);
       const id = await repository.createFile(name, type, currentFolderId);
+      loadRequestRef.current++;
       setRenamingNewId(id);
       const now = Date.now();
       setNodes((prev) => [
@@ -131,9 +154,10 @@ export function ExplorerTree({
           modifiedAt: now,
         },
       ]);
+      onChanged?.();
       requestAnimationFrame(() => setRenamingNewId(null));
     },
-    [currentFolderId, repository],
+    [currentFolderId, onChanged, repository],
   );
 
   useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [
@@ -148,8 +172,8 @@ export function ExplorerTree({
 
   const reloadAndNotify = useCallback(async () => {
     await reload();
-    onTagsChanged?.();
-  }, [reload, onTagsChanged]);
+    onChanged?.();
+  }, [reload, onChanged]);
 
   const sortedNodes = useMemo(() => {
     if (isSearching) {
