@@ -125,6 +125,7 @@ const zhHans: typeof en = {
       },
     },
     explorerTree: {
+      repositorySetupRequired: '请先在设置中完成仓库配置，才能查看文件',
       emptySearch: '未找到结果',
       emptyFilter: '没有项目匹配所选标签',
       emptyDefault: '还没有文件',

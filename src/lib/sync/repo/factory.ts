@@ -3,6 +3,11 @@ import type { ActiveRepository, RepositoryConfig } from './config';
 import { GitHubRepository } from './github';
 import { GoogleDriveRepository } from './google-drive';
 import { LocalRepository } from './local';
+import {
+  isRepositoryFullyConfigured,
+  RepositorySetupIncompleteError,
+} from './readiness';
+import type { FileType } from './types';
 
 function normalizeOutboxKeyPart(value: string): string {
   return value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_') || 'default';
@@ -18,14 +23,48 @@ function getGitHubStorageKey(
   ].join('__');
 }
 
+function guardNoteCreation(
+  repository: ActiveRepository,
+  config: RepositoryConfig,
+): ActiveRepository {
+  return new Proxy(repository, {
+    get(target, property, receiver) {
+      if (property === 'createFile') {
+        return async (
+          name: string,
+          fileType: FileType,
+          parentId: string | null,
+          bytes?: Uint8Array,
+        ) => {
+          if (
+            fileType === 'mcanvas' &&
+            !(await isRepositoryFullyConfigured(config))
+          ) {
+            throw new RepositorySetupIncompleteError();
+          }
+
+          return target.createFile(name, fileType, parentId, bytes);
+        };
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  }) as ActiveRepository;
+}
+
 export function createRepository(config: RepositoryConfig): ActiveRepository {
+  let repository: ActiveRepository;
+
   switch (config.kind) {
-    case 'local':
-      return new LocalRepository();
+    case 'local': {
+      repository = new LocalRepository();
+      break;
+    }
     case 'github': {
       const storageKey = getGitHubStorageKey(config);
       const cacheRoot = `repositories/github/${storageKey}`;
-      return new CachedRepository(
+      repository = new CachedRepository(
         new GitHubRepository({
           owner: config.owner,
           repo: config.repo,
@@ -35,17 +74,21 @@ export function createRepository(config: RepositoryConfig): ActiveRepository {
         new LocalRepository(cacheRoot),
         `${cacheRoot}/outbox.json`,
       );
+      break;
     }
     case 'googleDrive': {
       const storageKey = normalizeOutboxKeyPart(config.credentialId);
       const cacheRoot = `repositories/google-drive/${storageKey}`;
-      return new CachedRepository(
+      repository = new CachedRepository(
         new GoogleDriveRepository({
           credentialId: config.credentialId,
         }),
         new LocalRepository(cacheRoot),
         `${cacheRoot}/outbox.json`,
       );
+      break;
     }
   }
+
+  return guardNoteCreation(repository, config);
 }

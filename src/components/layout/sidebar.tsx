@@ -1,7 +1,9 @@
 import { BookOpen, HelpCircle, Plus, Settings } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Logo } from '@/components/logo';
 import { useMessages } from '@/lib/i18n';
+import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
@@ -57,6 +59,12 @@ function NavButton({
   );
 }
 
+const logger = new Logger('Sidebar');
+
+function errorDescription(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function Sidebar() {
   const strings = useMessages();
   const repository = useRepository();
@@ -91,12 +99,19 @@ export function Sidebar() {
   ];
 
   const handleNewCanvas = async () => {
-    const name = await repository.getUniqueFileName(
-      strings.library.createNew.untitledCanvas,
-      null,
-    );
-    const id = await repository.createFile(name, 'mcanvas', null);
-    navigate(`/mcanvas/${id}`);
+    try {
+      const name = await repository.getUniqueFileName(
+        strings.library.createNew.untitledCanvas,
+        null,
+      );
+      const id = await repository.createFile(name, 'mcanvas', null);
+      navigate(`/mcanvas/${id}`);
+    } catch (error) {
+      logger.error('Failed to create note from sidebar', error);
+      toast.error(strings.commandPalette.errors.createNote, {
+        description: errorDescription(error),
+      });
+    }
   };
 
   return (

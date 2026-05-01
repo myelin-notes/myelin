@@ -56,6 +56,10 @@ import { SemanticTags } from './semantic-tags';
 const logger = new Logger('LibraryPage');
 const LIBRARY_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
 
+function errorDescription(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function LibraryPage() {
   const strings = useMessages();
   const locale = useLocale();
@@ -509,9 +513,26 @@ export function LibraryPage() {
                   </button>
                   <CreateNewDropdown
                     onNewFolder={() => explorerRef.current?.startNewFolder()}
-                    onNewFile={(title, type) =>
-                      explorerRef.current?.startNewFile(title, type)
-                    }
+                    onNewFile={(title, type) => {
+                      void explorerRef.current
+                        ?.startNewFile(title, type)
+                        .catch((error) => {
+                          logger.error(
+                            'Failed to create explorer file',
+                            error,
+                            {
+                              currentFolderId,
+                              fileType: type,
+                            },
+                          );
+                          toast.error(
+                            strings.commandPalette.errors.createNote,
+                            {
+                              description: errorDescription(error),
+                            },
+                          );
+                        });
+                    }}
                     onImportFiles={() => importInputRef.current?.click()}
                     onImportObsidianVault={handleImportObsidianVault}
                     importDisabled={

@@ -126,6 +126,8 @@ const en = {
       },
     },
     explorerTree: {
+      repositorySetupRequired:
+        'Repository setup required. Finish setup in Settings to view files.',
       emptySearch: 'No results found',
       emptyFilter: 'No items match the selected tags',
       emptyDefault: 'No files yet',

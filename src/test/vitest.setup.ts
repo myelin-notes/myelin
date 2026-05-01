@@ -40,11 +40,13 @@ vi.mock('@/lib/thumbnails', () => ({
 }));
 
 vi.mock('@/lib/sync/repo/github-credentials', () => ({
-  getGitHubToken: async () => 'test-token',
+  getGitHubToken: vi.fn(async () => 'test-token'),
+  hasGitHubToken: vi.fn(async () => true),
 }));
 
 vi.mock('@/lib/sync/repo/google-drive-credentials', () => ({
-  getGoogleDriveAccessToken: async () => 'test-google-token',
+  getGoogleDriveAccessToken: vi.fn(async () => 'test-google-token'),
+  hasGoogleDriveCredentials: vi.fn(async () => true),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({

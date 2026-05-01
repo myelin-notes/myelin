@@ -60,6 +60,12 @@ export {
   waitForGoogleDriveDeviceAuth,
 } from './repo/google-drive-credentials';
 export {
+  isRepositoryConfigStructurallyComplete,
+  isRepositoryFullyConfigured,
+  REPOSITORY_SETUP_INCOMPLETE_MESSAGE,
+  RepositorySetupIncompleteError,
+} from './repo/readiness';
+export {
   getRepositoryConfig,
   setRepositoryConfig,
   subscribeRepositoryConfig,

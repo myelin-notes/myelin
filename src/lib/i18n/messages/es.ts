@@ -129,6 +129,8 @@ const es: typeof en = {
       },
     },
     explorerTree: {
+      repositorySetupRequired:
+        'Configura el repositorio en Ajustes para ver archivos.',
       emptySearch: 'No se encontraron resultados',
       emptyFilter: 'Ningún elemento coincide con las etiquetas',
       emptyDefault: 'Aún no hay archivos',

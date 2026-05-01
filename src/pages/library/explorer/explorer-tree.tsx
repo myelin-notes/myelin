@@ -8,7 +8,14 @@ import {
 } from 'react';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { type FileType, useRepository, type VFSNode } from '@/lib/sync';
+import {
+  type FileType,
+  isRepositoryConfigStructurallyComplete,
+  isRepositoryFullyConfigured,
+  useRepository,
+  useRepositoryStatus,
+  type VFSNode,
+} from '@/lib/sync';
 import { cn } from '@/lib/utils';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
@@ -17,6 +24,19 @@ import { GridFolderItem } from './grid-folder-item';
 import { useDropTarget } from './use-drop-target';
 
 const logger = new Logger('ExplorerTree');
+
+type RepositorySetupState = 'checking' | 'ready' | 'setup-required';
+
+function getInitialRepositorySetupState(
+  config: ReturnType<typeof useRepositoryStatus>['config'],
+): RepositorySetupState {
+  if (config.kind === 'local') {
+    return 'ready';
+  }
+  return isRepositoryConfigStructurallyComplete(config)
+    ? 'checking'
+    : 'setup-required';
+}
 
 export interface ExplorerTreeHandle {
   reload: () => Promise<void>;
@@ -50,16 +70,53 @@ export function ExplorerTree({
 }: ExplorerTreeProps) {
   const strings = useMessages();
   const repository = useRepository();
+  const repositoryStatus = useRepositoryStatus();
   const [nodes, setNodes] = useState<VFSNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [repositorySetupState, setRepositorySetupState] =
+    useState<RepositorySetupState>(() =>
+      getInitialRepositorySetupState(repositoryStatus.config),
+    );
   const [renamingNewId, setRenamingNewId] = useState<string | null>(null);
   const loadRequestRef = useRef(0);
   const isFiltering = filterTags && filterTags.length > 0;
   const isSearching = !!searchQuery?.trim();
 
+  useEffect(() => {
+    let cancelled = false;
+    const config = repositoryStatus.config;
+
+    if (config.kind === 'local') {
+      setRepositorySetupState('ready');
+      return;
+    }
+
+    if (!isRepositoryConfigStructurallyComplete(config)) {
+      setRepositorySetupState('setup-required');
+      return;
+    }
+
+    setRepositorySetupState('checking');
+    void isRepositoryFullyConfigured(config).then((configured) => {
+      if (!cancelled) {
+        setRepositorySetupState(configured ? 'ready' : 'setup-required');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repositoryStatus.config]);
+
   const reload = useCallback(async () => {
     const requestId = loadRequestRef.current + 1;
     loadRequestRef.current = requestId;
+    if (repositorySetupState !== 'ready') {
+      setNodes([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       let nextNodes: VFSNode[];
@@ -100,6 +157,7 @@ export function ExplorerTree({
     isFiltering,
     isSearching,
     repository,
+    repositorySetupState,
     searchQuery,
   ]);
 
@@ -204,7 +262,7 @@ export function ExplorerTree({
     onMoved: reloadAndNotify,
   });
 
-  if (loading) {
+  if (loading || repositorySetupState === 'checking') {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-border-subtle border-t-text-secondary" />
@@ -219,10 +277,17 @@ export function ExplorerTree({
 
   return (
     <div
-      {...(isFiltering || isSearching ? {} : dropTargetProps)}
+      {...(isFiltering || isSearching || repositorySetupState !== 'ready'
+        ? {}
+        : dropTargetProps)}
       className={cn(
         containerClass,
-        dragOver && !isFiltering && !isSearching ? 'bg-accent/10' : '',
+        dragOver &&
+          !isFiltering &&
+          !isSearching &&
+          repositorySetupState === 'ready'
+          ? 'bg-accent/10'
+          : '',
       )}
     >
       {sortedNodes.map((node) => {
@@ -272,11 +337,13 @@ export function ExplorerTree({
             viewMode === 'grid' ? 'col-span-full' : '',
           )}
         >
-          {isSearching
-            ? strings.library.explorerTree.emptySearch
-            : isFiltering
-              ? strings.library.explorerTree.emptyFilter
-              : strings.library.explorerTree.emptyDefault}
+          {repositorySetupState === 'setup-required'
+            ? strings.library.explorerTree.repositorySetupRequired
+            : isSearching
+              ? strings.library.explorerTree.emptySearch
+              : isFiltering
+                ? strings.library.explorerTree.emptyFilter
+                : strings.library.explorerTree.emptyDefault}
         </span>
       )}
     </div>
