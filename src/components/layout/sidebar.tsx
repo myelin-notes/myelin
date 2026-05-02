@@ -31,7 +31,7 @@ function NavButton({
       aria-current={isActive ? 'page' : undefined}
       title={item.label}
       className={cn(
-        'group flex cursor-pointer items-center justify-center gap-3 border-l-2 px-2 py-2 text-left transition-all duration-150 active:translate-x-px active:opacity-70 md:justify-start md:pl-2.5',
+        'group flex cursor-pointer items-center justify-center gap-3 border-l-2 px-2 py-2 text-left transition-colors duration-150 active:translate-x-px active:opacity-70 md:justify-start md:pl-2.5',
         isActive ? 'border-accent-navy' : 'border-transparent',
       )}
     >
@@ -139,9 +139,9 @@ export function Sidebar() {
         onClick={handleNewCanvas}
         aria-label={strings.sidebar.newCanvas}
         title={strings.sidebar.newCanvas}
-        className="group flex cursor-pointer items-center justify-center gap-2 rounded-md bg-gradient-to-b from-primary-container to-accent-dark px-2 py-2.5 transition-all duration-150 hover:brightness-125 md:px-4"
+        className="group flex cursor-pointer items-center justify-center gap-2 rounded-md bg-gradient-to-b from-primary-container to-accent-dark px-2 py-2.5 transition-shadow duration-150 hover:shadow-ambient md:px-4"
       >
-        <Plus className="size-3.5 text-text-on-dark transition-transform duration-150 group-hover:rotate-90" />
+        <Plus className="size-3.5 text-text-on-dark" />
         <span className="hidden font-medium text-text-on-dark text-xs uppercase tracking-[0.6px] md:inline">
           {strings.sidebar.newCanvas}
         </span>

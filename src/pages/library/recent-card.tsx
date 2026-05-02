@@ -29,8 +29,7 @@ export function RecentCard({
 
   const fadeMask = 'linear-gradient(to bottom, black 72%, transparent 100%)';
   const placeholderStyle = {
-    backgroundImage:
-      'linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 48%), radial-gradient(circle, rgba(28, 39, 56, 0.12) 1px, transparent 1px)',
+    backgroundImage: 'var(--gradient-thumb-placeholder)',
     backgroundPosition: '0 0, 0 0',
     backgroundSize: '100% 100%, 14px 14px',
   };

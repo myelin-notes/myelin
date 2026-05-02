@@ -22,13 +22,14 @@ export function KindCard({
       className={cn(
         'group relative flex w-full cursor-pointer items-center gap-4 px-4 py-3.5 text-left transition-colors',
         selected
-          ? 'bg-white'
+          ? 'bg-transparent'
           : 'bg-transparent hover:bg-hover-tint focus-visible:bg-hover-tint',
       )}
     >
       {selected && (
         <motion.span
           layoutId="repo-kind-rail"
+          aria-hidden="true"
           className="absolute inset-y-2 left-0 w-[2px] rounded-r-full bg-accent-navy"
           transition={{ type: 'spring', stiffness: 420, damping: 36 }}
         />
@@ -37,7 +38,7 @@ export function KindCard({
         className={cn(
           'flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors',
           selected
-            ? 'bg-accent-navy/8 text-accent-navy'
+            ? 'bg-accent-navy/12 text-accent-navy'
             : 'bg-hover-tint text-text-secondary group-hover:text-text-primary',
         )}
       >

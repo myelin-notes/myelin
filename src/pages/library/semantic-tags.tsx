@@ -109,7 +109,9 @@ export function SemanticTags({
           return (
             <button
               key={tag}
+              type="button"
               onClick={() => toggleTag(tag)}
+              aria-pressed={isActive}
               className={cn(
                 'cursor-pointer rounded-xl px-3 py-1.5 font-medium text-xs transition-all',
                 isActive
@@ -133,36 +135,28 @@ export function SemanticTags({
       </div>
 
       {/* Insights */}
-      <div className="flex flex-col gap-4 rounded-lg bg-page p-4">
-        <h4 className="font-bold text-[10px] text-text-secondary uppercase tracking-[1px]">
+      <div className="flex flex-col gap-3 rounded-lg bg-page p-4">
+        <h4 className="font-heading font-normal text-sm text-text-secondary italic">
           {strings.library.semanticTags.insights}
         </h4>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <span className="font-normal text-sm text-text-secondary">
-              {strings.library.semanticTags.stats.totalFiles}
-            </span>
-            <span className="font-medium text-sm text-text-primary tabular-nums">
-              {formatNumber(stats.totalFiles, locale)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="font-normal text-sm text-text-secondary">
-              {strings.library.semanticTags.stats.folders}
-            </span>
-            <span className="font-medium text-sm text-text-primary tabular-nums">
-              {formatNumber(stats.totalFolders, locale)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="font-normal text-sm text-text-secondary">
-              {strings.library.semanticTags.stats.uniqueTags}
-            </span>
-            <span className="font-medium text-sm text-text-primary tabular-nums">
-              {formatNumber(stats.totalTags, locale)}
-            </span>
-          </div>
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
+          {(
+            [
+              [stats.totalFiles, strings.library.semanticTags.stats.totalFiles],
+              [stats.totalFolders, strings.library.semanticTags.stats.folders],
+              [stats.totalTags, strings.library.semanticTags.stats.uniqueTags],
+            ] as const
+          ).map(([value, label]) => (
+            <div key={label} className="flex items-baseline gap-1.5">
+              <span className="font-heading font-normal text-lg text-text-primary tabular-nums leading-none">
+                {formatNumber(value, locale)}
+              </span>
+              <span className="font-normal text-text-muted text-xs">
+                {label}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

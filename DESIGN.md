@@ -18,6 +18,13 @@ Structure must be defined solely through:
 2. **Negative Space:** Use the Spacing Scale (specifically `8` and `12`) to create clear cognitive boundaries.
 3. **Soft Tonal Transitions:** Subtle shifts in grey tones provide all the "structure" a sophisticated user needs.
 
+**Permitted exception — interactive state marks.** A thin (≤2px) colored rule is allowed *only* as an active-state indicator on a single interactive element (nav item, list row, tab). Use `accent-navy` or `primary`. Constraints:
+- It must signal **state**, not chrome — the element must already be a button/link/tab.
+- It must be the *only* indicator carrying weight (i.e. paired with text-color and weight shifts, never with a background fill or pill — that combination becomes a chunky SaaS pattern).
+- It must not appear on cards, panels, sections, list groups, or any non-interactive container. Those still follow the strict mandate above.
+
+This carve-out is deliberate: a quiet 2px stripe on a sidebar nav item is the editorial equivalent of a magazine-style ToC marker, not the "side-stripe alert card" anti-pattern.
+
 ### Surface Hierarchy & Nesting
 Treat the UI as a series of stacked sheets of fine paper.
 - **Base Level:** `surface` (#f7f9fb) for the Infinite Canvas.

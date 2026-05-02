@@ -65,7 +65,7 @@ export function FolderItem({
             />
           }
         >
-          <Folder className="size-4 shrink-0 fill-amber-400 text-amber-400 transition-all duration-200 group-hover:fill-amber-500 group-hover:text-amber-500" />
+          <Folder className="size-4 shrink-0 fill-accent-amber text-accent-amber transition-all duration-200 group-hover:fill-accent-amber-strong group-hover:text-accent-amber-strong" />
           {renaming ? (
             <input
               {...renameInputProps}

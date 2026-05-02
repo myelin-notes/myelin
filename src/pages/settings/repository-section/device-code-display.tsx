@@ -29,7 +29,7 @@ export function DeviceCodeDisplay({
       transition={{ duration: 0.15, ease: 'easeInOut' }}
       className="overflow-hidden"
     >
-      <div className="flex items-center justify-between rounded-xl bg-white px-5 py-4 shadow-ambient ring-1 ring-border-subtle">
+      <div className="flex items-center justify-between rounded-xl bg-card px-5 py-4 shadow-ambient ring-1 ring-border-subtle">
         <div>
           <p className="text-[10px] text-text-muted uppercase tracking-widest">
             {strings.settings.repository.auth.deviceCode}

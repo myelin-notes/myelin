@@ -7,7 +7,7 @@ import {
   LogOut,
   X,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence } from 'motion/react';
 import { TimeAgo } from '@/components/time-ago';
 import { Button } from '@/components/ui/button';
 import { type Messages, useLocale, useMessages } from '@/lib/i18n';
@@ -19,6 +19,7 @@ import {
   subscribeRepositoryConfig,
   useRepositoryStatus,
 } from '@/lib/sync';
+import { cn } from '@/lib/utils';
 import { AuthStatusBadge } from './auth-status-badge';
 import { BranchField } from './branch-field';
 import { DeviceCodeDisplay } from './device-code-display';
@@ -142,7 +143,7 @@ export function RepositorySection() {
   } = computeSyncStatus(strings, remoteConfigReady, repositoryStatus);
 
   return (
-    <section>
+    <div>
       <div className="mb-6 flex items-baseline justify-between">
         <h3 className="font-heading text-xl">
           {strings.settings.repository.title}
@@ -178,244 +179,239 @@ export function RepositorySection() {
         />
       </div>
 
-      <AnimatePresence initial={false}>
-        {config.kind !== 'local' && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="overflow-hidden"
-          >
-            <div className="mt-5 space-y-4">
-              {!remoteAuth.tokenPresent ? (
-                <>
-                  <div className="flex flex-col gap-3 rounded-xl bg-input px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
-                      <RemoteAuthIcon className="size-5 shrink-0 text-text-secondary" />
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm text-text-primary">
-                          {strings.settings.repository.auth.title}
-                        </p>
-                        <p className="mt-0.5 text-text-muted text-xs">
-                          {authDescription}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
-                      {remoteAuth.polling ? (
-                        <>
-                          <AuthStatusBadge
-                            hasToken={false}
-                            checking={false}
-                            polling
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void remoteAuth.cancelAuth()}
-                            className="text-text-muted"
-                          >
-                            <X className="size-3.5" />
-                            {strings.common.cancel}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          onClick={() => void remoteAuth.signIn()}
-                          disabled={!remoteAuth.authAvailable}
-                        >
-                          <ExternalLink className="size-3.5" />
-                          {strings.settings.repository.auth.buttons.signIn}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  <AnimatePresence>
-                    {remoteAuth.userCode && (
-                      <DeviceCodeDisplay
-                        userCode={remoteAuth.userCode}
-                        onCopy={() => {}}
-                      />
-                    )}
-                  </AnimatePresence>
-
-                  {remoteAuth.authError && (
-                    <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
-                      {remoteAuth.authError}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-3 rounded-xl bg-input px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
-                      <RemoteAuthIcon className="size-5 shrink-0 text-text-secondary" />
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm text-text-primary">
-                          {strings.settings.repository.auth.title}
-                        </p>
-                        <p className="mt-0.5 text-text-muted text-xs">
-                          {authDescription}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
-                      <AuthStatusBadge
-                        hasToken={remoteAuth.tokenPresent}
-                        checking={remoteAuth.checkingToken}
-                        polling={remoteAuth.polling}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void remoteAuth.signOut()}
-                        className="text-text-muted hover:text-destructive"
-                      >
-                        <LogOut className="size-3.5" />
-                        {strings.settings.repository.auth.buttons.signOut}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {remoteAuth.authError && (
-                    <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
-                      {remoteAuth.authError}
-                    </p>
-                  )}
-
-                  {config.kind === 'github' && (
-                    <>
-                      <div>
-                        <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
-                          {strings.settings.repository.sync.remoteRepository}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-0.5 rounded-xl bg-input p-1 sm:flex-nowrap">
-                          <OwnerField
-                            disabled={!githubAuth.tokenPresent}
-                            loading={selectors.ownersLoading}
-                            user={selectors.user}
-                            orgs={selectors.orgs}
-                            value={config.owner}
-                            onChange={handleOwnerChange}
-                            className="min-w-0 flex-1"
-                          />
-                          <PathDivider>/</PathDivider>
-                          <RepoField
-                            disabled={
-                              !githubAuth.tokenPresent || !config.owner.trim()
-                            }
-                            loading={selectors.reposLoading}
-                            repos={selectors.repos}
-                            value={config.repo}
-                            onChange={handleRepoChange}
-                            className="min-w-0 flex-1"
-                          />
-                          <PathDivider>@</PathDivider>
-                          <BranchField
-                            disabled={
-                              !githubAuth.tokenPresent || !config.repo.trim()
-                            }
-                            loading={selectors.branchesLoading}
-                            branches={selectors.branches}
-                            value={config.branch ?? ''}
-                            onChange={handleBranchChange}
-                            className="min-w-0 flex-1"
-                          />
-                        </div>
-                      </div>
-
-                      {(selectors.ownersError ||
-                        selectors.reposError ||
-                        selectors.branchesError) && (
-                        <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
-                          {selectors.ownersError ??
-                            selectors.reposError ??
-                            selectors.branchesError}
-                        </p>
-                      )}
-                    </>
-                  )}
-
-                  <div className="rounded-xl bg-input px-5 py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-medium text-sm text-text-primary">
-                          {strings.settings.repository.sync.title}
-                        </p>
-                        <p className="mt-0.5 text-text-muted text-xs">
-                          {syncDescription}
-                        </p>
-                      </div>
-                      <SyncStatusBadge
-                        label={syncBadgeLabel}
-                        tone={syncBadgeTone}
-                      />
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-white/70 px-4 py-3 ring-1 ring-border-subtle sm:grid-cols-2 sm:gap-4">
-                      <div>
-                        <p className="text-[10px] text-text-muted uppercase tracking-widest">
-                          {strings.settings.repository.sync.queuedChanges}
-                        </p>
-                        <p className="mt-1 font-medium text-sm text-text-primary">
-                          {remoteConfigReady
-                            ? formatNumber(
-                                repositoryStatus.pendingRemoteWrites,
-                                locale,
-                              )
-                            : '—'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-text-muted uppercase tracking-widest">
-                          {strings.settings.repository.sync.lastSync}
-                        </p>
-                        <p className="mt-1 font-medium text-sm text-text-primary">
-                          {remoteConfigReady ? (
-                            repositoryStatus.lastRemoteSyncAt ? (
-                              <TimeAgo
-                                date={repositoryStatus.lastRemoteSyncAt}
-                              />
-                            ) : (
-                              strings.common.never
-                            )
-                          ) : (
-                            '—'
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    {remoteConfigReady && repositoryStatus.lastError && (
-                      <p className="mt-3 rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
-                        {repositoryStatus.lastError.message}
+      <div
+        className={cn(
+          'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+          config.kind !== 'local' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+        )}
+      >
+        <div className="min-h-0">
+          <div className="mt-5 space-y-4">
+            {!remoteAuth.tokenPresent ? (
+              <>
+                <div className="flex flex-col gap-3 rounded-xl bg-input px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <RemoteAuthIcon className="size-5 shrink-0 text-text-secondary" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-text-primary">
+                        {strings.settings.repository.auth.title}
                       </p>
+                      <p className="mt-0.5 text-text-muted text-xs">
+                        {authDescription}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+                    {remoteAuth.polling ? (
+                      <>
+                        <AuthStatusBadge
+                          hasToken={false}
+                          checking={false}
+                          polling
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void remoteAuth.cancelAuth()}
+                          className="text-text-muted"
+                        >
+                          <X className="size-3.5" />
+                          {strings.common.cancel}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        onClick={() => void remoteAuth.signIn()}
+                        disabled={!remoteAuth.authAvailable}
+                      >
+                        <ExternalLink className="size-3.5" />
+                        {strings.settings.repository.auth.buttons.signIn}
+                      </Button>
                     )}
                   </div>
+                </div>
 
-                  {config.kind === 'googleDrive' && (
+                <AnimatePresence>
+                  {remoteAuth.userCode && (
+                    <DeviceCodeDisplay
+                      userCode={remoteAuth.userCode}
+                      onCopy={() => {}}
+                    />
+                  )}
+                </AnimatePresence>
+
+                {remoteAuth.authError && (
+                  <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                    {remoteAuth.authError}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-3 rounded-xl bg-input px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <RemoteAuthIcon className="size-5 shrink-0 text-text-secondary" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-text-primary">
+                        {strings.settings.repository.auth.title}
+                      </p>
+                      <p className="mt-0.5 text-text-muted text-xs">
+                        {authDescription}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+                    <AuthStatusBadge
+                      hasToken={remoteAuth.tokenPresent}
+                      checking={remoteAuth.checkingToken}
+                      polling={remoteAuth.polling}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void remoteAuth.signOut()}
+                      className="text-text-muted hover:text-destructive"
+                    >
+                      <LogOut className="size-3.5" />
+                      {strings.settings.repository.auth.buttons.signOut}
+                    </Button>
+                  </div>
+                </div>
+
+                {remoteAuth.authError && (
+                  <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                    {remoteAuth.authError}
+                  </p>
+                )}
+
+                {config.kind === 'github' && (
+                  <>
                     <div>
                       <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
                         {strings.settings.repository.sync.remoteRepository}
                       </p>
-                      <div className="flex items-center gap-3 rounded-xl bg-input px-4 py-3">
-                        <Cloud className="size-4 shrink-0 text-text-muted" />
-                        <span className="font-medium text-sm text-text-primary">
-                          {strings.settings.repository.kinds.googleDrive.label}{' '}
-                          / {strings.app.name}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-0.5 rounded-xl bg-input p-1 sm:flex-nowrap">
+                        <OwnerField
+                          disabled={!githubAuth.tokenPresent}
+                          loading={selectors.ownersLoading}
+                          user={selectors.user}
+                          orgs={selectors.orgs}
+                          value={config.owner}
+                          onChange={handleOwnerChange}
+                          className="min-w-0 flex-1"
+                        />
+                        <PathDivider>/</PathDivider>
+                        <RepoField
+                          disabled={
+                            !githubAuth.tokenPresent || !config.owner.trim()
+                          }
+                          loading={selectors.reposLoading}
+                          repos={selectors.repos}
+                          value={config.repo}
+                          onChange={handleRepoChange}
+                          className="min-w-0 flex-1"
+                        />
+                        <PathDivider>@</PathDivider>
+                        <BranchField
+                          disabled={
+                            !githubAuth.tokenPresent || !config.repo.trim()
+                          }
+                          loading={selectors.branchesLoading}
+                          branches={selectors.branches}
+                          value={config.branch ?? ''}
+                          onChange={handleBranchChange}
+                          className="min-w-0 flex-1"
+                        />
                       </div>
                     </div>
+
+                    {(selectors.ownersError ||
+                      selectors.reposError ||
+                      selectors.branchesError) && (
+                      <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                        {selectors.ownersError ??
+                          selectors.reposError ??
+                          selectors.branchesError}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                <div className="rounded-xl bg-input px-5 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-sm text-text-primary">
+                        {strings.settings.repository.sync.title}
+                      </p>
+                      <p className="mt-0.5 text-text-muted text-xs">
+                        {syncDescription}
+                      </p>
+                    </div>
+                    <SyncStatusBadge
+                      label={syncBadgeLabel}
+                      tone={syncBadgeTone}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-card/70 px-4 py-3 ring-1 ring-border-ghost sm:grid-cols-2 sm:gap-4">
+                    <div>
+                      <p className="text-[10px] text-text-muted uppercase tracking-widest">
+                        {strings.settings.repository.sync.queuedChanges}
+                      </p>
+                      <p className="mt-1 font-medium text-sm text-text-primary">
+                        {remoteConfigReady
+                          ? formatNumber(
+                              repositoryStatus.pendingRemoteWrites,
+                              locale,
+                            )
+                          : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-text-muted uppercase tracking-widest">
+                        {strings.settings.repository.sync.lastSync}
+                      </p>
+                      <p className="mt-1 font-medium text-sm text-text-primary">
+                        {remoteConfigReady ? (
+                          repositoryStatus.lastRemoteSyncAt ? (
+                            <TimeAgo date={repositoryStatus.lastRemoteSyncAt} />
+                          ) : (
+                            strings.common.never
+                          )
+                        ) : (
+                          '—'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {remoteConfigReady && repositoryStatus.lastError && (
+                    <p className="mt-3 rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                      {repositoryStatus.lastError.message}
+                    </p>
                   )}
-                </>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </section>
+                </div>
+
+                {config.kind === 'googleDrive' && (
+                  <div>
+                    <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
+                      {strings.settings.repository.sync.remoteRepository}
+                    </p>
+                    <div className="flex items-center gap-3 rounded-xl bg-input px-4 py-3">
+                      <Cloud className="size-4 shrink-0 text-text-muted" />
+                      <span className="font-medium text-sm text-text-primary">
+                        {strings.settings.repository.kinds.googleDrive.label} /{' '}
+                        {strings.app.name}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

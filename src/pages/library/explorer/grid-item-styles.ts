@@ -1,5 +1,5 @@
 export const explorerGridCardClass =
-  'group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-[1.1rem] bg-card/75 text-left transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient';
+  'group relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl bg-card/75 text-left transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient';
 
 export const explorerGridCardDragOverClass =
   'bg-card ring-2 ring-accent/35 shadow-ambient';
@@ -31,8 +31,7 @@ export const explorerGridFadeMask = {
 };
 
 export const explorerGridPlaceholderStyle = {
-  backgroundImage:
-    'linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 48%), radial-gradient(circle, rgba(28, 39, 56, 0.12) 1px, transparent 1px)',
+  backgroundImage: 'var(--gradient-thumb-placeholder)',
   backgroundPosition: '0 0, 0 0',
   backgroundSize: '100% 100%, 14px 14px',
 };
