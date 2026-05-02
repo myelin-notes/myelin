@@ -214,7 +214,7 @@ export function KeybindsSection() {
   };
 
   return (
-    <>
+    <section id="keybinds" className="scroll-mt-12">
       <div className="mb-6 flex items-baseline justify-between">
         <h3 className="font-heading text-xl">
           {strings.settings.keybinds.title}
@@ -258,6 +258,6 @@ export function KeybindsSection() {
           </p>
         )}
       </div>
-    </>
+    </section>
   );
 }

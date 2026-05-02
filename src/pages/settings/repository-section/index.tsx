@@ -142,7 +142,7 @@ export function RepositorySection() {
   } = computeSyncStatus(strings, remoteConfigReady, repositoryStatus);
 
   return (
-    <section>
+    <div>
       <div className="mb-6 flex items-baseline justify-between">
         <h3 className="font-heading text-xl">
           {strings.settings.repository.title}
@@ -414,7 +414,7 @@ export function RepositorySection() {
           </motion.div>
         )}
       </AnimatePresence>
-    </section>
+    </div>
   );
 }
 
