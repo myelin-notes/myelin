@@ -160,6 +160,10 @@
   --color-text-green: var(--text-green);
   --color-text-tag: var(--text-tag);
   --color-text-brand: var(--text-brand);
+  --color-text-success: var(--text-success);
+  --color-text-error: var(--text-error);
+  --color-bg-success-soft: var(--bg-success-soft);
+  --color-bg-error-soft: var(--bg-error-soft);
 
   --color-accent-dark: var(--accent-dark);
   --color-accent-navy: var(--accent-navy);
@@ -225,6 +229,10 @@
   --accent-dark: #1c2738;
   --accent-navy: #2f3e46;
   --text-link: #2563eb;
+  --text-success: #1f5b3f;
+  --bg-success-soft: #e3f3e8;
+  --text-error: #8a2a2a;
+  --bg-error-soft: #f7e6e4;
 
   --bg-hover-tint: rgba(25, 28, 30, 0.05);
   --bg-secondary-container: #dce4ed;
@@ -801,7 +809,6 @@ input[type="range"].tool-slider::-moz-range-track {
   overflow: clip;
   border-radius: var(--radius-lg);
   background: rgba(230, 234, 240, 0.52);
-  border-left: 2.5px solid color-mix(in srgb, var(--accent-navy) 18%, transparent);
 }
 
 .pm-editor .ProseMirror .pm-monaco-code-block__external-selection {

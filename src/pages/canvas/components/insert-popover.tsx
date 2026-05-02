@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   FilePlus2 as FilePlusIcon,
   ImagePlus as ImagePlusIcon,
@@ -95,6 +95,59 @@ export function InsertPopover({
     },
   ];
 
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const firstEnabledIndex = items.findIndex((item) => !item.disabled);
+  const [focusedIndex, setFocusedIndex] = useState(
+    firstEnabledIndex === -1 ? 0 : firstEnabledIndex,
+  );
+
+  useEffect(() => {
+    itemRefs.current[focusedIndex]?.focus();
+  }, [focusedIndex]);
+
+  const findNextEnabled = (start: number, delta: number) => {
+    if (items.length === 0) {
+      return start;
+    }
+    let i = start;
+    for (let step = 0; step < items.length; step++) {
+      i = (i + delta + items.length) % items.length;
+      if (!items[i].disabled) {
+        return i;
+      }
+    }
+    return start;
+  };
+
+  const onPanelKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        setFocusedIndex((prev) => findNextEnabled(prev, 1));
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        setFocusedIndex((prev) => findNextEnabled(prev, -1));
+        break;
+      case 'Home':
+        event.preventDefault();
+        setFocusedIndex(findNextEnabled(items.length - 1, 1));
+        break;
+      case 'End':
+        event.preventDefault();
+        setFocusedIndex(findNextEnabled(0, -1));
+        break;
+      case 'Tab':
+        event.preventDefault();
+        setFocusedIndex((prev) =>
+          findNextEnabled(prev, event.shiftKey ? -1 : 1),
+        );
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <motion.div
       ref={panelRef}
@@ -103,6 +156,8 @@ export function InsertPopover({
       exit={{ opacity: 0, x: -8, scale: 0.98 }}
       transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
       className="ml-2 w-[260px] overflow-hidden rounded-2xl bg-white/85 shadow-ambient backdrop-blur-[24px]"
+      role="menu"
+      onKeyDown={onPanelKeyDown}
     >
       <div className="px-4 pt-3 pb-1">
         <span className="font-medium text-[10px] text-text-muted uppercase tracking-[0.18em]">
@@ -110,13 +165,19 @@ export function InsertPopover({
         </span>
       </div>
       <div className="flex flex-col px-1.5 pb-1.5">
-        {items.map((item) => {
+        {items.map((item, index) => {
           const Icon = item.icon;
           return (
             <button
               key={item.key}
+              ref={(el) => {
+                itemRefs.current[index] = el;
+              }}
               type="button"
+              role="menuitem"
+              tabIndex={index === focusedIndex ? 0 : -1}
               disabled={item.disabled}
+              onFocus={() => setFocusedIndex(index)}
               onClick={() => {
                 item.onSelect?.();
               }}
@@ -127,7 +188,7 @@ export function InsertPopover({
               }`}
             >
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface/70 text-text-primary transition-colors group-hover:bg-white">
-                <Icon className="size-4" strokeWidth={1.6} />
+                <Icon className="size-4" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-medium text-[13px] text-text-primary leading-tight">

@@ -186,7 +186,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
         {isDragOver && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-accent-green/30 via-white/40 to-accent-green/20 backdrop-blur-[2px]">
             <div className="flex flex-col items-center gap-2 text-text-primary">
-              <ImagePlusIcon className="size-6" strokeWidth={1.5} />
+              <ImagePlusIcon className="size-6" />
               <span className="font-heading text-base italic">
                 {strings.canvas.embedComposer.dropToEmbed}
               </span>
@@ -240,10 +240,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                 <div className="flex items-center gap-2.5 rounded-xl border border-border-divider bg-card p-2 pr-3">
                   <div className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface">
                     {urlState.mime === 'application/pdf' ? (
-                      <FileTextIcon
-                        className="size-5 text-text-secondary"
-                        strokeWidth={1.5}
-                      />
+                      <FileTextIcon className="size-5 text-text-secondary" />
                     ) : (
                       <img
                         src={urlState.previewSrc}
@@ -286,10 +283,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                 transition={transition}
               >
                 <div className="relative flex items-center">
-                  <LinkIcon
-                    className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-text-muted"
-                    strokeWidth={1.5}
-                  />
+                  <LinkIcon className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-text-muted" />
                   <input
                     type="url"
                     inputMode="url"
@@ -365,10 +359,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(111,251,190,0.12),transparent_70%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
             <div className="relative flex size-9 items-center justify-center rounded-full bg-white/80 shadow-[0_1px_3px_rgba(25,28,30,0.05)] transition-transform duration-200 group-hover:scale-110">
-              <ImagePlusIcon
-                className="size-4 text-text-primary"
-                strokeWidth={1.5}
-              />
+              <ImagePlusIcon className="size-4 text-text-primary" />
             </div>
             <div className="relative flex flex-col items-center gap-0.5">
               <span className="font-medium text-[12.5px] text-text-primary">

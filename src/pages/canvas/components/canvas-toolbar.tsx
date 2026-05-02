@@ -93,6 +93,7 @@ export function CanvasToolbar({
                 insertButtonRef.current = el;
               }}
               data-insert-trigger
+              aria-label={strings.canvas.toolbar.insert}
               className={`cursor-pointer rounded-xl p-2.5 transition-colors ${
                 insertOpen
                   ? 'bg-accent-dark text-white'
@@ -120,6 +121,7 @@ export function CanvasToolbar({
                   ref={(el) => {
                     toolButtonRefs.current[index] = el;
                   }}
+                  aria-label={tool.label}
                   className={`group relative cursor-pointer rounded-xl p-2.5 transition-colors ${
                     isActive
                       ? 'bg-accent-dark text-white'
@@ -170,6 +172,7 @@ export function CanvasToolbar({
               ref={(el) => {
                 shelfButtonRef.current = el;
               }}
+              aria-label={strings.canvas.toolbar.customizeWheel}
               className={`cursor-pointer rounded-xl p-2.5 transition-colors ${
                 shelfOpen
                   ? 'bg-accent-dark text-white'
