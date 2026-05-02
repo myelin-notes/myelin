@@ -84,8 +84,8 @@ export function GridFolderItem({
               style={explorerGridPlaceholderStyle}
             />
             <div className="relative flex h-full items-center justify-center">
-              <div className="flex size-[4.75rem] items-center justify-center rounded-[1.35rem] bg-card/80 shadow-[0_18px_40px_-24px_rgba(28,39,56,0.7)] ring-1 ring-white/55 backdrop-blur-sm transition-transform duration-300 group-hover:scale-[1.03]">
-                <Folder className="size-12 shrink-0 fill-amber-400 text-amber-400 transition-colors duration-200 group-hover:fill-amber-500 group-hover:text-amber-500" />
+              <div className="flex size-[4.75rem] items-center justify-center rounded-2xl bg-card/80 shadow-elevated backdrop-blur-sm transition-transform duration-300 group-hover:scale-[1.03]">
+                <Folder className="size-12 shrink-0 fill-accent-amber text-accent-amber transition-colors duration-200 group-hover:fill-accent-amber-strong group-hover:text-accent-amber-strong" />
               </div>
             </div>
           </div>

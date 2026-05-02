@@ -1,6 +1,7 @@
 import {
   type ChangeEvent,
   useCallback,
+  useDeferredValue,
   useEffect,
   useRef,
   useState,
@@ -30,6 +31,7 @@ import {
   type VFSFolderNode,
 } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
+import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
@@ -73,6 +75,7 @@ export function LibraryPage() {
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = [...activeTags];
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const sortModes: SortMode[] = [
     'name-asc',
     'name-desc',
@@ -367,7 +370,7 @@ export function LibraryPage() {
           {/* Explorer + Tags */}
           <section className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-12">
             <div className="flex flex-col gap-8 lg:col-span-8">
-              <div className="group flex items-center gap-1 rounded-[1.1rem] bg-card/75 px-3 py-2 transition-all duration-200 focus-within:bg-card focus-within:shadow-ambient hover:bg-card">
+              <div className="group flex items-center gap-1 rounded-2xl bg-card/75 px-3 py-2 transition-all duration-200 focus-within:bg-card focus-within:shadow-ambient hover:bg-card">
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-xl text-text-muted transition-colors duration-200 group-focus-within:text-accent-dark">
                   <Search className="size-3.5" />
                 </span>
@@ -384,7 +387,7 @@ export function LibraryPage() {
                     type="button"
                     onClick={() => setSearchQuery('')}
                     aria-label={strings.common.clear}
-                    className="flex size-7 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text-primary"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text-primary"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -393,21 +396,20 @@ export function LibraryPage() {
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h3
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        setCurrentFolderId(null);
-                      }
-                    }}
-                    onClick={() => setCurrentFolderId(null)}
-                    className={`cursor-pointer font-heading font-normal text-2xl leading-8 transition-colors ${
-                      breadcrumbDragIdx === -1
-                        ? 'text-accent-foreground'
-                        : 'text-text-primary hover:text-text-secondary'
-                    }`}
-                    {...makeBreadcrumbDragHandlers(null, -1)}
-                  >
-                    {strings.library.explorer}
+                  <h3 className="font-heading font-normal text-2xl leading-8">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentFolderId(null)}
+                      className={cn(
+                        '-mx-2 cursor-pointer rounded-lg px-2 py-0.5 transition-colors',
+                        breadcrumbDragIdx === -1
+                          ? 'bg-accent/15 text-accent-foreground'
+                          : 'text-text-primary hover:bg-hover-tint hover:text-text-secondary',
+                      )}
+                      {...makeBreadcrumbDragHandlers(null, -1)}
+                    >
+                      {strings.library.explorer}
+                    </button>
                   </h3>
                   {breadcrumbs.length > 0 && (
                     <div className="flex items-center gap-1 text-sm text-text-muted">
@@ -442,8 +444,9 @@ export function LibraryPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
                   <button
+                    type="button"
                     onClick={cycleSortMode}
                     aria-label={strings.library.sortLabel(
                       strings.library.sortModes[sortMode],
@@ -451,7 +454,7 @@ export function LibraryPage() {
                     title={strings.library.sortLabel(
                       strings.library.sortModes[sortMode],
                     )}
-                    className="cursor-pointer text-text-secondary transition-colors hover:text-text-primary"
+                    className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
                   >
                     {sortMode === 'name-asc' && (
                       <ArrowDownAZ className="size-4" />
@@ -465,6 +468,7 @@ export function LibraryPage() {
                     )}
                   </button>
                   <button
+                    type="button"
                     onClick={toggleViewMode}
                     aria-label={strings.library.viewModeLabel(
                       strings.library.viewModes[viewMode],
@@ -472,7 +476,7 @@ export function LibraryPage() {
                     title={strings.library.viewModeLabel(
                       strings.library.viewModes[viewMode],
                     )}
-                    className="cursor-pointer text-text-secondary transition-colors hover:text-text-primary"
+                    className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
                   >
                     {viewMode === 'tree' ? (
                       <List className="size-4" />
@@ -511,7 +515,7 @@ export function LibraryPage() {
                 }
                 sortMode={sortMode}
                 viewMode={viewMode}
-                searchQuery={searchQuery}
+                searchQuery={deferredSearchQuery}
                 filterTags={filterTagsArr}
               />
             </div>
