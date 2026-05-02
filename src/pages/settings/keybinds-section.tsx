@@ -92,7 +92,7 @@ function KeyCapture({
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0.95, opacity: 0 }}
       transition={{ duration: 0.1 }}
-      className="flex h-8 min-w-20 items-center justify-center rounded-lg bg-accent-navy px-4 font-semibold text-[10px] text-white uppercase tracking-widest outline-none"
+      className="flex h-8 min-w-20 items-center justify-center rounded-lg bg-accent-navy px-4 font-semibold text-[10px] text-text-on-dark uppercase tracking-widest outline-none"
     >
       {strings.settings.keybinds.pressKey}
     </motion.div>
@@ -126,10 +126,7 @@ function KeybindRow({
   };
 
   return (
-    <button
-      onClick={() => !capturing && setCapturing(true)}
-      className="group flex w-full cursor-pointer items-center gap-3 rounded-xl bg-input/40 px-3 py-2.5 text-left transition-colors hover:bg-hover-tint sm:gap-4 sm:px-4"
-    >
+    <div className="group flex w-full items-center gap-3 rounded-xl bg-input/40 px-3 py-2.5 text-left transition-colors hover:bg-hover-tint sm:gap-4 sm:px-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary">
           <Icon className="size-4" />
@@ -144,45 +141,45 @@ function KeybindRow({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-        <AnimatePresence mode="wait">
-          {capturing ? (
-            <KeyCapture
-              key="capture"
-              onCapture={handleCapture}
-              onCancel={() => setCapturing(false)}
-            />
-          ) : (
-            <motion.div
-              key="display"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.1 }}
-              className="flex items-center gap-1"
-            >
-              {currentCombo ? (
-                keyParts(currentCombo).map((part, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      'flex h-7 items-center justify-center rounded-md border-stone-300/50 border-b-2 bg-stone-200/50 font-bold text-text-secondary text-xs shadow-[0_1px_0_rgba(0,0,0,0.04)]',
-                      part.length === 1 ? 'w-9' : 'px-4',
-                    )}
-                  >
-                    {part}
-                  </span>
-                ))
-              ) : (
-                <span className="text-text-muted text-xs">
-                  {strings.settings.keybinds.unbound}
+      <AnimatePresence mode="wait">
+        {capturing ? (
+          <KeyCapture
+            key="capture"
+            onCapture={handleCapture}
+            onCancel={() => setCapturing(false)}
+          />
+        ) : (
+          <motion.button
+            key="display"
+            type="button"
+            onClick={() => setCapturing(true)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.1 }}
+            className="flex shrink-0 cursor-pointer flex-wrap items-center justify-end gap-1"
+          >
+            {currentCombo ? (
+              keyParts(currentCombo).map((part, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    'flex h-7 items-center justify-center rounded-md border-border-key border-b-2 bg-bg-key font-bold text-text-secondary text-xs shadow-key',
+                    part.length === 1 ? 'w-9' : 'px-4',
+                  )}
+                >
+                  {part}
                 </span>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </button>
+              ))
+            ) : (
+              <span className="text-text-muted text-xs">
+                {strings.settings.keybinds.unbound}
+              </span>
+            )}
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -194,15 +191,20 @@ export function KeybindsSection() {
     string,
     { action: Action; combo: KeyCombo | undefined; isRebound: boolean }[]
   >();
+  let hasAnyRebind = false;
   for (const action of actions) {
     const category = getActionCategory(strings, action);
     if (!grouped.has(category)) {
       grouped.set(category, []);
     }
+    const isRebound = registry.isRebound(action);
+    if (isRebound) {
+      hasAnyRebind = true;
+    }
     grouped.get(category)!.push({
       action,
       combo: registry.getCombo(action),
-      isRebound: registry.isRebound(action),
+      isRebound,
     });
   }
 
@@ -220,7 +222,8 @@ export function KeybindsSection() {
         <button
           type="button"
           onClick={handleResetAll}
-          className="flex items-center gap-1.5 text-text-muted text-xs transition-colors hover:text-text-secondary"
+          disabled={!hasAnyRebind}
+          className="flex items-center gap-1.5 text-text-muted text-xs transition-colors hover:text-text-secondary disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RotateCcw className="size-3" />
           {strings.settings.keybinds.resetAll}

@@ -1,3 +1,4 @@
+import { AlertCircle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type SyncStatusTone = 'neutral' | 'success' | 'danger';
@@ -18,7 +19,13 @@ export function SyncStatusBadge({
         tone === 'neutral' && 'bg-hover-tint text-text-muted',
       )}
     >
-      <span className="size-1.5 rounded-full bg-current" />
+      {tone === 'success' ? (
+        <Check className="size-3 text-current" />
+      ) : tone === 'danger' ? (
+        <AlertCircle className="size-3 text-current" />
+      ) : (
+        <span className="size-1.5 rounded-full bg-current" />
+      )}
       {label}
     </span>
   );

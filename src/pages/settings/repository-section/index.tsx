@@ -181,11 +181,10 @@ export function RepositorySection() {
       <AnimatePresence initial={false}>
         {config.kind !== 'local' && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
           >
             <div className="mt-5 space-y-4">
               {!remoteAuth.tokenPresent ? (
@@ -354,7 +353,7 @@ export function RepositorySection() {
                       />
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-white/70 px-4 py-3 ring-1 ring-border-subtle sm:grid-cols-2 sm:gap-4">
+                    <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-card/70 px-4 py-3 ring-1 ring-border-ghost sm:grid-cols-2 sm:gap-4">
                       <div>
                         <p className="text-[10px] text-text-muted uppercase tracking-widest">
                           {strings.settings.repository.sync.queuedChanges}

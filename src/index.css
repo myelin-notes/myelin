@@ -175,6 +175,10 @@
 
   --shadow-ambient: 0 0 32px 0 rgba(25, 28, 30, 0.06);
   --shadow-elevated: 0 18px 40px -24px rgba(28, 39, 56, 0.18);
+
+  --color-bg-key: var(--bg-key);
+  --color-border-key: var(--border-key);
+  --shadow-key: var(--shadow-key);
 }
 
 :root {
@@ -238,6 +242,10 @@
   --border-subtle: rgba(195, 199, 202, 0.2);
   --border-divider: rgba(195, 199, 202, 0.3);
   --border-ghost: rgba(195, 199, 202, 0.15);
+
+  --bg-key: rgba(0, 0, 0, 0.04);
+  --border-key: rgba(0, 0, 0, 0.08);
+  --shadow-key: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
 /* Dark mode — supply colors here to enable */

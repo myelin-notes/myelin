@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { Sidebar } from '@/components/layout/sidebar';
-import { PreferencesTab } from './preferences-tab';
+import { SettingsContent } from './preferences-page';
 
 export function SettingsPage() {
   return (
@@ -19,7 +19,7 @@ export function SettingsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
         >
-          <PreferencesTab />
+          <SettingsContent />
         </motion.div>
       </main>
     </div>

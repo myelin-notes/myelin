@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Check, Circle, Loader2 } from 'lucide-react';
 import { useMessages } from '@/lib/i18n';
 
 export function AuthStatusBadge({
@@ -33,7 +33,7 @@ export function AuthStatusBadge({
   if (hasToken) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-green/20 px-2.5 py-1 font-medium text-[10px] text-text-green uppercase tracking-widest">
-        <span className="size-1.5 rounded-full bg-current" />
+        <Check className="size-3 text-current" />
         {strings.settings.repository.authStatus.connected}
       </span>
     );
@@ -41,7 +41,7 @@ export function AuthStatusBadge({
 
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] text-text-muted uppercase tracking-widest">
-      <span className="size-1.5 rounded-full bg-current" />
+      <Circle className="size-3 text-current" />
       {strings.settings.repository.authStatus.disconnected}
     </span>
   );

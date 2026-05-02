@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
@@ -13,9 +12,10 @@ import {
   useI18n,
   useMessages,
 } from '@/lib/i18n';
+import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
-import { KeybindsSection } from './keybinds-tab';
+import { KeybindsSection } from './keybinds-section';
 import { RepositorySection } from './repository-section';
 
 type CanvasBg = 'grid' | 'dots' | 'blank';
@@ -42,19 +42,20 @@ function CanvasPreview({
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={selected}
       className="group cursor-pointer text-left"
     >
       <div
         className={cn(
           'relative aspect-video overflow-hidden rounded-xl p-4 transition-all duration-200',
           selected
-            ? 'bg-white shadow-ambient ring-2 ring-accent-navy/20'
-            : 'bg-input hover:bg-white hover:shadow-ambient',
+            ? 'bg-card shadow-ambient ring-2 ring-accent-navy/20'
+            : 'bg-input hover:bg-card hover:shadow-ambient',
         )}
       >
         {selected && (
           <div className="absolute top-2.5 right-2.5 flex size-5 items-center justify-center rounded-full bg-accent-navy">
-            <Check className="size-2.5 text-white" />
+            <Check className="size-2.5 text-text-on-dark" />
           </div>
         )}
         <div className="h-full w-full">
@@ -95,55 +96,18 @@ function CanvasPreview({
   );
 }
 
-export function PreferencesTab() {
+export function SettingsContent() {
   const strings = useMessages();
   const { setLocale } = useI18n();
-  const [canvasBg, setCanvasBg] = useState<CanvasBg>(
-    UserPrefs.get('canvasBackground'),
-  );
-  const [language, setLanguage] = useState(UserPrefs.get('language'));
-  const [pageFrameEditFitWholePage, setPageFrameEditFitWholePage] = useState(
-    UserPrefs.get('pageFrameEditFitWholePage'),
-  );
-  const [noteLinkHoverPreview, setNoteLinkHoverPreview] = useState(
-    UserPrefs.get('noteLinkHoverPreview'),
-  );
-  const [linkRequireModifier, setLinkRequireModifier] = useState(
-    UserPrefs.get('linkRequireModifier'),
-  );
+  const canvasBg = useUserPref('canvasBackground');
+  const language = useUserPref('language');
+  const pageFrameEditFitWholePage = useUserPref('pageFrameEditFitWholePage');
+  const noteLinkHoverPreview = useUserPref('noteLinkHoverPreview');
+  const linkRequireModifier = useUserPref('linkRequireModifier');
   const languages = Object.entries(localeLabels).map(([code, label]) => ({
     code: code as SupportedLocale,
     label,
   }));
-
-  useEffect(() => {
-    return UserPrefs.subscribe('canvasBackground', setCanvasBg);
-  }, []);
-
-  useEffect(() => {
-    return UserPrefs.subscribe('language', setLanguage);
-  }, []);
-
-  useEffect(() => {
-    return UserPrefs.subscribe(
-      'pageFrameEditFitWholePage',
-      setPageFrameEditFitWholePage,
-    );
-  }, []);
-
-  useEffect(() => {
-    return UserPrefs.subscribe(
-      'noteLinkHoverPreview',
-      setNoteLinkHoverPreview,
-    );
-  }, []);
-
-  useEffect(() => {
-    return UserPrefs.subscribe(
-      'linkRequireModifier',
-      setLinkRequireModifier,
-    );
-  }, []);
 
   const handleCanvasBg = (bg: CanvasBg) => {
     UserPrefs.set('canvasBackground', bg);
@@ -335,7 +299,7 @@ function ToggleRow({
       >
         <span
           className={cn(
-            'size-4 rounded-full bg-white shadow-sm transition-transform',
+            'size-4 rounded-full bg-card shadow-sm transition-transform',
             checked ? 'translate-x-4' : 'translate-x-0',
           )}
         />
