@@ -46,8 +46,26 @@ export class FrameChrome {
   private fileName: string | null = null;
   private kindLabel: string;
 
+  private readonly bgSurface: string;
+  private readonly textPrimary: string;
+  private readonly textSecondary: string;
+  private readonly textMuted: string;
+  private readonly bgHoverTint: string;
+
   constructor(options: FrameChromeOptions) {
     this.kindLabel = options.kindLabel;
+
+    const resolve = (token: string, fallback: string) => {
+      const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(token)
+        .trim();
+      return value || fallback;
+    };
+    this.bgSurface = resolve('--bg-surface', '#f2f4f6');
+    this.textPrimary = resolve('--text-primary', '#191c1e');
+    this.textSecondary = resolve('--text-secondary', '#43474a');
+    this.textMuted = resolve('--text-muted', '#64748b');
+    this.bgHoverTint = resolve('--bg-hover-tint', 'rgba(25, 28, 30, 0.05)');
 
     this.root = document.createElement('div');
     Object.assign(this.root.style, {
@@ -55,7 +73,7 @@ export class FrameChrome {
       left: '0px',
       top: '0px',
       transformOrigin: '0 0',
-      background: '#f2f4f6',
+      background: this.bgSurface,
       borderRadius: `${CHROME_CORNER_RADIUS}px`,
       boxShadow:
         '0 1px 2px rgba(25, 28, 30, 0.03), 0 18px 44px rgba(25, 28, 30, 0.07)',
@@ -87,7 +105,7 @@ export class FrameChrome {
       paddingRight: `${CHROME_SIDE_PADDING}px`,
       gap: '14px',
       fontFamily: 'Inter, Arial, sans-serif',
-      color: '#191c1e',
+      color: this.textPrimary,
       pointerEvents: 'none',
     } as Partial<CSSStyleDeclaration>);
 
@@ -108,7 +126,7 @@ export class FrameChrome {
       fontWeight: '600',
       letterSpacing: '0.12em',
       textTransform: 'uppercase',
-      color: '#64748b',
+      color: this.textMuted,
       lineHeight: '1',
     } as Partial<CSSStyleDeclaration>);
     this.kindEl.textContent = this.kindLabel;
@@ -118,7 +136,7 @@ export class FrameChrome {
       fontFamily: 'Inter, Arial, sans-serif',
       fontSize: '14px',
       fontWeight: '500',
-      color: '#191c1e',
+      color: this.textPrimary,
       lineHeight: '1.2',
       whiteSpace: 'nowrap',
       overflow: 'hidden',
@@ -252,6 +270,7 @@ export class FrameChrome {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.title = 'Menu';
+    btn.setAttribute('aria-label', 'Open frame menu');
     Object.assign(btn.style, {
       position: 'absolute',
       left: '0px',
@@ -263,7 +282,7 @@ export class FrameChrome {
       padding: '0',
       borderRadius: '10px',
       background: 'transparent',
-      color: '#43474a',
+      color: this.textSecondary,
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
@@ -289,12 +308,12 @@ export class FrameChrome {
       ev.stopPropagation();
     });
     btn.addEventListener('pointerenter', () => {
-      btn.style.background = 'rgba(25, 28, 30, 0.08)';
-      btn.style.color = '#191c1e';
+      btn.style.background = this.bgHoverTint;
+      btn.style.color = this.textPrimary;
     });
     btn.addEventListener('pointerleave', () => {
       btn.style.background = 'transparent';
-      btn.style.color = '#43474a';
+      btn.style.color = this.textSecondary;
     });
 
     return btn;

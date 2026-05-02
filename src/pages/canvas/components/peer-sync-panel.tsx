@@ -207,6 +207,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
           <button
             type="button"
             onClick={cleanup}
+            aria-label={strings.common.close}
             className="text-text-muted hover:text-text-primary"
           >
             <X className="size-3.5" />
@@ -215,7 +216,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 px-2 py-1 text-[10px] text-red-600">
+        <div className="rounded-md bg-bg-error-soft px-2 py-1 text-[10px] text-text-error">
           {error}
         </div>
       )}
@@ -225,7 +226,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
           <button
             type="button"
             onClick={host}
-            className="rounded-lg bg-primary px-3 py-1.5 font-medium text-white text-xs hover:bg-primary/90"
+            className="rounded-lg bg-accent-dark px-3 py-1.5 font-medium text-white text-xs hover:bg-accent-navy"
           >
             {strings.canvas.peerSync.host}
           </button>
@@ -259,7 +260,8 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
             <button
               type="button"
               onClick={copyShareToken}
-              className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80"
+              aria-label={strings.common.copy}
+              className="flex items-center gap-1 text-[10px] text-accent-dark hover:text-accent-navy"
             >
               {copied ? (
                 <Check className="size-3" />
@@ -285,9 +287,9 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
       )}
 
       {phase === 'connected' && (
-        <div className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5">
-          <div className="size-1.5 rounded-full bg-green-500" />
-          <span className="font-medium text-green-700 text-xs">
+        <div className="flex items-center gap-1.5 rounded-lg bg-bg-success-soft px-3 py-1.5">
+          <div className="size-1.5 rounded-full bg-text-success" />
+          <span className="font-medium text-text-success text-xs">
             {strings.canvas.peerSync.connected}
           </span>
         </div>

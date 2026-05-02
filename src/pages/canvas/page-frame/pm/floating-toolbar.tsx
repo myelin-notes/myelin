@@ -24,6 +24,7 @@ import { ColorSwatch } from '@/components/color-swatch';
 import { CustomColorSwatch } from '@/components/custom-color-swatch';
 import { useCustomColors } from '@/lib/custom-colors';
 import { PM_UPDATE_EVENT } from '@/lib/events';
+import { getDevicePixelRatio } from '@/lib/utils';
 import { PEN_COLORS } from '../../tools/pen-tool';
 import { schema } from './schema';
 
@@ -134,7 +135,7 @@ function selectionScreenRect(
   if (empty) {
     return null;
   }
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = getDevicePixelRatio();
   try {
     const start = view.coordsAtPos(from);
     const end = view.coordsAtPos(to);
@@ -336,7 +337,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
       className="fade-in-0 zoom-in-95 fixed z-50 flex animate-in items-center gap-1 rounded-xl bg-card/80 p-1 shadow-ambient backdrop-blur-[24px] duration-150"
       style={{
         ...style,
-        border: '0.5px solid var(--border-ghost)',
+        border: '1px solid var(--border-ghost)',
       }}
       onPointerDown={(e) => {
         // Keep PM selection intact when interacting with the toolbar.
@@ -481,7 +482,7 @@ function ToolbarButton({
         wide ? '' : 'w-8'
       } ${
         active
-          ? 'bg-gradient-to-b from-accent-dark to-primary-container text-text-on-dark'
+          ? 'bg-accent-dark text-text-on-dark'
           : 'bg-transparent text-text-secondary hover:bg-hover-tint hover:text-text-primary'
       }`}
     >

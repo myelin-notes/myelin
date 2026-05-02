@@ -43,6 +43,7 @@ export function ToolShelf({
         </span>
         <button
           onClick={onClose}
+          aria-label={strings.common.close}
           className="cursor-pointer border-none bg-transparent p-0 text-text-muted transition-colors hover:text-text-primary"
         >
           <svg

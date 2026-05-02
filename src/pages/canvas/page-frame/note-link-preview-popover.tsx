@@ -163,13 +163,26 @@ export function NoteLinkPreviewPopover({
         });
     };
 
-    const handlePointerMove = (event: PointerEvent) => {
+    let pendingRaf = 0;
+    let latestX = 0;
+    let latestY = 0;
+    let hasLatest = false;
+
+    const flush = () => {
+      pendingRaf = 0;
+      if (!hasLatest) {
+        return;
+      }
+      hasLatest = false;
+      const x = latestX;
+      const y = latestY;
+
       if (suppressedRef.current) {
         closePreview();
         return;
       }
 
-      const hover = getTargetAtPointEvent(event.clientX, event.clientY);
+      const hover = getTargetAtPointEvent(x, y);
       if (!hover) {
         closePreview();
         return;
@@ -200,6 +213,15 @@ export function NoteLinkPreviewPopover({
       }, HOVER_OPEN_DELAY_MS);
     };
 
+    const handlePointerMove = (event: PointerEvent) => {
+      latestX = event.clientX;
+      latestY = event.clientY;
+      hasLatest = true;
+      if (pendingRaf === 0) {
+        pendingRaf = requestAnimationFrame(flush);
+      }
+    };
+
     const handlePointerLeave = () => {
       closePreview();
     };
@@ -208,6 +230,10 @@ export function NoteLinkPreviewPopover({
     document.addEventListener('pointerleave', handlePointerLeave);
 
     return () => {
+      if (pendingRaf !== 0) {
+        cancelAnimationFrame(pendingRaf);
+        pendingRaf = 0;
+      }
       closePreview();
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerleave', handlePointerLeave);
@@ -241,7 +267,7 @@ export function NoteLinkPreviewPopover({
       style={{
         left: state.position.left,
         top: state.position.top,
-        border: '0.5px solid var(--border-ghost, rgba(195, 199, 202, 0.3))',
+        border: '1px solid var(--border-ghost)',
       }}
     >
       <NoteLinkPreviewCard title={title} body={body} noteId={noteId} />

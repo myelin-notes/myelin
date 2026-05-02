@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { PM_UPDATE_EVENT } from '@/lib/events';
+import { getDevicePixelRatio } from '@/lib/utils';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
@@ -71,12 +72,12 @@ const PAGE_CHROME_STYLE: Record<string, string> = {
   background: '#ffffff',
   borderRadius: `${PAGE_CORNER_RADIUS}px`,
   boxShadow: '0 4px 24px rgba(25, 28, 30, 0.08)',
-  border: '0.5px solid rgba(195, 199, 202, 0.2)',
+  border: '1px solid var(--border-ghost)',
   pointerEvents: 'none',
 };
 
 function snapToDevicePixel(value: number): number {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = getDevicePixelRatio();
   return Math.round(value * dpr) / dpr;
 }
 
@@ -344,7 +345,7 @@ export function PageFrameDomLayer({
         // Because the zoom value is constant, text metrics and line breaks
         // never change — the variable canvas zoom is handled entirely by
         // transform: scale(), which is a post-layout GPU operation.
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = getDevicePixelRatio();
         refs.viewportDiv.style.width = `${pageWidth}px`;
         refs.viewportDiv.style.height = `${frame.totalHeight}px`;
         refs.viewportDiv.style.zoom = `${dpr}`;
@@ -412,7 +413,7 @@ export function PageFrameDomLayer({
       // getBoundingClientRect) plus transform: scale(zoom/DPR) (IS in
       // getBoundingClientRect). Multiply by DPR to get screen coords.
       const zoom = dc.viewport.zoom;
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = getDevicePixelRatio();
       const screenBottom = rect.bottom * dpr;
       const screenTop = rect.top * dpr;
 

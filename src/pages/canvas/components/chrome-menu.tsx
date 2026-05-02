@@ -20,7 +20,9 @@ const VIEWPORT_PAD = 12;
 
 export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [pos, setPos] = useState(() => computePosition(anchor, 0, 0));
+  const [focusedIndex, setFocusedIndex] = useState(0);
   const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
     if (!menuRef.current?.contains(event.target as Node)) {
       onClose();
@@ -52,6 +54,48 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (focusedIndex >= items.length) {
+      setFocusedIndex(Math.max(0, items.length - 1));
+      return;
+    }
+    itemRefs.current[focusedIndex]?.focus();
+  }, [focusedIndex, items.length]);
+
+  const moveFocus = (delta: number) => {
+    if (items.length === 0) {
+      return;
+    }
+    setFocusedIndex((prev) => (prev + delta + items.length) % items.length);
+  };
+
+  const onMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        moveFocus(1);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        moveFocus(-1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        setFocusedIndex(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        setFocusedIndex(Math.max(0, items.length - 1));
+        break;
+      case 'Tab':
+        event.preventDefault();
+        moveFocus(event.shiftKey ? -1 : 1);
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <motion.div
       ref={menuRef}
@@ -62,20 +106,26 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
       className="pointer-events-auto fixed z-[100] min-w-[200px] origin-top-right overflow-hidden rounded-xl bg-popover/90 p-1.5 shadow-ambient outline-none backdrop-blur-2xl"
       style={{ top: pos.top, left: pos.left, minWidth: MENU_MIN_WIDTH }}
       role="menu"
+      onKeyDown={onMenuKeyDown}
     >
-      {items.map((item) => {
+      {items.map((item, index) => {
         const Icon = item.icon;
         const danger = item.variant === 'danger';
         return (
           <button
             key={item.id}
+            ref={(el) => {
+              itemRefs.current[index] = el;
+            }}
             type="button"
             role="menuitem"
+            tabIndex={index === focusedIndex ? 0 : -1}
             onPointerDown={(e) => {
               // Mouse menu interaction should not steal focus from an active
               // page-frame editor; the click still fires normally.
               e.preventDefault();
             }}
+            onFocus={() => setFocusedIndex(index)}
             onClick={() => {
               item.onSelect();
               onClose();
