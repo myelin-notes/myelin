@@ -12,6 +12,12 @@ function joinPath(...segments: string[]): string {
   return normalizePath(segments.filter(Boolean).join('/'));
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 function createJsonResponse(status: number, payload: unknown) {
   const body = JSON.stringify(payload);
   const bytes = new TextEncoder().encode(body);
@@ -22,10 +28,7 @@ function createJsonResponse(status: number, payload: unknown) {
       return payload;
     },
     async arrayBuffer() {
-      return bytes.buffer.slice(
-        bytes.byteOffset,
-        bytes.byteOffset + bytes.byteLength,
-      );
+      return toArrayBuffer(bytes);
     },
     async text() {
       return body;
@@ -42,10 +45,7 @@ function createTextResponse(status: number, body: string) {
       return JSON.parse(body) as unknown;
     },
     async arrayBuffer() {
-      return bytes.buffer.slice(
-        bytes.byteOffset,
-        bytes.byteOffset + bytes.byteLength,
-      );
+      return toArrayBuffer(bytes);
     },
     async text() {
       return body;
@@ -61,10 +61,7 @@ function createBinaryResponse(status: number, bytes: Uint8Array) {
       throw new Error('Binary response cannot be parsed as JSON.');
     },
     async arrayBuffer() {
-      return bytes.buffer.slice(
-        bytes.byteOffset,
-        bytes.byteOffset + bytes.byteLength,
-      );
+      return toArrayBuffer(bytes);
     },
     async text() {
       return new TextDecoder().decode(bytes);
@@ -96,6 +93,7 @@ export interface MemoryStorage {
   readFile(path: string): Promise<Uint8Array>;
   readTextFile(path: string): Promise<string>;
   remove(path: string, options?: { recursive?: boolean }): Promise<void>;
+  rename(oldPath: string, newPath: string): Promise<void>;
   writeFile(path: string, bytes: Uint8Array): Promise<void>;
   writeSymlink(path: string): void;
   writeTextFile(path: string, text: string): Promise<void>;
@@ -253,6 +251,27 @@ function createMemoryStorage(root: string = '/app-data'): MemoryStorage {
       }
       textFiles.delete(resolved);
       binaryFiles.delete(resolved);
+    },
+    rename: async (oldPath, newPath) => {
+      const oldResolved = resolve(oldPath);
+      const newResolved = resolve(newPath);
+      ensureParents(newResolved);
+
+      if (textFiles.has(oldResolved)) {
+        textFiles.set(newResolved, textFiles.get(oldResolved) ?? '');
+        textFiles.delete(oldResolved);
+      }
+      if (binaryFiles.has(oldResolved)) {
+        binaryFiles.set(
+          newResolved,
+          new Uint8Array(binaryFiles.get(oldResolved) ?? []),
+        );
+        binaryFiles.delete(oldResolved);
+      }
+      if (symlinks.has(oldResolved)) {
+        symlinks.add(newResolved);
+        symlinks.delete(oldResolved);
+      }
     },
     writeFile: async (path, bytes) => {
       const resolved = resolve(path);
@@ -675,6 +694,8 @@ export function createPluginFsModule() {
       },
     ) => currentStorage.remove(path, { recursive: options?.recursive }),
     removeFile: async (path: string) => currentStorage.remove(path),
+    rename: async (oldPath: string, newPath: string) =>
+      currentStorage.rename(oldPath, newPath),
     writeFile: async (path: string, bytes: Uint8Array) =>
       currentStorage.writeFile(path, bytes),
     writeTextFile: async (path: string, text: string) =>

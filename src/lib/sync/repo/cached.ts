@@ -4,6 +4,7 @@ import {
   exists,
   mkdir,
   readTextFile,
+  rename,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
@@ -120,10 +121,24 @@ function getParentPath(path: string): string {
   return separatorIndex === -1 ? '' : normalized.slice(0, separatorIndex);
 }
 
+function getCorruptOutboxPath(path: string, timestamp: Date): string {
+  const parentPath = getParentPath(path);
+  const fileName = parentPath ? path.slice(parentPath.length + 1) : path;
+  const timestampLabel = timestamp.toISOString().replace(/[^0-9]/g, '');
+  const dotIndex = fileName.lastIndexOf('.');
+  const corruptFileName =
+    dotIndex <= 0
+      ? `${fileName}.corrupt.${timestampLabel}`
+      : `${fileName.slice(0, dotIndex)}.corrupt.${timestampLabel}${fileName.slice(dotIndex)}`;
+
+  return parentPath ? `${parentPath}/${corruptFileName}` : corruptFileName;
+}
+
 function isSnapshotEmpty(snapshot: RepositorySnapshot): boolean {
   return (
     snapshot.manifest.children.length === 0 &&
-    Object.keys(snapshot.manifest.nodes).length === 0
+    Object.keys(snapshot.manifest.nodes).length === 0 &&
+    snapshot.manifest.customColors.length === 0
   );
 }
 
@@ -137,6 +152,53 @@ function detachNodeFromAllContainers(
       current.children = current.children.filter((id) => id !== nodeId);
     }
   }
+}
+
+function detachNodeFromOtherContainers(
+  manifest: VFSManifest,
+  nodeId: string,
+  targetParentId: string | null,
+): void {
+  if (targetParentId !== null) {
+    manifest.children = manifest.children.filter((id) => id !== nodeId);
+  }
+
+  for (const current of Object.values(manifest.nodes)) {
+    if (current.type === 'folder' && current.id !== targetParentId) {
+      current.children = current.children.filter((id) => id !== nodeId);
+    }
+  }
+}
+
+function addChildIfMissing(
+  manifest: VFSManifest,
+  parentId: string | null,
+  childId: string,
+): void {
+  const children =
+    parentId === null
+      ? manifest.children
+      : manifest.nodes[parentId]?.type === 'folder'
+        ? manifest.nodes[parentId].children
+        : null;
+
+  if (children && !children.includes(childId)) {
+    children.push(childId);
+  }
+}
+
+function upsertNodePreservingRemoteChildren(
+  remoteManifest: VFSManifest,
+  cacheNode: VFSNode,
+): void {
+  const nextNode = structuredClone(cacheNode);
+  const remoteNode = remoteManifest.nodes[cacheNode.id];
+  if (nextNode.type === 'folder') {
+    nextNode.children =
+      remoteNode?.type === 'folder' ? remoteNode.children : [];
+  }
+
+  remoteManifest.nodes[cacheNode.id] = nextNode;
 }
 
 function ensureNodePath(
@@ -153,7 +215,12 @@ function ensureNodePath(
     ensureNodePath(remoteManifest, cacheManifest, cacheNode.parentId);
   }
 
-  remoteManifest.nodes[nodeId] = structuredClone(cacheNode);
+  if (remoteManifest.nodes[nodeId]) {
+    return;
+  }
+
+  upsertNodePreservingRemoteChildren(remoteManifest, cacheNode);
+  restoreNodePlacement(remoteManifest, cacheManifest, nodeId);
 }
 
 function restoreNodePlacement(
@@ -166,15 +233,19 @@ function restoreNodePlacement(
     return;
   }
 
-  if (cacheNode.parentId === null) {
-    remoteManifest.children = [...cacheManifest.children];
+  const remoteNode = remoteManifest.nodes[nodeId];
+  if (!remoteNode) {
     return;
   }
 
-  const cacheParent = cacheManifest.nodes[cacheNode.parentId];
-  if (cacheParent?.type === 'folder') {
-    remoteManifest.nodes[cacheParent.id] = structuredClone(cacheParent);
-  }
+  const parentId =
+    cacheNode.parentId !== null &&
+    remoteManifest.nodes[cacheNode.parentId]?.type === 'folder'
+      ? cacheNode.parentId
+      : null;
+  remoteNode.parentId = parentId;
+  detachNodeFromOtherContainers(remoteManifest, nodeId, parentId);
+  addChildIfMissing(remoteManifest, parentId, nodeId);
 }
 
 function applyManifestUpsert(
@@ -186,8 +257,11 @@ function applyManifestUpsert(
     return;
   }
 
-  ensureNodePath(remoteManifest, cacheManifest, nodeId);
-  detachNodeFromAllContainers(remoteManifest, nodeId);
+  const cacheNode = cacheManifest.nodes[nodeId];
+  if (cacheNode.parentId !== null) {
+    ensureNodePath(remoteManifest, cacheManifest, cacheNode.parentId);
+  }
+  upsertNodePreservingRemoteChildren(remoteManifest, cacheNode);
   restoreNodePlacement(remoteManifest, cacheManifest, nodeId);
 }
 
@@ -336,6 +410,7 @@ export class CachedRepository
   private pendingOps: PendingOp[] = [];
   private flushPromise: Promise<void> | null = null;
   private flushTimer: number | null = null;
+  private outboxRecoveryError: Error | null = null;
   private runtimeStatus: RepositoryRuntimeStatus = {
     online: true,
     pendingRemoteWrites: 0,
@@ -393,6 +468,17 @@ export class CachedRepository
       await this.withLocalStateLock(async () => {
         await this.loadOutbox();
         cacheSnapshot = await this.cache.exportSnapshot();
+        if (this.outboxRecoveryError) {
+          logger.error(
+            'Skipped initial remote bootstrap because cached repository outbox requires recovery',
+            this.outboxRecoveryError,
+            {
+              repositoryKind: this.kind,
+              outboxPath: this.outboxPath(),
+            },
+          );
+          return;
+        }
         if (this.pendingOps.length !== 0) {
           return;
         }
@@ -1119,6 +1205,15 @@ export class CachedRepository
     snapshot: RepositorySnapshot,
   ): Promise<void> {
     await this.mutatePendingOpsInternal((ops) => {
+      if (snapshot.manifest.customColors.length > 0) {
+        const existing = ops.find((op) => op.kind === 'sync-custom-colors');
+        if (existing) {
+          touchPendingOp(existing);
+        } else {
+          ops.push(withQueueRevision({ kind: 'sync-custom-colors' }));
+        }
+      }
+
       for (const node of Object.values(snapshot.manifest.nodes)) {
         enqueueUpsertManifestNode(ops, node.id);
         if (node.type === 'file') {
@@ -1158,7 +1253,12 @@ export class CachedRepository
 
     try {
       const raw = await readTextFile(path, { baseDir: BaseDirectory.AppData });
-      this.pendingOps = JSON.parse(raw) as PendingOp[];
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) {
+        throw new Error('Cached repository outbox must contain a JSON array.');
+      }
+
+      this.pendingOps = parsed as PendingOp[];
       this.updateRuntimeStatus({ pendingRemoteWrites: this.pendingOps.length });
       logger.debug('Loaded cached repository outbox', {
         repositoryKind: this.kind,
@@ -1166,8 +1266,42 @@ export class CachedRepository
         pendingOps: this.pendingOps.length,
       });
     } catch {
+      const corruptPath = getCorruptOutboxPath(path, new Date());
+      try {
+        await rename(path, corruptPath, {
+          oldPathBaseDir: BaseDirectory.AppData,
+          newPathBaseDir: BaseDirectory.AppData,
+        });
+      } catch (renameError) {
+        logger.error(
+          'Failed to move corrupt cached repository outbox',
+          renameError,
+          {
+            repositoryKind: this.kind,
+            outboxPath: path,
+            corruptOutboxPath: corruptPath,
+          },
+        );
+      }
+
       this.pendingOps = [];
-      await this.saveOutbox();
+      this.outboxRecoveryError = new Error(
+        `Cached repository outbox could not be read and was moved to ${corruptPath}. Local cache sync is paused until recovery.`,
+      );
+      this.updateRuntimeStatus({
+        online: false,
+        pendingRemoteWrites: 0,
+        lastError: this.outboxRecoveryError,
+      });
+      logger.error(
+        'Moved corrupt cached repository outbox aside and paused remote cache replacement',
+        this.outboxRecoveryError,
+        {
+          repositoryKind: this.kind,
+          outboxPath: path,
+          corruptOutboxPath: corruptPath,
+        },
+      );
     }
   }
 
@@ -1213,6 +1347,18 @@ export class CachedRepository
         remoteNodeCount: Object.keys(remoteSnapshot.manifest.nodes).length,
         remoteNoteCount: Object.keys(remoteSnapshot.notes).length,
       });
+
+      if (this.outboxRecoveryError) {
+        logger.error(
+          'Skipped replacing cache from remote because cached repository outbox requires recovery',
+          this.outboxRecoveryError,
+          {
+            repositoryKind: this.kind,
+            outboxPath: this.outboxPath(),
+          },
+        );
+        return;
+      }
 
       if (this.pendingOps.length !== 0) {
         logger.debug(

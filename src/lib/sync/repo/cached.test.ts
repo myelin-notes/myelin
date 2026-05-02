@@ -411,6 +411,26 @@ describe('CachedRepository', () => {
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
+  it('bootstraps cached custom colors to an empty remote on initialize', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/color-bootstrap-test');
+
+    await cache.initialize();
+    await cache.addCustomColor('#ABCDEF');
+
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/color-bootstrap-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    expect(await remote.getCustomColors()).toEqual(['#abcdef']);
+    expect(await repository.getCustomColors()).toEqual(['#abcdef']);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
   it('collapses create and delete work into a single pending delete before flush', async () => {
     const remote = new MemoryRemoteRepository();
     const cache = new LocalRepository('repositories/pending-delete-test');
@@ -521,6 +541,56 @@ describe('CachedRepository', () => {
 
     const snapshot = await repository.loadDocument(fileId);
     expect(readNoteText(snapshot.update)).toBe('loaded by refresh');
+  });
+
+  it('preserves remote siblings when flushing cached manifest upserts', async () => {
+    const remote = new MemoryRemoteRepository();
+    const folderId = await remote.createFolder('Shared folder', null);
+    const cache = new LocalRepository('repositories/upsert-sibling-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/upsert-sibling-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const remoteRootId = await remote.createFile(
+      'Remote root sibling',
+      'mcanvas',
+      null,
+    );
+    const remoteNestedId = await remote.createFile(
+      'Remote nested sibling',
+      'mcanvas',
+      folderId,
+    );
+    await remote.renameNode(folderId, 'Remote renamed folder');
+    const localRootId = await repository.createFile(
+      'Local root file',
+      'mcanvas',
+      null,
+    );
+    const localNestedId = await repository.createFile(
+      'Local nested file',
+      'mcanvas',
+      folderId,
+    );
+
+    await repository.flushPending();
+
+    const [, rootFiles] = await remote.listDirectory(null);
+    const [, nestedFiles] = await remote.listDirectory(folderId);
+
+    expect(rootFiles.map((file) => file.id).sort()).toEqual(
+      [localRootId, remoteRootId].sort(),
+    );
+    expect(nestedFiles.map((file) => file.id).sort()).toEqual(
+      [localNestedId, remoteNestedId].sort(),
+    );
+    expect((await remote.getNode(folderId))?.name).toBe(
+      'Remote renamed folder',
+    );
   });
 
   it('opens cached note state before pulling newer remote state in the background', async () => {
@@ -876,27 +946,70 @@ describe('CachedRepository', () => {
     );
   });
 
-  it('recovers from a corrupted outbox file during initialize', async () => {
+  it('quarantines a corrupt outbox and keeps local cache state during initialize', async () => {
     const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const remoteNote = createNoteState('remote version');
+
+    await remote.pushUpdates(fileId, remoteNote.update, {
+      baseRevision: null,
+      localStateVector: remoteNote.stateVector,
+    });
+
     const cache = new LocalRepository('repositories/corrupt-outbox-test');
     const storage = getRepositoryTestStorage();
+    const outboxPath = 'repositories/corrupt-outbox-test/outbox.json';
 
-    await storage.writeTextFile(
-      'repositories/corrupt-outbox-test/outbox.json',
-      'not valid json',
+    await cache.replaceSnapshot(await remote.exportSnapshot());
+
+    const cacheSnapshot = await cache.loadDocument(fileId);
+    const doc = new Y.Doc();
+    if (cacheSnapshot.update) {
+      Y.applyUpdate(doc, cacheSnapshot.update);
+    }
+    const text = doc.getText('content');
+    text.delete(0, text.length);
+    text.insert(0, 'local offline version');
+
+    await cache.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(doc, cacheSnapshot.stateVector),
+      {
+        baseRevision: cacheSnapshot.revision,
+        localStateVector: Y.encodeStateVector(doc),
+      },
     );
 
-    const repository = new CachedRepository(
-      remote,
-      cache,
-      'repositories/corrupt-outbox-test/outbox.json',
-    );
+    await storage.writeTextFile(outboxPath, 'not valid json');
+
+    const repository = new CachedRepository(remote, cache, outboxPath);
 
     await repository.initialize();
 
+    const backup = (
+      await storage.readDir('repositories/corrupt-outbox-test')
+    ).find(
+      (entry) =>
+        entry.name.startsWith('outbox.corrupt.') &&
+        entry.name.endsWith('.json'),
+    );
+    const status = repository.getRuntimeStatus();
+
+    expect(storage.readText(outboxPath)).toBeNull();
+    expect(backup).toBeDefined();
     expect(
-      storage.readText('repositories/corrupt-outbox-test/outbox.json'),
-    ).toBe('[]');
+      storage.readText(
+        `repositories/corrupt-outbox-test/${backup?.name ?? ''}`,
+      ),
+    ).toBe('not valid json');
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'local offline version',
+    );
+    expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
+      'remote version',
+    );
+    expect(status.online).toBe(false);
+    expect(status.lastError?.message).toContain('outbox');
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
