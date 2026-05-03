@@ -19,6 +19,7 @@ import {
   FILES_DIR,
   getStoredFileName,
   MANIFEST_PATH,
+  migrate,
   type RepositorySnapshot,
   type VFSManifest,
 } from './shared';
@@ -162,7 +163,9 @@ export class LocalRepository extends BaseRepository {
       const text = await readTextFile(manifestPath, {
         baseDir: BaseDirectory.AppData,
       });
-      this.manifest = JSON.parse(text) as VFSManifest;
+      const manifest = JSON.parse(text) as VFSManifest;
+      migrate(manifest);
+      this.manifest = manifest;
       return { manifest: this.manifest, revision: null };
     }
 

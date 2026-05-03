@@ -5,6 +5,7 @@ import {
   createEmptyManifest,
   getMimeTypeForFileType,
   getStoredFileName,
+  migrate,
   type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities } from './types';
@@ -82,8 +83,10 @@ export class GoogleDriveRepository extends BaseRepository {
       };
     }
 
+    const manifest = JSON.parse(new TextDecoder().decode(bytes)) as VFSManifest;
+    migrate(manifest);
     return {
-      manifest: JSON.parse(new TextDecoder().decode(bytes)) as VFSManifest,
+      manifest,
       revision: manifestFile.headRevisionId ?? null,
     };
   }
@@ -321,6 +324,8 @@ export class GoogleDriveRepository extends BaseRepository {
     fileId: string,
     bytes: Uint8Array,
   ): Promise<GoogleDriveFile> {
+    const body = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(body).set(bytes);
     const response = await fetch(
       `${GOOGLE_DRIVE_UPLOAD_API_BASE}/files/${encodeURIComponent(fileId)}?uploadType=media&fields=id,headRevisionId`,
       {
@@ -329,7 +334,7 @@ export class GoogleDriveRepository extends BaseRepository {
           ...(await this.authHeaders()),
           'Content-Type': 'application/octet-stream',
         },
-        body: bytes,
+        body,
       },
     );
 
