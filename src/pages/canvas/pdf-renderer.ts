@@ -74,7 +74,8 @@ export function normalizePdfPageSizes(value: unknown): PdfPageSize[] {
 export function createDefaultPdfPageOrder(
   pageCount: number,
 ): PdfPageOrderEntry[] {
-  return Array.from({ length: pageCount }, (_, originalIndex) => ({
+  const count = Math.max(1, Math.floor(pageCount));
+  return Array.from({ length: count }, (_, originalIndex) => ({
     kind: 'pdf',
     originalIndex,
   }));
@@ -84,8 +85,9 @@ export function normalizePdfPageOrder(
   value: unknown,
   pageCount: number,
 ): PdfPageOrderEntry[] {
+  const count = Math.max(1, Math.floor(pageCount));
   if (!Array.isArray(value)) {
-    return createDefaultPdfPageOrder(pageCount);
+    return createDefaultPdfPageOrder(count);
   }
 
   const entries = value.flatMap((entry): PdfPageOrderEntry[] => {
@@ -105,7 +107,7 @@ export function normalizePdfPageOrder(
       typeof originalIndex !== 'number' ||
       !Number.isInteger(originalIndex) ||
       originalIndex < 0 ||
-      originalIndex >= pageCount
+      originalIndex >= count
     ) {
       return [];
     }
@@ -113,7 +115,12 @@ export function normalizePdfPageOrder(
     return [{ kind: 'pdf', originalIndex }];
   });
 
-  return entries.length > 0 ? entries : createDefaultPdfPageOrder(pageCount);
+  if (entries.length !== count) {
+    return createDefaultPdfPageOrder(count);
+  }
+
+  const seen = new Set(entries.map((entry) => entry.originalIndex));
+  return seen.size === count ? entries : createDefaultPdfPageOrder(count);
 }
 
 export async function loadPdfDocument(
