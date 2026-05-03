@@ -381,7 +381,7 @@ describe('CachedRepository', () => {
     expect(readNoteText(snapshot.update)).toBe('fetched from remote');
   });
 
-  it('pushes preexisting cache contents to an empty remote on initialize', async () => {
+  it('replaces preexisting cache contents from an empty remote on initialize', async () => {
     const remote = new MemoryRemoteRepository();
     const cache = new LocalRepository('repositories/cache-bootstrap-test');
 
@@ -403,15 +403,18 @@ describe('CachedRepository', () => {
 
     await repository.initialize();
 
+    const [folders, files] = await repository.listDirectory(null);
     const remoteSnapshot = await remote.exportSnapshot();
-    expect(remoteSnapshot.manifest.nodes[fileId]?.type).toBe('file');
-    expect(readNoteText(remoteSnapshot.notes[fileId] ?? null)).toBe(
-      'pushed from cache bootstrap',
-    );
+
+    expect(folders).toHaveLength(0);
+    expect(files).toHaveLength(0);
+    expect(await repository.getNode(fileId)).toBeNull();
+    expect(remoteSnapshot.manifest).toEqual(createEmptyManifest());
+    expect(remoteSnapshot.notes).toEqual({});
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
-  it('bootstraps cached custom colors to an empty remote on initialize', async () => {
+  it('replaces cached custom colors from an empty remote on initialize', async () => {
     const remote = new MemoryRemoteRepository();
     const cache = new LocalRepository('repositories/color-bootstrap-test');
 
@@ -426,8 +429,63 @@ describe('CachedRepository', () => {
 
     await repository.initialize();
 
-    expect(await remote.getCustomColors()).toEqual(['#abcdef']);
+    expect(await remote.getCustomColors()).toEqual([]);
+    expect(await repository.getCustomColors()).toEqual([]);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('applies metadata and color writes locally before remote flush', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/local-first-metadata-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/local-first-metadata-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const folderId = await repository.createFolder('Drafts', null);
+    const fileId = await repository.createFile(
+      'Local note',
+      'mcanvas',
+      folderId,
+    );
+    await repository.renameNode(fileId, 'Renamed local note');
+    await repository.moveNode(fileId, null);
+    await repository.setTags(fileId, ['local']);
+    await repository.addCustomColor('#ABCDEF');
+
+    const [rootFolders, rootFiles] = await repository.listDirectory(null);
+    const remoteBeforeFlush = await remote.exportSnapshot();
+
+    expect(rootFolders.map((folder) => folder.id)).toEqual([folderId]);
+    expect(rootFiles).toHaveLength(1);
+    expect(rootFiles[0]).toMatchObject({
+      id: fileId,
+      name: 'Renamed local note',
+      parentId: null,
+      tags: ['local'],
+    });
     expect(await repository.getCustomColors()).toEqual(['#abcdef']);
+    expect(remoteBeforeFlush.manifest).toEqual(createEmptyManifest());
+    expect(remoteBeforeFlush.notes).toEqual({});
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBeGreaterThan(
+      0,
+    );
+
+    await repository.flushPending();
+
+    const [remoteFolders, remoteFiles] = await remote.listDirectory(null);
+    expect(remoteFolders.map((folder) => folder.id)).toEqual([folderId]);
+    expect(remoteFiles).toHaveLength(1);
+    expect(remoteFiles[0]).toMatchObject({
+      id: fileId,
+      name: 'Renamed local note',
+      parentId: null,
+      tags: ['local'],
+    });
+    expect(await remote.getCustomColors()).toEqual(['#abcdef']);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
@@ -541,6 +599,37 @@ describe('CachedRepository', () => {
 
     const snapshot = await repository.loadDocument(fileId);
     expect(readNoteText(snapshot.update)).toBe('loaded by refresh');
+  });
+
+  it('refresh replaces stale cache contents from an empty remote', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const note = createNoteState('removed remotely');
+
+    await remote.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/refresh-empty-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/refresh-empty-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    expect(await repository.getNode(fileId)).not.toBeNull();
+
+    await remote.deleteNode(fileId);
+    await repository.refresh();
+
+    const [folders, files] = await repository.listDirectory(null);
+    expect(folders).toHaveLength(0);
+    expect(files).toHaveLength(0);
+    expect(await repository.getNode(fileId)).toBeNull();
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
   it('preserves remote siblings when flushing cached manifest upserts', async () => {

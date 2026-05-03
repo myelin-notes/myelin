@@ -49,7 +49,6 @@ import {
   detachNodeFromAllContainers,
   getConflictedFileName,
   getExistingParentId,
-  isSnapshotEmpty,
 } from './reconcile';
 
 const BACKGROUND_SYNC_INTERVAL_MS = 15_000;
@@ -123,10 +122,9 @@ export class CachedRepository
   }
 
   private async initializeImpl(): Promise<void> {
-    let cacheSnapshot = await this.withLocalStateLock(async () => {
+    await this.withLocalStateLock(async () => {
       await this.cache.initialize();
       await this.outbox.load();
-      return this.cache.exportSnapshot();
     });
     logger.debug('Initialized cached repository cache state', {
       repositoryKind: this.kind,
@@ -139,7 +137,6 @@ export class CachedRepository
 
       await this.withLocalStateLock(async () => {
         await this.outbox.load();
-        cacheSnapshot = await this.cache.exportSnapshot();
         if (this.outbox.recoveryError) {
           logger.error(
             'Skipped initial remote bootstrap because cached repository outbox requires recovery',
@@ -155,11 +152,7 @@ export class CachedRepository
           return;
         }
 
-        if (!isSnapshotEmpty(remoteSnapshot)) {
-          await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
-        } else if (!isSnapshotEmpty(cacheSnapshot)) {
-          await this.outbox.queueFullCacheSync(cacheSnapshot);
-        }
+        await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
       });
     } catch (error) {
       this.updateRuntimeStatus({
@@ -173,9 +166,7 @@ export class CachedRepository
 
     try {
       await this.flushPendingInternal();
-      await this.syncCacheFromRemote({
-        preserveLocalIfRemoteEmpty: true,
-      });
+      await this.syncCacheFromRemote();
     } catch (error) {
       logger.error('Initial outbox flush failed', error);
     }
@@ -195,9 +186,7 @@ export class CachedRepository
 
   private async refreshImpl(): Promise<void> {
     await this.flushPendingInternal();
-    await this.syncCacheFromRemote({
-      preserveLocalIfRemoteEmpty: true,
-    });
+    await this.syncCacheFromRemote();
   }
 
   private async flushPendingInternal(): Promise<void> {
@@ -884,9 +873,7 @@ export class CachedRepository
     return withAsyncKeyedMutex(this.outboxPath(), operation);
   }
 
-  private async syncCacheFromRemote(options?: {
-    preserveLocalIfRemoteEmpty?: boolean;
-  }): Promise<void> {
+  private async syncCacheFromRemote(): Promise<void> {
     const remoteSnapshot = await this.remote.exportSnapshot();
 
     await this.withLocalStateLock(async () => {
@@ -894,8 +881,6 @@ export class CachedRepository
       const cacheSnapshot = await this.cache.exportSnapshot();
       logger.debug('Syncing cache from remote snapshot', {
         repositoryKind: this.kind,
-        preserveLocalIfRemoteEmpty:
-          options?.preserveLocalIfRemoteEmpty ?? false,
         pendingOps: this.outbox.length,
         cacheNodeCount: Object.keys(cacheSnapshot.manifest.nodes).length,
         cacheNoteCount: Object.keys(cacheSnapshot.notes).length,
@@ -923,22 +908,6 @@ export class CachedRepository
             pendingOps: this.outbox.length,
           },
         );
-        this.updateRuntimeStatus({
-          online: true,
-          lastRemoteSyncAt: Date.now(),
-          lastError: null,
-        });
-        return;
-      }
-
-      if (
-        options?.preserveLocalIfRemoteEmpty &&
-        isSnapshotEmpty(remoteSnapshot) &&
-        !isSnapshotEmpty(cacheSnapshot)
-      ) {
-        logger.debug('Preserved local cache because remote snapshot is empty', {
-          repositoryKind: this.kind,
-        });
         this.updateRuntimeStatus({
           online: true,
           lastRemoteSyncAt: Date.now(),

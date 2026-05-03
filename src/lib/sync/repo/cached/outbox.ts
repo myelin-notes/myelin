@@ -7,7 +7,7 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
-import { createNodeId, type RepositorySnapshot } from '../shared';
+import { createNodeId } from '../shared';
 
 export type PendingOp =
   | {
@@ -336,28 +336,6 @@ export class CachedRepositoryOutbox {
 
     mutator(this.pendingOps);
     await this.save();
-  }
-
-  async queueFullCacheSync(snapshot: RepositorySnapshot): Promise<void> {
-    await this.mutate(
-      (ops) => {
-        if (snapshot.manifest.customColors.length > 0) {
-          enqueueCustomColorsSync(ops);
-        }
-
-        for (const node of Object.values(snapshot.manifest.nodes)) {
-          enqueueUpsertManifestNode(ops, node.id);
-          if (node.type === 'file') {
-            enqueuePushNote(
-              ops,
-              node.id,
-              node.fileType === 'mcanvas' ? undefined : null,
-            );
-          }
-        }
-      },
-      { reload: false },
-    );
   }
 
   async load(): Promise<void> {

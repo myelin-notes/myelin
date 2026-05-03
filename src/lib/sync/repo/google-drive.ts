@@ -72,14 +72,26 @@ export class GoogleDriveRepository extends BaseRepository {
   }> {
     const manifestFile = await this.findManifestFile();
     if (!manifestFile) {
-      return { manifest: createEmptyManifest(), revision: null };
+      const manifest = createEmptyManifest();
+      const revision = await this.saveManifestImpl(
+        manifest,
+        null,
+        'Initialize empty repository',
+      );
+      return { manifest, revision };
     }
 
     const bytes = await this.getFileBytes(manifestFile.id);
     if (bytes.byteLength === 0) {
+      const manifest = createEmptyManifest();
+      const revision = await this.saveManifestImpl(
+        manifest,
+        manifestFile.headRevisionId ?? null,
+        'Initialize empty repository',
+      );
       return {
-        manifest: createEmptyManifest(),
-        revision: manifestFile.headRevisionId ?? null,
+        manifest,
+        revision,
       };
     }
 

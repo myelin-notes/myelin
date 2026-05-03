@@ -6,6 +6,7 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { GoogleDriveRepository } from './google-drive';
+import { createEmptyManifest } from './shared';
 
 function createRepository() {
   return new GoogleDriveRepository({
@@ -18,8 +19,9 @@ describe('GoogleDriveRepository', () => {
     resetRepositoryTestDoubles();
   });
 
-  it('treats a missing manifest as an empty repository', async () => {
+  it('initializes a missing manifest as an empty repository', async () => {
     const repository = createRepository();
+    const driveApi = getRepositoryTestGoogleDriveApi();
 
     const stats = await repository.getStats();
 
@@ -28,6 +30,18 @@ describe('GoogleDriveRepository', () => {
       totalFolders: 0,
       totalTags: 0,
     });
+
+    const manifestFile = driveApi.readFileByAppProperty(
+      'myelin_role',
+      'manifest',
+    );
+    expect(manifestFile).not.toBeNull();
+    const manifestBytes = manifestFile
+      ? driveApi.readBytes(manifestFile.id)
+      : null;
+    expect(
+      JSON.parse(new TextDecoder().decode(manifestBytes ?? new Uint8Array())),
+    ).toEqual(createEmptyManifest());
   });
 
   it('creates a Drive folder, manifest, and note content through the transport', async () => {

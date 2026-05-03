@@ -138,15 +138,6 @@ export class LocalRepository extends BaseRepository {
     await file.close();
   }
 
-  protected async onFileSaved(nodeId: string): Promise<void> {
-    await this.mutateManifest('Touch file', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (node && node.type === 'file') {
-        node.modifiedAt = Date.now();
-      }
-    });
-  }
-
   protected async loadManifestImpl(): Promise<{
     manifest: VFSManifest;
     revision: string | null;

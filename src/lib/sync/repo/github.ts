@@ -78,7 +78,13 @@ export class GitHubRepository extends BaseRepository {
   }> {
     const payload = await this.getContents(MANIFEST_PATH);
     if (!payload.bytes || payload.bytes.byteLength === 0) {
-      return { manifest: createEmptyManifest(), revision: payload.sha };
+      const manifest = createEmptyManifest();
+      const revision = await this.saveManifestImpl(
+        manifest,
+        payload.sha,
+        'Initialize empty repository',
+      );
+      return { manifest, revision };
     }
 
     const text = new TextDecoder().decode(payload.bytes);

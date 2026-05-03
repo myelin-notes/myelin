@@ -105,7 +105,14 @@ export abstract class BaseRepository
 
   protected async onFileCreated(_nodeId: string): Promise<void> {}
 
-  protected async onFileSaved(_nodeId: string): Promise<void> {}
+  protected async onFileSaved(nodeId: string): Promise<void> {
+    await this.mutateManifest('Touch file', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (node && node.type === 'file') {
+        node.modifiedAt = Date.now();
+      }
+    });
+  }
 
   getRuntimeStatus(): RepositoryRuntimeStatus {
     return { ...this.runtimeStatus };

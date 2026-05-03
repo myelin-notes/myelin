@@ -228,6 +228,12 @@ export function ExplorerTree({
     reload();
   }, [reload]);
 
+  useEffect(() => {
+    if (repositoryStatus.lastRemoteSyncAt !== null) {
+      reload();
+    }
+  }, [reload, repositoryStatus.lastRemoteSyncAt]);
+
   const reloadAndNotify = useCallback(async () => {
     await reload();
     onChanged?.();

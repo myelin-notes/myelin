@@ -28,6 +28,7 @@ import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note-navigation';
 import {
   useRepository,
+  useRepositoryStatus,
   type VFSFileNode,
   type VFSFolderNode,
 } from '@/lib/sync';
@@ -66,6 +67,7 @@ export function LibraryPage() {
   const strings = useMessages();
   const locale = useLocale();
   const repository = useRepository();
+  const repositoryStatus = useRepositoryStatus();
   const navigate = useNavigate();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -230,6 +232,12 @@ export function LibraryPage() {
   useEffect(() => {
     void loadRecentFiles();
   }, [loadRecentFiles]);
+
+  useEffect(() => {
+    if (repositoryStatus.lastRemoteSyncAt !== null) {
+      refreshLibraryData();
+    }
+  }, [refreshLibraryData, repositoryStatus.lastRemoteSyncAt]);
 
   // Update breadcrumbs when folder changes
   useEffect(() => {

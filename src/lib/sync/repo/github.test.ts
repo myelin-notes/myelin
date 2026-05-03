@@ -6,7 +6,12 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { GitHubRepository } from './github';
-import { getNotePath, getStoredFilePath, MANIFEST_PATH } from './shared';
+import {
+  createEmptyManifest,
+  getNotePath,
+  getStoredFilePath,
+  MANIFEST_PATH,
+} from './shared';
 
 function createRepository() {
   return new GitHubRepository({
@@ -22,8 +27,9 @@ describe('GitHubRepository', () => {
     resetRepositoryTestDoubles();
   });
 
-  it('treats missing manifest content as an empty repository', async () => {
+  it('initializes missing manifest content as an empty repository', async () => {
     const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
 
     const stats = await repository.getStats();
 
@@ -32,6 +38,7 @@ describe('GitHubRepository', () => {
       totalFolders: 0,
       totalTags: 0,
     });
+    expect(githubApi.readJson(MANIFEST_PATH)).toEqual(createEmptyManifest());
   });
 
   it('writes manifest and note contents through the transport', async () => {
@@ -92,6 +99,7 @@ describe('GitHubRepository', () => {
     const repository = createRepository();
     const githubApi = getRepositoryTestGitHubApi();
 
+    await repository.initialize();
     githubApi.failNextPut(MANIFEST_PATH);
 
     const folderId = await repository.createFolder('Retry folder', null);
