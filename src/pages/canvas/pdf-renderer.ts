@@ -168,9 +168,9 @@ export function getPdfRenderScale(params: {
     MAX_RENDER_PIXELS / (params.pageSize.w * params.pageSize.h),
   );
 
-  return Math.max(
-    MIN_RENDER_SCALE,
-    Math.min(desiredScale, maxScaleForPixels, MAX_RENDER_SCALE),
+  return Math.min(
+    Math.max(MIN_RENDER_SCALE, Math.min(desiredScale, MAX_RENDER_SCALE)),
+    maxScaleForPixels,
   );
 }
 

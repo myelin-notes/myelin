@@ -59,6 +59,23 @@ function clonePageOrder(pageOrder: PdfPageOrderEntry[]): PdfPageOrderEntry[] {
   }));
 }
 
+function arePageSizesEqual(left: PdfPageSize[], right: PdfPageSize[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((size, i) => size.w === right[i].w && size.h === right[i].h)
+  );
+}
+
+function arePageOrdersEqual(
+  left: PdfPageOrderEntry[],
+  right: PdfPageOrderEntry[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((entry, i) => entry.originalIndex === right[i].originalIndex)
+  );
+}
+
 function getPositiveScale(value: number): number {
   return Math.max(Math.abs(value), 0.001);
 }
@@ -256,19 +273,47 @@ export class PdfElement extends DrawableElement {
   private setPageSizes(pageSizes: PdfPageSize[], sync: boolean): void {
     const nextPageSizes =
       pageSizes.length > 0 ? pageSizes : [DEFAULT_PAGE_SIZE];
-    this._pageSizes = clonePageSizes(nextPageSizes);
-    this._pageOrder = normalizePdfPageOrder(
+    const nextPageOrder = normalizePdfPageOrder(
       this._pageOrder,
-      this._pageSizes.length,
+      nextPageSizes.length,
     );
+    const shouldSync =
+      sync && this.shouldSyncPageMetadata(nextPageSizes, nextPageOrder);
+
+    this._pageSizes = clonePageSizes(nextPageSizes);
+    this._pageOrder = clonePageOrder(nextPageOrder);
     this.invalidatePageRenders();
 
-    if (sync) {
+    if (shouldSync) {
       this.syncToYMap({
         pageSizes: clonePageSizes(this._pageSizes),
         pageOrder: clonePageOrder(this.pageEntries),
       });
     }
+  }
+
+  private shouldSyncPageMetadata(
+    pageSizes: PdfPageSize[],
+    pageOrder: PdfPageOrderEntry[],
+  ): boolean {
+    if (!this._yMap) {
+      return false;
+    }
+
+    if (!this._yMap.has('pageSizes') || !this._yMap.has('pageOrder')) {
+      return true;
+    }
+
+    return (
+      !arePageSizesEqual(
+        normalizePdfPageSizes(this._yMap.get('pageSizes')),
+        pageSizes,
+      ) ||
+      !arePageOrdersEqual(
+        normalizePdfPageOrder(this._yMap.get('pageOrder'), pageSizes.length),
+        pageOrder,
+      )
+    );
   }
 
   private async loadPdfBytes(
@@ -299,23 +344,35 @@ export class PdfElement extends DrawableElement {
 
   private invalidatePageRenders(): void {
     for (const pageDom of this._pageDoms) {
-      pageDom.renderHandle?.cancel();
-      pageDom.renderHandle = null;
-      pageDom.renderedPageIndex = null;
-      pageDom.renderedScale = null;
-      pageDom.renderingPageIndex = null;
-      pageDom.renderingScale = null;
-      delete pageDom.root.dataset.rendering;
+      this.releasePageRender(pageDom, true);
     }
   }
 
   private cancelPageRenders(): void {
     for (const pageDom of this._pageDoms) {
-      pageDom.renderHandle?.cancel();
-      pageDom.renderHandle = null;
-      pageDom.renderingPageIndex = null;
-      pageDom.renderingScale = null;
-      delete pageDom.root.dataset.rendering;
+      this.releasePageRender(pageDom, false);
+    }
+  }
+
+  private releasePageRender(
+    pageDom: PdfPageDom,
+    clearRenderedCanvas: boolean,
+  ): void {
+    pageDom.renderHandle?.cancel();
+    pageDom.renderHandle = null;
+    pageDom.renderingPageIndex = null;
+    pageDom.renderingScale = null;
+    delete pageDom.root.dataset.rendering;
+
+    if (!clearRenderedCanvas) {
+      return;
+    }
+
+    pageDom.renderedPageIndex = null;
+    pageDom.renderedScale = null;
+    if (pageDom.canvas.width !== 1 || pageDom.canvas.height !== 1) {
+      pageDom.canvas.width = 1;
+      pageDom.canvas.height = 1;
     }
   }
 
@@ -394,11 +451,9 @@ export class PdfElement extends DrawableElement {
           renderScale,
         );
       } else if (pageDom.renderHandle) {
-        pageDom.renderHandle.cancel();
-        pageDom.renderHandle = null;
-        pageDom.renderingPageIndex = null;
-        pageDom.renderingScale = null;
-        delete pageDom.root.dataset.rendering;
+        this.releasePageRender(pageDom, true);
+      } else if (pageDom.renderedPageIndex !== null) {
+        this.releasePageRender(pageDom, true);
       }
 
       localTop += pageSize.h + PAGE_GAP;
@@ -537,6 +592,8 @@ export class PdfElement extends DrawableElement {
     root.dataset.pdfPage = 'true';
 
     const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
     Object.assign(canvas.style, {
       display: 'block',
       width: '100%',
