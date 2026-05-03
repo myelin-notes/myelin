@@ -1,6 +1,19 @@
 import type * as Y from 'yjs';
+import { Logger } from '@/lib/logger';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
+import {
+  createDefaultPdfPageOrder,
+  getPdfRenderScale,
+  isPdfRenderCancelled,
+  loadPdfDocument,
+  normalizePdfPageOrder,
+  normalizePdfPageSizes,
+  type PdfPageOrderEntry,
+  type PdfPageRenderHandle,
+  type PdfPageSize,
+  renderPdfPageToCanvas,
+} from '../pdf-renderer';
 import { bindYFields } from '../y-fields';
 import { DrawableElement, ResizeHandles } from './drawable-element';
 import { ElementType } from './element-type';
@@ -10,17 +23,58 @@ import {
   CHROME_SIDE_PADDING,
   FrameChrome,
 } from './frame-chrome';
-import { PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
+import { PAGE_GAP, PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
+
+const logger = new Logger('PdfElement');
+const DEFAULT_PAGE_SIZE: PdfPageSize = { w: PAGE_WIDTH, h: PAGE_HEIGHT };
+const PAGE_RENDER_MARGIN = PAGE_GAP * 2;
+
+interface PdfPageDom {
+  root: HTMLDivElement;
+  canvas: HTMLCanvasElement;
+  renderHandle: PdfPageRenderHandle | null;
+  renderedPageIndex: number | null;
+  renderedScale: number | null;
+  renderingPageIndex: number | null;
+  renderingScale: number | null;
+}
 
 function snapToDevicePixel(value: number): number {
   const dpr = window.devicePixelRatio || 1;
   return Math.round(value * dpr) / dpr;
 }
 
+function cloneBytes(bytes: Uint8Array): Uint8Array {
+  return new Uint8Array(bytes);
+}
+
+function clonePageSizes(pageSizes: PdfPageSize[]): PdfPageSize[] {
+  return pageSizes.map((size) => ({ w: size.w, h: size.h }));
+}
+
+function clonePageOrder(pageOrder: PdfPageOrderEntry[]): PdfPageOrderEntry[] {
+  return pageOrder.map((entry) => ({
+    kind: entry.kind,
+    originalIndex: entry.originalIndex,
+  }));
+}
+
+function getPositiveScale(value: number): number {
+  return Math.max(Math.abs(value), 0.001);
+}
+
 export class PdfElement extends DrawableElement {
   private _pdfBytes: Uint8Array | null = null;
   private _fileName: string = '';
+  private _pageSizes: PdfPageSize[] = [DEFAULT_PAGE_SIZE];
+  private _pageOrder: PdfPageOrderEntry[] = createDefaultPdfPageOrder(1);
+  private _pdfDocument:
+    | Awaited<ReturnType<typeof loadPdfDocument>>['document']
+    | null = null;
   private _chrome: FrameChrome | null = null;
+  private _contentRoot: HTMLDivElement | null = null;
+  private _pageDoms: PdfPageDom[] = [];
+  private _loadGeneration = 0;
 
   constructor(index: number) {
     super(index, ElementType.PDF);
@@ -37,12 +91,12 @@ export class PdfElement extends DrawableElement {
   public override getYMapProps(): Record<string, unknown> {
     const props: Record<string, unknown> = {
       fileName: this._fileName,
-      pageSizes: [{ w: PAGE_WIDTH, h: PAGE_HEIGHT }],
-      pageOrder: [{ kind: 'pdf', originalIndex: 0 }],
+      pageSizes: clonePageSizes(this._pageSizes),
+      pageOrder: clonePageOrder(this.pageEntries),
     };
 
     if (this._pdfBytes) {
-      props.pdfData = new Uint8Array(this._pdfBytes);
+      props.pdfData = cloneBytes(this._pdfBytes);
     }
 
     return props;
@@ -51,8 +105,16 @@ export class PdfElement extends DrawableElement {
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
     bindYFields(yMap, {
+      pageSizes: (v) => {
+        this.setPageSizes(normalizePdfPageSizes(v), false);
+      },
+      pageOrder: (v) => {
+        this._pageOrder = normalizePdfPageOrder(v, this._pageSizes.length);
+        this.invalidatePageRenders();
+      },
       pdfData: (v) => {
-        this._pdfBytes = new Uint8Array(v as Uint8Array);
+        this._pdfBytes = cloneBytes(v as Uint8Array);
+        void this.loadPdfBytes(this._pdfBytes, true);
       },
       fileName: (v) => {
         this._fileName = (v as string) ?? '';
@@ -61,17 +123,24 @@ export class PdfElement extends DrawableElement {
     });
   }
 
-  public setInitialPdfData(bytes: Uint8Array, fileName: string): void {
-    this._pdfBytes = bytes;
+  public setInitialPdfData(
+    bytes: Uint8Array,
+    fileName: string,
+    pageSizes: PdfPageSize[] = [DEFAULT_PAGE_SIZE],
+  ): void {
+    this._pdfBytes = cloneBytes(bytes);
     this._fileName = fileName;
     this._chrome?.setFileName(fileName || null);
+    this.setPageSizes(pageSizes, false);
 
     this.syncToYMap({
-      pdfData: new Uint8Array(bytes),
-      pageSizes: [{ w: PAGE_WIDTH, h: PAGE_HEIGHT }],
-      pageOrder: [{ kind: 'pdf', originalIndex: 0 }],
+      pdfData: cloneBytes(this._pdfBytes),
+      pageSizes: clonePageSizes(this._pageSizes),
+      pageOrder: clonePageOrder(this.pageEntries),
       fileName,
     });
+
+    void this.loadPdfBytes(this._pdfBytes, false);
   }
 
   public get fileName(): string {
@@ -83,11 +152,16 @@ export class PdfElement extends DrawableElement {
   }
 
   public get totalWidth(): number {
-    return PAGE_WIDTH;
+    return Math.max(
+      ...this.pageEntries.map((entry) => this.getPageSize(entry).w),
+    );
   }
 
   public get totalHeight(): number {
-    return PAGE_HEIGHT;
+    return this.pageEntries.reduce((height, entry, i) => {
+      const gap = i > 0 ? PAGE_GAP : 0;
+      return height + gap + this.getPageSize(entry).h;
+    }, 0);
   }
 
   public get localBoundingBox(): DOMRect {
@@ -141,21 +215,284 @@ export class PdfElement extends DrawableElement {
 
     const zoom = viewport.zoom;
     const offset = viewport.offset;
+    const scaleX = getPositiveScale(this._scale.x);
+    const scaleY = getPositiveScale(this._scale.y);
+    const contentWidth = this.totalWidth * scaleX;
+    const contentHeight = this.totalHeight * scaleY;
     const screenX = snapToDevicePixel((this.offset.x + offset.x) * zoom);
     const screenY = snapToDevicePixel((this.offset.y + offset.y) * zoom);
 
     this._chrome?.sync({
       screenX,
       screenY,
-      contentWidth: this.totalWidth * this._scale.x,
-      contentHeight: this.totalHeight * this._scale.y,
+      contentWidth,
+      contentHeight,
       zoom,
     });
+
+    this.syncContentRoot(contentWidth, contentHeight, zoom);
+    this.syncPageDoms(viewport, zoom, scaleX, scaleY);
   }
 
   public override disposeDOM(): void {
+    this._loadGeneration++;
+    this.cancelPageRenders();
+    void this._pdfDocument?.destroy();
+    this._pdfDocument = null;
+    this._pageDoms = [];
+    this._contentRoot = null;
     this._chrome?.dispose();
     this._chrome = null;
+  }
+
+  private get pageEntries(): PdfPageOrderEntry[] {
+    return normalizePdfPageOrder(this._pageOrder, this._pageSizes.length);
+  }
+
+  private getPageSize(entry: PdfPageOrderEntry): PdfPageSize {
+    return this._pageSizes[entry.originalIndex] ?? DEFAULT_PAGE_SIZE;
+  }
+
+  private setPageSizes(pageSizes: PdfPageSize[], sync: boolean): void {
+    const nextPageSizes =
+      pageSizes.length > 0 ? pageSizes : [DEFAULT_PAGE_SIZE];
+    this._pageSizes = clonePageSizes(nextPageSizes);
+    this._pageOrder = normalizePdfPageOrder(
+      this._pageOrder,
+      this._pageSizes.length,
+    );
+    this.invalidatePageRenders();
+
+    if (sync) {
+      this.syncToYMap({
+        pageSizes: clonePageSizes(this._pageSizes),
+        pageOrder: clonePageOrder(this.pageEntries),
+      });
+    }
+  }
+
+  private async loadPdfBytes(
+    bytes: Uint8Array,
+    syncMetadata: boolean,
+  ): Promise<void> {
+    const generation = ++this._loadGeneration;
+    try {
+      const loaded = await loadPdfDocument(bytes);
+      if (generation !== this._loadGeneration) {
+        await loaded.document.destroy();
+        return;
+      }
+
+      void this._pdfDocument?.destroy();
+      this._pdfDocument = loaded.document;
+      this.setPageSizes(loaded.pageSizes, syncMetadata);
+    } catch (error) {
+      if (generation !== this._loadGeneration) {
+        return;
+      }
+      logger.error('Failed to load PDF', error, {
+        index: this.index,
+        fileName: this._fileName,
+      });
+    }
+  }
+
+  private invalidatePageRenders(): void {
+    for (const pageDom of this._pageDoms) {
+      pageDom.renderHandle?.cancel();
+      pageDom.renderHandle = null;
+      pageDom.renderedPageIndex = null;
+      pageDom.renderedScale = null;
+      pageDom.renderingPageIndex = null;
+      pageDom.renderingScale = null;
+      delete pageDom.root.dataset.rendering;
+    }
+  }
+
+  private cancelPageRenders(): void {
+    for (const pageDom of this._pageDoms) {
+      pageDom.renderHandle?.cancel();
+      pageDom.renderHandle = null;
+      pageDom.renderingPageIndex = null;
+      pageDom.renderingScale = null;
+      delete pageDom.root.dataset.rendering;
+    }
+  }
+
+  private syncContentRoot(
+    contentWidth: number,
+    contentHeight: number,
+    zoom: number,
+  ): void {
+    if (!this._contentRoot) {
+      return;
+    }
+
+    this._contentRoot.style.width = `${contentWidth * zoom}px`;
+    this._contentRoot.style.height = `${contentHeight * zoom}px`;
+  }
+
+  private syncPageDoms(
+    viewport: CanvasViewport,
+    zoom: number,
+    scaleX: number,
+    scaleY: number,
+  ): void {
+    const contentRoot = this._contentRoot;
+    if (!contentRoot) {
+      return;
+    }
+
+    const entries = this.pageEntries;
+    while (this._pageDoms.length < entries.length) {
+      this._pageDoms.push(this.createPageDom(contentRoot));
+    }
+    while (this._pageDoms.length > entries.length) {
+      const pageDom = this._pageDoms.pop()!;
+      pageDom.renderHandle?.cancel();
+      pageDom.root.remove();
+    }
+
+    const worldRect = viewport.getWorldRect();
+    const dpr = window.devicePixelRatio || 1;
+    let localTop = 0;
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const pageSize = this.getPageSize(entry);
+      const pageDom = this._pageDoms[i];
+      const localLeft = (this.totalWidth - pageSize.w) / 2;
+      const cssLeft = localLeft * scaleX * zoom;
+      const cssTop = localTop * scaleY * zoom;
+      const cssWidth = pageSize.w * scaleX * zoom;
+      const cssHeight = pageSize.h * scaleY * zoom;
+
+      pageDom.root.style.transform = `translate(${cssLeft}px, ${cssTop}px)`;
+      pageDom.root.style.width = `${cssWidth}px`;
+      pageDom.root.style.height = `${cssHeight}px`;
+
+      if (
+        this.isPageVisible(
+          worldRect,
+          localLeft,
+          localTop,
+          pageSize,
+          scaleX,
+          scaleY,
+        )
+      ) {
+        const renderScale = getPdfRenderScale({
+          pageSize,
+          zoom,
+          elementScale: Math.max(scaleX, scaleY),
+          dpr,
+        });
+        this.requestPageRender(
+          pageDom,
+          entry.originalIndex,
+          pageSize,
+          renderScale,
+        );
+      } else if (pageDom.renderHandle) {
+        pageDom.renderHandle.cancel();
+        pageDom.renderHandle = null;
+        pageDom.renderingPageIndex = null;
+        pageDom.renderingScale = null;
+        delete pageDom.root.dataset.rendering;
+      }
+
+      localTop += pageSize.h + PAGE_GAP;
+    }
+  }
+
+  private isPageVisible(
+    worldRect: DOMRect,
+    localLeft: number,
+    localTop: number,
+    pageSize: PdfPageSize,
+    scaleX: number,
+    scaleY: number,
+  ): boolean {
+    const pageLeft = this.offset.x + localLeft * scaleX;
+    const pageTop = this.offset.y + localTop * scaleY;
+    const pageRight = pageLeft + pageSize.w * scaleX;
+    const pageBottom = pageTop + pageSize.h * scaleY;
+
+    return (
+      pageRight >= worldRect.left &&
+      pageLeft <= worldRect.right &&
+      pageBottom >= worldRect.top - PAGE_RENDER_MARGIN &&
+      pageTop <= worldRect.bottom + PAGE_RENDER_MARGIN
+    );
+  }
+
+  private requestPageRender(
+    pageDom: PdfPageDom,
+    pageIndex: number,
+    pageSize: PdfPageSize,
+    renderScale: number,
+  ): void {
+    const document = this._pdfDocument;
+    if (!document) {
+      return;
+    }
+
+    if (
+      pageDom.renderedPageIndex === pageIndex &&
+      pageDom.renderedScale === renderScale
+    ) {
+      return;
+    }
+
+    if (
+      pageDom.renderingPageIndex === pageIndex &&
+      pageDom.renderingScale === renderScale
+    ) {
+      return;
+    }
+
+    pageDom.renderHandle?.cancel();
+    pageDom.renderingPageIndex = pageIndex;
+    pageDom.renderingScale = renderScale;
+    pageDom.root.dataset.rendering = 'true';
+
+    const handle = renderPdfPageToCanvas({
+      document,
+      pageIndex,
+      canvas: pageDom.canvas,
+      renderScale,
+    });
+    pageDom.renderHandle = handle;
+
+    void handle.promise
+      .then(() => {
+        if (pageDom.renderHandle !== handle) {
+          return;
+        }
+        pageDom.renderHandle = null;
+        pageDom.renderedPageIndex = pageIndex;
+        pageDom.renderedScale = renderScale;
+        pageDom.renderingPageIndex = null;
+        pageDom.renderingScale = null;
+        delete pageDom.root.dataset.rendering;
+      })
+      .catch((error) => {
+        if (isPdfRenderCancelled(error) || pageDom.renderHandle !== handle) {
+          return;
+        }
+        pageDom.renderHandle = null;
+        pageDom.renderingPageIndex = null;
+        pageDom.renderingScale = null;
+        delete pageDom.root.dataset.rendering;
+        logger.error('Failed to render PDF page', error, {
+          index: this.index,
+          fileName: this._fileName,
+          pageIndex,
+          pageWidth: pageSize.w,
+          pageHeight: pageSize.h,
+          renderScale,
+        });
+      });
   }
 
   private createDom(host: HTMLElement): void {
@@ -166,7 +503,59 @@ export class PdfElement extends DrawableElement {
     chrome.setFileName(this._fileName || null);
     chrome.root.dataset.elementIndex = String(this.index);
     chrome.root.dataset.elementType = 'pdf';
+
+    const contentRoot = document.createElement('div');
+    Object.assign(contentRoot.style, {
+      position: 'absolute',
+      left: '0px',
+      top: '0px',
+      transformOrigin: '0 0',
+      overflow: 'hidden',
+      pointerEvents: 'none',
+    } as Partial<CSSStyleDeclaration>);
+    contentRoot.dataset.pdfContent = 'true';
+
+    chrome.contentSlot.appendChild(contentRoot);
     host.appendChild(chrome.root);
     this._chrome = chrome;
+    this._contentRoot = contentRoot;
+  }
+
+  private createPageDom(contentRoot: HTMLDivElement): PdfPageDom {
+    const root = document.createElement('div');
+    Object.assign(root.style, {
+      position: 'absolute',
+      left: '0px',
+      top: '0px',
+      transformOrigin: '0 0',
+      overflow: 'hidden',
+      background: '#ffffff',
+      border: '1px solid var(--border-ghost)',
+      boxSizing: 'border-box',
+      pointerEvents: 'none',
+    } as Partial<CSSStyleDeclaration>);
+    root.dataset.pdfPage = 'true';
+
+    const canvas = document.createElement('canvas');
+    Object.assign(canvas.style, {
+      display: 'block',
+      width: '100%',
+      height: '100%',
+      background: '#ffffff',
+      pointerEvents: 'none',
+    } as Partial<CSSStyleDeclaration>);
+
+    root.appendChild(canvas);
+    contentRoot.appendChild(root);
+
+    return {
+      root,
+      canvas,
+      renderHandle: null,
+      renderedPageIndex: null,
+      renderedScale: null,
+      renderingPageIndex: null,
+      renderingScale: null,
+    };
   }
 }

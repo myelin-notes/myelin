@@ -431,6 +431,7 @@ const zhHans: typeof en = {
       errors: {
         unsupportedUrl: '该链接指向的不是图片或 PDF',
         fetchFailed: '无法获取该链接',
+        embedFailed: '无法嵌入该文件',
         unsupportedType: '',
         unsupportedDesc: () => {
           throw new Error('not yet implemented language');

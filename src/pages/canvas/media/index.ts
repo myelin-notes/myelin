@@ -14,7 +14,7 @@ export type MediaImportHandler = (
   blob: Blob,
   canvas: DrawableCanvas,
   options?: MediaImportOptions,
-) => void;
+) => void | Promise<void>;
 
 export const SUPPORTED_MEDIA: Record<string, MediaImportHandler> = {
   'image/jpeg': imageImportHandler,

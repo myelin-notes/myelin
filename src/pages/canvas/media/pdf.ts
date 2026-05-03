@@ -1,5 +1,6 @@
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PdfElement } from '../elements/pdf-element';
+import { getPdfPageSizes } from '../pdf-renderer';
 import type { MediaImportOptions } from './index';
 
 export async function pdfImportHandler(
@@ -8,9 +9,10 @@ export async function pdfImportHandler(
   options: MediaImportOptions = {},
 ) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
+  const pageSizes = await getPdfPageSizes(bytes);
   const pdf = canvas.addElement((i) => new PdfElement(i));
   const fileName = blob instanceof File ? blob.name : '';
-  pdf.setInitialPdfData(bytes, fileName);
+  pdf.setInitialPdfData(bytes, fileName, pageSizes);
 
   const dpr = window.devicePixelRatio || 1;
   const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;

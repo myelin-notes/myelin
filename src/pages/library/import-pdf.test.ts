@@ -8,6 +8,15 @@ import {
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { importPdfFile, isPdfFile } from './import-pdf';
 
+vi.mock('@/pages/canvas/pdf-renderer', () => ({
+  createDefaultPdfPageOrder: (pageCount: number) =>
+    Array.from({ length: pageCount }, (_, originalIndex) => ({
+      kind: 'pdf',
+      originalIndex,
+    })),
+  getPdfPageSizes: vi.fn(async () => [{ w: 680, h: 880 }]),
+}));
+
 function createRepository(session: Partial<NoteSession>) {
   return {
     getUniqueFileName: vi.fn(async (name: string) => name),

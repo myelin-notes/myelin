@@ -4,6 +4,7 @@ import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import { type FileType, getFileTypeForName, type Repository } from '@/lib/sync';
 import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
+import { getPdfPageSizes } from '@/pages/canvas/pdf-renderer';
 import { addPdfElementToYDoc } from '@/pages/library/import-pdf';
 
 const logger = new Logger('ObsidianVaultImport');
@@ -318,6 +319,7 @@ async function importPdfVaultFile({
   parentId: string;
 }): Promise<void> {
   const bytes = await readFile(file.absolutePath);
+  const pageSizes = await getPdfPageSizes(bytes);
   const nodeId = await repository.createFile(
     getPdfCanvasName(file.name),
     'mcanvas',
@@ -325,7 +327,7 @@ async function importPdfVaultFile({
   );
   const session = await repository.openSession(nodeId);
   try {
-    addPdfElementToYDoc(session.ydoc, bytes, file.name);
+    addPdfElementToYDoc(session.ydoc, bytes, file.name, pageSizes);
     await session.save();
   } finally {
     await session.close().catch(() => {});

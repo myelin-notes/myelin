@@ -5,6 +5,11 @@ import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
 } from '@/pages/canvas/elements/page-frame-constants';
+import {
+  createDefaultPdfPageOrder,
+  getPdfPageSizes,
+  type PdfPageSize,
+} from '@/pages/canvas/pdf-renderer';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 
 const logger = new Logger('PdfImport');
@@ -29,6 +34,7 @@ export function addPdfElementToYDoc(
   ydoc: YDocManager,
   bytes: Uint8Array,
   fileName: string,
+  pageSizes: PdfPageSize[] = [{ w: PAGE_WIDTH, h: PAGE_HEIGHT }],
 ): number {
   const index = ydoc.nextIndex;
 
@@ -38,8 +44,8 @@ export function addPdfElementToYDoc(
     scaleX: 1,
     scaleY: 1,
     pdfData: new Uint8Array(bytes),
-    pageSizes: [{ w: PAGE_WIDTH, h: PAGE_HEIGHT }],
-    pageOrder: [{ kind: 'pdf', originalIndex: 0 }],
+    pageSizes,
+    pageOrder: createDefaultPdfPageOrder(pageSizes.length),
     fileName,
   });
 
@@ -66,11 +72,12 @@ export async function importPdfFile({
 
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
+    const pageSizes = await getPdfPageSizes(bytes);
     const baseTitle = getPdfCanvasTitle(file.name, fallbackTitle);
     const title = await repository.getUniqueFileName(baseTitle, parentId);
     createdId = await repository.createFile(title, 'mcanvas', parentId);
     session = await repository.openSession(createdId);
-    addPdfElementToYDoc(session.ydoc, bytes, file.name);
+    addPdfElementToYDoc(session.ydoc, bytes, file.name, pageSizes);
     await session.save();
     await session.close();
     session = null;
