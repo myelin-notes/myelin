@@ -13,7 +13,7 @@ The central design insight: **every note is a canvas with page frames.** There i
 Every note in Myelin is an infinite 2D canvas. On this canvas, users can:
 
 1. **Draw and write freely** with a stylus or mouse anywhere on the surface
-2. **Place elements freely** (images, text boxes, shapes) anywhere on the surface
+2. **Place elements freely** (PDFs, images, text boxes, shapes) anywhere on the surface
 3. **Use page frames** — rectangular document regions where structured content flows linearly across defined pages
 
 A page frame is an element that lives on the canvas. It behaves like a traditional document editor inside its bounds (content flows top-to-bottom, blocks stack vertically, pages break at defined heights), while the canvas space around it is fully usable for freeform annotation, margin notes, sketches, and diagrams.
@@ -35,7 +35,6 @@ A page frame is a rectangular region on the canvas with a defined width and heig
 
 - **Text** — Rich text with headings, bold/italic, lists, links, inline code
 - **Image** — Embedded images that flow within the document
-- **PDF Page** — A rendered page from an imported PDF (see PDF Handling below)
 - **Code** — Syntax-highlighted code blocks (executable in a future version)
 - **Spacer** — Blank vertical space for additional handwritten notes or breathing room
 - **Embed** — Links to other notes, external content, or embedded media
@@ -44,7 +43,7 @@ A page frame is a rectangular region on the canvas with a defined width and heig
 
 The data model supports multiple page frames on a single canvas. This enables workflows like:
 
-- A PDF page frame on the left, personal notes page frame on the right, with sketches and arrows connecting them on the canvas between
+- A PDF element on the left, personal notes page frame on the right, with sketches and arrows connecting them on the canvas between
 - Lecture slides in one frame, student notes in another, side by side
 - Multiple reference documents arranged spatially with synthesis notes in the surrounding canvas space
 
@@ -71,34 +70,34 @@ The ink layer is a transparent drawing surface that covers the entire canvas, in
 ### Key Behaviors
 
 - **Stylus auto-activation**: When a stylus touches the screen, the ink layer activates automatically. Finger/mouse input defaults to navigation and text editing. This should be configurable.
-- **Spatial anchoring**: Ink strokes drawn on or near a page frame are anchored to page-relative positions. If content above shifts (e.g., more text is inserted), ink strokes below shift with it, keeping annotations aligned with the content they relate to.
-- **Anywhere drawing**: Users can draw on top of page frames (annotating their own text or PDF pages), in the margins just outside a frame, or in the open canvas space between frames. There are no artificial boundaries on where ink can go.
+- **Spatial anchoring**: Ink strokes drawn on or near a page frame are anchored to page-relative positions. If content above shifts (e.g., more text is inserted), ink strokes below shift with it, keeping annotations aligned with the content they relate to. Ink over fixed-position elements such as PDFs anchors to the element's canvas position.
+- **Anywhere drawing**: Users can draw on top of page frames, PDF elements, in the margins just outside a frame, or in the open canvas space between elements. There are no artificial boundaries on where ink can go.
 
 ---
 
 ## PDF Handling
 
-PDFs are imported into a page frame as a sequence of PDF page blocks.
+PDFs are imported as standalone canvas elements. A PDF element owns the imported PDF bytes, file name, page metadata, page order, and any visual page slices needed for presentation.
+
+PDFs do not become page-frame blocks. They live on the same infinite canvas as page frames, images, strokes, and text boxes. This keeps PDF rendering independent from the structured document editor while still allowing users to annotate, arrange, resize, and relate PDFs spatially.
 
 ### Annotation
 
-- The ink layer allows drawing directly on top of any PDF page (highlights, underlines, handwritten notes)
-- Text blocks or spacer blocks can be inserted between any two PDF pages within the frame for typed annotations
+- The ink layer allows drawing directly on top of any PDF page (highlights, underlines, handwritten notes).
+- Typed annotations are separate canvas elements or page-frame content placed beside, above, below, or over the PDF element.
+- PDF annotations in Myelin are non-destructive by default: the original PDF bytes are preserved, and Myelin-owned marks remain separate until an explicit export operation flattens or writes them.
 
 ### Page Splitting
 
-Users can visually split a PDF page at a chosen y-coordinate, cutting it into two halves with a gap between them. This allows writing or drawing in the space between sections of a dense PDF page.
+Users can visually split a PDF page at a chosen y-coordinate, cutting it into two rendered slices with a gap between them. This allows writing or drawing in the space between sections of a dense PDF page.
 
 - The split is a visual operation — the page is rendered as two cropped regions, not a semantic reflow of PDF content
 - Works with any PDF regardless of layout complexity
-- The gap can contain typed text blocks, spacer blocks for handwriting, or both
+- The gap is canvas space. It can contain handwritten strokes, text elements, images, or a nearby page frame
 
-### PDF as Page Frame
+### Relationship to Page Frames
 
-An imported PDF naturally maps to the page frame concept — each PDF page has defined dimensions, just like a page frame's pages. A PDF import can either:
-
-- Insert PDF pages as blocks within an existing page frame (interleaved with the user's own content)
-- Create a new page frame containing only the PDF pages (useful for side-by-side multi-frame workflows — e.g., a PDF frame beside a notes frame)
+PDF elements and page frames are peers. A common research workflow is to place a PDF element next to a page frame, use the frame for structured notes, and draw connecting marks on the canvas between them.
 
 ---
 
@@ -121,13 +120,13 @@ These are **view presets**, not different data models. A user can start in Docum
 A single page frame, centered. The student types headings and bullet points into the frame. When the professor draws a diagram on the board, the student sketches it with a stylus in the margin space next to the relevant paragraph. Both live in the same note.
 
 **Researcher reading a paper:**
-Two page frames side by side. The left frame contains the imported PDF. The right frame contains the researcher's notes. On the canvas between them, the researcher draws arrows connecting specific passages to their notes and sketches a concept diagram.
+A PDF element and a page frame side by side. The PDF element contains the paper. The page frame contains the researcher's notes. On the canvas between them, the researcher draws arrows connecting specific passages to their notes and sketches a concept diagram.
 
 **Designer building a mood board:**
 Board mode, no page frames. Images, text boxes, and color swatches are placed freely on the canvas. The designer draws circles and arrows to group and connect ideas. Later, they add a page frame to write a structured design brief alongside the mood board.
 
 **Annotating a dense PDF:**
-A single page frame containing the PDF. The student draws highlights and margin notes with a stylus on top of the PDF pages. At one point, they split a dense page in half to create space and write a detailed explanation between two sections. They insert a blank spacer block between two PDF pages to sketch a diagram.
+A PDF element is centered on the canvas. The student draws highlights and margin notes with a stylus on top of the PDF pages. At one point, they split a dense page in half to create space and write a detailed explanation between two rendered slices. They place a text box or page frame nearby for longer notes.
 
 ---
 
@@ -158,6 +157,6 @@ A single page frame containing the PDF. The student draws highlights and margin 
 
 4. **Page frames bring structure.** Inside a page frame, content flows linearly across defined pages. This provides a familiar document editing experience without sacrificing the flexibility of the surrounding canvas.
 
-5. **PDFs are page frames.** Imported PDFs map naturally to the page frame concept — same defined dimensions, same annotation model. No special "PDF mode" is needed.
+5. **PDFs are first-class canvas elements.** Imported PDFs remain independent from page frames while sharing the same canvas, selection, positioning, annotation, and export model. No special "PDF mode" is needed.
 
 6. **Progressive disclosure.** A new user sees a clean, single-frame document editor. The canvas space, ink layer, multi-frame layouts, and board mode are available but don't clutter the default experience. The app should feel as simple as Apple Notes on first use and as powerful as needed when the user is ready.
