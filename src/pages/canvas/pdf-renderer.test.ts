@@ -71,4 +71,20 @@ describe('PDF render scale', () => {
     expect(scale).toBeCloseTo(0.04);
     expect(Math.ceil(100_000 * scale) ** 2).toBeLessThanOrEqual(16_000_000);
   });
+
+  it('accounts for canvas dimension rounding on extreme aspect ratios', () => {
+    const pageSize = { w: 1_000_000_000_000, h: 1 };
+    const scale = getPdfRenderScale({
+      pageSize,
+      zoom: 1,
+      elementScale: 1,
+      dpr: 1,
+    });
+
+    expect(
+      Math.ceil(pageSize.w * scale) * Math.ceil(pageSize.h * scale),
+    ).toBeLessThanOrEqual(16_000_000);
+    expect(Math.ceil(pageSize.w * scale)).toBeLessThanOrEqual(16_384);
+    expect(Math.ceil(pageSize.h * scale)).toBeLessThanOrEqual(16_384);
+  });
 });

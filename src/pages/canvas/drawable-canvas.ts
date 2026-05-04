@@ -71,6 +71,11 @@ export class DrawableCanvas {
   private _handlePointerMove!: (evt: PointerEvent) => void;
   private _handlePointerUp!: (evt: PointerEvent) => void;
   private _handleResize!: () => void;
+  private readonly _handleYArrayChange = (
+    event: Y.YArrayEvent<Y.Map<unknown>>,
+  ): void => {
+    this.handleYArrayChange(event);
+  };
 
   // Element editing state (e.g., page frame inline editing)
   private _editingElement: DrawableElement | null = null;
@@ -119,9 +124,7 @@ export class DrawableCanvas {
     );
 
     // Observe Y.Array for future add/remove (handles undo/redo + remote changes)
-    this._ydoc.elements.observe((event) => {
-      this.handleYArrayChange(event);
-    });
+    this._ydoc.elements.observe(this._handleYArrayChange);
   }
 
   public get ydoc(): YDocManager {
@@ -408,6 +411,13 @@ export class DrawableCanvas {
       this.endPlacement();
     }
     this.unsubBgPref?.();
+    this.unsubBgPref = null;
+    this._ydoc.elements.unobserve(this._handleYArrayChange);
+    for (const element of this._elements) {
+      element.disposeDOM();
+    }
+    this._elements = [];
+    this._yMapToElement.clear();
     this.viewport.destroy();
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);

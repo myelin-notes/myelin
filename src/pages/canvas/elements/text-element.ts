@@ -5,7 +5,6 @@ import {
   prepareWithSegments,
 } from '@chenglou/pretext';
 import type { DrawableCanvas } from '../drawable-canvas';
-import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
@@ -64,7 +63,7 @@ export class TextElement extends DrawableElement {
 
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
-    bindYFields(yMap, {
+    this.bindYFields(yMap, {
       text: (v) => {
         this._text = v as string;
       },

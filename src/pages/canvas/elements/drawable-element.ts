@@ -1,7 +1,11 @@
 import type * as Y from 'yjs';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import { bindYFields, writeYMap } from '../y-fields';
+import {
+  bindYFields as bindYFieldsToYMap,
+  writeYMap,
+  type YFieldMap,
+} from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
 import type { ElementType } from './element-type';
 
@@ -73,6 +77,7 @@ export abstract class DrawableElement {
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
   protected _yMap: Y.Map<unknown> | null = null;
+  private _unbindYFields: (() => void)[] = [];
 
   protected constructor(
     /**
@@ -102,8 +107,9 @@ export abstract class DrawableElement {
    * future changes. Subclasses override to bind additional fields.
    */
   public bindToYMap(yMap: Y.Map<unknown>): void {
+    this.unbindYFields();
     this._yMap = yMap;
-    bindYFields(yMap, {
+    this.bindYFields(yMap, {
       offsetX: (v) => {
         this._offset.x = v as number;
       },
@@ -119,6 +125,17 @@ export abstract class DrawableElement {
         this.updateBoundingBox();
       },
     });
+  }
+
+  protected bindYFields(yMap: Y.Map<unknown>, fields: YFieldMap): void {
+    this._unbindYFields.push(bindYFieldsToYMap(yMap, fields));
+  }
+
+  private unbindYFields(): void {
+    for (const unbind of this._unbindYFields) {
+      unbind();
+    }
+    this._unbindYFields = [];
   }
 
   /** Write key-value pairs to the backing Y.Map in a single transaction. */
@@ -300,7 +317,10 @@ export abstract class DrawableElement {
   public syncDOM(_viewport: CanvasViewport, _host: HTMLElement): void {}
 
   /** Detach any DOM this element created. Called on removal. Default: no-op. */
-  public disposeDOM(): void {}
+  public disposeDOM(): void {
+    this.unbindYFields();
+    this._yMap = null;
+  }
 
   public updateBounds() {
     this.updateBoundingBox();

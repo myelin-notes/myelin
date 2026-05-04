@@ -22,9 +22,11 @@ export interface PdfPageRenderHandle {
 }
 
 const MAX_RENDER_PIXELS = 16_000_000;
+const MAX_RENDER_AXIS_PIXELS = 16_384;
 const MAX_RENDER_SCALE = 4;
 const MIN_RENDER_SCALE = 0.2;
 const RENDER_SCALE_STEP = 0.25;
+const RENDER_SCALE_SEARCH_STEPS = 32;
 
 let pdfJsPromise: Promise<
   typeof import('pdfjs-dist/legacy/build/pdf.mjs')
@@ -46,6 +48,68 @@ async function getPdfJs() {
 
 function isFinitePositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function getRenderDimensions(
+  pageSize: PdfPageSize,
+  scale: number,
+): { w: number; h: number } {
+  return {
+    w: Math.max(1, Math.ceil(pageSize.w * scale)),
+    h: Math.max(1, Math.ceil(pageSize.h * scale)),
+  };
+}
+
+function isRenderScaleAllowed(pageSize: PdfPageSize, scale: number): boolean {
+  const dimensions = getRenderDimensions(pageSize, scale);
+  return (
+    dimensions.w <= MAX_RENDER_AXIS_PIXELS &&
+    dimensions.h <= MAX_RENDER_AXIS_PIXELS &&
+    dimensions.w * dimensions.h <= MAX_RENDER_PIXELS
+  );
+}
+
+function clampRenderScaleToCanvasLimits(
+  pageSize: PdfPageSize,
+  scale: number,
+): number {
+  if (isRenderScaleAllowed(pageSize, scale)) {
+    return scale;
+  }
+
+  let low = Math.min(scale, 1 / Math.max(pageSize.w, pageSize.h));
+  let high = scale;
+  for (let i = 0; i < RENDER_SCALE_SEARCH_STEPS; i++) {
+    const mid = (low + high) / 2;
+    if (isRenderScaleAllowed(pageSize, mid)) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  return low;
+}
+
+export async function openPdfDocument(
+  bytes: Uint8Array,
+): Promise<PDFDocumentProxy> {
+  const pdfjs = await getPdfJs();
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes) });
+  return loadingTask.promise;
+}
+
+export async function getPdfDocumentPageSizes(
+  document: PDFDocumentProxy,
+): Promise<PdfPageSize[]> {
+  const pageSizes: PdfPageSize[] = [];
+  for (let i = 1; i <= document.numPages; i++) {
+    const page = await document.getPage(i);
+    const viewport = page.getViewport({ scale: 1 });
+    pageSizes.push({ w: viewport.width, h: viewport.height });
+    page.cleanup();
+  }
+  return pageSizes;
 }
 
 export function normalizePdfPageSizes(value: unknown): PdfPageSize[] {
@@ -126,19 +190,10 @@ export function normalizePdfPageOrder(
 export async function loadPdfDocument(
   bytes: Uint8Array,
 ): Promise<LoadedPdfDocument> {
-  const pdfjs = await getPdfJs();
-  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes) });
-  const document = await loadingTask.promise;
+  const document = await openPdfDocument(bytes);
 
   try {
-    const pageSizes: PdfPageSize[] = [];
-    for (let i = 1; i <= document.numPages; i++) {
-      const page = await document.getPage(i);
-      const viewport = page.getViewport({ scale: 1 });
-      pageSizes.push({ w: viewport.width, h: viewport.height });
-      page.cleanup();
-    }
-
+    const pageSizes = await getPdfDocumentPageSizes(document);
     return { document, pageSizes };
   } catch (error) {
     await document.destroy();
@@ -167,11 +222,17 @@ export function getPdfRenderScale(params: {
   const maxScaleForPixels = Math.sqrt(
     MAX_RENDER_PIXELS / (params.pageSize.w * params.pageSize.h),
   );
-
-  return Math.min(
+  const maxScaleForSinglePixelAxis = Math.min(
+    MAX_RENDER_AXIS_PIXELS / params.pageSize.w,
+    MAX_RENDER_AXIS_PIXELS / params.pageSize.h,
+  );
+  const cappedScale = Math.min(
     Math.max(MIN_RENDER_SCALE, Math.min(desiredScale, MAX_RENDER_SCALE)),
     maxScaleForPixels,
+    maxScaleForSinglePixelAxis,
   );
+
+  return clampRenderScaleToCanvasLimits(params.pageSize, cappedScale);
 }
 
 export function renderPdfPageToCanvas(params: {
@@ -190,9 +251,18 @@ export function renderPdfPageToCanvas(params: {
       throw createRenderCancelledError();
     }
 
-    const viewport = page.getViewport({ scale: params.renderScale });
-    params.canvas.width = Math.max(1, Math.ceil(viewport.width));
-    params.canvas.height = Math.max(1, Math.ceil(viewport.height));
+    const baseViewport = page.getViewport({ scale: 1 });
+    const renderScale = clampRenderScaleToCanvasLimits(
+      { w: baseViewport.width, h: baseViewport.height },
+      params.renderScale,
+    );
+    const viewport = page.getViewport({ scale: renderScale });
+    const dimensions = getRenderDimensions(
+      { w: baseViewport.width, h: baseViewport.height },
+      renderScale,
+    );
+    params.canvas.width = dimensions.w;
+    params.canvas.height = dimensions.h;
 
     renderTask = page.render({
       canvas: params.canvas,

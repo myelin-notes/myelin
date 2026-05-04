@@ -5,7 +5,6 @@ import {
 } from 'perfect-freehand';
 import * as Y from 'yjs';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
-import { bindYFields } from '../y-fields';
 import { LOCAL_ORIGIN } from '../ydoc-manager';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
@@ -23,6 +22,14 @@ export class StrokeElement extends DrawableElement {
 
   /** Yjs backing array for points (flat: [x,y,p, x,y,p, ...]). */
   private _yPoints: Y.Array<number> | null = null;
+  private readonly _handleYPointsChange = (
+    event: Y.YArrayEvent<number>,
+  ): void => {
+    if (event.transaction.origin === LOCAL_ORIGIN) {
+      return;
+    }
+    this.rebuildPointsFromYArray();
+  };
 
   public get strokeStyle(): StrokeStyle {
     return this.style;
@@ -55,7 +62,7 @@ export class StrokeElement extends DrawableElement {
 
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
-    bindYFields(yMap, {
+    this.bindYFields(yMap, {
       color: (v) => {
         this.style.color = v as string;
       },
@@ -69,16 +76,18 @@ export class StrokeElement extends DrawableElement {
 
     const yPoints = yMap.get('points') as Y.Array<number> | undefined;
     if (yPoints) {
+      this._yPoints?.unobserve(this._handleYPointsChange);
       this._yPoints = yPoints;
       this.rebuildPointsFromYArray();
       this.updateBounds();
-      yPoints.observe((event) => {
-        if (event.transaction.origin === LOCAL_ORIGIN) {
-          return;
-        }
-        this.rebuildPointsFromYArray();
-      });
+      yPoints.observe(this._handleYPointsChange);
     }
+  }
+
+  public override disposeDOM(): void {
+    this._yPoints?.unobserve(this._handleYPointsChange);
+    this._yPoints = null;
+    super.disposeDOM();
   }
 
   private rebuildPointsFromYArray(): void {

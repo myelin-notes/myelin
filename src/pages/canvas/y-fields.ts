@@ -14,7 +14,10 @@ export type YFieldMap = Record<string, (value: unknown) => void>;
  *
  * Call once per element class level (base + subclass each call with their fields).
  */
-export function bindYFields(yMap: Y.Map<unknown>, fields: YFieldMap): void {
+export function bindYFields(
+  yMap: Y.Map<unknown>,
+  fields: YFieldMap,
+): () => void {
   for (const [key, set] of Object.entries(fields)) {
     const val = yMap.get(key);
     if (val !== undefined) {
@@ -22,7 +25,7 @@ export function bindYFields(yMap: Y.Map<unknown>, fields: YFieldMap): void {
     }
   }
 
-  yMap.observe((event) => {
+  const observer = (event: Y.YMapEvent<unknown>) => {
     if (event.transaction.origin === LOCAL_ORIGIN) {
       return;
     }
@@ -35,7 +38,12 @@ export function bindYFields(yMap: Y.Map<unknown>, fields: YFieldMap): void {
         }
       }
     }
-  });
+  };
+  yMap.observe(observer);
+
+  return () => {
+    yMap.unobserve(observer);
+  };
 }
 
 /**
