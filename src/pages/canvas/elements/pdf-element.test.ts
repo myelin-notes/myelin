@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import {
   getPdfDocumentPageSizes,
   openPdfDocument,
@@ -19,14 +20,14 @@ vi.mock('../pdf-renderer', async () => {
 });
 
 function mockOpenedPdf(pageCount: number): {
-  destroy: ReturnType<typeof vi.fn>;
+  destroy: Mock<() => Promise<void>>;
 } {
   const document = {
     numPages: pageCount,
     destroy: vi.fn(async () => {}),
   };
   vi.mocked(openPdfDocument).mockResolvedValueOnce(
-    document as unknown as Awaited<ReturnType<typeof openPdfDocument>>,
+    document as unknown as PDFDocumentProxy,
   );
   return document;
 }

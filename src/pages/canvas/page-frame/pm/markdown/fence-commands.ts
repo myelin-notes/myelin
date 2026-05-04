@@ -14,6 +14,7 @@ import {
   parseFenceMarkdown,
 } from './parse-fences';
 import {
+  type ChangedRange,
   collectAffectedTextblocks,
   getChangedRangesForTransactions,
 } from './range-tracking';
@@ -198,7 +199,7 @@ function findInvalidFenceReplacement(
 function collectInvalidFenceReplacements(
   doc: PMNode,
   schema: Schema,
-  ranges: ReturnType<typeof getChangedRangesForTransactions>,
+  ranges: ChangedRange[],
 ): InvalidFenceReplacement[] {
   return collectAffectedTextblocks(
     doc,

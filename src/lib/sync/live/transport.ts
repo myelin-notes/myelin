@@ -1,8 +1,12 @@
-export interface TransportEvents {
-  connected: () => void;
-  disconnected: () => void;
-  message: (data: Uint8Array) => void;
+export interface TransportEventArgs {
+  connected: [];
+  disconnected: [];
+  message: [data: Uint8Array];
 }
+
+export type TransportEvents = {
+  [E in keyof TransportEventArgs]: (...args: TransportEventArgs[E]) => void;
+};
 
 export interface Transport {
   readonly connected: boolean;

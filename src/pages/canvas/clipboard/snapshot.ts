@@ -38,7 +38,7 @@ function cloneXmlText(source: Y.XmlText): Y.XmlText {
   const target = new Y.XmlText();
   (
     target as unknown as {
-      applyDelta(delta: ReturnType<Y.XmlText['toDelta']>): void;
+      applyDelta(delta: Array<unknown>): void;
     }
   ).applyDelta(source.toDelta());
   return target;

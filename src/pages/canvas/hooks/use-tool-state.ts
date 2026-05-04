@@ -7,7 +7,7 @@ import {
 } from '@/components/tool-shelf';
 import type { WheelItem } from '@/components/wheel-picker';
 import { useCustomColors } from '@/lib/custom-colors';
-import { useMessages } from '@/lib/i18n';
+import { type Messages, useMessages } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import {
@@ -23,7 +23,7 @@ function makeSizeChildren(
   applyRef: {
     current: (tool: ITool, option: ToolOption, value: unknown) => void;
   },
-  strings: ReturnType<typeof useMessages>,
+  strings: Messages,
 ): WheelItem[] {
   const { min, max } = sizeOpt;
   const mid = Math.round((min + max) / 2);
@@ -85,7 +85,7 @@ function toolToWheelItem(
   applyRef: {
     current: (tool: ITool, option: ToolOption, value: unknown) => void;
   },
-  strings: ReturnType<typeof useMessages>,
+  strings: Messages,
   customColors: string[],
   promptAddColor: () => void,
 ): WheelItem {

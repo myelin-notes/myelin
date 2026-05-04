@@ -46,8 +46,11 @@ const PREFS = {
   explorerViewMode: pref<'tree' | 'grid'>('explorer-view-mode', 'tree'),
 };
 
-type PrefKey = keyof typeof PREFS;
-type PrefValue<K extends PrefKey> = (typeof PREFS)[K]['defaultValue'];
+export type UserPrefsKey = keyof typeof PREFS;
+export type UserPrefValue<K extends UserPrefsKey> =
+  (typeof PREFS)[K]['defaultValue'];
+type PrefKey = UserPrefsKey;
+type PrefValue<K extends PrefKey> = UserPrefValue<K>;
 type Listener<K extends PrefKey> = (value: PrefValue<K>) => void;
 const listeners = new Map<PrefKey, Set<Listener<never>>>();
 

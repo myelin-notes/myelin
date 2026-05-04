@@ -1,3 +1,4 @@
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
 import type { CanvasViewport } from '../canvas-viewport';
@@ -96,8 +97,7 @@ export class PdfElement extends DrawableElement {
   private _fileName: string = '';
   private _pageSizes: PdfPageSize[] = [DEFAULT_PAGE_SIZE];
   private _pageOrder: PdfPageOrderEntry[] = createDefaultPdfPageOrder(1);
-  private _pdfDocument: Awaited<ReturnType<typeof openPdfDocument>> | null =
-    null;
+  private _pdfDocument: PDFDocumentProxy | null = null;
   private _chrome: FrameChrome | null = null;
   private _contentRoot: HTMLDivElement | null = null;
   private _pageDoms = new Map<number, PdfPageDom>();

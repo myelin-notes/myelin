@@ -21,6 +21,7 @@ import type { NoteSessionStatus, YjsSyncTarget } from './types';
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
 const logger = new Logger('NoteSession');
+type HeartbeatTimer = number | NodeJS.Timeout;
 
 export class NoteSession {
   private closed = false;
@@ -43,8 +44,7 @@ export class NoteSession {
   >();
   // NoteSession is exercised in a Node test environment as well as the
   // browser/Tauri runtime, so timers intentionally go through globalThis.
-  private heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null =
-    null;
+  private heartbeatTimer: HeartbeatTimer | null = null;
   private operationQueue: Promise<void> = Promise.resolve();
   private status: NoteSessionStatus;
 

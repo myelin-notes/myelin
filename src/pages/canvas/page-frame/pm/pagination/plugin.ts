@@ -4,7 +4,9 @@ import { TableMap } from 'prosemirror-tables';
 import { Decoration, DecorationSet, type EditorView } from 'prosemirror-view';
 import {
   type LayoutCursor,
+  type LayoutLinesResult,
   layoutWithLines,
+  type PreparedTextWithSegments,
   prepareWithSegments,
 } from '@chenglou/pretext';
 import { PM_ADD_TO_HISTORY } from '../constants';
@@ -536,8 +538,8 @@ function measureLinesWithPretext(
     return null;
   }
 
-  let prepared: ReturnType<typeof prepareWithSegments>;
-  let layoutResult: ReturnType<typeof layoutWithLines>;
+  let prepared: PreparedTextWithSegments;
+  let layoutResult: LayoutLinesResult;
   try {
     prepared = prepareWithSegments(text, fontString);
     layoutResult = layoutWithLines(prepared, width, lineHeight);

@@ -1,7 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Logger } from '@/lib/logger';
-import type { Transport, TransportEvents } from './transport';
+import type {
+  Transport,
+  TransportEventArgs,
+  TransportEvents,
+} from './transport';
 
 type EventName = keyof TransportEvents;
 
@@ -98,7 +102,7 @@ export class IrohTransport implements Transport {
 
   private emit<E extends EventName>(
     event: E,
-    ...args: Parameters<TransportEvents[E]>
+    ...args: TransportEventArgs[E]
   ): void {
     const set = this.listeners.get(event);
     if (set) {
