@@ -22,14 +22,6 @@ export class StrokeElement extends DrawableElement {
 
   /** Yjs backing array for points (flat: [x,y,p, x,y,p, ...]). */
   private _yPoints: Y.Array<number> | null = null;
-  private readonly _handleYPointsChange = (
-    event: Y.YArrayEvent<number>,
-  ): void => {
-    if (event.transaction.origin === LOCAL_ORIGIN) {
-      return;
-    }
-    this.rebuildPointsFromYArray();
-  };
 
   public get strokeStyle(): StrokeStyle {
     return this.style;
@@ -72,22 +64,12 @@ export class StrokeElement extends DrawableElement {
       hasPressure: (v) => {
         this.hasPressure = v as boolean;
       },
+      points: (v) => {
+        this._yPoints = v as Y.Array<number>;
+        this.rebuildPointsFromYArray();
+        this.updateBounds();
+      },
     });
-
-    const yPoints = yMap.get('points') as Y.Array<number> | undefined;
-    if (yPoints) {
-      this._yPoints?.unobserve(this._handleYPointsChange);
-      this._yPoints = yPoints;
-      this.rebuildPointsFromYArray();
-      this.updateBounds();
-      yPoints.observe(this._handleYPointsChange);
-    }
-  }
-
-  public override disposeDOM(): void {
-    this._yPoints?.unobserve(this._handleYPointsChange);
-    this._yPoints = null;
-    super.disposeDOM();
   }
 
   private rebuildPointsFromYArray(): void {

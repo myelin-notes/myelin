@@ -158,13 +158,15 @@ describe('PdfElement metadata loading', () => {
       }
     });
 
-    new PdfElement(0).bindToYMap(yMap);
+    const element = new PdfElement(0);
+    element.bindToYMap(yMap);
     await flushPromises();
     expect(getPdfDocumentPageSizes).not.toHaveBeenCalled();
 
     const replacementPageSizes = [{ w: 360, h: 720 }];
     mockLoadedPdf(replacementPageSizes);
     yMap.set('pdfData', new Uint8Array([4, 5, 6]));
+    element.syncFromYMap(['pdfData']);
     await flushPromises();
 
     expect(localUpdates).toBe(1);
@@ -177,17 +179,19 @@ describe('PdfElement metadata loading', () => {
     const yMap = createPdfYMap(ydoc, pageSizes);
     const initialDocument = mockOpenedPdf(pageSizes.length);
 
-    new PdfElement(0).bindToYMap(yMap);
+    const element = new PdfElement(0);
+    element.bindToYMap(yMap);
     await flushPromises();
 
     vi.mocked(openPdfDocument).mockRejectedValueOnce(new Error('bad pdf'));
     yMap.set('pdfData', new Uint8Array([4, 5, 6]));
+    element.syncFromYMap(['pdfData']);
     await flushPromises();
 
     expect(initialDocument.destroy).toHaveBeenCalled();
   });
 
-  it('unsubscribes from Y.Map changes when disposed', async () => {
+  it('does not subscribe to Y.Map changes during binding', async () => {
     const ydoc = new YDocManager();
     const pageSizes = [{ w: 612, h: 792 }];
     const yMap = createPdfYMap(ydoc, pageSizes);
@@ -197,7 +201,6 @@ describe('PdfElement metadata loading', () => {
     element.bindToYMap(yMap);
     await flushPromises();
 
-    element.disposeDOM();
     vi.mocked(openPdfDocument).mockClear();
     yMap.set('pdfData', new Uint8Array([4, 5, 6]));
     await flushPromises();

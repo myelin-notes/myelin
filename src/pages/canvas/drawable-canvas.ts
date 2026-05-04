@@ -1,4 +1,4 @@
-import type * as Y from 'yjs';
+import * as Y from 'yjs';
 import { catalogs, type MessageGetter } from '@/lib/i18n/messages';
 import { Logger } from '@/lib/logger';
 import {
@@ -34,6 +34,13 @@ export interface PlacementGhost {
 }
 
 const logger = new Logger('DrawableCanvas');
+
+type YElementsDeepObserver = Parameters<
+  Y.Array<Y.Map<unknown>>['observeDeep']
+>[0];
+type YElementsDeepEvents = Parameters<YElementsDeepObserver>[0];
+type YElementsDeepTransaction = Parameters<YElementsDeepObserver>[1];
+type YElementsDeepEvent = YElementsDeepEvents[number];
 
 function isBackgroundElement(type: ElementType): boolean {
   return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
@@ -71,10 +78,11 @@ export class DrawableCanvas {
   private _handlePointerMove!: (evt: PointerEvent) => void;
   private _handlePointerUp!: (evt: PointerEvent) => void;
   private _handleResize!: () => void;
-  private readonly _handleYArrayChange = (
-    event: Y.YArrayEvent<Y.Map<unknown>>,
-  ): void => {
-    this.handleYArrayChange(event);
+  private readonly _handleYElementsChange: YElementsDeepObserver = (
+    events,
+    transaction,
+  ) => {
+    this.handleYElementsChange(events, transaction);
   };
 
   // Element editing state (e.g., page frame inline editing)
@@ -123,8 +131,8 @@ export class DrawableCanvas {
       summarizeDrawableElements(this._elements),
     );
 
-    // Observe Y.Array for future add/remove (handles undo/redo + remote changes)
-    this._ydoc.elements.observe(this._handleYArrayChange);
+    // Observe element-level changes for undo/redo and remote changes.
+    this._ydoc.elements.observeDeep(this._handleYElementsChange);
   }
 
   public get ydoc(): YDocManager {
@@ -189,16 +197,106 @@ export class DrawableCanvas {
     element.bindSharedYState(this._ydoc);
   }
 
-  /**
-   * Handle Y.Array changes — keeps _elements in sync with the Y.Doc.
-   * Fires on undo/redo and future remote changes.
-   */
-  private handleYArrayChange(event: Y.YArrayEvent<Y.Map<unknown>>): void {
-    // Skip locally-originated changes — we already updated _elements inline
-    if (event.transaction.origin === LOCAL_ORIGIN) {
+  /** Apply remote element-array and nested element-field changes. */
+  private handleYElementsChange(
+    events: YElementsDeepEvents,
+    transaction: YElementsDeepTransaction,
+  ): void {
+    if (transaction.origin === LOCAL_ORIGIN) {
       return;
     }
 
+    let changedElementFields = false;
+    const insertedMaps = new Set<Y.Map<unknown>>();
+
+    for (const event of events) {
+      if (
+        event instanceof Y.YArrayEvent &&
+        event.target === this._ydoc.elements
+      ) {
+        this.collectInsertedMaps(event, insertedMaps);
+        this.handleYArrayChange(event as Y.YArrayEvent<Y.Map<unknown>>);
+      }
+    }
+
+    for (const event of events) {
+      if (event instanceof Y.YMapEvent) {
+        const yMap = event.target as Y.Map<unknown>;
+        if (insertedMaps.has(yMap)) {
+          continue;
+        }
+        changedElementFields =
+          this.syncElementFromYMapEvent(yMap, event.keysChanged) ||
+          changedElementFields;
+        continue;
+      }
+
+      if (
+        event instanceof Y.YArrayEvent &&
+        event.target !== this._ydoc.elements
+      ) {
+        changedElementFields =
+          this.syncElementFromNestedEvent(event) || changedElementFields;
+      }
+    }
+
+    if (changedElementFields) {
+      this.updateBounding();
+    }
+  }
+
+  private collectInsertedMaps(
+    event: Y.YArrayEvent<Y.Map<unknown>>,
+    insertedMaps: Set<Y.Map<unknown>>,
+  ): void {
+    for (const delta of event.changes.delta) {
+      if ('insert' in delta) {
+        const inserted = delta.insert;
+        if (!Array.isArray(inserted)) {
+          continue;
+        }
+        for (const value of inserted) {
+          if (value instanceof Y.Map) {
+            insertedMaps.add(value as Y.Map<unknown>);
+          }
+        }
+      }
+    }
+  }
+
+  private syncElementFromYMapEvent(
+    yMap: Y.Map<unknown>,
+    keysChanged: Set<unknown>,
+  ): boolean {
+    const element = this._yMapToElement.get(yMap);
+    if (!element) {
+      return false;
+    }
+
+    const keys = Array.from(keysChanged).filter(
+      (key): key is string => typeof key === 'string',
+    );
+    element.syncFromYMap(keys);
+    return keys.length > 0;
+  }
+
+  private syncElementFromNestedEvent(event: YElementsDeepEvent): boolean {
+    const [elementPosition, fieldKey] = event.path;
+    if (typeof elementPosition !== 'number' || typeof fieldKey !== 'string') {
+      return false;
+    }
+
+    const yMap = this._ydoc.elements.get(elementPosition);
+    const element = this._yMapToElement.get(yMap);
+    if (!element) {
+      return false;
+    }
+
+    element.syncFromYMap([fieldKey]);
+    return true;
+  }
+
+  private handleYArrayChange(event: Y.YArrayEvent<Y.Map<unknown>>): void {
     let index = 0;
     for (const delta of event.changes.delta) {
       if ('retain' in delta) {
@@ -412,7 +510,7 @@ export class DrawableCanvas {
     }
     this.unsubBgPref?.();
     this.unsubBgPref = null;
-    this._ydoc.elements.unobserve(this._handleYArrayChange);
+    this._ydoc.elements.unobserveDeep(this._handleYElementsChange);
     for (const element of this._elements) {
       element.disposeDOM();
     }

@@ -1,11 +1,7 @@
 import type * as Y from 'yjs';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import {
-  bindYFields as bindYFieldsToYMap,
-  writeYMap,
-  type YFieldMap,
-} from '../y-fields';
+import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
 import type { ElementType } from './element-type';
 
@@ -77,7 +73,7 @@ export abstract class DrawableElement {
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
   protected _yMap: Y.Map<unknown> | null = null;
-  private _unbindYFields: (() => void)[] = [];
+  private _yFields: YFieldMap = {};
 
   protected constructor(
     /**
@@ -103,12 +99,12 @@ export abstract class DrawableElement {
   }
 
   /**
-   * Bind this element to a Y.Map, reading initial values and observing
-   * future changes. Subclasses override to bind additional fields.
+   * Bind this element to a Y.Map and read initial values. The canvas applies
+   * future remote changes by calling syncFromYMap.
    */
   public bindToYMap(yMap: Y.Map<unknown>): void {
-    this.unbindYFields();
     this._yMap = yMap;
+    this._yFields = {};
     this.bindYFields(yMap, {
       offsetX: (v) => {
         this._offset.x = v as number;
@@ -128,14 +124,15 @@ export abstract class DrawableElement {
   }
 
   protected bindYFields(yMap: Y.Map<unknown>, fields: YFieldMap): void {
-    this._unbindYFields.push(bindYFieldsToYMap(yMap, fields));
+    Object.assign(this._yFields, fields);
+    applyYFields(yMap, fields);
   }
 
-  private unbindYFields(): void {
-    for (const unbind of this._unbindYFields) {
-      unbind();
+  /** Apply changed Y.Map fields after the canvas observes a remote update. */
+  public syncFromYMap(keys: Iterable<string>): void {
+    if (this._yMap) {
+      applyYFields(this._yMap, this._yFields, keys);
     }
-    this._unbindYFields = [];
   }
 
   /** Write key-value pairs to the backing Y.Map in a single transaction. */
@@ -317,10 +314,7 @@ export abstract class DrawableElement {
   public syncDOM(_viewport: CanvasViewport, _host: HTMLElement): void {}
 
   /** Detach any DOM this element created. Called on removal. Default: no-op. */
-  public disposeDOM(): void {
-    this.unbindYFields();
-    this._yMap = null;
-  }
+  public disposeDOM(): void {}
 
   public updateBounds() {
     this.updateBoundingBox();
