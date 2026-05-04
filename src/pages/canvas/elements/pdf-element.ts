@@ -437,7 +437,6 @@ export class PdfElement extends DrawableElement {
     pageDom.renderHandle = null;
     pageDom.renderingPageIndex = null;
     pageDom.renderingScale = null;
-    delete pageDom.root.dataset.rendering;
 
     if (!clearRenderedCanvas) {
       return;
@@ -658,7 +657,6 @@ export class PdfElement extends DrawableElement {
     pageDom.renderHandle?.cancel();
     pageDom.renderingPageIndex = pageIndex;
     pageDom.renderingScale = renderScale;
-    pageDom.root.dataset.rendering = 'true';
 
     const handle = renderPdfPageToCanvas({
       document,
@@ -678,7 +676,6 @@ export class PdfElement extends DrawableElement {
         pageDom.renderedScale = renderScale;
         pageDom.renderingPageIndex = null;
         pageDom.renderingScale = null;
-        delete pageDom.root.dataset.rendering;
       })
       .catch((error) => {
         if (isPdfRenderCancelled(error) || pageDom.renderHandle !== handle) {
@@ -687,7 +684,6 @@ export class PdfElement extends DrawableElement {
         pageDom.renderHandle = null;
         pageDom.renderingPageIndex = null;
         pageDom.renderingScale = null;
-        delete pageDom.root.dataset.rendering;
         logger.error('Failed to render PDF page', error, {
           index: this.index,
           fileName: this._fileName,

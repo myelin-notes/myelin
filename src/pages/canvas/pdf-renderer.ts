@@ -95,7 +95,10 @@ export async function openPdfDocument(
   bytes: Uint8Array,
 ): Promise<PDFDocumentProxy> {
   const pdfjs = await getPdfJs();
-  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes) });
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(bytes),
+    verbosity: pdfjs.VerbosityLevel.ERRORS,
+  });
   return loadingTask.promise;
 }
 
