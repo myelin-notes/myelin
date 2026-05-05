@@ -2,7 +2,7 @@ import { PDFDocument } from 'pdf-lib';
 import { getScratchCanvasContext } from '@/lib/scratch-canvas';
 import type { Vector2 } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
-import type { PdfPageOrderEntry, PdfPageSize } from './pdf-renderer';
+import type { PdfPageSize } from './pdf-renderer';
 
 const OVERLAY_RASTER_SCALE = 2;
 const MAX_OVERLAY_PIXELS = 16_000_000;
@@ -11,17 +11,20 @@ const MAX_OVERLAY_AXIS_PIXELS = 16_384;
 export interface PdfElementExportSource {
   index: number;
   pdfBytes: Uint8Array;
-  pageSizes: PdfPageSize[];
-  pageOrder: PdfPageOrderEntry[];
-  pageTops: number[];
-  totalWidth: number;
+  pages: PdfElementExportPage[];
   offset: Vector2;
   scale: Vector2;
   boundingBox: DOMRect;
 }
 
+export interface PdfElementExportPage {
+  originalIndex: number;
+  size: PdfPageSize;
+  localLeft: number;
+  localTop: number;
+}
+
 export interface PdfExportPage {
-  orderIndex: number;
   originalIndex: number;
   size: PdfPageSize;
   localLeft: number;
@@ -52,22 +55,14 @@ export function getPdfExportPages(
   const scaleX = getPositiveScale(target.scale.x);
   const scaleY = getPositiveScale(target.scale.y);
 
-  return target.pageOrder.map((entry, orderIndex) => {
-    const size = target.pageSizes[entry.originalIndex];
-    const localLeft = (target.totalWidth - size.w) / 2;
-    const localTop = target.pageTops[orderIndex] ?? 0;
-
+  return target.pages.map((page) => {
     return {
-      orderIndex,
-      originalIndex: entry.originalIndex,
-      size,
-      localLeft,
-      localTop,
+      ...page,
       worldBounds: new DOMRect(
-        target.offset.x + localLeft * scaleX,
-        target.offset.y + localTop * scaleY,
-        size.w * scaleX,
-        size.h * scaleY,
+        target.offset.x + page.localLeft * scaleX,
+        target.offset.y + page.localTop * scaleY,
+        page.size.w * scaleX,
+        page.size.h * scaleY,
       ),
     };
   });
@@ -86,8 +81,8 @@ export async function createPdfExportBytes(
   );
   const candidates = getPdfOverlayCandidates(target, elements);
 
-  for (const page of pages) {
-    const outputPage = copiedPages[page.orderIndex];
+  for (const [pageIndex, page] of pages.entries()) {
+    const outputPage = copiedPages[pageIndex];
     outputDoc.addPage(outputPage);
 
     const pageElements = candidates.filter((element) =>

@@ -9,6 +9,7 @@ import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
 import {
   createPdfExportBytes,
+  type PdfElementExportPage,
   type PdfElementExportSource,
 } from '../pdf-export';
 import {
@@ -54,8 +55,7 @@ interface PdfPageDom {
 }
 
 interface PdfLayout {
-  entries: PdfPageOrderEntry[];
-  pageTops: number[];
+  pages: PdfElementExportPage[];
   totalWidth: number;
   totalHeight: number;
 }
@@ -308,10 +308,7 @@ export class PdfElement extends DrawableElement {
     return {
       index: this.index,
       pdfBytes: this._pdfBytes,
-      pageSizes: this._pageSizes,
-      pageOrder: this.pageEntries,
-      pageTops: [...layout.pageTops],
-      totalWidth: layout.totalWidth,
+      pages: layout.pages,
       offset: { x: this.offset.x, y: this.offset.y },
       scale: {
         x: getPositiveScale(this._scale.x),
@@ -369,7 +366,10 @@ export class PdfElement extends DrawableElement {
   }
 
   private get pageEntries(): PdfPageOrderEntry[] {
-    return this.getLayout().entries;
+    return this.getLayout().pages.map((page) => ({
+      kind: 'pdf',
+      originalIndex: page.originalIndex,
+    }));
   }
 
   private getPageSize(entry: PdfPageOrderEntry): PdfPageSize {
@@ -385,21 +385,30 @@ export class PdfElement extends DrawableElement {
       this._pageOrder,
       this._pageSizes.length,
     );
-    const pageTops: number[] = [];
+    const pages: PdfElementExportPage[] = [];
     let totalWidth = 0;
     let totalHeight = 0;
 
-    for (let i = 0; i < entries.length; i++) {
-      if (i > 0) {
+    for (const entry of entries) {
+      if (pages.length > 0) {
         totalHeight += PAGE_GAP;
       }
-      pageTops.push(totalHeight);
-      const pageSize = this.getPageSize(entries[i]);
+      const pageSize = this.getPageSize(entry);
+      pages.push({
+        originalIndex: entry.originalIndex,
+        size: pageSize,
+        localLeft: 0,
+        localTop: totalHeight,
+      });
       totalWidth = Math.max(totalWidth, pageSize.w);
       totalHeight += pageSize.h;
     }
 
-    this._layout = { entries, pageTops, totalWidth, totalHeight };
+    for (const page of pages) {
+      page.localLeft = (totalWidth - page.size.w) / 2;
+    }
+
+    this._layout = { pages, totalWidth, totalHeight };
     return this._layout;
   }
 
@@ -574,26 +583,27 @@ export class PdfElement extends DrawableElement {
 
     const worldRect = viewport.getWorldRect();
     const dpr = window.devicePixelRatio || 1;
-    const activePageDomIndexes = new Set<number>();
+    const activePagePositions = new Set<number>();
 
     if (!this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)) {
-      this.removeInactivePageDoms(activePageDomIndexes);
+      this.removeInactivePageDoms(activePagePositions);
       return;
     }
 
     const visibleRange = this.getVisiblePageRange(worldRect, layout, scaleY);
-    for (let i = visibleRange.start; i < visibleRange.end; i++) {
-      const entry = layout.entries[i];
-      const pageSize = this.getPageSize(entry);
-      const localTop = layout.pageTops[i];
-      const localLeft = (layout.totalWidth - pageSize.w) / 2;
+    for (
+      let pagePosition = visibleRange.start;
+      pagePosition < visibleRange.end;
+      pagePosition++
+    ) {
+      const page = layout.pages[pagePosition];
 
       if (
         !this.isPageVisible(
           worldRect,
-          localLeft,
-          localTop,
-          pageSize,
+          page.localLeft,
+          page.localTop,
+          page.size,
           scaleX,
           scaleY,
         )
@@ -601,45 +611,45 @@ export class PdfElement extends DrawableElement {
         continue;
       }
 
-      let pageDom = this._pageDoms.get(i);
+      let pageDom = this._pageDoms.get(pagePosition);
       if (!pageDom) {
         pageDom = this.createPageDom(contentRoot);
-        this._pageDoms.set(i, pageDom);
+        this._pageDoms.set(pagePosition, pageDom);
       }
-      activePageDomIndexes.add(i);
+      activePagePositions.add(pagePosition);
 
-      const cssLeft = localLeft * scaleX * zoom;
-      const cssTop = localTop * scaleY * zoom;
-      const cssWidth = pageSize.w * scaleX * zoom;
-      const cssHeight = pageSize.h * scaleY * zoom;
+      const cssLeft = page.localLeft * scaleX * zoom;
+      const cssTop = page.localTop * scaleY * zoom;
+      const cssWidth = page.size.w * scaleX * zoom;
+      const cssHeight = page.size.h * scaleY * zoom;
 
       pageDom.root.style.transform = `translate(${cssLeft}px, ${cssTop}px)`;
       pageDom.root.style.width = `${cssWidth}px`;
       pageDom.root.style.height = `${cssHeight}px`;
 
       const renderScale = getPdfRenderScale({
-        pageSize,
+        pageSize: page.size,
         zoom,
         elementScale: Math.max(scaleX, scaleY),
         dpr,
       });
       this.requestPageRender(
         pageDom,
-        entry.originalIndex,
-        pageSize,
+        page.originalIndex,
+        page.size,
         renderScale,
         zoom,
       );
     }
 
-    this.removeInactivePageDoms(activePageDomIndexes);
+    this.removeInactivePageDoms(activePagePositions);
   }
 
-  private removeInactivePageDoms(activePageDomIndexes: Set<number>): void {
-    for (const [index, pageDom] of this._pageDoms) {
-      if (!activePageDomIndexes.has(index)) {
+  private removeInactivePageDoms(activePagePositions: Set<number>): void {
+    for (const [pagePosition, pageDom] of this._pageDoms) {
+      if (!activePagePositions.has(pagePosition)) {
         this.disposePageDom(pageDom);
-        this._pageDoms.delete(index);
+        this._pageDoms.delete(pagePosition);
       }
     }
   }
@@ -675,11 +685,11 @@ export class PdfElement extends DrawableElement {
     localY: number,
   ): number {
     let low = 0;
-    let high = layout.entries.length;
+    let high = layout.pages.length;
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
-      const pageBottom =
-        layout.pageTops[mid] + this.getPageSize(layout.entries[mid]).h;
+      const page = layout.pages[mid];
+      const pageBottom = page.localTop + page.size.h;
       if (pageBottom < localY) {
         low = mid + 1;
       } else {
@@ -694,10 +704,10 @@ export class PdfElement extends DrawableElement {
     localY: number,
   ): number {
     let low = 0;
-    let high = layout.pageTops.length;
+    let high = layout.pages.length;
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
-      if (layout.pageTops[mid] <= localY) {
+      if (layout.pages[mid].localTop <= localY) {
         low = mid + 1;
       } else {
         high = mid;

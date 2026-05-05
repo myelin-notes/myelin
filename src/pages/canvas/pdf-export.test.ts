@@ -66,10 +66,14 @@ function exportSource(
   return {
     index: 10,
     pdfBytes: new Uint8Array(),
-    pageSizes: [{ w: 100, h: 50 }],
-    pageOrder: [{ kind: 'pdf', originalIndex: 0 }],
-    pageTops: [0],
-    totalWidth: 100,
+    pages: [
+      {
+        originalIndex: 0,
+        size: { w: 100, h: 50 },
+        localLeft: 0,
+        localTop: 0,
+      },
+    ],
     offset: { x: 10, y: 20 },
     scale: { x: 2, y: 3 },
     boundingBox: rect(-10, -36, 140, 126),
@@ -100,16 +104,20 @@ describe('PDF export page geometry', () => {
   it('maps ordered PDF pages to world-space page bounds', () => {
     const pages = getPdfExportPages(
       exportSource({
-        pageSizes: [
-          { w: 100, h: 50 },
-          { w: 50, h: 100 },
+        pages: [
+          {
+            originalIndex: 0,
+            size: { w: 100, h: 50 },
+            localLeft: 0,
+            localTop: 0,
+          },
+          {
+            originalIndex: 1,
+            size: { w: 50, h: 100 },
+            localLeft: 25,
+            localTop: 60,
+          },
         ],
-        pageOrder: [
-          { kind: 'pdf', originalIndex: 0 },
-          { kind: 'pdf', originalIndex: 1 },
-        ],
-        pageTops: [0, 60],
-        totalWidth: 100,
       }),
     );
 
@@ -140,16 +148,20 @@ describe('PDF export bytes', () => {
     const exportedBytes = await createPdfExportBytes(
       exportSource({
         pdfBytes: sourceBytes,
-        pageSizes: [
-          { w: 200, h: 100 },
-          { w: 300, h: 150 },
+        pages: [
+          {
+            originalIndex: 1,
+            size: { w: 300, h: 150 },
+            localLeft: 0,
+            localTop: 0,
+          },
+          {
+            originalIndex: 0,
+            size: { w: 200, h: 100 },
+            localLeft: 50,
+            localTop: 160,
+          },
         ],
-        pageOrder: [
-          { kind: 'pdf', originalIndex: 1 },
-          { kind: 'pdf', originalIndex: 0 },
-        ],
-        pageTops: [0, 160],
-        totalWidth: 300,
       }),
       [],
     );
