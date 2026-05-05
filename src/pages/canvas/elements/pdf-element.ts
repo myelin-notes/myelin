@@ -425,7 +425,7 @@ export class PdfElement extends DrawableElement {
 
   private cancelPageRenders(): void {
     for (const pageDom of this._pageDoms.values()) {
-      this.releasePageRender(pageDom, false);
+      this.releasePageRender(pageDom, true);
     }
   }
 
@@ -643,8 +643,8 @@ export class PdfElement extends DrawableElement {
     renderScale: number,
     zoom: number,
   ): void {
-    const document = this._pdfDocument;
-    if (!document) {
+    const pdfDocument = this._pdfDocument;
+    if (!pdfDocument) {
       return;
     }
 
@@ -722,8 +722,8 @@ export class PdfElement extends DrawableElement {
     pageSize: PdfPageSize,
     renderScale: number,
   ): void {
-    const document = this._pdfDocument;
-    if (!document) {
+    const pdfDocument = this._pdfDocument;
+    if (!pdfDocument) {
       return;
     }
 
@@ -731,10 +731,11 @@ export class PdfElement extends DrawableElement {
     pageDom.renderingPageIndex = pageIndex;
     pageDom.renderingScale = renderScale;
 
+    const renderCanvas = document.createElement('canvas');
     const handle = renderPdfPageToCanvas({
-      document,
+      document: pdfDocument,
       pageIndex,
-      canvas: pageDom.canvas,
+      canvas: renderCanvas,
       renderScale,
     });
     pageDom.renderHandle = handle;
@@ -744,6 +745,13 @@ export class PdfElement extends DrawableElement {
         if (pageDom.renderHandle !== handle) {
           return;
         }
+        const context = pageDom.canvas.getContext('2d');
+        if (!context) {
+          throw new Error('Failed to create PDF page canvas context');
+        }
+        pageDom.canvas.width = renderCanvas.width;
+        pageDom.canvas.height = renderCanvas.height;
+        context.drawImage(renderCanvas, 0, 0);
         pageDom.renderHandle = null;
         pageDom.renderedPageIndex = pageIndex;
         pageDom.renderedScale = renderScale;
@@ -765,6 +773,10 @@ export class PdfElement extends DrawableElement {
           pageHeight: pageSize.h,
           renderScale,
         });
+      })
+      .finally(() => {
+        renderCanvas.width = 1;
+        renderCanvas.height = 1;
       });
   }
 

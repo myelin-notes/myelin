@@ -58,11 +58,23 @@ function mockLoadedPdfWithStoredMetadata(pageSizes: PdfPageSize[]): void {
 
 function mockImmediatePageRender(): void {
   vi.mocked(renderPdfPageToCanvas).mockImplementation(
-    (): PdfPageRenderHandle => ({
-      promise: Promise.resolve(),
-      cancel: vi.fn(),
-    }),
+    ({ canvas, renderScale }): PdfPageRenderHandle => {
+      canvas.width = Math.round(1000 * renderScale);
+      canvas.height = Math.round(1200 * renderScale);
+      return {
+        promise: Promise.resolve(),
+        cancel: vi.fn(),
+      };
+    },
   );
+}
+
+interface TestCanvasContext {
+  drawImage: Mock<(image: HTMLCanvasElement, dx: number, dy: number) => void>;
+}
+
+interface TestCanvas extends HTMLCanvasElement {
+  testContext: TestCanvasContext;
 }
 
 interface TestPageDom {
@@ -114,10 +126,36 @@ async function flushPromises(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function createPageDom(renderedScale: number | null = null): TestPageDom {
+function createTestCanvas(width = 1, height = 1): TestCanvas {
+  const context: TestCanvasContext = {
+    drawImage: vi.fn(),
+  };
+  return {
+    width,
+    height,
+    testContext: context,
+    getContext: vi.fn(() => context),
+  } as unknown as TestCanvas;
+}
+
+function stubCanvasDocument(): void {
+  vi.stubGlobal('document', {
+    createElement: vi.fn((tagName: string) => {
+      if (tagName !== 'canvas') {
+        throw new Error(`Unexpected test element: ${tagName}`);
+      }
+      return createTestCanvas();
+    }),
+  });
+}
+
+function createPageDom(
+  renderedScale: number | null = null,
+  canvas: HTMLCanvasElement = createTestCanvas(),
+): TestPageDom {
   return {
     root: {} as HTMLDivElement,
-    canvas: {} as HTMLCanvasElement,
+    canvas,
     renderHandle: null,
     renderedPageIndex: renderedScale === null ? null : 0,
     renderedScale,
@@ -289,6 +327,7 @@ describe('PdfElement page rendering', () => {
   it('debounces zoom-driven rerenders after the page has rendered once', () => {
     const pageSize = { w: 612, h: 792 };
     const element = createRenderableElement();
+    stubCanvasDocument();
     mockImmediatePageRender();
 
     element.requestPageRender(createPageDom(), 0, pageSize, 1, 1);
@@ -319,5 +358,42 @@ describe('PdfElement page rendering', () => {
     expect(vi.mocked(renderPdfPageToCanvas).mock.calls[1][0].renderScale).toBe(
       1.25,
     );
+  });
+
+  it('keeps the visible canvas unchanged until the replacement render is ready', async () => {
+    const pageSize = { w: 612, h: 792 };
+    const element = createRenderableElement();
+    const visibleCanvas = createTestCanvas(1224, 1584);
+    const pageDom = createPageDom(1, visibleCanvas);
+    stubCanvasDocument();
+    mockImmediatePageRender();
+    vi.useFakeTimers();
+    vi.stubGlobal('window', {
+      setTimeout: globalThis.setTimeout,
+      clearTimeout: globalThis.clearTimeout,
+    });
+
+    element.requestPageRender(pageDom, 0, pageSize, 1.25, 1.2);
+    vi.advanceTimersByTime(120);
+
+    const renderCanvas = vi.mocked(renderPdfPageToCanvas).mock.calls[0][0]
+      .canvas;
+    expect(renderCanvas).not.toBe(visibleCanvas);
+    expect(visibleCanvas.width).toBe(1224);
+    expect(visibleCanvas.height).toBe(1584);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(visibleCanvas.width).toBe(1250);
+    expect(visibleCanvas.height).toBe(1500);
+    expect(visibleCanvas.testContext.drawImage).toHaveBeenCalledWith(
+      renderCanvas,
+      0,
+      0,
+    );
+    expect(renderCanvas.width).toBe(1);
+    expect(renderCanvas.height).toBe(1);
   });
 });
