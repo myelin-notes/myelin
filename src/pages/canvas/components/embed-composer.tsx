@@ -41,10 +41,34 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
   const [pulseKey, setPulseKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const previewSrcRef = useRef<string | null>(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  const fetchIdRef = useRef(0);
+
+  const revokePreviewSrc = () => {
+    if (!previewSrcRef.current) {
+      return;
+    }
+    URL.revokeObjectURL(previewSrcRef.current);
+    previewSrcRef.current = null;
+  };
+
+  const cancelUrlFetch = () => {
+    fetchIdRef.current += 1;
+    fetchAbortRef.current?.abort();
+    fetchAbortRef.current = null;
+  };
+
+  const closeComposer = () => {
+    cancelUrlFetch();
+    revokePreviewSrc();
+    onClose();
+  };
+
   const handleDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (event.key === 'Escape') {
       event.preventDefault();
-      onClose();
+      closeComposer();
     }
   });
 
@@ -56,13 +80,25 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      fetchIdRef.current += 1;
+      fetchAbortRef.current?.abort();
+      fetchAbortRef.current = null;
+      if (previewSrcRef.current) {
+        URL.revokeObjectURL(previewSrcRef.current);
+        previewSrcRef.current = null;
+      }
+    };
+  }, []);
+
   const embedBlobs = (blobs: File[]) => {
     if (blobs.length === 0) {
       return;
     }
     onEmbedFiles(blobs);
     setPulseKey((k) => k + 1);
-    onClose();
+    closeComposer();
   };
 
   const handleBrowse = () => fileInputRef.current?.click();
@@ -86,9 +122,17 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
   };
 
   const fetchUrl = async (url: string) => {
+    cancelUrlFetch();
+    revokePreviewSrc();
+    const fetchId = fetchIdRef.current;
+    const abortController = new AbortController();
+    fetchAbortRef.current = abortController;
     setUrlState({ kind: 'loading', url });
     try {
-      const res = await fetch(url, { mode: 'cors' });
+      const res = await fetch(url, {
+        mode: 'cors',
+        signal: abortController.signal,
+      });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -96,9 +140,22 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
       if (!blob.type.startsWith('image/') && blob.type !== 'application/pdf') {
         throw new Error(strings.canvas.embedComposer.errors.unsupportedUrl);
       }
+      if (abortController.signal.aborted || fetchIdRef.current !== fetchId) {
+        return;
+      }
       const previewSrc = URL.createObjectURL(blob);
+      previewSrcRef.current = previewSrc;
+      if (fetchAbortRef.current === abortController) {
+        fetchAbortRef.current = null;
+      }
       setUrlState({ kind: 'ready', url, previewSrc, mime: blob.type });
     } catch (err) {
+      if (abortController.signal.aborted || fetchIdRef.current !== fetchId) {
+        return;
+      }
+      if (fetchAbortRef.current === abortController) {
+        fetchAbortRef.current = null;
+      }
       const message =
         err instanceof Error && err.message.includes('HTTP')
           ? strings.canvas.embedComposer.errors.fetchFailed
@@ -129,7 +186,6 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
       const name = isPdf ? `embed.pdf` : `embed.${ext}`;
       const file = new File([blob], name, { type: blob.type });
       embedBlobs([file]);
-      URL.revokeObjectURL(urlState.previewSrc);
       setUrlInput('');
       setUrlState({ kind: 'idle' });
     } catch {
@@ -138,9 +194,8 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
   };
 
   const resetUrl = () => {
-    if (urlState.kind === 'ready') {
-      URL.revokeObjectURL(urlState.previewSrc);
-    }
+    cancelUrlFetch();
+    revokePreviewSrc();
     setUrlInput('');
     setUrlState({ kind: 'idle' });
   };
@@ -211,7 +266,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
             </span>
           </div>
           <button
-            onClick={onClose}
+            onClick={closeComposer}
             className="-mt-1 -mr-1 cursor-pointer rounded-lg border-none bg-transparent p-1.5 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
             aria-label={strings.common.close}
           >
