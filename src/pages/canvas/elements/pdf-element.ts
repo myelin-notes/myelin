@@ -29,6 +29,7 @@ import { PAGE_GAP, PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
 const logger = new Logger('PdfElement');
 const DEFAULT_PAGE_SIZE: PdfPageSize = { w: PAGE_WIDTH, h: PAGE_HEIGHT };
 const PAGE_RENDER_MARGIN = PAGE_GAP * 2;
+const PDF_RENDER_DEBOUNCE_MS = 120;
 
 interface PdfPageDom {
   root: HTMLDivElement;
@@ -38,6 +39,10 @@ interface PdfPageDom {
   renderedScale: number | null;
   renderingPageIndex: number | null;
   renderingScale: number | null;
+  pendingRenderTimeout: number | null;
+  pendingPageIndex: number | null;
+  pendingRenderScale: number | null;
+  pendingZoom: number | null;
 }
 
 interface PdfLayout {
@@ -433,6 +438,7 @@ export class PdfElement extends DrawableElement {
     pageDom: PdfPageDom,
     clearRenderedCanvas: boolean,
   ): void {
+    this.clearPendingPageRender(pageDom);
     pageDom.renderHandle?.cancel();
     pageDom.renderHandle = null;
     pageDom.renderingPageIndex = null;
@@ -531,6 +537,7 @@ export class PdfElement extends DrawableElement {
         entry.originalIndex,
         pageSize,
         renderScale,
+        zoom,
       );
     }
 
@@ -634,6 +641,7 @@ export class PdfElement extends DrawableElement {
     pageIndex: number,
     pageSize: PdfPageSize,
     renderScale: number,
+    zoom: number,
   ): void {
     const document = this._pdfDocument;
     if (!document) {
@@ -644,6 +652,7 @@ export class PdfElement extends DrawableElement {
       pageDom.renderedPageIndex === pageIndex &&
       pageDom.renderedScale === renderScale
     ) {
+      this.clearPendingPageRender(pageDom);
       return;
     }
 
@@ -651,6 +660,70 @@ export class PdfElement extends DrawableElement {
       pageDom.renderingPageIndex === pageIndex &&
       pageDom.renderingScale === renderScale
     ) {
+      this.clearPendingPageRender(pageDom);
+      return;
+    }
+
+    if (
+      pageDom.pendingPageIndex === pageIndex &&
+      pageDom.pendingRenderScale === renderScale
+    ) {
+      if (pageDom.pendingZoom === zoom) {
+        return;
+      }
+      this.schedulePageRender(pageDom, pageIndex, pageSize, renderScale, zoom);
+      return;
+    }
+
+    if (
+      pageDom.renderedPageIndex === pageIndex &&
+      pageDom.renderedScale !== null
+    ) {
+      this.schedulePageRender(pageDom, pageIndex, pageSize, renderScale, zoom);
+      return;
+    }
+
+    this.startPageRender(pageDom, pageIndex, pageSize, renderScale);
+  }
+
+  private schedulePageRender(
+    pageDom: PdfPageDom,
+    pageIndex: number,
+    pageSize: PdfPageSize,
+    renderScale: number,
+    zoom: number,
+  ): void {
+    this.clearPendingPageRender(pageDom);
+    pageDom.pendingPageIndex = pageIndex;
+    pageDom.pendingRenderScale = renderScale;
+    pageDom.pendingZoom = zoom;
+    pageDom.pendingRenderTimeout = window.setTimeout(() => {
+      pageDom.pendingRenderTimeout = null;
+      pageDom.pendingPageIndex = null;
+      pageDom.pendingRenderScale = null;
+      pageDom.pendingZoom = null;
+      this.startPageRender(pageDom, pageIndex, pageSize, renderScale);
+    }, PDF_RENDER_DEBOUNCE_MS);
+  }
+
+  private clearPendingPageRender(pageDom: PdfPageDom): void {
+    if (pageDom.pendingRenderTimeout !== null) {
+      window.clearTimeout(pageDom.pendingRenderTimeout);
+    }
+    pageDom.pendingRenderTimeout = null;
+    pageDom.pendingPageIndex = null;
+    pageDom.pendingRenderScale = null;
+    pageDom.pendingZoom = null;
+  }
+
+  private startPageRender(
+    pageDom: PdfPageDom,
+    pageIndex: number,
+    pageSize: PdfPageSize,
+    renderScale: number,
+  ): void {
+    const document = this._pdfDocument;
+    if (!document) {
       return;
     }
 
@@ -758,6 +831,10 @@ export class PdfElement extends DrawableElement {
       renderedScale: null,
       renderingPageIndex: null,
       renderingScale: null,
+      pendingRenderTimeout: null,
+      pendingPageIndex: null,
+      pendingRenderScale: null,
+      pendingZoom: null,
     };
   }
 }

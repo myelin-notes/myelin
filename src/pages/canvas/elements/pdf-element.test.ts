@@ -1,9 +1,19 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from 'vitest';
 import {
   getPdfDocumentPageSizes,
   openPdfDocument,
+  type PdfPageRenderHandle,
   type PdfPageSize,
+  renderPdfPageToCanvas,
 } from '../pdf-renderer';
 import { LOCAL_ORIGIN, YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
@@ -16,6 +26,7 @@ vi.mock('../pdf-renderer', async () => {
     ...actual,
     getPdfDocumentPageSizes: vi.fn(),
     openPdfDocument: vi.fn(),
+    renderPdfPageToCanvas: vi.fn(),
   };
 });
 
@@ -45,6 +56,40 @@ function mockLoadedPdfWithStoredMetadata(pageSizes: PdfPageSize[]): void {
   mockOpenedPdf(pageSizes.length);
 }
 
+function mockImmediatePageRender(): void {
+  vi.mocked(renderPdfPageToCanvas).mockImplementation(
+    (): PdfPageRenderHandle => ({
+      promise: Promise.resolve(),
+      cancel: vi.fn(),
+    }),
+  );
+}
+
+interface TestPageDom {
+  root: HTMLDivElement;
+  canvas: HTMLCanvasElement;
+  renderHandle: PdfPageRenderHandle | null;
+  renderedPageIndex: number | null;
+  renderedScale: number | null;
+  renderingPageIndex: number | null;
+  renderingScale: number | null;
+  pendingRenderTimeout: number | null;
+  pendingPageIndex: number | null;
+  pendingRenderScale: number | null;
+  pendingZoom: number | null;
+}
+
+interface TestablePdfElement {
+  _pdfDocument: PDFDocumentProxy | null;
+  requestPageRender: (
+    pageDom: TestPageDom,
+    pageIndex: number,
+    pageSize: PdfPageSize,
+    renderScale: number,
+    zoom: number,
+  ) => void;
+}
+
 function createPdfYMap(
   ydoc: YDocManager,
   pageSizes: PdfPageSize[],
@@ -69,12 +114,43 @@ async function flushPromises(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-describe('PdfElement metadata loading', () => {
-  beforeEach(() => {
-    vi.mocked(getPdfDocumentPageSizes).mockReset();
-    vi.mocked(openPdfDocument).mockReset();
-  });
+function createPageDom(renderedScale: number | null = null): TestPageDom {
+  return {
+    root: {} as HTMLDivElement,
+    canvas: {} as HTMLCanvasElement,
+    renderHandle: null,
+    renderedPageIndex: renderedScale === null ? null : 0,
+    renderedScale,
+    renderingPageIndex: null,
+    renderingScale: null,
+    pendingRenderTimeout: null,
+    pendingPageIndex: null,
+    pendingRenderScale: null,
+    pendingZoom: null,
+  };
+}
 
+function createRenderableElement(): TestablePdfElement {
+  const element = new PdfElement(0) as unknown as TestablePdfElement;
+  element._pdfDocument = {
+    numPages: 1,
+    destroy: vi.fn(async () => {}),
+  } as unknown as PDFDocumentProxy;
+  return element;
+}
+
+beforeEach(() => {
+  vi.mocked(getPdfDocumentPageSizes).mockReset();
+  vi.mocked(openPdfDocument).mockReset();
+  vi.mocked(renderPdfPageToCanvas).mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+describe('PdfElement metadata loading', () => {
   it('does not dirty the Y.Doc when parsed metadata matches stored metadata', async () => {
     const ydoc = new YDocManager();
     const pageSizes = [{ w: 612, h: 792 }];
@@ -206,5 +282,42 @@ describe('PdfElement metadata loading', () => {
     await flushPromises();
 
     expect(openPdfDocument).not.toHaveBeenCalled();
+  });
+});
+
+describe('PdfElement page rendering', () => {
+  it('debounces zoom-driven rerenders after the page has rendered once', () => {
+    const pageSize = { w: 612, h: 792 };
+    const element = createRenderableElement();
+    mockImmediatePageRender();
+
+    element.requestPageRender(createPageDom(), 0, pageSize, 1, 1);
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[0][0].renderScale).toBe(
+      1,
+    );
+
+    vi.useFakeTimers();
+    vi.stubGlobal('window', {
+      setTimeout: globalThis.setTimeout,
+      clearTimeout: globalThis.clearTimeout,
+    });
+
+    const renderedPageDom = createPageDom(1);
+    element.requestPageRender(renderedPageDom, 0, pageSize, 1.25, 1.1);
+    vi.advanceTimersByTime(80);
+    element.requestPageRender(renderedPageDom, 0, pageSize, 1.25, 1.2);
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(119);
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(1);
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[1][0].renderScale).toBe(
+      1.25,
+    );
   });
 });
