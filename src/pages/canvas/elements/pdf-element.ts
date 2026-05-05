@@ -1,8 +1,16 @@
+import { Download as DownloadIcon } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
+import {
+  createPdfExportBytes,
+  type PdfElementExportSource,
+} from '../pdf-export';
 import {
   createDefaultPdfPageOrder,
   getPdfDocumentPageSizes,
@@ -108,9 +116,17 @@ export class PdfElement extends DrawableElement {
   private _pageDoms = new Map<number, PdfPageDom>();
   private _layout: PdfLayout | null = null;
   private _loadGeneration = 0;
+  private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
+    null;
 
   constructor(index: number) {
     super(index, ElementType.PDF);
+  }
+
+  public setExportElementsProvider(
+    provider: () => readonly DrawableElement[],
+  ): void {
+    this._exportElementsProvider = provider;
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -183,7 +199,20 @@ export class PdfElement extends DrawableElement {
   }
 
   public getMenuItems(): ChromeMenuItem[] {
-    return [];
+    if (!this._pdfBytes) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'export-pdf',
+        label: 'Export to PDF',
+        icon: DownloadIcon,
+        onSelect: () => {
+          void this.exportPdf();
+        },
+      },
+    ];
   }
 
   public get totalWidth(): number {
@@ -237,6 +266,68 @@ export class PdfElement extends DrawableElement {
   protected updateBoundingBox(): void {}
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
+
+  private async exportPdf(): Promise<void> {
+    const source = this.getExportSource();
+    if (!source) {
+      return;
+    }
+
+    try {
+      const path = await save({
+        defaultPath: this.getDefaultExportFileName(),
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      });
+      if (!path) {
+        return;
+      }
+
+      const bytes = await createPdfExportBytes(
+        source,
+        this._exportElementsProvider?.() ?? [],
+      );
+      await writeFile(path, bytes);
+      toast.success('Exported to PDF');
+    } catch (err) {
+      logger.error('Export to PDF failed', err, {
+        index: this.index,
+        fileName: this._fileName,
+      });
+      toast.error('Export failed', {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private getExportSource(): PdfElementExportSource | null {
+    if (!this._pdfBytes) {
+      return null;
+    }
+
+    const layout = this.getLayout();
+    return {
+      index: this.index,
+      pdfBytes: this._pdfBytes,
+      pageSizes: this._pageSizes,
+      pageOrder: this.pageEntries,
+      pageTops: [...layout.pageTops],
+      totalWidth: layout.totalWidth,
+      offset: { x: this.offset.x, y: this.offset.y },
+      scale: {
+        x: getPositiveScale(this._scale.x),
+        y: getPositiveScale(this._scale.y),
+      },
+      boundingBox: this.boundingBox,
+    };
+  }
+
+  private getDefaultExportFileName(): string {
+    const trimmed = this._fileName.trim();
+    if (!trimmed) {
+      return `pdf-${this.index}.pdf`;
+    }
+    return trimmed.toLowerCase().endsWith('.pdf') ? trimmed : `${trimmed}.pdf`;
+  }
 
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
     if (!this._chrome) {
