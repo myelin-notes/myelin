@@ -73,10 +73,12 @@ export {
 export { getFileTypeForName } from './repo/shared';
 export type {
   FileType,
+  NoteBacklink,
   Repository,
   RepositoryCapabilities,
   RepositoryStats,
   RepositoryTag,
+  StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
