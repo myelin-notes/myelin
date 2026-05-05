@@ -15,6 +15,7 @@ import {
 } from './elements/element-factories';
 import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
+import { PdfElement } from './elements/pdf-element';
 import type { ResolveNoteLinkId } from './page-frame/pm/markdown/note-links';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
@@ -185,12 +186,19 @@ export class DrawableCanvas {
     }
 
     const element = factory(index);
-    if (element instanceof PageFrameElement) {
-      element.setNoteLinkResolver(this.resolveNoteLinkId);
-    }
+    this.configureElement(element);
     element.bindToYMap(yMap);
     this.bindElementSharedYState(element);
     return element;
+  }
+
+  private configureElement(element: DrawableElement): void {
+    if (element instanceof PageFrameElement) {
+      element.setNoteLinkResolver(this.resolveNoteLinkId);
+    }
+    if (element instanceof PdfElement) {
+      element.setExportElementsProvider(() => this._elements);
+    }
   }
 
   private bindElementSharedYState(element: DrawableElement): void {
@@ -761,9 +769,7 @@ export class DrawableCanvas {
   public addElement<T extends DrawableElement>(factory: (i: number) => T): T {
     const index = this._ydoc.nextIndex;
     const element = factory(index);
-    if (element instanceof PageFrameElement) {
-      element.setNoteLinkResolver(this.resolveNoteLinkId);
-    }
+    this.configureElement(element);
 
     // Build the Y.Map properties from the element's current state
     const props: Record<string, unknown> = {

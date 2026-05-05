@@ -81,14 +81,20 @@ interface TestPageDom {
   root: HTMLDivElement;
   canvas: HTMLCanvasElement;
   renderHandle: PdfPageRenderHandle | null;
-  renderedPageIndex: number | null;
-  renderedScale: number | null;
-  renderingPageIndex: number | null;
-  renderingScale: number | null;
-  pendingRenderTimeout: number | null;
-  pendingPageIndex: number | null;
-  pendingRenderScale: number | null;
-  pendingZoom: number | null;
+  rendered: TestRenderKey | null;
+  rendering: TestRenderKey | null;
+  pendingRender: TestPendingRender | null;
+}
+
+interface TestRenderKey {
+  pageIndex: number;
+  renderScale: number;
+}
+
+interface TestPendingRender {
+  key: TestRenderKey;
+  timeout: number;
+  zoom: number;
 }
 
 interface TestablePdfElement {
@@ -150,21 +156,19 @@ function stubCanvasDocument(): void {
 }
 
 function createPageDom(
-  renderedScale: number | null = null,
+  existingRenderScale: number | null = null,
   canvas: HTMLCanvasElement = createTestCanvas(),
 ): TestPageDom {
   return {
     root: {} as HTMLDivElement,
     canvas,
     renderHandle: null,
-    renderedPageIndex: renderedScale === null ? null : 0,
-    renderedScale,
-    renderingPageIndex: null,
-    renderingScale: null,
-    pendingRenderTimeout: null,
-    pendingPageIndex: null,
-    pendingRenderScale: null,
-    pendingZoom: null,
+    rendered:
+      existingRenderScale === null
+        ? null
+        : { pageIndex: 0, renderScale: existingRenderScale },
+    rendering: null,
+    pendingRender: null,
   };
 }
 

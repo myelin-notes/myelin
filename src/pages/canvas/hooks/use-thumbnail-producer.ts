@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getScratchCanvasContext } from '@/lib/scratch-canvas';
 import { registerThumbnailProducer } from '@/lib/thumbnails';
 
 interface UseCanvasThumbnailProducerArgs {
@@ -35,28 +36,13 @@ async function downscaleToBlob(
   const scale = Math.min(1, maxSize / longest);
   const width = Math.max(1, Math.round(source.width * scale));
   const height = Math.max(1, Math.round(source.height * scale));
+  const scratch = getScratchCanvasContext(width, height);
 
-  if (typeof OffscreenCanvas !== 'undefined') {
-    const offscreen = new OffscreenCanvas(width, height);
-    const context = offscreen.getContext('2d');
-    if (context === null) {
-      return null;
-    }
-    context.imageSmoothingQuality = 'high';
-    context.drawImage(source, 0, 0, width, height);
-    return await offscreen.convertToBlob({ type: 'image/png' });
+  try {
+    scratch.context.imageSmoothingQuality = 'high';
+    scratch.context.drawImage(source, 0, 0, width, height);
+    return await scratch.toBlob({ type: 'image/png' });
+  } finally {
+    scratch.release();
   }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext('2d');
-  if (context === null) {
-    return null;
-  }
-  context.imageSmoothingQuality = 'high';
-  context.drawImage(source, 0, 0, width, height);
-  return await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), 'image/png');
-  });
 }

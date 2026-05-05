@@ -1,8 +1,17 @@
+import { Download as DownloadIcon } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
+import {
+  createPdfExportBytes,
+  type PdfElementExportPage,
+  type PdfElementExportSource,
+} from '../pdf-export';
 import {
   createDefaultPdfPageOrder,
   getPdfDocumentPageSizes,
@@ -35,19 +44,24 @@ interface PdfPageDom {
   root: HTMLDivElement;
   canvas: HTMLCanvasElement;
   renderHandle: PdfPageRenderHandle | null;
-  renderedPageIndex: number | null;
-  renderedScale: number | null;
-  renderingPageIndex: number | null;
-  renderingScale: number | null;
-  pendingRenderTimeout: number | null;
-  pendingPageIndex: number | null;
-  pendingRenderScale: number | null;
-  pendingZoom: number | null;
+  rendered: PdfPageRenderKey | null;
+  rendering: PdfPageRenderKey | null;
+  pendingRender: PendingPdfPageRender | null;
+}
+
+interface PdfPageRenderKey {
+  pageIndex: number;
+  renderScale: number;
+}
+
+interface PendingPdfPageRender {
+  key: PdfPageRenderKey;
+  timeout: number;
+  zoom: number;
 }
 
 interface PdfLayout {
-  entries: PdfPageOrderEntry[];
-  pageTops: number[];
+  pages: PdfElementExportPage[];
   totalWidth: number;
   totalHeight: number;
 }
@@ -97,6 +111,17 @@ function isDefaultPageSize(size: PdfPageSize): boolean {
   return size.w === DEFAULT_PAGE_SIZE.w && size.h === DEFAULT_PAGE_SIZE.h;
 }
 
+function isSameRenderKey(
+  left: PdfPageRenderKey | null,
+  right: PdfPageRenderKey,
+): boolean {
+  return (
+    left !== null &&
+    left.pageIndex === right.pageIndex &&
+    left.renderScale === right.renderScale
+  );
+}
+
 export class PdfElement extends DrawableElement {
   private _pdfBytes: Uint8Array | null = null;
   private _fileName: string = '';
@@ -108,9 +133,17 @@ export class PdfElement extends DrawableElement {
   private _pageDoms = new Map<number, PdfPageDom>();
   private _layout: PdfLayout | null = null;
   private _loadGeneration = 0;
+  private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
+    null;
 
   constructor(index: number) {
     super(index, ElementType.PDF);
+  }
+
+  public setExportElementsProvider(
+    provider: () => readonly DrawableElement[],
+  ): void {
+    this._exportElementsProvider = provider;
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -183,7 +216,20 @@ export class PdfElement extends DrawableElement {
   }
 
   public getMenuItems(): ChromeMenuItem[] {
-    return [];
+    if (!this._pdfBytes) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'export-pdf',
+        label: 'Export to PDF',
+        icon: DownloadIcon,
+        onSelect: () => {
+          void this.exportPdf();
+        },
+      },
+    ];
   }
 
   public get totalWidth(): number {
@@ -238,6 +284,65 @@ export class PdfElement extends DrawableElement {
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
+  private async exportPdf(): Promise<void> {
+    const source = this.getExportSource();
+    if (!source) {
+      return;
+    }
+
+    try {
+      const path = await save({
+        defaultPath: this.getDefaultExportFileName(),
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      });
+      if (!path) {
+        return;
+      }
+
+      const bytes = await createPdfExportBytes(
+        source,
+        this._exportElementsProvider?.() ?? [],
+      );
+      await writeFile(path, bytes);
+      toast.success('Exported to PDF');
+    } catch (err) {
+      logger.error('Export to PDF failed', err, {
+        index: this.index,
+        fileName: this._fileName,
+      });
+      toast.error('Export failed', {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private getExportSource(): PdfElementExportSource | null {
+    if (!this._pdfBytes) {
+      return null;
+    }
+
+    const layout = this.getLayout();
+    return {
+      index: this.index,
+      pdfBytes: this._pdfBytes,
+      pages: layout.pages,
+      offset: { x: this.offset.x, y: this.offset.y },
+      scale: {
+        x: getPositiveScale(this._scale.x),
+        y: getPositiveScale(this._scale.y),
+      },
+      boundingBox: this.boundingBox,
+    };
+  }
+
+  private getDefaultExportFileName(): string {
+    const trimmed = this._fileName.trim();
+    if (!trimmed) {
+      return `pdf-${this.index}.pdf`;
+    }
+    return trimmed.toLowerCase().endsWith('.pdf') ? trimmed : `${trimmed}.pdf`;
+  }
+
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
     if (!this._chrome) {
       this.createDom(host);
@@ -278,7 +383,10 @@ export class PdfElement extends DrawableElement {
   }
 
   private get pageEntries(): PdfPageOrderEntry[] {
-    return this.getLayout().entries;
+    return this.getLayout().pages.map((page) => ({
+      kind: 'pdf',
+      originalIndex: page.originalIndex,
+    }));
   }
 
   private getPageSize(entry: PdfPageOrderEntry): PdfPageSize {
@@ -294,21 +402,30 @@ export class PdfElement extends DrawableElement {
       this._pageOrder,
       this._pageSizes.length,
     );
-    const pageTops: number[] = [];
+    const pages: PdfElementExportPage[] = [];
     let totalWidth = 0;
     let totalHeight = 0;
 
-    for (let i = 0; i < entries.length; i++) {
-      if (i > 0) {
+    for (const entry of entries) {
+      if (pages.length > 0) {
         totalHeight += PAGE_GAP;
       }
-      pageTops.push(totalHeight);
-      const pageSize = this.getPageSize(entries[i]);
+      const pageSize = this.getPageSize(entry);
+      pages.push({
+        originalIndex: entry.originalIndex,
+        size: pageSize,
+        localLeft: 0,
+        localTop: totalHeight,
+      });
       totalWidth = Math.max(totalWidth, pageSize.w);
       totalHeight += pageSize.h;
     }
 
-    this._layout = { entries, pageTops, totalWidth, totalHeight };
+    for (const page of pages) {
+      page.localLeft = (totalWidth - page.size.w) / 2;
+    }
+
+    this._layout = { pages, totalWidth, totalHeight };
     return this._layout;
   }
 
@@ -441,15 +558,13 @@ export class PdfElement extends DrawableElement {
     this.clearPendingPageRender(pageDom);
     pageDom.renderHandle?.cancel();
     pageDom.renderHandle = null;
-    pageDom.renderingPageIndex = null;
-    pageDom.renderingScale = null;
+    pageDom.rendering = null;
 
     if (!clearRenderedCanvas) {
       return;
     }
 
-    pageDom.renderedPageIndex = null;
-    pageDom.renderedScale = null;
+    pageDom.rendered = null;
     if (pageDom.canvas.width !== 1 || pageDom.canvas.height !== 1) {
       pageDom.canvas.width = 1;
       pageDom.canvas.height = 1;
@@ -483,26 +598,27 @@ export class PdfElement extends DrawableElement {
 
     const worldRect = viewport.getWorldRect();
     const dpr = window.devicePixelRatio || 1;
-    const activePageDomIndexes = new Set<number>();
+    const activePagePositions = new Set<number>();
 
     if (!this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)) {
-      this.removeInactivePageDoms(activePageDomIndexes);
+      this.removeInactivePageDoms(activePagePositions);
       return;
     }
 
     const visibleRange = this.getVisiblePageRange(worldRect, layout, scaleY);
-    for (let i = visibleRange.start; i < visibleRange.end; i++) {
-      const entry = layout.entries[i];
-      const pageSize = this.getPageSize(entry);
-      const localTop = layout.pageTops[i];
-      const localLeft = (layout.totalWidth - pageSize.w) / 2;
+    for (
+      let pagePosition = visibleRange.start;
+      pagePosition < visibleRange.end;
+      pagePosition++
+    ) {
+      const page = layout.pages[pagePosition];
 
       if (
         !this.isPageVisible(
           worldRect,
-          localLeft,
-          localTop,
-          pageSize,
+          page.localLeft,
+          page.localTop,
+          page.size,
           scaleX,
           scaleY,
         )
@@ -510,45 +626,45 @@ export class PdfElement extends DrawableElement {
         continue;
       }
 
-      let pageDom = this._pageDoms.get(i);
+      let pageDom = this._pageDoms.get(pagePosition);
       if (!pageDom) {
         pageDom = this.createPageDom(contentRoot);
-        this._pageDoms.set(i, pageDom);
+        this._pageDoms.set(pagePosition, pageDom);
       }
-      activePageDomIndexes.add(i);
+      activePagePositions.add(pagePosition);
 
-      const cssLeft = localLeft * scaleX * zoom;
-      const cssTop = localTop * scaleY * zoom;
-      const cssWidth = pageSize.w * scaleX * zoom;
-      const cssHeight = pageSize.h * scaleY * zoom;
+      const cssLeft = page.localLeft * scaleX * zoom;
+      const cssTop = page.localTop * scaleY * zoom;
+      const cssWidth = page.size.w * scaleX * zoom;
+      const cssHeight = page.size.h * scaleY * zoom;
 
       pageDom.root.style.transform = `translate(${cssLeft}px, ${cssTop}px)`;
       pageDom.root.style.width = `${cssWidth}px`;
       pageDom.root.style.height = `${cssHeight}px`;
 
       const renderScale = getPdfRenderScale({
-        pageSize,
+        pageSize: page.size,
         zoom,
         elementScale: Math.max(scaleX, scaleY),
         dpr,
       });
       this.requestPageRender(
         pageDom,
-        entry.originalIndex,
-        pageSize,
+        page.originalIndex,
+        page.size,
         renderScale,
         zoom,
       );
     }
 
-    this.removeInactivePageDoms(activePageDomIndexes);
+    this.removeInactivePageDoms(activePagePositions);
   }
 
-  private removeInactivePageDoms(activePageDomIndexes: Set<number>): void {
-    for (const [index, pageDom] of this._pageDoms) {
-      if (!activePageDomIndexes.has(index)) {
+  private removeInactivePageDoms(activePagePositions: Set<number>): void {
+    for (const [pagePosition, pageDom] of this._pageDoms) {
+      if (!activePagePositions.has(pagePosition)) {
         this.disposePageDom(pageDom);
-        this._pageDoms.delete(index);
+        this._pageDoms.delete(pagePosition);
       }
     }
   }
@@ -584,11 +700,11 @@ export class PdfElement extends DrawableElement {
     localY: number,
   ): number {
     let low = 0;
-    let high = layout.entries.length;
+    let high = layout.pages.length;
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
-      const pageBottom =
-        layout.pageTops[mid] + this.getPageSize(layout.entries[mid]).h;
+      const page = layout.pages[mid];
+      const pageBottom = page.localTop + page.size.h;
       if (pageBottom < localY) {
         low = mid + 1;
       } else {
@@ -603,10 +719,10 @@ export class PdfElement extends DrawableElement {
     localY: number,
   ): number {
     let low = 0;
-    let high = layout.pageTops.length;
+    let high = layout.pages.length;
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
-      if (layout.pageTops[mid] <= localY) {
+      if (layout.pages[mid].localTop <= localY) {
         low = mid + 1;
       } else {
         high = mid;
@@ -648,37 +764,30 @@ export class PdfElement extends DrawableElement {
       return;
     }
 
-    if (
-      pageDom.renderedPageIndex === pageIndex &&
-      pageDom.renderedScale === renderScale
-    ) {
+    const key = { pageIndex, renderScale };
+
+    if (isSameRenderKey(pageDom.rendered, key)) {
+      this.clearPendingPageRender(pageDom);
+      return;
+    }
+
+    if (isSameRenderKey(pageDom.rendering, key)) {
       this.clearPendingPageRender(pageDom);
       return;
     }
 
     if (
-      pageDom.renderingPageIndex === pageIndex &&
-      pageDom.renderingScale === renderScale
+      pageDom.pendingRender &&
+      isSameRenderKey(pageDom.pendingRender.key, key)
     ) {
-      this.clearPendingPageRender(pageDom);
-      return;
-    }
-
-    if (
-      pageDom.pendingPageIndex === pageIndex &&
-      pageDom.pendingRenderScale === renderScale
-    ) {
-      if (pageDom.pendingZoom === zoom) {
+      if (pageDom.pendingRender.zoom === zoom) {
         return;
       }
       this.schedulePageRender(pageDom, pageIndex, pageSize, renderScale, zoom);
       return;
     }
 
-    if (
-      pageDom.renderedPageIndex === pageIndex &&
-      pageDom.renderedScale !== null
-    ) {
+    if (pageDom.rendered?.pageIndex === pageIndex) {
       this.schedulePageRender(pageDom, pageIndex, pageSize, renderScale, zoom);
       return;
     }
@@ -694,26 +803,19 @@ export class PdfElement extends DrawableElement {
     zoom: number,
   ): void {
     this.clearPendingPageRender(pageDom);
-    pageDom.pendingPageIndex = pageIndex;
-    pageDom.pendingRenderScale = renderScale;
-    pageDom.pendingZoom = zoom;
-    pageDom.pendingRenderTimeout = window.setTimeout(() => {
-      pageDom.pendingRenderTimeout = null;
-      pageDom.pendingPageIndex = null;
-      pageDom.pendingRenderScale = null;
-      pageDom.pendingZoom = null;
+    const key = { pageIndex, renderScale };
+    const timeout = window.setTimeout(() => {
+      pageDom.pendingRender = null;
       this.startPageRender(pageDom, pageIndex, pageSize, renderScale);
     }, PDF_RENDER_DEBOUNCE_MS);
+    pageDom.pendingRender = { key, timeout, zoom };
   }
 
   private clearPendingPageRender(pageDom: PdfPageDom): void {
-    if (pageDom.pendingRenderTimeout !== null) {
-      window.clearTimeout(pageDom.pendingRenderTimeout);
+    if (pageDom.pendingRender) {
+      window.clearTimeout(pageDom.pendingRender.timeout);
     }
-    pageDom.pendingRenderTimeout = null;
-    pageDom.pendingPageIndex = null;
-    pageDom.pendingRenderScale = null;
-    pageDom.pendingZoom = null;
+    pageDom.pendingRender = null;
   }
 
   private startPageRender(
@@ -728,8 +830,7 @@ export class PdfElement extends DrawableElement {
     }
 
     pageDom.renderHandle?.cancel();
-    pageDom.renderingPageIndex = pageIndex;
-    pageDom.renderingScale = renderScale;
+    pageDom.rendering = { pageIndex, renderScale };
 
     const renderCanvas = document.createElement('canvas');
     const handle = renderPdfPageToCanvas({
@@ -753,18 +854,15 @@ export class PdfElement extends DrawableElement {
         pageDom.canvas.height = renderCanvas.height;
         context.drawImage(renderCanvas, 0, 0);
         pageDom.renderHandle = null;
-        pageDom.renderedPageIndex = pageIndex;
-        pageDom.renderedScale = renderScale;
-        pageDom.renderingPageIndex = null;
-        pageDom.renderingScale = null;
+        pageDom.rendered = { pageIndex, renderScale };
+        pageDom.rendering = null;
       })
       .catch((error) => {
         if (isPdfRenderCancelled(error) || pageDom.renderHandle !== handle) {
           return;
         }
         pageDom.renderHandle = null;
-        pageDom.renderingPageIndex = null;
-        pageDom.renderingScale = null;
+        pageDom.rendering = null;
         logger.error('Failed to render PDF page', error, {
           index: this.index,
           fileName: this._fileName,
@@ -839,14 +937,9 @@ export class PdfElement extends DrawableElement {
       root,
       canvas,
       renderHandle: null,
-      renderedPageIndex: null,
-      renderedScale: null,
-      renderingPageIndex: null,
-      renderingScale: null,
-      pendingRenderTimeout: null,
-      pendingPageIndex: null,
-      pendingRenderScale: null,
-      pendingZoom: null,
+      rendered: null,
+      rendering: null,
+      pendingRender: null,
     };
   }
 }
