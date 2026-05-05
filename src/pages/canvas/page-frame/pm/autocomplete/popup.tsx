@@ -140,6 +140,7 @@ export function PageFrameAutocompletePopup({
     },
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: causes issues with arrow navigation
   useEffect(() => {
     if (!previewVisible || !activeItem) {
       setActivePreview({ itemId: null, body: null });
@@ -403,9 +404,7 @@ export function PageFrameAutocompletePopup({
           <NoteLinkPreviewCard
             title={activeItem.title}
             body={
-              activePreview.itemId === activeItem.id
-                ? activePreview.body
-                : null
+              activePreview.itemId === activeItem.id ? activePreview.body : null
             }
             noteId={activeItem.id}
           />
