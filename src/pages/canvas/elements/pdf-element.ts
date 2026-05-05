@@ -44,14 +44,20 @@ interface PdfPageDom {
   root: HTMLDivElement;
   canvas: HTMLCanvasElement;
   renderHandle: PdfPageRenderHandle | null;
-  renderedPageIndex: number | null;
-  renderedScale: number | null;
-  renderingPageIndex: number | null;
-  renderingScale: number | null;
-  pendingRenderTimeout: number | null;
-  pendingPageIndex: number | null;
-  pendingRenderScale: number | null;
-  pendingZoom: number | null;
+  rendered: PdfPageRenderKey | null;
+  rendering: PdfPageRenderKey | null;
+  pendingRender: PendingPdfPageRender | null;
+}
+
+interface PdfPageRenderKey {
+  pageIndex: number;
+  renderScale: number;
+}
+
+interface PendingPdfPageRender {
+  key: PdfPageRenderKey;
+  timeout: number;
+  zoom: number;
 }
 
 interface PdfLayout {
@@ -103,6 +109,17 @@ function getPositiveScale(value: number): number {
 
 function isDefaultPageSize(size: PdfPageSize): boolean {
   return size.w === DEFAULT_PAGE_SIZE.w && size.h === DEFAULT_PAGE_SIZE.h;
+}
+
+function isSameRenderKey(
+  left: PdfPageRenderKey | null,
+  right: PdfPageRenderKey,
+): boolean {
+  return (
+    left !== null &&
+    left.pageIndex === right.pageIndex &&
+    left.renderScale === right.renderScale
+  );
 }
 
 export class PdfElement extends DrawableElement {
@@ -541,15 +558,13 @@ export class PdfElement extends DrawableElement {
     this.clearPendingPageRender(pageDom);
     pageDom.renderHandle?.cancel();
     pageDom.renderHandle = null;
-    pageDom.renderingPageIndex = null;
-    pageDom.renderingScale = null;
+    pageDom.rendering = null;
 
     if (!clearRenderedCanvas) {
       return;
     }
 
-    pageDom.renderedPageIndex = null;
-    pageDom.renderedScale = null;
+    pageDom.rendered = null;
     if (pageDom.canvas.width !== 1 || pageDom.canvas.height !== 1) {
       pageDom.canvas.width = 1;
       pageDom.canvas.height = 1;
@@ -749,37 +764,30 @@ export class PdfElement extends DrawableElement {
       return;
     }
 
-    if (
-      pageDom.renderedPageIndex === pageIndex &&
-      pageDom.renderedScale === renderScale
-    ) {
+    const key = { pageIndex, renderScale };
+
+    if (isSameRenderKey(pageDom.rendered, key)) {
+      this.clearPendingPageRender(pageDom);
+      return;
+    }
+
+    if (isSameRenderKey(pageDom.rendering, key)) {
       this.clearPendingPageRender(pageDom);
       return;
     }
 
     if (
-      pageDom.renderingPageIndex === pageIndex &&
-      pageDom.renderingScale === renderScale
+      pageDom.pendingRender &&
+      isSameRenderKey(pageDom.pendingRender.key, key)
     ) {
-      this.clearPendingPageRender(pageDom);
-      return;
-    }
-
-    if (
-      pageDom.pendingPageIndex === pageIndex &&
-      pageDom.pendingRenderScale === renderScale
-    ) {
-      if (pageDom.pendingZoom === zoom) {
+      if (pageDom.pendingRender.zoom === zoom) {
         return;
       }
       this.schedulePageRender(pageDom, pageIndex, pageSize, renderScale, zoom);
       return;
     }
 
-    if (
-      pageDom.renderedPageIndex === pageIndex &&
-      pageDom.renderedScale !== null
-    ) {
+    if (pageDom.rendered?.pageIndex === pageIndex) {
       this.schedulePageRender(pageDom, pageIndex, pageSize, renderScale, zoom);
       return;
     }
@@ -795,26 +803,19 @@ export class PdfElement extends DrawableElement {
     zoom: number,
   ): void {
     this.clearPendingPageRender(pageDom);
-    pageDom.pendingPageIndex = pageIndex;
-    pageDom.pendingRenderScale = renderScale;
-    pageDom.pendingZoom = zoom;
-    pageDom.pendingRenderTimeout = window.setTimeout(() => {
-      pageDom.pendingRenderTimeout = null;
-      pageDom.pendingPageIndex = null;
-      pageDom.pendingRenderScale = null;
-      pageDom.pendingZoom = null;
+    const key = { pageIndex, renderScale };
+    const timeout = window.setTimeout(() => {
+      pageDom.pendingRender = null;
       this.startPageRender(pageDom, pageIndex, pageSize, renderScale);
     }, PDF_RENDER_DEBOUNCE_MS);
+    pageDom.pendingRender = { key, timeout, zoom };
   }
 
   private clearPendingPageRender(pageDom: PdfPageDom): void {
-    if (pageDom.pendingRenderTimeout !== null) {
-      window.clearTimeout(pageDom.pendingRenderTimeout);
+    if (pageDom.pendingRender) {
+      window.clearTimeout(pageDom.pendingRender.timeout);
     }
-    pageDom.pendingRenderTimeout = null;
-    pageDom.pendingPageIndex = null;
-    pageDom.pendingRenderScale = null;
-    pageDom.pendingZoom = null;
+    pageDom.pendingRender = null;
   }
 
   private startPageRender(
@@ -829,8 +830,7 @@ export class PdfElement extends DrawableElement {
     }
 
     pageDom.renderHandle?.cancel();
-    pageDom.renderingPageIndex = pageIndex;
-    pageDom.renderingScale = renderScale;
+    pageDom.rendering = { pageIndex, renderScale };
 
     const renderCanvas = document.createElement('canvas');
     const handle = renderPdfPageToCanvas({
@@ -854,18 +854,15 @@ export class PdfElement extends DrawableElement {
         pageDom.canvas.height = renderCanvas.height;
         context.drawImage(renderCanvas, 0, 0);
         pageDom.renderHandle = null;
-        pageDom.renderedPageIndex = pageIndex;
-        pageDom.renderedScale = renderScale;
-        pageDom.renderingPageIndex = null;
-        pageDom.renderingScale = null;
+        pageDom.rendered = { pageIndex, renderScale };
+        pageDom.rendering = null;
       })
       .catch((error) => {
         if (isPdfRenderCancelled(error) || pageDom.renderHandle !== handle) {
           return;
         }
         pageDom.renderHandle = null;
-        pageDom.renderingPageIndex = null;
-        pageDom.renderingScale = null;
+        pageDom.rendering = null;
         logger.error('Failed to render PDF page', error, {
           index: this.index,
           fileName: this._fileName,
@@ -940,14 +937,9 @@ export class PdfElement extends DrawableElement {
       root,
       canvas,
       renderHandle: null,
-      renderedPageIndex: null,
-      renderedScale: null,
-      renderingPageIndex: null,
-      renderingScale: null,
-      pendingRenderTimeout: null,
-      pendingPageIndex: null,
-      pendingRenderScale: null,
-      pendingZoom: null,
+      rendered: null,
+      rendering: null,
+      pendingRender: null,
     };
   }
 }
