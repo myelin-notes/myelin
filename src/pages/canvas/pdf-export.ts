@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import { getScratchCanvasContext } from '@/lib/scratch-canvas';
 import type { Vector2 } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
 import type { PdfPageOrderEntry, PdfPageSize } from './pdf-renderer';
@@ -134,45 +135,31 @@ async function renderPageOverlay(
   elements: readonly PdfExportOverlayElement[],
 ): Promise<Uint8Array> {
   const rasterScale = getOverlayRasterScale(page.size);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.ceil(page.size.w * rasterScale));
-  canvas.height = Math.max(1, Math.ceil(page.size.h * rasterScale));
-
-  const ctx = canvas.getContext('2d', { alpha: true });
-  if (!ctx) {
-    throw new Error('Could not create PDF export canvas');
-  }
-
-  const targetScaleX = getPositiveScale(target.scale.x);
-  const targetScaleY = getPositiveScale(target.scale.y);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.setTransform(
-    rasterScale / targetScaleX,
-    0,
-    0,
-    rasterScale / targetScaleY,
-    (-page.worldBounds.x * rasterScale) / targetScaleX,
-    (-page.worldBounds.y * rasterScale) / targetScaleY,
+  const scratch = getScratchCanvasContext(
+    page.size.w * rasterScale,
+    page.size.h * rasterScale,
   );
 
-  for (const element of elements) {
-    element.draw(ctx, 0);
+  try {
+    const ctx = scratch.context;
+    const targetScaleX = getPositiveScale(target.scale.x);
+    const targetScaleY = getPositiveScale(target.scale.y);
+    ctx.clearRect(0, 0, scratch.width, scratch.height);
+    ctx.setTransform(
+      rasterScale / targetScaleX,
+      0,
+      0,
+      rasterScale / targetScaleY,
+      (-page.worldBounds.x * rasterScale) / targetScaleX,
+      (-page.worldBounds.y * rasterScale) / targetScaleY,
+    );
+
+    for (const element of elements) {
+      element.draw(ctx, 0);
+    }
+
+    return scratch.toBytes({ type: 'image/png' });
+  } finally {
+    scratch.release();
   }
-
-  return canvasToPngBytes(canvas);
-}
-
-async function canvasToPngBytes(
-  canvas: HTMLCanvasElement,
-): Promise<Uint8Array> {
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((result) => {
-      if (result) {
-        resolve(result);
-      } else {
-        reject(new Error('Could not encode PDF export overlay'));
-      }
-    }, 'image/png');
-  });
-  return new Uint8Array(await blob.arrayBuffer());
 }
