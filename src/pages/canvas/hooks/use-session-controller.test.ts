@@ -1,4 +1,7 @@
+import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ActiveRepository, NoteSessionStatus } from '@/lib/sync';
+import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 
 const { drawableCanvasCtor, resolveNoteLinkIdByTitleMock } = vi.hoisted(() => ({
   drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
@@ -25,12 +28,18 @@ vi.mock('@/pages/canvas/page-frame/note-link-resolution', () => ({
   resolveNoteLinkIdByTitle: resolveNoteLinkIdByTitleMock,
 }));
 
-type ControllerRepository = ConstructorParameters<
-  typeof import('./use-session-controller').CanvasSessionController
->[0];
-type ControllerDrawableCanvasRef = ConstructorParameters<
-  typeof import('./use-session-controller').CanvasSessionController
->[5];
+type ControllerRepository = ActiveRepository;
+type ControllerDrawableCanvasRef = RefObject<DrawableCanvas | null>;
+
+interface MockNoteSession {
+  id: string;
+  ydoc: { kind: string };
+  subscribeStatus: (
+    listener: (status: NoteSessionStatus) => void,
+  ) => () => void;
+  close: () => Promise<void>;
+  save: () => Promise<void>;
+}
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -42,7 +51,7 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
-function createSession(id: string) {
+function createSession(id: string): MockNoteSession {
   return {
     id,
     ydoc: { kind: `ydoc:${id}` },
@@ -69,8 +78,8 @@ describe('CanvasSessionController', () => {
     const { CanvasSessionController } = await import(
       './use-session-controller'
     );
-    const noteAOpen = createDeferred<ReturnType<typeof createSession>>();
-    const noteBOpen = createDeferred<ReturnType<typeof createSession>>();
+    const noteAOpen = createDeferred<MockNoteSession>();
+    const noteBOpen = createDeferred<MockNoteSession>();
     const noteASession = createSession('note-a');
     const noteBSession = createSession('note-b');
     const repository = {
@@ -174,7 +183,7 @@ describe('CanvasSessionController', () => {
     const { CanvasSessionController } = await import(
       './use-session-controller'
     );
-    const pendingOpen = createDeferred<ReturnType<typeof createSession>>();
+    const pendingOpen = createDeferred<MockNoteSession>();
     const noteSession = createSession('note-1');
     const repository = {
       kind: 'local',

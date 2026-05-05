@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, Radio, X } from 'lucide-react';
 import { TimeAgo } from '@/components/time-ago';
-import { useLocale, useMessages } from '@/lib/i18n';
+import { type Messages, useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import {
   type NoteSession,
   type NoteSessionStatus,
   type PeerSnapshot,
+  type RepositoryStatus,
   useRepositoryStatus,
 } from '@/lib/sync';
 import { IrohTransport } from '@/lib/sync/live/iroh';
@@ -29,10 +30,7 @@ function formatPeerId(peerId: string): string {
   return `${peerId.slice(0, 8)}...${peerId.slice(-4)}`;
 }
 
-function getRepositorySyncLabel(
-  strings: ReturnType<typeof useMessages>,
-  status: ReturnType<typeof useRepositoryStatus>,
-) {
+function getRepositorySyncLabel(strings: Messages, status: RepositoryStatus) {
   if (status.config.kind === 'local') {
     return strings.canvas.peerSync.repositoryStatus.localOnly;
   }

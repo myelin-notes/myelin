@@ -1,7 +1,7 @@
 export interface TransportEvents {
-  connected: () => void;
-  disconnected: () => void;
-  message: (data: Uint8Array) => void;
+  connected(): void;
+  disconnected(): void;
+  message(data: Uint8Array): void;
 }
 
 export interface Transport {

@@ -440,6 +440,7 @@ const en = {
       errors: {
         unsupportedUrl: 'That link does not point to an image or PDF.',
         fetchFailed: "Couldn't fetch that link.",
+        embedFailed: "Couldn't embed that file.",
         unsupportedType: 'Unsupported media type',
         unsupportedDesc: (type: string) => `${type} is not currently supported`,
       },

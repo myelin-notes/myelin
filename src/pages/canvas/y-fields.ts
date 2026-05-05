@@ -8,34 +8,27 @@ import { LOCAL_ORIGIN } from './ydoc-manager';
 export type YFieldMap = Record<string, (value: unknown) => void>;
 
 /**
- * Bind a Y.Map to element fields in one call:
- * 1. Reads initial values from the Y.Map into the element via setters
- * 2. Registers a single observer that dispatches remote changes to setters
- *
- * Call once per element class level (base + subclass each call with their fields).
+ * Read fields from a Y.Map into element-local state.
+ * This does not subscribe to the Y.Map; callers decide when to apply changes.
  */
-export function bindYFields(yMap: Y.Map<unknown>, fields: YFieldMap): void {
-  for (const [key, set] of Object.entries(fields)) {
+export function applyYFields(
+  yMap: Y.Map<unknown>,
+  fields: YFieldMap,
+  keys?: Iterable<string>,
+): void {
+  const entries = keys
+    ? Array.from(keys, (key) => [key, fields[key]] as const)
+    : Object.entries(fields);
+
+  for (const [key, set] of entries) {
+    if (!set) {
+      continue;
+    }
     const val = yMap.get(key);
     if (val !== undefined) {
       set(val);
     }
   }
-
-  yMap.observe((event) => {
-    if (event.transaction.origin === LOCAL_ORIGIN) {
-      return;
-    }
-    for (const key of event.keysChanged) {
-      const set = fields[key];
-      if (set) {
-        const val = yMap.get(key);
-        if (val !== undefined) {
-          set(val);
-        }
-      }
-    }
-  });
 }
 
 /**

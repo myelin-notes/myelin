@@ -12,6 +12,7 @@ import {
   type FileType,
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
+  type RepositoryConfig,
   useRepository,
   useRepositoryStatus,
   type VFSNode,
@@ -28,7 +29,7 @@ const logger = new Logger('ExplorerTree');
 type RepositorySetupState = 'checking' | 'ready' | 'setup-required';
 
 function getInitialRepositorySetupState(
-  config: ReturnType<typeof useRepositoryStatus>['config'],
+  config: RepositoryConfig,
 ): RepositorySetupState {
   if (config.kind === 'local') {
     return 'ready';

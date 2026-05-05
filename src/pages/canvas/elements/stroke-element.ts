@@ -5,7 +5,6 @@ import {
 } from 'perfect-freehand';
 import * as Y from 'yjs';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
-import { bindYFields } from '../y-fields';
 import { LOCAL_ORIGIN } from '../ydoc-manager';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
@@ -55,7 +54,7 @@ export class StrokeElement extends DrawableElement {
 
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
-    bindYFields(yMap, {
+    this.bindYFields(yMap, {
       color: (v) => {
         this.style.color = v as string;
       },
@@ -65,20 +64,12 @@ export class StrokeElement extends DrawableElement {
       hasPressure: (v) => {
         this.hasPressure = v as boolean;
       },
-    });
-
-    const yPoints = yMap.get('points') as Y.Array<number> | undefined;
-    if (yPoints) {
-      this._yPoints = yPoints;
-      this.rebuildPointsFromYArray();
-      this.updateBounds();
-      yPoints.observe((event) => {
-        if (event.transaction.origin === LOCAL_ORIGIN) {
-          return;
-        }
+      points: (v) => {
+        this._yPoints = v as Y.Array<number>;
         this.rebuildPointsFromYArray();
-      });
-    }
+        this.updateBounds();
+      },
+    });
   }
 
   private rebuildPointsFromYArray(): void {

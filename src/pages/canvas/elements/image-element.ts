@@ -1,5 +1,4 @@
 import type * as Y from 'yjs';
-import { bindYFields } from '../y-fields';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
@@ -22,7 +21,7 @@ export class ImageElement extends DrawableElement {
 
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
-    bindYFields(yMap, {
+    this.bindYFields(yMap, {
       naturalWidth: (v) => {
         this._naturalWidth = v as number;
       },

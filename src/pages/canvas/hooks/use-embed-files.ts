@@ -32,7 +32,14 @@ export function useEmbedFiles(
             ),
           });
         } else {
-          handler(file, dc, { repository, screenX, screenY });
+          void Promise.resolve(
+            handler(file, dc, { repository, screenX, screenY }),
+          ).catch((error) => {
+            toast.error(messages.canvas.embedComposer.errors.embedFailed, {
+              description:
+                error instanceof Error ? error.message : String(error),
+            });
+          });
         }
       }
     },

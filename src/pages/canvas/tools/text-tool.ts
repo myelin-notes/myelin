@@ -2,7 +2,7 @@ import { Type as TypeIcon } from 'lucide-react';
 import type { MessageGetter } from '@/lib/i18n';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import { TextElement } from '../elements/text-element';
+import { TextElement, type TextStyle } from '../elements/text-element';
 import type { FontEntry, ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const TEXT_COLORS = [
@@ -236,7 +236,7 @@ export class TextTool implements ITool {
     let touched = false;
     for (const el of canvas.elements) {
       if (el instanceof TextElement && el.isSelected) {
-        el.setStyle({ [key]: value } as Parameters<TextElement['setStyle']>[0]);
+        el.setStyle({ [key]: value } as Partial<TextStyle>);
         touched = true;
       }
     }

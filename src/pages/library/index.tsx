@@ -73,7 +73,7 @@ export function LibraryPage() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
-  const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragTimerRef = useRef<number | null>(null);
   const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(
     null,
   );
@@ -268,7 +268,7 @@ export function LibraryPage() {
 
   const clearDragTimer = () => {
     if (dragTimerRef.current) {
-      clearTimeout(dragTimerRef.current);
+      window.clearTimeout(dragTimerRef.current);
       dragTimerRef.current = null;
     }
   };
@@ -321,7 +321,7 @@ export function LibraryPage() {
       e.stopPropagation();
       setBreadcrumbDragIdx(idx);
       clearDragTimer();
-      dragTimerRef.current = setTimeout(() => {
+      dragTimerRef.current = window.setTimeout(() => {
         setCurrentFolderId(targetFolderId);
         setBreadcrumbDragIdx(null);
       }, 800);

@@ -1,10 +1,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { NoteLinkPreviewCard } from './note-link-preview-card';
 import type {
   NoteLinkPreview,
   NoteLinkPreviewTarget,
 } from './note-link-preview';
+import { NoteLinkPreviewCard } from './note-link-preview-card';
 
 const PREVIEW_WIDTH = 320;
 const PREVIEW_MARGIN = 12;
@@ -89,7 +89,7 @@ export function NoteLinkPreviewPopover({
   const activeTargetKeyRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
-  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTimerRef = useRef<number | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
   const suppressedRef = useRef(suppressed);
@@ -104,7 +104,7 @@ export function NoteLinkPreviewPopover({
 
   const closePreview = useEffectEvent(() => {
     if (pendingTimerRef.current !== null) {
-      clearTimeout(pendingTimerRef.current);
+      window.clearTimeout(pendingTimerRef.current);
       pendingTimerRef.current = null;
     }
     activeTargetKeyRef.current = null;
@@ -195,7 +195,7 @@ export function NoteLinkPreviewPopover({
 
       activeTargetKeyRef.current = targetKey;
       if (pendingTimerRef.current !== null) {
-        clearTimeout(pendingTimerRef.current);
+        window.clearTimeout(pendingTimerRef.current);
         pendingTimerRef.current = null;
       }
 
@@ -207,7 +207,7 @@ export function NoteLinkPreviewPopover({
         return;
       }
 
-      pendingTimerRef.current = setTimeout(() => {
+      pendingTimerRef.current = window.setTimeout(() => {
         pendingTimerRef.current = null;
         showPreview(hover);
       }, HOVER_OPEN_DELAY_MS);

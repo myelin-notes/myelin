@@ -13,7 +13,7 @@ import {
 } from 'prosemirror-commands';
 import { undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
-import type { MarkType, Schema } from 'prosemirror-model';
+import type { MarkType, ResolvedPos, Schema } from 'prosemirror-model';
 import { AllSelection, type Command, Selection } from 'prosemirror-state';
 import { goToNextCell } from 'prosemirror-tables';
 import { redo, undo } from 'y-prosemirror';
@@ -37,7 +37,7 @@ const EDITOR_MARK_ACTIONS: Record<string, { type: MarkType }> = {
  */
 const splitFlatListItem: Command = (state, dispatch) => {
   const { $cursor } = state.selection as {
-    $cursor?: ReturnType<typeof state.doc.resolve>;
+    $cursor?: ResolvedPos;
   };
   if (!$cursor) {
     return false;
@@ -79,7 +79,7 @@ const MAX_INDENT = 4;
 
 const indentListItem: Command = (state, dispatch) => {
   const { $cursor } = state.selection as {
-    $cursor?: ReturnType<typeof state.doc.resolve>;
+    $cursor?: ResolvedPos;
   };
   if (!$cursor) {
     return false;
@@ -110,7 +110,7 @@ const indentListItem: Command = (state, dispatch) => {
 
 const dedentListItem: Command = (state, dispatch) => {
   const { $cursor } = state.selection as {
-    $cursor?: ReturnType<typeof state.doc.resolve>;
+    $cursor?: ResolvedPos;
   };
   if (!$cursor) {
     return false;
@@ -145,7 +145,7 @@ const dedentListItem: Command = (state, dispatch) => {
  */
 const clearBlockFormatting: Command = (state, dispatch) => {
   const { $cursor } = state.selection as {
-    $cursor?: ReturnType<typeof state.doc.resolve>;
+    $cursor?: ResolvedPos;
   };
   if (!$cursor || $cursor.parentOffset > 0) {
     return false;

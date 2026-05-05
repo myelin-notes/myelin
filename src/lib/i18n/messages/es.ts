@@ -446,6 +446,7 @@ const es: typeof en = {
       errors: {
         unsupportedUrl: 'El enlace no es una imagen ni un PDF.',
         fetchFailed: 'Error al obtener el contenido del enlace.',
+        embedFailed: 'No se pudo insertar ese archivo.',
         unsupportedType: '',
         unsupportedDesc: () => {
           throw new Error('not yet implemented language');

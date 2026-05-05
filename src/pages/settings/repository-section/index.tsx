@@ -15,6 +15,7 @@ import { formatNumber } from '@/lib/i18n/format';
 import {
   getRepositoryConfig,
   type RepositoryConfig,
+  type RepositoryStatus,
   setRepositoryConfig,
   subscribeRepositoryConfig,
   useRepositoryStatus,
@@ -429,7 +430,7 @@ function PathDivider({ children }: { children: React.ReactNode }) {
 function computeSyncStatus(
   strings: Messages,
   remoteConfigReady: boolean,
-  status: ReturnType<typeof useRepositoryStatus>,
+  status: RepositoryStatus,
 ): { label: string; tone: SyncStatusTone; description: string } {
   const copy = strings.settings.repository.sync.status;
 

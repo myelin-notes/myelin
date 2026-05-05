@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react';
-import { UserPrefs } from './user-prefs';
-
-type UserPrefsKey = Parameters<typeof UserPrefs.get>[0];
-type UserPrefValue<K extends UserPrefsKey> = ReturnType<
-  typeof UserPrefs.get<K>
->;
+import { UserPrefs, type UserPrefsKey, type UserPrefValue } from './user-prefs';
 
 export function useUserPref<K extends UserPrefsKey>(key: K): UserPrefValue<K> {
   const [value, setValue] = useState<UserPrefValue<K>>(() =>

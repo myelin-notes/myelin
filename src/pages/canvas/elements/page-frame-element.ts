@@ -11,7 +11,6 @@ import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLinkId as NoteLinkIdResolver } from '../page-frame/pm/markdown/note-links';
-import { bindYFields } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
 import {
   DrawableElement,
@@ -136,7 +135,7 @@ export class PageFrameElement extends DrawableElement {
 
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
-    bindYFields(yMap, {
+    this.bindYFields(yMap, {
       pageWidth: (v) => {
         this._pageWidth = v as number;
       },
