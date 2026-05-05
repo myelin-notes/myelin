@@ -1,4 +1,5 @@
 import { Logger } from '@/lib/logger';
+import type { FileId } from '@/lib/sync';
 import * as cache from './cache';
 
 export interface ThumbnailProducer {
@@ -10,15 +11,15 @@ const DEBOUNCE_MS = 750;
 
 const logger = new Logger('ThumbnailService');
 
-const producers = new Map<string, ThumbnailProducer>();
-const subscribers = new Map<string, Set<() => void>>();
-const debounceTimers = new Map<string, number>();
-const inflight = new Map<string, Promise<void>>();
-const rerunRequested = new Set<string>();
-const versions = new Map<string, number>();
+const producers = new Map<FileId, ThumbnailProducer>();
+const subscribers = new Map<FileId, Set<() => void>>();
+const debounceTimers = new Map<FileId, number>();
+const inflight = new Map<FileId, Promise<void>>();
+const rerunRequested = new Set<FileId>();
+const versions = new Map<FileId, number>();
 
 export function registerThumbnailProducer(
-  nodeId: string,
+  nodeId: FileId,
   producer: ThumbnailProducer,
 ): () => void {
   producers.set(nodeId, producer);
@@ -29,7 +30,7 @@ export function registerThumbnailProducer(
   };
 }
 
-export function requestThumbnailRegeneration(nodeId: string): void {
+export function requestThumbnailRegeneration(nodeId: FileId): void {
   const prev = debounceTimers.get(nodeId);
   if (prev !== undefined) {
     window.clearTimeout(prev);
@@ -43,7 +44,7 @@ export function requestThumbnailRegeneration(nodeId: string): void {
   debounceTimers.set(nodeId, timer);
 }
 
-export async function regenerateThumbnailNow(nodeId: string): Promise<void> {
+export async function regenerateThumbnailNow(nodeId: FileId): Promise<void> {
   const timer = debounceTimers.get(nodeId);
   if (timer !== undefined) {
     window.clearTimeout(timer);
@@ -52,7 +53,7 @@ export async function regenerateThumbnailNow(nodeId: string): Promise<void> {
   await runGenerate(nodeId);
 }
 
-export async function getThumbnailUrl(nodeId: string): Promise<string | null> {
+export async function getThumbnailUrl(nodeId: FileId): Promise<string | null> {
   const url = await cache.readUrl(nodeId);
   if (url === null) {
     return null;
@@ -62,7 +63,7 @@ export async function getThumbnailUrl(nodeId: string): Promise<string | null> {
 }
 
 export function subscribeThumbnail(
-  nodeId: string,
+  nodeId: FileId,
   callback: () => void,
 ): () => void {
   let set = subscribers.get(nodeId);
@@ -83,13 +84,13 @@ export function subscribeThumbnail(
   };
 }
 
-export async function removeThumbnail(nodeId: string): Promise<void> {
+export async function removeThumbnail(nodeId: FileId): Promise<void> {
   await cache.removeEntry(nodeId);
   bumpVersion(nodeId);
   notify(nodeId);
 }
 
-async function runGenerate(nodeId: string): Promise<void> {
+async function runGenerate(nodeId: FileId): Promise<void> {
   const existing = inflight.get(nodeId);
   if (existing !== undefined) {
     rerunRequested.add(nodeId);
@@ -129,11 +130,11 @@ async function runGenerate(nodeId: string): Promise<void> {
   }
 }
 
-function bumpVersion(nodeId: string): void {
+function bumpVersion(nodeId: FileId): void {
   versions.set(nodeId, (versions.get(nodeId) ?? 0) + 1);
 }
 
-function notify(nodeId: string): void {
+function notify(nodeId: FileId): void {
   const set = subscribers.get(nodeId);
   if (set === undefined) {
     return;

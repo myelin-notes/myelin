@@ -15,7 +15,7 @@ import { IS_DEV } from '@/lib/env';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { Logger } from '@/lib/logger';
 import { openNoteLink } from '@/lib/note-navigation';
-import { useRepository } from '@/lib/sync';
+import { type FileId, useRepository } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
@@ -54,7 +54,7 @@ export function CanvasView() {
 }
 
 function CanvasViewInner() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: FileId }>();
   const navigate = useNavigate();
   const repository = useRepository();
   const canvasRef = useRef<HTMLCanvasElement>(null);

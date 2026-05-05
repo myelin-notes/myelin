@@ -84,6 +84,7 @@ export type {
 export { FileTypes, ImageFileTypes, VideoFileTypes } from './repo/types';
 export { NoteSession } from './session';
 export type {
+  FileId,
   NoteSessionStatus,
   YjsSyncPushOptions,
   YjsSyncPushResult,

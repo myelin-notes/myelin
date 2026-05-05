@@ -1,4 +1,7 @@
 import type { NoteSession } from '../session';
+import type { FileId } from '../types';
+
+export type { FileId } from '../types';
 
 export const ImageFileTypes = [
   'jpg',
@@ -26,7 +29,7 @@ export const FileTypes = [
 export type FileType = (typeof FileTypes)[number];
 
 export interface VFSFileNode {
-  id: string;
+  id: FileId;
   name: string;
   type: 'file';
   fileType: FileType;
@@ -86,22 +89,22 @@ export interface Repository {
     fileType: FileType,
     parentId: string | null,
     bytes?: Uint8Array,
-  ): Promise<string>;
-  readFileBytes(nodeId: string): Promise<Uint8Array | null>;
-  writeFileBytes(nodeId: string, bytes: Uint8Array): Promise<void>;
+  ): Promise<FileId>;
+  readFileBytes(nodeId: FileId): Promise<Uint8Array | null>;
+  writeFileBytes(nodeId: FileId, bytes: Uint8Array): Promise<void>;
   renameNode(nodeId: string, newName: string): Promise<void>;
   deleteNode(nodeId: string): Promise<void>;
   moveNode(nodeId: string, newParentId: string | null): Promise<void>;
   setTags(nodeId: string, tags: string[]): Promise<void>;
   addTag(nodeId: string, tag: string): Promise<void>;
   removeTag(nodeId: string, tag: string): Promise<void>;
-  getRevealPath(nodeId: string): Promise<string | null>;
+  getRevealPath(nodeId: FileId): Promise<string | null>;
 
   getCustomColors(): Promise<string[]>;
   addCustomColor(color: string): Promise<string[]>;
   removeCustomColor(color: string): Promise<string[]>;
 
-  openSession(nodeId: string): Promise<NoteSession>;
+  openSession(nodeId: FileId): Promise<NoteSession>;
 }
 
 export type { NoteSession };

@@ -15,7 +15,7 @@ import {
   createEmptyManifest,
   type VFSManifest,
 } from './shared';
-import type { RepositoryCapabilities, VFSFileNode } from './types';
+import type { FileId, RepositoryCapabilities, VFSFileNode } from './types';
 
 class MemoryRemoteRepository extends BaseRepository {
   public readonly kind = 'memory-remote';
@@ -26,7 +26,7 @@ class MemoryRemoteRepository extends BaseRepository {
 
   private manifest: VFSManifest = createEmptyManifest();
   private manifestRevision: string | null = null;
-  private readonly notes = new Map<string, Uint8Array>();
+  private readonly notes = new Map<FileId, Uint8Array>();
   private noteRevision = 0;
   private manifestVersion = 0;
   private loadFileBytesGate: Promise<void> | null = null;
@@ -64,7 +64,7 @@ class MemoryRemoteRepository extends BaseRepository {
     return this.manifestRevision;
   }
 
-  protected async loadFileBytes(nodeId: string): Promise<{
+  protected async loadFileBytes(nodeId: FileId): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
@@ -81,7 +81,7 @@ class MemoryRemoteRepository extends BaseRepository {
   }
 
   protected async saveFileBytes(
-    nodeId: string,
+    nodeId: FileId,
     bytes: Uint8Array,
     _revision: string | null,
     _message: string,
@@ -95,7 +95,7 @@ class MemoryRemoteRepository extends BaseRepository {
     return `note-${++this.noteRevision}`;
   }
 
-  protected async deleteFileBytes(nodeId: string): Promise<void> {
+  protected async deleteFileBytes(nodeId: FileId): Promise<void> {
     this.notes.delete(nodeId);
   }
 }

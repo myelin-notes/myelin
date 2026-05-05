@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { LocalRepository } from '@/lib/sync/repo/local';
-import type { FileType } from '@/lib/sync/repo/types';
+import type { FileId, FileType } from '@/lib/sync/repo/types';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import {
@@ -13,12 +13,12 @@ import { importObsidianVault } from './import-obsidian-vault';
 function collectNoteLinks(json: unknown): Array<{
   text: string;
   title: string;
-  noteId: string | null;
+  noteId: FileId | null;
 }> {
   const links: Array<{
     text: string;
     title: string;
-    noteId: string | null;
+    noteId: FileId | null;
   }> = [];
 
   const visit = (node: unknown) => {
@@ -32,7 +32,7 @@ function collectNoteLinks(json: unknown): Array<{
         type?: string;
         attrs?: {
           title?: string;
-          noteId?: string | null;
+          noteId?: FileId | null;
         };
       }>;
       content?: unknown[];
@@ -165,7 +165,7 @@ describe('Obsidian vault import', () => {
         fileType: FileType,
         parentId: string | null,
         bytes?: Uint8Array,
-      ): Promise<string> {
+      ): Promise<FileId> {
         if (name === 'Broken') {
           throw error;
         }

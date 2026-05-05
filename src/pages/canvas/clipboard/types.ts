@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import type { FileId } from '@/lib/sync';
 import type { ElementType } from '../elements/element-type';
 
 export interface CanvasPoint {
@@ -15,7 +16,7 @@ export interface CanvasRect {
 
 export interface CanvasClipboardSnapshot {
   version: 1;
-  sourceNoteId: string;
+  sourceNoteId: FileId;
   selectionBounds: CanvasRect;
   payload: string;
 }
@@ -29,13 +30,13 @@ export interface CanvasClipboardSelectionItem {
 }
 
 export interface CanvasClipboardSelection {
-  noteId: string;
+  noteId: FileId;
   bounds: CanvasRect;
   items: CanvasClipboardSelectionItem[];
 }
 
 export interface CanvasPasteContext {
-  noteId: string;
+  noteId: FileId;
   viewportCenter: CanvasPoint;
 }
 

@@ -1,3 +1,5 @@
+export type FileId = string;
+
 /**
  * Full or incremental snapshot of a document's sync state.
  *
@@ -44,15 +46,15 @@ export interface YjsSyncPushResult extends YjsSyncSnapshot {
  */
 export interface YjsSyncTarget {
   /** Load the current document state for an initial session open. */
-  loadDocument(nodeId: string): Promise<YjsSyncSnapshot>;
+  loadDocument(nodeId: FileId): Promise<YjsSyncSnapshot>;
   /** Pull remote changes since the provided state vector, or full state if omitted. */
   pullUpdates(
-    nodeId: string,
+    nodeId: FileId,
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot>;
   /** Push local changes and receive the remote sync state after the attempt. */
   pushUpdates(
-    nodeId: string,
+    nodeId: FileId,
     update: Uint8Array,
     options: YjsSyncPushOptions,
   ): Promise<YjsSyncPushResult>;

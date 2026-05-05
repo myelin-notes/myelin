@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import type { FileId } from '@/lib/sync';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
 
 interface RecentCardProps {
-  nodeId: string;
+  nodeId: FileId;
   category: string;
   time: string;
   title: string;

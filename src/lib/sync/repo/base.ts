@@ -35,6 +35,7 @@ import {
   type VFSManifest,
 } from './shared';
 import type {
+  FileId,
   FileType,
   Repository,
   RepositoryCapabilities,
@@ -78,20 +79,20 @@ export abstract class BaseRepository
     action: string,
   ): Promise<string | null>;
 
-  protected abstract loadFileBytes(nodeId: string): Promise<{
+  protected abstract loadFileBytes(nodeId: FileId): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }>;
 
   protected abstract saveFileBytes(
-    nodeId: string,
+    nodeId: FileId,
     bytes: Uint8Array,
     revision: string | null,
     message: string,
   ): Promise<string | null>;
 
   protected abstract deleteFileBytes(
-    nodeId: string,
+    nodeId: FileId,
     fileType?: FileType,
   ): Promise<void>;
 
@@ -103,9 +104,9 @@ export abstract class BaseRepository
     return 1;
   }
 
-  protected async onFileCreated(_nodeId: string): Promise<void> {}
+  protected async onFileCreated(_nodeId: FileId): Promise<void> {}
 
-  protected async onFileSaved(nodeId: string): Promise<void> {
+  protected async onFileSaved(nodeId: FileId): Promise<void> {
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
@@ -155,7 +156,7 @@ export abstract class BaseRepository
     return this.mutateManifest(action, mutator);
   }
 
-  async removeNoteData(nodeId: string, fileType?: FileType): Promise<void> {
+  async removeNoteData(nodeId: FileId, fileType?: FileType): Promise<void> {
     await this.deleteFileBytes(nodeId, fileType);
   }
 
@@ -242,7 +243,7 @@ export abstract class BaseRepository
     fileType: FileType,
     parentId: string | null,
     bytes?: Uint8Array,
-  ): Promise<string> {
+  ): Promise<FileId> {
     const id = await this.mutateManifest('Create file', (manifest) => {
       const newId = createNodeId();
       const now = Date.now();
@@ -263,12 +264,12 @@ export abstract class BaseRepository
     return id;
   }
 
-  async readFileBytes(nodeId: string): Promise<Uint8Array | null> {
+  async readFileBytes(nodeId: FileId): Promise<Uint8Array | null> {
     const { bytes } = await this.loadFileBytes(nodeId);
     return bytes ? new Uint8Array(bytes) : null;
   }
 
-  async writeFileBytes(nodeId: string, bytes: Uint8Array): Promise<void> {
+  async writeFileBytes(nodeId: FileId, bytes: Uint8Array): Promise<void> {
     const { revision } = await this.loadFileBytes(nodeId);
     const nextRevision = await this.saveFileBytes(
       nodeId,
@@ -350,7 +351,7 @@ export abstract class BaseRepository
     });
   }
 
-  async getRevealPath(_nodeId: string): Promise<string | null> {
+  async getRevealPath(_nodeId: FileId): Promise<string | null> {
     return null;
   }
 
@@ -385,7 +386,7 @@ export abstract class BaseRepository
     });
   }
 
-  async openSession(nodeId: string): Promise<NoteSession> {
+  async openSession(nodeId: FileId): Promise<NoteSession> {
     logger.debug('Opening repository-backed note session', {
       repositoryKind: this.kind,
       nodeId,
@@ -393,7 +394,7 @@ export abstract class BaseRepository
     return NoteSession.open(nodeId, this);
   }
 
-  async loadDocument(nodeId: string): Promise<YjsSyncSnapshot> {
+  async loadDocument(nodeId: FileId): Promise<YjsSyncSnapshot> {
     const remote = await this.readYjsSyncState(nodeId);
     logger.debug('Loaded repository document snapshot', {
       repositoryKind: this.kind,
@@ -411,7 +412,7 @@ export abstract class BaseRepository
   }
 
   async pullUpdates(
-    nodeId: string,
+    nodeId: FileId,
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot> {
     const remote = await this.readYjsSyncState(nodeId);
@@ -434,7 +435,7 @@ export abstract class BaseRepository
   }
 
   async pushUpdates(
-    nodeId: string,
+    nodeId: FileId,
     update: Uint8Array,
     options: YjsSyncPushOptions,
   ): Promise<YjsSyncPushResult> {
@@ -530,7 +531,7 @@ export abstract class BaseRepository
     );
   }
 
-  private async readYjsSyncState(nodeId: string): Promise<{
+  private async readYjsSyncState(nodeId: FileId): Promise<{
     bytes: Uint8Array | null;
     doc: Y.Doc;
     stateVector: Uint8Array;

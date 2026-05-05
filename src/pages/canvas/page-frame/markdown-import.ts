@@ -1,6 +1,7 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type * as Y from 'yjs';
+import type { FileId } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
 import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
 import type { YDocManager } from '../ydoc-manager';
@@ -19,7 +20,7 @@ export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
 
 interface MarkdownPageFrameImportOptions {
   repository?: NoteLinkResolveSource;
-  resolveNoteLinkId?: (title: string) => Promise<string | null>;
+  resolveNoteLinkId?: (title: string) => Promise<FileId | null>;
 }
 
 interface AddMarkdownPageFrameOptions extends MarkdownPageFrameImportOptions {

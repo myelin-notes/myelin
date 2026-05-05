@@ -1,4 +1,4 @@
-import type { Repository, VFSFileNode, VFSNode } from '@/lib/sync';
+import type { FileId, Repository, VFSFileNode, VFSNode } from '@/lib/sync';
 import type { PageFrameAutocompleteItem } from './pm/autocomplete';
 
 export type NoteLinkResolveSource = Pick<
@@ -93,7 +93,7 @@ async function getNoteLinkPath(
 export async function resolveNoteLinkIdByTitle(
   repository: NoteLinkResolveSource,
   target: string,
-): Promise<string | null> {
+): Promise<FileId | null> {
   const parsedTarget = parseNoteLinkTarget(target);
   if (!parsedTarget) {
     return null;

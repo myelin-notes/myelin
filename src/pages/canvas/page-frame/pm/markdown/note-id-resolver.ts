@@ -6,8 +6,9 @@
 import type { Node as PMNode, Schema } from 'prosemirror-model';
 import type { EditorState, PluginView, Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
+import type { FileId } from '@/lib/sync';
 
-export type ResolveNoteLinkId = (title: string) => Promise<string | null>;
+export type ResolveNoteLinkId = (title: string) => Promise<FileId | null>;
 
 export type CollectTitlesForResolution = (
   doc: PMNode,
@@ -17,7 +18,7 @@ export type CollectTitlesForResolution = (
 export type BuildResolveTransaction = (
   state: EditorState,
   schema: Schema,
-  noteIdsByTitle: ReadonlyMap<string, string | null>,
+  noteIdsByTitle: ReadonlyMap<string, FileId | null>,
 ) => Transaction | null;
 
 export async function buildResolvedTitleLookup(
@@ -25,9 +26,9 @@ export async function buildResolvedTitleLookup(
   schema: Schema,
   collectTitles: CollectTitlesForResolution,
   resolveNoteLinkId: ResolveNoteLinkId,
-): Promise<Map<string, string | null>> {
+): Promise<Map<string, FileId | null>> {
   const titles = Array.from(new Set(collectTitles(doc, schema)));
-  const noteIdsByTitle = new Map<string, string | null>();
+  const noteIdsByTitle = new Map<string, FileId | null>();
   await Promise.all(
     titles.map(async (title) => {
       noteIdsByTitle.set(title, await resolveNoteLinkId(title));

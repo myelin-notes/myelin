@@ -1,6 +1,7 @@
 import * as Y from 'yjs';
 import { searchItems } from '@/lib/search';
 import {
+  type FileId,
   type FileType,
   FileTypes,
   ImageFileTypes,
@@ -21,7 +22,7 @@ export interface VFSManifest {
 
 export interface RepositorySnapshot {
   manifest: VFSManifest;
-  notes: Record<string, Uint8Array | null>;
+  notes: Record<FileId, Uint8Array | null>;
 }
 
 export const CURRENT_MANIFEST_VERSION = 1;
@@ -84,7 +85,7 @@ export function createFolderNode(
 }
 
 export function createFileNode(
-  id: string,
+  id: FileId,
   name: string,
   fileType: FileType,
   parentId: string | null,
@@ -428,10 +429,10 @@ export function getStoredFilePath(
   return `${FILES_DIR}/${getStoredFileName(node)}`;
 }
 
-export function getNoteFileName(nodeId: string): string {
+export function getNoteFileName(nodeId: FileId): string {
   return `${nodeId}${FILE_EXT}`;
 }
 
-export function getNotePath(nodeId: string): string {
+export function getNotePath(nodeId: FileId): string {
   return `${FILES_DIR}/${getNoteFileName(nodeId)}`;
 }

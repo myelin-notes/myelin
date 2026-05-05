@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Logger } from '@/lib/logger';
-import type { NoteSession } from '@/lib/sync';
+import type { FileId, NoteSession } from '@/lib/sync';
 import {
   regenerateThumbnailNow,
   requestThumbnailRegeneration,
@@ -11,7 +11,7 @@ const SAVE_DEBOUNCE_MS = 250;
 const logger = new Logger('CanvasSessionSaveScheduler');
 
 interface UseSessionSavingArgs {
-  noteId: string | undefined;
+  noteId: FileId | undefined;
   noteSession: NoteSession | null;
 }
 

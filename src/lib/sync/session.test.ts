@@ -7,6 +7,7 @@ import {
 } from '@/pages/canvas/ydoc-manager';
 import { NoteSession } from './session';
 import type {
+  FileId,
   YjsSyncPushOptions,
   YjsSyncPushResult,
   YjsSyncSnapshot,
@@ -25,7 +26,7 @@ function createSyncTarget() {
     loadDocument: async (): Promise<YjsSyncSnapshot> => createEmptySnapshot(),
     pullUpdates: async (): Promise<YjsSyncSnapshot> => createEmptySnapshot(),
     pushUpdates: async (
-      _nodeId: string,
+      _nodeId: FileId,
       _update: Uint8Array,
       _options: YjsSyncPushOptions,
     ): Promise<YjsSyncPushResult> => ({
@@ -69,7 +70,7 @@ describe('NoteSession local change listeners', () => {
     const ydoc = new YDocManager();
     const pushUpdates = vi.fn<
       (
-        nodeId: string,
+        nodeId: FileId,
         update: Uint8Array,
         options: YjsSyncPushOptions,
       ) => Promise<YjsSyncPushResult>
@@ -148,7 +149,7 @@ describe('NoteSession local change listeners', () => {
 
     const pushUpdates = vi.fn<
       (
-        nodeId: string,
+        nodeId: FileId,
         update: Uint8Array,
         options: YjsSyncPushOptions,
       ) => Promise<YjsSyncPushResult>
@@ -187,7 +188,7 @@ describe('NoteSession local change listeners', () => {
     let lastStatusPhase: string | null = null;
     const pushUpdates = vi.fn<
       (
-        nodeId: string,
+        nodeId: FileId,
         update: Uint8Array,
         options: YjsSyncPushOptions,
       ) => Promise<YjsSyncPushResult>

@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { getScratchCanvasContext } from '@/lib/scratch-canvas';
+import type { FileId } from '@/lib/sync';
 import { registerThumbnailProducer } from '@/lib/thumbnails';
 
 interface UseCanvasThumbnailProducerArgs {
-  id: string | undefined;
+  id: FileId | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 

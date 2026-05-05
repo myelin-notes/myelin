@@ -1,3 +1,4 @@
+import type { FileId } from '@/lib/sync';
 import type {
   CanvasClipboardSnapshot,
   CanvasPasteContext,
@@ -44,7 +45,7 @@ export interface CanvasPastePlacementTracker {
 
 export function createCanvasPastePlacementTracker(): CanvasPastePlacementTracker {
   let lastSignature: string | null = null;
-  let lastDestinationNoteId: string | null = null;
+  let lastDestinationNoteId: FileId | null = null;
   let pasteCount = 0;
 
   return {

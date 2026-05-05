@@ -1,11 +1,12 @@
 import { type RefObject, useEffect, useEffectEvent, useMemo } from 'react';
+import type { FileId } from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { CanvasClipboardController } from '../clipboard/controller';
 import { DrawableCanvasClipboardAdapter } from '../clipboard/drawable-canvas-adapter';
 import type { EmbedFilesFn } from './use-embed-files';
 
 interface UseCanvasClipboardArgs {
-  id: string | undefined;
+  id: FileId | undefined;
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
   embedFiles: EmbedFilesFn;
 }

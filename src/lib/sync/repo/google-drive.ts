@@ -8,7 +8,7 @@ import {
   migrate,
   type VFSManifest,
 } from './shared';
-import type { RepositoryCapabilities } from './types';
+import type { FileId, RepositoryCapabilities } from './types';
 
 interface GoogleDriveRepositoryConfig {
   credentialId: string;
@@ -124,7 +124,7 @@ export class GoogleDriveRepository extends BaseRepository {
     );
   }
 
-  protected async loadFileBytes(nodeId: string): Promise<{
+  protected async loadFileBytes(nodeId: FileId): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
@@ -146,7 +146,7 @@ export class GoogleDriveRepository extends BaseRepository {
   }
 
   protected async saveFileBytes(
-    nodeId: string,
+    nodeId: FileId,
     bytes: Uint8Array,
     revision: string | null,
     _message: string,
@@ -173,7 +173,7 @@ export class GoogleDriveRepository extends BaseRepository {
     );
   }
 
-  protected async deleteFileBytes(nodeId: string): Promise<void> {
+  protected async deleteFileBytes(nodeId: FileId): Promise<void> {
     const noteFile = await this.findNoteFile(nodeId);
     if (!noteFile) {
       return;
@@ -432,7 +432,7 @@ export class GoogleDriveRepository extends BaseRepository {
     );
   }
 
-  private async findNoteFile(nodeId: string): Promise<GoogleDriveFile | null> {
+  private async findNoteFile(nodeId: FileId): Promise<GoogleDriveFile | null> {
     const rootFolderId = await this.ensureRootFolderId();
     return (
       (

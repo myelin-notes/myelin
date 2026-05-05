@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 import type * as Y from 'yjs';
+import type { FileId } from '@/lib/sync';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { ElementType } from '../elements/element-type';
 import { PageFrameElement } from '../elements/page-frame-element';
@@ -51,7 +52,7 @@ function asNumber(value: unknown, fallback = 0): number {
 export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
   public constructor(
     private readonly drawableCanvasRef: RefObject<DrawableCanvas | null>,
-    private readonly noteId: string,
+    private readonly noteId: FileId,
   ) {}
 
   private get canvas(): DrawableCanvas | null {

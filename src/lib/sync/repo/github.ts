@@ -8,7 +8,12 @@ import {
   migrate,
   type VFSManifest,
 } from './shared';
-import type { FileType, RepositoryCapabilities, VFSFileNode } from './types';
+import type {
+  FileId,
+  FileType,
+  RepositoryCapabilities,
+  VFSFileNode,
+} from './types';
 
 interface GitHubContentsResponse {
   sha: string;
@@ -107,7 +112,7 @@ export class GitHubRepository extends BaseRepository {
     );
   }
 
-  protected async loadFileBytes(nodeId: string): Promise<{
+  protected async loadFileBytes(nodeId: FileId): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
@@ -121,7 +126,7 @@ export class GitHubRepository extends BaseRepository {
   }
 
   protected async saveFileBytes(
-    nodeId: string,
+    nodeId: FileId,
     bytes: Uint8Array,
     revision: string | null,
     message: string,
@@ -134,7 +139,7 @@ export class GitHubRepository extends BaseRepository {
   }
 
   protected async deleteFileBytes(
-    nodeId: string,
+    nodeId: FileId,
     fileType?: FileType,
   ): Promise<void> {
     const node = await this.getFileNode(nodeId, fileType);
@@ -152,7 +157,7 @@ export class GitHubRepository extends BaseRepository {
   }
 
   private async getFileNode(
-    nodeId: string,
+    nodeId: FileId,
     fileType?: FileType,
   ): Promise<Pick<VFSFileNode, 'id' | 'fileType'> | null> {
     const { manifest } = await this.loadManifestImpl();

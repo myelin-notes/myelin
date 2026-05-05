@@ -1,5 +1,5 @@
 import { Logger } from '@/lib/logger';
-import type { NoteSession, Repository } from '@/lib/sync';
+import type { FileId, NoteSession, Repository } from '@/lib/sync';
 import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
 
 const logger = new Logger('MarkdownImport');
@@ -29,8 +29,8 @@ export async function importMarkdownFile({
   repository: Repository;
   parentId: string | null;
   fallbackTitle: string;
-}): Promise<string> {
-  let createdId: string | null = null;
+}): Promise<FileId> {
+  let createdId: FileId | null = null;
   let session: NoteSession | null = null;
 
   try {

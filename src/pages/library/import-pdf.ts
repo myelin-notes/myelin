@@ -1,5 +1,5 @@
 import { Logger } from '@/lib/logger';
-import type { NoteSession, Repository } from '@/lib/sync';
+import type { FileId, NoteSession, Repository } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import {
   PAGE_HEIGHT,
@@ -66,8 +66,8 @@ export async function importPdfFile({
   repository: Repository;
   parentId: string | null;
   fallbackTitle: string;
-}): Promise<string> {
-  let createdId: string | null = null;
+}): Promise<FileId> {
+  let createdId: FileId | null = null;
   let session: NoteSession | null = null;
 
   try {

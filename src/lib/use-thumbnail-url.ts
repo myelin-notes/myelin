@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import type { FileId } from './sync';
 import { getThumbnailUrl, subscribeThumbnail } from './thumbnails';
 
-export function useThumbnailUrl(nodeId: string): string | null | undefined {
+export function useThumbnailUrl(nodeId: FileId): string | null | undefined {
   const [url, setUrl] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
