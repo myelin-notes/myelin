@@ -153,7 +153,7 @@ async function renderPageOverlay(
       element.draw(ctx, 0);
     }
 
-    return scratch.toBytes({ type: 'image/png' });
+    return await scratch.toBytes({ type: 'image/png' });
   } finally {
     scratch.release();
   }

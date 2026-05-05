@@ -1,5 +1,14 @@
 import { PDFDocument } from 'pdf-lib';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+
+const { getScratchCanvasContextMock } = vi.hoisted(() => ({
+  getScratchCanvasContextMock: vi.fn(),
+}));
+
+vi.mock('@/lib/scratch-canvas', () => ({
+  getScratchCanvasContext: getScratchCanvasContextMock,
+}));
+
 import {
   createPdfExportBytes,
   getPdfExportPages,
@@ -42,6 +51,17 @@ beforeAll(() => {
 afterAll(() => {
   vi.unstubAllGlobals();
 });
+
+afterEach(() => {
+  getScratchCanvasContextMock.mockReset();
+});
+
+const PNG_1X1_BYTES = new Uint8Array([
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
+  0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65,
+  84, 120, 156, 99, 248, 255, 255, 63, 0, 5, 254, 2, 254, 167, 53, 129, 132,
+  0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+]);
 
 function rect(x: number, y: number, width: number, height: number): DOMRect {
   return new DOMRect(x, y, width, height);
@@ -174,5 +194,46 @@ describe('PDF export bytes', () => {
     expect(pages[0].getHeight()).toBe(150);
     expect(pages[1].getWidth()).toBe(200);
     expect(pages[1].getHeight()).toBe(100);
+  });
+
+  it('keeps overlay scratch canvas active until PNG bytes finish encoding', async () => {
+    const sourceDoc = await PDFDocument.create();
+    sourceDoc.addPage([100, 50]);
+    const sourceBytes = await sourceDoc.save();
+    const context = {
+      clearRect: vi.fn(),
+      setTransform: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
+    let resolveBytes: (bytes: Uint8Array) => void = () => {};
+    const release = vi.fn();
+    const toBytes = vi.fn(
+      () =>
+        new Promise<Uint8Array>((resolve) => {
+          resolveBytes = resolve;
+        }),
+    );
+
+    getScratchCanvasContextMock.mockReturnValue({
+      canvas: {} as HTMLCanvasElement,
+      context,
+      width: 200,
+      height: 100,
+      toBlob: vi.fn(),
+      toBytes,
+      release,
+    });
+
+    const exportBytes = createPdfExportBytes(
+      exportSource({ pdfBytes: sourceBytes }),
+      [overlayElement(1, rect(20, 30, 10, 10))],
+    );
+
+    await vi.waitFor(() => expect(toBytes).toHaveBeenCalledTimes(1));
+    expect(release).not.toHaveBeenCalled();
+
+    resolveBytes(PNG_1X1_BYTES);
+
+    await expect(exportBytes).resolves.toBeInstanceOf(Uint8Array);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 });
