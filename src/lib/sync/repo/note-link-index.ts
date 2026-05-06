@@ -3,6 +3,7 @@ import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
+import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import type { FileId, StoredNoteLink } from './types';
 
 const MAX_SNIPPET_LENGTH = 180;
@@ -79,11 +80,11 @@ function collectBlockLinks(node: PMNode, links: StoredNoteLink[]): void {
 }
 
 export function extractStoredNoteLinks(doc: Y.Doc): StoredNoteLink[] {
-  const elements = doc.getArray<Y.Map<unknown>>('elements');
+  const ydoc = new YDocManager(doc);
   const links: StoredNoteLink[] = [];
 
-  for (let i = 0; i < elements.length; i++) {
-    const yMap = elements.get(i);
+  for (let i = 0; i < ydoc.elements.length; i++) {
+    const yMap = ydoc.elements.get(i);
     if (yMap.get('type') !== ElementType.PAGE_FRAME) {
       continue;
     }
@@ -93,7 +94,7 @@ export function extractStoredNoteLinks(doc: Y.Doc): StoredNoteLink[] {
       continue;
     }
 
-    const fragment = doc.getXmlFragment(`pf-${index}`);
+    const fragment = ydoc.getXmlFragment(index);
     if (fragment.length === 0) {
       continue;
     }

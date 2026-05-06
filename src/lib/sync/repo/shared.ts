@@ -307,8 +307,8 @@ export function getBacklinks(
   const backlinks: NoteBacklink[] = [];
 
   for (const [sourceId, links] of Object.entries(manifest.linksBySource)) {
-    const source = manifest.nodes[sourceId];
-    if (!source || source.type !== 'file') {
+    const source = manifest.nodes[sourceId] as VFSFileNode | undefined;
+    if (!source) {
       continue;
     }
 
