@@ -13,6 +13,7 @@ import { Logger } from '@/lib/logger';
 import {
   type FileId,
   type NoteBacklink,
+  type StoredNoteLink,
   useRepository,
   useRepositoryStatus,
 } from '@/lib/sync';
@@ -25,10 +26,11 @@ type BacklinksState =
   | { status: 'ready'; backlinks: NoteBacklink[]; message?: never }
   | { status: 'error'; backlinks: NoteBacklink[]; message: string };
 
+// All backlinks from a single source note, collapsed into one card in the UI.
 interface BacklinkGroup {
   sourceId: FileId;
   sourceName: string;
-  mentions: NoteBacklink[];
+  mentions: StoredNoteLink[];
 }
 
 interface SnippetPart {
@@ -348,17 +350,17 @@ function splitSnippet(snippet: string, title: string): SnippetPart[] {
 function groupBacklinksBySource(backlinks: NoteBacklink[]): BacklinkGroup[] {
   const groups = new Map<FileId, BacklinkGroup>();
 
-  for (const backlink of backlinks) {
-    const group = groups.get(backlink.sourceId);
+  for (const { sourceId, sourceName, ...mention } of backlinks) {
+    const group = groups.get(sourceId);
     if (group) {
-      group.mentions.push(backlink);
+      group.mentions.push(mention);
       continue;
     }
 
-    groups.set(backlink.sourceId, {
-      sourceId: backlink.sourceId,
-      sourceName: backlink.sourceName,
-      mentions: [backlink],
+    groups.set(sourceId, {
+      sourceId,
+      sourceName,
+      mentions: [mention],
     });
   }
 

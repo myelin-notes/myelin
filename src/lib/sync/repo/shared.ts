@@ -64,9 +64,7 @@ export function createEmptyManifest(): VFSManifest {
   };
 }
 
-export function migrate(manifest: VFSManifest): void {
-  manifest.linksBySource ??= {};
-}
+export function migrate(_manifest: VFSManifest): void {}
 
 export function createNodeId(): string {
   return crypto.randomUUID();
