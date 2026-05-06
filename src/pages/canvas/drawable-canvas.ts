@@ -429,6 +429,28 @@ export class DrawableCanvas {
     return this._elements.filter((e) => e.type === type);
   }
 
+  public focusPageFrameByName(displayName: string): boolean {
+    const frame = this._elements.find(
+      (element): element is PageFrameElement =>
+        element instanceof PageFrameElement &&
+        element.displayName === displayName,
+    );
+    if (!frame) {
+      return false;
+    }
+
+    if (this._editingElement && this._editingElement !== frame) {
+      this.exitElementEdit();
+    }
+    this.clearSelection();
+    frame.select();
+    this.viewport.animateViewToFitRect(frame.boundingBox, {
+      widthRatio: 0.72,
+      heightRatio: 0.82,
+    });
+    return true;
+  }
+
   public get editingElement(): DrawableElement | null {
     return this._editingElement;
   }

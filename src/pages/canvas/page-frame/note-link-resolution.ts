@@ -1,4 +1,14 @@
-import type { FileId, Repository, VFSFileNode, VFSNode } from '@/lib/sync';
+import { parseNoteLinkTarget } from '@/lib/note-link-target';
+import type {
+  FileId,
+  Repository,
+  VFSFileNode,
+  VFSNode,
+  YjsSyncTarget,
+} from '@/lib/sync';
+import { ElementType } from '../elements/element-type';
+import { normalizePageFrameDisplayName } from '../elements/page-frame-constants';
+import { YDocManager } from '../ydoc-manager';
 import type { PageFrameAutocompleteItem } from './pm/autocomplete';
 
 export type NoteLinkResolveSource = Pick<
@@ -8,7 +18,8 @@ export type NoteLinkResolveSource = Pick<
 export type NoteLinkSearchSource = Pick<
   Repository,
   'searchNodes' | 'getFolderChain'
->;
+> &
+  Partial<Pick<YjsSyncTarget, 'loadDocument'>>;
 
 interface NoteLinkPathTarget {
   isPath: boolean;
@@ -28,8 +39,20 @@ interface NoteLinkAutocompleteMatch {
   linkPath: string;
 }
 
-function parseNoteLinkTarget(target: string): NoteLinkPathTarget | null {
-  const segments = target.split('/').map((segment) => segment.trim());
+interface NoteLinkPageFrameQuery {
+  noteQuery: string;
+  pageFrameQuery: string;
+}
+
+function parseNoteLinkPathTarget(target: string): NoteLinkPathTarget | null {
+  const parsedTarget = parseNoteLinkTarget(target);
+  if (!parsedTarget) {
+    return null;
+  }
+
+  const segments = parsedTarget.noteTarget
+    .split('/')
+    .map((segment) => segment.trim());
   if (segments.some((segment) => segment.length === 0)) {
     return null;
   }
@@ -72,6 +95,25 @@ function parseNoteLinkQuery(query: string): NoteLinkPathQuery {
   };
 }
 
+function parseNoteLinkPageFrameQuery(
+  query: string,
+): NoteLinkPageFrameQuery | null {
+  const hashIndex = query.indexOf('#');
+  if (hashIndex === -1) {
+    return null;
+  }
+
+  const noteQuery = query.slice(0, hashIndex).trim();
+  if (!noteQuery) {
+    return null;
+  }
+
+  return {
+    noteQuery,
+    pageFrameQuery: query.slice(hashIndex + 1).trim(),
+  };
+}
+
 function normalizePathQuery(value: string): string {
   return value.toLocaleLowerCase();
 }
@@ -89,12 +131,39 @@ async function getNoteLinkPath(
   };
 }
 
+function getPageFrameDisplayNames(update: Uint8Array | null): string[] {
+  if (!update || update.byteLength === 0) {
+    return [];
+  }
+
+  const ydoc = YDocManager.fromUpdate(update);
+  const displayNames: string[] = [];
+
+  for (let i = 0; i < ydoc.elements.length; i++) {
+    const yMap = ydoc.elements.get(i);
+    if (yMap.get('type') !== ElementType.PAGE_FRAME) {
+      continue;
+    }
+
+    const index = yMap.get('index');
+    if (typeof index !== 'number') {
+      continue;
+    }
+
+    displayNames.push(
+      normalizePageFrameDisplayName(index, yMap.get('displayName')),
+    );
+  }
+
+  return displayNames;
+}
+
 // todo: probably can avoid searching
 export async function resolveNoteLinkIdByTitle(
   repository: NoteLinkResolveSource,
   target: string,
 ): Promise<FileId | null> {
-  const parsedTarget = parseNoteLinkTarget(target);
+  const parsedTarget = parseNoteLinkPathTarget(target);
   if (!parsedTarget) {
     return null;
   }
@@ -123,6 +192,25 @@ export async function resolveNoteLinkIdByTitle(
 }
 
 export async function searchNoteLinkAutocompleteItems(
+  repository: NoteLinkSearchSource,
+  query: string,
+  limit: number,
+  signal: AbortSignal,
+): Promise<readonly PageFrameAutocompleteItem[]> {
+  const pageFrameQuery = parseNoteLinkPageFrameQuery(query);
+  if (pageFrameQuery) {
+    return searchNoteLinkPageFrameAutocompleteItems(
+      repository,
+      pageFrameQuery,
+      limit,
+      signal,
+    );
+  }
+
+  return searchNoteAutocompleteItems(repository, query, limit, signal);
+}
+
+async function searchNoteAutocompleteItems(
   repository: NoteLinkSearchSource,
   query: string,
   limit: number,
@@ -178,6 +266,56 @@ export async function searchNoteLinkAutocompleteItems(
           : undefined,
     };
   });
+}
+
+async function searchNoteLinkPageFrameAutocompleteItems(
+  repository: NoteLinkSearchSource,
+  query: NoteLinkPageFrameQuery,
+  limit: number,
+  signal: AbortSignal,
+): Promise<readonly PageFrameAutocompleteItem[]> {
+  if (!repository.loadDocument) {
+    return [];
+  }
+
+  const noteItems = await searchNoteAutocompleteItems(
+    repository,
+    query.noteQuery,
+    limit,
+    signal,
+  );
+  if (signal.aborted) {
+    return [];
+  }
+
+  const normalizedFrameQuery = normalizePathQuery(query.pageFrameQuery);
+  const matches = await Promise.all(
+    noteItems.map(async (noteItem): Promise<PageFrameAutocompleteItem[]> => {
+      const snapshot = await repository.loadDocument!(noteItem.id);
+      const noteTarget = noteItem.insertText ?? noteItem.title;
+      const frameNames = getPageFrameDisplayNames(snapshot.update);
+
+      return frameNames
+        .filter((frameName) =>
+          normalizePathQuery(frameName).startsWith(normalizedFrameQuery),
+        )
+        .map((frameName) => ({
+          id: noteItem.id,
+          title: frameName,
+          subtitle: noteItem.subtitle
+            ? `${noteItem.title} - ${noteItem.subtitle}`
+            : noteItem.title,
+          detail: 'Frame',
+          insertText: `${noteTarget}#${frameName}`,
+        }));
+    }),
+  );
+
+  if (signal.aborted) {
+    return [];
+  }
+
+  return matches.flat().slice(0, limit);
 }
 
 function isCanvasNote(node: VFSNode): node is VFSFileNode {

@@ -9,6 +9,16 @@ describe('note navigation', () => {
     );
   });
 
+  it('builds a note path with an encoded page-frame target', () => {
+    expect(
+      getNotePath({
+        fileType: 'mcanvas',
+        id: 'note-123',
+        pageFrameName: 'Research Notes',
+      }),
+    ).toBe('/mcanvas/note-123#Research%20Notes');
+  });
+
   it('opens notes with a view transition', () => {
     const navigate = vi.fn() as unknown as NavigateFunction;
 
@@ -38,6 +48,28 @@ describe('note navigation', () => {
     });
   });
 
+  it('opens resolved note links with page-frame targets', async () => {
+    const navigate = vi.fn() as unknown as NavigateFunction;
+    const repository = {
+      getNode: vi.fn(),
+      createFile: vi.fn(),
+    };
+
+    await openNoteLink(navigate, repository, 'current-note', {
+      title: 'Alpha Note#Research Notes',
+      noteId: 'note-123',
+    });
+
+    expect(repository.getNode).not.toHaveBeenCalled();
+    expect(repository.createFile).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith(
+      '/mcanvas/note-123#Research%20Notes',
+      {
+        viewTransition: true,
+      },
+    );
+  });
+
   it('creates unresolved note links in the current note directory before opening', async () => {
     const navigate = vi.fn() as unknown as NavigateFunction;
     const repository = {
@@ -55,7 +87,7 @@ describe('note navigation', () => {
     };
 
     await openNoteLink(navigate, repository, 'current-note', {
-      title: 'Alpha Note',
+      title: 'Alpha Note#Research Notes',
       noteId: null,
     });
 
@@ -65,8 +97,11 @@ describe('note navigation', () => {
       'mcanvas',
       'folder-1',
     );
-    expect(navigate).toHaveBeenCalledWith('/mcanvas/created-note', {
-      viewTransition: true,
-    });
+    expect(navigate).toHaveBeenCalledWith(
+      '/mcanvas/created-note#Research%20Notes',
+      {
+        viewTransition: true,
+      },
+    );
   });
 });
