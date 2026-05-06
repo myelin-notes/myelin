@@ -61,6 +61,7 @@ function createSelection(): {
     offsetY: 220,
     scaleX: 1,
     scaleY: 1,
+    displayName: 'Research outline',
     pageWidth: 680,
     pageHeight: 880,
   });
@@ -135,6 +136,9 @@ describe('canvas clipboard snapshot', () => {
     expect(Array.from(decodedPdf.get('pdfData') as Uint8Array)).toEqual([
       9, 8, 7, 6,
     ]);
+
+    const decodedPageFrameMap = clipboardDoc.elements.get(3);
+    expect(decodedPageFrameMap.get('displayName')).toBe('Research outline');
 
     const decodedPageFrame = yXmlFragmentToProseMirrorRootNode(
       clipboardDoc.getXmlFragment(3),

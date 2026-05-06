@@ -25,6 +25,7 @@ describe('markdown canvas import', () => {
     const pageFrame = ydoc.elements.get(0);
     expect(pageFrame.get('type')).toBe(ElementType.PAGE_FRAME);
     expect(pageFrame.get('index')).toBe(0);
+    expect(pageFrame.get('displayName')).toBe('Page Frame 1');
     expect(pageFrame.get('offsetX')).toBe(
       DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET.x,
     );
@@ -44,6 +45,16 @@ describe('markdown canvas import', () => {
       attrs: { level: 1 },
       content: [{ type: 'text', text: 'Imported Note' }],
     });
+  });
+
+  it('stores a custom page-frame display name when provided', async () => {
+    const ydoc = new YDocManager();
+    const index = await addMarkdownPageFrameToYDoc(ydoc, 'Body', {
+      displayName: '  Literature Review  ',
+    });
+
+    expect(index).toBe(0);
+    expect(ydoc.elements.get(0).get('displayName')).toBe('Literature Review');
   });
 
   it('resolves note links by title and keeps missing note ids null', async () => {

@@ -23,7 +23,13 @@ import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
 } from './frame-chrome';
-import { PAGE_GAP, PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
+import {
+  getDefaultPageFrameDisplayName,
+  normalizePageFrameDisplayName,
+  PAGE_GAP,
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+} from './page-frame-constants';
 
 export {
   PAGE_CORNER_RADIUS,
@@ -42,6 +48,7 @@ const logger = new Logger('PageFrameElement');
 export class PageFrameElement extends DrawableElement {
   private _pageWidth = PAGE_WIDTH;
   private _pageHeight = PAGE_HEIGHT;
+  private _displayName: string;
   private _editing = false;
   private _numPages = 1;
   private _noteLinkIdResolver?: NoteLinkIdResolver;
@@ -67,6 +74,7 @@ export class PageFrameElement extends DrawableElement {
 
   constructor(index: number) {
     super(index, ElementType.PAGE_FRAME);
+    this._displayName = getDefaultPageFrameDisplayName(index);
   }
 
   public setNoteLinkResolver(resolveNoteLinkId?: NoteLinkIdResolver): void {
@@ -115,6 +123,7 @@ export class PageFrameElement extends DrawableElement {
 
   public override getYMapProps(): Record<string, unknown> {
     return {
+      displayName: this._displayName,
       pageWidth: this._pageWidth,
       pageHeight: this._pageHeight,
     };
@@ -136,6 +145,9 @@ export class PageFrameElement extends DrawableElement {
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
     this.bindYFields(yMap, {
+      displayName: (v) => {
+        this._displayName = normalizePageFrameDisplayName(this.index, v);
+      },
       pageWidth: (v) => {
         this._pageWidth = v as number;
       },
@@ -153,6 +165,17 @@ export class PageFrameElement extends DrawableElement {
   }
   public get pageHeight(): number {
     return this._pageHeight;
+  }
+  public get displayName(): string {
+    return this._displayName;
+  }
+  public setDisplayName(displayName: string): void {
+    const next = normalizePageFrameDisplayName(this.index, displayName);
+    if (next === this._displayName) {
+      return;
+    }
+    this._displayName = next;
+    this.syncToYMap({ displayName: next });
   }
   public get numPages(): number {
     return this._numPages;

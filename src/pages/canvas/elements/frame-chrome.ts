@@ -1,7 +1,7 @@
 /**
  * Visual chrome that wraps a canvas-embedded document (page-frame or PDF).
  * Draws a softer "paper backing" surface with a header strip containing a
- * hamburger menu and the document's filename.
+ * hamburger menu and the document's display name.
  *
  * The chrome is positioned in screen space (to keep shadows and border-radii
  * at a constant pixel scale) while its inner header layout is rendered in
@@ -22,6 +22,7 @@ const MENU_BUTTON_SIZE = 32;
 const MENU_BUTTON_TOP = (CHROME_HEADER_HEIGHT - MENU_BUTTON_SIZE) / 2;
 const CONTROLS_LAYER_ID = 'canvas-chrome-controls';
 
+import { Pencil as PencilIcon } from 'lucide-react';
 import { type ChromeMenuItem, openChromeMenu } from '../chrome-menu';
 
 export interface FrameChromeOptions {
@@ -32,6 +33,7 @@ export interface FrameChromeOptions {
    * current state.
    */
   getMenuItems?: () => ChromeMenuItem[];
+  onTitleCommit?: (title: string) => string | undefined;
 }
 
 export class FrameChrome {
@@ -42,9 +44,12 @@ export class FrameChrome {
   private readonly headerInner: HTMLDivElement;
   private readonly menuButton: HTMLButtonElement;
   private readonly titleEl: HTMLSpanElement;
+  private readonly titleInput: HTMLInputElement;
   private readonly kindEl: HTMLSpanElement;
   private fileName: string | null = null;
   private kindLabel: string;
+  private isEditingTitle = false;
+  private readonly onTitleCommit?: (title: string) => string | undefined;
 
   private readonly bgSurface: string;
   private readonly textPrimary: string;
@@ -54,6 +59,7 @@ export class FrameChrome {
 
   constructor(options: FrameChromeOptions) {
     this.kindLabel = options.kindLabel;
+    this.onTitleCommit = options.onTitleCommit;
 
     const resolve = (token: string, fallback: string) => {
       const value = getComputedStyle(document.documentElement)
@@ -145,8 +151,32 @@ export class FrameChrome {
     } as Partial<CSSStyleDeclaration>);
     this.titleEl.textContent = '';
 
+    this.titleInput = document.createElement('input');
+    this.titleInput.type = 'text';
+    this.titleInput.setAttribute('aria-label', 'Page frame display name');
+    this.titleInput.dataset.pageFramePreserveFocus = 'true';
+    Object.assign(this.titleInput.style, {
+      display: 'none',
+      width: '100%',
+      minWidth: '0',
+      border: 'none',
+      borderBottom: `2px solid ${this.textPrimary}`,
+      borderRadius: '0',
+      outline: 'none',
+      padding: '0 0 2px',
+      background: 'transparent',
+      fontFamily: 'Inter, Arial, sans-serif',
+      fontSize: '14px',
+      fontWeight: '500',
+      color: this.textPrimary,
+      lineHeight: '1.2',
+      letterSpacing: '-0.005em',
+      pointerEvents: 'auto',
+    } as Partial<CSSStyleDeclaration>);
+
     titleWrap.appendChild(this.kindEl);
     titleWrap.appendChild(this.titleEl);
+    titleWrap.appendChild(this.titleInput);
 
     // Reserve the button's footprint in the header layout so the title
     // truncates correctly. The actual interactive button lives in the
@@ -179,7 +209,7 @@ export class FrameChrome {
     if (getItems) {
       this.menuButton.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        const items = getItems();
+        const items = this.getChromeMenuItems(getItems);
         if (items.length === 0) {
           return;
         }
@@ -191,6 +221,7 @@ export class FrameChrome {
     // first sync() call positions it.
     this.menuButton.style.visibility = 'hidden';
     getControlsLayer()?.appendChild(this.menuButton);
+    this.initTitleInputEvents();
 
     this.refreshTitle();
   }
@@ -203,6 +234,19 @@ export class FrameChrome {
     this.refreshTitle();
   }
 
+  public startTitleRename(): void {
+    if (!this.onTitleCommit || this.isEditingTitle) {
+      return;
+    }
+    this.isEditingTitle = true;
+    this.titleInput.value = this.fileName ?? '';
+    this.refreshTitle();
+    requestAnimationFrame(() => {
+      this.titleInput.focus();
+      this.titleInput.select();
+    });
+  }
+
   public setKindLabel(label: string): void {
     if (label === this.kindLabel) {
       return;
@@ -212,8 +256,77 @@ export class FrameChrome {
   }
 
   private refreshTitle(): void {
+    if (this.isEditingTitle) {
+      this.titleEl.style.display = 'none';
+      this.titleInput.style.display = '';
+      return;
+    }
     this.titleEl.textContent = this.fileName ?? '';
     this.titleEl.style.display = this.fileName ? '' : 'none';
+    this.titleInput.style.display = 'none';
+  }
+
+  private getChromeMenuItems(
+    getItems: () => ChromeMenuItem[],
+  ): ChromeMenuItem[] {
+    const items = getItems();
+    if (!this.onTitleCommit) {
+      return items;
+    }
+    return [
+      {
+        id: 'rename-frame',
+        label: 'Rename',
+        icon: PencilIcon,
+        onSelect: () => this.startTitleRename(),
+      },
+      ...items,
+    ];
+  }
+
+  private commitTitleRename(): void {
+    if (!this.isEditingTitle) {
+      return;
+    }
+    this.isEditingTitle = false;
+    const committed = this.onTitleCommit?.(this.titleInput.value);
+    if (typeof committed === 'string') {
+      this.setFileName(committed);
+    }
+    this.refreshTitle();
+  }
+
+  private cancelTitleRename(): void {
+    if (!this.isEditingTitle) {
+      return;
+    }
+    this.isEditingTitle = false;
+    this.titleInput.value = this.fileName ?? '';
+    this.refreshTitle();
+  }
+
+  private initTitleInputEvents(): void {
+    this.titleInput.addEventListener('pointerdown', (ev) => {
+      ev.stopPropagation();
+    });
+    this.titleInput.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+    });
+    this.titleInput.addEventListener('keydown', (ev) => {
+      ev.stopPropagation();
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        this.commitTitleRename();
+        return;
+      }
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        this.cancelTitleRename();
+      }
+    });
+    this.titleInput.addEventListener('blur', () => {
+      this.commitTitleRename();
+    });
   }
 
   /**
