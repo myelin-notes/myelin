@@ -141,6 +141,14 @@ const es: typeof en = {
       revealInFileManager: 'Mostrar en el explorador de archivos',
       remove: 'Eliminar',
     },
+    renameReferencesDialog: {
+      title: '¿Actualizar menciones enlazadas?',
+      description: (mentionCount: number, noteCount: number) =>
+        `Se reescribirán ${mentionCount} mención${mentionCount === 1 ? '' : 'es'} enlazada${mentionCount === 1 ? '' : 's'} en ${noteCount} otra${noteCount === 1 ? '' : 's'} nota${noteCount === 1 ? '' : 's'} para que coincidan con el nuevo nombre.`,
+      always: 'Actualizar siempre sin preguntar',
+      yes: 'Actualizar',
+      no: 'Omitir',
+    },
     tagDialog: {
       title: 'Administrar etiquetas',
       description: (name: string) => `Etiquetas en ${name}`,
@@ -185,6 +193,11 @@ const es: typeof en = {
         label: (key: string) => `Requerir ${key}-clic para abrir enlaces`,
         description: (key: string) =>
           `Cuando está desactivado, un clic simple abre enlaces de nota e hipervínculos. Cuando está activado, mantén ${key} para abrir; el clic normal coloca el cursor.`,
+      },
+      renameReferences: {
+        label: 'Actualizar siempre los enlaces al renombrar notas',
+        description:
+          'Cuando está desactivado, Myelin pregunta antes de cambiar menciones enlazadas después de renombrar una nota.',
       },
     },
     repository: {

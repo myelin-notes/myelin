@@ -36,6 +36,10 @@ const PREFS = {
   ),
   noteLinkHoverPreview: pref<boolean>('note-link-hover-preview', true),
   linkRequireModifier: pref<boolean>('link-require-modifier', true),
+  alwaysRenameNoteReferences: pref<boolean>(
+    'always-rename-note-references',
+    false,
+  ),
   language: pref<string>('language', 'en'),
   repositoryConfig: pref<RepositoryConfig>('repository-config', {
     kind: 'local',

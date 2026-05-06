@@ -21,6 +21,7 @@ import {
   explorerGridTitleClass,
 } from './grid-item-styles';
 import { ItemContextMenu } from './item-context-menu';
+import { RenameReferencesDialog } from './rename-references-dialog';
 import { useExplorerItem } from './use-explorer-item';
 
 interface Props {
@@ -43,11 +44,14 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
     handleRemove,
     handleDragStart,
     renameInputProps,
+    renameReferencesPrompt,
+    chooseRenameReferences,
   } = useExplorerItem({
     nodeId: file.id,
     name: file.name,
     onChanged,
     initialRenaming: autoRename,
+    renameReferencesOnRename: file.fileType === 'mcanvas',
   });
 
   return (
@@ -144,6 +148,10 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
         nodeId={file.id}
         nodeName={file.name}
         onChanged={onChanged}
+      />
+      <RenameReferencesDialog
+        prompt={renameReferencesPrompt}
+        onChoice={chooseRenameReferences}
       />
     </>
   );

@@ -57,6 +57,7 @@ export function EditingSection() {
   const pageFrameEditFitWholePage = useUserPref('pageFrameEditFitWholePage');
   const noteLinkHoverPreview = useUserPref('noteLinkHoverPreview');
   const linkRequireModifier = useUserPref('linkRequireModifier');
+  const alwaysRenameNoteReferences = useUserPref('alwaysRenameNoteReferences');
 
   const handlePageFrameEditFitWholePage = () => {
     UserPrefs.set('pageFrameEditFitWholePage', !pageFrameEditFitWholePage);
@@ -68,6 +69,10 @@ export function EditingSection() {
 
   const handleLinkRequireModifier = () => {
     UserPrefs.set('linkRequireModifier', !linkRequireModifier);
+  };
+
+  const handleAlwaysRenameNoteReferences = () => {
+    UserPrefs.set('alwaysRenameNoteReferences', !alwaysRenameNoteReferences);
   };
 
   return (
@@ -106,6 +111,14 @@ export function EditingSection() {
           description={strings.settings.pageFrameEditing.requireModifier.description(
             MODIFIER_KEY_LABEL,
           )}
+        />
+        <ToggleRow
+          checked={alwaysRenameNoteReferences}
+          onToggle={handleAlwaysRenameNoteReferences}
+          label={strings.settings.pageFrameEditing.renameReferences.label}
+          description={
+            strings.settings.pageFrameEditing.renameReferences.description
+          }
         />
       </div>
     </section>

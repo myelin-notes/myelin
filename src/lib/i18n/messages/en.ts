@@ -138,6 +138,14 @@ const en = {
       revealInFileManager: 'Reveal in File Manager',
       remove: 'Remove',
     },
+    renameReferencesDialog: {
+      title: 'Update linked mentions?',
+      description: (mentionCount: number, noteCount: number) =>
+        `${mentionCount} linked mention${mentionCount === 1 ? '' : 's'} in ${noteCount} other note${noteCount === 1 ? '' : 's'} will be rewritten to match the new name.`,
+      always: 'Always update without asking',
+      yes: 'Update',
+      no: 'Skip',
+    },
     tagDialog: {
       title: 'Manage Tags',
       description: (name: string) => `Tags on ${name}`,
@@ -182,6 +190,11 @@ const en = {
         label: (key: string) => `Require ${key}-click to follow links`,
         description: (key: string) =>
           `When off, a plain click follows note links and hyperlinks. When on, hold ${key} to follow, so single clicks place the cursor.`,
+      },
+      renameReferences: {
+        label: 'Always update links after renaming notes',
+        description:
+          'When off, Myelin asks before changing linked mentions after a note is renamed.',
       },
     },
     repository: {
