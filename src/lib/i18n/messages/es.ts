@@ -384,6 +384,19 @@ const es: typeof en = {
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },
+    backlinks: {
+      title: 'Backlinks',
+      linkedMentions: 'Menciones enlazadas',
+      showPane: 'Mostrar backlinks',
+      hidePane: 'Ocultar backlinks',
+      loadFailed: 'No se pudieron cargar los backlinks',
+      retry: 'Reintentar',
+      emptyTitle: 'Sin menciones enlazadas',
+      emptyDescription:
+        'Las notas que enlacen con este lienzo aparecerán aquí.',
+      mentionCount: (count: number, formatted: string) =>
+        `${formatted} ${count === 1 ? 'mención' : 'menciones'}`,
+    },
     toolbar: {
       clickForOptions: 'clic para opciones',
       customizeWheel: 'Personalizar rueda',

@@ -14,13 +14,14 @@ import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { Logger } from '@/lib/logger';
-import { openNoteLink } from '@/lib/note-navigation';
+import { openNote, openNoteLink } from '@/lib/note-navigation';
 import { type FileId, useRepository } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { useCanvasCommandContext } from './command-context';
+import { BacklinksPane } from './components/backlinks-pane';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
@@ -65,6 +66,7 @@ function CanvasViewInner() {
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
   const toolState = useToolState(drawableCanvasRef);
+  const [backlinksOpen, setBacklinksOpen] = useState(true);
 
   const [chromeMenu, setChromeMenu] = useState<{
     anchor: DOMRect;
@@ -173,6 +175,10 @@ function CanvasViewInner() {
       getNoteLinkPreview(repository, target, signal),
     [repository],
   );
+  const openBacklinkSource = useEffectEvent(async (sourceId: FileId) => {
+    await engine.saveBeforeExit();
+    openNote(navigate, { fileType: 'mcanvas', id: sourceId });
+  });
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
@@ -232,6 +238,22 @@ function CanvasViewInner() {
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
       )}
       <TitleBar fileName={engine.fileName} onBack={engine.back} />
+      <BacklinksPane
+        noteId={id}
+        open={backlinksOpen}
+        onOpenChange={setBacklinksOpen}
+        onOpenSource={(sourceId) => {
+          void openBacklinkSource(sourceId).catch((error) => {
+            logger.error('Failed to open backlink source', error, {
+              sourceId,
+            });
+            toast.error('Failed to open backlink', {
+              description:
+                error instanceof Error ? error.message : String(error),
+            });
+          });
+        }}
+      />
 
       <CanvasToolbar
         tools={toolState.canvasTools}
