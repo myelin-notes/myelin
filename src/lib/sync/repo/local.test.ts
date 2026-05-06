@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
+import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
   createNoteState,
   getRepositoryTestStorage,
@@ -13,6 +15,22 @@ import {
   getStoredFileName,
   MANIFEST_PATH,
 } from './shared';
+import type { FileId } from './types';
+
+async function createCanvasNoteState(
+  markdown: string,
+  resolveNoteLinkId?: (title: string) => Promise<FileId | null>,
+): Promise<{
+  update: Uint8Array;
+  stateVector: Uint8Array;
+}> {
+  const ydoc = new YDocManager();
+  await addMarkdownPageFrameToYDoc(ydoc, markdown, { resolveNoteLinkId });
+  return {
+    update: ydoc.encodeState(),
+    stateVector: ydoc.encodeStateVector(),
+  };
+}
 
 describe('LocalRepository', () => {
   beforeEach(() => {
@@ -77,6 +95,37 @@ describe('LocalRepository', () => {
 
     expect(storedBytes).not.toBeNull();
     expect(readNoteText(storedBytes)).toBe('persisted bytes');
+  });
+
+  it('stores outgoing note links and returns backlinks', async () => {
+    const repository = new LocalRepository('repositories/backlink-test');
+    await repository.initialize();
+
+    const sourceId = await repository.createFile('Source', 'mcanvas', null);
+    const targetId = await repository.createFile('Target', 'mcanvas', null);
+    const note = await createCanvasNoteState(
+      'See [[Target]] for context.',
+      async (title) => (title === 'Target' ? targetId : null),
+    );
+
+    await repository.pushUpdates(sourceId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    expect(await repository.getBacklinks(targetId)).toEqual([
+      {
+        sourceId,
+        sourceName: 'Source',
+        targetId,
+        title: 'Target',
+        snippet: 'See [[Target]] for context.',
+      },
+    ]);
+
+    await repository.deleteNode(sourceId);
+
+    expect(await repository.getBacklinks(targetId)).toEqual([]);
   });
 
   it('stores image files as regular VFS file nodes', async () => {

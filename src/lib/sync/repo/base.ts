@@ -14,6 +14,7 @@ import type {
   RepositoryRuntimeStatus,
   RepositoryStatusSource,
 } from './config';
+import { extractStoredNoteLinks } from './note-link-index';
 import {
   addChild,
   createDocFromBytes,
@@ -21,6 +22,7 @@ import {
   createFolderNode,
   createNodeId,
   deleteNodeFromManifest,
+  getBacklinks,
   getFolderChain,
   getNodesByAnyTag,
   getRecentFiles,
@@ -32,15 +34,18 @@ import {
   normalizeCustomColor,
   type RepositorySnapshot,
   searchNodes,
+  setStoredNoteLinks,
   type VFSManifest,
 } from './shared';
 import type {
   FileId,
   FileType,
+  NoteBacklink,
   Repository,
   RepositoryCapabilities,
   RepositoryStats,
   RepositoryTag,
+  StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
@@ -106,11 +111,17 @@ export abstract class BaseRepository
 
   protected async onFileCreated(_nodeId: FileId): Promise<void> {}
 
-  protected async onFileSaved(nodeId: FileId): Promise<void> {
+  protected async onFileSaved(
+    nodeId: FileId,
+    links?: readonly StoredNoteLink[],
+  ): Promise<void> {
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
+        if (node.fileType === 'mcanvas' && links) {
+          setStoredNoteLinks(manifest, nodeId, links);
+        }
       }
     });
   }
@@ -220,6 +231,11 @@ export abstract class BaseRepository
     return getRecentFiles(manifest, limit);
   }
 
+  async getBacklinks(noteId: FileId): Promise<NoteBacklink[]> {
+    const { manifest } = await this.loadManifestImpl();
+    return getBacklinks(manifest, noteId);
+  }
+
   async getUniqueFileName(
     baseName: string,
     parentId: string | null,
@@ -271,6 +287,7 @@ export abstract class BaseRepository
 
   async writeFileBytes(nodeId: FileId, bytes: Uint8Array): Promise<void> {
     const { revision } = await this.loadFileBytes(nodeId);
+    const links = await this.extractStoredNoteLinksForBytes(nodeId, bytes);
     const nextRevision = await this.saveFileBytes(
       nodeId,
       bytes,
@@ -278,7 +295,7 @@ export abstract class BaseRepository
       `Update file ${nodeId}`,
     );
     if (nextRevision !== null) {
-      await this.onFileSaved(nodeId);
+      await this.onFileSaved(nodeId, links);
     }
   }
 
@@ -477,6 +494,7 @@ export abstract class BaseRepository
     if (update.byteLength > 0) {
       Y.applyUpdate(remote.doc, update);
     }
+    const links = extractStoredNoteLinks(remote.doc);
 
     const mergedBytes = Y.encodeStateAsUpdate(remote.doc);
     const revision = await this.saveFileBytes(
@@ -486,7 +504,7 @@ export abstract class BaseRepository
       `Update note ${nodeId}`,
     );
     if (revision !== null) {
-      await this.onFileSaved(nodeId);
+      await this.onFileSaved(nodeId, links);
     }
 
     logger.debug('Accepted repository document push', {
@@ -550,5 +568,17 @@ export abstract class BaseRepository
       stateVector: Y.encodeStateVector(doc),
       revision,
     };
+  }
+
+  private async extractStoredNoteLinksForBytes(
+    nodeId: FileId,
+    bytes: Uint8Array,
+  ): Promise<StoredNoteLink[] | undefined> {
+    const node = await this.getNode(nodeId);
+    if (node?.type !== 'file' || node.fileType !== 'mcanvas') {
+      return undefined;
+    }
+
+    return extractStoredNoteLinks(createDocFromBytes(bytes));
   }
 }

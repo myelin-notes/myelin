@@ -5,8 +5,10 @@ import {
   type FileType,
   FileTypes,
   ImageFileTypes,
+  type NoteBacklink,
   type RepositoryStats,
   type RepositoryTag,
+  type StoredNoteLink,
   type VFSFileNode,
   type VFSFolderNode,
   type VFSNode,
@@ -17,6 +19,7 @@ export interface VFSManifest {
   version: number;
   children: string[];
   nodes: Record<string, VFSNode>;
+  linksBySource: Record<FileId, StoredNoteLink[]>;
   customColors: string[];
 }
 
@@ -56,6 +59,7 @@ export function createEmptyManifest(): VFSManifest {
     version: CURRENT_MANIFEST_VERSION,
     children: [],
     nodes: {},
+    linksBySource: {},
     customColors: [],
   };
 }
@@ -294,6 +298,45 @@ export function getRecentFiles(
     .slice(0, limit);
 }
 
+export function getBacklinks(
+  manifest: VFSManifest,
+  noteId: FileId,
+): NoteBacklink[] {
+  const backlinks: NoteBacklink[] = [];
+
+  for (const [sourceId, links] of Object.entries(manifest.linksBySource)) {
+    const source = manifest.nodes[sourceId] as VFSFileNode | undefined;
+    if (!source) {
+      continue;
+    }
+
+    for (const link of links) {
+      if (link.targetId === noteId) {
+        backlinks.push({
+          ...link,
+          sourceId: source.id,
+          sourceName: source.name,
+        });
+      }
+    }
+  }
+
+  return backlinks;
+}
+
+export function setStoredNoteLinks(
+  manifest: VFSManifest,
+  sourceId: FileId,
+  links: readonly StoredNoteLink[],
+): void {
+  if (links.length === 0) {
+    delete manifest.linksBySource[sourceId];
+    return;
+  }
+
+  manifest.linksBySource[sourceId] = links.map((link) => ({ ...link }));
+}
+
 export function getUniqueFileName(
   manifest: VFSManifest,
   baseName: string,
@@ -340,6 +383,7 @@ export function deleteNodeFromManifest(
       files.push(structuredClone(current));
     }
 
+    delete manifest.linksBySource[currentId];
     delete manifest.nodes[currentId];
   };
 

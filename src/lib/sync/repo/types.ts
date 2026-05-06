@@ -63,6 +63,17 @@ export interface RepositoryStats {
   totalTags: number;
 }
 
+export interface StoredNoteLink {
+  targetId: FileId | null;
+  title: string;
+  snippet: string;
+}
+
+export interface NoteBacklink extends StoredNoteLink {
+  sourceId: FileId;
+  sourceName: string;
+}
+
 export interface RepositoryCapabilities {
   polling: boolean;
   liveSync: boolean;
@@ -82,6 +93,7 @@ export interface Repository {
   listTags(): Promise<RepositoryTag[]>;
   getStats(): Promise<RepositoryStats>;
   getRecentFiles(limit?: number): Promise<VFSFileNode[]>;
+  getBacklinks(noteId: FileId): Promise<NoteBacklink[]>;
   getUniqueFileName(baseName: string, parentId: string | null): Promise<string>;
   createFolder(name: string, parentId: string | null): Promise<string>;
   createFile(

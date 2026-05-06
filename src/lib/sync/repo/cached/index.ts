@@ -27,6 +27,7 @@ import {
 import type {
   FileId,
   FileType,
+  NoteBacklink,
   Repository,
   RepositoryCapabilities,
   RepositoryStats,
@@ -248,6 +249,10 @@ export class CachedRepository
 
   async getRecentFiles(limit?: number): Promise<VFSFileNode[]> {
     return this.cache.getRecentFiles(limit);
+  }
+
+  async getBacklinks(noteId: FileId): Promise<NoteBacklink[]> {
+    return this.cache.getBacklinks(noteId);
   }
 
   async getUniqueFileName(

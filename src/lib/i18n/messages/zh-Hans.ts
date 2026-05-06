@@ -369,6 +369,18 @@ const zhHans: typeof en = {
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },
+    backlinks: {
+      title: '反向链接',
+      linkedMentions: '已链接提及',
+      showPane: '显示反向链接',
+      hidePane: '隐藏反向链接',
+      loadFailed: '无法加载反向链接',
+      retry: '重试',
+      emptyTitle: '没有已链接提及',
+      emptyDescription: '链接到此画布的笔记会显示在这里。',
+      mentionCount: (_count: number, formatted: string) =>
+        `${formatted} 处提及`,
+    },
     toolbar: {
       clickForOptions: '点击查看选项',
       customizeWheel: '自定义轮盘',
