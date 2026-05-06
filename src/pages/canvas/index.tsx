@@ -2,12 +2,13 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import { X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { CustomColorsProvider } from '@/lib/custom-colors';
@@ -57,6 +58,7 @@ export function CanvasView() {
 function CanvasViewInner() {
   const { id } = useParams<{ id: FileId }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const repository = useRepository();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -101,6 +103,29 @@ function CanvasViewInner() {
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
   });
+  const targetPageFrameName = useMemo(() => {
+    if (!location.hash) {
+      return null;
+    }
+
+    const rawHash = location.hash.slice(1);
+    try {
+      return decodeURIComponent(rawHash).trim() || null;
+    } catch {
+      return rawHash.trim() || null;
+    }
+  }, [location.hash]);
+  useEffect(() => {
+    if (!engine.ready || !targetPageFrameName) {
+      return;
+    }
+
+    if (!drawableCanvasRef.current?.focusPageFrameByName(targetPageFrameName)) {
+      logger.debug('Requested page frame target was not found', {
+        pageFrameName: targetPageFrameName,
+      });
+    }
+  }, [engine.ready, targetPageFrameName]);
 
   const importMarkdownFile = useCallback(
     async (file: File) => {

@@ -345,7 +345,7 @@ export function PageFrameAutocompletePopup({
           const active = index === state.activeIndex;
           return (
             <button
-              key={item.id}
+              key={`${item.id}:${item.insertText ?? item.title}:${index}`}
               type="button"
               role="option"
               aria-selected={active}
