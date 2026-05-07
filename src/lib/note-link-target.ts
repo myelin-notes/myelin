@@ -1,5 +1,7 @@
 export interface ParsedNoteLinkTarget {
-  noteTarget: string;
+  isPath: boolean;
+  path: string;
+  noteName: string;
   pageFrameName: string | null;
 }
 
@@ -12,11 +14,16 @@ export function parseNoteLinkTarget(
   }
 
   const [rawNoteTarget, rawPageFrameName] = withoutAlias.split('#', 2);
-  const noteTarget = rawNoteTarget.trim();
-  if (!noteTarget) {
+  const segments = rawNoteTarget.split('/').map((segment) => segment.trim());
+  if (segments.some((segment) => segment.length === 0)) {
     return null;
   }
 
-  const pageFrameName = rawPageFrameName?.trim() || null;
-  return { noteTarget, pageFrameName };
+  const noteName = segments[segments.length - 1];
+  return {
+    isPath: segments.length > 1,
+    path: segments.join('/'),
+    noteName,
+    pageFrameName: rawPageFrameName?.trim() || null,
+  };
 }

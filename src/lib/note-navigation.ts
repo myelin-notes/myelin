@@ -38,7 +38,7 @@ export async function openNoteLink(
   target: NoteLinkRouteTarget,
 ): Promise<void> {
   const parsedTarget = parseNoteLinkTarget(target.title);
-  const noteTitle = parsedTarget?.noteTarget ?? target.title;
+  const noteTitle = parsedTarget?.path ?? target.title;
   let noteId = target.noteId;
   if (!noteId) {
     const currentNode = await repository.getNode(currentNoteId);

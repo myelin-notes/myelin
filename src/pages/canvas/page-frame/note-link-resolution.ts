@@ -21,12 +21,6 @@ export type NoteLinkSearchSource = Pick<
 > &
   Partial<Pick<YjsSyncTarget, 'loadDocument'>>;
 
-interface NoteLinkPathTarget {
-  isPath: boolean;
-  noteName: string;
-  path: string;
-}
-
 interface NoteLinkPathQuery {
   isPath: boolean;
   noteQuery: string;
@@ -42,31 +36,6 @@ interface NoteLinkAutocompleteMatch {
 interface NoteLinkPageFrameQuery {
   noteQuery: string;
   pageFrameQuery: string;
-}
-
-function parseNoteLinkPathTarget(target: string): NoteLinkPathTarget | null {
-  const parsedTarget = parseNoteLinkTarget(target);
-  if (!parsedTarget) {
-    return null;
-  }
-
-  const segments = parsedTarget.noteTarget
-    .split('/')
-    .map((segment) => segment.trim());
-  if (segments.some((segment) => segment.length === 0)) {
-    return null;
-  }
-
-  const noteName = segments[segments.length - 1];
-  if (!noteName) {
-    return null;
-  }
-
-  return {
-    isPath: segments.length > 1,
-    noteName,
-    path: segments.join('/'),
-  };
 }
 
 function parseNoteLinkQuery(query: string): NoteLinkPathQuery {
@@ -163,7 +132,7 @@ export async function resolveNoteLinkIdByTitle(
   repository: NoteLinkResolveSource,
   target: string,
 ): Promise<FileId | null> {
-  const parsedTarget = parseNoteLinkPathTarget(target);
+  const parsedTarget = parseNoteLinkTarget(target);
   if (!parsedTarget) {
     return null;
   }
