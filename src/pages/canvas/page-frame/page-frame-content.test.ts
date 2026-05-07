@@ -160,7 +160,10 @@ describe('page-frame content shape', () => {
     const doc = await normalizeAndResolveNoteLinksDoc(
       parseMarkdownToDoc(markdown, schema),
       schema,
-      async (title) => (title === 'Alpha Note' ? 'note-1' : null),
+      async (title) => ({
+        noteId: title === 'Alpha Note' ? 'note-1' : null,
+        pageFrameId: null,
+      }),
     );
     const ydoc = prosemirrorToYDoc(doc, 'page-frame');
     const roundTripped = yXmlFragmentToProseMirrorRootNode(
@@ -181,7 +184,11 @@ describe('page-frame content shape', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Alpha Note', noteId: 'note-1' },
+                  attrs: {
+                    title: 'Alpha Note',
+                    noteId: 'note-1',
+                    pageFrameId: null,
+                  },
                 },
               ],
             },
@@ -192,7 +199,11 @@ describe('page-frame content shape', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Missing Note', noteId: null },
+                  attrs: {
+                    title: 'Missing Note',
+                    noteId: null,
+                    pageFrameId: null,
+                  },
                 },
               ],
             },

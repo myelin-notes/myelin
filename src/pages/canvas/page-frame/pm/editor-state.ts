@@ -5,7 +5,7 @@ import {
   CODE_BLOCK_CLEAR_SELECTION_EVENT,
   PM_UPDATE_EVENT,
 } from '@/lib/events';
-import type { ResolveNoteLinkId } from './markdown/note-links';
+import type { ResolveNoteLink } from './markdown/note-links';
 import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
@@ -25,7 +25,7 @@ export class PageFrameEditorState {
 
   constructor(
     private readonly _yXmlFragment: Y.XmlFragment,
-    private readonly _resolveNoteLinkId?: ResolveNoteLinkId,
+    private readonly _resolveNoteLink?: ResolveNoteLink,
   ) {}
 
   get view(): EditorView | null {
@@ -64,7 +64,7 @@ export class PageFrameEditorState {
       plugins: buildPlugins(
         this._yXmlFragment,
         onPageCount,
-        this._resolveNoteLinkId,
+        this._resolveNoteLink,
       ),
     });
 

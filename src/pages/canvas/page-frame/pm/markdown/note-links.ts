@@ -7,7 +7,8 @@ import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   buildResolvedTitleLookup,
   createTitleResolverView,
-  type ResolveNoteLinkId,
+  type NoteLinkRef,
+  type ResolveNoteLink,
 } from './note-id-resolver';
 import { parseInlineMarkdown } from './parse-inline';
 import {
@@ -16,7 +17,7 @@ import {
 } from './range-tracking';
 import { MARKDOWN_ATOM_CHAR } from './types';
 
-export type { ResolveNoteLinkId };
+export type { NoteLinkRef, ResolveNoteLink };
 
 interface TextOffsetMap {
   text: string;
@@ -26,6 +27,7 @@ interface TextOffsetMap {
 interface NoteLinkCoverage {
   title: string;
   noteId: VFSNodeId | null;
+  pageFrameId: string | null;
 }
 
 interface NoteLinkTarget {
@@ -35,6 +37,7 @@ interface NoteLinkTarget {
   textTo: number;
   title: string;
   noteId: VFSNodeId | null;
+  pageFrameId: string | null;
 }
 
 export interface RenameNoteLinkReferencesResult {
@@ -47,6 +50,7 @@ export const NOTE_LINK_SELECTOR = '[data-note-link-title]';
 export interface NoteLinkOpenRequestDetail {
   title: string;
   noteId: VFSNodeId | null;
+  pageFrameId: string | null;
 }
 
 type NoteLinkElementLike = {
@@ -116,7 +120,8 @@ function sameCoverage(
 ): boolean {
   return (
     left?.title === right?.title &&
-    (left?.noteId ?? null) === (right?.noteId ?? null)
+    (left?.noteId ?? null) === (right?.noteId ?? null) &&
+    (left?.pageFrameId ?? null) === (right?.pageFrameId ?? null)
   );
 }
 
@@ -135,6 +140,8 @@ function buildCurrentNoteLinkCoverage(
         ? {
             title: noteLinkMark.attrs.title as string,
             noteId: (noteLinkMark.attrs.noteId as VFSNodeId | null) ?? null,
+            pageFrameId:
+              (noteLinkMark.attrs.pageFrameId as string | null) ?? null,
           }
         : null;
 
@@ -210,6 +217,7 @@ function collectNoteLinkTargets(
         textTo: range.close.to,
         title,
         noteId: existingCoverage?.noteId ?? null,
+        pageFrameId: existingCoverage?.pageFrameId ?? null,
       };
     });
 }
@@ -228,6 +236,7 @@ function needsNoteLinkNormalization(
     const value = {
       title: target.title,
       noteId: target.noteId,
+      pageFrameId: target.pageFrameId,
     };
     for (let index = target.textFrom; index < target.textTo; index++) {
       desiredCoverage[index] = value;
@@ -315,6 +324,7 @@ export function buildNormalizedNoteLinkTransaction(
         noteLinkType.create({
           title: target.title,
           noteId: target.noteId,
+          pageFrameId: target.pageFrameId,
         }),
       );
     }
@@ -332,7 +342,7 @@ function collectNoteLinkTitles(doc: PMNode, schema: Schema): string[] {
 export async function normalizeAndResolveNoteLinksDoc(
   doc: PMNode,
   schema: Schema,
-  resolveNoteLinkId?: ResolveNoteLinkId,
+  resolveNoteLink?: ResolveNoteLink,
 ): Promise<PMNode> {
   let state = EditorState.create({ schema, doc });
 
@@ -341,20 +351,20 @@ export async function normalizeAndResolveNoteLinksDoc(
     state = state.apply(normalizeTr);
   }
 
-  if (!resolveNoteLinkId) {
+  if (!resolveNoteLink) {
     return state.doc;
   }
 
-  const noteIdsByTitle = await buildResolvedTitleLookup(
+  const refsByTitle = await buildResolvedTitleLookup(
     state.doc,
     schema,
     collectNoteLinkTitles,
-    resolveNoteLinkId,
+    resolveNoteLink,
   );
   const resolveTr = buildResolvedNoteLinkTransaction(
     state,
     schema,
-    noteIdsByTitle,
+    refsByTitle,
   );
   if (resolveTr) {
     state = state.apply(resolveTr);
@@ -366,7 +376,7 @@ export async function normalizeAndResolveNoteLinksDoc(
 export function buildResolvedNoteLinkTransaction(
   state: EditorState,
   schema: Schema,
-  noteIdsByTitle: ReadonlyMap<string, VFSNodeId | null>,
+  refsByTitle: ReadonlyMap<string, NoteLinkRef>,
 ) {
   const noteLinkType = schema.marks.noteLink;
   if (!noteLinkType) {
@@ -377,12 +387,17 @@ export function buildResolvedNoteLinkTransaction(
   let changed = false;
 
   for (const target of collectDocumentNoteLinks(state.doc, schema)) {
-    if (target.noteId !== null) {
+    const ref = refsByTitle.get(target.title);
+    if (!ref) {
       continue;
     }
 
-    const resolvedNoteId = noteIdsByTitle.get(target.title) ?? null;
-    if (resolvedNoteId === target.noteId) {
+    const nextNoteId = target.noteId ?? ref.noteId;
+    const nextPageFrameId = target.pageFrameId ?? ref.pageFrameId;
+    if (
+      nextNoteId === target.noteId &&
+      nextPageFrameId === target.pageFrameId
+    ) {
       continue;
     }
 
@@ -392,7 +407,8 @@ export function buildResolvedNoteLinkTransaction(
       target.to,
       noteLinkType.create({
         title: target.title,
-        noteId: resolvedNoteId,
+        noteId: nextNoteId,
+        pageFrameId: nextPageFrameId,
       }),
     );
     changed = true;
@@ -419,6 +435,88 @@ export function renameNoteLinkReferenceTitle(
   const pathSegments = noteTarget.split('/');
   pathSegments[pathSegments.length - 1] = newName;
   return `${pathSegments.join('/')}${frame}${alias}`;
+}
+
+export function renamePageFrameLinkReferenceTitle(
+  title: string,
+  newName: string,
+): string {
+  const aliasIndex = title.indexOf('|');
+  const target = aliasIndex === -1 ? title : title.slice(0, aliasIndex);
+  const alias = aliasIndex === -1 ? '' : title.slice(aliasIndex);
+  const frameIndex = target.indexOf('#');
+  if (frameIndex === -1) {
+    return title;
+  }
+  const noteTarget = target.slice(0, frameIndex);
+  return `${noteTarget}#${newName}${alias}`;
+}
+
+export interface RenamePageFrameLinkTransactionResult {
+  tr: import('prosemirror-state').Transaction;
+  count: number;
+}
+
+export function buildRenamePageFrameLinkReferencesTransaction(
+  state: EditorState,
+  schema: Schema,
+  pageFrameId: string,
+  newName: string,
+): RenamePageFrameLinkTransactionResult | null {
+  const noteLinkType = schema.marks.noteLink;
+  if (!noteLinkType) {
+    return null;
+  }
+
+  const targets = collectDocumentNoteLinks(state.doc, schema)
+    .filter((target) => target.pageFrameId === pageFrameId)
+    .sort((left, right) => right.from - left.from);
+  if (targets.length === 0) {
+    return null;
+  }
+
+  const tr = state.tr;
+  let count = 0;
+  for (const target of targets) {
+    const nextTitle = renamePageFrameLinkReferenceTitle(target.title, newName);
+    if (nextTitle === target.title) {
+      continue;
+    }
+
+    tr.replaceWith(
+      target.from,
+      target.to,
+      schema.text(`[[${nextTitle}]]`, [
+        noteLinkType.create({
+          title: nextTitle,
+          noteId: target.noteId,
+          pageFrameId,
+        }),
+      ]),
+    );
+    count++;
+  }
+
+  return count > 0 ? { tr, count } : null;
+}
+
+export function renamePageFrameLinkReferencesDoc(
+  doc: PMNode,
+  schema: Schema,
+  pageFrameId: string,
+  newName: string,
+): RenameNoteLinkReferencesResult {
+  const state = EditorState.create({ schema, doc });
+  const result = buildRenamePageFrameLinkReferencesTransaction(
+    state,
+    schema,
+    pageFrameId,
+    newName,
+  );
+  if (!result) {
+    return { doc, count: 0 };
+  }
+  return { doc: state.apply(result.tr).doc, count: result.count };
 }
 
 export function renameNoteLinkReferencesDoc(
@@ -452,7 +550,11 @@ export function renameNoteLinkReferencesDoc(
       target.from,
       target.to,
       schema.text(`[[${nextTitle}]]`, [
-        noteLinkType.create({ title: nextTitle, noteId }),
+        noteLinkType.create({
+          title: nextTitle,
+          noteId,
+          pageFrameId: target.pageFrameId,
+        }),
       ]),
     );
     count++;
@@ -467,7 +569,7 @@ export function renameNoteLinkReferencesDoc(
 
 export function noteLinkMarkdownPlugin(
   schema: Schema,
-  resolveNoteLinkId?: ResolveNoteLinkId,
+  resolveNoteLink?: ResolveNoteLink,
 ): Plugin {
   return new Plugin({
     props: {
@@ -498,6 +600,8 @@ export function noteLinkMarkdownPlugin(
               detail: {
                 title,
                 noteId: noteLinkElement.getAttribute('data-note-id') || null,
+                pageFrameId:
+                  noteLinkElement.getAttribute('data-page-frame-id') || null,
               },
             },
           ),
@@ -534,7 +638,7 @@ export function noteLinkMarkdownPlugin(
         schema,
         collectTitles: collectNoteLinkTitles,
         buildResolveTransaction: buildResolvedNoteLinkTransaction,
-        resolveNoteLinkId,
+        resolveNoteLink,
       });
     },
   });

@@ -32,7 +32,7 @@ function getBlockSnippet(node: PMNode): string {
 }
 
 function getLinkKey(link: StoredNoteLink): string {
-  return `${link.targetId ?? ''}\0${link.title}`;
+  return `${link.targetId ?? ''}\0${link.pageFrameId ?? ''}\0${link.title}`;
 }
 
 function collectBlockLinks(node: PMNode, links: StoredNoteLink[]): void {
@@ -63,10 +63,15 @@ function collectBlockLinks(node: PMNode, links: StoredNoteLink[]): void {
     }
 
     const noteId = noteLinkMark.attrs.noteId;
+    const pageFrameId = noteLinkMark.attrs.pageFrameId;
     const link: StoredNoteLink = {
       targetId:
         typeof noteId === 'string' && noteId.length > 0
           ? (noteId as VFSNodeId)
+          : null,
+      pageFrameId:
+        typeof pageFrameId === 'string' && pageFrameId.length > 0
+          ? pageFrameId
           : null,
       title,
       snippet,

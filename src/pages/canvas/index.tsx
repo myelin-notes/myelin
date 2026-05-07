@@ -115,17 +115,34 @@ function CanvasViewInner() {
       return rawHash.trim() || null;
     }
   }, [location.hash]);
+  const targetPageFrameId =
+    typeof (location.state as { pageFrameId?: unknown } | null)?.pageFrameId ===
+    'string'
+      ? ((location.state as { pageFrameId: string }).pageFrameId as string)
+      : null;
   useEffect(() => {
-    if (!engine.ready || !targetPageFrameName) {
+    if (!engine.ready) {
+      return;
+    }
+    if (!targetPageFrameId && !targetPageFrameName) {
       return;
     }
 
-    if (!drawableCanvasRef.current?.focusPageFrameByName(targetPageFrameName)) {
-      logger.debug('Requested page frame target was not found', {
-        pageFrameName: targetPageFrameName,
-      });
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
     }
-  }, [engine.ready, targetPageFrameName]);
+    if (targetPageFrameId && dc.focusPageFrameById(targetPageFrameId)) {
+      return;
+    }
+    if (targetPageFrameName && dc.focusPageFrameByName(targetPageFrameName)) {
+      return;
+    }
+    logger.debug('Requested page frame target was not found', {
+      pageFrameName: targetPageFrameName,
+      pageFrameId: targetPageFrameId,
+    });
+  }, [engine.ready, targetPageFrameId, targetPageFrameName]);
 
   const importMarkdownFile = useCallback(
     async (file: File) => {

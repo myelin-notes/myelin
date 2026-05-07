@@ -20,8 +20,20 @@ export type NoteLinkSearchSource = Pick<
   'searchNodes' | 'getFolderChain'
 > &
   Partial<Pick<YjsSyncTarget, 'loadDocument'>>;
+export type NoteLinkRefResolveSource = NoteLinkResolveSource &
+  Partial<Pick<YjsSyncTarget, 'loadDocument'>>;
 
-export type PageFrameNameCache = Map<VFSNodeId, readonly string[]>;
+export interface NoteLinkRef {
+  noteId: VFSNodeId | null;
+  pageFrameId: string | null;
+}
+
+export interface PageFrameMeta {
+  id: string;
+  displayName: string;
+}
+
+export type PageFrameNameCache = Map<VFSNodeId, readonly PageFrameMeta[]>;
 
 interface NoteLinkPathQuery {
   isPath: boolean;
@@ -102,13 +114,13 @@ async function getNoteLinkPath(
   };
 }
 
-function getPageFrameDisplayNames(update: Uint8Array | null): string[] {
+function getPageFrameMetas(update: Uint8Array | null): PageFrameMeta[] {
   if (!update || update.byteLength === 0) {
     return [];
   }
 
   const ydoc = YDocManager.fromUpdate(update);
-  const displayNames: string[] = [];
+  const metas: PageFrameMeta[] = [];
 
   for (let i = 0; i < ydoc.elements.length; i++) {
     const yMap = ydoc.elements.get(i);
@@ -116,14 +128,18 @@ function getPageFrameDisplayNames(update: Uint8Array | null): string[] {
       continue;
     }
 
-    if (typeof yMap.get('uuid') !== 'string') {
+    const uuid = yMap.get('uuid');
+    if (typeof uuid !== 'string') {
       continue;
     }
 
-    displayNames.push(normalizePageFrameDisplayName(yMap.get('displayName')));
+    metas.push({
+      id: uuid,
+      displayName: normalizePageFrameDisplayName(yMap.get('displayName')),
+    });
   }
 
-  return displayNames;
+  return metas;
 }
 
 // todo: probably can avoid searching
@@ -157,6 +173,47 @@ export async function resolveNoteLinkIdByTitle(
   }
 
   return match?.id ?? null;
+}
+
+async function loadFrameMetas(
+  loadDocument: NonNullable<YjsSyncTarget['loadDocument']>,
+  noteId: VFSNodeId,
+  cache?: PageFrameNameCache,
+): Promise<readonly PageFrameMeta[]> {
+  const cached = cache?.get(noteId);
+  if (cached) {
+    return cached;
+  }
+  const snapshot = await loadDocument(noteId);
+  const metas = getPageFrameMetas(snapshot.update);
+  cache?.set(noteId, metas);
+  return metas;
+}
+
+export async function resolveNoteLinkRefByTitle(
+  repository: NoteLinkRefResolveSource,
+  target: string,
+  cache?: PageFrameNameCache,
+): Promise<NoteLinkRef> {
+  const parsedTarget = parseNoteLinkTarget(target);
+  if (!parsedTarget) {
+    return { noteId: null, pageFrameId: null };
+  }
+
+  const noteId = await resolveNoteLinkIdByTitle(repository, target);
+  if (!noteId || !parsedTarget.pageFrameName) {
+    return { noteId, pageFrameId: null };
+  }
+
+  const loadDocument = repository.loadDocument;
+  if (!loadDocument) {
+    return { noteId, pageFrameId: null };
+  }
+
+  const frames = await loadFrameMetas(loadDocument, noteId, cache);
+  const targetName = parsedTarget.pageFrameName;
+  const frame = frames.find((meta) => meta.displayName === targetName);
+  return { noteId, pageFrameId: frame?.id ?? null };
 }
 
 export async function searchNoteLinkAutocompleteItems(
@@ -263,29 +320,28 @@ async function searchNoteLinkPageFrameAutocompleteItems(
   const normalizedFrameQuery = normalizePathQuery(query.pageFrameQuery);
   const matches = await Promise.all(
     noteItems.map(async (noteItem): Promise<PageFrameAutocompleteItem[]> => {
-      const cached = frameNameCache?.get(noteItem.id);
-      let frameNames: readonly string[];
-      if (cached) {
-        frameNames = cached;
-      } else {
-        const snapshot = await loadDocument(noteItem.id);
-        frameNames = getPageFrameDisplayNames(snapshot.update);
-        frameNameCache?.set(noteItem.id, frameNames);
-      }
+      const frames = await loadFrameMetas(
+        loadDocument,
+        noteItem.id,
+        frameNameCache,
+      );
       const noteTarget = noteItem.insertText ?? noteItem.title;
 
-      return frameNames
-        .filter((frameName) =>
-          normalizePathQuery(frameName).startsWith(normalizedFrameQuery),
+      return frames
+        .filter((frame) =>
+          normalizePathQuery(frame.displayName).startsWith(
+            normalizedFrameQuery,
+          ),
         )
-        .map((frameName) => ({
+        .map((frame) => ({
           id: noteItem.id,
-          title: frameName,
+          title: frame.displayName,
           subtitle: noteItem.subtitle
             ? `${noteItem.title} - ${noteItem.subtitle}`
             : noteItem.title,
           detail: 'Frame',
-          insertText: `${noteTarget}#${frameName}`,
+          insertText: `${noteTarget}#${frame.displayName}`,
+          pageFrameId: frame.id,
         }));
     }),
   );

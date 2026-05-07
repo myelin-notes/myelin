@@ -7,18 +7,21 @@ import type {
 } from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 
-const { drawableCanvasCtor, resolveNoteLinkIdByTitleMock } = vi.hoisted(() => ({
-  drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
-    return {
-      elements: [{ id: 'existing-element' }],
-      setBackgroundCanvas: vi.fn(),
-      setOverlayCanvas: vi.fn(),
-      setDomOverlayHost: vi.fn(),
-      destroy: vi.fn(),
-    };
+const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
+  () => ({
+    drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
+      return {
+        elements: [{ id: 'existing-element' }],
+        setBackgroundCanvas: vi.fn(),
+        setOverlayCanvas: vi.fn(),
+        setDomOverlayHost: vi.fn(),
+        setOnPageFrameRenamed: vi.fn(),
+        destroy: vi.fn(),
+      };
+    }),
+    resolveNoteLinkRefByTitleMock: vi.fn(),
   }),
-  resolveNoteLinkIdByTitleMock: vi.fn(),
-}));
+);
 
 vi.mock('@/pages/canvas/drawable-canvas', () => ({
   DrawableCanvas: drawableCanvasCtor,
@@ -29,7 +32,7 @@ vi.mock('@/pages/canvas/elements/page-frame-element', () => ({
 }));
 
 vi.mock('@/pages/canvas/page-frame/note-link-resolution', () => ({
-  resolveNoteLinkIdByTitle: resolveNoteLinkIdByTitleMock,
+  resolveNoteLinkRefByTitle: resolveNoteLinkRefByTitleMock,
 }));
 
 type ControllerRepository = ActiveRepository;
@@ -165,17 +168,23 @@ describe('CanvasSessionController', () => {
       { current: [] },
     );
 
-    resolveNoteLinkIdByTitleMock.mockResolvedValue('resolved-note-id');
+    resolveNoteLinkRefByTitleMock.mockResolvedValue({
+      noteId: 'resolved-note-id',
+      pageFrameId: 'resolved-frame-id',
+    });
 
     await controller.open('note-1');
 
     expect(drawableCanvasCtor).toHaveBeenCalledTimes(1);
-    const resolveNoteLinkId = drawableCanvasCtor.mock.calls[0]?.[3];
-    expect(resolveNoteLinkId).toEqual(expect.any(Function));
+    const resolveNoteLink = drawableCanvasCtor.mock.calls[0]?.[3];
+    expect(resolveNoteLink).toEqual(expect.any(Function));
 
-    const resolved = await resolveNoteLinkId('Alpha Note');
-    expect(resolved).toBe('resolved-note-id');
-    expect(resolveNoteLinkIdByTitleMock).toHaveBeenCalledWith(
+    const resolved = await resolveNoteLink('Alpha Note');
+    expect(resolved).toEqual({
+      noteId: 'resolved-note-id',
+      pageFrameId: 'resolved-frame-id',
+    });
+    expect(resolveNoteLinkRefByTitleMock).toHaveBeenCalledWith(
       repository,
       'Alpha Note',
     );

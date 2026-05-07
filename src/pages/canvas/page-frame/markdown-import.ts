@@ -11,10 +11,13 @@ import {
 import type { YDocManager } from '../ydoc-manager';
 import { parseMarkdownToDoc } from './markdown-parser';
 import {
-  type NoteLinkResolveSource,
-  resolveNoteLinkIdByTitle,
+  type NoteLinkRefResolveSource,
+  resolveNoteLinkRefByTitle,
 } from './note-link-resolution';
-import { normalizeAndResolveNoteLinksDoc } from './pm/markdown/note-links';
+import {
+  normalizeAndResolveNoteLinksDoc,
+  type ResolveNoteLink,
+} from './pm/markdown/note-links';
 import { schema } from './pm/schema';
 
 export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
@@ -23,7 +26,7 @@ export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
 } as const;
 
 interface MarkdownPageFrameImportOptions {
-  repository?: NoteLinkResolveSource;
+  repository?: NoteLinkRefResolveSource;
   resolveNoteLinkId?: (title: string) => Promise<VFSNodeId | null>;
 }
 
@@ -38,13 +41,25 @@ async function buildMarkdownPageFrameDoc(
   options: MarkdownPageFrameImportOptions = {},
 ): Promise<PMNode> {
   const doc = parseMarkdownToDoc(markdown, schema);
+  const resolveNoteLink = pickResolveNoteLink(options);
+  return normalizeAndResolveNoteLinksDoc(doc, schema, resolveNoteLink);
+}
+
+function pickResolveNoteLink(
+  options: MarkdownPageFrameImportOptions,
+): ResolveNoteLink | undefined {
+  if (options.resolveNoteLinkId) {
+    const fn = options.resolveNoteLinkId;
+    return async (title) => ({
+      noteId: await fn(title),
+      pageFrameId: null,
+    });
+  }
   const repository = options.repository;
-  const resolveNoteLinkId = options.resolveNoteLinkId
-    ? options.resolveNoteLinkId
-    : repository
-      ? async (title: string) => resolveNoteLinkIdByTitle(repository, title)
-      : undefined;
-  return normalizeAndResolveNoteLinksDoc(doc, schema, resolveNoteLinkId);
+  if (repository) {
+    return async (title) => resolveNoteLinkRefByTitle(repository, title);
+  }
+  return undefined;
 }
 
 function replacePageFrameFragmentDoc(

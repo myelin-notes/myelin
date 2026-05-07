@@ -148,6 +148,7 @@ describe('LocalRepository', () => {
         sourceId,
         sourceName: 'Source',
         targetId,
+        pageFrameId: null,
         title: 'Target',
         snippet: 'See [[Target]] for context.',
       },

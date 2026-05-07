@@ -95,7 +95,11 @@ describe('buildSelectNoteLinkAutocompleteTransaction', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Alpha Note', noteId: 'note-2' },
+                  attrs: {
+                    title: 'Alpha Note',
+                    noteId: 'note-2',
+                    pageFrameId: null,
+                  },
                 },
               ],
             },
@@ -108,7 +112,7 @@ describe('buildSelectNoteLinkAutocompleteTransaction', () => {
       buildResolvedNoteLinkTransaction(
         selectedState,
         schema,
-        new Map([['Alpha Note', 'note-1']]),
+        new Map([['Alpha Note', { noteId: 'note-1', pageFrameId: null }]]),
       ),
     ).toBeNull();
   });
@@ -152,6 +156,7 @@ describe('buildSelectNoteLinkAutocompleteTransaction', () => {
                   attrs: {
                     title: 'Projects/Alpha Note',
                     noteId: 'note-2',
+                    pageFrameId: null,
                   },
                 },
               ],

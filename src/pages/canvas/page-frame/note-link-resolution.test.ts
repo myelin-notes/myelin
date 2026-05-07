@@ -11,6 +11,7 @@ import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
 import { YDocManager } from '../ydoc-manager';
 import {
   resolveNoteLinkIdByTitle,
+  resolveNoteLinkRefByTitle,
   searchNoteLinkAutocompleteItems,
 } from './note-link-resolution';
 
@@ -263,6 +264,7 @@ describe('searchNoteLinkAutocompleteItems', () => {
         subtitle: 'Alpha - Root',
         detail: 'Frame',
         insertText: 'Alpha#Research Notes',
+        pageFrameId: 'frame-0',
       },
     ]);
   });
@@ -294,7 +296,73 @@ describe('searchNoteLinkAutocompleteItems', () => {
         subtitle: 'Alpha - Projects',
         detail: 'Frame',
         insertText: 'Projects/Alpha#Data Frame',
+        pageFrameId: 'frame-0',
       },
     ]);
+  });
+});
+
+describe('resolveNoteLinkRefByTitle', () => {
+  it('returns noteId only when target has no page-frame fragment', async () => {
+    const repository = {
+      searchNodes: vi.fn(async () => [
+        createFileNode('note-alpha', 'Alpha', null),
+      ]),
+      getFolderChain: vi.fn(async () => []),
+    };
+
+    await expect(
+      resolveNoteLinkRefByTitle(repository, 'Alpha'),
+    ).resolves.toEqual({ noteId: 'note-alpha', pageFrameId: null });
+  });
+
+  it('resolves both noteId and pageFrameId by matching displayName', async () => {
+    const repository = {
+      searchNodes: vi.fn(async () => [
+        createFileNode('note-alpha', 'Alpha', null),
+      ]),
+      getFolderChain: vi.fn(async () => []),
+      loadDocument: vi.fn(async () =>
+        createSnapshot(createPageFrameUpdate(['Research Notes', 'Draft'])),
+      ),
+    };
+
+    await expect(
+      resolveNoteLinkRefByTitle(repository, 'Alpha#Draft'),
+    ).resolves.toEqual({ noteId: 'note-alpha', pageFrameId: 'frame-1' });
+  });
+
+  it('returns null pageFrameId when no displayName matches', async () => {
+    const repository = {
+      searchNodes: vi.fn(async () => [
+        createFileNode('note-alpha', 'Alpha', null),
+      ]),
+      getFolderChain: vi.fn(async () => []),
+      loadDocument: vi.fn(async () =>
+        createSnapshot(createPageFrameUpdate(['Research Notes'])),
+      ),
+    };
+
+    await expect(
+      resolveNoteLinkRefByTitle(repository, 'Alpha#Missing'),
+    ).resolves.toEqual({ noteId: 'note-alpha', pageFrameId: null });
+  });
+
+  it('caches loadDocument results across repeated lookups', async () => {
+    const repository = {
+      searchNodes: vi.fn(async () => [
+        createFileNode('note-alpha', 'Alpha', null),
+      ]),
+      getFolderChain: vi.fn(async () => []),
+      loadDocument: vi.fn(async () =>
+        createSnapshot(createPageFrameUpdate(['Draft'])),
+      ),
+    };
+    const cache = new Map();
+
+    await resolveNoteLinkRefByTitle(repository, 'Alpha#Draft', cache);
+    await resolveNoteLinkRefByTitle(repository, 'Alpha#Draft', cache);
+
+    expect(repository.loadDocument).toHaveBeenCalledTimes(1);
   });
 });

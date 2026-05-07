@@ -12,9 +12,12 @@ import {
   type NoteSessionStatus,
   useRepository,
 } from '@/lib/sync';
+import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-references';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
-import { resolveNoteLinkIdByTitle } from '@/pages/canvas/page-frame/note-link-resolution';
+import { resolveNoteLinkRefByTitle } from '@/pages/canvas/page-frame/note-link-resolution';
+import { buildRenamePageFrameLinkReferencesTransaction } from '@/pages/canvas/page-frame/pm/markdown/note-links';
+import { schema as pageFrameSchema } from '@/pages/canvas/page-frame/pm/schema';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 
@@ -118,8 +121,11 @@ export class CanvasSessionController {
         canvas,
         session.ydoc,
         this.canvasToolsRef.current,
-        async (title) => resolveNoteLinkIdByTitle(this.repository, title),
+        async (title) => resolveNoteLinkRefByTitle(this.repository, title),
       );
+      drawableCanvas.setOnPageFrameRenamed((uuid, newName) => {
+        this.handlePageFrameRenamed(noteId, uuid, newName);
+      });
 
       if (this.bgCanvasRef.current) {
         drawableCanvas.setBackgroundCanvas(this.bgCanvasRef.current);
@@ -167,6 +173,46 @@ export class CanvasSessionController {
       logger.error('Failed to open canvas session', error, { id: noteId });
       this.setLifecycleError(error);
     }
+  }
+
+  private handlePageFrameRenamed(
+    ownerNoteId: VFSNodeId,
+    pageFrameId: string,
+    newName: string,
+  ): void {
+    const drawableCanvas = this.activeSession?.drawableCanvas;
+    if (drawableCanvas) {
+      for (const element of drawableCanvas.elements) {
+        if (!(element instanceof PageFrameElement)) {
+          continue;
+        }
+        const view = element.pmEditor?.view;
+        if (!view) {
+          continue;
+        }
+        const result = buildRenamePageFrameLinkReferencesTransaction(
+          view.state,
+          pageFrameSchema,
+          pageFrameId,
+          newName,
+        );
+        if (result) {
+          view.dispatch(result.tr);
+        }
+      }
+    }
+
+    void renamePageFrameReferences(
+      this.repository,
+      ownerNoteId,
+      pageFrameId,
+      newName,
+    ).catch((error) => {
+      logger.error('Failed to rename page-frame references', error, {
+        ownerNoteId,
+        pageFrameId,
+      });
+    });
   }
 
   private async teardownActiveSession(): Promise<void> {
