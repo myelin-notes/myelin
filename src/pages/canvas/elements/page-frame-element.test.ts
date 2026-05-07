@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
-import { PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
+import {
+  DEFAULT_PAGE_FRAME_DISPLAY_NAME,
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+} from './page-frame-constants';
 import { PageFrameElement } from './page-frame-element';
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({
@@ -9,12 +13,12 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 }));
 
 describe('PageFrameElement display name', () => {
-  it('serializes a deterministic default display name', () => {
-    const frame = new PageFrameElement(2);
+  it('serializes the default display name when none is provided', () => {
+    const frame = new PageFrameElement('frame-uuid-1');
 
-    expect(frame.displayName).toBe('Page Frame 3');
+    expect(frame.displayName).toBe(DEFAULT_PAGE_FRAME_DISPLAY_NAME);
     expect(frame.getYMapProps()).toMatchObject({
-      displayName: 'Page Frame 3',
+      displayName: DEFAULT_PAGE_FRAME_DISPLAY_NAME,
       pageWidth: PAGE_WIDTH,
       pageHeight: PAGE_HEIGHT,
     });
@@ -22,7 +26,7 @@ describe('PageFrameElement display name', () => {
 
   it('hydrates and writes display name through the Yjs map', () => {
     const ydoc = new YDocManager();
-    const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 4, {
+    const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame-uuid-2', {
       offsetX: 0,
       offsetY: 0,
       scaleX: 1,
@@ -31,7 +35,7 @@ describe('PageFrameElement display name', () => {
       pageWidth: PAGE_WIDTH,
       pageHeight: PAGE_HEIGHT,
     });
-    const frame = new PageFrameElement(4);
+    const frame = new PageFrameElement('frame-uuid-2');
 
     frame.bindToYMap(yMap);
     expect(frame.displayName).toBe('Research Notes');
@@ -43,7 +47,7 @@ describe('PageFrameElement display name', () => {
 
   it('falls back to the default display name for blank or missing values', () => {
     const ydoc = new YDocManager();
-    const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 1, {
+    const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame-uuid-3', {
       offsetX: 0,
       offsetY: 0,
       scaleX: 1,
@@ -51,17 +55,17 @@ describe('PageFrameElement display name', () => {
       pageWidth: PAGE_WIDTH,
       pageHeight: PAGE_HEIGHT,
     });
-    const frame = new PageFrameElement(1);
+    const frame = new PageFrameElement('frame-uuid-3');
 
     frame.bindToYMap(yMap);
-    expect(frame.displayName).toBe('Page Frame 2');
+    expect(frame.displayName).toBe(DEFAULT_PAGE_FRAME_DISPLAY_NAME);
 
     frame.setDisplayName('');
-    expect(frame.displayName).toBe('Page Frame 2');
+    expect(frame.displayName).toBe(DEFAULT_PAGE_FRAME_DISPLAY_NAME);
     expect(yMap.get('displayName')).toBeUndefined();
 
     yMap.set('displayName', '  ');
     frame.syncFromYMap(['displayName']);
-    expect(frame.displayName).toBe('Page Frame 2');
+    expect(frame.displayName).toBe(DEFAULT_PAGE_FRAME_DISPLAY_NAME);
   });
 });

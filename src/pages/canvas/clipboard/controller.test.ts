@@ -28,7 +28,7 @@ function createSelection(noteId: FileId): CanvasClipboardSelection {
   const elements = doc.getArray<Y.Map<unknown>>('elements');
   const yMap = new Y.Map<unknown>();
   yMap.set('type', ElementType.TEXT);
-  yMap.set('index', 1);
+  yMap.set('uuid', 'text-1');
   yMap.set('offsetX', 10);
   yMap.set('offsetY', 20);
   yMap.set('scaleX', 1);
@@ -46,7 +46,7 @@ function createSelection(noteId: FileId): CanvasClipboardSelection {
     bounds: { x: 10, y: 20, width: 200, height: 80 },
     items: [
       {
-        index: 1,
+        uuid: 'text-1',
         type: ElementType.TEXT,
         bounds: { x: 10, y: 20, width: 200, height: 80 },
         yMap,
@@ -88,7 +88,7 @@ function createPort(
       viewportCenter: { x: 400, y: 300 },
     }),
     deleteSelection: vi.fn(),
-    pasteSnapshot: vi.fn(() => ({ pastedElementIndices: [2] })),
+    pasteSnapshot: vi.fn(() => ({ pastedElementUuids: ['paste-1'] })),
     ...overrides,
   };
 }
@@ -128,7 +128,7 @@ describe('CanvasClipboardController', () => {
     const controller = new CanvasClipboardController();
     const snapshot = buildCanvasClipboardSnapshot(createSelection('note-1'));
     const payload = serializeCanvasClipboardSnapshot(snapshot);
-    const pasteSnapshot = vi.fn(() => ({ pastedElementIndices: [2] }));
+    const pasteSnapshot = vi.fn(() => ({ pastedElementUuids: ['paste-1'] }));
     const onMediaPaste = vi.fn(() => false);
     const port = createPort({ pasteSnapshot });
 

@@ -116,7 +116,7 @@ function createPdfYMap(
     originalIndex,
   })),
 ) {
-  return ydoc.createElementMap(ElementType.PDF, 0, {
+  return ydoc.createElementMap(ElementType.PDF, 'pdf-uuid', {
     offsetX: 0,
     offsetY: 0,
     scaleX: 1,
@@ -173,7 +173,7 @@ function createPageDom(
 }
 
 function createRenderableElement(): TestablePdfElement {
-  const element = new PdfElement(0) as unknown as TestablePdfElement;
+  const element = new PdfElement('pdf-uuid') as unknown as TestablePdfElement;
   element._pdfDocument = {
     numPages: 1,
     destroy: vi.fn(async () => {}),
@@ -206,7 +206,7 @@ describe('PdfElement metadata loading', () => {
       }
     });
 
-    new PdfElement(0).bindToYMap(yMap);
+    new PdfElement('pdf-uuid').bindToYMap(yMap);
     await flushPromises();
 
     expect(localUpdates).toBe(0);
@@ -231,7 +231,7 @@ describe('PdfElement metadata loading', () => {
       }
     });
 
-    new PdfElement(0).bindToYMap(yMap);
+    new PdfElement('pdf-uuid').bindToYMap(yMap);
     await flushPromises();
 
     expect(localUpdates).toBe(1);
@@ -255,7 +255,7 @@ describe('PdfElement metadata loading', () => {
       }
     });
 
-    new PdfElement(0).bindToYMap(yMap);
+    new PdfElement('pdf-uuid').bindToYMap(yMap);
     await flushPromises();
 
     expect(localUpdates).toBe(1);
@@ -276,7 +276,7 @@ describe('PdfElement metadata loading', () => {
       }
     });
 
-    const element = new PdfElement(0);
+    const element = new PdfElement('pdf-uuid');
     element.bindToYMap(yMap);
     await flushPromises();
     expect(getPdfDocumentPageSizes).not.toHaveBeenCalled();
@@ -297,7 +297,7 @@ describe('PdfElement metadata loading', () => {
     const yMap = createPdfYMap(ydoc, pageSizes);
     const initialDocument = mockOpenedPdf(pageSizes.length);
 
-    const element = new PdfElement(0);
+    const element = new PdfElement('pdf-uuid');
     element.bindToYMap(yMap);
     await flushPromises();
 
@@ -315,7 +315,7 @@ describe('PdfElement metadata loading', () => {
     const yMap = createPdfYMap(ydoc, pageSizes);
     mockLoadedPdf(pageSizes);
 
-    const element = new PdfElement(0);
+    const element = new PdfElement('pdf-uuid');
     element.bindToYMap(yMap);
     await flushPromises();
 

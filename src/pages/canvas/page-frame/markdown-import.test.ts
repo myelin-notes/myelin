@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type { Repository } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
-import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
+import {
+  DEFAULT_PAGE_FRAME_DISPLAY_NAME,
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+} from '../elements/page-frame-constants';
 import { YDocManager } from '../ydoc-manager';
 import {
   addMarkdownPageFrameToYDoc,
@@ -13,19 +17,19 @@ import { schema } from './pm/schema';
 describe('markdown canvas import', () => {
   it('creates a page frame populated with parsed markdown', async () => {
     const ydoc = new YDocManager();
-    const index = await addMarkdownPageFrameToYDoc(
+    const uuid = await addMarkdownPageFrameToYDoc(
       ydoc,
       ['# Imported Note', '', 'Hello **library** import.'].join('\n'),
     );
 
-    expect(index).toBe(0);
-    expect(ydoc.nextIndex).toBe(1);
+    expect(typeof uuid).toBe('string');
+    expect(uuid.length).toBeGreaterThan(0);
     expect(ydoc.elements.length).toBe(1);
 
     const pageFrame = ydoc.elements.get(0);
     expect(pageFrame.get('type')).toBe(ElementType.PAGE_FRAME);
-    expect(pageFrame.get('index')).toBe(0);
-    expect(pageFrame.get('displayName')).toBe('Page Frame 1');
+    expect(pageFrame.get('uuid')).toBe(uuid);
+    expect(pageFrame.get('displayName')).toBe(DEFAULT_PAGE_FRAME_DISPLAY_NAME);
     expect(pageFrame.get('offsetX')).toBe(
       DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET.x,
     );
@@ -36,7 +40,7 @@ describe('markdown canvas import', () => {
     expect(pageFrame.get('pageHeight')).toBe(PAGE_HEIGHT);
 
     const doc = yXmlFragmentToProseMirrorRootNode(
-      ydoc.getXmlFragment(index),
+      ydoc.getXmlFragment(uuid),
       schema,
     );
     expect(doc.textContent).toBe('Imported NoteHello library import.');
@@ -49,11 +53,11 @@ describe('markdown canvas import', () => {
 
   it('stores a custom page-frame display name when provided', async () => {
     const ydoc = new YDocManager();
-    const index = await addMarkdownPageFrameToYDoc(ydoc, 'Body', {
+    const uuid = await addMarkdownPageFrameToYDoc(ydoc, 'Body', {
       displayName: '  Literature Review  ',
     });
 
-    expect(index).toBe(0);
+    expect(typeof uuid).toBe('string');
     expect(ydoc.elements.get(0).get('displayName')).toBe('Literature Review');
   });
 
@@ -90,13 +94,13 @@ describe('markdown canvas import', () => {
       getFolderChain: async () => [],
     } satisfies Pick<Repository, 'searchNodes' | 'getFolderChain'>;
 
-    const index = await addMarkdownPageFrameToYDoc(
+    const uuid = await addMarkdownPageFrameToYDoc(
       ydoc,
       'See [[Alpha Note]] and [[Missing Note]].',
       { repository },
     );
     const doc = yXmlFragmentToProseMirrorRootNode(
-      ydoc.getXmlFragment(index),
+      ydoc.getXmlFragment(uuid),
       schema,
     );
 

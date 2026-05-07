@@ -8,8 +8,8 @@ export class ImageElement extends DrawableElement {
   private _naturalWidth: number = 0;
   private _naturalHeight: number = 0;
 
-  public constructor(index: number) {
-    super(index, ElementType.IMAGE);
+  public constructor(uuid: string) {
+    super(uuid, ElementType.IMAGE);
   }
 
   public override getYMapProps(): Record<string, unknown> {

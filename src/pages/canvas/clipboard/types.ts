@@ -22,7 +22,7 @@ export interface CanvasClipboardSnapshot {
 }
 
 export interface CanvasClipboardSelectionItem {
-  index: number;
+  uuid: string;
   type: ElementType;
   bounds: CanvasRect;
   yMap: Y.Map<unknown>;
@@ -46,7 +46,7 @@ export interface CanvasPastePlacement {
 }
 
 export interface CanvasPasteResult {
-  pastedElementIndices: number[];
+  pastedElementUuids: string[];
 }
 
 export interface CanvasClipboardPort {

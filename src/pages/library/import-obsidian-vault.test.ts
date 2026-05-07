@@ -123,8 +123,10 @@ describe('Obsidian vault import', () => {
     try {
       const pageFrame = session.ydoc.elements.get(0);
       expect(pageFrame.get('type')).toBe(ElementType.PAGE_FRAME);
+      const pageFrameUuid = pageFrame.get('uuid');
+      expect(typeof pageFrameUuid).toBe('string');
       const doc = yXmlFragmentToProseMirrorRootNode(
-        session.ydoc.getXmlFragment(0),
+        session.ydoc.getXmlFragment(pageFrameUuid as string),
         schema,
       );
       expect(collectNoteLinks(doc.toJSON())).toEqual([

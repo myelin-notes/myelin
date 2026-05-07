@@ -24,7 +24,7 @@ function createSelection(): {
 
   const strokePoints = new Y.Array<number>();
   strokePoints.push([10, 20, 1, 30, 40, 0.5]);
-  const stroke = sourceDoc.createElementMap(ElementType.STROKE, 0, {
+  const stroke = sourceDoc.createElementMap(ElementType.STROKE, 'stroke-uuid', {
     offsetX: 12,
     offsetY: 18,
     scaleX: 1,
@@ -35,7 +35,7 @@ function createSelection(): {
     points: strokePoints,
   });
 
-  const image = sourceDoc.createElementMap(ElementType.IMAGE, 1, {
+  const image = sourceDoc.createElementMap(ElementType.IMAGE, 'image-uuid', {
     offsetX: 60,
     offsetY: 72,
     scaleX: 1,
@@ -45,7 +45,7 @@ function createSelection(): {
     imageData: new Uint8Array([1, 2, 3, 4]),
   });
 
-  const pdf = sourceDoc.createElementMap(ElementType.PDF, 2, {
+  const pdf = sourceDoc.createElementMap(ElementType.PDF, 'pdf-uuid', {
     offsetX: 110,
     offsetY: 140,
     scaleX: 1,
@@ -56,18 +56,22 @@ function createSelection(): {
     pdfData: new Uint8Array([9, 8, 7, 6]),
   });
 
-  const pageFrame = sourceDoc.createElementMap(ElementType.PAGE_FRAME, 3, {
-    offsetX: 200,
-    offsetY: 220,
-    scaleX: 1,
-    scaleY: 1,
-    displayName: 'Research outline',
-    pageWidth: 680,
-    pageHeight: 880,
-  });
+  const pageFrame = sourceDoc.createElementMap(
+    ElementType.PAGE_FRAME,
+    'frame-uuid',
+    {
+      offsetX: 200,
+      offsetY: 220,
+      scaleX: 1,
+      scaleY: 1,
+      displayName: 'Research outline',
+      pageWidth: 680,
+      pageHeight: 880,
+    },
+  );
   prosemirrorToYXmlFragment(
     parseMarkdownToDoc('Hello **canvas** clipboard', schema),
-    sourceDoc.getXmlFragment(3),
+    sourceDoc.getXmlFragment('frame-uuid'),
   );
 
   return {
@@ -77,29 +81,29 @@ function createSelection(): {
       bounds: { x: 12, y: 18, width: 868, height: 1082 },
       items: [
         {
-          index: 0,
+          uuid: 'stroke-uuid',
           type: ElementType.STROKE,
           bounds: { x: 12, y: 18, width: 40, height: 36 },
           yMap: stroke,
         },
         {
-          index: 1,
+          uuid: 'image-uuid',
           type: ElementType.IMAGE,
           bounds: { x: 60, y: 72, width: 320, height: 180 },
           yMap: image,
         },
         {
-          index: 2,
+          uuid: 'pdf-uuid',
           type: ElementType.PDF,
           bounds: { x: 110, y: 140, width: 612, height: 792 },
           yMap: pdf,
         },
         {
-          index: 3,
+          uuid: 'frame-uuid',
           type: ElementType.PAGE_FRAME,
           bounds: { x: 200, y: 220, width: 680, height: 880 },
           yMap: pageFrame,
-          pageFrameFragment: sourceDoc.getXmlFragment(3),
+          pageFrameFragment: sourceDoc.getXmlFragment('frame-uuid'),
         },
       ],
     },
@@ -141,7 +145,7 @@ describe('canvas clipboard snapshot', () => {
     expect(decodedPageFrameMap.get('displayName')).toBe('Research outline');
 
     const decodedPageFrame = yXmlFragmentToProseMirrorRootNode(
-      clipboardDoc.getXmlFragment(3),
+      clipboardDoc.getXmlFragment('frame-uuid'),
       schema,
     );
     expect(decodedPageFrame.textContent).toContain('Hello');
@@ -154,7 +158,9 @@ describe('canvas clipboard snapshot', () => {
     const snapshot = buildCanvasClipboardSnapshot(selection);
     const clipboardDoc = openCanvasClipboardDocument(snapshot);
 
-    const decodedParagraph = clipboardDoc.getXmlFragment(3).toArray()[0];
+    const decodedParagraph = clipboardDoc
+      .getXmlFragment('frame-uuid')
+      .toArray()[0];
     expect(decodedParagraph).toBeInstanceOf(Y.XmlElement);
 
     const decodedText = (decodedParagraph as Y.XmlElement).toArray()[0];
@@ -166,11 +172,11 @@ describe('canvas clipboard snapshot', () => {
     );
 
     const sourcePmDoc = yXmlFragmentToProseMirrorRootNode(
-      sourceDoc.getXmlFragment(3),
+      sourceDoc.getXmlFragment('frame-uuid'),
       schema,
     );
     const decodedPmDoc = yXmlFragmentToProseMirrorRootNode(
-      clipboardDoc.getXmlFragment(3),
+      clipboardDoc.getXmlFragment('frame-uuid'),
       schema,
     );
 

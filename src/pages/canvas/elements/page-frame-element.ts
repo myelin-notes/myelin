@@ -24,7 +24,7 @@ import {
   CHROME_SIDE_PADDING,
 } from './frame-chrome';
 import {
-  getDefaultPageFrameDisplayName,
+  DEFAULT_PAGE_FRAME_DISPLAY_NAME,
   normalizePageFrameDisplayName,
   PAGE_GAP,
   PAGE_HEIGHT,
@@ -72,9 +72,9 @@ export class PageFrameElement extends DrawableElement {
     this._contentDiv = contentDiv;
   }
 
-  constructor(index: number) {
-    super(index, ElementType.PAGE_FRAME);
-    this._displayName = getDefaultPageFrameDisplayName(index);
+  constructor(uuid: string, displayName?: string) {
+    super(uuid, ElementType.PAGE_FRAME);
+    this._displayName = displayName ?? DEFAULT_PAGE_FRAME_DISPLAY_NAME;
   }
 
   public setNoteLinkResolver(resolveNoteLinkId?: NoteLinkIdResolver): void {
@@ -146,7 +146,7 @@ export class PageFrameElement extends DrawableElement {
     super.bindToYMap(yMap);
     this.bindYFields(yMap, {
       displayName: (v) => {
-        this._displayName = normalizePageFrameDisplayName(this.index, v);
+        this._displayName = normalizePageFrameDisplayName(v);
       },
       pageWidth: (v) => {
         this._pageWidth = v as number;
@@ -170,7 +170,7 @@ export class PageFrameElement extends DrawableElement {
     return this._displayName;
   }
   public setDisplayName(displayName: string): void {
-    const next = normalizePageFrameDisplayName(this.index, displayName);
+    const next = normalizePageFrameDisplayName(displayName);
     if (next === this._displayName) {
       return;
     }
@@ -236,7 +236,7 @@ export class PageFrameElement extends DrawableElement {
   }
 
   public override bindSharedYState(ydoc: YDocManager): void {
-    this.bindYProseMirror(ydoc.getXmlFragment(this.index));
+    this.bindYProseMirror(ydoc.getXmlFragment(this.uuid));
   }
 
   public override enterEditMode(
@@ -343,7 +343,7 @@ export class PageFrameElement extends DrawableElement {
     const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
     try {
       const path = await save({
-        defaultPath: `note-${this.index}.md`,
+        defaultPath: `${this._displayName}.md`,
         filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
       });
       if (!path) {
@@ -353,7 +353,7 @@ export class PageFrameElement extends DrawableElement {
       await writeTextFile(path, md);
       toast.success('Exported to Markdown');
     } catch (err) {
-      logger.error('Export to Markdown failed', err, { index: this.index });
+      logger.error('Export to Markdown failed', err, { uuid: this.uuid });
       toast.error('Export failed', {
         description: err instanceof Error ? err.message : String(err),
       });

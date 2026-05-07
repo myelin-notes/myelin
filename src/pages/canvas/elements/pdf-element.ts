@@ -136,8 +136,8 @@ export class PdfElement extends DrawableElement {
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
     null;
 
-  constructor(index: number) {
-    super(index, ElementType.PDF);
+  constructor(uuid: string) {
+    super(uuid, ElementType.PDF);
   }
 
   public setExportElementsProvider(
@@ -307,7 +307,7 @@ export class PdfElement extends DrawableElement {
       toast.success('Exported to PDF');
     } catch (err) {
       logger.error('Export to PDF failed', err, {
-        index: this.index,
+        uuid: this.uuid,
         fileName: this._fileName,
       });
       toast.error('Export failed', {
@@ -323,7 +323,7 @@ export class PdfElement extends DrawableElement {
 
     const layout = this.getLayout();
     return {
-      index: this.index,
+      uuid: this.uuid,
       pdfBytes: this._pdfBytes,
       pages: layout.pages,
       offset: { x: this.offset.x, y: this.offset.y },
@@ -338,7 +338,7 @@ export class PdfElement extends DrawableElement {
   private getDefaultExportFileName(): string {
     const trimmed = this._fileName.trim();
     if (!trimmed) {
-      return `pdf-${this.index}.pdf`;
+      return 'document.pdf';
     }
     return trimmed.toLowerCase().endsWith('.pdf') ? trimmed : `${trimmed}.pdf`;
   }
@@ -528,7 +528,7 @@ export class PdfElement extends DrawableElement {
         return;
       }
       logger.error('Failed to load PDF', error, {
-        index: this.index,
+        uuid: this.uuid,
         fileName: this._fileName,
       });
     }
@@ -864,7 +864,7 @@ export class PdfElement extends DrawableElement {
         pageDom.renderHandle = null;
         pageDom.rendering = null;
         logger.error('Failed to render PDF page', error, {
-          index: this.index,
+          uuid: this.uuid,
           fileName: this._fileName,
           pageIndex,
           pageWidth: pageSize.w,
@@ -884,7 +884,7 @@ export class PdfElement extends DrawableElement {
       getMenuItems: () => this.getMenuItems(),
     });
     chrome.setFileName(this._fileName || null);
-    chrome.root.dataset.elementIndex = String(this.index);
+    chrome.root.dataset.elementUuid = this.uuid;
     chrome.root.dataset.elementType = 'pdf';
 
     const contentRoot = document.createElement('div');

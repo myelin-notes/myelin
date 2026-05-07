@@ -63,7 +63,12 @@ export class DrawableCanvas {
   private spaceDown: boolean = false;
   private screenPosition: Vector2 = { x: 0, y: 0 };
 
-  private _elements: DrawableElement[] = [];
+  /** Element lookup keyed by stable uuid. */
+  private _elements = new Map<string, DrawableElement>();
+  /** Ordered list of element uuids in z-order (background first, foreground last). */
+  private _elementOrder: string[] = [];
+  /** Cached array snapshot for the public `elements` getter; null when stale. */
+  private _orderedSnapshot: DrawableElement[] | null = null;
   private _ydoc: YDocManager;
   private _domOverlayHost: HTMLElement | null = null;
   /** Maps Y.Map instances to their DrawableElement wrappers. */
@@ -129,7 +134,7 @@ export class DrawableCanvas {
     this.hydrateFromYDoc();
     logger.debug(
       'Hydrated canvas from Y.Doc',
-      summarizeDrawableElements(this._elements),
+      summarizeDrawableElements(this.elements),
     );
 
     // Observe element-level changes for undo/redo and remote changes.
@@ -145,27 +150,28 @@ export class DrawableCanvas {
    * Called once on construction for loaded documents.
    */
   private hydrateFromYDoc(): void {
+    const collected: DrawableElement[] = [];
     for (let i = 0; i < this._ydoc.elements.length; i++) {
       const yMap = this._ydoc.elements.get(i);
       const element = this.createElementFromYMap(yMap);
       if (element) {
-        this._elements.push(element);
+        collected.push(element);
+        this._elements.set(element.uuid, element);
         this._yMapToElement.set(yMap, element);
       }
     }
     // Sort: backgrounds (page frames, PDFs) first so other elements render on top.
-    this._elements.sort((a, b) => {
+    collected.sort((a, b) => {
       const aBg = isBackgroundElement(a.type) ? 0 : 1;
       const bBg = isBackgroundElement(b.type) ? 0 : 1;
       return aBg - bBg;
     });
-    // Sync nextIndex
-    if (this._elements.length > 0) {
-      const maxIndex = Math.max(...this._elements.map((e) => e.index));
-      if (maxIndex >= this._ydoc.nextIndex) {
-        this._ydoc.nextIndex = maxIndex + 1;
-      }
-    }
+    this._elementOrder = collected.map((e) => e.uuid);
+    this.invalidateOrderSnapshot();
+  }
+
+  private invalidateOrderSnapshot(): void {
+    this._orderedSnapshot = null;
   }
 
   /**
@@ -173,8 +179,8 @@ export class DrawableCanvas {
    */
   private createElementFromYMap(yMap: Y.Map<unknown>): DrawableElement | null {
     const type = yMap.get('type');
-    const index = yMap.get('index');
-    if (typeof type !== 'number' || typeof index !== 'number') {
+    const uuid = yMap.get('uuid');
+    if (typeof type !== 'number' || typeof uuid !== 'string') {
       return null;
     }
 
@@ -185,7 +191,7 @@ export class DrawableCanvas {
       return null;
     }
 
-    const element = factory(index);
+    const element = factory(uuid);
     this.configureElement(element);
     element.bindToYMap(yMap);
     this.bindElementSharedYState(element);
@@ -197,7 +203,7 @@ export class DrawableCanvas {
       element.setNoteLinkResolver(this.resolveNoteLinkId);
     }
     if (element instanceof PdfElement) {
-      element.setExportElementsProvider(() => this._elements);
+      element.setExportElementsProvider(() => this.elements);
     }
   }
 
@@ -305,18 +311,10 @@ export class DrawableCanvas {
   }
 
   private handleYArrayChange(event: Y.YArrayEvent<Y.Map<unknown>>): void {
-    let index = 0;
+    let position = 0;
     for (const delta of event.changes.delta) {
       if ('retain' in delta) {
-        index += delta.retain!;
-      }
-      if ('delete' in delta) {
-        // Find and remove the elements that were deleted
-        const count = delta.delete!;
-        for (let i = 0; i < count; i++) {
-          // Find which element was at this Y.Array position
-          // We need to find elements that are no longer in the Y.Array
-        }
+        position += delta.retain!;
       }
       if ('insert' in delta) {
         const inserted = delta.insert as Y.Map<unknown>[];
@@ -324,33 +322,43 @@ export class DrawableCanvas {
           if (!this._yMapToElement.has(yMap)) {
             const element = this.createElementFromYMap(yMap);
             if (element) {
-              this._elements.splice(index, 0, element);
+              this._elements.set(element.uuid, element);
+              this._elementOrder.splice(position, 0, element.uuid);
               this._yMapToElement.set(yMap, element);
             }
           }
-          index++;
+          position++;
         }
       }
     }
 
-    // Handle deletions: remove elements whose Y.Maps are no longer in the array
+    // Handle deletions: drop elements whose Y.Maps are no longer in the array.
     const currentYMaps = new Set<Y.Map<unknown>>();
     for (let i = 0; i < this._ydoc.elements.length; i++) {
       currentYMaps.add(this._ydoc.elements.get(i));
     }
-    this._elements = this._elements.filter((el) => {
-      if (el.yMap && !currentYMaps.has(el.yMap)) {
-        this._yMapToElement.delete(el.yMap);
-        el.disposeDOM();
-        return false;
+    const removedUuids = new Set<string>();
+    for (const element of this._elements.values()) {
+      if (element.yMap && !currentYMaps.has(element.yMap)) {
+        this._yMapToElement.delete(element.yMap);
+        element.disposeDOM();
+        removedUuids.add(element.uuid);
       }
-      return true;
-    });
+    }
+    if (removedUuids.size > 0) {
+      for (const uuid of removedUuids) {
+        this._elements.delete(uuid);
+      }
+      this._elementOrder = this._elementOrder.filter(
+        (uuid) => !removedUuids.has(uuid),
+      );
+    }
 
+    this.invalidateOrderSnapshot();
     this.updateBounding();
     logger.debug('Applied external canvas element change', {
       origin: String(event.transaction.origin ?? 'unknown'),
-      ...summarizeDrawableElements(this._elements),
+      ...summarizeDrawableElements(this.elements),
     });
   }
 
@@ -426,11 +434,11 @@ export class DrawableCanvas {
   }
 
   public getElementsByType(type: ElementType): DrawableElement[] {
-    return this._elements.filter((e) => e.type === type);
+    return this.elements.filter((e) => e.type === type);
   }
 
   public focusPageFrameByName(displayName: string): boolean {
-    const frame = this._elements.find(
+    const frame = this.elements.find(
       (element): element is PageFrameElement =>
         element instanceof PageFrameElement &&
         element.displayName === displayName,
@@ -466,9 +474,9 @@ export class DrawableCanvas {
 
     this._editingElement = element;
     logger.debug('Entering canvas element edit mode', {
-      index: element.index,
+      uuid: element.uuid,
       type: describeElementType(element.type),
-      ...summarizeDrawableElements(this._elements),
+      ...summarizeDrawableElements(this.elements),
     });
     // Canvas stops intercepting pointer events so the DOM editor (chrome
     // contentEditable / inline text input) receives them.
@@ -526,7 +534,7 @@ export class DrawableCanvas {
     this.canvas.style.zIndex = '10';
     this.onElementEdit?.(null);
     logger.debug('Exited canvas element edit mode', {
-      index: element.index,
+      uuid: element.uuid,
       type: describeElementType(element.type),
     });
   }
@@ -541,10 +549,12 @@ export class DrawableCanvas {
     this.unsubBgPref?.();
     this.unsubBgPref = null;
     this._ydoc.elements.unobserveDeep(this._handleYElementsChange);
-    for (const element of this._elements) {
+    for (const element of this._elements.values()) {
       element.disposeDOM();
     }
-    this._elements = [];
+    this._elements.clear();
+    this._elementOrder = [];
+    this.invalidateOrderSnapshot();
     this._yMapToElement.clear();
     this.viewport.destroy();
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
@@ -591,7 +601,7 @@ export class DrawableCanvas {
     this.ctx.scale(zoom, zoom);
     this.ctx.translate(offset.x, offset.y);
 
-    for (const element of this._elements) {
+    for (const element of this.elements) {
       element.draw(this.ctx, deltaTime);
     }
     // Cursor: compute fresh from screen position so it's correct even if
@@ -616,7 +626,7 @@ export class DrawableCanvas {
       this.overlayCtx.scale(zoom, zoom);
       this.overlayCtx.translate(offset.x, offset.y);
       const editing = this._editingElement;
-      for (const element of this._elements) {
+      for (const element of this.elements) {
         element.drawSelectionOverlay(this.overlayCtx, element === editing);
       }
       this.overlayCtx.restore();
@@ -624,33 +634,44 @@ export class DrawableCanvas {
 
     const host = this._domOverlayHost;
     if (host) {
-      for (const element of this._elements) {
+      for (const element of this.elements) {
         element.syncDOM(this.viewport, host);
       }
     }
   }
 
   public get elements(): DrawableElement[] {
-    return this._elements;
+    if (!this._orderedSnapshot) {
+      const snapshot: DrawableElement[] = [];
+      for (const uuid of this._elementOrder) {
+        const element = this._elements.get(uuid);
+        if (element) {
+          snapshot.push(element);
+        }
+      }
+      this._orderedSnapshot = snapshot;
+    }
+    return this._orderedSnapshot;
+  }
+
+  public getElementByUuid(uuid: string): DrawableElement | null {
+    return this._elements.get(uuid) ?? null;
   }
 
   public getSelectedElements(): DrawableElement[] {
-    return this._elements.filter((element) => element.isSelected);
+    return this.elements.filter((element) => element.isSelected);
   }
 
   public clearSelection(): void {
-    for (const element of this._elements) {
+    for (const element of this._elements.values()) {
       element.unselect();
     }
   }
 
-  public selectElementsByIndex(indices: number[]): void {
-    const selected = new Set(indices);
+  public selectElementsByUuid(uuids: readonly string[]): void {
     this.clearSelection();
-    for (const element of this._elements) {
-      if (selected.has(element.index)) {
-        element.select();
-      }
+    for (const uuid of uuids) {
+      this._elements.get(uuid)?.select();
     }
   }
 
@@ -658,7 +679,7 @@ export class DrawableCanvas {
     if (this._editingElement || this._placement) {
       return;
     }
-    for (const element of this._elements) {
+    for (const element of this._elements.values()) {
       element.select();
     }
   }
@@ -675,8 +696,8 @@ export class DrawableCanvas {
     const position = Math.max(
       0,
       Math.min(
-        options?.position ?? (background ? 0 : this._elements.length),
-        this._elements.length,
+        options?.position ?? (background ? 0 : this._elementOrder.length),
+        this._elementOrder.length,
       ),
     );
 
@@ -688,8 +709,10 @@ export class DrawableCanvas {
       return null;
     }
 
-    this._elements.splice(position, 0, element);
+    this._elements.set(element.uuid, element);
+    this._elementOrder.splice(position, 0, element.uuid);
     this._yMapToElement.set(yMap, element);
+    this.invalidateOrderSnapshot();
     return element;
   }
 
@@ -785,12 +808,15 @@ export class DrawableCanvas {
   }
 
   /**
-   * Add a new element to the canvas. The factory receives the element index.
-   * The element is created locally, bound to a new Y.Map, and added to the Y.Array.
+   * Add a new element to the canvas. The factory receives a freshly generated
+   * uuid. The element is created locally, bound to a new Y.Map, and added to
+   * the Y.Array.
    */
-  public addElement<T extends DrawableElement>(factory: (i: number) => T): T {
-    const index = this._ydoc.nextIndex;
-    const element = factory(index);
+  public addElement<T extends DrawableElement>(
+    factory: (uuid: string) => T,
+  ): T {
+    const uuid = crypto.randomUUID();
+    const element = factory(uuid);
     this.configureElement(element);
 
     // Build the Y.Map properties from the element's current state
@@ -806,27 +832,24 @@ export class DrawableCanvas {
     // render on top of them).
     let yMap: Y.Map<unknown>;
     if (isBackgroundElement(element.type)) {
-      yMap = this._ydoc.insertElementMap(0, element.type, index, props);
-      this._elements.unshift(element);
+      yMap = this._ydoc.insertElementMap(0, element.type, uuid, props);
+      this._elementOrder.unshift(uuid);
     } else {
-      yMap = this._ydoc.createElementMap(element.type, index, props);
-      this._elements.push(element);
+      yMap = this._ydoc.createElementMap(element.type, uuid, props);
+      this._elementOrder.push(uuid);
     }
+    this._elements.set(uuid, element);
 
     // Bind element to its Y.Map
     element.bindToYMap(yMap);
     this._yMapToElement.set(yMap, element);
     this.bindElementSharedYState(element);
-
-    // Increment nextIndex
-    this._ydoc.transact(() => {
-      this._ydoc.nextIndex = index + 1;
-    });
+    this.invalidateOrderSnapshot();
 
     logger.debug('Added canvas element', {
-      index: element.index,
+      uuid: element.uuid,
       type: describeElementType(element.type),
-      ...summarizeDrawableElements(this._elements),
+      ...summarizeDrawableElements(this.elements),
     });
 
     return element;
@@ -838,15 +861,17 @@ export class DrawableCanvas {
       this._ydoc.removeElementMap(yMap);
       this._yMapToElement.delete(yMap);
     }
-    const idx = this._elements.indexOf(element);
-    if (idx >= 0) {
-      this._elements.splice(idx, 1);
+    if (this._elements.delete(element.uuid)) {
+      this._elementOrder = this._elementOrder.filter(
+        (uuid) => uuid !== element.uuid,
+      );
+      this.invalidateOrderSnapshot();
     }
     element.disposeDOM();
     logger.debug('Removed canvas element', {
-      index: element.index,
+      uuid: element.uuid,
       type: describeElementType(element.type),
-      ...summarizeDrawableElements(this._elements),
+      ...summarizeDrawableElements(this.elements),
     });
   }
 
@@ -854,7 +879,12 @@ export class DrawableCanvas {
     if (this._editingElement) {
       return;
     }
-    const selected = this._elements.filter((e) => e.isSelected);
+    const selected: DrawableElement[] = [];
+    for (const element of this._elements.values()) {
+      if (element.isSelected) {
+        selected.push(element);
+      }
+    }
     if (selected.length === 0) {
       return;
     }
@@ -868,17 +898,23 @@ export class DrawableCanvas {
         }
       }
     });
+    const removedUuids = new Set<string>();
     for (const e of selected) {
       e.disposeDOM();
+      this._elements.delete(e.uuid);
+      removedUuids.add(e.uuid);
     }
-    this._elements = this._elements.filter((e) => !selected.includes(e));
+    this._elementOrder = this._elementOrder.filter(
+      (uuid) => !removedUuids.has(uuid),
+    );
+    this.invalidateOrderSnapshot();
     this.updateBounding();
     logger.debug('Deleted selected canvas elements', {
       deletedElements: selected.map((element) => ({
-        index: element.index,
+        uuid: element.uuid,
         type: describeElementType(element.type),
       })),
-      ...summarizeDrawableElements(this._elements),
+      ...summarizeDrawableElements(this.elements),
     });
   }
 
@@ -898,7 +934,7 @@ export class DrawableCanvas {
 
   public switchTool(to: number) {
     this.toolSelected.interrupt(this);
-    for (const e of this._elements) {
+    for (const e of this._elements.values()) {
       e.unselect();
     }
     this.toolSelected = this.tools[to];
@@ -912,7 +948,7 @@ export class DrawableCanvas {
     let maxX = Number.MIN_VALUE;
     let maxY = Number.MIN_VALUE;
 
-    this._elements.forEach((element) => {
+    for (const element of this._elements.values()) {
       const rect = element.boundingBox;
       if (rect.left < minX) {
         minX = rect.left;
@@ -926,7 +962,7 @@ export class DrawableCanvas {
       if (rect.bottom > maxY) {
         maxY = rect.bottom;
       }
-    });
+    }
   }
 
   private drawPlacementGhost(ctx: CanvasRenderingContext2D, worldPos: Vector2) {

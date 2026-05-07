@@ -35,10 +35,10 @@ export function addPdfElementToYDoc(
   bytes: Uint8Array,
   fileName: string,
   pageSizes: PdfPageSize[] = [{ w: PAGE_WIDTH, h: PAGE_HEIGHT }],
-): number {
-  const index = ydoc.nextIndex;
+): string {
+  const uuid = crypto.randomUUID();
 
-  ydoc.insertElementMap(0, ElementType.PDF, index, {
+  ydoc.insertElementMap(0, ElementType.PDF, uuid, {
     offsetX: DEFAULT_PDF_IMPORT_OFFSET.x,
     offsetY: DEFAULT_PDF_IMPORT_OFFSET.y,
     scaleX: 1,
@@ -49,11 +49,7 @@ export function addPdfElementToYDoc(
     fileName,
   });
 
-  ydoc.transact(() => {
-    ydoc.nextIndex = Math.max(ydoc.nextIndex, index + 1);
-  });
-
-  return index;
+  return uuid;
 }
 
 export async function importPdfFile({

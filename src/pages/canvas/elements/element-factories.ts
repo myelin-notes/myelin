@@ -6,16 +6,16 @@ import { PdfElement } from './pdf-element';
 import { StrokeElement } from './stroke-element';
 import { TextElement } from './text-element';
 
-export type ElementFactory = (index: number) => DrawableElement;
+export type ElementFactory = (uuid: string) => DrawableElement;
 
 export const ELEMENT_FACTORIES: Record<ElementType, ElementFactory> = {
-  [ElementType.STROKE]: (index) =>
-    new StrokeElement(index, [], false, {
+  [ElementType.STROKE]: (uuid) =>
+    new StrokeElement(uuid, [], false, {
       color: 'black',
       size: 12,
     }),
-  [ElementType.TEXT]: (index) => new TextElement(index),
-  [ElementType.IMAGE]: (index) => new ImageElement(index),
-  [ElementType.PAGE_FRAME]: (index) => new PageFrameElement(index),
-  [ElementType.PDF]: (index) => new PdfElement(index),
+  [ElementType.TEXT]: (uuid) => new TextElement(uuid),
+  [ElementType.IMAGE]: (uuid) => new ImageElement(uuid),
+  [ElementType.PAGE_FRAME]: (uuid) => new PageFrameElement(uuid),
+  [ElementType.PDF]: (uuid) => new PdfElement(uuid),
 };

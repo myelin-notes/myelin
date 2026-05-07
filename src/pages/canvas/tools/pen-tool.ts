@@ -28,8 +28,11 @@ export class PenTool implements ITool {
 
   public start(canvas: DrawableCanvas, _event: PointerEvent): void {
     this.currentStroke = canvas.addElement(
-      (i) =>
-        new StrokeElement(i, [], false, { color: this.color, size: this.size }),
+      (uuid) =>
+        new StrokeElement(uuid, [], false, {
+          color: this.color,
+          size: this.size,
+        }),
     );
   }
 

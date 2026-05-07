@@ -127,9 +127,9 @@ export class TextTool implements ITool {
     boxWidth: number,
     boxHeight: number,
   ) {
-    const el = canvas.addElement((i) => {
+    const el = canvas.addElement((uuid) => {
       const te = new TextElement(
-        i,
+        uuid,
         '',
         {
           color: this.color,

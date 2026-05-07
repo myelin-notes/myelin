@@ -9,7 +9,7 @@ export async function markdownImportHandler(
   options: MediaImportOptions = {},
 ) {
   const text = await blob.text();
-  const pf = canvas.addElement((i) => new PageFrameElement(i));
+  const pf = canvas.addElement((uuid) => new PageFrameElement(uuid));
   const frag = pf.yXmlFragment;
   if (frag) {
     await writeMarkdownToPageFrameFragment(text, frag, {

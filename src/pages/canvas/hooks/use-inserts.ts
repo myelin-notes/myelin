@@ -53,7 +53,7 @@ export function useCanvasInserts({
       if (!dc) {
         return;
       }
-      const frame = dc.addElement((i) => new PageFrameElement(i));
+      const frame = dc.addElement((uuid) => new PageFrameElement(uuid));
       frame.setOffset(worldPos.x, worldPos.y);
       frame.updateBounds();
       dc.updateBounding();

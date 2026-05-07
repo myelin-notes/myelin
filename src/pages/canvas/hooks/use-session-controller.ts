@@ -138,7 +138,7 @@ export class CanvasSessionController {
           y: canvas.height / dpr / 2,
         });
         const frame = drawableCanvas.addElement(
-          (index) => new PageFrameElement(index),
+          (uuid) => new PageFrameElement(uuid),
         );
         frame.setOffset(
           centerWorld.x - frame.pageWidth / 2,

@@ -51,11 +51,11 @@ describe('NoteSession local change listeners', () => {
     const unsubscribe = session.subscribeLocalChanges(listener);
 
     ydoc.transact(() => {
-      ydoc.meta.set('nextIndex', 1);
+      ydoc.doc.getMap('test').set('value', 1);
     });
 
     const remoteDoc = new Y.Doc();
-    remoteDoc.getMap('meta').set('nextIndex', 2);
+    remoteDoc.getMap('test').set('value', 2);
     session.applyUpdate(
       Y.encodeStateAsUpdate(remoteDoc),
       REPOSITORY_SYNC_ORIGIN,
@@ -138,7 +138,7 @@ describe('NoteSession local change listeners', () => {
 
   it('treats delete-only canvas changes as unsynced and pushes them', async () => {
     const ydoc = new YDocManager();
-    const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 0, {
+    const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame-uuid', {
       offsetX: 0,
       offsetY: 0,
       scaleX: 1,

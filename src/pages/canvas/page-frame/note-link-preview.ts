@@ -73,12 +73,12 @@ function extractPreviewText(update: Uint8Array | null): string {
       continue;
     }
 
-    const index = yMap.get('index');
-    if (typeof index !== 'number') {
+    const uuid = yMap.get('uuid');
+    if (typeof uuid !== 'string') {
       continue;
     }
 
-    const fragment = ydoc.getXmlFragment(index);
+    const fragment = ydoc.getXmlFragment(uuid);
     if (fragment.length === 0) {
       continue;
     }

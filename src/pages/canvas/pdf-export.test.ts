@@ -76,12 +76,12 @@ function rect(x: number, y: number, width: number, height: number): DOMRect {
 }
 
 function overlayElement(
-  index: number,
+  uuid: string,
   boundingBox: DOMRect,
   hidden = false,
 ): PdfExportOverlayElement {
   return {
-    index,
+    uuid,
     boundingBox,
     hidden,
     draw: vi.fn(),
@@ -92,7 +92,7 @@ function exportSource(
   overrides: Partial<PdfElementExportSource> = {},
 ): PdfElementExportSource {
   return {
-    index: 10,
+    uuid: 'pdf-target',
     pdfBytes: new Uint8Array(),
     pages: [
       {
@@ -112,10 +112,10 @@ function exportSource(
 describe('PDF export overlay selection', () => {
   it('uses the PDF element bounding box to choose overlay candidates', () => {
     const source = exportSource();
-    const insideChrome = overlayElement(1, rect(0, -30, 20, 20));
-    const outside = overlayElement(2, rect(200, 200, 20, 20));
-    const sameElement = overlayElement(10, rect(0, 0, 20, 20));
-    const hidden = overlayElement(3, rect(0, 0, 20, 20), true);
+    const insideChrome = overlayElement('a', rect(0, -30, 20, 20));
+    const outside = overlayElement('b', rect(200, 200, 20, 20));
+    const sameElement = overlayElement('pdf-target', rect(0, 0, 20, 20));
+    const hidden = overlayElement('c', rect(0, 0, 20, 20), true);
 
     expect(
       getPdfOverlayCandidates(source, [
@@ -233,7 +233,7 @@ describe('PDF export bytes', () => {
 
     const exportBytes = createPdfExportBytes(
       exportSource({ pdfBytes: sourceBytes }),
-      [overlayElement(1, rect(20, 30, 10, 10))],
+      [overlayElement('overlay-1', rect(20, 30, 10, 10))],
     );
 
     await vi.waitFor(() => expect(toBytes).toHaveBeenCalledTimes(1));
