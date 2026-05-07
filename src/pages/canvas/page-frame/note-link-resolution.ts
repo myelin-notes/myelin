@@ -21,6 +21,8 @@ export type NoteLinkSearchSource = Pick<
 > &
   Partial<Pick<YjsSyncTarget, 'loadDocument'>>;
 
+export type PageFrameNameCache = Map<FileId, readonly string[]>;
+
 interface NoteLinkPathQuery {
   isPath: boolean;
   noteQuery: string;
@@ -165,6 +167,7 @@ export async function searchNoteLinkAutocompleteItems(
   query: string,
   limit: number,
   signal: AbortSignal,
+  frameNameCache?: PageFrameNameCache,
 ): Promise<readonly PageFrameAutocompleteItem[]> {
   const pageFrameQuery = parseNoteLinkPageFrameQuery(query);
   if (pageFrameQuery) {
@@ -173,6 +176,7 @@ export async function searchNoteLinkAutocompleteItems(
       pageFrameQuery,
       limit,
       signal,
+      frameNameCache,
     );
   }
 
@@ -242,8 +246,10 @@ async function searchNoteLinkPageFrameAutocompleteItems(
   query: NoteLinkPageFrameQuery,
   limit: number,
   signal: AbortSignal,
+  frameNameCache: PageFrameNameCache | undefined,
 ): Promise<readonly PageFrameAutocompleteItem[]> {
-  if (!repository.loadDocument) {
+  const loadDocument = repository.loadDocument;
+  if (!loadDocument) {
     return [];
   }
 
@@ -260,9 +266,16 @@ async function searchNoteLinkPageFrameAutocompleteItems(
   const normalizedFrameQuery = normalizePathQuery(query.pageFrameQuery);
   const matches = await Promise.all(
     noteItems.map(async (noteItem): Promise<PageFrameAutocompleteItem[]> => {
-      const snapshot = await repository.loadDocument!(noteItem.id);
+      const cached = frameNameCache?.get(noteItem.id);
+      let frameNames: readonly string[];
+      if (cached) {
+        frameNames = cached;
+      } else {
+        const snapshot = await loadDocument(noteItem.id);
+        frameNames = getPageFrameDisplayNames(snapshot.update);
+        frameNameCache?.set(noteItem.id, frameNames);
+      }
       const noteTarget = noteItem.insertText ?? noteItem.title;
-      const frameNames = getPageFrameDisplayNames(snapshot.update);
 
       return frameNames
         .filter((frameName) =>

@@ -4,6 +4,7 @@ import type { EditorView } from 'prosemirror-view';
 import { PM_UPDATE_EVENT } from '@/lib/events';
 import {
   type NoteLinkSearchSource,
+  type PageFrameNameCache,
   searchNoteLinkAutocompleteItems,
 } from './note-link-resolution';
 import {
@@ -71,6 +72,11 @@ export function usePageFrameAutocomplete({
   const [activeKind, setActiveKind] =
     useState<PageFrameAutocompleteKind | null>(null);
 
+  const frameNameCache = useMemo<PageFrameNameCache>(
+    () => new Map(),
+    [repository],
+  );
+
   const controller = useMemo(
     () =>
       new PageFrameAutocompleteController({
@@ -84,10 +90,11 @@ export function usePageFrameAutocomplete({
             query,
             limit,
             signal,
+            frameNameCache,
           );
         },
       }),
-    [repository],
+    [repository, frameNameCache],
   );
 
   useEffect(() => () => controller.dispose(), [controller]);
