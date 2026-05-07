@@ -40,7 +40,7 @@ export function RenameReferencesDialog({
       open={prompt !== null}
       onOpenChange={(open) => {
         if (!open && prompt) {
-          onChoice('no');
+          onChoice('cancel');
         }
       }}
     >

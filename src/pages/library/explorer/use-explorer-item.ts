@@ -6,7 +6,7 @@ import { UserPrefs } from '@/lib/user-prefs';
 
 const logger = new Logger('ExplorerItem');
 
-export type RenameReferencesChoice = 'always' | 'yes' | 'no';
+export type RenameReferencesChoice = 'always' | 'yes' | 'no' | 'cancel';
 
 export interface RenameReferencesPrompt {
   mentionCount: number;
@@ -147,6 +147,9 @@ export function useExplorerItem({
     }
 
     setPendingReferencesPrompt(null);
+    if (choice === 'cancel') {
+      return;
+    }
     if (choice === 'always') {
       UserPrefs.set('alwaysRenameNoteReferences', true);
     }
