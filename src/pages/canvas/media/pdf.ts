@@ -10,7 +10,7 @@ export async function pdfImportHandler(
 ) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const pageSizes = await getPdfPageSizes(bytes);
-  const pdf = canvas.addElement((i) => new PdfElement(i));
+  const pdf = canvas.addElement((uuid) => new PdfElement(uuid));
   const fileName = blob instanceof File ? blob.name : '';
   pdf.setInitialPdfData(bytes, fileName, pageSizes);
 

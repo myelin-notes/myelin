@@ -49,13 +49,13 @@ function readFirstPageFrameMarkdown(update: Uint8Array | null): string {
       continue;
     }
 
-    const index = yMap.get('index');
-    if (typeof index !== 'number') {
+    const uuid = yMap.get('uuid');
+    if (typeof uuid !== 'string') {
       continue;
     }
 
     return serializeDocToMarkdown(
-      yXmlFragmentToProseMirrorRootNode(ydoc.getXmlFragment(index), schema),
+      yXmlFragmentToProseMirrorRootNode(ydoc.getXmlFragment(uuid), schema),
     );
   }
 

@@ -41,12 +41,12 @@ export class StrokeElement extends DrawableElement {
   }
 
   public constructor(
-    index: number,
+    uuid: string,
     protected points: [number, number, number][],
     protected hasPressure: boolean,
     protected style: StrokeStyle,
   ) {
-    super(index, ElementType.STROKE);
+    super(uuid, ElementType.STROKE);
     this.box = new DOMRect(0, 0, 0, 0);
     this.cachedPath = new Path2D();
     this.cachedPoints = [];

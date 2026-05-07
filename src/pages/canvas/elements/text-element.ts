@@ -37,13 +37,13 @@ export class TextElement extends DrawableElement {
   private _cachedLineHeight: number = 0;
 
   public constructor(
-    index: number,
+    uuid: string,
     text: string = '',
     style: Partial<TextStyle> = {},
     boxWidth: number = DEFAULT_BOX_WIDTH,
     boxHeight: number = DEFAULT_BOX_HEIGHT,
   ) {
-    super(index, ElementType.TEXT);
+    super(uuid, ElementType.TEXT);
     this._text = text;
     this._style = { ...DEFAULT_STYLE, ...style };
     this._boxWidth = boxWidth;

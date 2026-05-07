@@ -77,24 +77,23 @@ export async function addMarkdownPageFrameToYDoc(
   ydoc: YDocManager,
   markdown: string,
   options: AddMarkdownPageFrameOptions = {},
-): Promise<number> {
+): Promise<string> {
   const doc = await buildMarkdownPageFrameDoc(markdown, options);
-  const index = ydoc.nextIndex;
-  ydoc.insertElementMap(0, ElementType.PAGE_FRAME, index, {
+  const uuid = crypto.randomUUID();
+  ydoc.insertElementMap(0, ElementType.PAGE_FRAME, uuid, {
     offsetX: options.offsetX ?? DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET.x,
     offsetY: options.offsetY ?? DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET.y,
     scaleX: 1,
     scaleY: 1,
-    displayName: normalizePageFrameDisplayName(index, options.displayName),
+    displayName: normalizePageFrameDisplayName(options.displayName),
     pageWidth: PAGE_WIDTH,
     pageHeight: PAGE_HEIGHT,
   });
 
-  const fragment = ydoc.getXmlFragment(index);
+  const fragment = ydoc.getXmlFragment(uuid);
   ydoc.transact(() => {
     replacePageFrameFragmentDoc(fragment, doc);
-    ydoc.nextIndex = Math.max(ydoc.nextIndex, index + 1);
   });
 
-  return index;
+  return uuid;
 }

@@ -8,7 +8,7 @@ export async function imageImportHandler(
   options: MediaImportOptions = {},
 ) {
   const data = await blob.arrayBuffer();
-  const img = canvas.addElement((i) => new ImageElement(i));
+  const img = canvas.addElement((uuid) => new ImageElement(uuid));
   await img.setImageData(data);
 
   // Place at given screen position (or center of viewport)

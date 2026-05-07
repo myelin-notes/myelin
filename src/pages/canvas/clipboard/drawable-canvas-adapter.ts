@@ -49,6 +49,10 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' ? value : fallback;
 }
 
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
 export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
   public constructor(
     private readonly drawableCanvasRef: RefObject<DrawableCanvas | null>,
@@ -76,7 +80,7 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
 
       return [
         {
-          index: element.index,
+          uuid: element.uuid,
           type: element.type,
           bounds: rectFromDomRect(element.boundingBox),
           yMap: element.yMap,
@@ -136,21 +140,18 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
       return null;
     }
 
-    const insertedIndices: number[] = [];
+    const insertedUuids: string[] = [];
     let backgroundCursor = canvas.elements.filter((element) =>
       isBackgroundElement(element.type),
     ).length;
 
     canvas.ydoc.transact(() => {
-      let nextIndex = canvas.ydoc.nextIndex;
-
       for (const sourceMap of sourceMaps) {
-        const originalIndex = asNumber(sourceMap.get('index'));
+        const originalUuid = asString(sourceMap.get('uuid'));
         const nextMap = cloneYMap(sourceMap);
-        const newIndex = nextIndex;
-        nextIndex += 1;
+        const newUuid = crypto.randomUUID();
 
-        nextMap.set('index', newIndex);
+        nextMap.set('uuid', newUuid);
         nextMap.set(
           'offsetX',
           asNumber(sourceMap.get('offsetX')) + placement.translate.x,
@@ -178,25 +179,23 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
           backgroundCursor += 1;
         }
 
-        if (type === ElementType.PAGE_FRAME) {
+        if (type === ElementType.PAGE_FRAME && originalUuid) {
           copyXmlFragmentInto(
-            canvas.ydoc.getXmlFragment(newIndex),
-            clipboardDoc.getXmlFragment(originalIndex),
+            canvas.ydoc.getXmlFragment(newUuid),
+            clipboardDoc.getXmlFragment(originalUuid),
           );
         }
 
-        insertedIndices.push(newIndex);
+        insertedUuids.push(newUuid);
       }
-
-      canvas.ydoc.nextIndex = nextIndex;
     });
 
-    if (insertedIndices.length === 0) {
+    if (insertedUuids.length === 0) {
       return null;
     }
 
-    canvas.selectElementsByIndex(insertedIndices);
+    canvas.selectElementsByUuid(insertedUuids);
     canvas.updateBounding();
-    return { pastedElementIndices: insertedIndices };
+    return { pastedElementUuids: insertedUuids };
   }
 }

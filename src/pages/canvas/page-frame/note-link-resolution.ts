@@ -116,14 +116,11 @@ function getPageFrameDisplayNames(update: Uint8Array | null): string[] {
       continue;
     }
 
-    const index = yMap.get('index');
-    if (typeof index !== 'number') {
+    if (typeof yMap.get('uuid') !== 'string') {
       continue;
     }
 
-    displayNames.push(
-      normalizePageFrameDisplayName(index, yMap.get('displayName')),
-    );
+    displayNames.push(normalizePageFrameDisplayName(yMap.get('displayName')));
   }
 
   return displayNames;

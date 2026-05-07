@@ -59,7 +59,7 @@ function createSnapshot(update: Uint8Array | null): YjsSyncSnapshot {
 function createPageFrameUpdate(displayNames: readonly string[]): Uint8Array {
   const ydoc = new YDocManager();
   displayNames.forEach((displayName, index) => {
-    ydoc.createElementMap(ElementType.PAGE_FRAME, index, {
+    ydoc.createElementMap(ElementType.PAGE_FRAME, `frame-${index}`, {
       offsetX: 0,
       offsetY: 0,
       scaleX: 1,

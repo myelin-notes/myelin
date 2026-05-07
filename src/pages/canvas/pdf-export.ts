@@ -9,7 +9,7 @@ const MAX_OVERLAY_PIXELS = 16_000_000;
 const MAX_OVERLAY_AXIS_PIXELS = 16_384;
 
 export interface PdfElementExportSource {
-  index: number;
+  uuid: string;
   pdfBytes: Uint8Array;
   pages: PdfElementExportPage[];
   offset: Vector2;
@@ -34,16 +34,16 @@ export interface PdfExportPage {
 
 export type PdfExportOverlayElement = Pick<
   DrawableElement,
-  'index' | 'boundingBox' | 'draw' | 'hidden'
+  'uuid' | 'boundingBox' | 'draw' | 'hidden'
 >;
 
 export function getPdfOverlayCandidates(
-  target: Pick<PdfElementExportSource, 'index' | 'boundingBox'>,
+  target: Pick<PdfElementExportSource, 'uuid' | 'boundingBox'>,
   elements: readonly PdfExportOverlayElement[],
 ): PdfExportOverlayElement[] {
   return elements.filter(
     (element) =>
-      element.index !== target.index &&
+      element.uuid !== target.uuid &&
       !element.hidden &&
       rectsIntersect(element.boundingBox, target.boundingBox),
   );

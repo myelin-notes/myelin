@@ -17,33 +17,22 @@ export type SyncOrigin = LocalOrigin | PeerOrigin | RepositorySyncOrigin;
  * ## Structure
  * ```
  * Y.Doc
- * ├── Y.Map('meta')          → { nextIndex: number }
- * ├── Y.Array('elements')    → [ Y.Map, ... ]  per element
- * └── Y.XmlFragment('pf-N')  → one per PageFrameElement, keyed by element index
+ * ├── Y.Array('elements')      → [ Y.Map, ... ]  per element
+ * └── Y.XmlFragment('pf-<uuid>') → one per PageFrameElement, keyed by element uuid
  * ```
  */
 export class YDocManager {
   public readonly doc: Y.Doc;
-  public readonly meta: Y.Map<unknown>;
   public readonly elements: Y.Array<Y.Map<unknown>>;
   public readonly undoManager: Y.UndoManager;
 
   constructor(doc?: Y.Doc) {
     this.doc = doc ?? new Y.Doc();
-    this.meta = this.doc.getMap('meta');
     this.elements = this.doc.getArray('elements');
     this.undoManager = new Y.UndoManager([this.elements], {
       trackedOrigins: new Set([LOCAL_ORIGIN]),
       captureTimeout: 500,
     });
-  }
-
-  get nextIndex(): number {
-    return (this.meta.get('nextIndex') as number) ?? 0;
-  }
-
-  set nextIndex(value: number) {
-    this.meta.set('nextIndex', value);
   }
 
   /**
@@ -52,13 +41,13 @@ export class YDocManager {
    */
   createElementMap(
     type: ElementType,
-    index: number,
+    uuid: string,
     props: Record<string, unknown>,
   ): Y.Map<unknown> {
     const yMap = new Y.Map<unknown>();
     this.doc.transact(() => {
       yMap.set('type', type);
-      yMap.set('index', index);
+      yMap.set('uuid', uuid);
       for (const [key, value] of Object.entries(props)) {
         yMap.set(key, value);
       }
@@ -74,13 +63,13 @@ export class YDocManager {
   insertElementMap(
     position: number,
     type: ElementType,
-    index: number,
+    uuid: string,
     props: Record<string, unknown>,
   ): Y.Map<unknown> {
     const yMap = new Y.Map<unknown>();
     this.doc.transact(() => {
       yMap.set('type', type);
-      yMap.set('index', index);
+      yMap.set('uuid', uuid);
       for (const [key, value] of Object.entries(props)) {
         yMap.set(key, value);
       }
@@ -112,12 +101,11 @@ export class YDocManager {
   /**
    * Get or create the Y.XmlFragment for a PageFrame's ProseMirror content.
    *
-   * The fragment key uses the stable element index rather than the element's
-   * current position in the Y.Array, so page content stays attached across
-   * reordering and deletion of other elements.
+   * The fragment key uses the element's stable uuid, so page content stays
+   * attached across reordering and deletion of other elements.
    */
-  getXmlFragment(elementIndex: number): Y.XmlFragment {
-    return this.doc.getXmlFragment(`pf-${elementIndex}`);
+  getXmlFragment(elementUuid: string): Y.XmlFragment {
+    return this.doc.getXmlFragment(`pf-${elementUuid}`);
   }
 
   /** Wrap a mutation in a transaction with the local origin. */

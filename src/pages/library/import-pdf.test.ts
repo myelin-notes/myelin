@@ -69,11 +69,10 @@ describe('PDF library import', () => {
     expect(session.save).toHaveBeenCalledTimes(1);
     expect(session.close).toHaveBeenCalledTimes(1);
 
-    expect(ydoc.nextIndex).toBe(1);
     expect(ydoc.elements.length).toBe(1);
     const pdfElement = ydoc.elements.get(0);
     expect(pdfElement.get('type')).toBe(ElementType.PDF);
-    expect(pdfElement.get('index')).toBe(0);
+    expect(typeof pdfElement.get('uuid')).toBe('string');
     expect(pdfElement.get('offsetX')).toBe(160);
     expect(pdfElement.get('offsetY')).toBe(80);
     expect(pdfElement.get('scaleX')).toBe(1);

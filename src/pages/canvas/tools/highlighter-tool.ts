@@ -33,8 +33,8 @@ export class HighlighterTool extends PenTool {
 
   public start(canvas: DrawableCanvas, _event: PointerEvent): void {
     this.currentStroke = canvas.addElement(
-      (i) =>
-        new StrokeElement(i, [], false, {
+      (uuid) =>
+        new StrokeElement(uuid, [], false, {
           color: hexToRgba(this.color, 0.3),
           size: this.size,
         }),

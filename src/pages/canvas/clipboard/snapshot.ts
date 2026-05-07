@@ -130,7 +130,7 @@ export function buildCanvasClipboardSnapshot(
       clipboardDoc.elements.push([cloneYMap(item.yMap)]);
       if (item.pageFrameFragment) {
         copyXmlFragmentInto(
-          clipboardDoc.getXmlFragment(item.index),
+          clipboardDoc.getXmlFragment(item.uuid),
           item.pageFrameFragment,
         );
       }

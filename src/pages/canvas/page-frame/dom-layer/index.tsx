@@ -151,13 +151,13 @@ function disposeFrameRefs(refs: FrameRefs): void {
 }
 
 function removeStaleFrames(
-  frameMap: Map<number, FrameRefs>,
-  activeFrames: ReadonlyMap<number, PageFrameElement>,
+  frameMap: Map<string, FrameRefs>,
+  activeFrames: ReadonlyMap<string, PageFrameElement>,
 ): void {
-  for (const [index, refs] of frameMap) {
-    if (activeFrames.get(index) !== refs.frame) {
+  for (const [uuid, refs] of frameMap) {
+    if (activeFrames.get(uuid) !== refs.frame) {
       disposeFrameRefs(refs);
-      frameMap.delete(index);
+      frameMap.delete(uuid);
     }
   }
 }
@@ -216,7 +216,7 @@ function unionRects(rects: DOMRect[]): DOMRect {
 }
 
 function getNoteLinkPreviewTargetAtPoint(
-  frameMap: ReadonlyMap<number, FrameRefs>,
+  frameMap: ReadonlyMap<string, FrameRefs>,
   clientX: number,
   clientY: number,
 ): NoteLinkPreviewHit | null {
@@ -283,7 +283,7 @@ export function PageFrameDomLayer({
       : null;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const frameMap = useRef<Map<number, FrameRefs>>(new Map());
+  const frameMap = useRef<Map<string, FrameRefs>>(new Map());
   const getPreviewTargetAtPoint = useCallback(
     (clientX: number, clientY: number) =>
       getNoteLinkPreviewTargetAtPoint(frameMap.current, clientX, clientY),
@@ -311,20 +311,20 @@ export function PageFrameDomLayer({
       const frames = dc.getElementsByType(
         ElementType.PAGE_FRAME,
       ) as PageFrameElement[];
-      const activeFrames = new Map<number, PageFrameElement>();
+      const activeFrames = new Map<string, PageFrameElement>();
 
       for (const frame of frames) {
-        activeFrames.set(frame.index, frame);
+        activeFrames.set(frame.uuid, frame);
 
-        let refs = frameMap.current.get(frame.index);
+        let refs = frameMap.current.get(frame.uuid);
         if (refs && refs.frame !== frame) {
           disposeFrameRefs(refs);
-          frameMap.current.delete(frame.index);
+          frameMap.current.delete(frame.uuid);
           refs = undefined;
         }
         if (!refs) {
           refs = createFrameRefs(frame, container);
-          frameMap.current.set(frame.index, refs);
+          frameMap.current.set(frame.uuid, refs);
         }
         const screenX = snapToDevicePixel((frame.offset.x + offset.x) * zoom);
         const screenY = snapToDevicePixel((frame.offset.y + offset.y) * zoom);
