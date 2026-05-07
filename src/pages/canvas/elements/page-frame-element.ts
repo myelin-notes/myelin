@@ -342,8 +342,11 @@ export class PageFrameElement extends DrawableElement {
     // and menu close both paint smoothly while the doc is processed.
     const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
     try {
+      const safeName =
+        this._displayName.replace(/[/\\:*?"<>|\x00-\x1f]/g, '-').trim() ||
+        DEFAULT_PAGE_FRAME_DISPLAY_NAME;
       const path = await save({
-        defaultPath: `${this._displayName}.md`,
+        defaultPath: `${safeName}.md`,
         filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
       });
       if (!path) {
