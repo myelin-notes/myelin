@@ -2,11 +2,10 @@ import {
   prosemirrorToYXmlFragment,
   yXmlFragmentToProseMirrorRootNode,
 } from 'y-prosemirror';
-import * as Y from 'yjs';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { renameNoteLinkReferencesDoc } from '@/pages/canvas/page-frame/pm/markdown/note-links';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
-import { createDocFromBytes } from './shared';
+import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import type { FileId, NoteBacklink, Repository } from './types';
 
 type NoteReferenceRepository = Pick<
@@ -20,16 +19,15 @@ export interface RenameNoteReferencesResult {
 }
 
 function renameReferencesInDoc(
-  doc: Y.Doc,
+  ydoc: YDocManager,
   noteId: FileId,
   newName: string,
 ): number {
-  const elements = doc.getArray<Y.Map<unknown>>('elements');
   let linkCount = 0;
 
-  doc.transact(() => {
-    for (let i = 0; i < elements.length; i++) {
-      const yMap = elements.get(i);
+  ydoc.transact(() => {
+    for (let i = 0; i < ydoc.elements.length; i++) {
+      const yMap = ydoc.elements.get(i);
       if (yMap.get('type') !== ElementType.PAGE_FRAME) {
         continue;
       }
@@ -39,7 +37,7 @@ function renameReferencesInDoc(
         continue;
       }
 
-      const fragment = doc.getXmlFragment(`pf-${index}`);
+      const fragment = ydoc.getXmlFragment(index);
       if (fragment.length === 0) {
         continue;
       }
@@ -92,13 +90,13 @@ export async function renameNoteReferences(
       continue;
     }
 
-    const doc = createDocFromBytes(bytes);
-    const sourceLinkCount = renameReferencesInDoc(doc, noteId, newName);
+    const ydoc = YDocManager.fromUpdate(bytes);
+    const sourceLinkCount = renameReferencesInDoc(ydoc, noteId, newName);
     if (sourceLinkCount === 0) {
       continue;
     }
 
-    await repository.writeFileBytes(sourceId, Y.encodeStateAsUpdate(doc));
+    await repository.writeFileBytes(sourceId, ydoc.encodeState());
     sourceCount++;
     linkCount += sourceLinkCount;
   }
