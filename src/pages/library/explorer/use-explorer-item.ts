@@ -84,6 +84,8 @@ export function useExplorerItem({
   };
 
   const handleRename = async () => {
+    // Guards re-entry: handleRename runs on Enter and onBlur. When it sets
+    // renaming=false the input unmounts, firing onBlur and re-invoking this.
     if (renameInFlightRef.current) {
       return;
     }
