@@ -160,6 +160,9 @@ export class YDocManager {
 
     let cleared = 0;
     this.doc.transact(() => {
+      // `doc.share` is a Yjs internal (not part of the documented API). If a
+      // future Yjs upgrade renames or removes it, the sweep silently becomes a
+      // no-op — there's no public way to enumerate root types today.
       for (const key of this.doc.share.keys()) {
         if (!key.startsWith('pf-')) continue;
         const uuid = key.slice(3);
