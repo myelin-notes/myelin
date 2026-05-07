@@ -3,7 +3,11 @@ import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import type { FileId } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
-import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
+import {
+  normalizePageFrameDisplayName,
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+} from '../elements/page-frame-constants';
 import type { YDocManager } from '../ydoc-manager';
 import { parseMarkdownToDoc } from './markdown-parser';
 import {
@@ -26,6 +30,7 @@ interface MarkdownPageFrameImportOptions {
 interface AddMarkdownPageFrameOptions extends MarkdownPageFrameImportOptions {
   offsetX?: number;
   offsetY?: number;
+  displayName?: string;
 }
 
 async function buildMarkdownPageFrameDoc(
@@ -80,6 +85,7 @@ export async function addMarkdownPageFrameToYDoc(
     offsetY: options.offsetY ?? DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET.y,
     scaleX: 1,
     scaleY: 1,
+    displayName: normalizePageFrameDisplayName(index, options.displayName),
     pageWidth: PAGE_WIDTH,
     pageHeight: PAGE_HEIGHT,
   });

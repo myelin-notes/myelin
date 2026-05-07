@@ -108,7 +108,12 @@ function createFrameRefs(
   const chrome = new FrameChrome({
     kindLabel: 'NOTE',
     getMenuItems: () => frame.getMenuItems(),
+    onTitleCommit: (title) => {
+      frame.setDisplayName(title);
+      return frame.displayName;
+    },
   });
+  chrome.setFileName(frame.displayName);
 
   const frameDiv = document.createElement('div');
   Object.assign(frameDiv.style, FRAME_STYLE);
@@ -325,6 +330,7 @@ export function PageFrameDomLayer({
         const screenY = snapToDevicePixel((frame.offset.y + offset.y) * zoom);
 
         const pageWidth = frame.pageWidth;
+        refs.chrome.setFileName(frame.displayName);
         refs.chrome.sync({
           screenX,
           screenY,
