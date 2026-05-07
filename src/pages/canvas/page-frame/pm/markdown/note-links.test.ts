@@ -3,12 +3,15 @@ import type { EditorView } from 'prosemirror-view';
 import { describe, expect, it, vi } from 'vitest';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { parseMarkdownToDoc } from '../../markdown-parser';
+import { serializeDocToMarkdown } from '../../markdown-serializer';
 import { schema } from '../schema';
 import {
   buildNormalizedNoteLinkTransaction,
   buildResolvedNoteLinkTransaction,
   normalizeAndResolveNoteLinksDoc,
   noteLinkMarkdownPlugin,
+  renameNoteLinkReferencesDoc,
+  renameNoteLinkReferenceTitle,
 } from './note-links';
 
 function createEditorState(doc = schema.nodes.doc.createAndFill()!) {
@@ -155,6 +158,36 @@ describe('noteLinkMarkdownPlugin', () => {
         },
       ],
     });
+  });
+
+  it('renames resolved note-link references while preserving suffixes', async () => {
+    const doc = await normalizeAndResolveNoteLinksDoc(
+      parseMarkdownToDoc(
+        'See [[Projects/Alpha Note#Draft|alias]] and [[Other]].',
+        schema,
+      ),
+      schema,
+      async (title) =>
+        title.startsWith('Projects/Alpha Note') ? 'note-1' : null,
+    );
+
+    const result = renameNoteLinkReferencesDoc(
+      doc,
+      schema,
+      'note-1',
+      'Renamed Note',
+    );
+
+    expect(result.count).toBe(1);
+    expect(serializeDocToMarkdown(result.doc)).toBe(
+      'See [[Projects/Renamed Note#Draft|alias]] and [[Other]].\n',
+    );
+  });
+
+  it('renames the last path segment in note-link titles', () => {
+    expect(
+      renameNoteLinkReferenceTitle('Archive/Alpha#Research|display', 'Beta'),
+    ).toBe('Archive/Beta#Research|display');
   });
 
   it('requests navigation to the note link on cmd-click', () => {

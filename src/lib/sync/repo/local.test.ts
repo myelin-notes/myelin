@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
+import { ElementType } from '@/pages/canvas/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
+import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown-serializer';
+import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
   createNoteState,
@@ -8,6 +12,7 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { LocalRepository } from './local';
+import { renameNoteReferences } from './rename-note-references';
 import {
   createEmptyManifest,
   createFileNode,
@@ -30,6 +35,31 @@ async function createCanvasNoteState(
     update: ydoc.encodeState(),
     stateVector: ydoc.encodeStateVector(),
   };
+}
+
+function readFirstPageFrameMarkdown(update: Uint8Array | null): string {
+  if (!update || update.byteLength === 0) {
+    return '';
+  }
+
+  const ydoc = YDocManager.fromUpdate(update);
+  for (let i = 0; i < ydoc.elements.length; i++) {
+    const yMap = ydoc.elements.get(i);
+    if (yMap.get('type') !== ElementType.PAGE_FRAME) {
+      continue;
+    }
+
+    const index = yMap.get('index');
+    if (typeof index !== 'number') {
+      continue;
+    }
+
+    return serializeDocToMarkdown(
+      yXmlFragmentToProseMirrorRootNode(ydoc.getXmlFragment(index), schema),
+    );
+  }
+
+  return '';
 }
 
 describe('LocalRepository', () => {
@@ -126,6 +156,41 @@ describe('LocalRepository', () => {
     await repository.deleteNode(sourceId);
 
     expect(await repository.getBacklinks(targetId)).toEqual([]);
+  });
+
+  it('renames note references from backlink sources', async () => {
+    const repository = new LocalRepository(
+      'repositories/reference-rename-test',
+    );
+    await repository.initialize();
+
+    const sourceId = await repository.createFile('Source', 'mcanvas', null);
+    const targetId = await repository.createFile('Target', 'mcanvas', null);
+    const note = await createCanvasNoteState(
+      'See [[Target]] and [[Projects/Target#Frame|alias]].',
+      async (title) => (title.includes('Target') ? targetId : null),
+    );
+
+    await repository.pushUpdates(sourceId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const backlinks = await repository.getBacklinks(targetId);
+    await repository.renameNode(targetId, 'Renamed Target');
+
+    await expect(
+      renameNoteReferences(repository, targetId, 'Renamed Target', backlinks),
+    ).resolves.toEqual({ sourceCount: 1, linkCount: 2 });
+
+    expect(
+      readFirstPageFrameMarkdown(await repository.readFileBytes(sourceId)),
+    ).toBe(
+      'See [[Renamed Target]] and [[Projects/Renamed Target#Frame|alias]].\n',
+    );
+    expect(
+      (await repository.getBacklinks(targetId)).map((link) => link.title),
+    ).toEqual(['Renamed Target', 'Projects/Renamed Target#Frame|alias']);
   });
 
   it('stores image files as regular VFS file nodes', async () => {

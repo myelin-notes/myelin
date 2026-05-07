@@ -8,6 +8,7 @@ import { openNote } from '@/lib/note-navigation';
 import { useRepository, type VFSFileNode } from '@/lib/sync';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
+import { RenameReferencesDialog } from './rename-references-dialog';
 import { useExplorerItem } from './use-explorer-item';
 
 interface FileItemProps {
@@ -27,11 +28,14 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
     handleRemove,
     handleDragStart,
     renameInputProps,
+    renameReferencesPrompt,
+    chooseRenameReferences,
   } = useExplorerItem({
     nodeId: file.id,
     name: file.name,
     onChanged,
     initialRenaming: autoRename,
+    renameReferencesOnRename: file.fileType === 'mcanvas',
   });
 
   return (
@@ -104,6 +108,10 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
         nodeId={file.id}
         nodeName={file.name}
         onChanged={onChanged}
+      />
+      <RenameReferencesDialog
+        prompt={renameReferencesPrompt}
+        onChoice={chooseRenameReferences}
       />
     </>
   );

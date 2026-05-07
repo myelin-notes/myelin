@@ -37,6 +37,11 @@ interface NoteLinkTarget {
   noteId: FileId | null;
 }
 
+export interface RenameNoteLinkReferencesResult {
+  doc: PMNode;
+  count: number;
+}
+
 export const NOTE_LINK_SELECTOR = '[data-note-link-title]';
 
 export interface NoteLinkOpenRequestDetail {
@@ -399,6 +404,65 @@ export function buildResolvedNoteLinkTransaction(
 
   tr.setMeta(PM_ADD_TO_HISTORY, false);
   return tr;
+}
+
+export function renameNoteLinkReferenceTitle(
+  title: string,
+  newName: string,
+): string {
+  const aliasIndex = title.indexOf('|');
+  const target = aliasIndex === -1 ? title : title.slice(0, aliasIndex);
+  const alias = aliasIndex === -1 ? '' : title.slice(aliasIndex);
+  const frameIndex = target.indexOf('#');
+  const noteTarget = frameIndex === -1 ? target : target.slice(0, frameIndex);
+  const frame = frameIndex === -1 ? '' : target.slice(frameIndex);
+  const pathSegments = noteTarget.split('/');
+  pathSegments[pathSegments.length - 1] = newName;
+  return `${pathSegments.join('/')}${frame}${alias}`;
+}
+
+export function renameNoteLinkReferencesDoc(
+  doc: PMNode,
+  schema: Schema,
+  noteId: FileId,
+  newName: string,
+): RenameNoteLinkReferencesResult {
+  const noteLinkType = schema.marks.noteLink;
+  if (!noteLinkType) {
+    return { doc, count: 0 };
+  }
+
+  const state = EditorState.create({ schema, doc });
+  const targets = collectDocumentNoteLinks(state.doc, schema)
+    .filter((target) => target.noteId === noteId)
+    .sort((left, right) => right.from - left.from);
+  if (targets.length === 0) {
+    return { doc, count: 0 };
+  }
+
+  const tr = state.tr;
+  let count = 0;
+  for (const target of targets) {
+    const nextTitle = renameNoteLinkReferenceTitle(target.title, newName);
+    if (nextTitle === target.title) {
+      continue;
+    }
+
+    tr.replaceWith(
+      target.from,
+      target.to,
+      schema.text(`[[${nextTitle}]]`, [
+        noteLinkType.create({ title: nextTitle, noteId }),
+      ]),
+    );
+    count++;
+  }
+
+  if (count === 0) {
+    return { doc, count: 0 };
+  }
+
+  return { doc: state.apply(tr).doc, count };
 }
 
 export function noteLinkMarkdownPlugin(

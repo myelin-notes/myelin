@@ -136,6 +136,14 @@ const zhHans: typeof en = {
       revealInFileManager: '在文件管理器中显示',
       remove: '移除',
     },
+    renameReferencesDialog: {
+      title: '更新链接提及？',
+      description: (mentionCount: number, noteCount: number) =>
+        `将改写 ${noteCount} 篇其他笔记中的 ${mentionCount} 处链接提及，使其与新名称一致。`,
+      always: '始终更新且不再询问',
+      yes: '更新',
+      no: '跳过',
+    },
     tagDialog: {
       title: '管理标签',
       description: (name: string) => `${name} 的标签`,
@@ -177,6 +185,10 @@ const zhHans: typeof en = {
         label: (key: string) => `需要按住 ${key} 才能打开链接`,
         description: (key: string) =>
           `关闭时，单击即可打开笔记链接和超链接。开启时，需按住 ${key} 才能打开，普通单击仅用于定位光标。`,
+      },
+      renameReferences: {
+        label: '重命名笔记后始终更新链接',
+        description: '关闭时，笔记重命名后 Myelin 会先询问是否更改链接提及。',
       },
     },
     repository: {
