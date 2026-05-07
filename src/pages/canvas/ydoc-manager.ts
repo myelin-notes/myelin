@@ -8,6 +8,8 @@ export const PEER_ORIGIN = 'remote-peer' as const;
 export type PeerOrigin = typeof PEER_ORIGIN;
 export const REPOSITORY_SYNC_ORIGIN = 'repository-sync' as const;
 export type RepositorySyncOrigin = typeof REPOSITORY_SYNC_ORIGIN;
+export const FRAGMENT_SWEEP_ORIGIN = 'fragment-sweep' as const;
+export type FragmentSweepOrigin = typeof FRAGMENT_SWEEP_ORIGIN;
 export type SyncOrigin = LocalOrigin | PeerOrigin | RepositorySyncOrigin;
 
 /**
@@ -128,6 +130,44 @@ export class YDocManager {
   /** Wrap a mutation in a transaction with the local origin. */
   transact(fn: () => void): void {
     this.doc.transact(fn, LOCAL_ORIGIN);
+  }
+
+  /**
+   * Clear `pf-<uuid>` XML fragments whose uuid no longer matches a live page
+   * frame in the elements array. Concurrent edit-while-delete races can leave
+   * items in a fragment that the deleter's delete-set never covered; this
+   * mops them up so they don't accumulate in the persisted doc.
+   *
+   * Runs under {@link FRAGMENT_SWEEP_ORIGIN} so the cleared content is not
+   * captured by the canvas UndoManager (orphan content has no element to
+   * restore it onto). Returns the number of fragments cleared.
+   */
+  sweepOrphanPageFrameFragments(): number {
+    const liveUuids = new Set<string>();
+    for (let i = 0; i < this.elements.length; i++) {
+      const yMap = this.elements.get(i);
+      if (yMap.get('type') === ElementType.PAGE_FRAME) {
+        const uuid = yMap.get('uuid');
+        if (typeof uuid === 'string') {
+          liveUuids.add(uuid);
+        }
+      }
+    }
+
+    let cleared = 0;
+    this.doc.transact(() => {
+      for (const key of this.doc.share.keys()) {
+        if (!key.startsWith('pf-')) continue;
+        const uuid = key.slice(3);
+        if (liveUuids.has(uuid)) continue;
+        const fragment = this.doc.getXmlFragment(key);
+        if (fragment.length > 0) {
+          fragment.delete(0, fragment.length);
+          cleared++;
+        }
+      }
+    }, FRAGMENT_SWEEP_ORIGIN);
+    return cleared;
   }
 
   /** Encode the full document state for persistence. */

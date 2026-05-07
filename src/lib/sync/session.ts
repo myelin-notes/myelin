@@ -270,6 +270,7 @@ export class NoteSession {
       ...summarizeYDocManager(this.ydoc),
     });
     await this.runWithPhase('pushing', async () => {
+      this.ydoc.sweepOrphanPageFrameFragments();
       for (let attempt = 0; attempt < 4; attempt++) {
         if (targetChangeEpoch === this.flushedEpoch) {
           logger.debug('Skipped note session push; already synced', {

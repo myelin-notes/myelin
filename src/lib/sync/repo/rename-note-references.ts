@@ -96,6 +96,7 @@ export async function renameNoteReferences(
       continue;
     }
 
+    ydoc.sweepOrphanPageFrameFragments();
     await repository.writeFileBytes(sourceId, ydoc.encodeState());
     sourceCount++;
     linkCount += sourceLinkCount;

@@ -72,3 +72,82 @@ describe('YDocManager.removeElementMap', () => {
     expect(restored.toString()).toContain('keep me');
   });
 });
+
+describe('YDocManager.sweepOrphanPageFrameFragments', () => {
+  it('clears fragments whose uuid no longer matches any element', () => {
+    const ydoc = new YDocManager();
+    // Manually create an orphan: fragment exists but no element references it.
+    const orphan = ydoc.getXmlFragment('ghost-1');
+    orphan.insert(0, [withParagraph('orphan content')]);
+    expect(orphan.length).toBe(1);
+
+    const cleared = ydoc.sweepOrphanPageFrameFragments();
+
+    expect(cleared).toBe(1);
+    expect(orphan.length).toBe(0);
+  });
+
+  it('leaves fragments belonging to live page frames alone', () => {
+    const ydoc = new YDocManager();
+    ydoc.createElementMap(ElementType.PAGE_FRAME, 'live-1', {});
+    const live = ydoc.getXmlFragment('live-1');
+    live.insert(0, [withParagraph('live content')]);
+
+    const cleared = ydoc.sweepOrphanPageFrameFragments();
+
+    expect(cleared).toBe(0);
+    expect(live.length).toBe(1);
+  });
+
+  it('only touches fragments with the pf- prefix', () => {
+    const ydoc = new YDocManager();
+    const stranger = ydoc.doc.getXmlFragment('not-a-page-frame');
+    stranger.insert(0, [withParagraph('keep me')]);
+
+    ydoc.sweepOrphanPageFrameFragments();
+
+    expect(stranger.length).toBe(1);
+  });
+
+  it('mops up concurrent edit-while-delete orphans across two peers', () => {
+    // Simulate two peers, A and B. Both start with the same page frame.
+    const a = new YDocManager();
+    const b = new YDocManager();
+    const yMap = a.createElementMap(ElementType.PAGE_FRAME, 'frame-1', {});
+    a.getXmlFragment('frame-1').insert(0, [withParagraph('initial')]);
+    b.applyUpdate(Y.encodeStateAsUpdate(a.doc));
+
+    // A deletes the frame. B concurrently appends a paragraph to the fragment.
+    a.removeElementMap(yMap);
+    b.getXmlFragment('frame-1').insert(1, [withParagraph('B was here')]);
+
+    // Sync both ways.
+    const aSv = Y.encodeStateVector(a.doc);
+    const bSv = Y.encodeStateVector(b.doc);
+    a.applyUpdate(Y.encodeStateAsUpdate(b.doc, aSv));
+    b.applyUpdate(Y.encodeStateAsUpdate(a.doc, bSv));
+
+    // After merge, the element is gone on both sides but B's late insert
+    // survives in the fragment as an orphan.
+    expect(a.elements.length).toBe(0);
+    expect(b.elements.length).toBe(0);
+    expect(a.getXmlFragment('frame-1').length).toBeGreaterThan(0);
+    expect(b.getXmlFragment('frame-1').length).toBeGreaterThan(0);
+
+    // Sweep on save — A persists, then sync.
+    const cleared = a.sweepOrphanPageFrameFragments();
+    expect(cleared).toBe(1);
+    expect(a.getXmlFragment('frame-1').length).toBe(0);
+
+    b.applyUpdate(Y.encodeStateAsUpdate(a.doc, Y.encodeStateVector(b.doc)));
+    expect(b.getXmlFragment('frame-1').length).toBe(0);
+  });
+
+  it('does not clear when called on a doc with no orphans', () => {
+    const ydoc = new YDocManager();
+    ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame-1', {});
+    ydoc.getXmlFragment('frame-1').insert(0, [withParagraph('alive')]);
+
+    expect(ydoc.sweepOrphanPageFrameFragments()).toBe(0);
+  });
+});
