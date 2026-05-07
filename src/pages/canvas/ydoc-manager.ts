@@ -10,7 +10,11 @@ export const REPOSITORY_SYNC_ORIGIN = 'repository-sync' as const;
 export type RepositorySyncOrigin = typeof REPOSITORY_SYNC_ORIGIN;
 export const FRAGMENT_SWEEP_ORIGIN = 'fragment-sweep' as const;
 export type FragmentSweepOrigin = typeof FRAGMENT_SWEEP_ORIGIN;
-export type SyncOrigin = LocalOrigin | PeerOrigin | RepositorySyncOrigin;
+export type SyncOrigin =
+  | LocalOrigin
+  | PeerOrigin
+  | RepositorySyncOrigin
+  | FragmentSweepOrigin;
 
 /**
  * Owns a Y.Doc for a single canvas file and provides typed access

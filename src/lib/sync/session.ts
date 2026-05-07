@@ -1,6 +1,7 @@
 import { Logger } from '@/lib/logger';
 import { summarizeYDocManager } from '@/lib/note-state-summary';
 import {
+  FRAGMENT_SWEEP_ORIGIN,
   PEER_ORIGIN,
   REPOSITORY_SYNC_ORIGIN,
   type SyncOrigin,
@@ -525,5 +526,9 @@ export class NoteSession {
 }
 
 function isRemoteSyncOrigin(origin: unknown): origin is SyncOrigin {
-  return origin === PEER_ORIGIN || origin === REPOSITORY_SYNC_ORIGIN;
+  return (
+    origin === PEER_ORIGIN ||
+    origin === REPOSITORY_SYNC_ORIGIN ||
+    origin === FRAGMENT_SWEEP_ORIGIN
+  );
 }
