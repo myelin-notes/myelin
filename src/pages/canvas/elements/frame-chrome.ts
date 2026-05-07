@@ -13,6 +13,9 @@
  * that lives above the canvas. Its position is synced every frame.
  */
 
+import { Pencil as PencilIcon } from 'lucide-react';
+import { type ChromeMenuItem, openChromeMenu } from '../chrome-menu';
+
 export const CHROME_SIDE_PADDING = 20;
 export const CHROME_BOTTOM_PADDING = 20;
 export const CHROME_HEADER_HEIGHT = 56;
@@ -21,9 +24,6 @@ export const CHROME_CORNER_RADIUS = 16;
 const MENU_BUTTON_SIZE = 32;
 const MENU_BUTTON_TOP = (CHROME_HEADER_HEIGHT - MENU_BUTTON_SIZE) / 2;
 const CONTROLS_LAYER_ID = 'canvas-chrome-controls';
-
-import { Pencil as PencilIcon } from 'lucide-react';
-import { type ChromeMenuItem, openChromeMenu } from '../chrome-menu';
 
 export interface FrameChromeOptions {
   kindLabel: string;
