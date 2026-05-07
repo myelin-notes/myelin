@@ -1,13 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Logger } from '@/lib/logger';
-import type { FileId } from '../types';
+import type { VFSNodeId } from '../types';
 import type { Transport, TransportEvents } from './transport';
 
 type EventName = keyof TransportEvents;
 
 interface NoteTransportPayload {
-  noteId: FileId;
+  noteId: VFSNodeId;
   transportId: string;
 }
 
@@ -38,7 +38,7 @@ export class IrohTransport implements Transport {
   // biome-ignore lint/suspicious/noExplicitAny: generic event emitter
   private listeners = new Map<string, Set<(...args: any[]) => void>>();
 
-  constructor(private readonly noteId: FileId) {}
+  constructor(private readonly noteId: VFSNodeId) {}
 
   get connected(): boolean {
     return this._connected;

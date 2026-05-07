@@ -16,7 +16,7 @@ import {
   type SyncMessage,
 } from './live/protocol';
 import { noopTransport, type Transport } from './live/transport';
-import type { FileId, NoteSessionStatus, YjsSyncTarget } from './types';
+import type { NoteSessionStatus, VFSNodeId, YjsSyncTarget } from './types';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
@@ -49,7 +49,7 @@ export class NoteSession {
   private status: NoteSessionStatus;
 
   constructor(
-    public readonly id: FileId,
+    public readonly id: VFSNodeId,
     public readonly ydoc: YDocManager,
     private readonly syncTarget: YjsSyncTarget,
     initialRevision: string | null,
@@ -90,7 +90,7 @@ export class NoteSession {
   }
 
   static async open(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     syncTarget: YjsSyncTarget,
   ): Promise<NoteSession> {
     const initial = await syncTarget.loadDocument(nodeId);

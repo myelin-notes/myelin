@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { FileId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
 
 interface RecentCardProps {
-  nodeId: FileId;
+  nodeId: VFSNodeId;
   category: string;
   time: string;
   title: string;

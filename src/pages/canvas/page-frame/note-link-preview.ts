@@ -1,9 +1,9 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type {
-  FileId,
   Repository,
   VFSFileNode,
   VFSNode,
+  VFSNodeId,
   YjsSyncTarget,
 } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
@@ -15,11 +15,11 @@ const MAX_PREVIEW_LENGTH = 360;
 
 export interface NoteLinkPreviewTarget {
   title: string;
-  noteId: FileId | null;
+  noteId: VFSNodeId | null;
 }
 
 export interface NoteLinkPreview {
-  noteId: FileId;
+  noteId: VFSNodeId;
   title: string;
   body: string;
 }

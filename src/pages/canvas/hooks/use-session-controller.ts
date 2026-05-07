@@ -6,7 +6,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { Logger } from '@/lib/logger';
-import type { FileId, NoteSession } from '@/lib/sync';
+import type { NoteSession, VFSNodeId } from '@/lib/sync';
 import {
   type ActiveRepository,
   type NoteSessionStatus,
@@ -72,7 +72,7 @@ export class CanvasSessionController {
 
   getSnapshot = (): CanvasSessionSnapshot => this.snapshot;
 
-  async open(noteId: FileId): Promise<void> {
+  async open(noteId: VFSNodeId): Promise<void> {
     const token = ++this.lifecycleToken;
     await this.teardownActiveSession();
     if (token !== this.lifecycleToken) {
@@ -86,7 +86,7 @@ export class CanvasSessionController {
     await this.teardownActiveSession();
   }
 
-  private async openSession(noteId: FileId, token: number): Promise<void> {
+  private async openSession(noteId: VFSNodeId, token: number): Promise<void> {
     const canvas = this.canvasRef.current;
     if (!canvas) {
       this.setLifecycleError(new Error('Canvas is not mounted.'));
@@ -285,7 +285,7 @@ export class CanvasSessionController {
 }
 
 interface UseCanvasSessionControllerArgs {
-  id: FileId | undefined;
+  id: VFSNodeId | undefined;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: RefObject<HTMLCanvasElement | null>;
   overlayCanvasRef: RefObject<HTMLCanvasElement | null>;

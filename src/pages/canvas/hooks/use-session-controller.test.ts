@@ -1,6 +1,10 @@
 import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ActiveRepository, FileId, NoteSessionStatus } from '@/lib/sync';
+import type {
+  ActiveRepository,
+  NoteSessionStatus,
+  VFSNodeId,
+} from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 
 const { drawableCanvasCtor, resolveNoteLinkIdByTitleMock } = vi.hoisted(() => ({
@@ -32,7 +36,7 @@ type ControllerRepository = ActiveRepository;
 type ControllerDrawableCanvasRef = RefObject<DrawableCanvas | null>;
 
 interface MockNoteSession {
-  id: FileId;
+  id: VFSNodeId;
   ydoc: { kind: string };
   subscribeStatus: (
     listener: (status: NoteSessionStatus) => void,
@@ -51,7 +55,7 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
-function createSession(id: FileId): MockNoteSession {
+function createSession(id: VFSNodeId): MockNoteSession {
   return {
     id,
     ydoc: { kind: `ydoc:${id}` },
@@ -84,7 +88,7 @@ describe('CanvasSessionController', () => {
     const noteBSession = createSession('note-b');
     const repository = {
       kind: 'local',
-      openSession: vi.fn((noteId: FileId) => {
+      openSession: vi.fn((noteId: VFSNodeId) => {
         if (noteId === 'note-a') {
           return noteAOpen.promise;
         }
@@ -93,7 +97,7 @@ describe('CanvasSessionController', () => {
         }
         throw new Error(`Unexpected note id: ${noteId}`);
       }),
-      getNode: vi.fn(async (noteId: FileId) => ({
+      getNode: vi.fn(async (noteId: VFSNodeId) => ({
         type: 'file',
         name: `${noteId}.mcanvas`,
       })),

@@ -11,11 +11,11 @@ import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import {
-  type FileId,
   type NoteBacklink,
   type StoredNoteLink,
   useRepository,
   useRepositoryStatus,
+  type VFSNodeId,
 } from '@/lib/sync';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +28,7 @@ type BacklinksState =
 
 // All backlinks from a single source note, collapsed into one card in the UI.
 interface BacklinkGroup {
-  sourceId: FileId;
+  sourceId: VFSNodeId;
   sourceName: string;
   mentions: StoredNoteLink[];
 }
@@ -39,10 +39,10 @@ interface SnippetPart {
 }
 
 interface BacklinksPaneProps {
-  noteId: FileId | undefined;
+  noteId: VFSNodeId | undefined;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onOpenSource: (sourceId: FileId) => void;
+  onOpenSource: (sourceId: VFSNodeId) => void;
 }
 
 export function BacklinksPane({
@@ -182,7 +182,7 @@ function BacklinksPaneContent({
 }: {
   groups: BacklinkGroup[];
   state: BacklinksState;
-  onOpenSource: (sourceId: FileId) => void;
+  onOpenSource: (sourceId: VFSNodeId) => void;
   onRetry: () => void;
 }) {
   const strings = useMessages();
@@ -241,7 +241,7 @@ function BacklinkSourceGroup({
   onOpenSource,
 }: {
   group: BacklinkGroup;
-  onOpenSource: (sourceId: FileId) => void;
+  onOpenSource: (sourceId: VFSNodeId) => void;
 }) {
   const strings = useMessages();
   const locale = useLocale();
@@ -348,7 +348,7 @@ function splitSnippet(snippet: string, title: string): SnippetPart[] {
 }
 
 function groupBacklinksBySource(backlinks: NoteBacklink[]): BacklinkGroup[] {
-  const groups = new Map<FileId, BacklinkGroup>();
+  const groups = new Map<VFSNodeId, BacklinkGroup>();
 
   for (const { sourceId, sourceName, ...mention } of backlinks) {
     const group = groups.get(sourceId);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import type { FileId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
 import { CanvasClipboardController } from './controller';
 import {
@@ -23,7 +23,7 @@ class FakeClipboardData {
   }
 }
 
-function createSelection(noteId: FileId): CanvasClipboardSelection {
+function createSelection(noteId: VFSNodeId): CanvasClipboardSelection {
   const doc = new Y.Doc();
   const elements = doc.getArray<Y.Map<unknown>>('elements');
   const yMap = new Y.Map<unknown>();

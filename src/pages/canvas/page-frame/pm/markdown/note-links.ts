@@ -1,7 +1,7 @@
 import type { MarkType, Node as PMNode, Schema } from 'prosemirror-model';
 import { EditorState, Plugin } from 'prosemirror-state';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
-import type { FileId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
@@ -25,7 +25,7 @@ interface TextOffsetMap {
 
 interface NoteLinkCoverage {
   title: string;
-  noteId: FileId | null;
+  noteId: VFSNodeId | null;
 }
 
 interface NoteLinkTarget {
@@ -34,7 +34,7 @@ interface NoteLinkTarget {
   textFrom: number;
   textTo: number;
   title: string;
-  noteId: FileId | null;
+  noteId: VFSNodeId | null;
 }
 
 export interface RenameNoteLinkReferencesResult {
@@ -46,7 +46,7 @@ export const NOTE_LINK_SELECTOR = '[data-note-link-title]';
 
 export interface NoteLinkOpenRequestDetail {
   title: string;
-  noteId: FileId | null;
+  noteId: VFSNodeId | null;
 }
 
 type NoteLinkElementLike = {
@@ -134,7 +134,7 @@ function buildCurrentNoteLinkCoverage(
       const value = noteLinkMark
         ? {
             title: noteLinkMark.attrs.title as string,
-            noteId: (noteLinkMark.attrs.noteId as FileId | null) ?? null,
+            noteId: (noteLinkMark.attrs.noteId as VFSNodeId | null) ?? null,
           }
         : null;
 
@@ -366,7 +366,7 @@ export async function normalizeAndResolveNoteLinksDoc(
 export function buildResolvedNoteLinkTransaction(
   state: EditorState,
   schema: Schema,
-  noteIdsByTitle: ReadonlyMap<string, FileId | null>,
+  noteIdsByTitle: ReadonlyMap<string, VFSNodeId | null>,
 ) {
   const noteLinkType = schema.marks.noteLink;
   if (!noteLinkType) {
@@ -424,7 +424,7 @@ export function renameNoteLinkReferenceTitle(
 export function renameNoteLinkReferencesDoc(
   doc: PMNode,
   schema: Schema,
-  noteId: FileId,
+  noteId: VFSNodeId,
   newName: string,
 ): RenameNoteLinkReferencesResult {
   const noteLinkType = schema.marks.noteLink;

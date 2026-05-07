@@ -20,11 +20,11 @@ import {
   getStoredFileName,
   MANIFEST_PATH,
 } from './shared';
-import type { FileId } from './types';
+import type { VFSNodeId } from './types';
 
 async function createCanvasNoteState(
   markdown: string,
-  resolveNoteLinkId?: (title: string) => Promise<FileId | null>,
+  resolveNoteLinkId?: (title: string) => Promise<VFSNodeId | null>,
 ): Promise<{
   update: Uint8Array;
   stateVector: Uint8Array;

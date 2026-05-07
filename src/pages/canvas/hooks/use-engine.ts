@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import type { ActionBinding } from '@/lib/keybinds';
-import type { FileId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import type { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
@@ -18,7 +18,7 @@ import { useCanvasSessionSaving } from './use-session-saving';
 import { useCanvasThumbnailProducer } from './use-thumbnail-producer';
 
 interface UseCanvasEngineArgs {
-  id: FileId | undefined;
+  id: VFSNodeId | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>;

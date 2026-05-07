@@ -1,16 +1,16 @@
 import type { NavigateFunction } from 'react-router-dom';
-import type { FileId, FileType, Repository } from '@/lib/sync';
+import type { FileType, Repository, VFSNodeId } from '@/lib/sync';
 import { parseNoteLinkTarget } from './note-link-target';
 
 export interface NoteRouteTarget {
   fileType: FileType;
-  id: FileId;
+  id: VFSNodeId;
   pageFrameName?: string | null;
 }
 
 export interface NoteLinkRouteTarget {
   title: string;
-  noteId: FileId | null;
+  noteId: VFSNodeId | null;
 }
 
 export type NoteLinkRepository = Pick<Repository, 'createFile' | 'getNode'>;
@@ -34,7 +34,7 @@ export function openNote(
 export async function openNoteLink(
   navigate: NavigateFunction,
   repository: NoteLinkRepository,
-  currentNoteId: FileId,
+  currentNoteId: VFSNodeId,
   target: NoteLinkRouteTarget,
 ): Promise<void> {
   const parsedTarget = parseNoteLinkTarget(target.title);

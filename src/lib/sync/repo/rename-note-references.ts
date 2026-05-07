@@ -6,7 +6,7 @@ import { ElementType } from '@/pages/canvas/elements/element-type';
 import { renameNoteLinkReferencesDoc } from '@/pages/canvas/page-frame/pm/markdown/note-links';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
-import type { FileId, NoteBacklink, Repository } from './types';
+import type { NoteBacklink, Repository, VFSNodeId } from './types';
 
 type NoteReferenceRepository = Pick<
   Repository,
@@ -20,7 +20,7 @@ export interface RenameNoteReferencesResult {
 
 function renameReferencesInDoc(
   ydoc: YDocManager,
-  noteId: FileId,
+  noteId: VFSNodeId,
   newName: string,
 ): number {
   let linkCount = 0;
@@ -64,7 +64,7 @@ function renameReferencesInDoc(
 
 export async function renameNoteReferences(
   repository: NoteReferenceRepository,
-  noteId: FileId,
+  noteId: VFSNodeId,
   newName: string,
   backlinks?: readonly NoteBacklink[],
 ): Promise<RenameNoteReferencesResult> {
