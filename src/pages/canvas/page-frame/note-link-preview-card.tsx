@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { FileId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
 
@@ -15,7 +15,7 @@ const FADE_MASK = 'linear-gradient(to bottom, black 76%, transparent 100%)';
 export interface NoteLinkPreviewCardProps {
   title: string;
   body: string | null;
-  noteId: FileId | null;
+  noteId: VFSNodeId | null;
 }
 
 export function NoteLinkPreviewCard({
@@ -39,7 +39,7 @@ function ThumbnailRegion({
   noteId,
   body,
 }: {
-  noteId: FileId | null;
+  noteId: VFSNodeId | null;
   body: string | null;
 }) {
   return (
@@ -64,7 +64,7 @@ function ThumbnailImage({
   noteId,
   body,
 }: {
-  noteId: FileId;
+  noteId: VFSNodeId;
   body: string | null;
 }) {
   const thumbUrl = useThumbnailUrl(noteId);

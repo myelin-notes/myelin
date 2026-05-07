@@ -16,7 +16,7 @@ import { IS_DEV } from '@/lib/env';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { Logger } from '@/lib/logger';
 import { openNote, openNoteLink } from '@/lib/note-navigation';
-import { type FileId, useRepository } from '@/lib/sync';
+import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import type { ChromeMenuItem } from './chrome-menu';
@@ -56,7 +56,7 @@ export function CanvasView() {
 }
 
 function CanvasViewInner() {
-  const { id } = useParams<{ id: FileId }>();
+  const { id } = useParams<{ id: VFSNodeId }>();
   const navigate = useNavigate();
   const location = useLocation();
   const repository = useRepository();
@@ -200,7 +200,7 @@ function CanvasViewInner() {
       getNoteLinkPreview(repository, target, signal),
     [repository],
   );
-  const openBacklinkSource = useEffectEvent(async (sourceId: FileId) => {
+  const openBacklinkSource = useEffectEvent(async (sourceId: VFSNodeId) => {
     await engine.saveBeforeExit();
     openNote(navigate, { fileType: 'mcanvas', id: sourceId });
   });

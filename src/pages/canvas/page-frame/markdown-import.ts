@@ -1,7 +1,7 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import type { FileId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
 import {
   normalizePageFrameDisplayName,
@@ -24,7 +24,7 @@ export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
 
 interface MarkdownPageFrameImportOptions {
   repository?: NoteLinkResolveSource;
-  resolveNoteLinkId?: (title: string) => Promise<FileId | null>;
+  resolveNoteLinkId?: (title: string) => Promise<VFSNodeId | null>;
 }
 
 interface AddMarkdownPageFrameOptions extends MarkdownPageFrameImportOptions {

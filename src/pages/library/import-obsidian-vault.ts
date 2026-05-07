@@ -3,10 +3,10 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import {
-  type FileId,
   type FileType,
   getFileTypeForName,
   type Repository,
+  type VFSNodeId,
 } from '@/lib/sync';
 import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
 import { getPdfPageSizes } from '@/pages/canvas/pdf-renderer';
@@ -26,7 +26,7 @@ type VaultImportFile =
       name: string;
       noteName: string;
       notePath: string;
-      nodeId: FileId | null;
+      nodeId: VFSNodeId | null;
     }
   | {
       kind: 'pdf';
@@ -261,9 +261,9 @@ function normalizeNoteLinkTarget(target: string): string | null {
 
 function createVaultNoteLinkResolver(
   markdownFiles: readonly Extract<VaultImportFile, { kind: 'markdown' }>[],
-): (target: string) => Promise<FileId | null> {
-  const noteIdsByPath = new Map<string, FileId>();
-  const noteIdsByName = new Map<string, FileId>();
+): (target: string) => Promise<VFSNodeId | null> {
+  const noteIdsByPath = new Map<string, VFSNodeId>();
+  const noteIdsByName = new Map<string, VFSNodeId>();
 
   for (const file of markdownFiles) {
     if (!file.nodeId) {
@@ -296,7 +296,7 @@ async function writeMarkdownFile({
 }: {
   file: Extract<VaultImportFile, { kind: 'markdown' }>;
   repository: Repository;
-  resolveNoteLinkId: (target: string) => Promise<FileId | null>;
+  resolveNoteLinkId: (target: string) => Promise<VFSNodeId | null>;
 }): Promise<void> {
   if (!file.nodeId) {
     throw new Error(`Markdown file was not created: ${file.name}`);

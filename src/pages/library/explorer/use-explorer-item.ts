@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Logger } from '@/lib/logger';
-import { type FileId, type NoteBacklink, useRepository } from '@/lib/sync';
+import { type NoteBacklink, useRepository, type VFSNodeId } from '@/lib/sync';
 import { renameNoteReferences } from '@/lib/sync/repo/rename-note-references';
 import { UserPrefs } from '@/lib/user-prefs';
 
@@ -71,7 +71,7 @@ export function useExplorerItem({
       if (options.updateReferences) {
         await renameNoteReferences(
           repository,
-          nodeId as FileId,
+          nodeId as VFSNodeId,
           trimmed,
           options.backlinks,
         );
@@ -101,7 +101,7 @@ export function useExplorerItem({
       if (renameReferencesOnRename) {
         let backlinks: NoteBacklink[] = [];
         try {
-          backlinks = await repository.getBacklinks(nodeId as FileId);
+          backlinks = await repository.getBacklinks(nodeId as VFSNodeId);
         } catch (err) {
           logger.error('Failed to load backlinks before rename', err, {
             nodeId,

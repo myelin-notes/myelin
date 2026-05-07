@@ -23,7 +23,7 @@ import {
   type RepositorySnapshot,
   type VFSManifest,
 } from './shared';
-import type { FileId, FileType, RepositoryCapabilities } from './types';
+import type { FileType, RepositoryCapabilities, VFSNodeId } from './types';
 
 const logger = new Logger('LocalRepository');
 
@@ -58,7 +58,7 @@ export class LocalRepository extends BaseRepository {
     await this.loadManifestImpl();
   }
 
-  async getRevealPath(nodeId: FileId): Promise<string | null> {
+  async getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
     const { manifest } = await this.loadManifestImpl();
     const node = manifest.nodes[nodeId];
     if (!node || node.type !== 'file') {
@@ -118,7 +118,7 @@ export class LocalRepository extends BaseRepository {
     });
   }
 
-  protected async onFileCreated(nodeId: FileId): Promise<void> {
+  protected async onFileCreated(nodeId: VFSNodeId): Promise<void> {
     const { manifest } = await this.loadManifestImpl();
     const node = manifest.nodes[nodeId];
     if (!node || node.type !== 'file') {
@@ -176,7 +176,7 @@ export class LocalRepository extends BaseRepository {
     return null;
   }
 
-  protected async loadFileBytes(nodeId: FileId): Promise<{
+  protected async loadFileBytes(nodeId: VFSNodeId): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
@@ -213,7 +213,7 @@ export class LocalRepository extends BaseRepository {
   }
 
   protected async saveFileBytes(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     bytes: Uint8Array,
     _revision: string | null,
     _message: string,
@@ -252,7 +252,7 @@ export class LocalRepository extends BaseRepository {
   }
 
   protected async deleteFileBytes(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     fileType?: FileType,
   ): Promise<void> {
     const { manifest } = await this.loadManifestImpl();

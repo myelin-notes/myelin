@@ -8,7 +8,7 @@ import {
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import { createNodeId } from '../shared';
-import type { FileId } from '../types';
+import type { VFSNodeId } from '../types';
 
 export type PendingOp =
   | {
@@ -19,12 +19,12 @@ export type PendingOp =
   | {
       kind: 'delete-manifest-node';
       nodeId: string;
-      deletedFileIds: FileId[];
+      deletedFileIds: VFSNodeId[];
       queueRevision: string;
     }
   | {
       kind: 'push-note';
-      nodeId: FileId;
+      nodeId: VFSNodeId;
       baseFileRevision?: string | null;
       queueRevision: string;
     }
@@ -32,7 +32,7 @@ export type PendingOp =
 
 export interface DeletedSubtree {
   nodeIds: string[];
-  fileIds: FileId[];
+  fileIds: VFSNodeId[];
 }
 
 interface CachedRepositoryOutboxOptions {
@@ -197,7 +197,7 @@ export function enqueueUpsertManifestNode(
 
 export function enqueuePushNote(
   ops: PendingOp[],
-  nodeId: FileId,
+  nodeId: VFSNodeId,
   baseFileRevision?: string | null,
 ): void {
   const alreadyDeleted = ops.some(

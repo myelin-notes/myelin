@@ -1,9 +1,9 @@
 import { parseNoteLinkTarget } from '@/lib/note-link-target';
 import type {
-  FileId,
   Repository,
   VFSFileNode,
   VFSNode,
+  VFSNodeId,
   YjsSyncTarget,
 } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
@@ -21,7 +21,7 @@ export type NoteLinkSearchSource = Pick<
 > &
   Partial<Pick<YjsSyncTarget, 'loadDocument'>>;
 
-export type PageFrameNameCache = Map<FileId, readonly string[]>;
+export type PageFrameNameCache = Map<VFSNodeId, readonly string[]>;
 
 interface NoteLinkPathQuery {
   isPath: boolean;
@@ -133,7 +133,7 @@ function getPageFrameDisplayNames(update: Uint8Array | null): string[] {
 export async function resolveNoteLinkIdByTitle(
   repository: NoteLinkResolveSource,
   target: string,
-): Promise<FileId | null> {
+): Promise<VFSNodeId | null> {
   const parsedTarget = parseNoteLinkTarget(target);
   if (!parsedTarget) {
     return null;

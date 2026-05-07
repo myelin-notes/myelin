@@ -38,7 +38,6 @@ import {
   type VFSManifest,
 } from './shared';
 import type {
-  FileId,
   FileType,
   NoteBacklink,
   Repository,
@@ -49,6 +48,7 @@ import type {
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
+  VFSNodeId,
 } from './types';
 
 const logger = new Logger('BaseRepository');
@@ -84,20 +84,20 @@ export abstract class BaseRepository
     action: string,
   ): Promise<string | null>;
 
-  protected abstract loadFileBytes(nodeId: FileId): Promise<{
+  protected abstract loadFileBytes(nodeId: VFSNodeId): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }>;
 
   protected abstract saveFileBytes(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     bytes: Uint8Array,
     revision: string | null,
     message: string,
   ): Promise<string | null>;
 
   protected abstract deleteFileBytes(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     fileType?: FileType,
   ): Promise<void>;
 
@@ -109,10 +109,10 @@ export abstract class BaseRepository
     return 1;
   }
 
-  protected async onFileCreated(_nodeId: FileId): Promise<void> {}
+  protected async onFileCreated(_nodeId: VFSNodeId): Promise<void> {}
 
   protected async onFileSaved(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
     await this.mutateManifest('Touch file', (manifest) => {
@@ -167,7 +167,7 @@ export abstract class BaseRepository
     return this.mutateManifest(action, mutator);
   }
 
-  async removeNoteData(nodeId: FileId, fileType?: FileType): Promise<void> {
+  async removeNoteData(nodeId: VFSNodeId, fileType?: FileType): Promise<void> {
     await this.deleteFileBytes(nodeId, fileType);
   }
 
@@ -231,7 +231,7 @@ export abstract class BaseRepository
     return getRecentFiles(manifest, limit);
   }
 
-  async getBacklinks(noteId: FileId): Promise<NoteBacklink[]> {
+  async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
     const { manifest } = await this.loadManifestImpl();
     return getBacklinks(manifest, noteId);
   }
@@ -259,7 +259,7 @@ export abstract class BaseRepository
     fileType: FileType,
     parentId: string | null,
     bytes?: Uint8Array,
-  ): Promise<FileId> {
+  ): Promise<VFSNodeId> {
     const id = await this.mutateManifest('Create file', (manifest) => {
       const newId = createNodeId();
       const now = Date.now();
@@ -280,12 +280,12 @@ export abstract class BaseRepository
     return id;
   }
 
-  async readFileBytes(nodeId: FileId): Promise<Uint8Array | null> {
+  async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
     const { bytes } = await this.loadFileBytes(nodeId);
     return bytes ? new Uint8Array(bytes) : null;
   }
 
-  async writeFileBytes(nodeId: FileId, bytes: Uint8Array): Promise<void> {
+  async writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void> {
     const { revision } = await this.loadFileBytes(nodeId);
     const links = await this.extractStoredNoteLinksForBytes(nodeId, bytes);
     const nextRevision = await this.saveFileBytes(
@@ -368,7 +368,7 @@ export abstract class BaseRepository
     });
   }
 
-  async getRevealPath(_nodeId: FileId): Promise<string | null> {
+  async getRevealPath(_nodeId: VFSNodeId): Promise<string | null> {
     return null;
   }
 
@@ -403,7 +403,7 @@ export abstract class BaseRepository
     });
   }
 
-  async openSession(nodeId: FileId): Promise<NoteSession> {
+  async openSession(nodeId: VFSNodeId): Promise<NoteSession> {
     logger.debug('Opening repository-backed note session', {
       repositoryKind: this.kind,
       nodeId,
@@ -411,7 +411,7 @@ export abstract class BaseRepository
     return NoteSession.open(nodeId, this);
   }
 
-  async loadDocument(nodeId: FileId): Promise<YjsSyncSnapshot> {
+  async loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot> {
     const remote = await this.readYjsSyncState(nodeId);
     logger.debug('Loaded repository document snapshot', {
       repositoryKind: this.kind,
@@ -429,7 +429,7 @@ export abstract class BaseRepository
   }
 
   async pullUpdates(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot> {
     const remote = await this.readYjsSyncState(nodeId);
@@ -452,7 +452,7 @@ export abstract class BaseRepository
   }
 
   async pushUpdates(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     update: Uint8Array,
     options: YjsSyncPushOptions,
   ): Promise<YjsSyncPushResult> {
@@ -549,7 +549,7 @@ export abstract class BaseRepository
     );
   }
 
-  private async readYjsSyncState(nodeId: FileId): Promise<{
+  private async readYjsSyncState(nodeId: VFSNodeId): Promise<{
     bytes: Uint8Array | null;
     doc: Y.Doc;
     stateVector: Uint8Array;
@@ -571,7 +571,7 @@ export abstract class BaseRepository
   }
 
   private async extractStoredNoteLinksForBytes(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     bytes: Uint8Array,
   ): Promise<StoredNoteLink[] | undefined> {
     const node = await this.getNode(nodeId);

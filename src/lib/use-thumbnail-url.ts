@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { FileId } from './sync';
+import type { VFSNodeId } from './sync';
 import { getThumbnailUrl, subscribeThumbnail } from './thumbnails';
 
-export function useThumbnailUrl(nodeId: FileId): string | null | undefined {
+export function useThumbnailUrl(nodeId: VFSNodeId): string | null | undefined {
   const [url, setUrl] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {

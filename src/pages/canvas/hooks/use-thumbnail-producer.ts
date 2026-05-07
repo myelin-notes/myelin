@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { getScratchCanvasContext } from '@/lib/scratch-canvas';
-import type { FileId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync';
 import { registerThumbnailProducer } from '@/lib/thumbnails';
 
 interface UseCanvasThumbnailProducerArgs {
-  id: FileId | undefined;
+  id: VFSNodeId | undefined;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 

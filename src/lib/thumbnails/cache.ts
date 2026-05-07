@@ -8,7 +8,7 @@ import {
   remove as removeFile,
   stat,
 } from '@tauri-apps/plugin-fs';
-import type { FileId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync';
 
 const THUMBNAILS_DIR = 'Thumbnails';
 
@@ -21,11 +21,11 @@ async function ensureDir(): Promise<void> {
   }
 }
 
-function relPath(nodeId: FileId): string {
+function relPath(nodeId: VFSNodeId): string {
   return `${THUMBNAILS_DIR}/${nodeId}.png`;
 }
 
-export async function readUrl(nodeId: FileId): Promise<string | null> {
+export async function readUrl(nodeId: VFSNodeId): Promise<string | null> {
   const rel = relPath(nodeId);
   if (!(await exists(rel, { baseDir: BaseDirectory.AppCache }))) {
     return null;
@@ -34,7 +34,7 @@ export async function readUrl(nodeId: FileId): Promise<string | null> {
   return convertFileSrc(absolute);
 }
 
-export async function writeBlob(nodeId: FileId, blob: Blob): Promise<void> {
+export async function writeBlob(nodeId: VFSNodeId, blob: Blob): Promise<void> {
   await ensureDir();
   const file = await open(relPath(nodeId), {
     write: true,
@@ -50,14 +50,14 @@ export async function writeBlob(nodeId: FileId, blob: Blob): Promise<void> {
   }
 }
 
-export async function removeEntry(nodeId: FileId): Promise<void> {
+export async function removeEntry(nodeId: VFSNodeId): Promise<void> {
   const rel = relPath(nodeId);
   if (await exists(rel, { baseDir: BaseDirectory.AppCache })) {
     await removeFile(rel, { baseDir: BaseDirectory.AppCache });
   }
 }
 
-export async function getMtime(nodeId: FileId): Promise<number | null> {
+export async function getMtime(nodeId: VFSNodeId): Promise<number | null> {
   const rel = relPath(nodeId);
   if (!(await exists(rel, { baseDir: BaseDirectory.AppCache }))) {
     return null;

@@ -4,7 +4,7 @@ import type * as Y from 'yjs';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
-import type { FileId, StoredNoteLink } from './types';
+import type { StoredNoteLink, VFSNodeId } from './types';
 
 const MAX_SNIPPET_LENGTH = 180;
 
@@ -66,7 +66,7 @@ function collectBlockLinks(node: PMNode, links: StoredNoteLink[]): void {
     const link: StoredNoteLink = {
       targetId:
         typeof noteId === 'string' && noteId.length > 0
-          ? (noteId as FileId)
+          ? (noteId as VFSNodeId)
           : null,
       title,
       snippet,

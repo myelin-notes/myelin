@@ -25,7 +25,6 @@ import {
   type RepositorySnapshot,
 } from '../shared';
 import type {
-  FileId,
   FileType,
   NoteBacklink,
   Repository,
@@ -35,6 +34,7 @@ import type {
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
+  VFSNodeId,
 } from '../types';
 import { withAsyncKeyedMutex } from './lock';
 import {
@@ -251,7 +251,7 @@ export class CachedRepository
     return this.cache.getRecentFiles(limit);
   }
 
-  async getBacklinks(noteId: FileId): Promise<NoteBacklink[]> {
+  async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
     return this.cache.getBacklinks(noteId);
   }
 
@@ -289,7 +289,7 @@ export class CachedRepository
     fileType: FileType,
     parentId: string | null,
     bytes?: Uint8Array,
-  ): Promise<FileId> {
+  ): Promise<VFSNodeId> {
     return this.writeLocalAndQueue(
       () => this.cache.createFile(name, fileType, parentId, bytes),
       (ops, nodeId) => {
@@ -299,11 +299,11 @@ export class CachedRepository
     );
   }
 
-  async readFileBytes(nodeId: FileId): Promise<Uint8Array | null> {
+  async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
     return this.cache.readFileBytes(nodeId);
   }
 
-  async writeFileBytes(nodeId: FileId, bytes: Uint8Array): Promise<void> {
+  async writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void> {
     await this.writeLocalAndQueue(
       async () => {
         const baseFileRevision = await this.getRawFileBaseRevision(nodeId);
@@ -374,7 +374,7 @@ export class CachedRepository
     );
   }
 
-  async getRevealPath(nodeId: FileId): Promise<string | null> {
+  async getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
     return this.cache.getRevealPath(nodeId);
   }
 
@@ -401,7 +401,7 @@ export class CachedRepository
   }
 
   private async getRawFileBaseRevision(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
   ): Promise<string | null | undefined> {
     const node = await this.cache.getNode(nodeId);
     if (!node || node.type !== 'file' || node.fileType === 'mcanvas') {
@@ -410,7 +410,7 @@ export class CachedRepository
     return computeRevision(await this.cache.readFileBytes(nodeId));
   }
 
-  async openSession(nodeId: FileId): Promise<NoteSession> {
+  async openSession(nodeId: VFSNodeId): Promise<NoteSession> {
     logger.debug('Opening cached repository local session', {
       repositoryKind: this.kind,
       nodeId,
@@ -439,19 +439,19 @@ export class CachedRepository
     await session.pull();
   }
 
-  async loadDocument(nodeId: FileId): Promise<YjsSyncSnapshot> {
+  async loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot> {
     return this.cache.loadDocument(nodeId);
   }
 
   async pullUpdates(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot> {
     return this.cache.pullUpdates(nodeId, stateVector);
   }
 
   async pushUpdates(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     update: Uint8Array,
     options: YjsSyncPushOptions,
   ): Promise<YjsSyncPushResult> {
@@ -717,7 +717,7 @@ export class CachedRepository
   }
 
   private async applyCanvasNotePush(
-    nodeId: FileId,
+    nodeId: VFSNodeId,
     localSnapshot: YjsSyncSnapshot,
   ): Promise<void> {
     const update = localSnapshot.update ?? this.emptyDocUpdate;
@@ -768,7 +768,7 @@ export class CachedRepository
     const remoteNode = await this.remote.getNode(localNode.id);
     const originalRemoteNode =
       remoteNode?.type === 'file' ? structuredClone(remoteNode) : null;
-    const conflictId: FileId = createNodeId();
+    const conflictId: VFSNodeId = createNodeId();
     const now = Date.now();
     const timestamp = new Date(now);
     let conflictNode: VFSFileNode | null = null;

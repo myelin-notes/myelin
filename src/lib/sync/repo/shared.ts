@@ -1,7 +1,6 @@
 import * as Y from 'yjs';
 import { searchItems } from '@/lib/search';
 import {
-  type FileId,
   type FileType,
   FileTypes,
   ImageFileTypes,
@@ -12,6 +11,7 @@ import {
   type VFSFileNode,
   type VFSFolderNode,
   type VFSNode,
+  type VFSNodeId,
   VideoFileTypes,
 } from './types';
 
@@ -19,13 +19,13 @@ export interface VFSManifest {
   version: number;
   children: string[];
   nodes: Record<string, VFSNode>;
-  linksBySource: Record<FileId, StoredNoteLink[]>;
+  linksBySource: Record<VFSNodeId, StoredNoteLink[]>;
   customColors: string[];
 }
 
 export interface RepositorySnapshot {
   manifest: VFSManifest;
-  notes: Record<FileId, Uint8Array | null>;
+  notes: Record<VFSNodeId, Uint8Array | null>;
 }
 
 export const CURRENT_MANIFEST_VERSION = 1;
@@ -89,7 +89,7 @@ export function createFolderNode(
 }
 
 export function createFileNode(
-  id: FileId,
+  id: VFSNodeId,
   name: string,
   fileType: FileType,
   parentId: string | null,
@@ -300,7 +300,7 @@ export function getRecentFiles(
 
 export function getBacklinks(
   manifest: VFSManifest,
-  noteId: FileId,
+  noteId: VFSNodeId,
 ): NoteBacklink[] {
   const backlinks: NoteBacklink[] = [];
 
@@ -326,7 +326,7 @@ export function getBacklinks(
 
 export function setStoredNoteLinks(
   manifest: VFSManifest,
-  sourceId: FileId,
+  sourceId: VFSNodeId,
   links: readonly StoredNoteLink[],
 ): void {
   if (links.length === 0) {
@@ -473,10 +473,10 @@ export function getStoredFilePath(
   return `${FILES_DIR}/${getStoredFileName(node)}`;
 }
 
-export function getNoteFileName(nodeId: FileId): string {
+export function getNoteFileName(nodeId: VFSNodeId): string {
   return `${nodeId}${FILE_EXT}`;
 }
 
-export function getNotePath(nodeId: FileId): string {
+export function getNotePath(nodeId: VFSNodeId): string {
   return `${FILES_DIR}/${getNoteFileName(nodeId)}`;
 }
