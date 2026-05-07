@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import type { ElementType } from './elements/element-type';
+import { ElementType } from './elements/element-type';
 
 /** Origins used to label Yjs updates flowing through the canvas sync layer. */
 export const LOCAL_ORIGIN = 'local' as const;
@@ -8,7 +8,13 @@ export const PEER_ORIGIN = 'remote-peer' as const;
 export type PeerOrigin = typeof PEER_ORIGIN;
 export const REPOSITORY_SYNC_ORIGIN = 'repository-sync' as const;
 export type RepositorySyncOrigin = typeof REPOSITORY_SYNC_ORIGIN;
-export type SyncOrigin = LocalOrigin | PeerOrigin | RepositorySyncOrigin;
+export const FRAGMENT_SWEEP_ORIGIN = 'fragment-sweep' as const;
+export type FragmentSweepOrigin = typeof FRAGMENT_SWEEP_ORIGIN;
+export type SyncOrigin =
+  | LocalOrigin
+  | PeerOrigin
+  | RepositorySyncOrigin
+  | FragmentSweepOrigin;
 
 /**
  * Owns a Y.Doc for a single canvas file and provides typed access
@@ -86,11 +92,28 @@ export class YDocManager {
     }, LOCAL_ORIGIN);
   }
 
-  /** Remove an element's Y.Map from the elements array. */
+  /**
+   * Remove an element's Y.Map from the elements array.
+   *
+   * For PAGE_FRAME elements, also clears the matching `pf-<uuid>` fragment
+   * so the deleted page's ProseMirror content does not linger in the doc.
+   * The fragment is pulled into the UndoManager scope first so an undo of
+   * the deletion restores both the element and its content.
+   */
   removeElementMap(yMap: Y.Map<unknown>): void {
     this.doc.transact(() => {
       for (let i = 0; i < this.elements.length; i++) {
         if (this.elements.get(i) === yMap) {
+          if (yMap.get('type') === ElementType.PAGE_FRAME) {
+            const uuid = yMap.get('uuid');
+            if (typeof uuid === 'string') {
+              const fragment = this.doc.getXmlFragment(`pf-${uuid}`);
+              if (fragment.length > 0) {
+                this.undoManager.addToScope([fragment]);
+                fragment.delete(0, fragment.length);
+              }
+            }
+          }
           this.elements.delete(i, 1);
           return;
         }
@@ -111,6 +134,47 @@ export class YDocManager {
   /** Wrap a mutation in a transaction with the local origin. */
   transact(fn: () => void): void {
     this.doc.transact(fn, LOCAL_ORIGIN);
+  }
+
+  /**
+   * Clear `pf-<uuid>` XML fragments whose uuid no longer matches a live page
+   * frame in the elements array. Concurrent edit-while-delete races can leave
+   * items in a fragment that the deleter's delete-set never covered; this
+   * mops them up so they don't accumulate in the persisted doc.
+   *
+   * Runs under {@link FRAGMENT_SWEEP_ORIGIN} so the cleared content is not
+   * captured by the canvas UndoManager (orphan content has no element to
+   * restore it onto). Returns the number of fragments cleared.
+   */
+  sweepOrphanPageFrameFragments(): number {
+    const liveUuids = new Set<string>();
+    for (let i = 0; i < this.elements.length; i++) {
+      const yMap = this.elements.get(i);
+      if (yMap.get('type') === ElementType.PAGE_FRAME) {
+        const uuid = yMap.get('uuid');
+        if (typeof uuid === 'string') {
+          liveUuids.add(uuid);
+        }
+      }
+    }
+
+    let cleared = 0;
+    this.doc.transact(() => {
+      // `doc.share` is a Yjs internal (not part of the documented API). If a
+      // future Yjs upgrade renames or removes it, the sweep silently becomes a
+      // no-op — there's no public way to enumerate root types today.
+      for (const key of this.doc.share.keys()) {
+        if (!key.startsWith('pf-')) continue;
+        const uuid = key.slice(3);
+        if (liveUuids.has(uuid)) continue;
+        const fragment = this.doc.getXmlFragment(key);
+        if (fragment.length > 0) {
+          fragment.delete(0, fragment.length);
+          cleared++;
+        }
+      }
+    }, FRAGMENT_SWEEP_ORIGIN);
+    return cleared;
   }
 
   /** Encode the full document state for persistence. */
