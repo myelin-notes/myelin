@@ -91,12 +91,17 @@ export async function renameNoteReferences(
     }
 
     const ydoc = YDocManager.fromUpdate(bytes);
-    const sourceLinkCount = renameReferencesInDoc(ydoc, noteId, newName);
+    let sourceLinkCount = 0;
+    ydoc.transact(() => {
+      sourceLinkCount = renameReferencesInDoc(ydoc, noteId, newName);
+      if (sourceLinkCount > 0) {
+        ydoc.sweepOrphanPageFrameFragments();
+      }
+    });
     if (sourceLinkCount === 0) {
       continue;
     }
 
-    ydoc.sweepOrphanPageFrameFragments();
     await repository.writeFileBytes(sourceId, ydoc.encodeState());
     sourceCount++;
     linkCount += sourceLinkCount;
