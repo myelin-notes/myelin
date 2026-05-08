@@ -105,13 +105,20 @@ export class CanvasSessionController {
 
   getSnapshot = (): CanvasSessionSnapshot => this.snapshot;
 
-  async open(noteId: VFSNodeId): Promise<void> {
+  async open(
+    noteId: VFSNodeId,
+    options?: { initialPageFrameName?: string | null },
+  ): Promise<void> {
     const token = ++this.lifecycleToken;
     await this.teardownActiveSession();
     if (token !== this.lifecycleToken) {
       return;
     }
-    await this.openSession(noteId, token);
+    await this.openSession(
+      noteId,
+      token,
+      options?.initialPageFrameName ?? null,
+    );
   }
 
   async dispose(): Promise<void> {
@@ -123,7 +130,11 @@ export class CanvasSessionController {
     this.onPageFrameRenamed = listener;
   }
 
-  private async openSession(noteId: VFSNodeId, token: number): Promise<void> {
+  private async openSession(
+    noteId: VFSNodeId,
+    token: number,
+    initialPageFrameName: string | null,
+  ): Promise<void> {
     const canvas = this.canvasRef.current;
     if (!canvas) {
       this.setLifecycleError(new Error('Canvas is not mounted.'));
@@ -180,7 +191,8 @@ export class CanvasSessionController {
           y: canvas.height / dpr / 2,
         });
         const frame = drawableCanvas.addElement(
-          (uuid) => new PageFrameElement(uuid),
+          (uuid) =>
+            new PageFrameElement(uuid, initialPageFrameName ?? undefined),
         );
         frame.setOffset(
           centerWorld.x - frame.pageWidth / 2,
@@ -358,6 +370,7 @@ export class CanvasSessionController {
 
 interface UseCanvasSessionControllerArgs {
   id: VFSNodeId | undefined;
+  initialPageFrameName?: string | null;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: RefObject<HTMLCanvasElement | null>;
   overlayCanvasRef: RefObject<HTMLCanvasElement | null>;
@@ -368,6 +381,7 @@ interface UseCanvasSessionControllerArgs {
 
 export function useCanvasSessionController({
   id,
+  initialPageFrameName,
   canvasRef,
   bgCanvasRef,
   overlayCanvasRef,
@@ -407,13 +421,18 @@ export function useCanvasSessionController({
     controller.getSnapshot,
   );
 
+  const initialPageFrameNameRef = useRef(initialPageFrameName);
+  initialPageFrameNameRef.current = initialPageFrameName;
+
   useEffect(() => {
     if (!id) {
       void controller.dispose();
       return;
     }
 
-    void controller.open(id);
+    void controller.open(id, {
+      initialPageFrameName: initialPageFrameNameRef.current,
+    });
 
     return () => {
       void controller.dispose();

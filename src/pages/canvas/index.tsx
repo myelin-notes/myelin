@@ -32,7 +32,7 @@ import { PeerSyncPanel } from './components/peer-sync-panel';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
 import { ElementType } from './elements/element-type';
-import type { PageFrameElement } from './elements/page-frame-element';
+import { PageFrameElement } from './elements/page-frame-element';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
@@ -89,21 +89,6 @@ function CanvasViewInner() {
     embedFiles,
   });
 
-  const engine = useCanvasEngine({
-    id,
-    canvasRef,
-    bgCanvasRef,
-    overlayCanvasRef,
-    domOverlayRef,
-    wheelRef,
-    drawableCanvasRef,
-    canvasTools: toolState.canvasTools,
-    setSelectedToolIndex: toolState.setSelectedToolIndex,
-    onCanvasPointerDown: toolState.hideOptions,
-    onInsertFrame: inserts.onInsertFrame,
-    onInsertEmbed: inserts.onInsertEmbed,
-    embedFiles,
-  });
   const targetPageFrameName = useMemo(() => {
     if (!location.hash) {
       return null;
@@ -118,9 +103,25 @@ function CanvasViewInner() {
   }, [location.hash]);
   const routeState = location.state as { pageFrameId?: unknown } | null;
   const targetPageFrameId =
-    typeof routeState?.pageFrameId === 'string'
-      ? routeState.pageFrameId
-      : null;
+    typeof routeState?.pageFrameId === 'string' ? routeState.pageFrameId : null;
+
+  const engine = useCanvasEngine({
+    id,
+    initialPageFrameName: targetPageFrameName,
+    canvasRef,
+    bgCanvasRef,
+    overlayCanvasRef,
+    domOverlayRef,
+    wheelRef,
+    drawableCanvasRef,
+    canvasTools: toolState.canvasTools,
+    setSelectedToolIndex: toolState.setSelectedToolIndex,
+    onCanvasPointerDown: toolState.hideOptions,
+    onInsertFrame: inserts.onInsertFrame,
+    onInsertEmbed: inserts.onInsertEmbed,
+    embedFiles,
+  });
+
   useEffect(() => {
     if (!engine.ready) {
       return;
@@ -137,6 +138,28 @@ function CanvasViewInner() {
       return;
     }
     if (targetPageFrameName && dc.focusPageFrameByName(targetPageFrameName)) {
+      return;
+    }
+    if (targetPageFrameName) {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return;
+      }
+      const dpr = window.devicePixelRatio || 1;
+      const centerWorld = dc.viewport.screenToWorld({
+        x: canvas.width / dpr / 2,
+        y: canvas.height / dpr / 2,
+      });
+      const frame = dc.addElement(
+        (uuid) => new PageFrameElement(uuid, targetPageFrameName),
+      );
+      frame.setOffset(
+        centerWorld.x - frame.pageWidth / 2,
+        centerWorld.y - frame.pageHeight / 2,
+      );
+      frame.updateBounds();
+      dc.updateBounding();
+      dc.focusPageFrameById(frame.uuid);
       return;
     }
     logger.debug('Requested page frame target was not found', {
