@@ -20,15 +20,6 @@ describe('parseNoteLinkTarget', () => {
     });
   });
 
-  it('parses note + frame + alias and ignores the alias', () => {
-    expect(parseNoteLinkTarget('Alpha#Frame|Display')).toEqual({
-      isPath: false,
-      path: 'Alpha',
-      noteName: 'Alpha',
-      pageFrameName: 'Frame',
-    });
-  });
-
   it('parses a slash-delimited path', () => {
     expect(parseNoteLinkTarget('Projects/Alpha')).toEqual({
       isPath: true,
@@ -41,7 +32,6 @@ describe('parseNoteLinkTarget', () => {
   it('returns null for empty or whitespace-only target', () => {
     expect(parseNoteLinkTarget('')).toBeNull();
     expect(parseNoteLinkTarget('   ')).toBeNull();
-    expect(parseNoteLinkTarget('|alias')).toBeNull();
   });
 
   it('returns null when a path segment is empty', () => {
@@ -59,8 +49,8 @@ describe('parseNoteLinkTarget', () => {
     });
   });
 
-  it('unescapes pipe in the note name', () => {
-    expect(parseNoteLinkTarget('A\\|B')).toEqual({
+  it('treats pipe as a literal character in the note name', () => {
+    expect(parseNoteLinkTarget('A|B')).toEqual({
       isPath: false,
       path: 'A|B',
       noteName: 'A|B',
@@ -68,8 +58,8 @@ describe('parseNoteLinkTarget', () => {
     });
   });
 
-  it('unescapes hash and pipe in the frame name', () => {
-    expect(parseNoteLinkTarget('Alpha#Plan \\#2 \\| draft')).toEqual({
+  it('treats pipe as a literal character in the frame name', () => {
+    expect(parseNoteLinkTarget('Alpha#Plan \\#2 | draft')).toEqual({
       isPath: false,
       path: 'Alpha',
       noteName: 'Alpha',
@@ -78,10 +68,10 @@ describe('parseNoteLinkTarget', () => {
   });
 
   it('unescapes per path segment', () => {
-    expect(parseNoteLinkTarget('Folder\\#1/Note\\|A')).toEqual({
+    expect(parseNoteLinkTarget('Folder\\#1/Note')).toEqual({
       isPath: true,
-      path: 'Folder#1/Note|A',
-      noteName: 'Note|A',
+      path: 'Folder#1/Note',
+      noteName: 'Note',
       pageFrameName: null,
     });
   });
@@ -123,14 +113,4 @@ describe('parseNoteLinkTarget', () => {
     });
   });
 
-  it('preserves a hash in the alias as literal (not parsed as a frame)', () => {
-    // Alias `Has#Hash` — the `#` is past the alias boundary, so target is
-    // just `Note` and the frame stays null.
-    expect(parseNoteLinkTarget('Note|Has#Hash')).toEqual({
-      isPath: false,
-      path: 'Note',
-      noteName: 'Note',
-      pageFrameName: null,
-    });
-  });
 });

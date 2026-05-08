@@ -4,19 +4,20 @@ import {
   escapeNoteLinkSegment,
   joinNoteLinkTitle,
   splitNoteLinkTargetFrame,
-  splitNoteLinkTitle,
   unescapeNoteLinkSegment,
 } from './note-link-syntax';
 
 describe('escapeNoteLinkSegment', () => {
   it('escapes special characters', () => {
-    expect(escapeNoteLinkSegment('Foo#Bar|Baz\\Qux')).toBe(
-      'Foo\\#Bar\\|Baz\\\\Qux',
-    );
+    expect(escapeNoteLinkSegment('Foo#Bar\\Qux')).toBe('Foo\\#Bar\\\\Qux');
   });
 
   it('leaves non-special characters alone', () => {
     expect(escapeNoteLinkSegment('Plain Note 123')).toBe('Plain Note 123');
+  });
+
+  it('leaves pipe alone', () => {
+    expect(escapeNoteLinkSegment('Foo|Bar')).toBe('Foo|Bar');
   });
 
   it('returns empty for empty input', () => {
@@ -29,15 +30,13 @@ describe('escapeNoteLinkSegment', () => {
   });
 
   it('escapes a string of only special characters', () => {
-    expect(escapeNoteLinkSegment('#|\\')).toBe('\\#\\|\\\\');
+    expect(escapeNoteLinkSegment('#\\')).toBe('\\#\\\\');
   });
 });
 
 describe('unescapeNoteLinkSegment', () => {
   it('reverses escape pairs', () => {
-    expect(unescapeNoteLinkSegment('Foo\\#Bar\\|Baz\\\\Qux')).toBe(
-      'Foo#Bar|Baz\\Qux',
-    );
+    expect(unescapeNoteLinkSegment('Foo\\#Bar\\\\Qux')).toBe('Foo#Bar\\Qux');
   });
 
   it('treats unknown escapes as literal next char', () => {
@@ -59,76 +58,17 @@ describe('unescapeNoteLinkSegment', () => {
   });
 
   it.each([
-    'Section #3 | Plan B \\drafts',
-    '#|\\',
+    'Section #3 \\drafts',
+    '#\\',
     '\\\\',
-    '\\#\\|\\\\',
+    '\\#\\\\',
     'plain',
+    'has | pipe',
     '',
   ])('round-trips %j through escape then unescape', (original) => {
     expect(unescapeNoteLinkSegment(escapeNoteLinkSegment(original))).toBe(
       original,
     );
-  });
-});
-
-describe('splitNoteLinkTitle', () => {
-  it('returns whole title when no alias', () => {
-    expect(splitNoteLinkTitle('Note#Frame')).toEqual({
-      target: 'Note#Frame',
-      alias: null,
-    });
-  });
-
-  it('splits on first unescaped pipe', () => {
-    expect(splitNoteLinkTitle('Note#Frame|Display')).toEqual({
-      target: 'Note#Frame',
-      alias: 'Display',
-    });
-  });
-
-  it('honors escaped pipe in target', () => {
-    expect(splitNoteLinkTitle('A\\|B|Display')).toEqual({
-      target: 'A\\|B',
-      alias: 'Display',
-    });
-  });
-
-  it('treats subsequent pipes as part of alias', () => {
-    expect(splitNoteLinkTitle('Note|A|B')).toEqual({
-      target: 'Note',
-      alias: 'A|B',
-    });
-  });
-
-  it('splits on a real pipe after a double-backslash', () => {
-    // `\\` is an escaped backslash; the following `|` is a real delimiter.
-    expect(splitNoteLinkTitle('A\\\\|B')).toEqual({
-      target: 'A\\\\',
-      alias: 'B',
-    });
-  });
-
-  it('does not split when triple-backslash escapes the pipe', () => {
-    // `\\` then `\|` → escaped backslash + escaped pipe; no delimiter.
-    expect(splitNoteLinkTitle('A\\\\\\|B')).toEqual({
-      target: 'A\\\\\\|B',
-      alias: null,
-    });
-  });
-
-  it('returns empty alias when title ends with pipe', () => {
-    expect(splitNoteLinkTitle('Note|')).toEqual({
-      target: 'Note',
-      alias: '',
-    });
-  });
-
-  it('returns empty target when title starts with pipe', () => {
-    expect(splitNoteLinkTitle('|Alias')).toEqual({
-      target: '',
-      alias: 'Alias',
-    });
   });
 });
 
@@ -193,27 +133,21 @@ describe('splitNoteLinkTargetFrame', () => {
 
 describe('joinNoteLinkTitle', () => {
   it('joins note only', () => {
-    expect(joinNoteLinkTitle('Note', null, null)).toBe('Note');
+    expect(joinNoteLinkTitle('Note', null)).toBe('Note');
   });
 
   it('joins note and frame', () => {
-    expect(joinNoteLinkTitle('Note', 'Frame', null)).toBe('Note#Frame');
+    expect(joinNoteLinkTitle('Note', 'Frame')).toBe('Note#Frame');
   });
 
-  it('joins note, frame, and alias', () => {
-    expect(joinNoteLinkTitle('Note', 'Frame', 'Display')).toBe(
-      'Note#Frame|Display',
-    );
-  });
-
-  it('preserves empty alias and frame', () => {
-    expect(joinNoteLinkTitle('Note', '', '')).toBe('Note#|');
+  it('preserves empty frame', () => {
+    expect(joinNoteLinkTitle('Note', '')).toBe('Note#');
   });
 });
 
 describe('escapeNoteLinkPath', () => {
   it('escapes per segment', () => {
-    expect(escapeNoteLinkPath('Folder#1/Note|A')).toBe('Folder\\#1/Note\\|A');
+    expect(escapeNoteLinkPath('Folder#1/Note')).toBe('Folder\\#1/Note');
   });
 
   it('does not escape the path separator itself', () => {
@@ -224,30 +158,25 @@ describe('escapeNoteLinkPath', () => {
     expect(escapeNoteLinkPath('A\\B/C\\D')).toBe('A\\\\B/C\\\\D');
   });
 
-  it('handles a single segment', () => {
-    expect(escapeNoteLinkPath('Note|A')).toBe('Note\\|A');
+  it('leaves pipe alone', () => {
+    expect(escapeNoteLinkPath('Note|A')).toBe('Note|A');
   });
 });
 
 describe('full title round-trip', () => {
   it('escape -> split -> unescape recovers a target with all special chars', () => {
-    const noteName = 'Plan #2 | draft \\v1';
+    const noteName = 'Plan #2 \\v1';
     const frameName = 'Section #3';
-    const aliasName = 'Display | label';
     const title = joinNoteLinkTitle(
       escapeNoteLinkSegment(noteName),
       escapeNoteLinkSegment(frameName),
-      escapeNoteLinkSegment(aliasName),
     );
 
-    const { target, alias } = splitNoteLinkTitle(title);
-    const { noteTarget, frame } = splitNoteLinkTargetFrame(target);
+    const { noteTarget, frame } = splitNoteLinkTargetFrame(title);
 
     expect(unescapeNoteLinkSegment(noteTarget)).toBe(noteName);
     expect(frame).not.toBeNull();
     expect(unescapeNoteLinkSegment(frame ?? '')).toBe(frameName);
-    expect(alias).not.toBeNull();
-    expect(unescapeNoteLinkSegment(alias ?? '')).toBe(aliasName);
   });
 
   it('escape -> split keeps frame separator after escaped backslash', () => {
@@ -255,12 +184,10 @@ describe('full title round-trip', () => {
     const title = joinNoteLinkTitle(
       escapeNoteLinkSegment('A\\'),
       escapeNoteLinkSegment('Frame'),
-      null,
     );
     expect(title).toBe('A\\\\#Frame');
 
-    const { target } = splitNoteLinkTitle(title);
-    const { noteTarget, frame } = splitNoteLinkTargetFrame(target);
+    const { noteTarget, frame } = splitNoteLinkTargetFrame(title);
 
     expect(unescapeNoteLinkSegment(noteTarget)).toBe('A\\');
     expect(frame).toBe('Frame');

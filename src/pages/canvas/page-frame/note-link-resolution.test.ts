@@ -269,7 +269,7 @@ describe('searchNoteLinkAutocompleteItems', () => {
     ]);
   });
 
-  it('escapes hash and pipe in suggested frame names', async () => {
+  it('escapes hash in suggested frame names but leaves pipe alone', async () => {
     const repository = {
       searchNodes: vi.fn(async () => [
         createFileNode('note-alpha', 'Alpha', null),
@@ -293,7 +293,7 @@ describe('searchNoteLinkAutocompleteItems', () => {
         title: 'Plan #2 | draft',
         subtitle: 'Alpha - Root',
         detail: 'Frame',
-        insertText: 'Alpha#Plan \\#2 \\| draft',
+        insertText: 'Alpha#Plan \\#2 | draft',
         pageFrameId: 'frame-0',
       },
     ]);
@@ -393,7 +393,7 @@ describe('resolveNoteLinkRefByTitle', () => {
     ).resolves.toEqual({ noteId: 'note-alpha', pageFrameId: 'frame-1' });
   });
 
-  it('matches frame names containing hash and pipe via escapes', async () => {
+  it('matches frame names containing hash via escape and pipe as literal', async () => {
     const repository = {
       searchNodes: vi.fn(async () => [
         createFileNode('note-alpha', 'Alpha', null),
@@ -405,7 +405,7 @@ describe('resolveNoteLinkRefByTitle', () => {
     };
 
     await expect(
-      resolveNoteLinkRefByTitle(repository, 'Alpha#Plan \\#2 \\| draft'),
+      resolveNoteLinkRefByTitle(repository, 'Alpha#Plan \\#2 | draft'),
     ).resolves.toEqual({ noteId: 'note-alpha', pageFrameId: 'frame-0' });
   });
 

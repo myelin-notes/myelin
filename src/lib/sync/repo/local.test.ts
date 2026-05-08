@@ -168,7 +168,7 @@ describe('LocalRepository', () => {
     const sourceId = await repository.createFile('Source', 'mcanvas', null);
     const targetId = await repository.createFile('Target', 'mcanvas', null);
     const note = await createCanvasNoteState(
-      'See [[Target]] and [[Projects/Target#Frame|alias]].',
+      'See [[Target]] and [[Projects/Target#Frame]].',
       async (title) => (title.includes('Target') ? targetId : null),
     );
 
@@ -187,11 +187,11 @@ describe('LocalRepository', () => {
     expect(
       readFirstPageFrameMarkdown(await repository.readFileBytes(sourceId)),
     ).toBe(
-      'See [[Renamed Target]] and [[Projects/Renamed Target#Frame|alias]].\n',
+      'See [[Renamed Target]] and [[Projects/Renamed Target#Frame]].\n',
     );
     expect(
       (await repository.getBacklinks(targetId)).map((link) => link.title),
-    ).toEqual(['Renamed Target', 'Projects/Renamed Target#Frame|alias']);
+    ).toEqual(['Renamed Target', 'Projects/Renamed Target#Frame']);
   });
 
   it('stores image files as regular VFS file nodes', async () => {

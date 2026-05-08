@@ -1,6 +1,5 @@
 import {
   splitNoteLinkTargetFrame,
-  splitNoteLinkTitle,
   unescapeNoteLinkSegment,
 } from './note-link-syntax';
 
@@ -14,8 +13,7 @@ export interface ParsedNoteLinkTarget {
 export function parseNoteLinkTarget(
   target: string,
 ): ParsedNoteLinkTarget | null {
-  const { target: rawTarget } = splitNoteLinkTitle(target);
-  const { noteTarget, frame } = splitNoteLinkTargetFrame(rawTarget);
+  const { noteTarget, frame } = splitNoteLinkTargetFrame(target);
 
   const segments = noteTarget
     .split('/')

@@ -5,7 +5,6 @@ import {
   escapeNoteLinkSegment,
   joinNoteLinkTitle,
   splitNoteLinkTargetFrame,
-  splitNoteLinkTitle,
 } from '@/lib/note-link-syntax';
 import type { VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -437,23 +436,21 @@ export function renameNoteLinkReferenceTitle(
   title: string,
   newName: string,
 ): string {
-  const { target, alias } = splitNoteLinkTitle(title);
-  const { noteTarget, frame } = splitNoteLinkTargetFrame(target);
+  const { noteTarget, frame } = splitNoteLinkTargetFrame(title);
   const pathSegments = noteTarget.split('/');
   pathSegments[pathSegments.length - 1] = escapeNoteLinkSegment(newName);
-  return joinNoteLinkTitle(pathSegments.join('/'), frame, alias);
+  return joinNoteLinkTitle(pathSegments.join('/'), frame);
 }
 
 export function renamePageFrameLinkReferenceTitle(
   title: string,
   newName: string,
 ): string {
-  const { target, alias } = splitNoteLinkTitle(title);
-  const { noteTarget, frame } = splitNoteLinkTargetFrame(target);
+  const { noteTarget, frame } = splitNoteLinkTargetFrame(title);
   if (frame === null) {
     return title;
   }
-  return joinNoteLinkTitle(noteTarget, escapeNoteLinkSegment(newName), alias);
+  return joinNoteLinkTitle(noteTarget, escapeNoteLinkSegment(newName));
 }
 
 export interface RenamePageFrameLinkTransactionResult {
