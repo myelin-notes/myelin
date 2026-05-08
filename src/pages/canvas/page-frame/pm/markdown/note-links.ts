@@ -392,6 +392,11 @@ export function buildResolvedNoteLinkTransaction(
       continue;
     }
 
+    // Treats stored uuids as stable: once a pageFrameId is set on a link
+    // mark, we never overwrite it from a fresh resolution. A delete+recreate
+    // of the target frame under a new uuid leaves a dead uuid here, but
+    // canvas/index.tsx falls back to focusPageFrameByName so the link still
+    // navigates correctly.
     const nextNoteId = target.noteId ?? ref.noteId;
     const nextPageFrameId = target.pageFrameId ?? ref.pageFrameId;
     if (
