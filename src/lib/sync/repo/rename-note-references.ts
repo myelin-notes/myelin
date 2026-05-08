@@ -6,12 +6,14 @@ import { ElementType } from '@/pages/canvas/elements/element-type';
 import { renameNoteLinkReferencesDoc } from '@/pages/canvas/page-frame/pm/markdown/note-links';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import {
+  type DocRewriteRepository,
+  rewriteDocReferencesInSources,
+} from './rewrite-doc-references';
 import type { NoteBacklink, Repository, VFSNodeId } from './types';
 
-type NoteReferenceRepository = Pick<
-  Repository,
-  'getBacklinks' | 'getNode' | 'readFileBytes' | 'writeFileBytes'
->;
+type NoteReferenceRepository = DocRewriteRepository &
+  Pick<Repository, 'getBacklinks'>;
 
 export interface RenameNoteReferencesResult {
   sourceCount: number;
@@ -77,35 +79,7 @@ export async function renameNoteReferences(
     ),
   ];
 
-  let sourceCount = 0;
-  let linkCount = 0;
-  for (const sourceId of sourceIds) {
-    const node = await repository.getNode(sourceId);
-    if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
-      continue;
-    }
-
-    const bytes = await repository.readFileBytes(sourceId);
-    if (!bytes || bytes.byteLength === 0) {
-      continue;
-    }
-
-    const ydoc = YDocManager.fromUpdate(bytes);
-    let sourceLinkCount = 0;
-    ydoc.transact(() => {
-      sourceLinkCount = renameReferencesInDoc(ydoc, noteId, newName);
-      if (sourceLinkCount > 0) {
-        ydoc.sweepOrphanPageFrameFragments();
-      }
-    });
-    if (sourceLinkCount === 0) {
-      continue;
-    }
-
-    await repository.writeFileBytes(sourceId, ydoc.encodeState());
-    sourceCount++;
-    linkCount += sourceLinkCount;
-  }
-
-  return { sourceCount, linkCount };
+  return rewriteDocReferencesInSources(repository, sourceIds, (ydoc) =>
+    renameReferencesInDoc(ydoc, noteId, newName),
+  );
 }
