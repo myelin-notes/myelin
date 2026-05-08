@@ -1,6 +1,12 @@
 import type { MarkType, Node as PMNode, Schema } from 'prosemirror-model';
 import { EditorState, Plugin, type Transaction } from 'prosemirror-state';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
+import {
+  escapeNoteLinkSegment,
+  joinNoteLinkTitle,
+  splitNoteLinkTargetFrame,
+  splitNoteLinkTitle,
+} from '@/lib/note-link-syntax';
 import type { VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import { PM_ADD_TO_HISTORY } from '../constants';
@@ -431,30 +437,23 @@ export function renameNoteLinkReferenceTitle(
   title: string,
   newName: string,
 ): string {
-  const aliasIndex = title.indexOf('|');
-  const target = aliasIndex === -1 ? title : title.slice(0, aliasIndex);
-  const alias = aliasIndex === -1 ? '' : title.slice(aliasIndex);
-  const frameIndex = target.indexOf('#');
-  const noteTarget = frameIndex === -1 ? target : target.slice(0, frameIndex);
-  const frame = frameIndex === -1 ? '' : target.slice(frameIndex);
+  const { target, alias } = splitNoteLinkTitle(title);
+  const { noteTarget, frame } = splitNoteLinkTargetFrame(target);
   const pathSegments = noteTarget.split('/');
-  pathSegments[pathSegments.length - 1] = newName;
-  return `${pathSegments.join('/')}${frame}${alias}`;
+  pathSegments[pathSegments.length - 1] = escapeNoteLinkSegment(newName);
+  return joinNoteLinkTitle(pathSegments.join('/'), frame, alias);
 }
 
 export function renamePageFrameLinkReferenceTitle(
   title: string,
   newName: string,
 ): string {
-  const aliasIndex = title.indexOf('|');
-  const target = aliasIndex === -1 ? title : title.slice(0, aliasIndex);
-  const alias = aliasIndex === -1 ? '' : title.slice(aliasIndex);
-  const frameIndex = target.indexOf('#');
-  if (frameIndex === -1) {
+  const { target, alias } = splitNoteLinkTitle(title);
+  const { noteTarget, frame } = splitNoteLinkTargetFrame(target);
+  if (frame === null) {
     return title;
   }
-  const noteTarget = target.slice(0, frameIndex);
-  return `${noteTarget}#${newName}${alias}`;
+  return joinNoteLinkTitle(noteTarget, escapeNoteLinkSegment(newName), alias);
 }
 
 export interface RenamePageFrameLinkTransactionResult {

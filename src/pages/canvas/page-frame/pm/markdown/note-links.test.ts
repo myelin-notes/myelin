@@ -226,6 +226,27 @@ describe('noteLinkMarkdownPlugin', () => {
     );
   });
 
+  it('escapes hash and pipe in renamed note name', () => {
+    expect(
+      renameNoteLinkReferenceTitle('Archive/Alpha#Research', 'Plan B|notes'),
+    ).toBe('Archive/Plan B\\|notes#Research');
+  });
+
+  it('escapes hash and pipe in renamed page-frame name', () => {
+    expect(
+      renamePageFrameLinkReferenceTitle(
+        'Archive/Alpha#Research|display',
+        'Plan #2 | draft',
+      ),
+    ).toBe('Archive/Alpha#Plan \\#2 \\| draft|display');
+  });
+
+  it('preserves escaped hash in note target when renaming the frame', () => {
+    expect(renamePageFrameLinkReferenceTitle('Foo\\#Bar#Old', 'New')).toBe(
+      'Foo\\#Bar#New',
+    );
+  });
+
   it('preserves resolved pageFrameId across normalization passes', () => {
     const noteLinkMark = schema.marks.noteLink;
     const title = 'Alpha Note#Frame';

@@ -232,7 +232,7 @@ describe('searchNoteLinkAutocompleteItems', () => {
         id: 'note-beta',
         title: 'Beta',
         subtitle: 'Projects',
-        insertText: undefined,
+        insertText: 'Beta',
       },
     ]);
   });
@@ -264,6 +264,67 @@ describe('searchNoteLinkAutocompleteItems', () => {
         subtitle: 'Alpha - Root',
         detail: 'Frame',
         insertText: 'Alpha#Research Notes',
+        pageFrameId: 'frame-0',
+      },
+    ]);
+  });
+
+  it('escapes hash and pipe in suggested frame names', async () => {
+    const repository = {
+      searchNodes: vi.fn(async () => [
+        createFileNode('note-alpha', 'Alpha', null),
+      ]),
+      getFolderChain: vi.fn(async () => []),
+      loadDocument: vi.fn(async () =>
+        createSnapshot(createPageFrameUpdate(['Plan #2 | draft'])),
+      ),
+    };
+
+    const items = await searchNoteLinkAutocompleteItems(
+      repository,
+      'Alpha#Plan',
+      8,
+      new AbortController().signal,
+    );
+
+    expect(items).toEqual([
+      {
+        id: 'note-alpha',
+        title: 'Plan #2 | draft',
+        subtitle: 'Alpha - Root',
+        detail: 'Frame',
+        insertText: 'Alpha#Plan \\#2 \\| draft',
+        pageFrameId: 'frame-0',
+      },
+    ]);
+  });
+
+  it('resolves frame queries with escaped hash in note target', async () => {
+    const repository = {
+      searchNodes: vi.fn(async () => [
+        createFileNode('note-alpha', 'A#B', null),
+      ]),
+      getFolderChain: vi.fn(async () => []),
+      loadDocument: vi.fn(async () =>
+        createSnapshot(createPageFrameUpdate(['Research Notes'])),
+      ),
+    };
+
+    const items = await searchNoteLinkAutocompleteItems(
+      repository,
+      'A\\#B#Re',
+      8,
+      new AbortController().signal,
+    );
+
+    expect(repository.searchNodes).toHaveBeenCalledWith('A#B');
+    expect(items).toEqual([
+      {
+        id: 'note-alpha',
+        title: 'Research Notes',
+        subtitle: 'A#B - Root',
+        detail: 'Frame',
+        insertText: 'A\\#B#Research Notes',
         pageFrameId: 'frame-0',
       },
     ]);
@@ -330,6 +391,22 @@ describe('resolveNoteLinkRefByTitle', () => {
     await expect(
       resolveNoteLinkRefByTitle(repository, 'Alpha#Draft'),
     ).resolves.toEqual({ noteId: 'note-alpha', pageFrameId: 'frame-1' });
+  });
+
+  it('matches frame names containing hash and pipe via escapes', async () => {
+    const repository = {
+      searchNodes: vi.fn(async () => [
+        createFileNode('note-alpha', 'Alpha', null),
+      ]),
+      getFolderChain: vi.fn(async () => []),
+      loadDocument: vi.fn(async () =>
+        createSnapshot(createPageFrameUpdate(['Plan #2 | draft'])),
+      ),
+    };
+
+    await expect(
+      resolveNoteLinkRefByTitle(repository, 'Alpha#Plan \\#2 \\| draft'),
+    ).resolves.toEqual({ noteId: 'note-alpha', pageFrameId: 'frame-0' });
   });
 
   it('returns null pageFrameId when no displayName matches', async () => {
