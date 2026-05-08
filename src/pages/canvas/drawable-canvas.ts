@@ -16,7 +16,7 @@ import {
 import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
-import type { ResolveNoteLinkId } from './page-frame/pm/markdown/note-links';
+import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
@@ -75,7 +75,12 @@ export class DrawableCanvas {
   private _yMapToElement = new Map<Y.Map<unknown>, DrawableElement>();
   private _toolCursor: string = 'default';
   private toolSelected: ITool;
-  private readonly resolveNoteLinkId?: ResolveNoteLinkId;
+  private readonly resolveNoteLink?: ResolveNoteLink;
+  private onPageFrameRenamed?: (
+    uuid: string,
+    newName: string,
+    oldName: string,
+  ) => void;
 
   private onElementEdit?: (element: DrawableElement | null) => void;
 
@@ -105,7 +110,7 @@ export class DrawableCanvas {
     canvas: HTMLCanvasElement,
     ydoc: YDocManager,
     tools?: ITool[],
-    resolveNoteLinkId?: ResolveNoteLinkId,
+    resolveNoteLink?: ResolveNoteLink,
   ) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {
@@ -120,7 +125,7 @@ export class DrawableCanvas {
     this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
     this._ydoc = ydoc;
-    this.resolveNoteLinkId = resolveNoteLinkId;
+    this.resolveNoteLink = resolveNoteLink;
 
     this.initEventListeners(canvas);
     this.initStates();
@@ -200,11 +205,20 @@ export class DrawableCanvas {
 
   private configureElement(element: DrawableElement): void {
     if (element instanceof PageFrameElement) {
-      element.setNoteLinkResolver(this.resolveNoteLinkId);
+      element.setNoteLinkResolver(this.resolveNoteLink);
+      element.setOnDisplayNameRenamed((uuid, newName, oldName) => {
+        this.onPageFrameRenamed?.(uuid, newName, oldName);
+      });
     }
     if (element instanceof PdfElement) {
       element.setExportElementsProvider(() => this.elements);
     }
+  }
+
+  public setOnPageFrameRenamed(
+    callback?: (uuid: string, newName: string, oldName: string) => void,
+  ): void {
+    this.onPageFrameRenamed = callback;
   }
 
   private bindElementSharedYState(element: DrawableElement): void {
@@ -443,6 +457,18 @@ export class DrawableCanvas {
         element instanceof PageFrameElement &&
         element.displayName === displayName,
     );
+    return this.focusFrameElement(frame);
+  }
+
+  public focusPageFrameById(uuid: string): boolean {
+    const frame = this.elements.find(
+      (element): element is PageFrameElement =>
+        element instanceof PageFrameElement && element.uuid === uuid,
+    );
+    return this.focusFrameElement(frame);
+  }
+
+  private focusFrameElement(frame: PageFrameElement | undefined): boolean {
     if (!frame) {
       return false;
     }

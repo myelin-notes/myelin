@@ -1,22 +1,54 @@
 import {
   type RefObject,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
 } from 'react';
 import { Logger } from '@/lib/logger';
-import type { NoteSession, VFSNodeId } from '@/lib/sync';
+import type { NoteBacklink, NoteSession, VFSNodeId } from '@/lib/sync';
 import {
   type ActiveRepository,
   type NoteSessionStatus,
   useRepository,
 } from '@/lib/sync';
+import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-references';
+import { UserPrefs } from '@/lib/user-prefs';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
-import { resolveNoteLinkIdByTitle } from '@/pages/canvas/page-frame/note-link-resolution';
+import {
+  type PageFrameNameCache,
+  resolveNoteLinkRefByTitle,
+} from '@/pages/canvas/page-frame/note-link-resolution';
+import { buildRenamePageFrameLinkReferencesTransaction } from '@/pages/canvas/page-frame/pm/markdown/note-links';
+import { schema as pageFrameSchema } from '@/pages/canvas/page-frame/pm/schema';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
+import type {
+  RenameReferencesChoice,
+  RenameReferencesPrompt,
+} from '@/pages/library/explorer/use-explorer-item';
+
+type PageFrameRenameListener = (
+  ownerNoteId: VFSNodeId,
+  pageFrameId: string,
+  newName: string,
+) => void;
+
+interface PendingPageFrameRename {
+  ownerNoteId: VFSNodeId;
+  newName: string;
+  backlinks: NoteBacklink[];
+}
+
+interface PendingPageFrameRenamePrompt extends RenameReferencesPrompt {
+  ownerNoteId: VFSNodeId;
+  pageFrameId: string;
+  newName: string;
+  backlinks: NoteBacklink[];
+}
 
 const logger = new Logger('CanvasSessionController');
 
@@ -52,6 +84,7 @@ export class CanvasSessionController {
   private teardownQueue: Promise<void> = Promise.resolve();
   private activeSession: ActiveCanvasSession | null = null;
   private lifecycleError: Error | null = null;
+  private onPageFrameRenamed: PageFrameRenameListener | null = null;
 
   constructor(
     private readonly repository: ActiveRepository,
@@ -72,13 +105,20 @@ export class CanvasSessionController {
 
   getSnapshot = (): CanvasSessionSnapshot => this.snapshot;
 
-  async open(noteId: VFSNodeId): Promise<void> {
+  async open(
+    noteId: VFSNodeId,
+    options?: { initialPageFrameName?: string | null },
+  ): Promise<void> {
     const token = ++this.lifecycleToken;
     await this.teardownActiveSession();
     if (token !== this.lifecycleToken) {
       return;
     }
-    await this.openSession(noteId, token);
+    await this.openSession(
+      noteId,
+      token,
+      options?.initialPageFrameName ?? null,
+    );
   }
 
   async dispose(): Promise<void> {
@@ -86,7 +126,15 @@ export class CanvasSessionController {
     await this.teardownActiveSession();
   }
 
-  private async openSession(noteId: VFSNodeId, token: number): Promise<void> {
+  setOnPageFrameRenamed(listener: PageFrameRenameListener | null): void {
+    this.onPageFrameRenamed = listener;
+  }
+
+  private async openSession(
+    noteId: VFSNodeId,
+    token: number,
+    initialPageFrameName: string | null,
+  ): Promise<void> {
     const canvas = this.canvasRef.current;
     if (!canvas) {
       this.setLifecycleError(new Error('Canvas is not mounted.'));
@@ -114,12 +162,17 @@ export class CanvasSessionController {
         return;
       }
 
+      const frameNameCache: PageFrameNameCache = new Map();
       drawableCanvas = new DrawableCanvas(
         canvas,
         session.ydoc,
         this.canvasToolsRef.current,
-        async (title) => resolveNoteLinkIdByTitle(this.repository, title),
+        async (title) =>
+          resolveNoteLinkRefByTitle(this.repository, title, frameNameCache),
       );
+      drawableCanvas.setOnPageFrameRenamed((uuid, newName) => {
+        this.handlePageFrameRenamed(noteId, uuid, newName);
+      });
 
       if (this.bgCanvasRef.current) {
         drawableCanvas.setBackgroundCanvas(this.bgCanvasRef.current);
@@ -138,7 +191,8 @@ export class CanvasSessionController {
           y: canvas.height / dpr / 2,
         });
         const frame = drawableCanvas.addElement(
-          (uuid) => new PageFrameElement(uuid),
+          (uuid) =>
+            new PageFrameElement(uuid, initialPageFrameName ?? undefined),
         );
         frame.setOffset(
           centerWorld.x - frame.pageWidth / 2,
@@ -167,6 +221,36 @@ export class CanvasSessionController {
       logger.error('Failed to open canvas session', error, { id: noteId });
       this.setLifecycleError(error);
     }
+  }
+
+  private handlePageFrameRenamed(
+    ownerNoteId: VFSNodeId,
+    pageFrameId: string,
+    newName: string,
+  ): void {
+    const drawableCanvas = this.activeSession?.drawableCanvas;
+    if (drawableCanvas) {
+      for (const element of drawableCanvas.elements) {
+        if (!(element instanceof PageFrameElement)) {
+          continue;
+        }
+        const view = element.pmEditor?.view;
+        if (!view) {
+          continue;
+        }
+        const result = buildRenamePageFrameLinkReferencesTransaction(
+          view.state,
+          pageFrameSchema,
+          pageFrameId,
+          newName,
+        );
+        if (result) {
+          view.dispatch(result.tr);
+        }
+      }
+    }
+
+    this.onPageFrameRenamed?.(ownerNoteId, pageFrameId, newName);
   }
 
   private async teardownActiveSession(): Promise<void> {
@@ -286,6 +370,7 @@ export class CanvasSessionController {
 
 interface UseCanvasSessionControllerArgs {
   id: VFSNodeId | undefined;
+  initialPageFrameName?: string | null;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: RefObject<HTMLCanvasElement | null>;
   overlayCanvasRef: RefObject<HTMLCanvasElement | null>;
@@ -296,6 +381,7 @@ interface UseCanvasSessionControllerArgs {
 
 export function useCanvasSessionController({
   id,
+  initialPageFrameName,
   canvasRef,
   bgCanvasRef,
   overlayCanvasRef,
@@ -335,18 +421,164 @@ export function useCanvasSessionController({
     controller.getSnapshot,
   );
 
+  const initialPageFrameNameRef = useRef(initialPageFrameName);
+  initialPageFrameNameRef.current = initialPageFrameName;
+
   useEffect(() => {
     if (!id) {
       void controller.dispose();
       return;
     }
 
-    void controller.open(id);
+    void controller.open(id, {
+      initialPageFrameName: initialPageFrameNameRef.current,
+    });
 
     return () => {
       void controller.dispose();
     };
   }, [controller, id]);
 
-  return snapshot;
+  const [pageFrameRenamePrompt, setPageFrameRenamePrompt] =
+    useState<PendingPageFrameRenamePrompt | null>(null);
+  const pendingRenamesRef = useRef(new Map<string, PendingPageFrameRename>());
+  const drainingRef = useRef(false);
+
+  const drainPendingRenames = useCallback(async () => {
+    if (drainingRef.current) {
+      return;
+    }
+    drainingRef.current = true;
+    try {
+      while (pendingRenamesRef.current.size > 0) {
+        const next = pendingRenamesRef.current.entries().next();
+        if (next.done) {
+          break;
+        }
+        const [pageFrameId, { ownerNoteId, newName, backlinks }] = next.value;
+        pendingRenamesRef.current.delete(pageFrameId);
+        try {
+          await renamePageFrameReferences(
+            repository,
+            ownerNoteId,
+            pageFrameId,
+            newName,
+            backlinks,
+          );
+        } catch (error) {
+          logger.error('Failed to rename page-frame references', error, {
+            ownerNoteId,
+            pageFrameId,
+          });
+        }
+      }
+    } finally {
+      drainingRef.current = false;
+    }
+  }, [repository]);
+
+  const enqueueAndDrain = useCallback(
+    (entry: PendingPageFrameRename & { pageFrameId: string }) => {
+      pendingRenamesRef.current.set(entry.pageFrameId, {
+        ownerNoteId: entry.ownerNoteId,
+        newName: entry.newName,
+        backlinks: entry.backlinks,
+      });
+      void drainPendingRenames();
+    },
+    [drainPendingRenames],
+  );
+
+  useEffect(() => {
+    controller.setOnPageFrameRenamed((ownerNoteId, pageFrameId, newName) => {
+      void (async () => {
+        let backlinks: NoteBacklink[] = [];
+        try {
+          backlinks = await repository.getBacklinks(ownerNoteId);
+        } catch (err) {
+          logger.error(
+            'Failed to load backlinks before page-frame rename',
+            err,
+            { ownerNoteId, pageFrameId },
+          );
+        }
+
+        const matching = backlinks.filter(
+          (b) =>
+            b.targetId === ownerNoteId &&
+            b.pageFrameId === pageFrameId &&
+            b.sourceId !== ownerNoteId,
+        );
+
+        if (matching.length === 0) {
+          return;
+        }
+
+        if (UserPrefs.get('alwaysRenameNoteReferences')) {
+          enqueueAndDrain({
+            pageFrameId,
+            ownerNoteId,
+            newName,
+            backlinks: matching,
+          });
+          return;
+        }
+
+        const noteCount = new Set(matching.map((b) => b.sourceId)).size;
+        setPageFrameRenamePrompt({
+          ownerNoteId,
+          pageFrameId,
+          newName,
+          backlinks: matching,
+          mentionCount: matching.length,
+          noteCount,
+        });
+      })();
+    });
+    return () => {
+      controller.setOnPageFrameRenamed(null);
+    };
+  }, [controller, repository, enqueueAndDrain]);
+
+  const lastIdRef = useRef(id);
+  if (lastIdRef.current !== id) {
+    lastIdRef.current = id;
+    if (pageFrameRenamePrompt !== null) {
+      setPageFrameRenamePrompt(null);
+    }
+  }
+
+  const choosePageFrameRenameReferences = useCallback(
+    (choice: RenameReferencesChoice) => {
+      const pending = pageFrameRenamePrompt;
+      if (!pending) {
+        return;
+      }
+      setPageFrameRenamePrompt(null);
+      if (choice === 'cancel' || choice === 'no') {
+        return;
+      }
+      if (choice === 'always') {
+        UserPrefs.set('alwaysRenameNoteReferences', true);
+      }
+      enqueueAndDrain({
+        pageFrameId: pending.pageFrameId,
+        ownerNoteId: pending.ownerNoteId,
+        newName: pending.newName,
+        backlinks: pending.backlinks,
+      });
+    },
+    [pageFrameRenamePrompt, enqueueAndDrain],
+  );
+
+  return {
+    ...snapshot,
+    pageFrameRenamePrompt: pageFrameRenamePrompt
+      ? {
+          mentionCount: pageFrameRenamePrompt.mentionCount,
+          noteCount: pageFrameRenamePrompt.noteCount,
+        }
+      : null,
+    choosePageFrameRenameReferences,
+  };
 }

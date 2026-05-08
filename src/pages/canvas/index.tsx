@@ -19,6 +19,7 @@ import { openNote, openNoteLink } from '@/lib/note-navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { useCanvasCommandContext } from './command-context';
@@ -31,7 +32,7 @@ import { PeerSyncPanel } from './components/peer-sync-panel';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
 import { ElementType } from './elements/element-type';
-import type { PageFrameElement } from './elements/page-frame-element';
+import { PageFrameElement } from './elements/page-frame-element';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
@@ -88,8 +89,25 @@ function CanvasViewInner() {
     embedFiles,
   });
 
+  const targetPageFrameName = useMemo(() => {
+    if (!location.hash) {
+      return null;
+    }
+
+    const rawHash = location.hash.slice(1);
+    try {
+      return decodeURIComponent(rawHash).trim() || null;
+    } catch {
+      return rawHash.trim() || null;
+    }
+  }, [location.hash]);
+  const routeState = location.state as { pageFrameId?: unknown } | null;
+  const targetPageFrameId =
+    typeof routeState?.pageFrameId === 'string' ? routeState.pageFrameId : null;
+
   const engine = useCanvasEngine({
     id,
+    initialPageFrameName: targetPageFrameName,
     canvasRef,
     bgCanvasRef,
     overlayCanvasRef,
@@ -103,29 +121,52 @@ function CanvasViewInner() {
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
   });
-  const targetPageFrameName = useMemo(() => {
-    if (!location.hash) {
-      return null;
-    }
 
-    const rawHash = location.hash.slice(1);
-    try {
-      return decodeURIComponent(rawHash).trim() || null;
-    } catch {
-      return rawHash.trim() || null;
-    }
-  }, [location.hash]);
   useEffect(() => {
-    if (!engine.ready || !targetPageFrameName) {
+    if (!engine.ready) {
+      return;
+    }
+    if (!targetPageFrameId && !targetPageFrameName) {
       return;
     }
 
-    if (!drawableCanvasRef.current?.focusPageFrameByName(targetPageFrameName)) {
-      logger.debug('Requested page frame target was not found', {
-        pageFrameName: targetPageFrameName,
-      });
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
     }
-  }, [engine.ready, targetPageFrameName]);
+    if (targetPageFrameId && dc.focusPageFrameById(targetPageFrameId)) {
+      return;
+    }
+    if (targetPageFrameName && dc.focusPageFrameByName(targetPageFrameName)) {
+      return;
+    }
+    if (targetPageFrameName) {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return;
+      }
+      const dpr = window.devicePixelRatio || 1;
+      const centerWorld = dc.viewport.screenToWorld({
+        x: canvas.width / dpr / 2,
+        y: canvas.height / dpr / 2,
+      });
+      const frame = dc.addElement(
+        (uuid) => new PageFrameElement(uuid, targetPageFrameName),
+      );
+      frame.setOffset(
+        centerWorld.x - frame.pageWidth / 2,
+        centerWorld.y - frame.pageHeight / 2,
+      );
+      frame.updateBounds();
+      dc.updateBounding();
+      dc.focusPageFrameById(frame.uuid);
+      return;
+    }
+    logger.debug('Requested page frame target was not found', {
+      pageFrameName: targetPageFrameName,
+      pageFrameId: targetPageFrameId,
+    });
+  }, [engine.ready, targetPageFrameId, targetPageFrameName]);
 
   const importMarkdownFile = useCallback(
     async (file: File) => {
@@ -353,6 +394,11 @@ function CanvasViewInner() {
           />
         )}
       </AnimatePresence>
+
+      <RenameReferencesDialog
+        prompt={engine.pageFrameRenamePrompt}
+        onChoice={engine.choosePageFrameRenameReferences}
+      />
     </div>
   );
 }

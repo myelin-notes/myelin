@@ -65,6 +65,7 @@ export interface RepositoryStats {
 
 export interface StoredNoteLink {
   targetId: VFSNodeId | null;
+  pageFrameId: string | null;
   title: string;
   snippet: string;
 }

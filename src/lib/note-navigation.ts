@@ -6,11 +6,17 @@ export interface NoteRouteTarget {
   fileType: FileType;
   id: VFSNodeId;
   pageFrameName?: string | null;
+  pageFrameId?: string | null;
+}
+
+export interface NoteRouteState {
+  pageFrameId?: string | null;
 }
 
 export interface NoteLinkRouteTarget {
   title: string;
   noteId: VFSNodeId | null;
+  pageFrameId?: string | null;
 }
 
 export type NoteLinkRepository = Pick<Repository, 'createFile' | 'getNode'>;
@@ -28,7 +34,10 @@ export function openNote(
   navigate: NavigateFunction,
   target: NoteRouteTarget,
 ): void {
-  navigate(getNotePath(target), { viewTransition: true });
+  const state: NoteRouteState | undefined = target.pageFrameId
+    ? { pageFrameId: target.pageFrameId }
+    : undefined;
+  navigate(getNotePath(target), { viewTransition: true, state });
 }
 
 export async function openNoteLink(
@@ -50,5 +59,6 @@ export async function openNoteLink(
     fileType: 'mcanvas',
     id: noteId,
     pageFrameName: parsedTarget?.pageFrameName ?? null,
+    pageFrameId: target.pageFrameId ?? null,
   });
 }

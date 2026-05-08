@@ -7,11 +7,14 @@ import { serializeDocToMarkdown } from '../../markdown-serializer';
 import { schema } from '../schema';
 import {
   buildNormalizedNoteLinkTransaction,
+  buildRenamePageFrameLinkReferencesTransaction,
   buildResolvedNoteLinkTransaction,
   normalizeAndResolveNoteLinksDoc,
   noteLinkMarkdownPlugin,
   renameNoteLinkReferencesDoc,
   renameNoteLinkReferenceTitle,
+  renamePageFrameLinkReferencesDoc,
+  renamePageFrameLinkReferenceTitle,
 } from './note-links';
 
 function createEditorState(doc = schema.nodes.doc.createAndFill()!) {
@@ -41,7 +44,11 @@ describe('noteLinkMarkdownPlugin', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Alpha Note', noteId: null },
+                  attrs: {
+                    title: 'Alpha Note',
+                    noteId: null,
+                    pageFrameId: null,
+                  },
                 },
               ],
             },
@@ -69,7 +76,11 @@ describe('noteLinkMarkdownPlugin', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Alpha Note Revised', noteId: null },
+                  attrs: {
+                    title: 'Alpha Note Revised',
+                    noteId: null,
+                    pageFrameId: null,
+                  },
                 },
               ],
             },
@@ -86,7 +97,7 @@ describe('noteLinkMarkdownPlugin', () => {
     const tr = buildResolvedNoteLinkTransaction(
       state,
       schema,
-      new Map([['Alpha Note', 'note-1']]),
+      new Map([['Alpha Note', { noteId: 'note-1', pageFrameId: null }]]),
     );
 
     expect(tr).not.toBeNull();
@@ -102,7 +113,11 @@ describe('noteLinkMarkdownPlugin', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Alpha Note', noteId: 'note-1' },
+                  attrs: {
+                    title: 'Alpha Note',
+                    noteId: 'note-1',
+                    pageFrameId: null,
+                  },
                 },
               ],
             },
@@ -135,7 +150,7 @@ describe('noteLinkMarkdownPlugin', () => {
     const doc = await normalizeAndResolveNoteLinksDoc(
       parseMarkdownToDoc('[[Alpha Note]]', schema),
       schema,
-      async () => 'note-1',
+      async () => ({ noteId: 'note-1', pageFrameId: null }),
     );
 
     expect(doc.toJSON()).toEqual({
@@ -150,7 +165,11 @@ describe('noteLinkMarkdownPlugin', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Alpha Note', noteId: 'note-1' },
+                  attrs: {
+                    title: 'Alpha Note',
+                    noteId: 'note-1',
+                    pageFrameId: null,
+                  },
                 },
               ],
             },
@@ -167,8 +186,10 @@ describe('noteLinkMarkdownPlugin', () => {
         schema,
       ),
       schema,
-      async (title) =>
-        title.startsWith('Projects/Alpha Note') ? 'note-1' : null,
+      async (title) => ({
+        noteId: title.startsWith('Projects/Alpha Note') ? 'note-1' : null,
+        pageFrameId: null,
+      }),
     );
 
     const result = renameNoteLinkReferencesDoc(
@@ -188,6 +209,90 @@ describe('noteLinkMarkdownPlugin', () => {
     expect(
       renameNoteLinkReferenceTitle('Archive/Alpha#Research|display', 'Beta'),
     ).toBe('Archive/Beta#Research|display');
+  });
+
+  it('renames only the page-frame fragment in note-link titles', () => {
+    expect(
+      renamePageFrameLinkReferenceTitle(
+        'Archive/Alpha#Research|display',
+        'Findings',
+      ),
+    ).toBe('Archive/Alpha#Findings|display');
+  });
+
+  it('leaves titles without a page-frame fragment unchanged', () => {
+    expect(renamePageFrameLinkReferenceTitle('Archive/Alpha', 'Anything')).toBe(
+      'Archive/Alpha',
+    );
+  });
+
+  it('preserves resolved pageFrameId across normalization passes', () => {
+    const noteLinkMark = schema.marks.noteLink;
+    const title = 'Alpha Note#Frame';
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, [
+        schema.text('[[Alpha Note#Frame]]', [
+          noteLinkMark.create({
+            title,
+            noteId: 'note-1',
+            pageFrameId: 'frame-1',
+          }),
+        ]),
+      ]),
+    ]);
+    const state = createEditorState(doc);
+    expect(buildNormalizedNoteLinkTransaction(state, schema)).toBeNull();
+  });
+
+  it('rewrites page-frame link titles in a doc when the frame is renamed', async () => {
+    const doc = await normalizeAndResolveNoteLinksDoc(
+      parseMarkdownToDoc(
+        'See [[Alpha Note#Draft]] and [[Alpha Note#Final]].',
+        schema,
+      ),
+      schema,
+      async (title) => ({
+        noteId: 'note-1',
+        pageFrameId: title.endsWith('#Draft') ? 'frame-draft' : null,
+      }),
+    );
+
+    const result = renamePageFrameLinkReferencesDoc(
+      doc,
+      schema,
+      'frame-draft',
+      'Outline',
+    );
+
+    expect(result.count).toBe(1);
+    expect(serializeDocToMarkdown(result.doc)).toBe(
+      'See [[Alpha Note#Outline]] and [[Alpha Note#Final]].\n',
+    );
+  });
+
+  it('builds null transaction when no link references the renamed frame', () => {
+    const noteLinkMark = schema.marks.noteLink;
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, [
+        schema.text('[[Alpha Note#Other]]', [
+          noteLinkMark.create({
+            title: 'Alpha Note#Other',
+            noteId: 'note-1',
+            pageFrameId: 'frame-other',
+          }),
+        ]),
+      ]),
+    ]);
+    const state = createEditorState(doc);
+
+    expect(
+      buildRenamePageFrameLinkReferencesTransaction(
+        state,
+        schema,
+        'frame-missing',
+        'New Name',
+      ),
+    ).toBeNull();
   });
 
   it('requests navigation to the note link on cmd-click', () => {
@@ -228,6 +333,7 @@ describe('noteLinkMarkdownPlugin', () => {
     expect(dispatchedEvents[0]?.detail).toEqual({
       title: 'Alpha Note',
       noteId: 'note-1',
+      pageFrameId: null,
     });
   });
 });

@@ -6,6 +6,7 @@ export interface PageFrameAutocompleteItem {
   subtitle?: string;
   detail?: string;
   insertText?: string;
+  pageFrameId?: string | null;
 }
 
 export interface PageFrameAutocompleteRange {

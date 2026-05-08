@@ -12,7 +12,7 @@ import {
 import { linkMarkdownPlugin } from './markdown/links';
 import {
   noteLinkMarkdownPlugin,
-  type ResolveNoteLinkId,
+  type ResolveNoteLink,
 } from './markdown/note-links';
 import { markdownPastePlugin } from './markdown/paste';
 import { markdownPreviewPlugin } from './markdown/plugin';
@@ -71,7 +71,7 @@ function checkListPlugin(schema: Schema): Plugin {
 export function buildPlugins(
   yXmlFragment: Y.XmlFragment,
   onPageCount?: (pageCount: number) => void,
-  resolveNoteLinkId?: ResolveNoteLinkId,
+  resolveNoteLink?: ResolveNoteLink,
 ): Plugin[] {
   const plugins: Plugin[] = [
     ySyncPlugin(yXmlFragment),
@@ -79,7 +79,7 @@ export function buildPlugins(
     prefixMarkdownInputRules(schema),
     fenceMarkdownInputRules(schema),
     fenceMarkdownNormalizationPlugin(schema),
-    noteLinkMarkdownPlugin(schema, resolveNoteLinkId),
+    noteLinkMarkdownPlugin(schema, resolveNoteLink),
     linkMarkdownPlugin(schema),
     markdownPastePlugin(),
     markdownPreviewPlugin(),

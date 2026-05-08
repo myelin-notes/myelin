@@ -10,7 +10,7 @@ import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
-import type { ResolveNoteLinkId as NoteLinkIdResolver } from '../page-frame/pm/markdown/note-links';
+import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
 import type { YDocManager } from '../ydoc-manager';
 import {
   DrawableElement,
@@ -51,7 +51,12 @@ export class PageFrameElement extends DrawableElement {
   private _displayName: string;
   private _editing = false;
   private _numPages = 1;
-  private _noteLinkIdResolver?: NoteLinkIdResolver;
+  private _noteLinkResolver?: NoteLinkResolver;
+  private _onDisplayNameRenamed?: (
+    uuid: string,
+    newName: string,
+    oldName: string,
+  ) => void;
 
   /** Set externally by DrawableCanvas after binding to Y.Doc. */
   private _yXmlFragment: Y.XmlFragment | null = null;
@@ -77,8 +82,14 @@ export class PageFrameElement extends DrawableElement {
     this._displayName = displayName ?? DEFAULT_PAGE_FRAME_DISPLAY_NAME;
   }
 
-  public setNoteLinkResolver(resolveNoteLinkId?: NoteLinkIdResolver): void {
-    this._noteLinkIdResolver = resolveNoteLinkId;
+  public setNoteLinkResolver(resolveNoteLink?: NoteLinkResolver): void {
+    this._noteLinkResolver = resolveNoteLink;
+  }
+
+  public setOnDisplayNameRenamed(
+    callback?: (uuid: string, newName: string, oldName: string) => void,
+  ): void {
+    this._onDisplayNameRenamed = callback;
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -134,7 +145,7 @@ export class PageFrameElement extends DrawableElement {
     this._yXmlFragment = yXmlFragment;
     this.pmEditor = new PageFrameEditorState(
       yXmlFragment,
-      this._noteLinkIdResolver,
+      this._noteLinkResolver,
     );
   }
 
@@ -171,11 +182,13 @@ export class PageFrameElement extends DrawableElement {
   }
   public setDisplayName(displayName: string): void {
     const next = normalizePageFrameDisplayName(displayName);
-    if (next === this._displayName) {
+    const previous = this._displayName;
+    if (next === previous) {
       return;
     }
     this._displayName = next;
     this.syncToYMap({ displayName: next });
+    this._onDisplayNameRenamed?.(this.uuid, next, previous);
   }
   public get numPages(): number {
     return this._numPages;

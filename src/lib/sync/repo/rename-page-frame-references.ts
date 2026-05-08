@@ -3,7 +3,7 @@ import {
   yXmlFragmentToProseMirrorRootNode,
 } from 'y-prosemirror';
 import { ElementType } from '@/pages/canvas/elements/element-type';
-import { renameNoteLinkReferencesDoc } from '@/pages/canvas/page-frame/pm/markdown/note-links';
+import { renamePageFrameLinkReferencesDoc } from '@/pages/canvas/page-frame/pm/markdown/note-links';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
@@ -12,17 +12,17 @@ import {
 } from './rewrite-doc-references';
 import type { NoteBacklink, Repository, VFSNodeId } from './types';
 
-type NoteReferenceRepository = DocRewriteRepository &
+type PageFrameReferenceRepository = DocRewriteRepository &
   Pick<Repository, 'getBacklinks'>;
 
-export interface RenameNoteReferencesResult {
+export interface RenamePageFrameReferencesResult {
   sourceCount: number;
   linkCount: number;
 }
 
-function renameReferencesInDoc(
+function renamePageFrameReferencesInDoc(
   ydoc: YDocManager,
-  noteId: VFSNodeId,
+  pageFrameId: string,
   newName: string,
 ): number {
   let linkCount = 0;
@@ -45,10 +45,10 @@ function renameReferencesInDoc(
       }
 
       const currentDoc = yXmlFragmentToProseMirrorRootNode(fragment, schema);
-      const result = renameNoteLinkReferencesDoc(
+      const result = renamePageFrameLinkReferencesDoc(
         currentDoc,
         schema,
-        noteId,
+        pageFrameId,
         newName,
       );
       if (result.count === 0) {
@@ -64,22 +64,29 @@ function renameReferencesInDoc(
   return linkCount;
 }
 
-export async function renameNoteReferences(
-  repository: NoteReferenceRepository,
-  noteId: VFSNodeId,
+/**
+ * Rewrites note-links across all docs that reference `ownerNoteId` so any link
+ * with `pageFrameId === frameId` gets `#oldName` swapped for `#newName` in its
+ * title. The owner doc is skipped — callers must update its open editor in
+ * place to avoid clobbering live Y.js state.
+ */
+export async function renamePageFrameReferences(
+  repository: PageFrameReferenceRepository,
+  ownerNoteId: VFSNodeId,
+  pageFrameId: string,
   newName: string,
   backlinks?: readonly NoteBacklink[],
-): Promise<RenameNoteReferencesResult> {
-  const references = backlinks ?? (await repository.getBacklinks(noteId));
+): Promise<RenamePageFrameReferencesResult> {
+  const references = backlinks ?? (await repository.getBacklinks(ownerNoteId));
   const sourceIds = [
     ...new Set(
       references
-        .filter((backlink) => backlink.targetId === noteId)
+        .filter((backlink) => backlink.targetId === ownerNoteId)
         .map((backlink) => backlink.sourceId),
     ),
-  ];
+  ].filter((sourceId) => sourceId !== ownerNoteId);
 
   return rewriteDocReferencesInSources(repository, sourceIds, (ydoc) =>
-    renameReferencesInDoc(ydoc, noteId, newName),
+    renamePageFrameReferencesInDoc(ydoc, pageFrameId, newName),
   );
 }

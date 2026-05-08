@@ -117,7 +117,11 @@ describe('markdown canvas import', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Alpha Note', noteId: 'note-1' },
+                  attrs: {
+                    title: 'Alpha Note',
+                    noteId: 'note-1',
+                    pageFrameId: null,
+                  },
                 },
               ],
             },
@@ -128,7 +132,11 @@ describe('markdown canvas import', () => {
               marks: [
                 {
                   type: 'noteLink',
-                  attrs: { title: 'Missing Note', noteId: null },
+                  attrs: {
+                    title: 'Missing Note',
+                    noteId: null,
+                    pageFrameId: null,
+                  },
                 },
               ],
             },

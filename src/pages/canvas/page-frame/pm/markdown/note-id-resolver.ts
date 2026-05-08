@@ -8,7 +8,12 @@ import type { EditorState, PluginView, Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { VFSNodeId } from '@/lib/sync';
 
-export type ResolveNoteLinkId = (title: string) => Promise<VFSNodeId | null>;
+export interface NoteLinkRef {
+  noteId: VFSNodeId | null;
+  pageFrameId: string | null;
+}
+
+export type ResolveNoteLink = (title: string) => Promise<NoteLinkRef>;
 
 export type CollectTitlesForResolution = (
   doc: PMNode,
@@ -18,37 +23,37 @@ export type CollectTitlesForResolution = (
 export type BuildResolveTransaction = (
   state: EditorState,
   schema: Schema,
-  noteIdsByTitle: ReadonlyMap<string, VFSNodeId | null>,
+  refsByTitle: ReadonlyMap<string, NoteLinkRef>,
 ) => Transaction | null;
 
 export async function buildResolvedTitleLookup(
   doc: PMNode,
   schema: Schema,
   collectTitles: CollectTitlesForResolution,
-  resolveNoteLinkId: ResolveNoteLinkId,
-): Promise<Map<string, VFSNodeId | null>> {
+  resolveNoteLink: ResolveNoteLink,
+): Promise<Map<string, NoteLinkRef>> {
   const titles = Array.from(new Set(collectTitles(doc, schema)));
-  const noteIdsByTitle = new Map<string, VFSNodeId | null>();
+  const refsByTitle = new Map<string, NoteLinkRef>();
   await Promise.all(
     titles.map(async (title) => {
-      noteIdsByTitle.set(title, await resolveNoteLinkId(title));
+      refsByTitle.set(title, await resolveNoteLink(title));
     }),
   );
-  return noteIdsByTitle;
+  return refsByTitle;
 }
 
 interface TitleResolverViewOptions {
   schema: Schema;
   collectTitles: CollectTitlesForResolution;
   buildResolveTransaction: BuildResolveTransaction;
-  resolveNoteLinkId?: ResolveNoteLinkId;
+  resolveNoteLink?: ResolveNoteLink;
 }
 
 export function createTitleResolverView(
   view: EditorView,
   options: TitleResolverViewOptions,
 ): PluginView {
-  const { schema, collectTitles, buildResolveTransaction, resolveNoteLinkId } =
+  const { schema, collectTitles, buildResolveTransaction, resolveNoteLink } =
     options;
   let lastDoc = view.state.doc;
   let requestId = 0;
@@ -56,27 +61,23 @@ export function createTitleResolverView(
   let currentView = view;
 
   async function resolve(): Promise<void> {
-    if (!resolveNoteLinkId) {
+    if (!resolveNoteLink) {
       return;
     }
 
     const localId = ++requestId;
-    const noteIdsByTitle = await buildResolvedTitleLookup(
+    const refsByTitle = await buildResolvedTitleLookup(
       currentView.state.doc,
       schema,
       collectTitles,
-      resolveNoteLinkId,
+      resolveNoteLink,
     );
 
     if (destroyed || localId !== requestId) {
       return;
     }
 
-    const tr = buildResolveTransaction(
-      currentView.state,
-      schema,
-      noteIdsByTitle,
-    );
+    const tr = buildResolveTransaction(currentView.state, schema, refsByTitle);
     if (tr) {
       currentView.dispatch(tr);
     }

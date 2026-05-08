@@ -185,7 +185,10 @@ export function buildSelectNoteLinkAutocompleteTransaction(
   state: EditorState,
   schema: Schema,
   activeRequest: ActiveNoteLinkAutocomplete,
-  item: Pick<PageFrameAutocompleteItem, 'id' | 'title' | 'insertText'>,
+  item: Pick<
+    PageFrameAutocompleteItem,
+    'id' | 'title' | 'insertText' | 'pageFrameId'
+  >,
 ): Transaction | null {
   const noteLinkType = schema.marks.noteLink;
   if (!noteLinkType) {
@@ -204,6 +207,7 @@ export function buildSelectNoteLinkAutocompleteTransaction(
     noteLinkType.create({
       title: linkTarget,
       noteId: item.id,
+      pageFrameId: item.pageFrameId ?? null,
     }),
   );
   tr.setSelection(TextSelection.create(tr.doc, insertedTo));

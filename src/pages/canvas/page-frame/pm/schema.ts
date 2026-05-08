@@ -332,7 +332,11 @@ const textColor: MarkSpec = {
 };
 
 const noteLink: MarkSpec = {
-  attrs: { title: {}, noteId: { default: null } },
+  attrs: {
+    title: {},
+    noteId: { default: null },
+    pageFrameId: { default: null },
+  },
   inclusive: false,
   toDOM(mark) {
     const attrs: Record<string, string> = {
@@ -340,6 +344,12 @@ const noteLink: MarkSpec = {
     };
     if (typeof mark.attrs.noteId === 'string' && mark.attrs.noteId.length > 0) {
       attrs['data-note-id'] = mark.attrs.noteId;
+    }
+    if (
+      typeof mark.attrs.pageFrameId === 'string' &&
+      mark.attrs.pageFrameId.length > 0
+    ) {
+      attrs['data-page-frame-id'] = mark.attrs.pageFrameId;
     }
     return ['span', attrs, 0];
   },
@@ -351,6 +361,7 @@ const noteLink: MarkSpec = {
         return {
           title: el.getAttribute('data-note-link-title') ?? '',
           noteId: el.getAttribute('data-note-id') || null,
+          pageFrameId: el.getAttribute('data-page-frame-id') || null,
         };
       },
     },
