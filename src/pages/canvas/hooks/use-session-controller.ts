@@ -1,18 +1,21 @@
 import {
   type RefObject,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
 } from 'react';
 import { Logger } from '@/lib/logger';
-import type { NoteSession, VFSNodeId } from '@/lib/sync';
+import type { NoteBacklink, NoteSession, VFSNodeId } from '@/lib/sync';
 import {
   type ActiveRepository,
   type NoteSessionStatus,
   useRepository,
 } from '@/lib/sync';
 import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-references';
+import { UserPrefs } from '@/lib/user-prefs';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
 import {
@@ -23,10 +26,28 @@ import { buildRenamePageFrameLinkReferencesTransaction } from '@/pages/canvas/pa
 import { schema as pageFrameSchema } from '@/pages/canvas/page-frame/pm/schema';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
+import type {
+  RenameReferencesChoice,
+  RenameReferencesPrompt,
+} from '@/pages/library/explorer/use-explorer-item';
 
-interface PendingRename {
+type PageFrameRenameListener = (
+  ownerNoteId: VFSNodeId,
+  pageFrameId: string,
+  newName: string,
+) => void;
+
+interface PendingPageFrameRename {
   ownerNoteId: VFSNodeId;
   newName: string;
+  backlinks: NoteBacklink[];
+}
+
+interface PendingPageFrameRenamePrompt extends RenameReferencesPrompt {
+  ownerNoteId: VFSNodeId;
+  pageFrameId: string;
+  newName: string;
+  backlinks: NoteBacklink[];
 }
 
 const logger = new Logger('CanvasSessionController');
@@ -61,10 +82,9 @@ export class CanvasSessionController {
 
   private lifecycleToken = 0;
   private teardownQueue: Promise<void> = Promise.resolve();
-  private pendingRenames = new Map<string, PendingRename>();
-  private renameDraining = false;
   private activeSession: ActiveCanvasSession | null = null;
   private lifecycleError: Error | null = null;
+  private onPageFrameRenamed: PageFrameRenameListener | null = null;
 
   constructor(
     private readonly repository: ActiveRepository,
@@ -97,6 +117,10 @@ export class CanvasSessionController {
   async dispose(): Promise<void> {
     this.lifecycleToken += 1;
     await this.teardownActiveSession();
+  }
+
+  setOnPageFrameRenamed(listener: PageFrameRenameListener | null): void {
+    this.onPageFrameRenamed = listener;
   }
 
   private async openSession(noteId: VFSNodeId, token: number): Promise<void> {
@@ -214,43 +238,7 @@ export class CanvasSessionController {
       }
     }
 
-    // Drop intermediate renames per frame so a rapid Foo→Bar→Baz only writes
-    // the latest value, and serialize across frames so concurrent
-    // read-mutate-writes on the same source files can't clobber each other.
-    this.pendingRenames.set(pageFrameId, { ownerNoteId, newName });
-    void this.drainPendingRenames();
-  }
-
-  private async drainPendingRenames(): Promise<void> {
-    if (this.renameDraining) {
-      return;
-    }
-    this.renameDraining = true;
-    try {
-      while (this.pendingRenames.size > 0) {
-        const next = this.pendingRenames.entries().next();
-        if (next.done) {
-          break;
-        }
-        const [pageFrameId, { ownerNoteId, newName }] = next.value;
-        this.pendingRenames.delete(pageFrameId);
-        try {
-          await renamePageFrameReferences(
-            this.repository,
-            ownerNoteId,
-            pageFrameId,
-            newName,
-          );
-        } catch (error) {
-          logger.error('Failed to rename page-frame references', error, {
-            ownerNoteId,
-            pageFrameId,
-          });
-        }
-      }
-    } finally {
-      this.renameDraining = false;
-    }
+    this.onPageFrameRenamed?.(ownerNoteId, pageFrameId, newName);
   }
 
   private async teardownActiveSession(): Promise<void> {
@@ -432,5 +420,146 @@ export function useCanvasSessionController({
     };
   }, [controller, id]);
 
-  return snapshot;
+  const [pageFrameRenamePrompt, setPageFrameRenamePrompt] =
+    useState<PendingPageFrameRenamePrompt | null>(null);
+  const pendingRenamesRef = useRef(new Map<string, PendingPageFrameRename>());
+  const drainingRef = useRef(false);
+
+  const drainPendingRenames = useCallback(async () => {
+    if (drainingRef.current) {
+      return;
+    }
+    drainingRef.current = true;
+    try {
+      while (pendingRenamesRef.current.size > 0) {
+        const next = pendingRenamesRef.current.entries().next();
+        if (next.done) {
+          break;
+        }
+        const [pageFrameId, { ownerNoteId, newName, backlinks }] = next.value;
+        pendingRenamesRef.current.delete(pageFrameId);
+        try {
+          await renamePageFrameReferences(
+            repository,
+            ownerNoteId,
+            pageFrameId,
+            newName,
+            backlinks,
+          );
+        } catch (error) {
+          logger.error('Failed to rename page-frame references', error, {
+            ownerNoteId,
+            pageFrameId,
+          });
+        }
+      }
+    } finally {
+      drainingRef.current = false;
+    }
+  }, [repository]);
+
+  const enqueueAndDrain = useCallback(
+    (entry: PendingPageFrameRename & { pageFrameId: string }) => {
+      pendingRenamesRef.current.set(entry.pageFrameId, {
+        ownerNoteId: entry.ownerNoteId,
+        newName: entry.newName,
+        backlinks: entry.backlinks,
+      });
+      void drainPendingRenames();
+    },
+    [drainPendingRenames],
+  );
+
+  useEffect(() => {
+    controller.setOnPageFrameRenamed((ownerNoteId, pageFrameId, newName) => {
+      void (async () => {
+        let backlinks: NoteBacklink[] = [];
+        try {
+          backlinks = await repository.getBacklinks(ownerNoteId);
+        } catch (err) {
+          logger.error(
+            'Failed to load backlinks before page-frame rename',
+            err,
+            { ownerNoteId, pageFrameId },
+          );
+        }
+
+        const matching = backlinks.filter(
+          (b) =>
+            b.targetId === ownerNoteId &&
+            b.pageFrameId === pageFrameId &&
+            b.sourceId !== ownerNoteId,
+        );
+
+        if (matching.length === 0) {
+          return;
+        }
+
+        if (UserPrefs.get('alwaysRenameNoteReferences')) {
+          enqueueAndDrain({
+            pageFrameId,
+            ownerNoteId,
+            newName,
+            backlinks: matching,
+          });
+          return;
+        }
+
+        const noteCount = new Set(matching.map((b) => b.sourceId)).size;
+        setPageFrameRenamePrompt({
+          ownerNoteId,
+          pageFrameId,
+          newName,
+          backlinks: matching,
+          mentionCount: matching.length,
+          noteCount,
+        });
+      })();
+    });
+    return () => {
+      controller.setOnPageFrameRenamed(null);
+    };
+  }, [controller, repository, enqueueAndDrain]);
+
+  const lastIdRef = useRef(id);
+  if (lastIdRef.current !== id) {
+    lastIdRef.current = id;
+    if (pageFrameRenamePrompt !== null) {
+      setPageFrameRenamePrompt(null);
+    }
+  }
+
+  const choosePageFrameRenameReferences = useCallback(
+    (choice: RenameReferencesChoice) => {
+      const pending = pageFrameRenamePrompt;
+      if (!pending) {
+        return;
+      }
+      setPageFrameRenamePrompt(null);
+      if (choice === 'cancel' || choice === 'no') {
+        return;
+      }
+      if (choice === 'always') {
+        UserPrefs.set('alwaysRenameNoteReferences', true);
+      }
+      enqueueAndDrain({
+        pageFrameId: pending.pageFrameId,
+        ownerNoteId: pending.ownerNoteId,
+        newName: pending.newName,
+        backlinks: pending.backlinks,
+      });
+    },
+    [pageFrameRenamePrompt, enqueueAndDrain],
+  );
+
+  return {
+    ...snapshot,
+    pageFrameRenamePrompt: pageFrameRenamePrompt
+      ? {
+          mentionCount: pageFrameRenamePrompt.mentionCount,
+          noteCount: pageFrameRenamePrompt.noteCount,
+        }
+      : null,
+    choosePageFrameRenameReferences,
+  };
 }

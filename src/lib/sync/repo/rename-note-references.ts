@@ -5,7 +5,7 @@ import {
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { renameNoteLinkReferencesDoc } from '@/pages/canvas/page-frame/pm/markdown/note-links';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
   type DocRewriteRepository,
   rewriteDocReferencesInSources,

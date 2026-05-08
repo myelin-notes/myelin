@@ -5,12 +5,12 @@ import {
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { renamePageFrameLinkReferencesDoc } from '@/pages/canvas/page-frame/pm/markdown/note-links';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
   type DocRewriteRepository,
   rewriteDocReferencesInSources,
 } from './rewrite-doc-references';
-import type { Repository, VFSNodeId } from './types';
+import type { NoteBacklink, Repository, VFSNodeId } from './types';
 
 type PageFrameReferenceRepository = DocRewriteRepository &
   Pick<Repository, 'getBacklinks'>;
@@ -75,11 +75,12 @@ export async function renamePageFrameReferences(
   ownerNoteId: VFSNodeId,
   pageFrameId: string,
   newName: string,
+  backlinks?: readonly NoteBacklink[],
 ): Promise<RenamePageFrameReferencesResult> {
-  const backlinks = await repository.getBacklinks(ownerNoteId);
+  const references = backlinks ?? (await repository.getBacklinks(ownerNoteId));
   const sourceIds = [
     ...new Set(
-      backlinks
+      references
         .filter((backlink) => backlink.targetId === ownerNoteId)
         .map((backlink) => backlink.sourceId),
     ),

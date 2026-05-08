@@ -19,6 +19,7 @@ import { openNote, openNoteLink } from '@/lib/note-navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { useCanvasCommandContext } from './command-context';
@@ -370,6 +371,11 @@ function CanvasViewInner() {
           />
         )}
       </AnimatePresence>
+
+      <RenameReferencesDialog
+        prompt={engine.pageFrameRenamePrompt}
+        onChoice={engine.choosePageFrameRenameReferences}
+      />
     </div>
   );
 }
