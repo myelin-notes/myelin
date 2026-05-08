@@ -1,5 +1,5 @@
 import type { MarkType, Node as PMNode, Schema } from 'prosemirror-model';
-import { EditorState, Plugin } from 'prosemirror-state';
+import { EditorState, Plugin, type Transaction } from 'prosemirror-state';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import type { VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -458,8 +458,53 @@ export function renamePageFrameLinkReferenceTitle(
 }
 
 export interface RenamePageFrameLinkTransactionResult {
-  tr: import('prosemirror-state').Transaction;
+  tr: Transaction;
   count: number;
+}
+
+/**
+ * Shared core for note-link rename rewriters. Caller supplies a `rewriteTitle`
+ * predicate-and-rewriter — given a link target, return the new title or
+ * `null` to leave the link alone. Same-title returns are filtered out so
+ * callers don't need to compare.
+ */
+function buildNoteLinkRewriteTransaction(
+  state: EditorState,
+  schema: Schema,
+  rewriteTitle: (target: NoteLinkTarget) => string | null,
+): { tr: Transaction; count: number } | null {
+  const noteLinkType = schema.marks.noteLink;
+  if (!noteLinkType) {
+    return null;
+  }
+
+  const rewrites = collectDocumentNoteLinks(state.doc, schema)
+    .map((target) => ({ target, nextTitle: rewriteTitle(target) }))
+    .filter(
+      (entry): entry is { target: NoteLinkTarget; nextTitle: string } =>
+        entry.nextTitle !== null && entry.nextTitle !== entry.target.title,
+    )
+    .sort((left, right) => right.target.from - left.target.from);
+  if (rewrites.length === 0) {
+    return null;
+  }
+
+  const tr = state.tr;
+  for (const { target, nextTitle } of rewrites) {
+    tr.replaceWith(
+      target.from,
+      target.to,
+      schema.text(`[[${nextTitle}]]`, [
+        noteLinkType.create({
+          title: nextTitle,
+          noteId: target.noteId,
+          pageFrameId: target.pageFrameId,
+        }),
+      ]),
+    );
+  }
+
+  return { tr, count: rewrites.length };
 }
 
 export function buildRenamePageFrameLinkReferencesTransaction(
@@ -468,49 +513,19 @@ export function buildRenamePageFrameLinkReferencesTransaction(
   pageFrameId: string,
   newName: string,
 ): RenamePageFrameLinkTransactionResult | null {
-  const noteLinkType = schema.marks.noteLink;
-  if (!noteLinkType) {
+  const result = buildNoteLinkRewriteTransaction(state, schema, (target) =>
+    target.pageFrameId === pageFrameId
+      ? renamePageFrameLinkReferenceTitle(target.title, newName)
+      : null,
+  );
+  if (!result) {
     return null;
   }
-
-  const targets = collectDocumentNoteLinks(state.doc, schema)
-    .filter((target) => target.pageFrameId === pageFrameId)
-    .sort((left, right) => right.from - left.from);
-  if (targets.length === 0) {
-    return null;
-  }
-
-  const tr = state.tr;
-  let count = 0;
-  for (const target of targets) {
-    const nextTitle = renamePageFrameLinkReferenceTitle(target.title, newName);
-    if (nextTitle === target.title) {
-      continue;
-    }
-
-    tr.replaceWith(
-      target.from,
-      target.to,
-      schema.text(`[[${nextTitle}]]`, [
-        noteLinkType.create({
-          title: nextTitle,
-          noteId: target.noteId,
-          pageFrameId,
-        }),
-      ]),
-    );
-    count++;
-  }
-
-  if (count === 0) {
-    return null;
-  }
-
   // The frame rename itself is a Y.Map mutation (syncToYMap), not PM history,
   // so undo would otherwise revert the link title back to the old name while
   // the frame stays renamed. Same fix as buildResolvedNoteLinkTransaction.
-  tr.setMeta(PM_ADD_TO_HISTORY, false);
-  return { tr, count };
+  result.tr.setMeta(PM_ADD_TO_HISTORY, false);
+  return result;
 }
 
 export function renamePageFrameLinkReferencesDoc(
@@ -538,46 +553,16 @@ export function renameNoteLinkReferencesDoc(
   noteId: VFSNodeId,
   newName: string,
 ): RenameNoteLinkReferencesResult {
-  const noteLinkType = schema.marks.noteLink;
-  if (!noteLinkType) {
-    return { doc, count: 0 };
-  }
-
   const state = EditorState.create({ schema, doc });
-  const targets = collectDocumentNoteLinks(state.doc, schema)
-    .filter((target) => target.noteId === noteId)
-    .sort((left, right) => right.from - left.from);
-  if (targets.length === 0) {
+  const result = buildNoteLinkRewriteTransaction(state, schema, (target) =>
+    target.noteId === noteId
+      ? renameNoteLinkReferenceTitle(target.title, newName)
+      : null,
+  );
+  if (!result) {
     return { doc, count: 0 };
   }
-
-  const tr = state.tr;
-  let count = 0;
-  for (const target of targets) {
-    const nextTitle = renameNoteLinkReferenceTitle(target.title, newName);
-    if (nextTitle === target.title) {
-      continue;
-    }
-
-    tr.replaceWith(
-      target.from,
-      target.to,
-      schema.text(`[[${nextTitle}]]`, [
-        noteLinkType.create({
-          title: nextTitle,
-          noteId,
-          pageFrameId: target.pageFrameId,
-        }),
-      ]),
-    );
-    count++;
-  }
-
-  if (count === 0) {
-    return { doc, count: 0 };
-  }
-
-  return { doc: state.apply(tr).doc, count };
+  return { doc: state.apply(result.tr).doc, count: result.count };
 }
 
 export function noteLinkMarkdownPlugin(
