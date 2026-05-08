@@ -21,6 +21,11 @@ import { schema as pageFrameSchema } from '@/pages/canvas/page-frame/pm/schema';
 import type { ITool } from '@/pages/canvas/tools/tool';
 import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 
+interface PendingRename {
+  ownerNoteId: VFSNodeId;
+  newName: string;
+}
+
 const logger = new Logger('CanvasSessionController');
 
 export interface CanvasSessionSnapshot {
@@ -53,6 +58,8 @@ export class CanvasSessionController {
 
   private lifecycleToken = 0;
   private teardownQueue: Promise<void> = Promise.resolve();
+  private pendingRenames = new Map<string, PendingRename>();
+  private renameDraining = false;
   private activeSession: ActiveCanvasSession | null = null;
   private lifecycleError: Error | null = null;
 
@@ -202,17 +209,43 @@ export class CanvasSessionController {
       }
     }
 
-    void renamePageFrameReferences(
-      this.repository,
-      ownerNoteId,
-      pageFrameId,
-      newName,
-    ).catch((error) => {
-      logger.error('Failed to rename page-frame references', error, {
-        ownerNoteId,
-        pageFrameId,
-      });
-    });
+    // Drop intermediate renames per frame so a rapid Foo→Bar→Baz only writes
+    // the latest value, and serialize across frames so concurrent
+    // read-mutate-writes on the same source files can't clobber each other.
+    this.pendingRenames.set(pageFrameId, { ownerNoteId, newName });
+    void this.drainPendingRenames();
+  }
+
+  private async drainPendingRenames(): Promise<void> {
+    if (this.renameDraining) {
+      return;
+    }
+    this.renameDraining = true;
+    try {
+      while (this.pendingRenames.size > 0) {
+        const next = this.pendingRenames.entries().next();
+        if (next.done) {
+          break;
+        }
+        const [pageFrameId, { ownerNoteId, newName }] = next.value;
+        this.pendingRenames.delete(pageFrameId);
+        try {
+          await renamePageFrameReferences(
+            this.repository,
+            ownerNoteId,
+            pageFrameId,
+            newName,
+          );
+        } catch (error) {
+          logger.error('Failed to rename page-frame references', error, {
+            ownerNoteId,
+            pageFrameId,
+          });
+        }
+      }
+    } finally {
+      this.renameDraining = false;
+    }
   }
 
   private async teardownActiveSession(): Promise<void> {
