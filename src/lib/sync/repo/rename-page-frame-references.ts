@@ -97,20 +97,15 @@ export async function renamePageFrameReferences(
     }
 
     const ydoc = YDocManager.fromUpdate(bytes);
-    let sourceLinkCount = 0;
-    ydoc.transact(() => {
-      sourceLinkCount = renamePageFrameReferencesInDoc(
-        ydoc,
-        pageFrameId,
-        newName,
-      );
-      if (sourceLinkCount > 0) {
-        ydoc.sweepOrphanPageFrameFragments();
-      }
-    });
+    const sourceLinkCount = renamePageFrameReferencesInDoc(
+      ydoc,
+      pageFrameId,
+      newName,
+    );
     if (sourceLinkCount === 0) {
       continue;
     }
+    ydoc.sweepOrphanPageFrameFragments();
 
     await repository.writeFileBytes(sourceId, ydoc.encodeState());
     sourceCount++;
