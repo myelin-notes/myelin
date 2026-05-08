@@ -115,10 +115,10 @@ function CanvasViewInner() {
       return rawHash.trim() || null;
     }
   }, [location.hash]);
+  const routeState = location.state as { pageFrameId?: unknown } | null;
   const targetPageFrameId =
-    typeof (location.state as { pageFrameId?: unknown } | null)?.pageFrameId ===
-    'string'
-      ? ((location.state as { pageFrameId: string }).pageFrameId as string)
+    typeof routeState?.pageFrameId === 'string'
+      ? routeState.pageFrameId
       : null;
   useEffect(() => {
     if (!engine.ready) {
