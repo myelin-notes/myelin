@@ -502,7 +502,15 @@ export function buildRenamePageFrameLinkReferencesTransaction(
     count++;
   }
 
-  return count > 0 ? { tr, count } : null;
+  if (count === 0) {
+    return null;
+  }
+
+  // The frame rename itself is a Y.Map mutation (syncToYMap), not PM history,
+  // so undo would otherwise revert the link title back to the old name while
+  // the frame stays renamed. Same fix as buildResolvedNoteLinkTransaction.
+  tr.setMeta(PM_ADD_TO_HISTORY, false);
+  return { tr, count };
 }
 
 export function renamePageFrameLinkReferencesDoc(
