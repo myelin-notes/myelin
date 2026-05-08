@@ -15,7 +15,10 @@ import {
 import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-references';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
-import { resolveNoteLinkRefByTitle } from '@/pages/canvas/page-frame/note-link-resolution';
+import {
+  type PageFrameNameCache,
+  resolveNoteLinkRefByTitle,
+} from '@/pages/canvas/page-frame/note-link-resolution';
 import { buildRenamePageFrameLinkReferencesTransaction } from '@/pages/canvas/page-frame/pm/markdown/note-links';
 import { schema as pageFrameSchema } from '@/pages/canvas/page-frame/pm/schema';
 import type { ITool } from '@/pages/canvas/tools/tool';
@@ -124,11 +127,13 @@ export class CanvasSessionController {
         return;
       }
 
+      const frameNameCache: PageFrameNameCache = new Map();
       drawableCanvas = new DrawableCanvas(
         canvas,
         session.ydoc,
         this.canvasToolsRef.current,
-        async (title) => resolveNoteLinkRefByTitle(this.repository, title),
+        async (title) =>
+          resolveNoteLinkRefByTitle(this.repository, title, frameNameCache),
       );
       drawableCanvas.setOnPageFrameRenamed((uuid, newName) => {
         this.handlePageFrameRenamed(noteId, uuid, newName);

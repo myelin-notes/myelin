@@ -187,6 +187,7 @@ describe('CanvasSessionController', () => {
     expect(resolveNoteLinkRefByTitleMock).toHaveBeenCalledWith(
       repository,
       'Alpha Note',
+      expect.any(Map),
     );
 
     await controller.dispose();
