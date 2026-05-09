@@ -72,6 +72,35 @@ function addInlineDecorations(
         }),
       );
     }
+    if (range.kind === 'noteLink') {
+      addNoteLinkEscapeDecorations(
+        text,
+        posAt,
+        range.contentFrom,
+        range.contentTo,
+        decorations,
+      );
+    }
+  }
+}
+
+function addNoteLinkEscapeDecorations(
+  text: string,
+  posAt: number[],
+  contentFrom: number,
+  contentTo: number,
+  decorations: Decoration[],
+): void {
+  let i = contentFrom;
+  while (i < contentTo) {
+    if (text[i] === '\\' && i + 1 < contentTo) {
+      decorations.push(
+        Decoration.inline(posAt[i], posAt[i + 1], { class: 'pm-md-delim' }),
+      );
+      i += 2;
+      continue;
+    }
+    i += 1;
   }
 }
 
