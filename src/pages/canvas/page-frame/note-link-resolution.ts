@@ -1,3 +1,9 @@
+import {
+  escapeNoteLinkPath,
+  escapeNoteLinkSegment,
+  splitNoteLinkTargetFrame,
+  unescapeNoteLinkSegment,
+} from '@/lib/note-link-syntax';
 import { parseNoteLinkTarget } from '@/lib/note-link-target';
 import type {
   Repository,
@@ -53,12 +59,14 @@ interface NoteLinkPageFrameQuery {
 }
 
 function parseNoteLinkQuery(query: string): NoteLinkPathQuery {
-  const segments = query.split('/').map((segment) => segment.trim());
+  const segments = query
+    .split('/')
+    .map((segment) => unescapeNoteLinkSegment(segment).trim());
   if (segments.length <= 1) {
     return {
       isPath: false,
-      noteQuery: query,
-      pathQuery: query,
+      noteQuery: segments[0] ?? '',
+      pathQuery: segments[0] ?? '',
     };
   }
 
@@ -81,19 +89,19 @@ function parseNoteLinkQuery(query: string): NoteLinkPathQuery {
 function parseNoteLinkPageFrameQuery(
   query: string,
 ): NoteLinkPageFrameQuery | null {
-  const hashIndex = query.indexOf('#');
-  if (hashIndex === -1) {
+  const { noteTarget, frame } = splitNoteLinkTargetFrame(query);
+  if (frame === null) {
     return null;
   }
 
-  const noteQuery = query.slice(0, hashIndex).trim();
+  const noteQuery = noteTarget.trim();
   if (!noteQuery) {
     return null;
   }
 
   return {
     noteQuery,
-    pageFrameQuery: query.slice(hashIndex + 1).trim(),
+    pageFrameQuery: unescapeNoteLinkSegment(frame).trim(),
   };
 }
 
@@ -283,14 +291,13 @@ async function searchNoteAutocompleteItems(
     : matchingNotes;
 
   return limitedMatches.map(({ note, folderPath, linkPath }) => {
+    const useFullPath =
+      parsedQuery.isPath || (titleCounts.get(note.name) ?? 0) > 1;
     return {
       id: note.id,
       title: note.name,
       subtitle: folderPath.split('/').join(' / ') || 'Root',
-      insertText:
-        parsedQuery.isPath || (titleCounts.get(note.name) ?? 0) > 1
-          ? linkPath
-          : undefined,
+      insertText: escapeNoteLinkPath(useFullPath ? linkPath : note.name),
     };
   });
 }
@@ -340,7 +347,7 @@ async function searchNoteLinkPageFrameAutocompleteItems(
             ? `${noteItem.title} - ${noteItem.subtitle}`
             : noteItem.title,
           detail: 'Frame',
-          insertText: `${noteTarget}#${frame.displayName}`,
+          insertText: `${noteTarget}#${escapeNoteLinkSegment(frame.displayName)}`,
           pageFrameId: frame.id,
         }));
     }),

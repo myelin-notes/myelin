@@ -179,10 +179,10 @@ describe('noteLinkMarkdownPlugin', () => {
     });
   });
 
-  it('renames resolved note-link references while preserving suffixes', async () => {
+  it('renames resolved note-link references while preserving frame', async () => {
     const doc = await normalizeAndResolveNoteLinksDoc(
       parseMarkdownToDoc(
-        'See [[Projects/Alpha Note#Draft|alias]] and [[Other]].',
+        'See [[Projects/Alpha Note#Draft]] and [[Other]].',
         schema,
       ),
       schema,
@@ -201,28 +201,46 @@ describe('noteLinkMarkdownPlugin', () => {
 
     expect(result.count).toBe(1);
     expect(serializeDocToMarkdown(result.doc)).toBe(
-      'See [[Projects/Renamed Note#Draft|alias]] and [[Other]].\n',
+      'See [[Projects/Renamed Note#Draft]] and [[Other]].\n',
     );
   });
 
   it('renames the last path segment in note-link titles', () => {
-    expect(
-      renameNoteLinkReferenceTitle('Archive/Alpha#Research|display', 'Beta'),
-    ).toBe('Archive/Beta#Research|display');
+    expect(renameNoteLinkReferenceTitle('Archive/Alpha#Research', 'Beta')).toBe(
+      'Archive/Beta#Research',
+    );
   });
 
   it('renames only the page-frame fragment in note-link titles', () => {
     expect(
-      renamePageFrameLinkReferenceTitle(
-        'Archive/Alpha#Research|display',
-        'Findings',
-      ),
-    ).toBe('Archive/Alpha#Findings|display');
+      renamePageFrameLinkReferenceTitle('Archive/Alpha#Research', 'Findings'),
+    ).toBe('Archive/Alpha#Findings');
   });
 
   it('leaves titles without a page-frame fragment unchanged', () => {
     expect(renamePageFrameLinkReferenceTitle('Archive/Alpha', 'Anything')).toBe(
       'Archive/Alpha',
+    );
+  });
+
+  it('escapes hash in renamed note name', () => {
+    expect(
+      renameNoteLinkReferenceTitle('Archive/Alpha#Research', 'Plan #B'),
+    ).toBe('Archive/Plan \\#B#Research');
+  });
+
+  it('escapes hash in renamed page-frame name', () => {
+    expect(
+      renamePageFrameLinkReferenceTitle(
+        'Archive/Alpha#Research',
+        'Plan #2 draft',
+      ),
+    ).toBe('Archive/Alpha#Plan \\#2 draft');
+  });
+
+  it('preserves escaped hash in note target when renaming the frame', () => {
+    expect(renamePageFrameLinkReferenceTitle('Foo\\#Bar#Old', 'New')).toBe(
+      'Foo\\#Bar#New',
     );
   });
 

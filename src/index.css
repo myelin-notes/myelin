@@ -913,6 +913,24 @@ input[type="range"].tool-slider::-moz-range-track {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+.pm-editor .ProseMirror .pm-md-note-link.pm-md-delim {
+  color: color-mix(in srgb, var(--accent-dark) 40%, transparent);
+}
+
+/*
+ * When a note link is split into multiple spans (e.g., by an escape-`\\`
+ * decoration), each `::before` would extend by `inset-inline: -0.14em` and
+ * stack at the boundaries, doubling the green tint. Pull the extension
+ * inward at any split-adjacent boundary so the backgrounds tile without
+ * overlap, keeping the outermost edges extended for visual padding.
+ */
+.pm-editor .ProseMirror .pm-md-note-link:has(+ .pm-md-note-link)::before {
+  inset-inline-end: 0;
+}
+.pm-editor .ProseMirror .pm-md-note-link + .pm-md-note-link::before {
+  inset-inline-start: 0;
+}
+
 .pm-editor .ProseMirror a.pm-link {
   color: var(--text-link);
   cursor: pointer;
