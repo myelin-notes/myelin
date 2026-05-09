@@ -206,17 +206,14 @@ describe('noteLinkMarkdownPlugin', () => {
   });
 
   it('renames the last path segment in note-link titles', () => {
-    expect(
-      renameNoteLinkReferenceTitle('Archive/Alpha#Research', 'Beta'),
-    ).toBe('Archive/Beta#Research');
+    expect(renameNoteLinkReferenceTitle('Archive/Alpha#Research', 'Beta')).toBe(
+      'Archive/Beta#Research',
+    );
   });
 
   it('renames only the page-frame fragment in note-link titles', () => {
     expect(
-      renamePageFrameLinkReferenceTitle(
-        'Archive/Alpha#Research',
-        'Findings',
-      ),
+      renamePageFrameLinkReferenceTitle('Archive/Alpha#Research', 'Findings'),
     ).toBe('Archive/Alpha#Findings');
   });
 

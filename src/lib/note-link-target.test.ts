@@ -112,5 +112,4 @@ describe('parseNoteLinkTarget', () => {
       pageFrameName: null,
     });
   });
-
 });

@@ -186,9 +186,7 @@ describe('LocalRepository', () => {
 
     expect(
       readFirstPageFrameMarkdown(await repository.readFileBytes(sourceId)),
-    ).toBe(
-      'See [[Renamed Target]] and [[Projects/Renamed Target#Frame]].\n',
-    );
+    ).toBe('See [[Renamed Target]] and [[Projects/Renamed Target#Frame]].\n');
     expect(
       (await repository.getBacklinks(targetId)).map((link) => link.title),
     ).toEqual(['Renamed Target', 'Projects/Renamed Target#Frame']);
