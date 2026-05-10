@@ -1,5 +1,4 @@
 import { Plus as PlusIcon, Trash2 as TrashIcon } from 'lucide-react';
-import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
 type PdfChromeButtonKind = 'add' | 'delete';
@@ -30,9 +29,7 @@ export function createPdfChromeButton({
   } as Partial<CSSStyleDeclaration>);
 
   const reactRoot = createRoot(root);
-  flushSync(() => {
-    reactRoot.render(<PdfChromeButton kind={kind} onPress={onPress} />);
-  });
+  reactRoot.render(<PdfChromeButton kind={kind} onPress={onPress} />);
 
   return {
     root,
