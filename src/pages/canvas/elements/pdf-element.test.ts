@@ -110,6 +110,7 @@ interface TestablePdfElement {
 
 interface TestablePdfInsertion {
   insertBlankPage: (position: number) => void;
+  deletePage: (position: number) => void;
   getYMapProps: () => Record<string, unknown>;
 }
 
@@ -120,6 +121,7 @@ function createPdfYMap(
     kind: 'pdf' as const,
     originalIndex,
   })),
+  extraProps: Record<string, unknown> = {},
 ) {
   return ydoc.createElementMap(ElementType.PDF, 'pdf-uuid', {
     offsetX: 0,
@@ -130,6 +132,7 @@ function createPdfYMap(
     pageSizes,
     pageOrder,
     fileName: 'deck.pdf',
+    ...extraProps,
   });
 }
 
@@ -331,6 +334,37 @@ describe('PdfElement metadata loading', () => {
     expect(openPdfDocument).not.toHaveBeenCalled();
   });
 
+  it('preserves custom page order with a deleted source page', async () => {
+    const ydoc = new YDocManager();
+    const pageSizes = [
+      { w: 612, h: 792 },
+      { w: 612, h: 792 },
+      { w: 612, h: 792 },
+    ];
+    const pageOrder = [
+      { kind: 'pdf' as const, originalIndex: 0 },
+      { kind: 'pdf' as const, originalIndex: 2 },
+    ];
+    const yMap = createPdfYMap(ydoc, pageSizes, pageOrder, {
+      pageOrderCustom: true,
+    });
+    mockLoadedPdfWithStoredMetadata(pageSizes);
+
+    let localUpdates = 0;
+    ydoc.doc.on('update', (_update: Uint8Array, origin: unknown) => {
+      if (origin === LOCAL_ORIGIN) {
+        localUpdates += 1;
+      }
+    });
+
+    new PdfElement('pdf-uuid').bindToYMap(yMap);
+    await flushPromises();
+
+    expect(localUpdates).toBe(0);
+    expect(yMap.get('pageOrder')).toEqual(pageOrder);
+    expect(getPdfDocumentPageSizes).not.toHaveBeenCalled();
+  });
+
   it('inserts a blank page into the stored page order', async () => {
     const ydoc = new YDocManager();
     const pageSizes = [
@@ -353,7 +387,36 @@ describe('PdfElement metadata loading', () => {
       { kind: 'pdf', originalIndex: 1 },
     ];
     expect(yMap.get('pageOrder')).toEqual(expectedPageOrder);
+    expect(yMap.get('pageOrderCustom')).toBe(true);
     expect(insertable.getYMapProps().pageOrder).toEqual(expectedPageOrder);
+    expect(insertable.getYMapProps().pageOrderCustom).toBe(true);
+  });
+
+  it('deletes a source page from the stored page order', async () => {
+    const ydoc = new YDocManager();
+    const pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+      { w: 400, h: 200 },
+    ];
+    const yMap = createPdfYMap(ydoc, pageSizes);
+    mockLoadedPdfWithStoredMetadata(pageSizes);
+
+    const element = new PdfElement('pdf-uuid');
+    const editable = element as unknown as TestablePdfInsertion;
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    editable.deletePage(1);
+
+    const expectedPageOrder = [
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 2 },
+    ];
+    expect(yMap.get('pageOrder')).toEqual(expectedPageOrder);
+    expect(yMap.get('pageOrderCustom')).toBe(true);
+    expect(editable.getYMapProps().pageOrder).toEqual(expectedPageOrder);
+    expect(editable.getYMapProps().pageOrderCustom).toBe(true);
   });
 });
 

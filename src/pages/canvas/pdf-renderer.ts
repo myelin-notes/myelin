@@ -159,6 +159,7 @@ export function normalizePdfPageOrder(
   value: unknown,
   pageCount: number,
   blankPageFallback: PdfPageSize = { w: 612, h: 792 },
+  allowMissingPdfPages = false,
 ): PdfPageOrderEntry[] {
   const count = Math.max(1, Math.floor(pageCount));
   if (!Array.isArray(value)) {
@@ -211,12 +212,23 @@ export function normalizePdfPageOrder(
   });
 
   const pdfEntries = entries.filter((entry) => entry.kind === 'pdf');
-  if (pdfEntries.length !== count) {
+  if (
+    (!allowMissingPdfPages && pdfEntries.length !== count) ||
+    (allowMissingPdfPages && entries.length === 0)
+  ) {
     return createDefaultPdfPageOrder(count);
   }
 
   const seen = new Set(pdfEntries.map((entry) => entry.originalIndex));
-  return seen.size === count ? entries : createDefaultPdfPageOrder(count);
+  const hasCompletePdfEntries = seen.size === count;
+  const hasUniquePdfEntries = seen.size === pdfEntries.length;
+  return allowMissingPdfPages
+    ? hasUniquePdfEntries
+      ? entries
+      : createDefaultPdfPageOrder(count)
+    : hasCompletePdfEntries
+      ? entries
+      : createDefaultPdfPageOrder(count);
 }
 
 export async function loadPdfDocument(

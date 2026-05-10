@@ -58,6 +58,23 @@ describe('PDF page order metadata', () => {
     ]);
   });
 
+  it('keeps missing source pages only for custom page orders', () => {
+    expect(
+      normalizePdfPageOrder(
+        [
+          { kind: 'pdf', originalIndex: 0 },
+          { kind: 'pdf', originalIndex: 2 },
+        ],
+        3,
+        { w: 612, h: 792 },
+        true,
+      ),
+    ).toEqual([
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 2 },
+    ]);
+  });
+
   it('replaces duplicate entries with the complete default order', () => {
     expect(
       normalizePdfPageOrder(
