@@ -258,6 +258,7 @@ function CanvasViewInner() {
         {/* Background canvas: dot grid */}
         <canvas
           ref={bgCanvasRef}
+          data-thumbnail-exclude="true"
           className="absolute inset-0 block h-full w-full"
           style={{ zIndex: 0 }}
         />
