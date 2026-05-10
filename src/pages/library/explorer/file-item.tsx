@@ -6,6 +6,7 @@ import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { IS_DEV } from '@/lib/env';
 import { openNote } from '@/lib/note-navigation';
 import { useRepository, type VFSFileNode } from '@/lib/sync';
+import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
 import { RenameReferencesDialog } from './rename-references-dialog';
@@ -51,6 +52,11 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
                 }
               }}
               onDragStart={handleDragStart}
+              aria-label={
+                renaming
+                  ? undefined
+                  : formatExplorerItemAccessibleName(file.name, file.tags)
+              }
               className="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-2 transition-all duration-200 hover:bg-hover-tint"
             />
           }

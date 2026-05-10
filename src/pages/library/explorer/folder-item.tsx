@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Folder } from 'lucide-react';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
 import { useDropTarget } from './use-drop-target';
@@ -57,6 +58,11 @@ export function FolderItem({
               }}
               onDragStart={handleDragStart}
               {...dropTargetProps}
+              aria-label={
+                renaming
+                  ? undefined
+                  : formatExplorerItemAccessibleName(name, tags)
+              }
               className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-all duration-200 ${
                 dragOver
                   ? 'bg-accent/15 ring-1 ring-accent/40'

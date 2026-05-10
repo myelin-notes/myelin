@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Folder } from 'lucide-react';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
+import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
 import {
   explorerGridBodyClass,
@@ -71,6 +72,11 @@ export function GridFolderItem({
               }}
               onDragStart={handleDragStart}
               {...dropTargetProps}
+              aria-label={
+                renaming
+                  ? undefined
+                  : formatExplorerItemAccessibleName(name, tags)
+              }
               className={cn(
                 explorerGridCardClass,
                 dragOver && explorerGridCardDragOverClass,

@@ -356,8 +356,14 @@ export class PageFrameElement extends DrawableElement {
     const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
     try {
       const safeName =
-        this._displayName.replace(/[/\\:*?"<>|\x00-\x1f]/g, '-').trim() ||
-        DEFAULT_PAGE_FRAME_DISPLAY_NAME;
+        [...this._displayName]
+          .map((char) =>
+            char.charCodeAt(0) <= 0x1f || '/\\:*?"<>|'.includes(char)
+              ? '-'
+              : char,
+          )
+          .join('')
+          .trim() || DEFAULT_PAGE_FRAME_DISPLAY_NAME;
       const path = await save({
         defaultPath: `${safeName}.md`,
         filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],

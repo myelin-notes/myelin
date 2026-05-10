@@ -164,9 +164,13 @@ export class YDocManager {
       // future Yjs upgrade renames or removes it, the sweep silently becomes a
       // no-op — there's no public way to enumerate root types today.
       for (const key of this.doc.share.keys()) {
-        if (!key.startsWith('pf-')) continue;
+        if (!key.startsWith('pf-')) {
+          continue;
+        }
         const uuid = key.slice(3);
-        if (liveUuids.has(uuid)) continue;
+        if (liveUuids.has(uuid)) {
+          continue;
+        }
         const fragment = this.doc.getXmlFragment(key);
         if (fragment.length > 0) {
           fragment.delete(0, fragment.length);

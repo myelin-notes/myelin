@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { VFSNodeId } from '@/lib/sync';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
+import { formatExplorerItemAccessibleName } from './accessibility-labels';
 
 interface RecentCardProps {
   nodeId: VFSNodeId;
@@ -39,6 +40,11 @@ export function RecentCard({
     <button
       type="button"
       onClick={onClick}
+      aria-label={
+        tags.length > 0
+          ? formatExplorerItemAccessibleName(title, tags)
+          : undefined
+      }
       className={cn(
         'group relative flex aspect-[16/10] min-h-[180px] w-full cursor-pointer flex-col overflow-hidden rounded-xl text-left transition-all duration-300 hover:scale-[1.01] hover:shadow-ambient sm:aspect-auto sm:h-[204px]',
         featured ? 'bg-card-active hover:bg-card' : 'bg-surface hover:bg-card',

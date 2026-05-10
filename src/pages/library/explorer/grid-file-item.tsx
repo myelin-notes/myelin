@@ -7,6 +7,7 @@ import { openNote } from '@/lib/note-navigation';
 import { useRepository, type VFSFileNode } from '@/lib/sync';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
+import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
 import {
   explorerGridBodyClass,
@@ -67,6 +68,11 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
                 }
               }}
               onDragStart={handleDragStart}
+              aria-label={
+                renaming
+                  ? undefined
+                  : formatExplorerItemAccessibleName(file.name, file.tags)
+              }
               className={explorerGridCardClass}
             />
           }

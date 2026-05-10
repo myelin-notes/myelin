@@ -72,10 +72,7 @@ export function usePageFrameAutocomplete({
   const [activeKind, setActiveKind] =
     useState<PageFrameAutocompleteKind | null>(null);
 
-  const frameNameCache = useMemo<PageFrameNameCache>(
-    () => new Map(),
-    [repository],
-  );
+  const frameNameCache = useMemo<PageFrameNameCache>(() => new Map(), []);
 
   const controller = useMemo(
     () =>

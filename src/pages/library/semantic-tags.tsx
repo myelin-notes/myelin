@@ -4,6 +4,7 @@ import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { cn } from '@/lib/utils';
+import { formatSemanticTagAccessibleName } from './accessibility-labels';
 
 const logger = new Logger('SemanticTags');
 
@@ -106,11 +107,17 @@ export function SemanticTags({
         )}
         {tags.map(({ tag, count }) => {
           const isActive = activeTags.has(tag);
+          const formattedCount = formatNumber(count, locale);
           return (
             <button
               key={tag}
               type="button"
               onClick={() => toggleTag(tag)}
+              aria-label={formatSemanticTagAccessibleName(
+                tag,
+                count,
+                formattedCount,
+              )}
               aria-pressed={isActive}
               className={cn(
                 'cursor-pointer rounded-xl px-3 py-1.5 font-medium text-xs transition-all',
@@ -127,7 +134,7 @@ export function SemanticTags({
                   isActive ? 'text-text-on-dark/60' : 'text-text-muted',
                 )}
               >
-                {formatNumber(count, locale)}
+                {formattedCount}
               </span>
             </button>
           );
