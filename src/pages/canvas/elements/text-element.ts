@@ -7,6 +7,10 @@ import {
 import type { DrawableCanvas } from '../drawable-canvas';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
+import {
+  createTextEditOverlay,
+  type TextEditOverlayHandle,
+} from './text-edit-overlay';
 
 export interface TextStyle {
   color: string;
@@ -30,7 +34,7 @@ export class TextElement extends DrawableElement {
   private _boxWidth: number = DEFAULT_BOX_WIDTH;
   private _boxHeight: number = DEFAULT_BOX_HEIGHT;
   private _editing: boolean = false;
-  private _textarea: HTMLTextAreaElement | null = null;
+  private _editOverlay: TextEditOverlayHandle | null = null;
   private _oldText: string = '';
   private _canvas: DrawableCanvas | null = null;
   private _cachedLines: LayoutLine[] = [];
@@ -119,60 +123,41 @@ export class TextElement extends DrawableElement {
       y: box.y,
     });
 
-    const textarea = document.createElement('textarea');
-    textarea.value = this._text;
-    Object.assign(textarea.style, {
-      position: 'absolute',
-      zIndex: '20',
-      left: `${screenPos.x}px`,
-      top: `${screenPos.y}px`,
-      width: `${box.width * zoom}px`,
-      height: `${box.height * zoom}px`,
-      fontSize: `${this._style.fontSize * zoom}px`,
-      lineHeight: `${this._style.fontSize * 1.3 * zoom}px`,
-      fontFamily: this._style.fontFamily,
-      color: this._style.color,
-      caretColor: 'var(--accent-dark)',
-      wordWrap: 'break-word',
-      overflowWrap: 'break-word',
-      whiteSpace: 'pre-wrap',
-      margin: '0',
-      padding: '0',
-      resize: 'none',
-      overflow: 'hidden',
-      border: 'none',
-      background: 'transparent',
-      outline: 'none',
-    });
-
-    textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
+    const overlay = createTextEditOverlay({
+      initialText: this._text,
+      rect: {
+        left: screenPos.x,
+        top: screenPos.y,
+        width: box.width * zoom,
+        height: box.height * zoom,
+      },
+      textStyle: this._style,
+      zoom,
+      onSubmit: () => {
         canvas.exitElementEdit();
-      }
+      },
     });
 
-    document.body.appendChild(textarea);
-    textarea.focus();
+    overlay.focus();
 
-    this._textarea = textarea;
-    return textarea;
+    this._editOverlay = overlay;
+    return overlay.root;
   }
 
   public override exitEditMode(): void {
     this._editing = false;
 
-    const textarea = this._textarea;
+    const overlay = this._editOverlay;
     const canvas = this._canvas;
-    this._textarea = null;
+    this._editOverlay = null;
     this._canvas = null;
 
-    if (!textarea || !canvas) {
+    if (!overlay || !canvas) {
       return;
     }
 
-    const newText = textarea.value;
-    textarea.remove();
+    const newText = overlay.getValue();
+    overlay.dispose();
 
     if (!newText.trim()) {
       canvas.removeElement(this);
@@ -209,13 +194,10 @@ export class TextElement extends DrawableElement {
       fontFamily: this._style.fontFamily,
     });
 
-    const textarea = this._textarea;
-    if (textarea && this._canvas) {
+    const overlay = this._editOverlay;
+    if (overlay && this._canvas) {
       const zoom = this._canvas.viewport.zoom;
-      textarea.style.fontSize = `${this._style.fontSize * zoom}px`;
-      textarea.style.lineHeight = `${this._style.fontSize * 1.3 * zoom}px`;
-      textarea.style.fontFamily = this._style.fontFamily;
-      textarea.style.color = this._style.color;
+      overlay.setTextStyle(this._style, zoom);
     }
   }
 
