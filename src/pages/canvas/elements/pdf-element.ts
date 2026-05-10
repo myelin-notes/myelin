@@ -808,7 +808,7 @@ export class PdfElement extends DrawableElement {
     const worldRect = viewport.getWorldRect();
 
     if (
-      layout.pages.length < 2 ||
+      layout.pages.length < 1 ||
       !this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)
     ) {
       this.removeInactiveGapButtons(activePositions);
@@ -816,12 +816,17 @@ export class PdfElement extends DrawableElement {
     }
 
     for (
-      let insertPosition = 1;
-      insertPosition < layout.pages.length;
+      let insertPosition = 0;
+      insertPosition <= layout.pages.length;
       insertPosition++
     ) {
-      const page = layout.pages[insertPosition];
-      const localY = page.localTop - PAGE_GAP / 2;
+      let localY: number;
+      if (insertPosition < layout.pages.length) {
+        localY = layout.pages[insertPosition].localTop - PAGE_GAP / 2;
+      } else {
+        const lastPage = layout.pages[layout.pages.length - 1];
+        localY = lastPage.localTop + lastPage.size.h + PAGE_GAP / 2;
+      }
       const worldY = this.offset.y + localY * scaleY;
       if (
         worldY < worldRect.top - PAGE_RENDER_MARGIN ||
@@ -1021,19 +1026,20 @@ export class PdfElement extends DrawableElement {
 
   private insertBlankPage(position: number): void {
     const layout = this.getLayout();
-    if (layout.pages.length < 2) {
+    if (layout.pages.length < 1) {
       return;
     }
 
     const insertPosition = Math.max(
-      1,
-      Math.min(Math.floor(position), layout.pages.length - 1),
+      0,
+      Math.min(Math.floor(position), layout.pages.length),
     );
-    const previousPage = layout.pages[insertPosition - 1];
+    const referencePage =
+      layout.pages[Math.max(0, insertPosition - 1)] ?? layout.pages[0];
     const nextOrder = clonePageOrder(this.pageEntries);
     nextOrder.splice(insertPosition, 0, {
       kind: 'blank',
-      size: { ...previousPage.size },
+      size: { ...referencePage.size },
     });
 
     this.commitCustomPageOrder(nextOrder);
