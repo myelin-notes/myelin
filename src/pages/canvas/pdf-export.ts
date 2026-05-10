@@ -17,20 +17,28 @@ export interface PdfElementExportSource {
   boundingBox: DOMRect;
 }
 
-export interface PdfElementExportPage {
+export interface PdfElementExportPdfPage {
+  kind: 'pdf';
   originalIndex: number;
   size: PdfPageSize;
   localLeft: number;
   localTop: number;
 }
 
-export interface PdfExportPage {
-  originalIndex: number;
+export interface PdfElementExportBlankPage {
+  kind: 'blank';
   size: PdfPageSize;
   localLeft: number;
   localTop: number;
-  worldBounds: DOMRect;
 }
+
+export type PdfElementExportPage =
+  | PdfElementExportPdfPage
+  | PdfElementExportBlankPage;
+
+export type PdfExportPage = PdfElementExportPage & {
+  worldBounds: DOMRect;
+};
 
 export type PdfExportOverlayElement = Pick<
   DrawableElement,
@@ -75,15 +83,23 @@ export async function createPdfExportBytes(
   const sourceDoc = await PDFDocument.load(new Uint8Array(target.pdfBytes));
   const outputDoc = await PDFDocument.create();
   const pages = getPdfExportPages(target);
+  const pdfPages = pages.filter((page) => page.kind === 'pdf');
   const copiedPages = await outputDoc.copyPages(
     sourceDoc,
-    pages.map((page) => page.originalIndex),
+    pdfPages.map((page) => page.originalIndex),
   );
   const candidates = getPdfOverlayCandidates(target, elements);
+  let copiedPageIndex = 0;
 
-  for (const [pageIndex, page] of pages.entries()) {
-    const outputPage = copiedPages[pageIndex];
-    outputDoc.addPage(outputPage);
+  for (const page of pages) {
+    const outputPage =
+      page.kind === 'pdf'
+        ? copiedPages[copiedPageIndex++]
+        : outputDoc.addPage([page.size.w, page.size.h]);
+
+    if (page.kind === 'pdf') {
+      outputDoc.addPage(outputPage);
+    }
 
     const pageElements = candidates.filter((element) =>
       rectsIntersect(element.boundingBox, page.worldBounds),

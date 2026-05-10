@@ -96,6 +96,7 @@ function exportSource(
     pdfBytes: new Uint8Array(),
     pages: [
       {
+        kind: 'pdf',
         originalIndex: 0,
         size: { w: 100, h: 50 },
         localLeft: 0,
@@ -134,12 +135,14 @@ describe('PDF export page geometry', () => {
       exportSource({
         pages: [
           {
+            kind: 'pdf',
             originalIndex: 0,
             size: { w: 100, h: 50 },
             localLeft: 0,
             localTop: 0,
           },
           {
+            kind: 'pdf',
             originalIndex: 1,
             size: { w: 50, h: 100 },
             localLeft: 25,
@@ -178,12 +181,14 @@ describe('PDF export bytes', () => {
         pdfBytes: sourceBytes,
         pages: [
           {
+            kind: 'pdf',
             originalIndex: 1,
             size: { w: 300, h: 150 },
             localLeft: 0,
             localTop: 0,
           },
           {
+            kind: 'pdf',
             originalIndex: 0,
             size: { w: 200, h: 100 },
             localLeft: 50,
@@ -202,6 +207,51 @@ describe('PDF export bytes', () => {
     expect(pages[0].getHeight()).toBe(150);
     expect(pages[1].getWidth()).toBe(200);
     expect(pages[1].getHeight()).toBe(100);
+  });
+
+  it('creates blank pages in the PDF element page order', async () => {
+    const sourceDoc = await PDFDocument.create();
+    sourceDoc.addPage([200, 100]);
+    sourceDoc.addPage([300, 150]);
+    const sourceBytes = await sourceDoc.save();
+
+    const exportedBytes = await createPdfExportBytes(
+      exportSource({
+        pdfBytes: sourceBytes,
+        pages: [
+          {
+            kind: 'pdf',
+            originalIndex: 0,
+            size: { w: 200, h: 100 },
+            localLeft: 0,
+            localTop: 0,
+          },
+          {
+            kind: 'blank',
+            size: { w: 200, h: 100 },
+            localLeft: 0,
+            localTop: 110,
+          },
+          {
+            kind: 'pdf',
+            originalIndex: 1,
+            size: { w: 300, h: 150 },
+            localLeft: 0,
+            localTop: 220,
+          },
+        ],
+      }),
+      [],
+    );
+
+    const exportedDoc = await PDFDocument.load(exportedBytes);
+    const pages = exportedDoc.getPages();
+
+    expect(pages).toHaveLength(3);
+    expect(pages[0].getWidth()).toBe(200);
+    expect(pages[1].getWidth()).toBe(200);
+    expect(pages[1].getHeight()).toBe(100);
+    expect(pages[2].getWidth()).toBe(300);
   });
 
   it('keeps overlay scratch canvas active until PNG bytes finish encoding', async () => {

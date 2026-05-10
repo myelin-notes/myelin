@@ -32,6 +32,7 @@ import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
   FrameChrome,
+  getFrameChromeControlsLayer,
 } from './frame-chrome';
 import { PAGE_GAP, PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
 
@@ -39,6 +40,10 @@ const logger = new Logger('PdfElement');
 const DEFAULT_PAGE_SIZE: PdfPageSize = { w: PAGE_WIDTH, h: PAGE_HEIGHT };
 const PAGE_RENDER_MARGIN = PAGE_GAP * 2;
 const PDF_RENDER_DEBOUNCE_MS = 120;
+const GAP_BUTTON_SIZE = 24;
+const DELETE_BUTTON_SIZE = 24;
+const DELETE_BUTTON_OFFSET = 16;
+const MIN_CHROME_BUTTON_PIXEL_SIZE = 18;
 
 interface PdfPageDom {
   root: HTMLDivElement;
@@ -80,10 +85,11 @@ function clonePageSizes(pageSizes: PdfPageSize[]): PdfPageSize[] {
 }
 
 function clonePageOrder(pageOrder: PdfPageOrderEntry[]): PdfPageOrderEntry[] {
-  return pageOrder.map((entry) => ({
-    kind: entry.kind,
-    originalIndex: entry.originalIndex,
-  }));
+  return pageOrder.map((entry) =>
+    entry.kind === 'pdf'
+      ? { kind: 'pdf', originalIndex: entry.originalIndex }
+      : { kind: 'blank', size: { ...entry.size } },
+  );
 }
 
 function arePageSizesEqual(left: PdfPageSize[], right: PdfPageSize[]): boolean {
@@ -99,7 +105,19 @@ function arePageOrdersEqual(
 ): boolean {
   return (
     left.length === right.length &&
-    left.every((entry, i) => entry.originalIndex === right[i].originalIndex)
+    left.every((entry, i) => {
+      const other = right[i];
+      if (entry.kind !== other.kind) {
+        return false;
+      }
+      if (entry.kind === 'pdf' && other.kind === 'pdf') {
+        return entry.originalIndex === other.originalIndex;
+      }
+      if (entry.kind === 'blank' && other.kind === 'blank') {
+        return entry.size.w === other.size.w && entry.size.h === other.size.h;
+      }
+      return false;
+    })
   );
 }
 
@@ -131,10 +149,13 @@ export class PdfElement extends DrawableElement {
   private _chrome: FrameChrome | null = null;
   private _contentRoot: HTMLDivElement | null = null;
   private _pageDoms = new Map<number, PdfPageDom>();
+  private _gapButtons = new Map<number, HTMLButtonElement>();
+  private _deleteButtons = new Map<number, HTMLButtonElement>();
   private _layout: PdfLayout | null = null;
   private _loadGeneration = 0;
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
     null;
+  private _pageOrderCustom = false;
 
   constructor(uuid: string) {
     super(uuid, ElementType.PDF);
@@ -161,6 +182,10 @@ export class PdfElement extends DrawableElement {
       pageOrder: clonePageOrder(this.pageEntries),
     };
 
+    if (this._pageOrderCustom) {
+      props.pageOrderCustom = true;
+    }
+
     if (this._pdfBytes) {
       props.pdfData = cloneBytes(this._pdfBytes);
     }
@@ -174,10 +199,16 @@ export class PdfElement extends DrawableElement {
       pageSizes: (v) => {
         this.setPageSizes(normalizePdfPageSizes(v), false);
       },
+      pageOrderCustom: (v) => {
+        this._pageOrderCustom = v === true;
+      },
       pageOrder: (v) => {
-        this._pageOrder = normalizePdfPageOrder(v, this._pageSizes.length);
-        this._layout = null;
-        this.invalidatePageRenders();
+        const allowMissing =
+          this._pageOrderCustom || yMap.get('pageOrderCustom') === true;
+        if (allowMissing) {
+          this._pageOrderCustom = true;
+        }
+        this.applyPageOrder(this.normalizePageOrder(v, allowMissing));
       },
       pdfData: (v) => {
         const isReplacingPdf = this._pdfBytes !== null;
@@ -368,6 +399,8 @@ export class PdfElement extends DrawableElement {
 
     this.syncContentRoot(contentWidth, contentHeight, zoom);
     this.syncPageDoms(viewport, zoom, scaleX, scaleY, layout);
+    this.syncGapButtons(viewport, zoom, scaleX, scaleY, layout);
+    this.syncDeleteButtons(viewport, zoom, scaleX, scaleY, layout);
   }
 
   public override disposeDOM(): void {
@@ -377,20 +410,38 @@ export class PdfElement extends DrawableElement {
     void this._pdfDocument?.destroy();
     this._pdfDocument = null;
     this._pageDoms.clear();
+    this.removeAllGapButtons();
+    this.removeAllDeleteButtons();
     this._contentRoot = null;
     this._chrome?.dispose();
     this._chrome = null;
   }
 
   private get pageEntries(): PdfPageOrderEntry[] {
-    return this.getLayout().pages.map((page) => ({
-      kind: 'pdf',
-      originalIndex: page.originalIndex,
-    }));
+    return this.getLayout().pages.map((page) =>
+      page.kind === 'pdf'
+        ? { kind: 'pdf', originalIndex: page.originalIndex }
+        : { kind: 'blank', size: { ...page.size } },
+    );
   }
 
   private getPageSize(entry: PdfPageOrderEntry): PdfPageSize {
+    if (entry.kind === 'blank') {
+      return entry.size;
+    }
     return this._pageSizes[entry.originalIndex] ?? DEFAULT_PAGE_SIZE;
+  }
+
+  private normalizePageOrder(
+    value: unknown,
+    allowMissingPdfPages = this._pageOrderCustom,
+  ): PdfPageOrderEntry[] {
+    return normalizePdfPageOrder(
+      value,
+      this._pageSizes.length,
+      DEFAULT_PAGE_SIZE,
+      allowMissingPdfPages,
+    );
   }
 
   private getLayout(): PdfLayout {
@@ -398,10 +449,7 @@ export class PdfElement extends DrawableElement {
       return this._layout;
     }
 
-    const entries = normalizePdfPageOrder(
-      this._pageOrder,
-      this._pageSizes.length,
-    );
+    const entries = this.normalizePageOrder(this._pageOrder);
     const pages: PdfElementExportPage[] = [];
     let totalWidth = 0;
     let totalHeight = 0;
@@ -411,12 +459,22 @@ export class PdfElement extends DrawableElement {
         totalHeight += PAGE_GAP;
       }
       const pageSize = this.getPageSize(entry);
-      pages.push({
-        originalIndex: entry.originalIndex,
-        size: pageSize,
-        localLeft: 0,
-        localTop: totalHeight,
-      });
+      pages.push(
+        entry.kind === 'pdf'
+          ? {
+              kind: 'pdf',
+              originalIndex: entry.originalIndex,
+              size: pageSize,
+              localLeft: 0,
+              localTop: totalHeight,
+            }
+          : {
+              kind: 'blank',
+              size: pageSize,
+              localLeft: 0,
+              localTop: totalHeight,
+            },
+      );
       totalWidth = Math.max(totalWidth, pageSize.w);
       totalHeight += pageSize.h;
     }
@@ -435,6 +493,8 @@ export class PdfElement extends DrawableElement {
     const nextPageOrder = normalizePdfPageOrder(
       this._pageOrder,
       nextPageSizes.length,
+      DEFAULT_PAGE_SIZE,
+      this._pageOrderCustom,
     );
     const shouldSync =
       sync && this.shouldSyncPageMetadata(nextPageSizes, nextPageOrder);
@@ -470,7 +530,12 @@ export class PdfElement extends DrawableElement {
         pageSizes,
       ) ||
       !arePageOrdersEqual(
-        normalizePdfPageOrder(this._yMap.get('pageOrder'), pageSizes.length),
+        normalizePdfPageOrder(
+          this._yMap.get('pageOrder'),
+          pageSizes.length,
+          DEFAULT_PAGE_SIZE,
+          this._yMap.get('pageOrderCustom') === true,
+        ),
         pageOrder,
       )
     );
@@ -485,7 +550,12 @@ export class PdfElement extends DrawableElement {
       return true;
     }
 
-    const pageOrder = normalizePdfPageOrder(this._pageOrder, pageCount);
+    const pageOrder = normalizePdfPageOrder(
+      this._pageOrder,
+      pageCount,
+      DEFAULT_PAGE_SIZE,
+      this._pageOrderCustom,
+    );
     return (
       !arePageOrdersEqual(this._pageOrder, pageOrder) ||
       (pageCount === 1 &&
@@ -538,6 +608,69 @@ export class PdfElement extends DrawableElement {
     for (const pageDom of this._pageDoms.values()) {
       this.releasePageRender(pageDom, true);
     }
+  }
+
+  private applyPageOrder(nextOrder: PdfPageOrderEntry[]): void {
+    const previousPages =
+      this._pageDoms.size > 0 ? this.getLayout().pages : null;
+
+    this._pageOrder = clonePageOrder(nextOrder);
+    this._layout = null;
+
+    if (previousPages) {
+      this.reconcilePageDomsAfterOrderChange(
+        previousPages,
+        this.getLayout().pages,
+      );
+    }
+
+    this.removeAllGapButtons();
+    this.removeAllDeleteButtons();
+  }
+
+  private commitCustomPageOrder(nextOrder: PdfPageOrderEntry[]): void {
+    this._pageOrderCustom = true;
+    this.applyPageOrder(nextOrder);
+    this.syncToYMap({
+      pageOrder: clonePageOrder(this._pageOrder),
+      pageOrderCustom: true,
+    });
+  }
+
+  private reconcilePageDomsAfterOrderChange(
+    previousPages: PdfElementExportPage[],
+    nextPages: PdfElementExportPage[],
+  ): void {
+    const reusablePdfDoms = new Map<number, PdfPageDom>();
+    for (const [pagePosition, pageDom] of this._pageDoms) {
+      const page = previousPages[pagePosition];
+      if (page?.kind === 'pdf') {
+        reusablePdfDoms.set(page.originalIndex, pageDom);
+      }
+    }
+
+    const nextPageDoms = new Map<number, PdfPageDom>();
+    const reusedDoms = new Set<PdfPageDom>();
+    for (const [pagePosition, page] of nextPages.entries()) {
+      if (page.kind !== 'pdf') {
+        continue;
+      }
+      const pageDom = reusablePdfDoms.get(page.originalIndex);
+      if (!pageDom) {
+        continue;
+      }
+      nextPageDoms.set(pagePosition, pageDom);
+      reusedDoms.add(pageDom);
+      reusablePdfDoms.delete(page.originalIndex);
+    }
+
+    for (const pageDom of this._pageDoms.values()) {
+      if (!reusedDoms.has(pageDom)) {
+        this.disposePageDom(pageDom);
+      }
+    }
+
+    this._pageDoms = nextPageDoms;
   }
 
   private cancelPageRenders(): void {
@@ -648,16 +781,283 @@ export class PdfElement extends DrawableElement {
         elementScale: Math.max(scaleX, scaleY),
         dpr,
       });
-      this.requestPageRender(
-        pageDom,
-        page.originalIndex,
-        page.size,
-        renderScale,
-        zoom,
-      );
+      if (page.kind === 'pdf') {
+        this.requestPageRender(
+          pageDom,
+          page.originalIndex,
+          page.size,
+          renderScale,
+          zoom,
+        );
+      } else {
+        this.releasePageRender(pageDom, true);
+      }
     }
 
     this.removeInactivePageDoms(activePagePositions);
+  }
+
+  private syncGapButtons(
+    viewport: CanvasViewport,
+    zoom: number,
+    scaleX: number,
+    scaleY: number,
+    layout: PdfLayout,
+  ): void {
+    const activePositions = new Set<number>();
+    const worldRect = viewport.getWorldRect();
+
+    if (
+      layout.pages.length < 2 ||
+      !this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)
+    ) {
+      this.removeInactiveGapButtons(activePositions);
+      return;
+    }
+
+    for (
+      let insertPosition = 1;
+      insertPosition < layout.pages.length;
+      insertPosition++
+    ) {
+      const page = layout.pages[insertPosition];
+      const localY = page.localTop - PAGE_GAP / 2;
+      const worldY = this.offset.y + localY * scaleY;
+      if (
+        worldY < worldRect.top - PAGE_RENDER_MARGIN ||
+        worldY > worldRect.bottom + PAGE_RENDER_MARGIN
+      ) {
+        continue;
+      }
+
+      let button = this._gapButtons.get(insertPosition);
+      if (!button) {
+        button = this.createGapButton(insertPosition);
+        this._gapButtons.set(insertPosition, button);
+      }
+      if (!button.isConnected) {
+        getFrameChromeControlsLayer()?.appendChild(button);
+      }
+      activePositions.add(insertPosition);
+
+      const localX = layout.totalWidth / 2;
+      const screenX = snapToDevicePixel(
+        (this.offset.x + viewport.offset.x + localX * scaleX) * zoom,
+      );
+      const screenY = snapToDevicePixel(
+        (this.offset.y + viewport.offset.y + localY * scaleY) * zoom,
+      );
+      const buttonSize = Math.max(
+        MIN_CHROME_BUTTON_PIXEL_SIZE,
+        GAP_BUTTON_SIZE * zoom,
+      );
+      button.style.visibility = 'visible';
+      button.style.transform = `translate(${screenX - buttonSize / 2}px, ${screenY - buttonSize / 2}px)`;
+      button.style.width = `${buttonSize}px`;
+      button.style.height = `${buttonSize}px`;
+    }
+
+    this.removeInactiveGapButtons(activePositions);
+  }
+
+  private syncDeleteButtons(
+    viewport: CanvasViewport,
+    zoom: number,
+    scaleX: number,
+    scaleY: number,
+    layout: PdfLayout,
+  ): void {
+    const activePositions = new Set<number>();
+    const worldRect = viewport.getWorldRect();
+
+    if (
+      layout.pages.length < 2 ||
+      !this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)
+    ) {
+      this.removeInactiveDeleteButtons(activePositions);
+      return;
+    }
+
+    for (
+      let pagePosition = 0;
+      pagePosition < layout.pages.length;
+      pagePosition++
+    ) {
+      const page = layout.pages[pagePosition];
+      if (
+        !this.isPageVisible(
+          worldRect,
+          page.localLeft,
+          page.localTop,
+          page.size,
+          scaleX,
+          scaleY,
+        )
+      ) {
+        continue;
+      }
+
+      let button = this._deleteButtons.get(pagePosition);
+      if (!button) {
+        button = this.createDeleteButton(pagePosition);
+        this._deleteButtons.set(pagePosition, button);
+      }
+      if (!button.isConnected) {
+        getFrameChromeControlsLayer()?.appendChild(button);
+      }
+      activePositions.add(pagePosition);
+
+      const localX = page.localLeft + page.size.w - DELETE_BUTTON_OFFSET;
+      const localY = page.localTop + DELETE_BUTTON_OFFSET;
+      const screenX = snapToDevicePixel(
+        (this.offset.x + viewport.offset.x + localX * scaleX) * zoom,
+      );
+      const screenY = snapToDevicePixel(
+        (this.offset.y + viewport.offset.y + localY * scaleY) * zoom,
+      );
+      const buttonSize = Math.max(
+        MIN_CHROME_BUTTON_PIXEL_SIZE,
+        DELETE_BUTTON_SIZE * zoom,
+      );
+      button.style.visibility = 'visible';
+      button.style.transform = `translate(${screenX - buttonSize / 2}px, ${screenY - buttonSize / 2}px)`;
+      button.style.width = `${buttonSize}px`;
+      button.style.height = `${buttonSize}px`;
+    }
+
+    this.removeInactiveDeleteButtons(activePositions);
+  }
+
+  private removeInactiveGapButtons(activePositions: Set<number>): void {
+    for (const [insertPosition, button] of this._gapButtons) {
+      if (!activePositions.has(insertPosition)) {
+        button.remove();
+        this._gapButtons.delete(insertPosition);
+      }
+    }
+  }
+
+  private removeInactiveDeleteButtons(activePositions: Set<number>): void {
+    for (const [pagePosition, button] of this._deleteButtons) {
+      if (!activePositions.has(pagePosition)) {
+        button.remove();
+        this._deleteButtons.delete(pagePosition);
+      }
+    }
+  }
+
+  private removeAllGapButtons(): void {
+    for (const button of this._gapButtons.values()) {
+      button.remove();
+    }
+    this._gapButtons.clear();
+  }
+
+  private removeAllDeleteButtons(): void {
+    for (const button of this._deleteButtons.values()) {
+      button.remove();
+    }
+    this._deleteButtons.clear();
+  }
+
+  private createGapButton(insertPosition: number): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pdf-chrome-button pdf-chrome-button--add';
+    button.title = 'Add blank page';
+    button.setAttribute('aria-label', 'Add blank page');
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 5v14"/>
+        <path d="M5 12h14"/>
+      </svg>
+    `;
+
+    button.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    button.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.insertBlankPage(insertPosition);
+    });
+
+    getFrameChromeControlsLayer()?.appendChild(button);
+    return button;
+  }
+
+  private createDeleteButton(pagePosition: number): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pdf-chrome-button pdf-chrome-button--delete';
+    button.title = 'Delete page';
+    button.setAttribute('aria-label', 'Delete page');
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 7h16"/>
+        <path d="M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7"/>
+        <path d="M18 7l-.9 11.1A2 2 0 0 1 15.1 20H8.9a2 2 0 0 1-2-1.9L6 7"/>
+        <path d="M10 11.5v4.5"/>
+        <path d="M14 11.5v4.5"/>
+      </svg>
+    `;
+
+    button.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    button.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.deletePage(pagePosition);
+    });
+
+    getFrameChromeControlsLayer()?.appendChild(button);
+    return button;
+  }
+
+  private insertBlankPage(position: number): void {
+    const layout = this.getLayout();
+    if (layout.pages.length < 2) {
+      return;
+    }
+
+    const insertPosition = Math.max(
+      1,
+      Math.min(Math.floor(position), layout.pages.length - 1),
+    );
+    const previousPage = layout.pages[insertPosition - 1];
+    const nextOrder = clonePageOrder(this.pageEntries);
+    nextOrder.splice(insertPosition, 0, {
+      kind: 'blank',
+      size: { ...previousPage.size },
+    });
+
+    this.commitCustomPageOrder(nextOrder);
+  }
+
+  private deletePage(position: number): void {
+    const layout = this.getLayout();
+    if (layout.pages.length <= 1) {
+      return;
+    }
+
+    const pagePosition = Math.max(
+      0,
+      Math.min(Math.floor(position), layout.pages.length - 1),
+    );
+    const nextOrder = clonePageOrder(this.pageEntries);
+    nextOrder.splice(pagePosition, 1);
+    if (nextOrder.length === 0) {
+      return;
+    }
+
+    this.commitCustomPageOrder(nextOrder);
   }
 
   private removeInactivePageDoms(activePagePositions: Set<number>): void {

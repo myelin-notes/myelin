@@ -220,7 +220,7 @@ export class FrameChrome {
     // foreground canvas. Append on construction; keep it hidden until the
     // first sync() call positions it.
     this.menuButton.style.visibility = 'hidden';
-    getControlsLayer()?.appendChild(this.menuButton);
+    getFrameChromeControlsLayer()?.appendChild(this.menuButton);
     this.initTitleInputEvents();
 
     this.refreshTitle();
@@ -433,6 +433,6 @@ export class FrameChrome {
   }
 }
 
-function getControlsLayer(): HTMLElement | null {
+export function getFrameChromeControlsLayer(): HTMLElement | null {
   return document.getElementById(CONTROLS_LAYER_ID);
 }

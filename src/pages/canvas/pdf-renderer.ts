@@ -6,10 +6,17 @@ export interface PdfPageSize {
   h: number;
 }
 
-export interface PdfPageOrderEntry {
+export interface PdfPageOrderPdfEntry {
   kind: 'pdf';
   originalIndex: number;
 }
+
+export interface PdfPageOrderBlankEntry {
+  kind: 'blank';
+  size: PdfPageSize;
+}
+
+export type PdfPageOrderEntry = PdfPageOrderPdfEntry | PdfPageOrderBlankEntry;
 
 export interface LoadedPdfDocument {
   document: PDFDocumentProxy;
@@ -151,6 +158,8 @@ export function createDefaultPdfPageOrder(
 export function normalizePdfPageOrder(
   value: unknown,
   pageCount: number,
+  blankPageFallback: PdfPageSize = { w: 612, h: 792 },
+  allowMissingPdfPages = false,
 ): PdfPageOrderEntry[] {
   const count = Math.max(1, Math.floor(pageCount));
   if (!Array.isArray(value)) {
@@ -158,19 +167,39 @@ export function normalizePdfPageOrder(
   }
 
   const entries = value.flatMap((entry): PdfPageOrderEntry[] => {
-    if (
-      typeof entry !== 'object' ||
-      entry === null ||
-      !('kind' in entry) ||
-      !('originalIndex' in entry)
-    ) {
+    if (typeof entry !== 'object' || entry === null || !('kind' in entry)) {
       return [];
     }
 
     const kind = (entry as { kind: unknown }).kind;
+    if (kind === 'blank') {
+      const sizeValue = (entry as { size?: unknown }).size;
+      const size =
+        typeof sizeValue === 'object' &&
+        sizeValue !== null &&
+        'w' in sizeValue &&
+        'h' in sizeValue &&
+        isFinitePositiveNumber((sizeValue as { w: unknown }).w) &&
+        isFinitePositiveNumber((sizeValue as { h: unknown }).h)
+          ? {
+              w: (sizeValue as { w: number }).w,
+              h: (sizeValue as { h: number }).h,
+            }
+          : null;
+      return [
+        {
+          kind: 'blank',
+          size: size ?? { ...blankPageFallback },
+        },
+      ];
+    }
+
+    if (kind !== 'pdf' || !('originalIndex' in entry)) {
+      return [];
+    }
+
     const originalIndex = (entry as { originalIndex: unknown }).originalIndex;
     if (
-      kind !== 'pdf' ||
       typeof originalIndex !== 'number' ||
       !Number.isInteger(originalIndex) ||
       originalIndex < 0 ||
@@ -182,12 +211,24 @@ export function normalizePdfPageOrder(
     return [{ kind: 'pdf', originalIndex }];
   });
 
-  if (entries.length !== count) {
+  const pdfEntries = entries.filter((entry) => entry.kind === 'pdf');
+  if (
+    (!allowMissingPdfPages && pdfEntries.length !== count) ||
+    (allowMissingPdfPages && entries.length === 0)
+  ) {
     return createDefaultPdfPageOrder(count);
   }
 
-  const seen = new Set(entries.map((entry) => entry.originalIndex));
-  return seen.size === count ? entries : createDefaultPdfPageOrder(count);
+  const seen = new Set(pdfEntries.map((entry) => entry.originalIndex));
+  const hasCompletePdfEntries = seen.size === count;
+  const hasUniquePdfEntries = seen.size === pdfEntries.length;
+  return allowMissingPdfPages
+    ? hasUniquePdfEntries
+      ? entries
+      : createDefaultPdfPageOrder(count)
+    : hasCompletePdfEntries && hasUniquePdfEntries
+      ? entries
+      : createDefaultPdfPageOrder(count);
 }
 
 export async function loadPdfDocument(
