@@ -69,8 +69,8 @@ async function renderDomThumbnail(
     canvasWidth: width,
     canvasHeight: height,
     pixelRatio: 1,
-    skipFonts: true,
-    filter: shouldIncludeInThumbnail,
+      filter: shouldIncludeInThumbnail,
+    });
   });
 }
 
@@ -97,14 +97,38 @@ async function renderCanvasThumbnail(
   }
 }
 
-function shouldIncludeInThumbnail(node: HTMLElement): boolean {
+function shouldIncludeInThumbnail(
+  node: HTMLElement,
+  inkCanvas: HTMLCanvasElement | null,
+): boolean {
+  // html-to-image's filter is typed (HTMLElement) but is invoked on every
+  // child node, including Text/Comment which aren't Elements.
   if (!(node instanceof Element)) {
     return true;
   }
+  return node !== inkCanvas && !node.matches(EXCLUDE_SELECTOR);
+}
 
-  return (
-    !node.matches(EXCLUDE_SELECTOR) && node.closest(EXCLUDE_SELECTOR) === null
-  );
+async function compositeDomAndInk(
+  domBlob: Blob,
+  inkCanvas: HTMLCanvasElement | null,
+  width: number,
+  height: number,
+): Promise<Blob | null> {
+  const scratch = getScratchCanvasContext(width, height);
+  const domImage = await createImageBitmap(domBlob);
+
+  try {
+    const ctx = scratch.context;
+    ctx.drawImage(domImage, 0, 0, width, height);
+    if (inkCanvas !== null && inkCanvas.width > 0 && inkCanvas.height > 0) {
+      ctx.drawImage(inkCanvas, 0, 0, width, height);
+    }
+    return await scratch.toBlob({ type: 'image/png' });
+  } finally {
+    domImage.close();
+    scratch.release();
+  }
 }
 
 async function waitForSettledLayout(): Promise<void> {
