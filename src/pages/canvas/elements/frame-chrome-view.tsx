@@ -141,7 +141,7 @@ export const FrameChromeView = forwardRef<
             >
               <span
                 className="font-semibold text-[10px] text-text-muted uppercase leading-none"
-                style={{ letterSpacing: 0 }}
+                style={{ letterSpacing: '0.12em' }}
               >
                 {kindLabel}
               </span>
@@ -176,7 +176,7 @@ export const FrameChromeView = forwardRef<
                   style={{
                     borderRadius: 0,
                     fontFamily: 'Inter, Arial, sans-serif',
-                    letterSpacing: 0,
+                    letterSpacing: '-0.005em',
                     pointerEvents: 'auto',
                   }}
                 />
@@ -186,7 +186,7 @@ export const FrameChromeView = forwardRef<
                     className="truncate font-medium text-[14px] text-text-primary leading-[1.2]"
                     style={{
                       fontFamily: 'Inter, Arial, sans-serif',
-                      letterSpacing: 0,
+                      letterSpacing: '-0.005em',
                     }}
                   >
                     {fileName}
