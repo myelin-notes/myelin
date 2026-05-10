@@ -41,11 +41,9 @@ const DEFAULT_PAGE_SIZE: PdfPageSize = { w: PAGE_WIDTH, h: PAGE_HEIGHT };
 const PAGE_RENDER_MARGIN = PAGE_GAP * 2;
 const PDF_RENDER_DEBOUNCE_MS = 120;
 const GAP_BUTTON_SIZE = 24;
-const GAP_BUTTON_RADIUS = 8;
-const GAP_BUTTON_FONT_SIZE = 16;
 const DELETE_BUTTON_SIZE = 24;
-const DELETE_BUTTON_RADIUS = 8;
 const DELETE_BUTTON_OFFSET = 16;
+const MIN_CHROME_BUTTON_PIXEL_SIZE = 18;
 
 interface PdfPageDom {
   root: HTMLDivElement;
@@ -780,14 +778,14 @@ export class PdfElement extends DrawableElement {
       const screenY = snapToDevicePixel(
         (this.offset.y + viewport.offset.y + localY * scaleY) * zoom,
       );
-      const buttonSize = GAP_BUTTON_SIZE * zoom;
+      const buttonSize = Math.max(
+        MIN_CHROME_BUTTON_PIXEL_SIZE,
+        GAP_BUTTON_SIZE * zoom,
+      );
       button.style.visibility = 'visible';
       button.style.transform = `translate(${screenX - buttonSize / 2}px, ${screenY - buttonSize / 2}px)`;
       button.style.width = `${buttonSize}px`;
       button.style.height = `${buttonSize}px`;
-      button.style.borderRadius = `${GAP_BUTTON_RADIUS * zoom}px`;
-      button.style.fontSize = `${GAP_BUTTON_FONT_SIZE * zoom}px`;
-      button.style.boxShadow = `0 ${1 * zoom}px ${2 * zoom}px rgba(25, 28, 30, 0.04), 0 ${12 * zoom}px ${28 * zoom}px rgba(25, 28, 30, 0.12)`;
     }
 
     this.removeInactiveGapButtons(activePositions);
@@ -848,13 +846,14 @@ export class PdfElement extends DrawableElement {
       const screenY = snapToDevicePixel(
         (this.offset.y + viewport.offset.y + localY * scaleY) * zoom,
       );
-      const buttonSize = DELETE_BUTTON_SIZE * zoom;
+      const buttonSize = Math.max(
+        MIN_CHROME_BUTTON_PIXEL_SIZE,
+        DELETE_BUTTON_SIZE * zoom,
+      );
       button.style.visibility = 'visible';
       button.style.transform = `translate(${screenX - buttonSize / 2}px, ${screenY - buttonSize / 2}px)`;
       button.style.width = `${buttonSize}px`;
       button.style.height = `${buttonSize}px`;
-      button.style.borderRadius = `${DELETE_BUTTON_RADIUS * zoom}px`;
-      button.style.boxShadow = `0 ${1 * zoom}px ${2 * zoom}px rgba(25, 28, 30, 0.04), 0 ${12 * zoom}px ${28 * zoom}px rgba(25, 28, 30, 0.12)`;
     }
 
     this.removeInactiveDeleteButtons(activePositions);
@@ -895,32 +894,17 @@ export class PdfElement extends DrawableElement {
   private createGapButton(insertPosition: number): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
+    button.className = 'pdf-chrome-button pdf-chrome-button--add';
     button.title = 'Add blank page';
     button.setAttribute('aria-label', 'Add blank page');
-    Object.assign(button.style, {
-      position: 'absolute',
-      left: '0px',
-      top: '0px',
-      transformOrigin: '0 0',
-      border: 'none',
-      padding: '0',
-      background: 'var(--bg-card)',
-      color: 'var(--text-secondary)',
-      boxShadow:
-        '0 1px 2px rgba(25, 28, 30, 0.04), 0 12px 28px rgba(25, 28, 30, 0.12)',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      pointerEvents: 'auto',
-      fontFamily: 'Inter, Arial, sans-serif',
-      fontSize: '16px',
-      fontWeight: '500',
-      lineHeight: '1',
-      transition: 'background 0.15s ease, color 0.15s ease',
-      visibility: 'hidden',
-    } as Partial<CSSStyleDeclaration>);
-    button.textContent = '+';
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 5v14"/>
+        <path d="M5 12h14"/>
+      </svg>
+    `;
 
     button.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
@@ -931,14 +915,6 @@ export class PdfElement extends DrawableElement {
       ev.stopPropagation();
       this.insertBlankPage(insertPosition);
     });
-    button.addEventListener('pointerenter', () => {
-      button.style.background = 'var(--bg-surface)';
-      button.style.color = 'var(--text-primary)';
-    });
-    button.addEventListener('pointerleave', () => {
-      button.style.background = 'var(--bg-card)';
-      button.style.color = 'var(--text-secondary)';
-    });
 
     getFrameChromeControlsLayer()?.appendChild(button);
     return button;
@@ -947,36 +923,18 @@ export class PdfElement extends DrawableElement {
   private createDeleteButton(pagePosition: number): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
+    button.className = 'pdf-chrome-button pdf-chrome-button--delete';
     button.title = 'Delete page';
     button.setAttribute('aria-label', 'Delete page');
-    Object.assign(button.style, {
-      position: 'absolute',
-      left: '0px',
-      top: '0px',
-      transformOrigin: '0 0',
-      border: 'none',
-      padding: '0',
-      background: 'var(--bg-card)',
-      color: 'var(--text-secondary)',
-      boxShadow:
-        '0 1px 2px rgba(25, 28, 30, 0.04), 0 12px 28px rgba(25, 28, 30, 0.12)',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      pointerEvents: 'auto',
-      transition: 'background 0.15s ease, color 0.15s ease',
-      visibility: 'hidden',
-    } as Partial<CSSStyleDeclaration>);
     button.innerHTML = `
-      <svg width="62%" height="62%" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="1.75"
+      <svg viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.5"
         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 6h18"/>
-        <path d="M8 6V4h8v2"/>
-        <path d="M19 6l-1 14H6L5 6"/>
-        <path d="M10 11v5"/>
-        <path d="M14 11v5"/>
+        <path d="M4 7h16"/>
+        <path d="M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7"/>
+        <path d="M18 7l-.9 11.1A2 2 0 0 1 15.1 20H8.9a2 2 0 0 1-2-1.9L6 7"/>
+        <path d="M10 11.5v4.5"/>
+        <path d="M14 11.5v4.5"/>
       </svg>
     `;
 
@@ -988,14 +946,6 @@ export class PdfElement extends DrawableElement {
       ev.preventDefault();
       ev.stopPropagation();
       this.deletePage(pagePosition);
-    });
-    button.addEventListener('pointerenter', () => {
-      button.style.background = 'var(--bg-error-soft)';
-      button.style.color = 'var(--text-error)';
-    });
-    button.addEventListener('pointerleave', () => {
-      button.style.background = 'var(--bg-card)';
-      button.style.color = 'var(--text-secondary)';
     });
 
     getFrameChromeControlsLayer()?.appendChild(button);

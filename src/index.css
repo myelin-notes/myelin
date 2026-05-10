@@ -1014,3 +1014,64 @@ input[type="range"].tool-slider::-moz-range-track {
   width: 12px;
   height: 12px;
 }
+
+.pdf-chrome-button {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  padding: 0;
+  margin: 0;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  font: inherit;
+  visibility: hidden;
+  box-shadow: none;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 200ms ease;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pdf-chrome-button > svg {
+  width: 58%;
+  height: 58%;
+  display: block;
+  pointer-events: none;
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.pdf-chrome-button:hover > svg {
+  transform: scale(1.06);
+}
+
+.pdf-chrome-button:active > svg {
+  transform: scale(0.92);
+  transition-duration: 80ms;
+}
+
+.pdf-chrome-button:focus-visible {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 2px;
+}
+
+.pdf-chrome-button--add:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 0 32px rgba(25, 28, 30, 0.06);
+}
+
+.pdf-chrome-button--delete:hover {
+  background: var(--bg-error-soft);
+  color: var(--text-error);
+  box-shadow: 0 0 32px rgba(25, 28, 30, 0.06);
+}
