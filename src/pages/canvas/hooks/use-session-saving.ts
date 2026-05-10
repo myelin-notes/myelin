@@ -103,13 +103,12 @@ export function useCanvasSessionSaving({
       return;
     }
 
-    try {
-      await regenerateThumbnailNow(noteIdRef.current);
-    } catch (error) {
+    const id = noteIdRef.current;
+    void regenerateThumbnailNow(id).catch((error) => {
       logger.error('Failed to regenerate thumbnail before exit', error, {
-        id: noteIdRef.current,
+        id,
       });
-    }
+    });
   }, [clearScheduledSave, saveNow]);
 
   useEffect(() => {

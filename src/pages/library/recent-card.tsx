@@ -27,7 +27,8 @@ export function RecentCard({
 }: RecentCardProps) {
   const thumbUrl = useThumbnailUrl(nodeId);
   const hasThumb = typeof thumbUrl === 'string';
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [loadedThumbUrl, setLoadedThumbUrl] = useState<string | null>(null);
+  const imgLoaded = hasThumb && loadedThumbUrl === thumbUrl;
 
   const fadeMask = 'linear-gradient(to bottom, black 72%, transparent 100%)';
   const placeholderStyle = {
@@ -58,15 +59,21 @@ export function RecentCard({
           WebkitMaskImage: fadeMask,
         }}
       >
-        <div className="absolute inset-0 opacity-90" style={placeholderStyle} />
+        <div
+          className={cn(
+            'absolute inset-0 z-0 transition-opacity duration-300 ease-out',
+            hasThumb && imgLoaded ? 'opacity-0' : 'opacity-90',
+          )}
+          style={placeholderStyle}
+        />
         {hasThumb ? (
           <img
             src={thumbUrl}
             alt=""
             aria-hidden
-            onLoad={() => setImgLoaded(true)}
+            onLoad={() => setLoadedThumbUrl(thumbUrl)}
             className={cn(
-              'h-full w-full object-cover object-top transition-opacity duration-500 ease-out',
+              'relative z-10 h-full w-full bg-page object-cover object-top transition-opacity duration-500 ease-out',
               imgLoaded ? 'opacity-100' : 'opacity-0',
             )}
           />

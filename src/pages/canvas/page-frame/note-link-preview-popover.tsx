@@ -256,6 +256,7 @@ export function NoteLinkPreviewPopover({
 
   return (
     <div
+      data-thumbnail-exclude="true"
       data-page-frame-preserve-focus
       className={cn(
         'pointer-events-none fixed z-[80] w-[320px] overflow-hidden rounded-2xl bg-popover/95 shadow-ambient backdrop-blur-2xl',

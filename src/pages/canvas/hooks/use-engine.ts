@@ -20,6 +20,7 @@ import { useCanvasThumbnailProducer } from './use-thumbnail-producer';
 interface UseCanvasEngineArgs {
   id: VFSNodeId | undefined;
   initialPageFrameName?: string | null;
+  thumbnailRootRef: React.RefObject<HTMLElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -37,6 +38,7 @@ interface UseCanvasEngineArgs {
 export function useCanvasEngine({
   id,
   initialPageFrameName,
+  thumbnailRootRef,
   canvasRef,
   bgCanvasRef,
   overlayCanvasRef,
@@ -61,6 +63,7 @@ export function useCanvasEngine({
   useCanvasThumbnailProducer({
     id,
     canvasRef,
+    thumbnailRootRef,
   });
 
   const sessionController = useCanvasSessionController({
