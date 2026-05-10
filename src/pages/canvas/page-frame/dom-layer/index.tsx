@@ -5,6 +5,7 @@ import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
 import { FrameChrome } from '../../elements/frame-chrome';
+import { getFrameChromeMenuButtonRect } from '../../elements/frame-chrome-layout';
 import {
   PAGE_CORNER_RADIUS,
   PAGE_GAP,
@@ -76,9 +77,58 @@ const PAGE_CHROME_STYLE: Record<string, string> = {
   pointerEvents: 'none',
 };
 
+interface ScreenRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 function snapToDevicePixel(value: number): number {
   const dpr = getDevicePixelRatio();
   return Math.round(value * dpr) / dpr;
+}
+
+function getScreenRect(
+  rect: DOMRect,
+  offset: { x: number; y: number },
+  zoom: number,
+): ScreenRect {
+  const left = snapToDevicePixel((rect.x + offset.x) * zoom);
+  const top = snapToDevicePixel((rect.y + offset.y) * zoom);
+  return {
+    left,
+    top,
+    right: left + rect.width * zoom,
+    bottom: top + rect.height * zoom,
+  };
+}
+
+function rectsIntersect(a: ScreenRect, b: ScreenRect): boolean {
+  return (
+    a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+  );
+}
+
+function isFrameMenuCoveredByHigherFrame(
+  frameIndex: number,
+  frames: PageFrameElement[],
+  menuRect: ScreenRect,
+  offset: { x: number; y: number },
+  zoom: number,
+): boolean {
+  for (let i = frameIndex + 1; i < frames.length; i++) {
+    const frame = frames[i];
+    if (frame.hidden) {
+      continue;
+    }
+    if (
+      rectsIntersect(menuRect, getScreenRect(frame.boundingBox, offset, zoom))
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function syncPageChrome(
@@ -313,7 +363,8 @@ export function PageFrameDomLayer({
       ) as PageFrameElement[];
       const activeFrames = new Map<string, PageFrameElement>();
 
-      for (const frame of frames) {
+      for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
+        const frame = frames[frameIndex];
         activeFrames.set(frame.uuid, frame);
 
         let refs = frameMap.current.get(frame.uuid);
@@ -330,6 +381,12 @@ export function PageFrameDomLayer({
         const screenY = snapToDevicePixel((frame.offset.y + offset.y) * zoom);
 
         const pageWidth = frame.pageWidth;
+        const menuRect = getFrameChromeMenuButtonRect({
+          screenX,
+          screenY,
+          contentWidth: pageWidth,
+          zoom,
+        });
         refs.chrome.setFileName(frame.displayName);
         refs.chrome.sync({
           screenX,
@@ -337,6 +394,13 @@ export function PageFrameDomLayer({
           contentWidth: pageWidth,
           contentHeight: frame.totalHeight,
           zoom,
+          controlsVisible: !isFrameMenuCoveredByHigherFrame(
+            frameIndex,
+            frames,
+            menuRect,
+            offset,
+            zoom,
+          ),
         });
 
         // Inner frame: screen-sized clip box, lives inside chrome contentSlot

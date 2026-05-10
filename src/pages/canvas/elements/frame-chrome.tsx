@@ -16,8 +16,7 @@ import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
   CONTROLS_LAYER_ID,
-  MENU_BUTTON_SIZE,
-  MENU_BUTTON_TOP,
+  getFrameChromeMenuButtonRect,
 } from './frame-chrome-layout';
 import {
   FrameChromeView,
@@ -134,6 +133,7 @@ export class FrameChrome {
     contentWidth: number;
     contentHeight: number;
     zoom: number;
+    controlsVisible?: boolean;
   }): void {
     const { screenX, screenY, contentWidth, contentHeight, zoom } = params;
     const chromeWidth = contentWidth + CHROME_SIDE_PADDING * 2;
@@ -161,14 +161,17 @@ export class FrameChrome {
     this.contentSlot.style.width = `${contentWidth * zoom}px`;
     this.contentSlot.style.height = `${contentHeight * zoom}px`;
 
-    const buttonWorldRight = chromeWidth - CHROME_SIDE_PADDING;
-    const buttonX = rootX + (buttonWorldRight - MENU_BUTTON_SIZE) * zoom;
-    const buttonY = rootY + MENU_BUTTON_TOP * zoom;
-    const buttonSize = MENU_BUTTON_SIZE * zoom;
-    this.controlsSlot.style.visibility = 'visible';
-    this.controlsSlot.style.transform = `translate(${buttonX}px, ${buttonY}px)`;
-    this.controlsSlot.style.width = `${buttonSize}px`;
-    this.controlsSlot.style.height = `${buttonSize}px`;
+    const buttonRect = getFrameChromeMenuButtonRect({
+      screenX,
+      screenY,
+      contentWidth,
+      zoom,
+    });
+    this.controlsSlot.style.visibility =
+      params.controlsVisible === false ? 'hidden' : 'visible';
+    this.controlsSlot.style.transform = `translate(${buttonRect.left}px, ${buttonRect.top}px)`;
+    this.controlsSlot.style.width = `${buttonRect.size}px`;
+    this.controlsSlot.style.height = `${buttonRect.size}px`;
     this.controlsSlot.style.borderRadius = `${10 * zoom}px`;
   }
 
