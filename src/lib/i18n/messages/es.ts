@@ -56,11 +56,6 @@ const es: typeof en = {
         label: 'Importar Markdown',
         description: 'Agregar un marco de página Markdown a este lienzo',
       },
-      insertLink: {
-        label: 'Insertar enlace de nota',
-        description:
-          'Requiere enlaces internos de notas del punto 2 del roadmap',
-      },
       switchView: {
         label: 'Cambiar vista de biblioteca',
         description: 'Alternar la biblioteca entre lista y cuadrícula',
@@ -425,10 +420,6 @@ const es: typeof en = {
       embed: {
         label: 'Imagen o PDF',
         description: 'Arrastra archivos o pega una URL',
-      },
-      link: {
-        label: 'Enlace a nota',
-        description: 'Enlaza o inserta otra nota',
       },
     },
     toolShelf: {

@@ -57,6 +57,16 @@ function isFinitePositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
+function parsePageSize(value: unknown): PdfPageSize | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+  const { w, h } = value as { w?: unknown; h?: unknown };
+  return isFinitePositiveNumber(w) && isFinitePositiveNumber(h)
+    ? { w, h }
+    : null;
+}
+
 function getRenderDimensions(
   pageSize: PdfPageSize,
   scale: number,
@@ -128,20 +138,8 @@ export function normalizePdfPageSizes(value: unknown): PdfPageSize[] {
   }
 
   return value.flatMap((entry) => {
-    if (
-      typeof entry !== 'object' ||
-      entry === null ||
-      !('w' in entry) ||
-      !('h' in entry)
-    ) {
-      return [];
-    }
-
-    const w = (entry as { w: unknown }).w;
-    const h = (entry as { h: unknown }).h;
-    return isFinitePositiveNumber(w) && isFinitePositiveNumber(h)
-      ? [{ w, h }]
-      : [];
+    const size = parsePageSize(entry);
+    return size ? [size] : [];
   });
 }
 
@@ -173,19 +171,7 @@ export function normalizePdfPageOrder(
 
     const kind = (entry as { kind: unknown }).kind;
     if (kind === 'blank') {
-      const sizeValue = (entry as { size?: unknown }).size;
-      const size =
-        typeof sizeValue === 'object' &&
-        sizeValue !== null &&
-        'w' in sizeValue &&
-        'h' in sizeValue &&
-        isFinitePositiveNumber((sizeValue as { w: unknown }).w) &&
-        isFinitePositiveNumber((sizeValue as { h: unknown }).h)
-          ? {
-              w: (sizeValue as { w: number }).w,
-              h: (sizeValue as { h: number }).h,
-            }
-          : null;
+      const size = parsePageSize((entry as { size?: unknown }).size);
       return [
         {
           kind: 'blank',
@@ -212,23 +198,21 @@ export function normalizePdfPageOrder(
   });
 
   const pdfEntries = entries.filter((entry) => entry.kind === 'pdf');
-  if (
-    (!allowMissingPdfPages && pdfEntries.length !== count) ||
-    (allowMissingPdfPages && entries.length === 0)
-  ) {
-    return createDefaultPdfPageOrder(count);
-  }
-
   const seen = new Set(pdfEntries.map((entry) => entry.originalIndex));
   const hasCompletePdfEntries = seen.size === count;
   const hasUniquePdfEntries = seen.size === pdfEntries.length;
-  return allowMissingPdfPages
-    ? hasUniquePdfEntries
-      ? entries
-      : createDefaultPdfPageOrder(count)
-    : hasCompletePdfEntries && hasUniquePdfEntries
-      ? entries
-      : createDefaultPdfPageOrder(count);
+
+  if (allowMissingPdfPages) {
+    if (entries.length === 0 || !hasUniquePdfEntries) {
+      return createDefaultPdfPageOrder(count);
+    }
+    return entries;
+  }
+
+  if (!hasCompletePdfEntries || !hasUniquePdfEntries) {
+    return createDefaultPdfPageOrder(count);
+  }
+  return entries;
 }
 
 export async function loadPdfDocument(

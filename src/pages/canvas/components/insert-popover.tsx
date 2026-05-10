@@ -2,7 +2,6 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   FilePlus2 as FilePlusIcon,
   ImagePlus as ImagePlusIcon,
-  Link as LinkIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -83,15 +82,6 @@ export function InsertPopover({
       description: strings.canvas.insert.embed.description,
       hotkey: getInsertHotkey('embed'),
       onSelect: onInsertEmbed,
-    },
-    {
-      key: 'link',
-      icon: LinkIcon,
-      label: strings.canvas.insert.link.label,
-      description: strings.canvas.insert.link.description,
-      hotkey: '',
-      disabled: true,
-      comingSoon: true,
     },
   ];
 

@@ -1,11 +1,4 @@
-import {
-  BookOpen,
-  FileText,
-  Grid2X2,
-  Keyboard,
-  Link,
-  Plus,
-} from 'lucide-react';
+import { BookOpen, FileText, Grid2X2, Keyboard, Plus } from 'lucide-react';
 import type { Messages } from '@/lib/i18n';
 import { type Action, registry } from '@/lib/keybinds';
 import {
@@ -95,17 +88,6 @@ export function createCommandPaletteItems({
       icon: Grid2X2,
       visibleOn: ['library'],
       onSelect: toggleLibraryView,
-    },
-    {
-      id: 'insert-note-link',
-      label: strings.commandPalette.commands.insertLink.label,
-      description: strings.commandPalette.commands.insertLink.description,
-      keywords: ['link', 'embed', 'backlink'],
-      section: strings.commandPalette.sections.commands,
-      icon: Link,
-      disabled: true,
-      visibleOn: ['canvas'],
-      onSelect: () => {},
     },
     ...createKeybindingCommandPaletteItems({
       actions: activeKeybindingActions,

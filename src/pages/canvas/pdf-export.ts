@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, type PDFPage } from 'pdf-lib';
 import { getScratchCanvasContext } from '@/lib/scratch-canvas';
 import type { Vector2 } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
@@ -92,13 +92,12 @@ export async function createPdfExportBytes(
   let copiedPageIndex = 0;
 
   for (const page of pages) {
-    const outputPage =
-      page.kind === 'pdf'
-        ? copiedPages[copiedPageIndex++]
-        : outputDoc.addPage([page.size.w, page.size.h]);
-
+    let outputPage: PDFPage;
     if (page.kind === 'pdf') {
+      outputPage = copiedPages[copiedPageIndex++];
       outputDoc.addPage(outputPage);
+    } else {
+      outputPage = outputDoc.addPage([page.size.w, page.size.h]);
     }
 
     const pageElements = candidates.filter((element) =>

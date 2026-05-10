@@ -35,6 +35,10 @@ import {
   getFrameChromeControlsLayer,
 } from './frame-chrome';
 import { PAGE_GAP, PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
+import {
+  createPdfChromeButton,
+  type PdfChromeButtonHandle,
+} from './pdf-chrome-button';
 
 const logger = new Logger('PdfElement');
 const DEFAULT_PAGE_SIZE: PdfPageSize = { w: PAGE_WIDTH, h: PAGE_HEIGHT };
@@ -149,8 +153,8 @@ export class PdfElement extends DrawableElement {
   private _chrome: FrameChrome | null = null;
   private _contentRoot: HTMLDivElement | null = null;
   private _pageDoms = new Map<number, PdfPageDom>();
-  private _gapButtons = new Map<number, HTMLButtonElement>();
-  private _deleteButtons = new Map<number, HTMLButtonElement>();
+  private _gapButtons = new Map<number, PdfChromeButtonHandle>();
+  private _deleteButtons = new Map<number, PdfChromeButtonHandle>();
   private _layout: PdfLayout | null = null;
   private _loadGeneration = 0;
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
@@ -808,7 +812,7 @@ export class PdfElement extends DrawableElement {
     const worldRect = viewport.getWorldRect();
 
     if (
-      layout.pages.length < 2 ||
+      layout.pages.length < 1 ||
       !this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)
     ) {
       this.removeInactiveGapButtons(activePositions);
@@ -816,12 +820,17 @@ export class PdfElement extends DrawableElement {
     }
 
     for (
-      let insertPosition = 1;
-      insertPosition < layout.pages.length;
+      let insertPosition = 0;
+      insertPosition <= layout.pages.length;
       insertPosition++
     ) {
-      const page = layout.pages[insertPosition];
-      const localY = page.localTop - PAGE_GAP / 2;
+      let localY: number;
+      if (insertPosition < layout.pages.length) {
+        localY = layout.pages[insertPosition].localTop - PAGE_GAP / 2;
+      } else {
+        const lastPage = layout.pages[layout.pages.length - 1];
+        localY = lastPage.localTop + lastPage.size.h + PAGE_GAP / 2;
+      }
       const worldY = this.offset.y + localY * scaleY;
       if (
         worldY < worldRect.top - PAGE_RENDER_MARGIN ||
@@ -835,8 +844,8 @@ export class PdfElement extends DrawableElement {
         button = this.createGapButton(insertPosition);
         this._gapButtons.set(insertPosition, button);
       }
-      if (!button.isConnected) {
-        getFrameChromeControlsLayer()?.appendChild(button);
+      if (!button.root.isConnected) {
+        getFrameChromeControlsLayer()?.appendChild(button.root);
       }
       activePositions.add(insertPosition);
 
@@ -851,10 +860,7 @@ export class PdfElement extends DrawableElement {
         MIN_CHROME_BUTTON_PIXEL_SIZE,
         GAP_BUTTON_SIZE * zoom,
       );
-      button.style.visibility = 'visible';
-      button.style.transform = `translate(${screenX - buttonSize / 2}px, ${screenY - buttonSize / 2}px)`;
-      button.style.width = `${buttonSize}px`;
-      button.style.height = `${buttonSize}px`;
+      button.sync({ screenX, screenY, size: buttonSize });
     }
 
     this.removeInactiveGapButtons(activePositions);
@@ -902,8 +908,8 @@ export class PdfElement extends DrawableElement {
         button = this.createDeleteButton(pagePosition);
         this._deleteButtons.set(pagePosition, button);
       }
-      if (!button.isConnected) {
-        getFrameChromeControlsLayer()?.appendChild(button);
+      if (!button.root.isConnected) {
+        getFrameChromeControlsLayer()?.appendChild(button.root);
       }
       activePositions.add(pagePosition);
 
@@ -919,10 +925,7 @@ export class PdfElement extends DrawableElement {
         MIN_CHROME_BUTTON_PIXEL_SIZE,
         DELETE_BUTTON_SIZE * zoom,
       );
-      button.style.visibility = 'visible';
-      button.style.transform = `translate(${screenX - buttonSize / 2}px, ${screenY - buttonSize / 2}px)`;
-      button.style.width = `${buttonSize}px`;
-      button.style.height = `${buttonSize}px`;
+      button.sync({ screenX, screenY, size: buttonSize });
     }
 
     this.removeInactiveDeleteButtons(activePositions);
@@ -931,7 +934,7 @@ export class PdfElement extends DrawableElement {
   private removeInactiveGapButtons(activePositions: Set<number>): void {
     for (const [insertPosition, button] of this._gapButtons) {
       if (!activePositions.has(insertPosition)) {
-        button.remove();
+        button.dispose();
         this._gapButtons.delete(insertPosition);
       }
     }
@@ -940,7 +943,7 @@ export class PdfElement extends DrawableElement {
   private removeInactiveDeleteButtons(activePositions: Set<number>): void {
     for (const [pagePosition, button] of this._deleteButtons) {
       if (!activePositions.has(pagePosition)) {
-        button.remove();
+        button.dispose();
         this._deleteButtons.delete(pagePosition);
       }
     }
@@ -948,94 +951,52 @@ export class PdfElement extends DrawableElement {
 
   private removeAllGapButtons(): void {
     for (const button of this._gapButtons.values()) {
-      button.remove();
+      button.dispose();
     }
     this._gapButtons.clear();
   }
 
   private removeAllDeleteButtons(): void {
     for (const button of this._deleteButtons.values()) {
-      button.remove();
+      button.dispose();
     }
     this._deleteButtons.clear();
   }
 
-  private createGapButton(insertPosition: number): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'pdf-chrome-button pdf-chrome-button--add';
-    button.title = 'Add blank page';
-    button.setAttribute('aria-label', 'Add blank page');
-    button.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="1.5"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 5v14"/>
-        <path d="M5 12h14"/>
-      </svg>
-    `;
-
-    button.addEventListener('pointerdown', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
+  private createGapButton(insertPosition: number): PdfChromeButtonHandle {
+    return createPdfChromeButton({
+      kind: 'add',
+      onPress: () => {
+        this.insertBlankPage(insertPosition);
+      },
     });
-    button.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      this.insertBlankPage(insertPosition);
-    });
-
-    getFrameChromeControlsLayer()?.appendChild(button);
-    return button;
   }
 
-  private createDeleteButton(pagePosition: number): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'pdf-chrome-button pdf-chrome-button--delete';
-    button.title = 'Delete page';
-    button.setAttribute('aria-label', 'Delete page');
-    button.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="1.5"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 7h16"/>
-        <path d="M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7"/>
-        <path d="M18 7l-.9 11.1A2 2 0 0 1 15.1 20H8.9a2 2 0 0 1-2-1.9L6 7"/>
-        <path d="M10 11.5v4.5"/>
-        <path d="M14 11.5v4.5"/>
-      </svg>
-    `;
-
-    button.addEventListener('pointerdown', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
+  private createDeleteButton(pagePosition: number): PdfChromeButtonHandle {
+    return createPdfChromeButton({
+      kind: 'delete',
+      onPress: () => {
+        this.deletePage(pagePosition);
+      },
     });
-    button.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      this.deletePage(pagePosition);
-    });
-
-    getFrameChromeControlsLayer()?.appendChild(button);
-    return button;
   }
 
   private insertBlankPage(position: number): void {
     const layout = this.getLayout();
-    if (layout.pages.length < 2) {
+    if (layout.pages.length < 1) {
       return;
     }
 
     const insertPosition = Math.max(
-      1,
-      Math.min(Math.floor(position), layout.pages.length - 1),
+      0,
+      Math.min(Math.floor(position), layout.pages.length),
     );
-    const previousPage = layout.pages[insertPosition - 1];
+    const referencePage =
+      layout.pages[Math.max(0, insertPosition - 1)] ?? layout.pages[0];
     const nextOrder = clonePageOrder(this.pageEntries);
     nextOrder.splice(insertPosition, 0, {
       kind: 'blank',
-      size: { ...previousPage.size },
+      size: { ...referencePage.size },
     });
 
     this.commitCustomPageOrder(nextOrder);

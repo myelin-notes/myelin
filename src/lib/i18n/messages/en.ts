@@ -54,10 +54,6 @@ const en = {
         label: 'Import Markdown',
         description: 'Add a Markdown page frame to this canvas',
       },
-      insertLink: {
-        label: 'Insert note link',
-        description: 'Requires internal note links from roadmap item 2',
-      },
       switchView: {
         label: 'Switch library view',
         description: 'Toggle the library between list and grid',
@@ -418,10 +414,6 @@ const en = {
       embed: {
         label: 'Image or PDF',
         description: 'Drop in files or paste a URL',
-      },
-      link: {
-        label: 'Note link',
-        description: 'Link or embed another note',
       },
     },
     toolShelf: {

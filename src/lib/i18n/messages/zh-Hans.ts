@@ -56,10 +56,6 @@ const zhHans: typeof en = {
         label: '导入 Markdown',
         description: '向当前画布添加 Markdown 页面框',
       },
-      insertLink: {
-        label: '插入笔记链接',
-        description: '需要路线图第 2 项的内部笔记链接',
-      },
       switchView: {
         label: '切换资料库视图',
         description: '在列表和网格之间切换资料库',
@@ -408,10 +404,6 @@ const zhHans: typeof en = {
       embed: {
         label: '图片或 PDF',
         description: '拖入文件或粘贴链接',
-      },
-      link: {
-        label: '笔记链接',
-        description: '链接或嵌入其他笔记',
       },
     },
     toolShelf: {
