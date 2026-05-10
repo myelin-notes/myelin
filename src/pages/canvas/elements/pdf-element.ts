@@ -985,7 +985,6 @@ export class PdfElement extends DrawableElement {
       this.insertBlankPage(insertPosition);
     });
 
-    getFrameChromeControlsLayer()?.appendChild(button);
     return button;
   }
 
@@ -1017,7 +1016,6 @@ export class PdfElement extends DrawableElement {
       this.deletePage(pagePosition);
     });
 
-    getFrameChromeControlsLayer()?.appendChild(button);
     return button;
   }
 
