@@ -32,6 +32,7 @@ import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
   FrameChrome,
+  getFrameChromeControlsLayer,
 } from './frame-chrome';
 import { PAGE_GAP, PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
 
@@ -80,10 +81,11 @@ function clonePageSizes(pageSizes: PdfPageSize[]): PdfPageSize[] {
 }
 
 function clonePageOrder(pageOrder: PdfPageOrderEntry[]): PdfPageOrderEntry[] {
-  return pageOrder.map((entry) => ({
-    kind: entry.kind,
-    originalIndex: entry.originalIndex,
-  }));
+  return pageOrder.map((entry) =>
+    entry.kind === 'pdf'
+      ? { kind: 'pdf', originalIndex: entry.originalIndex }
+      : { kind: 'blank', size: { ...entry.size } },
+  );
 }
 
 function arePageSizesEqual(left: PdfPageSize[], right: PdfPageSize[]): boolean {
@@ -99,7 +101,19 @@ function arePageOrdersEqual(
 ): boolean {
   return (
     left.length === right.length &&
-    left.every((entry, i) => entry.originalIndex === right[i].originalIndex)
+    left.every((entry, i) => {
+      const other = right[i];
+      if (entry.kind !== other.kind) {
+        return false;
+      }
+      if (entry.kind === 'pdf' && other.kind === 'pdf') {
+        return entry.originalIndex === other.originalIndex;
+      }
+      if (entry.kind === 'blank' && other.kind === 'blank') {
+        return entry.size.w === other.size.w && entry.size.h === other.size.h;
+      }
+      return false;
+    })
   );
 }
 
@@ -131,6 +145,7 @@ export class PdfElement extends DrawableElement {
   private _chrome: FrameChrome | null = null;
   private _contentRoot: HTMLDivElement | null = null;
   private _pageDoms = new Map<number, PdfPageDom>();
+  private _gapButtons = new Map<number, HTMLButtonElement>();
   private _layout: PdfLayout | null = null;
   private _loadGeneration = 0;
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
@@ -175,7 +190,7 @@ export class PdfElement extends DrawableElement {
         this.setPageSizes(normalizePdfPageSizes(v), false);
       },
       pageOrder: (v) => {
-        this._pageOrder = normalizePdfPageOrder(v, this._pageSizes.length);
+        this._pageOrder = this.normalizePageOrder(v);
         this._layout = null;
         this.invalidatePageRenders();
       },
@@ -368,6 +383,7 @@ export class PdfElement extends DrawableElement {
 
     this.syncContentRoot(contentWidth, contentHeight, zoom);
     this.syncPageDoms(viewport, zoom, scaleX, scaleY, layout);
+    this.syncGapButtons(viewport, zoom, scaleX, scaleY, layout);
   }
 
   public override disposeDOM(): void {
@@ -377,20 +393,33 @@ export class PdfElement extends DrawableElement {
     void this._pdfDocument?.destroy();
     this._pdfDocument = null;
     this._pageDoms.clear();
+    this.removeAllGapButtons();
     this._contentRoot = null;
     this._chrome?.dispose();
     this._chrome = null;
   }
 
   private get pageEntries(): PdfPageOrderEntry[] {
-    return this.getLayout().pages.map((page) => ({
-      kind: 'pdf',
-      originalIndex: page.originalIndex,
-    }));
+    return this.getLayout().pages.map((page) =>
+      page.kind === 'pdf'
+        ? { kind: 'pdf', originalIndex: page.originalIndex }
+        : { kind: 'blank', size: { ...page.size } },
+    );
   }
 
   private getPageSize(entry: PdfPageOrderEntry): PdfPageSize {
+    if (entry.kind === 'blank') {
+      return entry.size;
+    }
     return this._pageSizes[entry.originalIndex] ?? DEFAULT_PAGE_SIZE;
+  }
+
+  private normalizePageOrder(value: unknown): PdfPageOrderEntry[] {
+    return normalizePdfPageOrder(
+      value,
+      this._pageSizes.length,
+      DEFAULT_PAGE_SIZE,
+    );
   }
 
   private getLayout(): PdfLayout {
@@ -398,10 +427,7 @@ export class PdfElement extends DrawableElement {
       return this._layout;
     }
 
-    const entries = normalizePdfPageOrder(
-      this._pageOrder,
-      this._pageSizes.length,
-    );
+    const entries = this.normalizePageOrder(this._pageOrder);
     const pages: PdfElementExportPage[] = [];
     let totalWidth = 0;
     let totalHeight = 0;
@@ -411,12 +437,22 @@ export class PdfElement extends DrawableElement {
         totalHeight += PAGE_GAP;
       }
       const pageSize = this.getPageSize(entry);
-      pages.push({
-        originalIndex: entry.originalIndex,
-        size: pageSize,
-        localLeft: 0,
-        localTop: totalHeight,
-      });
+      pages.push(
+        entry.kind === 'pdf'
+          ? {
+              kind: 'pdf',
+              originalIndex: entry.originalIndex,
+              size: pageSize,
+              localLeft: 0,
+              localTop: totalHeight,
+            }
+          : {
+              kind: 'blank',
+              size: pageSize,
+              localLeft: 0,
+              localTop: totalHeight,
+            },
+      );
       totalWidth = Math.max(totalWidth, pageSize.w);
       totalHeight += pageSize.h;
     }
@@ -435,6 +471,7 @@ export class PdfElement extends DrawableElement {
     const nextPageOrder = normalizePdfPageOrder(
       this._pageOrder,
       nextPageSizes.length,
+      DEFAULT_PAGE_SIZE,
     );
     const shouldSync =
       sync && this.shouldSyncPageMetadata(nextPageSizes, nextPageOrder);
@@ -470,7 +507,11 @@ export class PdfElement extends DrawableElement {
         pageSizes,
       ) ||
       !arePageOrdersEqual(
-        normalizePdfPageOrder(this._yMap.get('pageOrder'), pageSizes.length),
+        normalizePdfPageOrder(
+          this._yMap.get('pageOrder'),
+          pageSizes.length,
+          DEFAULT_PAGE_SIZE,
+        ),
         pageOrder,
       )
     );
@@ -485,7 +526,11 @@ export class PdfElement extends DrawableElement {
       return true;
     }
 
-    const pageOrder = normalizePdfPageOrder(this._pageOrder, pageCount);
+    const pageOrder = normalizePdfPageOrder(
+      this._pageOrder,
+      pageCount,
+      DEFAULT_PAGE_SIZE,
+    );
     return (
       !arePageOrdersEqual(this._pageOrder, pageOrder) ||
       (pageCount === 1 &&
@@ -648,16 +693,172 @@ export class PdfElement extends DrawableElement {
         elementScale: Math.max(scaleX, scaleY),
         dpr,
       });
-      this.requestPageRender(
-        pageDom,
-        page.originalIndex,
-        page.size,
-        renderScale,
-        zoom,
-      );
+      if (page.kind === 'pdf') {
+        this.requestPageRender(
+          pageDom,
+          page.originalIndex,
+          page.size,
+          renderScale,
+          zoom,
+        );
+      } else {
+        this.releasePageRender(pageDom, true);
+      }
     }
 
     this.removeInactivePageDoms(activePagePositions);
+  }
+
+  private syncGapButtons(
+    viewport: CanvasViewport,
+    zoom: number,
+    scaleX: number,
+    scaleY: number,
+    layout: PdfLayout,
+  ): void {
+    const activePositions = new Set<number>();
+    const worldRect = viewport.getWorldRect();
+
+    if (
+      layout.pages.length < 2 ||
+      !this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)
+    ) {
+      this.removeInactiveGapButtons(activePositions);
+      return;
+    }
+
+    for (
+      let insertPosition = 1;
+      insertPosition < layout.pages.length;
+      insertPosition++
+    ) {
+      const page = layout.pages[insertPosition];
+      const localY = page.localTop - PAGE_GAP / 2;
+      const worldY = this.offset.y + localY * scaleY;
+      if (
+        worldY < worldRect.top - PAGE_RENDER_MARGIN ||
+        worldY > worldRect.bottom + PAGE_RENDER_MARGIN
+      ) {
+        continue;
+      }
+
+      let button = this._gapButtons.get(insertPosition);
+      if (!button) {
+        button = this.createGapButton(insertPosition);
+        this._gapButtons.set(insertPosition, button);
+      }
+      if (!button.isConnected) {
+        getFrameChromeControlsLayer()?.appendChild(button);
+      }
+      activePositions.add(insertPosition);
+
+      const localX = layout.totalWidth / 2;
+      const screenX = snapToDevicePixel(
+        (this.offset.x + viewport.offset.x + localX * scaleX) * zoom,
+      );
+      const screenY = snapToDevicePixel(
+        (this.offset.y + viewport.offset.y + localY * scaleY) * zoom,
+      );
+      const buttonSize = Math.max(18, Math.min(28, 24 * zoom));
+      button.style.visibility = 'visible';
+      button.style.transform = `translate(${screenX - buttonSize / 2}px, ${screenY - buttonSize / 2}px)`;
+      button.style.width = `${buttonSize}px`;
+      button.style.height = `${buttonSize}px`;
+      button.style.borderRadius = `${Math.max(6, Math.min(9, 8 * zoom))}px`;
+    }
+
+    this.removeInactiveGapButtons(activePositions);
+  }
+
+  private removeInactiveGapButtons(activePositions: Set<number>): void {
+    for (const [insertPosition, button] of this._gapButtons) {
+      if (!activePositions.has(insertPosition)) {
+        button.remove();
+        this._gapButtons.delete(insertPosition);
+      }
+    }
+  }
+
+  private removeAllGapButtons(): void {
+    for (const button of this._gapButtons.values()) {
+      button.remove();
+    }
+    this._gapButtons.clear();
+  }
+
+  private createGapButton(insertPosition: number): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.title = 'Add blank page';
+    button.setAttribute('aria-label', 'Add blank page');
+    Object.assign(button.style, {
+      position: 'absolute',
+      left: '0px',
+      top: '0px',
+      transformOrigin: '0 0',
+      border: 'none',
+      padding: '0',
+      background: 'var(--bg-card)',
+      color: 'var(--text-secondary)',
+      boxShadow:
+        '0 1px 2px rgba(25, 28, 30, 0.04), 0 12px 28px rgba(25, 28, 30, 0.12)',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      pointerEvents: 'auto',
+      fontFamily: 'Inter, Arial, sans-serif',
+      fontSize: '16px',
+      fontWeight: '500',
+      lineHeight: '1',
+      transition: 'background 0.15s ease, color 0.15s ease',
+      visibility: 'hidden',
+    } as Partial<CSSStyleDeclaration>);
+    button.textContent = '+';
+
+    button.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    button.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.insertBlankPage(insertPosition);
+    });
+    button.addEventListener('pointerenter', () => {
+      button.style.background = 'var(--bg-surface)';
+      button.style.color = 'var(--text-primary)';
+    });
+    button.addEventListener('pointerleave', () => {
+      button.style.background = 'var(--bg-card)';
+      button.style.color = 'var(--text-secondary)';
+    });
+
+    getFrameChromeControlsLayer()?.appendChild(button);
+    return button;
+  }
+
+  private insertBlankPage(position: number): void {
+    const layout = this.getLayout();
+    if (layout.pages.length < 2) {
+      return;
+    }
+
+    const insertPosition = Math.max(
+      1,
+      Math.min(Math.floor(position), layout.pages.length - 1),
+    );
+    const previousPage = layout.pages[insertPosition - 1];
+    const nextOrder = clonePageOrder(this.pageEntries);
+    nextOrder.splice(insertPosition, 0, {
+      kind: 'blank',
+      size: { ...previousPage.size },
+    });
+
+    this._pageOrder = nextOrder;
+    this._layout = null;
+    this.invalidatePageRenders();
+    this.syncToYMap({ pageOrder: clonePageOrder(this._pageOrder) });
   }
 
   private removeInactivePageDoms(activePagePositions: Set<number>): void {

@@ -108,6 +108,11 @@ interface TestablePdfElement {
   ) => void;
 }
 
+interface TestablePdfInsertion {
+  insertBlankPage: (position: number) => void;
+  getYMapProps: () => Record<string, unknown>;
+}
+
 function createPdfYMap(
   ydoc: YDocManager,
   pageSizes: PdfPageSize[],
@@ -324,6 +329,31 @@ describe('PdfElement metadata loading', () => {
     await flushPromises();
 
     expect(openPdfDocument).not.toHaveBeenCalled();
+  });
+
+  it('inserts a blank page into the stored page order', async () => {
+    const ydoc = new YDocManager();
+    const pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+    ];
+    const yMap = createPdfYMap(ydoc, pageSizes);
+    mockLoadedPdfWithStoredMetadata(pageSizes);
+
+    const element = new PdfElement('pdf-uuid');
+    const insertable = element as unknown as TestablePdfInsertion;
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    insertable.insertBlankPage(1);
+
+    const expectedPageOrder = [
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'blank', size: { w: 612, h: 792 } },
+      { kind: 'pdf', originalIndex: 1 },
+    ];
+    expect(yMap.get('pageOrder')).toEqual(expectedPageOrder);
+    expect(insertable.getYMapProps().pageOrder).toEqual(expectedPageOrder);
   });
 });
 

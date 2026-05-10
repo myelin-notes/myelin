@@ -41,6 +41,23 @@ describe('PDF page order metadata', () => {
     ]);
   });
 
+  it('keeps blank pages when every source page is still present', () => {
+    expect(
+      normalizePdfPageOrder(
+        [
+          { kind: 'pdf', originalIndex: 0 },
+          { kind: 'blank', size: { w: 612, h: 792 } },
+          { kind: 'pdf', originalIndex: 1 },
+        ],
+        2,
+      ),
+    ).toEqual([
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'blank', size: { w: 612, h: 792 } },
+      { kind: 'pdf', originalIndex: 1 },
+    ]);
+  });
+
   it('replaces duplicate entries with the complete default order', () => {
     expect(
       normalizePdfPageOrder(
