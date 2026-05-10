@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { toBlob as htmlToImageBlob } from 'html-to-image';
+import { toCanvas as htmlToImageCanvas } from 'html-to-image';
 import { Logger } from '@/lib/logger';
 import { getScratchCanvasContext } from '@/lib/scratch-canvas';
 import type { VFSNodeId } from '@/lib/sync';
@@ -29,7 +29,11 @@ export function useCanvasThumbnailProducer({
         const root = thumbnailRootRef.current;
         if (root !== null && root.clientWidth > 0 && root.clientHeight > 0) {
           try {
-            const blob = await renderDomThumbnail(root, maxSize);
+            const blob = await renderDomThumbnail(
+              root,
+              canvasRef.current,
+              maxSize,
+            );
             if (blob !== null) {
               return blob;
             }
@@ -51,6 +55,7 @@ export function useCanvasThumbnailProducer({
 
 async function renderDomThumbnail(
   root: HTMLElement,
+  inkCanvas: HTMLCanvasElement | null,
   maxSize: number,
 ): Promise<Blob | null> {
   await waitForSettledLayout();
@@ -65,13 +70,15 @@ async function renderDomThumbnail(
   const scale = Math.min(1, maxSize / longest);
   const width = Math.max(1, Math.round(sourceWidth * scale));
   const height = Math.max(1, Math.round(sourceHeight * scale));
-  return htmlToImageBlob(root, {
+
+  const domCanvas = await htmlToImageCanvas(root, {
     canvasWidth: width,
     canvasHeight: height,
     pixelRatio: 1,
-      filter: shouldIncludeInThumbnail,
-    });
+    filter: (node) => shouldIncludeInThumbnail(node, inkCanvas),
   });
+
+  return compositeDomAndInk(domCanvas, inkCanvas, width, height);
 }
 
 async function renderCanvasThumbnail(
@@ -106,27 +113,29 @@ function shouldIncludeInThumbnail(
   if (!(node instanceof Element)) {
     return true;
   }
-  return node !== inkCanvas && !node.matches(EXCLUDE_SELECTOR);
+  return (
+    node !== inkCanvas &&
+    !node.matches(EXCLUDE_SELECTOR) &&
+    node.closest(EXCLUDE_SELECTOR) === null
+  );
 }
 
 async function compositeDomAndInk(
-  domBlob: Blob,
+  domCanvas: HTMLCanvasElement,
   inkCanvas: HTMLCanvasElement | null,
   width: number,
   height: number,
 ): Promise<Blob | null> {
   const scratch = getScratchCanvasContext(width, height);
-  const domImage = await createImageBitmap(domBlob);
 
   try {
     const ctx = scratch.context;
-    ctx.drawImage(domImage, 0, 0, width, height);
+    ctx.drawImage(domCanvas, 0, 0, width, height);
     if (inkCanvas !== null && inkCanvas.width > 0 && inkCanvas.height > 0) {
       ctx.drawImage(inkCanvas, 0, 0, width, height);
     }
     return await scratch.toBlob({ type: 'image/png' });
   } finally {
-    domImage.close();
     scratch.release();
   }
 }
