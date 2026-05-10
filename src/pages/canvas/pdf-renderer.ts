@@ -226,7 +226,7 @@ export function normalizePdfPageOrder(
     ? hasUniquePdfEntries
       ? entries
       : createDefaultPdfPageOrder(count)
-    : hasCompletePdfEntries
+    : hasCompletePdfEntries && hasUniquePdfEntries
       ? entries
       : createDefaultPdfPageOrder(count);
 }

@@ -91,6 +91,22 @@ describe('PDF page order metadata', () => {
       { kind: 'pdf', originalIndex: 2 },
     ]);
   });
+
+  it('replaces duplicate entries even when every source page is present', () => {
+    expect(
+      normalizePdfPageOrder(
+        [
+          { kind: 'pdf', originalIndex: 0 },
+          { kind: 'pdf', originalIndex: 0 },
+          { kind: 'pdf', originalIndex: 1 },
+        ],
+        2,
+      ),
+    ).toEqual([
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 1 },
+    ]);
+  });
 });
 
 describe('PDF render scale', () => {

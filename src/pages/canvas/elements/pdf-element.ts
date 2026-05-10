@@ -203,9 +203,12 @@ export class PdfElement extends DrawableElement {
         this._pageOrderCustom = v === true;
       },
       pageOrder: (v) => {
-        this._pageOrder = this.normalizePageOrder(v);
-        this._layout = null;
-        this.invalidatePageRenders();
+        const allowMissing =
+          this._pageOrderCustom || yMap.get('pageOrderCustom') === true;
+        if (allowMissing) {
+          this._pageOrderCustom = true;
+        }
+        this.applyPageOrder(this.normalizePageOrder(v, allowMissing));
       },
       pdfData: (v) => {
         const isReplacingPdf = this._pdfBytes !== null;
@@ -429,12 +432,15 @@ export class PdfElement extends DrawableElement {
     return this._pageSizes[entry.originalIndex] ?? DEFAULT_PAGE_SIZE;
   }
 
-  private normalizePageOrder(value: unknown): PdfPageOrderEntry[] {
+  private normalizePageOrder(
+    value: unknown,
+    allowMissingPdfPages = this._pageOrderCustom,
+  ): PdfPageOrderEntry[] {
     return normalizePdfPageOrder(
       value,
       this._pageSizes.length,
       DEFAULT_PAGE_SIZE,
-      this._pageOrderCustom,
+      allowMissingPdfPages,
     );
   }
 
@@ -602,6 +608,69 @@ export class PdfElement extends DrawableElement {
     for (const pageDom of this._pageDoms.values()) {
       this.releasePageRender(pageDom, true);
     }
+  }
+
+  private applyPageOrder(nextOrder: PdfPageOrderEntry[]): void {
+    const previousPages =
+      this._pageDoms.size > 0 ? this.getLayout().pages : null;
+
+    this._pageOrder = clonePageOrder(nextOrder);
+    this._layout = null;
+
+    if (previousPages) {
+      this.reconcilePageDomsAfterOrderChange(
+        previousPages,
+        this.getLayout().pages,
+      );
+    }
+
+    this.removeAllGapButtons();
+    this.removeAllDeleteButtons();
+  }
+
+  private commitCustomPageOrder(nextOrder: PdfPageOrderEntry[]): void {
+    this._pageOrderCustom = true;
+    this.applyPageOrder(nextOrder);
+    this.syncToYMap({
+      pageOrder: clonePageOrder(this._pageOrder),
+      pageOrderCustom: true,
+    });
+  }
+
+  private reconcilePageDomsAfterOrderChange(
+    previousPages: PdfElementExportPage[],
+    nextPages: PdfElementExportPage[],
+  ): void {
+    const reusablePdfDoms = new Map<number, PdfPageDom>();
+    for (const [pagePosition, pageDom] of this._pageDoms) {
+      const page = previousPages[pagePosition];
+      if (page?.kind === 'pdf') {
+        reusablePdfDoms.set(page.originalIndex, pageDom);
+      }
+    }
+
+    const nextPageDoms = new Map<number, PdfPageDom>();
+    const reusedDoms = new Set<PdfPageDom>();
+    for (const [pagePosition, page] of nextPages.entries()) {
+      if (page.kind !== 'pdf') {
+        continue;
+      }
+      const pageDom = reusablePdfDoms.get(page.originalIndex);
+      if (!pageDom) {
+        continue;
+      }
+      nextPageDoms.set(pagePosition, pageDom);
+      reusedDoms.add(pageDom);
+      reusablePdfDoms.delete(page.originalIndex);
+    }
+
+    for (const pageDom of this._pageDoms.values()) {
+      if (!reusedDoms.has(pageDom)) {
+        this.disposePageDom(pageDom);
+      }
+    }
+
+    this._pageDoms = nextPageDoms;
   }
 
   private cancelPageRenders(): void {
@@ -969,16 +1038,7 @@ export class PdfElement extends DrawableElement {
       size: { ...previousPage.size },
     });
 
-    this._pageOrder = nextOrder;
-    this._pageOrderCustom = true;
-    this._layout = null;
-    this.invalidatePageRenders();
-    this.removeAllGapButtons();
-    this.removeAllDeleteButtons();
-    this.syncToYMap({
-      pageOrder: clonePageOrder(this._pageOrder),
-      pageOrderCustom: true,
-    });
+    this.commitCustomPageOrder(nextOrder);
   }
 
   private deletePage(position: number): void {
@@ -997,16 +1057,7 @@ export class PdfElement extends DrawableElement {
       return;
     }
 
-    this._pageOrder = nextOrder;
-    this._pageOrderCustom = true;
-    this._layout = null;
-    this.invalidatePageRenders();
-    this.removeAllGapButtons();
-    this.removeAllDeleteButtons();
-    this.syncToYMap({
-      pageOrder: clonePageOrder(this._pageOrder),
-      pageOrderCustom: true,
-    });
+    this.commitCustomPageOrder(nextOrder);
   }
 
   private removeInactivePageDoms(activePagePositions: Set<number>): void {

@@ -11,6 +11,7 @@ import {
 import {
   getPdfDocumentPageSizes,
   openPdfDocument,
+  type PdfPageOrderEntry,
   type PdfPageRenderHandle,
   type PdfPageSize,
   renderPdfPageToCanvas,
@@ -78,7 +79,7 @@ interface TestCanvas extends HTMLCanvasElement {
 }
 
 interface TestPageDom {
-  root: HTMLDivElement;
+  root: HTMLDivElement & { remove: Mock<() => void> };
   canvas: HTMLCanvasElement;
   renderHandle: PdfPageRenderHandle | null;
   rendered: TestRenderKey | null;
@@ -112,6 +113,13 @@ interface TestablePdfInsertion {
   insertBlankPage: (position: number) => void;
   deletePage: (position: number) => void;
   getYMapProps: () => Record<string, unknown>;
+}
+
+interface TestablePdfPageDomState extends TestablePdfInsertion {
+  _pageSizes: PdfPageSize[];
+  _pageOrder: PdfPageOrderEntry[];
+  _pageDoms: Map<number, TestPageDom>;
+  _layout: unknown | null;
 }
 
 function createPdfYMap(
@@ -168,7 +176,9 @@ function createPageDom(
   canvas: HTMLCanvasElement = createTestCanvas(),
 ): TestPageDom {
   return {
-    root: {} as HTMLDivElement,
+    root: { remove: vi.fn() } as unknown as HTMLDivElement & {
+      remove: Mock<() => void>;
+    },
     canvas,
     renderHandle: null,
     rendered:
@@ -417,6 +427,75 @@ describe('PdfElement metadata loading', () => {
     expect(yMap.get('pageOrderCustom')).toBe(true);
     expect(editable.getYMapProps().pageOrder).toEqual(expectedPageOrder);
     expect(editable.getYMapProps().pageOrderCustom).toBe(true);
+  });
+
+  it('preserves rendered canvases when inserting a blank page', () => {
+    const element = new PdfElement('pdf-uuid');
+    const state = element as unknown as TestablePdfPageDomState;
+    state._pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+    ];
+    state._pageOrder = [
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 1 },
+    ];
+    state._layout = null;
+
+    const firstPageDom = createPageDom(1, createTestCanvas(612, 792));
+    const secondPageDom = createPageDom(1, createTestCanvas(300, 150));
+    state._pageDoms = new Map([
+      [0, firstPageDom],
+      [1, secondPageDom],
+    ]);
+
+    state.insertBlankPage(1);
+
+    expect(state._pageDoms.get(0)).toBe(firstPageDom);
+    expect(state._pageDoms.get(2)).toBe(secondPageDom);
+    expect(firstPageDom.canvas.width).toBe(612);
+    expect(firstPageDom.canvas.height).toBe(792);
+    expect(secondPageDom.canvas.width).toBe(300);
+    expect(secondPageDom.canvas.height).toBe(150);
+    expect(firstPageDom.root.remove).not.toHaveBeenCalled();
+    expect(secondPageDom.root.remove).not.toHaveBeenCalled();
+  });
+
+  it('preserves surviving rendered canvases when deleting a page', () => {
+    const element = new PdfElement('pdf-uuid');
+    const state = element as unknown as TestablePdfPageDomState;
+    state._pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+      { w: 400, h: 200 },
+    ];
+    state._pageOrder = [
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 1 },
+      { kind: 'pdf', originalIndex: 2 },
+    ];
+    state._layout = null;
+
+    const firstPageDom = createPageDom(1, createTestCanvas(612, 792));
+    const deletedPageDom = createPageDom(1, createTestCanvas(300, 150));
+    const thirdPageDom = createPageDom(1, createTestCanvas(400, 200));
+    state._pageDoms = new Map([
+      [0, firstPageDom],
+      [1, deletedPageDom],
+      [2, thirdPageDom],
+    ]);
+
+    state.deletePage(1);
+
+    expect(state._pageDoms.get(0)).toBe(firstPageDom);
+    expect(state._pageDoms.get(1)).toBe(thirdPageDom);
+    expect(firstPageDom.canvas.width).toBe(612);
+    expect(firstPageDom.canvas.height).toBe(792);
+    expect(thirdPageDom.canvas.width).toBe(400);
+    expect(thirdPageDom.canvas.height).toBe(200);
+    expect(firstPageDom.root.remove).not.toHaveBeenCalled();
+    expect(thirdPageDom.root.remove).not.toHaveBeenCalled();
+    expect(deletedPageDom.root.remove).toHaveBeenCalledTimes(1);
   });
 });
 
