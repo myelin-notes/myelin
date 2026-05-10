@@ -61,6 +61,7 @@ function CanvasViewInner() {
   const navigate = useNavigate();
   const location = useLocation();
   const repository = useRepository();
+  const thumbnailRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,6 +109,7 @@ function CanvasViewInner() {
   const engine = useCanvasEngine({
     id,
     initialPageFrameName: targetPageFrameName,
+    thumbnailRootRef,
     canvasRef,
     bgCanvasRef,
     overlayCanvasRef,
@@ -248,39 +250,45 @@ function CanvasViewInner() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
-      {/* Background canvas: dot grid */}
-      <canvas
-        ref={bgCanvasRef}
-        className="absolute inset-0 block h-full w-full"
-        style={{ zIndex: 0 }}
-      />
-
-      {/* DOM layer: page chrome + PM editor text */}
-      <PageFrameDomLayer
-        canvasRef={engine.drawableCanvasRef}
-        editingElement={engine.editingElement}
-        autocompleteController={pageFrameAutocomplete.controller}
-        autocompleteKind={pageFrameAutocomplete.activeKind}
-        onAutocompleteSelect={pageFrameAutocomplete.onSelectItem}
-        loadNoteLinkPreview={
-          hoverPreviewEnabled ? loadNoteLinkPreview : undefined
-        }
-      />
-
-      {/* Element-owned DOM overlay */}
       <div
-        ref={domOverlayRef}
-        id="dom-overlay"
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-        style={{ zIndex: 5 }}
-      />
+        ref={thumbnailRootRef}
+        data-thumbnail-root="true"
+        className="absolute inset-0 overflow-hidden bg-page"
+      >
+        {/* Background canvas: dot grid */}
+        <canvas
+          ref={bgCanvasRef}
+          className="absolute inset-0 block h-full w-full"
+          style={{ zIndex: 0 }}
+        />
 
-      {/* Foreground canvas: strokes, images, element content (z-index toggled by DrawableCanvas during edit) */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 block h-full w-full"
-        onClick={inserts.onCanvasClick}
-      />
+        {/* DOM layer: page chrome + PM editor text */}
+        <PageFrameDomLayer
+          canvasRef={engine.drawableCanvasRef}
+          editingElement={engine.editingElement}
+          autocompleteController={pageFrameAutocomplete.controller}
+          autocompleteKind={pageFrameAutocomplete.activeKind}
+          onAutocompleteSelect={pageFrameAutocomplete.onSelectItem}
+          loadNoteLinkPreview={
+            hoverPreviewEnabled ? loadNoteLinkPreview : undefined
+          }
+        />
+
+        {/* Element-owned DOM overlay */}
+        <div
+          ref={domOverlayRef}
+          id="dom-overlay"
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          style={{ zIndex: 5 }}
+        />
+
+        {/* Foreground canvas: strokes, images, element content (z-index toggled by DrawableCanvas during edit) */}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 block h-full w-full"
+          onClick={inserts.onCanvasClick}
+        />
+      </div>
 
       {/* Selection overlay canvas: outline + handles. Always above DOM chrome
           so selection stays visible while editing. */}
