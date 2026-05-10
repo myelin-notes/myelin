@@ -390,14 +390,6 @@ const en = {
     backlinks: {
       title: 'Backlinks',
       linkedMentions: 'Linked mentions',
-      showPane: 'Show backlinks',
-      hidePane: 'Hide backlinks',
-      loadFailed: 'Could not load backlinks',
-      retry: 'Retry',
-      emptyTitle: 'No linked mentions',
-      emptyDescription: 'Notes that link to this canvas will appear here.',
-      mentionCount: (count: number, formatted: string) =>
-        `${formatted} mention${count === 1 ? '' : 's'}`,
     },
     toolbar: {
       clickForOptions: 'click for options',

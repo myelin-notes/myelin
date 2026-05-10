@@ -23,7 +23,7 @@ import { RenameReferencesDialog } from '@/pages/library/explorer/rename-referenc
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { useCanvasCommandContext } from './command-context';
-import { BacklinksPane } from './components/backlinks-pane';
+import { BacklinksChip } from './components/backlinks-chip';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
@@ -70,7 +70,6 @@ function CanvasViewInner() {
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
   const toolState = useToolState(drawableCanvasRef);
-  const [backlinksOpen, setBacklinksOpen] = useState(true);
 
   const [chromeMenu, setChromeMenu] = useState<{
     anchor: DOMRect;
@@ -312,22 +311,25 @@ function CanvasViewInner() {
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
       )}
-      <TitleBar fileName={engine.fileName} onBack={engine.back} />
-      <BacklinksPane
-        noteId={id}
-        open={backlinksOpen}
-        onOpenChange={setBacklinksOpen}
-        onOpenSource={(sourceId) => {
-          void openBacklinkSource(sourceId).catch((error) => {
-            logger.error('Failed to open backlink source', error, {
-              sourceId,
-            });
-            toast.error('Failed to open backlink', {
-              description:
-                error instanceof Error ? error.message : String(error),
-            });
-          });
-        }}
+      <TitleBar
+        fileName={engine.fileName}
+        onBack={engine.back}
+        trailing={
+          <BacklinksChip
+            noteId={id}
+            onOpenSource={(sourceId) => {
+              void openBacklinkSource(sourceId).catch((error) => {
+                logger.error('Failed to open backlink source', error, {
+                  sourceId,
+                });
+                toast.error('Failed to open backlink', {
+                  description:
+                    error instanceof Error ? error.message : String(error),
+                });
+              });
+            }}
+          />
+        }
       />
 
       <CanvasToolbar

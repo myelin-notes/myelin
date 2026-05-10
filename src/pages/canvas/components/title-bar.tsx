@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ChevronLeft as ChevronLeftIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
@@ -5,9 +6,10 @@ import { useMessages } from '@/lib/i18n';
 interface TitleBarProps {
   fileName: string;
   onBack: () => void;
+  trailing?: ReactNode;
 }
 
-export function TitleBar({ fileName, onBack }: TitleBarProps) {
+export function TitleBar({ fileName, onBack, trailing }: TitleBarProps) {
   const strings = useMessages();
 
   return (
@@ -30,6 +32,7 @@ export function TitleBar({ fileName, onBack }: TitleBarProps) {
       <span className="shrink-0 font-bold text-[10px] text-text-muted uppercase tracking-[0.05em]">
         {strings.canvas.kind}
       </span>
+      {trailing}
     </motion.div>
   );
 }
