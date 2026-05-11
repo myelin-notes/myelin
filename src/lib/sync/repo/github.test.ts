@@ -183,5 +183,42 @@ describe('GitHubRepository', () => {
     });
 
     expect(await mailbox?.list('note-1')).toEqual([]);
+    expect(
+      githubApi.readBytes('.myelin/live/v1/notes/note-1/expired-record.json'),
+    ).not.toBeNull();
+    await mailbox?.cleanupExpired('note-1');
+    expect(
+      githubApi.readBytes('.myelin/live/v1/notes/note-1/expired-record.json'),
+    ).toBeNull();
+    expect(
+      githubApi.readBytes('.myelin/live/v1/notes/note-1/bad.json'),
+    ).not.toBeNull();
+  });
+
+  it('does not clean up excluded live discovery records', async () => {
+    const repository = createRepository();
+    const mailbox = repository.liveDiscoveryMailbox;
+    const now = Date.now();
+
+    await mailbox?.publish({
+      version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      recordId: 'current-record',
+      noteId: 'note-1',
+      peerId: 'peer-1',
+      ticket: 'iroh-ticket-1',
+      updatedAt: now - 60_000,
+      expiresAt: now - 1,
+    });
+
+    await mailbox?.cleanupExpired('note-1', {
+      excludeRecordIds: ['current-record'],
+    });
+
+    expect(await mailbox?.list('note-1')).toEqual([]);
+    expect(
+      getRepositoryTestGitHubApi().readBytes(
+        '.myelin/live/v1/notes/note-1/current-record.json',
+      ),
+    ).not.toBeNull();
   });
 });

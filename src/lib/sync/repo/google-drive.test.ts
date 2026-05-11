@@ -148,6 +148,7 @@ describe('GoogleDriveRepository', () => {
   it('ignores missing and expired live discovery records', async () => {
     const repository = createRepository();
     const mailbox = repository.liveDiscoveryMailbox;
+    const driveApi = getRepositoryTestGoogleDriveApi();
     const now = Date.now();
 
     expect(await mailbox?.list('note-1')).toEqual([]);
@@ -163,5 +164,38 @@ describe('GoogleDriveRepository', () => {
     });
 
     expect(await mailbox?.list('note-1')).toEqual([]);
+    expect(
+      driveApi.readFileByAppProperty('myelin_live_record_id', 'expired-record'),
+    ).not.toBeNull();
+    await mailbox?.cleanupExpired('note-1');
+    expect(
+      driveApi.readFileByAppProperty('myelin_live_record_id', 'expired-record'),
+    ).toBeNull();
+  });
+
+  it('does not clean up excluded live discovery records', async () => {
+    const repository = createRepository();
+    const mailbox = repository.liveDiscoveryMailbox;
+    const driveApi = getRepositoryTestGoogleDriveApi();
+    const now = Date.now();
+
+    await mailbox?.publish({
+      version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      recordId: 'current-record',
+      noteId: 'note-1',
+      peerId: 'peer-1',
+      ticket: 'iroh-ticket-1',
+      updatedAt: now - 60_000,
+      expiresAt: now - 1,
+    });
+
+    await mailbox?.cleanupExpired('note-1', {
+      excludeRecordIds: ['current-record'],
+    });
+
+    expect(await mailbox?.list('note-1')).toEqual([]);
+    expect(
+      driveApi.readFileByAppProperty('myelin_live_record_id', 'current-record'),
+    ).not.toBeNull();
   });
 });

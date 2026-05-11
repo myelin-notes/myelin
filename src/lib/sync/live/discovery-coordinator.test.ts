@@ -32,6 +32,7 @@ class FakeMailbox implements LiveDiscoveryMailbox {
       (record) => record.noteId !== noteId || record.recordId !== recordId,
     );
   });
+  cleanupExpired = vi.fn(async () => {});
 }
 
 class FakeTransport implements LiveDiscoveryTransport {
@@ -240,6 +241,31 @@ describe('LivePeerDiscoveryCoordinator', () => {
     expect(mailbox.remove).toHaveBeenCalledWith('note-1', 'record-local');
     expect(transport.destroy).toHaveBeenCalledTimes(1);
     expect(session.clearTransport).toHaveBeenCalled();
+  });
+
+  it('cleans up expired records after publish even when already connected', async () => {
+    const now = 1_000;
+    const session = createSession();
+    const mailbox = new FakeMailbox();
+    const transport = new FakeTransport('local-ticket');
+    transport.connected = true;
+    const coordinator = new LivePeerDiscoveryCoordinator({
+      session,
+      mailbox,
+      createTransport: () => transport,
+      now: () => now,
+      recordId: 'record-local',
+    });
+
+    await coordinator.start();
+
+    expect(mailbox.cleanupExpired).toHaveBeenCalledWith('note-1', {
+      excludeRecordIds: ['record-local'],
+    });
+    expect(mailbox.list).not.toHaveBeenCalled();
+    expect(transport.join).not.toHaveBeenCalled();
+
+    await coordinator.stop();
   });
 
   it('joins a different record even when the stored peer id matches', async () => {

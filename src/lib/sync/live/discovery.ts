@@ -17,6 +17,23 @@ export interface LiveDiscoveryMailbox {
   publish(record: LivePeerDiscoveryRecord): Promise<void>;
   list(noteId: VFSNodeId): Promise<LivePeerDiscoveryRecord[]>;
   remove(noteId: VFSNodeId, recordId: string): Promise<void>;
+  cleanupExpired(
+    noteId: VFSNodeId,
+    options?: { excludeRecordIds?: readonly string[] },
+  ): Promise<void>;
+}
+
+export interface LiveDiscoveryCleanupCandidate {
+  record: LivePeerDiscoveryRecord;
+  remove(): Promise<void>;
+}
+
+export interface CleanupExpiredLiveDiscoveryEntriesOptions<Entry> {
+  noteId: VFSNodeId;
+  entries: readonly Entry[];
+  excludeRecordIds?: readonly string[];
+  now?: number;
+  readCandidate(entry: Entry): Promise<LiveDiscoveryCleanupCandidate | null>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,4 +107,31 @@ export function isLivePeerDiscoveryRecordFresh(
   now: number,
 ): boolean {
   return record.expiresAt > now;
+}
+
+export async function cleanupExpiredLiveDiscoveryEntries<Entry>(
+  options: CleanupExpiredLiveDiscoveryEntriesOptions<Entry>,
+): Promise<void> {
+  const excludeRecordIds = new Set(options.excludeRecordIds ?? []);
+  const now = options.now ?? Date.now();
+
+  await Promise.all(
+    options.entries.map(async (entry) => {
+      try {
+        const candidate = await options.readCandidate(entry);
+        if (
+          !candidate ||
+          candidate.record.noteId !== options.noteId ||
+          excludeRecordIds.has(candidate.record.recordId) ||
+          isLivePeerDiscoveryRecordFresh(candidate.record, now)
+        ) {
+          return;
+        }
+
+        await candidate.remove();
+      } catch {
+        return;
+      }
+    }),
+  );
 }

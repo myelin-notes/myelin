@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import {
+  cleanupExpiredLiveDiscoveryEntries,
   isLivePeerDiscoveryRecordFresh,
   type LiveDiscoveryMailbox,
   type LivePeerDiscoveryRecord,
@@ -87,6 +88,8 @@ export class GitHubRepository extends BaseRepository {
       list: (noteId) => this.listLiveDiscoveryRecords(noteId),
       remove: (noteId, recordId) =>
         this.removeLiveDiscoveryRecord(noteId, recordId),
+      cleanupExpired: (noteId, options) =>
+        this.cleanupExpiredLiveDiscoveryRecords(noteId, options),
     };
   }
 
@@ -389,5 +392,38 @@ export class GitHubRepository extends BaseRepository {
       existing.sha,
       `Remove live discovery for ${noteId}`,
     );
+  }
+
+  private async cleanupExpiredLiveDiscoveryRecords(
+    noteId: VFSNodeId,
+    options?: { excludeRecordIds?: readonly string[] },
+  ): Promise<void> {
+    const entries = await this.listContents(this.liveDiscoveryDir(noteId));
+    await cleanupExpiredLiveDiscoveryEntries({
+      noteId,
+      entries,
+      excludeRecordIds: options?.excludeRecordIds,
+      readCandidate: async (entry) => {
+        const { bytes, sha } = await this.getContents(entry.path);
+        if (!bytes || !sha) {
+          return null;
+        }
+        const record = parseLivePeerDiscoveryRecord(
+          JSON.parse(new TextDecoder().decode(bytes)),
+        );
+        if (!record) {
+          return null;
+        }
+        return {
+          record,
+          remove: () =>
+            this.deleteContents(
+              entry.path,
+              sha,
+              `Remove expired live discovery for ${noteId}`,
+            ),
+        };
+      },
+    });
   }
 }

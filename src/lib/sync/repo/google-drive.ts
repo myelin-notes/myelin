@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import {
+  cleanupExpiredLiveDiscoveryEntries,
   isLivePeerDiscoveryRecordFresh,
   type LiveDiscoveryMailbox,
   type LivePeerDiscoveryRecord,
@@ -76,6 +77,8 @@ export class GoogleDriveRepository extends BaseRepository {
       list: (noteId) => this.listLiveDiscoveryRecords(noteId),
       remove: (noteId, recordId) =>
         this.removeLiveDiscoveryRecord(noteId, recordId),
+      cleanupExpired: (noteId, options) =>
+        this.cleanupExpiredLiveDiscoveryRecords(noteId, options),
     };
   }
 
@@ -538,6 +541,32 @@ export class GoogleDriveRepository extends BaseRepository {
     }
 
     await this.deleteFile(file.id);
+  }
+
+  private async cleanupExpiredLiveDiscoveryRecords(
+    noteId: VFSNodeId,
+    options?: { excludeRecordIds?: readonly string[] },
+  ): Promise<void> {
+    const files = await this.findLiveDiscoveryFiles(noteId);
+    await cleanupExpiredLiveDiscoveryEntries({
+      noteId,
+      entries: files,
+      excludeRecordIds: options?.excludeRecordIds,
+      readCandidate: async (file) => {
+        const record = parseLivePeerDiscoveryRecord(
+          JSON.parse(
+            new TextDecoder().decode(await this.getFileBytes(file.id)),
+          ),
+        );
+        if (!record) {
+          return null;
+        }
+        return {
+          record,
+          remove: () => this.deleteFile(file.id),
+        };
+      },
+    });
   }
 
   private async findLiveDiscoveryFiles(

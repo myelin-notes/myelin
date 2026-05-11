@@ -166,7 +166,15 @@ export class LivePeerDiscoveryCoordinator {
     }
 
     const now = this.now();
-    await this.publishLocalRecord(now, ticket);
+    const published = await this.publishLocalRecord(now, ticket);
+
+    if (this.stopped || this.transport !== transport) {
+      return;
+    }
+
+    if (published) {
+      await this.cleanupExpiredRecords();
+    }
 
     if (this.stopped || this.transport !== transport) {
       return;
@@ -176,7 +184,7 @@ export class LivePeerDiscoveryCoordinator {
       return;
     }
 
-    let records: LivePeerDiscoveryRecord[];
+    let records: LivePeerDiscoveryRecord[] = [];
     try {
       records = await this.mailbox.list(this.session.id);
     } catch (error) {
@@ -248,13 +256,16 @@ export class LivePeerDiscoveryCoordinator {
     this.timer = null;
   }
 
-  private async publishLocalRecord(now: number, ticket: string): Promise<void> {
+  private async publishLocalRecord(
+    now: number,
+    ticket: string,
+  ): Promise<boolean> {
     const refreshIntervalMs = Math.max(1, Math.floor(this.recordTtlMs / 2));
     if (
       this.lastPublishedAt !== null &&
       now - this.lastPublishedAt < refreshIntervalMs
     ) {
-      return;
+      return false;
     }
 
     try {
@@ -269,8 +280,22 @@ export class LivePeerDiscoveryCoordinator {
         }),
       );
       this.lastPublishedAt = now;
+      return true;
     } catch (error) {
       logger.warn('Failed to publish live discovery record', error, {
+        noteId: this.session.id,
+      });
+      return false;
+    }
+  }
+
+  private async cleanupExpiredRecords(): Promise<void> {
+    try {
+      await this.mailbox.cleanupExpired(this.session.id, {
+        excludeRecordIds: [this.localRecordId],
+      });
+    } catch (error) {
+      logger.warn('Failed to clean up expired live discovery records', error, {
         noteId: this.session.id,
       });
     }
