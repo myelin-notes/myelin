@@ -1,10 +1,12 @@
 import { Logger } from '@/lib/logger';
+import { createEphemeralPeerId } from '../identity';
 import type { VFSNodeId } from '../types';
 import {
   createLivePeerDiscoveryRecord,
   isLivePeerDiscoveryRecordFresh,
   LIVE_PEER_DISCOVERY_TTL_MS,
   type LiveDiscoveryMailbox,
+  type LivePeerDiscoveryRecord,
 } from './discovery';
 import type { PeerSnapshot } from './peer-state';
 import type { Transport } from './transport';
@@ -34,6 +36,7 @@ export interface LivePeerDiscoveryCoordinatorOptions {
   pollIntervalMs?: number;
   recordTtlMs?: number;
   failedTicketRetryMs?: number;
+  recordId?: string;
 }
 
 const logger = new Logger('LivePeerDiscovery');
@@ -48,10 +51,12 @@ export class LivePeerDiscoveryCoordinator {
   private readonly pollIntervalMs: number;
   private readonly recordTtlMs: number;
   private readonly failedTicketRetryMs: number;
+  private readonly localRecordId: string;
   private readonly localPeerId: string;
   private transport: LiveDiscoveryTransport | null = null;
   private ticket: string | null = null;
   private timer: Timer | null = null;
+  private lastPublishedAt: number | null = null;
   private stopped = true;
   private started = false;
   private cycleInFlight: Promise<void> | null = null;
@@ -67,6 +72,7 @@ export class LivePeerDiscoveryCoordinator {
     this.recordTtlMs = options.recordTtlMs ?? LIVE_PEER_DISCOVERY_TTL_MS;
     this.failedTicketRetryMs =
       options.failedTicketRetryMs ?? DEFAULT_FAILED_TICKET_RETRY_MS;
+    this.localRecordId = options.recordId ?? createEphemeralPeerId();
     this.localPeerId = options.session.getPeerSnapshot().localPeerId;
   }
 
@@ -108,13 +114,14 @@ export class LivePeerDiscoveryCoordinator {
     const transport = this.transport;
     this.transport = null;
     this.ticket = null;
+    this.lastPublishedAt = null;
     transport?.off('disconnected', this.onTransportDisconnected);
     this.session.clearTransport();
 
     await inFlight?.catch(() => {});
 
     await Promise.allSettled([
-      this.mailbox.remove(this.session.id, this.localPeerId),
+      this.mailbox.remove(this.session.id, this.localRecordId),
       transport?.destroy(),
     ]);
   }
@@ -159,15 +166,7 @@ export class LivePeerDiscoveryCoordinator {
     }
 
     const now = this.now();
-    await this.mailbox.publish(
-      createLivePeerDiscoveryRecord({
-        noteId: this.session.id,
-        peerId: this.localPeerId,
-        ticket,
-        now,
-        ttlMs: this.recordTtlMs,
-      }),
-    );
+    await this.publishLocalRecord(now, ticket);
 
     if (this.stopped || this.transport !== transport) {
       return;
@@ -177,14 +176,24 @@ export class LivePeerDiscoveryCoordinator {
       return;
     }
 
-    const records = await this.mailbox.list(this.session.id);
+    let records: LivePeerDiscoveryRecord[];
+    try {
+      records = await this.mailbox.list(this.session.id);
+    } catch (error) {
+      logger.warn('Failed to list live discovery records', error, {
+        noteId: this.session.id,
+      });
+      return;
+    }
+
     if (this.stopped || this.transport !== transport) {
       return;
     }
 
     for (const record of records) {
       if (
-        record.peerId === this.localPeerId ||
+        record.recordId === this.localRecordId ||
+        record.ticket === ticket ||
         record.noteId !== this.session.id ||
         !isLivePeerDiscoveryRecordFresh(record, now)
       ) {
@@ -205,7 +214,7 @@ export class LivePeerDiscoveryCoordinator {
         return;
       } catch (error) {
         this.failedTickets.set(failedKey, now);
-        logger.error('Failed to join discovered peer', error, {
+        logger.warn('Failed to join discovered peer', error, {
           noteId: this.session.id,
           peerId: record.peerId,
         });
@@ -222,7 +231,7 @@ export class LivePeerDiscoveryCoordinator {
       this.timer = null;
       void this.runCycle()
         .catch((error) => {
-          logger.error('Live peer discovery poll failed', error, {
+          logger.warn('Live peer discovery poll failed', error, {
             noteId: this.session.id,
           });
         })
@@ -237,5 +246,33 @@ export class LivePeerDiscoveryCoordinator {
 
     globalThis.clearTimeout(this.timer);
     this.timer = null;
+  }
+
+  private async publishLocalRecord(now: number, ticket: string): Promise<void> {
+    const refreshIntervalMs = Math.max(1, Math.floor(this.recordTtlMs / 2));
+    if (
+      this.lastPublishedAt !== null &&
+      now - this.lastPublishedAt < refreshIntervalMs
+    ) {
+      return;
+    }
+
+    try {
+      await this.mailbox.publish(
+        createLivePeerDiscoveryRecord({
+          recordId: this.localRecordId,
+          noteId: this.session.id,
+          peerId: this.localPeerId,
+          ticket,
+          now,
+          ttlMs: this.recordTtlMs,
+        }),
+      );
+      this.lastPublishedAt = now;
+    } catch (error) {
+      logger.warn('Failed to publish live discovery record', error, {
+        noteId: this.session.id,
+      });
+    }
   }
 }

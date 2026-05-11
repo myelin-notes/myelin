@@ -119,6 +119,7 @@ describe('GoogleDriveRepository', () => {
     const now = Date.now();
     const record: LivePeerDiscoveryRecord = {
       version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      recordId: 'record-1',
       noteId: 'note-1',
       peerId: 'peer-1',
       ticket: 'iroh-ticket-1',
@@ -136,9 +137,10 @@ describe('GoogleDriveRepository', () => {
       myelin_role: 'live_discovery',
       myelin_note_id: 'note-1',
       myelin_peer_id: 'peer-1',
+      myelin_live_record_id: 'record-1',
     });
 
-    await mailbox?.remove('note-1', 'peer-1');
+    await mailbox?.remove('note-1', 'record-1');
 
     expect(await mailbox?.list('note-1')).toEqual([]);
   });
@@ -152,6 +154,7 @@ describe('GoogleDriveRepository', () => {
 
     await mailbox?.publish({
       version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      recordId: 'expired-record',
       noteId: 'note-1',
       peerId: 'expired-peer',
       ticket: 'expired-ticket',

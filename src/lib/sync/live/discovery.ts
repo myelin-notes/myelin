@@ -5,6 +5,7 @@ export const LIVE_PEER_DISCOVERY_TTL_MS = 30_000;
 
 export interface LivePeerDiscoveryRecord {
   version: typeof LIVE_PEER_DISCOVERY_RECORD_VERSION;
+  recordId: string;
   noteId: VFSNodeId;
   peerId: string;
   ticket: string;
@@ -15,7 +16,7 @@ export interface LivePeerDiscoveryRecord {
 export interface LiveDiscoveryMailbox {
   publish(record: LivePeerDiscoveryRecord): Promise<void>;
   list(noteId: VFSNodeId): Promise<LivePeerDiscoveryRecord[]>;
-  remove(noteId: VFSNodeId, peerId: string): Promise<void>;
+  remove(noteId: VFSNodeId, recordId: string): Promise<void>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,6 +28,7 @@ function isFiniteTimestamp(value: unknown): value is number {
 }
 
 export function createLivePeerDiscoveryRecord(params: {
+  recordId: string;
   noteId: VFSNodeId;
   peerId: string;
   ticket: string;
@@ -36,6 +38,7 @@ export function createLivePeerDiscoveryRecord(params: {
   const ttlMs = params.ttlMs ?? LIVE_PEER_DISCOVERY_TTL_MS;
   return {
     version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+    recordId: params.recordId,
     noteId: params.noteId,
     peerId: params.peerId,
     ticket: params.ticket,
@@ -55,11 +58,13 @@ export function parseLivePeerDiscoveryRecord(
     return null;
   }
 
-  const { noteId, peerId, ticket, updatedAt, expiresAt } = value;
+  const { recordId, noteId, peerId, ticket, updatedAt, expiresAt } = value;
   if (
+    typeof recordId !== 'string' ||
     typeof noteId !== 'string' ||
     typeof peerId !== 'string' ||
     typeof ticket !== 'string' ||
+    recordId.trim().length === 0 ||
     noteId.trim().length === 0 ||
     peerId.trim().length === 0 ||
     ticket.trim().length === 0 ||
@@ -71,6 +76,7 @@ export function parseLivePeerDiscoveryRecord(
 
   return {
     version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+    recordId,
     noteId,
     peerId,
     ticket,

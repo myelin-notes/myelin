@@ -47,6 +47,7 @@ const FILE_ROLE_NOTE = 'note';
 const FILE_ROLE_LIVE_DISCOVERY = 'live_discovery';
 const NOTE_ID_PROPERTY_KEY = 'myelin_note_id';
 const PEER_ID_PROPERTY_KEY = 'myelin_peer_id';
+const LIVE_RECORD_ID_PROPERTY_KEY = 'myelin_live_record_id';
 const MAX_MANIFEST_RETRIES = 4;
 
 function pathSegment(value: string): string {
@@ -73,8 +74,8 @@ export class GoogleDriveRepository extends BaseRepository {
     this.liveDiscoveryMailbox = {
       publish: (record) => this.publishLiveDiscoveryRecord(record),
       list: (noteId) => this.listLiveDiscoveryRecords(noteId),
-      remove: (noteId, peerId) =>
-        this.removeLiveDiscoveryRecord(noteId, peerId),
+      remove: (noteId, recordId) =>
+        this.removeLiveDiscoveryRecord(noteId, recordId),
     };
   }
 
@@ -474,19 +475,20 @@ export class GoogleDriveRepository extends BaseRepository {
   ): Promise<void> {
     const existingFile = await this.findLiveDiscoveryFile(
       record.noteId,
-      record.peerId,
+      record.recordId,
     );
     const bytes = new TextEncoder().encode(JSON.stringify(record));
     await this.upsertFileBytes(
       existingFile,
       {
-        name: `${pathSegment(record.noteId)}-${pathSegment(record.peerId)}.live.json`,
+        name: `${pathSegment(record.noteId)}-${pathSegment(record.recordId)}.live.json`,
         mimeType: 'application/json',
         parents: [await this.ensureRootFolderId()],
         appProperties: {
           [FILE_ROLE_PROPERTY_KEY]: FILE_ROLE_LIVE_DISCOVERY,
           [NOTE_ID_PROPERTY_KEY]: record.noteId,
           [PEER_ID_PROPERTY_KEY]: record.peerId,
+          [LIVE_RECORD_ID_PROPERTY_KEY]: record.recordId,
         },
       },
       bytes,
@@ -528,9 +530,9 @@ export class GoogleDriveRepository extends BaseRepository {
 
   private async removeLiveDiscoveryRecord(
     noteId: VFSNodeId,
-    peerId: string,
+    recordId: string,
   ): Promise<void> {
-    const file = await this.findLiveDiscoveryFile(noteId, peerId);
+    const file = await this.findLiveDiscoveryFile(noteId, recordId);
     if (!file) {
       return;
     }
@@ -554,13 +556,13 @@ export class GoogleDriveRepository extends BaseRepository {
 
   private async findLiveDiscoveryFile(
     noteId: VFSNodeId,
-    peerId: string,
+    recordId: string,
   ): Promise<GoogleDriveFile | null> {
     const files = await this.findLiveDiscoveryFiles(noteId);
     return (
       files.find(
         (file) =>
-          file.appProperties?.[PEER_ID_PROPERTY_KEY] === peerId &&
+          file.appProperties?.[LIVE_RECORD_ID_PROPERTY_KEY] === recordId &&
           file.appProperties?.[NOTE_ID_PROPERTY_KEY] === noteId,
       ) ?? null
     );

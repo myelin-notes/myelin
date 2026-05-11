@@ -121,6 +121,7 @@ describe('GitHubRepository', () => {
     const now = Date.now();
     const record: LivePeerDiscoveryRecord = {
       version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      recordId: 'record-1',
       noteId: 'note-1',
       peerId: 'peer-1',
       ticket: 'iroh-ticket-1',
@@ -133,9 +134,30 @@ describe('GitHubRepository', () => {
 
     expect(await mailbox?.list('note-1')).toEqual([record]);
 
-    await mailbox?.remove('note-1', 'peer-1');
+    await mailbox?.remove('note-1', 'record-1');
 
     expect(await mailbox?.list('note-1')).toEqual([]);
+  });
+
+  it('retries live discovery publish after a GitHub content conflict', async () => {
+    const repository = createRepository();
+    const mailbox = repository.liveDiscoveryMailbox;
+    const githubApi = getRepositoryTestGitHubApi();
+    const now = Date.now();
+    const record: LivePeerDiscoveryRecord = {
+      version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      recordId: 'record-1',
+      noteId: 'note-1',
+      peerId: 'peer-1',
+      ticket: 'iroh-ticket-1',
+      updatedAt: now,
+      expiresAt: now + 30_000,
+    };
+
+    githubApi.failNextPut('.myelin/live/v1/notes/note-1/record-1.json');
+    await mailbox?.publish(record);
+
+    expect(await mailbox?.list('note-1')).toEqual([record]);
   });
 
   it('ignores missing, malformed, and expired live discovery records', async () => {
@@ -152,6 +174,7 @@ describe('GitHubRepository', () => {
     );
     await mailbox?.publish({
       version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      recordId: 'expired-record',
       noteId: 'note-1',
       peerId: 'expired-peer',
       ticket: 'expired-ticket',

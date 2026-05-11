@@ -85,8 +85,8 @@ export class GitHubRepository extends BaseRepository {
     this.liveDiscoveryMailbox = {
       publish: (record) => this.publishLiveDiscoveryRecord(record),
       list: (noteId) => this.listLiveDiscoveryRecords(noteId),
-      remove: (noteId, peerId) =>
-        this.removeLiveDiscoveryRecord(noteId, peerId),
+      remove: (noteId, recordId) =>
+        this.removeLiveDiscoveryRecord(noteId, recordId),
     };
   }
 
@@ -202,8 +202,8 @@ export class GitHubRepository extends BaseRepository {
     return `${LIVE_DISCOVERY_ROOT}/${pathSegment(noteId)}`;
   }
 
-  private liveDiscoveryPath(noteId: VFSNodeId, peerId: string): string {
-    return `${this.liveDiscoveryDir(noteId)}/${pathSegment(peerId)}.json`;
+  private liveDiscoveryPath(noteId: VFSNodeId, recordId: string): string {
+    return `${this.liveDiscoveryDir(noteId)}/${pathSegment(recordId)}.json`;
   }
 
   private async authHeaders(): Promise<Record<string, string>> {
@@ -324,15 +324,20 @@ export class GitHubRepository extends BaseRepository {
   private async publishLiveDiscoveryRecord(
     record: LivePeerDiscoveryRecord,
   ): Promise<void> {
-    const path = this.liveDiscoveryPath(record.noteId, record.peerId);
+    const path = this.liveDiscoveryPath(record.noteId, record.recordId);
     const existing = await this.getContents(path);
     const bytes = new TextEncoder().encode(JSON.stringify(record));
-    await this.putContents(
-      path,
-      bytes,
-      existing.sha,
-      `Update live discovery for ${record.noteId}`,
-    );
+    const message = `Update live discovery for ${record.noteId}`;
+    try {
+      await this.putContents(path, bytes, existing.sha, message);
+    } catch (error) {
+      if (!this.isConflictError(error)) {
+        throw error;
+      }
+
+      const latest = await this.getContents(path);
+      await this.putContents(path, bytes, latest.sha, message);
+    }
   }
 
   private async listLiveDiscoveryRecords(
@@ -371,9 +376,9 @@ export class GitHubRepository extends BaseRepository {
 
   private async removeLiveDiscoveryRecord(
     noteId: VFSNodeId,
-    peerId: string,
+    recordId: string,
   ): Promise<void> {
-    const path = this.liveDiscoveryPath(noteId, peerId);
+    const path = this.liveDiscoveryPath(noteId, recordId);
     const existing = await this.getContents(path);
     if (!existing.sha) {
       return;
