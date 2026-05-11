@@ -25,9 +25,7 @@ export interface GitHubSelectorsState {
   ownersLoading: boolean;
   reposLoading: boolean;
   branchesLoading: boolean;
-  ownersError: string | null;
-  reposError: string | null;
-  branchesError: string | null;
+  error: string | null;
 }
 
 export function useGitHubSelectors({
@@ -47,9 +45,7 @@ export function useGitHubSelectors({
   const [ownersLoading, setOwnersLoading] = useState(false);
   const [reposLoading, setReposLoading] = useState(false);
   const [branchesLoading, setBranchesLoading] = useState(false);
-  const [ownersError, setOwnersError] = useState<string | null>(null);
-  const [reposError, setReposError] = useState<string | null>(null);
-  const [branchesError, setBranchesError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const owner = config.kind === 'github' ? config.owner : '';
   const repo = config.kind === 'github' ? config.repo : '';
@@ -58,13 +54,13 @@ export function useGitHubSelectors({
     if (!tokenPresent || config.kind !== 'github') {
       setUser(null);
       setOrgs([]);
-      setOwnersError(null);
+      setError(null);
       return;
     }
 
     const abort = new AbortController();
     setOwnersLoading(true);
-    setOwnersError(null);
+    setError(null);
 
     void (async () => {
       try {
@@ -82,7 +78,7 @@ export function useGitHubSelectors({
       } catch (error) {
         if (!abort.signal.aborted) {
           logger.error('Failed to load GitHub owners', error);
-          setOwnersError(
+          setError(
             error instanceof Error
               ? error.message
               : strings.settings.repository.fields.owner.error,
@@ -108,14 +104,13 @@ export function useGitHubSelectors({
   useEffect(() => {
     if (!tokenPresent || config.kind !== 'github' || !user || !owner.trim()) {
       setRepos([]);
-      setReposError(null);
       return;
     }
 
     const ownerName = owner.trim();
     const abort = new AbortController();
     setReposLoading(true);
-    setReposError(null);
+    setError(null);
 
     void (async () => {
       try {
@@ -131,7 +126,7 @@ export function useGitHubSelectors({
           logger.error('Failed to load GitHub repos', error, {
             owner: ownerName,
           });
-          setReposError(
+          setError(
             error instanceof Error
               ? error.message
               : strings.settings.repository.fields.repo.error,
@@ -164,7 +159,6 @@ export function useGitHubSelectors({
       !repo.trim()
     ) {
       setBranches([]);
-      setBranchesError(null);
       return;
     }
 
@@ -172,7 +166,7 @@ export function useGitHubSelectors({
     const repoName = repo.trim();
     const abort = new AbortController();
     setBranchesLoading(true);
-    setBranchesError(null);
+    setError(null);
 
     void (async () => {
       try {
@@ -191,7 +185,7 @@ export function useGitHubSelectors({
             owner: ownerName,
             repo: repoName,
           });
-          setBranchesError(
+          setError(
             error instanceof Error
               ? error.message
               : strings.settings.repository.fields.branch.error,
@@ -231,8 +225,6 @@ export function useGitHubSelectors({
     ownersLoading,
     reposLoading,
     branchesLoading,
-    ownersError,
-    reposError,
-    branchesError,
+    error,
   };
 }
