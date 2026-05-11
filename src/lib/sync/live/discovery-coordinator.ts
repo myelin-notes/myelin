@@ -24,8 +24,12 @@ export interface LiveDiscoveryTransport extends Transport {
 export interface LiveDiscoverySession {
   readonly id: VFSNodeId;
   getPeerSnapshot(): PeerSnapshot;
-  setTransport(transport: Transport): void;
-  clearTransport(): void;
+  setTransport(transport: Transport, options?: TransportPeerStateOptions): void;
+  clearTransport(options?: TransportPeerStateOptions): void;
+}
+
+interface TransportPeerStateOptions {
+  resetRemotePeers?: boolean;
 }
 
 export interface LivePeerDiscoveryCoordinatorOptions {
@@ -76,7 +80,7 @@ export class LivePeerDiscoveryCoordinator {
     this.localPeerId = options.session.getPeerSnapshot().localPeerId;
   }
 
-  async start(): Promise<void> {
+  async start(options: TransportPeerStateOptions = {}): Promise<void> {
     if (this.started) {
       return;
     }
@@ -86,7 +90,7 @@ export class LivePeerDiscoveryCoordinator {
     const transport = this.createTransport(this.session.id);
     this.transport = transport;
     transport.on('disconnected', this.onTransportDisconnected);
-    this.session.setTransport(transport);
+    this.session.setTransport(transport, options);
 
     try {
       const ticket = await transport.host();
@@ -105,7 +109,7 @@ export class LivePeerDiscoveryCoordinator {
     }
   }
 
-  async stop(): Promise<void> {
+  async stop(options: TransportPeerStateOptions = {}): Promise<void> {
     this.stopped = true;
     this.started = false;
     this.clearTimer();
@@ -116,7 +120,7 @@ export class LivePeerDiscoveryCoordinator {
     this.ticket = null;
     this.lastPublishedAt = null;
     transport?.off('disconnected', this.onTransportDisconnected);
-    this.session.clearTransport();
+    this.session.clearTransport(options);
 
     await inFlight?.catch(() => {});
 
@@ -143,8 +147,9 @@ export class LivePeerDiscoveryCoordinator {
   };
 
   private async restart(): Promise<void> {
-    await this.stop();
-    await this.start();
+    const options = { resetRemotePeers: false };
+    await this.stop(options);
+    await this.start(options);
   }
 
   private async runCycle(): Promise<void> {

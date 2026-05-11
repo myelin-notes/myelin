@@ -5,6 +5,9 @@ import {
   REPOSITORY_SYNC_ORIGIN,
   YDocManager,
 } from '@/pages/canvas/ydoc-manager';
+import { UserPrefs } from '../user-prefs';
+import { encodeMessage, type SyncMessage } from './live/protocol';
+import type { Transport, TransportEvents } from './live/transport';
 import { NoteSession } from './session';
 import type {
   VFSNodeId,
@@ -35,6 +38,84 @@ function createSyncTarget() {
       ...createEmptySnapshot(),
     }),
   };
+}
+
+type TransportEventName = keyof TransportEvents;
+
+class FakeTransport implements Transport {
+  connected = true;
+  send = vi.fn(async () => {});
+  destroy = vi.fn(async () => {
+    this.connected = false;
+  });
+  private readonly connectedListeners = new Set<TransportEvents['connected']>();
+  private readonly disconnectedListeners = new Set<
+    TransportEvents['disconnected']
+  >();
+  private readonly messageListeners = new Set<TransportEvents['message']>();
+
+  on<E extends TransportEventName>(
+    event: E,
+    handler: TransportEvents[E],
+  ): void {
+    if (event === 'connected') {
+      this.connectedListeners.add(handler as TransportEvents['connected']);
+      return;
+    }
+
+    if (event === 'disconnected') {
+      this.disconnectedListeners.add(
+        handler as TransportEvents['disconnected'],
+      );
+      return;
+    }
+
+    this.messageListeners.add(handler as TransportEvents['message']);
+  }
+
+  off<E extends TransportEventName>(
+    event: E,
+    handler: TransportEvents[E],
+  ): void {
+    if (event === 'connected') {
+      this.connectedListeners.delete(handler as TransportEvents['connected']);
+      return;
+    }
+
+    if (event === 'disconnected') {
+      this.disconnectedListeners.delete(
+        handler as TransportEvents['disconnected'],
+      );
+      return;
+    }
+
+    this.messageListeners.delete(handler as TransportEvents['message']);
+  }
+
+  emitMessage(message: SyncMessage): void {
+    for (const handler of this.messageListeners) {
+      handler(encodeMessage(message));
+    }
+  }
+
+  disconnect(): void {
+    this.connected = false;
+    for (const handler of this.disconnectedListeners) {
+      handler();
+    }
+  }
+}
+
+function createSessionWithPeerId(peerId: string): NoteSession {
+  UserPrefs.set('peerId', peerId);
+  const ydoc = new YDocManager();
+  return new NoteSession(
+    'note-1',
+    ydoc,
+    createSyncTarget(),
+    null,
+    ydoc.encodeStateVector(),
+  );
 }
 
 describe('NoteSession local change listeners', () => {
@@ -235,5 +316,78 @@ describe('NoteSession local change listeners', () => {
     expect(lastStatusPhase).toBe('closed');
 
     unsubscribeStatus();
+  });
+});
+
+describe('NoteSession peer writer election', () => {
+  it('keeps one writer after the current writer leaves and transport disconnects', () => {
+    const sessionB = createSessionWithPeerId('peer-b');
+    const sessionC = createSessionWithPeerId('peer-c');
+    const transportB = new FakeTransport();
+    const transportC = new FakeTransport();
+
+    try {
+      sessionB.setTransport(transportB);
+      sessionC.setTransport(transportC);
+
+      transportB.emitMessage({
+        type: 'peer',
+        peerId: 'peer-a',
+        kind: 'hello',
+        mode: 'owner-device',
+      });
+      transportB.emitMessage({
+        type: 'peer',
+        peerId: 'peer-c',
+        kind: 'hello',
+        mode: 'owner-device',
+      });
+      transportC.emitMessage({
+        type: 'peer',
+        peerId: 'peer-a',
+        kind: 'hello',
+        mode: 'owner-device',
+      });
+      transportC.emitMessage({
+        type: 'peer',
+        peerId: 'peer-b',
+        kind: 'hello',
+        mode: 'owner-device',
+      });
+
+      expect(sessionB.getPeerSnapshot().currentWriter).toBe('peer-a');
+      expect(sessionC.getPeerSnapshot().currentWriter).toBe('peer-a');
+
+      transportB.emitMessage({
+        type: 'peer',
+        peerId: 'peer-a',
+        kind: 'left',
+        mode: 'owner-device',
+      });
+      transportC.emitMessage({
+        type: 'peer',
+        peerId: 'peer-a',
+        kind: 'left',
+        mode: 'owner-device',
+      });
+
+      expect(sessionB.getPeerSnapshot().currentWriter).toBe('peer-b');
+      expect(sessionC.getPeerSnapshot().currentWriter).toBe('peer-b');
+
+      transportB.disconnect();
+      transportC.disconnect();
+
+      expect(sessionB.getPeerSnapshot()).toMatchObject({
+        currentWriter: 'peer-b',
+        isWriter: true,
+      });
+      expect(sessionC.getPeerSnapshot()).toMatchObject({
+        currentWriter: 'peer-b',
+        isWriter: false,
+      });
+    } finally {
+      sessionB.clearTransport();
+      sessionC.clearTransport();
+    }
   });
 });

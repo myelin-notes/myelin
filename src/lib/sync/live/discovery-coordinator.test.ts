@@ -129,6 +129,10 @@ function deferred() {
   return { promise, resolve };
 }
 
+async function waitForRestart(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe('LivePeerDiscoveryCoordinator', () => {
   it('publishes the local ticket and joins a discovered peer', async () => {
     const now = 1_000;
@@ -241,6 +245,38 @@ describe('LivePeerDiscoveryCoordinator', () => {
     expect(mailbox.remove).toHaveBeenCalledWith('note-1', 'record-local');
     expect(transport.destroy).toHaveBeenCalledTimes(1);
     expect(session.clearTransport).toHaveBeenCalled();
+  });
+
+  it('preserves peer state while restarting after a transient disconnect', async () => {
+    const now = 1_000;
+    const session = createSession();
+    const mailbox = new FakeMailbox();
+    const firstTransport = new FakeTransport('first-ticket');
+    const secondTransport = new FakeTransport('second-ticket');
+    const createTransport = vi
+      .fn()
+      .mockReturnValueOnce(firstTransport)
+      .mockReturnValueOnce(secondTransport);
+    const coordinator = new LivePeerDiscoveryCoordinator({
+      session,
+      mailbox,
+      createTransport,
+      now: () => now,
+      recordId: 'record-local',
+    });
+
+    await coordinator.start();
+    firstTransport.emit('disconnected');
+    await waitForRestart();
+
+    expect(session.clearTransport).toHaveBeenCalledWith({
+      resetRemotePeers: false,
+    });
+    expect(session.setTransport).toHaveBeenLastCalledWith(secondTransport, {
+      resetRemotePeers: false,
+    });
+
+    await coordinator.stop();
   });
 
   it('cleans up expired records after publish even when already connected', async () => {

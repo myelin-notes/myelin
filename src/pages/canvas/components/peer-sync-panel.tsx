@@ -22,6 +22,10 @@ interface PeerSyncPanelProps {
   status: NoteSessionStatus | null;
 }
 
+interface CleanupOptions {
+  resetRemotePeers?: boolean;
+}
+
 function formatPeerId(peerId: string): string {
   if (peerId.length <= 12) {
     return peerId;
@@ -97,16 +101,19 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
     };
   }, [session]);
 
-  const cleanup = useCallback(async () => {
-    session?.clearTransport();
-    await transportRef.current?.destroy();
-    transportRef.current = null;
-    setPhase('idle');
-    setJoinToken('');
-    setShareToken('');
-    setError('');
-    setCopied(false);
-  }, [session]);
+  const cleanup = useCallback(
+    async (options: CleanupOptions = {}) => {
+      session?.clearTransport(options);
+      await transportRef.current?.destroy();
+      transportRef.current = null;
+      setPhase('idle');
+      setJoinToken('');
+      setShareToken('');
+      setError('');
+      setCopied(false);
+    },
+    [session],
+  );
 
   const host = useCallback(async () => {
     if (!session) {
@@ -117,7 +124,9 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
     const transport = new IrohTransport(session.id);
     transportRef.current = transport;
     transport.on('connected', () => setPhase('connected'));
-    transport.on('disconnected', () => cleanup());
+    transport.on('disconnected', () => {
+      void cleanup({ resetRemotePeers: false });
+    });
     session.setTransport(transport);
     try {
       const ticket = await transport.host();
@@ -146,7 +155,9 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
     const transport = new IrohTransport(session.id);
     transportRef.current = transport;
     transport.on('connected', () => setPhase('connected'));
-    transport.on('disconnected', () => cleanup());
+    transport.on('disconnected', () => {
+      void cleanup({ resetRemotePeers: false });
+    });
     session.setTransport(transport);
     try {
       setPhase('joining');
@@ -204,7 +215,9 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
         {phase !== 'idle' && (
           <button
             type="button"
-            onClick={cleanup}
+            onClick={() => {
+              void cleanup();
+            }}
             aria-label={strings.common.close}
             className="text-text-muted hover:text-text-primary"
           >

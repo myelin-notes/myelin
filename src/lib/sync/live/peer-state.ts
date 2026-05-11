@@ -86,6 +86,10 @@ export class PeerState {
     return true;
   }
 
+  public hasRemotePeers(): boolean {
+    return this.connectedPeers.size > 0;
+  }
+
   public getSnapshot(): PeerSnapshot {
     const connectedPeers = Array.from(this.connectedPeers.values())
       .map((peer) => ({

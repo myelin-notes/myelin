@@ -23,6 +23,9 @@ const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
 const logger = new Logger('NoteSession');
 type HeartbeatTimer = number | NodeJS.Timeout;
+interface TransportTransitionOptions {
+  resetRemotePeers?: boolean;
+}
 
 export class NoteSession {
   private closed = false;
@@ -154,8 +157,20 @@ export class NoteSession {
     };
   }
 
-  setTransport(transport: Transport): void {
-    if (this.closed || this.transport === transport) {
+  setTransport(
+    transport: Transport,
+    options: TransportTransitionOptions = {},
+  ): void {
+    if (this.closed) {
+      return;
+    }
+
+    const resetRemotePeers = options.resetRemotePeers ?? true;
+    if (this.transport === transport) {
+      if (resetRemotePeers) {
+        this.stopHeartbeat();
+        this.updatePeerSnapshot(this.peerState.resetRemotePeers());
+      }
       return;
     }
 
@@ -168,8 +183,10 @@ export class NoteSession {
     previousTransport.off('message', this.onTransportMessage);
     previousTransport.off('disconnected', this.onTransportDisconnected);
     previousTransport.off('connected', this.onTransportConnected);
-    this.stopHeartbeat();
-    this.updatePeerSnapshot(this.peerState.resetRemotePeers());
+    if (resetRemotePeers) {
+      this.stopHeartbeat();
+      this.updatePeerSnapshot(this.peerState.resetRemotePeers());
+    }
 
     this.transport = transport;
 
@@ -182,8 +199,8 @@ export class NoteSession {
     }
   }
 
-  clearTransport(): void {
-    this.setTransport(noopTransport);
+  clearTransport(options: TransportTransitionOptions = {}): void {
+    this.setTransport(noopTransport, options);
   }
 
   encodeStateVector(): Uint8Array {
@@ -365,7 +382,7 @@ export class NoteSession {
   };
 
   private onTransportDisconnected = () => {
-    this.clearTransport();
+    this.clearTransport({ resetRemotePeers: false });
   };
 
   private sendInitialState(): void {
@@ -462,6 +479,9 @@ export class NoteSession {
       this.updatePeerSnapshot(
         this.peerState.pruneStalePeers(Date.now(), PEER_TIMEOUT_MS),
       );
+      if (!this.transport.connected && !this.peerState.hasRemotePeers()) {
+        this.stopHeartbeat();
+      }
     }, HEARTBEAT_INTERVAL_MS);
   }
 
