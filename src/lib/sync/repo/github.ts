@@ -16,8 +16,8 @@ import type {
   VFSNodeId,
 } from './types';
 
-const EXPORT_SNAPSHOT_CONCURRENCY = 6;
 const RATE_LIMIT_MAX_RETRY_DELAY_MS = 60_000;
+const TAR_BLOCK_SIZE = 512;
 
 interface ResponseHeaders {
   get(name: string): string | null;
@@ -61,27 +61,6 @@ function base64DecodeToBytes(content: string): Uint8Array {
   return bytes;
 }
 
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  limit: number,
-  worker: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  const runOne = async (): Promise<void> => {
-    while (true) {
-      const index = nextIndex++;
-      if (index >= items.length) {
-        return;
-      }
-      results[index] = await worker(items[index], index);
-    }
-  };
-  const workerCount = Math.min(limit, items.length);
-  await Promise.all(Array.from({ length: workerCount }, runOne));
-  return results;
-}
-
 function getResponseHeader(
   response: { headers?: ResponseHeaders },
   name: string,
@@ -121,6 +100,97 @@ function readRateLimitDelayMs(response: {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function gunzip(input: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([new Uint8Array(input)])
+    .stream()
+    .pipeThrough(new DecompressionStream('gzip'));
+  const buffer = await new Response(stream).arrayBuffer();
+  return new Uint8Array(buffer);
+}
+
+function parseTarOctal(bytes: Uint8Array): number {
+  let text = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const byte = bytes[i];
+    if (byte === 0 || byte === 0x20) {
+      break;
+    }
+    text += String.fromCharCode(byte);
+  }
+  return text ? Number.parseInt(text, 8) : 0;
+}
+
+function parseTarString(bytes: Uint8Array): string {
+  let end = bytes.length;
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0) {
+      end = i;
+      break;
+    }
+  }
+  return new TextDecoder().decode(bytes.subarray(0, end));
+}
+
+// Minimal tar reader: returns regular file entries keyed by path. Handles
+// ustar `prefix` and GNU long-name records ('L'); skips pax/global headers.
+function parseTar(tar: Uint8Array): Map<string, Uint8Array> {
+  const entries = new Map<string, Uint8Array>();
+  let offset = 0;
+  let pendingLongName: string | null = null;
+
+  while (offset + TAR_BLOCK_SIZE <= tar.length) {
+    const header = tar.subarray(offset, offset + TAR_BLOCK_SIZE);
+    offset += TAR_BLOCK_SIZE;
+
+    let allZero = true;
+    for (let i = 0; i < header.length; i++) {
+      if (header[i] !== 0) {
+        allZero = false;
+        break;
+      }
+    }
+    if (allZero) {
+      break;
+    }
+
+    const size = parseTarOctal(header.subarray(124, 136));
+    const typeflag = String.fromCharCode(header[156] || 0);
+    const contentEnd = offset + size;
+    const paddedEnd =
+      offset + Math.ceil(size / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE;
+
+    if (typeflag === 'L') {
+      pendingLongName = parseTarString(tar.subarray(offset, contentEnd));
+      offset = paddedEnd;
+      continue;
+    }
+
+    if (typeflag === 'x' || typeflag === 'g') {
+      offset = paddedEnd;
+      continue;
+    }
+
+    if (typeflag === '0' || typeflag === '\0') {
+      let name = pendingLongName ?? parseTarString(header.subarray(0, 100));
+      const prefix = parseTarString(header.subarray(345, 500));
+      if (!pendingLongName && prefix) {
+        name = `${prefix}/${name}`;
+      }
+      entries.set(name, tar.slice(offset, contentEnd));
+    }
+
+    pendingLongName = null;
+    offset = paddedEnd;
+  }
+
+  return entries;
+}
+
+function stripTopLevelDir(path: string): string {
+  const slash = path.indexOf('/');
+  return slash === -1 ? '' : path.slice(slash + 1);
 }
 
 export class GitHubRepository extends BaseRepository {
@@ -202,19 +272,17 @@ export class GitHubRepository extends BaseRepository {
       (node): node is VFSFileNode => node.type === 'file',
     );
 
-    const noteEntries = await mapWithConcurrency(
-      fileNodes,
-      EXPORT_SNAPSHOT_CONCURRENCY,
-      async (node) => {
-        const payload = await this.getContents(getStoredFilePath(node));
-        return [node.id, payload.bytes] as const;
-      },
-    );
+    if (fileNodes.length === 0) {
+      return { manifest: snapshotManifest, notes: {} };
+    }
 
-    return {
-      manifest: snapshotManifest,
-      notes: Object.fromEntries(noteEntries),
-    };
+    const entries = await this.fetchTarballEntries();
+    const notes: Record<VFSNodeId, Uint8Array | null> = {};
+    for (const node of fileNodes) {
+      notes[node.id] = entries.get(getStoredFilePath(node)) ?? null;
+    }
+
+    return { manifest: snapshotManifest, notes };
   }
 
   protected async saveFileBytes(
@@ -280,6 +348,46 @@ export class GitHubRepository extends BaseRepository {
   ): Promise<Error> {
     const body = await response.text().catch(() => '<no response body>');
     return new Error(`${label} (${response.status}): ${body}`);
+  }
+
+  private async fetchTarballEntries(): Promise<Map<string, Uint8Array>> {
+    const ref = encodeURIComponent(this.config.branch);
+    const url = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}/tarball/${ref}`;
+
+    // maxRedirections: 0 keeps Authorization off the codeload.github.com hop.
+    let response = await fetch(url, {
+      method: 'GET',
+      headers: await this.authHeaders(),
+      maxRedirections: 0,
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = getResponseHeader(response, 'location');
+      if (!location) {
+        throw await this.failureError(
+          'GitHub tarball redirect missing Location',
+          response,
+        );
+      }
+      response = await fetch(location, { method: 'GET' });
+    }
+
+    if (!response.ok) {
+      throw await this.failureError('GitHub tarball request failed', response);
+    }
+
+    const gzipped = new Uint8Array(await response.arrayBuffer());
+    const tar = await gunzip(gzipped);
+    const entries = parseTar(tar);
+
+    const stripped = new Map<string, Uint8Array>();
+    for (const [path, bytes] of entries) {
+      const trimmed = stripTopLevelDir(path);
+      if (trimmed) {
+        stripped.set(trimmed, bytes);
+      }
+    }
+    return stripped;
   }
 
   private async getContents(path: string): Promise<{

@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import * as Y from 'yjs';
 
 function normalizePath(path: string): string {
@@ -323,6 +324,7 @@ export interface MemoryGitHubApi {
   failNextPut(path: string, status?: number): void;
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
+  setTarball(gzippedTarBytes: Uint8Array): void;
 }
 
 interface MemoryGoogleDriveFile {
@@ -359,10 +361,21 @@ export interface MemoryGoogleDriveApi {
   readBytes(fileId: string): Uint8Array | null;
 }
 
+function buildTarballFromFiles(
+  files: Map<string, { sha: string; bytes: Uint8Array }>,
+): Uint8Array {
+  const entries: TarEntryInput[] = [];
+  for (const [path, entry] of files) {
+    entries.push({ path, bytes: entry.bytes });
+  }
+  return createGzippedTar('myelin-test-abc1234', entries);
+}
+
 function createMemoryGitHubApi(): MemoryGitHubApi {
   const files = new Map<string, { sha: string; bytes: Uint8Array }>();
   const nextPutFailures = new Map<string, number>();
   let revision = 0;
+  let tarball: Uint8Array | null = null;
 
   function getPath(url: string): string {
     const parsed = new URL(url);
@@ -381,6 +394,12 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
 
   return {
     async fetch(url, init) {
+      const parsed = new URL(url);
+      if (parsed.pathname.includes('/tarball/')) {
+        const bytes = tarball ?? buildTarballFromFiles(files);
+        return createBinaryResponse(200, bytes);
+      }
+
       const path = getPath(url);
 
       if (init.method === 'GET') {
@@ -448,6 +467,9 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
         return null;
       }
       return JSON.parse(new TextDecoder().decode(bytes)) as T;
+    },
+    setTarball(gzippedTarBytes) {
+      tarball = new Uint8Array(gzippedTarBytes);
     },
   };
 }
@@ -744,4 +766,84 @@ export function readNoteText(update: Uint8Array | null): string {
   const doc = new Y.Doc();
   Y.applyUpdate(doc, update);
   return doc.getText('content').toString();
+}
+
+export interface TarEntryInput {
+  path: string;
+  bytes: Uint8Array;
+}
+
+const TAR_BLOCK = 512;
+
+function writeAscii(target: Uint8Array, offset: number, text: string): void {
+  for (let i = 0; i < text.length; i++) {
+    target[offset + i] = text.charCodeAt(i);
+  }
+}
+
+function writeOctal(
+  target: Uint8Array,
+  offset: number,
+  size: number,
+  value: number,
+): void {
+  const text = value.toString(8).padStart(size - 1, '0');
+  writeAscii(target, offset, text);
+}
+
+function buildTarHeader(path: string, size: number): Uint8Array {
+  const header = new Uint8Array(TAR_BLOCK);
+  writeAscii(header, 0, path);
+  writeOctal(header, 100, 8, 0o644);
+  writeOctal(header, 108, 8, 0);
+  writeOctal(header, 116, 8, 0);
+  writeOctal(header, 124, 12, size);
+  writeOctal(header, 136, 12, 0);
+  header.set(new TextEncoder().encode('        '), 148); // checksum placeholder
+  header[156] = '0'.charCodeAt(0);
+  writeAscii(header, 257, 'ustar');
+  header[262] = 0;
+  writeAscii(header, 263, '00');
+
+  let checksum = 0;
+  for (let i = 0; i < TAR_BLOCK; i++) {
+    checksum += header[i];
+  }
+  writeAscii(header, 148, checksum.toString(8).padStart(6, '0'));
+  header[154] = 0;
+  header[155] = 0x20;
+  return header;
+}
+
+// Build a gzipped tar with a `{topDir}/` prefix on each entry, matching the
+// layout GitHub's tarball endpoint returns.
+export function createGzippedTar(
+  topDir: string,
+  entries: readonly TarEntryInput[],
+): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  for (const entry of entries) {
+    const fullPath = `${topDir}/${entry.path}`;
+    chunks.push(buildTarHeader(fullPath, entry.bytes.byteLength));
+    chunks.push(entry.bytes);
+    const padding =
+      (TAR_BLOCK - (entry.bytes.byteLength % TAR_BLOCK)) % TAR_BLOCK;
+    if (padding > 0) {
+      chunks.push(new Uint8Array(padding));
+    }
+  }
+  chunks.push(new Uint8Array(TAR_BLOCK * 2));
+
+  let totalLength = 0;
+  for (const chunk of chunks) {
+    totalLength += chunk.byteLength;
+  }
+  const tar = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    tar.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new Uint8Array(gzipSync(tar));
 }

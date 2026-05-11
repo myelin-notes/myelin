@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  createGzippedTar,
   createNoteState,
   getRepositoryTestGitHubApi,
   readNoteText,
@@ -109,5 +110,64 @@ describe('GitHubRepository', () => {
 
     expect(manifest).not.toBeNull();
     expect(manifest?.nodes[folderId]?.name).toBe('Retry folder');
+  });
+
+  it('exports a snapshot via a single tarball fetch', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const fileA = await repository.createFile('A.mp4', 'mp4', null);
+    const fileB = await repository.createFile('B.mp4', 'mp4', null);
+    const bytesA = new Uint8Array([1, 2, 3, 4, 5]);
+    const bytesB = new Uint8Array([9, 8, 7]);
+
+    githubApi.setTarball(
+      createGzippedTar('myelin-notes-abc1234', [
+        {
+          path: getStoredFilePath({ id: fileA, fileType: 'mp4' }),
+          bytes: bytesA,
+        },
+        {
+          path: getStoredFilePath({ id: fileB, fileType: 'mp4' }),
+          bytes: bytesB,
+        },
+      ]),
+    );
+
+    const snapshot = await repository.exportSnapshot();
+
+    expect(Array.from(snapshot.notes[fileA] ?? [])).toEqual(Array.from(bytesA));
+    expect(Array.from(snapshot.notes[fileB] ?? [])).toEqual(Array.from(bytesB));
+  });
+
+  it('skips the tarball fetch when the manifest has no files', async () => {
+    const repository = createRepository();
+
+    const snapshot = await repository.exportSnapshot();
+
+    expect(snapshot.notes).toEqual({});
+  });
+
+  it('returns null for files missing from the tarball', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const fileA = await repository.createFile('A.mp4', 'mp4', null);
+    const fileB = await repository.createFile('B.mp4', 'mp4', null);
+    const bytesA = new Uint8Array([1, 2, 3]);
+
+    githubApi.setTarball(
+      createGzippedTar('myelin-notes-abc1234', [
+        {
+          path: getStoredFilePath({ id: fileA, fileType: 'mp4' }),
+          bytes: bytesA,
+        },
+      ]),
+    );
+
+    const snapshot = await repository.exportSnapshot();
+
+    expect(Array.from(snapshot.notes[fileA] ?? [])).toEqual(Array.from(bytesA));
+    expect(snapshot.notes[fileB]).toBeNull();
   });
 });
