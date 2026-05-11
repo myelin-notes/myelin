@@ -1,4 +1,10 @@
 import { fetch } from '@tauri-apps/plugin-http';
+import {
+  isLivePeerDiscoveryRecordFresh,
+  type LiveDiscoveryMailbox,
+  type LivePeerDiscoveryRecord,
+  parseLivePeerDiscoveryRecord,
+} from '../live/discovery';
 import { BaseRepository } from './base';
 import { getGoogleDriveAccessToken } from './google-drive-credentials';
 import {
@@ -38,8 +44,14 @@ const ROOT_FOLDER_PROPERTY_VALUE = '1';
 const FILE_ROLE_PROPERTY_KEY = 'myelin_role';
 const FILE_ROLE_MANIFEST = 'manifest';
 const FILE_ROLE_NOTE = 'note';
+const FILE_ROLE_LIVE_DISCOVERY = 'live_discovery';
 const NOTE_ID_PROPERTY_KEY = 'myelin_note_id';
+const PEER_ID_PROPERTY_KEY = 'myelin_peer_id';
 const MAX_MANIFEST_RETRIES = 4;
+
+function pathSegment(value: string): string {
+  return value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_') || 'unknown';
+}
 
 function escapeDriveQueryValue(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -50,12 +62,20 @@ export class GoogleDriveRepository extends BaseRepository {
   public readonly capabilities: RepositoryCapabilities = {
     polling: true,
     liveSync: false,
+    liveDiscovery: true,
   };
+  public readonly liveDiscoveryMailbox: LiveDiscoveryMailbox;
 
   private rootFolderIdPromise: Promise<string> | null = null;
 
   constructor(private readonly config: GoogleDriveRepositoryConfig) {
     super();
+    this.liveDiscoveryMailbox = {
+      publish: (record) => this.publishLiveDiscoveryRecord(record),
+      list: (noteId) => this.listLiveDiscoveryRecords(noteId),
+      remove: (noteId, peerId) =>
+        this.removeLiveDiscoveryRecord(noteId, peerId),
+    };
   }
 
   protected manifestMaxRetries(): number {
@@ -446,6 +466,103 @@ export class GoogleDriveRepository extends BaseRepository {
           ].join(' and '),
         )
       )[0] ?? null
+    );
+  }
+
+  private async publishLiveDiscoveryRecord(
+    record: LivePeerDiscoveryRecord,
+  ): Promise<void> {
+    const existingFile = await this.findLiveDiscoveryFile(
+      record.noteId,
+      record.peerId,
+    );
+    const bytes = new TextEncoder().encode(JSON.stringify(record));
+    await this.upsertFileBytes(
+      existingFile,
+      {
+        name: `${pathSegment(record.noteId)}-${pathSegment(record.peerId)}.live.json`,
+        mimeType: 'application/json',
+        parents: [await this.ensureRootFolderId()],
+        appProperties: {
+          [FILE_ROLE_PROPERTY_KEY]: FILE_ROLE_LIVE_DISCOVERY,
+          [NOTE_ID_PROPERTY_KEY]: record.noteId,
+          [PEER_ID_PROPERTY_KEY]: record.peerId,
+        },
+      },
+      bytes,
+      existingFile?.headRevisionId ?? null,
+    );
+  }
+
+  private async listLiveDiscoveryRecords(
+    noteId: VFSNodeId,
+  ): Promise<LivePeerDiscoveryRecord[]> {
+    const files = await this.findLiveDiscoveryFiles(noteId);
+    const now = Date.now();
+    const records = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const parsed = parseLivePeerDiscoveryRecord(
+            JSON.parse(
+              new TextDecoder().decode(await this.getFileBytes(file.id)),
+            ),
+          );
+          if (
+            !parsed ||
+            parsed.noteId !== noteId ||
+            !isLivePeerDiscoveryRecordFresh(parsed, now)
+          ) {
+            return null;
+          }
+          return parsed;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    return records.filter(
+      (record): record is LivePeerDiscoveryRecord => record !== null,
+    );
+  }
+
+  private async removeLiveDiscoveryRecord(
+    noteId: VFSNodeId,
+    peerId: string,
+  ): Promise<void> {
+    const file = await this.findLiveDiscoveryFile(noteId, peerId);
+    if (!file) {
+      return;
+    }
+
+    await this.deleteFile(file.id);
+  }
+
+  private async findLiveDiscoveryFiles(
+    noteId: VFSNodeId,
+  ): Promise<GoogleDriveFile[]> {
+    const rootFolderId = await this.ensureRootFolderId();
+    return this.listFiles(
+      [
+        'trashed = false',
+        `'${escapeDriveQueryValue(rootFolderId)}' in parents`,
+        `appProperties has { key='${FILE_ROLE_PROPERTY_KEY}' and value='${FILE_ROLE_LIVE_DISCOVERY}' }`,
+        `appProperties has { key='${NOTE_ID_PROPERTY_KEY}' and value='${escapeDriveQueryValue(noteId)}' }`,
+      ].join(' and '),
+    );
+  }
+
+  private async findLiveDiscoveryFile(
+    noteId: VFSNodeId,
+    peerId: string,
+  ): Promise<GoogleDriveFile | null> {
+    const files = await this.findLiveDiscoveryFiles(noteId);
+    return (
+      files.find(
+        (file) =>
+          file.appProperties?.[PEER_ID_PROPERTY_KEY] === peerId &&
+          file.appProperties?.[NOTE_ID_PROPERTY_KEY] === noteId,
+      ) ?? null
     );
   }
 }

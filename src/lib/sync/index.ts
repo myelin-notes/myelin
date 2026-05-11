@@ -15,6 +15,10 @@ export {
   useRepository,
   useRepositoryStatus,
 } from './context';
+export type {
+  LiveDiscoveryMailbox,
+  LivePeerDiscoveryRecord,
+} from './live/discovery';
 export type { PeerSnapshot } from './live/peer-state';
 export type {
   PeerControlMessage,

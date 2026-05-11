@@ -1,4 +1,10 @@
 import { fetch } from '@tauri-apps/plugin-http';
+import {
+  isLivePeerDiscoveryRecordFresh,
+  type LiveDiscoveryMailbox,
+  type LivePeerDiscoveryRecord,
+  parseLivePeerDiscoveryRecord,
+} from '../live/discovery';
 import { BaseRepository } from './base';
 import { getGitHubToken } from './github-credentials';
 import {
@@ -20,6 +26,13 @@ interface GitHubContentsResponse {
   content?: string | null;
 }
 
+interface GitHubDirectoryEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  sha: string;
+}
+
 interface GitHubWriteResponse {
   content: { sha: string };
 }
@@ -33,7 +46,12 @@ interface GitHubRepositoryConfig {
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
+const LIVE_DISCOVERY_ROOT = '.myelin/live/v1/notes';
 const MAX_MANIFEST_RETRIES = 4;
+
+function pathSegment(value: string): string {
+  return value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_') || 'unknown';
+}
 
 function base64EncodeBytes(bytes: Uint8Array): string {
   let binary = '';
@@ -58,10 +76,18 @@ export class GitHubRepository extends BaseRepository {
   public readonly capabilities: RepositoryCapabilities = {
     polling: true,
     liveSync: false,
+    liveDiscovery: true,
   };
+  public readonly liveDiscoveryMailbox: LiveDiscoveryMailbox;
 
   constructor(private readonly config: GitHubRepositoryConfig) {
     super();
+    this.liveDiscoveryMailbox = {
+      publish: (record) => this.publishLiveDiscoveryRecord(record),
+      list: (noteId) => this.listLiveDiscoveryRecords(noteId),
+      remove: (noteId, peerId) =>
+        this.removeLiveDiscoveryRecord(noteId, peerId),
+    };
   }
 
   protected manifestMaxRetries(): number {
@@ -172,6 +198,14 @@ export class GitHubRepository extends BaseRepository {
     return `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}/contents/${path}`;
   }
 
+  private liveDiscoveryDir(noteId: VFSNodeId): string {
+    return `${LIVE_DISCOVERY_ROOT}/${pathSegment(noteId)}`;
+  }
+
+  private liveDiscoveryPath(noteId: VFSNodeId, peerId: string): string {
+    return `${this.liveDiscoveryDir(noteId)}/${pathSegment(peerId)}.json`;
+  }
+
   private async authHeaders(): Promise<Record<string, string>> {
     const accessToken = await getGitHubToken(this.config.credentialId);
     return {
@@ -211,6 +245,29 @@ export class GitHubRepository extends BaseRepository {
     const payload = (await response.json()) as GitHubContentsResponse;
     const bytes = payload.content ? base64DecodeToBytes(payload.content) : null;
     return { sha: payload.sha, bytes };
+  }
+
+  private async listContents(path: string): Promise<GitHubDirectoryEntry[]> {
+    const url = `${this.contentsUrl(path)}?ref=${encodeURIComponent(this.config.branch)}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: await this.authHeaders(),
+    });
+
+    if (response.status === 404) {
+      return [];
+    }
+
+    if (!response.ok) {
+      throw await this.failureError('GitHub contents request failed', response);
+    }
+
+    const payload = (await response.json()) as
+      | GitHubDirectoryEntry[]
+      | GitHubContentsResponse;
+    return Array.isArray(payload)
+      ? payload.filter((entry) => entry.type === 'file')
+      : [];
   }
 
   private async putContents(
@@ -262,5 +319,70 @@ export class GitHubRepository extends BaseRepository {
     if (!response.ok) {
       throw await this.failureError('GitHub delete request failed', response);
     }
+  }
+
+  private async publishLiveDiscoveryRecord(
+    record: LivePeerDiscoveryRecord,
+  ): Promise<void> {
+    const path = this.liveDiscoveryPath(record.noteId, record.peerId);
+    const existing = await this.getContents(path);
+    const bytes = new TextEncoder().encode(JSON.stringify(record));
+    await this.putContents(
+      path,
+      bytes,
+      existing.sha,
+      `Update live discovery for ${record.noteId}`,
+    );
+  }
+
+  private async listLiveDiscoveryRecords(
+    noteId: VFSNodeId,
+  ): Promise<LivePeerDiscoveryRecord[]> {
+    const entries = await this.listContents(this.liveDiscoveryDir(noteId));
+    const now = Date.now();
+    const records = await Promise.all(
+      entries.map(async (entry) => {
+        try {
+          const { bytes } = await this.getContents(entry.path);
+          if (!bytes) {
+            return null;
+          }
+          const parsed = parseLivePeerDiscoveryRecord(
+            JSON.parse(new TextDecoder().decode(bytes)),
+          );
+          if (
+            !parsed ||
+            parsed.noteId !== noteId ||
+            !isLivePeerDiscoveryRecordFresh(parsed, now)
+          ) {
+            return null;
+          }
+          return parsed;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    return records.filter(
+      (record): record is LivePeerDiscoveryRecord => record !== null,
+    );
+  }
+
+  private async removeLiveDiscoveryRecord(
+    noteId: VFSNodeId,
+    peerId: string,
+  ): Promise<void> {
+    const path = this.liveDiscoveryPath(noteId, peerId);
+    const existing = await this.getContents(path);
+    if (!existing.sha) {
+      return;
+    }
+
+    await this.deleteContents(
+      path,
+      existing.sha,
+      `Remove live discovery for ${noteId}`,
+    );
   }
 }

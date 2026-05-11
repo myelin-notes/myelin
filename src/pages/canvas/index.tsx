@@ -36,6 +36,7 @@ import { PageFrameElement } from './elements/page-frame-element';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
+import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { useToolState } from './hooks/use-tool-state';
 import { markdownImportHandler } from './media/markdown';
 import { PageFrameDomLayer } from './page-frame/dom-layer';
@@ -122,6 +123,7 @@ function CanvasViewInner() {
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
   });
+  useLivePeerDiscovery(engine.noteSession, repository);
 
   useEffect(() => {
     if (!engine.ready) {

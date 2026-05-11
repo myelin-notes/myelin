@@ -5,6 +5,10 @@ import {
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import {
+  LIVE_PEER_DISCOVERY_RECORD_VERSION,
+  type LivePeerDiscoveryRecord,
+} from '../live/discovery';
 import { GitHubRepository } from './github';
 import {
   createEmptyManifest,
@@ -109,5 +113,52 @@ describe('GitHubRepository', () => {
 
     expect(manifest).not.toBeNull();
     expect(manifest?.nodes[folderId]?.name).toBe('Retry folder');
+  });
+
+  it('publishes and removes live discovery records', async () => {
+    const repository = createRepository();
+    const mailbox = repository.liveDiscoveryMailbox;
+    const now = Date.now();
+    const record: LivePeerDiscoveryRecord = {
+      version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      noteId: 'note-1',
+      peerId: 'peer-1',
+      ticket: 'iroh-ticket-1',
+      updatedAt: now,
+      expiresAt: now + 30_000,
+    };
+
+    expect(mailbox).not.toBeNull();
+    await mailbox?.publish(record);
+
+    expect(await mailbox?.list('note-1')).toEqual([record]);
+
+    await mailbox?.remove('note-1', 'peer-1');
+
+    expect(await mailbox?.list('note-1')).toEqual([]);
+  });
+
+  it('ignores missing, malformed, and expired live discovery records', async () => {
+    const repository = createRepository();
+    const mailbox = repository.liveDiscoveryMailbox;
+    const githubApi = getRepositoryTestGitHubApi();
+    const now = Date.now();
+
+    expect(await mailbox?.list('note-1')).toEqual([]);
+
+    githubApi.writeBytes(
+      '.myelin/live/v1/notes/note-1/bad.json',
+      new TextEncoder().encode('{bad json'),
+    );
+    await mailbox?.publish({
+      version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      noteId: 'note-1',
+      peerId: 'expired-peer',
+      ticket: 'expired-ticket',
+      updatedAt: now - 60_000,
+      expiresAt: now - 1,
+    });
+
+    expect(await mailbox?.list('note-1')).toEqual([]);
   });
 });

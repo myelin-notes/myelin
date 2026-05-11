@@ -45,6 +45,7 @@ export class LocalRepository extends BaseRepository {
   public readonly capabilities: RepositoryCapabilities = {
     polling: false,
     liveSync: false,
+    liveDiscovery: false,
   };
 
   private manifest: VFSManifest | null = null;

@@ -1,6 +1,7 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
 import { summarizeNoteBytes } from '@/lib/note-state-summary';
+import type { LiveDiscoveryMailbox } from '@/lib/sync/live/discovery';
 import { NoteSession } from '../../session';
 import type {
   YjsSyncPushOptions,
@@ -65,6 +66,7 @@ export class CachedRepository
 {
   public readonly kind: string;
   public readonly capabilities: RepositoryCapabilities;
+  public readonly liveDiscoveryMailbox: LiveDiscoveryMailbox | null;
 
   private readonly emptyDocUpdate = Y.encodeStateAsUpdate(new Y.Doc());
   private readonly outbox: CachedRepositoryOutbox;
@@ -87,6 +89,7 @@ export class CachedRepository
   ) {
     this.kind = remote.kind;
     this.capabilities = remote.capabilities;
+    this.liveDiscoveryMailbox = remote.liveDiscoveryMailbox;
     this.outbox = new CachedRepositoryOutbox({
       path: outboxPath,
       repositoryKind: this.kind,

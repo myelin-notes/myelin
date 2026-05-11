@@ -1,3 +1,4 @@
+import type { LiveDiscoveryMailbox } from '../live/discovery';
 import type { NoteSession } from '../session';
 import type { VFSNodeId } from '../types';
 
@@ -78,11 +79,13 @@ export interface NoteBacklink extends StoredNoteLink {
 export interface RepositoryCapabilities {
   polling: boolean;
   liveSync: boolean;
+  liveDiscovery: boolean;
 }
 
 export interface Repository {
   readonly kind: string;
   readonly capabilities: RepositoryCapabilities;
+  readonly liveDiscoveryMailbox: LiveDiscoveryMailbox | null;
 
   getNode(nodeId: VFSNodeId): Promise<VFSNode | null>;
   listDirectory(

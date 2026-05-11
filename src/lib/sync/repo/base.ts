@@ -2,6 +2,7 @@ import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
 import { summarizeYDoc } from '@/lib/note-state-summary';
 import { removeThumbnail } from '@/lib/thumbnails';
+import type { LiveDiscoveryMailbox } from '../live/discovery';
 import { NoteSession } from '../session';
 import type {
   YjsSyncPushOptions,
@@ -62,6 +63,7 @@ export abstract class BaseRepository
 {
   public abstract readonly kind: string;
   public abstract readonly capabilities: RepositoryCapabilities;
+  public readonly liveDiscoveryMailbox: LiveDiscoveryMailbox | null = null;
 
   private runtimeStatus: RepositoryRuntimeStatus = {
     online: true,

@@ -321,6 +321,7 @@ export interface MemoryGitHubApi {
     text(): Promise<string>;
   }>;
   failNextPut(path: string, status?: number): void;
+  writeBytes(path: string, bytes: Uint8Array): void;
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
 }
@@ -386,6 +387,27 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
       if (init.method === 'GET') {
         const entry = files.get(path);
         if (!entry) {
+          const prefix = path === '' ? '' : `${path}/`;
+          const directoryEntries = [...files.entries()]
+            .filter(([filePath]) => filePath.startsWith(prefix))
+            .map(([filePath, fileEntry]) => {
+              const rest = filePath.slice(prefix.length);
+              if (!rest || rest.includes('/')) {
+                return null;
+              }
+              return {
+                name: rest,
+                path: filePath,
+                type: 'file',
+                sha: fileEntry.sha,
+              };
+            })
+            .filter(
+              (value): value is NonNullable<typeof value> => value !== null,
+            );
+          if (directoryEntries.length > 0) {
+            return createJsonResponse(200, directoryEntries);
+          }
           return createTextResponse(404, '{"message":"Not Found"}');
         }
         return createJsonResponse(200, {
@@ -437,6 +459,9 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     failNextPut(path, status = 409) {
       nextPutFailures.set(path, status);
+    },
+    writeBytes(path, bytes) {
+      write(path, bytes);
     },
     readBytes(path) {
       const entry = files.get(path);
@@ -492,8 +517,11 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
     const parentMatch = /'([^']+)' in parents/.exec(query);
     const mimeTypeMatch = /mimeType = '([^']+)'/.exec(query);
     const nameMatch = /name = '([^']+)'/.exec(query);
-    const appPropertyMatch =
-      /appProperties has \{ key='([^']+)' and value='([^']+)' \}/.exec(query);
+    const appPropertyMatches = [
+      ...query.matchAll(
+        /appProperties has \{ key='([^']+)' and value='([^']+)' \}/g,
+      ),
+    ];
     const requireNotTrashed = query.includes('trashed = false');
 
     return [...files.values()].filter((file) => {
@@ -509,8 +537,8 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
       if (nameMatch && file.name !== (nameMatch[1] ?? '')) {
         return false;
       }
-      if (appPropertyMatch) {
-        const [key, value] = appPropertyMatch.slice(1);
+      for (const appPropertyMatch of appPropertyMatches) {
+        const [, key, value] = appPropertyMatch;
         if (file.appProperties[key ?? ''] !== value) {
           return false;
         }

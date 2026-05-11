@@ -5,6 +5,10 @@ import {
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import {
+  LIVE_PEER_DISCOVERY_RECORD_VERSION,
+  type LivePeerDiscoveryRecord,
+} from '../live/discovery';
 import { GoogleDriveRepository } from './google-drive';
 import { createEmptyManifest } from './shared';
 
@@ -106,5 +110,55 @@ describe('GoogleDriveRepository', () => {
     expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual(
       Array.from(bytes),
     );
+  });
+
+  it('publishes and removes live discovery records', async () => {
+    const repository = createRepository();
+    const mailbox = repository.liveDiscoveryMailbox;
+    const driveApi = getRepositoryTestGoogleDriveApi();
+    const now = Date.now();
+    const record: LivePeerDiscoveryRecord = {
+      version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      noteId: 'note-1',
+      peerId: 'peer-1',
+      ticket: 'iroh-ticket-1',
+      updatedAt: now,
+      expiresAt: now + 30_000,
+    };
+
+    expect(mailbox).not.toBeNull();
+    await mailbox?.publish(record);
+
+    expect(await mailbox?.list('note-1')).toEqual([record]);
+    expect(
+      driveApi.readFileByAppProperty('myelin_peer_id', 'peer-1')?.appProperties,
+    ).toMatchObject({
+      myelin_role: 'live_discovery',
+      myelin_note_id: 'note-1',
+      myelin_peer_id: 'peer-1',
+    });
+
+    await mailbox?.remove('note-1', 'peer-1');
+
+    expect(await mailbox?.list('note-1')).toEqual([]);
+  });
+
+  it('ignores missing and expired live discovery records', async () => {
+    const repository = createRepository();
+    const mailbox = repository.liveDiscoveryMailbox;
+    const now = Date.now();
+
+    expect(await mailbox?.list('note-1')).toEqual([]);
+
+    await mailbox?.publish({
+      version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      noteId: 'note-1',
+      peerId: 'expired-peer',
+      ticket: 'expired-ticket',
+      updatedAt: now - 60_000,
+      expiresAt: now - 1,
+    });
+
+    expect(await mailbox?.list('note-1')).toEqual([]);
   });
 });
