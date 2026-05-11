@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMessages } from '@/lib/i18n';
+import { Logger } from '@/lib/logger';
 import {
   fetchGitHubBranches,
   fetchGitHubOrgs,
@@ -13,6 +14,8 @@ import {
   type RepositoryConfig,
   setRepositoryConfig,
 } from '@/lib/sync';
+
+const logger = new Logger('GitHubSelectors');
 
 export interface GitHubSelectorsState {
   user: GitHubUser | null;
@@ -78,6 +81,7 @@ export function useGitHubSelectors({
         setOrgs(fetchedOrgs);
       } catch (error) {
         if (!abort.signal.aborted) {
+          logger.error('Failed to load GitHub owners', error);
           setOwnersError(
             error instanceof Error
               ? error.message
@@ -124,6 +128,9 @@ export function useGitHubSelectors({
         }
       } catch (error) {
         if (!abort.signal.aborted) {
+          logger.error('Failed to load GitHub repos', error, {
+            owner: ownerName,
+          });
           setReposError(
             error instanceof Error
               ? error.message
@@ -180,6 +187,10 @@ export function useGitHubSelectors({
         }
       } catch (error) {
         if (!abort.signal.aborted) {
+          logger.error('Failed to load GitHub branches', error, {
+            owner: ownerName,
+            repo: repoName,
+          });
           setBranchesError(
             error instanceof Error
               ? error.message
