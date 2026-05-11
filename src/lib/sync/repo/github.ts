@@ -6,6 +6,7 @@ import {
   getStoredFilePath,
   MANIFEST_PATH,
   migrate,
+  type RepositorySnapshot,
   type VFSManifest,
 } from './shared';
 import type {
@@ -14,6 +15,13 @@ import type {
   VFSFileNode,
   VFSNodeId,
 } from './types';
+
+const EXPORT_SNAPSHOT_CONCURRENCY = 6;
+const RATE_LIMIT_MAX_RETRY_DELAY_MS = 60_000;
+
+interface ResponseHeaders {
+  get(name: string): string | null;
+}
 
 interface GitHubContentsResponse {
   sha: string;
@@ -51,6 +59,68 @@ function base64DecodeToBytes(content: string): Uint8Array {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const runOne = async (): Promise<void> => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) {
+        return;
+      }
+      results[index] = await worker(items[index], index);
+    }
+  };
+  const workerCount = Math.min(limit, items.length);
+  await Promise.all(Array.from({ length: workerCount }, runOne));
+  return results;
+}
+
+function getResponseHeader(
+  response: { headers?: ResponseHeaders },
+  name: string,
+): string | null {
+  return response.headers?.get(name) ?? null;
+}
+
+function isRateLimited(response: { status: number }): boolean {
+  return response.status === 403 || response.status === 429;
+}
+
+function readRateLimitDelayMs(response: {
+  status: number;
+  headers?: ResponseHeaders;
+}): number | null {
+  const retryAfter = getResponseHeader(response, 'retry-after');
+  if (retryAfter) {
+    const seconds = Number.parseInt(retryAfter, 10);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(seconds * 1000, RATE_LIMIT_MAX_RETRY_DELAY_MS);
+    }
+  }
+
+  const resetHeader = getResponseHeader(response, 'x-ratelimit-reset');
+  if (resetHeader) {
+    const resetEpochSeconds = Number.parseInt(resetHeader, 10);
+    if (Number.isFinite(resetEpochSeconds)) {
+      const deltaMs = resetEpochSeconds * 1000 - Date.now();
+      if (deltaMs > 0) {
+        return Math.min(deltaMs, RATE_LIMIT_MAX_RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export class GitHubRepository extends BaseRepository {
@@ -125,6 +195,28 @@ export class GitHubRepository extends BaseRepository {
     return { bytes: payload.bytes, revision: payload.sha };
   }
 
+  async exportSnapshot(): Promise<RepositorySnapshot> {
+    const { manifest } = await this.loadManifestImpl();
+    const snapshotManifest = structuredClone(manifest);
+    const fileNodes = Object.values(snapshotManifest.nodes).filter(
+      (node): node is VFSFileNode => node.type === 'file',
+    );
+
+    const noteEntries = await mapWithConcurrency(
+      fileNodes,
+      EXPORT_SNAPSHOT_CONCURRENCY,
+      async (node) => {
+        const payload = await this.getContents(getStoredFilePath(node));
+        return [node.id, payload.bytes] as const;
+      },
+    );
+
+    return {
+      manifest: snapshotManifest,
+      notes: Object.fromEntries(noteEntries),
+    };
+  }
+
   protected async saveFileBytes(
     nodeId: VFSNodeId,
     bytes: Uint8Array,
@@ -195,10 +287,21 @@ export class GitHubRepository extends BaseRepository {
     bytes: Uint8Array | null;
   }> {
     const url = `${this.contentsUrl(path)}?ref=${encodeURIComponent(this.config.branch)}`;
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: 'GET',
       headers: await this.authHeaders(),
     });
+
+    if (isRateLimited(response)) {
+      const delayMs = readRateLimitDelayMs(response);
+      if (delayMs !== null) {
+        await sleep(delayMs);
+        response = await fetch(url, {
+          method: 'GET',
+          headers: await this.authHeaders(),
+        });
+      }
+    }
 
     if (response.status === 404) {
       return { sha: null, bytes: null };
