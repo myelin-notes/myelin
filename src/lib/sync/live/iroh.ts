@@ -67,20 +67,20 @@ export class IrohTransport implements Transport {
 
   async host(): Promise<string> {
     await this.setupTauriListeners();
-    const ticket = await invoke<string>('iroh_host', {
+    const nodeId = await invoke<string>('iroh_host', {
       noteId: this.noteId,
       transportId: this.transportId,
     });
     logger.debug('Hosting note transport', { noteId: this.noteId });
-    return ticket;
+    return nodeId;
   }
 
-  async join(ticket: string): Promise<void> {
+  async join(nodeId: string): Promise<void> {
     await this.setupTauriListeners();
     await invoke('iroh_join', {
       noteId: this.noteId,
       transportId: this.transportId,
-      ticket,
+      nodeId,
     });
     logger.debug('Joining note transport', { noteId: this.noteId });
   }

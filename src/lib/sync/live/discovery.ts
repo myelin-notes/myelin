@@ -1,14 +1,16 @@
 import type { VFSNodeId } from '../types';
 
 export const LIVE_PEER_DISCOVERY_RECORD_VERSION = 1;
-export const LIVE_PEER_DISCOVERY_TTL_MS = 30_000;
+// Node IDs are stable across address changes, so the TTL only needs to be long
+// enough to filter out crashed or uninstalled devices.
+export const LIVE_PEER_DISCOVERY_TTL_MS = 300_000;
 
 export interface LivePeerDiscoveryRecord {
   version: typeof LIVE_PEER_DISCOVERY_RECORD_VERSION;
   recordId: string;
   noteId: VFSNodeId;
   peerId: string;
-  ticket: string;
+  nodeId: string;
   updatedAt: number;
   expiresAt: number;
 }
@@ -48,7 +50,7 @@ export function createLivePeerDiscoveryRecord(params: {
   recordId: string;
   noteId: VFSNodeId;
   peerId: string;
-  ticket: string;
+  nodeId: string;
   now: number;
   ttlMs?: number;
 }): LivePeerDiscoveryRecord {
@@ -58,7 +60,7 @@ export function createLivePeerDiscoveryRecord(params: {
     recordId: params.recordId,
     noteId: params.noteId,
     peerId: params.peerId,
-    ticket: params.ticket,
+    nodeId: params.nodeId,
     updatedAt: params.now,
     expiresAt: params.now + ttlMs,
   };
@@ -75,16 +77,16 @@ export function parseLivePeerDiscoveryRecord(
     return null;
   }
 
-  const { recordId, noteId, peerId, ticket, updatedAt, expiresAt } = value;
+  const { recordId, noteId, peerId, nodeId, updatedAt, expiresAt } = value;
   if (
     typeof recordId !== 'string' ||
     typeof noteId !== 'string' ||
     typeof peerId !== 'string' ||
-    typeof ticket !== 'string' ||
+    typeof nodeId !== 'string' ||
     recordId.trim().length === 0 ||
     noteId.trim().length === 0 ||
     peerId.trim().length === 0 ||
-    ticket.trim().length === 0 ||
+    nodeId.trim().length === 0 ||
     !isFiniteTimestamp(updatedAt) ||
     !isFiniteTimestamp(expiresAt)
   ) {
@@ -96,7 +98,7 @@ export function parseLivePeerDiscoveryRecord(
     recordId,
     noteId,
     peerId,
-    ticket,
+    nodeId,
     updatedAt,
     expiresAt,
   };

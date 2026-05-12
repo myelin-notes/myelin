@@ -10,14 +10,14 @@ import {
 } from './discovery';
 import type { Transport } from './transport';
 
-const DEFAULT_DISCOVERY_POLL_INTERVAL_MS = 5_000;
-const DEFAULT_FAILED_TICKET_RETRY_MS = 30_000;
+const DEFAULT_DISCOVERY_POLL_INTERVAL_MS = 60_000;
+const DEFAULT_FAILED_JOIN_RETRY_MS = 30_000;
 
 type Timer = number | NodeJS.Timeout;
 
 export interface LiveDiscoveryTransport extends Transport {
   host(): Promise<string>;
-  join(ticket: string): Promise<void>;
+  join(nodeId: string): Promise<void>;
 }
 
 export interface LiveDiscoverySession {
@@ -38,7 +38,7 @@ export interface LivePeerDiscoveryCoordinatorOptions {
   now?: () => number;
   pollIntervalMs?: number;
   recordTtlMs?: number;
-  failedTicketRetryMs?: number;
+  failedJoinRetryMs?: number;
   recordId?: string;
 }
 
@@ -53,17 +53,17 @@ export class LivePeerDiscoveryCoordinator {
   private readonly now: () => number;
   private readonly pollIntervalMs: number;
   private readonly recordTtlMs: number;
-  private readonly failedTicketRetryMs: number;
+  private readonly failedJoinRetryMs: number;
   private readonly localRecordId: string;
   private readonly localPeerId: string;
   private transport: LiveDiscoveryTransport | null = null;
-  private ticket: string | null = null;
+  private nodeId: string | null = null;
   private timer: Timer | null = null;
   private lastPublishedAt: number | null = null;
   private stopped = true;
   private started = false;
   private cycleInFlight: Promise<void> | null = null;
-  private readonly failedTickets = new Map<string, number>();
+  private readonly failedJoins = new Map<string, number>();
 
   constructor(options: LivePeerDiscoveryCoordinatorOptions) {
     this.session = options.session;
@@ -73,8 +73,8 @@ export class LivePeerDiscoveryCoordinator {
     this.pollIntervalMs =
       options.pollIntervalMs ?? DEFAULT_DISCOVERY_POLL_INTERVAL_MS;
     this.recordTtlMs = options.recordTtlMs ?? LIVE_PEER_DISCOVERY_TTL_MS;
-    this.failedTicketRetryMs =
-      options.failedTicketRetryMs ?? DEFAULT_FAILED_TICKET_RETRY_MS;
+    this.failedJoinRetryMs =
+      options.failedJoinRetryMs ?? DEFAULT_FAILED_JOIN_RETRY_MS;
     this.localRecordId = options.recordId ?? createEphemeralPeerId();
     this.localPeerId = options.session.localPeerId;
   }
@@ -92,12 +92,12 @@ export class LivePeerDiscoveryCoordinator {
     this.session.setTransport(transport, options);
 
     try {
-      const ticket = await transport.host();
+      const nodeId = await transport.host();
       if (this.stopped || this.transport !== transport) {
         return;
       }
 
-      this.ticket = ticket;
+      this.nodeId = nodeId;
       await this.runCycle();
       this.scheduleNextCycle();
     } catch (error) {
@@ -116,7 +116,7 @@ export class LivePeerDiscoveryCoordinator {
     const inFlight = this.cycleInFlight;
     const transport = this.transport;
     this.transport = null;
-    this.ticket = null;
+    this.nodeId = null;
     this.lastPublishedAt = null;
     transport?.off('disconnected', this.onTransportDisconnected);
     this.session.clearTransport(options);
@@ -164,13 +164,13 @@ export class LivePeerDiscoveryCoordinator {
 
   private async runCycleInternal(): Promise<void> {
     const transport = this.transport;
-    const ticket = this.ticket;
-    if (this.stopped || !transport || !ticket) {
+    const nodeId = this.nodeId;
+    if (this.stopped || !transport || !nodeId) {
       return;
     }
 
     const now = this.now();
-    const published = await this.publishLocalRecord(now, ticket);
+    const published = await this.publishLocalRecord(now, nodeId);
 
     if (this.stopped || this.transport !== transport) {
       return;
@@ -205,27 +205,27 @@ export class LivePeerDiscoveryCoordinator {
     for (const record of records) {
       if (
         record.recordId === this.localRecordId ||
-        record.ticket === ticket ||
+        record.nodeId === nodeId ||
         record.noteId !== this.session.id ||
         !isLivePeerDiscoveryRecordFresh(record, now)
       ) {
         continue;
       }
 
-      const failedKey = `${record.peerId}\0${record.ticket}`;
-      const lastFailedAt = this.failedTickets.get(failedKey);
+      const failedKey = `${record.peerId}\0${record.nodeId}`;
+      const lastFailedAt = this.failedJoins.get(failedKey);
       if (
         lastFailedAt !== undefined &&
-        now - lastFailedAt < this.failedTicketRetryMs
+        now - lastFailedAt < this.failedJoinRetryMs
       ) {
         continue;
       }
 
       try {
-        await transport.join(record.ticket);
+        await transport.join(record.nodeId);
         return;
       } catch (error) {
-        this.failedTickets.set(failedKey, now);
+        this.failedJoins.set(failedKey, now);
         logger.warn('Failed to join discovered peer', error, {
           noteId: this.session.id,
           peerId: record.peerId,
@@ -262,7 +262,7 @@ export class LivePeerDiscoveryCoordinator {
 
   private async publishLocalRecord(
     now: number,
-    ticket: string,
+    nodeId: string,
   ): Promise<boolean> {
     const refreshIntervalMs = Math.max(1, Math.floor(this.recordTtlMs / 2));
     if (
@@ -278,7 +278,7 @@ export class LivePeerDiscoveryCoordinator {
           recordId: this.localRecordId,
           noteId: this.session.id,
           peerId: this.localPeerId,
-          ticket,
+          nodeId,
           now,
           ttlMs: this.recordTtlMs,
         }),

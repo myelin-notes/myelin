@@ -122,7 +122,7 @@ describe('GoogleDriveRepository', () => {
       recordId: 'record-1',
       noteId: 'note-1',
       peerId: 'peer-1',
-      ticket: 'iroh-ticket-1',
+      nodeId: 'iroh-node-1',
       updatedAt: now,
       expiresAt: now + 30_000,
     };
@@ -158,7 +158,7 @@ describe('GoogleDriveRepository', () => {
       recordId: 'expired-record',
       noteId: 'note-1',
       peerId: 'expired-peer',
-      ticket: 'expired-ticket',
+      nodeId: 'expired-node',
       updatedAt: now - 60_000,
       expiresAt: now - 1,
     });
@@ -184,7 +184,7 @@ describe('GoogleDriveRepository', () => {
       recordId: 'current-record',
       noteId: 'note-1',
       peerId: 'peer-1',
-      ticket: 'iroh-ticket-1',
+      nodeId: 'iroh-node-1',
       updatedAt: now - 60_000,
       expiresAt: now - 1,
     });
