@@ -65,6 +65,11 @@ function parseTar(tar: Uint8Array): Map<string, Uint8Array> {
       continue;
     }
 
+    // Pax 'x' headers can carry a `path=` override; we ignore them, so a file
+    // whose path exceeds the 100-char ustar field is silently keyed under its
+    // truncated name. Safe today (our paths are `files/<uuid>.<ext>`, well
+    // under 100 chars including GitHub's `<owner>-<repo>-<sha>/` wrapper) but
+    // a future schema change that lengthens stored paths must add pax parsing.
     if (typeflag === 'x' || typeflag === 'g') {
       offset = paddedEnd;
       continue;
