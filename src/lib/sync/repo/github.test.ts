@@ -150,6 +150,29 @@ describe('GitHubRepository', () => {
     expect(githubApi.tarballFetchCount).toBe(0);
   });
 
+  it('retries the tarball fetch after a rate-limit response', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const fileA = await repository.createFile('A.mp4', 'mp4', null);
+    const bytesA = new Uint8Array([1, 2, 3]);
+
+    githubApi.setTarball(
+      createGzippedTar('myelin-notes-abc1234', [
+        {
+          path: getStoredFilePath({ id: fileA, fileType: 'mp4' }),
+          bytes: bytesA,
+        },
+      ]),
+    );
+    githubApi.failNextTarball(429, 0);
+
+    const snapshot = await repository.exportSnapshot();
+
+    expect(githubApi.tarballFetchCount).toBe(2);
+    expect(Array.from(snapshot.notes[fileA] ?? [])).toEqual(Array.from(bytesA));
+  });
+
   it('returns null for files missing from the tarball', async () => {
     const repository = createRepository();
     const githubApi = getRepositoryTestGitHubApi();

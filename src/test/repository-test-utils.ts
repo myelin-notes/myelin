@@ -70,6 +70,30 @@ function createBinaryResponse(status: number, bytes: Uint8Array) {
   };
 }
 
+function createRateLimitResponse(status: number, retryAfterSeconds: number) {
+  const body = '{"message":"rate limited"}';
+  return {
+    ok: false,
+    status,
+    headers: {
+      get(name: string): string | null {
+        return name.toLowerCase() === 'retry-after'
+          ? String(retryAfterSeconds)
+          : null;
+      },
+    },
+    async json() {
+      return JSON.parse(body) as unknown;
+    },
+    async arrayBuffer() {
+      return toArrayBuffer(new TextEncoder().encode(body));
+    },
+    async text() {
+      return body;
+    },
+  };
+}
+
 export interface MemoryStorage {
   appDataDir(): Promise<string>;
   join(...segments: string[]): Promise<string>;
@@ -322,6 +346,7 @@ export interface MemoryGitHubApi {
     text(): Promise<string>;
   }>;
   failNextPut(path: string, status?: number): void;
+  failNextTarball(status: number, retryAfterSeconds: number): void;
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
   setTarball(gzippedTarBytes: Uint8Array): void;
@@ -378,6 +403,10 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   let revision = 0;
   let tarball: Uint8Array | null = null;
   let tarballFetchCount = 0;
+  let nextTarballFailure: {
+    status: number;
+    retryAfterSeconds: number;
+  } | null = null;
 
   function getPath(url: string): string {
     const parsed = new URL(url);
@@ -399,6 +428,14 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
       const parsed = new URL(url);
       if (parsed.pathname.includes('/tarball/')) {
         tarballFetchCount += 1;
+        if (nextTarballFailure) {
+          const failure = nextTarballFailure;
+          nextTarballFailure = null;
+          return createRateLimitResponse(
+            failure.status,
+            failure.retryAfterSeconds,
+          );
+        }
         const bytes = tarball ?? buildTarballFromFiles(files);
         return createBinaryResponse(200, bytes);
       }
@@ -459,6 +496,9 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     failNextPut(path, status = 409) {
       nextPutFailures.set(path, status);
+    },
+    failNextTarball(status, retryAfterSeconds) {
+      nextTarballFailure = { status, retryAfterSeconds };
     },
     readBytes(path) {
       const entry = files.get(path);

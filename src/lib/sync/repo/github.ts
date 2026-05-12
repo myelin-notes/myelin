@@ -258,14 +258,32 @@ export class GitHubRepository extends BaseRepository {
     return new Error(`${label} (${response.status}): ${body}`);
   }
 
+  // Sends an authenticated GET; on a 403/429 with a Retry-After or
+  // X-RateLimit-Reset hint, sleeps once and retries. Re-issues authHeaders()
+  // each attempt so a refreshed token is picked up.
+  private async fetchWithRateLimitRetry(
+    url: string,
+    init: { maxRedirections?: number } = {},
+  ): Promise<Response> {
+    const send = async () =>
+      fetch(url, { method: 'GET', headers: await this.authHeaders(), ...init });
+    let response = await send();
+    if (isRateLimited(response)) {
+      const delayMs = readRateLimitDelayMs(response);
+      if (delayMs !== null) {
+        await sleep(delayMs);
+        response = await send();
+      }
+    }
+    return response;
+  }
+
   private async fetchTarballEntries(): Promise<Map<string, Uint8Array>> {
     const ref = encodeURIComponent(this.config.branch);
     const url = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}/tarball/${ref}`;
 
     // maxRedirections: 0 keeps Authorization off the codeload.github.com hop.
-    let response = await fetch(url, {
-      method: 'GET',
-      headers: await this.authHeaders(),
+    let response = await this.fetchWithRateLimitRetry(url, {
       maxRedirections: 0,
     });
 
@@ -293,21 +311,7 @@ export class GitHubRepository extends BaseRepository {
     bytes: Uint8Array | null;
   }> {
     const url = `${this.contentsUrl(path)}?ref=${encodeURIComponent(this.config.branch)}`;
-    let response = await fetch(url, {
-      method: 'GET',
-      headers: await this.authHeaders(),
-    });
-
-    if (isRateLimited(response)) {
-      const delayMs = readRateLimitDelayMs(response);
-      if (delayMs !== null) {
-        await sleep(delayMs);
-        response = await fetch(url, {
-          method: 'GET',
-          headers: await this.authHeaders(),
-        });
-      }
-    }
+    const response = await this.fetchWithRateLimitRetry(url);
 
     if (response.status === 404) {
       return { sha: null, bytes: null };
