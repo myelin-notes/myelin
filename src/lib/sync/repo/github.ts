@@ -176,13 +176,12 @@ export class GitHubRepository extends BaseRepository {
 
   async exportSnapshot(): Promise<RepositorySnapshot> {
     const { manifest } = await this.loadManifestImpl();
-    const snapshotManifest = structuredClone(manifest);
-    const fileNodes = Object.values(snapshotManifest.nodes).filter(
+    const fileNodes = Object.values(manifest.nodes).filter(
       (node): node is VFSFileNode => node.type === 'file',
     );
 
     if (fileNodes.length === 0) {
-      return { manifest: snapshotManifest, notes: {} };
+      return { manifest, notes: {} };
     }
 
     const entries = await this.fetchTarballEntries();
@@ -191,7 +190,7 @@ export class GitHubRepository extends BaseRepository {
       notes[node.id] = entries.get(getStoredFilePath(node)) ?? null;
     }
 
-    return { manifest: snapshotManifest, notes };
+    return { manifest, notes };
   }
 
   protected async saveFileBytes(
