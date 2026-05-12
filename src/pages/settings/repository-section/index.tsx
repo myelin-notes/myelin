@@ -326,13 +326,9 @@ export function RepositorySection() {
                       </div>
                     </div>
 
-                    {(selectors.ownersError ||
-                      selectors.reposError ||
-                      selectors.branchesError) && (
+                    {selectors.error && (
                       <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
-                        {selectors.ownersError ??
-                          selectors.reposError ??
-                          selectors.branchesError}
+                        {selectors.error}
                       </p>
                     )}
                   </>
