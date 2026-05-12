@@ -13,14 +13,22 @@ import {
   getStoredFilePath,
   MANIFEST_PATH,
   migrate,
+  type RepositorySnapshot,
   type VFSManifest,
 } from './shared';
+import { readGzippedTarballEntries } from './tar';
 import type {
   FileType,
   RepositoryCapabilities,
   VFSFileNode,
   VFSNodeId,
 } from './types';
+
+const RATE_LIMIT_MAX_RETRY_DELAY_MS = 60_000;
+
+interface ResponseHeaders {
+  get(name: string): string | null;
+}
 
 interface GitHubContentsResponse {
   sha: string;
@@ -70,6 +78,47 @@ function base64DecodeToBytes(content: string): Uint8Array {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
+}
+
+function getResponseHeader(
+  response: { headers?: ResponseHeaders },
+  name: string,
+): string | null {
+  return response.headers?.get(name) ?? null;
+}
+
+function isRateLimited(response: { status: number }): boolean {
+  return response.status === 403 || response.status === 429;
+}
+
+function readRateLimitDelayMs(response: {
+  status: number;
+  headers?: ResponseHeaders;
+}): number | null {
+  const retryAfter = getResponseHeader(response, 'retry-after');
+  if (retryAfter) {
+    const seconds = Number.parseInt(retryAfter, 10);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(seconds * 1000, RATE_LIMIT_MAX_RETRY_DELAY_MS);
+    }
+  }
+
+  const resetHeader = getResponseHeader(response, 'x-ratelimit-reset');
+  if (resetHeader) {
+    const resetEpochSeconds = Number.parseInt(resetHeader, 10);
+    if (Number.isFinite(resetEpochSeconds)) {
+      const deltaMs = resetEpochSeconds * 1000 - Date.now();
+      if (deltaMs > 0) {
+        return Math.min(deltaMs, RATE_LIMIT_MAX_RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export class GitHubRepository extends BaseRepository {
@@ -154,6 +203,25 @@ export class GitHubRepository extends BaseRepository {
     return { bytes: payload.bytes, revision: payload.sha };
   }
 
+  async exportSnapshot(): Promise<RepositorySnapshot> {
+    const { manifest } = await this.loadManifestImpl();
+    const fileNodes = Object.values(manifest.nodes).filter(
+      (node): node is VFSFileNode => node.type === 'file',
+    );
+
+    if (fileNodes.length === 0) {
+      return { manifest, notes: {} };
+    }
+
+    const entries = await this.fetchTarballEntries();
+    const notes: Record<VFSNodeId, Uint8Array | null> = {};
+    for (const node of fileNodes) {
+      notes[node.id] = entries.get(getStoredFilePath(node)) ?? null;
+    }
+
+    return { manifest, notes };
+  }
+
   protected async saveFileBytes(
     nodeId: VFSNodeId,
     bytes: Uint8Array,
@@ -227,15 +295,60 @@ export class GitHubRepository extends BaseRepository {
     return new Error(`${label} (${response.status}): ${body}`);
   }
 
+  // Sends an authenticated GET; on a 403/429 with a Retry-After or
+  // X-RateLimit-Reset hint, sleeps once and retries. Re-issues authHeaders()
+  // each attempt so a refreshed token is picked up.
+  private async fetchWithRateLimitRetry(
+    url: string,
+    init: { maxRedirections?: number } = {},
+  ): Promise<Response> {
+    const send = async () =>
+      fetch(url, { method: 'GET', headers: await this.authHeaders(), ...init });
+    let response = await send();
+    if (isRateLimited(response)) {
+      const delayMs = readRateLimitDelayMs(response);
+      if (delayMs !== null) {
+        await sleep(delayMs);
+        response = await send();
+      }
+    }
+    return response;
+  }
+
+  private async fetchTarballEntries(): Promise<Map<string, Uint8Array>> {
+    const ref = encodeURIComponent(this.config.branch);
+    const url = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}/tarball/${ref}`;
+
+    // maxRedirections: 0 keeps Authorization off the codeload.github.com hop.
+    let response = await this.fetchWithRateLimitRetry(url, {
+      maxRedirections: 0,
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = getResponseHeader(response, 'location');
+      if (!location) {
+        throw await this.failureError(
+          'GitHub tarball redirect missing Location',
+          response,
+        );
+      }
+      response = await fetch(location, { method: 'GET' });
+    }
+
+    if (!response.ok) {
+      throw await this.failureError('GitHub tarball request failed', response);
+    }
+
+    const gzipped = new Uint8Array(await response.arrayBuffer());
+    return readGzippedTarballEntries(gzipped);
+  }
+
   private async getContents(path: string): Promise<{
     sha: string | null;
     bytes: Uint8Array | null;
   }> {
     const url = `${this.contentsUrl(path)}?ref=${encodeURIComponent(this.config.branch)}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: await this.authHeaders(),
-    });
+    const response = await this.fetchWithRateLimitRetry(url);
 
     if (response.status === 404) {
       return { sha: null, bytes: null };

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  createGzippedTar,
   createNoteState,
   getRepositoryTestGitHubApi,
   readNoteText,
@@ -220,5 +221,89 @@ describe('GitHubRepository', () => {
         '.myelin/live/v1/notes/note-1/current-record.json',
       ),
     ).not.toBeNull();
+  });
+
+  it('exports a snapshot via a single tarball fetch', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const fileA = await repository.createFile('A.mp4', 'mp4', null);
+    const fileB = await repository.createFile('B.mp4', 'mp4', null);
+    const bytesA = new Uint8Array([1, 2, 3, 4, 5]);
+    const bytesB = new Uint8Array([9, 8, 7]);
+
+    githubApi.setTarball(
+      createGzippedTar('myelin-notes-abc1234', [
+        {
+          path: getStoredFilePath({ id: fileA, fileType: 'mp4' }),
+          bytes: bytesA,
+        },
+        {
+          path: getStoredFilePath({ id: fileB, fileType: 'mp4' }),
+          bytes: bytesB,
+        },
+      ]),
+    );
+
+    const snapshot = await repository.exportSnapshot();
+
+    expect(Array.from(snapshot.notes[fileA] ?? [])).toEqual(Array.from(bytesA));
+    expect(Array.from(snapshot.notes[fileB] ?? [])).toEqual(Array.from(bytesB));
+  });
+
+  it('skips the tarball fetch when the manifest has no files', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const snapshot = await repository.exportSnapshot();
+
+    expect(snapshot.notes).toEqual({});
+    expect(githubApi.tarballFetchCount).toBe(0);
+  });
+
+  it('retries the tarball fetch after a rate-limit response', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const fileA = await repository.createFile('A.mp4', 'mp4', null);
+    const bytesA = new Uint8Array([1, 2, 3]);
+
+    githubApi.setTarball(
+      createGzippedTar('myelin-notes-abc1234', [
+        {
+          path: getStoredFilePath({ id: fileA, fileType: 'mp4' }),
+          bytes: bytesA,
+        },
+      ]),
+    );
+    githubApi.failNextTarball(429, 0);
+
+    const snapshot = await repository.exportSnapshot();
+
+    expect(githubApi.tarballFetchCount).toBe(2);
+    expect(Array.from(snapshot.notes[fileA] ?? [])).toEqual(Array.from(bytesA));
+  });
+
+  it('returns null for files missing from the tarball', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const fileA = await repository.createFile('A.mp4', 'mp4', null);
+    const fileB = await repository.createFile('B.mp4', 'mp4', null);
+    const bytesA = new Uint8Array([1, 2, 3]);
+
+    githubApi.setTarball(
+      createGzippedTar('myelin-notes-abc1234', [
+        {
+          path: getStoredFilePath({ id: fileA, fileType: 'mp4' }),
+          bytes: bytesA,
+        },
+      ]),
+    );
+
+    const snapshot = await repository.exportSnapshot();
+
+    expect(Array.from(snapshot.notes[fileA] ?? [])).toEqual(Array.from(bytesA));
+    expect(snapshot.notes[fileB]).toBeNull();
   });
 });
