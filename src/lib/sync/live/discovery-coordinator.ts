@@ -8,7 +8,6 @@ import {
   type LiveDiscoveryMailbox,
   type LivePeerDiscoveryRecord,
 } from './discovery';
-import type { PeerSnapshot } from './peer-state';
 import type { Transport } from './transport';
 
 const DEFAULT_DISCOVERY_POLL_INTERVAL_MS = 5_000;
@@ -23,7 +22,7 @@ export interface LiveDiscoveryTransport extends Transport {
 
 export interface LiveDiscoverySession {
   readonly id: VFSNodeId;
-  getPeerSnapshot(): PeerSnapshot;
+  readonly localPeerId: string;
   setTransport(transport: Transport, options?: TransportPeerStateOptions): void;
   clearTransport(options?: TransportPeerStateOptions): void;
 }
@@ -77,7 +76,7 @@ export class LivePeerDiscoveryCoordinator {
     this.failedTicketRetryMs =
       options.failedTicketRetryMs ?? DEFAULT_FAILED_TICKET_RETRY_MS;
     this.localRecordId = options.recordId ?? createEphemeralPeerId();
-    this.localPeerId = options.session.getPeerSnapshot().localPeerId;
+    this.localPeerId = options.session.localPeerId;
   }
 
   async start(options: TransportPeerStateOptions = {}): Promise<void> {

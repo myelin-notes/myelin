@@ -83,13 +83,7 @@ function createSession(): LiveDiscoverySession & {
   return {
     id: 'note-1',
     transport: null,
-    getPeerSnapshot: () => ({
-      localPeerId: 'peer-local',
-      localMode: 'owner-device',
-      connectedPeers: [],
-      currentWriter: 'peer-local',
-      isWriter: true,
-    }),
+    localPeerId: 'peer-local',
     setTransport: vi.fn(function (
       this: { transport: LiveDiscoveryTransport | null },
       transport: LiveDiscoveryTransport,
