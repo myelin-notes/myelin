@@ -85,7 +85,7 @@ export function CanvasToolbar({
       >
         <div
           ref={toolbarInnerRef}
-          className="flex max-h-[calc(100dvh-6rem)] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-white/80 px-2 py-3 shadow-ambient backdrop-blur-[24px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex max-h-[calc(100dvh-6rem)] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-card px-2 py-3 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           <Tooltip>
             <TooltipTrigger
@@ -94,7 +94,7 @@ export function CanvasToolbar({
               }}
               data-insert-trigger
               aria-label={strings.canvas.toolbar.insert}
-              className={`cursor-pointer rounded-xl p-2.5 transition-colors ${
+              className={`cursor-pointer rounded-lg p-2.5 transition-colors ${
                 insertOpen
                   ? 'bg-accent-dark text-white'
                   : 'bg-transparent text-text-secondary hover:bg-hover-tint'
@@ -122,7 +122,7 @@ export function CanvasToolbar({
                     toolButtonRefs.current[index] = el;
                   }}
                   aria-label={tool.label}
-                  className={`group relative cursor-pointer rounded-xl p-2.5 transition-colors ${
+                  className={`group relative cursor-pointer rounded-lg p-2.5 transition-colors ${
                     isActive
                       ? 'bg-accent-dark text-white'
                       : 'bg-transparent text-text-secondary hover:bg-hover-tint'
@@ -173,7 +173,7 @@ export function CanvasToolbar({
                 shelfButtonRef.current = el;
               }}
               aria-label={strings.canvas.toolbar.customizeWheel}
-              className={`cursor-pointer rounded-xl p-2.5 transition-colors ${
+              className={`cursor-pointer rounded-lg p-2.5 transition-colors ${
                 shelfOpen
                   ? 'bg-accent-dark text-white'
                   : 'bg-transparent text-text-secondary hover:bg-hover-tint'

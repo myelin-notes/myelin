@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Canvas — direction explorations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,400..500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      font-family: "Inter", system-ui, sans-serif;
+      color: #191c1e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #ebedf0;
+      padding: 64px 48px 96px;
+    }
+    .page-shell {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 64px;
+    }
+    .page-head h1 {
+      font-family: "Newsreader", serif;
+      font-weight: 480;
+      font-size: 40px;
+      letter-spacing: -0.015em;
+      margin: 0 0 10px;
+      line-height: 1.05;
+    }
+    .page-head p {
+      margin: 0;
+      max-width: 64ch;
+      color: #43474a;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .mock {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 36px;
+      align-items: start;
+    }
+    .meta .label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #5b6677;
+      margin-bottom: 8px;
+    }
+    .meta h2 {
+      font-family: "Newsreader", serif;
+      font-weight: 480;
+      font-size: 28px;
+      letter-spacing: -0.01em;
+      margin: 0 0 12px;
+    }
+    .meta .body {
+      color: #43474a;
+      font-size: 13px;
+      line-height: 1.65;
+      margin: 0;
+    }
+    .meta dl {
+      margin: 18px 0 0;
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 6px 16px;
+      font-size: 12px;
+    }
+    .meta dt { color: #5b6677; }
+    .meta dd { margin: 0; color: #191c1e; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+    .viewport {
+      position: relative;
+      aspect-ratio: 16 / 10;
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 0 rgba(25, 28, 30, 0.05), 0 28px 64px -28px rgba(25, 28, 30, 0.22);
+    }
+    .canvas-bg { position: absolute; inset: 0; }
+
+    .frame {
+      position: absolute;
+      width: 50%;
+      aspect-ratio: 0.78;
+      left: 27%;
+      top: 12%;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .frame-header {
+      padding: 16px 22px 12px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .frame-header .kind {
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #5b6677;
+      line-height: 1;
+    }
+    .frame-header .title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #191c1e;
+      letter-spacing: -0.005em;
+      margin-top: 4px;
+      line-height: 1.2;
+    }
+    .frame-header .menu {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      color: #5b6677;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .frame-body {
+      padding: 4px 24px 24px;
+      font-family: "Newsreader", serif;
+    }
+    .frame-body h3 {
+      font-family: "Newsreader", serif;
+      font-weight: 460;
+      font-size: 24px;
+      letter-spacing: -0.012em;
+      margin: 6px 0 12px;
+      line-height: 1.12;
+    }
+    .frame-body p {
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 0 0 10px;
+      color: #2a2f33;
+    }
+    .frame-body .meta-line {
+      font-family: "Inter", sans-serif;
+      font-size: 9.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #6b7480;
+      font-weight: 600;
+      margin-top: 14px;
+    }
+
+    /* Toolbar (vertical, default) */
+    .toolbar {
+      position: absolute;
+      top: 50%;
+      left: 18px;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 8px;
+      border-radius: 14px;
+      align-items: center;
+    }
+    .tool {
+      width: 30px; height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: #43474a;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .tool.active { background: #1c2738; color: #fff; }
+    .toolbar .div { height: 1px; width: 16px; background: rgba(91, 102, 119, 0.25); margin: 4px auto; }
+
+    /* Title bar */
+    .title-bar {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+    .title-bar .chev { color: #43474a; font-size: 18px; line-height: 1; }
+    .title-bar .name { color: #191c1e; font-weight: 500; }
+    .title-bar .kind {
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #5b6677;
+      font-weight: 700;
+    }
+
+    /* Status */
+    .status-bar {
+      position: absolute;
+      bottom: 18px;
+      right: 18px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 11px;
+      color: #43474a;
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    /* ============ BASELINE ============ */
+    .baseline .canvas-bg {
+      background-color: #f7f9fb;
+      background-image: radial-gradient(circle at center, rgba(28, 39, 56, 0.13) 0.7px, transparent 1px);
+      background-size: 22px 22px;
+    }
+    .baseline .frame {
+      background: #f2f4f6;
+      box-shadow: 0 1px 2px rgba(25, 28, 30, 0.03), 0 18px 44px rgba(25, 28, 30, 0.07);
+    }
+    .baseline .toolbar,
+    .baseline .title-bar,
+    .baseline .status-bar {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      box-shadow: 0 0 32px rgba(25, 28, 30, 0.06);
+    }
+
+    /* ============ A · DRAFTING TABLE ============ */
+    .drafting .canvas-bg {
+      background-color: #e7e0d1;
+      background-image: radial-gradient(circle at center, rgba(70, 55, 30, 0.18) 0.8px, transparent 1.1px);
+      background-size: 24px 24px;
+    }
+    .drafting .frame {
+      background: #ffffff;
+      box-shadow:
+        0 0 0 1px rgba(95, 75, 40, 0.10),
+        0 1px 1px rgba(25, 28, 30, 0.05),
+        0 6px 14px rgba(60, 45, 20, 0.10),
+        0 32px 60px -18px rgba(60, 45, 20, 0.22);
+    }
+    .drafting .toolbar,
+    .drafting .title-bar {
+      background: #f4ecd9;
+      box-shadow: inset 0 0 0 1px rgba(95, 75, 40, 0.10), 0 1px 1px rgba(80, 60, 30, 0.04);
+    }
+    .drafting .toolbar .tool { color: #5b4f3a; }
+    .drafting .toolbar .tool.active {
+      background: #2a2218; color: #f5efe1;
+    }
+    .drafting .toolbar .div { background: rgba(80, 60, 30, 0.18); }
+    .drafting .title-bar .chev { color: #5b4f3a; }
+    .drafting .title-bar .name { color: #2a2218; }
+    .drafting .title-bar .kind { color: #74684e; }
+    .drafting .status-bar {
+      background: transparent;
+      color: #5b4f3a;
+      box-shadow: none;
+      padding: 0;
+      font-size: 11px;
+    }
+
+    /* ============ B · INK SLATE ============ */
+    .ink .canvas-bg {
+      background-color: #1e2330;
+      background-image: radial-gradient(circle at center, rgba(255, 250, 235, 0.09) 0.7px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .ink .frame {
+      background: #f8f4ea;
+      box-shadow:
+        0 1px 0 rgba(0, 0, 0, 0.4),
+        0 8px 18px rgba(0, 0, 0, 0.25),
+        0 36px 72px -16px rgba(0, 0, 0, 0.55);
+    }
+    .ink .toolbar,
+    .ink .title-bar {
+      background: #151a25;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+    .ink .toolbar .tool { color: #b9c0cc; }
+    .ink .toolbar .tool.active { background: #f8f4ea; color: #1e2330; }
+    .ink .toolbar .div { background: rgba(255, 255, 255, 0.10); }
+    .ink .title-bar .chev { color: #b9c0cc; }
+    .ink .title-bar .name { color: #f4f0e6; }
+    .ink .title-bar .kind { color: #8a93a4; }
+    .ink .status-bar {
+      background: transparent;
+      color: #c9cfd9;
+      font-family: "Newsreader", serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 13px;
+      box-shadow: none;
+      padding: 0;
+    }
+
+    /* ============ C · EDGE DOCK ============ */
+    .edge .canvas-bg {
+      background-color: #f3f5f8;
+      background-image: radial-gradient(circle at center, rgba(28, 39, 56, 0.14) 0.7px, transparent 1px);
+      background-size: 22px 22px;
+    }
+    .edge .frame {
+      background: #ffffff;
+      top: 22%;
+      left: 32%;
+      box-shadow:
+        0 0 0 1px rgba(28, 39, 56, 0.08),
+        0 1px 2px rgba(25, 28, 30, 0.06),
+        0 10px 20px rgba(25, 28, 30, 0.07),
+        0 40px 76px -22px rgba(25, 28, 30, 0.22);
+    }
+    .edge .toolbar {
+      top: 0;
+      left: 0;
+      transform: none;
+      height: 100%;
+      width: 56px;
+      border-radius: 0;
+      background: #e9ecf0;
+      box-shadow: inset -1px 0 0 rgba(28, 39, 56, 0.08);
+      padding: 64px 0 24px;
+      gap: 4px;
+    }
+    .edge .title-bar {
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 12px 18px 12px 76px;
+      background: #e9ecf0;
+      border-radius: 0;
+      box-shadow: inset 0 -1px 0 rgba(28, 39, 56, 0.08);
+    }
+    .edge .status-bar {
+      background: transparent;
+      box-shadow: none;
+      padding: 0;
+      color: #5b6677;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="page-head">
+      <h1>Canvas page — direction explorations</h1>
+      <p>Three alternative directions against the current baseline. Same scene each time: dot-grid canvas, one page frame, toolbar (left), title bar (top-left), status (bottom-right). Mockups are HTML/CSS, not the real Tauri app — focus on tone, contrast, and chrome treatment.</p>
+    </header>
+
+    <!-- BASELINE -->
+    <section class="mock">
+      <div class="meta">
+        <div class="label">Now</div>
+        <h2>Baseline</h2>
+        <p class="body">Current canvas. Three glass pills (toolbar, title, status) all use the same recipe — that's the strongest "shadcn / AI dev tool" signal. Page frame ghosts on a near-identical tone with a soft shadow doing all the lifting.</p>
+        <dl>
+          <dt>Canvas</dt><dd>#f7f9fb</dd>
+          <dt>Frame</dt><dd>#f2f4f6</dd>
+          <dt>L-delta</dt><dd>~1.7%</dd>
+          <dt>Chrome</dt><dd>Glass pills ×3</dd>
+        </dl>
+      </div>
+      <div class="viewport baseline">
+        <div class="canvas-bg"></div>
+        <div class="frame">
+          <div class="frame-header">
+            <div>
+              <div class="kind">Page</div>
+              <div class="title">North wing — site notes</div>
+            </div>
+            <div class="menu">≡</div>
+          </div>
+          <div class="frame-body">
+            <h3>The first walkthrough</h3>
+            <p>Daylight enters through the north window in the morning, pooling on the table near the entry. By midday the room dims and the back wall reads as the brightest plane.</p>
+            <p>Two columns set the rhythm. They mark the threshold between gallery and study without separating them.</p>
+            <div class="meta-line">Site visit 04 · 2026-05-09</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="tool">+</div>
+          <div class="div"></div>
+          <div class="tool active">✎</div>
+          <div class="tool">⌧</div>
+          <div class="tool">T</div>
+          <div class="tool">▥</div>
+          <div class="div"></div>
+          <div class="tool">⚙</div>
+        </div>
+        <div class="title-bar">
+          <span class="chev">‹</span>
+          <span class="name">North wing — site notes</span>
+          <span class="kind">Canvas</span>
+        </div>
+        <div class="status-bar">100%</div>
+      </div>
+    </section>
+
+    <!-- A -->
+    <section class="mock">
+      <div class="meta">
+        <div class="label">Direction A</div>
+        <h2>Drafting Table</h2>
+        <p class="body">Canvas shifts to a warm craft-mat tone (~10% darker, +warmth). Page frames go bright paper-white with a real three-layer shadow and a warm hairline edge — paper on desk, tactile. Glass pills become flat warm panels with subtle inset borders. Status drops the container.</p>
+        <dl>
+          <dt>Canvas</dt><dd>#e7e0d1 warm</dd>
+          <dt>Frame</dt><dd>#ffffff paper</dd>
+          <dt>L-delta</dt><dd>~10%</dd>
+          <dt>Chrome</dt><dd>Flat warm trays</dd>
+          <dt>Risk</dt><dd>Low</dd>
+        </dl>
+      </div>
+      <div class="viewport drafting">
+        <div class="canvas-bg"></div>
+        <div class="frame">
+          <div class="frame-header">
+            <div>
+              <div class="kind">Page</div>
+              <div class="title">North wing — site notes</div>
+            </div>
+            <div class="menu">≡</div>
+          </div>
+          <div class="frame-body">
+            <h3>The first walkthrough</h3>
+            <p>Daylight enters through the north window in the morning, pooling on the table near the entry. By midday the room dims and the back wall reads as the brightest plane.</p>
+            <p>Two columns set the rhythm. They mark the threshold between gallery and study without separating them.</p>
+            <div class="meta-line">Site visit 04 · 2026-05-09</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="tool">+</div>
+          <div class="div"></div>
+          <div class="tool active">✎</div>
+          <div class="tool">⌧</div>
+          <div class="tool">T</div>
+          <div class="tool">▥</div>
+          <div class="div"></div>
+          <div class="tool">⚙</div>
+        </div>
+        <div class="title-bar">
+          <span class="chev">‹</span>
+          <span class="name">North wing — site notes</span>
+          <span class="kind">Canvas</span>
+        </div>
+        <div class="status-bar">100%</div>
+      </div>
+    </section>
+
+    <!-- B -->
+    <section class="mock">
+      <div class="meta">
+        <div class="label">Direction B</div>
+        <h2>Ink Slate</h2>
+        <p class="body">Editorial dark canvas — warm near-navy, NOT cyber-blue, NOT pure black. Cream paper frames glow against it; the page is the only bright thing. Inverted dark chrome, no glass, no neon. Status reads as Newsreader italic. Highest contrast lift; highest risk if it drifts toward dev-tool territory.</p>
+        <dl>
+          <dt>Canvas</dt><dd>#1e2330 ink</dd>
+          <dt>Frame</dt><dd>#f8f4ea cream</dd>
+          <dt>L-delta</dt><dd>~70%</dd>
+          <dt>Chrome</dt><dd>Inverted, flat</dd>
+          <dt>Risk</dt><dd>High</dd>
+        </dl>
+      </div>
+      <div class="viewport ink">
+        <div class="canvas-bg"></div>
+        <div class="frame">
+          <div class="frame-header">
+            <div>
+              <div class="kind">Page</div>
+              <div class="title">North wing — site notes</div>
+            </div>
+            <div class="menu">≡</div>
+          </div>
+          <div class="frame-body">
+            <h3>The first walkthrough</h3>
+            <p>Daylight enters through the north window in the morning, pooling on the table near the entry. By midday the room dims and the back wall reads as the brightest plane.</p>
+            <p>Two columns set the rhythm. They mark the threshold between gallery and study without separating them.</p>
+            <div class="meta-line">Site visit 04 · 2026-05-09</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="tool">+</div>
+          <div class="div"></div>
+          <div class="tool active">✎</div>
+          <div class="tool">⌧</div>
+          <div class="tool">T</div>
+          <div class="tool">▥</div>
+          <div class="div"></div>
+          <div class="tool">⚙</div>
+        </div>
+        <div class="title-bar">
+          <span class="chev">‹</span>
+          <span class="name">North wing — site notes</span>
+          <span class="kind">Canvas</span>
+        </div>
+        <div class="status-bar">100%</div>
+      </div>
+    </section>
+
+    <!-- C -->
+    <section class="mock">
+      <div class="meta">
+        <div class="label">Direction C</div>
+        <h2>Edge Dock</h2>
+        <p class="body">Tones barely change. The shadcn signature gets killed by killing the floats themselves: toolbar becomes a flush left dock; title bar runs flush across the top. Page frames gain a sharper four-layer shadow plus a 1px hairline so they read as objects, not tone shifts. Status is text-only.</p>
+        <dl>
+          <dt>Canvas</dt><dd>#f3f5f8</dd>
+          <dt>Frame</dt><dd>#ffffff w/ hairline</dd>
+          <dt>L-delta</dt><dd>~3% + hairline</dd>
+          <dt>Chrome</dt><dd>Flush docks</dd>
+          <dt>Risk</dt><dd>Low</dd>
+        </dl>
+      </div>
+      <div class="viewport edge">
+        <div class="canvas-bg"></div>
+        <div class="frame">
+          <div class="frame-header">
+            <div>
+              <div class="kind">Page</div>
+              <div class="title">North wing — site notes</div>
+            </div>
+            <div class="menu">≡</div>
+          </div>
+          <div class="frame-body">
+            <h3>The first walkthrough</h3>
+            <p>Daylight enters through the north window in the morning, pooling on the table near the entry. By midday the room dims and the back wall reads as the brightest plane.</p>
+            <p>Two columns set the rhythm. They mark the threshold between gallery and study without separating them.</p>
+            <div class="meta-line">Site visit 04 · 2026-05-09</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="tool">+</div>
+          <div class="div"></div>
+          <div class="tool active">✎</div>
+          <div class="tool">⌧</div>
+          <div class="tool">T</div>
+          <div class="tool">▥</div>
+          <div class="div"></div>
+          <div class="tool">⚙</div>
+        </div>
+        <div class="title-bar">
+          <span class="chev">‹</span>
+          <span class="name">North wing — site notes</span>
+          <span class="kind">Canvas</span>
+        </div>
+        <div class="status-bar">100%</div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
