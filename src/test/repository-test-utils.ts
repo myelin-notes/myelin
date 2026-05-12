@@ -325,6 +325,7 @@ export interface MemoryGitHubApi {
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
   setTarball(gzippedTarBytes: Uint8Array): void;
+  readonly tarballFetchCount: number;
 }
 
 interface MemoryGoogleDriveFile {
@@ -376,6 +377,7 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   const nextPutFailures = new Map<string, number>();
   let revision = 0;
   let tarball: Uint8Array | null = null;
+  let tarballFetchCount = 0;
 
   function getPath(url: string): string {
     const parsed = new URL(url);
@@ -396,6 +398,7 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     async fetch(url, init) {
       const parsed = new URL(url);
       if (parsed.pathname.includes('/tarball/')) {
+        tarballFetchCount += 1;
         const bytes = tarball ?? buildTarballFromFiles(files);
         return createBinaryResponse(200, bytes);
       }
@@ -470,6 +473,9 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     setTarball(gzippedTarBytes) {
       tarball = new Uint8Array(gzippedTarBytes);
+    },
+    get tarballFetchCount() {
+      return tarballFetchCount;
     },
   };
 }

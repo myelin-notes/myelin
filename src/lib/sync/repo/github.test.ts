@@ -142,10 +142,12 @@ describe('GitHubRepository', () => {
 
   it('skips the tarball fetch when the manifest has no files', async () => {
     const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
 
     const snapshot = await repository.exportSnapshot();
 
     expect(snapshot.notes).toEqual({});
+    expect(githubApi.tarballFetchCount).toBe(0);
   });
 
   it('returns null for files missing from the tarball', async () => {
