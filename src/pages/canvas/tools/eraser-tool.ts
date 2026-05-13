@@ -1,6 +1,7 @@
 import { Eraser as EraserIcon } from 'lucide-react';
 import type { MessageGetter } from '@/lib/i18n';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import { ElementType } from '../elements/element-type';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 export class EraserTool implements ITool {
@@ -26,7 +27,11 @@ export class EraserTool implements ITool {
     position: Vector2,
   ): void {
     canvas.elements
-      .filter((e) => e.isOver(position.x, position.y, this.radius, canvas.ctx))
+      .filter(
+        (e) =>
+          e.type === ElementType.STROKE &&
+          e.isOver(position.x, position.y, this.radius, canvas.ctx),
+      )
       .forEach((e) => {
         canvas.removeElement(e);
       });
