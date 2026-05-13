@@ -33,6 +33,7 @@ export class CanvasViewport {
   private _touchPinchLastDist: number | null = null;
 
   private _onZoomChange?: (zoom: number) => void;
+  private _viewListeners = new Set<() => void>();
 
   /**
    * When true, plain wheel/touch pan is restricted to the vertical axis,
@@ -67,6 +68,7 @@ export class CanvasViewport {
           this._offset.x -= evt.deltaX / this._zoom;
         }
         this._offset.y -= evt.deltaY / this._zoom;
+        this.notifyViewChange();
       }
     };
 
@@ -126,6 +128,7 @@ export class CanvasViewport {
         );
       }
       this._touchPinchLastDist = dist;
+      this.notifyViewChange();
     };
 
     this._handleTouchEnd = (evt) => {
@@ -170,9 +173,23 @@ export class CanvasViewport {
     this._onZoomChange = cb;
   }
 
+  public onViewChange(listener: () => void): () => void {
+    this._viewListeners.add(listener);
+    return () => {
+      this._viewListeners.delete(listener);
+    };
+  }
+
+  private notifyViewChange(): void {
+    for (const listener of this._viewListeners) {
+      listener();
+    }
+  }
+
   public panBy(dx: number, dy: number): void {
     this._offset.x += dx;
     this._offset.y += dy;
+    this.notifyViewChange();
   }
 
   public worldToScreen(world: Vector2): Vector2 {
@@ -269,6 +286,7 @@ export class CanvasViewport {
           y: sy / z - worldFocus.y,
         };
         this._onZoomChange?.(this._zoom);
+        this.notifyViewChange();
       },
       onComplete: () => {
         this._viewAnim = null;
@@ -323,5 +341,6 @@ export class CanvasViewport {
     this._offset.y += wyAfter - wyBefore;
 
     this._onZoomChange?.(this._zoom);
+    this.notifyViewChange();
   }
 }

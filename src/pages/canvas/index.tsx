@@ -309,7 +309,9 @@ function CanvasViewInner() {
       />
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
-      <SelectionReorderToolbar drawableCanvasRef={drawableCanvasRef} />
+      {engine.ready && (
+        <SelectionReorderToolbar drawableCanvasRef={drawableCanvasRef} />
+      )}
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
       )}

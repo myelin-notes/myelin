@@ -183,6 +183,14 @@ export class DrawableCanvas {
   private _placementCleanup: (() => void) | null = null;
   private onPlacementEnd?: () => void;
 
+  /**
+   * Listeners notified when selection, element set, element order, edit mode,
+   * or placement state changes — anything that affects view layers like the
+   * selection reorder toolbar. Viewport pan/zoom uses a separate channel on
+   * CanvasViewport.
+   */
+  private _changeListeners = new Set<() => void>();
+
   public constructor(
     canvas: HTMLCanvasElement,
     ydoc: YDocManager,
@@ -245,6 +253,20 @@ export class DrawableCanvas {
 
   private invalidateOrderSnapshot(): void {
     this._orderedSnapshot = null;
+    this.notifyChange();
+  }
+
+  public onChange(listener: () => void): () => void {
+    this._changeListeners.add(listener);
+    return () => {
+      this._changeListeners.delete(listener);
+    };
+  }
+
+  private notifyChange(): void {
+    for (const listener of this._changeListeners) {
+      listener();
+    }
   }
 
   private getElementZOrderValue(
@@ -319,6 +341,9 @@ export class DrawableCanvas {
   }
 
   private configureElement(element: DrawableElement): void {
+    element.onSelectionChanged = () => {
+      this.notifyChange();
+    };
     if (element instanceof PageFrameElement) {
       element.setNoteLinkResolver(this.resolveNoteLink);
       element.setOnDisplayNameRenamed((uuid, newName, oldName) => {
@@ -541,6 +566,7 @@ export class DrawableCanvas {
     this._placement = ghost;
     this._toolCursor = 'copy';
     this.updateCursor();
+    this.notifyChange();
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -567,6 +593,7 @@ export class DrawableCanvas {
     this._toolCursor = 'default';
     this.updateCursor();
     this.onPlacementEnd?.();
+    this.notifyChange();
   }
 
   public getElementsByType(type: ElementType): DrawableElement[] {
@@ -621,6 +648,7 @@ export class DrawableCanvas {
     event?.stopPropagation();
 
     this._editingElement = element;
+    this.notifyChange();
     logger.debug('Entering canvas element edit mode', {
       uuid: element.uuid,
       type: describeElementType(element.type),
@@ -677,6 +705,7 @@ export class DrawableCanvas {
     element.exitEditMode();
     // Yjs captures changes automatically — no command to push
     this._editingElement = null;
+    this.notifyChange();
     this.viewport.editMode = false;
     this.canvas.style.pointerEvents = '';
     this.canvas.style.zIndex = '10';

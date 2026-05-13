@@ -70,6 +70,7 @@ export abstract class DrawableElement {
   private selected: boolean = false;
   private selectionT: number = 0;
   private _hidden: boolean = false;
+  public onSelectionChanged?: () => void;
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
   protected _yMap: Y.Map<unknown> | null = null;
@@ -264,12 +265,20 @@ export abstract class DrawableElement {
   }
 
   public select() {
+    if (this.selected) {
+      return;
+    }
     this.selected = true;
+    this.onSelectionChanged?.();
   }
 
   public unselect() {
+    if (!this.selected) {
+      return;
+    }
     this.selected = false;
     this.selectionT = 0;
+    this.onSelectionChanged?.();
   }
 
   /** Whether this element supports inline editing (double-click to edit). */

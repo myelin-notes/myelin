@@ -57,15 +57,18 @@ export function SelectionReorderToolbar({
   const [state, setState] = useState<ToolbarState>(HIDDEN_STATE);
 
   useEffect(() => {
-    let frameId = 0;
+    const canvas = drawableCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
     let currentState = HIDDEN_STATE;
 
     const sync = () => {
-      const canvas = drawableCanvasRef.current;
       const toolbar = toolbarRef.current;
       let bounds: DOMRect | null = null;
       let nextState = HIDDEN_STATE;
-      if (canvas && !canvas.editingElement && !canvas.isPlacing) {
+      if (!canvas.editingElement && !canvas.isPlacing) {
         bounds = canvas.getSelectedElementScreenBounds();
         if (bounds) {
           nextState = {
@@ -102,13 +105,18 @@ export function SelectionReorderToolbar({
         currentState = nextState;
         setState(nextState);
       }
-
-      frameId = requestAnimationFrame(sync);
     };
 
-    frameId = requestAnimationFrame(sync);
+    sync();
+    const unsubChange = canvas.onChange(sync);
+    const unsubView = canvas.viewport.onViewChange(sync);
+    const handleResize = () => sync();
+    window.addEventListener('resize', handleResize);
+
     return () => {
-      cancelAnimationFrame(frameId);
+      unsubChange();
+      unsubView();
+      window.removeEventListener('resize', handleResize);
     };
   }, [drawableCanvasRef]);
 
