@@ -54,6 +54,7 @@ const CONTENT_STYLE: Record<string, string> = {
   // contenteditable area.
   position: 'absolute',
   inset: '0',
+  boxSizing: 'border-box',
   padding: `${PAGE_PADDING}px`,
 };
 
@@ -135,6 +136,8 @@ function syncPageChrome(
   refs: FrameRefs,
   numPages: number,
   pageWidth: number,
+  pageHeight: number,
+  pageLayout: 'vertical' | 'horizontal',
 ): void {
   while (refs.pageChromeDivs.length < numPages) {
     const div = document.createElement('div');
@@ -146,9 +149,46 @@ function syncPageChrome(
     refs.pageChromeDivs.pop()!.remove();
   }
   for (let p = 0; p < numPages; p++) {
-    refs.pageChromeDivs[p].style.top = `${p * (PAGE_HEIGHT + PAGE_GAP)}px`;
+    refs.pageChromeDivs[p].style.left =
+      pageLayout === 'horizontal' ? `${p * (pageWidth + PAGE_GAP)}px` : '0px';
+    refs.pageChromeDivs[p].style.top =
+      pageLayout === 'horizontal' ? '0px' : `${p * (pageHeight + PAGE_GAP)}px`;
     refs.pageChromeDivs[p].style.width = `${pageWidth}px`;
+    refs.pageChromeDivs[p].style.height = `${pageHeight}px`;
   }
+}
+
+function syncEditorLayout(
+  refs: FrameRefs,
+  pageWidth: number,
+  pageHeight: number,
+  pageLayout: 'vertical' | 'horizontal',
+): void {
+  refs.contentDiv.dataset.pageLayout = pageLayout;
+
+  const editorDom = refs.frame.pmEditor?.view?.dom;
+  if (!(editorDom instanceof HTMLElement)) {
+    return;
+  }
+
+  if (pageLayout === 'horizontal') {
+    const columnWidth = Math.max(1, pageWidth - PAGE_PADDING * 2);
+    const columnHeight = Math.max(1, pageHeight - PAGE_PADDING * 2);
+    editorDom.style.width = `${columnWidth}px`;
+    editorDom.style.height = `${columnHeight}px`;
+    editorDom.style.columnWidth = `${columnWidth}px`;
+    editorDom.style.columnGap = `${PAGE_GAP + PAGE_PADDING * 2}px`;
+    editorDom.style.columnFill = 'auto';
+    editorDom.style.overflow = 'visible';
+    return;
+  }
+
+  editorDom.style.removeProperty('width');
+  editorDom.style.removeProperty('height');
+  editorDom.style.removeProperty('column-width');
+  editorDom.style.removeProperty('column-gap');
+  editorDom.style.removeProperty('column-fill');
+  editorDom.style.removeProperty('overflow');
 }
 
 function createFrameRefs(
@@ -381,18 +421,25 @@ export function PageFrameDomLayer({
         const screenY = snapToDevicePixel((frame.offset.y + offset.y) * zoom);
 
         const pageWidth = frame.pageWidth;
+        const pageHeight = frame.pageHeight;
+        const contentWidth = frame.totalWidth;
+        const contentHeight = frame.totalHeight;
+        const pageLayout = frame.pageLayout;
+        if (dc.editingElement === frame) {
+          dc.syncViewportEditModePan();
+        }
         const menuRect = getFrameChromeMenuButtonRect({
           screenX,
           screenY,
-          contentWidth: pageWidth,
+          contentWidth,
           zoom,
         });
         refs.chrome.setFileName(frame.displayName);
         refs.chrome.sync({
           screenX,
           screenY,
-          contentWidth: pageWidth,
-          contentHeight: frame.totalHeight,
+          contentWidth,
+          contentHeight,
           zoom,
           controlsVisible: !isFrameMenuCoveredByHigherFrame(
             frameIndex,
@@ -405,8 +452,8 @@ export function PageFrameDomLayer({
 
         // Inner frame: screen-sized clip box, lives inside chrome contentSlot
         // so no extra translate needed — contentSlot positions it.
-        refs.frameDiv.style.width = `${pageWidth * zoom}px`;
-        refs.frameDiv.style.height = `${frame.totalHeight * zoom}px`;
+        refs.frameDiv.style.width = `${contentWidth * zoom}px`;
+        refs.frameDiv.style.height = `${contentHeight * zoom}px`;
         refs.frameDiv.style.transform = '';
 
         // Inner viewport: world-sized. A fixed CSS zoom of devicePixelRatio
@@ -416,14 +463,15 @@ export function PageFrameDomLayer({
         // never change — the variable canvas zoom is handled entirely by
         // transform: scale(), which is a post-layout GPU operation.
         const dpr = getDevicePixelRatio();
-        refs.viewportDiv.style.width = `${pageWidth}px`;
-        refs.viewportDiv.style.height = `${frame.totalHeight}px`;
+        refs.viewportDiv.style.width = `${contentWidth}px`;
+        refs.viewportDiv.style.height = `${contentHeight}px`;
         refs.viewportDiv.style.zoom = `${dpr}`;
         refs.viewportDiv.style.setProperty('--vp-zoom', `${dpr}`);
         refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
 
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
-        syncPageChrome(refs, frame.numPages, pageWidth);
+        syncEditorLayout(refs, pageWidth, pageHeight, pageLayout);
+        syncPageChrome(refs, frame.numPages, pageWidth, pageHeight, pageLayout);
       }
 
       removeStaleFrames(frameMap.current, activeFrames);
@@ -472,7 +520,7 @@ export function PageFrameDomLayer({
       }
       const sel = view.state.selection;
       // coordsAtPos can throw if the position is stale (mid-transaction)
-      let rect: { top: number; bottom: number };
+      let rect: { left: number; right: number; top: number; bottom: number };
       try {
         rect = view.coordsAtPos(sel.head);
       } catch {
@@ -484,21 +532,32 @@ export function PageFrameDomLayer({
       // getBoundingClientRect). Multiply by DPR to get screen coords.
       const zoom = dc.viewport.zoom;
       const dpr = getDevicePixelRatio();
+      const screenLeft = rect.left * dpr;
+      const screenRight = rect.right * dpr;
       const screenBottom = rect.bottom * dpr;
       const screenTop = rect.top * dpr;
 
       const margin = 120;
+      const viewportLeft = margin;
+      const viewportRight = window.innerWidth - margin;
       const viewportTop = margin;
       const viewportBottom = window.innerHeight - margin;
 
+      let dx = 0;
       let dy = 0;
-      if (screenBottom > viewportBottom) {
+      if (editingElement.pageLayout === 'horizontal') {
+        if (screenRight > viewportRight) {
+          dx = (viewportRight - screenRight) / zoom;
+        } else if (screenLeft < viewportLeft) {
+          dx = (viewportLeft - screenLeft) / zoom;
+        }
+      } else if (screenBottom > viewportBottom) {
         dy = (viewportBottom - screenBottom) / zoom;
       } else if (screenTop < viewportTop) {
         dy = (viewportTop - screenTop) / zoom;
       }
-      if (dy !== 0) {
-        dc.viewport.panBy(0, dy);
+      if (dx !== 0 || dy !== 0) {
+        dc.viewport.panBy(dx, dy);
       }
     };
 

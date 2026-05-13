@@ -18,6 +18,7 @@ import {
 } from '../pdf-renderer';
 import { LOCAL_ORIGIN, YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
+import { PAGE_GAP } from './page-frame-constants';
 import { PdfElement } from './pdf-element';
 
 vi.mock('../pdf-renderer', async () => {
@@ -120,6 +121,18 @@ interface TestablePdfPageDomState extends TestablePdfInsertion {
   _pageOrder: PdfPageOrderEntry[];
   _pageDoms: Map<number, TestPageDom>;
   _layout: unknown | null;
+}
+
+interface TestablePdfLayoutState extends TestablePdfPageDomState {
+  getLayout: () => {
+    pages: Array<{
+      size: PdfPageSize;
+      localLeft: number;
+      localTop: number;
+    }>;
+    totalWidth: number;
+    totalHeight: number;
+  };
 }
 
 function createPdfYMap(
@@ -373,6 +386,65 @@ describe('PdfElement metadata loading', () => {
     expect(localUpdates).toBe(0);
     expect(yMap.get('pageOrder')).toEqual(pageOrder);
     expect(getPdfDocumentPageSizes).not.toHaveBeenCalled();
+  });
+
+  it('hydrates and writes page layout through the Yjs map', async () => {
+    const ydoc = new YDocManager();
+    const pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+    ];
+    const yMap = createPdfYMap(
+      ydoc,
+      pageSizes,
+      pageSizes.map((_, originalIndex) => ({
+        kind: 'pdf' as const,
+        originalIndex,
+      })),
+      { pageLayout: 'horizontal' },
+    );
+    mockLoadedPdfWithStoredMetadata(pageSizes);
+
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    expect(element.pageLayout).toBe('horizontal');
+    expect(element.totalWidth).toBe(612 + PAGE_GAP + 300);
+    expect(element.totalHeight).toBe(792);
+
+    element.setPageLayout('vertical');
+    expect(yMap.get('pageLayout')).toBe('vertical');
+    expect(element.pageLayout).toBe('vertical');
+  });
+
+  it('positions pages side by side in horizontal layout', () => {
+    const element = new PdfElement('pdf-uuid');
+    const state = element as unknown as TestablePdfLayoutState;
+    state._pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+    ];
+    state._pageOrder = [
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 1 },
+    ];
+    state._layout = null;
+
+    element.setPageLayout('horizontal');
+
+    const layout = state.getLayout();
+    expect(layout.totalWidth).toBe(612 + PAGE_GAP + 300);
+    expect(layout.totalHeight).toBe(792);
+    expect(layout.pages[0]).toMatchObject({
+      localLeft: 0,
+      localTop: 0,
+    });
+    expect(layout.pages[1]).toMatchObject({
+      localLeft: 612 + PAGE_GAP,
+      localTop: 321,
+    });
+    expect(element.getYMapProps().pageLayout).toBe('horizontal');
   });
 
   it('inserts a blank page into the stored page order', async () => {

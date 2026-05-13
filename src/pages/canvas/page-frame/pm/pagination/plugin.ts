@@ -1362,6 +1362,29 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
   return true;
 }
 
+function isHorizontalPageLayout(view: EditorView): boolean {
+  return (
+    view.dom.closest('.pm-editor')?.getAttribute('data-page-layout') ===
+    'horizontal'
+  );
+}
+
+function getHorizontalPageCount(view: EditorView): number {
+  const columnWidth = view.dom.offsetWidth;
+  if (columnWidth <= 0) {
+    return 1;
+  }
+
+  const columnGap = Number.parseFloat(getComputedStyle(view.dom).columnGap);
+  const gap = Number.isFinite(columnGap) ? columnGap : PAGE_BREAK_GAP;
+  const stride = columnWidth + gap;
+  if (stride <= 0) {
+    return 1;
+  }
+
+  return Math.max(1, Math.ceil((view.dom.scrollWidth + gap) / stride - 0.01));
+}
+
 function observeLayoutInvalidations(
   view: EditorView,
   schedule: (followUpPasses?: number) => void,
@@ -1490,6 +1513,35 @@ export function paginationPlugin(
         const metrics = run?.metrics ?? null;
 
         try {
+          if (isHorizontalPageLayout(editorView)) {
+            const pageCount = getHorizontalPageCount(editorView);
+            const changed =
+              prevBreaks.length > 0 || pageCount !== prevPageCount;
+            if (!changed) {
+              syncBlockquoteRuleStyles(editorView);
+              return;
+            }
+
+            if (pageCount !== prevPageCount) {
+              onPageCount?.(pageCount);
+            }
+
+            const tr = editorView.state.tr;
+            tr.setMeta(paginationKey, {
+              decos: DecorationSet.empty,
+              breaks: [],
+              pageCount,
+            });
+            tr.setMeta(PM_ADD_TO_HISTORY, false);
+            editorView.dispatch(tr);
+            syncBlockquoteRuleStyles(editorView);
+
+            if (remainingFollowUpPasses > 0) {
+              schedule(remainingFollowUpPasses - 1);
+            }
+            return;
+          }
+
           const editorOffsetTop = editorView.dom.offsetTop;
           const collectBlocksStartedAt = metrics ? performance.now() : 0;
           const blocks = collectBlocks(editorView, editorOffsetTop);

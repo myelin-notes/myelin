@@ -489,6 +489,17 @@ export class DrawableCanvas {
     return this._editingElement;
   }
 
+  public syncViewportEditModePan(): void {
+    const element = this._editingElement;
+    this.viewport.setEditMode(element !== null, {
+      panAxis:
+        element instanceof PageFrameElement &&
+        element.pageLayout === 'horizontal'
+          ? 'horizontal'
+          : 'vertical',
+    });
+  }
+
   public enterElementEdit(element: DrawableElement, event?: Event): void {
     if (this._editingElement) {
       this.exitElementEdit();
@@ -515,8 +526,8 @@ export class DrawableCanvas {
       this.canvas.style.zIndex = '2';
     }
 
-    // Camera switches to "vertical-only pan + handle two-finger touch" mode.
-    this.viewport.editMode = true;
+    // Camera switches to edit-mode pan + two-finger touch handling.
+    this.syncViewportEditModePan();
     const pe = event instanceof PointerEvent ? event : undefined;
     const editDomRoot = element.enterEditMode(this, pe?.clientX, pe?.clientY);
     this.onElementEdit?.(element);
@@ -555,7 +566,7 @@ export class DrawableCanvas {
     element.exitEditMode();
     // Yjs captures changes automatically — no command to push
     this._editingElement = null;
-    this.viewport.editMode = false;
+    this.syncViewportEditModePan();
     this.canvas.style.pointerEvents = '';
     this.canvas.style.zIndex = '10';
     this.onElementEdit?.(null);
