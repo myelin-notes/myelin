@@ -155,7 +155,6 @@ export function SelectionReorderToolbar({
       >
         <ToolbarButton
           label={strings.canvas.selectionToolbar.moveHigher}
-          shortLabel={strings.canvas.selectionToolbar.moveHigherShort}
           disabled={!state.canMoveHigher}
           onClick={moveHigher}
         >
@@ -164,7 +163,6 @@ export function SelectionReorderToolbar({
         <div className="h-5 w-px bg-border-divider/70" />
         <ToolbarButton
           label={strings.canvas.selectionToolbar.moveLower}
-          shortLabel={strings.canvas.selectionToolbar.moveLowerShort}
           disabled={!state.canMoveLower}
           onClick={moveLower}
         >
@@ -177,13 +175,11 @@ export function SelectionReorderToolbar({
 
 function ToolbarButton({
   label,
-  shortLabel,
   disabled,
   onClick,
   children,
 }: {
   label: string;
-  shortLabel: string;
   disabled: boolean;
   onClick: () => void;
   children: React.ReactNode;
@@ -194,7 +190,7 @@ function ToolbarButton({
         aria-label={label}
         aria-disabled={disabled}
         data-disabled={disabled ? 'true' : undefined}
-        className="flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-transparent px-2.5 font-medium text-[12px] text-inherit transition-colors hover:bg-hover-tint hover:text-text-primary focus-visible:bg-hover-tint focus-visible:text-text-primary focus-visible:outline-none data-disabled:cursor-default data-disabled:opacity-35 data-disabled:hover:bg-transparent data-disabled:hover:text-inherit"
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg bg-transparent text-inherit transition-colors hover:bg-hover-tint hover:text-text-primary focus-visible:bg-hover-tint focus-visible:text-text-primary focus-visible:outline-none data-disabled:cursor-default data-disabled:opacity-35 data-disabled:hover:bg-transparent data-disabled:hover:text-inherit"
         onClick={(event) => {
           if (disabled) {
             event.preventDefault();
@@ -204,7 +200,6 @@ function ToolbarButton({
         }}
       >
         {children}
-        <span>{shortLabel}</span>
       </TooltipTrigger>
       <TooltipContent side="top">
         <p>{label}</p>

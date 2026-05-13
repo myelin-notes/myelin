@@ -389,9 +389,7 @@ const zhHans: typeof en = {
     selectionToolbar: {
       label: '选区层级',
       moveHigher: '前移一层',
-      moveHigherShort: '前移',
       moveLower: '后移一层',
-      moveLowerShort: '后移',
     },
     insert: {
       title: '插入',
