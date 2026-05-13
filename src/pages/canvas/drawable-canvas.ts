@@ -344,6 +344,11 @@ export class DrawableCanvas {
     element.onSelectionChanged = () => {
       this.notifyChange();
     };
+    element.onTransformChanged = () => {
+      if (element.isSelected) {
+        this.notifyChange();
+      }
+    };
     if (element instanceof PageFrameElement) {
       element.setNoteLinkResolver(this.resolveNoteLink);
       element.setOnDisplayNameRenamed((uuid, newName, oldName) => {

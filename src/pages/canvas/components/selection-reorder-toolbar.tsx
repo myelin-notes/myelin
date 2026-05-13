@@ -107,16 +107,29 @@ export function SelectionReorderToolbar({
       }
     };
 
+    let pendingFrame = 0;
+    const scheduleSync = () => {
+      if (pendingFrame !== 0) {
+        return;
+      }
+      pendingFrame = requestAnimationFrame(() => {
+        pendingFrame = 0;
+        sync();
+      });
+    };
+
     sync();
-    const unsubChange = canvas.onChange(sync);
-    const unsubView = canvas.viewport.onViewChange(sync);
-    const handleResize = () => sync();
-    window.addEventListener('resize', handleResize);
+    const unsubChange = canvas.onChange(scheduleSync);
+    const unsubView = canvas.viewport.onViewChange(scheduleSync);
+    window.addEventListener('resize', scheduleSync);
 
     return () => {
+      if (pendingFrame !== 0) {
+        cancelAnimationFrame(pendingFrame);
+      }
       unsubChange();
       unsubView();
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', scheduleSync);
     };
   }, [drawableCanvasRef]);
 

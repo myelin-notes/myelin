@@ -71,6 +71,7 @@ export abstract class DrawableElement {
   private selectionT: number = 0;
   private _hidden: boolean = false;
   public onSelectionChanged?: () => void;
+  public onTransformChanged?: () => void;
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
   protected _yMap: Y.Map<unknown> | null = null;
@@ -144,17 +145,20 @@ export abstract class DrawableElement {
     this._offset.x += dx;
     this._offset.y += dy;
     this.syncToYMap({ offsetX: this._offset.x, offsetY: this._offset.y });
+    this.onTransformChanged?.();
   }
 
   public setOffset(x: number, y: number) {
     this._offset = { x, y };
     this.syncToYMap({ offsetX: x, offsetY: y });
+    this.onTransformChanged?.();
   }
 
   public setScale(x: number, y: number) {
     this._scale = { x, y };
     this.updateBoundingBox();
     this.syncToYMap({ scaleX: x, scaleY: y });
+    this.onTransformChanged?.();
   }
 
   public get hidden(): boolean {
