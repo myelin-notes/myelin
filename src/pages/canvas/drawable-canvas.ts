@@ -927,9 +927,14 @@ export class DrawableCanvas {
     this._ydoc.undoManager.stopCapturing();
     this._ydoc.transact(() => {
       for (let i = 0; i < this._elementOrder.length; i++) {
-        this._elements
-          .get(this._elementOrder[i])
-          ?.yMap?.set(ELEMENT_Z_ORDER_KEY, i);
+        const yMap = this._elements.get(this._elementOrder[i])?.yMap;
+        if (!yMap) {
+          continue;
+        }
+        if (yMap.get(ELEMENT_Z_ORDER_KEY) === i) {
+          continue;
+        }
+        yMap.set(ELEMENT_Z_ORDER_KEY, i);
       }
     });
     this._ydoc.undoManager.stopCapturing();
