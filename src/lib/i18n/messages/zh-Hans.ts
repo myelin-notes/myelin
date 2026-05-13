@@ -386,6 +386,13 @@ const zhHans: typeof en = {
       customizeWheel: '自定义轮盘',
       insert: '插入',
     },
+    selectionToolbar: {
+      label: '选区层级',
+      moveHigher: '前移一层',
+      moveHigherShort: '前移',
+      moveLower: '后移一层',
+      moveLowerShort: '后移',
+    },
     insert: {
       title: '插入',
       soon: '即将推出',

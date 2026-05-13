@@ -401,6 +401,13 @@ const es: typeof en = {
       customizeWheel: 'Personalizar rueda',
       insert: 'Insertar',
     },
+    selectionToolbar: {
+      label: 'Orden de selección',
+      moveHigher: 'Mover hacia delante',
+      moveHigherShort: 'Delante',
+      moveLower: 'Mover hacia atrás',
+      moveLowerShort: 'Atrás',
+    },
     insert: {
       title: 'Insertar',
       soon: 'Pronto',
