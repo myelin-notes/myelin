@@ -54,6 +54,28 @@ describe('moveElementOrderForSelection', () => {
     ]);
   });
 
+  it('shifts each selected element independently when selection is discontiguous', () => {
+    const items = order(
+      ['a', ElementType.STROKE],
+      ['b', ElementType.STROKE],
+      ['c', ElementType.STROKE],
+      ['d', ElementType.STROKE],
+    );
+
+    expect(moveElementOrderForSelection(items, ['a', 'c'], 'higher')).toEqual([
+      'b',
+      'a',
+      'd',
+      'c',
+    ]);
+    expect(moveElementOrderForSelection(items, ['b', 'd'], 'lower')).toEqual([
+      'b',
+      'a',
+      'd',
+      'c',
+    ]);
+  });
+
   it('keeps background elements behind foreground elements', () => {
     const items = order(
       ['frame', ElementType.PAGE_FRAME],
