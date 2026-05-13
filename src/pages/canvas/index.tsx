@@ -152,11 +152,16 @@ function CanvasViewInner() {
         y: canvas.height / dpr / 2,
       });
       const frame = dc.addElement(
-        (uuid) => new PageFrameElement(uuid, targetPageFrameName),
+        (uuid) =>
+          new PageFrameElement(
+            uuid,
+            targetPageFrameName,
+            UserPrefs.get('defaultPageLayout'),
+          ),
       );
       frame.setOffset(
-        centerWorld.x - frame.pageWidth / 2,
-        centerWorld.y - frame.pageHeight / 2,
+        centerWorld.x - frame.totalWidth / 2,
+        centerWorld.y - frame.totalHeight / 2,
       );
       frame.updateBounds();
       dc.updateBounding();

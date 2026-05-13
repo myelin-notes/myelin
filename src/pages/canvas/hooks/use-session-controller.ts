@@ -192,11 +192,15 @@ export class CanvasSessionController {
         });
         const frame = drawableCanvas.addElement(
           (uuid) =>
-            new PageFrameElement(uuid, initialPageFrameName ?? undefined),
+            new PageFrameElement(
+              uuid,
+              initialPageFrameName ?? undefined,
+              UserPrefs.get('defaultPageLayout'),
+            ),
         );
         frame.setOffset(
-          centerWorld.x - frame.pageWidth / 2,
-          centerWorld.y - frame.pageHeight / 2,
+          centerWorld.x - frame.totalWidth / 2,
+          centerWorld.y - frame.totalHeight / 2,
         );
         frame.updateBounds();
         drawableCanvas.updateBounding();

@@ -173,8 +173,9 @@ export class PdfElement extends DrawableElement {
     null;
   private _pageOrderCustom = false;
 
-  constructor(uuid: string) {
+  constructor(uuid: string, pageLayout: PageLayout = DEFAULT_PAGE_LAYOUT) {
     super(uuid, ElementType.PDF);
+    this._pageLayout = normalizePageLayout(pageLayout);
   }
 
   public setExportElementsProvider(

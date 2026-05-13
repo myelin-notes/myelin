@@ -34,6 +34,10 @@ const PREFS = {
     'page-frame-edit-fit-whole-page',
     true,
   ),
+  defaultPageLayout: pref<'vertical' | 'horizontal'>(
+    'default-page-layout',
+    'vertical',
+  ),
   noteLinkHoverPreview: pref<boolean>('note-link-hover-preview', true),
   linkRequireModifier: pref<boolean>('link-require-modifier', true),
   alwaysRenameNoteReferences: pref<boolean>(

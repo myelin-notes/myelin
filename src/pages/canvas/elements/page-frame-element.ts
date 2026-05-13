@@ -85,9 +85,14 @@ export class PageFrameElement extends DrawableElement {
     this._contentDiv = contentDiv;
   }
 
-  constructor(uuid: string, displayName?: string) {
+  constructor(
+    uuid: string,
+    displayName?: string,
+    pageLayout: PageLayout = DEFAULT_PAGE_LAYOUT,
+  ) {
     super(uuid, ElementType.PAGE_FRAME);
     this._displayName = displayName ?? DEFAULT_PAGE_FRAME_DISPLAY_NAME;
+    this._pageLayout = normalizePageLayout(pageLayout);
   }
 
   public setNoteLinkResolver(resolveNoteLink?: NoteLinkResolver): void {

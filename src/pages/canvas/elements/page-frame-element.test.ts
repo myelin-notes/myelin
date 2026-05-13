@@ -27,6 +27,15 @@ describe('PageFrameElement display name', () => {
     });
   });
 
+  it('uses the constructor page layout for new frames', () => {
+    const frame = new PageFrameElement('frame-uuid-5', undefined, 'horizontal');
+
+    expect(frame.pageLayout).toBe('horizontal');
+    expect(frame.getYMapProps()).toMatchObject({
+      pageLayout: 'horizontal',
+    });
+  });
+
   it('hydrates and writes display name and page layout through the Yjs map', () => {
     const ydoc = new YDocManager();
     const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame-uuid-2', {

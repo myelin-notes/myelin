@@ -418,6 +418,15 @@ describe('PdfElement metadata loading', () => {
     expect(element.pageLayout).toBe('vertical');
   });
 
+  it('uses the constructor page layout for new PDFs', () => {
+    const element = new PdfElement('pdf-uuid', 'horizontal');
+
+    expect(element.pageLayout).toBe('horizontal');
+    expect(element.getYMapProps()).toMatchObject({
+      pageLayout: 'horizontal',
+    });
+  });
+
   it('positions pages side by side in horizontal layout', () => {
     const element = new PdfElement('pdf-uuid');
     const state = element as unknown as TestablePdfLayoutState;
