@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useRef, useState } from 'react';
+import { UserPrefs } from '@/lib/user-prefs';
 import { CollisionHelper } from '@/lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
 import {
@@ -53,7 +54,14 @@ export function useCanvasInserts({
       if (!dc) {
         return;
       }
-      const frame = dc.addElement((uuid) => new PageFrameElement(uuid));
+      const frame = dc.addElement(
+        (uuid) =>
+          new PageFrameElement(
+            uuid,
+            undefined,
+            UserPrefs.get('defaultPageLayout'),
+          ),
+      );
       frame.setOffset(worldPos.x, worldPos.y);
       frame.updateBounds();
       dc.updateBounding();

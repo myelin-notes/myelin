@@ -13,6 +13,7 @@ export interface ChromeMenuItem {
   id: string;
   label: string;
   icon?: LucideIcon;
+  checked?: boolean;
   onSelect: () => void;
   variant?: 'default' | 'danger';
 }

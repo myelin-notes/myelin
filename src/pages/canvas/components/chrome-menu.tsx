@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Check as CheckIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { ChromeMenuItem } from '../chrome-menu';
 
@@ -111,6 +112,13 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
       {items.map((item, index) => {
         const Icon = item.icon;
         const danger = item.variant === 'danger';
+        const isCheckable = item.checked !== undefined;
+        const roleProps = isCheckable
+          ? ({
+              role: 'menuitemradio',
+              'aria-checked': item.checked,
+            } as const)
+          : ({ role: 'menuitem' } as const);
         return (
           <button
             key={item.id}
@@ -118,7 +126,7 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
               itemRefs.current[index] = el;
             }}
             type="button"
-            role="menuitem"
+            {...roleProps}
             tabIndex={index === focusedIndex ? 0 : -1}
             onPointerDown={(e) => {
               // Mouse menu interaction should not steal focus from an active
@@ -146,6 +154,13 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
               />
             )}
             <span className="flex-1 truncate">{item.label}</span>
+            {item.checked && (
+              <CheckIcon
+                aria-hidden="true"
+                className="size-4 text-text-primary"
+                strokeWidth={1.5}
+              />
+            )}
           </button>
         );
       })}
