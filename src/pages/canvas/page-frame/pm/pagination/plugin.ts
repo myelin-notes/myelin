@@ -1369,6 +1369,11 @@ function isHorizontalPageLayout(view: EditorView): boolean {
   );
 }
 
+// scrollWidth that exactly equals N*stride - gap can drift to N*stride - gap + ε
+// in floating-point, flipping ceil() from N to N+1. Shave a sub-pixel epsilon
+// off the quotient before ceiling so the natural N-column width stays at N.
+const PAGE_COUNT_STRIDE_EPSILON = 0.01;
+
 function getHorizontalPageCount(view: EditorView): number {
   const columnWidth = view.dom.offsetWidth;
   if (columnWidth <= 0) {
@@ -1382,7 +1387,12 @@ function getHorizontalPageCount(view: EditorView): number {
     return 1;
   }
 
-  return Math.max(1, Math.ceil((view.dom.scrollWidth + gap) / stride - 0.01));
+  return Math.max(
+    1,
+    Math.ceil(
+      (view.dom.scrollWidth + gap) / stride - PAGE_COUNT_STRIDE_EPSILON,
+    ),
+  );
 }
 
 function observeLayoutInvalidations(

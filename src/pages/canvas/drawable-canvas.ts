@@ -493,7 +493,8 @@ export class DrawableCanvas {
     const element = this._editingElement;
     this.viewport.setEditMode(element !== null, {
       panAxis:
-        element instanceof PageFrameElement &&
+        element !== null &&
+        'pageLayout' in element &&
         element.pageLayout === 'horizontal'
           ? 'horizontal'
           : 'vertical',
