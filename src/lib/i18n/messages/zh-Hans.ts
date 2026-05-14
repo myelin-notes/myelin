@@ -169,6 +169,14 @@ const zhHans: typeof en = {
     pageFrameEditing: {
       title: '页面框编辑',
       eyebrow: '文档视图',
+      defaultOrientation: {
+        label: '默认页面方向',
+        description: '选择新页面框和 PDF 的页面排列方式。',
+        options: {
+          vertical: '纵向',
+          horizontal: '横向',
+        },
+      },
       fitWholePage: {
         label: '编辑时适配整页',
         description: '进入页面框编辑模式时缩小视图，显示完整页面高度。',

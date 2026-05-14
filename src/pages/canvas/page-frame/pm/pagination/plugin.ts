@@ -1362,6 +1362,39 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
   return true;
 }
 
+function isHorizontalPageLayout(view: EditorView): boolean {
+  return (
+    view.dom.closest('.pm-editor')?.getAttribute('data-page-layout') ===
+    'horizontal'
+  );
+}
+
+// scrollWidth that exactly equals N*stride - gap can drift to N*stride - gap + ε
+// in floating-point, flipping ceil() from N to N+1. Shave a sub-pixel epsilon
+// off the quotient before ceiling so the natural N-column width stays at N.
+const PAGE_COUNT_STRIDE_EPSILON = 0.01;
+
+function getHorizontalPageCount(view: EditorView): number {
+  const columnWidth = view.dom.offsetWidth;
+  if (columnWidth <= 0) {
+    return 1;
+  }
+
+  const columnGap = Number.parseFloat(getComputedStyle(view.dom).columnGap);
+  const gap = Number.isFinite(columnGap) ? columnGap : PAGE_BREAK_GAP;
+  const stride = columnWidth + gap;
+  if (stride <= 0) {
+    return 1;
+  }
+
+  return Math.max(
+    1,
+    Math.ceil(
+      (view.dom.scrollWidth + gap) / stride - PAGE_COUNT_STRIDE_EPSILON,
+    ),
+  );
+}
+
 function observeLayoutInvalidations(
   view: EditorView,
   schedule: (followUpPasses?: number) => void,
@@ -1490,6 +1523,35 @@ export function paginationPlugin(
         const metrics = run?.metrics ?? null;
 
         try {
+          if (isHorizontalPageLayout(editorView)) {
+            const pageCount = getHorizontalPageCount(editorView);
+            const changed =
+              prevBreaks.length > 0 || pageCount !== prevPageCount;
+            if (!changed) {
+              syncBlockquoteRuleStyles(editorView);
+              return;
+            }
+
+            if (pageCount !== prevPageCount) {
+              onPageCount?.(pageCount);
+            }
+
+            const tr = editorView.state.tr;
+            tr.setMeta(paginationKey, {
+              decos: DecorationSet.empty,
+              breaks: [],
+              pageCount,
+            });
+            tr.setMeta(PM_ADD_TO_HISTORY, false);
+            editorView.dispatch(tr);
+            syncBlockquoteRuleStyles(editorView);
+
+            if (remainingFollowUpPasses > 0) {
+              schedule(remainingFollowUpPasses - 1);
+            }
+            return;
+          }
+
           const editorOffsetTop = editorView.dom.offsetTop;
           const collectBlocksStartedAt = metrics ? performance.now() : 0;
           const blocks = collectBlocks(editorView, editorOffsetTop);

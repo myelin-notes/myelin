@@ -1,6 +1,8 @@
 import { type AnimationPlaybackControls, animate } from 'motion';
 import type { Vector2 } from './drawable-canvas';
 
+type EditModePanAxis = 'vertical' | 'horizontal';
+
 /**
  * Camera state for the canvas: pan offset, zoom level, the wheel + touch
  * gestures that mutate them, and the animated view-fit transition.
@@ -12,9 +14,9 @@ import type { Vector2 } from './drawable-canvas';
  * gesture is a scene-level concern, not a camera one.
  *
  * `editMode` is a hint set by DrawableCanvas when an element is being
- * inline-edited: it restricts wheel/trackpad pan to vertical only, and
- * enables two-finger touch pan + pinch zoom (single-finger touch is left
- * alone so the contentEditable can place the cursor / select text).
+ * inline-edited: it restricts wheel/trackpad pan to vertical by default,
+ * and enables two-finger touch pan + pinch zoom (single-finger touch is
+ * left alone so the contentEditable can place the cursor / select text).
  */
 export class CanvasViewport {
   private readonly canvas: HTMLCanvasElement;
@@ -29,18 +31,19 @@ export class CanvasViewport {
   private readonly _gestureTarget: HTMLElement;
 
   // Two-finger touch pan + pinch state
-  private _touchPanLastY: number | null = null;
+  private _touchPanLast: Vector2 | null = null;
   private _touchPinchLastDist: number | null = null;
 
   private _onZoomChange?: (zoom: number) => void;
   private _viewListeners = new Set<() => void>();
 
   /**
-   * When true, plain wheel/touch pan is restricted to the vertical axis,
-   * and two-finger touch gestures (pan + pinch zoom) are active. Toggled
-   * by DrawableCanvas on element edit enter/exit.
+   * When true, plain wheel/touch pan is restricted to the edit-mode axis,
+   * and two-finger touch gestures (pan + pinch zoom) are active. Toggled by
+   * DrawableCanvas on element edit enter/exit.
    */
   public editMode: boolean = false;
+  public editModePanAxis: EditModePanAxis = 'vertical';
 
   // Stored handlers for cleanup
   private readonly _handleWheel: (evt: WheelEvent) => void;
@@ -62,12 +65,13 @@ export class CanvasViewport {
         this.zoomAroundViewportCenter(this._zoom + evt.deltaY * -0.005);
       } else {
         // Two-finger scroll on trackpad / mouse wheel → pan.
-        // In edit mode, restrict to vertical — page is centered horizontally
-        // and there's nothing meaningful left/right.
-        if (!this.editMode) {
+        // In edit mode, lock wheel pan to the edited element's page axis.
+        if (!this.editMode || this.editModePanAxis === 'horizontal') {
           this._offset.x -= evt.deltaX / this._zoom;
         }
-        this._offset.y -= evt.deltaY / this._zoom;
+        if (!this.editMode || this.editModePanAxis === 'vertical') {
+          this._offset.y -= evt.deltaY / this._zoom;
+        }
         this.notifyViewChange();
       }
     };
@@ -78,7 +82,7 @@ export class CanvasViewport {
       return Math.hypot(dx, dy);
     };
 
-    // Two-finger touch in edit mode: vertical pan + pinch zoom.
+    // Two-finger touch in edit mode: pan + pinch zoom.
     // Single-finger touch is left to the contentEditable for cursor
     // placement / selection.
     this._handleTouchStart = (evt) => {
@@ -88,11 +92,14 @@ export class CanvasViewport {
       if (evt.touches.length >= 2) {
         const t0 = evt.touches[0];
         const t1 = evt.touches[1];
-        this._touchPanLastY = (t0.clientY + t1.clientY) / 2;
+        this._touchPanLast = {
+          x: (t0.clientX + t1.clientX) / 2,
+          y: (t0.clientY + t1.clientY) / 2,
+        };
         this._touchPinchLastDist = touchDistance(t0, t1);
         evt.preventDefault();
       } else {
-        this._touchPanLastY = null;
+        this._touchPanLast = null;
         this._touchPinchLastDist = null;
       }
     };
@@ -103,7 +110,7 @@ export class CanvasViewport {
       }
       if (
         evt.touches.length < 2 ||
-        this._touchPanLastY == null ||
+        this._touchPanLast == null ||
         this._touchPinchLastDist == null
       ) {
         return;
@@ -113,13 +120,21 @@ export class CanvasViewport {
 
       const t0 = evt.touches[0];
       const t1 = evt.touches[1];
-      const avgY = (t0.clientY + t1.clientY) / 2;
+      const avg = {
+        x: (t0.clientX + t1.clientX) / 2,
+        y: (t0.clientY + t1.clientY) / 2,
+      };
       const dist = touchDistance(t0, t1);
 
-      // Pan (vertical only).
-      const dy = avgY - this._touchPanLastY;
-      this._offset.y += dy / this._zoom;
-      this._touchPanLastY = avgY;
+      // Pan only along the edited element's page axis.
+      const dx = avg.x - this._touchPanLast.x;
+      const dy = avg.y - this._touchPanLast.y;
+      if (this.editModePanAxis === 'horizontal') {
+        this._offset.x += dx / this._zoom;
+      } else {
+        this._offset.y += dy / this._zoom;
+      }
+      this._touchPanLast = avg;
 
       // Pinch zoom around viewport center (consistent with wheel).
       if (this._touchPinchLastDist > 0 && dist > 0) {
@@ -133,7 +148,7 @@ export class CanvasViewport {
 
     this._handleTouchEnd = (evt) => {
       if (evt.touches.length < 2) {
-        this._touchPanLastY = null;
+        this._touchPanLast = null;
         this._touchPinchLastDist = null;
       }
     };
@@ -184,6 +199,20 @@ export class CanvasViewport {
     for (const listener of this._viewListeners) {
       listener();
     }
+  }
+
+  public setEditMode(
+    editMode: boolean,
+    options: { panAxis?: EditModePanAxis } = {},
+  ): void {
+    const nextPanAxis = options.panAxis ?? 'vertical';
+    if (this.editMode === editMode && this.editModePanAxis === nextPanAxis) {
+      return;
+    }
+    this.editMode = editMode;
+    this.editModePanAxis = nextPanAxis;
+    this._touchPanLast = null;
+    this._touchPinchLastDist = null;
   }
 
   public panBy(dx: number, dy: number): void {

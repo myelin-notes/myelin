@@ -1,3 +1,4 @@
+import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PdfElement } from '../elements/pdf-element';
 import { getPdfPageSizes } from '../pdf-renderer';
@@ -10,7 +11,9 @@ export async function pdfImportHandler(
 ) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const pageSizes = await getPdfPageSizes(bytes);
-  const pdf = canvas.addElement((uuid) => new PdfElement(uuid));
+  const pdf = canvas.addElement(
+    (uuid) => new PdfElement(uuid, UserPrefs.get('defaultPageLayout')),
+  );
   const fileName = blob instanceof File ? blob.name : '';
   pdf.setInitialPdfData(bytes, fileName, pageSizes);
 

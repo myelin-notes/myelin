@@ -1,4 +1,8 @@
-import { Download as DownloadIcon } from 'lucide-react';
+import {
+  Columns3 as ColumnsIcon,
+  Download as DownloadIcon,
+  Rows3 as RowsIcon,
+} from 'lucide-react';
 import { Selection } from 'prosemirror-state';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
@@ -29,6 +33,7 @@ import {
   PAGE_GAP,
   PAGE_HEIGHT,
   PAGE_WIDTH,
+  type PageLayout,
 } from './page-frame-constants';
 
 export {
@@ -49,6 +54,7 @@ export class PageFrameElement extends DrawableElement {
   private _pageWidth = PAGE_WIDTH;
   private _pageHeight = PAGE_HEIGHT;
   private _displayName: string;
+  private _pageLayout: PageLayout;
   private _editing = false;
   private _numPages = 1;
   private _noteLinkResolver?: NoteLinkResolver;
@@ -77,9 +83,14 @@ export class PageFrameElement extends DrawableElement {
     this._contentDiv = contentDiv;
   }
 
-  constructor(uuid: string, displayName?: string) {
+  constructor(
+    uuid: string,
+    displayName?: string,
+    pageLayout: PageLayout = 'vertical',
+  ) {
     super(uuid, ElementType.PAGE_FRAME);
     this._displayName = displayName ?? DEFAULT_PAGE_FRAME_DISPLAY_NAME;
+    this._pageLayout = pageLayout;
   }
 
   public setNoteLinkResolver(resolveNoteLink?: NoteLinkResolver): void {
@@ -137,6 +148,7 @@ export class PageFrameElement extends DrawableElement {
       displayName: this._displayName,
       pageWidth: this._pageWidth,
       pageHeight: this._pageHeight,
+      pageLayout: this._pageLayout,
     };
   }
 
@@ -165,6 +177,9 @@ export class PageFrameElement extends DrawableElement {
       pageHeight: (v) => {
         this._pageHeight = v as number;
       },
+      pageLayout: (v) => {
+        this._pageLayout = v === 'horizontal' ? 'horizontal' : 'vertical';
+      },
     });
   }
 
@@ -180,6 +195,9 @@ export class PageFrameElement extends DrawableElement {
   public get displayName(): string {
     return this._displayName;
   }
+  public get pageLayout(): PageLayout {
+    return this._pageLayout;
+  }
   public setDisplayName(displayName: string): void {
     const next = normalizePageFrameDisplayName(displayName);
     const previous = this._displayName;
@@ -190,6 +208,13 @@ export class PageFrameElement extends DrawableElement {
     this.syncToYMap({ displayName: next });
     this._onDisplayNameRenamed?.(this.uuid, next, previous);
   }
+  public setPageLayout(pageLayout: PageLayout): void {
+    if (pageLayout === this._pageLayout) {
+      return;
+    }
+    this._pageLayout = pageLayout;
+    this.syncToYMap({ pageLayout });
+  }
   public get numPages(): number {
     return this._numPages;
   }
@@ -197,8 +222,19 @@ export class PageFrameElement extends DrawableElement {
     this._numPages = n;
   }
 
+  public get totalWidth(): number {
+    const n = this._numPages;
+    if (this._pageLayout === 'horizontal') {
+      return n * this._pageWidth + Math.max(0, n - 1) * PAGE_GAP;
+    }
+    return this._pageWidth;
+  }
+
   public get totalHeight(): number {
     const n = this._numPages;
+    if (this._pageLayout === 'horizontal') {
+      return this._pageHeight;
+    }
     return n * this._pageHeight + Math.max(0, n - 1) * PAGE_GAP;
   }
 
@@ -206,7 +242,7 @@ export class PageFrameElement extends DrawableElement {
     return new DOMRect(
       -CHROME_SIDE_PADDING,
       -CHROME_HEADER_HEIGHT,
-      this._pageWidth + CHROME_SIDE_PADDING * 2,
+      this.totalWidth + CHROME_SIDE_PADDING * 2,
       this.totalHeight + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
     );
   }
@@ -220,18 +256,27 @@ export class PageFrameElement extends DrawableElement {
     // Chrome (surrounding frame + header) hit area
     if (
       x >= -CHROME_SIDE_PADDING &&
-      x <= this._pageWidth + CHROME_SIDE_PADDING &&
+      x <= this.totalWidth + CHROME_SIDE_PADDING &&
       y >= -CHROME_HEADER_HEIGHT &&
       y <= this.totalHeight + CHROME_BOTTOM_PADDING
     ) {
       return true;
     }
-    if (x < 0 || x > this._pageWidth) {
-      return false;
-    }
     for (let p = 0; p < this._numPages; p++) {
-      const pageTop = p * (this._pageHeight + PAGE_GAP);
-      if (y >= pageTop && y <= pageTop + this._pageHeight) {
+      const pageLeft =
+        this._pageLayout === 'horizontal'
+          ? p * (this._pageWidth + PAGE_GAP)
+          : 0;
+      const pageTop =
+        this._pageLayout === 'horizontal'
+          ? 0
+          : p * (this._pageHeight + PAGE_GAP);
+      if (
+        x >= pageLeft &&
+        x <= pageLeft + this._pageWidth &&
+        y >= pageTop &&
+        y <= pageTop + this._pageHeight
+      ) {
         return true;
       }
     }
@@ -263,20 +308,31 @@ export class PageFrameElement extends DrawableElement {
     if (UserPrefs.get('pageFrameEditFitWholePage')) {
       const sx = Math.abs(this._scale.x);
       const sy = Math.abs(this._scale.y);
-      const focusWorldY =
+      const focusWorld =
         screenX != null && screenY != null
-          ? canvas.viewport.screenToWorld({ x: screenX, y: screenY }).y
-          : this.offset.y + (this._pageHeight * sy) / 2;
-
-      const pageStride = this._pageHeight + PAGE_GAP;
-      const localFocusY = (focusWorldY - this.offset.y) / sy;
+          ? canvas.viewport.screenToWorld({ x: screenX, y: screenY })
+          : {
+              x: this.offset.x + (this._pageWidth * sx) / 2,
+              y: this.offset.y + (this._pageHeight * sy) / 2,
+            };
+      const pageStride =
+        this._pageLayout === 'horizontal'
+          ? this._pageWidth + PAGE_GAP
+          : this._pageHeight + PAGE_GAP;
+      const localFocus =
+        this._pageLayout === 'horizontal'
+          ? (focusWorld.x - this.offset.x) / sx
+          : (focusWorld.y - this.offset.y) / sy;
       const pageIndex = Math.min(
         Math.max(0, this._numPages - 1),
-        Math.max(0, Math.floor(localFocusY / pageStride)),
+        Math.max(0, Math.floor(localFocus / pageStride)),
       );
-      const pageTop = pageIndex * pageStride;
+      const pageLeft =
+        this._pageLayout === 'horizontal' ? pageIndex * pageStride : 0;
+      const pageTop =
+        this._pageLayout === 'horizontal' ? 0 : pageIndex * pageStride;
       const focusRect = new DOMRect(
-        this.offset.x,
+        this.offset.x + pageLeft * sx,
         this.offset.y + pageTop * sy,
         this._pageWidth * sx,
         this._pageHeight * sy,
@@ -334,6 +390,20 @@ export class PageFrameElement extends DrawableElement {
 
   public getMenuItems(): ChromeMenuItem[] {
     return [
+      {
+        id: 'layout-vertical',
+        label: 'Vertical pages',
+        icon: RowsIcon,
+        checked: this._pageLayout === 'vertical',
+        onSelect: () => this.setPageLayout('vertical'),
+      },
+      {
+        id: 'layout-horizontal',
+        label: 'Horizontal pages',
+        icon: ColumnsIcon,
+        checked: this._pageLayout === 'horizontal',
+        onSelect: () => this.setPageLayout('horizontal'),
+      },
       {
         id: 'export-markdown',
         label: 'Export to Markdown',
