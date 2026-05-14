@@ -70,6 +70,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "react-devtools": "^7.0.1",
+    "react-devtools-core": "^7.0.1",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",

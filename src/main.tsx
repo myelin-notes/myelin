@@ -8,9 +8,8 @@ import * as Sentry from '@sentry/react';
 import { IS_DEV, MODE } from '@/lib/env';
 
 if (IS_DEV) {
-  // @ts-expect-error -- react-devtools has no type declarations; its only side
-  // effect is opening a WS connection to the standalone DevTools window.
-  await import('react-devtools');
+  const { connectToDevTools } = await import('react-devtools-core');
+  connectToDevTools({ host: 'localhost', port: 8097 });
 }
 
 Sentry.init({
