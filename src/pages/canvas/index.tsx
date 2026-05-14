@@ -29,7 +29,7 @@ import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
 import { InsertPopover } from './components/insert-popover';
 import { PeerSyncPanel } from './components/peer-sync-panel';
-import { SelectionReorderToolbar } from './components/selection-reorder-toolbar';
+import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
 import { ElementType } from './elements/element-type';
@@ -315,7 +315,7 @@ function CanvasViewInner() {
 
       <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
       {engine.ready && (
-        <SelectionReorderToolbar drawableCanvasRef={drawableCanvasRef} />
+        <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />
       )}
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />

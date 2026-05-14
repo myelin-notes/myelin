@@ -1,9 +1,22 @@
+import type { LucideIcon } from 'lucide-react';
 import type * as Y from 'yjs';
+import type { Messages } from '@/lib/i18n/messages';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
 import type { ElementType } from './element-type';
+
+export interface SelectionToolbarItem {
+  /** Stable id within an element's items, used as React key. */
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  /** Render the button in an active/pressed style. */
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}
 
 const SELECTION_STROKE = '#2f3e46';
 const HANDLE_SIZE = 6;
@@ -414,6 +427,15 @@ export abstract class DrawableElement {
       });
     }
     return result;
+  }
+
+  /**
+   * Buttons this element contributes to the selection toolbar when it is the
+   * sole selected element. Default: none. Override to expose element-specific
+   * actions (e.g. crop on image).
+   */
+  public getSelectionToolbarItems(_strings: Messages): SelectionToolbarItem[] {
+    return [];
   }
 
   /** Called once when a resize drag begins. Snapshot any baseline state here. */
