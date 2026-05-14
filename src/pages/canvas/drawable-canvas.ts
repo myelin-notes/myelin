@@ -43,8 +43,85 @@ type YElementsDeepEvents = Parameters<YElementsDeepObserver>[0];
 type YElementsDeepTransaction = Parameters<YElementsDeepObserver>[1];
 type YElementsDeepEvent = YElementsDeepEvents[number];
 
+const ELEMENT_Z_ORDER_KEY = 'zOrder';
+
 function isBackgroundElement(type: ElementType): boolean {
   return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
+}
+
+function getElementLayer(type: ElementType): number {
+  return isBackgroundElement(type) ? 0 : 1;
+}
+
+export type ElementReorderDirection = 'higher' | 'lower';
+
+export interface ElementOrderItem {
+  uuid: string;
+  type: ElementType;
+}
+
+function canSwapElementOrder(
+  a: ElementOrderItem,
+  b: ElementOrderItem,
+  selectedUuids: ReadonlySet<string>,
+): boolean {
+  return (
+    getElementLayer(a.type) === getElementLayer(b.type) &&
+    selectedUuids.has(a.uuid) &&
+    !selectedUuids.has(b.uuid)
+  );
+}
+
+export function canMoveElementOrderForSelection(
+  items: readonly ElementOrderItem[],
+  selectedUuids: Iterable<string>,
+  direction: ElementReorderDirection,
+): boolean {
+  const selected = new Set(selectedUuids);
+  if (selected.size === 0) {
+    return false;
+  }
+
+  if (direction === 'higher') {
+    for (let i = 0; i < items.length - 1; i++) {
+      if (canSwapElementOrder(items[i], items[i + 1], selected)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  for (let i = 1; i < items.length; i++) {
+    if (canSwapElementOrder(items[i], items[i - 1], selected)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function moveElementOrderForSelection(
+  items: readonly ElementOrderItem[],
+  selectedUuids: Iterable<string>,
+  direction: ElementReorderDirection,
+): string[] {
+  const selected = new Set(selectedUuids);
+  const next = [...items];
+
+  if (direction === 'higher') {
+    for (let i = next.length - 2; i >= 0; i--) {
+      if (canSwapElementOrder(next[i], next[i + 1], selected)) {
+        [next[i], next[i + 1]] = [next[i + 1], next[i]];
+      }
+    }
+  } else {
+    for (let i = 1; i < next.length; i++) {
+      if (canSwapElementOrder(next[i], next[i - 1], selected)) {
+        [next[i], next[i - 1]] = [next[i - 1], next[i]];
+      }
+    }
+  }
+
+  return next.map((item) => item.uuid);
 }
 
 export class DrawableCanvas {
@@ -106,6 +183,14 @@ export class DrawableCanvas {
   private _placementCleanup: (() => void) | null = null;
   private onPlacementEnd?: () => void;
 
+  /**
+   * Listeners notified when selection, element set, element order, edit mode,
+   * or placement state changes — anything that affects view layers like the
+   * selection reorder toolbar. Viewport pan/zoom uses a separate channel on
+   * CanvasViewport.
+   */
+  private _changeListeners = new Set<() => void>();
+
   public constructor(
     canvas: HTMLCanvasElement,
     ydoc: YDocManager,
@@ -155,28 +240,80 @@ export class DrawableCanvas {
    * Called once on construction for loaded documents.
    */
   private hydrateFromYDoc(): void {
-    const collected: DrawableElement[] = [];
     for (let i = 0; i < this._ydoc.elements.length; i++) {
       const yMap = this._ydoc.elements.get(i);
       const element = this.createElementFromYMap(yMap);
       if (element) {
-        collected.push(element);
         this._elements.set(element.uuid, element);
         this._yMapToElement.set(yMap, element);
       }
     }
-    // Sort: backgrounds (page frames, PDFs) first so other elements render on top.
-    collected.sort((a, b) => {
-      const aBg = isBackgroundElement(a.type) ? 0 : 1;
-      const bBg = isBackgroundElement(b.type) ? 0 : 1;
-      return aBg - bBg;
-    });
-    this._elementOrder = collected.map((e) => e.uuid);
-    this.invalidateOrderSnapshot();
+    this.rebuildElementOrderFromYDoc();
   }
 
   private invalidateOrderSnapshot(): void {
     this._orderedSnapshot = null;
+    this.notifyChange();
+  }
+
+  public onChange(listener: () => void): () => void {
+    this._changeListeners.add(listener);
+    return () => {
+      this._changeListeners.delete(listener);
+    };
+  }
+
+  private notifyChange(): void {
+    for (const listener of this._changeListeners) {
+      listener();
+    }
+  }
+
+  private getElementZOrderValue(
+    element: DrawableElement,
+    fallback: number,
+  ): number {
+    const value = element.yMap?.get(ELEMENT_Z_ORDER_KEY);
+    return typeof value === 'number' && Number.isFinite(value)
+      ? value
+      : fallback;
+  }
+
+  private rebuildElementOrderFromYDoc(): void {
+    const ordered: Array<{
+      element: DrawableElement;
+      arrayIndex: number;
+      zOrder: number;
+    }> = [];
+
+    for (let i = 0; i < this._ydoc.elements.length; i++) {
+      const yMap = this._ydoc.elements.get(i);
+      const element = this._yMapToElement.get(yMap);
+      if (!element) {
+        continue;
+      }
+      ordered.push({
+        element,
+        arrayIndex: i,
+        zOrder: this.getElementZOrderValue(element, i),
+      });
+    }
+
+    ordered.sort((a, b) => {
+      const layerDelta =
+        getElementLayer(a.element.type) - getElementLayer(b.element.type);
+      if (layerDelta !== 0) {
+        return layerDelta;
+      }
+      const orderDelta = a.zOrder - b.zOrder;
+      if (orderDelta !== 0) {
+        return orderDelta;
+      }
+      return a.arrayIndex - b.arrayIndex;
+    });
+
+    this._elementOrder = ordered.map(({ element }) => element.uuid);
+    this.invalidateOrderSnapshot();
   }
 
   /**
@@ -204,6 +341,14 @@ export class DrawableCanvas {
   }
 
   private configureElement(element: DrawableElement): void {
+    element.onSelectionChanged = () => {
+      this.notifyChange();
+    };
+    element.onTransformChanged = () => {
+      if (element.isSelected) {
+        this.notifyChange();
+      }
+    };
     if (element instanceof PageFrameElement) {
       element.setNoteLinkResolver(this.resolveNoteLink);
       element.setOnDisplayNameRenamed((uuid, newName, oldName) => {
@@ -235,6 +380,7 @@ export class DrawableCanvas {
     }
 
     let changedElementFields = false;
+    let changedElementOrder = false;
     const insertedMaps = new Set<Y.Map<unknown>>();
 
     for (const event of events) {
@@ -253,6 +399,9 @@ export class DrawableCanvas {
         if (insertedMaps.has(yMap)) {
           continue;
         }
+        if (event.keysChanged.has(ELEMENT_Z_ORDER_KEY)) {
+          changedElementOrder = true;
+        }
         changedElementFields =
           this.syncElementFromYMapEvent(yMap, event.keysChanged) ||
           changedElementFields;
@@ -270,6 +419,9 @@ export class DrawableCanvas {
 
     if (changedElementFields) {
       this.updateBounding();
+    }
+    if (changedElementOrder) {
+      this.rebuildElementOrderFromYDoc();
     }
   }
 
@@ -368,7 +520,7 @@ export class DrawableCanvas {
       );
     }
 
-    this.invalidateOrderSnapshot();
+    this.rebuildElementOrderFromYDoc();
     this.updateBounding();
     logger.debug('Applied external canvas element change', {
       origin: String(event.transaction.origin ?? 'unknown'),
@@ -419,6 +571,7 @@ export class DrawableCanvas {
     this._placement = ghost;
     this._toolCursor = 'copy';
     this.updateCursor();
+    this.notifyChange();
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -445,6 +598,7 @@ export class DrawableCanvas {
     this._toolCursor = 'default';
     this.updateCursor();
     this.onPlacementEnd?.();
+    this.notifyChange();
   }
 
   public getElementsByType(type: ElementType): DrawableElement[] {
@@ -511,6 +665,7 @@ export class DrawableCanvas {
     event?.stopPropagation();
 
     this._editingElement = element;
+    this.notifyChange();
     logger.debug('Entering canvas element edit mode', {
       uuid: element.uuid,
       type: describeElementType(element.type),
@@ -567,6 +722,7 @@ export class DrawableCanvas {
     element.exitEditMode();
     // Yjs captures changes automatically — no command to push
     this._editingElement = null;
+    this.notifyChange();
     this.syncViewportEditModePan();
     this.canvas.style.pointerEvents = '';
     this.canvas.style.zIndex = '10';
@@ -700,6 +856,107 @@ export class DrawableCanvas {
     return this.elements.filter((element) => element.isSelected);
   }
 
+  public getSelectedElementBounds(): DOMRect | null {
+    const selected = this.getSelectedElements();
+    if (selected.length === 0) {
+      return null;
+    }
+
+    let left = Number.POSITIVE_INFINITY;
+    let top = Number.POSITIVE_INFINITY;
+    let right = Number.NEGATIVE_INFINITY;
+    let bottom = Number.NEGATIVE_INFINITY;
+
+    for (const element of selected) {
+      const box = element.boundingBox;
+      left = Math.min(left, box.left);
+      top = Math.min(top, box.top);
+      right = Math.max(right, box.right);
+      bottom = Math.max(bottom, box.bottom);
+    }
+
+    return new DOMRect(left, top, right - left, bottom - top);
+  }
+
+  public getSelectedElementScreenBounds(): DOMRect | null {
+    const bounds = this.getSelectedElementBounds();
+    if (!bounds) {
+      return null;
+    }
+
+    const topLeft = this.viewport.worldToScreen({
+      x: bounds.left,
+      y: bounds.top,
+    });
+    const bottomRight = this.viewport.worldToScreen({
+      x: bounds.right,
+      y: bounds.bottom,
+    });
+
+    return new DOMRect(
+      Math.min(topLeft.x, bottomRight.x),
+      Math.min(topLeft.y, bottomRight.y),
+      Math.abs(bottomRight.x - topLeft.x),
+      Math.abs(bottomRight.y - topLeft.y),
+    );
+  }
+
+  private getElementOrderItems(): ElementOrderItem[] {
+    return this.elements.map((element) => ({
+      uuid: element.uuid,
+      type: element.type,
+    }));
+  }
+
+  public canReorderSelection(direction: ElementReorderDirection): boolean {
+    return canMoveElementOrderForSelection(
+      this.getElementOrderItems(),
+      this.getSelectedElements().map((element) => element.uuid),
+      direction,
+    );
+  }
+
+  public reorderSelection(direction: ElementReorderDirection): boolean {
+    const selectedUuids = this.getSelectedElements().map(
+      (element) => element.uuid,
+    );
+    if (
+      !canMoveElementOrderForSelection(
+        this.getElementOrderItems(),
+        selectedUuids,
+        direction,
+      )
+    ) {
+      return false;
+    }
+
+    this._elementOrder = moveElementOrderForSelection(
+      this.getElementOrderItems(),
+      selectedUuids,
+      direction,
+    );
+    this.invalidateOrderSnapshot();
+    this.persistCurrentElementOrder();
+    return true;
+  }
+
+  private persistCurrentElementOrder(): void {
+    this._ydoc.undoManager.stopCapturing();
+    this._ydoc.transact(() => {
+      for (let i = 0; i < this._elementOrder.length; i++) {
+        const yMap = this._elements.get(this._elementOrder[i])?.yMap;
+        if (!yMap) {
+          continue;
+        }
+        if (yMap.get(ELEMENT_Z_ORDER_KEY) === i) {
+          continue;
+        }
+        yMap.set(ELEMENT_Z_ORDER_KEY, i);
+      }
+    });
+    this._ydoc.undoManager.stopCapturing();
+  }
+
   public clearSelection(): void {
     for (const element of this._elements.values()) {
       element.unselect();
@@ -722,6 +979,42 @@ export class DrawableCanvas {
     }
   }
 
+  private getZOrderForInsertion(position: number, background: boolean): number {
+    const layer = background ? 0 : 1;
+    let before: DrawableElement | null = null;
+    let after: DrawableElement | null = null;
+
+    for (let i = position - 1; i >= 0; i--) {
+      const element = this._elements.get(this._elementOrder[i]);
+      if (element && getElementLayer(element.type) === layer) {
+        before = element;
+        break;
+      }
+    }
+    for (let i = position; i < this._elementOrder.length; i++) {
+      const element = this._elements.get(this._elementOrder[i]);
+      if (element && getElementLayer(element.type) === layer) {
+        after = element;
+        break;
+      }
+    }
+
+    if (before && after) {
+      return (
+        (this.getElementZOrderValue(before, position - 1) +
+          this.getElementZOrderValue(after, position)) /
+        2
+      );
+    }
+    if (before) {
+      return this.getElementZOrderValue(before, position - 1) + 1;
+    }
+    if (after) {
+      return this.getElementZOrderValue(after, position) - 1;
+    }
+    return position;
+  }
+
   public insertElementMap(
     yMap: Y.Map<unknown>,
     options?: { background?: boolean; position?: number },
@@ -739,6 +1032,10 @@ export class DrawableCanvas {
       ),
     );
 
+    yMap.set(
+      ELEMENT_Z_ORDER_KEY,
+      this.getZOrderForInsertion(position, background),
+    );
     this._ydoc.insertExistingElementMap(position, yMap);
 
     const element = this.createElementFromYMap(yMap);
@@ -858,18 +1155,21 @@ export class DrawableCanvas {
     this.configureElement(element);
 
     // Build the Y.Map properties from the element's current state
+    const background = isBackgroundElement(element.type);
+    const position = background ? 0 : this._elementOrder.length;
     const props: Record<string, unknown> = {
       offsetX: element.offset.x,
       offsetY: element.offset.y,
       scaleX: element.scale.x,
       scaleY: element.scale.y,
+      [ELEMENT_Z_ORDER_KEY]: this.getZOrderForInsertion(position, background),
       ...element.getYMapProps(),
     };
 
     // Create Y.Map and add to array (backgrounds go first so other elements
     // render on top of them).
     let yMap: Y.Map<unknown>;
-    if (isBackgroundElement(element.type)) {
+    if (background) {
       yMap = this._ydoc.insertElementMap(0, element.type, uuid, props);
       this._elementOrder.unshift(uuid);
     } else {

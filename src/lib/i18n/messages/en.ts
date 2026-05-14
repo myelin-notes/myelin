@@ -404,6 +404,11 @@ const en = {
       customizeWheel: 'Customize wheel',
       insert: 'Insert',
     },
+    selectionToolbar: {
+      label: 'Selection order',
+      moveHigher: 'Move forward',
+      moveLower: 'Move backward',
+    },
     insert: {
       title: 'Insert',
       soon: 'Soon',
