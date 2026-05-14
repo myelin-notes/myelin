@@ -39,8 +39,6 @@ import {
   getFrameChromeControlsLayer,
 } from './frame-chrome';
 import {
-  DEFAULT_PAGE_LAYOUT,
-  normalizePageLayout,
   PAGE_GAP,
   PAGE_HEIGHT,
   PAGE_WIDTH,
@@ -160,7 +158,7 @@ export class PdfElement extends DrawableElement {
   private _fileName: string = '';
   private _pageSizes: PdfPageSize[] = [DEFAULT_PAGE_SIZE];
   private _pageOrder: PdfPageOrderEntry[] = createDefaultPdfPageOrder(1);
-  private _pageLayout: PageLayout = DEFAULT_PAGE_LAYOUT;
+  private _pageLayout: PageLayout;
   private _pdfDocument: PDFDocumentProxy | null = null;
   private _chrome: FrameChrome | null = null;
   private _contentRoot: HTMLDivElement | null = null;
@@ -173,9 +171,9 @@ export class PdfElement extends DrawableElement {
     null;
   private _pageOrderCustom = false;
 
-  constructor(uuid: string, pageLayout: PageLayout = DEFAULT_PAGE_LAYOUT) {
+  constructor(uuid: string, pageLayout: PageLayout = 'vertical') {
     super(uuid, ElementType.PDF);
-    this._pageLayout = normalizePageLayout(pageLayout);
+    this._pageLayout = pageLayout;
   }
 
   public setExportElementsProvider(
@@ -229,7 +227,7 @@ export class PdfElement extends DrawableElement {
         this.applyPageOrder(this.normalizePageOrder(v, allowMissing));
       },
       pageLayout: (v) => {
-        const next = normalizePageLayout(v);
+        const next: PageLayout = v === 'horizontal' ? 'horizontal' : 'vertical';
         if (next !== this._pageLayout) {
           this._pageLayout = next;
           this._layout = null;
@@ -278,15 +276,14 @@ export class PdfElement extends DrawableElement {
   }
 
   public setPageLayout(pageLayout: PageLayout): void {
-    const next = normalizePageLayout(pageLayout);
-    if (next === this._pageLayout) {
+    if (pageLayout === this._pageLayout) {
       return;
     }
-    this._pageLayout = next;
+    this._pageLayout = pageLayout;
     this._layout = null;
     this.removeAllGapButtons();
     this.removeAllDeleteButtons();
-    this.syncToYMap({ pageLayout: next });
+    this.syncToYMap({ pageLayout });
   }
 
   public getMenuItems(): ChromeMenuItem[] {

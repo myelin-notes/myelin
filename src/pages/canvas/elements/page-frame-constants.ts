@@ -8,12 +8,6 @@ export const DEFAULT_PAGE_FRAME_DISPLAY_NAME = 'Page Frame';
 
 export type PageLayout = 'vertical' | 'horizontal';
 
-export const DEFAULT_PAGE_LAYOUT: PageLayout = 'vertical';
-
-export function normalizePageLayout(value: unknown): PageLayout {
-  return value === 'horizontal' ? 'horizontal' : DEFAULT_PAGE_LAYOUT;
-}
-
 export function normalizePageFrameDisplayName(displayName: unknown): string {
   const raw = typeof displayName === 'string' ? displayName : '';
   return raw.trim() || DEFAULT_PAGE_FRAME_DISPLAY_NAME;

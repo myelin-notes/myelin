@@ -3,7 +3,6 @@ import { YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
-  DEFAULT_PAGE_LAYOUT,
   PAGE_GAP,
   PAGE_HEIGHT,
   PAGE_WIDTH,
@@ -23,7 +22,7 @@ describe('PageFrameElement display name', () => {
       displayName: DEFAULT_PAGE_FRAME_DISPLAY_NAME,
       pageWidth: PAGE_WIDTH,
       pageHeight: PAGE_HEIGHT,
-      pageLayout: DEFAULT_PAGE_LAYOUT,
+      pageLayout: 'vertical',
     });
   });
 

@@ -2,7 +2,8 @@ import { Columns3, Rows3 } from 'lucide-react';
 import { useMessages } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
-import { cn } from '@/lib/utils';
+import { OptionsRow, type OptionsRowOption } from '../components/options-row';
+import { ToggleRow } from '../components/toggle-row';
 
 type DefaultPageLayout = 'vertical' | 'horizontal';
 
@@ -11,100 +12,6 @@ const MODIFIER_KEY_LABEL =
     ? '⌘'
     : 'Ctrl';
 
-function ToggleRow({
-  checked,
-  onToggle,
-  label,
-  description,
-}: {
-  checked: boolean;
-  onToggle: () => void;
-  label: string;
-  description: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onToggle}
-      className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 text-left transition-colors hover:bg-hover-tint"
-    >
-      <span className="min-w-0">
-        <span className="block font-medium text-sm text-text-primary">
-          {label}
-        </span>
-        <span className="mt-1 block text-text-muted text-xs leading-relaxed">
-          {description}
-        </span>
-      </span>
-      <span
-        className={cn(
-          'relative flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors',
-          checked ? 'bg-accent-dark' : 'bg-text-muted/20',
-        )}
-      >
-        <span
-          className={cn(
-            'size-4 rounded-full bg-card shadow-sm transition-transform',
-            checked ? 'translate-x-4' : 'translate-x-0',
-          )}
-        />
-      </span>
-    </button>
-  );
-}
-
-function OrientationRow({
-  value,
-  onChange,
-}: {
-  value: DefaultPageLayout;
-  onChange: (value: DefaultPageLayout) => void;
-}) {
-  const strings = useMessages();
-  const options = strings.settings.pageFrameEditing.defaultOrientation.options;
-  return (
-    <div className="flex w-full flex-col gap-3 rounded-xl bg-input px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <span className="min-w-0">
-        <span className="block font-medium text-sm text-text-primary">
-          {strings.settings.pageFrameEditing.defaultOrientation.label}
-        </span>
-        <span className="mt-1 block text-text-muted text-xs leading-relaxed">
-          {strings.settings.pageFrameEditing.defaultOrientation.description}
-        </span>
-      </span>
-      <span className="grid w-full shrink-0 grid-cols-2 gap-1 rounded-lg bg-card/70 p-1 sm:w-64">
-        {(
-          [
-            { value: 'vertical', label: options.vertical, Icon: Rows3 },
-            { value: 'horizontal', label: options.horizontal, Icon: Columns3 },
-          ] as const
-        ).map(({ value: optionValue, label, Icon }) => {
-          const selected = value === optionValue;
-          return (
-            <button
-              key={optionValue}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onChange(optionValue)}
-              className={cn(
-                'flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-medium text-xs transition-colors',
-                selected
-                  ? 'bg-accent-dark text-text-on-dark shadow-sm'
-                  : 'text-text-muted hover:text-text-primary',
-              )}
-            >
-              <Icon className="size-3.5" />
-              <span>{label}</span>
-            </button>
-          );
-        })}
-      </span>
-    </div>
-  );
-}
-
 export function EditingSection() {
   const strings = useMessages();
   const defaultPageLayout = useUserPref('defaultPageLayout');
@@ -112,6 +19,19 @@ export function EditingSection() {
   const noteLinkHoverPreview = useUserPref('noteLinkHoverPreview');
   const linkRequireModifier = useUserPref('linkRequireModifier');
   const alwaysRenameNoteReferences = useUserPref('alwaysRenameNoteReferences');
+
+  const orientationOptions =
+    strings.settings.pageFrameEditing.defaultOrientation.options;
+  const orientationRowOptions: ReadonlyArray<
+    OptionsRowOption<DefaultPageLayout>
+  > = [
+    { value: 'vertical', label: orientationOptions.vertical, Icon: Rows3 },
+    {
+      value: 'horizontal',
+      label: orientationOptions.horizontal,
+      Icon: Columns3,
+    },
+  ];
 
   const handleDefaultPageLayout = (layout: DefaultPageLayout) => {
     UserPrefs.set('defaultPageLayout', layout);
@@ -144,9 +64,14 @@ export function EditingSection() {
         </span>
       </div>
       <div className="space-y-2">
-        <OrientationRow
+        <OptionsRow
           value={defaultPageLayout}
           onChange={handleDefaultPageLayout}
+          label={strings.settings.pageFrameEditing.defaultOrientation.label}
+          description={
+            strings.settings.pageFrameEditing.defaultOrientation.description
+          }
+          options={orientationRowOptions}
         />
         <ToggleRow
           checked={pageFrameEditFitWholePage}

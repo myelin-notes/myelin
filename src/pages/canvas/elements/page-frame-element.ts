@@ -29,9 +29,7 @@ import {
 } from './frame-chrome';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
-  DEFAULT_PAGE_LAYOUT,
   normalizePageFrameDisplayName,
-  normalizePageLayout,
   PAGE_GAP,
   PAGE_HEIGHT,
   PAGE_WIDTH,
@@ -56,7 +54,7 @@ export class PageFrameElement extends DrawableElement {
   private _pageWidth = PAGE_WIDTH;
   private _pageHeight = PAGE_HEIGHT;
   private _displayName: string;
-  private _pageLayout: PageLayout = DEFAULT_PAGE_LAYOUT;
+  private _pageLayout: PageLayout;
   private _editing = false;
   private _numPages = 1;
   private _noteLinkResolver?: NoteLinkResolver;
@@ -88,11 +86,11 @@ export class PageFrameElement extends DrawableElement {
   constructor(
     uuid: string,
     displayName?: string,
-    pageLayout: PageLayout = DEFAULT_PAGE_LAYOUT,
+    pageLayout: PageLayout = 'vertical',
   ) {
     super(uuid, ElementType.PAGE_FRAME);
     this._displayName = displayName ?? DEFAULT_PAGE_FRAME_DISPLAY_NAME;
-    this._pageLayout = normalizePageLayout(pageLayout);
+    this._pageLayout = pageLayout;
   }
 
   public setNoteLinkResolver(resolveNoteLink?: NoteLinkResolver): void {
@@ -180,7 +178,7 @@ export class PageFrameElement extends DrawableElement {
         this._pageHeight = v as number;
       },
       pageLayout: (v) => {
-        this._pageLayout = normalizePageLayout(v);
+        this._pageLayout = v === 'horizontal' ? 'horizontal' : 'vertical';
       },
     });
   }
@@ -211,12 +209,11 @@ export class PageFrameElement extends DrawableElement {
     this._onDisplayNameRenamed?.(this.uuid, next, previous);
   }
   public setPageLayout(pageLayout: PageLayout): void {
-    const next = normalizePageLayout(pageLayout);
-    if (next === this._pageLayout) {
+    if (pageLayout === this._pageLayout) {
       return;
     }
-    this._pageLayout = next;
-    this.syncToYMap({ pageLayout: next });
+    this._pageLayout = pageLayout;
+    this.syncToYMap({ pageLayout });
   }
   public get numPages(): number {
     return this._numPages;
