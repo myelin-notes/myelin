@@ -28,7 +28,7 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
   const strings = useMessages();
   const locale = useLocale();
   const repository = useRepository();
-  const repositoryStatus = useRepositoryStatus();
+  const _repositoryStatus = useRepositoryStatus();
   const [backlinks, setBacklinks] = useState<NoteBacklink[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -58,7 +58,7 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
     return () => {
       cancelled = true;
     };
-  }, [noteId, repository, repositoryStatus.lastRemoteSyncAt]);
+  }, [noteId, repository]);
 
   useEffect(() => {
     if (!open) {
