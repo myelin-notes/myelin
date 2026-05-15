@@ -5,12 +5,7 @@ import App from './App';
 import { RepositoryProvider } from './lib/sync';
 import './index.css';
 import * as Sentry from '@sentry/react';
-import { IS_DEV, MODE } from '@/lib/env';
-
-if (IS_DEV) {
-  const { connectToDevTools } = await import('react-devtools-core');
-  connectToDevTools({ host: 'localhost', port: 8097 });
-}
+import { MODE } from '@/lib/env';
 
 Sentry.init({
   dsn: 'https://accc52ccd8d9f95fa75ef02fe44db0ca@o4511254895001600.ingest.us.sentry.io/4511254923247616',
