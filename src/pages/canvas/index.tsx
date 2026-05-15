@@ -77,6 +77,18 @@ function CanvasViewInner() {
     items: ChromeMenuItem[];
   } | null>(null);
 
+  const [zoomLocked, setZoomLocked] = useState(false);
+  const onToggleZoomLock = useCallback(() => {
+    setZoomLocked((prev) => {
+      const next = !prev;
+      drawableCanvasRef.current?.viewport.setZoomLocked(next);
+      return next;
+    });
+  }, []);
+  const onRecenterViewport = useCallback(() => {
+    drawableCanvasRef.current?.viewport.animateRecenter();
+  }, []);
+
   useEffect(() => {
     setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
     return () => setChromeMenuOpener(() => {});
@@ -313,7 +325,13 @@ function CanvasViewInner() {
         style={{ zIndex: 100 }}
       />
 
-      <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
+      <StatusBar
+        zoomLevel={engine.zoomLevel}
+        fps={engine.fps}
+        zoomLocked={zoomLocked}
+        onToggleZoomLock={onToggleZoomLock}
+        onRecenter={onRecenterViewport}
+      />
       {engine.ready && (
         <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />
       )}

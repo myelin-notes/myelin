@@ -36,6 +36,7 @@ export class CanvasViewport {
 
   private _onZoomChange?: (zoom: number) => void;
   private _viewListeners = new Set<() => void>();
+  private _zoomLocked: boolean = false;
 
   /**
    * When true, plain wheel/touch pan is restricted to the edit-mode axis,
@@ -62,7 +63,9 @@ export class CanvasViewport {
       evt.preventDefault();
       if (evt.ctrlKey) {
         // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures).
-        this.zoomAroundViewportCenter(this._zoom + evt.deltaY * -0.005);
+        if (!this._zoomLocked) {
+          this.zoomAroundViewportCenter(this._zoom + evt.deltaY * -0.005);
+        }
       } else {
         // Two-finger scroll on trackpad / mouse wheel → pan.
         // In edit mode, lock wheel pan to the edited element's page axis.
@@ -137,7 +140,11 @@ export class CanvasViewport {
       this._touchPanLast = avg;
 
       // Pinch zoom around viewport center (consistent with wheel).
-      if (this._touchPinchLastDist > 0 && dist > 0) {
+      if (
+        !this._zoomLocked &&
+        this._touchPinchLastDist > 0 &&
+        dist > 0
+      ) {
         this.zoomAroundViewportCenter(
           this._zoom * (dist / this._touchPinchLastDist),
         );
@@ -182,6 +189,12 @@ export class CanvasViewport {
   }
   public get isAnimatingView(): boolean {
     return this._viewAnim !== null;
+  }
+  public get zoomLocked(): boolean {
+    return this._zoomLocked;
+  }
+  public setZoomLocked(locked: boolean): void {
+    this._zoomLocked = locked;
   }
 
   public setOnZoomChange(cb: (zoom: number) => void): void {
@@ -321,6 +334,15 @@ export class CanvasViewport {
         this._viewAnim = null;
       },
     });
+  }
+
+  /**
+   * Animate the viewport so world (0, 0) is at the screen center, preserving
+   * the current zoom. Passing an empty fit object skips both zoom candidates
+   * so animateViewToFitRect keeps `this._zoom`.
+   */
+  public animateRecenter(): void {
+    this.animateViewToFitRect(new DOMRect(0, 0, 0, 0), {});
   }
 
   /** Stop any in-flight view animation. */
