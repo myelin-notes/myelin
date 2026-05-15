@@ -30,7 +30,7 @@ function CanvasPreview({
           'relative aspect-video overflow-hidden rounded-xl p-4 transition-all duration-200',
           selected
             ? 'bg-card shadow-ambient ring-2 ring-accent-navy/20'
-            : 'bg-input hover:bg-card hover:shadow-ambient',
+            : 'bg-input ring-1 ring-border-subtle/70 hover:bg-card hover:shadow-ambient',
         )}
       >
         {selected && (

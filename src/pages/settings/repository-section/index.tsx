@@ -154,7 +154,7 @@ export function RepositorySection() {
         </span>
       </div>
 
-      <div className="divide-y divide-border-divider/60 overflow-hidden rounded-xl bg-input ring-1 ring-border-subtle">
+      <div className="divide-y divide-border-divider/60 overflow-hidden rounded-xl bg-input ring-1 ring-border-subtle/70">
         <KindCard
           selected={config.kind === 'local'}
           onSelect={() => handleKindChange('local')}
