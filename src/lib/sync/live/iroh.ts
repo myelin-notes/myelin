@@ -109,6 +109,15 @@ export class IrohTransport implements Transport {
     }
   }
 
+  private markConnected(): void {
+    if (this._connected) {
+      return;
+    }
+
+    this._connected = true;
+    this.emit('connected');
+  }
+
   private matches(payload: NoteTransportPayload): boolean {
     return (
       payload.noteId === this.noteId && payload.transportId === this.transportId
@@ -124,6 +133,10 @@ export class IrohTransport implements Transport {
       if (!this.matches(event.payload)) {
         return;
       }
+
+      // The passive side can receive a gossip payload before Iroh reports
+      // NeighborUp. Treat the payload itself as proof of a live peer.
+      this.markConnected();
 
       const data = new Uint8Array(event.payload.data);
       logger.debug('Received transport payload', {
@@ -144,8 +157,7 @@ export class IrohTransport implements Transport {
           noteId: this.noteId,
           peerId: event.payload.peerId,
         });
-        this._connected = true;
-        this.emit('connected');
+        this.markConnected();
       },
     );
 
