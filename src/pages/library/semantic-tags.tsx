@@ -82,7 +82,7 @@ export function SemanticTags({
   };
 
   return (
-    <div className="flex flex-col gap-6 rounded-xl bg-surface p-6 sm:p-8">
+    <div className="flex flex-col gap-6 rounded-xl bg-surface p-6 ring-1 ring-border-subtle/70 sm:p-8">
       {/* Heading */}
       <div className="flex items-center justify-between">
         <h3 className="font-heading font-normal text-text-primary text-xl leading-7">
@@ -91,7 +91,7 @@ export function SemanticTags({
         {activeTags.size > 0 && (
           <button
             onClick={clearAll}
-            className="cursor-pointer font-bold text-[10px] text-text-muted uppercase tracking-[1px] transition-colors hover:text-text-secondary"
+            className="cursor-pointer rounded-lg px-2.5 py-1.5 font-bold text-[10px] text-text-muted uppercase tracking-[1px] ring-1 ring-border-subtle/70 transition-colors hover:bg-hover-tint hover:text-text-secondary"
           >
             {strings.common.clear}
           </button>
@@ -122,8 +122,8 @@ export function SemanticTags({
               className={cn(
                 'cursor-pointer rounded-xl px-3 py-1.5 font-medium text-xs transition-all',
                 isActive
-                  ? 'scale-[1.04] bg-tag-active text-text-on-dark'
-                  : 'bg-card text-text-secondary hover:bg-card-active hover:shadow-ambient',
+                  ? 'scale-[1.04] bg-tag-active text-text-on-dark ring-1 ring-accent-navy/20'
+                  : 'bg-card text-text-secondary ring-1 ring-border-subtle/70 hover:bg-card-active hover:shadow-ambient',
               )}
             >
               <span className="opacity-50">#</span>
@@ -142,7 +142,7 @@ export function SemanticTags({
       </div>
 
       {/* Insights */}
-      <div className="flex flex-col gap-3 rounded-lg bg-page p-4">
+      <div className="flex flex-col gap-3 rounded-lg bg-page p-4 ring-1 ring-border-subtle/70">
         <h4 className="font-heading font-normal text-sm text-text-secondary italic">
           {strings.library.semanticTags.insights}
         </h4>

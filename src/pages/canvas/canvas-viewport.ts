@@ -141,11 +141,7 @@ export class CanvasViewport {
       this._touchPanLast = avg;
 
       // Pinch zoom around viewport center (consistent with wheel).
-      if (
-        !this._zoomLocked &&
-        this._touchPinchLastDist > 0 &&
-        dist > 0
-      ) {
+      if (!this._zoomLocked && this._touchPinchLastDist > 0 && dist > 0) {
         this.zoomAroundViewportCenter(
           this._zoom * (dist / this._touchPinchLastDist),
         );

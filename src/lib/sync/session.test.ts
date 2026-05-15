@@ -105,13 +105,14 @@ describe('NoteSession local change listeners', () => {
 
   it('does not enter pushing phase when saving with no unsynced changes', async () => {
     const ydoc = new YDocManager();
-    const pushUpdates = vi.fn<
-      (
-        nodeId: VFSNodeId,
-        update: Uint8Array,
-        options: YjsSyncPushOptions,
-      ) => Promise<YjsSyncPushResult>
-    >();
+    const pushUpdates =
+      vi.fn<
+        (
+          nodeId: VFSNodeId,
+          update: Uint8Array,
+          options: YjsSyncPushOptions,
+        ) => Promise<YjsSyncPushResult>
+      >();
 
     const session = new NoteSession(
       'note-1',

@@ -27,7 +27,7 @@ export function StatusBar({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
-      className="absolute right-6 bottom-6 z-[100] inline-flex items-center gap-1 rounded-xl bg-white/80 py-2 pr-3 pl-2 shadow-ambient backdrop-blur-[24px]"
+      className="absolute right-4 bottom-3 z-[100] inline-flex select-none items-center gap-1 rounded-xl bg-card py-2 pr-3 pl-2 ring-1 ring-border-subtle/70"
     >
       <button
         type="button"

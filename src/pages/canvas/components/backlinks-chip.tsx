@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLocale, useMessages } from '@/lib/i18n';
@@ -28,12 +28,12 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
   const strings = useMessages();
   const locale = useLocale();
   const repository = useRepository();
-  const _repositoryStatus = useRepositoryStatus();
+  const repositoryStatus = useRepositoryStatus();
   const [backlinks, setBacklinks] = useState<NoteBacklink[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  const loadBacklinks = useCallback(() => {
     if (!noteId) {
       setBacklinks([]);
       return;
@@ -59,6 +59,14 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
       cancelled = true;
     };
   }, [noteId, repository]);
+
+  useEffect(() => loadBacklinks(), [loadBacklinks]);
+
+  useEffect(() => {
+    if (repositoryStatus.lastRemoteSyncAt !== null) {
+      return loadBacklinks();
+    }
+  }, [loadBacklinks, repositoryStatus.lastRemoteSyncAt]);
 
   useEffect(() => {
     if (!open) {
@@ -101,7 +109,7 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
         aria-expanded={open}
         aria-label={strings.canvas.backlinks.title}
         className={cn(
-          'flex h-7 cursor-pointer items-center gap-1.5 rounded-md bg-surface/70 px-2 text-text-secondary text-xs transition-colors',
+          'flex h-7 cursor-pointer items-center gap-1.5 rounded-md bg-surface px-2 text-text-secondary text-xs transition-colors',
           'hover:bg-surface hover:text-text-primary',
           open && 'bg-surface text-text-primary',
         )}

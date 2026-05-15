@@ -21,7 +21,7 @@ export function OptionsRow<T extends string>({
   options: ReadonlyArray<OptionsRowOption<T>>;
 }) {
   return (
-    <div className="flex w-full flex-col gap-3 rounded-xl bg-input px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex w-full flex-col gap-3 rounded-xl bg-input px-4 py-3 ring-1 ring-border-subtle/70 sm:flex-row sm:items-center sm:justify-between">
       <span className="min-w-0">
         <span className="block font-medium text-sm text-text-primary">
           {label}
@@ -31,7 +31,7 @@ export function OptionsRow<T extends string>({
         </span>
       </span>
       <span
-        className="grid w-full shrink-0 gap-1 rounded-lg bg-card/70 p-1 sm:w-64"
+        className="grid w-full shrink-0 gap-1 rounded-lg bg-card/70 p-1 ring-1 ring-border-ghost sm:w-64"
         style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
       >
         {options.map(({ value: optionValue, label: optionLabel, Icon }) => {

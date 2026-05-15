@@ -17,7 +17,7 @@ export function ToggleRow({
       role="switch"
       aria-checked={checked}
       onClick={onToggle}
-      className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 text-left transition-colors hover:bg-hover-tint"
+      className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 text-left ring-1 ring-border-subtle/70 transition-colors hover:bg-hover-tint"
     >
       <span className="min-w-0">
         <span className="block font-medium text-sm text-text-primary">

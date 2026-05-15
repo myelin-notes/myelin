@@ -41,7 +41,7 @@ export function LanguageSection() {
         </span>
       </div>
       <DropdownMenu>
-        <DropdownMenuTrigger className="group flex w-full max-w-xs cursor-pointer items-center justify-between rounded-xl bg-input px-4 py-3 text-sm transition-colors hover:bg-hover-tint">
+        <DropdownMenuTrigger className="group flex w-full max-w-xs cursor-pointer items-center justify-between rounded-xl bg-input px-4 py-3 text-sm ring-1 ring-border-subtle/70 transition-colors hover:bg-hover-tint">
           <div className="flex items-center gap-3">
             <span className="font-medium text-[10px] text-text-muted uppercase tracking-widest">
               {selectedLang.code.split('-')[0]}

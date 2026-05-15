@@ -110,11 +110,11 @@ export const FrameChromeView = forwardRef<
     <>
       <div
         ref={surfaceRef}
-        className="absolute inset-0 overflow-visible bg-surface"
+        className="absolute inset-0 overflow-visible bg-card"
         style={{
           borderRadius: 'inherit',
           boxShadow:
-            '0 1px 2px rgba(25, 28, 30, 0.03), 0 18px 44px rgba(25, 28, 30, 0.07)',
+            '0 0 0 1px rgba(28, 39, 56, 0.10), 0 1px 2px rgba(25, 28, 30, 0.06), 0 10px 20px -8px rgba(25, 28, 30, 0.10), 0 36px 72px -24px rgba(25, 28, 30, 0.22)',
           pointerEvents: 'none',
         }}
       >
