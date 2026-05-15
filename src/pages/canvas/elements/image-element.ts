@@ -1,7 +1,8 @@
 import { Crop as CropIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import type { Messages } from '@/lib/i18n/messages';
-import type { Vector2 } from '../drawable-canvas';
+import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import type { YDocManager } from '../ydoc-manager';
 import {
   DrawableElement,
   type ResizeHandle,
@@ -41,6 +42,8 @@ export class ImageElement extends DrawableElement {
   private _cropKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   private _cropResizeBaseline: CropResizeBaseline | null = null;
   private _cropEntrySnapshot: CropEntrySnapshot | null = null;
+  private _ydoc: YDocManager | null = null;
+  private _editingCropCanvas: DrawableCanvas | null = null;
 
   public constructor(uuid: string) {
     super(uuid, ElementType.IMAGE);
@@ -98,6 +101,10 @@ export class ImageElement extends DrawableElement {
     return this._cropMode;
   }
 
+  public override get editable(): boolean {
+    return this._bitmap !== null && this._naturalWidth !== 0;
+  }
+
   public async setImageData(data: ArrayBuffer) {
     const blob = new Blob([data]);
     this._bitmap = await createImageBitmap(blob);
@@ -120,12 +127,6 @@ export class ImageElement extends DrawableElement {
   }
 
   private updateBox() {
-    if (this._cropW === 0) {
-      this._cropW = this._naturalWidth;
-    }
-    if (this._cropH === 0) {
-      this._cropH = this._naturalHeight;
-    }
     this.box = new DOMRect(0, 0, this._cropW, this._cropH);
   }
 
@@ -170,10 +171,15 @@ export class ImageElement extends DrawableElement {
     this.updateBox();
   }
 
+  public override bindSharedYState(ydoc: YDocManager): void {
+    this._ydoc = ydoc;
+  }
+
   public enterCropMode(): void {
     if (this._cropMode || !this._bitmap || this._naturalWidth === 0) {
       return;
     }
+    this._ydoc?.undoManager.stopCapturing();
     this._cropMode = true;
     this._cropEntrySnapshot = {
       cropX: this._cropX,
@@ -204,6 +210,7 @@ export class ImageElement extends DrawableElement {
     }
     this._cropResizeBaseline = null;
     this._cropEntrySnapshot = null;
+    this._ydoc?.undoManager.stopCapturing();
     this.onTransformChanged?.();
   }
 
@@ -231,10 +238,27 @@ export class ImageElement extends DrawableElement {
 
   public toggleCropMode(): void {
     if (this._cropMode) {
+      // Toolbar "Apply Crop" is the only commit path. Commit first, then
+      // tear down edit mode — the subsequent exitEditMode will see
+      // _cropMode === false and its cancel is a no-op.
       this.exitCropMode();
+      this._editingCropCanvas?.exitElementEdit();
     } else {
       this.enterCropMode();
     }
+  }
+
+  public override enterEditMode(canvas: DrawableCanvas): HTMLElement | null {
+    this._editingCropCanvas = canvas;
+    this.enterCropMode();
+    return null;
+  }
+
+  public override exitEditMode(): void {
+    // Default exit (click-outside, canvas Escape) reverts; explicit
+    // apply via toggleCropMode commits before reaching here.
+    this.cancelCropMode();
+    this._editingCropCanvas = null;
   }
 
   public override getSelectionToolbarItems(
@@ -257,7 +281,7 @@ export class ImageElement extends DrawableElement {
   }
 
   public override unselect(): void {
-    this.exitCropMode();
+    this.cancelCropMode();
     super.unselect();
   }
 
@@ -307,10 +331,12 @@ export class ImageElement extends DrawableElement {
       const newWorldW = Math.abs(opts.ratioX) * Math.abs(bcw * sx);
       const maxCw =
         h.anchorFx === 1 ? anchorNaturalX : this._naturalWidth - anchorNaturalX;
-      newCw = Math.min(
-        maxCw,
-        Math.max(MIN_CROP_NATURAL, newWorldW / Math.abs(sx)),
-      );
+      if (maxCw >= MIN_CROP_NATURAL) {
+        newCw = Math.min(
+          maxCw,
+          Math.max(MIN_CROP_NATURAL, newWorldW / Math.abs(sx)),
+        );
+      }
     }
     if (h.scaleY) {
       const newWorldH = Math.abs(opts.ratioY) * Math.abs(bch * sy);
@@ -318,10 +344,12 @@ export class ImageElement extends DrawableElement {
         h.anchorFy === 1
           ? anchorNaturalY
           : this._naturalHeight - anchorNaturalY;
-      newCh = Math.min(
-        maxCh,
-        Math.max(MIN_CROP_NATURAL, newWorldH / Math.abs(sy)),
-      );
+      if (maxCh >= MIN_CROP_NATURAL) {
+        newCh = Math.min(
+          maxCh,
+          Math.max(MIN_CROP_NATURAL, newWorldH / Math.abs(sy)),
+        );
+      }
     }
 
     const newCx =

@@ -10,6 +10,7 @@ import type {
   DrawableElement,
   ResizeHandle,
 } from '../elements/drawable-element';
+import { ElementType } from '../elements/element-type';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const HANDLE_HIT_RADIUS = 10;
@@ -128,7 +129,7 @@ export class SelectTool implements ITool {
       }
     }
 
-    // 2. Double-click detection for page frame editing
+    // 2. Double-click detection for element editing
     const now = Date.now();
     const dx = point.x - this.lastClickPos.x;
     const dy = point.y - this.lastClickPos.y;
@@ -138,7 +139,10 @@ export class SelectTool implements ITool {
     if (isDoubleClick) {
       for (let i = canvas.elements.length - 1; i >= 0; i--) {
         const e = canvas.elements[i];
-        if (e.editable && CollisionHelper.inBox(point, e.boundingBox)) {
+        if (!CollisionHelper.inBox(point, e.boundingBox)) {
+          continue;
+        }
+        if (e.editable) {
           for (const el of canvas.elements) {
             if (el !== e) {
               el.unselect();
@@ -190,6 +194,13 @@ export class SelectTool implements ITool {
 
       const wasAlreadySelected = pick.isSelected;
 
+      if (
+        canvas.isCanvasInteractiveEditMode &&
+        canvas.editingElement !== pick
+      ) {
+        canvas.exitElementEdit();
+      }
+
       if (!wasAlreadySelected) {
         for (const e of canvas.elements) {
           e.unselect();
@@ -204,13 +215,21 @@ export class SelectTool implements ITool {
 
       // Clicking an already-selected editable element (without dragging)
       // re-enters edit mode.
-      if (pick.editable && wasAlreadySelected && !this.pendingCycle) {
+      if (
+        pick.editable &&
+        pick.type !== ElementType.IMAGE &&
+        wasAlreadySelected &&
+        !this.pendingCycle
+      ) {
         this.clickToEditCandidate = pick;
       }
       return;
     }
 
     // 3. Empty space → marquee or lasso
+    if (canvas.isCanvasInteractiveEditMode) {
+      canvas.exitElementEdit();
+    }
     this.lastCycledElement = null;
     if (this.selectionStyle === 'lasso') {
       this.mode = SelectMode.Lasso;

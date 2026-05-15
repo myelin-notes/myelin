@@ -109,7 +109,10 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
       const toolbar = toolbarRef.current;
       let bounds: DOMRect | null = null;
       let nextState = HIDDEN_STATE;
-      if (!canvas.editingElement && !canvas.isPlacing) {
+      if (
+        (!canvas.editingElement || canvas.isCanvasInteractiveEditMode) &&
+        !canvas.isPlacing
+      ) {
         bounds = canvas.getSelectedElementScreenBounds();
         if (bounds) {
           nextState = {
