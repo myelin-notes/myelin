@@ -255,9 +255,10 @@ export class ImageElement extends DrawableElement {
   }
 
   public override exitEditMode(): void {
-    // Default exit (click-outside, canvas Escape) reverts; explicit
-    // apply via toggleCropMode commits before reaching here.
-    this.cancelCropMode();
+    // Commits the crop. Escape cancels via the element's own keydown handler
+    // registered in enterCropMode, which clears _cropMode before this runs,
+    // so the exitCropMode below becomes a no-op on Escape.
+    this.exitCropMode();
     this._editingCropCanvas = null;
   }
 
