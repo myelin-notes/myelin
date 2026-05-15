@@ -37,6 +37,7 @@ export class CanvasViewport {
   private _onZoomChange?: (zoom: number) => void;
   private _viewListeners = new Set<() => void>();
   private _zoomLocked: boolean = false;
+  private _contentBoundsProvider: (() => DOMRect | null) | null = null;
 
   /**
    * When true, plain wheel/touch pan is restricted to the edit-mode axis,
@@ -197,6 +198,17 @@ export class CanvasViewport {
     this._zoomLocked = locked;
   }
 
+  /**
+   * Provider for the world-space union bounds of content. Used to clamp pan
+   * so the user can pan content off-screen by a controlled amount but can't
+   * drift arbitrarily far into empty space. Return `null` to disable clamping.
+   */
+  public setContentBoundsProvider(
+    provider: (() => DOMRect | null) | null,
+  ): void {
+    this._contentBoundsProvider = provider;
+  }
+
   public setOnZoomChange(cb: (zoom: number) => void): void {
     this._onZoomChange = cb;
   }
@@ -209,6 +221,9 @@ export class CanvasViewport {
   }
 
   private notifyViewChange(): void {
+    if (!this._viewAnim) {
+      this.clampOffsetToContent();
+    }
     for (const listener of this._viewListeners) {
       listener();
     }
@@ -368,6 +383,36 @@ export class CanvasViewport {
     this._gestureTarget.removeEventListener(
       'touchend',
       this._handleTouchEnd as EventListener,
+    );
+  }
+
+  /**
+   * Clamp `_offset` so the viewport center stays within the content bounds
+   * inflated by ~3/4 viewport on each side — enough slack to pan content
+   * fully off-screen, not enough to drift so far the user can't find it. No
+   * provider / empty content → no clamp, so fresh documents stay free.
+   *
+   * Derivation: viewport center in world is `-offset + halfViewport`. We
+   * constrain that to `[bounds.left - slack, bounds.right + slack]`, then
+   * solve for `offset`.
+   */
+  private clampOffsetToContent(): void {
+    const bounds = this._contentBoundsProvider?.();
+    if (!bounds) {
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const halfVW = this.canvas.width / dpr / this._zoom / 2;
+    const halfVH = this.canvas.height / dpr / this._zoom / 2;
+    const slackX = halfVW * 1.5;
+    const slackY = halfVH * 1.5;
+    this._offset.x = Math.min(
+      halfVW - bounds.left + slackX,
+      Math.max(halfVW - bounds.right - slackX, this._offset.x),
+    );
+    this._offset.y = Math.min(
+      halfVH - bounds.top + slackY,
+      Math.max(halfVH - bounds.bottom - slackY, this._offset.y),
     );
   }
 

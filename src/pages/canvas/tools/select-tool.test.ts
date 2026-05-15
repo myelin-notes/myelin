@@ -50,7 +50,7 @@ function makeImageElement() {
   image.bindToYMap(yMap);
   (image as unknown as { _bitmap: ImageBitmap | null })._bitmap =
     {} as ImageBitmap;
-  return image;
+  return { image, ydoc };
 }
 
 function makeCanvas(elements: ImageElement[], point: Vector2) {
@@ -78,7 +78,7 @@ afterEach(() => {
 
 describe('SelectTool', () => {
   it('enters image crop mode on double-click', () => {
-    const image = makeImageElement();
+    const { image } = makeImageElement();
     const enterCropMode = vi
       .spyOn(image, 'enterCropMode')
       .mockImplementation(() => {});
@@ -100,7 +100,7 @@ describe('SelectTool', () => {
   });
 
   it('does not enter image crop mode on a single click of a selected image', () => {
-    const image = makeImageElement();
+    const { image } = makeImageElement();
     image.select();
     const enterCropMode = vi
       .spyOn(image, 'enterCropMode')
@@ -114,5 +114,23 @@ describe('SelectTool', () => {
 
     expect(enterCropMode).not.toHaveBeenCalled();
     expect(enterElementEdit).not.toHaveBeenCalled();
+  });
+
+  it('does not write element position when clicking to select without moving', () => {
+    const { image, ydoc } = makeImageElement();
+    const updates = vi.fn();
+    ydoc.doc.on('update', updates);
+    const point = { x: 10, y: 10 };
+    const { canvas } = makeCanvas([image], point);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, point);
+    tool.finish(canvas, event);
+
+    expect(image.isSelected).toBe(true);
+    expect(image.offset).toEqual({ x: 0, y: 0 });
+    expect(updates).not.toHaveBeenCalled();
   });
 });

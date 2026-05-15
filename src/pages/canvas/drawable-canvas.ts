@@ -207,6 +207,7 @@ export class DrawableCanvas {
     this.canvas.style.zIndex = '10';
     this.ctx = ctx!;
     this.viewport = new CanvasViewport(canvas);
+    this.viewport.setContentBoundsProvider(() => this.getContentBounds());
     this.state = new StateMachine(InteractState.Idle);
     this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
@@ -856,6 +857,24 @@ export class DrawableCanvas {
         element.syncDOM(this.viewport, host);
       }
     }
+  }
+
+  /**
+   * Union of element world-space bounding boxes. `null` when empty — viewport
+   * treats that as "no clamp" so fresh documents stay fully pannable.
+   */
+  public getContentBounds(): DOMRect | null {
+    const boxes = this.elements
+      .map((e) => e.boundingBox)
+      .filter((b) => b.width > 0 || b.height > 0);
+    if (boxes.length === 0) {
+      return null;
+    }
+    const left = Math.min(...boxes.map((b) => b.left));
+    const top = Math.min(...boxes.map((b) => b.top));
+    const right = Math.max(...boxes.map((b) => b.right));
+    const bottom = Math.max(...boxes.map((b) => b.bottom));
+    return new DOMRect(left, top, right - left, bottom - top);
   }
 
   public get elements(): DrawableElement[] {
