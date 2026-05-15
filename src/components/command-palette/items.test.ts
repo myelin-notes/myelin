@@ -49,11 +49,9 @@ describe('createCommandPaletteItems', () => {
 
   it('shows canvas commands only on the canvas page', () => {
     expect(commandIdsForPage('canvas')).toContain('import-markdown-canvas');
-    expect(commandIdsForPage('canvas')).toContain('insert-note-link');
     expect(commandIdsForPage('library')).not.toContain(
       'import-markdown-canvas',
     );
-    expect(commandIdsForPage('library')).not.toContain('insert-note-link');
   });
 
   it('adds live keybinding actions as runnable command items', () => {

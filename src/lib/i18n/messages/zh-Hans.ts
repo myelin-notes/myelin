@@ -169,6 +169,14 @@ const zhHans: typeof en = {
     pageFrameEditing: {
       title: '页面框编辑',
       eyebrow: '文档视图',
+      defaultOrientation: {
+        label: '默认页面方向',
+        description: '选择新页面框和 PDF 的页面排列方式。',
+        options: {
+          vertical: '纵向',
+          horizontal: '横向',
+        },
+      },
       fitWholePage: {
         label: '编辑时适配整页',
         description: '进入页面框编辑模式时缩小视图，显示完整页面高度。',
@@ -385,6 +393,13 @@ const zhHans: typeof en = {
       clickForOptions: '点击查看选项',
       customizeWheel: '自定义轮盘',
       insert: '插入',
+    },
+    selectionToolbar: {
+      label: '选区层级',
+      moveHigher: '前移一层',
+      moveLower: '后移一层',
+      crop: '裁剪',
+      applyCrop: '应用裁剪',
     },
     insert: {
       title: '插入',

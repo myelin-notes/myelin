@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import svgr from 'vite-plugin-svgr';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
@@ -34,6 +34,24 @@ export default defineConfig(async ({ mode }) => {
 
   return {
     plugins: [
+      {
+        // Inject the standalone React DevTools bootstrap script before any
+        // other <head> content so it installs __REACT_DEVTOOLS_GLOBAL_HOOK__
+        // before @vitejs/plugin-react's React Refresh preamble runs.
+        // Otherwise React Refresh installs a stub hook that breaks the
+        // DevTools component tree and profiler.
+        name: 'react-devtools',
+        apply: 'serve',
+        transformIndexHtml: {
+          order: 'pre',
+          handler(html: string) {
+            return html.replace(
+              '<head>',
+              '<head>\n    <script src="http://localhost:8097"></script>',
+            );
+          },
+        },
+      } satisfies Plugin,
       react({
         babel: {
           plugins: ['babel-plugin-react-compiler'],

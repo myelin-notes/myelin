@@ -262,6 +262,18 @@ export class NoteSession {
     }
 
     const targetChangeEpoch = this.changeEpoch;
+    if (targetChangeEpoch === this.flushedEpoch) {
+      logger.debug('Skipped note session push; already synced', {
+        nodeId: this.id,
+        changeEpoch: this.changeEpoch,
+        flushedEpoch: this.flushedEpoch,
+        remoteRevision: this.status.remoteRevision,
+        targetChangeEpoch,
+        ...summarizeYDocManager(this.ydoc),
+      });
+      return;
+    }
+
     logger.debug('Pushing note session updates', {
       nodeId: this.id,
       changeEpoch: this.changeEpoch,

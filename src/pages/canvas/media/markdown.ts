@@ -1,3 +1,4 @@
+import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameElement } from '../elements/page-frame-element';
 import { writeMarkdownToPageFrameFragment } from '../page-frame/markdown-import';
@@ -9,7 +10,10 @@ export async function markdownImportHandler(
   options: MediaImportOptions = {},
 ) {
   const text = await blob.text();
-  const pf = canvas.addElement((uuid) => new PageFrameElement(uuid));
+  const pf = canvas.addElement(
+    (uuid) =>
+      new PageFrameElement(uuid, undefined, UserPrefs.get('defaultPageLayout')),
+  );
   const frag = pf.yXmlFragment;
   if (frag) {
     await writeMarkdownToPageFrameFragment(text, frag, {

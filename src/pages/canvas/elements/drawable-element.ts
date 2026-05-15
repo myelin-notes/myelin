@@ -1,9 +1,22 @@
+import type { LucideIcon } from 'lucide-react';
 import type * as Y from 'yjs';
+import type { Messages } from '@/lib/i18n/messages';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { YDocManager } from '../ydoc-manager';
 import type { ElementType } from './element-type';
+
+export interface SelectionToolbarItem {
+  /** Stable id within an element's items, used as React key. */
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  /** Render the button in an active/pressed style. */
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}
 
 const SELECTION_STROKE = '#2f3e46';
 const HANDLE_SIZE = 6;
@@ -70,6 +83,8 @@ export abstract class DrawableElement {
   private selected: boolean = false;
   private selectionT: number = 0;
   private _hidden: boolean = false;
+  public onSelectionChanged?: () => void;
+  public onTransformChanged?: () => void;
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
   protected _yMap: Y.Map<unknown> | null = null;
@@ -140,20 +155,26 @@ export abstract class DrawableElement {
   }
 
   public translate(dx: number, dy: number) {
+    if (dx === 0 && dy === 0) {
+      return;
+    }
     this._offset.x += dx;
     this._offset.y += dy;
     this.syncToYMap({ offsetX: this._offset.x, offsetY: this._offset.y });
+    this.onTransformChanged?.();
   }
 
   public setOffset(x: number, y: number) {
     this._offset = { x, y };
     this.syncToYMap({ offsetX: x, offsetY: y });
+    this.onTransformChanged?.();
   }
 
   public setScale(x: number, y: number) {
     this._scale = { x, y };
     this.updateBoundingBox();
     this.syncToYMap({ scaleX: x, scaleY: y });
+    this.onTransformChanged?.();
   }
 
   public get hidden(): boolean {
@@ -264,12 +285,20 @@ export abstract class DrawableElement {
   }
 
   public select() {
+    if (this.selected) {
+      return;
+    }
     this.selected = true;
+    this.onSelectionChanged?.();
   }
 
   public unselect() {
+    if (!this.selected) {
+      return;
+    }
     this.selected = false;
     this.selectionT = 0;
+    this.onSelectionChanged?.();
   }
 
   /** Whether this element supports inline editing (double-click to edit). */
@@ -401,6 +430,15 @@ export abstract class DrawableElement {
       });
     }
     return result;
+  }
+
+  /**
+   * Buttons this element contributes to the selection toolbar when it is the
+   * sole selected element. Default: none. Override to expose element-specific
+   * actions (e.g. crop on image).
+   */
+  public getSelectionToolbarItems(_strings: Messages): SelectionToolbarItem[] {
+    return [];
   }
 
   /** Called once when a resize drag begins. Snapshot any baseline state here. */

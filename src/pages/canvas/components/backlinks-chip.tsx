@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLocale, useMessages } from '@/lib/i18n';
@@ -33,7 +33,7 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  const loadBacklinks = useCallback(() => {
     if (!noteId) {
       setBacklinks([]);
       return;
@@ -58,7 +58,15 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
     return () => {
       cancelled = true;
     };
-  }, [noteId, repository, repositoryStatus.lastRemoteSyncAt]);
+  }, [noteId, repository]);
+
+  useEffect(() => loadBacklinks(), [loadBacklinks]);
+
+  useEffect(() => {
+    if (repositoryStatus.lastRemoteSyncAt !== null) {
+      return loadBacklinks();
+    }
+  }, [loadBacklinks, repositoryStatus.lastRemoteSyncAt]);
 
   useEffect(() => {
     if (!open) {

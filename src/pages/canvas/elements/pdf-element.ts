@@ -1,4 +1,8 @@
-import { Download as DownloadIcon } from 'lucide-react';
+import {
+  Columns3 as ColumnsIcon,
+  Download as DownloadIcon,
+  Rows3 as RowsIcon,
+} from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
@@ -34,7 +38,12 @@ import {
   FrameChrome,
   getFrameChromeControlsLayer,
 } from './frame-chrome';
-import { PAGE_GAP, PAGE_HEIGHT, PAGE_WIDTH } from './page-frame-constants';
+import {
+  PAGE_GAP,
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+  type PageLayout,
+} from './page-frame-constants';
 import {
   createPdfChromeButton,
   type PdfChromeButtonHandle,
@@ -149,6 +158,7 @@ export class PdfElement extends DrawableElement {
   private _fileName: string = '';
   private _pageSizes: PdfPageSize[] = [DEFAULT_PAGE_SIZE];
   private _pageOrder: PdfPageOrderEntry[] = createDefaultPdfPageOrder(1);
+  private _pageLayout: PageLayout;
   private _pdfDocument: PDFDocumentProxy | null = null;
   private _chrome: FrameChrome | null = null;
   private _contentRoot: HTMLDivElement | null = null;
@@ -161,8 +171,9 @@ export class PdfElement extends DrawableElement {
     null;
   private _pageOrderCustom = false;
 
-  constructor(uuid: string) {
+  constructor(uuid: string, pageLayout: PageLayout = 'vertical') {
     super(uuid, ElementType.PDF);
+    this._pageLayout = pageLayout;
   }
 
   public setExportElementsProvider(
@@ -184,6 +195,7 @@ export class PdfElement extends DrawableElement {
       fileName: this._fileName,
       pageSizes: clonePageSizes(this._pageSizes),
       pageOrder: clonePageOrder(this.pageEntries),
+      pageLayout: this._pageLayout,
     };
 
     if (this._pageOrderCustom) {
@@ -213,6 +225,15 @@ export class PdfElement extends DrawableElement {
           this._pageOrderCustom = true;
         }
         this.applyPageOrder(this.normalizePageOrder(v, allowMissing));
+      },
+      pageLayout: (v) => {
+        const next: PageLayout = v === 'horizontal' ? 'horizontal' : 'vertical';
+        if (next !== this._pageLayout) {
+          this._pageLayout = next;
+          this._layout = null;
+          this.removeAllGapButtons();
+          this.removeAllDeleteButtons();
+        }
       },
       pdfData: (v) => {
         const isReplacingPdf = this._pdfBytes !== null;
@@ -250,12 +271,41 @@ export class PdfElement extends DrawableElement {
     return this._fileName;
   }
 
+  public get pageLayout(): PageLayout {
+    return this._pageLayout;
+  }
+
+  public setPageLayout(pageLayout: PageLayout): void {
+    if (pageLayout === this._pageLayout) {
+      return;
+    }
+    this._pageLayout = pageLayout;
+    this._layout = null;
+    this.removeAllGapButtons();
+    this.removeAllDeleteButtons();
+    this.syncToYMap({ pageLayout });
+  }
+
   public getMenuItems(): ChromeMenuItem[] {
     if (!this._pdfBytes) {
       return [];
     }
 
     return [
+      {
+        id: 'layout-vertical',
+        label: 'Vertical pages',
+        icon: RowsIcon,
+        checked: this._pageLayout === 'vertical',
+        onSelect: () => this.setPageLayout('vertical'),
+      },
+      {
+        id: 'layout-horizontal',
+        label: 'Horizontal pages',
+        icon: ColumnsIcon,
+        checked: this._pageLayout === 'horizontal',
+        onSelect: () => this.setPageLayout('horizontal'),
+      },
       {
         id: 'export-pdf',
         label: 'Export to PDF',
@@ -458,33 +508,64 @@ export class PdfElement extends DrawableElement {
     let totalWidth = 0;
     let totalHeight = 0;
 
-    for (const entry of entries) {
-      if (pages.length > 0) {
-        totalHeight += PAGE_GAP;
+    if (this._pageLayout === 'horizontal') {
+      for (const entry of entries) {
+        if (pages.length > 0) {
+          totalWidth += PAGE_GAP;
+        }
+        const pageSize = this.getPageSize(entry);
+        pages.push(
+          entry.kind === 'pdf'
+            ? {
+                kind: 'pdf',
+                originalIndex: entry.originalIndex,
+                size: pageSize,
+                localLeft: totalWidth,
+                localTop: 0,
+              }
+            : {
+                kind: 'blank',
+                size: pageSize,
+                localLeft: totalWidth,
+                localTop: 0,
+              },
+        );
+        totalWidth += pageSize.w;
+        totalHeight = Math.max(totalHeight, pageSize.h);
       }
-      const pageSize = this.getPageSize(entry);
-      pages.push(
-        entry.kind === 'pdf'
-          ? {
-              kind: 'pdf',
-              originalIndex: entry.originalIndex,
-              size: pageSize,
-              localLeft: 0,
-              localTop: totalHeight,
-            }
-          : {
-              kind: 'blank',
-              size: pageSize,
-              localLeft: 0,
-              localTop: totalHeight,
-            },
-      );
-      totalWidth = Math.max(totalWidth, pageSize.w);
-      totalHeight += pageSize.h;
-    }
 
-    for (const page of pages) {
-      page.localLeft = (totalWidth - page.size.w) / 2;
+      for (const page of pages) {
+        page.localTop = (totalHeight - page.size.h) / 2;
+      }
+    } else {
+      for (const entry of entries) {
+        if (pages.length > 0) {
+          totalHeight += PAGE_GAP;
+        }
+        const pageSize = this.getPageSize(entry);
+        pages.push(
+          entry.kind === 'pdf'
+            ? {
+                kind: 'pdf',
+                originalIndex: entry.originalIndex,
+                size: pageSize,
+                localLeft: 0,
+                localTop: totalHeight,
+              }
+            : {
+                kind: 'blank',
+                size: pageSize,
+                localLeft: 0,
+                localTop: totalHeight,
+              },
+        );
+        totalWidth = Math.max(totalWidth, pageSize.w);
+        totalHeight += pageSize.h;
+      }
+
+      for (const page of pages) {
+        page.localLeft = (totalWidth - page.size.w) / 2;
+      }
     }
 
     this._layout = { pages, totalWidth, totalHeight };
@@ -737,12 +818,17 @@ export class PdfElement extends DrawableElement {
     const dpr = window.devicePixelRatio || 1;
     const activePagePositions = new Set<number>();
 
-    if (!this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)) {
+    if (!this.isLayoutVisible(worldRect, layout, scaleX, scaleY)) {
       this.removeInactivePageDoms(activePagePositions);
       return;
     }
 
-    const visibleRange = this.getVisiblePageRange(worldRect, layout, scaleY);
+    const visibleRange = this.getVisiblePageRange(
+      worldRect,
+      layout,
+      scaleX,
+      scaleY,
+    );
     for (
       let pagePosition = visibleRange.start;
       pagePosition < visibleRange.end;
@@ -813,7 +899,7 @@ export class PdfElement extends DrawableElement {
 
     if (
       layout.pages.length < 1 ||
-      !this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)
+      !this.isLayoutVisible(worldRect, layout, scaleX, scaleY)
     ) {
       this.removeInactiveGapButtons(activePositions);
       return;
@@ -824,19 +910,41 @@ export class PdfElement extends DrawableElement {
       insertPosition <= layout.pages.length;
       insertPosition++
     ) {
+      let localX: number;
       let localY: number;
-      if (insertPosition < layout.pages.length) {
-        localY = layout.pages[insertPosition].localTop - PAGE_GAP / 2;
+      if (this._pageLayout === 'horizontal') {
+        if (insertPosition < layout.pages.length) {
+          localX = layout.pages[insertPosition].localLeft - PAGE_GAP / 2;
+        } else {
+          const lastPage = layout.pages[layout.pages.length - 1];
+          localX = lastPage.localLeft + lastPage.size.w + PAGE_GAP / 2;
+        }
+        localY = layout.totalHeight / 2;
       } else {
-        const lastPage = layout.pages[layout.pages.length - 1];
-        localY = lastPage.localTop + lastPage.size.h + PAGE_GAP / 2;
+        localX = layout.totalWidth / 2;
+        if (insertPosition < layout.pages.length) {
+          localY = layout.pages[insertPosition].localTop - PAGE_GAP / 2;
+        } else {
+          const lastPage = layout.pages[layout.pages.length - 1];
+          localY = lastPage.localTop + lastPage.size.h + PAGE_GAP / 2;
+        }
       }
+      const worldX = this.offset.x + localX * scaleX;
       const worldY = this.offset.y + localY * scaleY;
-      if (
-        worldY < worldRect.top - PAGE_RENDER_MARGIN ||
-        worldY > worldRect.bottom + PAGE_RENDER_MARGIN
-      ) {
-        continue;
+      if (this._pageLayout === 'horizontal') {
+        if (
+          worldX < worldRect.left - PAGE_RENDER_MARGIN ||
+          worldX > worldRect.right + PAGE_RENDER_MARGIN
+        ) {
+          continue;
+        }
+      } else {
+        if (
+          worldY < worldRect.top - PAGE_RENDER_MARGIN ||
+          worldY > worldRect.bottom + PAGE_RENDER_MARGIN
+        ) {
+          continue;
+        }
       }
 
       let button = this._gapButtons.get(insertPosition);
@@ -849,7 +957,6 @@ export class PdfElement extends DrawableElement {
       }
       activePositions.add(insertPosition);
 
-      const localX = layout.totalWidth / 2;
       const screenX = snapToDevicePixel(
         (this.offset.x + viewport.offset.x + localX * scaleX) * zoom,
       );
@@ -878,7 +985,7 @@ export class PdfElement extends DrawableElement {
 
     if (
       layout.pages.length < 2 ||
-      !this.isLayoutHorizontallyVisible(worldRect, layout, scaleX)
+      !this.isLayoutVisible(worldRect, layout, scaleX, scaleY)
     ) {
       this.removeInactiveDeleteButtons(activePositions);
       return;
@@ -1030,21 +1137,42 @@ export class PdfElement extends DrawableElement {
     }
   }
 
-  private isLayoutHorizontallyVisible(
+  private isLayoutVisible(
     worldRect: DOMRect,
     layout: PdfLayout,
     scaleX: number,
+    scaleY: number,
   ): boolean {
     const left = this.offset.x;
     const right = left + layout.totalWidth * scaleX;
-    return right >= worldRect.left && left <= worldRect.right;
+    const top = this.offset.y;
+    const bottom = top + layout.totalHeight * scaleY;
+    return (
+      right >= worldRect.left &&
+      left <= worldRect.right &&
+      bottom >= worldRect.top &&
+      top <= worldRect.bottom
+    );
   }
 
   private getVisiblePageRange(
     worldRect: DOMRect,
     layout: PdfLayout,
+    scaleX: number,
     scaleY: number,
   ): { start: number; end: number } {
+    if (this._pageLayout === 'horizontal') {
+      const localLeft =
+        (worldRect.left - PAGE_RENDER_MARGIN - this.offset.x) / scaleX;
+      const localRight =
+        (worldRect.right + PAGE_RENDER_MARGIN - this.offset.x) / scaleX;
+
+      return {
+        start: this.findFirstPageEndingAtOrAfter(layout, localLeft),
+        end: this.findFirstPageStartingAfter(layout, localRight),
+      };
+    }
+
     const localTop =
       (worldRect.top - PAGE_RENDER_MARGIN - this.offset.y) / scaleY;
     const localBottom =
@@ -1058,15 +1186,18 @@ export class PdfElement extends DrawableElement {
 
   private findFirstPageEndingAtOrAfter(
     layout: PdfLayout,
-    localY: number,
+    localPosition: number,
   ): number {
     let low = 0;
     let high = layout.pages.length;
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
       const page = layout.pages[mid];
-      const pageBottom = page.localTop + page.size.h;
-      if (pageBottom < localY) {
+      const pageEnd =
+        this._pageLayout === 'horizontal'
+          ? page.localLeft + page.size.w
+          : page.localTop + page.size.h;
+      if (pageEnd < localPosition) {
         low = mid + 1;
       } else {
         high = mid;
@@ -1077,13 +1208,17 @@ export class PdfElement extends DrawableElement {
 
   private findFirstPageStartingAfter(
     layout: PdfLayout,
-    localY: number,
+    localPosition: number,
   ): number {
     let low = 0;
     let high = layout.pages.length;
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
-      if (layout.pages[mid].localTop <= localY) {
+      const pageStart =
+        this._pageLayout === 'horizontal'
+          ? layout.pages[mid].localLeft
+          : layout.pages[mid].localTop;
+      if (pageStart <= localPosition) {
         low = mid + 1;
       } else {
         high = mid;

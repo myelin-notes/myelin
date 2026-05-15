@@ -1,6 +1,8 @@
 import { type AnimationPlaybackControls, animate } from 'motion';
 import type { Vector2 } from './drawable-canvas';
 
+type EditModePanAxis = 'vertical' | 'horizontal';
+
 /**
  * Camera state for the canvas: pan offset, zoom level, the wheel + touch
  * gestures that mutate them, and the animated view-fit transition.
@@ -12,9 +14,9 @@ import type { Vector2 } from './drawable-canvas';
  * gesture is a scene-level concern, not a camera one.
  *
  * `editMode` is a hint set by DrawableCanvas when an element is being
- * inline-edited: it restricts wheel/trackpad pan to vertical only, and
- * enables two-finger touch pan + pinch zoom (single-finger touch is left
- * alone so the contentEditable can place the cursor / select text).
+ * inline-edited: it restricts wheel/trackpad pan to vertical by default,
+ * and enables two-finger touch pan + pinch zoom (single-finger touch is
+ * left alone so the contentEditable can place the cursor / select text).
  */
 export class CanvasViewport {
   private readonly canvas: HTMLCanvasElement;
@@ -29,17 +31,21 @@ export class CanvasViewport {
   private readonly _gestureTarget: HTMLElement;
 
   // Two-finger touch pan + pinch state
-  private _touchPanLastY: number | null = null;
+  private _touchPanLast: Vector2 | null = null;
   private _touchPinchLastDist: number | null = null;
 
   private _onZoomChange?: (zoom: number) => void;
+  private _viewListeners = new Set<() => void>();
+  private _zoomLocked: boolean = false;
+  private _contentBoundsProvider: (() => DOMRect | null) | null = null;
 
   /**
-   * When true, plain wheel/touch pan is restricted to the vertical axis,
-   * and two-finger touch gestures (pan + pinch zoom) are active. Toggled
-   * by DrawableCanvas on element edit enter/exit.
+   * When true, plain wheel/touch pan is restricted to the edit-mode axis,
+   * and two-finger touch gestures (pan + pinch zoom) are active. Toggled by
+   * DrawableCanvas on element edit enter/exit.
    */
   public editMode: boolean = false;
+  public editModePanAxis: EditModePanAxis = 'vertical';
 
   // Stored handlers for cleanup
   private readonly _handleWheel: (evt: WheelEvent) => void;
@@ -58,15 +64,19 @@ export class CanvasViewport {
       evt.preventDefault();
       if (evt.ctrlKey) {
         // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures).
-        this.zoomAroundViewportCenter(this._zoom + evt.deltaY * -0.005);
+        if (!this._zoomLocked) {
+          this.zoomAroundViewportCenter(this._zoom + evt.deltaY * -0.005);
+        }
       } else {
         // Two-finger scroll on trackpad / mouse wheel → pan.
-        // In edit mode, restrict to vertical — page is centered horizontally
-        // and there's nothing meaningful left/right.
-        if (!this.editMode) {
+        // In edit mode, lock wheel pan to the edited element's page axis.
+        if (!this.editMode || this.editModePanAxis === 'horizontal') {
           this._offset.x -= evt.deltaX / this._zoom;
         }
-        this._offset.y -= evt.deltaY / this._zoom;
+        if (!this.editMode || this.editModePanAxis === 'vertical') {
+          this._offset.y -= evt.deltaY / this._zoom;
+        }
+        this.notifyViewChange();
       }
     };
 
@@ -76,7 +86,7 @@ export class CanvasViewport {
       return Math.hypot(dx, dy);
     };
 
-    // Two-finger touch in edit mode: vertical pan + pinch zoom.
+    // Two-finger touch in edit mode: pan + pinch zoom.
     // Single-finger touch is left to the contentEditable for cursor
     // placement / selection.
     this._handleTouchStart = (evt) => {
@@ -86,11 +96,14 @@ export class CanvasViewport {
       if (evt.touches.length >= 2) {
         const t0 = evt.touches[0];
         const t1 = evt.touches[1];
-        this._touchPanLastY = (t0.clientY + t1.clientY) / 2;
+        this._touchPanLast = {
+          x: (t0.clientX + t1.clientX) / 2,
+          y: (t0.clientY + t1.clientY) / 2,
+        };
         this._touchPinchLastDist = touchDistance(t0, t1);
         evt.preventDefault();
       } else {
-        this._touchPanLastY = null;
+        this._touchPanLast = null;
         this._touchPinchLastDist = null;
       }
     };
@@ -101,7 +114,7 @@ export class CanvasViewport {
       }
       if (
         evt.touches.length < 2 ||
-        this._touchPanLastY == null ||
+        this._touchPanLast == null ||
         this._touchPinchLastDist == null
       ) {
         return;
@@ -111,26 +124,35 @@ export class CanvasViewport {
 
       const t0 = evt.touches[0];
       const t1 = evt.touches[1];
-      const avgY = (t0.clientY + t1.clientY) / 2;
+      const avg = {
+        x: (t0.clientX + t1.clientX) / 2,
+        y: (t0.clientY + t1.clientY) / 2,
+      };
       const dist = touchDistance(t0, t1);
 
-      // Pan (vertical only).
-      const dy = avgY - this._touchPanLastY;
-      this._offset.y += dy / this._zoom;
-      this._touchPanLastY = avgY;
+      // Pan only along the edited element's page axis.
+      const dx = avg.x - this._touchPanLast.x;
+      const dy = avg.y - this._touchPanLast.y;
+      if (this.editModePanAxis === 'horizontal') {
+        this._offset.x += dx / this._zoom;
+      } else {
+        this._offset.y += dy / this._zoom;
+      }
+      this._touchPanLast = avg;
 
       // Pinch zoom around viewport center (consistent with wheel).
-      if (this._touchPinchLastDist > 0 && dist > 0) {
+      if (!this._zoomLocked && this._touchPinchLastDist > 0 && dist > 0) {
         this.zoomAroundViewportCenter(
           this._zoom * (dist / this._touchPinchLastDist),
         );
       }
       this._touchPinchLastDist = dist;
+      this.notifyViewChange();
     };
 
     this._handleTouchEnd = (evt) => {
       if (evt.touches.length < 2) {
-        this._touchPanLastY = null;
+        this._touchPanLast = null;
         this._touchPinchLastDist = null;
       }
     };
@@ -165,14 +187,62 @@ export class CanvasViewport {
   public get isAnimatingView(): boolean {
     return this._viewAnim !== null;
   }
+  public get zoomLocked(): boolean {
+    return this._zoomLocked;
+  }
+  public setZoomLocked(locked: boolean): void {
+    this._zoomLocked = locked;
+  }
+
+  /**
+   * Provider for the world-space union bounds of content. Used to clamp pan
+   * so the user can pan content off-screen by a controlled amount but can't
+   * drift arbitrarily far into empty space. Return `null` to disable clamping.
+   */
+  public setContentBoundsProvider(
+    provider: (() => DOMRect | null) | null,
+  ): void {
+    this._contentBoundsProvider = provider;
+  }
 
   public setOnZoomChange(cb: (zoom: number) => void): void {
     this._onZoomChange = cb;
   }
 
+  public onViewChange(listener: () => void): () => void {
+    this._viewListeners.add(listener);
+    return () => {
+      this._viewListeners.delete(listener);
+    };
+  }
+
+  private notifyViewChange(): void {
+    if (!this._viewAnim) {
+      this.clampOffsetToContent();
+    }
+    for (const listener of this._viewListeners) {
+      listener();
+    }
+  }
+
+  public setEditMode(
+    editMode: boolean,
+    options: { panAxis?: EditModePanAxis } = {},
+  ): void {
+    const nextPanAxis = options.panAxis ?? 'vertical';
+    if (this.editMode === editMode && this.editModePanAxis === nextPanAxis) {
+      return;
+    }
+    this.editMode = editMode;
+    this.editModePanAxis = nextPanAxis;
+    this._touchPanLast = null;
+    this._touchPinchLastDist = null;
+  }
+
   public panBy(dx: number, dy: number): void {
     this._offset.x += dx;
     this._offset.y += dy;
+    this.notifyViewChange();
   }
 
   public worldToScreen(world: Vector2): Vector2 {
@@ -269,11 +339,21 @@ export class CanvasViewport {
           y: sy / z - worldFocus.y,
         };
         this._onZoomChange?.(this._zoom);
+        this.notifyViewChange();
       },
       onComplete: () => {
         this._viewAnim = null;
       },
     });
+  }
+
+  /**
+   * Animate the viewport so world (0, 0) is at the screen center, preserving
+   * the current zoom. Passing an empty fit object skips both zoom candidates
+   * so animateViewToFitRect keeps `this._zoom`.
+   */
+  public animateRecenter(): void {
+    this.animateViewToFitRect(new DOMRect(0, 0, 0, 0), {});
   }
 
   /** Stop any in-flight view animation. */
@@ -303,6 +383,36 @@ export class CanvasViewport {
   }
 
   /**
+   * Clamp `_offset` so the viewport center stays within the content bounds
+   * inflated by ~3/4 viewport on each side — enough slack to pan content
+   * fully off-screen, not enough to drift so far the user can't find it. No
+   * provider / empty content → no clamp, so fresh documents stay free.
+   *
+   * Derivation: viewport center in world is `-offset + halfViewport`. We
+   * constrain that to `[bounds.left - slack, bounds.right + slack]`, then
+   * solve for `offset`.
+   */
+  private clampOffsetToContent(): void {
+    const bounds = this._contentBoundsProvider?.();
+    if (!bounds) {
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const halfVW = this.canvas.width / dpr / this._zoom / 2;
+    const halfVH = this.canvas.height / dpr / this._zoom / 2;
+    const slackX = halfVW * 1.5;
+    const slackY = halfVH * 1.5;
+    this._offset.x = Math.min(
+      halfVW - bounds.left + slackX,
+      Math.max(halfVW - bounds.right - slackX, this._offset.x),
+    );
+    this._offset.y = Math.min(
+      halfVH - bounds.top + slackY,
+      Math.max(halfVH - bounds.bottom - slackY, this._offset.y),
+    );
+  }
+
+  /**
    * Set the zoom level, anchoring the world point currently at the canvas
    * center so it stays at the canvas center after the zoom.
    */
@@ -323,5 +433,6 @@ export class CanvasViewport {
     this._offset.y += wyAfter - wyBefore;
 
     this._onZoomChange?.(this._zoom);
+    this.notifyViewChange();
   }
 }

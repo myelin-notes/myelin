@@ -174,6 +174,15 @@ const es: typeof en = {
     pageFrameEditing: {
       title: 'Edición de marcos de página',
       eyebrow: 'Vista de documento',
+      defaultOrientation: {
+        label: 'Orientación predeterminada de página',
+        description:
+          'Elige cómo los nuevos marcos de página y PDF organizan sus páginas.',
+        options: {
+          vertical: 'Vertical',
+          horizontal: 'Horizontal',
+        },
+      },
       fitWholePage: {
         label: 'Ajustar página completa al editar',
         description:
@@ -400,6 +409,13 @@ const es: typeof en = {
       clickForOptions: 'clic para opciones',
       customizeWheel: 'Personalizar rueda',
       insert: 'Insertar',
+    },
+    selectionToolbar: {
+      label: 'Orden de selección',
+      moveHigher: 'Mover hacia delante',
+      moveLower: 'Mover hacia atrás',
+      crop: 'Recortar',
+      applyCrop: 'Aplicar recorte',
     },
     insert: {
       title: 'Insertar',

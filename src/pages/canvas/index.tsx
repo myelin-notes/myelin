@@ -29,6 +29,7 @@ import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
 import { InsertPopover } from './components/insert-popover';
 import { PeerSyncPanel } from './components/peer-sync-panel';
+import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
 import { ElementType } from './elements/element-type';
@@ -75,6 +76,18 @@ function CanvasViewInner() {
     anchor: DOMRect;
     items: ChromeMenuItem[];
   } | null>(null);
+
+  const [zoomLocked, setZoomLocked] = useState(false);
+  const onToggleZoomLock = useCallback(() => {
+    setZoomLocked((prev) => {
+      const next = !prev;
+      drawableCanvasRef.current?.viewport.setZoomLocked(next);
+      return next;
+    });
+  }, []);
+  const onRecenterViewport = useCallback(() => {
+    drawableCanvasRef.current?.viewport.animateRecenter();
+  }, []);
 
   useEffect(() => {
     setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
@@ -152,11 +165,16 @@ function CanvasViewInner() {
         y: canvas.height / dpr / 2,
       });
       const frame = dc.addElement(
-        (uuid) => new PageFrameElement(uuid, targetPageFrameName),
+        (uuid) =>
+          new PageFrameElement(
+            uuid,
+            targetPageFrameName,
+            UserPrefs.get('defaultPageLayout'),
+          ),
       );
       frame.setOffset(
-        centerWorld.x - frame.pageWidth / 2,
-        centerWorld.y - frame.pageHeight / 2,
+        centerWorld.x - frame.totalWidth / 2,
+        centerWorld.y - frame.totalHeight / 2,
       );
       frame.updateBounds();
       dc.updateBounding();
@@ -307,7 +325,16 @@ function CanvasViewInner() {
         style={{ zIndex: 100 }}
       />
 
-      <StatusBar zoomLevel={engine.zoomLevel} fps={engine.fps} />
+      <StatusBar
+        zoomLevel={engine.zoomLevel}
+        fps={engine.fps}
+        zoomLocked={zoomLocked}
+        onToggleZoomLock={onToggleZoomLock}
+        onRecenter={onRecenterViewport}
+      />
+      {engine.ready && (
+        <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />
+      )}
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
       )}

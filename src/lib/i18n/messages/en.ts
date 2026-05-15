@@ -172,6 +172,14 @@ const en = {
     pageFrameEditing: {
       title: 'Page Frame Editing',
       eyebrow: 'Document View',
+      defaultOrientation: {
+        label: 'Default page orientation',
+        description: 'Choose how new page frames and PDFs arrange pages.',
+        options: {
+          vertical: 'Vertical',
+          horizontal: 'Horizontal',
+        },
+      },
       fitWholePage: {
         label: 'Fit whole page when editing',
         description:
@@ -395,6 +403,13 @@ const en = {
       clickForOptions: 'click for options',
       customizeWheel: 'Customize wheel',
       insert: 'Insert',
+    },
+    selectionToolbar: {
+      label: 'Selection order',
+      moveHigher: 'Move forward',
+      moveLower: 'Move backward',
+      crop: 'Crop',
+      applyCrop: 'Apply crop',
     },
     insert: {
       title: 'Insert',
