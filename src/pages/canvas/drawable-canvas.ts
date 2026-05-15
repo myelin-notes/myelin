@@ -175,6 +175,7 @@ export class DrawableCanvas {
 
   // Element editing state (e.g., page frame inline editing)
   private _editingElement: DrawableElement | null = null;
+  private _editDomRoot: HTMLElement | null = null;
   private _cleanupEditListeners: (() => void) | null = null;
 
   // One-shot placement state — orthogonal to tools. When set, the next
@@ -643,9 +644,15 @@ export class DrawableCanvas {
     return this._editingElement;
   }
 
+  public get isCanvasInteractiveEditMode(): boolean {
+    return this._editingElement !== null && this._editDomRoot === null;
+  }
+
   public syncViewportEditModePan(): void {
     const element = this._editingElement;
-    this.viewport.setEditMode(element !== null, {
+    const viewportEditMode =
+      element !== null && !this.isCanvasInteractiveEditMode;
+    this.viewport.setEditMode(viewportEditMode, {
       panAxis:
         element !== null &&
         'pageLayout' in element &&
@@ -671,21 +678,25 @@ export class DrawableCanvas {
       type: describeElementType(element.type),
       ...summarizeDrawableElements(this.elements),
     });
-    // Canvas stops intercepting pointer events so the DOM editor (chrome
-    // contentEditable / inline text input) receives them.
-    this.canvas.style.pointerEvents = 'none';
-    // For elements with DOM-backed editing chrome, drop the
-    // foreground canvas below the chrome so strokes don't bleed onto the
-    // editing surface. The selection outline lives on a separate overlay
-    // canvas (z=12) so it stays visible above chrome.
-    if (element.lowersCanvasWhileEditing) {
-      this.canvas.style.zIndex = '2';
+    const pe = event instanceof PointerEvent ? event : undefined;
+    const editDomRoot = element.enterEditMode(this, pe?.clientX, pe?.clientY);
+    this._editDomRoot = editDomRoot;
+
+    if (editDomRoot) {
+      // Canvas stops intercepting pointer events so the DOM editor (chrome
+      // contentEditable / inline text input) receives them.
+      this.canvas.style.pointerEvents = 'none';
+      // For elements with DOM-backed editing chrome, drop the
+      // foreground canvas below the chrome so strokes don't bleed onto the
+      // editing surface. The selection outline lives on a separate overlay
+      // canvas (z=12) so it stays visible above chrome.
+      if (element.lowersCanvasWhileEditing) {
+        this.canvas.style.zIndex = '2';
+      }
     }
 
     // Camera switches to edit-mode pan + two-finger touch handling.
     this.syncViewportEditModePan();
-    const pe = event instanceof PointerEvent ? event : undefined;
-    const editDomRoot = element.enterEditMode(this, pe?.clientX, pe?.clientY);
     this.onElementEdit?.(element);
 
     // Escape exits edit mode
@@ -698,8 +709,20 @@ export class DrawableCanvas {
     };
     document.addEventListener('keydown', handleKeyDown);
 
-    // Click outside editing DOM exits edit mode (no DOM root → any click exits)
+    // Click outside editing DOM exits edit mode. Canvas-interactive edit modes
+    // handle canvas clicks through the active tool so resize handles still work.
     const handlePointerDown = (e: PointerEvent) => {
+      if (!editDomRoot) {
+        if (e.target === this.canvas) {
+          return;
+        }
+        if (
+          e.target instanceof Element &&
+          e.target.closest('[data-selection-toolbar="true"]')
+        ) {
+          return;
+        }
+      }
       if (!editDomRoot?.contains(e.target as Node)) {
         this.exitElementEdit();
       }
@@ -722,6 +745,7 @@ export class DrawableCanvas {
     element.exitEditMode();
     // Yjs captures changes automatically — no command to push
     this._editingElement = null;
+    this._editDomRoot = null;
     this.notifyChange();
     this.syncViewportEditModePan();
     this.canvas.style.pointerEvents = '';

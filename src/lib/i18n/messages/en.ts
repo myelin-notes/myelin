@@ -408,6 +408,8 @@ const en = {
       label: 'Selection order',
       moveHigher: 'Move forward',
       moveLower: 'Move backward',
+      crop: 'Crop',
+      applyCrop: 'Apply crop',
     },
     insert: {
       title: 'Insert',

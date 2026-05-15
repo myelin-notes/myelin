@@ -414,6 +414,8 @@ const es: typeof en = {
       label: 'Orden de selección',
       moveHigher: 'Mover hacia delante',
       moveLower: 'Mover hacia atrás',
+      crop: 'Recortar',
+      applyCrop: 'Aplicar recorte',
     },
     insert: {
       title: 'Insertar',
