@@ -155,6 +155,9 @@ export abstract class DrawableElement {
   }
 
   public translate(dx: number, dy: number) {
+    if (dx === 0 && dy === 0) {
+      return;
+    }
     this._offset.x += dx;
     this._offset.y += dy;
     this.syncToYMap({ offsetX: this._offset.x, offsetY: this._offset.y });

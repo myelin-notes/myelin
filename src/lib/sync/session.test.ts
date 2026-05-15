@@ -103,6 +103,39 @@ describe('NoteSession local change listeners', () => {
     expect(session.hasUnsyncedChanges()).toBe(false);
   });
 
+  it('does not enter pushing phase when saving with no unsynced changes', async () => {
+    const ydoc = new YDocManager();
+    const pushUpdates = vi.fn<
+      (
+        nodeId: VFSNodeId,
+        update: Uint8Array,
+        options: YjsSyncPushOptions,
+      ) => Promise<YjsSyncPushResult>
+    >();
+
+    const session = new NoteSession(
+      'note-1',
+      ydoc,
+      {
+        ...createSyncTarget(),
+        pushUpdates,
+      },
+      null,
+      ydoc.encodeStateVector(),
+    );
+    const phases: string[] = [];
+    const unsubscribe = session.subscribeStatus((status) => {
+      phases.push(status.phase);
+    });
+
+    await session.save();
+
+    expect(pushUpdates).not.toHaveBeenCalled();
+    expect(phases).toEqual(['idle']);
+
+    unsubscribe();
+  });
+
   it('does not mark pulled repository updates as local changes', async () => {
     const ydoc = new YDocManager();
     const remoteDoc = new Y.Doc();
