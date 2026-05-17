@@ -8,6 +8,7 @@ import {
   type LiveDiscoverySession,
   type LiveDiscoveryTransport,
   LivePeerDiscoveryCoordinator,
+  SlidingWindowLiveDiscoveryMailboxBudget,
 } from './discovery-coordinator';
 import type { TransportEvents } from './transport';
 
@@ -24,9 +25,12 @@ class FakeMailbox implements LiveDiscoveryMailbox {
       record,
     ];
   });
-  list = vi.fn(async (noteId: string) =>
-    this.records.filter((record) => record.noteId === noteId),
-  );
+  list = vi.fn(async (noteId: string, options?: { maxEntries?: number }) => {
+    const records = this.records.filter((record) => record.noteId === noteId);
+    return options?.maxEntries === undefined
+      ? records
+      : records.slice(0, options.maxEntries);
+  });
   remove = vi.fn(async (noteId: string, recordId: string) => {
     this.records = this.records.filter(
       (record) => record.noteId !== noteId || record.recordId !== recordId,
@@ -37,14 +41,14 @@ class FakeMailbox implements LiveDiscoveryMailbox {
 
 class FakeTransport implements LiveDiscoveryTransport {
   connected = false;
-  readonly failedNodeIds = new Set<string>();
+  readonly failedTickets = new Set<string>();
   private readonly listeners = new Map<EventName, Set<() => void>>();
 
-  constructor(private readonly hostNodeId: string) {}
+  constructor(private readonly hostTicket: string) {}
 
-  host = vi.fn(async () => this.hostNodeId);
-  join = vi.fn(async (nodeId: string) => {
-    if (this.failedNodeIds.has(nodeId)) {
+  host = vi.fn(async () => this.hostTicket);
+  join = vi.fn(async (ticket: string) => {
+    if (this.failedTickets.has(ticket)) {
       throw new Error('join failed');
     }
     this.connected = true;
@@ -101,7 +105,7 @@ function createSession(): LiveDiscoverySession & {
 function createRecord(params: {
   recordId?: string;
   peerId: string;
-  nodeId: string;
+  ticket: string;
   now: number;
   expiresAt?: number;
 }): LivePeerDiscoveryRecord {
@@ -109,7 +113,7 @@ function createRecord(params: {
     recordId: params.recordId ?? `record-${params.peerId}`,
     noteId: 'note-1',
     peerId: params.peerId,
-    nodeId: params.nodeId,
+    ticket: params.ticket,
     now: params.now,
     ttlMs: (params.expiresAt ?? params.now + 300_000) - params.now,
   });
@@ -128,13 +132,13 @@ async function waitForRestart(): Promise<void> {
 }
 
 describe('LivePeerDiscoveryCoordinator', () => {
-  it('publishes the local node id and joins a discovered peer', async () => {
+  it('publishes the local ticket and joins a discovered peer', async () => {
     const now = 1_000;
     const session = createSession();
     const mailbox = new FakeMailbox();
-    const transport = new FakeTransport('local-node');
+    const transport = new FakeTransport('local-ticket');
     mailbox.records = [
-      createRecord({ peerId: 'peer-remote', nodeId: 'remote-node', now }),
+      createRecord({ peerId: 'peer-remote', ticket: 'remote-ticket', now }),
     ];
     const coordinator = new LivePeerDiscoveryCoordinator({
       session,
@@ -152,10 +156,10 @@ describe('LivePeerDiscoveryCoordinator', () => {
         noteId: 'note-1',
         recordId: 'record-local',
         peerId: 'peer-local',
-        nodeId: 'local-node',
+        ticket: 'local-ticket',
       }),
     );
-    expect(transport.join).toHaveBeenCalledWith('remote-node');
+    expect(transport.join).toHaveBeenCalledWith('remote-ticket');
 
     await coordinator.stop();
   });
@@ -164,17 +168,17 @@ describe('LivePeerDiscoveryCoordinator', () => {
     const now = 1_000;
     const session = createSession();
     const mailbox = new FakeMailbox();
-    const transport = new FakeTransport('local-node');
+    const transport = new FakeTransport('local-ticket');
     mailbox.records = [
       createRecord({
         recordId: 'record-local',
         peerId: 'peer-local',
-        nodeId: 'self-node',
+        ticket: 'self-ticket',
         now,
       }),
       createRecord({
         peerId: 'peer-expired',
-        nodeId: 'expired-node',
+        ticket: 'expired-ticket',
         now: now - 600_000,
         expiresAt: now - 1,
       }),
@@ -190,25 +194,29 @@ describe('LivePeerDiscoveryCoordinator', () => {
     await coordinator.start();
 
     expect(transport.join).not.toHaveBeenCalled();
+    expect(mailbox.cleanupExpired).toHaveBeenCalledWith('note-1', {
+      excludeRecordIds: ['record-local'],
+      maxEntries: 8,
+    });
 
     await coordinator.stop();
   });
 
-  it('does not retry the same failed node id inside the retry window', async () => {
+  it('does not retry the same failed ticket inside the retry window', async () => {
     const now = 1_000;
     const session = createSession();
     const mailbox = new FakeMailbox();
-    const transport = new FakeTransport('local-node');
-    transport.failedNodeIds.add('bad-node');
+    const transport = new FakeTransport('local-ticket');
+    transport.failedTickets.add('bad-ticket');
     mailbox.records = [
-      createRecord({ peerId: 'peer-remote', nodeId: 'bad-node', now }),
+      createRecord({ peerId: 'peer-remote', ticket: 'bad-ticket', now }),
     ];
     const coordinator = new LivePeerDiscoveryCoordinator({
       session,
       mailbox,
       createTransport: () => transport,
       now: () => now,
-      failedJoinRetryMs: 30_000,
+      failedTicketRetryMs: 30_000,
       recordId: 'record-local',
     });
 
@@ -224,7 +232,7 @@ describe('LivePeerDiscoveryCoordinator', () => {
     const now = 1_000;
     const session = createSession();
     const mailbox = new FakeMailbox();
-    const transport = new FakeTransport('local-node');
+    const transport = new FakeTransport('local-ticket');
     const coordinator = new LivePeerDiscoveryCoordinator({
       session,
       mailbox,
@@ -241,12 +249,35 @@ describe('LivePeerDiscoveryCoordinator', () => {
     expect(session.clearTransport).toHaveBeenCalled();
   });
 
+  it('uses the local peer id as the default stable record id', async () => {
+    const now = 1_000;
+    const session = createSession();
+    const mailbox = new FakeMailbox();
+    const transport = new FakeTransport('local-ticket');
+    const coordinator = new LivePeerDiscoveryCoordinator({
+      session,
+      mailbox,
+      createTransport: () => transport,
+      now: () => now,
+    });
+
+    await coordinator.start();
+    await coordinator.stop();
+
+    expect(mailbox.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordId: 'peer-local',
+      }),
+    );
+    expect(mailbox.remove).toHaveBeenCalledWith('note-1', 'peer-local');
+  });
+
   it('preserves peer state while restarting after a transient disconnect', async () => {
     const now = 1_000;
     const session = createSession();
     const mailbox = new FakeMailbox();
-    const firstTransport = new FakeTransport('first-node');
-    const secondTransport = new FakeTransport('second-node');
+    const firstTransport = new FakeTransport('first-ticket');
+    const secondTransport = new FakeTransport('second-ticket');
     const createTransport = vi
       .fn()
       .mockReturnValueOnce(firstTransport)
@@ -273,11 +304,11 @@ describe('LivePeerDiscoveryCoordinator', () => {
     await coordinator.stop();
   });
 
-  it('cleans up expired records after publish even when already connected', async () => {
+  it('does not list or clean up records while already connected', async () => {
     const now = 1_000;
     const session = createSession();
     const mailbox = new FakeMailbox();
-    const transport = new FakeTransport('local-node');
+    const transport = new FakeTransport('local-ticket');
     transport.connected = true;
     const coordinator = new LivePeerDiscoveryCoordinator({
       session,
@@ -289,9 +320,7 @@ describe('LivePeerDiscoveryCoordinator', () => {
 
     await coordinator.start();
 
-    expect(mailbox.cleanupExpired).toHaveBeenCalledWith('note-1', {
-      excludeRecordIds: ['record-local'],
-    });
+    expect(mailbox.cleanupExpired).not.toHaveBeenCalled();
     expect(mailbox.list).not.toHaveBeenCalled();
     expect(transport.join).not.toHaveBeenCalled();
 
@@ -302,12 +331,12 @@ describe('LivePeerDiscoveryCoordinator', () => {
     const now = 1_000;
     const session = createSession();
     const mailbox = new FakeMailbox();
-    const transport = new FakeTransport('local-node');
+    const transport = new FakeTransport('local-ticket');
     mailbox.records = [
       createRecord({
         recordId: 'record-other-instance',
         peerId: 'peer-local',
-        nodeId: 'remote-node',
+        ticket: 'remote-ticket',
         now,
       }),
     ];
@@ -321,7 +350,7 @@ describe('LivePeerDiscoveryCoordinator', () => {
 
     await coordinator.start();
 
-    expect(transport.join).toHaveBeenCalledWith('remote-node');
+    expect(transport.join).toHaveBeenCalledWith('remote-ticket');
 
     await coordinator.stop();
   });
@@ -330,7 +359,7 @@ describe('LivePeerDiscoveryCoordinator', () => {
     const now = 1_000;
     const session = createSession();
     const mailbox = new FakeMailbox();
-    const transport = new FakeTransport('local-node');
+    const transport = new FakeTransport('local-ticket');
     const publishStarted = deferred();
     const releasePublish = deferred();
     const publish = mailbox.publish;
@@ -355,5 +384,42 @@ describe('LivePeerDiscoveryCoordinator', () => {
 
     expect(mailbox.records).toEqual([]);
     expect(mailbox.remove).toHaveBeenCalledWith('note-1', 'record-local');
+  });
+
+  it('skips mailbox calls after the hourly mailbox budget is exhausted', async () => {
+    const now = 1_000;
+    const sessionA = createSession();
+    const sessionB = createSession();
+    const mailboxA = new FakeMailbox();
+    const mailboxB = new FakeMailbox();
+    const transportA = new FakeTransport('local-ticket-a');
+    const transportB = new FakeTransport('local-ticket-b');
+    const mailboxBudget = new SlidingWindowLiveDiscoveryMailboxBudget(16);
+    const firstCoordinator = new LivePeerDiscoveryCoordinator({
+      session: sessionA,
+      mailbox: mailboxA,
+      createTransport: () => transportA,
+      now: () => now,
+      mailboxBudget,
+    });
+    const secondCoordinator = new LivePeerDiscoveryCoordinator({
+      session: sessionB,
+      mailbox: mailboxB,
+      createTransport: () => transportB,
+      now: () => now,
+      mailboxBudget,
+    });
+
+    await firstCoordinator.start();
+    await secondCoordinator.start();
+
+    expect(mailboxA.publish).toHaveBeenCalledTimes(1);
+    expect(mailboxA.list).toHaveBeenCalledTimes(1);
+    expect(mailboxA.cleanupExpired).not.toHaveBeenCalled();
+    expect(mailboxB.publish).not.toHaveBeenCalled();
+    expect(mailboxB.list).not.toHaveBeenCalled();
+
+    await firstCoordinator.stop();
+    await secondCoordinator.stop();
   });
 });

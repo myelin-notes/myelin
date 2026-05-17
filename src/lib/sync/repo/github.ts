@@ -134,7 +134,7 @@ export class GitHubRepository extends BaseRepository {
     super();
     this.liveDiscoveryMailbox = {
       publish: (record) => this.publishLiveDiscoveryRecord(record),
-      list: (noteId) => this.listLiveDiscoveryRecords(noteId),
+      list: (noteId, options) => this.listLiveDiscoveryRecords(noteId, options),
       remove: (noteId, recordId) =>
         this.removeLiveDiscoveryRecord(noteId, recordId),
       cleanupExpired: (noteId, options) =>
@@ -458,11 +458,16 @@ export class GitHubRepository extends BaseRepository {
 
   private async listLiveDiscoveryRecords(
     noteId: VFSNodeId,
+    options?: { maxEntries?: number },
   ): Promise<LivePeerDiscoveryRecord[]> {
     const entries = await this.listContents(this.liveDiscoveryDir(noteId));
+    const candidates =
+      options?.maxEntries === undefined
+        ? entries
+        : entries.slice(0, options.maxEntries);
     const now = Date.now();
     const records = await Promise.all(
-      entries.map(async (entry) => {
+      candidates.map(async (entry) => {
         try {
           const { bytes } = await this.getContents(entry.path);
           if (!bytes) {
@@ -509,33 +514,43 @@ export class GitHubRepository extends BaseRepository {
 
   private async cleanupExpiredLiveDiscoveryRecords(
     noteId: VFSNodeId,
-    options?: { excludeRecordIds?: readonly string[] },
+    options?: { excludeRecordIds?: readonly string[]; maxEntries?: number },
   ): Promise<void> {
     const entries = await this.listContents(this.liveDiscoveryDir(noteId));
+    const candidates =
+      options?.maxEntries === undefined
+        ? entries
+        : entries.slice(0, options.maxEntries);
     await cleanupExpiredLiveDiscoveryEntries({
       noteId,
-      entries,
+      entries: candidates,
       excludeRecordIds: options?.excludeRecordIds,
       readCandidate: async (entry) => {
-        const { bytes, sha } = await this.getContents(entry.path);
-        if (!bytes || !sha) {
+        try {
+          const { bytes, sha } = await this.getContents(entry.path);
+          if (!bytes || !sha) {
+            return null;
+          }
+          let record: LivePeerDiscoveryRecord | null = null;
+          try {
+            record = parseLivePeerDiscoveryRecord(
+              JSON.parse(new TextDecoder().decode(bytes)),
+            );
+          } catch {
+            record = null;
+          }
+          return {
+            record,
+            remove: () =>
+              this.deleteContents(
+                entry.path,
+                sha,
+                `Remove expired live discovery for ${noteId}`,
+              ),
+          };
+        } catch {
           return null;
         }
-        const record = parseLivePeerDiscoveryRecord(
-          JSON.parse(new TextDecoder().decode(bytes)),
-        );
-        if (!record) {
-          return null;
-        }
-        return {
-          record,
-          remove: () =>
-            this.deleteContents(
-              entry.path,
-              sha,
-              `Remove expired live discovery for ${noteId}`,
-            ),
-        };
       },
     });
   }

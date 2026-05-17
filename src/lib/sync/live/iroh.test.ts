@@ -61,7 +61,7 @@ describe('IrohTransport', () => {
     tauri.invoke.mockReset();
     tauri.invoke.mockImplementation(async (command: string) => {
       if (command === 'iroh_host') {
-        return 'local-node';
+        return 'local-ticket';
       }
       return undefined;
     });

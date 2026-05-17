@@ -74,7 +74,7 @@ export class GoogleDriveRepository extends BaseRepository {
     super();
     this.liveDiscoveryMailbox = {
       publish: (record) => this.publishLiveDiscoveryRecord(record),
-      list: (noteId) => this.listLiveDiscoveryRecords(noteId),
+      list: (noteId, options) => this.listLiveDiscoveryRecords(noteId, options),
       remove: (noteId, recordId) =>
         this.removeLiveDiscoveryRecord(noteId, recordId),
       cleanupExpired: (noteId, options) =>
@@ -501,11 +501,16 @@ export class GoogleDriveRepository extends BaseRepository {
 
   private async listLiveDiscoveryRecords(
     noteId: VFSNodeId,
+    options?: { maxEntries?: number },
   ): Promise<LivePeerDiscoveryRecord[]> {
     const files = await this.findLiveDiscoveryFiles(noteId);
+    const candidates =
+      options?.maxEntries === undefined
+        ? files
+        : files.slice(0, options.maxEntries);
     const now = Date.now();
     const records = await Promise.all(
-      files.map(async (file) => {
+      candidates.map(async (file) => {
         try {
           const parsed = parseLivePeerDiscoveryRecord(
             JSON.parse(
@@ -545,26 +550,35 @@ export class GoogleDriveRepository extends BaseRepository {
 
   private async cleanupExpiredLiveDiscoveryRecords(
     noteId: VFSNodeId,
-    options?: { excludeRecordIds?: readonly string[] },
+    options?: { excludeRecordIds?: readonly string[]; maxEntries?: number },
   ): Promise<void> {
     const files = await this.findLiveDiscoveryFiles(noteId);
+    const candidates =
+      options?.maxEntries === undefined
+        ? files
+        : files.slice(0, options.maxEntries);
     await cleanupExpiredLiveDiscoveryEntries({
       noteId,
-      entries: files,
+      entries: candidates,
       excludeRecordIds: options?.excludeRecordIds,
       readCandidate: async (file) => {
-        const record = parseLivePeerDiscoveryRecord(
-          JSON.parse(
-            new TextDecoder().decode(await this.getFileBytes(file.id)),
-          ),
-        );
-        if (!record) {
+        try {
+          const bytes = await this.getFileBytes(file.id);
+          let record: LivePeerDiscoveryRecord | null = null;
+          try {
+            record = parseLivePeerDiscoveryRecord(
+              JSON.parse(new TextDecoder().decode(bytes)),
+            );
+          } catch {
+            record = null;
+          }
+          return {
+            record,
+            remove: () => this.deleteFile(file.id),
+          };
+        } catch {
           return null;
         }
-        return {
-          record,
-          remove: () => this.deleteFile(file.id),
-        };
       },
     });
   }

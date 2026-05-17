@@ -125,7 +125,7 @@ describe('GitHubRepository', () => {
       recordId: 'record-1',
       noteId: 'note-1',
       peerId: 'peer-1',
-      nodeId: 'iroh-node-1',
+      ticket: 'iroh-ticket-1',
       updatedAt: now,
       expiresAt: now + 30_000,
     };
@@ -150,7 +150,7 @@ describe('GitHubRepository', () => {
       recordId: 'record-1',
       noteId: 'note-1',
       peerId: 'peer-1',
-      nodeId: 'iroh-node-1',
+      ticket: 'iroh-ticket-1',
       updatedAt: now,
       expiresAt: now + 30_000,
     };
@@ -173,12 +173,26 @@ describe('GitHubRepository', () => {
       '.myelin/live/v1/notes/note-1/bad.json',
       new TextEncoder().encode('{bad json'),
     );
+    githubApi.writeBytes(
+      '.myelin/live/v1/notes/note-1/legacy.json',
+      new TextEncoder().encode(
+        JSON.stringify({
+          version: 1,
+          recordId: 'legacy-record',
+          noteId: 'note-1',
+          peerId: 'legacy-peer',
+          nodeId: 'legacy-node',
+          updatedAt: now - 60_000,
+          expiresAt: now + 30_000,
+        }),
+      ),
+    );
     await mailbox?.publish({
       version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
       recordId: 'expired-record',
       noteId: 'note-1',
       peerId: 'expired-peer',
-      nodeId: 'expired-node',
+      ticket: 'expired-ticket',
       updatedAt: now - 60_000,
       expiresAt: now - 1,
     });
@@ -193,7 +207,40 @@ describe('GitHubRepository', () => {
     ).toBeNull();
     expect(
       githubApi.readBytes('.myelin/live/v1/notes/note-1/bad.json'),
-    ).not.toBeNull();
+    ).toBeNull();
+    expect(
+      githubApi.readBytes('.myelin/live/v1/notes/note-1/legacy.json'),
+    ).toBeNull();
+  });
+
+  it('finds fresh live discovery records behind more than eight stale records', async () => {
+    const repository = createRepository();
+    const mailbox = repository.liveDiscoveryMailbox;
+    const now = Date.now();
+    const freshRecord: LivePeerDiscoveryRecord = {
+      version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+      recordId: 'fresh-record',
+      noteId: 'note-1',
+      peerId: 'fresh-peer',
+      ticket: 'fresh-ticket',
+      updatedAt: now,
+      expiresAt: now + 30_000,
+    };
+
+    for (let index = 0; index < 9; index += 1) {
+      await mailbox?.publish({
+        version: LIVE_PEER_DISCOVERY_RECORD_VERSION,
+        recordId: `expired-record-${index}`,
+        noteId: 'note-1',
+        peerId: `expired-peer-${index}`,
+        ticket: `expired-ticket-${index}`,
+        updatedAt: now - 60_000,
+        expiresAt: now - 1,
+      });
+    }
+    await mailbox?.publish(freshRecord);
+
+    expect(await mailbox?.list('note-1')).toEqual([freshRecord]);
   });
 
   it('does not clean up excluded live discovery records', async () => {
@@ -206,7 +253,7 @@ describe('GitHubRepository', () => {
       recordId: 'current-record',
       noteId: 'note-1',
       peerId: 'peer-1',
-      nodeId: 'iroh-node-1',
+      ticket: 'iroh-ticket-1',
       updatedAt: now - 60_000,
       expiresAt: now - 1,
     });

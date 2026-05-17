@@ -1,32 +1,34 @@
 import type { VFSNodeId } from '../types';
 
-export const LIVE_PEER_DISCOVERY_RECORD_VERSION = 1;
-// Node IDs are stable across address changes, so the TTL only needs to be long
-// enough to filter out crashed or uninstalled devices.
-export const LIVE_PEER_DISCOVERY_TTL_MS = 300_000;
+export const LIVE_PEER_DISCOVERY_RECORD_VERSION = 2;
+export const LIVE_PEER_DISCOVERY_TTL_MS = 900_000;
+export const LIVE_PEER_DISCOVERY_MAX_RECORDS = 8;
 
 export interface LivePeerDiscoveryRecord {
   version: typeof LIVE_PEER_DISCOVERY_RECORD_VERSION;
   recordId: string;
   noteId: VFSNodeId;
   peerId: string;
-  nodeId: string;
+  ticket: string;
   updatedAt: number;
   expiresAt: number;
 }
 
 export interface LiveDiscoveryMailbox {
   publish(record: LivePeerDiscoveryRecord): Promise<void>;
-  list(noteId: VFSNodeId): Promise<LivePeerDiscoveryRecord[]>;
+  list(
+    noteId: VFSNodeId,
+    options?: { maxEntries?: number },
+  ): Promise<LivePeerDiscoveryRecord[]>;
   remove(noteId: VFSNodeId, recordId: string): Promise<void>;
   cleanupExpired(
     noteId: VFSNodeId,
-    options?: { excludeRecordIds?: readonly string[] },
+    options?: { excludeRecordIds?: readonly string[]; maxEntries?: number },
   ): Promise<void>;
 }
 
 export interface LiveDiscoveryCleanupCandidate {
-  record: LivePeerDiscoveryRecord;
+  record: LivePeerDiscoveryRecord | null;
   remove(): Promise<void>;
 }
 
@@ -50,7 +52,7 @@ export function createLivePeerDiscoveryRecord(params: {
   recordId: string;
   noteId: VFSNodeId;
   peerId: string;
-  nodeId: string;
+  ticket: string;
   now: number;
   ttlMs?: number;
 }): LivePeerDiscoveryRecord {
@@ -60,7 +62,7 @@ export function createLivePeerDiscoveryRecord(params: {
     recordId: params.recordId,
     noteId: params.noteId,
     peerId: params.peerId,
-    nodeId: params.nodeId,
+    ticket: params.ticket,
     updatedAt: params.now,
     expiresAt: params.now + ttlMs,
   };
@@ -77,16 +79,16 @@ export function parseLivePeerDiscoveryRecord(
     return null;
   }
 
-  const { recordId, noteId, peerId, nodeId, updatedAt, expiresAt } = value;
+  const { recordId, noteId, peerId, ticket, updatedAt, expiresAt } = value;
   if (
     typeof recordId !== 'string' ||
     typeof noteId !== 'string' ||
     typeof peerId !== 'string' ||
-    typeof nodeId !== 'string' ||
+    typeof ticket !== 'string' ||
     recordId.trim().length === 0 ||
     noteId.trim().length === 0 ||
     peerId.trim().length === 0 ||
-    nodeId.trim().length === 0 ||
+    ticket.trim().length === 0 ||
     !isFiniteTimestamp(updatedAt) ||
     !isFiniteTimestamp(expiresAt)
   ) {
@@ -98,7 +100,7 @@ export function parseLivePeerDiscoveryRecord(
     recordId,
     noteId,
     peerId,
-    nodeId,
+    ticket,
     updatedAt,
     expiresAt,
   };
@@ -121,6 +123,11 @@ export async function cleanupExpiredLiveDiscoveryEntries<Entry>(
     options.entries.map(async (entry) => {
       try {
         const candidate = await options.readCandidate(entry);
+        if (candidate?.record === null) {
+          await candidate.remove();
+          return;
+        }
+
         if (
           !candidate ||
           candidate.record.noteId !== options.noteId ||

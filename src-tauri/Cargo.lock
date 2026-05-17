@@ -3145,6 +3145,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "iroh-tickets"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab64bac4bb573b9cfd2142bd2876ed65ca792efbc4398361a4ee51a0f9afbed6"
+dependencies = [
+ "data-encoding",
+ "derive_more 2.1.1",
+ "iroh-base",
+ "n0-error",
+ "postcard",
+ "serde",
+]
+
+[[package]]
 name = "irpc"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3684,6 +3698,7 @@ dependencies = [
  "bytes",
  "iroh",
  "iroh-gossip",
+ "iroh-tickets",
  "n0-future",
  "serde",
  "serde_json",

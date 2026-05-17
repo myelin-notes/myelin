@@ -11,6 +11,7 @@ use iroh_gossip::{
     api::{Event as GossipEvent, GossipSender},
     Gossip, TopicId,
 };
+use iroh_tickets::endpoint::EndpointTicket;
 use n0_future::StreamExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -34,6 +35,7 @@ struct IrohRuntime {
     endpoint: Endpoint,
     _router: Router,
     gossip: Gossip,
+    memory_lookup: MemoryLookup,
     topics: HashMap<String, ActiveTopic>,
 }
 
@@ -93,6 +95,7 @@ impl IrohRuntime {
             endpoint,
             _router: router,
             gossip,
+            memory_lookup,
             topics: HashMap::new(),
         })
     }
@@ -106,7 +109,7 @@ impl IrohRuntime {
         self.endpoint.online().await;
         self.attach_topic(app, note_id, transport_id, vec![])
             .await?;
-        Ok(self.endpoint.id().to_string())
+        Ok(EndpointTicket::new(self.endpoint.addr()).to_string())
     }
 
     async fn join(
@@ -114,14 +117,17 @@ impl IrohRuntime {
         app: &AppHandle,
         note_id: &str,
         transport_id: &str,
-        node_id: &str,
+        ticket: &str,
     ) -> Result<(), String> {
         self.endpoint.online().await;
 
-        let endpoint_id = EndpointId::from_str(node_id.trim())
-            .map_err(|err| format!("Invalid iroh node id: {err}"))?;
+        let ticket = EndpointTicket::from_str(ticket.trim())
+            .map_err(|err| format!("Invalid iroh ticket: {err}"))?;
+        let endpoint_addr = ticket.endpoint_addr().clone();
+        let bootstrap = vec![endpoint_addr.id];
+        self.memory_lookup.add_endpoint_info(endpoint_addr);
 
-        self.attach_topic(app, note_id, transport_id, vec![endpoint_id])
+        self.attach_topic(app, note_id, transport_id, bootstrap)
             .await
     }
 
@@ -378,7 +384,7 @@ pub async fn iroh_join(
     state: tauri::State<'_, IrohState>,
     note_id: String,
     transport_id: String,
-    node_id: String,
+    ticket: String,
 ) -> Result<(), String> {
     let mut runtime = state.runtime.lock().await;
     if runtime.is_none() {
@@ -388,7 +394,7 @@ pub async fn iroh_join(
     runtime
         .as_mut()
         .expect("runtime initialized")
-        .join(&app, &note_id, &transport_id, &node_id)
+        .join(&app, &note_id, &transport_id, &ticket)
         .await
 }
 
