@@ -35,6 +35,10 @@ import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
 import { parseCalloutMarker } from '../callouts';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { expandMarkdownLinkCommand } from './markdown/links';
+import {
+  buildTextOffsetMap,
+  type TextOffsetMap,
+} from './markdown/text-offset-map';
 import { schema } from './schema';
 import { exitTableOnLastRow, goToNextTableRow } from './table/commands';
 
@@ -168,6 +172,11 @@ function deleteCalloutRange(
   setDomTextSelection(view, selectionPos, -1);
 }
 
+// After dispatching a transaction that inserts a `\n` + trailing-space caret
+// anchor in a callout, PM's selection sync can resolve the cursor onto the
+// end of the previous DOM text node (across the `<br>` from
+// `linebreakReplacement`) instead of the start of the new line. Force the
+// DOM range to the text node we want so the caret renders on the new line.
 function setDomTextSelection(
   view: EditorView | undefined,
   pos: number,
@@ -256,42 +265,6 @@ export const deleteBackwardInCallout: Command = (state, dispatch, view) => {
   }
   return true;
 };
-
-interface TextOffsetMap {
-  posAt: number[];
-  text: string;
-}
-
-function buildTextOffsetMap(node: PMNode, pos: number): TextOffsetMap {
-  const parts: string[] = [];
-  const posAt = [pos + 1];
-  let cursorPos = pos + 1;
-
-  node.forEach((child) => {
-    if (child.isText) {
-      const text = child.text ?? '';
-      parts.push(text);
-      for (let i = 0; i < text.length; i++) {
-        cursorPos += 1;
-        posAt.push(cursorPos);
-      }
-      return;
-    }
-
-    if (child.type === schema.nodes.hardBreak) {
-      parts.push('\n');
-      cursorPos += child.nodeSize;
-      posAt.push(cursorPos);
-      return;
-    }
-
-    parts.push('\ufffc');
-    cursorPos += child.nodeSize;
-    posAt.push(cursorPos);
-  });
-
-  return { posAt, text: parts.join('') };
-}
 
 interface DeleteRange {
   from: number;

@@ -105,19 +105,6 @@ function isDotEntryName(name: string): boolean {
   return name.startsWith('.');
 }
 
-function uniqueTags(tags: string[]): string[] {
-  const seen = new Set<string>();
-  const unique: string[] = [];
-  for (const tag of tags) {
-    if (seen.has(tag)) {
-      continue;
-    }
-    seen.add(tag);
-    unique.push(tag);
-  }
-  return unique;
-}
-
 function normalizeFrontMatterTag(value: string): string | null {
   let tag = value.trim();
   const quote = tag[0];
@@ -196,7 +183,7 @@ function extractFrontMatterTags(frontMatter: string): string[] {
 
     const inlineValue = match[1] ?? '';
     if (inlineValue.trim()) {
-      return uniqueTags(parseFrontMatterTagValue(inlineValue));
+      return Array.from(new Set(parseFrontMatterTagValue(inlineValue)));
     }
 
     const tags: string[] = [];
@@ -215,7 +202,7 @@ function extractFrontMatterTags(frontMatter: string): string[] {
       }
     }
 
-    return uniqueTags(tags);
+    return Array.from(new Set(tags));
   }
 
   return [];
@@ -223,7 +210,7 @@ function extractFrontMatterTags(frontMatter: string): string[] {
 
 function parseObsidianMarkdown(markdown: string): ParsedObsidianMarkdown {
   const frontMatterMatch = MARKDOWN_FRONT_MATTER_RE.exec(markdown);
-  if (!frontMatterMatch) {
+  if (!frontMatterMatch || frontMatterMatch.index !== 0) {
     return { body: markdown, tags: [] };
   }
 
