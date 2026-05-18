@@ -65,6 +65,16 @@ describe('Obsidian vault import', () => {
     await storage.writeTextFile(
       '/vault/Projects/Alpha.md',
       [
+        '---',
+        'created_at: 2024-01-30T13:06:58+05:30',
+        'modified_at: 2024-02-17T13:20:08+05:30',
+        'cssclasses:',
+        '  - wide-page',
+        'tags:',
+        '  - project',
+        '  - "#research"',
+        '---',
+        '',
         'See [[Archive/Beta]], [[Beta]], [[Missing]], and [[Archive/Beta#Heading|Alias]].',
       ].join('\n'),
     );
@@ -121,6 +131,10 @@ describe('Obsidian vault import', () => {
 
     const alpha = projectFiles.find((file) => file.name === 'Alpha')!;
     const beta = archiveFiles.find((file) => file.name === 'Beta')!;
+    expect(alpha.tags).toEqual(['project', 'research']);
+    expect(
+      (await repository.listTags()).map((entry) => entry.tag).sort(),
+    ).toEqual(['project', 'research']);
     const session = await repository.openSession(alpha.id);
     try {
       const pageFrame = session.ydoc.elements.get(0);
@@ -130,6 +144,9 @@ describe('Obsidian vault import', () => {
       const doc = yXmlFragmentToProseMirrorRootNode(
         session.ydoc.getXmlFragment(pageFrameUuid as string),
         schema,
+      );
+      expect(doc.textContent).toBe(
+        'See [[Archive/Beta]], [[Beta]], [[Missing]], and [[Archive/Beta#Heading|Alias]].',
       );
       expect(collectNoteLinks(doc.toJSON())).toEqual([
         {

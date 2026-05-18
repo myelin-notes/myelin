@@ -15,6 +15,8 @@ import { addPdfElementToYDoc } from '@/pages/library/import-pdf';
 const logger = new Logger('ObsidianVaultImport');
 
 const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
+const MARKDOWN_FRONT_MATTER_RE =
+  /^(?:\uFEFF)?---[ \t]*\r?\n([\s\S]*?)^---[ \t]*(?:\r?\n|$)/m;
 const PDF_EXTENSION_RE = /\.pdf$/i;
 
 type VaultImportFile =
@@ -45,6 +47,11 @@ interface ScannedVault {
   files: VaultImportFile[];
   folderPaths: Set<string>;
   skippedFiles: number;
+}
+
+interface ParsedObsidianMarkdown {
+  body: string;
+  tags: string[];
 }
 
 export interface ObsidianVaultImportResult {
@@ -96,6 +103,134 @@ function isPdfFileName(fileName: string): boolean {
 
 function isDotEntryName(name: string): boolean {
   return name.startsWith('.');
+}
+
+function uniqueTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const tag of tags) {
+    if (seen.has(tag)) {
+      continue;
+    }
+    seen.add(tag);
+    unique.push(tag);
+  }
+  return unique;
+}
+
+function normalizeFrontMatterTag(value: string): string | null {
+  let tag = value.trim();
+  const quote = tag[0];
+  if ((quote === '"' || quote === "'") && tag.endsWith(quote)) {
+    tag = tag.slice(1, -1);
+  }
+
+  tag = tag.trim();
+  if (tag.startsWith('#')) {
+    tag = tag.slice(1).trim();
+  }
+
+  if (!tag || tag === '[]' || tag === 'null' || tag === '~') {
+    return null;
+  }
+
+  return tag;
+}
+
+function splitInlineYamlList(value: string): string[] {
+  const items: string[] = [];
+  let current = '';
+  let quote: string | null = null;
+
+  for (const char of value) {
+    if (quote) {
+      current += char;
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      current += char;
+      continue;
+    }
+
+    if (char === ',') {
+      items.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  items.push(current);
+  return items;
+}
+
+function parseFrontMatterTagValue(value: string): string[] {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === '[]') {
+    return [];
+  }
+
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return splitInlineYamlList(trimmed.slice(1, -1))
+      .map(normalizeFrontMatterTag)
+      .filter((tag): tag is string => tag !== null);
+  }
+
+  const tag = normalizeFrontMatterTag(trimmed);
+  return tag ? [tag] : [];
+}
+
+function extractFrontMatterTags(frontMatter: string): string[] {
+  const lines = frontMatter.replace(/\r\n/g, '\n').split('\n');
+  for (let index = 0; index < lines.length; index++) {
+    const match = /^tags\s*:\s*(.*)$/.exec(lines[index]);
+    if (!match) {
+      continue;
+    }
+
+    const inlineValue = match[1] ?? '';
+    if (inlineValue.trim()) {
+      return uniqueTags(parseFrontMatterTagValue(inlineValue));
+    }
+
+    const tags: string[] = [];
+    for (let listIndex = index + 1; listIndex < lines.length; listIndex++) {
+      const line = lines[listIndex];
+      if (line.trim() === '') {
+        continue;
+      }
+      if (/^\S/.test(line)) {
+        break;
+      }
+
+      const itemMatch = /^\s*-\s*(.+?)\s*$/.exec(line);
+      if (itemMatch) {
+        tags.push(...parseFrontMatterTagValue(itemMatch[1] ?? ''));
+      }
+    }
+
+    return uniqueTags(tags);
+  }
+
+  return [];
+}
+
+function parseObsidianMarkdown(markdown: string): ParsedObsidianMarkdown {
+  const frontMatterMatch = MARKDOWN_FRONT_MATTER_RE.exec(markdown);
+  if (!frontMatterMatch) {
+    return { body: markdown, tags: [] };
+  }
+
+  return {
+    body: markdown.slice(frontMatterMatch[0].length),
+    tags: extractFrontMatterTags(frontMatterMatch[1] ?? ''),
+  };
 }
 
 function addFolderAncestors(
@@ -307,9 +442,14 @@ async function writeMarkdownFile({
   }
 
   const markdown = await readTextFile(file.absolutePath);
+  const parsedMarkdown = parseObsidianMarkdown(markdown);
+  if (parsedMarkdown.tags.length > 0) {
+    await repository.setTags(file.nodeId, parsedMarkdown.tags);
+  }
+
   const session = await repository.openSession(file.nodeId);
   try {
-    await addMarkdownPageFrameToYDoc(session.ydoc, markdown, {
+    await addMarkdownPageFrameToYDoc(session.ydoc, parsedMarkdown.body, {
       resolveNoteLinkId,
     });
     await session.save();
