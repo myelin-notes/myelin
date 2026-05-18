@@ -1,4 +1,8 @@
-export type { ThumbnailProducer } from './service';
+export type {
+  ThumbnailProducer,
+  ThumbnailRegenerationOptions,
+  ThumbnailRenderOptions,
+} from './service';
 export {
   getThumbnailUrl,
   regenerateThumbnailNow,

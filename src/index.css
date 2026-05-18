@@ -519,6 +519,52 @@ input[type="range"].tool-slider::-moz-range-track {
   background-origin: border-box;
 }
 
+.pm-editor .ProseMirror blockquote.pm-callout {
+  --pm-callout-fill-color: color-mix(
+    in srgb,
+    var(--bg-surface) 78%,
+    transparent
+  );
+  --pm-blockquote-rule-color: rgba(47, 62, 70, 0.28);
+  padding-block: 0.85rem;
+  padding-right: 1rem;
+  border-radius: var(--radius-lg);
+  background-image:
+    var(
+      --pm-blockquote-rule-images,
+      linear-gradient(
+        var(--pm-blockquote-rule-color),
+        var(--pm-blockquote-rule-color)
+      )
+    ),
+    var(
+      --pm-callout-fill-images,
+      linear-gradient(var(--pm-callout-fill-color), var(--pm-callout-fill-color))
+    );
+  background-position:
+    var(--pm-blockquote-rule-positions, 0 0),
+    var(--pm-callout-fill-positions, 0 0);
+  background-size:
+    var(
+      --pm-blockquote-rule-sizes,
+      var(--pm-blockquote-rule-width) 100%
+    ),
+    var(--pm-callout-fill-sizes, 100% 100%);
+  background-repeat:
+    var(--pm-blockquote-rule-repeats, no-repeat),
+    var(--pm-callout-fill-repeats, no-repeat);
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout .pm-callout-marker {
+  color: color-mix(in srgb, var(--text-muted) 68%, transparent);
+  font-weight: 520;
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout .pm-callout-title {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
 .pm-editor .ProseMirror .pm-table-node {
   position: relative;
   margin: 1.2em 0;

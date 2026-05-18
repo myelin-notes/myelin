@@ -3,17 +3,29 @@ import type { VFSNodeId } from '@/lib/sync';
 import * as cache from './cache';
 
 export interface ThumbnailProducer {
-  render(maxSize: number): Promise<Blob | null>;
+  render(
+    maxSize: number,
+    options: ThumbnailRenderOptions,
+  ): Promise<Blob | null>;
+}
+
+export interface ThumbnailRenderOptions {
+  reason: 'scheduled' | 'immediate';
+}
+
+export interface ThumbnailRegenerationOptions {
+  delayMs?: number;
 }
 
 const MAX_SIZE = 600;
-const DEBOUNCE_MS = 750;
+const SCHEDULED_DEBOUNCE_MS = 30_000;
 
 const logger = new Logger('ThumbnailService');
+type ThumbnailTimer = ReturnType<typeof globalThis.setTimeout>;
 
 const producers = new Map<VFSNodeId, ThumbnailProducer>();
 const subscribers = new Map<VFSNodeId, Set<() => void>>();
-const debounceTimers = new Map<VFSNodeId, number>();
+const debounceTimers = new Map<VFSNodeId, ThumbnailTimer>();
 const inflight = new Map<VFSNodeId, Promise<void>>();
 const rerunRequested = new Set<VFSNodeId>();
 const versions = new Map<VFSNodeId, number>();
@@ -30,27 +42,31 @@ export function registerThumbnailProducer(
   };
 }
 
-export function requestThumbnailRegeneration(nodeId: VFSNodeId): void {
+export function requestThumbnailRegeneration(
+  nodeId: VFSNodeId,
+  options: ThumbnailRegenerationOptions = {},
+): void {
   const prev = debounceTimers.get(nodeId);
   if (prev !== undefined) {
-    window.clearTimeout(prev);
+    globalThis.clearTimeout(prev);
   }
-  const timer = window.setTimeout(() => {
+  const delayMs = options.delayMs ?? SCHEDULED_DEBOUNCE_MS;
+  const timer = globalThis.setTimeout(() => {
     debounceTimers.delete(nodeId);
-    void runGenerate(nodeId).catch((err) => {
+    void runGenerate(nodeId, 'scheduled').catch((err) => {
       logger.error('Scheduled regeneration failed', err, { nodeId });
     });
-  }, DEBOUNCE_MS);
+  }, delayMs);
   debounceTimers.set(nodeId, timer);
 }
 
 export async function regenerateThumbnailNow(nodeId: VFSNodeId): Promise<void> {
   const timer = debounceTimers.get(nodeId);
   if (timer !== undefined) {
-    window.clearTimeout(timer);
+    globalThis.clearTimeout(timer);
     debounceTimers.delete(nodeId);
   }
-  await runGenerate(nodeId);
+  await runGenerate(nodeId, 'immediate');
 }
 
 export async function getThumbnailUrl(
@@ -92,7 +108,10 @@ export async function removeThumbnail(nodeId: VFSNodeId): Promise<void> {
   notify(nodeId);
 }
 
-async function runGenerate(nodeId: VFSNodeId): Promise<void> {
+async function runGenerate(
+  nodeId: VFSNodeId,
+  reason: 'scheduled' | 'immediate',
+): Promise<void> {
   const existing = inflight.get(nodeId);
   if (existing !== undefined) {
     rerunRequested.add(nodeId);
@@ -110,7 +129,7 @@ async function runGenerate(nodeId: VFSNodeId): Promise<void> {
 
   const task = (async () => {
     try {
-      const blob = await producer.render(MAX_SIZE);
+      const blob = await producer.render(MAX_SIZE, { reason });
       if (blob === null) {
         return;
       }

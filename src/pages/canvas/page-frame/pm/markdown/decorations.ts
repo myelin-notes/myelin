@@ -1,8 +1,10 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { Decoration } from 'prosemirror-view';
+import { parseCalloutMarker } from '../../callouts';
 import { parseFenceMarkdown } from './parse-fences';
 import { parseInlineMarkdown } from './parse-inline';
-import { type InlinePreviewKind, MARKDOWN_ATOM_CHAR } from './types';
+import { buildTextOffsetMap } from './text-offset-map';
+import type { InlinePreviewKind } from './types';
 
 const INLINE_CLASS_BY_KIND: Record<InlinePreviewKind, string> = {
   bold: 'pm-md-bold',
@@ -10,38 +12,6 @@ const INLINE_CLASS_BY_KIND: Record<InlinePreviewKind, string> = {
   inlineCode: 'pm-md-inline-code',
   noteLink: 'pm-md-note-link',
 };
-
-interface TextOffsetMap {
-  text: string;
-  posAt: number[];
-}
-
-function buildTextOffsetMap(node: PMNode, pos: number): TextOffsetMap {
-  const parts: string[] = [];
-  const posAt = [pos + 1];
-  let cursorPos = pos + 1;
-
-  node.forEach((child) => {
-    if (child.isText) {
-      const text = child.text ?? '';
-      parts.push(text);
-      for (let i = 0; i < text.length; i++) {
-        cursorPos += 1;
-        posAt.push(cursorPos);
-      }
-      return;
-    }
-
-    parts.push(MARKDOWN_ATOM_CHAR);
-    cursorPos += child.nodeSize;
-    posAt.push(cursorPos);
-  });
-
-  return {
-    text: parts.join(''),
-    posAt,
-  };
-}
 
 function addInlineDecorations(
   node: PMNode,
@@ -81,6 +51,43 @@ function addInlineDecorations(
         decorations,
       );
     }
+  }
+}
+
+function addCalloutDecorations(
+  node: PMNode,
+  pos: number,
+  decorations: Decoration[],
+): void {
+  if (node.type.name !== 'blockquote') {
+    return;
+  }
+
+  const { text, posAt } = buildTextOffsetMap(node, pos);
+  const marker = parseCalloutMarker(text);
+  if (!marker) {
+    return;
+  }
+
+  decorations.push(
+    Decoration.node(pos, pos + node.nodeSize, {
+      class: 'pm-callout',
+      'data-callout-label': marker.label,
+      'data-callout-type': marker.type,
+    }),
+  );
+  decorations.push(
+    Decoration.inline(posAt[marker.markerFrom], posAt[marker.markerTo], {
+      class: 'pm-md-delim pm-callout-marker',
+    }),
+  );
+
+  if (marker.titleFrom < marker.titleTo) {
+    decorations.push(
+      Decoration.inline(posAt[marker.titleFrom], posAt[marker.titleTo], {
+        class: 'pm-callout-title',
+      }),
+    );
   }
 }
 
@@ -151,6 +158,7 @@ export function buildMarkdownDecorationsForTextblock(
   if (node.type.spec.code) {
     addFenceDecorations(node, pos, decorations);
   } else {
+    addCalloutDecorations(node, pos, decorations);
     addInlineDecorations(node, pos, decorations);
   }
   return decorations;

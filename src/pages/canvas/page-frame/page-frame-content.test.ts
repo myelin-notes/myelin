@@ -50,6 +50,43 @@ describe('page-frame content shape', () => {
     ]);
   });
 
+  it('imports Obsidian-style callouts as editable blockquotes', () => {
+    const markdown = [
+      '> [!info] Info',
+      '> This note is for practicing and testing different css and templater snippets.',
+    ].join('\n');
+    const doc = parseMarkdownToDoc(markdown, schema);
+
+    expect(doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'blockquote',
+          content: [
+            {
+              type: 'text',
+              text: '[!info] Info',
+            },
+            { type: 'hardBreak' },
+            {
+              type: 'text',
+              text: 'This note is for practicing and testing different css and templater snippets.',
+            },
+          ],
+        },
+      ],
+    });
+
+    const ydoc = prosemirrorToYDoc(doc, 'page-frame');
+    const roundTripped = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment('page-frame'),
+      schema,
+    );
+
+    expect(roundTripped.toJSON()).toEqual(doc.toJSON());
+    expect(serializeDocToMarkdown(roundTripped)).toBe(`${markdown}\n`);
+  });
+
   it('preserves rich-text paragraphs through the Yjs-backed editor state', () => {
     const doc = parseMarkdownToDoc(
       'Hello **bold** [link](https://example.com) ![diagram](https://example.com/a.png) `inline`',

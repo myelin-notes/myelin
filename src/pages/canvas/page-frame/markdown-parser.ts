@@ -4,12 +4,14 @@
  * The schema is bespoke (flat list items with indent attrs, custom
  * mentions) so we skip the standard `prosemirror-markdown` package and
  * hand-roll a focused parser. Supports: headings, paragraphs, bullet,
- * ordered, and checklist items (with indent), blockquote, fenced code blocks,
+ * ordered, and checklist items (with indent), blockquote, callouts,
+ * fenced code blocks,
  * tables, hr,
  * and inline marks (bold, italic, strikethrough, code, link, image).
  */
 
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
+import { parseCalloutMarker } from './callouts';
 
 export function parseMarkdownToDoc(md: string, schema: Schema): PMNode {
   const blocks = parseBlocks(md.replace(/\r\n/g, '\n'));
@@ -251,7 +253,12 @@ function parseBlocks(md: string): BlockToken[] {
         parts.push(m[1]);
         i++;
       }
-      out.push({ type: 'blockquote', content: parts.join(' ') });
+      out.push({
+        type: 'blockquote',
+        content: parseCalloutMarker(parts[0])
+          ? parts.join('\n')
+          : parts.join(' '),
+      });
       continue;
     }
 
@@ -332,6 +339,13 @@ function scanInline(
     if (ch === '\\' && i + 1 < text.length) {
       buf += text[i + 1];
       i += 2;
+      continue;
+    }
+
+    if (ch === '\n' && schema.nodes.hardBreak) {
+      pushText();
+      nodes.push(schema.nodes.hardBreak.create());
+      i++;
       continue;
     }
 
