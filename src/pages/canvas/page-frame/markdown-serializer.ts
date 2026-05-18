@@ -6,6 +6,7 @@
  */
 
 import type { Mark, Node as PMNode } from 'prosemirror-model';
+import { parseCalloutMarker } from './callouts';
 
 export function serializeDocToMarkdown(doc: PMNode): string {
   const parts: string[] = [];
@@ -93,10 +94,7 @@ function serializeBlock(node: PMNode): string | null {
       return `${'  '.repeat(indent)}${order}. ${serializeInline(node)}`;
     }
     case 'blockquote':
-      return serializeInline(node)
-        .split('\n')
-        .map((line) => `> ${line}`)
-        .join('\n');
+      return serializeBlockquote(node);
     case 'codeBlock':
       // The page-frame schema stores fence delimiters (```lang / ```) as
       // part of the code block's own text content — the editor renders
@@ -109,6 +107,18 @@ function serializeBlock(node: PMNode): string | null {
     default:
       return serializeInline(node);
   }
+}
+
+function serializeBlockquote(node: PMNode): string {
+  const lines = serializeInline(node).split('\n');
+  if (parseCalloutMarker(node.textContent)) {
+    lines[0] = lines[0].replace(
+      /^\\\[!([A-Za-z][A-Za-z0-9_-]*)\\\]([+-]?)/,
+      '[!$1]$2',
+    );
+  }
+
+  return lines.map((line) => `> ${line.replace(/[ \t]+$/, '')}`).join('\n');
 }
 
 function serializeInline(node: PMNode): string {
@@ -163,6 +173,8 @@ function renderInlineAtom(node: PMNode): string {
       const label = (node.attrs.label as string | null) ?? '';
       return `@${label}`;
     }
+    case 'hardBreak':
+      return '\n';
     default:
       return node.textContent;
   }

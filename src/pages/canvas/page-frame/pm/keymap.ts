@@ -13,11 +13,26 @@ import {
 } from 'prosemirror-commands';
 import { undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
-import type { MarkType, ResolvedPos, Schema } from 'prosemirror-model';
-import { AllSelection, type Command, Selection } from 'prosemirror-state';
+import type {
+  MarkType,
+  Node as PMNode,
+  ResolvedPos,
+  Schema,
+} from 'prosemirror-model';
+import {
+  AllSelection,
+  type Command,
+  type EditorState,
+  Plugin,
+  Selection,
+  TextSelection,
+  type Transaction,
+} from 'prosemirror-state';
 import { goToNextCell } from 'prosemirror-tables';
+import type { EditorView } from 'prosemirror-view';
 import { redo, undo } from 'y-prosemirror';
 import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
+import { parseCalloutMarker } from '../callouts';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { expandMarkdownLinkCommand } from './markdown/links';
 import { schema } from './schema';
@@ -74,6 +89,273 @@ const splitFlatListItem: Command = (state, dispatch) => {
   }
   return true;
 };
+
+function shouldAddCalloutCaretAnchor($cursor: ResolvedPos): boolean {
+  const trailingText = $cursor.parent.textBetween(
+    $cursor.parentOffset,
+    $cursor.parent.content.size,
+    '\n',
+    '\n',
+  );
+  const lineBreakIndex = trailingText.indexOf('\n');
+  const restOfLine =
+    lineBreakIndex === -1
+      ? trailingText
+      : trailingText.slice(0, lineBreakIndex);
+  return /^[ \t]*$/.test(restOfLine);
+}
+
+function isCalloutBlockquote(node: PMNode): boolean {
+  return (
+    node.type === schema.nodes.blockquote &&
+    parseCalloutMarker(node.textBetween(0, node.content.size, '\n', '\n')) !==
+      null
+  );
+}
+
+export const insertNewlineInCallout: Command = (state, dispatch) => {
+  const { $cursor } = state.selection as {
+    $cursor?: ResolvedPos;
+  };
+  if (!$cursor) {
+    return false;
+  }
+
+  const node = $cursor.parent;
+  if (!isCalloutBlockquote(node)) {
+    return false;
+  }
+
+  if (dispatch) {
+    const text = shouldAddCalloutCaretAnchor($cursor) ? '\n ' : '\n';
+    const tr = state.tr.insertText(text);
+    if (text.endsWith(' ')) {
+      tr.setSelection(Selection.near(tr.doc.resolve(tr.selection.from - 1)));
+    }
+    dispatch(tr.scrollIntoView());
+  }
+  return true;
+};
+
+function textOffsetAtPos(map: TextOffsetMap, pos: number): number | null {
+  const offset = map.posAt.indexOf(pos);
+  return offset === -1 ? null : offset;
+}
+
+function lineEndAfter(text: string, offset: number): number {
+  const lineEnd = text.indexOf('\n', offset);
+  return lineEnd === -1 ? text.length : lineEnd;
+}
+
+function deleteCalloutRange(
+  state: EditorState,
+  dispatch: ((tr: Transaction) => void) | undefined,
+  view: EditorView | undefined,
+  from: number,
+  to: number,
+): void {
+  if (!dispatch) {
+    return;
+  }
+
+  const tr = state.tr.delete(from, to);
+  const selectionPos = Math.min(from, tr.doc.content.size);
+  dispatch(
+    tr
+      .setSelection(TextSelection.create(tr.doc, selectionPos))
+      .scrollIntoView(),
+  );
+  setDomTextSelection(view, selectionPos, -1);
+}
+
+function setDomTextSelection(
+  view: EditorView | undefined,
+  pos: number,
+  side: -1 | 1,
+): void {
+  if (!view) {
+    return;
+  }
+
+  const { node, offset } = view.domAtPos(pos, side);
+  if (node.nodeType !== 3) {
+    return;
+  }
+
+  const doc = view.dom.ownerDocument;
+  const selection = doc.getSelection();
+  if (!selection) {
+    return;
+  }
+
+  const range = doc.createRange();
+  range.setStart(node, Math.min(offset, node.textContent?.length ?? 0));
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+export const deleteBackwardInCallout: Command = (state, dispatch, view) => {
+  const { $cursor } = state.selection as {
+    $cursor?: ResolvedPos;
+  };
+  if (!$cursor || !isCalloutBlockquote($cursor.parent)) {
+    return false;
+  }
+
+  const map = buildTextOffsetMap($cursor.parent, $cursor.before());
+  const offset = textOffsetAtPos(map, $cursor.pos);
+  if (offset === null || offset === 0) {
+    return false;
+  }
+
+  const lineStart = map.text.lastIndexOf('\n', offset - 1) + 1;
+  const lineEnd = lineEndAfter(map.text, offset);
+  const previousChar = map.text[offset - 1];
+  const remainingLine =
+    map.text.slice(lineStart, offset - 1) + map.text.slice(offset, lineEnd);
+  const isBlankLine = /^[ \t]*$/.test(remainingLine);
+
+  if ((previousChar === '\n' || /^[ \t]$/.test(previousChar)) && isBlankLine) {
+    const fromOffset = previousChar === '\n' ? offset - 1 : lineStart - 1;
+    if (fromOffset >= 0) {
+      deleteCalloutRange(
+        state,
+        dispatch,
+        view,
+        map.posAt[fromOffset],
+        map.posAt[lineEnd],
+      );
+      return true;
+    }
+  }
+
+  if (!dispatch) {
+    return true;
+  }
+
+  const from = map.posAt[offset - 1];
+  const to = map.posAt[offset];
+  if (isBlankLine) {
+    const tr = state.tr;
+    const replaceFrom = lineStart > 0 ? map.posAt[lineStart - 1] : from;
+    const replaceTo = lineStart > 0 ? map.posAt[lineEnd] : to;
+    const text = lineStart > 0 ? '\n ' : ' ';
+    const selectionPos = replaceFrom + text.length - 1;
+
+    tr.delete(replaceFrom, replaceTo);
+    tr.insertText(text, replaceFrom);
+    tr.setSelection(TextSelection.create(tr.doc, selectionPos));
+    dispatch(tr.scrollIntoView());
+    setDomTextSelection(view, selectionPos, 1);
+  } else {
+    const tr = state.tr.delete(from, to);
+    tr.setSelection(TextSelection.create(tr.doc, from));
+    dispatch(tr.scrollIntoView());
+    setDomTextSelection(view, from, offset - 1 === lineStart ? 1 : -1);
+  }
+  return true;
+};
+
+interface TextOffsetMap {
+  posAt: number[];
+  text: string;
+}
+
+function buildTextOffsetMap(node: PMNode, pos: number): TextOffsetMap {
+  const parts: string[] = [];
+  const posAt = [pos + 1];
+  let cursorPos = pos + 1;
+
+  node.forEach((child) => {
+    if (child.isText) {
+      const text = child.text ?? '';
+      parts.push(text);
+      for (let i = 0; i < text.length; i++) {
+        cursorPos += 1;
+        posAt.push(cursorPos);
+      }
+      return;
+    }
+
+    if (child.type === schema.nodes.hardBreak) {
+      parts.push('\n');
+      cursorPos += child.nodeSize;
+      posAt.push(cursorPos);
+      return;
+    }
+
+    parts.push('\ufffc');
+    cursorPos += child.nodeSize;
+    posAt.push(cursorPos);
+  });
+
+  return { posAt, text: parts.join('') };
+}
+
+interface DeleteRange {
+  from: number;
+  to: number;
+}
+
+function collectCalloutCaretAnchorDeletes(
+  node: PMNode,
+  pos: number,
+): DeleteRange[] {
+  if (node.type !== schema.nodes.blockquote) {
+    return [];
+  }
+
+  const { posAt, text } = buildTextOffsetMap(node, pos);
+  if (!parseCalloutMarker(text)) {
+    return [];
+  }
+
+  const deletes: DeleteRange[] = [];
+  let lineStart = 0;
+  for (let i = 0; i <= text.length; i++) {
+    if (i < text.length && text[i] !== '\n') {
+      continue;
+    }
+
+    let trailingStart = i;
+    while (trailingStart > lineStart && /[ \t]/.test(text[trailingStart - 1])) {
+      trailingStart--;
+    }
+    if (trailingStart < i && /\S/.test(text.slice(lineStart, trailingStart))) {
+      deletes.push({ from: posAt[trailingStart], to: posAt[i] });
+    }
+
+    lineStart = i + 1;
+  }
+
+  return deletes;
+}
+
+export function calloutCaretAnchorCleanupPlugin(): Plugin {
+  return new Plugin({
+    appendTransaction(transactions, _oldState, newState) {
+      if (!transactions.some((tr) => tr.docChanged)) {
+        return null;
+      }
+
+      const deletes: DeleteRange[] = [];
+      newState.doc.descendants((node, pos) => {
+        deletes.push(...collectCalloutCaretAnchorDeletes(node, pos));
+        return true;
+      });
+      if (deletes.length === 0) {
+        return null;
+      }
+
+      const tr = newState.tr;
+      for (const range of deletes.sort((a, b) => b.from - a.from)) {
+        tr.delete(range.from, range.to);
+      }
+      return tr;
+    },
+  });
+}
 
 const MAX_INDENT = 4;
 
@@ -193,6 +475,7 @@ export function buildKeymap(s: Schema) {
       newlineInCode,
       goToNextTableRow,
       splitFlatListItem,
+      insertNewlineInCallout,
       liftEmptyBlock,
       splitBlock,
     ),
@@ -201,6 +484,7 @@ export function buildKeymap(s: Schema) {
       undoInputRule,
       clearBlockFormatting,
       expandMarkdownLinkCommand,
+      deleteBackwardInCallout,
       joinBackward,
       selectNodeBackward,
     ),

@@ -1273,6 +1273,10 @@ function clearBlockquoteRuleStyle(blockquote: HTMLElement): void {
   blockquote.style.removeProperty('--pm-blockquote-rule-positions');
   blockquote.style.removeProperty('--pm-blockquote-rule-sizes');
   blockquote.style.removeProperty('--pm-blockquote-rule-repeats');
+  blockquote.style.removeProperty('--pm-callout-fill-images');
+  blockquote.style.removeProperty('--pm-callout-fill-positions');
+  blockquote.style.removeProperty('--pm-callout-fill-sizes');
+  blockquote.style.removeProperty('--pm-callout-fill-repeats');
 }
 
 function collectBlockquoteRuleSegments(
@@ -1318,6 +1322,9 @@ function syncBlockquoteRuleStyles(view: EditorView): void {
     }
     if (segments.length === 0) {
       blockquote.style.setProperty('--pm-blockquote-rule-images', 'none');
+      if (blockquote.classList.contains('pm-callout')) {
+        blockquote.style.setProperty('--pm-callout-fill-images', 'none');
+      }
       continue;
     }
 
@@ -1339,6 +1346,29 @@ function syncBlockquoteRuleStyles(view: EditorView): void {
     );
     blockquote.style.setProperty(
       '--pm-blockquote-rule-repeats',
+      segments.map(() => 'no-repeat').join(', '),
+    );
+
+    if (!blockquote.classList.contains('pm-callout')) {
+      continue;
+    }
+
+    const calloutFillImage =
+      'linear-gradient(var(--pm-callout-fill-color), var(--pm-callout-fill-color))';
+    blockquote.style.setProperty(
+      '--pm-callout-fill-images',
+      segments.map(() => calloutFillImage).join(', '),
+    );
+    blockquote.style.setProperty(
+      '--pm-callout-fill-positions',
+      segments.map((segment) => `0 ${segment.top}px`).join(', '),
+    );
+    blockquote.style.setProperty(
+      '--pm-callout-fill-sizes',
+      segments.map((segment) => `100% ${segment.height}px`).join(', '),
+    );
+    blockquote.style.setProperty(
+      '--pm-callout-fill-repeats',
       segments.map(() => 'no-repeat').join(', '),
     );
   }
@@ -1503,6 +1533,19 @@ export function paginationPlugin(
       let pendingFollowUpPasses = 0;
       let suppressResizeInvalidation = false;
       let clearSuppressResizeRafId = 0;
+      let syncBlockquoteStylesRafId = 0;
+
+      function scheduleBlockquoteRuleSync() {
+        if (syncBlockquoteStylesRafId !== 0) {
+          cancelAnimationFrame(syncBlockquoteStylesRafId);
+        }
+        syncBlockquoteStylesRafId = requestAnimationFrame(() => {
+          syncBlockquoteStylesRafId = 0;
+          if (!destroyed) {
+            syncBlockquoteRuleStyles(editorView);
+          }
+        });
+      }
 
       function paginate() {
         if (destroyed) {
@@ -1595,7 +1638,7 @@ export function paginationPlugin(
             metrics.changed = changed;
           }
           if (!changed) {
-            syncBlockquoteRuleStyles(editorView);
+            scheduleBlockquoteRuleSync();
             return;
           }
 
@@ -1629,7 +1672,7 @@ export function paginationPlugin(
 
           const dispatchStartedAt = metrics ? performance.now() : 0;
           editorView.dispatch(tr);
-          syncBlockquoteRuleStyles(editorView);
+          scheduleBlockquoteRuleSync();
           if (metrics) {
             metrics.dispatchMs = performance.now() - dispatchStartedAt;
           }
@@ -1679,6 +1722,9 @@ export function paginationPlugin(
           stopObservingLayout();
           if (rafId !== 0) {
             cancelAnimationFrame(rafId);
+          }
+          if (syncBlockquoteStylesRafId !== 0) {
+            cancelAnimationFrame(syncBlockquoteStylesRafId);
           }
           if (clearSuppressResizeRafId !== 0) {
             cancelAnimationFrame(clearSuppressResizeRafId);

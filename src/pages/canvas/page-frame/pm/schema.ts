@@ -172,6 +172,17 @@ const blockquote: NodeSpec = {
   parseDOM: [{ tag: 'blockquote' }],
 };
 
+const hardBreak: NodeSpec = {
+  inline: true,
+  group: 'inline',
+  selectable: false,
+  linebreakReplacement: true,
+  toDOM() {
+    return ['br'];
+  },
+  parseDOM: [{ tag: 'br' }],
+};
+
 const codeBlock: NodeSpec = {
   content: 'text*',
   group: 'block textblock',
@@ -412,6 +423,7 @@ export const schema = new Schema({
     orderedListItem,
     checkListItem,
     blockquote,
+    hardBreak,
     codeBlock,
     horizontalRule,
     image,

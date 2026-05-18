@@ -19,6 +19,18 @@ function docFromCodeBlock(text: string) {
   return schema.nodes.doc.create(null, codeBlock);
 }
 
+function docFromBlockquote(text: string) {
+  const content = text
+    .split('\n')
+    .flatMap((part, index) =>
+      index === 0
+        ? [schema.text(part)]
+        : [schema.nodes.hardBreak.create(), schema.text(part)],
+    );
+  const blockquote = schema.nodes.blockquote.create(null, content);
+  return schema.nodes.doc.create(null, blockquote);
+}
+
 function toDecorationViews(decorations: Decoration[]): DecorationView[] {
   return decorations
     .map((d) => ({
@@ -102,6 +114,28 @@ describe('buildMarkdownDecorations inline delimiters', () => {
 
   it('produces no decorations for plain text', () => {
     const decorations = buildMarkdownDecorations(docFromText('just text'));
+
+    expect(toDecorationViews(decorations)).toEqual([]);
+  });
+});
+
+describe('buildMarkdownDecorations Obsidian callouts', () => {
+  it('decorates a callout blockquote marker and title', () => {
+    const decorations = buildMarkdownDecorations(
+      docFromBlockquote('[!info] Info\nBody'),
+    );
+
+    expect(toDecorationViews(decorations)).toEqual([
+      { from: 0, to: 19, class: 'pm-callout' },
+      { from: 1, to: 8, class: 'pm-md-delim pm-callout-marker' },
+      { from: 9, to: 13, class: 'pm-callout-title' },
+    ]);
+  });
+
+  it('does not decorate regular blockquotes as callouts', () => {
+    const decorations = buildMarkdownDecorations(
+      docFromBlockquote('regular quote'),
+    );
 
     expect(toDecorationViews(decorations)).toEqual([]);
   });

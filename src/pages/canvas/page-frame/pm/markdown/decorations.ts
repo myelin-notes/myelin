@@ -1,5 +1,6 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { Decoration } from 'prosemirror-view';
+import { parseCalloutMarker } from '../../callouts';
 import { parseFenceMarkdown } from './parse-fences';
 import { parseInlineMarkdown } from './parse-inline';
 import { type InlinePreviewKind, MARKDOWN_ATOM_CHAR } from './types';
@@ -29,6 +30,13 @@ function buildTextOffsetMap(node: PMNode, pos: number): TextOffsetMap {
         cursorPos += 1;
         posAt.push(cursorPos);
       }
+      return;
+    }
+
+    if (child.type.name === 'hardBreak') {
+      parts.push('\n');
+      cursorPos += child.nodeSize;
+      posAt.push(cursorPos);
       return;
     }
 
@@ -81,6 +89,43 @@ function addInlineDecorations(
         decorations,
       );
     }
+  }
+}
+
+function addCalloutDecorations(
+  node: PMNode,
+  pos: number,
+  decorations: Decoration[],
+): void {
+  if (node.type.name !== 'blockquote') {
+    return;
+  }
+
+  const { text, posAt } = buildTextOffsetMap(node, pos);
+  const marker = parseCalloutMarker(text);
+  if (!marker) {
+    return;
+  }
+
+  decorations.push(
+    Decoration.node(pos, pos + node.nodeSize, {
+      class: 'pm-callout',
+      'data-callout-label': marker.label,
+      'data-callout-type': marker.type,
+    }),
+  );
+  decorations.push(
+    Decoration.inline(posAt[marker.markerFrom], posAt[marker.markerTo], {
+      class: 'pm-md-delim pm-callout-marker',
+    }),
+  );
+
+  if (marker.titleFrom < marker.titleTo) {
+    decorations.push(
+      Decoration.inline(posAt[marker.titleFrom], posAt[marker.titleTo], {
+        class: 'pm-callout-title',
+      }),
+    );
   }
 }
 
@@ -151,6 +196,7 @@ export function buildMarkdownDecorationsForTextblock(
   if (node.type.spec.code) {
     addFenceDecorations(node, pos, decorations);
   } else {
+    addCalloutDecorations(node, pos, decorations);
     addInlineDecorations(node, pos, decorations);
   }
   return decorations;

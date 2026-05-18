@@ -3,7 +3,11 @@ import { toCanvas as htmlToImageCanvas } from 'html-to-image';
 import { Logger } from '@/lib/logger';
 import { getScratchCanvasContext } from '@/lib/scratch-canvas';
 import type { VFSNodeId } from '@/lib/sync';
-import { registerThumbnailProducer } from '@/lib/thumbnails';
+import {
+  registerThumbnailProducer,
+  requestThumbnailRegeneration,
+  type ThumbnailRenderOptions,
+} from '@/lib/thumbnails';
 
 interface UseCanvasThumbnailProducerArgs {
   id: VFSNodeId | undefined;
@@ -13,6 +17,7 @@ interface UseCanvasThumbnailProducerArgs {
 
 const logger = new Logger('CanvasThumbnailProducer');
 const EXCLUDE_SELECTOR = '[data-thumbnail-exclude="true"]';
+const EDITING_FINISHED_THUMBNAIL_DELAY_MS = 3_000;
 
 export function useCanvasThumbnailProducer({
   id,
@@ -25,8 +30,12 @@ export function useCanvasThumbnailProducer({
     }
 
     return registerThumbnailProducer(id, {
-      async render(maxSize) {
+      async render(maxSize, options) {
         const root = thumbnailRootRef.current;
+        if (root !== null && isScheduledWhileEditing(root, options)) {
+          return null;
+        }
+
         if (root !== null && root.clientWidth > 0 && root.clientHeight > 0) {
           try {
             const blob = await renderDomThumbnail(
@@ -51,6 +60,58 @@ export function useCanvasThumbnailProducer({
       },
     });
   }, [canvasRef, id, thumbnailRootRef]);
+
+  useEffect(() => {
+    if (id === undefined) {
+      return;
+    }
+
+    const root = thumbnailRootRef.current;
+    if (root === null) {
+      return;
+    }
+
+    const handleFocusOut = (event: FocusEvent) => {
+      if (
+        event.target instanceof HTMLElement &&
+        root.contains(event.target) &&
+        isEditableElement(event.target)
+      ) {
+        requestThumbnailRegeneration(id, {
+          delayMs: EDITING_FINISHED_THUMBNAIL_DELAY_MS,
+        });
+      }
+    };
+
+    root.addEventListener('focusout', handleFocusOut);
+    return () => {
+      root.removeEventListener('focusout', handleFocusOut);
+    };
+  }, [id, thumbnailRootRef]);
+}
+
+function isScheduledWhileEditing(
+  root: HTMLElement,
+  options: ThumbnailRenderOptions,
+): boolean {
+  if (options.reason !== 'scheduled') {
+    return false;
+  }
+
+  const activeElement = root.ownerDocument.activeElement;
+  return (
+    activeElement instanceof HTMLElement &&
+    root.contains(activeElement) &&
+    isEditableElement(activeElement)
+  );
+}
+
+function isEditableElement(element: HTMLElement): boolean {
+  return (
+    element.isContentEditable ||
+    element.matches('input, textarea, [contenteditable="true"]') ||
+    element.closest('[contenteditable="true"]') !== null
+  );
 }
 
 async function renderDomThumbnail(

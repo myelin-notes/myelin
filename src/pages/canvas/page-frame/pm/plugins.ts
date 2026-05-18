@@ -4,7 +4,7 @@ import { Plugin as ProseMirrorPlugin } from 'prosemirror-state';
 import { tableEditing } from 'prosemirror-tables';
 import { ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import { buildKeymap } from './keymap';
+import { buildKeymap, calloutCaretAnchorCleanupPlugin } from './keymap';
 import {
   fenceMarkdownInputRules,
   fenceMarkdownNormalizationPlugin,
@@ -84,6 +84,7 @@ export function buildPlugins(
     markdownPastePlugin(),
     markdownPreviewPlugin(),
     checkListPlugin(schema),
+    calloutCaretAnchorCleanupPlugin(),
     buildKeymap(schema),
     paginationPlugin(onPageCount),
     selectionHighlightPlugin(),
