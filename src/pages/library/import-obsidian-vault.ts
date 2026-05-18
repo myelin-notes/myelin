@@ -16,7 +16,6 @@ const logger = new Logger('ObsidianVaultImport');
 
 const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
 const PDF_EXTENSION_RE = /\.pdf$/i;
-const SKIPPED_DIRECTORY_NAMES = new Set(['.obsidian']);
 
 type VaultImportFile =
   | {
@@ -95,6 +94,10 @@ function isPdfFileName(fileName: string): boolean {
   return PDF_EXTENSION_RE.test(fileName);
 }
 
+function isDotEntryName(name: string): boolean {
+  return name.startsWith('.');
+}
+
 function addFolderAncestors(
   folderPaths: Set<string>,
   folderSegments: readonly string[],
@@ -155,6 +158,10 @@ async function scanVaultDirectory(
   const entries = await readDir(absolutePath);
 
   for (const entry of entries) {
+    if (isDotEntryName(entry.name)) {
+      continue;
+    }
+
     if (entry.isSymlink) {
       scanned.skippedFiles += 1;
       continue;
@@ -162,9 +169,6 @@ async function scanVaultDirectory(
 
     const childPath = await join(absolutePath, entry.name);
     if (entry.isDirectory) {
-      if (SKIPPED_DIRECTORY_NAMES.has(entry.name)) {
-        continue;
-      }
       await scanVaultDirectory(
         childPath,
         [...relativeSegments, entry.name],

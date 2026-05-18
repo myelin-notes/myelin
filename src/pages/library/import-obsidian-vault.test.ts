@@ -72,6 +72,8 @@ describe('Obsidian vault import', () => {
     await storage.writeFile('/vault/Projects/image.png', new Uint8Array([7]));
     await storage.writeTextFile('/vault/Ignored/todo.txt', 'skip');
     await storage.writeTextFile('/vault/.obsidian/app.json', '{}');
+    await storage.writeFile('/vault/Projects/.cover.png', new Uint8Array([8]));
+    await storage.writeTextFile('/vault/.DS_Store', 'skip');
     storage.writeSymlink('/vault/Projects/link.md');
 
     const repository = new LocalRepository('obsidian-import');
