@@ -1,0 +1,23 @@
+{
+  "last_sync_commit": "b90726f28a24c2362556279d7f5037f5ab89a63d",
+  "docs_enabled": false,
+  "phase_timings": {
+    "traverse": 18.4,
+    "co_change": 18.2,
+    "git": 21.01,
+    "parse": 3.91,
+    "tsconfig": 1.07,
+    "graph.imports": 0.64,
+    "graph.type_refs": 0.0,
+    "graph.heritage": 0.0,
+    "graph.calls": 0.01,
+    "dynamic_hints": 12.2,
+    "graph.metrics": 2.69,
+    "graph.communities": 0.09,
+    "external_systems": 3.59,
+    "dead_code": 0.26,
+    "health": 1.43,
+    "decisions": 285.71,
+    "graph.flows": 0.01
+  }
+}
