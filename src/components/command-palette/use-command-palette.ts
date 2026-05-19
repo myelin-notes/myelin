@@ -20,6 +20,7 @@ import {
 import {
   finishManualRepositoryRefresh,
   reserveManualRepositoryRefresh,
+  useManualRepositoryRefreshInFlight,
 } from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
 import { useCanvasCommandContext } from '@/pages/canvas/command-context';
@@ -92,7 +93,7 @@ export function useCommandPalette(): {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
-  const [isRefreshingRepository, setIsRefreshingRepository] = useState(false);
+  const isRefreshingRepository = useManualRepositoryRefreshInFlight();
   const [activeKeybindingActions, setActiveKeybindingActions] = useState<
     Action[]
   >(() => keybindings.getCommandPaletteActions());
@@ -238,16 +239,16 @@ export function useCommandPalette(): {
   );
 
   const refreshRepository = useCallback(async () => {
-    closePalette();
     if (
       !canRefreshRepository ||
+      repositoryStatus.initializing ||
       isRefreshingRepository ||
       !reserveManualRepositoryRefresh()
     ) {
       return;
     }
+    closePalette();
 
-    setIsRefreshingRepository(true);
     try {
       await repository.refresh();
     } catch (error) {
@@ -257,13 +258,13 @@ export function useCommandPalette(): {
       });
     } finally {
       finishManualRepositoryRefresh();
-      setIsRefreshingRepository(false);
     }
   }, [
     canRefreshRepository,
     closePalette,
     isRefreshingRepository,
     repository,
+    repositoryStatus.initializing,
     strings.commandPalette.errors.refreshRepository,
   ]);
 

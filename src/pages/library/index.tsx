@@ -37,6 +37,7 @@ import {
 import {
   finishManualRepositoryRefresh,
   reserveManualRepositoryRefresh,
+  useManualRepositoryRefreshInFlight,
 } from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
@@ -98,7 +99,7 @@ export function LibraryPage() {
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [isImportingObsidianVault, setIsImportingObsidianVault] =
     useState(false);
-  const [isRefreshingRepository, setIsRefreshingRepository] = useState(false);
+  const isRefreshingRepository = useManualRepositoryRefreshInFlight();
   const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
     setSortMode(
@@ -162,7 +163,6 @@ export function LibraryPage() {
       return;
     }
 
-    setIsRefreshingRepository(true);
     try {
       await repository.refresh();
       triggerRefresh();
@@ -172,7 +172,6 @@ export function LibraryPage() {
       });
     } finally {
       finishManualRepositoryRefresh();
-      setIsRefreshingRepository(false);
     }
   }, [
     isRefreshingRepository,
