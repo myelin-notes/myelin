@@ -15,6 +15,7 @@ import {
   Clock,
   LayoutGrid,
   List,
+  LoaderCircle,
   Search,
   X,
 } from 'lucide-react';
@@ -102,6 +103,14 @@ export function LibraryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     UserPrefs.get('explorerViewMode'),
   );
+  const activityLabel = isImportingObsidianVault
+    ? strings.library.importObsidianVault.loading
+    : isImportingFiles
+      ? strings.library.importFiles.loading
+      : repositoryStatus.initializing &&
+          repositoryStatus.config.kind !== 'local'
+        ? strings.library.repositoryLoading
+        : null;
   useEffect(() => UserPrefs.subscribe('explorerViewMode', setViewMode), []);
   const toggleViewMode = () => {
     UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
@@ -483,7 +492,16 @@ export function LibraryPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {activityLabel && (
+                    <div
+                      role="status"
+                      className="mr-1 flex min-w-0 items-center gap-2 rounded-lg bg-surface px-2.5 py-1 text-text-muted text-xs"
+                    >
+                      <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+                      <span className="truncate">{activityLabel}</span>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={cycleSortMode}

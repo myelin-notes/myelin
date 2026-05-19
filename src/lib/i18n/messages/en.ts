@@ -102,14 +102,17 @@ const en = {
       unsupportedFile: 'Choose a Markdown, PDF, image, or video file.',
       someUnsupported: 'Some files were not supported.',
       failed: 'Import failed',
+      loading: 'Importing files...',
     },
     importObsidianVault: {
       failed: 'Obsidian vault import failed',
+      loading: 'Importing Obsidian vault...',
       skipped: (count: number) =>
         `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
       succeeded: (notes: number, media: number) =>
         `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
     },
+    repositoryLoading: 'Loading repository...',
     semanticTags: {
       title: 'Semantic Tags',
       empty:

@@ -104,14 +104,17 @@ const es: typeof en = {
       unsupportedFile: 'Elige un archivo Markdown, PDF, de imagen o video.',
       someUnsupported: 'Algunos archivos no son compatibles.',
       failed: 'No se pudo importar',
+      loading: 'Importando archivos...',
     },
     importObsidianVault: {
       failed: 'No se pudo importar la bóveda de Obsidian',
+      loading: 'Importando bóveda de Obsidian...',
       skipped: (count: number) =>
         `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} omitido${count === 1 ? '' : 's'}.`,
       succeeded: (notes: number, media: number) =>
         `Se importaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
     },
+    repositoryLoading: 'Cargando repositorio...',
     semanticTags: {
       title: 'Etiquetas semánticas',
       empty:

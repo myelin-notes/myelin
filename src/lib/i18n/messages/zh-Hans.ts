@@ -103,13 +103,16 @@ const zhHans: typeof en = {
       unsupportedFile: '请选择 Markdown、PDF、图片或视频文件',
       someUnsupported: '部分文件不受支持',
       failed: '导入失败',
+      loading: '正在导入文件...',
     },
     importObsidianVault: {
       failed: 'Obsidian 仓库导入失败',
+      loading: '正在导入 Obsidian 仓库...',
       skipped: (count: number) => `已跳过 ${count} 个不受支持的文件`,
       succeeded: (notes: number, media: number) =>
         `已导入 ${notes} 个笔记和 ${media} 个媒体文件`,
     },
+    repositoryLoading: '正在加载仓库...',
     semanticTags: {
       title: '语义标签',
       empty: '还没有标签，右键点击文件并选择“管理标签”即可开始',
