@@ -17,6 +17,10 @@ import {
   useRepository,
   useRepositoryStatus,
 } from '@/lib/sync';
+import {
+  finishManualRepositoryRefresh,
+  reserveManualRepositoryRefresh,
+} from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
 import { useCanvasCommandContext } from '@/pages/canvas/command-context';
 import {
@@ -235,7 +239,11 @@ export function useCommandPalette(): {
 
   const refreshRepository = useCallback(async () => {
     closePalette();
-    if (!canRefreshRepository || isRefreshingRepository) {
+    if (
+      !canRefreshRepository ||
+      isRefreshingRepository ||
+      !reserveManualRepositoryRefresh()
+    ) {
       return;
     }
 
@@ -248,6 +256,7 @@ export function useCommandPalette(): {
         description: errorDescription(error),
       });
     } finally {
+      finishManualRepositoryRefresh();
       setIsRefreshingRepository(false);
     }
   }, [

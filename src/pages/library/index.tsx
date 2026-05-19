@@ -34,6 +34,10 @@ import {
   type VFSFileNode,
   type VFSFolderNode,
 } from '@/lib/sync';
+import {
+  finishManualRepositoryRefresh,
+  reserveManualRepositoryRefresh,
+} from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from './create-new-dropdown';
@@ -152,7 +156,8 @@ export function LibraryPage() {
     if (
       !repositoryRefreshAvailable ||
       repositoryStatus.initializing ||
-      isRefreshingRepository
+      isRefreshingRepository ||
+      !reserveManualRepositoryRefresh()
     ) {
       return;
     }
@@ -166,6 +171,7 @@ export function LibraryPage() {
         description: errorDescription(error),
       });
     } finally {
+      finishManualRepositoryRefresh();
       setIsRefreshingRepository(false);
     }
   }, [
