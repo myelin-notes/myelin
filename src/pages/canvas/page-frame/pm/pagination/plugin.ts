@@ -133,6 +133,21 @@ interface CachedTextOnlyParagraphLines {
   width: number;
 }
 
+interface CachedTextOnlyParagraphLineBox {
+  charOffset: number;
+  relativeBottom: number;
+  relativeTop: number;
+}
+
+interface CachedTextOnlyParagraphLineResult {
+  contentSize: number;
+  generation: number;
+  height: number;
+  lineBoxes: CachedTextOnlyParagraphLineBox[];
+  text: string;
+  width: number;
+}
+
 const domLineFragmentCache = new WeakMap<
   HTMLElement,
   CachedParagraphTextLineFragments
@@ -140,6 +155,10 @@ const domLineFragmentCache = new WeakMap<
 const textOnlyParagraphLineCache = new Map<
   number,
   CachedTextOnlyParagraphLines
+>();
+const textOnlyParagraphLineResultCache = new WeakMap<
+  HTMLElement,
+  CachedTextOnlyParagraphLineResult
 >();
 const MAX_TEXT_ONLY_PARAGRAPH_CACHE_ENTRIES = 200;
 
@@ -368,6 +387,43 @@ function rememberTextOnlyParagraphLineCache(
   }
 }
 
+function canReuseTextOnlyParagraphLineResultCache(
+  cached: CachedTextOnlyParagraphLineResult | undefined,
+  paragraph: TextOnlyParagraphInfo,
+  generation: number,
+  width: number,
+  height: number,
+): cached is CachedTextOnlyParagraphLineResult {
+  if (
+    !cached ||
+    cached.generation !== generation ||
+    cached.text !== paragraph.text ||
+    cached.contentSize !== paragraph.contentSize ||
+    cached.lineBoxes.length === 0
+  ) {
+    return false;
+  }
+  return (
+    Math.abs(cached.width - width) <= 0.5 &&
+    Math.abs(cached.height - height) <= 0.5
+  );
+}
+
+function linesFromCachedTextOnlyParagraphLineResult(
+  cached: CachedTextOnlyParagraphLineResult,
+  block: BlockInfo,
+  blockNaturalTop: number,
+): ParagraphLine[] {
+  return cached.lineBoxes.map((lineBox) => ({
+    naturalTop: blockNaturalTop + lineBox.relativeTop,
+    naturalBottom: blockNaturalTop + lineBox.relativeBottom,
+    getPos: () =>
+      block.pos +
+      1 +
+      Math.max(0, Math.min(lineBox.charOffset, cached.contentSize)),
+  }));
+}
+
 /**
  * `Range#getClientRects()` tells us which visual line fragments a text node
  * occupies, but not which character starts each fragment. To recover a stable
@@ -587,18 +643,43 @@ function measureLinesWithDom(
   view: EditorView,
   editorScreenTop: number,
   invScale: number,
+  blockNaturalTop: number | null,
   blockShift: number,
   metrics: PaginationRunMetrics | null,
+  measurementCacheGeneration: number | null,
 ): ParagraphLine[] {
   const startedAt = metrics ? performance.now() : 0;
-  if (metrics) {
-    metrics.domMeasurementAttemptCount++;
-  }
 
   const textOnlyParagraph = getTextOnlyParagraphInfo(view, block.pos);
   if (textOnlyParagraph) {
+    const width = block.dom.clientWidth;
+    const cachedLineResult = textOnlyParagraphLineResultCache.get(block.dom);
+    if (
+      blockNaturalTop !== null &&
+      measurementCacheGeneration !== null &&
+      width > 0 &&
+      canReuseTextOnlyParagraphLineResultCache(
+        cachedLineResult,
+        textOnlyParagraph,
+        measurementCacheGeneration,
+        width,
+        block.height,
+      )
+    ) {
+      return linesFromCachedTextOnlyParagraphLineResult(
+        cachedLineResult,
+        block,
+        blockNaturalTop,
+      );
+    }
+
+    if (metrics) {
+      metrics.domMeasurementAttemptCount++;
+    }
+
     const textNodeRects = collectVisibleTextNodeRects(block.dom, metrics);
     if (textNodeRects.length === 0) {
+      textOnlyParagraphLineResultCache.delete(block.dom);
       if (metrics) {
         metrics.domMeasurementMs += performance.now() - startedAt;
       }
@@ -606,7 +687,6 @@ function measureLinesWithDom(
     }
 
     const mergedRects = mergeVisibleTextLineRects(textNodeRects);
-    const width = block.dom.clientWidth;
     let lineStartOffsets: number[];
     const cached = textOnlyParagraphLineCache.get(block.pos);
     if (
@@ -668,6 +748,9 @@ function measureLinesWithDom(
     const tolerance = 1;
 
     const lines: ParagraphLine[] = new Array(mergedRects.length);
+    const lineBoxes: CachedTextOnlyParagraphLineBox[] = new Array(
+      mergedRects.length,
+    );
     let innerShiftViewport = 0;
     let prevTop = Number.NEGATIVE_INFINITY;
     for (let i = 0; i < mergedRects.length; i++) {
@@ -684,21 +767,49 @@ function measureLinesWithDom(
       const measuredBottom = (rect.bottom - editorScreenTop) * invScale;
       const totalExistingShift = blockShift + innerShiftViewport * invScale;
       const charOffset = lineStartOffsets[i] ?? 0;
+      const naturalTop = measuredTop - totalExistingShift;
+      const naturalBottom = measuredBottom - totalExistingShift;
 
       lines[i] = {
-        naturalTop: measuredTop - totalExistingShift,
-        naturalBottom: measuredBottom - totalExistingShift,
+        naturalTop,
+        naturalBottom,
         getPos: () =>
           block.pos +
           1 +
           Math.max(0, Math.min(charOffset, textOnlyParagraph.contentSize)),
       };
+      lineBoxes[i] = {
+        charOffset,
+        relativeTop:
+          blockNaturalTop === null ? 0 : naturalTop - blockNaturalTop,
+        relativeBottom:
+          blockNaturalTop === null ? 0 : naturalBottom - blockNaturalTop,
+      };
+    }
+
+    if (
+      blockNaturalTop !== null &&
+      measurementCacheGeneration !== null &&
+      width > 0
+    ) {
+      textOnlyParagraphLineResultCache.set(block.dom, {
+        text: textOnlyParagraph.text,
+        contentSize: textOnlyParagraph.contentSize,
+        generation: measurementCacheGeneration,
+        width,
+        height: block.height,
+        lineBoxes,
+      });
     }
     if (metrics) {
       metrics.domMeasurementSuccessCount++;
       metrics.domMeasurementMs += performance.now() - startedAt;
     }
     return lines;
+  }
+
+  if (metrics) {
+    metrics.domMeasurementAttemptCount++;
   }
 
   const cachedParagraph = domLineFragmentCache.get(block.dom);
@@ -823,6 +934,7 @@ function measureParagraphLines(
   blockNaturalTop: number,
   blockShift: number,
   metrics: PaginationRunMetrics | null,
+  measurementCacheGeneration: number,
 ): ParagraphLine[] {
   if (metrics) {
     metrics.paragraphMeasurementCount++;
@@ -832,8 +944,10 @@ function measureParagraphLines(
     view,
     editorScreenTop,
     invScale,
+    blockNaturalTop,
     blockShift,
     metrics,
+    measurementCacheGeneration,
   );
   return fromDom.length > 0
     ? fromDom
@@ -963,7 +1077,9 @@ function measureTableRowSplitLines(
         view,
         editorScreenTop,
         invScale,
+        null,
         rowExternalShift + cellBreakShiftBeforeBlock,
+        null,
         null,
       ),
     );
@@ -1071,6 +1187,7 @@ function calculateLayout(
   invScale: number,
   existingBreaks: Break[],
   metrics: PaginationRunMetrics | null,
+  measurementCacheGeneration: number,
 ): { breaks: Break[]; pageCount: number } {
   return calculateBreakLayout({
     blocks,
@@ -1084,6 +1201,7 @@ function calculateLayout(
         state.blockNaturalTop,
         state.blockShift,
         metrics,
+        measurementCacheGeneration,
       ),
     measureTableRows: (block, state) =>
       measureTableRows(
@@ -1534,6 +1652,7 @@ export function paginationPlugin(
       let suppressResizeInvalidation = false;
       let clearSuppressResizeRafId = 0;
       let syncBlockquoteStylesRafId = 0;
+      let measurementCacheGeneration = 0;
 
       function scheduleBlockquoteRuleSync() {
         if (syncBlockquoteStylesRafId !== 0) {
@@ -1624,6 +1743,7 @@ export function paginationPlugin(
             invScale,
             prevBreaks,
             metrics,
+            measurementCacheGeneration,
           );
           if (metrics) {
             metrics.calculateLayoutMs =
@@ -1690,6 +1810,9 @@ export function paginationPlugin(
       }
 
       function schedule(followUpPasses = 0) {
+        if (followUpPasses >= SETTLE_PASS_COUNT) {
+          measurementCacheGeneration++;
+        }
         pendingFollowUpPasses = Math.max(pendingFollowUpPasses, followUpPasses);
         if (!destroyed && rafId === 0) {
           rafId = requestAnimationFrame(paginate);
