@@ -124,6 +124,8 @@ export class CachedRepository
   }
 
   private async initializeImpl(): Promise<void> {
+    let didBootstrapFromRemote = false;
+
     await this.withLocalStateLock(async () => {
       await this.cache.initialize();
       await this.outbox.load();
@@ -155,6 +157,7 @@ export class CachedRepository
         }
 
         await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
+        didBootstrapFromRemote = true;
       });
     } catch (error) {
       this.updateRuntimeStatus({
@@ -168,7 +171,9 @@ export class CachedRepository
 
     try {
       await this.flushPendingInternal();
-      await this.syncCacheFromRemote();
+      if (!didBootstrapFromRemote) {
+        await this.syncCacheFromRemote();
+      }
     } catch (error) {
       logger.error('Initial outbox flush failed', error);
     }
