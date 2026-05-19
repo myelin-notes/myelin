@@ -1,14 +1,8 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
-import type {
-  Repository,
-  VFSFileNode,
-  VFSNode,
-  VFSNodeId,
-  YjsSyncTarget,
-} from '@/lib/sync';
+import type { Repository, VFSNodeId, YjsSyncTarget } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
 import { YDocManager } from '../ydoc-manager';
-import { resolveNoteLinkIdByTitle } from './note-link-resolution';
+import { isCanvasNote, resolveNoteLinkIdByTitle } from './note-link-resolution';
 import { schema } from './pm/schema';
 
 const MAX_PREVIEW_LENGTH = 360;
@@ -29,10 +23,6 @@ export type NoteLinkPreviewSource = Pick<
   'getNode' | 'searchNodes' | 'getFolderChain'
 > &
   Pick<YjsSyncTarget, 'loadDocument'>;
-
-function isCanvasNote(node: VFSNode | null): node is VFSFileNode {
-  return node?.type === 'file' && node.fileType === 'mcanvas';
-}
 
 function isAborted(signal?: AbortSignal): boolean {
   return signal?.aborted === true;

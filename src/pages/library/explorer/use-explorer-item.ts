@@ -3,6 +3,7 @@ import { Logger } from '@/lib/logger';
 import { type NoteBacklink, useRepository, type VFSNodeId } from '@/lib/sync';
 import { renameNoteReferences } from '@/lib/sync/repo/rename-note-references';
 import { UserPrefs } from '@/lib/user-prefs';
+import { evaluateRenameDecision } from './rename-decision';
 
 const logger = new Logger('ExplorerItem');
 
@@ -83,6 +84,18 @@ export function useExplorerItem({
     await onChanged();
   };
 
+  const loadBacklinks = async (): Promise<NoteBacklink[]> => {
+    if (!renameReferencesOnRename) {
+      return [];
+    }
+    try {
+      return await repository.getBacklinks(nodeId as VFSNodeId);
+    } catch (err) {
+      logger.error('Failed to load backlinks before rename', err, { nodeId });
+      return [];
+    }
+  };
+
   const handleRename = async () => {
     // Guards re-entry: handleRename runs on Enter and onBlur. When it sets
     // renaming=false the input unmounts, firing onBlur and re-invoking this.
@@ -98,39 +111,26 @@ export function useExplorerItem({
 
     renameInFlightRef.current = true;
     try {
-      if (renameReferencesOnRename) {
-        let backlinks: NoteBacklink[] = [];
-        try {
-          backlinks = await repository.getBacklinks(nodeId as VFSNodeId);
-        } catch (err) {
-          logger.error('Failed to load backlinks before rename', err, {
-            nodeId,
-          });
-        }
+      const backlinks = await loadBacklinks();
+      const decision = evaluateRenameDecision(
+        backlinks,
+        UserPrefs.get('alwaysRenameNoteReferences'),
+      );
 
-        if (backlinks.length > 0) {
-          if (UserPrefs.get('alwaysRenameNoteReferences')) {
-            await commitRename(trimmed, {
-              updateReferences: true,
-              backlinks,
-            });
-            return;
-          }
-
-          const noteCount = new Set(backlinks.map((b) => b.sourceId)).size;
-          setPendingReferencesPrompt({
-            oldName: name,
-            newName: trimmed,
-            mentionCount: backlinks.length,
-            noteCount,
-            backlinks,
-          });
-          setRenaming(false);
-          return;
-        }
+      if (decision.kind === 'plain') {
+        await commitRename(trimmed, { updateReferences: false });
+      } else if (decision.kind === 'commit-with-refs') {
+        await commitRename(trimmed, { updateReferences: true, backlinks });
+      } else {
+        setPendingReferencesPrompt({
+          oldName: name,
+          newName: trimmed,
+          mentionCount: decision.mentionCount,
+          noteCount: decision.noteCount,
+          backlinks,
+        });
+        setRenaming(false);
       }
-
-      await commitRename(trimmed, { updateReferences: false });
     } finally {
       renameInFlightRef.current = false;
     }

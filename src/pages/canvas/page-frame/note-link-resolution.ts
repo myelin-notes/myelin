@@ -360,6 +360,6 @@ async function searchNoteLinkPageFrameAutocompleteItems(
   return matches.flat().slice(0, limit);
 }
 
-function isCanvasNote(node: VFSNode): node is VFSFileNode {
-  return node.type === 'file' && node.fileType === 'mcanvas';
+export function isCanvasNote(node: VFSNode | null): node is VFSFileNode {
+  return node?.type === 'file' && node.fileType === 'mcanvas';
 }
