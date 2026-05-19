@@ -1,7 +1,6 @@
 import {
   type ChangeEvent,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -83,7 +82,6 @@ export function LibraryPage() {
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
   const sortModes: SortMode[] = [
     'name-asc',
     'name-desc',
@@ -587,7 +585,7 @@ export function LibraryPage() {
                 onChanged={refreshLibraryData}
                 sortMode={sortMode}
                 viewMode={viewMode}
-                searchQuery={deferredSearchQuery}
+                searchQuery={searchQuery}
                 filterTags={filterTagsArr}
               />
             </div>

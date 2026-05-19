@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -25,6 +26,7 @@ import { GridFolderItem } from './grid-folder-item';
 import { useDropTarget } from './use-drop-target';
 
 const logger = new Logger('ExplorerTree');
+const SEARCH_DEBOUNCE_MS = 150;
 
 type RepositorySetupState = 'checking' | 'ready' | 'setup-required';
 
@@ -161,6 +163,9 @@ export function ExplorerTree({
     repositorySetupState,
     searchQuery,
   ]);
+  const reloadNow = useEffectEvent(() => {
+    void reload();
+  });
 
   const startNewFolder = useCallback(async () => {
     const name = await repository.getUniqueFileName(
@@ -226,14 +231,29 @@ export function ExplorerTree({
   ]);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    if (!isSearching || repositorySetupState !== 'ready') {
+      void reload();
+      return () => {
+        loadRequestRef.current++;
+      };
+    }
+
+    setLoading(true);
+    const timer = window.setTimeout(() => {
+      void reload();
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      loadRequestRef.current++;
+    };
+  }, [isSearching, reload, repositorySetupState]);
 
   useEffect(() => {
     if (repositoryStatus.lastRemoteSyncAt !== null) {
-      reload();
+      reloadNow();
     }
-  }, [reload, repositoryStatus.lastRemoteSyncAt]);
+  }, [repositoryStatus.lastRemoteSyncAt]);
 
   const reloadAndNotify = useCallback(async () => {
     await reload();

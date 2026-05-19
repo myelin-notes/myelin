@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText } from 'lucide-react';
 import type { NavigateFunction } from 'react-router-dom';
 import type { Messages } from '@/lib/i18n';
@@ -9,6 +9,7 @@ import type { CommandPaletteItem, CommandPaletteModeState } from './types';
 import { filterCommandPaletteEntries } from './utils';
 
 const logger = new Logger('CommandPalette');
+const SEARCH_DEBOUNCE_MS = 150;
 
 function isFileNode(node: VFSNode): node is VFSFileNode {
   return node.type === 'file';
@@ -56,44 +57,60 @@ export function useNotesMode({
 }): CommandPaletteModeState {
   const [noteResults, setNoteResults] = useState<VFSFileNode[]>([]);
   const [loading, setLoading] = useState(false);
+  const loadRequestRef = useRef(0);
 
   useEffect(() => {
+    const requestId = loadRequestRef.current + 1;
+    loadRequestRef.current = requestId;
+
     if (!active) {
       setNoteResults([]);
       setLoading(false);
       return;
     }
 
-    let disposed = false;
     const trimmed = query.trim();
 
-    setLoading(true);
-    void (
-      trimmed ? repository.searchNodes(trimmed) : repository.getRecentFiles(6)
-    )
-      .then((nodes) => {
-        if (disposed) {
-          return;
-        }
-        setNoteResults(nodes.filter(isFileNode));
-      })
-      .catch((error) => {
-        if (disposed) {
-          return;
-        }
-        logger.error('Failed to load command palette notes', error, {
-          query: trimmed,
+    const loadNotes = () => {
+      setLoading(true);
+      void (
+        trimmed ? repository.searchNodes(trimmed) : repository.getRecentFiles(6)
+      )
+        .then((nodes) => {
+          if (requestId !== loadRequestRef.current) {
+            return;
+          }
+          setNoteResults(nodes.filter(isFileNode));
+        })
+        .catch((error) => {
+          if (requestId !== loadRequestRef.current) {
+            return;
+          }
+          logger.error('Failed to load command palette notes', error, {
+            query: trimmed,
+          });
+          setNoteResults([]);
+        })
+        .finally(() => {
+          if (requestId === loadRequestRef.current) {
+            setLoading(false);
+          }
         });
-        setNoteResults([]);
-      })
-      .finally(() => {
-        if (!disposed) {
-          setLoading(false);
-        }
-      });
+    };
+
+    if (!trimmed) {
+      loadNotes();
+      return () => {
+        loadRequestRef.current++;
+      };
+    }
+
+    setLoading(true);
+    const timer = window.setTimeout(loadNotes, SEARCH_DEBOUNCE_MS);
 
     return () => {
-      disposed = true;
+      window.clearTimeout(timer);
+      loadRequestRef.current++;
     };
   }, [active, query, repository]);
 
