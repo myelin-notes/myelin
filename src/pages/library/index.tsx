@@ -15,6 +15,7 @@ import {
   LayoutGrid,
   List,
   LoaderCircle,
+  RefreshCw,
   Search,
   X,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note-navigation';
 import {
+  isRepositoryConfigStructurallyComplete,
   useRepository,
   useRepositoryStatus,
   type VFSFileNode,
@@ -92,6 +94,7 @@ export function LibraryPage() {
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [isImportingObsidianVault, setIsImportingObsidianVault] =
     useState(false);
+  const [isRefreshingRepository, setIsRefreshingRepository] = useState(false);
   const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
     setSortMode(
@@ -101,14 +104,19 @@ export function LibraryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     UserPrefs.get('explorerViewMode'),
   );
+  const repositoryRefreshAvailable =
+    repositoryStatus.config.kind !== 'local' &&
+    isRepositoryConfigStructurallyComplete(repositoryStatus.config);
   const activityLabel = isImportingObsidianVault
     ? strings.library.importObsidianVault.loading
     : isImportingFiles
       ? strings.library.importFiles.loading
-      : repositoryStatus.initializing &&
-          repositoryStatus.config.kind !== 'local'
-        ? strings.library.repositoryLoading
-        : null;
+      : isRefreshingRepository
+        ? strings.library.refreshRepository.loading
+        : repositoryStatus.initializing &&
+            repositoryStatus.config.kind !== 'local'
+          ? strings.library.repositoryLoading
+          : null;
   useEffect(() => UserPrefs.subscribe('explorerViewMode', setViewMode), []);
   const toggleViewMode = () => {
     UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
@@ -139,6 +147,35 @@ export function LibraryPage() {
     refreshLibraryData();
     explorerRef.current?.reload();
   }, [refreshLibraryData]);
+
+  const handleRefreshRepository = useCallback(async () => {
+    if (
+      !repositoryRefreshAvailable ||
+      repositoryStatus.initializing ||
+      isRefreshingRepository
+    ) {
+      return;
+    }
+
+    setIsRefreshingRepository(true);
+    try {
+      await repository.refresh();
+      triggerRefresh();
+    } catch (error) {
+      toast.error(strings.library.refreshRepository.failed, {
+        description: errorDescription(error),
+      });
+    } finally {
+      setIsRefreshingRepository(false);
+    }
+  }, [
+    isRefreshingRepository,
+    repository,
+    repositoryRefreshAvailable,
+    repositoryStatus.initializing,
+    strings.library.refreshRepository.failed,
+    triggerRefresh,
+  ]);
 
   const handleImportStorageFiles = async (files: File[]) => {
     const supportedFiles = files.filter(
@@ -499,6 +536,30 @@ export function LibraryPage() {
                       <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
                       <span className="truncate">{activityLabel}</span>
                     </div>
+                  )}
+                  {repositoryRefreshAvailable && (
+                    <button
+                      type="button"
+                      onClick={handleRefreshRepository}
+                      disabled={
+                        repositoryStatus.initializing || isRefreshingRepository
+                      }
+                      aria-label={strings.library.refreshRepository.label}
+                      title={strings.library.refreshRepository.label}
+                      className={cn(
+                        'flex size-8 items-center justify-center rounded-lg text-text-secondary transition-colors duration-150',
+                        repositoryStatus.initializing || isRefreshingRepository
+                          ? 'cursor-default opacity-60'
+                          : 'cursor-pointer hover:bg-hover-tint hover:text-text-primary',
+                      )}
+                    >
+                      <RefreshCw
+                        className={cn(
+                          'size-4',
+                          isRefreshingRepository && 'animate-spin',
+                        )}
+                      />
+                    </button>
                   )}
                   <button
                     type="button"

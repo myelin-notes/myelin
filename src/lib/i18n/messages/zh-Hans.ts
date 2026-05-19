@@ -60,9 +60,14 @@ const zhHans: typeof en = {
         label: '切换资料库视图',
         description: '在列表和网格之间切换资料库',
       },
+      refreshRepository: {
+        label: '刷新仓库',
+        description: '将最新的远程更改拉取到资料库',
+      },
     },
     errors: {
       createNote: '无法创建笔记',
+      refreshRepository: '无法刷新仓库',
     },
   },
   library: {
@@ -113,6 +118,11 @@ const zhHans: typeof en = {
         `已导入 ${notes} 个笔记和 ${media} 个媒体文件`,
     },
     repositoryLoading: '正在加载仓库...',
+    refreshRepository: {
+      label: '刷新仓库',
+      loading: '正在刷新仓库...',
+      failed: '仓库刷新失败',
+    },
     semanticTags: {
       title: '语义标签',
       empty: '还没有标签，右键点击文件并选择“管理标签”即可开始',

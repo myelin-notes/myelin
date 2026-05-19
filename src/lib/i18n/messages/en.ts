@@ -58,9 +58,14 @@ const en = {
         label: 'Switch library view',
         description: 'Toggle the library between list and grid',
       },
+      refreshRepository: {
+        label: 'Refresh repository',
+        description: 'Pull the latest remote changes into the library',
+      },
     },
     errors: {
       createNote: 'Could not create note',
+      refreshRepository: 'Could not refresh repository',
     },
   },
   library: {
@@ -113,6 +118,11 @@ const en = {
         `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
     },
     repositoryLoading: 'Loading repository...',
+    refreshRepository: {
+      label: 'Refresh repository',
+      loading: 'Refreshing repository...',
+      failed: 'Repository refresh failed',
+    },
     semanticTags: {
       title: 'Semantic Tags',
       empty:

@@ -60,9 +60,14 @@ const es: typeof en = {
         label: 'Cambiar vista de biblioteca',
         description: 'Alternar la biblioteca entre lista y cuadrícula',
       },
+      refreshRepository: {
+        label: 'Actualizar repositorio',
+        description: 'Traer los últimos cambios remotos a la biblioteca',
+      },
     },
     errors: {
       createNote: 'No se pudo crear la nota',
+      refreshRepository: 'No se pudo actualizar el repositorio',
     },
   },
   library: {
@@ -115,6 +120,11 @@ const es: typeof en = {
         `Se importaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
     },
     repositoryLoading: 'Cargando repositorio...',
+    refreshRepository: {
+      label: 'Actualizar repositorio',
+      loading: 'Actualizando repositorio...',
+      failed: 'No se pudo actualizar el repositorio',
+    },
     semanticTags: {
       title: 'Etiquetas semánticas',
       empty:

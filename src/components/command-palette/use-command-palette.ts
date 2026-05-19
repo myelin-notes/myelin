@@ -12,7 +12,11 @@ import { useKeybindings } from '@/hooks/useKeybindings';
 import { useMessages } from '@/lib/i18n';
 import { type Action, type ActionBinding, keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
-import { useRepository } from '@/lib/sync';
+import {
+  isRepositoryConfigStructurallyComplete,
+  useRepository,
+  useRepositoryStatus,
+} from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import { useCanvasCommandContext } from '@/pages/canvas/command-context';
 import {
@@ -74,6 +78,7 @@ export function useCommandPalette(): {
 } {
   const strings = useMessages();
   const repository = useRepository();
+  const repositoryStatus = useRepositoryStatus();
   const { getHandlers: getCanvasCommandHandlers } = useCanvasCommandContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -83,10 +88,14 @@ export function useCommandPalette(): {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
+  const [isRefreshingRepository, setIsRefreshingRepository] = useState(false);
   const [activeKeybindingActions, setActiveKeybindingActions] = useState<
     Action[]
   >(() => keybindings.getCommandPaletteActions());
   const currentPage = commandPalettePageFromPathname(location.pathname);
+  const canRefreshRepository =
+    repositoryStatus.config.kind !== 'local' &&
+    isRepositoryConfigStructurallyComplete(repositoryStatus.config);
 
   const closePalette = useCallback(() => {
     setOpen(false);
@@ -224,6 +233,31 @@ export function useCommandPalette(): {
     [closePalette],
   );
 
+  const refreshRepository = useCallback(async () => {
+    closePalette();
+    if (!canRefreshRepository || isRefreshingRepository) {
+      return;
+    }
+
+    setIsRefreshingRepository(true);
+    try {
+      await repository.refresh();
+    } catch (error) {
+      logger.error('Failed to refresh repository from command palette', error);
+      toast.error(strings.commandPalette.errors.refreshRepository, {
+        description: errorDescription(error),
+      });
+    } finally {
+      setIsRefreshingRepository(false);
+    }
+  }, [
+    canRefreshRepository,
+    closePalette,
+    isRefreshingRepository,
+    repository,
+    strings.commandPalette.errors.refreshRepository,
+  ]);
+
   const commandItems = useMemo(
     () =>
       createCommandPaletteItems({
@@ -231,8 +265,11 @@ export function useCommandPalette(): {
         currentPage,
         strings,
         isImportingMarkdown,
+        isRefreshingRepository,
+        canRefreshRepository,
         createNote,
         openPalette,
+        refreshRepository,
         toggleLibraryView,
         triggerKeybindingAction,
         triggerCanvasMarkdownImport,
@@ -240,10 +277,13 @@ export function useCommandPalette(): {
       }),
     [
       activeKeybindingActions,
+      canRefreshRepository,
       createNote,
       currentPage,
       isImportingMarkdown,
+      isRefreshingRepository,
       openPalette,
+      refreshRepository,
       strings,
       toggleLibraryView,
       triggerCanvasMarkdownImport,
