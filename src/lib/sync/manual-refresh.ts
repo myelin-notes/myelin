@@ -1,4 +1,6 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import type { RepositoryConfig } from './repo/config';
+import { isRepositoryFullyConfigured } from './repo/readiness';
 
 export const MANUAL_REPOSITORY_REFRESH_COOLDOWN_MS = 5_000;
 
@@ -55,6 +57,41 @@ export function useManualRepositoryRefreshInFlight(): boolean {
     getManualRepositoryRefreshInFlight,
     getManualRepositoryRefreshInFlight,
   );
+}
+
+export function useManualRepositoryRefreshAvailable(
+  config: RepositoryConfig,
+  initializing: boolean,
+): boolean {
+  const [fullyConfigured, setFullyConfigured] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (config.kind === 'local') {
+      setFullyConfigured(false);
+      return;
+    }
+
+    setFullyConfigured(false);
+    void isRepositoryFullyConfigured(config)
+      .then((configured) => {
+        if (!cancelled) {
+          setFullyConfigured(configured);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFullyConfigured(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config]);
+
+  return fullyConfigured && !initializing;
 }
 
 export function resetManualRepositoryRefreshForTests(): void {

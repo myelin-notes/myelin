@@ -28,7 +28,6 @@ import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note-navigation';
 import {
-  isRepositoryConfigStructurallyComplete,
   useRepository,
   useRepositoryStatus,
   type VFSFileNode,
@@ -37,6 +36,7 @@ import {
 import {
   finishManualRepositoryRefresh,
   reserveManualRepositoryRefresh,
+  useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshInFlight,
 } from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -109,9 +109,10 @@ export function LibraryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     UserPrefs.get('explorerViewMode'),
   );
-  const repositoryRefreshAvailable =
-    repositoryStatus.config.kind !== 'local' &&
-    isRepositoryConfigStructurallyComplete(repositoryStatus.config);
+  const repositoryRefreshAvailable = useManualRepositoryRefreshAvailable(
+    repositoryStatus.config,
+    repositoryStatus.initializing,
+  );
   const activityLabel = isImportingObsidianVault
     ? strings.library.importObsidianVault.loading
     : isImportingFiles

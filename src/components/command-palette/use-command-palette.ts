@@ -12,14 +12,11 @@ import { useKeybindings } from '@/hooks/useKeybindings';
 import { useMessages } from '@/lib/i18n';
 import { type Action, type ActionBinding, keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
-import {
-  isRepositoryConfigStructurallyComplete,
-  useRepository,
-  useRepositoryStatus,
-} from '@/lib/sync';
+import { useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   finishManualRepositoryRefresh,
   reserveManualRepositoryRefresh,
+  useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshInFlight,
 } from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -98,9 +95,10 @@ export function useCommandPalette(): {
     Action[]
   >(() => keybindings.getCommandPaletteActions());
   const currentPage = commandPalettePageFromPathname(location.pathname);
-  const canRefreshRepository =
-    repositoryStatus.config.kind !== 'local' &&
-    isRepositoryConfigStructurallyComplete(repositoryStatus.config);
+  const canRefreshRepository = useManualRepositoryRefreshAvailable(
+    repositoryStatus.config,
+    repositoryStatus.initializing,
+  );
 
   const closePalette = useCallback(() => {
     setOpen(false);
