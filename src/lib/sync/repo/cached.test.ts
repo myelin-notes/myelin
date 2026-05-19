@@ -682,7 +682,7 @@ describe('CachedRepository', () => {
     );
   });
 
-  it('opens cached note state before pulling newer remote state in the background', async () => {
+  it('opens cached note state without refreshing the whole repository in the background', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote later', 'mcanvas', null);
     const initialNote = createNoteState('stale cache copy');
@@ -719,8 +719,7 @@ describe('CachedRepository', () => {
       },
     );
 
-    const remoteRefresh = createDeferred();
-    remote.blockFileLoads(remoteRefresh.promise);
+    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
 
     const session = await expectQuickLocalResult(
       repository.openSession(fileId),
@@ -728,21 +727,17 @@ describe('CachedRepository', () => {
 
     expect(readNoteText(session.encodeUpdate())).toBe('stale cache copy');
 
-    remoteRefresh.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    await vi.waitFor(() => {
-      expect(readNoteText(session.encodeUpdate())).toBe('opened latest remote');
-    });
-    await vi.waitFor(async () => {
-      expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
-        'opened latest remote',
-      );
-    });
+    expect(exportSnapshot).not.toHaveBeenCalled();
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'stale cache copy',
+    );
 
     await session.close();
   });
 
-  it('preserves local edits saved while open-session refresh is pending', async () => {
+  it('keeps explicit refresh available after opening a cached session', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote note', 'mcanvas', null);
     const initialNote = createNoteState('base');
@@ -779,9 +774,6 @@ describe('CachedRepository', () => {
       },
     );
 
-    const remoteRefresh = createDeferred();
-    remote.blockFileLoads(remoteRefresh.promise);
-
     const session = await expectQuickLocalResult(
       repository.openSession(fileId),
     );
@@ -793,8 +785,6 @@ describe('CachedRepository', () => {
     expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
       'base local',
     );
-
-    remoteRefresh.resolve();
 
     await repository.flushPending();
     await repository.refresh();
