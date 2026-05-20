@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { ChevronLeft as ChevronLeftIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
@@ -9,7 +9,11 @@ interface TitleBarProps {
   trailing?: ReactNode;
 }
 
-export function TitleBar({ fileName, onBack, trailing }: TitleBarProps) {
+export const TitleBar = memo(function TitleBar({
+  fileName,
+  onBack,
+  trailing,
+}: TitleBarProps) {
   const strings = useMessages();
 
   return (
@@ -35,4 +39,4 @@ export function TitleBar({ fileName, onBack, trailing }: TitleBarProps) {
       {trailing}
     </motion.div>
   );
-}
+});

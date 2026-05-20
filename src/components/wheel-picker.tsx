@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -99,7 +100,7 @@ function pathsEqual(a: number[], b: number[]): boolean {
 
 /* ── Component ─────────────────────────────────────── */
 
-export function WheelPicker({
+export const WheelPicker = memo(function WheelPicker({
   radius,
   items,
   children,
@@ -422,4 +423,4 @@ export function WheelPicker({
       )}
     </div>
   );
-}
+});

@@ -36,6 +36,8 @@ type NoteLinkPreviewState =
       position: PopoverPosition;
     };
 
+const CLOSED_PREVIEW_STATE: NoteLinkPreviewState = { status: 'closed' };
+
 interface NoteLinkPreviewPopoverProps {
   getTargetAtPoint: (
     clientX: number,
@@ -83,9 +85,8 @@ export function NoteLinkPreviewPopover({
   suppressed = false,
 }: NoteLinkPreviewPopoverProps) {
   const previewEnabled = loadPreview !== undefined;
-  const [state, setState] = useState<NoteLinkPreviewState>({
-    status: 'closed',
-  });
+  const [state, setState] =
+    useState<NoteLinkPreviewState>(CLOSED_PREVIEW_STATE);
   const activeTargetKeyRef = useRef<string | null>(null);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -103,6 +104,15 @@ export function NoteLinkPreviewPopover({
   );
 
   const closePreview = useEffectEvent(() => {
+    if (
+      pendingTimerRef.current === null &&
+      activeTargetKeyRef.current === null &&
+      abortRef.current === null &&
+      stateRef.current.status === 'closed'
+    ) {
+      return;
+    }
+
     if (pendingTimerRef.current !== null) {
       window.clearTimeout(pendingTimerRef.current);
       pendingTimerRef.current = null;
@@ -111,7 +121,9 @@ export function NoteLinkPreviewPopover({
     requestIdRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = null;
-    setState({ status: 'closed' });
+    setState((current) =>
+      current.status === 'closed' ? current : CLOSED_PREVIEW_STATE,
+    );
   });
 
   useEffect(() => {

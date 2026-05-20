@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
@@ -35,7 +35,7 @@ interface CanvasToolbarProps {
   embedComposer?: React.ReactNode;
 }
 
-export function CanvasToolbar({
+export const CanvasToolbar = memo(function CanvasToolbar({
   tools,
   selectedToolIndex,
   optionsVisible,
@@ -219,14 +219,17 @@ export function CanvasToolbar({
           </div>
         )}
 
-        {!shelfOpen && embedComposer && (
-          <div
-            className="absolute top-0 left-full"
-            style={{ paddingTop: insertPanelOffset }}
-          >
-            {embedComposer}
-          </div>
-        )}
+        <AnimatePresence>
+          {!shelfOpen && embedComposer && (
+            <div
+              key="embed-composer"
+              className="absolute top-0 left-full"
+              style={{ paddingTop: insertPanelOffset }}
+            >
+              {embedComposer}
+            </div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {insertOpen && !shelfOpen && (
@@ -242,4 +245,4 @@ export function CanvasToolbar({
       </motion.div>
     </TooltipProvider>
   );
-}
+});
