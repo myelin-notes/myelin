@@ -1,5 +1,6 @@
 import {
   createContext,
+  memo,
   type PropsWithChildren,
   useCallback,
   useContext,
@@ -100,22 +101,40 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
   return (
     <CustomColorsContext.Provider value={value}>
       {children}
-      {createPortal(
-        <AnimatePresence>
-          {pickerOpen && (
-            <ColorPickerDialog
-              key="custom-color-picker"
-              initialColor={INITIAL_PICKER_COLOR}
-              onConfirm={onConfirm}
-              onCancel={onCancel}
-            />
-          )}
-        </AnimatePresence>,
-        document.body,
-      )}
+      <CustomColorPickerPortal
+        pickerOpen={pickerOpen}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
     </CustomColorsContext.Provider>
   );
 }
+
+interface CustomColorPickerPortalProps {
+  pickerOpen: boolean;
+  onConfirm: (hex: string) => void;
+  onCancel: () => void;
+}
+
+const CustomColorPickerPortal = memo(function CustomColorPickerPortal({
+  pickerOpen,
+  onConfirm,
+  onCancel,
+}: CustomColorPickerPortalProps) {
+  return createPortal(
+    <AnimatePresence>
+      {pickerOpen && (
+        <ColorPickerDialog
+          key="custom-color-picker"
+          initialColor={INITIAL_PICKER_COLOR}
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        />
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+});
 
 interface ColorPickerDialogProps {
   initialColor: string;

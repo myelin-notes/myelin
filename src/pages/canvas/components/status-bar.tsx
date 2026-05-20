@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Crosshair, Lock, Unlock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { IS_DEV } from '@/lib/env';
@@ -12,7 +13,7 @@ interface StatusBarProps {
   onRecenter: () => void;
 }
 
-export function StatusBar({
+export const StatusBar = memo(function StatusBar({
   zoomLevel,
   fps,
   zoomLocked,
@@ -75,4 +76,4 @@ export function StatusBar({
       )}
     </motion.div>
   );
-}
+});

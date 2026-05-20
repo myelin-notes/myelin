@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
@@ -13,7 +13,7 @@ interface SemanticTagsProps {
   onActiveTagsChanged: (tags: Set<string>) => void;
 }
 
-export function SemanticTags({
+export const SemanticTags = memo(function SemanticTags({
   activeTags,
   onActiveTagsChanged,
 }: SemanticTagsProps) {
@@ -168,4 +168,4 @@ export function SemanticTags({
       </div>
     </div>
   );
-}
+});

@@ -149,6 +149,35 @@ function selectionScreenRect(
   }
 }
 
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const value of a) {
+    if (!b.has(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function attrsEqual(
+  a: Record<string, unknown> | null,
+  b: Record<string, unknown> | null,
+): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (!a || !b) {
+    return false;
+  }
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function styleEqual(a: CSSProperties, b: CSSProperties): boolean {
+  return a.left === b.left && a.top === b.top;
+}
+
 export function FloatingToolbar({ view }: FloatingToolbarProps) {
   const {
     colors: customColors,
@@ -182,9 +211,17 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
         nextActive.add(t.key);
       }
     }
-    setActive(nextActive);
-    setFontAttrs(uniformMarkAttrs(view.state, schema.marks.fontFamily));
-    setColorAttrs(uniformMarkAttrs(view.state, schema.marks.textColor));
+    setActive((current) =>
+      setsEqual(current, nextActive) ? current : nextActive,
+    );
+    const nextFontAttrs = uniformMarkAttrs(view.state, schema.marks.fontFamily);
+    const nextColorAttrs = uniformMarkAttrs(view.state, schema.marks.textColor);
+    setFontAttrs((current) =>
+      attrsEqual(current, nextFontAttrs) ? current : nextFontAttrs,
+    );
+    setColorAttrs((current) =>
+      attrsEqual(current, nextColorAttrs) ? current : nextColorAttrs,
+    );
 
     const toolbar = ref.current;
     const width = toolbar?.offsetWidth ?? 260;
@@ -203,7 +240,10 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
         ? above
         : Math.min(below, window.innerHeight - height - EDGE_MARGIN);
 
-    setStyle({ left, top });
+    const nextStyle = { left, top };
+    setStyle((current) =>
+      styleEqual(current, nextStyle) ? current : nextStyle,
+    );
     setVisible(true);
   });
   const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {

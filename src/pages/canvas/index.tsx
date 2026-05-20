@@ -264,6 +264,48 @@ function CanvasViewInner() {
     await engine.saveBeforeExit();
     openNote(navigate, { fileType: 'mcanvas', id: sourceId });
   });
+  const handleOpenBacklinkSource = useCallback((sourceId: VFSNodeId) => {
+    void openBacklinkSource(sourceId).catch((error) => {
+      logger.error('Failed to open backlink source', error, {
+        sourceId,
+      });
+      toast.error('Failed to open backlink', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, []);
+  const titleTrailing = useMemo(
+    () => <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />,
+    [handleOpenBacklinkSource, id],
+  );
+  const insertPopover = useMemo(
+    () => (
+      <InsertPopover
+        onInsertFrame={inserts.onInsertFrame}
+        onInsertEmbed={inserts.onInsertEmbed}
+        onClose={inserts.closeInsert}
+      />
+    ),
+    [inserts.closeInsert, inserts.onInsertEmbed, inserts.onInsertFrame],
+  );
+  const embedComposer = useMemo(
+    () => (
+      <AnimatePresence>
+        {inserts.embedOpen && (
+          <EmbedComposer
+            key="embed-composer"
+            onEmbedFiles={inserts.submitEmbed}
+            onClose={inserts.closeEmbed}
+          />
+        )}
+      </AnimatePresence>
+    ),
+    [inserts.closeEmbed, inserts.embedOpen, inserts.submitEmbed],
+  );
+  const wheelCenterIcon = useMemo(
+    () => <XIcon className="size-4 text-white" />,
+    [],
+  );
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-page">
@@ -341,22 +383,7 @@ function CanvasViewInner() {
       <TitleBar
         fileName={engine.fileName}
         onBack={engine.back}
-        trailing={
-          <BacklinksChip
-            noteId={id}
-            onOpenSource={(sourceId) => {
-              void openBacklinkSource(sourceId).catch((error) => {
-                logger.error('Failed to open backlink source', error, {
-                  sourceId,
-                });
-                toast.error('Failed to open backlink', {
-                  description:
-                    error instanceof Error ? error.message : String(error),
-                });
-              });
-            }}
-          />
-        }
+        trailing={titleTrailing}
       />
 
       <CanvasToolbar
@@ -374,24 +401,8 @@ function CanvasViewInner() {
         onCloseShelf={toolState.closeShelf}
         onToggleInsert={inserts.toggleInsert}
         onToggleWheelTool={toolState.handleToggleWheelTool}
-        insertPopover={
-          <InsertPopover
-            onInsertFrame={inserts.onInsertFrame}
-            onInsertEmbed={inserts.onInsertEmbed}
-            onClose={inserts.closeInsert}
-          />
-        }
-        embedComposer={
-          <AnimatePresence>
-            {inserts.embedOpen && (
-              <EmbedComposer
-                key="embed-composer"
-                onEmbedFiles={inserts.submitEmbed}
-                onClose={inserts.closeEmbed}
-              />
-            )}
-          </AnimatePresence>
-        }
+        insertPopover={insertPopover}
+        embedComposer={embedComposer}
       />
 
       <AnimatePresence>
@@ -418,7 +429,7 @@ function CanvasViewInner() {
         className="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto"
       >
         <WheelPicker ref={wheelRef} radius={100} items={toolState.wheelItems}>
-          <XIcon className="size-4 text-white" />
+          {wheelCenterIcon}
         </WheelPicker>
       </div>
 

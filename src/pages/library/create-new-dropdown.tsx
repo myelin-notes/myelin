@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   FolderInput,
   FolderPlus,
@@ -26,7 +27,7 @@ interface CreateNewDropdownProps {
   importDisabled?: boolean;
 }
 
-export function CreateNewDropdown({
+export const CreateNewDropdown = memo(function CreateNewDropdown({
   onNewFolder,
   onNewFile,
   onImportFiles,
@@ -81,4 +82,4 @@ export function CreateNewDropdown({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});

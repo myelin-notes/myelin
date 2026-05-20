@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
@@ -35,7 +35,7 @@ interface CanvasToolbarProps {
   embedComposer?: React.ReactNode;
 }
 
-export function CanvasToolbar({
+export const CanvasToolbar = memo(function CanvasToolbar({
   tools,
   selectedToolIndex,
   optionsVisible,
@@ -242,4 +242,4 @@ export function CanvasToolbar({
       </motion.div>
     </TooltipProvider>
   );
-}
+});

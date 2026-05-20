@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { BookOpen, HelpCircle, Plus, Settings } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -65,7 +66,7 @@ function errorDescription(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function Sidebar() {
+export const Sidebar = memo(function Sidebar() {
   const strings = useMessages();
   const repository = useRepository();
   const navigate = useNavigate();
@@ -183,4 +184,4 @@ export function Sidebar() {
       </nav>
     </aside>
   );
-}
+});

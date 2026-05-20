@@ -28,6 +28,7 @@ import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note-navigation';
 import {
+  type FileType,
   useRepository,
   useRepositoryStatus,
   type VFSFileNode,
@@ -64,6 +65,7 @@ import { SemanticTags } from './semantic-tags';
 
 const logger = new Logger('LibraryPage');
 const LIBRARY_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
+const SORT_MODES: SortMode[] = ['name-asc', 'name-desc', 'modified', 'created'];
 
 function errorDescription(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -88,12 +90,6 @@ export function LibraryPage() {
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
   const [searchQuery, setSearchQuery] = useState('');
-  const sortModes: SortMode[] = [
-    'name-asc',
-    'name-desc',
-    'modified',
-    'created',
-  ];
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [isImportingObsidianVault, setIsImportingObsidianVault] =
@@ -102,7 +98,7 @@ export function LibraryPage() {
   const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
     setSortMode(
-      (prev) => sortModes[(sortModes.indexOf(prev) + 1) % sortModes.length],
+      (prev) => SORT_MODES[(SORT_MODES.indexOf(prev) + 1) % SORT_MODES.length],
     );
   };
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
@@ -234,7 +230,7 @@ export function LibraryPage() {
     void handleImportStorageFiles(files);
   };
 
-  const handleImportObsidianVault = async () => {
+  const handleImportObsidianVault = useCallback(async () => {
     if (isImportingFiles || isImportingObsidianVault) {
       return;
     }
@@ -270,7 +266,37 @@ export function LibraryPage() {
     } finally {
       setIsImportingObsidianVault(false);
     }
-  };
+  }, [
+    currentFolderId,
+    isImportingFiles,
+    isImportingObsidianVault,
+    repository,
+    strings.library.importObsidianVault,
+    triggerRefresh,
+  ]);
+
+  const handleNewFolder = useCallback(() => {
+    void explorerRef.current?.startNewFolder();
+  }, []);
+
+  const handleNewFile = useCallback(
+    (title: string, type: FileType) => {
+      void explorerRef.current?.startNewFile(title, type).catch((error) => {
+        logger.error('Failed to create explorer file', error, {
+          currentFolderId,
+          fileType: type,
+        });
+        toast.error(strings.commandPalette.errors.createNote, {
+          description: errorDescription(error),
+        });
+      });
+    },
+    [currentFolderId, strings.commandPalette.errors.createNote],
+  );
+
+  const handleImportFiles = useCallback(() => {
+    importInputRef.current?.click();
+  }, []);
 
   useEffect(() => {
     void loadRecentFiles();
@@ -600,28 +626,9 @@ export function LibraryPage() {
                     )}
                   </button>
                   <CreateNewDropdown
-                    onNewFolder={() => explorerRef.current?.startNewFolder()}
-                    onNewFile={(title, type) => {
-                      void explorerRef.current
-                        ?.startNewFile(title, type)
-                        .catch((error) => {
-                          logger.error(
-                            'Failed to create explorer file',
-                            error,
-                            {
-                              currentFolderId,
-                              fileType: type,
-                            },
-                          );
-                          toast.error(
-                            strings.commandPalette.errors.createNote,
-                            {
-                              description: errorDescription(error),
-                            },
-                          );
-                        });
-                    }}
-                    onImportFiles={() => importInputRef.current?.click()}
+                    onNewFolder={handleNewFolder}
+                    onNewFile={handleNewFile}
+                    onImportFiles={handleImportFiles}
                     onImportObsidianVault={handleImportObsidianVault}
                     importDisabled={
                       isImportingFiles || isImportingObsidianVault
