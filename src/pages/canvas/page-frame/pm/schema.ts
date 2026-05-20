@@ -203,35 +203,6 @@ const horizontalRule: NodeSpec = {
   parseDOM: [{ tag: 'hr' }],
 };
 
-const image: NodeSpec = {
-  inline: true,
-  group: 'inline',
-  attrs: {
-    src: {},
-    alt: { default: null },
-    width: { default: null },
-    height: { default: null },
-  },
-  draggable: true,
-  toDOM(node) {
-    return ['img', node.attrs];
-  },
-  parseDOM: [
-    {
-      tag: 'img[src]',
-      getAttrs(dom) {
-        const el = dom as HTMLImageElement;
-        return {
-          src: el.getAttribute('src'),
-          alt: el.getAttribute('alt'),
-          width: el.naturalWidth || null,
-          height: el.naturalHeight || null,
-        };
-      },
-    },
-  ],
-};
-
 const mention: NodeSpec = {
   inline: true,
   group: 'inline',
@@ -426,7 +397,6 @@ export const schema = new Schema({
     hardBreak,
     codeBlock,
     horizontalRule,
-    image,
     mention,
     ...tableSpecs,
     text: { group: 'inline' },

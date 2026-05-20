@@ -164,11 +164,6 @@ function serializeInline(node: PMNode): string {
 
 function renderInlineAtom(node: PMNode): string {
   switch (node.type.name) {
-    case 'image': {
-      const alt = (node.attrs.alt as string | null) ?? '';
-      const src = (node.attrs.src as string | null) ?? '';
-      return `![${escapeMarkdown(alt)}](${src})`;
-    }
     case 'mention': {
       const label = (node.attrs.label as string | null) ?? '';
       return `@${label}`;

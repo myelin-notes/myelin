@@ -195,6 +195,28 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
       close: '`',
     },
   },
+  {
+    id: 'slash-embed',
+    title: 'Embed',
+    subtitle: 'Insert ![alt](url) — images, videos, YouTube, link cards',
+    detail: '![]',
+    keywords: [
+      'embed',
+      'image',
+      'img',
+      'photo',
+      'video',
+      'youtube',
+      'vimeo',
+      'link',
+      '![]',
+    ],
+    slashAction: {
+      kind: 'inline',
+      open: '![',
+      close: ']()',
+    },
+  },
 ];
 
 function buildTextOffsetMap(

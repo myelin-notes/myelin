@@ -108,7 +108,6 @@ describe('page-frame content shape', () => {
     expect(roundTripped.toJSON()).toEqual(doc.toJSON());
     expect(paragraph?.type.name).toBe('paragraph');
     expect(paragraph?.isTextblock).toBe(true);
-    expect(childTypes).toContain('image');
     expect(paragraphJson).toEqual(
       expect.objectContaining({
         type: 'paragraph',
@@ -126,13 +125,8 @@ describe('page-frame content shape', () => {
             ],
           },
           {
-            type: 'image',
-            attrs: {
-              alt: 'diagram',
-              height: null,
-              src: 'https://example.com/a.png',
-              width: null,
-            },
+            type: 'text',
+            text: ' ![diagram](https://example.com/a.png) ',
           },
           { type: 'text', text: 'inline', marks: [{ type: 'code' }] },
         ]),
