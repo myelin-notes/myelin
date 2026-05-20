@@ -219,17 +219,14 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           </div>
         )}
 
-        <AnimatePresence>
-          {!shelfOpen && embedComposer && (
-            <div
-              key="embed-composer"
-              className="absolute top-0 left-full"
-              style={{ paddingTop: insertPanelOffset }}
-            >
-              {embedComposer}
-            </div>
-          )}
-        </AnimatePresence>
+        {!shelfOpen && embedComposer && (
+          <div
+            className="absolute top-0 left-full"
+            style={{ paddingTop: insertPanelOffset }}
+          >
+            {embedComposer}
+          </div>
+        )}
 
         <AnimatePresence>
           {insertOpen && !shelfOpen && (

@@ -289,13 +289,17 @@ function CanvasViewInner() {
     [inserts.closeInsert, inserts.onInsertEmbed, inserts.onInsertFrame],
   );
   const embedComposer = useMemo(
-    () =>
-      inserts.embedOpen ? (
-        <EmbedComposer
-          onEmbedFiles={inserts.submitEmbed}
-          onClose={inserts.closeEmbed}
-        />
-      ) : null,
+    () => (
+      <AnimatePresence>
+        {inserts.embedOpen && (
+          <EmbedComposer
+            key="embed-composer"
+            onEmbedFiles={inserts.submitEmbed}
+            onClose={inserts.closeEmbed}
+          />
+        )}
+      </AnimatePresence>
+    ),
     [inserts.closeEmbed, inserts.embedOpen, inserts.submitEmbed],
   );
   const wheelCenterIcon = useMemo(

@@ -269,39 +269,21 @@ export function useToolState(
     setShelfOpen(false);
   }, []);
 
-  return useMemo(
-    () => ({
-      canvasTools,
-      selectedToolIndex,
-      setSelectedToolIndex,
-      selectTool,
-      toggleOptions,
-      toggleShelf,
-      closeShelf,
-      optionsVisible,
-      shelfOpen,
-      activeOptions,
-      hasOptions,
-      hideOptions,
-      wheelItems,
-      wheelEnabledIndices,
-      handleToggleWheelTool,
-    }),
-    [
-      activeOptions,
-      canvasTools,
-      closeShelf,
-      handleToggleWheelTool,
-      hasOptions,
-      hideOptions,
-      optionsVisible,
-      selectedToolIndex,
-      selectTool,
-      shelfOpen,
-      toggleOptions,
-      toggleShelf,
-      wheelEnabledIndices,
-      wheelItems,
-    ],
-  );
+  return {
+    canvasTools,
+    selectedToolIndex,
+    setSelectedToolIndex,
+    selectTool,
+    toggleOptions,
+    toggleShelf,
+    closeShelf,
+    optionsVisible,
+    shelfOpen,
+    activeOptions,
+    hasOptions,
+    hideOptions,
+    wheelItems,
+    wheelEnabledIndices,
+    handleToggleWheelTool,
+  };
 }
