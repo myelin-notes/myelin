@@ -1,4 +1,11 @@
-import { BookOpen, FileText, Grid2X2, Keyboard, Plus } from 'lucide-react';
+import {
+  BookOpen,
+  FileText,
+  Grid2X2,
+  Keyboard,
+  Plus,
+  RefreshCw,
+} from 'lucide-react';
 import type { Messages } from '@/lib/i18n';
 import { type Action, registry } from '@/lib/keybinds';
 import {
@@ -17,8 +24,11 @@ export interface CommandPaletteItemContext {
   currentPage: CommandPalettePage;
   strings: Messages;
   isImportingMarkdown: boolean;
+  isRefreshingRepository: boolean;
+  canRefreshRepository: boolean;
   createNote: () => Promise<void>;
   openPalette: (mode: CommandPaletteMode) => void;
+  refreshRepository: () => void;
   toggleLibraryView: () => void;
   triggerKeybindingAction: (action: Action) => void;
   triggerCanvasMarkdownImport: () => void;
@@ -30,8 +40,11 @@ export function createCommandPaletteItems({
   currentPage,
   strings,
   isImportingMarkdown,
+  isRefreshingRepository,
+  canRefreshRepository,
   createNote,
   openPalette,
+  refreshRepository,
   toggleLibraryView,
   triggerKeybindingAction,
   triggerCanvasMarkdownImport,
@@ -89,6 +102,22 @@ export function createCommandPaletteItems({
       visibleOn: ['library'],
       onSelect: toggleLibraryView,
     },
+    ...(canRefreshRepository
+      ? [
+          {
+            id: 'refresh-repository',
+            label: strings.commandPalette.commands.refreshRepository.label,
+            description:
+              strings.commandPalette.commands.refreshRepository.description,
+            keywords: ['sync', 'pull', 'remote', 'repository'],
+            section: strings.commandPalette.sections.commands,
+            icon: RefreshCw,
+            disabled: isRefreshingRepository,
+            visibleOn: ['library' as const],
+            onSelect: refreshRepository,
+          },
+        ]
+      : []),
     ...createKeybindingCommandPaletteItems({
       actions: activeKeybindingActions,
       strings,

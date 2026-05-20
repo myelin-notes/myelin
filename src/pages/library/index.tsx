@@ -1,7 +1,6 @@
 import {
   type ChangeEvent,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -15,6 +14,8 @@ import {
   Clock,
   LayoutGrid,
   List,
+  LoaderCircle,
+  RefreshCw,
   Search,
   X,
 } from 'lucide-react';
@@ -32,6 +33,11 @@ import {
   type VFSFileNode,
   type VFSFolderNode,
 } from '@/lib/sync';
+import {
+  enqueueManualRepositoryRefresh,
+  useManualRepositoryRefreshAvailable,
+  useManualRepositoryRefreshPending,
+} from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from './create-new-dropdown';
@@ -82,7 +88,6 @@ export function LibraryPage() {
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
   const sortModes: SortMode[] = [
     'name-asc',
     'name-desc',
@@ -93,6 +98,7 @@ export function LibraryPage() {
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [isImportingObsidianVault, setIsImportingObsidianVault] =
     useState(false);
+  const isRefreshingRepository = useManualRepositoryRefreshPending();
   const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
     setSortMode(
@@ -102,6 +108,20 @@ export function LibraryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     UserPrefs.get('explorerViewMode'),
   );
+  const repositoryRefreshAvailable = useManualRepositoryRefreshAvailable(
+    repositoryStatus.config,
+    repositoryStatus.initializing,
+  );
+  const activityLabel = isImportingObsidianVault
+    ? strings.library.importObsidianVault.loading
+    : isImportingFiles
+      ? strings.library.importFiles.loading
+      : isRefreshingRepository
+        ? strings.library.refreshRepository.loading
+        : repositoryStatus.initializing &&
+            repositoryStatus.config.kind !== 'local'
+          ? strings.library.repositoryLoading
+          : null;
   useEffect(() => UserPrefs.subscribe('explorerViewMode', setViewMode), []);
   const toggleViewMode = () => {
     UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
@@ -132,6 +152,29 @@ export function LibraryPage() {
     refreshLibraryData();
     explorerRef.current?.reload();
   }, [refreshLibraryData]);
+
+  const handleRefreshRepository = useCallback(() => {
+    if (!repositoryRefreshAvailable || repositoryStatus.initializing) {
+      return;
+    }
+
+    enqueueManualRepositoryRefresh(async () => {
+      try {
+        await repository.refresh();
+        triggerRefresh();
+      } catch (error) {
+        toast.error(strings.library.refreshRepository.failed, {
+          description: errorDescription(error),
+        });
+      }
+    });
+  }, [
+    repository,
+    repositoryRefreshAvailable,
+    repositoryStatus.initializing,
+    strings.library.refreshRepository.failed,
+    triggerRefresh,
+  ]);
 
   const handleImportStorageFiles = async (files: File[]) => {
     const supportedFiles = files.filter(
@@ -483,7 +526,40 @@ export function LibraryPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {activityLabel && (
+                    <div
+                      role="status"
+                      className="mr-1 flex min-w-0 items-center gap-2 rounded-lg bg-surface px-2.5 py-1 text-text-muted text-xs"
+                    >
+                      <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+                      <span className="truncate">{activityLabel}</span>
+                    </div>
+                  )}
+                  {repositoryRefreshAvailable && (
+                    <button
+                      type="button"
+                      onClick={handleRefreshRepository}
+                      disabled={
+                        repositoryStatus.initializing || isRefreshingRepository
+                      }
+                      aria-label={strings.library.refreshRepository.label}
+                      title={strings.library.refreshRepository.label}
+                      className={cn(
+                        'flex size-8 items-center justify-center rounded-lg text-text-secondary transition-colors duration-150',
+                        repositoryStatus.initializing || isRefreshingRepository
+                          ? 'cursor-default opacity-60'
+                          : 'cursor-pointer hover:bg-hover-tint hover:text-text-primary',
+                      )}
+                    >
+                      <RefreshCw
+                        className={cn(
+                          'size-4',
+                          isRefreshingRepository && 'animate-spin',
+                        )}
+                      />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={cycleSortMode}
@@ -569,7 +645,7 @@ export function LibraryPage() {
                 onChanged={refreshLibraryData}
                 sortMode={sortMode}
                 viewMode={viewMode}
-                searchQuery={deferredSearchQuery}
+                searchQuery={searchQuery}
                 filterTags={filterTagsArr}
               />
             </div>

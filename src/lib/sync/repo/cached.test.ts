@@ -381,6 +381,96 @@ describe('CachedRepository', () => {
     expect(readNoteText(snapshot.update)).toBe('fetched from remote');
   });
 
+  it('does not immediately resync after a clean remote bootstrap', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const note = createNoteState('single bootstrap sync');
+
+    await remote.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/single-bootstrap-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/single-bootstrap-test/outbox.json',
+    );
+    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
+    const replaceSnapshot = vi.spyOn(cache, 'replaceSnapshot');
+
+    await repository.initialize();
+
+    expect(exportSnapshot).toHaveBeenCalledTimes(1);
+    expect(replaceSnapshot).toHaveBeenCalledTimes(1);
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'single bootstrap sync',
+    );
+  });
+
+  it('flushes pending outbox work before syncing remote changes on initialize', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const initialNote = createNoteState('remote baseline');
+
+    await remote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/pending-bootstrap-test');
+    const outboxPath = 'repositories/pending-bootstrap-test/outbox.json';
+    await cache.replaceSnapshot(await remote.exportSnapshot());
+
+    const cacheSnapshot = await cache.loadDocument(fileId);
+    const doc = new Y.Doc();
+    if (cacheSnapshot.update) {
+      Y.applyUpdate(doc, cacheSnapshot.update);
+    }
+    const text = doc.getText('content');
+    text.delete(0, text.length);
+    text.insert(0, 'local pending edit');
+
+    await cache.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(doc, cacheSnapshot.stateVector),
+      {
+        baseRevision: cacheSnapshot.revision,
+        localStateVector: Y.encodeStateVector(doc),
+      },
+    );
+
+    const remoteOnlyId = await remote.createFile(
+      'Remote added while offline',
+      'mcanvas',
+      null,
+    );
+    await getRepositoryTestStorage().writeTextFile(
+      outboxPath,
+      JSON.stringify([{ kind: 'push-note', nodeId: fileId }]),
+    );
+
+    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
+    const replaceSnapshot = vi.spyOn(cache, 'replaceSnapshot');
+    const repository = new CachedRepository(remote, cache, outboxPath);
+
+    await repository.initialize();
+
+    expect(exportSnapshot).toHaveBeenCalledTimes(2);
+    expect(replaceSnapshot).toHaveBeenCalledTimes(1);
+    expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
+      'local pending edit',
+    );
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'local pending edit',
+    );
+    expect(await repository.getNode(remoteOnlyId)).toMatchObject({
+      name: 'Remote added while offline',
+    });
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
   it('replaces preexisting cache contents from an empty remote on initialize', async () => {
     const remote = new MemoryRemoteRepository();
     const cache = new LocalRepository('repositories/cache-bootstrap-test');
@@ -682,7 +772,7 @@ describe('CachedRepository', () => {
     );
   });
 
-  it('opens cached note state before pulling newer remote state in the background', async () => {
+  it('opens cached note state without refreshing the whole repository in the background', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote later', 'mcanvas', null);
     const initialNote = createNoteState('stale cache copy');
@@ -719,8 +809,7 @@ describe('CachedRepository', () => {
       },
     );
 
-    const remoteRefresh = createDeferred();
-    remote.blockFileLoads(remoteRefresh.promise);
+    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
 
     const session = await expectQuickLocalResult(
       repository.openSession(fileId),
@@ -728,21 +817,17 @@ describe('CachedRepository', () => {
 
     expect(readNoteText(session.encodeUpdate())).toBe('stale cache copy');
 
-    remoteRefresh.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    await vi.waitFor(() => {
-      expect(readNoteText(session.encodeUpdate())).toBe('opened latest remote');
-    });
-    await vi.waitFor(async () => {
-      expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
-        'opened latest remote',
-      );
-    });
+    expect(exportSnapshot).not.toHaveBeenCalled();
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'stale cache copy',
+    );
 
     await session.close();
   });
 
-  it('preserves local edits saved while open-session refresh is pending', async () => {
+  it('keeps explicit refresh available after opening a cached session', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote note', 'mcanvas', null);
     const initialNote = createNoteState('base');
@@ -779,9 +864,6 @@ describe('CachedRepository', () => {
       },
     );
 
-    const remoteRefresh = createDeferred();
-    remote.blockFileLoads(remoteRefresh.promise);
-
     const session = await expectQuickLocalResult(
       repository.openSession(fileId),
     );
@@ -793,8 +875,6 @@ describe('CachedRepository', () => {
     expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
       'base local',
     );
-
-    remoteRefresh.resolve();
 
     await repository.flushPending();
     await repository.refresh();

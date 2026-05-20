@@ -124,6 +124,8 @@ export class CachedRepository
   }
 
   private async initializeImpl(): Promise<void> {
+    let didBootstrapFromRemote = false;
+
     await this.withLocalStateLock(async () => {
       await this.cache.initialize();
       await this.outbox.load();
@@ -155,6 +157,7 @@ export class CachedRepository
         }
 
         await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
+        didBootstrapFromRemote = true;
       });
     } catch (error) {
       this.updateRuntimeStatus({
@@ -168,7 +171,9 @@ export class CachedRepository
 
     try {
       await this.flushPendingInternal();
-      await this.syncCacheFromRemote();
+      if (!didBootstrapFromRemote) {
+        await this.syncCacheFromRemote();
+      }
     } catch (error) {
       logger.error('Initial outbox flush failed', error);
     }
@@ -416,27 +421,7 @@ export class CachedRepository
       nodeId,
       pendingOps: this.outbox.length,
     });
-    const session = await NoteSession.open(nodeId, this);
-    this.refreshOpenSessionInBackground(session);
-    return session;
-  }
-
-  private refreshOpenSessionInBackground(session: NoteSession): void {
-    void this.refreshOpenSession(session).catch((error) => {
-      logger.error('Failed to refresh open cached repository session', error, {
-        nodeId: session.id,
-      });
-    });
-  }
-
-  private async refreshOpenSession(session: NoteSession): Promise<void> {
-    logger.debug('Refreshing open cached repository session in background', {
-      repositoryKind: this.kind,
-      nodeId: session.id,
-      pendingOps: this.outbox.length,
-    });
-    await this.refresh();
-    await session.pull();
+    return NoteSession.open(nodeId, this);
   }
 
   async loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot> {

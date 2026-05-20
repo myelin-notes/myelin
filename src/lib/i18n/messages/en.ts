@@ -58,9 +58,14 @@ const en = {
         label: 'Switch library view',
         description: 'Toggle the library between list and grid',
       },
+      refreshRepository: {
+        label: 'Refresh repository',
+        description: 'Pull the latest remote changes into the library',
+      },
     },
     errors: {
       createNote: 'Could not create note',
+      refreshRepository: 'Could not refresh repository',
     },
   },
   library: {
@@ -102,13 +107,21 @@ const en = {
       unsupportedFile: 'Choose a Markdown, PDF, image, or video file.',
       someUnsupported: 'Some files were not supported.',
       failed: 'Import failed',
+      loading: 'Importing files...',
     },
     importObsidianVault: {
       failed: 'Obsidian vault import failed',
+      loading: 'Importing Obsidian vault...',
       skipped: (count: number) =>
         `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
       succeeded: (notes: number, media: number) =>
         `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
+    },
+    repositoryLoading: 'Loading repository...',
+    refreshRepository: {
+      label: 'Refresh repository',
+      loading: 'Refreshing repository...',
+      failed: 'Repository refresh failed',
     },
     semanticTags: {
       title: 'Semantic Tags',

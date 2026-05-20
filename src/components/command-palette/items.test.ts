@@ -14,8 +14,11 @@ function commandIdsForPage(currentPage: CommandPalettePage): string[] {
     currentPage,
     strings: en,
     isImportingMarkdown: false,
+    isRefreshingRepository: false,
+    canRefreshRepository: false,
     createNote: async () => {},
     openPalette: () => {},
+    refreshRepository: async () => {},
     toggleLibraryView: () => {},
     triggerKeybindingAction: () => {},
     triggerCanvasMarkdownImport: () => {},
@@ -47,6 +50,27 @@ describe('createCommandPaletteItems', () => {
     expect(commandIdsForPage('canvas')).not.toContain('switch-library-view');
   });
 
+  it('shows repository refresh only for refreshable library repositories', () => {
+    const items = createCommandPaletteItems({
+      activeKeybindingActions: [],
+      currentPage: 'library',
+      strings: en,
+      isImportingMarkdown: false,
+      isRefreshingRepository: false,
+      canRefreshRepository: true,
+      createNote: async () => {},
+      openPalette: () => {},
+      refreshRepository: async () => {},
+      toggleLibraryView: () => {},
+      triggerKeybindingAction: () => {},
+      triggerCanvasMarkdownImport: () => {},
+      triggerLibraryMarkdownImport: () => {},
+    });
+
+    expect(items.map((item) => item.id)).toContain('refresh-repository');
+    expect(commandIdsForPage('library')).not.toContain('refresh-repository');
+  });
+
   it('shows canvas commands only on the canvas page', () => {
     expect(commandIdsForPage('canvas')).toContain('import-markdown-canvas');
     expect(commandIdsForPage('library')).not.toContain(
@@ -65,8 +89,11 @@ describe('createCommandPaletteItems', () => {
       currentPage: 'canvas',
       strings: en,
       isImportingMarkdown: false,
+      isRefreshingRepository: false,
+      canRefreshRepository: false,
       createNote: async () => {},
       openPalette: () => {},
+      refreshRepository: async () => {},
       toggleLibraryView: () => {},
       triggerKeybindingAction: (action) => triggered.push(action),
       triggerCanvasMarkdownImport: () => {},
