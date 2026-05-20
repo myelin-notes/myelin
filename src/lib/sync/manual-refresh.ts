@@ -4,8 +4,12 @@ import { isRepositoryFullyConfigured } from './repo/readiness';
 
 export const MANUAL_REPOSITORY_REFRESH_COOLDOWN_MS = 5_000;
 
-let lastManualRepositoryRefreshStartedAt = 0;
-let manualRepositoryRefreshInFlight = false;
+type RefreshTask = () => Promise<void>;
+
+let lastStartedAt = 0;
+let running = false;
+let queued: RefreshTask | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -14,49 +18,60 @@ function notify(): void {
   }
 }
 
-export function reserveManualRepositoryRefresh(now = Date.now()): boolean {
-  if (manualRepositoryRefreshInFlight) {
-    return false;
-  }
-
-  if (
-    now - lastManualRepositoryRefreshStartedAt <
-    MANUAL_REPOSITORY_REFRESH_COOLDOWN_MS
-  ) {
-    return false;
-  }
-
-  lastManualRepositoryRefreshStartedAt = now;
-  manualRepositoryRefreshInFlight = true;
+async function run(task: RefreshTask): Promise<void> {
+  lastStartedAt = Date.now();
+  running = true;
   notify();
-  return true;
+  try {
+    await task();
+  } catch {
+    // Task is responsible for its own error handling.
+  }
+  running = false;
+  notify();
+  schedule();
 }
 
-export function finishManualRepositoryRefresh(): void {
-  if (!manualRepositoryRefreshInFlight) {
+function schedule(): void {
+  if (timer !== null || running || queued === null) {
     return;
   }
-  manualRepositoryRefreshInFlight = false;
+  const remaining =
+    MANUAL_REPOSITORY_REFRESH_COOLDOWN_MS - (Date.now() - lastStartedAt);
+  if (remaining <= 0) {
+    const task = queued;
+    queued = null;
+    void run(task);
+    return;
+  }
+  timer = setTimeout(() => {
+    timer = null;
+    schedule();
+  }, remaining);
+}
+
+export function enqueueManualRepositoryRefresh(task: RefreshTask): void {
+  if (queued !== null) {
+    return;
+  }
+  queued = task;
   notify();
+  schedule();
 }
 
-export function getManualRepositoryRefreshInFlight(): boolean {
-  return manualRepositoryRefreshInFlight;
+function getPending(): boolean {
+  return running || queued !== null;
 }
 
-function subscribeManualRepositoryRefresh(listener: () => void): () => void {
+function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
   };
 }
 
-export function useManualRepositoryRefreshInFlight(): boolean {
-  return useSyncExternalStore(
-    subscribeManualRepositoryRefresh,
-    getManualRepositoryRefreshInFlight,
-    getManualRepositoryRefreshInFlight,
-  );
+export function useManualRepositoryRefreshPending(): boolean {
+  return useSyncExternalStore(subscribe, getPending);
 }
 
 export function useManualRepositoryRefreshAvailable(
@@ -95,7 +110,12 @@ export function useManualRepositoryRefreshAvailable(
 }
 
 export function resetManualRepositoryRefreshForTests(): void {
-  lastManualRepositoryRefreshStartedAt = 0;
-  manualRepositoryRefreshInFlight = false;
+  lastStartedAt = 0;
+  running = false;
+  queued = null;
+  if (timer !== null) {
+    clearTimeout(timer);
+    timer = null;
+  }
   notify();
 }

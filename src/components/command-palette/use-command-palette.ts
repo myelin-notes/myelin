@@ -14,10 +14,9 @@ import { type Action, type ActionBinding, keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
 import { useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
-  finishManualRepositoryRefresh,
-  reserveManualRepositoryRefresh,
+  enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
-  useManualRepositoryRefreshInFlight,
+  useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
 import { useCanvasCommandContext } from '@/pages/canvas/command-context';
@@ -90,7 +89,7 @@ export function useCommandPalette(): {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
-  const isRefreshingRepository = useManualRepositoryRefreshInFlight();
+  const isRefreshingRepository = useManualRepositoryRefreshPending();
   const [activeKeybindingActions, setActiveKeybindingActions] = useState<
     Action[]
   >(() => keybindings.getCommandPaletteActions());
@@ -236,31 +235,28 @@ export function useCommandPalette(): {
     [closePalette],
   );
 
-  const refreshRepository = useCallback(async () => {
-    if (
-      !canRefreshRepository ||
-      repositoryStatus.initializing ||
-      isRefreshingRepository ||
-      !reserveManualRepositoryRefresh()
-    ) {
+  const refreshRepository = useCallback(() => {
+    if (!canRefreshRepository || repositoryStatus.initializing) {
       return;
     }
     closePalette();
 
-    try {
-      await repository.refresh();
-    } catch (error) {
-      logger.error('Failed to refresh repository from command palette', error);
-      toast.error(strings.commandPalette.errors.refreshRepository, {
-        description: errorDescription(error),
-      });
-    } finally {
-      finishManualRepositoryRefresh();
-    }
+    enqueueManualRepositoryRefresh(async () => {
+      try {
+        await repository.refresh();
+      } catch (error) {
+        logger.error(
+          'Failed to refresh repository from command palette',
+          error,
+        );
+        toast.error(strings.commandPalette.errors.refreshRepository, {
+          description: errorDescription(error),
+        });
+      }
+    });
   }, [
     canRefreshRepository,
     closePalette,
-    isRefreshingRepository,
     repository,
     repositoryStatus.initializing,
     strings.commandPalette.errors.refreshRepository,

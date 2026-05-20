@@ -34,10 +34,9 @@ import {
   type VFSFolderNode,
 } from '@/lib/sync';
 import {
-  finishManualRepositoryRefresh,
-  reserveManualRepositoryRefresh,
+  enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
-  useManualRepositoryRefreshInFlight,
+  useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
@@ -99,7 +98,7 @@ export function LibraryPage() {
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [isImportingObsidianVault, setIsImportingObsidianVault] =
     useState(false);
-  const isRefreshingRepository = useManualRepositoryRefreshInFlight();
+  const isRefreshingRepository = useManualRepositoryRefreshPending();
   const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
     setSortMode(
@@ -154,28 +153,22 @@ export function LibraryPage() {
     explorerRef.current?.reload();
   }, [refreshLibraryData]);
 
-  const handleRefreshRepository = useCallback(async () => {
-    if (
-      !repositoryRefreshAvailable ||
-      repositoryStatus.initializing ||
-      isRefreshingRepository ||
-      !reserveManualRepositoryRefresh()
-    ) {
+  const handleRefreshRepository = useCallback(() => {
+    if (!repositoryRefreshAvailable || repositoryStatus.initializing) {
       return;
     }
 
-    try {
-      await repository.refresh();
-      triggerRefresh();
-    } catch (error) {
-      toast.error(strings.library.refreshRepository.failed, {
-        description: errorDescription(error),
-      });
-    } finally {
-      finishManualRepositoryRefresh();
-    }
+    enqueueManualRepositoryRefresh(async () => {
+      try {
+        await repository.refresh();
+        triggerRefresh();
+      } catch (error) {
+        toast.error(strings.library.refreshRepository.failed, {
+          description: errorDescription(error),
+        });
+      }
+    });
   }, [
-    isRefreshingRepository,
     repository,
     repositoryRefreshAvailable,
     repositoryStatus.initializing,

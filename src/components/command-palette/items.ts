@@ -28,7 +28,7 @@ export interface CommandPaletteItemContext {
   canRefreshRepository: boolean;
   createNote: () => Promise<void>;
   openPalette: (mode: CommandPaletteMode) => void;
-  refreshRepository: () => Promise<void>;
+  refreshRepository: () => void;
   toggleLibraryView: () => void;
   triggerKeybindingAction: (action: Action) => void;
   triggerCanvasMarkdownImport: () => void;
