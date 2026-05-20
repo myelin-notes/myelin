@@ -215,14 +215,16 @@ export function useToolState(
   }, []);
 
   const tool = canvasTools[selectedToolIndex];
-  const activeOptions = useMemo(() => {
-    void optionsTick;
-    return tool
-      ? (tool.getOptions?.() ?? []).map((option) =>
-          bindToolOption(tool, option, applyOptionRef),
-        )
-      : [];
-  }, [optionsTick, tool]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: optionsTick forces recompute when a tool option mutates in place
+  const activeOptions = useMemo(
+    () =>
+      tool
+        ? (tool.getOptions?.() ?? []).map((option) =>
+            bindToolOption(tool, option, applyOptionRef),
+          )
+        : [],
+    [optionsTick, tool],
+  );
 
   const hasOptions = activeOptions.length > 0;
 
