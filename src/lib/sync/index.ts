@@ -70,7 +70,11 @@ export {
   setRepositoryConfig,
   subscribeRepositoryConfig,
 } from './repo/repository-settings';
-export { getFileTypeForName } from './repo/shared';
+export {
+  getFileTypeForName,
+  getMimeTypeForFileType,
+  isImageFileType,
+} from './repo/shared';
 export type {
   FileType,
   NoteBacklink,
