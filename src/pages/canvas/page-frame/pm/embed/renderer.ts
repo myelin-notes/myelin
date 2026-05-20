@@ -63,10 +63,11 @@ function buildOEmbed(meta: OEmbedMeta, url: string): HTMLElement {
     iframe.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:transparent}body>*{max-width:100%}</style>${meta.html}`;
     if (meta.width && meta.height) {
       iframe.style.aspectRatio = `${meta.width} / ${meta.height}`;
+      iframe.style.width = `${meta.width}px`;
     } else {
       iframe.style.aspectRatio = '16 / 9';
+      iframe.style.width = '640px';
     }
-    iframe.style.width = '100%';
     iframe.style.border = '0';
     wrap.appendChild(iframe);
     if (meta.title) {

@@ -1124,7 +1124,8 @@ input[type="range"].tool-slider::-moz-range-track {
 
 .pm-editor .ProseMirror .pm-embed-host {
   display: block;
-  width: 100%;
+  max-width: 100%;
+  width: max-content;
   margin: 0.25em 0 0.5em;
   max-height: 784px;
   overflow: auto;
@@ -1132,21 +1133,21 @@ input[type="range"].tool-slider::-moz-range-track {
 }
 
 .pm-editor .ProseMirror .pm-embed-image {
-  width: 100%;
+  max-width: 100%;
   height: auto;
   border-radius: 6px;
   display: block;
 }
 
 .pm-editor .ProseMirror .pm-embed-video {
-  width: 100%;
+  max-width: 100%;
   border-radius: 6px;
   display: block;
 }
 
 .pm-editor .ProseMirror .pm-embed-oembed {
   display: block;
-  width: 100%;
+  max-width: 100%;
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg-card);
@@ -1154,7 +1155,7 @@ input[type="range"].tool-slider::-moz-range-track {
 
 .pm-editor .ProseMirror .pm-embed-oembed > iframe {
   display: block;
-  width: 100%;
+  max-width: 100%;
   border: 0;
 }
 
@@ -1168,7 +1169,8 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror a.pm-embed-link {
   display: flex;
   gap: 0.75em;
-  width: 100%;
+  max-width: 100%;
+  width: 560px;
   padding: 0.75em;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -1232,7 +1234,7 @@ input[type="range"].tool-slider::-moz-range-track {
 
 .pm-editor .ProseMirror .pm-embed-skeleton {
   display: block;
-  width: 100%;
+  max-width: 100%;
   padding: 0.6em 0.8em;
   border: 1px dashed var(--border-subtle);
   border-radius: 6px;
