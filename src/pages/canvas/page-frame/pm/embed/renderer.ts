@@ -53,6 +53,9 @@ const VIDEO_TYPES = new Set(['video', 'photo']);
 const DEFAULT_RICH_HEIGHT = 480;
 
 function buildOEmbedMedia(meta: OEmbedMeta): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'pm-embed-rich-media';
+
   const iframe = document.createElement('iframe');
   iframe.setAttribute(
     'sandbox',
@@ -66,13 +69,15 @@ function buildOEmbedMedia(meta: OEmbedMeta): HTMLElement {
   const isVideoLike = meta.type ? VIDEO_TYPES.has(meta.type) : hasRatio;
 
   if (hasRatio) {
-    iframe.style.aspectRatio = `${meta.width} / ${meta.height}`;
+    wrap.style.aspectRatio = `${meta.width} / ${meta.height}`;
   } else if (isVideoLike) {
-    iframe.style.aspectRatio = '16 / 9';
+    wrap.style.aspectRatio = '16 / 9';
   } else {
-    iframe.style.height = `${DEFAULT_RICH_HEIGHT}px`;
+    wrap.style.height = `${DEFAULT_RICH_HEIGHT}px`;
   }
-  return iframe;
+
+  wrap.appendChild(iframe);
+  return wrap;
 }
 
 function buildOEmbed(meta: OEmbedMeta, url: string): HTMLElement {
