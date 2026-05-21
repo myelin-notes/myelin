@@ -39,6 +39,10 @@ function findEmbedHitsForBlock(node: PMNode): EmbedHit[] {
   return hits;
 }
 
+function embedKey(hit: EmbedHit): string {
+  return `embed:${hit.url}::${hit.alt ?? ''}`;
+}
+
 function buildBlockDecorations(node: PMNode, pos: number): Decoration[] {
   const hits = findEmbedHitsForBlock(node);
   if (hits.length === 0) {
@@ -53,12 +57,36 @@ function buildBlockDecorations(node: PMNode, pos: number): Decoration[] {
         return dom;
       },
       {
-        side: 1 + index,
-        key: `embed:${hit.url}::${hit.alt ?? ''}`,
+        side: -1 - index,
+        key: embedKey(hit),
         ignoreSelection: true,
       },
     ),
   );
+}
+
+function embedDecorationsAt(
+  set: DecorationSet,
+  widgetPos: number,
+): Decoration[] {
+  return set.find(widgetPos, widgetPos).filter((d) => {
+    const key = (d.spec as { key?: unknown } | undefined)?.key;
+    return typeof key === 'string' && key.startsWith('embed:');
+  });
+}
+
+function sameKeySet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  for (let i = 0; i < sortedA.length; i++) {
+    if (sortedA[i] !== sortedB[i]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function buildAllDecorations(doc: PMNode): Decoration[] {
@@ -105,13 +133,22 @@ export function embedPreviewPlugin(): Plugin {
           return mapped;
         }
 
-        const toRemove = changedBlocks.flatMap(({ pos, node }) =>
-          mapped.find(pos, pos + node.nodeSize + 1),
-        );
+        const toRemove: Decoration[] = [];
+        const toAdd: Decoration[] = [];
+        for (const { pos, node } of changedBlocks) {
+          const widgetPos = pos + node.nodeSize;
+          const desiredKeys = findEmbedHitsForBlock(node).map(embedKey);
+          const existing = embedDecorationsAt(mapped, widgetPos);
+          const existingKeys = existing.map(
+            (d) => (d.spec as { key: string }).key,
+          );
+          if (sameKeySet(existingKeys, desiredKeys)) {
+            continue;
+          }
+          toRemove.push(...existing);
+          toAdd.push(...buildBlockDecorations(node, pos));
+        }
         const next = toRemove.length > 0 ? mapped.remove(toRemove) : mapped;
-        const toAdd = changedBlocks.flatMap(({ pos, node }) =>
-          buildBlockDecorations(node, pos),
-        );
         return toAdd.length > 0 ? next.add(tr.doc, toAdd) : next;
       },
     },
