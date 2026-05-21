@@ -24,6 +24,7 @@ export interface LinkMeta {
 
 export type EmbedMeta = OEmbedMeta | LinkMeta;
 
+const MAX_CACHE_ENTRIES = 200;
 const cache = new Map<string, Promise<EmbedMeta>>();
 
 function asNumber(v: unknown): number | null {
@@ -91,25 +92,33 @@ async function fetchInner(url: string): Promise<EmbedMeta> {
       // fall through to OG scrape
     }
   }
-  try {
-    return await fetchLink(url);
-  } catch {
-    return {
-      kind: 'link',
-      title: null,
-      description: null,
-      image: null,
-      siteName: null,
-    };
+  return fetchLink(url);
+}
+
+function touch(url: string, p: Promise<EmbedMeta>): void {
+  cache.delete(url);
+  cache.set(url, p);
+  while (cache.size > MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) {
+      break;
+    }
+    cache.delete(oldest);
   }
 }
 
 export function fetchEmbed(url: string): Promise<EmbedMeta> {
   const existing = cache.get(url);
   if (existing) {
+    touch(url, existing);
     return existing;
   }
   const p = fetchInner(url);
-  cache.set(url, p);
+  touch(url, p);
+  p.catch(() => {
+    if (cache.get(url) === p) {
+      cache.delete(url);
+    }
+  });
   return p;
 }

@@ -16,11 +16,26 @@ function hostnameOf(url: string): string {
 
 function faviconFor(url: string): string {
   try {
-    const host = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.hostname}/favicon.ico`;
   } catch {
     return '';
   }
+}
+
+function buildFavicon(url: string, className: string): HTMLImageElement | null {
+  const src = faviconFor(url);
+  if (!src) {
+    return null;
+  }
+  const fav = document.createElement('img');
+  fav.src = src;
+  fav.className = className;
+  fav.loading = 'lazy';
+  fav.onerror = () => {
+    fav.remove();
+  };
+  return fav;
 }
 
 function clear(el: HTMLElement): void {
@@ -59,7 +74,7 @@ function buildOEmbedMedia(meta: OEmbedMeta): HTMLElement {
   const iframe = document.createElement('iframe');
   iframe.setAttribute(
     'sandbox',
-    'allow-scripts allow-same-origin allow-popups allow-presentation',
+    'allow-scripts allow-popups allow-presentation',
   );
   iframe.setAttribute('loading', 'lazy');
   iframe.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden}body>iframe,body>embed,body>video,body>object{width:100%!important;height:100%!important;border:0;display:block;max-width:100%;max-height:100%}body>img{max-width:100%;height:auto;display:block}</style>${meta.html ?? ''}`;
@@ -100,13 +115,9 @@ function buildOEmbed(meta: OEmbedMeta, url: string): HTMLElement {
 
   const header = document.createElement('div');
   header.className = 'pm-embed-rich-header';
-  const favicon = faviconFor(url);
-  if (favicon) {
-    const fav = document.createElement('img');
-    fav.src = favicon;
-    fav.className = 'pm-embed-rich-favicon';
-    fav.loading = 'lazy';
-    header.appendChild(fav);
+  const headerFav = buildFavicon(url, 'pm-embed-rich-favicon');
+  if (headerFav) {
+    header.appendChild(headerFav);
   }
   const provider = document.createElement('span');
   provider.className = 'pm-embed-rich-provider';
@@ -167,12 +178,9 @@ function buildLinkCard(meta: LinkMeta, url: string): HTMLElement {
 
   const metaRow = document.createElement('div');
   metaRow.className = 'pm-embed-link-meta';
-  const favicon = faviconFor(url);
-  if (favicon) {
-    const fav = document.createElement('img');
-    fav.src = favicon;
-    fav.className = 'pm-embed-link-favicon';
-    metaRow.appendChild(fav);
+  const metaFav = buildFavicon(url, 'pm-embed-link-favicon');
+  if (metaFav) {
+    metaRow.appendChild(metaFav);
   }
   const site = document.createElement('span');
   site.textContent = meta.siteName || hostnameOf(url);
@@ -232,12 +240,30 @@ export function renderEmbedHost(
   }
 
   swap(buildSkeleton(url));
-  fetchEmbed(url).then((meta) => {
-    if (cancelled) {
-      return;
-    }
-    swap(renderResolved(meta, url));
-  });
+  fetchEmbed(url)
+    .then((meta) => {
+      if (cancelled) {
+        return;
+      }
+      swap(renderResolved(meta, url));
+    })
+    .catch(() => {
+      if (cancelled) {
+        return;
+      }
+      swap(
+        buildLinkCard(
+          {
+            kind: 'link',
+            title: null,
+            description: null,
+            image: null,
+            siteName: null,
+          },
+          url,
+        ),
+      );
+    });
 
   return {
     dom: host,
