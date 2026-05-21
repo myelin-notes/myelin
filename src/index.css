@@ -1145,25 +1145,64 @@ input[type="range"].tool-slider::-moz-range-track {
   display: block;
 }
 
-.pm-editor .ProseMirror .pm-embed-oembed {
-  display: block;
+.pm-editor .ProseMirror .pm-embed-rich {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  width: 560px;
   max-width: 100%;
+  padding: 0.75em;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  overflow: hidden;
   background: var(--bg-card);
+  box-sizing: border-box;
 }
 
-.pm-editor .ProseMirror .pm-embed-oembed > iframe {
-  display: block;
-  max-width: 100%;
-  border: 0;
+.pm-editor .ProseMirror .pm-embed-rich-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 0.78em;
+  color: var(--text-tertiary, var(--text-secondary));
 }
 
-.pm-editor .ProseMirror .pm-embed-caption {
-  padding: 0.5em 0.75em;
+.pm-editor .ProseMirror .pm-embed-rich-favicon {
+  width: 14px;
+  height: 14px;
+}
+
+.pm-editor .ProseMirror .pm-embed-rich-provider {
+  font-weight: 500;
+}
+
+.pm-editor .ProseMirror a.pm-embed-rich-title {
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-brand, var(--foreground));
+  text-decoration: none;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.pm-editor .ProseMirror a.pm-embed-rich-title:hover {
+  text-decoration: underline;
+}
+
+.pm-editor .ProseMirror .pm-embed-rich-author {
   font-size: 0.85em;
   color: var(--text-secondary);
-  border-top: 1px solid var(--border-subtle);
+}
+
+.pm-editor .ProseMirror .pm-embed-rich-iframe {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 6px;
+  background: #000;
+  overflow: hidden;
 }
 
 .pm-editor .ProseMirror a.pm-embed-link {

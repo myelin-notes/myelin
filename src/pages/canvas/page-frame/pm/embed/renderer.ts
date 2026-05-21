@@ -49,45 +49,85 @@ function buildVideo(url: string): HTMLElement {
   return video;
 }
 
-function buildOEmbed(meta: OEmbedMeta, url: string): HTMLElement {
-  if (meta.html) {
-    const wrap = document.createElement('div');
-    wrap.className = 'pm-embed pm-embed-oembed';
-    wrap.setAttribute('data-provider', meta.providerName);
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute(
-      'sandbox',
-      'allow-scripts allow-same-origin allow-popups allow-presentation',
-    );
-    iframe.setAttribute('loading', 'lazy');
-    iframe.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:transparent}body>*{max-width:100%}</style>${meta.html}`;
-    if (meta.width && meta.height) {
-      iframe.style.aspectRatio = `${meta.width} / ${meta.height}`;
-      iframe.style.width = `${meta.width}px`;
-    } else {
-      iframe.style.aspectRatio = '16 / 9';
-      iframe.style.width = '640px';
-    }
-    iframe.style.border = '0';
-    wrap.appendChild(iframe);
-    if (meta.title) {
-      const cap = document.createElement('div');
-      cap.className = 'pm-embed-caption';
-      cap.textContent = meta.title;
-      wrap.appendChild(cap);
-    }
-    return wrap;
-  }
-  return buildLinkCard(
-    {
-      kind: 'link',
-      title: meta.title,
-      description: null,
-      image: meta.thumbnailUrl,
-      siteName: meta.providerName,
-    },
-    url,
+const VIDEO_TYPES = new Set(['video', 'photo']);
+const DEFAULT_RICH_HEIGHT = 480;
+
+function buildOEmbedMedia(meta: OEmbedMeta): HTMLElement {
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute(
+    'sandbox',
+    'allow-scripts allow-same-origin allow-popups allow-presentation',
   );
+  iframe.setAttribute('loading', 'lazy');
+  iframe.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden}body>iframe,body>embed,body>video,body>object{width:100%!important;height:100%!important;border:0;display:block;max-width:100%;max-height:100%}body>img{max-width:100%;height:auto;display:block}</style>${meta.html ?? ''}`;
+  iframe.className = 'pm-embed-rich-iframe';
+
+  const hasRatio = meta.width && meta.height;
+  const isVideoLike = meta.type ? VIDEO_TYPES.has(meta.type) : hasRatio;
+
+  if (hasRatio) {
+    iframe.style.aspectRatio = `${meta.width} / ${meta.height}`;
+  } else if (isVideoLike) {
+    iframe.style.aspectRatio = '16 / 9';
+  } else {
+    iframe.style.height = `${DEFAULT_RICH_HEIGHT}px`;
+  }
+  return iframe;
+}
+
+function buildOEmbed(meta: OEmbedMeta, url: string): HTMLElement {
+  if (!meta.html) {
+    return buildLinkCard(
+      {
+        kind: 'link',
+        title: meta.title,
+        description: meta.authorName,
+        image: meta.thumbnailUrl,
+        siteName: meta.providerName,
+      },
+      url,
+    );
+  }
+
+  const card = document.createElement('div');
+  card.className = 'pm-embed pm-embed-rich';
+  card.setAttribute('data-provider', meta.providerName);
+
+  const header = document.createElement('div');
+  header.className = 'pm-embed-rich-header';
+  const favicon = faviconFor(url);
+  if (favicon) {
+    const fav = document.createElement('img');
+    fav.src = favicon;
+    fav.className = 'pm-embed-rich-favicon';
+    fav.loading = 'lazy';
+    header.appendChild(fav);
+  }
+  const provider = document.createElement('span');
+  provider.className = 'pm-embed-rich-provider';
+  provider.textContent = meta.providerName || hostnameOf(url);
+  header.appendChild(provider);
+  card.appendChild(header);
+
+  if (meta.title) {
+    const titleLink = document.createElement('a');
+    titleLink.href = url;
+    titleLink.target = '_blank';
+    titleLink.rel = 'noopener noreferrer';
+    titleLink.className = 'pm-embed-rich-title';
+    titleLink.textContent = meta.title;
+    card.appendChild(titleLink);
+  }
+
+  if (meta.authorName) {
+    const author = document.createElement('div');
+    author.className = 'pm-embed-rich-author';
+    author.textContent = meta.authorName;
+    card.appendChild(author);
+  }
+
+  card.appendChild(buildOEmbedMedia(meta));
+  return card;
 }
 
 function buildLinkCard(meta: LinkMeta, url: string): HTMLElement {

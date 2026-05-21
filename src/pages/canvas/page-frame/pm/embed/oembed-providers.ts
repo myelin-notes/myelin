@@ -4,8 +4,12 @@ export interface OEmbedProvider {
   endpoint: (url: string) => string;
 }
 
-const json = (base: string, url: string): string =>
-  `${base}${base.includes('?') ? '&' : '?'}format=json&url=${encodeURIComponent(url)}`;
+const OEMBED_MAX_WIDTH = 640;
+
+const json = (base: string, url: string): string => {
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}format=json&maxwidth=${OEMBED_MAX_WIDTH}&url=${encodeURIComponent(url)}`;
+};
 
 export const OEMBED_PROVIDERS: OEmbedProvider[] = [
   {

@@ -7,6 +7,7 @@ export interface OEmbedMeta {
   providerName: string;
   type: string | null;
   title: string | null;
+  authorName: string | null;
   html: string | null;
   thumbnailUrl: string | null;
   width: number | null;
@@ -54,6 +55,7 @@ async function fetchOEmbed(
     providerName,
     type: asString(data.type),
     title: asString(data.title),
+    authorName: asString(data.author_name),
     html: asString(data.html),
     thumbnailUrl: asString(data.thumbnail_url),
     width: asNumber(data.width),
