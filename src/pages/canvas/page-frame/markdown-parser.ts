@@ -349,18 +349,14 @@ function scanInline(
       continue;
     }
 
-    // Image: ![alt](src)
+    // Embed syntax (`![alt](url)`) stays as literal text — a decoration
+    // plugin renders the preview beneath the source.
     if (ch === '!' && text[i + 1] === '[') {
       const m = text
         .slice(i)
         .match(/^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/);
       if (m) {
-        pushText();
-        if (schema.nodes.image) {
-          nodes.push(
-            schema.nodes.image.create({ src: m[2], alt: m[1] || null }),
-          );
-        }
+        buf += m[0];
         i += m[0].length;
         continue;
       }

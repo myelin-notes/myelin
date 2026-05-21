@@ -29,7 +29,8 @@
         { "url": "https://oauth2.googleapis.com/device/code" },
         { "url": "https://oauth2.googleapis.com/token" },
         { "url": "https://www.googleapis.com/drive/v3/*" },
-        { "url": "https://www.googleapis.com/upload/drive/v3/*" }
+        { "url": "https://www.googleapis.com/upload/drive/v3/*" },
+        { "url": "https://**" }
       ]
     }
   ]
