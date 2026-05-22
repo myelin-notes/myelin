@@ -67,17 +67,74 @@ function buildVideo(url: string): HTMLElement {
 const VIDEO_TYPES = new Set(['video', 'photo']);
 const DEFAULT_RICH_HEIGHT = 480;
 
+const IFRAME_PASSTHROUGH_ATTRS = [
+  'allowfullscreen',
+  'referrerpolicy',
+  'title',
+];
+
+const PROVIDER_IFRAME_SANDBOX =
+  'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation allow-forms';
+
+const ALLOWED_IFRAME_FEATURES = new Set([
+  'accelerometer',
+  'autoplay',
+  'clipboard-write',
+  'encrypted-media',
+  'fullscreen',
+  'gyroscope',
+  'picture-in-picture',
+  'web-share',
+]);
+
+function sanitizeAllow(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const tokens = value
+    .split(';')
+    .map((part) => part.trim().split(/\s+/)[0]?.toLowerCase() ?? '')
+    .filter((feature) => ALLOWED_IFRAME_FEATURES.has(feature));
+  return tokens.length > 0 ? tokens.join('; ') : null;
+}
+
+function extractProviderIframe(html: string): HTMLIFrameElement | null {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const source = doc.querySelector('iframe');
+  const src = source?.getAttribute('src');
+  if (!src || !/^https:\/\//i.test(src)) {
+    return null;
+  }
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('src', src);
+  iframe.setAttribute('sandbox', PROVIDER_IFRAME_SANDBOX);
+  const allow = sanitizeAllow(source?.getAttribute('allow') ?? null);
+  if (allow) {
+    iframe.setAttribute('allow', allow);
+  }
+  for (const attr of IFRAME_PASSTHROUGH_ATTRS) {
+    const value = source?.getAttribute(attr);
+    if (value !== null && value !== undefined) {
+      iframe.setAttribute(attr, value);
+    }
+  }
+  return iframe;
+}
+
 function buildOEmbedMedia(meta: OEmbedMeta): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'pm-embed-rich-media';
 
-  const iframe = document.createElement('iframe');
-  iframe.setAttribute(
-    'sandbox',
-    'allow-scripts allow-popups allow-presentation',
-  );
+  const providerIframe = meta.html ? extractProviderIframe(meta.html) : null;
+  const iframe = providerIframe ?? document.createElement('iframe');
+  if (!providerIframe) {
+    iframe.setAttribute(
+      'sandbox',
+      'allow-scripts allow-popups allow-presentation',
+    );
+    iframe.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden}body>iframe,body>embed,body>video,body>object{width:100%!important;height:100%!important;border:0;display:block;max-width:100%;max-height:100%}body>img{max-width:100%;height:auto;display:block}</style>${meta.html ?? ''}`;
+  }
   iframe.setAttribute('loading', 'lazy');
-  iframe.srcdoc = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden}body>iframe,body>embed,body>video,body>object{width:100%!important;height:100%!important;border:0;display:block;max-width:100%;max-height:100%}body>img{max-width:100%;height:auto;display:block}</style>${meta.html ?? ''}`;
   iframe.className = 'pm-embed-rich-iframe';
 
   const hasRatio = meta.width && meta.height;
