@@ -21,6 +21,7 @@ import { prefixMarkdownInputRules } from './markdown/prefix-rules';
 import { paginationPlugin } from './pagination/plugin';
 import { schema } from './schema';
 import { selectionHighlightPlugin } from './selection-highlight';
+import { wordSelectionDragPlugin } from './word-selection-drag';
 
 function checkListPlugin(schema: Schema): Plugin {
   return new ProseMirrorPlugin({
@@ -90,6 +91,7 @@ export function buildPlugins(
     buildKeymap(schema),
     paginationPlugin(onPageCount),
     selectionHighlightPlugin(),
+    wordSelectionDragPlugin(),
     tableEditing(),
   ];
   return plugins;
