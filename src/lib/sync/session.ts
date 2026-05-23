@@ -119,6 +119,10 @@ export class NoteSession {
     return this.transport.connected;
   }
 
+  get localPeerId(): string {
+    return this.localPeer.peerId;
+  }
+
   hasUnsyncedChanges(): boolean {
     return this.changeEpoch !== this.flushedEpoch;
   }

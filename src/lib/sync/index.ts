@@ -15,6 +15,19 @@ export {
   useRepository,
   useRepositoryStatus,
 } from './context';
+export { CloudflareLiveDiscoveryClient } from './live/cloudflare-discovery';
+export {
+  createLiveDiscoveryRecordInput,
+  createLiveDiscoveryRoomId,
+  getLiveDiscoveryRepositoryKey,
+  LIVE_DISCOVERY_MAX_RECORDS,
+  LIVE_DISCOVERY_RECORD_TTL_MS,
+  type LiveDiscoveryClient,
+  type LiveDiscoveryRecord,
+  type LiveDiscoveryRecordInput,
+  parseLiveDiscoveryRecord,
+  parseLiveDiscoveryRecords,
+} from './live/discovery';
 export type { PeerSnapshot } from './live/peer-state';
 export type {
   PeerControlMessage,
