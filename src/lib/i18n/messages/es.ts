@@ -229,11 +229,6 @@ const es: typeof en = {
           label: 'GitHub',
           description: 'Sincronizar con un repositorio privado de GitHub',
         },
-        googleDrive: {
-          label: 'Google Drive',
-          description:
-            'Sincronizar con una carpeta dedicada en tu Google Drive',
-        },
       },
       auth: {
         title: 'Autenticación del repositorio',

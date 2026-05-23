@@ -1,7 +1,5 @@
 import type { RepositoryConfig } from './config';
 import { hasGitHubToken } from './github-credentials';
-import { hasGoogleDriveCredentials } from './google-drive-credentials';
-
 export const REPOSITORY_SETUP_INCOMPLETE_MESSAGE =
   'Finish repository setup in Settings before creating notes.';
 
@@ -28,8 +26,6 @@ export function isRepositoryConfigStructurallyComplete(
         hasText(config.repo) &&
         hasText(config.branch ?? 'main')
       );
-    case 'googleDrive':
-      return true;
   }
 }
 
@@ -46,8 +42,6 @@ export async function isRepositoryFullyConfigured(
         return true;
       case 'github':
         return hasGitHubToken(config.credentialId);
-      case 'googleDrive':
-        return hasGoogleDriveCredentials(config.credentialId);
     }
   } catch {
     return false;

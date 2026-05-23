@@ -44,11 +44,6 @@ vi.mock('@/lib/sync/repo/github-credentials', () => ({
   hasGitHubToken: vi.fn(async () => true),
 }));
 
-vi.mock('@/lib/sync/repo/google-drive-credentials', () => ({
-  getGoogleDriveAccessToken: vi.fn(async () => 'test-google-token'),
-  hasGoogleDriveCredentials: vi.fn(async () => true),
-}));
-
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => path,
 }));

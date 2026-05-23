@@ -359,40 +359,6 @@ export interface MemoryGitHubApi {
   readonly headOid: string;
 }
 
-interface MemoryGoogleDriveFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  parents: string[];
-  appProperties: Record<string, string>;
-  bytes: Uint8Array | null;
-  headRevisionId: string | null;
-  version: number;
-  trashed: boolean;
-}
-
-export interface MemoryGoogleDriveApi {
-  fetch(
-    url: string,
-    init: {
-      method: string;
-      headers?: Record<string, string>;
-      body?: BodyInit | null;
-    },
-  ): Promise<{
-    ok: boolean;
-    status: number;
-    json(): Promise<unknown>;
-    arrayBuffer(): Promise<ArrayBuffer>;
-    text(): Promise<string>;
-  }>;
-  readFileByAppProperty(
-    key: string,
-    value: string,
-  ): Omit<MemoryGoogleDriveFile, 'bytes'> | null;
-  readBytes(fileId: string): Uint8Array | null;
-}
-
 function buildTarballFromFiles(
   files: Map<string, { sha: string; bytes: Uint8Array }>,
 ): Uint8Array {
@@ -655,195 +621,11 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   };
 }
 
-function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
-  const files = new Map<string, MemoryGoogleDriveFile>();
-  let nextId = 0;
-  let nextRevision = 0;
-
-  function createId(): string {
-    nextId += 1;
-    return `drive-file-${nextId}`;
-  }
-
-  function createHeadRevisionId(): string {
-    nextRevision += 1;
-    return `drive-rev-${nextRevision}`;
-  }
-
-  function normalizeBodyBytes(body: BodyInit | null | undefined): Uint8Array {
-    if (!body) {
-      return new Uint8Array();
-    }
-    if (typeof body === 'string') {
-      return new TextEncoder().encode(body);
-    }
-    if (body instanceof Uint8Array) {
-      return new Uint8Array(body);
-    }
-    if (body instanceof ArrayBuffer) {
-      return new Uint8Array(body);
-    }
-    if (ArrayBuffer.isView(body)) {
-      return new Uint8Array(
-        body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
-      );
-    }
-    throw new Error(`Unsupported Google Drive request body: ${typeof body}`);
-  }
-
-  function listFiles(query: string): MemoryGoogleDriveFile[] {
-    const parentMatch = /'([^']+)' in parents/.exec(query);
-    const mimeTypeMatch = /mimeType = '([^']+)'/.exec(query);
-    const nameMatch = /name = '([^']+)'/.exec(query);
-    const appPropertyMatch =
-      /appProperties has \{ key='([^']+)' and value='([^']+)' \}/.exec(query);
-    const requireNotTrashed = query.includes('trashed = false');
-
-    return [...files.values()].filter((file) => {
-      if (requireNotTrashed && file.trashed) {
-        return false;
-      }
-      if (parentMatch && !file.parents.includes(parentMatch[1] ?? '')) {
-        return false;
-      }
-      if (mimeTypeMatch && file.mimeType !== (mimeTypeMatch[1] ?? '')) {
-        return false;
-      }
-      if (nameMatch && file.name !== (nameMatch[1] ?? '')) {
-        return false;
-      }
-      if (appPropertyMatch) {
-        const [key, value] = appPropertyMatch.slice(1);
-        if (file.appProperties[key ?? ''] !== value) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }
-
-  function metadataFor(file: MemoryGoogleDriveFile) {
-    return {
-      id: file.id,
-      name: file.name,
-      mimeType: file.mimeType,
-      parents: [...file.parents],
-      appProperties: { ...file.appProperties },
-      headRevisionId: file.headRevisionId,
-      trashed: file.trashed,
-      version: String(file.version),
-    };
-  }
-
-  return {
-    async fetch(url, init) {
-      const parsed = new URL(url);
-      const isDriveHost = parsed.hostname === 'www.googleapis.com';
-      if (!isDriveHost) {
-        throw new Error(`Unsupported Google Drive URL: ${url}`);
-      }
-
-      const pathMatch = parsed.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/);
-      const uploadMatch = parsed.pathname.match(
-        /^\/upload\/drive\/v3\/files\/([^/]+)$/,
-      );
-
-      if (parsed.pathname === '/drive/v3/files' && init.method === 'GET') {
-        const query = parsed.searchParams.get('q') ?? '';
-        return createJsonResponse(200, {
-          files: listFiles(query).map(metadataFor),
-        });
-      }
-
-      if (parsed.pathname === '/drive/v3/files' && init.method === 'POST') {
-        const payload = JSON.parse(String(init.body ?? '{}')) as {
-          name?: string;
-          mimeType?: string;
-          parents?: string[];
-          appProperties?: Record<string, string>;
-        };
-        const file: MemoryGoogleDriveFile = {
-          id: createId(),
-          name: payload.name ?? 'Untitled',
-          mimeType: payload.mimeType ?? 'application/octet-stream',
-          parents: [...(payload.parents ?? [])],
-          appProperties: { ...(payload.appProperties ?? {}) },
-          bytes: null,
-          headRevisionId: null,
-          version: 0,
-          trashed: false,
-        };
-        files.set(file.id, file);
-        return createJsonResponse(200, metadataFor(file));
-      }
-
-      if (pathMatch && init.method === 'GET') {
-        const file = files.get(pathMatch[1] ?? '');
-        if (!file || file.trashed) {
-          return createTextResponse(404, '{"error":"Not Found"}');
-        }
-        if (parsed.searchParams.get('alt') === 'media') {
-          return createBinaryResponse(200, file.bytes ?? new Uint8Array());
-        }
-        return createJsonResponse(200, metadataFor(file));
-      }
-
-      if (uploadMatch && init.method === 'PATCH') {
-        const file = files.get(uploadMatch[1] ?? '');
-        if (!file || file.trashed) {
-          return createTextResponse(404, '{"error":"Not Found"}');
-        }
-        file.bytes = normalizeBodyBytes(init.body);
-        file.version += 1;
-        file.headRevisionId = createHeadRevisionId();
-        return createJsonResponse(200, metadataFor(file));
-      }
-
-      if (pathMatch && init.method === 'DELETE') {
-        const file = files.get(pathMatch[1] ?? '');
-        if (!file || file.trashed) {
-          return createTextResponse(404, '{"error":"Not Found"}');
-        }
-        file.trashed = true;
-        return createJsonResponse(200, {});
-      }
-
-      throw new Error(`Unsupported Google Drive method: ${init.method} ${url}`);
-    },
-    readFileByAppProperty(key, value) {
-      const file =
-        [...files.values()].find(
-          (entry) => !entry.trashed && entry.appProperties[key] === value,
-        ) ?? null;
-      if (!file) {
-        return null;
-      }
-      return {
-        id: file.id,
-        name: file.name,
-        mimeType: file.mimeType,
-        parents: [...file.parents],
-        appProperties: { ...file.appProperties },
-        headRevisionId: file.headRevisionId,
-        version: file.version,
-        trashed: file.trashed,
-      };
-    },
-    readBytes(fileId) {
-      const file = files.get(fileId);
-      return file?.bytes ? new Uint8Array(file.bytes) : null;
-    },
-  };
-}
-
 let currentStorage = createMemoryStorage();
 let currentGitHubApi = createMemoryGitHubApi();
-let currentGoogleDriveApi = createMemoryGoogleDriveApi();
-
 export function resetRepositoryTestDoubles(): void {
   currentStorage = createMemoryStorage();
   currentGitHubApi = createMemoryGitHubApi();
-  currentGoogleDriveApi = createMemoryGoogleDriveApi();
 }
 
 export function getRepositoryTestStorage(): MemoryStorage {
@@ -852,10 +634,6 @@ export function getRepositoryTestStorage(): MemoryStorage {
 
 export function getRepositoryTestGitHubApi(): MemoryGitHubApi {
   return currentGitHubApi;
-}
-
-export function getRepositoryTestGoogleDriveApi(): MemoryGoogleDriveApi {
-  return currentGoogleDriveApi;
 }
 
 export function createPathModule() {
@@ -919,9 +697,6 @@ export function createPluginHttpModule() {
       const host = new URL(url).hostname;
       if (host === 'api.github.com') {
         return currentGitHubApi.fetch(url, init);
-      }
-      if (host === 'www.googleapis.com') {
-        return currentGoogleDriveApi.fetch(url, init);
       }
       throw new Error(`Unsupported mock HTTP host: ${host}`);
     },

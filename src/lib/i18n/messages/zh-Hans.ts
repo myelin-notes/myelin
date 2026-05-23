@@ -220,10 +220,6 @@ const zhHans: typeof en = {
           label: 'GitHub',
           description: '同步到私有 GitHub 仓库',
         },
-        googleDrive: {
-          label: 'Google Drive',
-          description: '同步到你 Google Drive 中的专用文件夹',
-        },
       },
       auth: {
         title: '仓库身份验证',

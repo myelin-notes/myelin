@@ -6,7 +6,6 @@ import {
 } from '@/test/repository-test-utils';
 import type { BaseRepository } from './base';
 import { GitHubRepository } from './github';
-import { GoogleDriveRepository } from './google-drive';
 import { LocalRepository } from './local';
 
 const repositoryCases: {
@@ -25,13 +24,6 @@ const repositoryCases: {
         repo: label,
         branch: 'main',
         credentialId: 'test-credential',
-      }),
-  },
-  {
-    name: 'google-drive',
-    createRepository: () =>
-      new GoogleDriveRepository({
-        credentialId: 'test-drive-credential',
       }),
   },
 ];

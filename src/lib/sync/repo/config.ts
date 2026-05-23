@@ -10,10 +10,7 @@ export type RepositoryConfig =
       branch?: string;
       credentialId: string;
     }
-  | {
-      kind: 'googleDrive';
-      credentialId: string;
-    };
+;
 
 export interface RepositoryLifecycle {
   initialize(): Promise<void>;

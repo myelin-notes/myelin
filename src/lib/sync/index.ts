@@ -45,20 +45,6 @@ export {
   storeGitHubToken,
   waitForGitHubDeviceAuth,
 } from './repo/github-credentials';
-export type { GoogleDriveDeviceAuthPollResult } from './repo/google-drive-credentials';
-export {
-  beginGoogleDriveDeviceAuth,
-  cancelGoogleDriveDeviceAuth,
-  clearGoogleDriveCredentials,
-  getGoogleDriveAccessToken,
-  hasGoogleDriveCredentials,
-  isGoogleDriveDeviceAuthAvailable,
-  isGoogleDriveSecureStorageAvailable,
-  openGoogleDriveDeviceAuth,
-  pollGoogleDriveDeviceAuth,
-  startGoogleDriveDeviceAuth,
-  waitForGoogleDriveDeviceAuth,
-} from './repo/google-drive-credentials';
 export {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,

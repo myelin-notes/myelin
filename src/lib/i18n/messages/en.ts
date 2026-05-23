@@ -226,10 +226,6 @@ const en = {
           label: 'GitHub',
           description: 'Sync to a private GitHub repository',
         },
-        googleDrive: {
-          label: 'Google Drive',
-          description: 'Sync to a dedicated folder in your Google Drive',
-        },
       },
       auth: {
         title: 'Repository Authentication',

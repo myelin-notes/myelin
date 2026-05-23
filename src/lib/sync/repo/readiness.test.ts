@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRepository } from './factory';
 import { hasGitHubToken } from './github-credentials';
-import { hasGoogleDriveCredentials } from './google-drive-credentials';
 import {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
@@ -9,14 +8,10 @@ import {
 } from './readiness';
 
 const mockHasGitHubToken = vi.mocked(hasGitHubToken);
-const mockHasGoogleDriveCredentials = vi.mocked(hasGoogleDriveCredentials);
-
 describe('repository readiness', () => {
   beforeEach(() => {
     mockHasGitHubToken.mockClear();
     mockHasGitHubToken.mockResolvedValue(true);
-    mockHasGoogleDriveCredentials.mockClear();
-    mockHasGoogleDriveCredentials.mockResolvedValue(true);
   });
 
   it('treats GitHub configs without repository details as incomplete', async () => {

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Cloud,
   ExternalLink,
   Github,
   HardDrive,
@@ -30,7 +29,6 @@ import { RepoField } from './repo-field';
 import { SyncStatusBadge, type SyncStatusTone } from './sync-status-badge';
 import { useGitHubAuth } from './use-github-auth';
 import { useGitHubSelectors } from './use-github-selectors';
-import { useGoogleDriveAuth } from './use-google-drive-auth';
 
 type RepoKind = RepositoryConfig['kind'];
 
@@ -48,21 +46,15 @@ export function RepositorySection() {
     config.kind === 'github'
       ? config.credentialId.trim() || 'default'
       : 'default';
-  const googleDriveCredentialId =
-    config.kind === 'googleDrive'
-      ? config.credentialId.trim() || 'default'
-      : 'default';
-
   const githubAuth = useGitHubAuth(githubCredentialId);
-  const googleDriveAuth = useGoogleDriveAuth(googleDriveCredentialId);
   const selectors = useGitHubSelectors({
     tokenPresent: githubAuth.tokenPresent,
     credentialId: githubCredentialId,
     config,
   });
 
-  const remoteAuth = config.kind === 'github' ? githubAuth : googleDriveAuth;
-  const RemoteAuthIcon = config.kind === 'github' ? Github : Cloud;
+  const remoteAuth = githubAuth;
+  const RemoteAuthIcon = Github;
 
   const handleKindChange = (kind: RepoKind) => {
     if (kind === 'local') {
@@ -81,11 +73,6 @@ export function RepositorySection() {
       return;
     }
 
-    setRepositoryConfig({
-      kind: 'googleDrive',
-      credentialId:
-        config.kind === 'googleDrive' ? googleDriveCredentialId : 'default',
-    });
   };
 
   const handleOwnerChange = (owner: string) => {
@@ -133,9 +120,7 @@ export function RepositorySection() {
     Boolean(config.repo.trim()) &&
     Boolean((config.branch ?? '').trim()) &&
     githubAuth.tokenPresent;
-  const googleDriveConfigReady =
-    config.kind === 'googleDrive' && googleDriveAuth.tokenPresent;
-  const remoteConfigReady = githubConfigReady || googleDriveConfigReady;
+  const remoteConfigReady = githubConfigReady;
 
   const {
     label: syncBadgeLabel,
@@ -168,15 +153,6 @@ export function RepositorySection() {
           icon={Github}
           label={strings.settings.repository.kinds.github.label}
           description={strings.settings.repository.kinds.github.description}
-        />
-        <KindCard
-          selected={config.kind === 'googleDrive'}
-          onSelect={() => handleKindChange('googleDrive')}
-          icon={Cloud}
-          label={strings.settings.repository.kinds.googleDrive.label}
-          description={
-            strings.settings.repository.kinds.googleDrive.description
-          }
         />
       </div>
 
@@ -389,20 +365,6 @@ export function RepositorySection() {
                   )}
                 </div>
 
-                {config.kind === 'googleDrive' && (
-                  <div>
-                    <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
-                      {strings.settings.repository.sync.remoteRepository}
-                    </p>
-                    <div className="flex items-center gap-3 rounded-xl bg-input px-4 py-3 ring-1 ring-border-subtle/70">
-                      <Cloud className="size-4 shrink-0 text-text-muted" />
-                      <span className="font-medium text-sm text-text-primary">
-                        {strings.settings.repository.kinds.googleDrive.label} /{' '}
-                        {strings.app.name}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>
