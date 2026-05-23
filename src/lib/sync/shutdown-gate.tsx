@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { useRepository } from './context';
@@ -119,22 +122,23 @@ export function RepositoryShutdownGate() {
           <DialogTitle>{copy.title}</DialogTitle>
           <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
-        <div className="flex items-center gap-2.5 text-text-secondary text-xs">
-          <Loader2 className="size-4 shrink-0 animate-spin" />
-          {copy.progress(shutdownState.totalPending)}
-        </div>
-        {canForceQuit && (
-          <DialogFooter>
-            <div className="flex flex-col gap-1 sm:items-end">
-              <Button variant="outline" onClick={forceQuit}>
+        <div className="flex items-center justify-between text-text-secondary text-xs">
+          <div className="flex items-center gap-2.5">
+            <Loader2 className="size-4 shrink-0 animate-spin" />
+            {copy.progress(shutdownState.totalPending)}
+          </div>
+          {canForceQuit && (
+            <Tooltip>
+              <TooltipTrigger
+                onClick={forceQuit}
+                className="fade-in-0 animate-in cursor-pointer text-text-tertiary underline decoration-border-ghost underline-offset-2 duration-200 hover:text-text-secondary"
+              >
                 {copy.forceQuit}
-              </Button>
-              <div className="text-text-secondary text-xs">
-                {copy.forceQuitHint}
-              </div>
-            </div>
-          </DialogFooter>
-        )}
+              </TooltipTrigger>
+              <TooltipContent>{copy.forceQuitHint}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
