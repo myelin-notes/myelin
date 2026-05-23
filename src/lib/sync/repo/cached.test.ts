@@ -409,7 +409,7 @@ describe('CachedRepository', () => {
     );
   });
 
-  it('flushes pending outbox work before syncing remote changes on initialize', async () => {
+  it('preserves pending outbox work across initialize without pushing to remote', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote note', 'mcanvas', null);
     const initialNote = createNoteState('remote baseline');
@@ -441,33 +441,31 @@ describe('CachedRepository', () => {
       },
     );
 
-    const remoteOnlyId = await remote.createFile(
-      'Remote added while offline',
-      'mcanvas',
-      null,
-    );
     await getRepositoryTestStorage().writeTextFile(
       outboxPath,
       JSON.stringify([{ kind: 'push-note', nodeId: fileId }]),
     );
 
-    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
-    const replaceSnapshot = vi.spyOn(cache, 'replaceSnapshot');
     const repository = new CachedRepository(remote, cache, outboxPath);
 
     await repository.initialize();
 
-    expect(exportSnapshot).toHaveBeenCalledTimes(2);
-    expect(replaceSnapshot).toHaveBeenCalledTimes(1);
+    // Remote unchanged because init no longer flushes the outbox.
     expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
-      'local pending edit',
+      'remote baseline',
     );
+    // Local cache still holds the pending edit.
     expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
       'local pending edit',
     );
-    expect(await repository.getNode(remoteOnlyId)).toMatchObject({
-      name: 'Remote added while offline',
-    });
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+
+    // Explicit flush (timer or app-close path) drains the outbox.
+    await repository.flushPending();
+
+    expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
+      'local pending edit',
+    );
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
@@ -1244,6 +1242,14 @@ describe('CachedRepository', () => {
 
     expect(first.getRuntimeStatus().lastError).toBeNull();
     expect(second.getRuntimeStatus().lastError).toBeNull();
+    // Init no longer flushes, so the remote is still on baseline and the
+    // queued op survives. Flushing explicitly drains the shared outbox.
+    expect(
+      readNoteText((await createRemote().loadDocument(fileId)).update),
+    ).toBe('remote baseline');
+
+    await first.flushPending();
+
     expect(
       readNoteText((await createRemote().loadDocument(fileId)).update),
     ).toBe('local pending edit');

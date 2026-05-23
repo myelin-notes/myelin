@@ -18,6 +18,7 @@ import {
   getRepositoryConfig,
   subscribeRepositoryConfig,
 } from './repo/repository-settings';
+import { RepositoryShutdownGate } from './shutdown-gate';
 
 export interface RepositoryStatus {
   config: RepositoryConfig;
@@ -171,6 +172,7 @@ export function RepositoryProvider({
 
   return (
     <RepositoryContext.Provider value={contextValue}>
+      <RepositoryShutdownGate />
       {children}
     </RepositoryContext.Provider>
   );

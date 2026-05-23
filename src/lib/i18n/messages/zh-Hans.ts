@@ -517,6 +517,12 @@ const zhHans: typeof en = {
   dialogs: {
     closeSrOnly: '关闭',
   },
+  shutdown: {
+    title: '正在保存更改…',
+    description: '退出前正在将待同步的更改推送到仓库。',
+    progress: (remaining: number, total: number) =>
+      `已同步 ${total - remaining} / ${total}`,
+  },
 };
 
 export default zhHans;

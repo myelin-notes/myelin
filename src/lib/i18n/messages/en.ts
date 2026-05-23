@@ -525,6 +525,12 @@ const en = {
   dialogs: {
     closeSrOnly: 'Close',
   },
+  shutdown: {
+    title: 'Saving changes…',
+    description: 'Syncing pending changes to your repository before quitting.',
+    progress: (remaining: number, total: number) =>
+      `${total - remaining} of ${total} synced`,
+  },
 };
 
 export default en;

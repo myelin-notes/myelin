@@ -53,7 +53,7 @@ import {
   getExistingParentId,
 } from './reconcile';
 
-const BACKGROUND_SYNC_INTERVAL_MS = 15_000;
+const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 const logger = new Logger('CachedRepository');
 
 export class CachedRepository
@@ -169,13 +169,12 @@ export class CachedRepository
 
     this.startBackgroundSync();
 
-    try {
-      await this.flushPendingInternal();
-      if (!didBootstrapFromRemote) {
+    if (!didBootstrapFromRemote) {
+      try {
         await this.syncCacheFromRemote();
+      } catch (error) {
+        logger.error('Initial remote pull failed', error);
       }
-    } catch (error) {
-      logger.error('Initial outbox flush failed', error);
     }
   }
 
@@ -192,7 +191,6 @@ export class CachedRepository
   }
 
   private async refreshImpl(): Promise<void> {
-    await this.flushPendingInternal();
     await this.syncCacheFromRemote();
   }
 
@@ -219,6 +217,11 @@ export class CachedRepository
     if (this.flushTimer !== null) {
       window.clearInterval(this.flushTimer);
       this.flushTimer = null;
+    }
+    try {
+      await this.flushPending();
+    } catch (error) {
+      logger.error('Final outbox flush during dispose failed', error);
     }
   }
 
