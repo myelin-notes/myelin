@@ -182,4 +182,43 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     const conflictCopy = files.find((f) => f.name !== 'Clip.mp4');
     expect(conflictCopy).toBeDefined();
   });
+
+  it('updates manifest modifiedAt for canvas pushes routed through the batch', async () => {
+    const { remote, repository } = buildRepository('batch-canvas-manifest');
+    await repository.initialize();
+
+    const fileId = await repository.createFile('Linked note', 'mcanvas', null);
+    await repository.flushPending();
+
+    const remoteNodeBefore = await remote.getNode(fileId);
+    expect(remoteNodeBefore?.type).toBe('file');
+    const modifiedAtBefore =
+      remoteNodeBefore && remoteNodeBefore.type === 'file'
+        ? remoteNodeBefore.modifiedAt
+        : 0;
+
+    const api = getRepositoryTestGitHubApi();
+    const baselineGraphql = api.graphqlCallCount;
+
+    // Advance the wall clock by sleeping enough that Date.now() must move
+    // forward; modifiedAt is timestamp-based.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const note = createNoteState('updated content');
+    await repository.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+    await repository.flushPending();
+
+    expect(api.graphqlCallCount - baselineGraphql).toBe(1);
+
+    const remoteNodeAfter = await remote.getNode(fileId);
+    expect(remoteNodeAfter?.type).toBe('file');
+    const modifiedAtAfter =
+      remoteNodeAfter && remoteNodeAfter.type === 'file'
+        ? remoteNodeAfter.modifiedAt
+        : 0;
+    expect(modifiedAtAfter).toBeGreaterThan(modifiedAtBefore);
+  });
 });

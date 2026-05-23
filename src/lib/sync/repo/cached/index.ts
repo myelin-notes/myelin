@@ -23,6 +23,7 @@ import type {
   RepositoryStatusSource,
 } from '../config';
 import type { LocalRepository } from '../local';
+import { extractStoredNoteLinks } from '../note-link-index';
 import {
   addChild,
   computeRevision,
@@ -33,6 +34,7 @@ import {
   getUniqueFileName,
   MANIFEST_PATH,
   type RepositorySnapshot,
+  setStoredNoteLinks,
   type VFSManifest,
 } from '../shared';
 import type {
@@ -733,18 +735,58 @@ export class CachedRepository
     const expectedHeadOid = await remote.getBranchHeadOid();
     const { manifest: remoteManifest } = await remote.loadManifestForBatch();
 
-    const cacheSnapshot = await this.withLocalStateLock(() =>
-      this.cache.exportSnapshot(),
-    );
-
-    const ops = await this.withLocalStateLock(async () => {
+    // Snapshot cache + outbox + per-op payloads atomically. A concurrent
+    // user write that lands between the outbox read and the cache reads
+    // would otherwise let us drain an op whose data we never committed.
+    const snapshot = await this.withLocalStateLock(async () => {
       await this.outbox.load();
-      return this.outbox.snapshotOps();
+      const ops = this.outbox.snapshotOps();
+      if (ops.length === 0) {
+        return null;
+      }
+      const cacheSnapshot = await this.cache.exportSnapshot();
+
+      const canvasOps: Array<{
+        op: Extract<PendingOp, { kind: 'push-note' }>;
+        node: VFSFileNode;
+        snapshot: YjsSyncSnapshot;
+      }> = [];
+      const rawOps: Array<{
+        op: Extract<PendingOp, { kind: 'push-note' }>;
+        node: VFSFileNode;
+        bytes: Uint8Array | null;
+      }> = [];
+
+      for (const op of ops) {
+        if (op.kind !== 'push-note') {
+          continue;
+        }
+        const node = cacheSnapshot.manifest.nodes[op.nodeId];
+        if (!node || node.type !== 'file') {
+          continue;
+        }
+        if (node.fileType === 'mcanvas') {
+          canvasOps.push({
+            op,
+            node,
+            snapshot: await this.cache.loadDocument(op.nodeId),
+          });
+        } else {
+          rawOps.push({
+            op,
+            node,
+            bytes: await this.cache.readFileBytes(op.nodeId),
+          });
+        }
+      }
+
+      return { ops, cacheSnapshot, canvasOps, rawOps };
     });
 
-    if (ops.length === 0) {
+    if (snapshot === null) {
       return null;
     }
+    const { ops, cacheSnapshot, canvasOps, rawOps } = snapshot;
 
     const plan: BatchPlan = {
       manifest: structuredClone(remoteManifest),
@@ -755,17 +797,6 @@ export class CachedRepository
       resolvedOps: ops,
       expectedHeadOid,
     };
-
-    const canvasOps: Array<{
-      op: Extract<PendingOp, { kind: 'push-note' }>;
-      node: VFSFileNode;
-      snapshot: YjsSyncSnapshot;
-    }> = [];
-    const rawOps: Array<{
-      op: Extract<PendingOp, { kind: 'push-note' }>;
-      node: VFSFileNode;
-      bytes: Uint8Array | null;
-    }> = [];
 
     for (const op of ops) {
       switch (op.kind) {
@@ -798,25 +829,13 @@ export class CachedRepository
           const node = cacheSnapshot.manifest.nodes[op.nodeId];
           if (!node || node.type !== 'file') {
             plan.messages.push(`Skip missing node ${op.nodeId}`);
-            break;
-          }
-          if (node.fileType === 'mcanvas') {
-            canvasOps.push({
-              op,
-              node,
-              snapshot: await this.cache.loadDocument(op.nodeId),
-            });
-          } else {
-            rawOps.push({
-              op,
-              node,
-              bytes: await this.cache.readFileBytes(op.nodeId),
-            });
           }
           break;
         }
       }
     }
+
+    const fileSavedAt = Date.now();
 
     if (rawOps.length > 0) {
       const conflict = await this.checkRawConflicts(remote, rawOps);
@@ -831,6 +850,11 @@ export class CachedRepository
         plan.messages.push(
           `Update raw ${entry.node.fileType} ${entry.node.name}`,
         );
+        const manifestNode = plan.manifest.nodes[entry.node.id];
+        if (manifestNode && manifestNode.type === 'file') {
+          manifestNode.modifiedAt = fileSavedAt;
+          plan.manifestChanged = true;
+        }
       }
     }
 
@@ -845,14 +869,22 @@ export class CachedRepository
           Y.applyUpdate(doc, entry.snapshot.update);
         }
         return {
+          nodeId: entry.node.id,
           path: getStoredFilePath(entry.node),
           bytes: Y.encodeStateAsUpdate(doc),
+          links: extractStoredNoteLinks(doc),
           name: entry.node.name,
         };
       });
       for (const m of merged) {
         plan.additions.set(m.path, m.bytes);
         plan.messages.push(`Update note ${m.name}`);
+        const manifestNode = plan.manifest.nodes[m.nodeId];
+        if (manifestNode && manifestNode.type === 'file') {
+          manifestNode.modifiedAt = fileSavedAt;
+          setStoredNoteLinks(plan.manifest, m.nodeId, m.links);
+          plan.manifestChanged = true;
+        }
       }
     }
 
