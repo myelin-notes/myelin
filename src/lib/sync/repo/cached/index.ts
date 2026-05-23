@@ -10,11 +10,8 @@ import type {
 } from '../../types';
 import type { BaseRepository } from '../base';
 import {
-  type BatchedCommitInput,
   type BatchedCommitTarget,
   BatchHeadConflictError,
-  GITHUB_BATCH_MAX_FILES,
-  GITHUB_BATCH_MAX_PAYLOAD_BYTES,
   supportsBatchedCommit,
 } from '../batch';
 import type {
@@ -80,10 +77,6 @@ interface BatchPlan {
   expectedHeadOid: string;
 }
 
-interface BatchChunk {
-  additions: Array<{ path: string; contents: Uint8Array }>;
-}
-
 async function mapWithConcurrency<T, U>(
   items: T[],
   limit: number,
@@ -117,66 +110,6 @@ function buildCommitBody(messages: string[]): string | undefined {
     body = `${body.slice(0, COMMIT_BODY_MAX_BYTES - 16)}\n- (truncated)`;
   }
   return body;
-}
-
-function chunkBatchAdditions(plan: BatchPlan): BatchChunk[] {
-  const fileEntries: Array<{ path: string; contents: Uint8Array }> = [];
-  let manifestEntry: { path: string; contents: Uint8Array } | null = null;
-  for (const [path, contents] of plan.additions) {
-    if (path === MANIFEST_PATH) {
-      manifestEntry = { path, contents };
-    } else {
-      fileEntries.push({ path, contents });
-    }
-  }
-
-  const chunks: BatchChunk[] = [];
-  let current: BatchChunk = { additions: [] };
-  let currentBytes = 0;
-  for (const entry of fileEntries) {
-    const entryBytes = entry.contents.byteLength;
-    const wouldExceed =
-      current.additions.length + 1 > GITHUB_BATCH_MAX_FILES ||
-      currentBytes + entryBytes > GITHUB_BATCH_MAX_PAYLOAD_BYTES;
-    if (wouldExceed && current.additions.length > 0) {
-      chunks.push(current);
-      current = { additions: [] };
-      currentBytes = 0;
-    }
-    current.additions.push(entry);
-    currentBytes += entryBytes;
-  }
-  if (current.additions.length > 0) {
-    chunks.push(current);
-  }
-
-  if (manifestEntry) {
-    const last = chunks[chunks.length - 1];
-    const manifestBytes = manifestEntry.contents.byteLength;
-    if (
-      !last ||
-      last.additions.length + 1 > GITHUB_BATCH_MAX_FILES ||
-      sumChunkBytes(last) + manifestBytes > GITHUB_BATCH_MAX_PAYLOAD_BYTES
-    ) {
-      chunks.push({ additions: [manifestEntry] });
-    } else {
-      last.additions.push(manifestEntry);
-    }
-  }
-
-  if (chunks.length === 0) {
-    chunks.push({ additions: [] });
-  }
-
-  return chunks;
-}
-
-function sumChunkBytes(chunk: BatchChunk): number {
-  let total = 0;
-  for (const entry of chunk.additions) {
-    total += entry.contents.byteLength;
-  }
-  return total;
 }
 
 export class CachedRepository
@@ -940,30 +873,18 @@ export class CachedRepository
       opCount === 1 && plan.messages[0]
         ? plan.messages[0]
         : `Sync ${opCount} changes`;
-    const body = buildCommitBody(plan.messages);
 
-    const chunks = chunkBatchAdditions(plan);
-    let expectedHeadOid = plan.expectedHeadOid;
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const isLast = i === chunks.length - 1;
-      const input: BatchedCommitInput = {
-        additions: chunk.additions,
-        deletions: isLast
-          ? Array.from(plan.deletions).map((path) => ({ path }))
-          : [],
-        message: {
-          headline:
-            chunks.length === 1
-              ? headline
-              : `${headline} (${i + 1}/${chunks.length})`,
-          body: i === 0 ? body : undefined,
-        },
-        expectedHeadOid,
-      };
-      const result = await remote.commitBatch(input);
-      expectedHeadOid = result.newHeadOid;
-    }
+    const additions = Array.from(plan.additions, ([path, contents]) => ({
+      path,
+      contents,
+    }));
+
+    await remote.commitBatch({
+      additions,
+      deletions: Array.from(plan.deletions, (path) => ({ path })),
+      message: { headline, body: buildCommitBody(plan.messages) },
+      expectedHeadOid: plan.expectedHeadOid,
+    });
   }
 
   private async drainResolvedOps(ops: PendingOp[]): Promise<void> {

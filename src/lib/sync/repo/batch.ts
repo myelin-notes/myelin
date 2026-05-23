@@ -1,9 +1,6 @@
 import type { VFSManifest } from './shared';
 import type { RepositoryCapabilities } from './types';
 
-export const GITHUB_BATCH_MAX_FILES = 50;
-export const GITHUB_BATCH_MAX_PAYLOAD_BYTES = 30 * 1024 * 1024;
-
 export interface BatchedCommitFileChange {
   path: string;
   contents: Uint8Array;

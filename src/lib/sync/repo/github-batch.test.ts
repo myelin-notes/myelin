@@ -132,8 +132,8 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
-  it('chunks a flush exceeding the per-commit file limit', async () => {
-    const { repository } = buildRepository('batch-chunking');
+  it('flushes a large batch in a single commit without chunking', async () => {
+    const { repository } = buildRepository('batch-large');
     await repository.initialize();
 
     const api = getRepositoryTestGitHubApi();
@@ -146,7 +146,7 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
 
     await repository.flushPending();
 
-    expect(api.graphqlCallCount - baselineGraphql).toBe(2);
+    expect(api.graphqlCallCount - baselineGraphql).toBe(1);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
