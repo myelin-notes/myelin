@@ -528,8 +528,8 @@ const en = {
   shutdown: {
     title: 'Saving changes…',
     description: 'Syncing pending changes to your repository before quitting.',
-    progress: (remaining: number, total: number) =>
-      `${total - remaining} of ${total} synced`,
+    progress: (count: number) =>
+      `Syncing ${count} change${count === 1 ? '' : 's'}…`,
     forceQuit: 'Quit anyway',
     forceQuitHint: 'Unsynced changes stay queued and will retry next launch.',
   },

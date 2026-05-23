@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { useRepository, useRepositoryStatus } from './context';
+import { useRepository } from './context';
 
 const logger = new Logger('RepositoryShutdownGate');
 const FORCE_QUIT_DELAY_MS = 10_000;
@@ -27,7 +28,6 @@ export function RepositoryShutdownGate() {
   const strings = useMessages();
   const copy = strings.shutdown;
   const repository = useRepository();
-  const status = useRepositoryStatus();
   const [shutdownState, setShutdownState] = useState<ShutdownState>({
     phase: 'idle',
     totalPending: 0,
@@ -36,8 +36,6 @@ export function RepositoryShutdownGate() {
   const shuttingDownRef = useRef(false);
   const repositoryRef = useRef(repository);
   repositoryRef.current = repository;
-  const initialPendingRef = useRef(status.pendingRemoteWrites);
-  initialPendingRef.current = status.pendingRemoteWrites;
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -53,7 +51,8 @@ export function RepositoryShutdownGate() {
           }
           shuttingDownRef.current = true;
 
-          const totalPending = initialPendingRef.current;
+          const totalPending =
+            repositoryRef.current.getRuntimeStatus().pendingRemoteWrites;
           if (totalPending > 0) {
             setShutdownState({ phase: 'flushing', totalPending });
           }
@@ -113,12 +112,6 @@ export function RepositoryShutdownGate() {
     return null;
   }
 
-  const remaining = status.pendingRemoteWrites;
-  const total = shutdownState.totalPending;
-  const completed = Math.min(total, Math.max(0, total - remaining));
-  const ratio = total === 0 ? 1 : completed / total;
-  const percent = Math.round(ratio * 100);
-
   return (
     <Dialog open modal>
       <DialogContent showCloseButton={false} className="sm:max-w-[360px]">
@@ -126,22 +119,9 @@ export function RepositoryShutdownGate() {
           <DialogTitle>{copy.title}</DialogTitle>
           <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-2">
-          <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-            className="h-1.5 w-full overflow-hidden rounded-full bg-surface"
-          >
-            <div
-              className="h-full bg-primary transition-[width] duration-200"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-          <div className="text-text-secondary text-xs">
-            {copy.progress(remaining, total)}
-          </div>
+        <div className="flex items-center gap-2.5 text-text-secondary text-xs">
+          <Loader2 className="size-4 shrink-0 animate-spin" />
+          {copy.progress(shutdownState.totalPending)}
         </div>
         {canForceQuit && (
           <DialogFooter>
