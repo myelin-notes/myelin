@@ -347,10 +347,16 @@ export interface MemoryGitHubApi {
   }>;
   failNextPut(path: string, status?: number): void;
   failNextTarball(status: number, retryAfterSeconds: number): void;
+  failNextGraphQL(reason: 'network' | 'unknown' | 'head-conflict'): void;
+  bumpHeadOidExternally(): string;
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
   setTarball(gzippedTarBytes: Uint8Array): void;
   readonly tarballFetchCount: number;
+  readonly graphqlCallCount: number;
+  readonly putCallCount: number;
+  readonly deleteCallCount: number;
+  readonly headOid: string;
 }
 
 interface MemoryGoogleDriveFile {
@@ -401,18 +407,42 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   const files = new Map<string, { sha: string; bytes: Uint8Array }>();
   const nextPutFailures = new Map<string, number>();
   let revision = 0;
+  let headOid = 'oid-0';
+  let headOidCounter = 0;
   let tarball: Uint8Array | null = null;
   let tarballFetchCount = 0;
+  let graphqlCallCount = 0;
+  let putCallCount = 0;
+  let deleteCallCount = 0;
   let nextTarballFailure: {
     status: number;
     retryAfterSeconds: number;
   } | null = null;
+  const nextGraphqlFailures: Array<'network' | 'unknown' | 'head-conflict'> =
+    [];
 
-  function getPath(url: string): string {
+  function bumpHeadOid(): string {
+    headOidCounter += 1;
+    headOid = `oid-${headOidCounter}`;
+    return headOid;
+  }
+
+  function getContentsPath(url: string): string | null {
     const parsed = new URL(url);
     const match = parsed.pathname.match(/\/contents\/(.+)$/);
     if (!match) {
-      throw new Error(`Unsupported GitHub contents URL: ${url}`);
+      return null;
+    }
+    return decodeURIComponent(match[1] ?? '');
+  }
+
+  function getBranchName(url: string): string | null {
+    const parsed = new URL(url);
+    const match = parsed.pathname.match(
+      /\/repos\/[^/]+\/[^/]+\/branches\/(.+)$/,
+    );
+    if (!match) {
+      return null;
     }
     return decodeURIComponent(match[1] ?? '');
   }
@@ -423,9 +453,89 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     return sha;
   }
 
+  async function handleGraphQL(init: {
+    body?: BodyInit | null;
+  }): Promise<ReturnType<typeof createJsonResponse>> {
+    graphqlCallCount += 1;
+    if (nextGraphqlFailures.length > 0) {
+      const reason = nextGraphqlFailures.shift()!;
+      if (reason === 'network') {
+        return createTextResponse(503, '{"message":"Service Unavailable"}');
+      }
+      if (reason === 'head-conflict') {
+        return createJsonResponse(200, {
+          errors: [
+            {
+              message: `Expected head oid forced-mismatch but got ${headOid}`,
+            },
+          ],
+        });
+      }
+      return createJsonResponse(200, {
+        errors: [{ message: 'Unexpected error' }],
+      });
+    }
+
+    const body = JSON.parse(String(init.body ?? '{}')) as {
+      query?: string;
+      variables?: {
+        input?: {
+          expectedHeadOid?: string;
+          fileChanges?: {
+            additions?: Array<{ path: string; contents: string }>;
+            deletions?: Array<{ path: string }>;
+          };
+        };
+      };
+    };
+
+    if (!body.query?.includes('createCommitOnBranch')) {
+      return createJsonResponse(200, {
+        errors: [{ message: `Unsupported GraphQL operation` }],
+      });
+    }
+
+    const input = body.variables?.input;
+    if (!input) {
+      return createJsonResponse(200, {
+        errors: [{ message: 'Missing input' }],
+      });
+    }
+
+    if (input.expectedHeadOid && input.expectedHeadOid !== headOid) {
+      return createJsonResponse(200, {
+        errors: [
+          {
+            message: `Expected head oid ${input.expectedHeadOid} but got ${headOid}`,
+          },
+        ],
+      });
+    }
+
+    for (const deletion of input.fileChanges?.deletions ?? []) {
+      files.delete(deletion.path);
+    }
+    for (const addition of input.fileChanges?.additions ?? []) {
+      const bytes = new Uint8Array(Buffer.from(addition.contents, 'base64'));
+      write(addition.path, bytes);
+    }
+
+    const newOid = bumpHeadOid();
+    return createJsonResponse(200, {
+      data: { createCommitOnBranch: { commit: { oid: newOid } } },
+    });
+  }
+
   return {
     async fetch(url, init) {
       const parsed = new URL(url);
+      if (parsed.pathname === '/graphql') {
+        return handleGraphQL(init);
+      }
+      const branch = getBranchName(url);
+      if (branch !== null) {
+        return createJsonResponse(200, { commit: { sha: headOid } });
+      }
       if (parsed.pathname.includes('/tarball/')) {
         tarballFetchCount += 1;
         if (nextTarballFailure) {
@@ -440,7 +550,10 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
         return createBinaryResponse(200, bytes);
       }
 
-      const path = getPath(url);
+      const path = getContentsPath(url);
+      if (path === null) {
+        throw new Error(`Unsupported GitHub URL: ${url}`);
+      }
 
       if (init.method === 'GET') {
         const entry = files.get(path);
@@ -454,6 +567,7 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
       }
 
       if (init.method === 'PUT') {
+        putCallCount += 1;
         const forcedStatus = nextPutFailures.get(path);
         if (forcedStatus) {
           nextPutFailures.delete(path);
@@ -472,12 +586,14 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
           Buffer.from(payload.content ?? '', 'base64'),
         );
         const sha = write(path, bytes);
+        bumpHeadOid();
         return createJsonResponse(200, {
           content: { sha },
         });
       }
 
       if (init.method === 'DELETE') {
+        deleteCallCount += 1;
         const payload = JSON.parse(String(init.body ?? '{}')) as {
           sha?: string;
         };
@@ -489,6 +605,7 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
           return createTextResponse(409, '{"message":"SHA mismatch"}');
         }
         files.delete(path);
+        bumpHeadOid();
         return createJsonResponse(200, {});
       }
 
@@ -499,6 +616,12 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     failNextTarball(status, retryAfterSeconds) {
       nextTarballFailure = { status, retryAfterSeconds };
+    },
+    failNextGraphQL(reason) {
+      nextGraphqlFailures.push(reason);
+    },
+    bumpHeadOidExternally() {
+      return bumpHeadOid();
     },
     readBytes(path) {
       const entry = files.get(path);
@@ -516,6 +639,18 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     get tarballFetchCount() {
       return tarballFetchCount;
+    },
+    get graphqlCallCount() {
+      return graphqlCallCount;
+    },
+    get putCallCount() {
+      return putCallCount;
+    },
+    get deleteCallCount() {
+      return deleteCallCount;
+    },
+    get headOid() {
+      return headOid;
     },
   };
 }

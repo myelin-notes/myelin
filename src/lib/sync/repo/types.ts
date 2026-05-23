@@ -78,6 +78,7 @@ export interface NoteBacklink extends StoredNoteLink {
 export interface RepositoryCapabilities {
   polling: boolean;
   liveSync: boolean;
+  batchedCommit: boolean;
 }
 
 export interface Repository {

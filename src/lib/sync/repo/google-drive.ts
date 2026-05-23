@@ -50,6 +50,7 @@ export class GoogleDriveRepository extends BaseRepository {
   public readonly capabilities: RepositoryCapabilities = {
     polling: true,
     liveSync: false,
+    batchedCommit: false,
   };
 
   private rootFolderIdPromise: Promise<string> | null = null;

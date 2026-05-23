@@ -67,11 +67,7 @@ function buildVideo(url: string): HTMLElement {
 const VIDEO_TYPES = new Set(['video', 'photo']);
 const DEFAULT_RICH_HEIGHT = 480;
 
-const IFRAME_PASSTHROUGH_ATTRS = [
-  'allowfullscreen',
-  'referrerpolicy',
-  'title',
-];
+const IFRAME_PASSTHROUGH_ATTRS = ['allowfullscreen', 'referrerpolicy', 'title'];
 
 const PROVIDER_IFRAME_SANDBOX =
   'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation allow-forms';
