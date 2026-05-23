@@ -517,6 +517,13 @@ const zhHans: typeof en = {
   dialogs: {
     closeSrOnly: '关闭',
   },
+  shutdown: {
+    title: '正在保存更改…',
+    description: '退出前正在将待同步的更改推送到仓库。',
+    progress: (count: number) => `正在同步 ${count} 项更改…`,
+    forceQuit: '仍要退出',
+    forceQuitHint: '未同步的更改会保留在队列中，下次启动时重试。',
+  },
 };
 
 export default zhHans;

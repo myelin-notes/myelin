@@ -314,6 +314,10 @@ export class CachedRepositoryOutbox {
     };
   }
 
+  snapshotOps(): PendingOp[] {
+    return this.pendingOps.map((op) => structuredClone(op));
+  }
+
   async removeHeadIfUnchanged(expected: PendingOp): Promise<boolean> {
     await this.load();
     const currentOp = this.pendingOps[0];

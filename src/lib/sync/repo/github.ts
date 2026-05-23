@@ -1,5 +1,11 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { BaseRepository } from './base';
+import {
+  type BatchedCommitInput,
+  type BatchedCommitResult,
+  BatchHeadConflictError,
+  BatchUnknownError,
+} from './batch';
 import { getGitHubToken } from './github-credentials';
 import {
   createEmptyManifest,
@@ -40,6 +46,7 @@ interface GitHubRepositoryConfig {
 }
 
 const GITHUB_API_BASE = 'https://api.github.com';
+const GITHUB_GRAPHQL_URL = `${GITHUB_API_BASE}/graphql`;
 const GITHUB_API_VERSION = '2022-11-28';
 const MAX_MANIFEST_RETRIES = 4;
 
@@ -107,6 +114,7 @@ export class GitHubRepository extends BaseRepository {
   public readonly capabilities: RepositoryCapabilities = {
     polling: true,
     liveSync: false,
+    batchedCommit: true,
   };
 
   constructor(private readonly config: GitHubRepositoryConfig) {
@@ -376,4 +384,97 @@ export class GitHubRepository extends BaseRepository {
       throw await this.failureError('GitHub delete request failed', response);
     }
   }
+
+  async getBranchHeadOid(): Promise<string> {
+    const url = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}/branches/${encodeURIComponent(this.config.branch)}`;
+    const response = await this.fetchWithRateLimitRetry(url);
+    if (!response.ok) {
+      throw await this.failureError('GitHub branch request failed', response);
+    }
+    const payload = (await response.json()) as { commit: { sha: string } };
+    return payload.commit.sha;
+  }
+
+  async loadManifestForBatch(): Promise<{
+    manifest: VFSManifest;
+    revision: string | null;
+  }> {
+    return this.loadManifestImpl();
+  }
+
+  async commitBatch(input: BatchedCommitInput): Promise<BatchedCommitResult> {
+    const additions = input.additions.map((change) => ({
+      path: change.path,
+      contents: base64EncodeBytes(change.contents),
+    }));
+    const variables = {
+      input: {
+        branch: {
+          repositoryNameWithOwner: `${this.config.owner}/${this.config.repo}`,
+          branchName: this.config.branch,
+        },
+        expectedHeadOid: input.expectedHeadOid,
+        message: input.message.body
+          ? { headline: input.message.headline, body: input.message.body }
+          : { headline: input.message.headline },
+        fileChanges: {
+          additions,
+          deletions: input.deletions.map((d) => ({ path: d.path })),
+        },
+      },
+    };
+
+    const response = await fetch(GITHUB_GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        ...(await this.authHeaders()),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query:
+          'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }',
+        variables,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new BatchUnknownError(
+        `GitHub GraphQL request failed (${response.status})`,
+        await response.text().catch(() => '<no response body>'),
+      );
+    }
+
+    const body = (await response.json()) as {
+      data?: { createCommitOnBranch?: { commit?: { oid?: string } } };
+      errors?: Array<{ message?: string; type?: string }>;
+    };
+
+    if (body.errors && body.errors.length > 0) {
+      const firstMessage = body.errors[0]?.message ?? '';
+      if (isHeadConflictMessage(firstMessage)) {
+        throw new BatchHeadConflictError(firstMessage);
+      }
+      throw new BatchUnknownError(
+        `GitHub GraphQL returned errors: ${firstMessage}`,
+        body.errors,
+      );
+    }
+
+    const newOid = body.data?.createCommitOnBranch?.commit?.oid;
+    if (!newOid) {
+      throw new BatchUnknownError(
+        'GitHub GraphQL response missing commit oid',
+        body,
+      );
+    }
+    return { newHeadOid: newOid };
+  }
+}
+
+function isHeadConflictMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  if (lower.includes('stale_data')) {
+    return true;
+  }
+  return lower.includes('expected') && lower.includes('oid');
 }

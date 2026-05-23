@@ -533,6 +533,16 @@ const es: typeof en = {
   dialogs: {
     closeSrOnly: 'Cerrar',
   },
+  shutdown: {
+    title: 'Guardando cambios…',
+    description:
+      'Sincronizando cambios pendientes con tu repositorio antes de salir.',
+    progress: (count: number) =>
+      `Sincronizando ${count} cambio${count === 1 ? '' : 's'}…`,
+    forceQuit: 'Salir de todas formas',
+    forceQuitHint:
+      'Los cambios sin sincronizar quedan en cola y se reintentarán al iniciar.',
+  },
 };
 
 export default es;

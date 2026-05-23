@@ -525,6 +525,14 @@ const en = {
   dialogs: {
     closeSrOnly: 'Close',
   },
+  shutdown: {
+    title: 'Saving changes…',
+    description: 'Syncing pending changes to your repository before quitting.',
+    progress: (count: number) =>
+      `Syncing ${count} change${count === 1 ? '' : 's'}…`,
+    forceQuit: 'Quit anyway',
+    forceQuitHint: 'Unsynced changes stay queued and will retry next launch.',
+  },
 };
 
 export default en;
