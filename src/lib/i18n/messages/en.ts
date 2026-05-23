@@ -530,6 +530,8 @@ const en = {
     description: 'Syncing pending changes to your repository before quitting.',
     progress: (remaining: number, total: number) =>
       `${total - remaining} of ${total} synced`,
+    forceQuit: 'Quit anyway',
+    forceQuitHint: 'Unsynced changes stay queued and will retry next launch.',
   },
 };
 

@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -12,6 +14,7 @@ import { Logger } from '@/lib/logger';
 import { useRepository, useRepositoryStatus } from './context';
 
 const logger = new Logger('RepositoryShutdownGate');
+const FORCE_QUIT_DELAY_MS = 10_000;
 
 type ShutdownPhase = 'idle' | 'flushing';
 
@@ -29,6 +32,7 @@ export function RepositoryShutdownGate() {
     phase: 'idle',
     totalPending: 0,
   });
+  const [canForceQuit, setCanForceQuit] = useState(false);
   const shuttingDownRef = useRef(false);
   const repositoryRef = useRef(repository);
   repositoryRef.current = repository;
@@ -43,11 +47,11 @@ export function RepositoryShutdownGate() {
       try {
         const win = getCurrentWindow();
         const off = await win.onCloseRequested(async (event) => {
+          event.preventDefault();
           if (shuttingDownRef.current) {
             return;
           }
           shuttingDownRef.current = true;
-          event.preventDefault();
 
           const totalPending = initialPendingRef.current;
           if (totalPending > 0) {
@@ -85,6 +89,26 @@ export function RepositoryShutdownGate() {
     };
   }, []);
 
+  useEffect(() => {
+    if (shutdownState.phase !== 'flushing') {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setCanForceQuit(true);
+    }, FORCE_QUIT_DELAY_MS);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [shutdownState.phase]);
+
+  const forceQuit = useCallback(() => {
+    void getCurrentWindow()
+      .destroy()
+      .catch((error) => {
+        logger.error('Failed to force-quit window', error);
+      });
+  }, []);
+
   if (shutdownState.phase !== 'flushing') {
     return null;
   }
@@ -119,6 +143,18 @@ export function RepositoryShutdownGate() {
             {copy.progress(remaining, total)}
           </div>
         </div>
+        {canForceQuit && (
+          <DialogFooter>
+            <div className="flex flex-col gap-1 sm:items-end">
+              <Button variant="outline" onClick={forceQuit}>
+                {copy.forceQuit}
+              </Button>
+              <div className="text-text-secondary text-xs">
+                {copy.forceQuitHint}
+              </div>
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

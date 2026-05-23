@@ -539,6 +539,9 @@ const es: typeof en = {
       'Sincronizando cambios pendientes con tu repositorio antes de salir.',
     progress: (remaining: number, total: number) =>
       `${total - remaining} de ${total} sincronizados`,
+    forceQuit: 'Salir de todas formas',
+    forceQuitHint:
+      'Los cambios sin sincronizar quedan en cola y se reintentarán al iniciar.',
   },
 };
 
