@@ -11,6 +11,7 @@ import type { Transport } from './transport';
 const INITIAL_POLL_INTERVAL_MS = 2_000;
 const MAX_POLL_INTERVAL_MS = 60_000;
 const JOIN_RETRY_MS = 30_000;
+const REFRESH_TTL_FRACTION = 0.9;
 
 type Timer = number | NodeJS.Timeout;
 
@@ -287,7 +288,10 @@ export class LivePeerDiscoveryCoordinator {
       return;
     }
 
-    const refreshIntervalMs = Math.max(1_000, Math.floor(this.recordTtlMs / 2));
+    const refreshIntervalMs = Math.max(
+      1_000,
+      Math.floor(this.recordTtlMs * REFRESH_TTL_FRACTION),
+    );
     this.refreshTimer = globalThis.setTimeout(() => {
       this.refreshTimer = null;
       void this.publishAndTryJoin()

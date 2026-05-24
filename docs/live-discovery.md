@@ -14,7 +14,8 @@ without copying a manual code.
    the current fresh records.
 4. The app joins one of the returned peer tickets. Yjs updates then flow
    directly over Iroh.
-5. While the note stays open, the app refreshes its record every few minutes.
+5. While the note stays open, the app refreshes its record shortly before the
+   TTL expires.
 6. When the note closes normally, the app deletes its record. If a record is
    left behind, the Worker deletes it after its TTL.
 

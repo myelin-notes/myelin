@@ -221,6 +221,37 @@ describe('LivePeerDiscoveryCoordinator', () => {
     expect(session.clearTransport).toHaveBeenCalled();
   });
 
+  it('refreshes the published record near the TTL', async () => {
+    vi.useFakeTimers();
+    try {
+      const session = createSession();
+      const client = new FakeClient();
+      const transport = new FakeTransport('local-ticket');
+      const coordinator = new LivePeerDiscoveryCoordinator({
+        session,
+        client,
+        createTransport: () => transport,
+        initialPollIntervalMs: 60_000,
+        recordId: 'record-local',
+        recordTtlMs: 10_000,
+      });
+
+      await coordinator.start();
+
+      expect(client.publish).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(8_999);
+      expect(client.publish).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(client.publish).toHaveBeenCalledTimes(2);
+
+      await coordinator.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not restart after stop interrupts a disconnect restart', async () => {
     const session = createSession();
     const client = new FakeClient();
