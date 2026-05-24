@@ -97,6 +97,7 @@ const es: typeof en = {
       folder: 'Nueva carpeta',
       canvas: 'Nuevo lienzo',
       importFiles: 'Importar archivos',
+      importGoodnotesZip: 'Importar ZIP de Goodnotes',
       importObsidianVault: 'Importar bóveda de Obsidian',
       untitledCanvas: 'Lienzo sin título',
       unnamedFolder: 'Carpeta sin nombre',
@@ -110,6 +111,14 @@ const es: typeof en = {
       someUnsupported: 'Algunos archivos no son compatibles.',
       failed: 'No se pudo importar',
       loading: 'Importando archivos...',
+    },
+    importGoodnotesZip: {
+      unsupportedFile: 'Elige un ZIP exportado desde Goodnotes como PDF.',
+      nativeFile:
+        'Los archivos .goodnotes nativos aún no son compatibles. Exporta una carpeta de Goodnotes como PDF y luego importa el ZIP.',
+      failed: 'No se pudo importar el ZIP de Goodnotes',
+      skipped: (count: number) =>
+        `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} omitido${count === 1 ? '' : 's'}.`,
     },
     importObsidianVault: {
       failed: 'No se pudo importar la bóveda de Obsidian',

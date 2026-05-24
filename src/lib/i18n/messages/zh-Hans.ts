@@ -96,6 +96,7 @@ const zhHans: typeof en = {
       folder: '新建文件夹',
       canvas: '新建画布',
       importFiles: '导入文件',
+      importGoodnotesZip: '导入 Goodnotes ZIP',
       importObsidianVault: '导入 Obsidian 仓库',
       untitledCanvas: '未命名画布',
       unnamedFolder: '未命名文件夹',
@@ -109,6 +110,13 @@ const zhHans: typeof en = {
       someUnsupported: '部分文件不受支持',
       failed: '导入失败',
       loading: '正在导入文件...',
+    },
+    importGoodnotesZip: {
+      unsupportedFile: '请选择从 Goodnotes 以 PDF 格式导出的 ZIP',
+      nativeFile:
+        '暂不支持原生 .goodnotes 文件。请先在 Goodnotes 中将文件夹导出为 PDF，再导入该 ZIP。',
+      failed: 'Goodnotes ZIP 导入失败',
+      skipped: (count: number) => `已跳过 ${count} 个不受支持的文件`,
     },
     importObsidianVault: {
       failed: 'Obsidian 仓库导入失败',

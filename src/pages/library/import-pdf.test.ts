@@ -6,7 +6,7 @@ import {
   PAGE_WIDTH,
 } from '@/pages/canvas/elements/page-frame-constants';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
-import { importPdfFile, isPdfFile } from './import-pdf';
+import { importPdfFile, isNativeGoodnotesFile, isPdfFile } from './import-pdf';
 
 vi.mock('@/pages/canvas/pdf-renderer', () => ({
   createDefaultPdfPageOrder: (pageCount: number) =>
@@ -35,6 +35,13 @@ describe('PDF library import', () => {
     expect(isPdfFile(new File([], 'paper.txt', { type: 'text/plain' }))).toBe(
       false,
     );
+  });
+
+  it('detects native Goodnotes documents separately from PDFs', () => {
+    const nativeDocument = new File([], 'Lecture.goodnotes', { type: '' });
+
+    expect(isNativeGoodnotesFile(nativeDocument)).toBe(true);
+    expect(isPdfFile(nativeDocument)).toBe(false);
   });
 
   it('creates a canvas containing one PDF element', async () => {
