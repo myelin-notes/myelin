@@ -3709,7 +3709,6 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-http",
  "tauri-plugin-mcp-bridge",
- "tauri-plugin-ocr",
  "tauri-plugin-opener",
  "tauri-plugin-stronghold",
  "tokio",
@@ -6784,15 +6783,6 @@ dependencies = [
  "webview2-com",
  "windows 0.61.3",
  "windows-core 0.61.2",
-]
-
-[[package]]
-name = "tauri-plugin-ocr"
-version = "0.1.0"
-dependencies = [
- "serde",
- "swift-rs",
- "tauri",
 ]
 
 [[package]]

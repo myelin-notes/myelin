@@ -19,7 +19,6 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_ocr::init())
         .manage(iroh_transport::IrohState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
