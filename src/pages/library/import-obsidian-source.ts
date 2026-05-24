@@ -65,7 +65,7 @@ export function createObsidianVaultImportSource({
       };
     },
 
-    async run({ conflictResolution, signal, onProgress }) {
+    async run({ conflictResolution, onProgress }) {
       if (!scanned) {
         throw new Error('Must scan before importing');
       }
@@ -83,7 +83,6 @@ export function createObsidianVaultImportSource({
             ? undefined
             : vaultName,
         scanned,
-        signal,
         onProgress,
       });
 

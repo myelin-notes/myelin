@@ -67,7 +67,6 @@ export interface ImportObsidianVaultOptions {
   vaultPath: string;
   vaultName?: string;
   scanned?: ScannedVault;
-  signal?: AbortSignal;
   onProgress?: (progress: ImportProgress) => void;
 }
 
@@ -496,7 +495,6 @@ export async function importObsidianVault({
   vaultPath,
   vaultName = getPathName(vaultPath),
   scanned: preScanned,
-  signal,
   onProgress,
 }: ImportObsidianVaultOptions): Promise<ObsidianVaultImportResult> {
   const scanned = preScanned ?? (await scanVault(vaultPath));
@@ -522,9 +520,6 @@ export async function importObsidianVault({
     );
 
     for (const file of markdownFiles) {
-      if (signal?.aborted) {
-        break;
-      }
       file.nodeId = await repository.createFile(
         file.noteName,
         'mcanvas',
@@ -532,22 +527,14 @@ export async function importObsidianVault({
       );
     }
 
-    if (!signal?.aborted) {
-      const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
-      for (const file of markdownFiles) {
-        if (signal?.aborted) {
-          break;
-        }
-        onProgress?.({ current: ++current, total, fileName: file.name });
-        await writeMarkdownFile({ file, repository, resolveNoteLinkId });
-      }
+    const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
+    for (const file of markdownFiles) {
+      onProgress?.({ current: ++current, total, fileName: file.name });
+      await writeMarkdownFile({ file, repository, resolveNoteLinkId });
     }
 
     let mediaImported = 0;
     for (const file of scanned.files) {
-      if (signal?.aborted) {
-        break;
-      }
       if (file.kind === 'markdown') {
         continue;
       }
@@ -574,13 +561,9 @@ export async function importObsidianVault({
       mediaImported += 1;
     }
 
-    const notesImported = signal?.aborted
-      ? markdownFiles.filter((f) => f.nodeId !== null).length
-      : markdownFiles.length;
-
     return {
       rootFolderId,
-      notesImported,
+      notesImported: markdownFiles.length,
       mediaImported,
       skippedFiles: scanned.skippedFiles,
     };

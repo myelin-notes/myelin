@@ -55,7 +55,6 @@ export interface ImportSource {
   scan(): Promise<ImportPreviewData>;
   run(options: {
     conflictResolution: ConflictResolution;
-    signal: AbortSignal;
     onProgress: (progress: ImportProgress) => void;
   }): Promise<ImportSummaryData>;
 }
@@ -72,16 +71,8 @@ type DialogPhase =
       data: ImportPreviewData;
       conflictResolution: ConflictResolution;
     }
-  | {
-      kind: 'importing';
-      progress: ImportProgress | null;
-      cancelling: boolean;
-    }
-  | {
-      kind: 'summary';
-      data: ImportSummaryData;
-      cancelled: boolean;
-    }
+  | { kind: 'importing'; progress: ImportProgress | null }
+  | { kind: 'summary'; data: ImportSummaryData }
   | { kind: 'error'; message: string };
 
 interface ImportDialogProps {
@@ -97,7 +88,6 @@ export function ImportDialog({
 }: ImportDialogProps) {
   const strings = useMessages();
   const [phase, setPhase] = useState<DialogPhase>({ kind: 'scanning' });
-  const abortRef = useRef<AbortController | null>(null);
   const importedRootRef = useRef<string | null>(null);
   const sourceRef = useRef(source);
   sourceRef.current = source;
@@ -140,15 +130,11 @@ export function ImportDialog({
     }
 
     const { conflictResolution } = phase;
-    setPhase({ kind: 'importing', progress: null, cancelling: false });
-
-    const controller = new AbortController();
-    abortRef.current = controller;
+    setPhase({ kind: 'importing', progress: null });
 
     try {
       const data = await sourceRef.current.run({
         conflictResolution,
-        signal: controller.signal,
         onProgress: (progress) => {
           setPhase((prev) =>
             prev.kind === 'importing' ? { ...prev, progress } : prev,
@@ -157,31 +143,14 @@ export function ImportDialog({
       });
 
       importedRootRef.current = data.rootFolderId;
-      setPhase({
-        kind: 'summary',
-        data,
-        cancelled: controller.signal.aborted,
-      });
+      setPhase({ kind: 'summary', data });
     } catch (error) {
       setPhase({
         kind: 'error',
         message: error instanceof Error ? error.message : String(error),
       });
-    } finally {
-      abortRef.current = null;
     }
   }, [phase]);
-
-  const handleCancel = useCallback(() => {
-    if (phase.kind === 'importing') {
-      abortRef.current?.abort();
-      setPhase((prev) =>
-        prev.kind === 'importing' ? { ...prev, cancelling: true } : prev,
-      );
-    } else {
-      handleClose();
-    }
-  }, [phase.kind, handleClose]);
 
   return (
     <Dialog
@@ -287,14 +256,12 @@ export function ImportDialog({
               />
             </div>
             <p className="text-sm text-text-secondary">
-              {phase.cancelling
-                ? strings.library.importDialog.progress.cancelling
-                : phase.progress
-                  ? strings.library.importDialog.progress.importing(
-                      phase.progress.current,
-                      phase.progress.total,
-                    )
-                  : strings.library.importDialog.progress.importing(0, 0)}
+              {phase.progress
+                ? strings.library.importDialog.progress.importing(
+                    phase.progress.current,
+                    phase.progress.total,
+                  )
+                : strings.library.importDialog.progress.importing(0, 0)}
             </p>
             {phase.progress && (
               <p className="truncate text-text-muted text-xs">
@@ -308,9 +275,7 @@ export function ImportDialog({
           <div className="flex flex-col gap-3 py-2">
             <div className="flex items-center gap-2 font-medium text-sm text-text-primary">
               <CheckCircle2 className="size-4 shrink-0 text-green-600 dark:text-green-400" />
-              {phase.cancelled
-                ? strings.library.importDialog.summary.cancelled
-                : strings.library.importDialog.summary.title}
+              {strings.library.importDialog.summary.title}
             </div>
             <div className="rounded-lg bg-surface p-3">
               <p className="text-sm text-text-secondary">{phase.data.text}</p>
@@ -346,16 +311,6 @@ export function ImportDialog({
                 {strings.library.importDialog.buttons.cancel}
               </Button>
             </>
-          )}
-
-          {phase.kind === 'importing' && (
-            <Button
-              variant="outline"
-              onClick={handleCancel}
-              disabled={phase.cancelling}
-            >
-              {strings.library.importDialog.buttons.cancel}
-            </Button>
           )}
 
           {(phase.kind === 'summary' || phase.kind === 'error') && (
