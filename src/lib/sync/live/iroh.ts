@@ -167,10 +167,12 @@ export class IrohTransport implements Transport {
         return;
       }
 
-      logger.error('Transport error', {
+      const error = new Error(event.payload.message);
+      logger.error('Transport error', error, {
         noteId: this.noteId,
         message: event.payload.message,
       });
+      this.emit('error', error);
     });
 
     this.unlisteners = [onMessage, onConnected, onDisconnected, onError];

@@ -771,7 +771,7 @@ describe('CachedRepository', () => {
     );
   });
 
-  it('opens cached note state without refreshing the whole repository in the background', async () => {
+  it('pulls newer remote note state before opening a cached session', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote later', 'mcanvas', null);
     const initialNote = createNoteState('stale cache copy');
@@ -814,13 +814,10 @@ describe('CachedRepository', () => {
       repository.openSession(fileId),
     );
 
-    expect(readNoteText(session.encodeUpdate())).toBe('stale cache copy');
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
+    expect(readNoteText(session.encodeUpdate())).toBe('opened latest remote');
     expect(exportSnapshot).not.toHaveBeenCalled();
     expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
-      'stale cache copy',
+      'opened latest remote',
     );
 
     await session.close();
@@ -866,13 +863,13 @@ describe('CachedRepository', () => {
     const session = await expectQuickLocalResult(
       repository.openSession(fileId),
     );
-    expect(readNoteText(session.encodeUpdate())).toBe('base');
+    expect(readNoteText(session.encodeUpdate())).toBe('base remote');
 
     session.ydoc.doc.getText('content').insert(4, ' local');
     await expectQuickLocalResult(session.save());
 
     expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
-      'base local',
+      'base local remote',
     );
 
     await repository.flushPending();

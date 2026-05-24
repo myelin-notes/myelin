@@ -480,7 +480,9 @@ export class CachedRepository
       nodeId,
       pendingOps: this.outbox.length,
     });
-    return NoteSession.open(nodeId, this);
+    const session = await NoteSession.open(nodeId, this);
+    await session.pull();
+    return session;
   }
 
   async loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot> {
@@ -491,6 +493,7 @@ export class CachedRepository
     nodeId: VFSNodeId,
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot> {
+    await this.tryPullRemoteNoteIntoCache(nodeId);
     return this.cache.pullUpdates(nodeId, stateVector);
   }
 
@@ -1115,6 +1118,87 @@ export class CachedRepository
     }
 
     throw new Error(`Failed to sync note ${nodeId} after retrying conflicts.`);
+  }
+
+  private async tryPullRemoteNoteIntoCache(nodeId: VFSNodeId): Promise<void> {
+    try {
+      await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
+        await this.pullRemoteNoteIntoCache(nodeId);
+      });
+    } catch (error) {
+      this.updateRuntimeStatus({
+        online: false,
+        lastError: error instanceof Error ? error : new Error(String(error)),
+      });
+      logger.error('Failed to pull remote note into cache', error, {
+        repositoryKind: this.kind,
+        nodeId,
+      });
+    }
+  }
+
+  private async pullRemoteNoteIntoCache(nodeId: VFSNodeId): Promise<void> {
+    const baseStateVector = await this.withLocalStateLock(async () => {
+      await this.outbox.load();
+      if (this.outbox.recoveryError) {
+        return null;
+      }
+
+      const node = await this.cache.getNode(nodeId);
+      if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
+        return null;
+      }
+
+      return (await this.cache.loadDocument(nodeId)).stateVector;
+    });
+
+    if (!baseStateVector) {
+      return;
+    }
+
+    const remoteSnapshot = await this.remote.pullUpdates(
+      nodeId,
+      baseStateVector,
+    );
+
+    const remoteUpdate = remoteSnapshot.update;
+
+    if (!remoteUpdate || remoteUpdate.byteLength === 0) {
+      this.updateRuntimeStatus({
+        online: true,
+        lastRemoteSyncAt: Date.now(),
+        lastError: null,
+      });
+      return;
+    }
+
+    await this.withLocalStateLock(async () => {
+      const node = await this.cache.getNode(nodeId);
+      if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
+        return;
+      }
+
+      const currentSnapshot = await this.cache.loadDocument(nodeId);
+      const result = await this.cache.pushUpdates(nodeId, remoteUpdate, {
+        baseRevision: currentSnapshot.revision,
+        localStateVector: currentSnapshot.stateVector,
+      });
+
+      if (!result.accepted) {
+        throw new Error(`Failed to merge remote note ${nodeId} into cache.`);
+      }
+    });
+
+    this.updateRuntimeStatus({
+      online: true,
+      lastRemoteSyncAt: Date.now(),
+      lastError: null,
+    });
+    logger.debug('Pulled remote note into cache', {
+      repositoryKind: this.kind,
+      nodeId,
+      updateByteLength: remoteUpdate.byteLength,
+    });
   }
 
   private async createRawFileConflictCopy(

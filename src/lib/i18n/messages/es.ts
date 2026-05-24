@@ -503,6 +503,7 @@ const es: typeof en = {
       lastRemoteSync: 'Última sincronización remota',
       remotePeers: 'Nodos remotos',
       noRemotePeers: 'No hay nodos remotos',
+      livePaused: 'Sincronización en vivo pausada',
       peerModes: {
         'owner-device': 'Dispositivo propietario',
         'guest-editor': 'Editor invitado',

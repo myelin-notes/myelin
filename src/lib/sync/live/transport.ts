@@ -1,6 +1,7 @@
 export interface TransportEvents {
   connected(): void;
   disconnected(): void;
+  error(error: Error): void;
   message(data: Uint8Array): void;
 }
 
