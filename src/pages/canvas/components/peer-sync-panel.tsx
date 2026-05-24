@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, Copy, Radio, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Radio } from 'lucide-react';
 import { TimeAgo } from '@/components/time-ago';
 import { type Messages, useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
-import { Logger } from '@/lib/logger';
 import {
   type NoteSession,
   type NoteSessionStatus,
@@ -11,11 +10,6 @@ import {
   type RepositoryStatus,
   useRepositoryStatus,
 } from '@/lib/sync';
-import { IrohTransport } from '@/lib/sync/live/iroh';
-
-const logger = new Logger('PeerSyncPanel');
-
-type Phase = 'idle' | 'hosting' | 'joining' | 'connected';
 
 interface PeerSyncPanelProps {
   session: NoteSession | null;
@@ -60,15 +54,9 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
   const strings = useMessages();
   const locale = useLocale();
   const repositoryStatus = useRepositoryStatus();
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [joinToken, setJoinToken] = useState('');
-  const [shareToken, setShareToken] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState('');
   const [peerSnapshot, setPeerSnapshot] = useState<PeerSnapshot | null>(
     () => session?.getPeerSnapshot() ?? null,
   );
-  const transportRef = useRef<IrohTransport | null>(null);
 
   useEffect(() => {
     if (!session) {
@@ -79,99 +67,6 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
     setPeerSnapshot(session.getPeerSnapshot());
     return session.subscribePeerSnapshot(setPeerSnapshot);
   }, [session]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the panel when the session instance changes, even though the effect body only mutates local UI state.
-  useEffect(() => {
-    setPhase('idle');
-    setJoinToken('');
-    setShareToken('');
-    setError('');
-    setCopied(false);
-
-    return () => {
-      const transport = transportRef.current;
-      transportRef.current = null;
-      void transport?.destroy().catch((error) => {
-        logger.error('Failed to destroy transport on unmount', error);
-      });
-    };
-  }, [session]);
-
-  const cleanup = useCallback(async () => {
-    session?.clearTransport();
-    await transportRef.current?.destroy();
-    transportRef.current = null;
-    setPhase('idle');
-    setJoinToken('');
-    setShareToken('');
-    setError('');
-    setCopied(false);
-  }, [session]);
-
-  const host = useCallback(async () => {
-    if (!session) {
-      return;
-    }
-    await cleanup();
-    setError('');
-    const transport = new IrohTransport(session.id);
-    transportRef.current = transport;
-    transport.on('connected', () => setPhase('connected'));
-    transport.on('disconnected', () => cleanup());
-    session.setTransport(transport);
-    try {
-      const ticket = await transport.host();
-      setShareToken(ticket);
-      setPhase('hosting');
-    } catch (err) {
-      void transport.destroy().catch((error) => {
-        logger.error('Failed to destroy transport after host error', error);
-      });
-      if (transportRef.current === transport) {
-        transportRef.current = null;
-      }
-      session.clearTransport();
-      setShareToken('');
-      setError(String(err));
-      setPhase('idle');
-    }
-  }, [session, cleanup]);
-
-  const join = useCallback(async () => {
-    if (!session || !joinToken.trim()) {
-      return;
-    }
-    await cleanup();
-    setError('');
-    const transport = new IrohTransport(session.id);
-    transportRef.current = transport;
-    transport.on('connected', () => setPhase('connected'));
-    transport.on('disconnected', () => cleanup());
-    session.setTransport(transport);
-    try {
-      setPhase('joining');
-      await transport.join(joinToken.trim());
-    } catch (err) {
-      void transport.destroy().catch((error) => {
-        logger.error('Failed to destroy transport after join error', error);
-      });
-      if (transportRef.current === transport) {
-        transportRef.current = null;
-      }
-      session.clearTransport();
-      setError(String(err));
-      setPhase('idle');
-    }
-  }, [session, joinToken, cleanup]);
-
-  const copyShareToken = useCallback(() => {
-    if (!shareToken) {
-      return;
-    }
-    navigator.clipboard.writeText(shareToken);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [shareToken]);
 
   if (!session) {
     return null;
@@ -184,114 +79,18 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
     : strings.common.none;
 
   const peerCount = peerSnapshot?.connectedPeers.length ?? 0;
-  const phaseLabel =
-    strings.canvas.peerSync.sessionPhase[status?.phase ?? 'idle'];
   const syncStatus =
-    phase === 'connected'
-      ? strings.canvas.peerSync.sessionPhase.live(phaseLabel)
-      : phaseLabel;
+    strings.canvas.peerSync.sessionPhase[status?.phase ?? 'idle'];
   const repositorySyncLabel = getRepositorySyncLabel(strings, repositoryStatus);
 
   return (
     <div className="absolute bottom-6 left-6 z-[100] flex max-h-[calc(100dvh-4rem)] w-72 flex-col gap-2 overflow-y-auto rounded-xl bg-white/90 p-3 shadow-ambient backdrop-blur-[24px]">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Radio className="size-3.5 text-text-muted" />
-          <span className="font-medium text-text-secondary text-xs">
-            {strings.canvas.peerSync.title}
-          </span>
-        </div>
-        {phase !== 'idle' && (
-          <button
-            type="button"
-            onClick={cleanup}
-            aria-label={strings.common.close}
-            className="text-text-muted hover:text-text-primary"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
-      </div>
-
-      {error && (
-        <div className="rounded-md bg-bg-error-soft px-2 py-1 text-[10px] text-text-error">
-          {error}
-        </div>
-      )}
-
-      {phase === 'idle' && (
-        <>
-          <button
-            type="button"
-            onClick={host}
-            className="rounded-lg bg-accent-dark px-3 py-1.5 font-medium text-white text-xs hover:bg-accent-navy"
-          >
-            {strings.canvas.peerSync.host}
-          </button>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={joinToken}
-              onChange={(e) => setJoinToken(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && join()}
-              placeholder={strings.canvas.peerSync.joinPlaceholder}
-              className="min-w-0 flex-1 rounded-lg bg-surface px-2 py-1.5 font-mono text-[10px] text-text-secondary outline-none placeholder:text-text-muted"
-            />
-            <button
-              type="button"
-              onClick={join}
-              disabled={!joinToken.trim()}
-              className="rounded-lg bg-surface px-3 py-1.5 font-medium text-text-secondary text-xs hover:bg-hover-tint disabled:opacity-40"
-            >
-              {strings.canvas.peerSync.join}
-            </button>
-          </div>
-        </>
-      )}
-
-      {phase === 'hosting' && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-text-muted">
-              {strings.canvas.peerSync.waitingForPeer}
-            </span>
-            <button
-              type="button"
-              onClick={copyShareToken}
-              aria-label={strings.common.copy}
-              className="flex items-center gap-1 text-[10px] text-accent-dark hover:text-accent-navy"
-            >
-              {copied ? (
-                <Check className="size-3" />
-              ) : (
-                <Copy className="size-3" />
-              )}
-              {copied ? strings.common.copied : strings.common.copy}
-            </button>
-          </div>
-          <div className="break-all rounded-md bg-surface px-2 py-1.5 text-center font-mono text-[10px] text-text-primary">
-            {shareToken}
-          </div>
-          <span className="text-center text-[10px] text-text-muted">
-            {strings.canvas.peerSync.shareCode}
-          </span>
-        </div>
-      )}
-
-      {phase === 'joining' && (
-        <span className="text-center text-[10px] text-text-muted">
-          {strings.canvas.peerSync.connecting}
+      <div className="flex items-center gap-1.5">
+        <Radio className="size-3.5 text-text-muted" />
+        <span className="font-medium text-text-secondary text-xs">
+          {strings.canvas.peerSync.title}
         </span>
-      )}
-
-      {phase === 'connected' && (
-        <div className="flex items-center gap-1.5 rounded-lg bg-bg-success-soft px-3 py-1.5">
-          <div className="size-1.5 rounded-full bg-text-success" />
-          <span className="font-medium text-text-success text-xs">
-            {strings.canvas.peerSync.connected}
-          </span>
-        </div>
-      )}
+      </div>
 
       {peerSnapshot && (
         <div className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2">
