@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { LIVE_DISCOVERY_URL } from '@/lib/env';
 import { Logger } from '@/lib/logger';
+import { registerShutdownTask } from '@/lib/shutdown-tasks';
 import {
   CloudflareLiveDiscoveryClient,
   createLiveDiscoveryRoomId,
@@ -22,6 +23,29 @@ export function useLivePeerDiscovery(noteSession: NoteSession | null): void {
 
     let coordinator: LivePeerDiscoveryCoordinator | null = null;
     let disposed = false;
+    let stopPromise: Promise<void> | null = null;
+
+    const stopDiscovery = async () => {
+      disposed = true;
+      if (stopPromise) {
+        await stopPromise;
+        return;
+      }
+
+      const activeCoordinator = coordinator;
+      coordinator = null;
+      if (!activeCoordinator) {
+        return;
+      }
+
+      stopPromise = activeCoordinator.stop().catch((error) => {
+        logger.error('Failed to stop live peer discovery', error, {
+          noteId: noteSession.id,
+        });
+      });
+      await stopPromise;
+    };
+    const unregisterShutdownTask = registerShutdownTask(stopDiscovery);
 
     void (async () => {
       const roomId = await createLiveDiscoveryRoomId(
@@ -49,12 +73,8 @@ export function useLivePeerDiscovery(noteSession: NoteSession | null): void {
     });
 
     return () => {
-      disposed = true;
-      void coordinator?.stop().catch((error) => {
-        logger.error('Failed to stop live peer discovery', error, {
-          noteId: noteSession.id,
-        });
-      });
+      unregisterShutdownTask();
+      void stopDiscovery();
     };
   }, [noteSession, repositoryStatus.config]);
 }

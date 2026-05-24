@@ -20,6 +20,7 @@ interface DurableObjectStorage {
   get<T>(key: string): Promise<T | undefined>;
   put<T>(key: string, value: T): Promise<void>;
   delete(key: string): Promise<boolean>;
+  deleteAll(): Promise<void>;
   list<T>(options?: { prefix?: string }): Promise<Map<string, T>>;
 }
 
@@ -256,6 +257,10 @@ export class LiveDiscoveryRoom {
     }
 
     await this.state.storage.delete(storageKey(recordId));
+    if ((await this.listFreshRecords()).length === 0) {
+      await this.state.storage.deleteAll();
+    }
+
     return empty(204);
   }
 
@@ -284,7 +289,12 @@ export class LiveDiscoveryRoom {
       ),
     );
 
-    return records.slice(0, MAX_RECORDS_PER_ROOM);
+    const freshRecords = records.slice(0, MAX_RECORDS_PER_ROOM);
+    if (freshRecords.length === 0 && entries.size > 0) {
+      await this.state.storage.deleteAll();
+    }
+
+    return freshRecords;
   }
 }
 
