@@ -121,6 +121,18 @@ async function expectQuickLocalResult<T>(promise: Promise<T>): Promise<T> {
   return result as T;
 }
 
+async function waitForCondition(condition: () => boolean): Promise<void> {
+  for (let index = 0; index < 50; index += 1) {
+    if (condition()) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  expect(condition()).toBe(true);
+}
+
 function installMemoryLocalStorage(): void {
   const storage = new Map<string, string>();
 
@@ -771,7 +783,7 @@ describe('CachedRepository', () => {
     );
   });
 
-  it('pulls newer remote note state before opening a cached session', async () => {
+  it('opens a cached session before the remote note refresh completes', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote later', 'mcanvas', null);
     const initialNote = createNoteState('stale cache copy');
@@ -809,16 +821,129 @@ describe('CachedRepository', () => {
     );
 
     const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
+    const remoteRefresh = createDeferred();
+    const reachedRemoteFileLoad = createDeferred();
+    remote.blockFileLoads(remoteRefresh.promise, reachedRemoteFileLoad.resolve);
 
     const session = await expectQuickLocalResult(
       repository.openSession(fileId),
     );
 
-    expect(readNoteText(session.encodeUpdate())).toBe('opened latest remote');
+    expect(readNoteText(session.encodeUpdate())).toBe('stale cache copy');
     expect(exportSnapshot).not.toHaveBeenCalled();
+
+    await expectQuickLocalResult(reachedRemoteFileLoad.promise);
+    remoteRefresh.resolve();
+    await waitForCondition(
+      () => readNoteText(session.encodeUpdate()) === 'opened latest remote',
+    );
+
     expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
       'opened latest remote',
     );
+
+    await session.close();
+  });
+
+  it('pulls cached session updates without fetching from the remote', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const initialNote = createNoteState('base');
+
+    await remote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/pull-cache-only-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/pull-cache-only-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const remoteSnapshot = await remote.loadDocument(fileId);
+    const doc = new Y.Doc();
+    if (remoteSnapshot.update) {
+      Y.applyUpdate(doc, remoteSnapshot.update);
+    }
+    doc.getText('content').insert(4, ' remote');
+
+    await remote.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(doc, remoteSnapshot.stateVector),
+      {
+        baseRevision: remoteSnapshot.revision,
+        localStateVector: Y.encodeStateVector(doc),
+      },
+    );
+
+    const remotePullUpdates = vi.spyOn(remote, 'pullUpdates');
+
+    const snapshot = await expectQuickLocalResult(
+      repository.pullUpdates(fileId, null),
+    );
+
+    expect(readNoteText(snapshot.update)).toBe('base');
+    expect(remotePullUpdates).not.toHaveBeenCalled();
+  });
+
+  it('keeps the repository online when remote note cache merge loses a local race', async () => {
+    const remote = new MemoryRemoteRepository();
+    const fileId = await remote.createFile('Remote note', 'mcanvas', null);
+    const initialNote = createNoteState('base');
+
+    await remote.pushUpdates(fileId, initialNote.update, {
+      baseRevision: null,
+      localStateVector: initialNote.stateVector,
+    });
+
+    const cache = new LocalRepository('repositories/open-session-race-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/open-session-race-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const remoteSnapshot = await remote.loadDocument(fileId);
+    const doc = new Y.Doc();
+    if (remoteSnapshot.update) {
+      Y.applyUpdate(doc, remoteSnapshot.update);
+    }
+    doc.getText('content').insert(4, ' remote');
+
+    await remote.pushUpdates(
+      fileId,
+      Y.encodeStateAsUpdate(doc, remoteSnapshot.stateVector),
+      {
+        baseRevision: remoteSnapshot.revision,
+        localStateVector: Y.encodeStateVector(doc),
+      },
+    );
+
+    vi.spyOn(cache, 'pushUpdates').mockResolvedValueOnce({
+      accepted: false,
+      update: null,
+      stateVector: new Uint8Array(),
+      revision: 'cache-conflict',
+      remoteUpdate: null,
+    });
+
+    const session = await repository.openSession(fileId);
+    await waitForCondition(
+      () =>
+        repository
+          .getRuntimeStatus()
+          .lastError?.message.includes('Failed to merge remote note') === true,
+    );
+
+    const status = repository.getRuntimeStatus();
+    expect(status.online).toBe(true);
+    expect(status.lastError?.message).toContain('Failed to merge remote note');
 
     await session.close();
   });
@@ -863,7 +988,9 @@ describe('CachedRepository', () => {
     const session = await expectQuickLocalResult(
       repository.openSession(fileId),
     );
-    expect(readNoteText(session.encodeUpdate())).toBe('base remote');
+    await waitForCondition(
+      () => readNoteText(session.encodeUpdate()) === 'base remote',
+    );
 
     session.ydoc.doc.getText('content').insert(4, ' local');
     await expectQuickLocalResult(session.save());

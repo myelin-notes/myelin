@@ -175,6 +175,7 @@ export class LivePeerDiscoveryCoordinator {
     }
 
     this.markLiveSyncPaused(error);
+    this.requestRestart();
   };
 
   private onTransportDisconnected = () => {
@@ -182,12 +183,16 @@ export class LivePeerDiscoveryCoordinator {
       return;
     }
 
+    this.requestRestart();
+  };
+
+  private requestRestart(): void {
     void this.restart().catch((error) => {
       logger.error('Failed to restart live peer discovery', error, {
         noteId: this.session.id,
       });
     });
-  };
+  }
 
   private async restart(): Promise<void> {
     const stopToken = this.stopToken;
