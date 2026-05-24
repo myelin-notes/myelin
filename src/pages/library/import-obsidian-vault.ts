@@ -1,5 +1,4 @@
 import { join } from '@tauri-apps/api/path';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import {
@@ -11,6 +10,7 @@ import {
 import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
 import { getPdfPageSizes } from '@/pages/canvas/pdf-renderer';
 import { addPdfElementToYDoc } from '@/pages/library/import-pdf';
+import type { ImportProgress } from './import-dialog';
 
 const logger = new Logger('ObsidianVaultImport');
 
@@ -43,7 +43,7 @@ type VaultImportFile =
       name: string;
     };
 
-interface ScannedVault {
+export interface ScannedVault {
   files: VaultImportFile[];
   folderPaths: Set<string>;
   skippedFiles: number;
@@ -66,9 +66,11 @@ export interface ImportObsidianVaultOptions {
   parentId: string | null;
   vaultPath: string;
   vaultName?: string;
+  scanned?: ScannedVault;
+  onProgress?: (progress: ImportProgress) => void;
 }
 
-function getPathName(path: string): string {
+export function getPathName(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
   return normalized.split('/').pop()?.trim() || 'Obsidian Vault';
 }
@@ -315,7 +317,7 @@ async function scanVaultDirectory(
   }
 }
 
-async function scanVault(vaultPath: string): Promise<ScannedVault> {
+export async function scanVault(vaultPath: string): Promise<ScannedVault> {
   const scanned: ScannedVault = {
     files: [],
     folderPaths: new Set(),
@@ -492,13 +494,17 @@ export async function importObsidianVault({
   parentId,
   vaultPath,
   vaultName = getPathName(vaultPath),
+  scanned: preScanned,
+  onProgress,
 }: ImportObsidianVaultOptions): Promise<ObsidianVaultImportResult> {
-  const scanned = await scanVault(vaultPath);
+  const scanned = preScanned ?? (await scanVault(vaultPath));
   if (scanned.files.length === 0) {
     throw new Error('No supported files found in the selected vault.');
   }
 
   let rootFolderId: string | null = null;
+  let current = 0;
+  const total = scanned.files.length;
 
   try {
     rootFolderId = await repository.createFolder(vaultName, parentId);
@@ -523,6 +529,7 @@ export async function importObsidianVault({
 
     const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
     for (const file of markdownFiles) {
+      onProgress?.({ current: ++current, total, fileName: file.name });
       await writeMarkdownFile({ file, repository, resolveNoteLinkId });
     }
 
@@ -532,6 +539,7 @@ export async function importObsidianVault({
         continue;
       }
 
+      onProgress?.({ current: ++current, total, fileName: file.name });
       const importParentId = getImportParentId(
         rootFolderId,
         folderIds,
@@ -577,27 +585,4 @@ export async function importObsidianVault({
     }
     throw error;
   }
-}
-
-export async function importObsidianVaultFromPicker({
-  repository,
-  parentId,
-}: {
-  repository: Repository;
-  parentId: string | null;
-}): Promise<ObsidianVaultImportResult | null> {
-  const selected = await openDialog({
-    directory: true,
-    multiple: false,
-    recursive: true,
-  });
-  if (!selected || Array.isArray(selected)) {
-    return null;
-  }
-
-  return importObsidianVault({
-    repository,
-    parentId,
-    vaultPath: selected,
-  });
 }

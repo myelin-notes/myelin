@@ -119,6 +119,39 @@ const es: typeof en = {
       succeeded: (notes: number, media: number) =>
         `Se importaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
     },
+    importDialog: {
+      title: 'Importar bóveda de Obsidian',
+      scanning: 'Escaneando bóveda...',
+      notes: (count: number) => `${count} nota${count === 1 ? '' : 's'}`,
+      media: (count: number) =>
+        `${count} archivo${count === 1 ? '' : 's'} multimedia`,
+      skippedFiles: (count: number) =>
+        `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} se omitirá${count === 1 ? '' : 'n'}`,
+      noFiles: 'No se encontraron archivos compatibles en esta bóveda',
+      conflict: {
+        label: 'Ya existe una carpeta con este nombre',
+        rename: 'Conservar ambos (renombrar)',
+        replace: 'Reemplazar existente',
+      },
+      progress: {
+        importing: (current: number, total: number) =>
+          `Importando ${current} de ${total}...`,
+        cancelling: 'Cancelando...',
+      },
+      summary: {
+        title: 'Importación completa',
+        cancelled: 'Importación cancelada',
+        imported: (notes: number, media: number) =>
+          `Se importaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia`,
+        skipped: (count: number) =>
+          `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} omitido${count === 1 ? '' : 's'}`,
+      },
+      buttons: {
+        import: 'Importar',
+        cancel: 'Cancelar',
+        done: 'Listo',
+      },
+    },
     repositoryLoading: 'Cargando repositorio...',
     refreshRepository: {
       label: 'Actualizar repositorio',

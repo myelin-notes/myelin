@@ -9,8 +9,7 @@ export type RepositoryConfig =
       repo: string;
       branch?: string;
       credentialId: string;
-    }
-;
+    };
 
 export interface RepositoryLifecycle {
   initialize(): Promise<void>;
