@@ -61,8 +61,10 @@ export class LivePeerDiscoveryCoordinator {
   private pollTimer: Timer | null = null;
   private refreshTimer: Timer | null = null;
   private stopped = true;
+  private disposed = false;
   private started = false;
   private cycleInFlight: Promise<void> | null = null;
+  private stopToken = 0;
   private currentPollIntervalMs: number;
   private readonly recentJoinAttempts = new Map<string, number>();
 
@@ -81,7 +83,7 @@ export class LivePeerDiscoveryCoordinator {
   }
 
   async start(): Promise<void> {
-    if (this.started) {
+    if (this.started || this.disposed) {
       return;
     }
 
@@ -114,6 +116,12 @@ export class LivePeerDiscoveryCoordinator {
   }
 
   async stop(): Promise<void> {
+    this.disposed = true;
+    this.stopToken += 1;
+    await this.stopTransport();
+  }
+
+  private async stopTransport(): Promise<void> {
     this.stopped = true;
     this.started = false;
     this.clearPollTimer();
@@ -160,7 +168,12 @@ export class LivePeerDiscoveryCoordinator {
   };
 
   private async restart(): Promise<void> {
-    await this.stop();
+    const stopToken = this.stopToken;
+    await this.stopTransport();
+    if (this.disposed || this.stopToken !== stopToken) {
+      return;
+    }
+
     await this.start();
   }
 
@@ -184,14 +197,23 @@ export class LivePeerDiscoveryCoordinator {
   }
 
   private async runCycle(action: () => Promise<void>): Promise<void> {
-    if (this.cycleInFlight) {
-      return this.cycleInFlight;
-    }
+    const previousCycle =
+      this.cycleInFlight?.catch(() => {}) ?? Promise.resolve();
 
-    this.cycleInFlight = action().finally(() => {
-      this.cycleInFlight = null;
+    const cycle = previousCycle.then(async () => {
+      if (this.stopped) {
+        return;
+      }
+
+      await action();
     });
-    return this.cycleInFlight;
+    const trackedCycle = cycle.finally(() => {
+      if (this.cycleInFlight === trackedCycle) {
+        this.cycleInFlight = null;
+      }
+    });
+    this.cycleInFlight = trackedCycle;
+    return trackedCycle;
   }
 
   private async tryJoin(records: LiveDiscoveryRecord[]): Promise<void> {

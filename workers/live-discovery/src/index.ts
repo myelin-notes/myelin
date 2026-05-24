@@ -3,6 +3,7 @@ const MAX_RECORD_TTL_MS = 30 * 60 * 1000;
 const MAX_RECORDS_PER_ROOM = 16;
 const MAX_REQUEST_BYTES = 16 * 1024;
 const RECORD_PREFIX = 'record:';
+const textDecoder = new TextDecoder();
 
 type DurableObjectId = object;
 
@@ -127,12 +128,45 @@ function storageKey(recordId: string): string {
 }
 
 async function readJsonBody(request: Request): Promise<unknown> {
-  const contentLength = Number(request.headers.get('content-length') ?? '0');
-  if (contentLength > MAX_REQUEST_BYTES) {
-    throw new Error('Request body is too large.');
+  if (!request.body) {
+    throw new Error('Invalid JSON body.');
   }
 
-  return request.json();
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      byteLength += value.byteLength;
+      if (byteLength > MAX_REQUEST_BYTES) {
+        throw new Error('Request body is too large.');
+      }
+
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  }
+
+  const bytes = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  try {
+    return JSON.parse(textDecoder.decode(bytes));
+  } catch {
+    throw new Error('Invalid JSON body.');
+  }
 }
 
 function parseRecordInput(value: unknown): DiscoveryRecordInput | null {

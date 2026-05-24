@@ -111,6 +111,22 @@ function remoteRecord(ticket: string): LiveDiscoveryRecord {
   };
 }
 
+async function nextTick(): Promise<void> {
+  await Promise.resolve();
+}
+
+async function waitForMicrotaskCondition(
+  condition: () => boolean,
+): Promise<void> {
+  for (let index = 0; index < 10; index += 1) {
+    if (condition()) {
+      return;
+    }
+
+    await nextTick();
+  }
+}
+
 describe('LivePeerDiscoveryCoordinator', () => {
   it('publishes the local ticket and joins a discovered peer', async () => {
     const session = createSession();
@@ -203,5 +219,83 @@ describe('LivePeerDiscoveryCoordinator', () => {
     expect(client.remove).toHaveBeenCalledWith('record-local');
     expect(transport.destroy).toHaveBeenCalledTimes(1);
     expect(session.clearTransport).toHaveBeenCalled();
+  });
+
+  it('does not restart after stop interrupts a disconnect restart', async () => {
+    const session = createSession();
+    const client = new FakeClient();
+    const removeResolvers: Array<() => void> = [];
+    client.remove.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          removeResolvers.push(resolve);
+        }),
+    );
+    const transports: FakeTransport[] = [];
+    const coordinator = new LivePeerDiscoveryCoordinator({
+      session,
+      client,
+      createTransport: () => {
+        const transport = new FakeTransport(
+          `local-ticket-${transports.length}`,
+        );
+        transports.push(transport);
+        return transport;
+      },
+      recordId: 'record-local',
+    });
+
+    await coordinator.start();
+    transports[0].emit('disconnected');
+    await waitForMicrotaskCondition(() => removeResolvers.length === 1);
+    expect(removeResolvers).toHaveLength(1);
+
+    const stopPromise = coordinator.stop();
+    await nextTick();
+    expect(removeResolvers).toHaveLength(2);
+
+    for (const resolve of removeResolvers) {
+      resolve();
+    }
+    await stopPromise;
+    await nextTick();
+
+    expect(transports).toHaveLength(1);
+  });
+
+  it('runs overlapping cycles sequentially', async () => {
+    const session = createSession();
+    const client = new FakeClient();
+    const transport = new FakeTransport('local-ticket');
+    const listResolvers: Array<() => void> = [];
+    client.list.mockImplementation(
+      () =>
+        new Promise<LiveDiscoveryRecord[]>((resolve) => {
+          listResolvers.push(() => resolve(client.records));
+        }),
+    );
+    const coordinator = new LivePeerDiscoveryCoordinator({
+      session,
+      client,
+      createTransport: () => transport,
+      recordId: 'record-local',
+    });
+
+    await coordinator.start();
+    const firstPoll = coordinator.pollNow();
+    const secondPoll = coordinator.pollNow();
+    await nextTick();
+    expect(listResolvers).toHaveLength(1);
+
+    listResolvers[0]();
+    await waitForMicrotaskCondition(() => listResolvers.length === 2);
+    expect(listResolvers).toHaveLength(2);
+
+    listResolvers[1]();
+    await Promise.all([firstPoll, secondPoll]);
+
+    expect(client.list).toHaveBeenCalledTimes(2);
+
+    await coordinator.stop();
   });
 });
