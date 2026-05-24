@@ -1,4 +1,4 @@
-import { unzipSync } from 'fflate';
+import { type Unzipped, unzip } from 'fflate';
 import type { Repository, VFSNodeId } from '@/lib/sync';
 import type { ImportProgress } from './import-dialog';
 import { importPdfFile } from './import-pdf';
@@ -34,7 +34,7 @@ export interface ImportGoodnotesZipOptions {
   onProgress?: (progress: ImportProgress) => void;
 }
 
-export function isGoodnotesZipFile(file: File): boolean {
+export function isZipFile(file: File): boolean {
   return ZIP_EXTENSION_RE.test(file.name) || ZIP_MIME_TYPES.has(file.type);
 }
 
@@ -78,7 +78,7 @@ function addFolderAncestors(
 async function readGoodnotesZipEntries(
   file: File,
 ): Promise<{ pdfEntries: GoodnotesZipEntry[]; skippedFiles: number }> {
-  const archive = unzipSync(new Uint8Array(await file.arrayBuffer()));
+  const archive = await unzipArchive(new Uint8Array(await file.arrayBuffer()));
   const pdfEntries: GoodnotesZipEntry[] = [];
   let skippedFiles = 0;
 
@@ -88,7 +88,11 @@ async function readGoodnotesZipEntries(
     }
 
     const path = normalizeZipPath(rawPath);
-    if (!path || !PDF_EXTENSION_RE.test(path)) {
+    if (!path) {
+      continue;
+    }
+
+    if (!PDF_EXTENSION_RE.test(path)) {
       skippedFiles += 1;
       continue;
     }
@@ -109,6 +113,18 @@ async function readGoodnotesZipEntries(
 
   pdfEntries.sort((left, right) => left.path.localeCompare(right.path));
   return { pdfEntries, skippedFiles };
+}
+
+function unzipArchive(bytes: Uint8Array): Promise<Unzipped> {
+  return new Promise((resolve, reject) => {
+    unzip(bytes, (error, archive) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(archive);
+    });
+  });
 }
 
 async function createImportedFolders({
@@ -167,16 +183,13 @@ function getFocusFolderId(
 }
 
 function getCleanupNodeIds(
-  parentId: VFSNodeId | null,
   folderIds: ReadonlyMap<string, VFSNodeId>,
   rootFileIds: readonly VFSNodeId[],
 ): VFSNodeId[] {
   const topLevelFolderIds = [...folderIds.entries()]
     .filter(([folderPath]) => !folderPath.includes('/'))
     .map(([, folderId]) => folderId);
-  return parentId === null
-    ? [...topLevelFolderIds, ...rootFileIds]
-    : [...topLevelFolderIds, ...rootFileIds];
+  return [...topLevelFolderIds, ...rootFileIds];
 }
 
 export async function importGoodnotesZip({
@@ -236,7 +249,7 @@ export async function importGoodnotesZip({
       skippedFiles,
     };
   } catch (error) {
-    for (const nodeId of getCleanupNodeIds(parentId, folderIds, rootFileIds)) {
+    for (const nodeId of getCleanupNodeIds(folderIds, rootFileIds)) {
       await repository.deleteNode(nodeId).catch(() => {});
     }
     throw error;

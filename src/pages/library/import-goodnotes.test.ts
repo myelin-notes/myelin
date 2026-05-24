@@ -5,7 +5,7 @@ import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
-import { importGoodnotesZip, isGoodnotesZipFile } from './import-goodnotes';
+import { importGoodnotesZip, isZipFile } from './import-goodnotes';
 
 vi.mock('@/pages/canvas/pdf-renderer', () => ({
   createDefaultPdfPageOrder: (pageCount: number) =>
@@ -123,15 +123,13 @@ describe('Goodnotes ZIP import', () => {
   });
 
   it('detects ZIP files by extension or MIME type', () => {
-    expect(isGoodnotesZipFile(new File([], 'Notebook.ZIP', { type: '' }))).toBe(
-      true,
-    );
+    expect(isZipFile(new File([], 'Notebook.ZIP', { type: '' }))).toBe(true);
     expect(
-      isGoodnotesZipFile(new File([], 'Notebook', { type: 'application/zip' })),
+      isZipFile(new File([], 'Notebook', { type: 'application/zip' })),
     ).toBe(true);
-    expect(
-      isGoodnotesZipFile(new File([], 'Notebook.goodnotes', { type: '' })),
-    ).toBe(false);
+    expect(isZipFile(new File([], 'Notebook.goodnotes', { type: '' }))).toBe(
+      false,
+    );
   });
 
   it('imports PDFs from a ZIP while preserving folder structure', async () => {
@@ -158,7 +156,7 @@ describe('Goodnotes ZIP import', () => {
     });
 
     expect(result.pdfsImported).toBe(2);
-    expect(result.skippedFiles).toBe(2);
+    expect(result.skippedFiles).toBe(1);
 
     const [rootFolders] = await repository.listDirectory(null);
     expect(rootFolders.map((folder) => folder.name)).toEqual(['Math']);

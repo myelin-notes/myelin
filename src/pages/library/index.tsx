@@ -58,7 +58,7 @@ import {
 import {
   GOODNOTES_ZIP_FILE_ACCEPT,
   importGoodnotesZip,
-  isGoodnotesZipFile,
+  isZipFile,
 } from './import-goodnotes';
 import {
   importMarkdownFile,
@@ -236,7 +236,7 @@ export function LibraryPage() {
   };
 
   const handleImportGoodnotesZipFile = async (file: File) => {
-    if (!isGoodnotesZipFile(file)) {
+    if (!isZipFile(file)) {
       toast.error(
         isNativeGoodnotesFile(file)
           ? strings.library.importGoodnotesZip.nativeFile
@@ -257,7 +257,7 @@ export function LibraryPage() {
       setCurrentFolderId(result.focusFolderId);
       triggerRefresh();
       if (result.skippedFiles > 0) {
-        toast.error(
+        toast.info(
           strings.library.importGoodnotesZip.skipped(result.skippedFiles),
         );
       }
