@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import {
+  FileText,
   FolderInput,
   FolderPlus,
   Import,
@@ -23,6 +24,7 @@ interface CreateNewDropdownProps {
   onNewFolder?: () => void;
   onNewFile?: (title: string, type: FileType) => void;
   onImportFiles?: () => void;
+  onImportGoodnotesZip?: () => void;
   onImportObsidianVault?: () => void;
   importDisabled?: boolean;
 }
@@ -31,6 +33,7 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
   onNewFolder,
   onNewFile,
   onImportFiles,
+  onImportGoodnotesZip,
   onImportObsidianVault,
   importDisabled = false,
 }: CreateNewDropdownProps) {
@@ -70,6 +73,14 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
         >
           <Import className="size-4" />
           {strings.library.createNew.importFiles}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={itemClass}
+          disabled={importDisabled}
+          onClick={() => onImportGoodnotesZip?.()}
+        >
+          <FileText className="size-4" />
+          {strings.library.createNew.importGoodnotesZip}
         </DropdownMenuItem>
         <DropdownMenuItem
           className={itemClass}

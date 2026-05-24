@@ -56,12 +56,22 @@ import {
   STORAGE_FILE_ACCEPT,
 } from './import-files';
 import {
+  GOODNOTES_ZIP_FILE_ACCEPT,
+  importGoodnotesZip,
+  isZipFile,
+} from './import-goodnotes';
+import {
   importMarkdownFile,
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
 } from './import-markdown';
 import { createObsidianVaultImportSource } from './import-obsidian-source';
-import { importPdfFile, isPdfFile, PDF_FILE_ACCEPT } from './import-pdf';
+import {
+  importPdfFile,
+  isNativeGoodnotesFile,
+  isPdfFile,
+  PDF_FILE_ACCEPT,
+} from './import-pdf';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
@@ -81,6 +91,7 @@ export function LibraryPage() {
   const navigate = useNavigate();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const goodnotesZipInputRef = useRef<HTMLInputElement>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
   const dragTimerRef = useRef<number | null>(null);
@@ -176,7 +187,11 @@ export function LibraryPage() {
       (file) => isMarkdownFile(file) || isPdfFile(file) || isStorageFile(file),
     );
     if (supportedFiles.length === 0) {
-      toast.error(strings.library.importFiles.unsupportedFile);
+      toast.error(
+        files.some(isNativeGoodnotesFile)
+          ? strings.library.importGoodnotesZip.nativeFile
+          : strings.library.importFiles.unsupportedFile,
+      );
       return;
     }
 
@@ -220,6 +235,41 @@ export function LibraryPage() {
     }
   };
 
+  const handleImportGoodnotesZipFile = async (file: File) => {
+    if (!isZipFile(file)) {
+      toast.error(
+        isNativeGoodnotesFile(file)
+          ? strings.library.importGoodnotesZip.nativeFile
+          : strings.library.importGoodnotesZip.unsupportedFile,
+      );
+      return;
+    }
+
+    setIsImportingFiles(true);
+
+    try {
+      const result = await importGoodnotesZip({
+        file,
+        repository,
+        parentId: currentFolderId,
+        fallbackTitle: strings.library.createNew.untitledCanvas,
+      });
+      setCurrentFolderId(result.focusFolderId);
+      triggerRefresh();
+      if (result.skippedFiles > 0) {
+        toast.info(
+          strings.library.importGoodnotesZip.skipped(result.skippedFiles),
+        );
+      }
+    } catch (error) {
+      toast.error(strings.library.importGoodnotesZip.failed, {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsImportingFiles(false);
+    }
+  };
+
   const handleStorageInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.currentTarget.files ?? []);
     event.currentTarget.value = '';
@@ -227,6 +277,17 @@ export function LibraryPage() {
       return;
     }
     void handleImportStorageFiles(files);
+  };
+
+  const handleGoodnotesZipInputChange = (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = '';
+    if (files.length === 0 || isImportingFiles) {
+      return;
+    }
+    void handleImportGoodnotesZipFile(files[0]);
   };
 
   const handleImportObsidianVault = useCallback(async () => {
@@ -282,6 +343,10 @@ export function LibraryPage() {
 
   const handleImportFiles = useCallback(() => {
     importInputRef.current?.click();
+  }, []);
+
+  const handleImportGoodnotesZip = useCallback(() => {
+    goodnotesZipInputRef.current?.click();
   }, []);
 
   useEffect(() => {
@@ -615,6 +680,7 @@ export function LibraryPage() {
                     onNewFolder={handleNewFolder}
                     onNewFile={handleNewFile}
                     onImportFiles={handleImportFiles}
+                    onImportGoodnotesZip={handleImportGoodnotesZip}
                     onImportObsidianVault={handleImportObsidianVault}
                     importDisabled={isImportingFiles || importSource !== null}
                   />
@@ -625,6 +691,13 @@ export function LibraryPage() {
                     accept={LIBRARY_IMPORT_ACCEPT}
                     className="hidden"
                     onChange={handleStorageInputChange}
+                  />
+                  <input
+                    ref={goodnotesZipInputRef}
+                    type="file"
+                    accept={GOODNOTES_ZIP_FILE_ACCEPT}
+                    className="hidden"
+                    onChange={handleGoodnotesZipInputChange}
                   />
                 </div>
               </div>

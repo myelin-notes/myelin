@@ -95,6 +95,7 @@ const en = {
       folder: 'New Folder',
       canvas: 'New Canvas',
       importFiles: 'Import Files',
+      importGoodnotesZip: 'Import Goodnotes ZIP',
       importObsidianVault: 'Import Obsidian Vault',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
@@ -108,6 +109,14 @@ const en = {
       someUnsupported: 'Some files were not supported.',
       failed: 'Import failed',
       loading: 'Importing files...',
+    },
+    importGoodnotesZip: {
+      unsupportedFile: 'Choose a ZIP exported from Goodnotes as PDFs.',
+      nativeFile:
+        'Native .goodnotes files are not supported yet. Export a Goodnotes folder as PDFs, then import the ZIP.',
+      failed: 'Goodnotes ZIP import failed',
+      skipped: (count: number) =>
+        `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
     },
     importObsidianVault: {
       failed: 'Obsidian vault import failed',

@@ -15,6 +15,7 @@ import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 const logger = new Logger('PdfImport');
 export const PDF_FILE_ACCEPT = 'application/pdf,.pdf';
 const PDF_EXTENSION_RE = /\.pdf$/i;
+const GOODNOTES_EXTENSION_RE = /\.goodnotes$/i;
 const PDF_MIME_TYPES = new Set(['application/pdf']);
 const DEFAULT_PDF_IMPORT_OFFSET = {
   x: 160,
@@ -23,6 +24,10 @@ const DEFAULT_PDF_IMPORT_OFFSET = {
 
 export function isPdfFile(file: File): boolean {
   return PDF_EXTENSION_RE.test(file.name) || PDF_MIME_TYPES.has(file.type);
+}
+
+export function isNativeGoodnotesFile(file: File): boolean {
+  return GOODNOTES_EXTENSION_RE.test(file.name);
 }
 
 function getPdfCanvasTitle(fileName: string, fallback: string): string {
