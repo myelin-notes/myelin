@@ -10,6 +10,7 @@ import {
 import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
 import { getPdfPageSizes } from '@/pages/canvas/pdf-renderer';
 import { addPdfElementToYDoc } from '@/pages/library/import-pdf';
+import type { ImportProgress } from './import-dialog';
 
 const logger = new Logger('ObsidianVaultImport');
 
@@ -58,12 +59,6 @@ export interface ObsidianVaultImportResult {
   notesImported: number;
   mediaImported: number;
   skippedFiles: number;
-}
-
-export interface ImportProgress {
-  current: number;
-  total: number;
-  fileName: string;
 }
 
 export interface ImportObsidianVaultOptions {
@@ -527,7 +522,9 @@ export async function importObsidianVault({
     );
 
     for (const file of markdownFiles) {
-      if (signal?.aborted) break;
+      if (signal?.aborted) {
+        break;
+      }
       file.nodeId = await repository.createFile(
         file.noteName,
         'mcanvas',
@@ -538,7 +535,9 @@ export async function importObsidianVault({
     if (!signal?.aborted) {
       const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
       for (const file of markdownFiles) {
-        if (signal?.aborted) break;
+        if (signal?.aborted) {
+          break;
+        }
         onProgress?.({ current: ++current, total, fileName: file.name });
         await writeMarkdownFile({ file, repository, resolveNoteLinkId });
       }
@@ -546,7 +545,9 @@ export async function importObsidianVault({
 
     let mediaImported = 0;
     for (const file of scanned.files) {
-      if (signal?.aborted) break;
+      if (signal?.aborted) {
+        break;
+      }
       if (file.kind === 'markdown') {
         continue;
       }
@@ -602,4 +603,3 @@ export async function importObsidianVault({
     throw error;
   }
 }
-

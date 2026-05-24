@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
@@ -16,25 +17,59 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useMessages } from '@/lib/i18n';
-import type { Repository, VFSFolderNode } from '@/lib/sync';
-import {
-  getPathName,
-  type ImportProgress,
-  importObsidianVault,
-  type ObsidianVaultImportResult,
-  type ScannedVault,
-  scanVault,
-} from './import-obsidian-vault';
+export type ConflictResolution = 'rename' | 'replace';
 
-type ConflictResolution = 'rename' | 'replace';
+export interface ImportProgress {
+  current: number;
+  total: number;
+  fileName: string;
+}
+
+export interface ImportPreviewLine {
+  icon: 'note' | 'media';
+  text: string;
+}
+
+export interface ImportConflict {
+  nodeId: string;
+}
+
+export interface ImportPreviewData {
+  name: string;
+  lines: ImportPreviewLine[];
+  skippedText: string | null;
+  isEmpty: boolean;
+  conflict: ImportConflict | null;
+}
+
+export interface ImportSummaryData {
+  rootFolderId: string;
+  text: string;
+  skippedText: string | null;
+}
+
+export interface ImportSource {
+  title: string;
+  scanningLabel: string;
+  emptyLabel: string;
+  scan(): Promise<ImportPreviewData>;
+  run(options: {
+    conflictResolution: ConflictResolution;
+    signal: AbortSignal;
+    onProgress: (progress: ImportProgress) => void;
+  }): Promise<ImportSummaryData>;
+}
+
+const previewIcons: Record<ImportPreviewLine['icon'], ReactNode> = {
+  note: <FileText className="size-3.5 shrink-0" />,
+  media: <Image className="size-3.5 shrink-0" />,
+};
 
 type DialogPhase =
   | { kind: 'scanning' }
   | {
       kind: 'preview';
-      scanned: ScannedVault;
-      vaultName: string;
-      conflict: VFSFolderNode | null;
+      data: ImportPreviewData;
       conflictResolution: ConflictResolution;
     }
   | {
@@ -44,66 +79,38 @@ type DialogPhase =
     }
   | {
       kind: 'summary';
-      result: ObsidianVaultImportResult;
+      data: ImportSummaryData;
       cancelled: boolean;
     }
   | { kind: 'error'; message: string };
 
 interface ImportDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  vaultPath: string;
-  parentId: string | null;
-  repository: Repository;
+  source: ImportSource;
   onImported: (rootFolderId: string) => void;
+  onClose: () => void;
 }
 
 export function ImportDialog({
-  open,
-  onOpenChange,
-  vaultPath,
-  parentId,
-  repository,
+  source,
   onImported,
+  onClose,
 }: ImportDialogProps) {
   const strings = useMessages();
   const [phase, setPhase] = useState<DialogPhase>({ kind: 'scanning' });
   const abortRef = useRef<AbortController | null>(null);
   const importedRootRef = useRef<string | null>(null);
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    setPhase({ kind: 'scanning' });
-    importedRootRef.current = null;
-
     let cancelled = false;
     (async () => {
       try {
-        const scanned = await scanVault(vaultPath);
+        const data = await sourceRef.current.scan();
         if (cancelled) {
           return;
         }
-
-        const vaultName = getPathName(vaultPath);
-        const [folders] = await repository.listDirectory(parentId);
-        const conflict =
-          folders.find(
-            (f) => f.name.toLowerCase() === vaultName.toLowerCase(),
-          ) ?? null;
-
-        if (cancelled) {
-          return;
-        }
-        setPhase({
-          kind: 'preview',
-          scanned,
-          vaultName,
-          conflict,
-          conflictResolution: 'rename',
-        });
+        setPhase({ kind: 'preview', data, conflictResolution: 'rename' });
       } catch (error) {
         if (cancelled) {
           return;
@@ -118,38 +125,29 @@ export function ImportDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, vaultPath, parentId, repository]);
+  }, []);
 
   const handleClose = useCallback(() => {
     if (importedRootRef.current) {
       onImported(importedRootRef.current);
     }
-    onOpenChange(false);
-  }, [onImported, onOpenChange]);
+    onClose();
+  }, [onImported, onClose]);
 
   const handleImport = useCallback(async () => {
     if (phase.kind !== 'preview') {
       return;
     }
 
-    const { scanned, vaultName, conflict, conflictResolution } = phase;
+    const { conflictResolution } = phase;
     setPhase({ kind: 'importing', progress: null, cancelling: false });
 
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      if (conflict && conflictResolution === 'replace') {
-        await repository.deleteNode(conflict.id);
-      }
-
-      const result = await importObsidianVault({
-        repository,
-        parentId,
-        vaultPath,
-        vaultName:
-          conflict && conflictResolution === 'rename' ? undefined : vaultName,
-        scanned,
+      const data = await sourceRef.current.run({
+        conflictResolution,
         signal: controller.signal,
         onProgress: (progress) => {
           setPhase((prev) =>
@@ -158,10 +156,10 @@ export function ImportDialog({
         },
       });
 
-      importedRootRef.current = result.rootFolderId;
+      importedRootRef.current = data.rootFolderId;
       setPhase({
         kind: 'summary',
-        result,
+        data,
         cancelled: controller.signal.aborted,
       });
     } catch (error) {
@@ -172,7 +170,7 @@ export function ImportDialog({
     } finally {
       abortRef.current = null;
     }
-  }, [phase, repository, parentId, vaultPath]);
+  }, [phase]);
 
   const handleCancel = useCallback(() => {
     if (phase.kind === 'importing') {
@@ -181,22 +179,13 @@ export function ImportDialog({
         prev.kind === 'importing' ? { ...prev, cancelling: true } : prev,
       );
     } else {
-      onOpenChange(false);
+      handleClose();
     }
-  }, [phase.kind, onOpenChange]);
-
-  const noteCount =
-    phase.kind === 'preview'
-      ? phase.scanned.files.filter((f) => f.kind === 'markdown').length
-      : 0;
-  const mediaCount =
-    phase.kind === 'preview'
-      ? phase.scanned.files.filter((f) => f.kind !== 'markdown').length
-      : 0;
+  }, [phase.kind, handleClose]);
 
   return (
     <Dialog
-      open={open}
+      open
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
           handleClose();
@@ -208,14 +197,14 @@ export function ImportDialog({
         className="sm:max-w-[420px]"
       >
         <DialogHeader>
-          <DialogTitle>{strings.library.importDialog.title}</DialogTitle>
+          <DialogTitle>{source.title}</DialogTitle>
         </DialogHeader>
 
         {phase.kind === 'scanning' && (
           <div className="flex items-center gap-3 py-6">
             <LoaderCircle className="size-5 shrink-0 animate-spin text-text-muted" />
             <span className="text-sm text-text-secondary">
-              {strings.library.importDialog.scanning}
+              {source.scanningLabel}
             </span>
           </div>
         )}
@@ -224,34 +213,31 @@ export function ImportDialog({
           <div className="flex flex-col gap-4">
             <div className="rounded-lg bg-surface p-3">
               <p className="mb-2 font-medium text-sm text-text-primary">
-                {phase.vaultName}
+                {phase.data.name}
               </p>
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 text-sm text-text-secondary">
-                  <FileText className="size-3.5 shrink-0" />
-                  {strings.library.importDialog.notes(noteCount)}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-text-secondary">
-                  <Image className="size-3.5 shrink-0" />
-                  {strings.library.importDialog.media(mediaCount)}
-                </div>
-                {phase.scanned.skippedFiles > 0 && (
+                {phase.data.lines.map((line) => (
+                  <div
+                    key={line.icon}
+                    className="flex items-center gap-2 text-sm text-text-secondary"
+                  >
+                    {previewIcons[line.icon]}
+                    {line.text}
+                  </div>
+                ))}
+                {phase.data.skippedText && (
                   <p className="text-text-muted text-xs">
-                    {strings.library.importDialog.skippedFiles(
-                      phase.scanned.skippedFiles,
-                    )}
+                    {phase.data.skippedText}
                   </p>
                 )}
               </div>
             </div>
 
-            {phase.scanned.files.length === 0 && (
-              <p className="text-sm text-text-muted">
-                {strings.library.importDialog.noFiles}
-              </p>
+            {phase.data.isEmpty && (
+              <p className="text-sm text-text-muted">{source.emptyLabel}</p>
             )}
 
-            {phase.conflict && (
+            {phase.data.conflict && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-50/50 p-3 dark:bg-amber-950/20">
                 <div className="mb-2 flex items-center gap-2 font-medium text-amber-700 text-sm dark:text-amber-400">
                   <AlertTriangle className="size-4 shrink-0" />
@@ -327,17 +313,10 @@ export function ImportDialog({
                 : strings.library.importDialog.summary.title}
             </div>
             <div className="rounded-lg bg-surface p-3">
-              <p className="text-sm text-text-secondary">
-                {strings.library.importDialog.summary.imported(
-                  phase.result.notesImported,
-                  phase.result.mediaImported,
-                )}
-              </p>
-              {phase.result.skippedFiles > 0 && (
+              <p className="text-sm text-text-secondary">{phase.data.text}</p>
+              {phase.data.skippedText && (
                 <p className="mt-1 text-text-muted text-xs">
-                  {strings.library.importDialog.summary.skipped(
-                    phase.result.skippedFiles,
-                  )}
+                  {phase.data.skippedText}
                 </p>
               )}
             </div>
@@ -353,20 +332,17 @@ export function ImportDialog({
 
         <DialogFooter>
           {phase.kind === 'scanning' && (
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={handleClose}>
               {strings.library.importDialog.buttons.cancel}
             </Button>
           )}
 
           {phase.kind === 'preview' && (
             <>
-              <Button
-                onClick={handleImport}
-                disabled={phase.scanned.files.length === 0}
-              >
+              <Button onClick={handleImport} disabled={phase.data.isEmpty}>
                 {strings.library.importDialog.buttons.import}
               </Button>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" onClick={handleClose}>
                 {strings.library.importDialog.buttons.cancel}
               </Button>
             </>

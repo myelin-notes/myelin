@@ -49,7 +49,7 @@ import {
   type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
-import { ImportDialog } from './import-dialog';
+import { ImportDialog, type ImportSource } from './import-dialog';
 import {
   importStorageFile,
   isStorageFile,
@@ -60,6 +60,7 @@ import {
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
 } from './import-markdown';
+import { createObsidianVaultImportSource } from './import-obsidian-source';
 import { importPdfFile, isPdfFile, PDF_FILE_ACCEPT } from './import-pdf';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
@@ -93,7 +94,7 @@ export function LibraryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingFiles, setIsImportingFiles] = useState(false);
-  const [importVaultPath, setImportVaultPath] = useState<string | null>(null);
+  const [importSource, setImportSource] = useState<ImportSource | null>(null);
   const isRefreshingRepository = useManualRepositoryRefreshPending();
   const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
@@ -229,7 +230,7 @@ export function LibraryPage() {
   };
 
   const handleImportObsidianVault = useCallback(async () => {
-    if (isImportingFiles || importVaultPath !== null) {
+    if (isImportingFiles || importSource !== null) {
       return;
     }
 
@@ -242,8 +243,15 @@ export function LibraryPage() {
       return;
     }
 
-    setImportVaultPath(selected);
-  }, [isImportingFiles, importVaultPath]);
+    setImportSource(
+      createObsidianVaultImportSource({
+        vaultPath: selected,
+        repository,
+        parentId: currentFolderId,
+        strings,
+      }),
+    );
+  }, [isImportingFiles, importSource, repository, currentFolderId, strings]);
 
   const handleImportDialogDone = useCallback(
     (rootFolderId: string) => {
@@ -608,9 +616,7 @@ export function LibraryPage() {
                     onNewFile={handleNewFile}
                     onImportFiles={handleImportFiles}
                     onImportObsidianVault={handleImportObsidianVault}
-                    importDisabled={
-                      isImportingFiles || importVaultPath !== null
-                    }
+                    importDisabled={isImportingFiles || importSource !== null}
                   />
                   <input
                     ref={importInputRef}
@@ -646,18 +652,11 @@ export function LibraryPage() {
         </motion.div>
       </main>
 
-      {importVaultPath !== null && (
+      {importSource !== null && (
         <ImportDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setImportVaultPath(null);
-            }
-          }}
-          vaultPath={importVaultPath}
-          parentId={currentFolderId}
-          repository={repository}
+          source={importSource}
           onImported={handleImportDialogDone}
+          onClose={() => setImportSource(null)}
         />
       )}
     </div>
