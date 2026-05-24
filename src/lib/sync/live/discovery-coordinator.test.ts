@@ -215,10 +215,10 @@ describe('LivePeerDiscoveryCoordinator', () => {
     await coordinator.stop();
   });
 
-  it('marks live sync paused when the transport reports an error', async () => {
+  it('restarts when the transport reports an error', async () => {
     const session = createSession();
     const client = new FakeClient();
-    const transport = new FakeTransport('local-ticket');
+    const transports: FakeTransport[] = [];
     const transportError = new Error(
       'Iroh gossip receiver lagged; reconnect to resume live sync.',
     );
@@ -226,16 +226,26 @@ describe('LivePeerDiscoveryCoordinator', () => {
     const coordinator = new LivePeerDiscoveryCoordinator({
       session,
       client,
-      createTransport: () => transport,
+      createTransport: () => {
+        const transport = new FakeTransport(
+          `local-ticket-${transports.length}`,
+        );
+        transports.push(transport);
+        return transport;
+      },
       onPauseChange: (error) => pauseErrors.push(error),
       recordId: 'record-local',
       now: () => 1_000,
     });
 
     await coordinator.start();
-    transport.emitError(transportError);
+    const firstTransport = transports[0];
+    firstTransport.emitError(transportError);
+    await waitForMicrotaskCondition(() => transports.length === 2);
 
     expect(pauseErrors).toContain(transportError);
+    expect(firstTransport.destroy).toHaveBeenCalledTimes(1);
+    expect(transports).toHaveLength(2);
 
     await coordinator.stop();
   });

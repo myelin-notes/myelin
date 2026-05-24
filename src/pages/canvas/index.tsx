@@ -278,10 +278,11 @@ function CanvasViewInner() {
       });
     });
   }, []);
-  const liveSyncPausedTitle =
-    liveDiscoveryPauseError?.message ?? strings.canvas.peerSync.livePaused;
-  const titleTrailing = useMemo(
-    () => (
+  const titleTrailing = useMemo(() => {
+    const liveSyncPausedTitle =
+      liveDiscoveryPauseError?.message ?? strings.canvas.peerSync.livePaused;
+
+    return (
       <>
         {liveDiscoveryPauseError && (
           <span
@@ -295,15 +296,13 @@ function CanvasViewInner() {
         )}
         <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />
       </>
-    ),
-    [
-      handleOpenBacklinkSource,
-      id,
-      liveDiscoveryPauseError,
-      liveSyncPausedTitle,
-      strings.canvas.peerSync.livePaused,
-    ],
-  );
+    );
+  }, [
+    handleOpenBacklinkSource,
+    id,
+    liveDiscoveryPauseError,
+    strings.canvas.peerSync.livePaused,
+  ]);
   const insertPopover = useMemo(
     () => (
       <InsertPopover

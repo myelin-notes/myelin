@@ -67,6 +67,13 @@ const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 const COMMIT_BODY_MAX_BYTES = 64 * 1024;
 const logger = new Logger('CachedRepository');
 
+class RemoteNoteCacheMergeError extends Error {
+  constructor(nodeId: VFSNodeId) {
+    super(`Failed to merge remote note ${nodeId} into cache.`);
+    this.name = 'RemoteNoteCacheMergeError';
+  }
+}
+
 interface BatchPlan {
   manifest: VFSManifest;
   manifestChanged: boolean;
@@ -481,8 +488,18 @@ export class CachedRepository
       pendingOps: this.outbox.length,
     });
     const session = await NoteSession.open(nodeId, this);
-    await session.pull();
+    void this.pullOpenSessionUpdates(session).catch((error) => {
+      logger.error('Failed to pull open cached session updates', error, {
+        repositoryKind: this.kind,
+        nodeId,
+      });
+    });
     return session;
+  }
+
+  private async pullOpenSessionUpdates(session: NoteSession): Promise<void> {
+    await this.tryPullRemoteNoteIntoCache(session.id);
+    await session.pull();
   }
 
   async loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot> {
@@ -493,7 +510,6 @@ export class CachedRepository
     nodeId: VFSNodeId,
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot> {
-    await this.tryPullRemoteNoteIntoCache(nodeId);
     return this.cache.pullUpdates(nodeId, stateVector);
   }
 
@@ -1126,9 +1142,13 @@ export class CachedRepository
         await this.pullRemoteNoteIntoCache(nodeId);
       });
     } catch (error) {
+      const statusError =
+        error instanceof Error ? error : new Error(String(error));
       this.updateRuntimeStatus({
-        online: false,
-        lastError: error instanceof Error ? error : new Error(String(error)),
+        ...(statusError instanceof RemoteNoteCacheMergeError
+          ? {}
+          : { online: false }),
+        lastError: statusError,
       });
       logger.error('Failed to pull remote note into cache', error, {
         repositoryKind: this.kind,
@@ -1185,7 +1205,7 @@ export class CachedRepository
       });
 
       if (!result.accepted) {
-        throw new Error(`Failed to merge remote note ${nodeId} into cache.`);
+        throw new RemoteNoteCacheMergeError(nodeId);
       }
     });
 
