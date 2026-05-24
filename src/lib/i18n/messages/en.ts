@@ -496,6 +496,7 @@ const en = {
       lastRemoteSync: 'Last remote sync',
       remotePeers: 'Remote peers',
       noRemotePeers: 'No remote peers',
+      livePaused: 'Live sync paused',
       peerModes: {
         'owner-device': 'Owner device',
         'guest-editor': 'Guest editor',

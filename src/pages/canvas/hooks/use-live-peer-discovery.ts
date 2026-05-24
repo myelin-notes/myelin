@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LIVE_DISCOVERY_URL } from '@/lib/env';
 import { Logger } from '@/lib/logger';
 import { registerShutdownTask } from '@/lib/shutdown-tasks';
@@ -13,10 +13,14 @@ import { IrohTransport } from '@/lib/sync/live/iroh';
 
 const logger = new Logger('useLivePeerDiscovery');
 
-export function useLivePeerDiscovery(noteSession: NoteSession | null): void {
+export function useLivePeerDiscovery(
+  noteSession: NoteSession | null,
+): Error | null {
   const repositoryStatus = useRepositoryStatus();
+  const [pauseError, setPauseError] = useState<Error | null>(null);
 
   useEffect(() => {
+    setPauseError(null);
     if (!noteSession || !LIVE_DISCOVERY_URL) {
       return;
     }
@@ -24,6 +28,11 @@ export function useLivePeerDiscovery(noteSession: NoteSession | null): void {
     let coordinator: LivePeerDiscoveryCoordinator | null = null;
     let disposed = false;
     let stopPromise: Promise<void> | null = null;
+    const setLiveDiscoveryPause = (error: Error | null) => {
+      if (!disposed) {
+        setPauseError(error);
+      }
+    };
 
     const stopDiscovery = async () => {
       disposed = true;
@@ -63,10 +72,14 @@ export function useLivePeerDiscovery(noteSession: NoteSession | null): void {
           roomId,
         }),
         createTransport: (noteId) => new IrohTransport(noteId),
+        onPauseChange: setLiveDiscoveryPause,
       });
 
       await coordinator.start();
     })().catch((error) => {
+      setLiveDiscoveryPause(
+        error instanceof Error ? error : new Error(String(error)),
+      );
       logger.error('Failed to start live peer discovery', error, {
         noteId: noteSession.id,
       });
@@ -77,4 +90,6 @@ export function useLivePeerDiscovery(noteSession: NoteSession | null): void {
       void stopDiscovery();
     };
   }, [noteSession, repositoryStatus.config]);
+
+  return pauseError;
 }

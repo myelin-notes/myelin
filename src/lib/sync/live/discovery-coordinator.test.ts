@@ -40,7 +40,10 @@ class FakeClient implements LiveDiscoveryClient {
 class FakeTransport implements LiveDiscoveryTransport {
   connected = false;
   readonly failedTickets = new Set<string>();
-  private readonly listeners = new Map<EventName, Set<() => void>>();
+  private readonly listeners = new Map<
+    string,
+    Set<(...args: unknown[]) => void>
+  >();
 
   constructor(private readonly hostTicket: string) {}
 
@@ -64,16 +67,22 @@ class FakeTransport implements LiveDiscoveryTransport {
       listeners = new Set();
       this.listeners.set(event, listeners);
     }
-    listeners.add(handler as () => void);
+    listeners.add(handler as (...args: unknown[]) => void);
   }
 
   off<E extends EventName>(event: E, handler: TransportEvents[E]): void {
-    this.listeners.get(event)?.delete(handler as () => void);
+    this.listeners.get(event)?.delete(handler as (...args: unknown[]) => void);
   }
 
   emit(event: EventName): void {
     for (const handler of this.listeners.get(event) ?? []) {
       handler();
+    }
+  }
+
+  emitError(error: Error): void {
+    for (const handler of this.listeners.get('error') ?? []) {
+      handler(error);
     }
   }
 }
@@ -175,6 +184,58 @@ describe('LivePeerDiscoveryCoordinator', () => {
 
     expect(client.list).toHaveBeenCalledTimes(1);
     expect(transport.join).toHaveBeenCalledWith('remote-ticket');
+
+    await coordinator.stop();
+  });
+
+  it('marks live sync paused when discovery polling fails and active after recovery', async () => {
+    const session = createSession();
+    const client = new FakeClient();
+    const transport = new FakeTransport('local-ticket');
+    const networkError = new Error('network down');
+    const pauseErrors: Array<Error | null> = [];
+    const coordinator = new LivePeerDiscoveryCoordinator({
+      session,
+      client,
+      createTransport: () => transport,
+      onPauseChange: (error) => pauseErrors.push(error),
+      recordId: 'record-local',
+      now: () => 1_000,
+    });
+
+    await coordinator.start();
+    client.list.mockRejectedValueOnce(networkError);
+
+    await expect(coordinator.pollNow()).rejects.toThrow('network down');
+    expect(pauseErrors).toContain(networkError);
+
+    await coordinator.pollNow();
+    expect(pauseErrors[pauseErrors.length - 1]).toBeNull();
+
+    await coordinator.stop();
+  });
+
+  it('marks live sync paused when the transport reports an error', async () => {
+    const session = createSession();
+    const client = new FakeClient();
+    const transport = new FakeTransport('local-ticket');
+    const transportError = new Error(
+      'Iroh gossip receiver lagged; reconnect to resume live sync.',
+    );
+    const pauseErrors: Array<Error | null> = [];
+    const coordinator = new LivePeerDiscoveryCoordinator({
+      session,
+      client,
+      createTransport: () => transport,
+      onPauseChange: (error) => pauseErrors.push(error),
+      recordId: 'record-local',
+      now: () => 1_000,
+    });
+
+    await coordinator.start();
+    transport.emitError(transportError);
+
+    expect(pauseErrors).toContain(transportError);
 
     await coordinator.stop();
   });

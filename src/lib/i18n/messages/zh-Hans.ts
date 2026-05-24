@@ -488,6 +488,7 @@ const zhHans: typeof en = {
       lastRemoteSync: '上次远程同步',
       remotePeers: '远程节点',
       noRemotePeers: '没有远程节点',
+      livePaused: '实时同步已暂停',
       peerModes: {
         'owner-device': '拥有者设备',
         'guest-editor': '访客编辑',

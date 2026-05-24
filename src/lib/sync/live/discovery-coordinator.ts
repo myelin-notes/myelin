@@ -31,6 +31,7 @@ export interface LivePeerDiscoveryCoordinatorOptions {
   session: LiveDiscoverySession;
   client: LiveDiscoveryClient;
   createTransport(noteId: VFSNodeId): LiveDiscoveryTransport;
+  onPauseChange?: (error: Error | null) => void;
   now?: () => number;
   recordId?: string;
   recordTtlMs?: number;
@@ -51,6 +52,7 @@ export class LivePeerDiscoveryCoordinator {
   private readonly createTransport: (
     noteId: VFSNodeId,
   ) => LiveDiscoveryTransport;
+  private readonly onPauseChange: (error: Error | null) => void;
   private readonly now: () => number;
   private readonly recordId: string;
   private readonly recordTtlMs: number;
@@ -73,6 +75,7 @@ export class LivePeerDiscoveryCoordinator {
     this.session = options.session;
     this.client = options.client;
     this.createTransport = options.createTransport;
+    this.onPauseChange = options.onPauseChange ?? (() => {});
     this.now = options.now ?? (() => Date.now());
     this.recordId = options.recordId ?? createRecordId();
     this.recordTtlMs = options.recordTtlMs ?? LIVE_DISCOVERY_RECORD_TTL_MS;
@@ -94,6 +97,7 @@ export class LivePeerDiscoveryCoordinator {
 
     const transport = this.createTransport(this.session.id);
     this.transport = transport;
+    transport.on('error', this.onTransportError);
     transport.on('connected', this.onTransportConnected);
     transport.on('disconnected', this.onTransportDisconnected);
     this.session.setTransport(transport);
@@ -109,6 +113,7 @@ export class LivePeerDiscoveryCoordinator {
       this.scheduleRefresh();
       this.schedulePoll();
     } catch (error) {
+      this.markLiveSyncPaused(error);
       logger.error('Failed to start live peer discovery', error, {
         noteId: this.session.id,
       });
@@ -135,6 +140,7 @@ export class LivePeerDiscoveryCoordinator {
 
     transport?.off('connected', this.onTransportConnected);
     transport?.off('disconnected', this.onTransportDisconnected);
+    transport?.off('error', this.onTransportError);
     this.session.clearTransport();
 
     await inFlight?.catch(() => {});
@@ -146,14 +152,29 @@ export class LivePeerDiscoveryCoordinator {
   }
 
   async pollNow(): Promise<void> {
-    await this.runCycle(async () => {
-      const records = await this.client.list();
-      await this.tryJoin(records);
-    });
+    try {
+      await this.runCycle(async () => {
+        const records = await this.client.list();
+        await this.tryJoin(records);
+        this.markLiveSyncActive();
+      });
+    } catch (error) {
+      this.markLiveSyncPaused(error);
+      throw error;
+    }
   }
 
   private onTransportConnected = () => {
+    this.markLiveSyncActive();
     this.clearPollTimer();
+  };
+
+  private onTransportError = (error: Error) => {
+    if (this.stopped) {
+      return;
+    }
+
+    this.markLiveSyncPaused(error);
   };
 
   private onTransportDisconnected = () => {
@@ -179,22 +200,28 @@ export class LivePeerDiscoveryCoordinator {
   }
 
   private async publishAndTryJoin(): Promise<void> {
-    await this.runCycle(async () => {
-      const ticket = this.ticket;
-      if (!ticket) {
-        return;
-      }
+    try {
+      await this.runCycle(async () => {
+        const ticket = this.ticket;
+        if (!ticket) {
+          return;
+        }
 
-      const records = await this.client.publish(
-        createLiveDiscoveryRecordInput({
-          recordId: this.recordId,
-          peerId: this.session.localPeerId,
-          ticket,
-          ttlMs: this.recordTtlMs,
-        }),
-      );
-      await this.tryJoin(records);
-    });
+        const records = await this.client.publish(
+          createLiveDiscoveryRecordInput({
+            recordId: this.recordId,
+            peerId: this.session.localPeerId,
+            ticket,
+            ttlMs: this.recordTtlMs,
+          }),
+        );
+        await this.tryJoin(records);
+        this.markLiveSyncActive();
+      });
+    } catch (error) {
+      this.markLiveSyncPaused(error);
+      throw error;
+    }
   }
 
   private async runCycle(action: () => Promise<void>): Promise<void> {
@@ -320,5 +347,15 @@ export class LivePeerDiscoveryCoordinator {
 
     globalThis.clearTimeout(this.refreshTimer);
     this.refreshTimer = null;
+  }
+
+  private markLiveSyncActive(): void {
+    this.onPauseChange(null);
+  }
+
+  private markLiveSyncPaused(error: unknown): void {
+    this.onPauseChange(
+      error instanceof Error ? error : new Error(String(error)),
+    );
   }
 }

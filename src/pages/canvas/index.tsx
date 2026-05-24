@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { X as XIcon } from 'lucide-react';
+import { WifiOff, X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
+import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { openNote, openNoteLink } from '@/lib/note-navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
@@ -63,6 +64,7 @@ function CanvasViewInner() {
   const navigate = useNavigate();
   const location = useLocation();
   const repository = useRepository();
+  const strings = useMessages();
   const thumbnailRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -136,7 +138,7 @@ function CanvasViewInner() {
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
   });
-  useLivePeerDiscovery(engine.noteSession);
+  const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
 
   useEffect(() => {
     if (!engine.ready) {
@@ -276,9 +278,31 @@ function CanvasViewInner() {
       });
     });
   }, []);
+  const liveSyncPausedTitle =
+    liveDiscoveryPauseError?.message ?? strings.canvas.peerSync.livePaused;
   const titleTrailing = useMemo(
-    () => <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />,
-    [handleOpenBacklinkSource, id],
+    () => (
+      <>
+        {liveDiscoveryPauseError && (
+          <span
+            role="status"
+            title={liveSyncPausedTitle}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-destructive/5 px-2 py-1 font-medium text-[10px] text-destructive"
+          >
+            <WifiOff className="size-3" />
+            <span>{strings.canvas.peerSync.livePaused}</span>
+          </span>
+        )}
+        <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />
+      </>
+    ),
+    [
+      handleOpenBacklinkSource,
+      id,
+      liveDiscoveryPauseError,
+      liveSyncPausedTitle,
+      strings.canvas.peerSync.livePaused,
+    ],
   );
   const insertPopover = useMemo(
     () => (
