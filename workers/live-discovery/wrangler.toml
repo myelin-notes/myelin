@@ -1,0 +1,26 @@
+name = "myelin-live-discovery"
+main = "src/index.ts"
+compatibility_date = "2026-05-23"
+
+[[durable_objects.bindings]]
+name = "LIVE_DISCOVERY_ROOMS"
+class_name = "LiveDiscoveryRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LiveDiscoveryRoom"]
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1

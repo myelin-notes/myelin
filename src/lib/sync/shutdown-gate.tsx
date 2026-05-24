@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
+import { runShutdownTasks } from '@/lib/shutdown-tasks';
 import { useRepository } from './context';
 
 const logger = new Logger('RepositoryShutdownGate');
@@ -58,6 +59,13 @@ export function RepositoryShutdownGate() {
             repositoryRef.current.getRuntimeStatus().pendingRemoteWrites;
           if (totalPending > 0) {
             setShutdownState({ phase: 'flushing', totalPending });
+          }
+
+          const shutdownResults = await runShutdownTasks();
+          for (const result of shutdownResults) {
+            if (result.status === 'rejected') {
+              logger.error('Failed to run shutdown task', result.reason);
+            }
           }
 
           try {
