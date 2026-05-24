@@ -1,5 +1,4 @@
 import { join } from '@tauri-apps/api/path';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import {
@@ -43,7 +42,7 @@ type VaultImportFile =
       name: string;
     };
 
-interface ScannedVault {
+export interface ScannedVault {
   files: VaultImportFile[];
   folderPaths: Set<string>;
   skippedFiles: number;
@@ -61,14 +60,23 @@ export interface ObsidianVaultImportResult {
   skippedFiles: number;
 }
 
+export interface ImportProgress {
+  current: number;
+  total: number;
+  fileName: string;
+}
+
 export interface ImportObsidianVaultOptions {
   repository: Repository;
   parentId: string | null;
   vaultPath: string;
   vaultName?: string;
+  scanned?: ScannedVault;
+  signal?: AbortSignal;
+  onProgress?: (progress: ImportProgress) => void;
 }
 
-function getPathName(path: string): string {
+export function getPathName(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
   return normalized.split('/').pop()?.trim() || 'Obsidian Vault';
 }
@@ -315,7 +323,7 @@ async function scanVaultDirectory(
   }
 }
 
-async function scanVault(vaultPath: string): Promise<ScannedVault> {
+export async function scanVault(vaultPath: string): Promise<ScannedVault> {
   const scanned: ScannedVault = {
     files: [],
     folderPaths: new Set(),
@@ -492,13 +500,18 @@ export async function importObsidianVault({
   parentId,
   vaultPath,
   vaultName = getPathName(vaultPath),
+  scanned: preScanned,
+  signal,
+  onProgress,
 }: ImportObsidianVaultOptions): Promise<ObsidianVaultImportResult> {
-  const scanned = await scanVault(vaultPath);
+  const scanned = preScanned ?? (await scanVault(vaultPath));
   if (scanned.files.length === 0) {
     throw new Error('No supported files found in the selected vault.');
   }
 
   let rootFolderId: string | null = null;
+  let current = 0;
+  const total = scanned.files.length;
 
   try {
     rootFolderId = await repository.createFolder(vaultName, parentId);
@@ -514,6 +527,7 @@ export async function importObsidianVault({
     );
 
     for (const file of markdownFiles) {
+      if (signal?.aborted) break;
       file.nodeId = await repository.createFile(
         file.noteName,
         'mcanvas',
@@ -521,17 +535,23 @@ export async function importObsidianVault({
       );
     }
 
-    const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
-    for (const file of markdownFiles) {
-      await writeMarkdownFile({ file, repository, resolveNoteLinkId });
+    if (!signal?.aborted) {
+      const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
+      for (const file of markdownFiles) {
+        if (signal?.aborted) break;
+        onProgress?.({ current: ++current, total, fileName: file.name });
+        await writeMarkdownFile({ file, repository, resolveNoteLinkId });
+      }
     }
 
     let mediaImported = 0;
     for (const file of scanned.files) {
+      if (signal?.aborted) break;
       if (file.kind === 'markdown') {
         continue;
       }
 
+      onProgress?.({ current: ++current, total, fileName: file.name });
       const importParentId = getImportParentId(
         rootFolderId,
         folderIds,
@@ -553,9 +573,13 @@ export async function importObsidianVault({
       mediaImported += 1;
     }
 
+    const notesImported = signal?.aborted
+      ? markdownFiles.filter((f) => f.nodeId !== null).length
+      : markdownFiles.length;
+
     return {
       rootFolderId,
-      notesImported: markdownFiles.length,
+      notesImported,
       mediaImported,
       skippedFiles: scanned.skippedFiles,
     };
@@ -579,25 +603,3 @@ export async function importObsidianVault({
   }
 }
 
-export async function importObsidianVaultFromPicker({
-  repository,
-  parentId,
-}: {
-  repository: Repository;
-  parentId: string | null;
-}): Promise<ObsidianVaultImportResult | null> {
-  const selected = await openDialog({
-    directory: true,
-    multiple: false,
-    recursive: true,
-  });
-  if (!selected || Array.isArray(selected)) {
-    return null;
-  }
-
-  return importObsidianVault({
-    repository,
-    parentId,
-    vaultPath: selected,
-  });
-}

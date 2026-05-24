@@ -22,6 +22,7 @@ import {
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { Sidebar } from '@/components/layout/sidebar';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
@@ -48,6 +49,7 @@ import {
   type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
+import { ImportDialog } from './import-dialog';
 import {
   importStorageFile,
   isStorageFile,
@@ -58,7 +60,6 @@ import {
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
 } from './import-markdown';
-import { importObsidianVaultFromPicker } from './import-obsidian-vault';
 import { importPdfFile, isPdfFile, PDF_FILE_ACCEPT } from './import-pdf';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
@@ -92,8 +93,7 @@ export function LibraryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingFiles, setIsImportingFiles] = useState(false);
-  const [isImportingObsidianVault, setIsImportingObsidianVault] =
-    useState(false);
+  const [importVaultPath, setImportVaultPath] = useState<string | null>(null);
   const isRefreshingRepository = useManualRepositoryRefreshPending();
   const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
@@ -108,16 +108,14 @@ export function LibraryPage() {
     repositoryStatus.config,
     repositoryStatus.initializing,
   );
-  const activityLabel = isImportingObsidianVault
-    ? strings.library.importObsidianVault.loading
-    : isImportingFiles
-      ? strings.library.importFiles.loading
-      : isRefreshingRepository
-        ? strings.library.refreshRepository.loading
-        : repositoryStatus.initializing &&
-            repositoryStatus.config.kind !== 'local'
-          ? strings.library.repositoryLoading
-          : null;
+  const activityLabel = isImportingFiles
+    ? strings.library.importFiles.loading
+    : isRefreshingRepository
+      ? strings.library.refreshRepository.loading
+      : repositoryStatus.initializing &&
+          repositoryStatus.config.kind !== 'local'
+        ? strings.library.repositoryLoading
+        : null;
   useEffect(() => UserPrefs.subscribe('explorerViewMode', setViewMode), []);
   const toggleViewMode = () => {
     UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
@@ -231,49 +229,29 @@ export function LibraryPage() {
   };
 
   const handleImportObsidianVault = useCallback(async () => {
-    if (isImportingFiles || isImportingObsidianVault) {
+    if (isImportingFiles || importVaultPath !== null) {
       return;
     }
 
-    setIsImportingObsidianVault(true);
-    try {
-      const result = await importObsidianVaultFromPicker({
-        repository,
-        parentId: currentFolderId,
-      });
-      if (!result) {
-        return;
-      }
-
-      setCurrentFolderId(result.rootFolderId);
-      triggerRefresh();
-      toast.success(
-        strings.library.importObsidianVault.succeeded(
-          result.notesImported,
-          result.mediaImported,
-        ),
-        {
-          description:
-            result.skippedFiles > 0
-              ? strings.library.importObsidianVault.skipped(result.skippedFiles)
-              : undefined,
-        },
-      );
-    } catch (error) {
-      toast.error(strings.library.importObsidianVault.failed, {
-        description: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setIsImportingObsidianVault(false);
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      recursive: true,
+    });
+    if (!selected || Array.isArray(selected)) {
+      return;
     }
-  }, [
-    currentFolderId,
-    isImportingFiles,
-    isImportingObsidianVault,
-    repository,
-    strings.library.importObsidianVault,
-    triggerRefresh,
-  ]);
+
+    setImportVaultPath(selected);
+  }, [isImportingFiles, importVaultPath]);
+
+  const handleImportDialogDone = useCallback(
+    (rootFolderId: string) => {
+      setCurrentFolderId(rootFolderId);
+      triggerRefresh();
+    },
+    [triggerRefresh],
+  );
 
   const handleNewFolder = useCallback(() => {
     void explorerRef.current?.startNewFolder();
@@ -631,7 +609,7 @@ export function LibraryPage() {
                     onImportFiles={handleImportFiles}
                     onImportObsidianVault={handleImportObsidianVault}
                     importDisabled={
-                      isImportingFiles || isImportingObsidianVault
+                      isImportingFiles || importVaultPath !== null
                     }
                   />
                   <input
@@ -667,6 +645,21 @@ export function LibraryPage() {
           </section>
         </motion.div>
       </main>
+
+      {importVaultPath !== null && (
+        <ImportDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setImportVaultPath(null);
+            }
+          }}
+          vaultPath={importVaultPath}
+          parentId={currentFolderId}
+          repository={repository}
+          onImported={handleImportDialogDone}
+        />
+      )}
     </div>
   );
 }

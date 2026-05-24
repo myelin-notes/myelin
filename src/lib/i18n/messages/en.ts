@@ -117,6 +117,38 @@ const en = {
       succeeded: (notes: number, media: number) =>
         `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
     },
+    importDialog: {
+      title: 'Import Obsidian Vault',
+      scanning: 'Scanning vault...',
+      notes: (count: number) => `${count} note${count === 1 ? '' : 's'}`,
+      media: (count: number) => `${count} media file${count === 1 ? '' : 's'}`,
+      skippedFiles: (count: number) =>
+        `${count} unsupported file${count === 1 ? '' : 's'} will be skipped`,
+      noFiles: 'No supported files found in this vault',
+      conflict: {
+        label: 'A folder with this name already exists',
+        rename: 'Keep both (rename)',
+        replace: 'Replace existing',
+      },
+      progress: {
+        importing: (current: number, total: number) =>
+          `Importing ${current} of ${total}...`,
+        cancelling: 'Cancelling...',
+      },
+      summary: {
+        title: 'Import complete',
+        cancelled: 'Import cancelled',
+        imported: (notes: number, media: number) =>
+          `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}`,
+        skipped: (count: number) =>
+          `${count} unsupported file${count === 1 ? '' : 's'} skipped`,
+      },
+      buttons: {
+        import: 'Import',
+        cancel: 'Cancel',
+        done: 'Done',
+      },
+    },
     repositoryLoading: 'Loading repository...',
     refreshRepository: {
       label: 'Refresh repository',

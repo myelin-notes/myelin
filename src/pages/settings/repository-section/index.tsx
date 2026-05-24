@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  ExternalLink,
-  Github,
-  HardDrive,
-  LogOut,
-  X,
-} from 'lucide-react';
+import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { TimeAgo } from '@/components/time-ago';
 import { Button } from '@/components/ui/button';
@@ -72,7 +66,6 @@ export function RepositorySection() {
       });
       return;
     }
-
   };
 
   const handleOwnerChange = (owner: string) => {
@@ -364,7 +357,6 @@ export function RepositorySection() {
                     </p>
                   )}
                 </div>
-
               </>
             )}
           </div>

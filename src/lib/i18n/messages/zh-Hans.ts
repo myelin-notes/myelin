@@ -117,6 +117,36 @@ const zhHans: typeof en = {
       succeeded: (notes: number, media: number) =>
         `已导入 ${notes} 个笔记和 ${media} 个媒体文件`,
     },
+    importDialog: {
+      title: '导入 Obsidian 仓库',
+      scanning: '正在扫描仓库...',
+      notes: (count: number) => `${count} 个笔记`,
+      media: (count: number) => `${count} 个媒体文件`,
+      skippedFiles: (count: number) => `${count} 个不受支持的文件将被跳过`,
+      noFiles: '此仓库中未找到受支持的文件',
+      conflict: {
+        label: '已存在同名文件夹',
+        rename: '保留两者（重命名）',
+        replace: '替换现有',
+      },
+      progress: {
+        importing: (current: number, total: number) =>
+          `正在导入 ${current}/${total}...`,
+        cancelling: '正在取消...',
+      },
+      summary: {
+        title: '导入完成',
+        cancelled: '导入已取消',
+        imported: (notes: number, media: number) =>
+          `已导入 ${notes} 个笔记和 ${media} 个媒体文件`,
+        skipped: (count: number) => `已跳过 ${count} 个不受支持的文件`,
+      },
+      buttons: {
+        import: '导入',
+        cancel: '取消',
+        done: '完成',
+      },
+    },
     repositoryLoading: '正在加载仓库...',
     refreshRepository: {
       label: '刷新仓库',
