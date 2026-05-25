@@ -803,16 +803,23 @@ export class CachedRepository
         return 'abort-to-rest';
       }
       for (const entry of rawOps) {
-        plan.additions.set(
-          getStoredFilePath(entry.node),
-          entry.bytes ?? new Uint8Array(),
-        );
+        const bytes = entry.bytes ?? new Uint8Array();
+        plan.additions.set(getStoredFilePath(entry.node), bytes);
         plan.messages.push(
           `Update raw ${entry.node.fileType} ${entry.node.name}`,
         );
         const manifestNode = plan.manifest.nodes[entry.node.id];
         if (manifestNode && manifestNode.type === 'file') {
           manifestNode.modifiedAt = fileSavedAt;
+          if (entry.node.fileType === 'mcanvas' && bytes.byteLength > 0) {
+            const doc = new Y.Doc();
+            Y.applyUpdate(doc, bytes);
+            setStoredNoteLinks(
+              plan.manifest,
+              entry.node.id,
+              extractStoredNoteLinks(doc),
+            );
+          }
           plan.manifestChanged = true;
         }
       }
@@ -1049,12 +1056,8 @@ export class CachedRepository
     }
 
     const node = localState.node;
-    if (node.fileType !== 'mcanvas') {
-      await this.applyRawFilePush(
-        op,
-        node,
-        localState.kind === 'raw-file' ? localState.bytes : null,
-      );
+    if (localState.kind === 'raw-file') {
+      await this.applyRawFilePush(op, node, localState.bytes);
       return;
     }
 
@@ -1172,6 +1175,18 @@ export class CachedRepository
         return null;
       }
 
+      const hasPendingReplace = this.outbox
+        .snapshotOps()
+        .some(
+          (op) =>
+            op.kind === 'push-note' &&
+            op.nodeId === nodeId &&
+            op.replace === true,
+        );
+      if (hasPendingReplace) {
+        return null;
+      }
+
       const node = await this.cache.getNode(nodeId);
       if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
         return null;
@@ -1201,6 +1216,19 @@ export class CachedRepository
     }
 
     await this.withLocalStateLock(async () => {
+      await this.outbox.load();
+      const hasPendingReplace = this.outbox
+        .snapshotOps()
+        .some(
+          (op) =>
+            op.kind === 'push-note' &&
+            op.nodeId === nodeId &&
+            op.replace === true,
+        );
+      if (hasPendingReplace) {
+        return;
+      }
+
       const node = await this.cache.getNode(nodeId);
       if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
         return;
