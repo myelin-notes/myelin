@@ -9,6 +9,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
@@ -90,31 +91,39 @@ export function VersionHistoryDialog({
 
   return (
     <>
-      <button
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className="rounded-lg"
         onClick={() => setOpen(true)}
         aria-label={versionHistoryStrings.title}
         title={versionHistoryStrings.title}
-        className="inline-flex shrink-0 cursor-pointer items-center rounded-md border-none bg-transparent p-1 text-text-secondary transition-colors hover:text-text-primary"
       >
         <History className="size-4" />
-      </button>
+      </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[70vh] sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{versionHistoryStrings.title}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="size-4 text-text-muted" />
+              {versionHistoryStrings.title}
+            </DialogTitle>
           </DialogHeader>
           {versions.length === 0 ? (
-            <p className="py-6 text-center text-muted-foreground text-sm">
-              {versionHistoryStrings.empty}
-            </p>
+            <div className="flex flex-col items-center gap-2 py-8">
+              <History className="size-8 text-text-muted/40" />
+              <p className="font-heading text-muted-foreground text-sm italic">
+                {versionHistoryStrings.empty}
+              </p>
+            </div>
           ) : (
             <div className="-mx-4 max-h-[calc(70vh-8rem)] overflow-y-auto px-4">
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {versions.map((entry) => (
                   <div
                     key={entry.timestamp}
-                    className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50"
+                    className="group/version flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-hover-tint"
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-sm text-text-primary">
@@ -127,13 +136,12 @@ export function VersionHistoryDialog({
                         }).format(entry.timestamp)}
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="xs"
+                    <button
+                      className="cursor-pointer font-medium text-primary text-xs underline-offset-3 opacity-0 transition-opacity hover:underline group-hover/version:opacity-100"
                       onClick={() => setConfirmEntry(entry)}
                     >
                       {versionHistoryStrings.restore}
-                    </Button>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -152,6 +160,9 @@ export function VersionHistoryDialog({
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
+            <AlertDialogMedia>
+              <History />
+            </AlertDialogMedia>
             <AlertDialogTitle>
               {versionHistoryStrings.restoreConfirmTitle}
             </AlertDialogTitle>
@@ -160,11 +171,12 @@ export function VersionHistoryDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={restoring}>
+            <AlertDialogCancel disabled={restoring} className="rounded-lg">
               {versionHistoryStrings.cancel}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={restoring}
+              className="rounded-lg"
               onClick={() => {
                 if (confirmEntry) {
                   void handleRestore(confirmEntry);
