@@ -165,6 +165,7 @@ describe('CachedRepository', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
     installMemoryLocalStorage();
+    vi.useRealTimers();
   });
 
   it('serves cache writes immediately and flushes them to remote', async () => {
@@ -232,6 +233,52 @@ describe('CachedRepository', () => {
     expect(Array.from(remoteSnapshot.notes[fileId] ?? [])).toEqual(
       Array.from(bytes),
     );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('queues version history files through the regular outbox', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/cached-version-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/cached-version-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const fileId = await repository.createFile(
+      'Photo.png',
+      'png',
+      null,
+      new Uint8Array([1, 2, 3]),
+    );
+
+    const version = await repository.createFileVersionIfDue(fileId);
+
+    expect(version).not.toBeNull();
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(5);
+
+    await repository.flushPending();
+
+    const remoteSnapshot = await remote.exportSnapshot();
+    expect(remoteSnapshot.manifest.nodes[fileId]).toMatchObject({
+      type: 'file',
+      name: 'Photo.png',
+    });
+    expect(remoteSnapshot.manifest.nodes[version?.id ?? '']).toMatchObject({
+      type: 'file',
+      system: {
+        kind: 'file-version',
+        sourceFileId: fileId,
+      },
+    });
+    expect(Array.from(remoteSnapshot.notes[version?.id ?? ''] ?? [])).toEqual([
+      1, 2, 3,
+    ]);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 

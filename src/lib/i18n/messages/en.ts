@@ -185,6 +185,7 @@ const en = {
     itemMenu: {
       rename: 'Rename',
       manageTags: 'Manage Tags',
+      versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
       remove: 'Remove',
     },
@@ -205,6 +206,20 @@ const en = {
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
     },
+  },
+  versionHistory: {
+    title: 'Version History',
+    description: (name: string) => `Previous versions of ${name}`,
+    empty: 'No versions yet',
+    selectVersion: 'Select a version',
+    emptyCanvas: 'Empty canvas',
+    previewUnavailable: 'Preview unavailable',
+    loadFailed: 'Could not load version history',
+    previewFailed: 'Could not load preview',
+    restore: 'Restore',
+    restoring: 'Restoring...',
+    restored: 'Version restored',
+    restoreFailed: 'Could not restore version',
   },
   settings: {
     title: 'Preferences',

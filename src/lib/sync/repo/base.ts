@@ -17,12 +17,15 @@ import type {
 import { extractStoredNoteLinks } from './note-link-index';
 import {
   addChild,
+  computeRevision,
   createDocFromBytes,
   createFileNode,
   createFolderNode,
   createNodeId,
   deleteNodeFromManifest,
+  ensureVersionHistoryRoot,
   getBacklinks,
+  getFileVersionNodes,
   getFolderChain,
   getNodesByAnyTag,
   getRecentFiles,
@@ -35,10 +38,15 @@ import {
   type RepositorySnapshot,
   searchNodes,
   setStoredNoteLinks,
+  toFileVersion,
+  VERSION_HISTORY_INTERVAL_MS,
+  VERSION_HISTORY_MAX_PER_FILE,
   type VFSManifest,
 } from './shared';
 import type {
+  CreateFileOptions,
   FileType,
+  FileVersion,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
@@ -259,6 +267,7 @@ export abstract class BaseRepository
     fileType: FileType,
     parentId: string | null,
     bytes?: Uint8Array,
+    options?: CreateFileOptions,
   ): Promise<VFSNodeId> {
     const id = await this.mutateManifest('Create file', (manifest) => {
       const newId = createNodeId();
@@ -269,6 +278,7 @@ export abstract class BaseRepository
         fileType,
         parentId,
         now,
+        options?.system,
       );
       addChild(manifest, parentId, newId);
       return newId;
@@ -278,6 +288,84 @@ export abstract class BaseRepository
       await this.writeFileBytes(id, bytes);
     }
     return id;
+  }
+
+  async listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]> {
+    const { manifest } = await this.loadManifestImpl();
+    return getFileVersionNodes(manifest, nodeId).map(toFileVersion);
+  }
+
+  async createFileVersionIfDue(
+    nodeId: VFSNodeId,
+    options: { force?: boolean } = {},
+  ): Promise<FileVersion | null> {
+    const node = await this.getNode(nodeId);
+    if (!node || node.type !== 'file' || node.system) {
+      return null;
+    }
+
+    const bytes = await this.readFileBytes(nodeId);
+    if (!bytes) {
+      return null;
+    }
+
+    const now = Date.now();
+    const sourceRevision = await computeRevision(bytes);
+    const versions = await this.listFileVersions(nodeId);
+    const latest = versions[0];
+    if (latest?.sourceRevision === sourceRevision) {
+      return null;
+    }
+    if (
+      !options.force &&
+      latest &&
+      now - latest.capturedAt < VERSION_HISTORY_INTERVAL_MS
+    ) {
+      return null;
+    }
+
+    const parentId = await this.getOrCreateVersionHistoryRoot();
+    const versionId = await this.createFile(
+      `${node.name} ${new Date(now).toISOString()}`,
+      node.fileType,
+      parentId,
+      bytes,
+      {
+        system: {
+          kind: 'file-version',
+          sourceFileId: node.id,
+          sourceFileType: node.fileType,
+          sourceName: node.name,
+          sourceRevision,
+          capturedAt: now,
+          byteLength: bytes.byteLength,
+        },
+      },
+    );
+
+    await this.enforceFileVersionLimit(nodeId);
+
+    const versionNode = await this.getNode(versionId);
+    return isConcreteFileVersionNode(versionNode)
+      ? toFileVersion(versionNode)
+      : null;
+  }
+
+  async restoreFileVersion(
+    nodeId: VFSNodeId,
+    versionId: VFSNodeId,
+  ): Promise<void> {
+    const versionNode = await this.getNode(versionId);
+    if (
+      !isConcreteFileVersionNode(versionNode) ||
+      versionNode.system.sourceFileId !== nodeId
+    ) {
+      throw new Error('Version does not belong to this file.');
+    }
+
+    const bytes = await this.readFileBytes(versionId);
+    await this.createFileVersionIfDue(nodeId, { force: true });
+    await this.writeFileBytes(nodeId, bytes ?? new Uint8Array());
   }
 
   async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
@@ -581,4 +669,26 @@ export abstract class BaseRepository
 
     return extractStoredNoteLinks(createDocFromBytes(bytes));
   }
+
+  private async getOrCreateVersionHistoryRoot(): Promise<VFSNodeId> {
+    return this.mutateManifest('Create version history root', (manifest) =>
+      ensureVersionHistoryRoot(manifest, Date.now()),
+    );
+  }
+
+  private async enforceFileVersionLimit(nodeId: VFSNodeId): Promise<void> {
+    const versions = await this.listFileVersions(nodeId);
+    const expired = versions.slice(VERSION_HISTORY_MAX_PER_FILE);
+    for (const version of expired) {
+      await this.deleteNode(version.id);
+    }
+  }
+}
+
+function isConcreteFileVersionNode(
+  node: VFSNode | null,
+): node is VFSFileNode & {
+  system: Extract<NonNullable<VFSFileNode['system']>, { kind: 'file-version' }>;
+} {
+  return node?.type === 'file' && node.system?.kind === 'file-version';
 }

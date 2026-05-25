@@ -27,15 +27,21 @@ import {
   createFileNode,
   createNodeId,
   deleteNodeFromManifest,
+  ensureVersionHistoryRoot,
   getStoredFilePath,
   getUniqueFileName,
   MANIFEST_PATH,
   type RepositorySnapshot,
   setStoredNoteLinks,
+  toFileVersion,
+  VERSION_HISTORY_INTERVAL_MS,
+  VERSION_HISTORY_MAX_PER_FILE,
   type VFSManifest,
 } from '../shared';
 import type {
+  CreateFileOptions,
   FileType,
+  FileVersion,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
@@ -72,6 +78,14 @@ class RemoteNoteCacheMergeError extends Error {
     super(`Failed to merge remote note ${nodeId} into cache.`);
     this.name = 'RemoteNoteCacheMergeError';
   }
+}
+
+function isConcreteFileVersionNode(
+  node: VFSNode | null,
+): node is VFSFileNode & {
+  system: Extract<NonNullable<VFSFileNode['system']>, { kind: 'file-version' }>;
+} {
+  return node?.type === 'file' && node.system?.kind === 'file-version';
 }
 
 interface BatchPlan {
@@ -360,14 +374,92 @@ export class CachedRepository
     fileType: FileType,
     parentId: string | null,
     bytes?: Uint8Array,
+    options?: CreateFileOptions,
   ): Promise<VFSNodeId> {
     return this.writeLocalAndQueue(
-      () => this.cache.createFile(name, fileType, parentId, bytes),
+      () => this.cache.createFile(name, fileType, parentId, bytes, options),
       (ops, nodeId) => {
         enqueueUpsertManifestNode(ops, nodeId);
         enqueuePushNote(ops, nodeId, fileType === 'mcanvas' ? undefined : null);
       },
     );
+  }
+
+  async listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]> {
+    return this.cache.listFileVersions(nodeId);
+  }
+
+  async createFileVersionIfDue(
+    nodeId: VFSNodeId,
+    options: { force?: boolean } = {},
+  ): Promise<FileVersion | null> {
+    const node = await this.cache.getNode(nodeId);
+    if (!node || node.type !== 'file' || node.system) {
+      return null;
+    }
+
+    const bytes = await this.cache.readFileBytes(nodeId);
+    if (!bytes) {
+      return null;
+    }
+
+    const now = Date.now();
+    const sourceRevision = await computeRevision(bytes);
+    const versions = await this.listFileVersions(nodeId);
+    const latest = versions[0];
+    if (latest?.sourceRevision === sourceRevision) {
+      return null;
+    }
+    if (
+      !options.force &&
+      latest &&
+      now - latest.capturedAt < VERSION_HISTORY_INTERVAL_MS
+    ) {
+      return null;
+    }
+
+    const parentId = await this.getOrCreateVersionHistoryRoot();
+    const versionId = await this.createFile(
+      `${node.name} ${new Date(now).toISOString()}`,
+      node.fileType,
+      parentId,
+      bytes,
+      {
+        system: {
+          kind: 'file-version',
+          sourceFileId: node.id,
+          sourceFileType: node.fileType,
+          sourceName: node.name,
+          sourceRevision,
+          capturedAt: now,
+          byteLength: bytes.byteLength,
+        },
+      },
+    );
+
+    await this.enforceFileVersionLimit(nodeId);
+
+    const versionNode = await this.cache.getNode(versionId);
+    return isConcreteFileVersionNode(versionNode)
+      ? toFileVersion(versionNode)
+      : null;
+  }
+
+  async restoreFileVersion(
+    nodeId: VFSNodeId,
+    versionId: VFSNodeId,
+  ): Promise<void> {
+    const versionNode = await this.cache.getNode(versionId);
+    if (
+      !isConcreteFileVersionNode(versionNode) ||
+      versionNode.system.sourceFileId !== nodeId
+    ) {
+      throw new Error('Version does not belong to this file.');
+    }
+
+    const bytes = await this.cache.readFileBytes(versionId);
+    await this.createFileVersionIfDue(nodeId, { force: true });
+    await this.writeFileBytes(nodeId, bytes ?? new Uint8Array());
   }
 
   async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
@@ -479,6 +571,27 @@ export class CachedRepository
       return undefined;
     }
     return computeRevision(await this.cache.readFileBytes(nodeId));
+  }
+
+  private async getOrCreateVersionHistoryRoot(): Promise<VFSNodeId> {
+    return this.writeLocalAndQueue(
+      () =>
+        this.cache.applyManifestMutation(
+          'Create version history root',
+          (manifest) => ensureVersionHistoryRoot(manifest, Date.now()),
+        ),
+      (ops, rootId) => {
+        enqueueUpsertManifestNode(ops, rootId);
+      },
+    );
+  }
+
+  private async enforceFileVersionLimit(nodeId: VFSNodeId): Promise<void> {
+    const versions = await this.listFileVersions(nodeId);
+    const expired = versions.slice(VERSION_HISTORY_MAX_PER_FILE);
+    for (const version of expired) {
+      await this.deleteNode(version.id);
+    }
   }
 
   async openSession(nodeId: VFSNodeId): Promise<NoteSession> {

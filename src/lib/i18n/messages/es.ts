@@ -188,6 +188,7 @@ const es: typeof en = {
     itemMenu: {
       rename: 'Renombrar',
       manageTags: 'Administrar etiquetas',
+      versionHistory: 'Historial de versiones',
       revealInFileManager: 'Mostrar en el explorador de archivos',
       remove: 'Eliminar',
     },
@@ -208,6 +209,20 @@ const es: typeof en = {
       createNew: 'Crear nueva etiqueta',
       placeholder: 'Nombre de la etiqueta...',
     },
+  },
+  versionHistory: {
+    title: 'Historial de versiones',
+    description: (name: string) => `Versiones anteriores de ${name}`,
+    empty: 'Aún no hay versiones',
+    selectVersion: 'Selecciona una versión',
+    emptyCanvas: 'Lienzo vacío',
+    previewUnavailable: 'Vista previa no disponible',
+    loadFailed: 'No se pudo cargar el historial de versiones',
+    previewFailed: 'No se pudo cargar la vista previa',
+    restore: 'Restaurar',
+    restoring: 'Restaurando...',
+    restored: 'Versión restaurada',
+    restoreFailed: 'No se pudo restaurar la versión',
   },
   settings: {
     title: 'Preferencias',

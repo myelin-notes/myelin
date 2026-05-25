@@ -73,9 +73,11 @@ export {
   getFileTypeForName,
   getMimeTypeForFileType,
   isImageFileType,
+  isVideoFileType,
 } from './repo/shared';
 export type {
   FileType,
+  FileVersion,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,

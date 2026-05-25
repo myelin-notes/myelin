@@ -6,7 +6,7 @@ import {
   isRepositoryFullyConfigured,
   RepositorySetupIncompleteError,
 } from './readiness';
-import type { FileType } from './types';
+import type { CreateFileOptions, FileType } from './types';
 
 function normalizeOutboxKeyPart(value: string): string {
   return value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_') || 'default';
@@ -34,6 +34,7 @@ function guardNoteCreation(
           fileType: FileType,
           parentId: string | null,
           bytes?: Uint8Array,
+          options?: CreateFileOptions,
         ) => {
           if (
             fileType === 'mcanvas' &&
@@ -42,7 +43,7 @@ function guardNoteCreation(
             throw new RepositorySetupIncompleteError();
           }
 
-          return target.createFile(name, fileType, parentId, bytes);
+          return target.createFile(name, fileType, parentId, bytes, options);
         };
       }
 
