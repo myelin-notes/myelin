@@ -24,6 +24,7 @@ import { extractStoredNoteLinks } from '../note-link-index';
 import {
   addChild,
   computeRevision,
+  createDocFromBytes,
   createFileNode,
   createNodeId,
   deleteNodeFromManifest,
@@ -458,8 +459,11 @@ export class CachedRepository
     }
 
     const bytes = await this.cache.readFileBytes(versionId);
+    if (!bytes) {
+      throw new Error('Version data is missing.');
+    }
     await this.createFileVersionIfDue(nodeId, { force: true });
-    await this.writeFileBytes(nodeId, bytes ?? new Uint8Array());
+    await this.replaceFileBytes(nodeId, bytes);
   }
 
   async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
@@ -475,6 +479,20 @@ export class CachedRepository
       },
       (ops, baseFileRevision) => {
         enqueuePushNote(ops, nodeId, baseFileRevision);
+      },
+    );
+  }
+
+  private async replaceFileBytes(
+    nodeId: VFSNodeId,
+    bytes: Uint8Array,
+  ): Promise<void> {
+    await this.writeLocalAndQueue(
+      async () => {
+        await this.cache.writeFileBytes(nodeId, bytes);
+      },
+      (ops) => {
+        enqueuePushNote(ops, nodeId, undefined, { replaceFile: true });
       },
     );
   }
@@ -830,7 +848,7 @@ export class CachedRepository
         if (!node || node.type !== 'file') {
           continue;
         }
-        if (node.fileType === 'mcanvas') {
+        if (node.fileType === 'mcanvas' && !op.replaceFile) {
           canvasOps.push({
             op,
             node,
@@ -908,13 +926,25 @@ export class CachedRepository
         return 'abort-to-rest';
       }
       for (const entry of rawOps) {
+        if (entry.op.replaceFile && !entry.bytes) {
+          return 'abort-to-rest';
+        }
         plan.additions.set(
           getStoredFilePath(entry.node),
           entry.bytes ?? new Uint8Array(),
         );
-        plan.messages.push(
-          `Update raw ${entry.node.fileType} ${entry.node.name}`,
-        );
+        if (entry.op.replaceFile && entry.node.fileType === 'mcanvas') {
+          setStoredNoteLinks(
+            plan.manifest,
+            entry.node.id,
+            extractStoredNoteLinks(createDocFromBytes(entry.bytes)),
+          );
+          plan.messages.push(`Replace note ${entry.node.name}`);
+        } else {
+          plan.messages.push(
+            `Update raw ${entry.node.fileType} ${entry.node.name}`,
+          );
+        }
         const manifestNode = plan.manifest.nodes[entry.node.id];
         if (manifestNode && manifestNode.type === 'file') {
           manifestNode.modifiedAt = fileSavedAt;
@@ -978,7 +1008,7 @@ export class CachedRepository
     }>,
   ): Promise<boolean> {
     for (const entry of rawOps) {
-      if (entry.op.baseFileRevision === undefined) {
+      if (entry.op.replaceFile || entry.op.baseFileRevision === undefined) {
         continue;
       }
       const remoteBytes = await remote.readFileBytes(entry.op.nodeId);
@@ -1130,6 +1160,14 @@ export class CachedRepository
         return { kind: 'missing' as const };
       }
 
+      if (op.replaceFile) {
+        return {
+          kind: 'replace-file' as const,
+          node,
+          bytes: await this.cache.readFileBytes(nodeId),
+        };
+      }
+
       if (node.fileType !== 'mcanvas') {
         return {
           kind: 'raw-file' as const,
@@ -1154,6 +1192,11 @@ export class CachedRepository
     }
 
     const node = localState.node;
+    if (localState.kind === 'replace-file') {
+      await this.applyFileReplace(node, localState.bytes);
+      return;
+    }
+
     if (node.fileType !== 'mcanvas') {
       await this.applyRawFilePush(
         op,
@@ -1168,6 +1211,23 @@ export class CachedRepository
     }
 
     await this.applyCanvasNotePush(nodeId, localState.snapshot);
+  }
+
+  private async applyFileReplace(
+    node: VFSFileNode,
+    bytes: Uint8Array | null,
+  ): Promise<void> {
+    if (!bytes) {
+      throw new Error(`Missing cached bytes for ${node.id}.`);
+    }
+
+    await this.remote.writeFileBytes(node.id, bytes);
+    logger.debug('Applied cached file replacement to remote', {
+      repositoryKind: this.kind,
+      nodeId: node.id,
+      fileType: node.fileType,
+      byteLength: bytes.byteLength,
+    });
   }
 
   private async applyRawFilePush(

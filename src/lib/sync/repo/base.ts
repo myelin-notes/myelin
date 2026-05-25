@@ -364,8 +364,11 @@ export abstract class BaseRepository
     }
 
     const bytes = await this.readFileBytes(versionId);
+    if (!bytes) {
+      throw new Error('Version data is missing.');
+    }
     await this.createFileVersionIfDue(nodeId, { force: true });
-    await this.writeFileBytes(nodeId, bytes ?? new Uint8Array());
+    await this.writeFileBytes(nodeId, bytes);
   }
 
   async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {

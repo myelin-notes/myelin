@@ -4,7 +4,7 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { LocalRepository } from './local';
-import type { VFSManifest } from './shared';
+import { getStoredFileName, type VFSManifest } from './shared';
 
 describe('repository file version history', () => {
   beforeEach(() => {
@@ -146,5 +146,35 @@ describe('repository file version history', () => {
     expect(
       Array.from((await repository.readFileBytes(versions[0].id)) ?? []),
     ).toEqual([99]);
+  });
+
+  it('does not restore missing version data as an empty file', async () => {
+    const repository = new LocalRepository('repositories/version-missing-test');
+    await repository.initialize();
+
+    const fileId = await repository.createFile(
+      'Photo.png',
+      'png',
+      null,
+      new Uint8Array([1]),
+    );
+    const version = await repository.createFileVersionIfDue(fileId);
+    expect(version).not.toBeNull();
+
+    await repository.writeFileBytes(fileId, new Uint8Array([2]));
+    await getRepositoryTestStorage().remove(
+      `repositories/version-missing-test/files/${getStoredFileName({
+        id: version?.id ?? '',
+        fileType: 'png',
+      })}`,
+    );
+
+    await expect(
+      repository.restoreFileVersion(fileId, version?.id ?? ''),
+    ).rejects.toThrow('Version data is missing.');
+    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual([
+      2,
+    ]);
+    expect(await repository.listFileVersions(fileId)).toHaveLength(1);
   });
 });

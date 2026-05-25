@@ -70,10 +70,12 @@ function VersionPreview({
   bytes,
   fileType,
   objectUrl,
+  previewText,
 }: {
   bytes: Uint8Array | null;
   fileType: FileType;
   objectUrl: string | null;
+  previewText: string | null;
 }) {
   const strings = useMessages();
   const locale = useLocale();
@@ -87,7 +89,6 @@ function VersionPreview({
   }
 
   if (fileType === 'mcanvas') {
-    const previewText = extractCanvasPreviewText(bytes);
     return (
       <div className="h-full overflow-auto rounded-lg bg-surface/70 p-4 text-sm text-text-secondary leading-6">
         {previewText || strings.versionHistory.emptyCanvas}
@@ -143,33 +144,41 @@ export function VersionHistoryDialog({
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewBytes, setPreviewBytes] = useState<Uint8Array | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
-  const requestRef = useRef(0);
+  const versionListRequestRef = useRef(0);
+  const previewRequestRef = useRef(0);
+  const restoringRef = useRef(false);
 
   const selectedVersion =
     versions.find((version) => version.id === selectedVersionId) ?? null;
 
   useEffect(() => {
+    const requestId = versionListRequestRef.current + 1;
+    versionListRequestRef.current = requestId;
+
     if (!open) {
+      setLoadingVersions(false);
       return;
     }
 
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
     setLoadingVersions(true);
+    setVersions([]);
+    setSelectedVersionId(null);
     setPreviewBytes(null);
+    setPreviewText(null);
 
     void repository
       .listFileVersions(fileId)
       .then((nextVersions) => {
-        if (requestRef.current !== requestId) {
+        if (versionListRequestRef.current !== requestId) {
           return;
         }
         setVersions(nextVersions);
         setSelectedVersionId(nextVersions[0]?.id ?? null);
       })
       .catch((error) => {
-        if (requestRef.current !== requestId) {
+        if (versionListRequestRef.current !== requestId) {
           return;
         }
         setVersions([]);
@@ -179,32 +188,39 @@ export function VersionHistoryDialog({
         });
       })
       .finally(() => {
-        if (requestRef.current === requestId) {
+        if (versionListRequestRef.current === requestId) {
           setLoadingVersions(false);
         }
       });
   }, [fileId, open, repository, strings.versionHistory.loadFailed]);
 
   useEffect(() => {
+    const requestId = previewRequestRef.current + 1;
+    previewRequestRef.current = requestId;
+    setPreviewBytes(null);
+    setPreviewText(null);
+
     if (!open || !selectedVersionId) {
-      setPreviewBytes(null);
+      setLoadingPreview(false);
       return;
     }
 
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
     setLoadingPreview(true);
-    setPreviewBytes(null);
 
     void repository
       .readFileBytes(selectedVersionId)
       .then((bytes) => {
-        if (requestRef.current === requestId) {
+        const nextPreviewText =
+          bytes && fileType === 'mcanvas'
+            ? extractCanvasPreviewText(bytes)
+            : null;
+        if (previewRequestRef.current === requestId) {
           setPreviewBytes(bytes);
+          setPreviewText(nextPreviewText);
         }
       })
       .catch((error) => {
-        if (requestRef.current !== requestId) {
+        if (previewRequestRef.current !== requestId) {
           return;
         }
         toast.error(strings.versionHistory.previewFailed, {
@@ -212,11 +228,12 @@ export function VersionHistoryDialog({
         });
       })
       .finally(() => {
-        if (requestRef.current === requestId) {
+        if (previewRequestRef.current === requestId) {
           setLoadingPreview(false);
         }
       });
   }, [
+    fileType,
     open,
     repository,
     selectedVersionId,
@@ -239,10 +256,11 @@ export function VersionHistoryDialog({
   }, [objectUrl]);
 
   const restoreSelectedVersion = useCallback(async () => {
-    if (!selectedVersion) {
+    if (!selectedVersion || restoringRef.current) {
       return;
     }
 
+    restoringRef.current = true;
     setRestoring(true);
     try {
       await onBeforeRestore?.();
@@ -255,6 +273,7 @@ export function VersionHistoryDialog({
         description: error instanceof Error ? error.message : String(error),
       });
     } finally {
+      restoringRef.current = false;
       setRestoring(false);
     }
   }, [
@@ -330,6 +349,7 @@ export function VersionHistoryDialog({
               bytes={previewBytes}
               fileType={fileType}
               objectUrl={objectUrl}
+              previewText={previewText}
             />
           </div>
         </div>

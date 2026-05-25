@@ -26,6 +26,7 @@ export type PendingOp =
       kind: 'push-note';
       nodeId: VFSNodeId;
       baseFileRevision?: string | null;
+      replaceFile?: true;
       queueRevision: string;
     }
   | { kind: 'sync-custom-colors'; queueRevision: string };
@@ -96,6 +97,16 @@ function optionalStringOrNull(value: unknown): string | null | undefined {
   );
 }
 
+function optionalTrue(value: unknown, field: string): true | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === true) {
+    return true;
+  }
+  throw new Error(`Cached repository outbox entry has invalid ${field}.`);
+}
+
 function normalizeQueueRevision(value: unknown): {
   queueRevision: string;
   changed: boolean;
@@ -146,11 +157,13 @@ function normalizePendingOp(value: unknown): {
       };
     case 'push-note': {
       const baseFileRevision = optionalStringOrNull(entry.baseFileRevision);
+      const replaceFile = optionalTrue(entry.replaceFile, 'replaceFile');
       return {
         op: {
           kind,
           nodeId: requireString(entry.nodeId, 'nodeId'),
           ...(baseFileRevision !== undefined ? { baseFileRevision } : {}),
+          ...(replaceFile ? { replaceFile } : {}),
           queueRevision,
         },
         changed,
@@ -199,6 +212,7 @@ export function enqueuePushNote(
   ops: PendingOp[],
   nodeId: VFSNodeId,
   baseFileRevision?: string | null,
+  options: { replaceFile?: boolean } = {},
 ): void {
   const alreadyDeleted = ops.some(
     (op) =>
@@ -209,9 +223,14 @@ export function enqueuePushNote(
   }
 
   const existing = ops.find(
-    (op) => op.kind === 'push-note' && op.nodeId === nodeId,
+    (op): op is Extract<PendingOp, { kind: 'push-note' }> =>
+      op.kind === 'push-note' && op.nodeId === nodeId,
   );
   if (existing) {
+    if (options.replaceFile) {
+      existing.replaceFile = true;
+      existing.baseFileRevision = undefined;
+    }
     touchPendingOp(existing);
     return;
   }
@@ -220,7 +239,11 @@ export function enqueuePushNote(
     withQueueRevision({
       kind: 'push-note',
       nodeId,
-      ...(baseFileRevision !== undefined ? { baseFileRevision } : {}),
+      ...(options.replaceFile
+        ? { replaceFile: true as const }
+        : baseFileRevision !== undefined
+          ? { baseFileRevision }
+          : {}),
     }),
   );
 }
