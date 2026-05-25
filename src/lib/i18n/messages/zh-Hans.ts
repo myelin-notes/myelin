@@ -548,6 +548,15 @@ const zhHans: typeof en = {
         live: (phase: string) => `实时 / ${phase}`,
       },
     },
+    versionHistory: {
+      title: '版本历史',
+      current: '当前版本',
+      restore: '恢复',
+      restoreConfirmTitle: '恢复此版本？',
+      restoreConfirmDescription: '恢复前将自动保存当前版本。',
+      empty: '暂无保存的版本',
+      cancel: '取消',
+    },
   },
   dialogs: {
     closeSrOnly: '关闭',

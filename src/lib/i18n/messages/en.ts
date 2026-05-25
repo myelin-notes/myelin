@@ -559,6 +559,16 @@ const en = {
         live: (phase: string) => `Live / ${phase}`,
       },
     },
+    versionHistory: {
+      title: 'Version history',
+      current: 'Current version',
+      restore: 'Restore',
+      restoreConfirmTitle: 'Restore this version?',
+      restoreConfirmDescription:
+        'Your current version will be saved before restoring.',
+      empty: 'No saved versions yet',
+      cancel: 'Cancel',
+    },
   },
   dialogs: {
     closeSrOnly: 'Close',

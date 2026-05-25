@@ -14,6 +14,7 @@ export {
   RepositoryProvider,
   useRepository,
   useRepositoryStatus,
+  useVersionStore,
 } from './context';
 export { CloudflareLiveDiscoveryClient } from './live/cloudflare-discovery';
 export {
@@ -96,3 +97,4 @@ export type {
   YjsSyncSnapshot,
   YjsSyncTarget,
 } from './types';
+export { type VersionEntry, VersionStore } from './versions';

@@ -13,12 +13,13 @@ import type {
   RepositoryConfig,
   RepositoryRuntimeStatus,
 } from './repo/config';
-import { createRepository } from './repo/factory';
+import { createRepository, getStorageRoot } from './repo/factory';
 import {
   getRepositoryConfig,
   subscribeRepositoryConfig,
 } from './repo/repository-settings';
 import { RepositoryShutdownGate } from './shutdown-gate';
+import { VersionStore } from './versions';
 
 export interface RepositoryStatus {
   config: RepositoryConfig;
@@ -31,6 +32,7 @@ export interface RepositoryStatus {
 
 interface RepositoryContextValue {
   repository: ActiveRepository;
+  versionStore: VersionStore;
   status: RepositoryStatus;
 }
 
@@ -97,15 +99,20 @@ export function RepositoryProvider({
     () => createRepository(resolvedConfig),
     [resolvedConfig],
   );
+  const versionStore = useMemo(
+    () => new VersionStore(getStorageRoot(resolvedConfig)),
+    [resolvedConfig],
+  );
   const [status, setStatus] = useState<RepositoryStatus>(() =>
     createRepositoryStatus(resolvedConfig),
   );
   const contextValue = useMemo<RepositoryContextValue>(
     () => ({
       repository,
+      versionStore,
       status,
     }),
-    [repository, status],
+    [repository, versionStore, status],
   );
 
   useEffect(() => {
@@ -183,6 +190,17 @@ export function useRepository(): ActiveRepository {
   }
 
   return context.repository;
+}
+
+export function useVersionStore(): VersionStore {
+  const context = useContext(RepositoryContext);
+  if (!context) {
+    throw new Error(
+      'useVersionStore must be used within a RepositoryProvider.',
+    );
+  }
+
+  return context.versionStore;
 }
 
 export function useRepositoryStatus(): RepositoryStatus {

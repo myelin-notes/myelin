@@ -126,6 +126,16 @@ export class CanvasSessionController {
     await this.teardownActiveSession();
   }
 
+  async restoreVersion(noteId: VFSNodeId, bytes: Uint8Array): Promise<void> {
+    const token = ++this.lifecycleToken;
+    await this.teardownActiveSession();
+    if (token !== this.lifecycleToken) {
+      return;
+    }
+    await this.repository.writeFileBytes(noteId, bytes);
+    await this.openSession(noteId, token, null);
+  }
+
   setOnPageFrameRenamed(listener: PageFrameRenameListener | null): void {
     this.onPageFrameRenamed = listener;
   }
@@ -552,6 +562,16 @@ export function useCanvasSessionController({
     }
   }
 
+  const restoreVersion = useCallback(
+    async (bytes: Uint8Array) => {
+      if (!id) {
+        return;
+      }
+      await controller.restoreVersion(id, bytes);
+    },
+    [controller, id],
+  );
+
   const choosePageFrameRenameReferences = useCallback(
     (choice: RenameReferencesChoice) => {
       const pending = pageFrameRenamePrompt;
@@ -584,5 +604,6 @@ export function useCanvasSessionController({
         }
       : null,
     choosePageFrameRenameReferences,
+    restoreVersion,
   };
 }

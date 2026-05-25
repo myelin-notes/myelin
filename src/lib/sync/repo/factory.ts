@@ -52,6 +52,15 @@ function guardNoteCreation(
   }) as ActiveRepository;
 }
 
+export function getStorageRoot(config: RepositoryConfig): string {
+  switch (config.kind) {
+    case 'local':
+      return '';
+    case 'github':
+      return `repositories/github/${getGitHubStorageKey(config)}`;
+  }
+}
+
 export function createRepository(config: RepositoryConfig): ActiveRepository {
   let repository: ActiveRepository;
 

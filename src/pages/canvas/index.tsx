@@ -33,6 +33,7 @@ import { PeerSyncPanel } from './components/peer-sync-panel';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
+import { VersionHistoryDialog } from './components/version-history-dialog';
 import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
 import { useEmbedFiles } from './hooks/use-embed-files';
@@ -295,9 +296,16 @@ function CanvasViewInner() {
           </span>
         )}
         <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />
+        <VersionHistoryDialog
+          noteId={id}
+          noteSession={engine.noteSession}
+          restoreVersion={engine.restoreVersion}
+        />
       </>
     );
   }, [
+    engine.noteSession,
+    engine.restoreVersion,
     handleOpenBacklinkSource,
     id,
     liveDiscoveryPauseError,

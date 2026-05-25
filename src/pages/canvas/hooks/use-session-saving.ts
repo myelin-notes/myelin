@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Logger } from '@/lib/logger';
 import type { NoteSession, VFSNodeId } from '@/lib/sync';
+import { useVersionStore } from '@/lib/sync';
 import {
   regenerateThumbnailNow,
   requestThumbnailRegeneration,
@@ -25,9 +26,24 @@ export function useCanvasSessionSaving({
   const noteSessionRef = useRef(noteSession);
   noteSessionRef.current = noteSession;
 
+  const versionStore = useVersionStore();
+
   const saveTimerRef = useRef<number | null>(null);
   const autoSaveTimerRef = useRef<number | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
+
+  const maybeCreateVersion = useCallback(async (): Promise<void> => {
+    const id = noteIdRef.current;
+    const session = noteSessionRef.current;
+    if (!id || !session || !versionStore.shouldCreateVersion(id)) {
+      return;
+    }
+    try {
+      await versionStore.createSnapshot(id, session.ydoc.encodeState());
+    } catch (error) {
+      logger.error('Failed to create version snapshot', error, { id });
+    }
+  }, [versionStore]);
 
   const saveNow = useCallback(async (): Promise<void> => {
     const session = noteSessionRef.current;
@@ -42,14 +58,17 @@ export function useCanvasSessionSaving({
       }
     }
 
-    const savePromise = session.save().finally(() => {
-      if (savePromiseRef.current === savePromise) {
-        savePromiseRef.current = null;
-      }
-    });
+    const savePromise = session
+      .save()
+      .then(() => maybeCreateVersion())
+      .finally(() => {
+        if (savePromiseRef.current === savePromise) {
+          savePromiseRef.current = null;
+        }
+      });
     savePromiseRef.current = savePromise;
     await savePromise;
-  }, []);
+  }, [maybeCreateVersion]);
 
   const clearScheduledSave = useCallback((): void => {
     if (saveTimerRef.current === null) {
