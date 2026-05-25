@@ -108,7 +108,11 @@ export interface Repository {
     bytes?: Uint8Array,
   ): Promise<VFSNodeId>;
   readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null>;
-  writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void>;
+  writeFileBytes(
+    nodeId: VFSNodeId,
+    bytes: Uint8Array,
+    options?: { replace?: boolean },
+  ): Promise<void>;
   renameNode(nodeId: VFSNodeId, newName: string): Promise<void>;
   deleteNode(nodeId: VFSNodeId): Promise<void>;
   moveNode(nodeId: VFSNodeId, newParentId: VFSNodeId | null): Promise<void>;

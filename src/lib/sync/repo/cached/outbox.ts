@@ -26,6 +26,7 @@ export type PendingOp =
       kind: 'push-note';
       nodeId: VFSNodeId;
       baseFileRevision?: string | null;
+      replace?: boolean;
       queueRevision: string;
     }
   | { kind: 'sync-custom-colors'; queueRevision: string };
@@ -151,6 +152,7 @@ function normalizePendingOp(value: unknown): {
           kind,
           nodeId: requireString(entry.nodeId, 'nodeId'),
           ...(baseFileRevision !== undefined ? { baseFileRevision } : {}),
+          ...(entry.replace === true ? { replace: true } : {}),
           queueRevision,
         },
         changed,
@@ -199,6 +201,7 @@ export function enqueuePushNote(
   ops: PendingOp[],
   nodeId: VFSNodeId,
   baseFileRevision?: string | null,
+  options?: { replace?: boolean },
 ): void {
   const alreadyDeleted = ops.some(
     (op) =>
@@ -212,6 +215,9 @@ export function enqueuePushNote(
     (op) => op.kind === 'push-note' && op.nodeId === nodeId,
   );
   if (existing) {
+    if (options?.replace) {
+      (existing as Extract<PendingOp, { kind: 'push-note' }>).replace = true;
+    }
     touchPendingOp(existing);
     return;
   }
@@ -221,6 +227,7 @@ export function enqueuePushNote(
       kind: 'push-note',
       nodeId,
       ...(baseFileRevision !== undefined ? { baseFileRevision } : {}),
+      ...(options?.replace ? { replace: true } : {}),
     }),
   );
 }

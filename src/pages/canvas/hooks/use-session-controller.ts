@@ -133,7 +133,7 @@ export class CanvasSessionController {
     if (token !== this.lifecycleToken) {
       return;
     }
-    await this.repository.writeFileBytes(noteId, bytes);
+    await this.repository.writeFileBytes(noteId, bytes, { replace: true });
     await this.openSession(noteId, token, null, true);
   }
 

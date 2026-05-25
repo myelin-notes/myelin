@@ -374,15 +374,23 @@ export class CachedRepository
     return this.cache.readFileBytes(nodeId);
   }
 
-  async writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void> {
+  async writeFileBytes(
+    nodeId: VFSNodeId,
+    bytes: Uint8Array,
+    options?: { replace?: boolean },
+  ): Promise<void> {
     await this.writeLocalAndQueue(
       async () => {
-        const baseFileRevision = await this.getRawFileBaseRevision(nodeId);
+        const baseFileRevision = options?.replace
+          ? undefined
+          : await this.getRawFileBaseRevision(nodeId);
         await this.cache.writeFileBytes(nodeId, bytes);
         return baseFileRevision;
       },
       (ops, baseFileRevision) => {
-        enqueuePushNote(ops, nodeId, baseFileRevision);
+        enqueuePushNote(ops, nodeId, baseFileRevision, {
+          replace: options?.replace,
+        });
       },
     );
   }
@@ -717,7 +725,7 @@ export class CachedRepository
         if (!node || node.type !== 'file') {
           continue;
         }
-        if (node.fileType === 'mcanvas') {
+        if (node.fileType === 'mcanvas' && !op.replace) {
           canvasOps.push({
             op,
             node,
@@ -1017,7 +1025,7 @@ export class CachedRepository
         return { kind: 'missing' as const };
       }
 
-      if (node.fileType !== 'mcanvas') {
+      if (node.fileType !== 'mcanvas' || op.replace) {
         return {
           kind: 'raw-file' as const,
           node,
