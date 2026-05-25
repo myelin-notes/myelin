@@ -8,9 +8,10 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { Logger } from '@/lib/logger';
-import type { NoteBacklink, NoteSession, VFSNodeId } from '@/lib/sync';
+import type { NoteBacklink, VFSNodeId } from '@/lib/sync';
 import {
   type ActiveRepository,
+  NoteSession,
   type NoteSessionStatus,
   useRepository,
 } from '@/lib/sync';
@@ -133,7 +134,7 @@ export class CanvasSessionController {
       return;
     }
     await this.repository.writeFileBytes(noteId, bytes);
-    await this.openSession(noteId, token, null);
+    await this.openSession(noteId, token, null, true);
   }
 
   setOnPageFrameRenamed(listener: PageFrameRenameListener | null): void {
@@ -144,6 +145,7 @@ export class CanvasSessionController {
     noteId: VFSNodeId,
     token: number,
     initialPageFrameName: string | null,
+    skipRemotePull?: boolean,
   ): Promise<void> {
     const canvas = this.canvasRef.current;
     if (!canvas) {
@@ -160,7 +162,9 @@ export class CanvasSessionController {
         repositoryKind: this.repository.kind,
       });
 
-      session = await this.repository.openSession(noteId);
+      session = skipRemotePull
+        ? await NoteSession.open(noteId, this.repository)
+        : await this.repository.openSession(noteId);
       if (this.shouldAbortOpen(token)) {
         await this.cleanupAbandonedSession(session);
         return;
