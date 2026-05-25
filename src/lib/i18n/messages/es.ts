@@ -569,12 +569,12 @@ const es: typeof en = {
     },
     versionHistory: {
       title: 'Historial de versiones',
-      current: 'Versión actual',
       restore: 'Restaurar',
       restoreConfirmTitle: '¿Restaurar esta versión?',
       restoreConfirmDescription:
         'Tu versión actual se guardará antes de restaurar.',
       empty: 'Aún no hay versiones guardadas',
+      restoreFailed: 'No se pudo restaurar la versión',
       cancel: 'Cancelar',
     },
   },

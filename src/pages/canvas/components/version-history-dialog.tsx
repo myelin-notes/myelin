@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { History } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -44,6 +44,9 @@ export function VersionHistoryDialog({
   const [versions, setVersions] = useState<VersionEntry[]>([]);
   const [confirmEntry, setConfirmEntry] = useState<VersionEntry | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const restoringRef = useRef(false);
+
+  const versionHistoryStrings = strings.canvas.versionHistory;
 
   useEffect(() => {
     if (!open || !noteId) {
@@ -54,9 +57,10 @@ export function VersionHistoryDialog({
 
   const handleRestore = useCallback(
     async (entry: VersionEntry) => {
-      if (!noteId || !noteSession) {
+      if (!noteId || !noteSession || restoringRef.current) {
         return;
       }
+      restoringRef.current = true;
       setRestoring(true);
       try {
         await versionStore.createSnapshot(
@@ -75,15 +79,14 @@ export function VersionHistoryDialog({
           noteId,
           timestamp: entry.timestamp,
         });
-        toast.error('Failed to restore version');
+        toast.error(versionHistoryStrings.restoreFailed);
       } finally {
+        restoringRef.current = false;
         setRestoring(false);
       }
     },
-    [noteId, noteSession, restoreVersion, versionStore],
+    [noteId, noteSession, restoreVersion, versionHistoryStrings, versionStore],
   );
-
-  const versionHistoryStrings = strings.canvas.versionHistory;
 
   return (
     <>
@@ -108,16 +111,14 @@ export function VersionHistoryDialog({
           ) : (
             <div className="-mx-4 max-h-[calc(70vh-8rem)] overflow-y-auto px-4">
               <div className="space-y-1">
-                {versions.map((entry, index) => (
+                {versions.map((entry) => (
                   <div
                     key={entry.timestamp}
                     className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50"
                   >
                     <div className="min-w-0">
                       <p className="font-medium text-sm text-text-primary">
-                        {index === 0
-                          ? versionHistoryStrings.current
-                          : formatRelativeTime(entry.timestamp, locale)}
+                        {formatRelativeTime(entry.timestamp, locale)}
                       </p>
                       <p className="text-muted-foreground text-xs">
                         {new Intl.DateTimeFormat(locale, {
@@ -126,15 +127,13 @@ export function VersionHistoryDialog({
                         }).format(entry.timestamp)}
                       </p>
                     </div>
-                    {index > 0 && (
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() => setConfirmEntry(entry)}
-                      >
-                        {versionHistoryStrings.restore}
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => setConfirmEntry(entry)}
+                    >
+                      {versionHistoryStrings.restore}
+                    </Button>
                   </div>
                 ))}
               </div>

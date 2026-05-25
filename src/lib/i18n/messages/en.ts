@@ -561,12 +561,12 @@ const en = {
     },
     versionHistory: {
       title: 'Version history',
-      current: 'Current version',
       restore: 'Restore',
       restoreConfirmTitle: 'Restore this version?',
       restoreConfirmDescription:
         'Your current version will be saved before restoring.',
       empty: 'No saved versions yet',
+      restoreFailed: 'Failed to restore version',
       cancel: 'Cancel',
     },
   },

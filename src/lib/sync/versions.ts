@@ -6,6 +6,7 @@ import {
   readFile,
   readTextFile,
   remove,
+  rename,
   writeFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
@@ -26,6 +27,7 @@ export interface VersionEntry {
 
 export class VersionStore {
   private lastVersionByNote = new Map<string, number>();
+  private pendingByNote = new Map<string, Promise<void>>();
 
   constructor(private readonly storageRoot: string) {}
 
@@ -35,6 +37,18 @@ export class VersionStore {
   }
 
   async createSnapshot(noteId: string, bytes: Uint8Array): Promise<void> {
+    const pending = this.pendingByNote.get(noteId) ?? Promise.resolve();
+    const next = pending
+      .catch(() => undefined)
+      .then(() => this.createSnapshotImpl(noteId, bytes));
+    this.pendingByNote.set(noteId, next);
+    await next;
+  }
+
+  private async createSnapshotImpl(
+    noteId: string,
+    bytes: Uint8Array,
+  ): Promise<void> {
     const timestamp = Date.now();
     const dir = await this.resolveNoteVersionDir(noteId);
     await this.ensureDir(dir);
@@ -61,7 +75,7 @@ export class VersionStore {
 
   async listVersions(noteId: string): Promise<VersionEntry[]> {
     const index = await this.readIndex(noteId);
-    return index.sort((a, b) => b.timestamp - a.timestamp);
+    return [...index].sort((a, b) => b.timestamp - a.timestamp);
   }
 
   async getVersionBytes(
@@ -114,7 +128,16 @@ export class VersionStore {
         baseDir: BaseDirectory.AppData,
       });
       return JSON.parse(text) as VersionEntry[];
-    } catch {
+    } catch (error) {
+      logger.error('Corrupt version index, quarantining', error, { noteId });
+      try {
+        await rename(indexPath, `${indexPath}.bad`, {
+          oldPathBaseDir: BaseDirectory.AppData,
+          newPathBaseDir: BaseDirectory.AppData,
+        });
+      } catch {
+        // Best-effort quarantine
+      }
       return [];
     }
   }

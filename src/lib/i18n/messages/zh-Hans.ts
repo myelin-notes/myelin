@@ -550,11 +550,11 @@ const zhHans: typeof en = {
     },
     versionHistory: {
       title: '版本历史',
-      current: '当前版本',
       restore: '恢复',
       restoreConfirmTitle: '恢复此版本？',
       restoreConfirmDescription: '恢复前将自动保存当前版本。',
       empty: '暂无保存的版本',
+      restoreFailed: '恢复版本失败',
       cancel: '取消',
     },
   },

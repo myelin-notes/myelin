@@ -70,8 +70,7 @@ export function createRepository(config: RepositoryConfig): ActiveRepository {
       break;
     }
     case 'github': {
-      const storageKey = getGitHubStorageKey(config);
-      const cacheRoot = `repositories/github/${storageKey}`;
+      const cacheRoot = getStorageRoot(config);
       repository = new CachedRepository(
         new GitHubRepository({
           owner: config.owner,

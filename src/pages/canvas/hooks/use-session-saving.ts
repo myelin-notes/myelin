@@ -32,21 +32,9 @@ export function useCanvasSessionSaving({
   const autoSaveTimerRef = useRef<number | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
 
-  const maybeCreateVersion = useCallback(async (): Promise<void> => {
-    const id = noteIdRef.current;
-    const session = noteSessionRef.current;
-    if (!id || !session || !versionStore.shouldCreateVersion(id)) {
-      return;
-    }
-    try {
-      await versionStore.createSnapshot(id, session.ydoc.encodeState());
-    } catch (error) {
-      logger.error('Failed to create version snapshot', error, { id });
-    }
-  }, [versionStore]);
-
   const saveNow = useCallback(async (): Promise<void> => {
     const session = noteSessionRef.current;
+    const id = noteIdRef.current;
     if (!session) {
       return;
     }
@@ -60,7 +48,16 @@ export function useCanvasSessionSaving({
 
     const savePromise = session
       .save()
-      .then(() => maybeCreateVersion())
+      .then(async () => {
+        if (!id || !versionStore.shouldCreateVersion(id)) {
+          return;
+        }
+        try {
+          await versionStore.createSnapshot(id, session.ydoc.encodeState());
+        } catch (error) {
+          logger.error('Failed to create version snapshot', error, { id });
+        }
+      })
       .finally(() => {
         if (savePromiseRef.current === savePromise) {
           savePromiseRef.current = null;
@@ -68,7 +65,7 @@ export function useCanvasSessionSaving({
       });
     savePromiseRef.current = savePromise;
     await savePromise;
-  }, [maybeCreateVersion]);
+  }, [versionStore]);
 
   const clearScheduledSave = useCallback((): void => {
     if (saveTimerRef.current === null) {
