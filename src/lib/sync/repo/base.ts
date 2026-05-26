@@ -31,6 +31,7 @@ import {
   getRecentFiles,
   getStats,
   getUniqueFileName,
+  isFileVersionNode as isConcreteFileVersionNode,
   listDirectoryNodes,
   listTags,
   moveNodeInManifest,
@@ -694,12 +695,4 @@ export abstract class BaseRepository
       await this.deleteNode(version.id);
     }
   }
-}
-
-function isConcreteFileVersionNode(
-  node: VFSNode | null,
-): node is VFSFileNode & {
-  system: Extract<NonNullable<VFSFileNode['system']>, { kind: 'file-version' }>;
-} {
-  return node?.type === 'file' && node.system?.kind === 'file-version';
 }

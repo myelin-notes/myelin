@@ -31,6 +31,7 @@ import {
   ensureVersionHistoryRoot,
   getStoredFilePath,
   getUniqueFileName,
+  isFileVersionNode as isConcreteFileVersionNode,
   MANIFEST_PATH,
   type RepositorySnapshot,
   setStoredNoteLinks,
@@ -79,14 +80,6 @@ class RemoteNoteCacheMergeError extends Error {
     super(`Failed to merge remote note ${nodeId} into cache.`);
     this.name = 'RemoteNoteCacheMergeError';
   }
-}
-
-function isConcreteFileVersionNode(
-  node: VFSNode | null,
-): node is VFSFileNode & {
-  system: Extract<NonNullable<VFSFileNode['system']>, { kind: 'file-version' }>;
-} {
-  return node?.type === 'file' && node.system?.kind === 'file-version';
 }
 
 interface BatchPlan {
