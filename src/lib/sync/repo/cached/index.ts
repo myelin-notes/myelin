@@ -1336,6 +1336,16 @@ export class CachedRepository
       if (this.outbox.recoveryError) {
         return null;
       }
+      if (this.hasPendingFileReplacement(nodeId)) {
+        logger.debug(
+          'Skipped pulling remote note into cache because a file replacement is pending',
+          {
+            repositoryKind: this.kind,
+            nodeId,
+          },
+        );
+        return null;
+      }
 
       const node = await this.cache.getNode(nodeId);
       if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
@@ -1392,6 +1402,15 @@ export class CachedRepository
       nodeId,
       updateByteLength: remoteUpdate.byteLength,
     });
+  }
+
+  private hasPendingFileReplacement(nodeId: VFSNodeId): boolean {
+    return this.outbox
+      .snapshotOps()
+      .some(
+        (op) =>
+          op.kind === 'push-note' && op.nodeId === nodeId && op.replaceFile,
+      );
   }
 
   private async createRawFileConflictCopy(

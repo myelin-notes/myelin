@@ -367,6 +367,49 @@ describe('CachedRepository', () => {
     );
   });
 
+  it('does not pull remote state over an unflushed canvas restore', async () => {
+    const remote = new MemoryRemoteRepository();
+    const oldNote = createNoteState('old version');
+    const fileId = await remote.createFile(
+      'Remote note',
+      'mcanvas',
+      null,
+      oldNote.update,
+    );
+
+    const cache = new LocalRepository(
+      'repositories/canvas-restore-open-session-test',
+    );
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/canvas-restore-open-session-test/outbox.json',
+    );
+
+    await repository.initialize();
+    const version = await repository.createFileVersionIfDue(fileId, {
+      force: true,
+    });
+    expect(version).not.toBeNull();
+
+    const newerRemoteNote = createNoteState('newer remote version');
+    await remote.writeFileBytes(fileId, newerRemoteNote.update);
+
+    await repository.restoreFileVersion(fileId, version?.id ?? '');
+
+    const remotePullUpdates = vi.spyOn(remote, 'pullUpdates');
+    const session = await repository.openSession(fileId);
+
+    expect(readNoteText(session.encodeUpdate())).toBe('old version');
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(remotePullUpdates).not.toHaveBeenCalled();
+    expect(readNoteText(session.encodeUpdate())).toBe('old version');
+
+    await session.close();
+  });
+
   it('updates the original raw file when the remote has not changed', async () => {
     const remote = new MemoryRemoteRepository();
     const initialBytes = new Uint8Array([1, 2, 3]);
