@@ -408,7 +408,7 @@ export class CachedRepository
     const sourceRevision = await computeRevision(bytes);
     const versions = await this.listFileVersions(nodeId);
     const latest = versions[0];
-    if (latest?.sourceRevision === sourceRevision) {
+    if (versions.some((version) => version.sourceRevision === sourceRevision)) {
       return null;
     }
     if (
