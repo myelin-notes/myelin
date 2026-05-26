@@ -462,6 +462,14 @@ export class CachedRepository
     if (!bytes) {
       throw new Error('Version data is missing.');
     }
+    const currentBytes = await this.cache.readFileBytes(nodeId);
+    const versionRevision = await computeRevision(bytes);
+    if (
+      currentBytes &&
+      (await computeRevision(currentBytes)) === versionRevision
+    ) {
+      return;
+    }
     await this.createFileVersionIfDue(nodeId, { force: true });
     await this.replaceFileBytes(nodeId, bytes);
   }
@@ -1375,10 +1383,25 @@ export class CachedRepository
       return;
     }
 
-    await this.withLocalStateLock(async () => {
+    const appliedRemoteUpdate = await this.withLocalStateLock(async () => {
+      await this.outbox.load();
+      if (this.outbox.recoveryError) {
+        return false;
+      }
+      if (this.hasPendingFileReplacement(nodeId)) {
+        logger.debug(
+          'Skipped applying remote note update because a file replacement is pending',
+          {
+            repositoryKind: this.kind,
+            nodeId,
+          },
+        );
+        return false;
+      }
+
       const node = await this.cache.getNode(nodeId);
       if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
-        return;
+        return false;
       }
 
       const currentSnapshot = await this.cache.loadDocument(nodeId);
@@ -1390,6 +1413,7 @@ export class CachedRepository
       if (!result.accepted) {
         throw new RemoteNoteCacheMergeError(nodeId);
       }
+      return true;
     });
 
     this.updateRuntimeStatus({
@@ -1397,11 +1421,13 @@ export class CachedRepository
       lastRemoteSyncAt: Date.now(),
       lastError: null,
     });
-    logger.debug('Pulled remote note into cache', {
-      repositoryKind: this.kind,
-      nodeId,
-      updateByteLength: remoteUpdate.byteLength,
-    });
+    if (appliedRemoteUpdate) {
+      logger.debug('Pulled remote note into cache', {
+        repositoryKind: this.kind,
+        nodeId,
+        updateByteLength: remoteUpdate.byteLength,
+      });
+    }
   }
 
   private hasPendingFileReplacement(nodeId: VFSNodeId): boolean {

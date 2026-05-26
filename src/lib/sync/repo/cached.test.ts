@@ -354,13 +354,54 @@ describe('CachedRepository', () => {
     expect(version).not.toBeNull();
 
     const newerRemoteNote = createNoteState('newer remote version');
-    await remote.writeFileBytes(fileId, newerRemoteNote.update);
+    await repository.writeFileBytes(fileId, newerRemoteNote.update);
+    await repository.flushPending();
 
     await repository.restoreFileVersion(fileId, version?.id ?? '');
     await repository.flushPending();
 
     expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
       'old version',
+    );
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'old version',
+    );
+  });
+
+  it('does not overwrite newer remote state when restoring the current cache state', async () => {
+    const remote = new MemoryRemoteRepository();
+    const oldNote = createNoteState('old version');
+    const fileId = await remote.createFile(
+      'Remote note',
+      'mcanvas',
+      null,
+      oldNote.update,
+    );
+
+    const cache = new LocalRepository('repositories/current-restore-noop-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/current-restore-noop-test/outbox.json',
+    );
+
+    await repository.initialize();
+    const version = await repository.createFileVersionIfDue(fileId, {
+      force: true,
+    });
+    expect(version).not.toBeNull();
+    await repository.flushPending();
+
+    const newerRemoteNote = createNoteState('newer remote version');
+    await remote.writeFileBytes(fileId, newerRemoteNote.update);
+
+    await repository.restoreFileVersion(fileId, version?.id ?? '');
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+
+    await repository.flushPending();
+
+    expect(readNoteText((await remote.loadDocument(fileId)).update)).toBe(
+      'newer remote version',
     );
     expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
       'old version',
@@ -392,6 +433,10 @@ describe('CachedRepository', () => {
     });
     expect(version).not.toBeNull();
 
+    const currentNote = createNoteState('current version');
+    await repository.writeFileBytes(fileId, currentNote.update);
+    await repository.flushPending();
+
     const newerRemoteNote = createNoteState('newer remote version');
     await remote.writeFileBytes(fileId, newerRemoteNote.update);
 
@@ -408,6 +453,62 @@ describe('CachedRepository', () => {
     expect(readNoteText(session.encodeUpdate())).toBe('old version');
 
     await session.close();
+  });
+
+  it('does not apply an in-flight remote pull after a canvas restore queues replacement', async () => {
+    const remote = new MemoryRemoteRepository();
+    const oldNote = createNoteState('old version');
+    const fileId = await remote.createFile(
+      'Remote note',
+      'mcanvas',
+      null,
+      oldNote.update,
+    );
+
+    const cache = new LocalRepository(
+      'repositories/canvas-restore-inflight-pull-test',
+    );
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/canvas-restore-inflight-pull-test/outbox.json',
+    );
+
+    await repository.initialize();
+    const version = await repository.createFileVersionIfDue(fileId, {
+      force: true,
+    });
+    expect(version).not.toBeNull();
+
+    const currentNote = createNoteState('current version');
+    await repository.writeFileBytes(fileId, currentNote.update);
+    await repository.flushPending();
+
+    const newerRemoteNote = createNoteState('newer remote version');
+    await remote.writeFileBytes(fileId, newerRemoteNote.update);
+
+    const remotePullGate = createDeferred();
+    const remotePullBlocked = createDeferred();
+    remote.blockFileLoads(remotePullGate.promise, remotePullBlocked.resolve);
+
+    const session = await repository.openSession(fileId);
+    await remotePullBlocked.promise;
+
+    await repository.restoreFileVersion(fileId, version?.id ?? '');
+
+    remotePullGate.resolve();
+    await waitForCondition(
+      () => repository.getRuntimeStatus().lastRemoteSyncAt !== null,
+    );
+
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'old version',
+    );
+
+    await session.close();
+    const reopened = await repository.openSession(fileId);
+    expect(readNoteText(reopened.encodeUpdate())).toBe('old version');
+    await reopened.close();
   });
 
   it('updates the original raw file when the remote has not changed', async () => {
