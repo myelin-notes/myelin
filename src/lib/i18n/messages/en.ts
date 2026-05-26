@@ -185,6 +185,7 @@ const en = {
     itemMenu: {
       rename: 'Rename',
       manageTags: 'Manage Tags',
+      versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
       remove: 'Remove',
     },
@@ -205,6 +206,16 @@ const en = {
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
     },
+  },
+  versionHistory: {
+    title: 'Version History',
+    description: (name: string) => `Previous versions of ${name}`,
+    empty: 'No versions yet',
+    loadFailed: 'Could not load version history',
+    restore: 'Restore',
+    restoring: 'Restoring...',
+    restored: 'Version restored',
+    restoreFailed: 'Could not restore version',
   },
   settings: {
     title: 'Preferences',

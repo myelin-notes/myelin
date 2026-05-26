@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Logger } from '@/lib/logger';
-import type { NoteSession, VFSNodeId } from '@/lib/sync';
+import { type NoteSession, useRepository, type VFSNodeId } from '@/lib/sync';
 import {
   regenerateThumbnailNow,
   requestThumbnailRegeneration,
 } from '@/lib/thumbnails';
+import { saveSessionAndCreateVersion } from './session-version-history';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;
 const SAVE_DEBOUNCE_MS = 250;
@@ -19,6 +20,10 @@ export function useCanvasSessionSaving({
   noteId,
   noteSession,
 }: UseSessionSavingArgs) {
+  const repository = useRepository();
+  const repositoryRef = useRef(repository);
+  repositoryRef.current = repository;
+
   const noteIdRef = useRef(noteId);
   noteIdRef.current = noteId;
 
@@ -42,7 +47,10 @@ export function useCanvasSessionSaving({
       }
     }
 
-    const savePromise = session.save().finally(() => {
+    const savePromise = saveSessionAndCreateVersion(
+      session,
+      repositoryRef.current,
+    ).finally(() => {
       if (savePromiseRef.current === savePromise) {
         savePromiseRef.current = null;
       }

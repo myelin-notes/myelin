@@ -3,6 +3,7 @@ import { searchItems } from '@/lib/search';
 import {
   type FileType,
   FileTypes,
+  type FileVersion,
   ImageFileTypes,
   type NoteBacklink,
   type RepositoryStats,
@@ -12,6 +13,7 @@ import {
   type VFSFolderNode,
   type VFSNode,
   type VFSNodeId,
+  type VFSSystemMetadata,
   VideoFileTypes,
 } from './types';
 
@@ -32,6 +34,9 @@ export const CURRENT_MANIFEST_VERSION = 1;
 export const MANIFEST_PATH = 'manifest.json';
 export const FILES_DIR = 'files';
 export const FILE_EXT = '.myelin';
+export const VERSION_HISTORY_INTERVAL_MS = 10 * 60 * 1000;
+export const VERSION_HISTORY_MAX_PER_FILE = 32;
+export const VERSION_HISTORY_ROOT_NAME = '.myelin-version-history';
 const FILE_TYPE_SET = new Set<string>(FileTypes);
 const IMAGE_FILE_TYPE_SET = new Set<string>(ImageFileTypes);
 const VIDEO_FILE_TYPE_SET = new Set<string>(VideoFileTypes);
@@ -75,6 +80,7 @@ export function createFolderNode(
   name: string,
   parentId: string | null,
   now: number,
+  system?: VFSSystemMetadata,
 ): VFSFolderNode {
   return {
     id,
@@ -85,6 +91,7 @@ export function createFolderNode(
     tags: [],
     createdAt: now,
     modifiedAt: now,
+    ...(system ? { system } : {}),
   };
 }
 
@@ -94,6 +101,7 @@ export function createFileNode(
   fileType: FileType,
   parentId: string | null,
   now: number,
+  system?: VFSSystemMetadata,
 ): VFSFileNode {
   return {
     id,
@@ -104,6 +112,7 @@ export function createFileNode(
     tags: [],
     createdAt: now,
     modifiedAt: now,
+    ...(system ? { system } : {}),
   };
 }
 
@@ -135,6 +144,72 @@ export function getChildren(
   return getChildrenIds(manifest, folderId)
     .map((id) => manifest.nodes[id])
     .filter(Boolean);
+}
+
+export function isSystemNode(node: VFSNode | null | undefined): boolean {
+  return Boolean(node?.system);
+}
+
+export function isFileVersionNode(
+  node: VFSNode | null | undefined,
+): node is VFSFileNode & {
+  system: Extract<VFSSystemMetadata, { kind: 'file-version' }>;
+} {
+  return node?.type === 'file' && node.system?.kind === 'file-version';
+}
+
+export function toFileVersion(
+  node: VFSFileNode & {
+    system: Extract<VFSSystemMetadata, { kind: 'file-version' }>;
+  },
+): FileVersion {
+  return {
+    id: node.id,
+    sourceFileId: node.system.sourceFileId,
+    sourceName: node.system.sourceName,
+    fileType: node.system.sourceFileType,
+    sourceRevision: node.system.sourceRevision,
+    capturedAt: node.system.capturedAt,
+    byteLength: node.system.byteLength,
+  };
+}
+
+export function getFileVersionNodes(
+  manifest: VFSManifest,
+  sourceFileId: VFSNodeId,
+): Array<
+  VFSFileNode & {
+    system: Extract<VFSSystemMetadata, { kind: 'file-version' }>;
+  }
+> {
+  return Object.values(manifest.nodes)
+    .filter(isFileVersionNode)
+    .filter((node) => node.system.sourceFileId === sourceFileId)
+    .sort((left, right) => right.system.capturedAt - left.system.capturedAt);
+}
+
+export function ensureVersionHistoryRoot(
+  manifest: VFSManifest,
+  now: number,
+): VFSNodeId {
+  const existing = Object.values(manifest.nodes).find(
+    (node) =>
+      node.type === 'folder' && node.system?.kind === 'version-history-root',
+  );
+  if (existing?.type === 'folder') {
+    return existing.id;
+  }
+
+  const rootId = createNodeId();
+  manifest.nodes[rootId] = createFolderNode(
+    rootId,
+    VERSION_HISTORY_ROOT_NAME,
+    null,
+    now,
+    { kind: 'version-history-root' },
+  );
+  addChild(manifest, null, rootId);
+  return rootId;
 }
 
 export function getChildrenIds(
@@ -189,7 +264,9 @@ export function listDirectoryNodes(
   manifest: VFSManifest,
   folderId: string | null,
 ): [VFSFolderNode[], VFSFileNode[]] {
-  const children = getChildren(manifest, folderId);
+  const children = getChildren(manifest, folderId).filter(
+    (node) => !isSystemNode(node),
+  );
   const folders: VFSFolderNode[] = [];
   const files: VFSFileNode[] = [];
 
@@ -226,18 +303,22 @@ export function getFolderChain(
 }
 
 export function searchNodes(manifest: VFSManifest, query: string): VFSNode[] {
-  return searchItems(Object.values(manifest.nodes), query, {
-    getId: (node) => node.id,
-    fields: [
-      { name: 'name', weight: 4, getValue: (node) => node.name },
-      { name: 'tags', weight: 3, getValue: (node) => node.tags },
-      { name: 'kind', getValue: (node) => node.type },
-      {
-        name: 'fileType',
-        getValue: (node) => (node.type === 'file' ? node.fileType : ''),
-      },
-    ],
-  }).map((hit) => hit.item);
+  return searchItems(
+    Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
+    query,
+    {
+      getId: (node) => node.id,
+      fields: [
+        { name: 'name', weight: 4, getValue: (node) => node.name },
+        { name: 'tags', weight: 3, getValue: (node) => node.tags },
+        { name: 'kind', getValue: (node) => node.type },
+        {
+          name: 'fileType',
+          getValue: (node) => (node.type === 'file' ? node.fileType : ''),
+        },
+      ],
+    },
+  ).map((hit) => hit.item);
 }
 
 export function getNodesByAnyTag(
@@ -245,8 +326,8 @@ export function getNodesByAnyTag(
   tags: string[],
 ): VFSNode[] {
   const tagSet = new Set(tags);
-  return Object.values(manifest.nodes).filter((node) =>
-    node.tags.some((tag) => tagSet.has(tag)),
+  return Object.values(manifest.nodes).filter(
+    (node) => !isSystemNode(node) && node.tags.some((tag) => tagSet.has(tag)),
   );
 }
 
@@ -254,6 +335,9 @@ export function listTags(manifest: VFSManifest): RepositoryTag[] {
   const counts = new Map<string, number>();
 
   for (const node of Object.values(manifest.nodes)) {
+    if (isSystemNode(node)) {
+      continue;
+    }
     for (const tag of node.tags) {
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
     }
@@ -270,6 +354,9 @@ export function getStats(manifest: VFSManifest): RepositoryStats {
   const tagSet = new Set<string>();
 
   for (const node of Object.values(manifest.nodes)) {
+    if (isSystemNode(node)) {
+      continue;
+    }
     if (node.type === 'file') {
       totalFiles++;
     } else {
@@ -293,7 +380,10 @@ export function getRecentFiles(
   limit: number = 3,
 ): VFSFileNode[] {
   return Object.values(manifest.nodes)
-    .filter((node): node is VFSFileNode => node.type === 'file')
+    .filter(
+      (node): node is VFSFileNode =>
+        node.type === 'file' && !isSystemNode(node),
+    )
     .sort((a, b) => b.modifiedAt - a.modifiedAt)
     .slice(0, limit);
 }
@@ -306,7 +396,7 @@ export function getBacklinks(
 
   for (const [sourceId, links] of Object.entries(manifest.linksBySource)) {
     const source = manifest.nodes[sourceId] as VFSFileNode | undefined;
-    if (!source) {
+    if (!source || isSystemNode(source)) {
       continue;
     }
 
@@ -342,7 +432,9 @@ export function getUniqueFileName(
   baseName: string,
   parentId: string | null,
 ): string {
-  const children = getChildren(manifest, parentId);
+  const children = getChildren(manifest, parentId).filter(
+    (node) => !isSystemNode(node),
+  );
   const names = new Set(children.map((node) => node.name));
 
   if (!names.has(baseName)) {

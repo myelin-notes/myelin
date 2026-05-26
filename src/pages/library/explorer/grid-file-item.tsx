@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { IS_DEV } from '@/lib/env';
 import { openNote } from '@/lib/note-navigation';
 import { useRepository, type VFSFileNode } from '@/lib/sync';
@@ -35,6 +36,7 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
   const repository = useRepository();
   const navigate = useNavigate();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const thumbUrl = useThumbnailUrl(file.id);
   const hasThumb = typeof thumbUrl === 'string';
@@ -136,6 +138,7 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
           onRename={startRenaming}
           onRemove={handleRemove}
           onManageTags={() => setTagDialogOpen(true)}
+          onVersionHistory={() => setVersionHistoryOpen(true)}
           onReveal={
             IS_DEV
               ? async () => {
@@ -154,6 +157,14 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
         nodeId={file.id}
         nodeName={file.name}
         onChanged={onChanged}
+      />
+      <VersionHistoryDialog
+        open={versionHistoryOpen}
+        onOpenChange={setVersionHistoryOpen}
+        fileId={file.id}
+        fileName={file.name}
+        fileType={file.fileType}
+        onRestored={onChanged}
       />
       <RenameReferencesDialog
         prompt={renameReferencesPrompt}

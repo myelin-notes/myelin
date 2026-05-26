@@ -575,8 +575,16 @@ export function useCanvasSessionController({
     [pageFrameRenamePrompt, enqueueAndDrain],
   );
 
+  const reopenSession = useCallback(async () => {
+    if (!id) {
+      return;
+    }
+    await controller.open(id);
+  }, [controller, id]);
+
   return {
     ...snapshot,
+    reopenSession,
     pageFrameRenamePrompt: pageFrameRenamePrompt
       ? {
           mentionCount: pageFrameRenamePrompt.mentionCount,

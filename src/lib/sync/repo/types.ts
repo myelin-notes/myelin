@@ -37,6 +37,7 @@ export interface VFSFileNode {
   tags: string[];
   createdAt: number;
   modifiedAt: number;
+  system?: VFSSystemMetadata;
 }
 
 export interface VFSFolderNode {
@@ -48,9 +49,36 @@ export interface VFSFolderNode {
   tags: string[];
   createdAt: number;
   modifiedAt: number;
+  system?: VFSSystemMetadata;
 }
 
 export type VFSNode = VFSFileNode | VFSFolderNode;
+
+export type VFSSystemMetadata =
+  | { kind: 'version-history-root' }
+  | {
+      kind: 'file-version';
+      sourceFileId: VFSNodeId;
+      sourceFileType: FileType;
+      sourceName: string;
+      sourceRevision: string | null;
+      capturedAt: number;
+      byteLength: number;
+    };
+
+export interface CreateFileOptions {
+  system?: VFSSystemMetadata;
+}
+
+export interface FileVersion {
+  id: VFSNodeId;
+  sourceFileId: VFSNodeId;
+  sourceName: string;
+  fileType: FileType;
+  sourceRevision: string | null;
+  capturedAt: number;
+  byteLength: number;
+}
 
 export interface RepositoryTag {
   tag: string;
@@ -106,9 +134,16 @@ export interface Repository {
     fileType: FileType,
     parentId: VFSNodeId | null,
     bytes?: Uint8Array,
+    options?: CreateFileOptions,
   ): Promise<VFSNodeId>;
   readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null>;
   writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void>;
+  listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]>;
+  createFileVersionIfDue(
+    nodeId: VFSNodeId,
+    options?: { force?: boolean },
+  ): Promise<FileVersion | null>;
+  restoreFileVersion(nodeId: VFSNodeId, versionId: VFSNodeId): Promise<void>;
   renameNode(nodeId: VFSNodeId, newName: string): Promise<void>;
   deleteNode(nodeId: VFSNodeId): Promise<void>;
   moveNode(nodeId: VFSNodeId, newParentId: VFSNodeId | null): Promise<void>;

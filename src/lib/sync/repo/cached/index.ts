@@ -24,18 +24,26 @@ import { extractStoredNoteLinks } from '../note-link-index';
 import {
   addChild,
   computeRevision,
+  createDocFromBytes,
   createFileNode,
   createNodeId,
   deleteNodeFromManifest,
+  ensureVersionHistoryRoot,
   getStoredFilePath,
   getUniqueFileName,
+  isFileVersionNode as isConcreteFileVersionNode,
   MANIFEST_PATH,
   type RepositorySnapshot,
   setStoredNoteLinks,
+  toFileVersion,
+  VERSION_HISTORY_INTERVAL_MS,
+  VERSION_HISTORY_MAX_PER_FILE,
   type VFSManifest,
 } from '../shared';
 import type {
+  CreateFileOptions,
   FileType,
+  FileVersion,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
@@ -360,14 +368,103 @@ export class CachedRepository
     fileType: FileType,
     parentId: string | null,
     bytes?: Uint8Array,
+    options?: CreateFileOptions,
   ): Promise<VFSNodeId> {
     return this.writeLocalAndQueue(
-      () => this.cache.createFile(name, fileType, parentId, bytes),
+      () => this.cache.createFile(name, fileType, parentId, bytes, options),
       (ops, nodeId) => {
         enqueueUpsertManifestNode(ops, nodeId);
         enqueuePushNote(ops, nodeId, fileType === 'mcanvas' ? undefined : null);
       },
     );
+  }
+
+  async listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]> {
+    return this.cache.listFileVersions(nodeId);
+  }
+
+  async createFileVersionIfDue(
+    nodeId: VFSNodeId,
+    options: { force?: boolean } = {},
+  ): Promise<FileVersion | null> {
+    const node = await this.cache.getNode(nodeId);
+    if (!node || node.type !== 'file' || node.system) {
+      return null;
+    }
+
+    const bytes = await this.cache.readFileBytes(nodeId);
+    if (!bytes) {
+      return null;
+    }
+
+    const now = Date.now();
+    const sourceRevision = await computeRevision(bytes);
+    const versions = await this.listFileVersions(nodeId);
+    const latest = versions[0];
+    if (versions.some((version) => version.sourceRevision === sourceRevision)) {
+      return null;
+    }
+    if (
+      !options.force &&
+      latest &&
+      now - latest.capturedAt < VERSION_HISTORY_INTERVAL_MS
+    ) {
+      return null;
+    }
+
+    const parentId = await this.getOrCreateVersionHistoryRoot();
+    const versionId = await this.createFile(
+      `${node.name} ${new Date(now).toISOString()}`,
+      node.fileType,
+      parentId,
+      bytes,
+      {
+        system: {
+          kind: 'file-version',
+          sourceFileId: node.id,
+          sourceFileType: node.fileType,
+          sourceName: node.name,
+          sourceRevision,
+          capturedAt: now,
+          byteLength: bytes.byteLength,
+        },
+      },
+    );
+
+    await this.enforceFileVersionLimit(nodeId);
+
+    const versionNode = await this.cache.getNode(versionId);
+    return isConcreteFileVersionNode(versionNode)
+      ? toFileVersion(versionNode)
+      : null;
+  }
+
+  async restoreFileVersion(
+    nodeId: VFSNodeId,
+    versionId: VFSNodeId,
+  ): Promise<void> {
+    const versionNode = await this.cache.getNode(versionId);
+    if (
+      !isConcreteFileVersionNode(versionNode) ||
+      versionNode.system.sourceFileId !== nodeId
+    ) {
+      throw new Error('Version does not belong to this file.');
+    }
+
+    const bytes = await this.cache.readFileBytes(versionId);
+    if (!bytes) {
+      throw new Error('Version data is missing.');
+    }
+    const currentBytes = await this.cache.readFileBytes(nodeId);
+    const versionRevision = await computeRevision(bytes);
+    if (
+      currentBytes &&
+      (await computeRevision(currentBytes)) === versionRevision
+    ) {
+      return;
+    }
+    await this.createFileVersionIfDue(nodeId, { force: true });
+    await this.replaceFileBytes(nodeId, bytes);
   }
 
   async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
@@ -383,6 +480,20 @@ export class CachedRepository
       },
       (ops, baseFileRevision) => {
         enqueuePushNote(ops, nodeId, baseFileRevision);
+      },
+    );
+  }
+
+  private async replaceFileBytes(
+    nodeId: VFSNodeId,
+    bytes: Uint8Array,
+  ): Promise<void> {
+    await this.writeLocalAndQueue(
+      async () => {
+        await this.cache.writeFileBytes(nodeId, bytes);
+      },
+      (ops) => {
+        enqueuePushNote(ops, nodeId, undefined, { replaceFile: true });
       },
     );
   }
@@ -479,6 +590,27 @@ export class CachedRepository
       return undefined;
     }
     return computeRevision(await this.cache.readFileBytes(nodeId));
+  }
+
+  private async getOrCreateVersionHistoryRoot(): Promise<VFSNodeId> {
+    return this.writeLocalAndQueue(
+      () =>
+        this.cache.applyManifestMutation(
+          'Create version history root',
+          (manifest) => ensureVersionHistoryRoot(manifest, Date.now()),
+        ),
+      (ops, rootId) => {
+        enqueueUpsertManifestNode(ops, rootId);
+      },
+    );
+  }
+
+  private async enforceFileVersionLimit(nodeId: VFSNodeId): Promise<void> {
+    const versions = await this.listFileVersions(nodeId);
+    const expired = versions.slice(VERSION_HISTORY_MAX_PER_FILE);
+    for (const version of expired) {
+      await this.deleteNode(version.id);
+    }
   }
 
   async openSession(nodeId: VFSNodeId): Promise<NoteSession> {
@@ -717,7 +849,7 @@ export class CachedRepository
         if (!node || node.type !== 'file') {
           continue;
         }
-        if (node.fileType === 'mcanvas') {
+        if (node.fileType === 'mcanvas' && !op.replaceFile) {
           canvasOps.push({
             op,
             node,
@@ -795,13 +927,25 @@ export class CachedRepository
         return 'abort-to-rest';
       }
       for (const entry of rawOps) {
+        if (entry.op.replaceFile && !entry.bytes) {
+          return 'abort-to-rest';
+        }
         plan.additions.set(
           getStoredFilePath(entry.node),
           entry.bytes ?? new Uint8Array(),
         );
-        plan.messages.push(
-          `Update raw ${entry.node.fileType} ${entry.node.name}`,
-        );
+        if (entry.op.replaceFile && entry.node.fileType === 'mcanvas') {
+          setStoredNoteLinks(
+            plan.manifest,
+            entry.node.id,
+            extractStoredNoteLinks(createDocFromBytes(entry.bytes)),
+          );
+          plan.messages.push(`Replace note ${entry.node.name}`);
+        } else {
+          plan.messages.push(
+            `Update raw ${entry.node.fileType} ${entry.node.name}`,
+          );
+        }
         const manifestNode = plan.manifest.nodes[entry.node.id];
         if (manifestNode && manifestNode.type === 'file') {
           manifestNode.modifiedAt = fileSavedAt;
@@ -865,7 +1009,7 @@ export class CachedRepository
     }>,
   ): Promise<boolean> {
     for (const entry of rawOps) {
-      if (entry.op.baseFileRevision === undefined) {
+      if (entry.op.replaceFile || entry.op.baseFileRevision === undefined) {
         continue;
       }
       const remoteBytes = await remote.readFileBytes(entry.op.nodeId);
@@ -1017,6 +1161,14 @@ export class CachedRepository
         return { kind: 'missing' as const };
       }
 
+      if (op.replaceFile) {
+        return {
+          kind: 'replace-file' as const,
+          node,
+          bytes: await this.cache.readFileBytes(nodeId),
+        };
+      }
+
       if (node.fileType !== 'mcanvas') {
         return {
           kind: 'raw-file' as const,
@@ -1041,6 +1193,11 @@ export class CachedRepository
     }
 
     const node = localState.node;
+    if (localState.kind === 'replace-file') {
+      await this.applyFileReplace(node, localState.bytes);
+      return;
+    }
+
     if (node.fileType !== 'mcanvas') {
       await this.applyRawFilePush(
         op,
@@ -1055,6 +1212,23 @@ export class CachedRepository
     }
 
     await this.applyCanvasNotePush(nodeId, localState.snapshot);
+  }
+
+  private async applyFileReplace(
+    node: VFSFileNode,
+    bytes: Uint8Array | null,
+  ): Promise<void> {
+    if (!bytes) {
+      throw new Error(`Missing cached bytes for ${node.id}.`);
+    }
+
+    await this.remote.writeFileBytes(node.id, bytes);
+    logger.debug('Applied cached file replacement to remote', {
+      repositoryKind: this.kind,
+      nodeId: node.id,
+      fileType: node.fileType,
+      byteLength: bytes.byteLength,
+    });
   }
 
   private async applyRawFilePush(
@@ -1163,6 +1337,16 @@ export class CachedRepository
       if (this.outbox.recoveryError) {
         return null;
       }
+      if (this.hasPendingFileReplacement(nodeId)) {
+        logger.debug(
+          'Skipped pulling remote note into cache because a file replacement is pending',
+          {
+            repositoryKind: this.kind,
+            nodeId,
+          },
+        );
+        return null;
+      }
 
       const node = await this.cache.getNode(nodeId);
       if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
@@ -1192,10 +1376,25 @@ export class CachedRepository
       return;
     }
 
-    await this.withLocalStateLock(async () => {
+    const appliedRemoteUpdate = await this.withLocalStateLock(async () => {
+      await this.outbox.load();
+      if (this.outbox.recoveryError) {
+        return false;
+      }
+      if (this.hasPendingFileReplacement(nodeId)) {
+        logger.debug(
+          'Skipped applying remote note update because a file replacement is pending',
+          {
+            repositoryKind: this.kind,
+            nodeId,
+          },
+        );
+        return false;
+      }
+
       const node = await this.cache.getNode(nodeId);
       if (!node || node.type !== 'file' || node.fileType !== 'mcanvas') {
-        return;
+        return false;
       }
 
       const currentSnapshot = await this.cache.loadDocument(nodeId);
@@ -1207,6 +1406,7 @@ export class CachedRepository
       if (!result.accepted) {
         throw new RemoteNoteCacheMergeError(nodeId);
       }
+      return true;
     });
 
     this.updateRuntimeStatus({
@@ -1214,11 +1414,22 @@ export class CachedRepository
       lastRemoteSyncAt: Date.now(),
       lastError: null,
     });
-    logger.debug('Pulled remote note into cache', {
-      repositoryKind: this.kind,
-      nodeId,
-      updateByteLength: remoteUpdate.byteLength,
-    });
+    if (appliedRemoteUpdate) {
+      logger.debug('Pulled remote note into cache', {
+        repositoryKind: this.kind,
+        nodeId,
+        updateByteLength: remoteUpdate.byteLength,
+      });
+    }
+  }
+
+  private hasPendingFileReplacement(nodeId: VFSNodeId): boolean {
+    return this.outbox
+      .snapshotOps()
+      .some(
+        (op) =>
+          op.kind === 'push-note' && op.nodeId === nodeId && op.replaceFile,
+      );
   }
 
   private async createRawFileConflictCopy(

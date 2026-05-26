@@ -6,10 +6,18 @@ import {
   useRef,
   useState,
 } from 'react';
-import { WifiOff, X as XIcon } from 'lucide-react';
+import { History, WifiOff, X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
@@ -81,6 +89,7 @@ function CanvasViewInner() {
   } | null>(null);
 
   const [zoomLocked, setZoomLocked] = useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const onToggleZoomLock = useCallback(() => {
     setZoomLocked((prev) => {
       const next = !prev;
@@ -278,6 +287,12 @@ function CanvasViewInner() {
       });
     });
   }, []);
+  const handleBeforeVersionRestore = useCallback(async () => {
+    await engine.saveBeforeExit();
+  }, [engine.saveBeforeExit]);
+  const handleVersionRestored = useCallback(async () => {
+    await engine.reopenSession();
+  }, [engine.reopenSession]);
   const titleTrailing = useMemo(() => {
     const liveSyncPausedTitle =
       liveDiscoveryPauseError?.message ?? strings.canvas.peerSync.livePaused;
@@ -294,6 +309,25 @@ function CanvasViewInner() {
             <span>{strings.canvas.peerSync.livePaused}</span>
           </span>
         )}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => setVersionHistoryOpen(true)}
+                  aria-label={strings.versionHistory.title}
+                  disabled={!id}
+                />
+              }
+            >
+              <History className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>{strings.versionHistory.title}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />
       </>
     );
@@ -302,6 +336,7 @@ function CanvasViewInner() {
     id,
     liveDiscoveryPauseError,
     strings.canvas.peerSync.livePaused,
+    strings.versionHistory.title,
   ]);
   const insertPopover = useMemo(
     () => (
@@ -473,6 +508,17 @@ function CanvasViewInner() {
         prompt={engine.pageFrameRenamePrompt}
         onChoice={engine.choosePageFrameRenameReferences}
       />
+      {id && (
+        <VersionHistoryDialog
+          open={versionHistoryOpen}
+          onOpenChange={setVersionHistoryOpen}
+          fileId={id}
+          fileName={engine.fileName}
+          fileType="mcanvas"
+          onBeforeRestore={handleBeforeVersionRestore}
+          onRestored={handleVersionRestored}
+        />
+      )}
     </div>
   );
 }

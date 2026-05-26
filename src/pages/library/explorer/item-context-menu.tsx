@@ -1,4 +1,4 @@
-import { FolderOpen, Pencil, Tag, Trash2 } from 'lucide-react';
+import { FolderOpen, History, Pencil, Tag, Trash2 } from 'lucide-react';
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -11,6 +11,7 @@ interface ItemContextMenuProps {
   onRemove: () => void;
   onReveal?: () => void;
   onManageTags?: () => void;
+  onVersionHistory?: () => void;
 }
 
 export function ItemContextMenu({
@@ -18,6 +19,7 @@ export function ItemContextMenu({
   onRemove,
   onReveal,
   onManageTags,
+  onVersionHistory,
 }: ItemContextMenuProps) {
   const strings = useMessages();
 
@@ -37,6 +39,15 @@ export function ItemContextMenu({
         >
           <Tag className="size-4" />
           {strings.library.itemMenu.manageTags}
+        </ContextMenuItem>
+      )}
+      {onVersionHistory && (
+        <ContextMenuItem
+          className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"
+          onClick={onVersionHistory}
+        >
+          <History className="size-4" />
+          {strings.library.itemMenu.versionHistory}
         </ContextMenuItem>
       )}
       {onReveal && (

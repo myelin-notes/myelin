@@ -180,6 +180,7 @@ const zhHans: typeof en = {
     itemMenu: {
       rename: '重命名',
       manageTags: '管理标签',
+      versionHistory: '版本历史',
       revealInFileManager: '在文件管理器中显示',
       remove: '移除',
     },
@@ -200,6 +201,16 @@ const zhHans: typeof en = {
       createNew: '创建新标签',
       placeholder: '标签名称...',
     },
+  },
+  versionHistory: {
+    title: '版本历史',
+    description: (name: string) => `${name} 的历史版本`,
+    empty: '还没有版本',
+    loadFailed: '无法加载版本历史',
+    restore: '恢复',
+    restoring: '正在恢复...',
+    restored: '版本已恢复',
+    restoreFailed: '无法恢复版本',
   },
   settings: {
     title: '偏好设置',
