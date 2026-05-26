@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
-import { useLocation } from 'react-router-dom';
-import { Sidebar } from '@/components/layout/sidebar';
 import { useMessages } from '@/lib/i18n';
 import { KeybindsSection } from './keybinds-section';
 import { AppearanceSection } from './sections/appearance-section';
@@ -21,34 +19,6 @@ export function SettingsPage() {
   const mainRef = useRef<HTMLElement>(null);
   const ids = useMemo(() => SECTION_IDS, []);
   const activeId = useScrollSpy(ids, mainRef);
-  const location = useLocation();
-  const [didInitialJump, setDidInitialJump] = useState(false);
-
-  useEffect(() => {
-    if (!activeId) {
-      return;
-    }
-    const next = `#${activeId}`;
-    if (window.location.hash !== next) {
-      window.history.replaceState(
-        null,
-        '',
-        `${window.location.pathname}${next}`,
-      );
-    }
-  }, [activeId]);
-
-  useEffect(() => {
-    if (didInitialJump) {
-      return;
-    }
-    const hash = location.hash.replace('#', '');
-    if (hash && SECTION_IDS.includes(hash as SettingsSectionId)) {
-      const el = document.getElementById(hash);
-      el?.scrollIntoView({ block: 'start', behavior: 'auto' });
-    }
-    setDidInitialJump(true);
-  }, [didInitialJump, location.hash]);
 
   const handleJump = useCallback((id: string) => {
     const el = document.getElementById(id);
@@ -69,12 +39,11 @@ export function SettingsPage() {
       <a href="#settings-main" data-skip-link className="skip-link">
         {strings.settings.title}
       </a>
-      <Sidebar />
 
       <main
         ref={mainRef}
         id="settings-main"
-        className="ml-16 flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:ml-64 md:px-10 md:pt-12 lg:px-12"
+        className="flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
         <motion.div
           initial={{ opacity: 0, y: 6 }}

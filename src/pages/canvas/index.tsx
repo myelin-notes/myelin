@@ -8,7 +8,6 @@ import {
 } from 'react';
 import { History, WifiOff, X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +25,7 @@ import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { openNote, openNoteLink } from '@/lib/note-navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
+import { usePaneId, useTabController } from '@/lib/tabs/context';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
@@ -59,18 +59,25 @@ import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomple
 
 const logger = new Logger('CanvasView');
 
-export function CanvasView() {
+interface CanvasViewProps {
+  id: VFSNodeId;
+  initialPageFrameName?: string | null;
+}
+
+export function CanvasView({ id, initialPageFrameName }: CanvasViewProps) {
   return (
     <CustomColorsProvider>
-      <CanvasViewInner />
+      <CanvasViewInner id={id} initialPageFrameName={initialPageFrameName} />
     </CustomColorsProvider>
   );
 }
 
-function CanvasViewInner() {
-  const { id } = useParams<{ id: VFSNodeId }>();
-  const navigate = useNavigate();
-  const location = useLocation();
+function CanvasViewInner({
+  id,
+  initialPageFrameName: initialPageFrameNameProp,
+}: CanvasViewProps) {
+  const tabController = useTabController();
+  const paneId = usePaneId();
   const repository = useRepository();
   const strings = useMessages();
   const thumbnailRootRef = useRef<HTMLDivElement>(null);
@@ -114,21 +121,19 @@ function CanvasViewInner() {
     embedFiles,
   });
 
-  const targetPageFrameName = useMemo(() => {
-    if (!location.hash) {
-      return null;
-    }
+  const targetPageFrameName = initialPageFrameNameProp ?? null;
+  const targetPageFrameId: string | null = null;
 
-    const rawHash = location.hash.slice(1);
-    try {
-      return decodeURIComponent(rawHash).trim() || null;
-    } catch {
-      return rawHash.trim() || null;
+  const handleBack = useCallback(() => {
+    const pane = tabController.getPane(paneId);
+    if (!pane) return;
+    const tab = pane.tabs.find(
+      (t) => t.target.type === 'canvas' && t.target.id === id,
+    );
+    if (tab) {
+      tabController.closeTab(tab.id, paneId);
     }
-  }, [location.hash]);
-  const routeState = location.state as { pageFrameId?: unknown } | null;
-  const targetPageFrameId =
-    typeof routeState?.pageFrameId === 'string' ? routeState.pageFrameId : null;
+  }, [tabController, paneId, id]);
 
   const engine = useCanvasEngine({
     id,
@@ -146,8 +151,22 @@ function CanvasViewInner() {
     onInsertFrame: inserts.onInsertFrame,
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
+    onBack: handleBack,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
+
+  useEffect(() => {
+    if (engine.fileName) {
+      const pane = tabController.getPane(paneId);
+      if (!pane) return;
+      const tab = pane.tabs.find(
+        (t) => t.target.type === 'canvas' && t.target.id === id,
+      );
+      if (tab) {
+        tabController.updateTabTitle(tab.id, engine.fileName);
+      }
+    }
+  }, [engine.fileName, tabController, paneId, id]);
 
   useEffect(() => {
     if (!engine.ready) {
@@ -229,7 +248,7 @@ function CanvasViewInner() {
       }
 
       await engine.saveBeforeExit();
-      await openNoteLink(navigate, repository, id, detail);
+      await openNoteLink(tabController, repository, id, detail);
     },
   );
   useEffect(() => {
@@ -275,7 +294,7 @@ function CanvasViewInner() {
   );
   const openBacklinkSource = useEffectEvent(async (sourceId: VFSNodeId) => {
     await engine.saveBeforeExit();
-    openNote(navigate, { fileType: 'mcanvas', id: sourceId });
+    openNote(tabController, { fileType: 'mcanvas', id: sourceId });
   });
   const handleOpenBacklinkSource = useCallback((sourceId: VFSNodeId) => {
     void openBacklinkSource(sourceId).catch((error) => {
@@ -440,11 +459,7 @@ function CanvasViewInner() {
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
       )}
-      <TitleBar
-        fileName={engine.fileName}
-        onBack={engine.back}
-        trailing={titleTrailing}
-      />
+      <TitleBar trailing={titleTrailing} />
 
       <CanvasToolbar
         tools={toolState.canvasTools}

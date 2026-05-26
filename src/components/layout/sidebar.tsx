@@ -1,18 +1,19 @@
 import { memo } from 'react';
 import { BookOpen, HelpCircle, Plus, Settings } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Logo } from '@/components/logo';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
+import { useTabController, useWindowState } from '@/lib/tabs/context';
+import type { TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
   label: string;
   icon?: React.ReactNode;
   active?: boolean;
-  navTo: string;
+  target: TabTarget;
 }
 
 function NavButton({
@@ -66,36 +67,42 @@ function errorDescription(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isNavItemActive(target: TabTarget, focusedTabTarget: TabTarget | null): boolean {
+  if (!focusedTabTarget) return false;
+  return target.type === focusedTabTarget.type;
+}
+
 export const Sidebar = memo(function Sidebar() {
   const strings = useMessages();
   const repository = useRepository();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const tabController = useTabController();
+  const windowState = useWindowState();
+
+  const focusedPane = tabController.getPane(windowState.focusedPaneId);
+  const activeTab = focusedPane
+    ? focusedPane.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null
+    : null;
+  const focusedTarget = activeTab?.target ?? null;
 
   const mainNav: NavItem[] = [
     {
       label: strings.sidebar.nav.library,
       icon: <BookOpen className="size-4" />,
       active: true,
-      navTo: '/library',
+      target: { type: 'library' },
     },
-    // {
-    //   label: strings.sidebar.nav.graph,
-    //   icon: <Waypoints className="size-5" />,
-    //   navTo: '/graph',
-    // },
   ];
 
   const bottomNav: NavItem[] = [
     {
       label: strings.sidebar.nav.settings,
       icon: <Settings className="size-4" />,
-      navTo: '/settings',
+      target: { type: 'settings' },
     },
     {
       label: strings.sidebar.nav.help,
       icon: <HelpCircle className="size-4" />,
-      navTo: '/help',
+      target: { type: 'settings' },
     },
   ];
 
@@ -106,7 +113,7 @@ export const Sidebar = memo(function Sidebar() {
         null,
       );
       const id = await repository.createFile(name, 'mcanvas', null);
-      navigate(`/mcanvas/${id}`);
+      tabController.openTab({ type: 'canvas', id }, name);
     } catch (error) {
       logger.error('Failed to create note from sidebar', error);
       toast.error(strings.commandPalette.errors.createNote, {
@@ -118,7 +125,7 @@ export const Sidebar = memo(function Sidebar() {
   return (
     <aside
       aria-label={strings.sidebar.nav.library}
-      className="fixed top-0 bottom-0 left-0 z-20 flex w-16 flex-col bg-sidebar-bg p-3 md:w-64 md:p-6"
+      className="flex w-16 shrink-0 flex-col bg-sidebar-bg p-3 md:w-64 md:p-6"
     >
       {/* Brand — collapses to logo mark below md */}
       <div className="flex flex-col items-center gap-1 pb-4 md:items-start">
@@ -152,13 +159,13 @@ export const Sidebar = memo(function Sidebar() {
       <nav className="flex flex-1 flex-col pt-6">
         <div className="flex flex-col">
           {mainNav.map((item) => {
-            const isActive = location.pathname.startsWith(item.navTo);
+            const isActive = isNavItemActive(item.target, focusedTarget);
             return (
               <NavButton
                 key={item.label}
                 item={item}
                 isActive={isActive}
-                onClick={() => navigate(item.navTo)}
+                onClick={() => tabController.openTab(item.target, item.label)}
               />
             );
           })}
@@ -170,13 +177,13 @@ export const Sidebar = memo(function Sidebar() {
         {/* Bottom Nav */}
         <div className="flex flex-col pt-8">
           {bottomNav.map((item) => {
-            const isActive = location.pathname.startsWith(item.navTo);
+            const isActive = isNavItemActive(item.target, focusedTarget);
             return (
               <NavButton
                 key={item.label}
                 item={item}
                 isActive={isActive}
-                onClick={() => navigate(item.navTo)}
+                onClick={() => tabController.openTab(item.target, item.label)}
               />
             );
           })}

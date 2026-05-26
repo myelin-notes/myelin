@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { IS_DEV } from '@/lib/env';
 import { openNote } from '@/lib/note-navigation';
 import { useRepository, type VFSFileNode } from '@/lib/sync';
+import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
@@ -21,7 +21,7 @@ interface FileItemProps {
 
 export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
   const repository = useRepository();
-  const navigate = useNavigate();
+  const tabController = useTabController();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
 
@@ -50,7 +50,7 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
               draggable={!renaming}
               onClick={() => {
                 if (!renaming) {
-                  openNote(navigate, file);
+                  openNote(tabController, file, file.name);
                 }
               }}
               onDragStart={handleDragStart}

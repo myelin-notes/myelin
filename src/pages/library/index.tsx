@@ -20,10 +20,8 @@ import {
   X,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { Sidebar } from '@/components/layout/sidebar';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
@@ -35,6 +33,7 @@ import {
   type VFSFileNode,
   type VFSFolderNode,
 } from '@/lib/sync';
+import { useTabController } from '@/lib/tabs/context';
 import {
   enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
@@ -88,7 +87,7 @@ export function LibraryPage() {
   const locale = useLocale();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
-  const navigate = useNavigate();
+  const tabController = useTabController();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const goodnotesZipInputRef = useRef<HTMLInputElement>(null);
@@ -459,11 +458,10 @@ export function LibraryPage() {
       <a href="#library-main" data-skip-link className="skip-link">
         {strings.library.title}
       </a>
-      <Sidebar />
 
       <main
         id="library-main"
-        className="ml-16 flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:ml-64 md:px-10 md:pt-12 lg:px-12"
+        className="flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
         <motion.div
           initial={{ opacity: 0, y: 6 }}
@@ -518,7 +516,7 @@ export function LibraryPage() {
                       title={file.name}
                       tags={file.tags}
                       featured={i === 0}
-                      onClick={() => openNote(navigate, file)}
+                      onClick={() => openNote(tabController, file, file.name)}
                     />
                   </motion.div>
                 ))}
