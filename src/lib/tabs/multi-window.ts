@@ -20,11 +20,11 @@ export function spawnWindow(tab: Tab): Promise<void> {
 }
 
 export function isTabDragOutsideWindow(e: DragEvent): boolean {
-  const margin = 20;
+  const margin = 8;
   return (
-    e.clientX < margin ||
-    e.clientY < margin ||
-    e.clientX > window.innerWidth - margin ||
-    e.clientY > window.innerHeight - margin
+    e.clientX <= margin ||
+    e.clientY <= margin ||
+    e.clientX >= window.innerWidth - margin ||
+    e.clientY >= window.innerHeight - margin
   );
 }

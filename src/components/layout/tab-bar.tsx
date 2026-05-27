@@ -1,5 +1,6 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { BookOpen, Columns2, Plus, Rows2, Settings, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -11,10 +12,11 @@ import {
   computeTabDropIndex,
   getTabDragData,
   setTabDragData,
+  setupDragGhost,
   TAB_DRAG_MIME,
 } from '@/lib/tabs/drag';
 import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
-import type { Tab, TabTarget } from '@/lib/tabs/types';
+import type { Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
 
 function tabIcon(target: TabTarget) {
@@ -28,6 +30,21 @@ function tabIcon(target: TabTarget) {
   }
 }
 
+function DropIndicator() {
+  return (
+    <motion.div
+      layout
+      initial={{ width: 0, opacity: 0 }}
+      animate={{ width: 12, opacity: 1 }}
+      exit={{ width: 0, opacity: 0 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
+      className="mb-1 flex shrink-0 items-center justify-center overflow-hidden"
+    >
+      <div className="h-5 w-0.5 rounded-full bg-accent-dark" />
+    </motion.div>
+  );
+}
+
 export const TabBar = memo(function TabBar() {
   const controller = useTabController();
   const windowState = useWindowState();
@@ -37,6 +54,7 @@ export const TabBar = memo(function TabBar() {
   const activeTabId = pane?.activeTabId ?? null;
   const paneId = pane?.id ?? windowState.focusedPaneId;
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
   const handleNewTab = useCallback(() => {
     controller.openTab({ type: 'library' }, 'Library');
@@ -94,18 +112,22 @@ export const TabBar = memo(function TabBar() {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {tabs.map((tab, i) => (
-          <TabItem
-            key={tab.id}
-            tab={tab}
-            isActive={tab.id === activeTabId}
-            paneId={paneId}
-            showDropIndicator={dropIndex === i}
-          />
-        ))}
-        {dropIndex === tabs.length && (
-          <div className="mb-1 h-5 w-0.5 shrink-0 rounded-full bg-accent-dark" />
-        )}
+        <AnimatePresence initial={false}>
+          {tabs.map((tab, i) => (
+            <TabItem
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === activeTabId}
+              isDragging={tab.id === dragTabId}
+              paneId={paneId}
+              showDropIndicator={dropIndex === i}
+              onDragStateChange={setDragTabId}
+            />
+          ))}
+          {dropIndex === tabs.length && (
+            <DropIndicator key="drop-end" />
+          )}
+        </AnimatePresence>
       </div>
 
       <div
@@ -128,15 +150,20 @@ export const TabBar = memo(function TabBar() {
 const TabItem = memo(function TabItem({
   tab,
   isActive,
+  isDragging,
   paneId,
   showDropIndicator,
+  onDragStateChange,
 }: {
   tab: Tab;
   isActive: boolean;
+  isDragging: boolean;
   paneId: string;
   showDropIndicator?: boolean;
+  onDragStateChange: (tabId: TabId | null) => void;
 }) {
   const controller = useTabController();
+  const tabRef = useRef<HTMLDivElement>(null);
 
   const handleClick = useCallback(() => {
     controller.activateTab(tab.id, paneId);
@@ -164,12 +191,17 @@ const TabItem = memo(function TabItem({
     (e: React.DragEvent) => {
       setTabDragData(e.dataTransfer, { tabId: tab.id, sourcePaneId: paneId });
       e.dataTransfer.effectAllowed = 'move';
+      if (tabRef.current) {
+        setupDragGhost(e, tabRef.current);
+      }
+      onDragStateChange(tab.id);
     },
-    [tab.id, paneId],
+    [tab.id, paneId, onDragStateChange],
   );
 
   const handleDragEnd = useCallback(
     (e: React.DragEvent) => {
+      onDragStateChange(null);
       if (
         e.dataTransfer.dropEffect === 'none' &&
         isTabDragOutsideWindow(e.nativeEvent)
@@ -181,7 +213,7 @@ const TabItem = memo(function TabItem({
           .catch(() => undefined);
       }
     },
-    [controller, tab, paneId],
+    [controller, tab, paneId, onDragStateChange],
   );
 
   const handleKeyDown = useCallback(
@@ -206,13 +238,14 @@ const TabItem = memo(function TabItem({
 
   return (
     <>
-      {showDropIndicator && (
-        <div className="mb-1 h-5 w-0.5 shrink-0 rounded-full bg-accent-dark" />
-      )}
+      <AnimatePresence initial={false}>
+        {showDropIndicator && <DropIndicator key="drop" />}
+      </AnimatePresence>
       <ContextMenu>
         <ContextMenuTrigger
           render={
             <div
+              ref={tabRef}
               role="tab"
               tabIndex={0}
               aria-selected={isActive}
@@ -224,10 +257,11 @@ const TabItem = memo(function TabItem({
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               className={cn(
-                'group relative flex h-8 min-w-[100px] max-w-[200px] cursor-pointer items-center gap-2 px-3 transition-colors duration-150',
+                'group relative flex h-8 min-w-[100px] max-w-[200px] cursor-grab items-center gap-2 px-3 transition-[colors,opacity] duration-150 active:cursor-grabbing',
                 isActive
                   ? '-mb-px rounded-t-lg border border-border-subtle border-b-0 bg-page text-text-primary'
                   : 'mb-0 text-text-muted hover:text-text-secondary',
+                isDragging && 'opacity-30',
               )}
             />
           }

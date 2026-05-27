@@ -1,14 +1,32 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
   getTabDragData,
   setTabDragData,
+  setupDragGhost,
   TAB_DRAG_MIME,
 } from '@/lib/tabs/drag';
-import type { PaneNode, Tab } from '@/lib/tabs/types';
+import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
+import type { PaneNode, Tab, TabId } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
+
+function PaneDropIndicator() {
+  return (
+    <motion.div
+      layout
+      initial={{ width: 0, opacity: 0 }}
+      animate={{ width: 10, opacity: 1 }}
+      exit={{ width: 0, opacity: 0 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
+      className="flex shrink-0 items-center justify-center overflow-hidden"
+    >
+      <div className="h-4 w-0.5 rounded-full bg-accent-dark" />
+    </motion.div>
+  );
+}
 
 interface PaneTabBarProps {
   pane: PaneNode;
@@ -21,6 +39,7 @@ export const PaneTabBar = memo(function PaneTabBar({
 }: PaneTabBarProps) {
   const controller = useTabController();
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
   const handleNewTab = useCallback(() => {
     controller.openTab({ type: 'library' }, 'Library', pane.id);
@@ -81,18 +100,22 @@ export const PaneTabBar = memo(function PaneTabBar({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {pane.tabs.map((tab, i) => (
-          <PaneTabItem
-            key={tab.id}
-            tab={tab}
-            isActive={tab.id === pane.activeTabId}
-            paneId={pane.id}
-            showDropIndicator={dropIndex === i}
-          />
-        ))}
-        {dropIndex === pane.tabs.length && (
-          <div className="h-5 w-0.5 shrink-0 rounded-full bg-accent-dark" />
-        )}
+        <AnimatePresence initial={false}>
+          {pane.tabs.map((tab, i) => (
+            <PaneTabItem
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === pane.activeTabId}
+              isDragging={tab.id === dragTabId}
+              paneId={pane.id}
+              showDropIndicator={dropIndex === i}
+              onDragStateChange={setDragTabId}
+            />
+          ))}
+          {dropIndex === pane.tabs.length && (
+            <PaneDropIndicator key="drop-end" />
+          )}
+        </AnimatePresence>
       </div>
       <button
         type="button"
@@ -109,15 +132,20 @@ export const PaneTabBar = memo(function PaneTabBar({
 const PaneTabItem = memo(function PaneTabItem({
   tab,
   isActive,
+  isDragging,
   paneId,
   showDropIndicator,
+  onDragStateChange,
 }: {
   tab: Tab;
   isActive: boolean;
+  isDragging: boolean;
   paneId: string;
   showDropIndicator?: boolean;
+  onDragStateChange: (tabId: TabId | null) => void;
 }) {
   const controller = useTabController();
+  const tabRef = useRef<HTMLDivElement>(null);
 
   const handleClick = useCallback(() => {
     controller.activateTab(tab.id, paneId);
@@ -145,8 +173,29 @@ const PaneTabItem = memo(function PaneTabItem({
     (e: React.DragEvent) => {
       setTabDragData(e.dataTransfer, { tabId: tab.id, sourcePaneId: paneId });
       e.dataTransfer.effectAllowed = 'move';
+      if (tabRef.current) {
+        setupDragGhost(e, tabRef.current);
+      }
+      onDragStateChange(tab.id);
     },
-    [tab.id, paneId],
+    [tab.id, paneId, onDragStateChange],
+  );
+
+  const handleDragEnd = useCallback(
+    (e: React.DragEvent) => {
+      onDragStateChange(null);
+      if (
+        e.dataTransfer.dropEffect === 'none' &&
+        isTabDragOutsideWindow(e.nativeEvent)
+      ) {
+        void spawnWindow(tab)
+          .then(() => {
+            controller.closeTab(tab.id, paneId);
+          })
+          .catch(() => undefined);
+      }
+    },
+    [controller, tab, paneId, onDragStateChange],
   );
 
   const handleKeyDown = useCallback(
@@ -161,10 +210,11 @@ const PaneTabItem = memo(function PaneTabItem({
 
   return (
     <>
-      {showDropIndicator && (
-        <div className="h-5 w-0.5 shrink-0 rounded-full bg-accent-dark" />
-      )}
+      <AnimatePresence initial={false}>
+        {showDropIndicator && <PaneDropIndicator key="drop" />}
+      </AnimatePresence>
       <div
+        ref={tabRef}
         role="tab"
         tabIndex={0}
         aria-selected={isActive}
@@ -174,11 +224,13 @@ const PaneTabItem = memo(function PaneTabItem({
         onKeyDown={handleKeyDown}
         onMouseDown={handleMiddleClick}
         onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         className={cn(
-          'group flex h-7 min-w-[80px] max-w-[160px] cursor-pointer items-center gap-1.5 rounded-t px-2 transition-colors duration-150',
+          'group flex h-7 min-w-[80px] max-w-[160px] cursor-grab items-center gap-1.5 rounded-t px-2 transition-[colors,opacity] duration-150 active:cursor-grabbing',
           isActive
             ? 'bg-card text-text-primary'
             : 'text-text-muted hover:bg-hover-tint hover:text-text-secondary',
+          isDragging && 'opacity-30',
         )}
       >
         <span className="min-w-0 flex-1 truncate font-medium text-[10px]">

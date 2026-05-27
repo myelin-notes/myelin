@@ -1,4 +1,5 @@
 import { Fragment, memo, type ReactNode, useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import {
   PaneIdProvider,
@@ -172,14 +173,21 @@ export function PaneDropTarget({
       onDrop={handleDrop}
     >
       {children}
-      {splitIntent && (
-        <div
-          className={cn(
-            'pointer-events-none absolute rounded-lg bg-accent-dark/10 ring-1 ring-accent-dark/25',
-            splitPreviewClass(splitIntent.edge),
-          )}
-        />
-      )}
+      <AnimatePresence>
+        {splitIntent && (
+          <motion.div
+            key={splitIntent.edge}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
+            className={cn(
+              'pointer-events-none absolute rounded-lg bg-accent-dark/8 ring-1 ring-accent-dark/20',
+              splitPreviewClass(splitIntent.edge),
+            )}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
