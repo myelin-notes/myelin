@@ -11,11 +11,11 @@ export function AppShell() {
 
   if (hasSplits) {
     return (
-      <div className="flex h-screen w-screen flex-col overflow-hidden">
-        <TabBar />
-        <div className="flex min-h-0 flex-1">
-          <Sidebar />
-          <div className="min-h-0 min-w-0 flex-1">
+      <div className="flex h-screen w-screen overflow-hidden">
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TabBar />
+          <div className="min-h-0 flex-1">
             <PaneLayout />
           </div>
         </div>
@@ -30,13 +30,13 @@ export function AppShell() {
     : null;
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden">
-      <TabBar />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar />
+    <div className="flex h-screen w-screen overflow-hidden">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TabBar />
         {activeTab && pane && (
           <PaneIdProvider paneId={pane.id}>
-            <div className="min-h-0 min-w-0 flex-1">
+            <div className="min-h-0 flex-1">
               <PaneContent tab={activeTab} />
             </div>
           </PaneIdProvider>

@@ -42,7 +42,7 @@ function NavButton({
           'transition-colors duration-150',
           isActive
             ? 'text-accent-navy'
-            : 'text-text-muted group-hover:text-text-secondary',
+            : 'text-text-secondary group-hover:text-text-primary',
         )}
       >
         {item.icon}
@@ -52,7 +52,7 @@ function NavButton({
           'hidden text-xs uppercase tracking-[0.6px] transition-colors duration-150 md:inline',
           isActive
             ? 'font-semibold text-accent-navy tracking-[0.8px]'
-            : 'font-normal text-text-muted group-hover:text-text-primary',
+            : 'font-normal text-text-secondary group-hover:text-text-primary',
         )}
       >
         {item.label}
@@ -125,7 +125,8 @@ export const Sidebar = memo(function Sidebar() {
   return (
     <aside
       aria-label={strings.sidebar.nav.library}
-      className="flex w-16 shrink-0 flex-col bg-sidebar-bg p-3 md:w-64 md:p-6"
+      data-tauri-drag-region
+      className="flex w-20 shrink-0 flex-col bg-sidebar-bg px-3 pb-3 pt-12 md:w-64 md:px-6 md:pb-6"
     >
       {/* Brand — collapses to logo mark below md */}
       <div className="flex flex-col items-center gap-1 pb-4 md:items-start">

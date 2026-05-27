@@ -36,9 +36,6 @@ function tabIcon(target: TabTarget) {
   }
 }
 
-const IS_MAC =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
-
 export const TabBar = memo(function TabBar() {
   const controller = useTabController();
   const windowState = useWindowState();
@@ -123,14 +120,10 @@ export const TabBar = memo(function TabBar() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-10 shrink-0 select-none items-center bg-sidebar-bg"
+      className="flex h-10 shrink-0 select-none items-end border-b border-border-subtle bg-surface"
     >
-      {IS_MAC && (
-        <div className="w-[78px] shrink-0" data-tauri-drag-region />
-      )}
-
       <div
-        className="flex min-w-0 flex-1 items-end gap-px overflow-x-auto"
+        className="flex min-w-0 flex-1 items-end gap-px overflow-x-auto pl-2"
         data-tauri-drag-region
         style={{ scrollbarWidth: 'none' }}
         onDragOver={handleDragOver}
@@ -147,11 +140,11 @@ export const TabBar = memo(function TabBar() {
           />
         ))}
         {dropIndex === tabs.length && (
-          <div className="h-6 w-0.5 shrink-0 rounded-full bg-accent-dark" />
+          <div className="mb-1 h-5 w-0.5 shrink-0 rounded-full bg-accent-dark" />
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 px-2" data-tauri-drag-region>
+      <div className="flex shrink-0 items-center gap-1 px-2 pb-1" data-tauri-drag-region>
         <button
           type="button"
           onClick={handleNewTab}
@@ -235,7 +228,7 @@ const TabItem = memo(function TabItem({
   return (
     <>
       {showDropIndicator && (
-        <div className="h-6 w-0.5 shrink-0 rounded-full bg-accent-dark" />
+        <div className="mb-1 h-5 w-0.5 shrink-0 rounded-full bg-accent-dark" />
       )}
       <ContextMenu>
         <ContextMenuTrigger
@@ -249,10 +242,10 @@ const TabItem = memo(function TabItem({
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               className={cn(
-                'group flex h-8 max-w-[180px] min-w-[100px] cursor-pointer items-center gap-2 rounded-t-lg px-3 transition-colors duration-150',
+                'group relative flex h-8 max-w-[200px] min-w-[100px] cursor-pointer items-center gap-2 px-3 transition-colors duration-150',
                 isActive
-                  ? 'bg-card text-text-primary'
-                  : 'text-text-muted hover:bg-hover-tint hover:text-text-secondary',
+                  ? '-mb-px rounded-t-lg border border-b-0 border-border-subtle bg-page text-text-primary'
+                  : 'mb-0 text-text-muted hover:text-text-secondary',
               )}
             />
           }
@@ -269,7 +262,7 @@ const TabItem = memo(function TabItem({
             className={cn(
               'flex size-4 shrink-0 items-center justify-center rounded transition-colors duration-150',
               isActive
-                ? 'text-text-muted hover:bg-surface hover:text-text-primary'
+                ? 'text-text-muted hover:bg-hover-tint hover:text-text-primary'
                 : 'text-transparent group-hover:text-text-muted group-hover:hover:text-text-primary',
             )}
           >
