@@ -540,7 +540,11 @@ export class TabStateController {
     });
   }
 
-  splitPane(paneId: PaneId, direction: SplitDirection): PaneId {
+  splitPane(
+    paneId: PaneId,
+    direction: SplitDirection,
+    placement: 'before' | 'after' = 'after',
+  ): PaneId {
     const state = this.state;
     const pane = findPane(state.layout, paneId);
     if (!pane) {
@@ -552,7 +556,7 @@ export class TabStateController {
       type: 'split',
       id: createSplitId(),
       direction,
-      children: [pane, newPane],
+      children: placement === 'before' ? [newPane, pane] : [pane, newPane],
       sizes: [50, 50],
     };
 
@@ -568,11 +572,12 @@ export class TabStateController {
     paneId: PaneId,
     direction: SplitDirection,
     tabId: TabId,
+    placement: 'before' | 'after' = 'after',
   ): PaneId {
     const state = this.state;
     const sourcePane = findPaneForTab(state.layout, tabId);
     const targetPane = findPane(state.layout, paneId);
-    if (!sourcePane || !targetPane || sourcePane.tabs.length <= 1) {
+    if (!sourcePane || !targetPane) {
       return paneId;
     }
 
@@ -585,16 +590,24 @@ export class TabStateController {
     const sourceTabs = sourcePane.tabs.filter(
       (candidate) => candidate.id !== tabId,
     );
-    let layout = replacePane(state.layout, {
-      ...sourcePane,
-      tabs: sourceTabs,
-      activeTabId: activeTabAfterRemoving(
-        sourcePane,
-        tabId,
-        tabIndex,
-        sourceTabs,
-      ),
-    });
+    let layout = state.layout;
+
+    if (sourceTabs.length === 0 && sourcePane.id !== targetPane.id) {
+      const nextLayout = removePane(layout, sourcePane.id);
+      if (!nextLayout) {
+        return paneId;
+      }
+      layout = nextLayout;
+    } else {
+      layout = replacePane(layout, {
+        ...sourcePane,
+        tabs: sourceTabs,
+        activeTabId:
+          sourceTabs.length === 0
+            ? sourcePane.activeTabId
+            : activeTabAfterRemoving(sourcePane, tabId, tabIndex, sourceTabs),
+      });
+    }
 
     const splitTargetPane = findPane(layout, targetPane.id);
     if (!splitTargetPane) {
@@ -611,7 +624,10 @@ export class TabStateController {
       type: 'split',
       id: createSplitId(),
       direction,
-      children: [splitTargetPane, newPane],
+      children:
+        placement === 'before'
+          ? [newPane, splitTargetPane]
+          : [splitTargetPane, newPane],
       sizes: [50, 50],
     };
 

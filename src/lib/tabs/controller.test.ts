@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TabStateController } from './controller';
+import { createWindowStateWithTab, TabStateController } from './controller';
 import type { LayoutNode, PaneNode, SplitNode, WindowState } from './types';
 
 function panesIn(node: LayoutNode): PaneNode[] {
@@ -200,10 +200,36 @@ describe('TabStateController', () => {
     expectValidWindowState(state);
   });
 
-  it('does not split the only tab out of a pane', () => {
+  it('can place a split tab before the target pane', () => {
     const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha');
+    openCanvas(controller, 'beta', 'Beta');
+
+    const newPaneId = controller.splitPaneWithTab(
+      paneId,
+      'horizontal',
+      alphaId,
+      'before',
+    );
+
+    const state = controller.getSnapshot();
+    const split = state.layout as SplitNode;
+    expect(split.type).toBe('split');
+    expect(split.children[0]!.id).toBe(newPaneId);
+    expect(split.children[1]!.id).toBe(paneId);
+    expectValidWindowState(state);
+  });
+
+  it('splits the only tab out of a pane by leaving a default tab behind', () => {
+    const controller = new TabStateController(
+      createWindowStateWithTab({
+        id: 'alpha-tab',
+        target: { type: 'canvas', id: 'alpha' },
+        title: 'Alpha',
+      }),
+    );
     const pane = focusedPane(controller);
-    const before = controller.getSnapshot();
 
     const returnedPaneId = controller.splitPaneWithTab(
       pane.id,
@@ -211,9 +237,13 @@ describe('TabStateController', () => {
       pane.activeTabId,
     );
 
-    expect(returnedPaneId).toBe(pane.id);
-    expect(controller.getSnapshot()).toBe(before);
-    expectValidWindowState(controller.getSnapshot());
+    const state = controller.getSnapshot();
+    expect(state.layout.type).toBe('split');
+    expect(returnedPaneId).not.toBe(pane.id);
+    expect(tabTitles(controller.getPane(pane.id)!)).toEqual(['Library']);
+    expect(tabTitles(controller.getPane(returnedPaneId)!)).toEqual(['Alpha']);
+    expect(state.focusedPaneId).toBe(returnedPaneId);
+    expectValidWindowState(state);
   });
 
   it('ignores invalid focus, activation, and resize requests', () => {

@@ -24,7 +24,9 @@ export const PaneTabBar = memo(function PaneTabBar({
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) return;
+      if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) {
+        return;
+      }
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
@@ -57,7 +59,10 @@ export const PaneTabBar = memo(function PaneTabBar({
     (e: React.DragEvent) => {
       setDropIndex(null);
       const raw = e.dataTransfer.getData(TAB_DRAG_MIME);
-      if (!raw) return;
+      if (!raw) {
+        return;
+      }
+      e.stopPropagation();
       e.preventDefault();
 
       const data = JSON.parse(raw) as {
@@ -88,6 +93,7 @@ export const PaneTabBar = memo(function PaneTabBar({
 
   return (
     <div
+      data-pane-tab-bar
       className={cn(
         'flex h-8 shrink-0 items-center gap-px bg-sidebar-bg',
         !isFocused && 'opacity-80',
@@ -184,13 +190,13 @@ const PaneTabItem = memo(function PaneTabItem({
         onMouseDown={handleMiddleClick}
         onDragStart={handleDragStart}
         className={cn(
-          'group flex h-7 max-w-[160px] min-w-[80px] cursor-pointer items-center gap-1.5 rounded-t px-2 transition-colors duration-150',
+          'group flex h-7 min-w-[80px] max-w-[160px] cursor-pointer items-center gap-1.5 rounded-t px-2 transition-colors duration-150',
           isActive
             ? 'bg-card text-text-primary'
             : 'text-text-muted hover:bg-hover-tint hover:text-text-secondary',
         )}
       >
-        <span className="min-w-0 flex-1 truncate text-[10px] font-medium">
+        <span className="min-w-0 flex-1 truncate font-medium text-[10px]">
           {tab.title}
         </span>
         <button
