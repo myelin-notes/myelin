@@ -103,7 +103,12 @@ describe('TabStateController', () => {
     const pane = rootPane(controller);
     const alpha = pane.tabs.find((tab) => tab.id === alphaId);
     expect(reopenedId).toBe(alphaId);
-    expect(tabTitles(pane)).toEqual(['Library', 'Alpha', 'Gamma', 'Beta']);
+    expect(tabTitles(pane)).toEqual([
+      'Library',
+      'Alpha again',
+      'Gamma',
+      'Beta',
+    ]);
     expect(alpha?.target).toMatchObject({
       type: 'canvas',
       id: 'alpha',

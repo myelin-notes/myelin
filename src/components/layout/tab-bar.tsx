@@ -8,6 +8,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
+import { findPaneInLayout } from '@/lib/tabs/controller';
 import {
   computeTabDropIndex,
   getTabDragData,
@@ -48,7 +49,7 @@ function DropIndicator() {
 export const TabBar = memo(function TabBar() {
   const controller = useTabController();
   const windowState = useWindowState();
-  const pane = controller.getPane(windowState.focusedPaneId);
+  const pane = findPaneInLayout(windowState.layout, windowState.focusedPaneId);
 
   const tabs = pane?.tabs ?? [];
   const activeTabId = pane?.activeTabId ?? null;
@@ -124,9 +125,7 @@ export const TabBar = memo(function TabBar() {
               onDragStateChange={setDragTabId}
             />
           ))}
-          {dropIndex === tabs.length && (
-            <DropIndicator key="drop-end" />
-          )}
+          {dropIndex === tabs.length && <DropIndicator key="drop-end" />}
         </AnimatePresence>
       </div>
 
