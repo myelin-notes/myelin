@@ -22,8 +22,32 @@ function createSplitId(): string {
   return crypto.randomUUID();
 }
 
+function createLibraryTab(): Tab {
+  return {
+    id: createTabId(),
+    target: { type: 'library' },
+    title: 'Library',
+  };
+}
+
+function createPaneWithTabs(tabs: Tab[]): PaneNode {
+  return {
+    type: 'pane',
+    id: createPaneId(),
+    tabs,
+    activeTabId: tabs[0]!.id,
+  };
+}
+
+function createLibraryPane(): PaneNode {
+  return createPaneWithTabs([createLibraryTab()]);
+}
+
 function targetsEqual(a: TabTarget, b: TabTarget): boolean {
-  if (a.type !== b.type) return false;
+  if (a.type !== b.type) {
+    return false;
+  }
+
   switch (a.type) {
     case 'library':
     case 'settings':
@@ -35,42 +59,154 @@ function targetsEqual(a: TabTarget, b: TabTarget): boolean {
   }
 }
 
-function findPane(
-  node: LayoutNode,
-  paneId: PaneId,
-): PaneNode | null {
+function clampIndex(index: number, max: number): number {
+  if (!Number.isFinite(index)) {
+    return max;
+  }
+  return Math.min(Math.max(Math.trunc(index), 0), max);
+}
+
+function insertAt<T>(items: T[], item: T, index: number): T[] {
+  const insertIndex = clampIndex(index, items.length);
+  return [...items.slice(0, insertIndex), item, ...items.slice(insertIndex)];
+}
+
+function evenSizes(count: number): number[] {
+  return Array.from({ length: count }, () => 100 / count);
+}
+
+function normalizeSizes(sizes: number[], count: number): number[] {
+  if (
+    sizes.length !== count ||
+    sizes.some((size) => !Number.isFinite(size) || size <= 0)
+  ) {
+    return evenSizes(count);
+  }
+
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  if (total <= 0) {
+    return evenSizes(count);
+  }
+  return sizes.map((size) => (size / total) * 100);
+}
+
+function normalizePane(pane: PaneNode): PaneNode {
+  if (pane.tabs.length === 0) {
+    const tab = createLibraryTab();
+    return {
+      ...pane,
+      tabs: [tab],
+      activeTabId: tab.id,
+    };
+  }
+
+  if (pane.tabs.some((tab) => tab.id === pane.activeTabId)) {
+    return pane;
+  }
+
+  return {
+    ...pane,
+    activeTabId: pane.tabs[0]!.id,
+  };
+}
+
+function normalizeLayout(node: LayoutNode): LayoutNode {
+  if (node.type === 'pane') {
+    return normalizePane(node);
+  }
+
+  const children = node.children.map(normalizeLayout);
+  if (children.length === 0) {
+    return createLibraryPane();
+  }
+  if (children.length === 1) {
+    return children[0]!;
+  }
+
+  return {
+    ...node,
+    children,
+    sizes: normalizeSizes(node.sizes, children.length),
+  };
+}
+
+function collectPaneIds(node: LayoutNode): PaneId[] {
+  if (node.type === 'pane') {
+    return [node.id];
+  }
+  return node.children.flatMap(collectPaneIds);
+}
+
+function normalizeWindowState(state: WindowState): WindowState {
+  const layout = normalizeLayout(state.layout);
+  const paneIds = collectPaneIds(layout);
+  const focusedPaneId = paneIds.includes(state.focusedPaneId)
+    ? state.focusedPaneId
+    : paneIds[0]!;
+
+  if (layout === state.layout && focusedPaneId === state.focusedPaneId) {
+    return state;
+  }
+
+  return {
+    layout,
+    focusedPaneId,
+  };
+}
+
+function findPane(node: LayoutNode, paneId: PaneId): PaneNode | null {
   if (node.type === 'pane') {
     return node.id === paneId ? node : null;
   }
+
   for (const child of node.children) {
     const found = findPane(child, paneId);
-    if (found) return found;
+    if (found) {
+      return found;
+    }
   }
+
   return null;
 }
 
-function findPaneForTab(
-  node: LayoutNode,
-  tabId: TabId,
-): PaneNode | null {
+function findPaneForTab(node: LayoutNode, tabId: TabId): PaneNode | null {
   if (node.type === 'pane') {
-    return node.tabs.some((t) => t.id === tabId) ? node : null;
+    return node.tabs.some((tab) => tab.id === tabId) ? node : null;
   }
+
   for (const child of node.children) {
     const found = findPaneForTab(child, tabId);
-    if (found) return found;
+    if (found) {
+      return found;
+    }
   }
+
   return null;
 }
 
 function findFirstPane(node: LayoutNode): PaneNode {
-  if (node.type === 'pane') return node;
-  return findFirstPane(node.children[0]);
+  if (node.type === 'pane') {
+    return node;
+  }
+  return findFirstPane(node.children[0]!);
 }
 
-function collectPaneIds(node: LayoutNode): PaneId[] {
-  if (node.type === 'pane') return [node.id];
-  return node.children.flatMap(collectPaneIds);
+function findSplit(node: LayoutNode, splitId: string): SplitNode | null {
+  if (node.type === 'pane') {
+    return null;
+  }
+  if (node.id === splitId) {
+    return node;
+  }
+
+  for (const child of node.children) {
+    const found = findSplit(child, splitId);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
 }
 
 function replaceNode(
@@ -78,15 +214,42 @@ function replaceNode(
   targetId: string,
   replacement: LayoutNode,
 ): LayoutNode {
-  if (root.type === 'pane') {
-    return root.id === targetId ? replacement : root;
+  if (root.id === targetId) {
+    return replacement;
   }
-  if (root.id === targetId) return replacement;
+
+  if (root.type === 'pane') {
+    return root;
+  }
+
+  const children = root.children.map((child) =>
+    replaceNode(child, targetId, replacement),
+  );
+
+  if (children.every((child, index) => child === root.children[index])) {
+    return root;
+  }
+
   return {
     ...root,
-    children: root.children.map((child) =>
-      replaceNode(child, targetId, replacement),
-    ),
+    children,
+  };
+}
+
+function replacePane(root: LayoutNode, pane: PaneNode): LayoutNode {
+  return replaceNode(root, pane.id, pane);
+}
+
+function compactSplit(split: SplitNode): LayoutNode | null {
+  if (split.children.length === 0) {
+    return null;
+  }
+  if (split.children.length === 1) {
+    return split.children[0]!;
+  }
+  return {
+    ...split,
+    sizes: normalizeSizes(split.sizes, split.children.length),
   };
 }
 
@@ -95,55 +258,71 @@ function removePane(root: LayoutNode, paneId: PaneId): LayoutNode | null {
     return root.id === paneId ? null : root;
   }
 
-  const newChildren: LayoutNode[] = [];
-  const newSizes: number[] = [];
-  let removedSize = 0;
+  const children: LayoutNode[] = [];
+  const sizes: number[] = [];
 
-  for (let i = 0; i < root.children.length; i++) {
-    const result = removePane(root.children[i], paneId);
-    if (result) {
-      newChildren.push(result);
-      newSizes.push(root.sizes[i]);
-    } else {
-      removedSize += root.sizes[i];
+  for (let index = 0; index < root.children.length; index++) {
+    const child = removePane(root.children[index]!, paneId);
+    if (child) {
+      children.push(child);
+      sizes.push(root.sizes[index] ?? 0);
     }
   }
 
-  if (newChildren.length === 0) return null;
-  if (newChildren.length === 1) return newChildren[0];
-
-  const sizeScale = 100 / (100 - removedSize);
-  return {
+  return compactSplit({
     ...root,
-    children: newChildren,
-    sizes: newSizes.map((s) => s * sizeScale),
-  };
+    children,
+    sizes,
+  });
+}
+
+function activeTabAfterRemoving(
+  pane: PaneNode,
+  removedTabId: TabId,
+  removedIndex: number,
+  tabs: Tab[],
+): TabId {
+  if (pane.activeTabId !== removedTabId) {
+    return pane.activeTabId;
+  }
+
+  return tabs[Math.min(removedIndex, tabs.length - 1)]!.id;
+}
+
+function findTabByTargetInLayout(
+  node: LayoutNode,
+  target: TabTarget,
+): { tab: Tab; paneId: PaneId } | null {
+  if (node.type === 'pane') {
+    const tab = node.tabs.find((candidate) =>
+      targetsEqual(candidate.target, target),
+    );
+    return tab ? { tab, paneId: node.id } : null;
+  }
+
+  for (const child of node.children) {
+    const found = findTabByTargetInLayout(child, target);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
 }
 
 export function createDefaultWindowState(): WindowState {
-  const paneId = createPaneId();
-  const tabId = createTabId();
+  const pane = createLibraryPane();
   return {
-    layout: {
-      type: 'pane',
-      id: paneId,
-      tabs: [{ id: tabId, target: { type: 'library' }, title: 'Library' }],
-      activeTabId: tabId,
-    },
-    focusedPaneId: paneId,
+    layout: pane,
+    focusedPaneId: pane.id,
   };
 }
 
 export function createWindowStateWithTab(tab: Tab): WindowState {
-  const paneId = createPaneId();
+  const pane = createPaneWithTabs([tab]);
   return {
-    layout: {
-      type: 'pane',
-      id: paneId,
-      tabs: [tab],
-      activeTabId: tab.id,
-    },
-    focusedPaneId: paneId,
+    layout: pane,
+    focusedPaneId: pane.id,
   };
 }
 
@@ -152,7 +331,9 @@ export class TabStateController {
   private readonly listeners = new Set<() => void>();
 
   constructor(initialState?: WindowState) {
-    this.state = initialState ?? createDefaultWindowState();
+    this.state = initialState
+      ? normalizeWindowState(initialState)
+      : createDefaultWindowState();
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -165,8 +346,7 @@ export class TabStateController {
   getSnapshot = (): WindowState => this.state;
 
   replaceState(state: WindowState): void {
-    this.state = state;
-    this.emit();
+    this.commit(state);
   }
 
   private emit(): void {
@@ -175,95 +355,89 @@ export class TabStateController {
     }
   }
 
-  private update(next: WindowState): void {
-    this.state = next;
+  private commit(next: WindowState): void {
+    this.state = normalizeWindowState(next);
     this.emit();
   }
 
   openTab(target: TabTarget, title: string, paneId?: PaneId): TabId {
     const state = this.state;
-    const targetPaneId = paneId ?? state.focusedPaneId;
-    const pane = findPane(state.layout, targetPaneId);
-    if (!pane) return this.openTabInFirstPane(target, title);
+    const preferredPaneId = paneId ?? state.focusedPaneId;
+    const pane =
+      findPane(state.layout, preferredPaneId) ?? findFirstPane(state.layout);
+    const existing = pane.tabs.find((tab) => targetsEqual(tab.target, target));
 
-    const existing = pane.tabs.find((t) => targetsEqual(t.target, target));
     if (existing) {
-      this.activateTab(existing.id, targetPaneId);
+      this.activateTab(existing.id, pane.id);
       return existing.id;
     }
 
-    const tabId = createTabId();
-    const newTab: Tab = { id: tabId, target, title };
-    const activeIndex = pane.tabs.findIndex((t) => t.id === pane.activeTabId);
-    const insertIndex = activeIndex + 1;
-    const newTabs = [
-      ...pane.tabs.slice(0, insertIndex),
-      newTab,
-      ...pane.tabs.slice(insertIndex),
-    ];
+    const tab: Tab = {
+      id: createTabId(),
+      target,
+      title,
+    };
+    const activeIndex = pane.tabs.findIndex(
+      (candidate) => candidate.id === pane.activeTabId,
+    );
+    const insertIndex = activeIndex === -1 ? pane.tabs.length : activeIndex + 1;
+    const nextPane: PaneNode = {
+      ...pane,
+      tabs: insertAt(pane.tabs, tab, insertIndex),
+      activeTabId: tab.id,
+    };
 
-    this.update({
-      ...state,
-      layout: replaceNode(state.layout, pane.id, {
-        ...pane,
-        tabs: newTabs,
-        activeTabId: tabId,
-      }),
-      focusedPaneId: targetPaneId,
+    this.commit({
+      layout: replacePane(state.layout, nextPane),
+      focusedPaneId: pane.id,
     });
-    return tabId;
-  }
 
-  private openTabInFirstPane(target: TabTarget, title: string): TabId {
-    const pane = findFirstPane(this.state.layout);
-    return this.openTab(target, title, pane.id);
+    return tab.id;
   }
 
   closeTab(tabId: TabId, paneId: PaneId): void {
     const state = this.state;
     const pane = findPane(state.layout, paneId);
-    if (!pane) return;
+    if (!pane) {
+      return;
+    }
 
-    const tabIndex = pane.tabs.findIndex((t) => t.id === tabId);
-    if (tabIndex === -1) return;
+    const removedIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
+    if (removedIndex === -1) {
+      return;
+    }
 
-    const newTabs = pane.tabs.filter((t) => t.id !== tabId);
-
-    if (newTabs.length === 0) {
+    const tabs = pane.tabs.filter((tab) => tab.id !== tabId);
+    if (tabs.length === 0) {
       this.closePane(paneId);
       return;
     }
 
-    let newActiveTabId = pane.activeTabId;
-    if (pane.activeTabId === tabId) {
-      const nextIndex = Math.min(tabIndex, newTabs.length - 1);
-      newActiveTabId = newTabs[nextIndex].id;
-    }
+    const nextPane: PaneNode = {
+      ...pane,
+      tabs,
+      activeTabId: activeTabAfterRemoving(pane, tabId, removedIndex, tabs),
+    };
 
-    this.update({
+    this.commit({
       ...state,
-      layout: replaceNode(state.layout, pane.id, {
-        ...pane,
-        tabs: newTabs,
-        activeTabId: newActiveTabId,
-      }),
+      layout: replacePane(state.layout, nextPane),
     });
   }
 
   activateTab(tabId: TabId, paneId: PaneId): void {
     const state = this.state;
     const pane = findPane(state.layout, paneId);
-    if (!pane) return;
-    if (pane.activeTabId === tabId) {
-      if (state.focusedPaneId !== paneId) {
-        this.update({ ...state, focusedPaneId: paneId });
-      }
+    if (!pane?.tabs.some((tab) => tab.id === tabId)) {
       return;
     }
 
-    this.update({
-      ...state,
-      layout: replaceNode(state.layout, pane.id, {
+    if (pane.activeTabId === tabId && state.focusedPaneId === paneId) {
+      return;
+    }
+
+    this.commit({
+      layout: replacePane(state.layout, {
         ...pane,
         activeTabId: tabId,
       }),
@@ -285,87 +459,95 @@ export class TabStateController {
     const state = this.state;
     const fromPane = findPane(state.layout, fromPaneId);
     const toPane = findPane(state.layout, toPaneId);
-    if (!fromPane || !toPane) return;
+    if (!fromPane || !toPane) {
+      return;
+    }
 
-    const tab = fromPane.tabs.find((t) => t.id === tabId);
-    if (!tab) return;
+    const movedIndex = fromPane.tabs.findIndex((tab) => tab.id === tabId);
+    if (movedIndex === -1) {
+      return;
+    }
 
-    const fromTabs = fromPane.tabs.filter((t) => t.id !== tabId);
-    const toTabs = [
-      ...toPane.tabs.slice(0, index),
-      tab,
-      ...toPane.tabs.slice(index),
-    ];
-
+    const tab = fromPane.tabs[movedIndex]!;
+    const fromTabs = fromPane.tabs.filter(
+      (candidate) => candidate.id !== tabId,
+    );
     let layout = state.layout;
 
     if (fromTabs.length === 0) {
-      const removed = removePane(layout, fromPaneId);
-      if (!removed) return;
-      layout = removed;
-    } else {
-      let newActiveTabId = fromPane.activeTabId;
-      if (fromPane.activeTabId === tabId) {
-        const tabIndex = fromPane.tabs.findIndex((t) => t.id === tabId);
-        const nextIndex = Math.min(tabIndex, fromTabs.length - 1);
-        newActiveTabId = fromTabs[nextIndex].id;
+      const nextLayout = removePane(layout, fromPaneId);
+      if (!nextLayout) {
+        return;
       }
-      layout = replaceNode(layout, fromPane.id, {
+      layout = nextLayout;
+    } else {
+      layout = replacePane(layout, {
         ...fromPane,
         tabs: fromTabs,
-        activeTabId: newActiveTabId,
+        activeTabId: activeTabAfterRemoving(
+          fromPane,
+          tabId,
+          movedIndex,
+          fromTabs,
+        ),
       });
     }
 
-    layout = replaceNode(layout, toPane.id, {
-      ...toPane,
-      tabs: toTabs,
+    const targetPane = findPane(layout, toPaneId);
+    if (!targetPane) {
+      return;
+    }
+
+    const nextTargetPane: PaneNode = {
+      ...targetPane,
+      tabs: insertAt(targetPane.tabs, tab, index),
       activeTabId: tabId,
+    };
+
+    this.commit({
+      layout: replacePane(layout, nextTargetPane),
+      focusedPaneId: targetPane.id,
     });
-
-    const paneIds = collectPaneIds(layout);
-    const focusedPaneId = paneIds.includes(toPaneId)
-      ? toPaneId
-      : paneIds[0];
-
-    this.update({ layout, focusedPaneId });
   }
 
-  private reorderTab(tabId: TabId, paneId: PaneId, newIndex: number): void {
+  private reorderTab(tabId: TabId, paneId: PaneId, index: number): void {
     const state = this.state;
     const pane = findPane(state.layout, paneId);
-    if (!pane) return;
+    if (!pane) {
+      return;
+    }
 
-    const oldIndex = pane.tabs.findIndex((t) => t.id === tabId);
-    if (oldIndex === -1 || oldIndex === newIndex) return;
+    const oldIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
+    if (oldIndex === -1) {
+      return;
+    }
 
-    const newTabs = [...pane.tabs];
-    const [moved] = newTabs.splice(oldIndex, 1);
-    newTabs.splice(newIndex, 0, moved);
+    const dropIndex = clampIndex(index, pane.tabs.length);
+    if (dropIndex === oldIndex || dropIndex === oldIndex + 1) {
+      return;
+    }
 
-    this.update({
+    const tabs = pane.tabs.filter((tab) => tab.id !== tabId);
+    const insertIndex = dropIndex > oldIndex ? dropIndex - 1 : dropIndex;
+    const nextPane: PaneNode = {
+      ...pane,
+      tabs: insertAt(tabs, pane.tabs[oldIndex]!, insertIndex),
+    };
+
+    this.commit({
       ...state,
-      layout: replaceNode(state.layout, pane.id, {
-        ...pane,
-        tabs: newTabs,
-      }),
+      layout: replacePane(state.layout, nextPane),
     });
   }
 
   splitPane(paneId: PaneId, direction: SplitDirection): PaneId {
     const state = this.state;
     const pane = findPane(state.layout, paneId);
-    if (!pane) return paneId;
+    if (!pane) {
+      return paneId;
+    }
 
-    const newPaneId = createPaneId();
-    const newTabId = createTabId();
-    const newPane: PaneNode = {
-      type: 'pane',
-      id: newPaneId,
-      tabs: [{ id: newTabId, target: { type: 'library' }, title: 'Library' }],
-      activeTabId: newTabId,
-    };
-
+    const newPane = createLibraryPane();
     const split: SplitNode = {
       type: 'split',
       id: createSplitId(),
@@ -374,12 +556,12 @@ export class TabStateController {
       sizes: [50, 50],
     };
 
-    this.update({
+    this.commit({
       ...state,
       layout: replaceNode(state.layout, pane.id, split),
     });
 
-    return newPaneId;
+    return newPane.id;
   }
 
   splitPaneWithTab(
@@ -388,89 +570,107 @@ export class TabStateController {
     tabId: TabId,
   ): PaneId {
     const state = this.state;
-    const fromPane = findPaneForTab(state.layout, tabId);
-    if (!fromPane) return paneId;
+    const sourcePane = findPaneForTab(state.layout, tabId);
+    const targetPane = findPane(state.layout, paneId);
+    if (!sourcePane || !targetPane || sourcePane.tabs.length <= 1) {
+      return paneId;
+    }
 
-    const tab = fromPane.tabs.find((t) => t.id === tabId);
-    if (!tab) return paneId;
+    const tabIndex = sourcePane.tabs.findIndex((tab) => tab.id === tabId);
+    if (tabIndex === -1) {
+      return paneId;
+    }
 
-    const newPaneId = createPaneId();
+    const tab = sourcePane.tabs[tabIndex]!;
+    const sourceTabs = sourcePane.tabs.filter(
+      (candidate) => candidate.id !== tabId,
+    );
+    let layout = replacePane(state.layout, {
+      ...sourcePane,
+      tabs: sourceTabs,
+      activeTabId: activeTabAfterRemoving(
+        sourcePane,
+        tabId,
+        tabIndex,
+        sourceTabs,
+      ),
+    });
+
+    const splitTargetPane = findPane(layout, targetPane.id);
+    if (!splitTargetPane) {
+      return paneId;
+    }
+
     const newPane: PaneNode = {
       type: 'pane',
-      id: newPaneId,
+      id: createPaneId(),
       tabs: [tab],
       activeTabId: tab.id,
     };
-
-    const fromTabs = fromPane.tabs.filter((t) => t.id !== tabId);
-    let layout = state.layout;
-
-    if (fromTabs.length > 0) {
-      let newActiveTabId = fromPane.activeTabId;
-      if (fromPane.activeTabId === tabId) {
-        const idx = fromPane.tabs.findIndex((t) => t.id === tabId);
-        newActiveTabId = fromTabs[Math.min(idx, fromTabs.length - 1)].id;
-      }
-      layout = replaceNode(layout, fromPane.id, {
-        ...fromPane,
-        tabs: fromTabs,
-        activeTabId: newActiveTabId,
-      });
-    }
-
-    const targetPane = findPane(layout, paneId);
-    if (!targetPane) return paneId;
-
     const split: SplitNode = {
       type: 'split',
       id: createSplitId(),
       direction,
-      children: [targetPane, newPane],
+      children: [splitTargetPane, newPane],
       sizes: [50, 50],
     };
 
-    layout = replaceNode(layout, targetPane.id, split);
+    layout = replaceNode(layout, splitTargetPane.id, split);
+    this.commit({
+      layout,
+      focusedPaneId: newPane.id,
+    });
 
-    this.update({ layout, focusedPaneId: newPaneId });
-    return newPaneId;
+    return newPane.id;
   }
 
   closePane(paneId: PaneId): void {
     const state = this.state;
-    const result = removePane(state.layout, paneId);
+    const layout = removePane(state.layout, paneId);
 
-    if (!result) {
-      this.update({
-        ...state,
-        layout: createDefaultWindowState().layout,
-        focusedPaneId: (createDefaultWindowState().layout as PaneNode).id,
-      });
+    if (!layout) {
+      this.commit(createDefaultWindowState());
       return;
     }
 
-    const paneIds = collectPaneIds(result);
-    const focusedPaneId = paneIds.includes(state.focusedPaneId)
-      ? state.focusedPaneId
-      : paneIds[0];
-
-    this.update({ layout: result, focusedPaneId });
+    const paneIds = collectPaneIds(layout);
+    this.commit({
+      layout,
+      focusedPaneId: paneIds.includes(state.focusedPaneId)
+        ? state.focusedPaneId
+        : paneIds[0]!,
+    });
   }
 
   focusPane(paneId: PaneId): void {
-    if (this.state.focusedPaneId === paneId) return;
-    this.update({ ...this.state, focusedPaneId: paneId });
+    if (this.state.focusedPaneId === paneId) {
+      return;
+    }
+    if (!findPane(this.state.layout, paneId)) {
+      return;
+    }
+
+    this.commit({
+      ...this.state,
+      focusedPaneId: paneId,
+    });
   }
 
   resizeSplit(splitId: string, sizes: number[]): void {
     const state = this.state;
-    const node = findSplit(state.layout, splitId);
-    if (!node) return;
+    const split = findSplit(state.layout, splitId);
+    if (!split || sizes.length !== split.children.length) {
+      return;
+    }
+    if (sizes.some((size) => !Number.isFinite(size) || size <= 0)) {
+      return;
+    }
 
-    this.update({
+    this.commit({
       ...state,
       layout: replaceNode(state.layout, splitId, {
-        ...node,
-        sizes,
+        ...split,
+        sizes: normalizeSizes(sizes, split.children.length),
       }),
     });
   }
@@ -478,16 +678,22 @@ export class TabStateController {
   updateTabTitle(tabId: TabId, title: string): void {
     const state = this.state;
     const pane = findPaneForTab(state.layout, tabId);
-    if (!pane) return;
+    if (!pane) {
+      return;
+    }
 
-    const tab = pane.tabs.find((t) => t.id === tabId);
-    if (!tab || tab.title === title) return;
+    const tab = pane.tabs.find((candidate) => candidate.id === tabId);
+    if (!tab || tab.title === title) {
+      return;
+    }
 
-    this.update({
+    this.commit({
       ...state,
-      layout: replaceNode(state.layout, pane.id, {
+      layout: replacePane(state.layout, {
         ...pane,
-        tabs: pane.tabs.map((t) => (t.id === tabId ? { ...t, title } : t)),
+        tabs: pane.tabs.map((candidate) =>
+          candidate.id === tabId ? { ...candidate, title } : candidate,
+        ),
       }),
     });
   }
@@ -503,29 +709,4 @@ export class TabStateController {
   findTabByTarget(target: TabTarget): { tab: Tab; paneId: PaneId } | null {
     return findTabByTargetInLayout(this.state.layout, target);
   }
-}
-
-function findSplit(node: LayoutNode, splitId: string): SplitNode | null {
-  if (node.type === 'pane') return null;
-  if (node.id === splitId) return node;
-  for (const child of node.children) {
-    const found = findSplit(child, splitId);
-    if (found) return found;
-  }
-  return null;
-}
-
-function findTabByTargetInLayout(
-  node: LayoutNode,
-  target: TabTarget,
-): { tab: Tab; paneId: PaneId } | null {
-  if (node.type === 'pane') {
-    const tab = node.tabs.find((t) => targetsEqual(t.target, target));
-    return tab ? { tab, paneId: node.id } : null;
-  }
-  for (const child of node.children) {
-    const found = findTabByTargetInLayout(child, target);
-    if (found) return found;
-  }
-  return null;
 }
