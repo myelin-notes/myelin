@@ -6,7 +6,6 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import {
-  type FileType,
   getMimeTypeForFileType,
   isImageFileType,
   useRepository,
@@ -26,7 +25,6 @@ function errorMessage(error: unknown): string {
 
 interface ImageViewerPageProps {
   id: VFSNodeId;
-  fileType: FileType;
 }
 
 export function ImageViewerPage({ id }: ImageViewerPageProps) {
@@ -87,7 +85,9 @@ export function ImageViewerPage({ id }: ImageViewerPageProps) {
 
   const goBack = () => {
     const pane = tabController.getPane(paneId);
-    if (!pane) return;
+    if (!pane) {
+      return;
+    }
     const tab = pane.tabs.find(
       (t) => t.target.type === 'image' && t.target.id === id,
     );

@@ -1,10 +1,14 @@
 import { memo, useCallback, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useTabController } from '@/lib/tabs/context';
+import {
+  computeTabDropIndex,
+  getTabDragData,
+  setTabDragData,
+  TAB_DRAG_MIME,
+} from '@/lib/tabs/drag';
 import type { PaneNode, Tab } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
-
-const TAB_DRAG_MIME = 'application/myelin-tab';
 
 interface PaneTabBarProps {
   pane: PaneNode;
@@ -30,23 +34,9 @@ export const PaneTabBar = memo(function PaneTabBar({
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
-      const tabElements = (e.currentTarget as HTMLElement).querySelectorAll(
-        '[data-tab-id]',
+      setDropIndex(
+        computeTabDropIndex(e.currentTarget, pane.tabs.length, e.clientX),
       );
-      let closest = pane.tabs.length;
-      let closestDist = Infinity;
-
-      tabElements.forEach((el, i) => {
-        const rect = el.getBoundingClientRect();
-        const center = rect.left + rect.width / 2;
-        const dist = Math.abs(e.clientX - center);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closest = e.clientX < center ? i : i + 1;
-        }
-      });
-
-      setDropIndex(closest);
     },
     [pane.tabs.length],
   );
@@ -58,33 +48,18 @@ export const PaneTabBar = memo(function PaneTabBar({
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       setDropIndex(null);
-      const raw = e.dataTransfer.getData(TAB_DRAG_MIME);
-      if (!raw) {
+      const data = getTabDragData(e.dataTransfer);
+      if (!data) {
         return;
       }
       e.stopPropagation();
       e.preventDefault();
 
-      const data = JSON.parse(raw) as {
-        tabId: string;
-        sourcePaneId: string;
-      };
-
-      const tabElements = (e.currentTarget as HTMLElement).querySelectorAll(
-        '[data-tab-id]',
+      const targetIndex = computeTabDropIndex(
+        e.currentTarget,
+        pane.tabs.length,
+        e.clientX,
       );
-      let targetIndex = pane.tabs.length;
-      let closestDist = Infinity;
-
-      tabElements.forEach((el, i) => {
-        const rect = el.getBoundingClientRect();
-        const center = rect.left + rect.width / 2;
-        const dist = Math.abs(e.clientX - center);
-        if (dist < closestDist) {
-          closestDist = dist;
-          targetIndex = e.clientX < center ? i : i + 1;
-        }
-      });
 
       controller.moveTab(data.tabId, data.sourcePaneId, pane.id, targetIndex);
     },
@@ -168,13 +143,20 @@ const PaneTabItem = memo(function PaneTabItem({
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
-      e.dataTransfer.setData(
-        TAB_DRAG_MIME,
-        JSON.stringify({ tabId: tab.id, sourcePaneId: paneId }),
-      );
+      setTabDragData(e.dataTransfer, { tabId: tab.id, sourcePaneId: paneId });
       e.dataTransfer.effectAllowed = 'move';
     },
     [tab.id, paneId],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        controller.activateTab(tab.id, paneId);
+      }
+    },
+    [controller, tab.id, paneId],
   );
 
   return (
@@ -182,11 +164,14 @@ const PaneTabItem = memo(function PaneTabItem({
       {showDropIndicator && (
         <div className="h-5 w-0.5 shrink-0 rounded-full bg-accent-dark" />
       )}
-      <button
-        type="button"
+      <div
+        role="tab"
+        tabIndex={0}
+        aria-selected={isActive}
         draggable
         data-tab-id={tab.id}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         onMouseDown={handleMiddleClick}
         onDragStart={handleDragStart}
         className={cn(
@@ -212,7 +197,7 @@ const PaneTabItem = memo(function PaneTabItem({
         >
           <X className="size-2.5" />
         </button>
-      </button>
+      </div>
     </>
   );
 });

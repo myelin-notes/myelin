@@ -1,10 +1,10 @@
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { FileType, Repository, VFSNodeId } from '@/lib/sync';
 import type { TabStateController } from '@/lib/tabs/controller';
 import type { TabTarget } from '@/lib/tabs/types';
 import { parseNoteLinkTarget } from './note-link-target';
 
 export interface NoteRouteTarget {
-  fileType: string;
+  fileType: FileType;
   id: VFSNodeId;
   pageFrameName?: string | null;
   pageFrameId?: string | null;
@@ -29,7 +29,7 @@ function noteTargetToTabTarget(target: NoteRouteTarget): TabTarget {
   return {
     type: 'image',
     id: target.id,
-    fileType: target.fileType as import('@/lib/sync').FileType,
+    fileType: target.fileType,
   };
 }
 

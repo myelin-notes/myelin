@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { BookOpen, Columns2, Plus, Rows2, Settings, X } from 'lucide-react';
 import {
   ContextMenu,
@@ -7,23 +7,15 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
+import {
+  computeTabDropIndex,
+  getTabDragData,
+  setTabDragData,
+  TAB_DRAG_MIME,
+} from '@/lib/tabs/drag';
 import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
-import type { PaneNode, Tab, TabTarget } from '@/lib/tabs/types';
+import type { Tab, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
-
-const TAB_DRAG_MIME = 'application/myelin-tab';
-
-function findFocusedPane(
-  node: import('@/lib/tabs/types').LayoutNode,
-  paneId: string,
-): PaneNode | null {
-  if (node.type === 'pane') return node.id === paneId ? node : null;
-  for (const child of node.children) {
-    const found = findFocusedPane(child, paneId);
-    if (found) return found;
-  }
-  return null;
-}
 
 function tabIcon(target: TabTarget) {
   switch (target.type) {
@@ -39,10 +31,7 @@ function tabIcon(target: TabTarget) {
 export const TabBar = memo(function TabBar() {
   const controller = useTabController();
   const windowState = useWindowState();
-  const pane = findFocusedPane(
-    windowState.layout,
-    windowState.focusedPaneId,
-  );
+  const pane = controller.getPane(windowState.focusedPaneId);
 
   const tabs = pane?.tabs ?? [];
   const activeTabId = pane?.activeTabId ?? null;
@@ -55,27 +44,15 @@ export const TabBar = memo(function TabBar() {
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) return;
+      if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) {
+        return;
+      }
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
-      const tabElements = (e.currentTarget as HTMLElement).querySelectorAll(
-        '[data-tab-id]',
+      setDropIndex(
+        computeTabDropIndex(e.currentTarget, tabs.length, e.clientX),
       );
-      let closest = tabs.length;
-      let closestDist = Infinity;
-
-      tabElements.forEach((el, i) => {
-        const rect = el.getBoundingClientRect();
-        const center = rect.left + rect.width / 2;
-        const dist = Math.abs(e.clientX - center);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closest = e.clientX < center ? i : i + 1;
-        }
-      });
-
-      setDropIndex(closest);
     },
     [tabs.length],
   );
@@ -87,30 +64,17 @@ export const TabBar = memo(function TabBar() {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       setDropIndex(null);
-      const raw = e.dataTransfer.getData(TAB_DRAG_MIME);
-      if (!raw) return;
+      const data = getTabDragData(e.dataTransfer);
+      if (!data) {
+        return;
+      }
       e.preventDefault();
 
-      const data = JSON.parse(raw) as {
-        tabId: string;
-        sourcePaneId: string;
-      };
-
-      const tabElements = (e.currentTarget as HTMLElement).querySelectorAll(
-        '[data-tab-id]',
+      const targetIndex = computeTabDropIndex(
+        e.currentTarget,
+        tabs.length,
+        e.clientX,
       );
-      let targetIndex = tabs.length;
-      let closestDist = Infinity;
-
-      tabElements.forEach((el, i) => {
-        const rect = el.getBoundingClientRect();
-        const center = rect.left + rect.width / 2;
-        const dist = Math.abs(e.clientX - center);
-        if (dist < closestDist) {
-          closestDist = dist;
-          targetIndex = e.clientX < center ? i : i + 1;
-        }
-      });
 
       controller.moveTab(data.tabId, data.sourcePaneId, paneId, targetIndex);
     },
@@ -120,7 +84,7 @@ export const TabBar = memo(function TabBar() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-10 shrink-0 select-none items-end border-b border-border-subtle bg-surface"
+      className="flex h-10 shrink-0 select-none items-end border-border-subtle border-b bg-surface"
     >
       <div
         className="flex min-w-0 flex-1 items-end gap-px overflow-x-auto pl-2"
@@ -144,7 +108,10 @@ export const TabBar = memo(function TabBar() {
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 px-2 pb-1" data-tauri-drag-region>
+      <div
+        className="flex shrink-0 items-center gap-1 px-2 pb-1"
+        data-tauri-drag-region
+      >
         <button
           type="button"
           onClick={handleNewTab}
@@ -170,7 +137,6 @@ const TabItem = memo(function TabItem({
   showDropIndicator?: boolean;
 }) {
   const controller = useTabController();
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleClick = useCallback(() => {
     controller.activateTab(tab.id, paneId);
@@ -196,10 +162,7 @@ const TabItem = memo(function TabItem({
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
-      e.dataTransfer.setData(
-        TAB_DRAG_MIME,
-        JSON.stringify({ tabId: tab.id, sourcePaneId: paneId }),
-      );
+      setTabDragData(e.dataTransfer, { tabId: tab.id, sourcePaneId: paneId });
       e.dataTransfer.effectAllowed = 'move';
     },
     [tab.id, paneId],
@@ -207,14 +170,28 @@ const TabItem = memo(function TabItem({
 
   const handleDragEnd = useCallback(
     (e: React.DragEvent) => {
-      if (e.dataTransfer.dropEffect === 'none' && isTabDragOutsideWindow(e.nativeEvent)) {
-        controller.closeTab(tab.id, paneId);
-        void spawnWindow(tab).catch(() => {
-          controller.openTab(tab.target, tab.title);
-        });
+      if (
+        e.dataTransfer.dropEffect === 'none' &&
+        isTabDragOutsideWindow(e.nativeEvent)
+      ) {
+        void spawnWindow(tab)
+          .then(() => {
+            controller.closeTab(tab.id, paneId);
+          })
+          .catch(() => undefined);
       }
     },
     [controller, tab, paneId],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        controller.activateTab(tab.id, paneId);
+      }
+    },
+    [controller, tab.id, paneId],
   );
 
   const handleSplitRight = useCallback(() => {
@@ -235,29 +212,31 @@ const TabItem = memo(function TabItem({
       <ContextMenu>
         <ContextMenuTrigger
           render={
-            <button
-              type="button"
+            <div
+              role="tab"
+              tabIndex={0}
+              aria-selected={isActive}
               draggable
               data-tab-id={tab.id}
               onClick={handleClick}
+              onKeyDown={handleKeyDown}
               onMouseDown={handleMiddleClick}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               className={cn(
-                'group relative flex h-8 max-w-[200px] min-w-[100px] cursor-pointer items-center gap-2 px-3 transition-colors duration-150',
+                'group relative flex h-8 min-w-[100px] max-w-[200px] cursor-pointer items-center gap-2 px-3 transition-colors duration-150',
                 isActive
-                  ? '-mb-px rounded-t-lg border border-b-0 border-border-subtle bg-page text-text-primary'
+                  ? '-mb-px rounded-t-lg border border-border-subtle border-b-0 bg-page text-text-primary'
                   : 'mb-0 text-text-muted hover:text-text-secondary',
               )}
             />
           }
         >
           {icon}
-          <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
+          <span className="min-w-0 flex-1 truncate font-medium text-[11px]">
             {tab.title}
           </span>
           <button
-            ref={closeButtonRef}
             type="button"
             onClick={handleClose}
             aria-label={`Close ${tab.title}`}

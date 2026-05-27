@@ -5,6 +5,7 @@ import {
   useTabController,
   useWindowState,
 } from '@/lib/tabs/context';
+import { getTabDragData, TAB_DRAG_MIME } from '@/lib/tabs/drag';
 import type {
   LayoutNode,
   PaneId,
@@ -14,8 +15,6 @@ import type {
 import { cn } from '@/lib/utils';
 import { PaneContent } from './pane';
 import { PaneTabBar } from './pane-tab-bar';
-
-const TAB_DRAG_MIME = 'application/myelin-tab';
 
 type SplitEdge = 'left' | 'right' | 'top' | 'bottom';
 
@@ -143,8 +142,8 @@ export function PaneDropTarget({
         return;
       }
 
-      const raw = e.dataTransfer.getData(TAB_DRAG_MIME);
-      if (!raw) {
+      const data = getTabDragData(e.dataTransfer);
+      if (!data) {
         setSplitIntent(null);
         return;
       }
@@ -152,10 +151,6 @@ export function PaneDropTarget({
       e.preventDefault();
       e.stopPropagation();
       setSplitIntent(null);
-
-      const data = JSON.parse(raw) as {
-        tabId: string;
-      };
 
       controller.splitPaneWithTab(
         paneId,

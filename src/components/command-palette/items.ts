@@ -13,6 +13,7 @@ import {
   getActionCopy,
   getActionIcon,
 } from '@/lib/keybinds/messages';
+import type { TabTarget } from '@/lib/tabs/types';
 import type {
   CommandPaletteItem,
   CommandPaletteMode,
@@ -133,9 +134,11 @@ export function commandPaletteShortcut(): string {
 }
 
 export function commandPalettePageFromTabTarget(
-  target: import('@/lib/tabs/types').TabTarget | null,
+  target: TabTarget | null,
 ): CommandPalettePage {
-  if (!target) return 'library';
+  if (!target) {
+    return 'library';
+  }
   switch (target.type) {
     case 'library':
       return 'library';

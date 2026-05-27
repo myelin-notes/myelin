@@ -9,7 +9,9 @@ interface PaneContentProps {
   tab: Tab;
 }
 
-export const PaneContent = memo(function PaneContent({ tab }: PaneContentProps) {
+export const PaneContent = memo(function PaneContent({
+  tab,
+}: PaneContentProps) {
   switch (tab.target.type) {
     case 'library':
       return <LibraryPage />;
@@ -23,8 +25,6 @@ export const PaneContent = memo(function PaneContent({ tab }: PaneContentProps) 
         />
       );
     case 'image':
-      return (
-        <ImageViewerPage id={tab.target.id} fileType={tab.target.fileType} />
-      );
+      return <ImageViewerPage id={tab.target.id} />;
   }
 });
