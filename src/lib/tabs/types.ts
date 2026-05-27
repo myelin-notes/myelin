@@ -6,7 +6,12 @@ export type PaneId = string;
 export type TabTarget =
   | { type: 'library' }
   | { type: 'settings' }
-  | { type: 'canvas'; id: VFSNodeId; pageFrameName?: string | null }
+  | {
+      type: 'canvas';
+      id: VFSNodeId;
+      pageFrameName?: string | null;
+      pageFrameId?: string | null;
+    }
   | { type: 'image'; id: VFSNodeId; fileType: FileType };
 
 export interface Tab {

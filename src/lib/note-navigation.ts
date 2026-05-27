@@ -24,6 +24,7 @@ function noteTargetToTabTarget(target: NoteRouteTarget): TabTarget {
       type: 'canvas',
       id: target.id,
       pageFrameName: target.pageFrameName ?? null,
+      pageFrameId: target.pageFrameId ?? null,
     };
   }
   return {

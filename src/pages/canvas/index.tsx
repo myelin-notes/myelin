@@ -62,12 +62,21 @@ const logger = new Logger('CanvasView');
 interface CanvasViewProps {
   id: VFSNodeId;
   initialPageFrameName?: string | null;
+  initialPageFrameId?: string | null;
 }
 
-export function CanvasView({ id, initialPageFrameName }: CanvasViewProps) {
+export function CanvasView({
+  id,
+  initialPageFrameName,
+  initialPageFrameId,
+}: CanvasViewProps) {
   return (
     <CustomColorsProvider>
-      <CanvasViewInner id={id} initialPageFrameName={initialPageFrameName} />
+      <CanvasViewInner
+        id={id}
+        initialPageFrameName={initialPageFrameName}
+        initialPageFrameId={initialPageFrameId}
+      />
     </CustomColorsProvider>
   );
 }
@@ -75,6 +84,7 @@ export function CanvasView({ id, initialPageFrameName }: CanvasViewProps) {
 function CanvasViewInner({
   id,
   initialPageFrameName: initialPageFrameNameProp,
+  initialPageFrameId: initialPageFrameIdProp,
 }: CanvasViewProps) {
   const tabController = useTabController();
   const paneId = usePaneId();
@@ -122,11 +132,13 @@ function CanvasViewInner({
   });
 
   const targetPageFrameName = initialPageFrameNameProp ?? null;
-  const targetPageFrameId: string | null = null;
+  const targetPageFrameId = initialPageFrameIdProp ?? null;
 
   const handleBack = useCallback(() => {
     const pane = tabController.getPane(paneId);
-    if (!pane) return;
+    if (!pane) {
+      return;
+    }
     const tab = pane.tabs.find(
       (t) => t.target.type === 'canvas' && t.target.id === id,
     );
@@ -158,7 +170,9 @@ function CanvasViewInner({
   useEffect(() => {
     if (engine.fileName) {
       const pane = tabController.getPane(paneId);
-      if (!pane) return;
+      if (!pane) {
+        return;
+      }
       const tab = pane.tabs.find(
         (t) => t.target.type === 'canvas' && t.target.id === id,
       );

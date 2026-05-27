@@ -90,14 +90,26 @@ describe('TabStateController', () => {
     ]);
 
     const reopenedId = controller.openTab(
-      { type: 'canvas', id: 'alpha', pageFrameName: 'Details' },
+      {
+        type: 'canvas',
+        id: 'alpha',
+        pageFrameName: 'Details',
+        pageFrameId: 'frame-details',
+      },
       'Alpha again',
       paneId,
     );
 
     const pane = rootPane(controller);
+    const alpha = pane.tabs.find((tab) => tab.id === alphaId);
     expect(reopenedId).toBe(alphaId);
     expect(tabTitles(pane)).toEqual(['Library', 'Alpha', 'Gamma', 'Beta']);
+    expect(alpha?.target).toMatchObject({
+      type: 'canvas',
+      id: 'alpha',
+      pageFrameName: 'Details',
+      pageFrameId: 'frame-details',
+    });
     expect(pane.activeTabId).toBe(alphaId);
     expectValidWindowState(controller.getSnapshot());
   });

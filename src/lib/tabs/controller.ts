@@ -368,7 +368,16 @@ export class TabStateController {
     const existing = pane.tabs.find((tab) => targetsEqual(tab.target, target));
 
     if (existing) {
-      this.activateTab(existing.id, pane.id);
+      this.commit({
+        layout: replacePane(state.layout, {
+          ...pane,
+          tabs: pane.tabs.map((tab) =>
+            tab.id === existing.id ? { ...tab, target } : tab,
+          ),
+          activeTabId: existing.id,
+        }),
+        focusedPaneId: pane.id,
+      });
       return existing.id;
     }
 

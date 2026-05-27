@@ -8,13 +8,10 @@ describe('note navigation', () => {
     openNote(controller, { fileType: 'mcanvas', id: 'note-123' });
 
     const state = controller.getSnapshot();
-    const pane =
-      state.layout.type === 'pane' ? state.layout : null;
+    const pane = state.layout.type === 'pane' ? state.layout : null;
     expect(pane).not.toBeNull();
     const tab = pane!.tabs.find(
-      (t) =>
-        t.target.type === 'canvas' &&
-        t.target.id === 'note-123',
+      (t) => t.target.type === 'canvas' && t.target.id === 'note-123',
     );
     expect(tab).toBeDefined();
     expect(pane!.activeTabId).toBe(tab!.id);
@@ -65,6 +62,31 @@ describe('note navigation', () => {
         t.target.type === 'canvas' &&
         t.target.id === 'note-123' &&
         t.target.pageFrameName === 'Research Notes',
+    );
+    expect(tab).toBeDefined();
+  });
+
+  it('preserves resolved page-frame ids when opening note links', async () => {
+    const controller = new TabStateController();
+    const repository = {
+      getNode: vi.fn(),
+      createFile: vi.fn(),
+    };
+
+    await openNoteLink(controller, repository, 'current-note', {
+      title: 'Alpha Note#Research Notes',
+      noteId: 'note-123',
+      pageFrameId: 'frame-123',
+    });
+
+    const state = controller.getSnapshot();
+    const pane = state.layout.type === 'pane' ? state.layout : null;
+    const tab = pane!.tabs.find(
+      (t) =>
+        t.target.type === 'canvas' &&
+        t.target.id === 'note-123' &&
+        t.target.pageFrameName === 'Research Notes' &&
+        t.target.pageFrameId === 'frame-123',
     );
     expect(tab).toBeDefined();
   });

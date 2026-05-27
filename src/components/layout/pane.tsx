@@ -22,6 +22,7 @@ export const PaneContent = memo(function PaneContent({
         <CanvasView
           id={tab.target.id}
           initialPageFrameName={tab.target.pageFrameName}
+          initialPageFrameId={tab.target.pageFrameId}
         />
       );
     case 'image':
