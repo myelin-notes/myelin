@@ -209,7 +209,9 @@ const TabItem = memo(function TabItem({
     (e: React.DragEvent) => {
       if (e.dataTransfer.dropEffect === 'none' && isTabDragOutsideWindow(e.nativeEvent)) {
         controller.closeTab(tab.id, paneId);
-        void spawnWindow(tab);
+        void spawnWindow(tab).catch(() => {
+          controller.openTab(tab.target, tab.title);
+        });
       }
     },
     [controller, tab, paneId],

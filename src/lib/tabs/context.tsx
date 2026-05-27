@@ -1,35 +1,33 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
-import { listen } from '@tauri-apps/api/event';
 import {
   createWindowStateWithTab,
   TabStateController,
 } from './controller';
 import type { PaneId, Tab, WindowState } from './types';
 
+function readInitTab(): Tab | null {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get('init-tab');
+  if (!raw) return null;
+  window.history.replaceState({}, '', '/');
+  return JSON.parse(raw) as Tab;
+}
+
 const TabControllerContext = createContext<TabStateController | null>(null);
 const PaneIdContext = createContext<PaneId | null>(null);
 
 export function TabStateProvider({ children }: { children: ReactNode }) {
-  const controller = useMemo(() => new TabStateController(), []);
-
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    listen<{ tab: Tab }>('myelin:init-tab', (event) => {
-      controller.replaceState(createWindowStateWithTab(event.payload.tab));
-    }).then((fn) => {
-      unlisten = fn;
-    });
-    return () => {
-      unlisten?.();
-    };
-  }, [controller]);
+  const controller = useMemo(() => {
+    const initTab = readInitTab();
+    if (initTab) return new TabStateController(createWindowStateWithTab(initTab));
+    return new TabStateController();
+  }, []);
 
   return (
     <TabControllerContext.Provider value={controller}>
