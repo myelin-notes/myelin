@@ -33,12 +33,12 @@ import {
   type VFSFileNode,
   type VFSFolderNode,
 } from '@/lib/sync';
-import { useTabController } from '@/lib/tabs/context';
 import {
   enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
+import { useTabController } from '@/lib/tabs/context';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from './create-new-dropdown';

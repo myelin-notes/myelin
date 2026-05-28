@@ -6,7 +6,9 @@ interface TitleBarProps {
 }
 
 export const TitleBar = memo(function TitleBar({ trailing }: TitleBarProps) {
-  if (!trailing) return null;
+  if (!trailing) {
+    return null;
+  }
 
   return (
     <motion.div

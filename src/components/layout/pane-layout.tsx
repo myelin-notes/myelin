@@ -1,11 +1,4 @@
 import { Fragment, memo, type ReactNode, useCallback, useState } from 'react';
-import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  type LucideIcon,
-} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import {
@@ -73,25 +66,46 @@ function isPaneTabBarEvent(e: React.DragEvent): boolean {
   );
 }
 
-function splitPreviewClass(edge: SplitEdge): string {
+function splitLineStyle(edge: SplitEdge): React.CSSProperties {
+  const line: React.CSSProperties = { position: 'absolute' };
   switch (edge) {
     case 'left':
-      return 'inset-y-1 left-1 w-[45%]';
+      return { ...line, top: 0, bottom: 0, left: '50%', width: 2 };
     case 'right':
-      return 'inset-y-1 right-1 w-[45%]';
+      return { ...line, top: 0, bottom: 0, right: '50%', width: 2 };
     case 'top':
-      return 'top-1 inset-x-1 h-[45%]';
+      return { ...line, left: 0, right: 0, top: '50%', height: 2 };
     case 'bottom':
-      return 'bottom-1 inset-x-1 h-[45%]';
+      return { ...line, left: 0, right: 0, bottom: '50%', height: 2 };
   }
 }
 
-const splitEdgeIcon: Record<SplitEdge, LucideIcon> = {
-  left: ArrowLeft,
-  right: ArrowRight,
-  top: ArrowUp,
-  bottom: ArrowDown,
-};
+function splitGradient(edge: SplitEdge): string {
+  const from = 'var(--accent-dark)';
+  switch (edge) {
+    case 'left':
+      return `linear-gradient(to right, ${from} 0%, transparent 100%)`;
+    case 'right':
+      return `linear-gradient(to left, ${from} 0%, transparent 100%)`;
+    case 'top':
+      return `linear-gradient(to bottom, ${from} 0%, transparent 100%)`;
+    case 'bottom':
+      return `linear-gradient(to top, ${from} 0%, transparent 100%)`;
+  }
+}
+
+function splitGradientClass(edge: SplitEdge): string {
+  switch (edge) {
+    case 'left':
+      return 'inset-y-0 left-0 w-1/2';
+    case 'right':
+      return 'inset-y-0 right-0 w-1/2';
+    case 'top':
+      return 'inset-x-0 top-0 h-1/2';
+    case 'bottom':
+      return 'inset-x-0 bottom-0 h-1/2';
+  }
+}
 
 export function PaneDropTarget({
   paneId,
@@ -188,7 +202,9 @@ export function PaneDropTarget({
     >
       {children}
       <AnimatePresence>
-        {splitIntent && <SplitPreview key={splitIntent.edge} intent={splitIntent} />}
+        {splitIntent && (
+          <SplitPreview key={splitIntent.edge} intent={splitIntent} />
+        )}
         {showCenter && <CenterPreview key="center" />}
       </AnimatePresence>
     </div>
@@ -196,19 +212,27 @@ export function PaneDropTarget({
 }
 
 function SplitPreview({ intent }: { intent: SplitIntent }) {
-  const Icon = splitEdgeIcon[intent.edge];
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ duration: 0.12, ease: 'easeOut' }}
-      className={cn(
-        'pointer-events-none absolute z-50 flex items-center justify-center rounded-md bg-accent-dark/12 ring-2 ring-accent-dark/30',
-        splitPreviewClass(intent.edge),
-      )}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.1, ease: 'easeOut' }}
+      className="pointer-events-none absolute inset-0 z-50"
     >
-      <Icon className="size-5 text-accent-dark/50" />
+      {/* Directional wash */}
+      <div
+        className={cn(
+          'absolute opacity-[0.12]',
+          splitGradientClass(intent.edge),
+        )}
+        style={{ background: splitGradient(intent.edge) }}
+      />
+      {/* Split line */}
+      <div
+        className="rounded-full bg-accent-dark/40"
+        style={splitLineStyle(intent.edge)}
+      />
     </motion.div>
   );
 }
@@ -220,7 +244,7 @@ function CenterPreview() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.1, ease: 'easeOut' }}
-      className="pointer-events-none absolute inset-1 z-50 rounded-md bg-accent-dark/6 ring-1 ring-accent-dark/15"
+      className="pointer-events-none absolute inset-0 z-50 rounded-md border-2 border-accent-dark/15"
     />
   );
 }

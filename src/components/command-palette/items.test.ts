@@ -29,10 +29,22 @@ function commandIdsForPage(currentPage: CommandPalettePage): string[] {
 describe('commandPalettePageFromTabTarget', () => {
   it('maps tab targets to command palette pages', () => {
     expect(commandPalettePageFromTabTarget(null)).toBe('library');
-    expect(commandPalettePageFromTabTarget({ type: 'library' })).toBe('library');
-    expect(commandPalettePageFromTabTarget({ type: 'canvas', id: 'note-1' })).toBe('canvas');
-    expect(commandPalettePageFromTabTarget({ type: 'settings' })).toBe('settings');
-    expect(commandPalettePageFromTabTarget({ type: 'image', id: 'img-1', fileType: 'png' })).toBe('unknown');
+    expect(commandPalettePageFromTabTarget({ type: 'library' })).toBe(
+      'library',
+    );
+    expect(
+      commandPalettePageFromTabTarget({ type: 'canvas', id: 'note-1' }),
+    ).toBe('canvas');
+    expect(commandPalettePageFromTabTarget({ type: 'settings' })).toBe(
+      'settings',
+    );
+    expect(
+      commandPalettePageFromTabTarget({
+        type: 'image',
+        id: 'img-1',
+        fileType: 'png',
+      }),
+    ).toBe('unknown');
   });
 });
 

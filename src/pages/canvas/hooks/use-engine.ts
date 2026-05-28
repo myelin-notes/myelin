@@ -54,7 +54,6 @@ export function useCanvasEngine({
   embedFiles,
   onBack,
 }: UseCanvasEngineArgs) {
-
   usePageCanvasBindings({
     canvasRef,
     wheelRef,

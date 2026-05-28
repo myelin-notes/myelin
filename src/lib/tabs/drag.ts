@@ -53,10 +53,7 @@ export function computeTabDropIndex(
   return targetIndex;
 }
 
-export function setupDragGhost(
-  e: React.DragEvent,
-  tabEl: HTMLElement,
-): void {
+export function setupDragGhost(e: React.DragEvent, tabEl: HTMLElement): void {
   const ghost = tabEl.cloneNode(true) as HTMLElement;
   ghost.style.position = 'fixed';
   ghost.style.top = '-9999px';
@@ -73,7 +70,11 @@ export function setupDragGhost(
   document.body.appendChild(ghost);
 
   const rect = tabEl.getBoundingClientRect();
-  e.dataTransfer.setDragImage(ghost, e.clientX - rect.left, e.clientY - rect.top);
+  e.dataTransfer.setDragImage(
+    ghost,
+    e.clientX - rect.left,
+    e.clientY - rect.top,
+  );
 
   requestAnimationFrame(() => {
     document.body.removeChild(ghost);

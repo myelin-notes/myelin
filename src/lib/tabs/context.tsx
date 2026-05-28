@@ -1,20 +1,19 @@
 import {
   createContext,
+  type ReactNode,
   useContext,
   useMemo,
   useSyncExternalStore,
-  type ReactNode,
 } from 'react';
-import {
-  createWindowStateWithTab,
-  TabStateController,
-} from './controller';
+import { createWindowStateWithTab, TabStateController } from './controller';
 import type { PaneId, Tab, WindowState } from './types';
 
 function readInitTab(): Tab | null {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('init-tab');
-  if (!raw) return null;
+  if (!raw) {
+    return null;
+  }
   window.history.replaceState({}, '', '/');
   return JSON.parse(raw) as Tab;
 }
@@ -25,7 +24,9 @@ const PaneIdContext = createContext<PaneId | null>(null);
 export function TabStateProvider({ children }: { children: ReactNode }) {
   const controller = useMemo(() => {
     const initTab = readInitTab();
-    if (initTab) return new TabStateController(createWindowStateWithTab(initTab));
+    if (initTab) {
+      return new TabStateController(createWindowStateWithTab(initTab));
+    }
     return new TabStateController();
   }, []);
 

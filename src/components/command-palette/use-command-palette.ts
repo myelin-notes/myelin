@@ -12,12 +12,12 @@ import { useMessages } from '@/lib/i18n';
 import { type Action, type ActionBinding, keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
 import { useRepository, useRepositoryStatus } from '@/lib/sync';
-import { useTabController, useWindowState } from '@/lib/tabs/context';
 import {
   enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
+import { useTabController, useWindowState } from '@/lib/tabs/context';
 import { UserPrefs } from '@/lib/user-prefs';
 import { useCanvasCommandContext } from '@/pages/canvas/command-context';
 import {
@@ -95,9 +95,11 @@ export function useCommandPalette(): {
   >(() => keybindings.getCommandPaletteActions());
   const focusedPane = tabController.getPane(windowState.focusedPaneId);
   const focusedTab = focusedPane
-    ? focusedPane.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null
+    ? (focusedPane.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null)
     : null;
-  const currentPage = commandPalettePageFromTabTarget(focusedTab?.target ?? null);
+  const currentPage = commandPalettePageFromTabTarget(
+    focusedTab?.target ?? null,
+  );
   const canRefreshRepository = useManualRepositoryRefreshAvailable(
     repositoryStatus.config,
     repositoryStatus.initializing,
