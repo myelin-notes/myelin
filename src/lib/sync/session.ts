@@ -206,7 +206,7 @@ export class NoteSession {
     return this.enqueueOperation(() => this.pullInternal());
   }
 
-  async save(): Promise<void> {
+  async save(): Promise<boolean> {
     return this.enqueueOperation(() => this.saveInternal());
   }
 
@@ -260,9 +260,9 @@ export class NoteSession {
     return pulledUpdate;
   }
 
-  private async saveInternal(): Promise<void> {
+  private async saveInternal(): Promise<boolean> {
     if (this.closed) {
-      return;
+      return false;
     }
 
     const targetChangeEpoch = this.changeEpoch;
@@ -275,7 +275,7 @@ export class NoteSession {
         targetChangeEpoch,
         ...summarizeYDocManager(this.ydoc),
       });
-      return;
+      return false;
     }
 
     logger.debug('Pushing note session updates', {
@@ -286,6 +286,7 @@ export class NoteSession {
       remoteStateVectorByteLength: this.remoteStateVector.byteLength,
       ...summarizeYDocManager(this.ydoc),
     });
+    let savedChanges = false;
     await this.runWithPhase('pushing', async () => {
       this.ydoc.sweepOrphanPageFrameFragments();
       for (let attempt = 0; attempt < 4; attempt++) {
@@ -329,6 +330,7 @@ export class NoteSession {
 
         if (result.accepted) {
           this.flushedEpoch = Math.max(this.flushedEpoch, targetChangeEpoch);
+          savedChanges = true;
           logger.info('Accepted note session push', {
             nodeId: this.id,
             attempt: attempt + 1,
@@ -358,6 +360,8 @@ export class NoteSession {
         'Failed to push Yjs updates after reconciling remote changes.',
       );
     });
+
+    return savedChanges;
   }
 
   private onTransportMessage = (data: Uint8Array) => {

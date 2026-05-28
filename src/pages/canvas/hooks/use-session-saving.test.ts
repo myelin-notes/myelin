@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   },
   regenerateThumbnailNow: vi.fn(async () => {}),
   requestThumbnailRegeneration: vi.fn(),
-  saveSessionAndCreateVersion: vi.fn(async () => {}),
+  saveSessionAndCreateVersion: vi.fn(async () => true),
 }));
 
 vi.mock('react', () => ({
@@ -128,6 +128,7 @@ describe('useCanvasSessionSaving', () => {
   });
 
   it('does not regenerate the thumbnail when leaving an unchanged note', async () => {
+    mocks.saveSessionAndCreateVersion.mockResolvedValueOnce(false);
     const note = createSession('note-a', false);
 
     const saving = renderSaving('note-a', note.session);
@@ -138,5 +139,19 @@ describe('useCanvasSessionSaving', () => {
       mocks.repository,
     );
     expect(mocks.regenerateThumbnailNow).not.toHaveBeenCalled();
+  });
+
+  it('regenerates the thumbnail when the save reports teardown-time changes', async () => {
+    mocks.saveSessionAndCreateVersion.mockResolvedValueOnce(true);
+    const note = createSession('note-a', false);
+
+    const saving = renderSaving('note-a', note.session);
+    await saving.saveBeforeExit();
+
+    expect(mocks.saveSessionAndCreateVersion).toHaveBeenCalledWith(
+      note.session,
+      mocks.repository,
+    );
+    expect(mocks.regenerateThumbnailNow).toHaveBeenCalledWith('note-a');
   });
 });

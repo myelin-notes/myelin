@@ -37,18 +37,19 @@ export function useCanvasSessionSaving({
 
   const saveTimerRef = useRef<number | null>(null);
   const autoSaveTimerRef = useRef<number | null>(null);
-  const savePromiseRef = useRef<Promise<void> | null>(null);
+  const savePromiseRef = useRef<Promise<boolean> | null>(null);
 
   const saveSession = useCallback(
     async (
       session: NoteSession,
       saveRepository: Pick<Repository, 'createFileVersionIfDue'>,
       shouldContinue: () => boolean = () => true,
-    ): Promise<void> => {
+    ): Promise<boolean> => {
+      let savedChanges = false;
       if (savePromiseRef.current) {
-        await savePromiseRef.current;
+        savedChanges = await savePromiseRef.current;
         if (!shouldContinue() || !session.hasUnsyncedChanges()) {
-          return;
+          return savedChanges;
         }
       }
 
@@ -61,7 +62,7 @@ export function useCanvasSessionSaving({
         }
       });
       savePromiseRef.current = savePromise;
-      await savePromise;
+      return (await savePromise) || savedChanges;
     },
     [],
   );
@@ -93,11 +94,10 @@ export function useCanvasSessionSaving({
       id: VFSNodeId | undefined,
       saveRepository: Pick<Repository, 'createFileVersionIfDue'>,
     ): Promise<void> => {
-      const hadUnsyncedChanges = session.hasUnsyncedChanges();
       clearScheduledSave();
-      await saveSession(session, saveRepository);
+      const savedChanges = await saveSession(session, saveRepository);
 
-      if (id === undefined || !hadUnsyncedChanges) {
+      if (id === undefined || !savedChanges) {
         return;
       }
 
@@ -111,10 +111,6 @@ export function useCanvasSessionSaving({
   );
 
   const saveBeforeExit = useCallback(async (): Promise<void> => {
-    if (savePromiseRef.current) {
-      await savePromiseRef.current;
-    }
-
     const session = noteSessionRef.current;
     if (!session) {
       clearScheduledSave();
