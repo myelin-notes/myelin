@@ -1,4 +1,4 @@
-import { Fragment, memo, type ReactNode, useCallback, useState } from 'react';
+import { Fragment, memo, type ReactNode, useCallback, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import {
@@ -120,48 +120,58 @@ export function PaneDropTarget({
 }) {
   const controller = useTabController();
   const [dragIntent, setDragIntent] = useState<DragIntent | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) {
-      return;
-    }
-
-    if (isPaneTabBarEvent(e)) {
-      setDragIntent(null);
-      return;
-    }
-
-    const intent = dragIntentForPoint(
-      e.currentTarget.getBoundingClientRect(),
-      e.clientX,
-      e.clientY,
-    );
-    setDragIntent(intent);
-
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) return;
+    if (isPaneTabBarEvent(e)) return;
+    setDragIntent((prev) => prev ?? { edge: 'center' });
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleOverlayDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      setDragIntent(
+        dragIntentForPoint(
+          container.getBoundingClientRect(),
+          e.clientX,
+          e.clientY,
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleOverlayDragLeave = useCallback((e: React.DragEvent) => {
+    const container = containerRef.current;
     if (
+      container &&
       e.relatedTarget instanceof Node &&
-      e.currentTarget.contains(e.relatedTarget)
+      container.contains(e.relatedTarget)
     ) {
       return;
     }
     setDragIntent(null);
   }, []);
 
-  const handleDrop = useCallback(
+  const handleOverlayDrop = useCallback(
     (e: React.DragEvent) => {
+      const container = containerRef.current;
       const intent =
         dragIntent ??
-        dragIntentForPoint(
-          e.currentTarget.getBoundingClientRect(),
-          e.clientX,
-          e.clientY,
-        );
+        (container
+          ? dragIntentForPoint(
+              container.getBoundingClientRect(),
+              e.clientX,
+              e.clientY,
+            )
+          : ({ edge: 'center' } as DragIntent));
 
       const data = getTabDragData(e.dataTransfer);
       if (!data) {
@@ -193,14 +203,21 @@ export function PaneDropTarget({
 
   return (
     <div
+      ref={containerRef}
       data-pane-drop-target={paneId}
       className={cn('relative', className)}
       onPointerDown={onPointerDown}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      onDragEnter={handleDragEnter}
     >
       {children}
+      {dragIntent && (
+        <div
+          className="absolute inset-0 z-40"
+          onDragOver={handleOverlayDragOver}
+          onDragLeave={handleOverlayDragLeave}
+          onDrop={handleOverlayDrop}
+        />
+      )}
       <AnimatePresence>
         {splitIntent && (
           <SplitPreview key={splitIntent.edge} intent={splitIntent} />
