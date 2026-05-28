@@ -10,6 +10,8 @@ This revision supersedes the live-sync-led framing in the sections below. Four d
 2. **Student/Educator tier removed.** The generous free tier already serves students and is the better evangelism engine; a discounted SKU dilutes ARPU on the least-able-to-pay cohort and adds verification friction for no acquisition gain. Replace with the free tier + occasional time-boxed promo codes (no verification infrastructure).
 3. **Pro and Lab merged.** Collaboration moves into a single per-seat **Pro** (Pro users can invite **free guests** into a shared space, which drives the loop and converts guests). The future top tier becomes a light **Team** (shared billing + member management). **Enterprise (SSO/SOC 2/admin console) stays unbuilt** — placeholder only, built solely if an inbound buyer with budget forces it.
 4. **A web app editor is now planned** (this reverses the prior "no web build" principle). It runs the core editor for **invited collaborators or Pro subscribers**, giving the collaboration loop a zero-install entry point (click invite link → edit in browser). Open: the exact access/storage model — invite-gated, Pro-gated, and/or browser-cache-local storage — to be decided.
+5. **Patron deferred out of v1.** It presupposes a public indie/founder narrative; without one it reads as an upsell, not patronage. Spec kept, but not launched until a founder voice + community exist, and then confined to the community/enthusiast surface — never the team-buying path.
+6. **Brand posture split by surface + local-first as the team-trust answer.** Founder/indie voice lives in community/distribution channels (the acquisition loop); buyer-facing surfaces (site, pricing, in-app) present a product-grade brand. The team-longevity fear ("what if you disappear") is answered **structurally** — notes stay as files in the user's own GitHub/disk regardless — not by posing as a bigger company.
 
 Two open risks the reframe rests on:
 
@@ -175,7 +177,7 @@ Charge for:
 | --- | --- | --- | --- |
 | Free | Everyone | Free | Adoption, habit, trust; DIY collaboration via a shared GitHub repo is the loop's free on-ramp |
 | Pro | Serious students, researchers, prosumers, and anyone collaborating | $8/month or $72/year (test $10–12/month) | Primary revenue. Per seat. Includes managed collaboration (invite by link, no GitHub) + search/OCR + history. Pro users can invite free guests into a shared space |
-| Patron | Users who want to back Myelin beyond Pro | $15/month or $144/year | Voluntary supporter revenue + community bond |
+| Patron (deferred) | Committed supporters, via the community/enthusiast surface only | $15/month or $144/year | Deferred out of v1 (see Revision). Voluntary supporter revenue; gated on establishing a public founder/indie narrative |
 | Team (later) | Small groups who want one bill | per seat | Light shared billing + member management. Built when groups ask; not required for viability |
 | ~~Student/Educator Pro~~ | — | — | Removed 2026-05-28 (see Revision). Replaced by generous free tier + occasional promo codes |
 | ~~Enterprise~~ | — | contact us | Placeholder only — do not build SSO/SOC 2/admin until an inbound buyer with budget forces it |
@@ -230,7 +232,9 @@ This tier has been cut. Reasoning:
 
 Replacement: the free tier as the de-facto student offer ("free for students, forever, not a trial"), plus occasional time-boxed promo codes (e.g. a fall-semester discount) when a push is wanted — zero verification infrastructure, fully reversible.
 
-### Patron plan
+### Patron plan — deferred out of v1 (2026-05-28)
+
+**Deferred.** Patron presupposes a public indie/founder narrative; until that exists it reads as an upsell, not patronage. Do not launch it at v1 (no community yet, near-zero takers, clutters the just-simplified pricing page). Keep the full spec below intact and revisit once a founder voice and an engaged community exist — and when it returns, scope it to the **community/enthusiast surface only**, never the team-buying path. The decision to put a founder forward publicly (see Brand posture, revision point 6) gates this.
 
 Patron is an optional recurring supporter tier priced above Pro, aligned with the Patreon model of directly backing an indie product.
 

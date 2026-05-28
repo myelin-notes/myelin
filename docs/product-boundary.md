@@ -405,6 +405,8 @@ Myelin should not publicly promise:
 
 #### Recommendation
 
+**Deferred out of v1 (2026-05-28).** Keep the spec below, but do not launch Patron until a public founder/indie narrative exists; otherwise it reads as an upsell, not patronage. When it returns, confine it to the community/enthusiast surface, never the team-buying path. See §13.
+
 Offer an optional Patron subscription above Pro for users who want to back Myelin beyond the standard paid plan.
 
 - Price: `$15/month` or `$144/year`
@@ -460,6 +462,36 @@ The collaboration wedge needs a frictionless way for the *second* person to join
 #### Open risk
 
 Collaboration-as-wedge is still an **untested assumption**. Validate that the target audience actually wants to co-author notes (group projects, co-authored papers, lab notebooks, shared study notes) before over-investing in the web editor and managed cloud build.
+
+### 13. Brand Posture & Team Trust Boundary
+
+#### Recommendation
+
+Do not treat "indie/solo developer" as one global brand setting. Split it by surface:
+
+- **Community / distribution channels** (YouTube demos, build-in-public posts, Reddit, HN, changelog): the founder voice lives here. Indie is an asset in these spaces, and this is where the primary cold-acquisition loop runs.
+- **Buyer-facing surfaces** (marketing site, pricing page, in-app): present as a **credible product brand**, not a personal side project. No "solo side project" framing on the pricing page.
+
+This keeps indie warmth for acquisition without wearing fragility on the sales surface, and it matches the brand voice in `PRODUCT.md` (calm, considered, editorial — quiet authority, no marketing in-app).
+
+#### Team longevity / trust
+
+The team buyer's real fear is not "is this a company" — it is "what happens to our shared notes if Myelin disappears." Answer it **structurally with local-first**, not by pretending to be bigger:
+
+- Even if Myelin vanishes, notes remain plain files in the user's own GitHub repo / on disk, usable in any editor. This is a durability guarantee a closed SaaS competitor cannot make — local-first turns the solo-dev bus-factor from the team's problem into a non-issue.
+
+Two conditions to keep this real, not just copy:
+
+1. The free **local + GitHub path must always remain fully usable** — never make a team wholly dependent on Myelin-hosted cloud with no escape.
+2. **Export and the cloud-cancellation grace period** must be prominent in the team-facing story, not buried.
+
+#### Scope note
+
+The "indie scares teams" risk genuinely bites only for **enterprise** buyers (vendor-risk assessments, SSO/SOC 2) — a segment already ruled out. The in-scope teams (small labs, co-author groups, study groups) are indie-tolerant. Re-open this boundary only if strategy shifts toward larger orgs.
+
+#### Open decision
+
+Whether — and how prominently — to put a founder forward publicly is still an explicit open decision. It gates both the deferred Patron tier (§11) and the tone of the cold-acquisition content loop.
 
 ## Remaining Open Decisions
 
@@ -517,6 +549,21 @@ Why:
 
 It is useful, but not core to validating whether users will pay for Myelin's strongest convenience layer.
 
+### D. Founder Narrative Boundary
+
+Question:
+
+Should a founder be put forward publicly, and how prominently?
+
+Recommendation:
+
+- Use the founder/indie voice in community/distribution channels (the acquisition loop); keep buyer-facing surfaces product-grade (see §13).
+- Treat the *degree* of public founder presence as an explicit, reversible call — it gates the deferred Patron tier and the tone of the content loop.
+
+Why:
+
+The founder narrative is your main cold-acquisition engine and the precondition for Patron, but it carries a data-trust tradeoff for team buyers — which local-first (§13) is designed to neutralize.
+
 ## Decision Log
 
 Use this section to convert open boundaries into explicit calls.
@@ -541,6 +588,9 @@ Use this section to convert open boundaries into explicit calls.
 | 2026-05-28 | Enterprise | Stays **unbuilt** — placeholder only | No SSO/SOC 2/admin console/sales motion unless an inbound buyer with budget forces it |
 | 2026-05-28 | Web build | **Reverses the prior "no web build" principle** — a web app editor running the core editor is now planned, gated to invited collaborators or Pro | Gives the collaboration loop a zero-install entry (click invite → edit in browser). Access/storage model (invite-gated / Pro-gated / browser-cache-local) still open |
 | 2026-05-28 | Paid heroes | Pro headline features are **search/OCR retrieval** and **managed collaboration**, not managed solo sync | Free GitHub sync undercuts solo managed sync for the technical wedge; search and managed collaboration are what GitHub cannot replicate |
+| 2026-05-28 | Patron tier | **Deferred out of v1** — keep spec, launch only once a public founder/indie narrative exists; confine to community/enthusiast surface, never the team path | Without the indie narrative it reads as an upsell; near-zero takers at launch and clutters the simplified pricing page |
+| 2026-05-28 | Brand posture | **Split by surface** — founder/indie voice in community/distribution channels; product-grade brand on buyer-facing surfaces (site, pricing, in-app) | Keeps indie warmth for acquisition without showing fragility to team buyers; matches PRODUCT.md voice |
+| 2026-05-28 | Team trust | Answer team-longevity fear **structurally with local-first** (notes stay as files in the user's own GitHub/disk if Myelin disappears), not by posing as a bigger company | A durability guarantee SaaS can't match; requires the local+GitHub path always usable + prominent export/grace-period |
 
 ## Next Step
 
