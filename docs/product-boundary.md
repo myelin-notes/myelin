@@ -352,8 +352,8 @@ The first paid personal plan should be priced like a serious tool, not a throwaw
 
 Working default recommendation:
 
-- Pro: `$8/month` or `$72/year`
-- Student/Educator Pro: `$4/month` or `$36/year`
+- Pro: `$8/month` or `$72/year` (test `$10–12/month` — researchers expense tools; ARPU matters more than volume at sub-2,000 customers)
+- Student/Educator Pro: removed 2026-05-28 (see Decision Log) — replaced by the free tier + occasional promo codes
 
 #### Pricing floor rule
 
@@ -430,6 +430,37 @@ Patron provides:
 
 Frame Patron as "back the product beyond Pro," not as the next rung on the pricing ladder. Visual treatment on the pricing page should be a distinct block below the three main plans, with its own CTA.
 
+### 12. Collaboration, Web, and Tier Structure Boundary
+
+#### Recommendation
+
+Treat **collaboration (co-authoring notes)**, not live multi-device sync, as the product wedge.
+
+- **Free:** DIY collaboration via a shared GitHub repo (both peers configure the same repo). This is the growth loop's free on-ramp. Self-device sync is included but unhyped.
+- **Pro (per seat):** managed collaboration — invite by link, no GitHub. The shared note's durable copy moves from a user-owned GitHub repo to a Myelin-hosted cloud repository; access is granted by Myelin-account membership instead of GitHub repo access. The live-editing engine (iroh P2P + CRDT + discovery) is unchanged. Pro users can invite **free guests** into a shared space (owner-pays / guests-free, to keep the loop alive among price-sensitive groups).
+- **Team (later):** Pro + shared billing + member management. Build when groups ask.
+- **Enterprise:** unbuilt placeholder.
+
+#### Web app editor
+
+A web app running the **core editor** is now planned (this reverses the earlier "no web build" stance). Purpose: a zero-install entry point for the collaboration loop — an invited collaborator clicks a link and edits in the browser rather than being forced to install a native app first.
+
+Gating intent: **invited collaborators or Pro subscribers only** — this is not a free public web platform.
+
+Open access/storage model (founder decision):
+
+- invite-gated access, and/or
+- Pro-gated access, and/or
+- browser-cache-local storage (IndexedDB) so a web client can hold its own local copy
+
+#### Why this matters
+
+The collaboration wedge needs a frictionless way for the *second* person to join. A native-install requirement throttles exactly the loop the business now depends on. The web editor is the escape hatch — but its scope and access model are unsettled, and it adds a real build surface to a plan that was otherwise native-only and low-infra.
+
+#### Open risk
+
+Collaboration-as-wedge is still an **untested assumption**. Validate that the target audience actually wants to co-author notes (group projects, co-authored papers, lab notebooks, shared study notes) before over-investing in the web editor and managed cloud build.
+
 ## Remaining Open Decisions
 
 These are the founder decisions that still matter most right now.
@@ -504,6 +535,12 @@ Use this section to convert open boundaries into explicit calls.
 | 2026-04-21 | Semantic search launch scope | Semantic search ships as a Pro feature at paid launch | Previously planned as post-launch; moved forward so retrieval story is complete at launch |
 | 2026-04-21 | Patron tier | Ship an optional Patron subscription at $15/month or $144/year above Pro | Patreon-style recurring support; voluntary, visually separate from the Free/Pro/Student grid; perks are ongoing (monthly log, beta, survey), never critical features |
 | 2026-04-21 | Billing model | All billing on the web via Stripe, no Apple IAP / Google Play Billing | One subscription travels with the Myelin account across platforms; on mobile, app uses reader-app pattern (no in-app subscribe UI) |
+| 2026-05-28 | Product wedge | Reframe from "live multi-device sync" to **collaboration** (co-authoring); self-device sync demoted to a quiet background feature | Self-sync judged "neat, not needed"; co-editing with others is the valued capability, the growth loop, and a paid wedge |
+| 2026-05-28 | Student tier | **Removed** | Free tier already serves students better; discounted SKU dilutes ARPU + adds verification friction. Replace with free tier + occasional promo codes |
+| 2026-05-28 | Tier structure | **Merge Lab into Pro** — collaboration ships in per-seat Pro with free guests; future top tier is a light **Team** (shared billing/admin) | Gating collaboration behind the top tier would starve the growth loop and the best paid wedge |
+| 2026-05-28 | Enterprise | Stays **unbuilt** — placeholder only | No SSO/SOC 2/admin console/sales motion unless an inbound buyer with budget forces it |
+| 2026-05-28 | Web build | **Reverses the prior "no web build" principle** — a web app editor running the core editor is now planned, gated to invited collaborators or Pro | Gives the collaboration loop a zero-install entry (click invite → edit in browser). Access/storage model (invite-gated / Pro-gated / browser-cache-local) still open |
+| 2026-05-28 | Paid heroes | Pro headline features are **search/OCR retrieval** and **managed collaboration**, not managed solo sync | Free GitHub sync undercuts solo managed sync for the technical wedge; search and managed collaboration are what GitHub cannot replicate |
 
 ## Next Step
 

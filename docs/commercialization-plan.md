@@ -1,6 +1,20 @@
 # Myelin Commercialization Plan
 
-_Last updated: April 20, 2026_
+_Last updated: May 28, 2026_
+
+## Revision — May 28, 2026
+
+This revision supersedes the live-sync-led framing in the sections below. Four decisions:
+
+1. **Wedge reframed from "live multi-device sync" to "collaboration" — writing and drawing *together*.** Self-device sync (laptop↔iPad) is demoted from headline-and-paywall to a quiet background feature; the founder's read is that it is "neat," not needed. Real-time co-editing *with other people* is the valued capability and the growth loop. Paid heroes are now **search/OCR retrieval** and **managed collaboration**, not managed solo sync.
+2. **Student/Educator tier removed.** The generous free tier already serves students and is the better evangelism engine; a discounted SKU dilutes ARPU on the least-able-to-pay cohort and adds verification friction for no acquisition gain. Replace with the free tier + occasional time-boxed promo codes (no verification infrastructure).
+3. **Pro and Lab merged.** Collaboration moves into a single per-seat **Pro** (Pro users can invite **free guests** into a shared space, which drives the loop and converts guests). The future top tier becomes a light **Team** (shared billing + member management). **Enterprise (SSO/SOC 2/admin console) stays unbuilt** — placeholder only, built solely if an inbound buyer with budget forces it.
+4. **A web app editor is now planned** (this reverses the prior "no web build" principle). It runs the core editor for **invited collaborators or Pro subscribers**, giving the collaboration loop a zero-install entry point (click invite link → edit in browser). Open: the exact access/storage model — invite-gated, Pro-gated, and/or browser-cache-local storage — to be decided.
+
+Two open risks the reframe rests on:
+
+- **Collaboration is still an untested bet.** Validate that the target audience actually wants to co-author notes before committing heavily.
+- **No-web vs invite-loop tension** — partially resolved by the planned web editor above, but its scope and access model are unsettled, and it adds a real build surface to an otherwise native-only, low-infra plan.
 
 ## Executive Summary
 
@@ -159,11 +173,12 @@ Charge for:
 
 | Plan | Audience | Price | Purpose |
 | --- | --- | --- | --- |
-| Free | Everyone | Free | Adoption, habit, trust |
-| Pro | Serious students, researchers, prosumers | $8/month or $72/year | Primary revenue |
-| Student/Educator Pro | Price-sensitive academic users | $4/month or $36/year | Accessibility without destroying ARPU |
+| Free | Everyone | Free | Adoption, habit, trust; DIY collaboration via a shared GitHub repo is the loop's free on-ramp |
+| Pro | Serious students, researchers, prosumers, and anyone collaborating | $8/month or $72/year (test $10–12/month) | Primary revenue. Per seat. Includes managed collaboration (invite by link, no GitHub) + search/OCR + history. Pro users can invite free guests into a shared space |
 | Patron | Users who want to back Myelin beyond Pro | $15/month or $144/year | Voluntary supporter revenue + community bond |
-| Lab | Small research groups, later | $12/user/month or $120/user/year | Optional expansion, not required for viability |
+| Team (later) | Small groups who want one bill | per seat | Light shared billing + member management. Built when groups ask; not required for viability |
+| ~~Student/Educator Pro~~ | — | — | Removed 2026-05-28 (see Revision). Replaced by generous free tier + occasional promo codes |
+| ~~Enterprise~~ | — | contact us | Placeholder only — do not build SSO/SOC 2/admin until an inbound buyer with budget forces it |
 
 ### Free plan
 
@@ -191,32 +206,29 @@ Pro should be the main plan that funds the product.
 
 Pro should include:
 
-- managed Myelin Cloud sync and backup
-- zero-setup multi-device onboarding
+- managed collaboration — invite by link, no GitHub; Pro users can invite free guests into a shared space (primary paid wedge + growth loop)
+- cross-platform OCR-backed and semantic search (the other primary paid wedge; free GitHub sync cannot replicate it)
+- managed Myelin Cloud storage and backup
 - version history and restore
-- cross-platform OCR-backed search
 - faster indexing and background processing
 - advanced PDF and research workflows
 - priority support
 - early access/beta channel
 
+Managed *solo* multi-device sync is no longer a headline selling point — it is a quiet background convenience, since free GitHub sync already covers the technically-comfortable wedge users.
+
 This plan is not "more notes."
 
-It is "Myelin removes setup, backup, sync, and retrieval friction for people who use it seriously."
+It is "Myelin removes collaboration, backup, and retrieval friction for people who use it seriously."
 
-### Student/Educator Pro
+### Student/Educator Pro — removed (2026-05-28)
 
-This plan exists because accessibility matters and students are a natural wedge.
+This tier has been cut. Reasoning:
 
-It should be:
+- The generous free tier already serves students and is the stronger evangelism engine — students evangelize by *using and showing* the app, not by paying.
+- A discounted SKU dilutes ARPU on the least-able-to-pay cohort and adds verification friction for no acquisition gain.
 
-- genuinely cheap
-- annual-first
-- verified if needed later, but not overcomplicated at launch
-
-The purpose is not maximizing revenue per user.
-
-The purpose is maximizing adoption in the segment most likely to love and evangelize the product.
+Replacement: the free tier as the de-facto student offer ("free for students, forever, not a trial"), plus occasional time-boxed promo codes (e.g. a fall-semester discount) when a push is wanted — zero verification infrastructure, fully reversible.
 
 ### Patron plan
 
@@ -244,19 +256,17 @@ Purpose:
 - a forcing function for transparent development (the monthly log)
 - a direct signal of indie-first trajectory — "you can back this product"
 
-### Lab plan
+### Team plan (formerly "Lab")
 
-This should come only after individual product-market fit.
+Collaboration itself now lives in **Pro** (see above), so the top tier is no longer "the collaboration tier." Team is a thin layer over Pro for groups who want one bill:
 
-It can include:
+- shared billing across seats
+- member management
+- light admin controls
 
-- shared spaces or shared notebooks
-- collaborator permissions
-- activity history
-- centralized billing
-- simple admin controls
+Build it only after individual product-market fit, and only when groups actually ask. **It should not be the near-term funding assumption.**
 
-This is a nice later expansion, but **it should not be the near-term funding assumption**.
+**Enterprise** (SSO, SOC 2, admin console, procurement, a sales motion) stays unbuilt — a "contact us" placeholder built only if an inbound buyer with real budget forces it. Do not build it speculatively.
 
 ## What Must Be Built To Make This Sellable
 
