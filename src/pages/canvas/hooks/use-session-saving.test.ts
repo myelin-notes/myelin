@@ -54,11 +54,11 @@ interface MockNoteSession {
   ) => () => void;
 }
 
-function createSession(id: string) {
+function createSession(id: string, hasUnsyncedChanges = true) {
   let localChangeListener = () => {};
   const session: MockNoteSession = {
     id,
-    hasUnsyncedChanges: vi.fn(() => true),
+    hasUnsyncedChanges: vi.fn(() => hasUnsyncedChanges),
     save: vi.fn(async () => {}),
     subscribeLocalChanges: vi.fn((listener) => {
       localChangeListener = listener;
@@ -125,5 +125,18 @@ describe('useCanvasSessionSaving', () => {
       noteB.session,
       mocks.repository,
     );
+  });
+
+  it('does not regenerate the thumbnail when leaving an unchanged note', async () => {
+    const note = createSession('note-a', false);
+
+    const saving = renderSaving('note-a', note.session);
+    await saving.saveBeforeExit();
+
+    expect(mocks.saveSessionAndCreateVersion).toHaveBeenCalledWith(
+      note.session,
+      mocks.repository,
+    );
+    expect(mocks.regenerateThumbnailNow).not.toHaveBeenCalled();
   });
 });

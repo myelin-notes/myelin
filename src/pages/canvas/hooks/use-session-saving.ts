@@ -93,10 +93,11 @@ export function useCanvasSessionSaving({
       id: VFSNodeId | undefined,
       saveRepository: Pick<Repository, 'createFileVersionIfDue'>,
     ): Promise<void> => {
+      const hadUnsyncedChanges = session.hasUnsyncedChanges();
       clearScheduledSave();
       await saveSession(session, saveRepository);
 
-      if (id === undefined) {
+      if (id === undefined || !hadUnsyncedChanges) {
         return;
       }
 
