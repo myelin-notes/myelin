@@ -289,6 +289,14 @@ export class CachedRepository
       window.clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
+    // Skip the final flush when there's nothing to push. flushPending acquires
+    // the remoteSync mutex, which an in-flight background sync may be holding —
+    // that wait dominates window-close time (seconds) even though our outbox
+    // is already empty. The in-flight sync owns the same work we'd do, and the
+    // outbox is durable, so abandoning the wait is safe.
+    if (this.outbox.length === 0) {
+      return;
+    }
     try {
       await this.flushPending();
     } catch (error) {
@@ -816,6 +824,17 @@ export class CachedRepository
   private async buildBatchPlan(
     remote: BaseRepository & BatchedCommitTarget,
   ): Promise<BatchPlan | null | 'abort-to-rest'> {
+    // Bail before any remote round-trips when there's nothing to push —
+    // dispose() calls flushPending() on every window close, and the network
+    // hops below otherwise add noticeable latency to closing.
+    const hasPending = await this.withLocalStateLock(async () => {
+      await this.outbox.load();
+      return this.outbox.length > 0;
+    });
+    if (!hasPending) {
+      return null;
+    }
+
     const expectedHeadOid = await remote.getBranchHeadOid();
     const { manifest: remoteManifest } = await remote.loadManifestForBatch();
 
