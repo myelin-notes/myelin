@@ -1,4 +1,11 @@
 import { Fragment, memo, type ReactNode, useCallback, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  type LucideIcon,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import {
@@ -25,15 +32,14 @@ interface SplitIntent {
   placement: 'before' | 'after';
 }
 
-function splitIntentForPoint(
+type DragIntent = SplitIntent | { edge: 'center' };
+
+function dragIntentForPoint(
   rect: DOMRect,
   clientX: number,
   clientY: number,
-): SplitIntent | null {
-  const edgeSize = Math.min(
-    72,
-    Math.max(36, Math.min(rect.width, rect.height) * 0.18),
-  );
+): DragIntent {
+  const edgeSize = Math.min(rect.width, rect.height) * 0.38;
   const distances: Array<[SplitEdge, number]> = [
     ['left', clientX - rect.left],
     ['right', rect.right - clientX],
@@ -45,7 +51,7 @@ function splitIntentForPoint(
   );
 
   if (distance > edgeSize) {
-    return null;
+    return { edge: 'center' };
   }
 
   switch (edge) {
@@ -70,15 +76,22 @@ function isPaneTabBarEvent(e: React.DragEvent): boolean {
 function splitPreviewClass(edge: SplitEdge): string {
   switch (edge) {
     case 'left':
-      return 'inset-y-2 left-2 w-[28%]';
+      return 'inset-y-1 left-1 w-[45%]';
     case 'right':
-      return 'inset-y-2 right-2 w-[28%]';
+      return 'inset-y-1 right-1 w-[45%]';
     case 'top':
-      return 'top-2 inset-x-2 h-[28%]';
+      return 'top-1 inset-x-1 h-[45%]';
     case 'bottom':
-      return 'bottom-2 inset-x-2 h-[28%]';
+      return 'bottom-1 inset-x-1 h-[45%]';
   }
 }
+
+const splitEdgeIcon: Record<SplitEdge, LucideIcon> = {
+  left: ArrowLeft,
+  right: ArrowRight,
+  top: ArrowUp,
+  bottom: ArrowDown,
+};
 
 export function PaneDropTarget({
   paneId,
@@ -92,7 +105,7 @@ export function PaneDropTarget({
   onPointerDown?: () => void;
 }) {
   const controller = useTabController();
-  const [splitIntent, setSplitIntent] = useState<SplitIntent | null>(null);
+  const [dragIntent, setDragIntent] = useState<DragIntent | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) {
@@ -100,20 +113,16 @@ export function PaneDropTarget({
     }
 
     if (isPaneTabBarEvent(e)) {
-      setSplitIntent(null);
+      setDragIntent(null);
       return;
     }
 
-    const intent = splitIntentForPoint(
+    const intent = dragIntentForPoint(
       e.currentTarget.getBoundingClientRect(),
       e.clientX,
       e.clientY,
     );
-    setSplitIntent(intent);
-
-    if (!intent) {
-      return;
-    }
+    setDragIntent(intent);
 
     e.preventDefault();
     e.stopPropagation();
@@ -127,41 +136,46 @@ export function PaneDropTarget({
     ) {
       return;
     }
-    setSplitIntent(null);
+    setDragIntent(null);
   }, []);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       const intent =
-        splitIntent ??
-        splitIntentForPoint(
+        dragIntent ??
+        dragIntentForPoint(
           e.currentTarget.getBoundingClientRect(),
           e.clientX,
           e.clientY,
         );
-      if (!intent) {
-        return;
-      }
 
       const data = getTabDragData(e.dataTransfer);
       if (!data) {
-        setSplitIntent(null);
+        setDragIntent(null);
         return;
       }
 
       e.preventDefault();
       e.stopPropagation();
-      setSplitIntent(null);
+      setDragIntent(null);
 
-      controller.splitPaneWithTab(
-        paneId,
-        intent.direction,
-        data.tabId,
-        intent.placement,
-      );
+      if (intent.edge === 'center') {
+        controller.moveTab(data.tabId, data.sourcePaneId, paneId, Infinity);
+      } else {
+        controller.splitPaneWithTab(
+          paneId,
+          intent.direction,
+          data.tabId,
+          intent.placement,
+        );
+      }
     },
-    [controller, paneId, splitIntent],
+    [controller, paneId, dragIntent],
   );
+
+  const splitIntent =
+    dragIntent && dragIntent.edge !== 'center' ? dragIntent : null;
+  const showCenter = dragIntent?.edge === 'center';
 
   return (
     <div
@@ -174,21 +188,40 @@ export function PaneDropTarget({
     >
       {children}
       <AnimatePresence>
-        {splitIntent && (
-          <motion.div
-            key={splitIntent.edge}
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.12, ease: 'easeOut' }}
-            className={cn(
-              'pointer-events-none absolute rounded-lg bg-accent-dark/8 ring-1 ring-accent-dark/20',
-              splitPreviewClass(splitIntent.edge),
-            )}
-          />
-        )}
+        {splitIntent && <SplitPreview key={splitIntent.edge} intent={splitIntent} />}
+        {showCenter && <CenterPreview key="center" />}
       </AnimatePresence>
     </div>
+  );
+}
+
+function SplitPreview({ intent }: { intent: SplitIntent }) {
+  const Icon = splitEdgeIcon[intent.edge];
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.12, ease: 'easeOut' }}
+      className={cn(
+        'pointer-events-none absolute z-50 flex items-center justify-center rounded-md bg-accent-dark/12 ring-2 ring-accent-dark/30',
+        splitPreviewClass(intent.edge),
+      )}
+    >
+      <Icon className="size-5 text-accent-dark/50" />
+    </motion.div>
+  );
+}
+
+function CenterPreview() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.1, ease: 'easeOut' }}
+      className="pointer-events-none absolute inset-1 z-50 rounded-md bg-accent-dark/6 ring-1 ring-accent-dark/15"
+    />
   );
 }
 
