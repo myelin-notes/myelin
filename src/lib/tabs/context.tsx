@@ -17,7 +17,11 @@ function readInitTab(): Tab | null {
     return null;
   }
   window.history.replaceState({}, '', '/');
-  return JSON.parse(raw) as Tab;
+  try {
+    return JSON.parse(raw) as Tab;
+  } catch {
+    return null;
+  }
 }
 
 const TabControllerContext = createContext<TabStateController | null>(null);

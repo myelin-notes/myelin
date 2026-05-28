@@ -134,19 +134,6 @@ function CanvasViewInner({
   const targetPageFrameName = initialPageFrameNameProp ?? null;
   const targetPageFrameId = initialPageFrameIdProp ?? null;
 
-  const handleBack = useCallback(() => {
-    const pane = tabController.getPane(paneId);
-    if (!pane) {
-      return;
-    }
-    const tab = pane.tabs.find(
-      (t) => t.target.type === 'canvas' && t.target.id === id,
-    );
-    if (tab) {
-      tabController.closeTab(tab.id, paneId);
-    }
-  }, [tabController, paneId, id]);
-
   const engine = useCanvasEngine({
     id,
     initialPageFrameName: targetPageFrameName,
@@ -163,7 +150,6 @@ function CanvasViewInner({
     onInsertFrame: inserts.onInsertFrame,
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
-    onBack: handleBack,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
 

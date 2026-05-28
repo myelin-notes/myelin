@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { AllSelection } from 'prosemirror-state';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
@@ -33,7 +33,6 @@ interface UseCanvasEngineArgs {
   onInsertFrame: () => void;
   onInsertEmbed: () => void;
   embedFiles: EmbedFilesFn;
-  onBack: () => void;
 }
 
 export function useCanvasEngine({
@@ -52,7 +51,6 @@ export function useCanvasEngine({
   onInsertFrame,
   onInsertEmbed,
   embedFiles,
-  onBack,
 }: UseCanvasEngineArgs) {
   usePageCanvasBindings({
     canvasRef,
@@ -157,16 +155,10 @@ export function useCanvasEngine({
   );
   useKeybindings(keyBindings);
 
-  const back = useCallback(async () => {
-    await saving.saveBeforeExit();
-    onBack();
-  }, [onBack, saving.saveBeforeExit]);
-
   return {
     drawableCanvasRef,
     ...canvasViewState,
     ...sessionController,
     ...saving,
-    back,
   };
 }
