@@ -1,4 +1,11 @@
-import { Fragment, memo, type ReactNode, useCallback, useRef, useState } from 'react';
+import {
+  Fragment,
+  memo,
+  type ReactNode,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import {
@@ -123,30 +130,33 @@ export function PaneDropTarget({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
-    if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) return;
-    if (isPaneTabBarEvent(e)) return;
+    if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) {
+      return;
+    }
+    if (isPaneTabBarEvent(e)) {
+      return;
+    }
     setDragIntent((prev) => prev ?? { edge: 'center' });
   }, []);
 
-  const handleOverlayDragOver = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
+  const handleOverlayDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
 
-      const container = containerRef.current;
-      if (!container) return;
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
 
-      setDragIntent(
-        dragIntentForPoint(
-          container.getBoundingClientRect(),
-          e.clientX,
-          e.clientY,
-        ),
-      );
-    },
-    [],
-  );
+    setDragIntent(
+      dragIntentForPoint(
+        container.getBoundingClientRect(),
+        e.clientX,
+        e.clientY,
+      ),
+    );
+  }, []);
 
   const handleOverlayDragLeave = useCallback((e: React.DragEvent) => {
     const container = containerRef.current;
