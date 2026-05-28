@@ -660,7 +660,7 @@ export class CachedRepository
   ): Promise<YjsSyncPushResult> {
     return this.withLocalStateLock(async () => {
       const result = await this.cache.pushUpdates(nodeId, update, options);
-      if (result.accepted) {
+      if (result.accepted && result.changed) {
         await this.outbox.mutate((ops) => {
           enqueuePushNote(ops, nodeId);
         });

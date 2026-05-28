@@ -36,6 +36,8 @@ export interface YjsSyncPushOptions {
 export interface YjsSyncPushResult extends YjsSyncSnapshot {
   /** Whether the backend accepted the pushed update. */
   accepted: boolean;
+  /** Whether the accepted push changed the stored document bytes. */
+  changed: boolean;
   /** Remote changes that should be applied locally before retrying a push. */
   remoteUpdate: Uint8Array | null;
 }

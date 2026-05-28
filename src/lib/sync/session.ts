@@ -330,10 +330,11 @@ export class NoteSession {
 
         if (result.accepted) {
           this.flushedEpoch = Math.max(this.flushedEpoch, targetChangeEpoch);
-          savedChanges = true;
+          savedChanges = result.changed;
           logger.info('Accepted note session push', {
             nodeId: this.id,
             attempt: attempt + 1,
+            changed: result.changed,
             changeEpoch: this.changeEpoch,
             flushedEpoch: this.flushedEpoch,
             remoteRevision: this.status.remoteRevision,

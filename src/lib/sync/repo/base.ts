@@ -596,6 +596,7 @@ export abstract class BaseRepository
       );
       return {
         accepted: false,
+        changed: false,
         remoteUpdate: options.localStateVector
           ? Y.encodeStateAsUpdate(remote.doc, options.localStateVector)
           : remote.bytes,
@@ -622,6 +623,7 @@ export abstract class BaseRepository
       });
       return {
         accepted: true,
+        changed: false,
         remoteUpdate: null,
         stateVector,
         revision: remote.revision,
@@ -650,6 +652,7 @@ export abstract class BaseRepository
 
     return {
       accepted: true,
+      changed: true,
       remoteUpdate: null,
       stateVector,
       revision,

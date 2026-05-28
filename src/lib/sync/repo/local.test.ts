@@ -82,6 +82,7 @@ describe('LocalRepository', () => {
     });
 
     expect(result.accepted).toBe(true);
+    expect(result.changed).toBe(true);
 
     const reopened = new LocalRepository('repositories/local-test');
     await reopened.initialize();
@@ -160,6 +161,7 @@ describe('LocalRepository', () => {
     );
 
     expect(result.accepted).toBe(true);
+    expect(result.changed).toBe(false);
     expect(result.revision).toBe(snapshot.revision);
     expect((await repository.getNode(fileId))?.modifiedAt).toBe(modifiedAt);
     expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
