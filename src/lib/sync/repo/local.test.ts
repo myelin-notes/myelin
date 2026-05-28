@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
@@ -64,6 +64,7 @@ function readFirstPageFrameMarkdown(update: Uint8Array | null): string {
 
 describe('LocalRepository', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     resetRepositoryTestDoubles();
   });
 
@@ -125,6 +126,45 @@ describe('LocalRepository', () => {
 
     expect(storedBytes).not.toBeNull();
     expect(readNoteText(storedBytes)).toBe('persisted bytes');
+  });
+
+  it('does not touch notes when pushed updates make no document changes', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+
+    const repository = new LocalRepository('repositories/noop-push-test');
+    await repository.initialize();
+
+    const fileId = await repository.createFile('Stable', 'mcanvas', null);
+    const note = createNoteState('stable content');
+    await repository.pushUpdates(fileId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const snapshot = await repository.loadDocument(fileId);
+    const modifiedAt = (await repository.getNode(fileId))?.modifiedAt;
+    const noOpUpdate = (
+      await repository.pullUpdates(fileId, snapshot.stateVector)
+    ).update;
+
+    vi.setSystemTime(new Date('2026-01-01T00:01:00Z'));
+
+    const result = await repository.pushUpdates(
+      fileId,
+      noOpUpdate ?? new Uint8Array(),
+      {
+        baseRevision: snapshot.revision,
+        localStateVector: snapshot.stateVector,
+      },
+    );
+
+    expect(result.accepted).toBe(true);
+    expect(result.revision).toBe(snapshot.revision);
+    expect((await repository.getNode(fileId))?.modifiedAt).toBe(modifiedAt);
+    expect(readNoteText((await repository.loadDocument(fileId)).update)).toBe(
+      'stable content',
+    );
   });
 
   it('stores outgoing note links and returns backlinks', async () => {
