@@ -19,6 +19,7 @@ export const keybindings = new KeybindingHandler(registry);
 declare module './registry' {
   interface ActionMap {
     'app:command-palette': true;
+    'tab:close': true;
     'canvas:pan': true;
     'canvas:undo': true;
     'canvas:redo': true;
@@ -45,6 +46,13 @@ registry.defineDefaults({
     mod: true,
   },
 });
+
+registry.defineDefaults(
+  {
+    'tab:close': { key: 'w', mod: true },
+  },
+  { locked: true },
+);
 
 registry.defineDefaults(
   {

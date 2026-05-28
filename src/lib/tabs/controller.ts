@@ -137,6 +137,13 @@ function collectPaneIds(node: LayoutNode): PaneId[] {
   return node.children.flatMap(collectPaneIds);
 }
 
+function countTabs(node: LayoutNode): number {
+  if (node.type === 'pane') {
+    return node.tabs.length;
+  }
+  return node.children.reduce((sum, child) => sum + countTabs(child), 0);
+}
+
 function normalizeWindowState(state: WindowState): WindowState {
   const layout = normalizeLayout(state.layout);
   const paneIds = collectPaneIds(layout);
@@ -736,6 +743,10 @@ export class TabStateController {
 
   getFocusedPane(): PaneNode | null {
     return findPane(this.state.layout, this.state.focusedPaneId);
+  }
+
+  getTotalTabCount(): number {
+    return countTabs(this.state.layout);
   }
 
   findTabByTarget(target: TabTarget): { tab: Tab; paneId: PaneId } | null {

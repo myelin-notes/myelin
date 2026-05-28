@@ -1,10 +1,12 @@
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useMemo,
   useSyncExternalStore,
 } from 'react';
+import { useKeybindings } from '@/hooks/useKeybindings';
 import { createWindowStateWithTab, TabStateController } from './controller';
 import type { PaneId, Tab, WindowState } from './types';
 
@@ -30,10 +32,36 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
     return new TabStateController();
   }, []);
 
+  useTabCloseShortcut(controller);
+
   return (
     <TabControllerContext.Provider value={controller}>
       {children}
     </TabControllerContext.Provider>
+  );
+}
+
+function useTabCloseShortcut(controller: TabStateController) {
+  const handleClose = useCallback(
+    (e: KeyboardEvent) => {
+      if (controller.getTotalTabCount() <= 1) {
+        return;
+      }
+      const pane = controller.getFocusedPane();
+      if (!pane) {
+        return;
+      }
+      e.preventDefault();
+      controller.closeTab(pane.activeTabId, pane.id);
+    },
+    [controller],
+  );
+
+  useKeybindings(
+    useMemo(
+      () => [{ action: 'tab:close', allowEditable: true, onDown: handleClose }],
+      [handleClose],
+    ),
   );
 }
 
