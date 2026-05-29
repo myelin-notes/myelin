@@ -9,22 +9,19 @@ import {
   getActionCopy,
   getActionIcon,
 } from '@/lib/keybinds/messages';
+import { isApplePlatform } from '@/lib/platform';
 import { cn } from '@/lib/utils';
-
-const isMac =
-  typeof navigator !== 'undefined' &&
-  /Mac|iPhone|iPad/.test(navigator.platform);
 
 function keyParts(combo: KeyCombo): string[] {
   const parts: string[] = [];
   if (combo.mod) {
-    parts.push(isMac ? '⌘' : 'Ctrl');
+    parts.push(isApplePlatform ? '⌘' : 'Ctrl');
   }
   if (combo.shift) {
-    parts.push(isMac ? '⇧' : 'Shift');
+    parts.push(isApplePlatform ? '⇧' : 'Shift');
   }
   if (combo.alt) {
-    parts.push(isMac ? '⌥' : 'Alt');
+    parts.push(isApplePlatform ? '⌥' : 'Alt');
   }
   const key =
     combo.key === ' '
@@ -65,8 +62,7 @@ function KeyCapture({
         return;
       }
 
-      const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
-      const mod = isMac ? e.metaKey : e.ctrlKey;
+      const mod = isApplePlatform ? e.metaKey : e.ctrlKey;
       const combo: KeyCombo = { key: e.key };
       if (mod) {
         combo.mod = true;

@@ -7,8 +7,13 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { useTabController, useWindowState } from '@/lib/tabs/context';
-import { findPaneInLayout } from '@/lib/tabs/controller';
+import { useMessages } from '@/lib/i18n';
+import {
+  isMac,
+  TAB_BAR_HEIGHT_CLASS,
+  TRAFFIC_LIGHT_INSET_CLASS,
+} from '@/lib/platform';
+import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
   getTabDragData,
@@ -17,7 +22,7 @@ import {
   TAB_DRAG_MIME,
 } from '@/lib/tabs/drag';
 import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
-import type { Tab, TabId, TabTarget } from '@/lib/tabs/types';
+import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
 
 function tabIcon(target: TabTarget) {
@@ -46,20 +51,31 @@ function DropIndicator() {
   );
 }
 
-export const TabBar = memo(function TabBar() {
-  const controller = useTabController();
-  const windowState = useWindowState();
-  const pane = findPaneInLayout(windowState.layout, windowState.focusedPaneId);
+interface TabBarProps {
+  pane: PaneNode;
+  isFocused: boolean;
+  isTopLeft: boolean;
+  windowDraggable: boolean;
+}
 
-  const tabs = pane?.tabs ?? [];
-  const activeTabId = pane?.activeTabId ?? null;
-  const paneId = pane?.id ?? windowState.focusedPaneId;
+export const TabBar = memo(function TabBar({
+  pane,
+  isFocused,
+  isTopLeft,
+  windowDraggable,
+}: TabBarProps) {
+  const strings = useMessages();
+  const controller = useTabController();
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
   const handleNewTab = useCallback(() => {
-    controller.openTab({ type: 'library' }, 'Library');
-  }, [controller]);
+    controller.openTab({ type: 'library' }, strings.tabBar.library, pane.id);
+  }, [controller, pane.id, strings.tabBar.library]);
+
+  const handleSettings = useCallback(() => {
+    controller.openTab({ type: 'settings' }, strings.tabBar.settings, pane.id);
+  }, [controller, pane.id, strings.tabBar.settings]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -70,10 +86,10 @@ export const TabBar = memo(function TabBar() {
       e.dataTransfer.dropEffect = 'move';
 
       setDropIndex(
-        computeTabDropIndex(e.currentTarget, tabs.length, e.clientX),
+        computeTabDropIndex(e.currentTarget, pane.tabs.length, e.clientX),
       );
     },
-    [tabs.length],
+    [pane.tabs.length],
   );
 
   const handleDragLeave = useCallback(() => {
@@ -87,59 +103,81 @@ export const TabBar = memo(function TabBar() {
       if (!data) {
         return;
       }
+      e.stopPropagation();
       e.preventDefault();
 
       const targetIndex = computeTabDropIndex(
         e.currentTarget,
-        tabs.length,
+        pane.tabs.length,
         e.clientX,
       );
 
-      controller.moveTab(data.tabId, data.sourcePaneId, paneId, targetIndex);
+      controller.moveTab(data.tabId, data.sourcePaneId, pane.id, targetIndex);
     },
-    [controller, paneId, tabs.length],
+    [controller, pane.id, pane.tabs.length],
   );
+
+  const dragRegion = windowDraggable ? { 'data-tauri-drag-region': '' } : {};
 
   return (
     <div
-      data-tauri-drag-region
-      className="flex h-10 shrink-0 select-none items-end border-border-subtle border-b bg-surface"
+      data-pane-tab-bar
+      {...dragRegion}
+      className={cn(
+        'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
+        TAB_BAR_HEIGHT_CLASS,
+        !isFocused && 'opacity-75',
+        isMac && isTopLeft && TRAFFIC_LIGHT_INSET_CLASS,
+      )}
     >
       <div
-        className="flex min-w-0 flex-1 items-end gap-px overflow-x-auto pl-2"
-        data-tauri-drag-region
+        className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
         style={{ scrollbarWidth: 'none' }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         <AnimatePresence initial={false}>
-          {tabs.map((tab, i) => (
+          {pane.tabs.map((tab, i) => (
             <TabItem
               key={tab.id}
               tab={tab}
-              isActive={tab.id === activeTabId}
+              isActive={tab.id === pane.activeTabId}
               isDragging={tab.id === dragTabId}
-              paneId={paneId}
+              paneId={pane.id}
               showDropIndicator={dropIndex === i}
               onDragStateChange={setDragTabId}
             />
           ))}
-          {dropIndex === tabs.length && <DropIndicator key="drop-end" />}
+          {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
         </AnimatePresence>
       </div>
 
+      {/* Kept outside the scroll strip so it stays beside the tabs and never
+          scrolls off when they overflow. */}
+      <button
+        type="button"
+        onClick={handleNewTab}
+        aria-label="New tab"
+        className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+      >
+        <Plus className="size-3.5" />
+      </button>
+
+      <div className="flex-1 self-stretch" {...dragRegion} />
+
       <div
         className="flex shrink-0 items-center gap-1 px-2 pb-1"
-        data-tauri-drag-region
+        {...dragRegion}
       >
         <button
           type="button"
-          onClick={handleNewTab}
-          aria-label="New tab"
+          onClick={handleSettings}
+          aria-label={strings.tabBar.settings}
+          title={strings.tabBar.settings}
           className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
-          <Plus className="size-3.5" />
+          <Settings className="size-3.5" />
         </button>
       </div>
     </div>

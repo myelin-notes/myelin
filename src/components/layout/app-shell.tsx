@@ -2,7 +2,6 @@ import { PaneIdProvider, useWindowState } from '@/lib/tabs/context';
 import type { PaneNode } from '@/lib/tabs/types';
 import { PaneContent } from './pane';
 import { PaneDropTarget, PaneLayout } from './pane-layout';
-import { Sidebar } from './sidebar';
 import { TabBar } from './tab-bar';
 
 export function AppShell() {
@@ -11,12 +10,9 @@ export function AppShell() {
 
   if (hasSplits) {
     return (
-      <div className="flex h-screen w-screen overflow-hidden">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1">
-            <PaneLayout />
-          </div>
+      <div className="flex h-screen w-screen flex-col overflow-hidden">
+        <div className="min-h-0 flex-1">
+          <PaneLayout />
         </div>
       </div>
     );
@@ -29,18 +25,15 @@ export function AppShell() {
     : null;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TabBar />
-        {activeTab && pane && (
-          <PaneIdProvider paneId={pane.id}>
-            <PaneDropTarget paneId={pane.id} className="min-h-0 flex-1">
-              <PaneContent tab={activeTab} />
-            </PaneDropTarget>
-          </PaneIdProvider>
-        )}
-      </div>
+    <div className="flex h-screen w-screen flex-col overflow-hidden">
+      {pane && <TabBar pane={pane} isFocused isTopLeft windowDraggable />}
+      {activeTab && pane && (
+        <PaneIdProvider paneId={pane.id}>
+          <PaneDropTarget paneId={pane.id} className="min-h-0 flex-1">
+            <PaneContent tab={activeTab} />
+          </PaneDropTarget>
+        </PaneIdProvider>
+      )}
     </div>
   );
 }

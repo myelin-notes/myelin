@@ -1,3 +1,4 @@
+import { isApplePlatform } from '@/lib/platform';
 import { UserPrefs } from '@/lib/user-prefs';
 
 // biome-ignore lint/suspicious/noEmptyInterface: intentionally empty, extended via declaration merging
@@ -13,15 +14,11 @@ export interface KeyCombo {
   alt?: boolean;
 }
 
-const isMac =
-  typeof navigator !== 'undefined' &&
-  /Mac|iPhone|iPad/.test(navigator.platform);
-
 export function comboMatches(e: KeyboardEvent, combo: KeyCombo): boolean {
   if (e.key.toLowerCase() !== combo.key.toLowerCase()) {
     return false;
   }
-  const mod = isMac ? e.metaKey : e.ctrlKey;
+  const mod = isApplePlatform ? e.metaKey : e.ctrlKey;
   if (!!combo.mod !== mod) {
     return false;
   }
@@ -37,13 +34,13 @@ export function comboMatches(e: KeyboardEvent, combo: KeyCombo): boolean {
 export function formatKeyCombo(combo: KeyCombo): string {
   const parts: string[] = [];
   if (combo.mod) {
-    parts.push(isMac ? '⌘' : 'Ctrl');
+    parts.push(isApplePlatform ? '⌘' : 'Ctrl');
   }
   if (combo.shift) {
-    parts.push(isMac ? '⇧' : 'Shift');
+    parts.push(isApplePlatform ? '⇧' : 'Shift');
   }
   if (combo.alt) {
-    parts.push(isMac ? '⌥' : 'Alt');
+    parts.push(isApplePlatform ? '⌥' : 'Alt');
   }
   const key =
     combo.key === ' '
@@ -52,7 +49,7 @@ export function formatKeyCombo(combo: KeyCombo): string {
         ? combo.key.toUpperCase()
         : combo.key;
   parts.push(key);
-  return isMac ? parts.join(' ') : parts.join('+');
+  return isApplePlatform ? parts.join(' ') : parts.join('+');
 }
 
 /** Convert a KeyCombo to a ProseMirror keymap string (e.g., "Mod-b"). */
