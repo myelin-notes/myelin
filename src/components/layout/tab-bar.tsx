@@ -8,7 +8,11 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { useMessages } from '@/lib/i18n';
-import { isMac } from '@/lib/platform';
+import {
+  isMac,
+  TAB_BAR_HEIGHT_CLASS,
+  TRAFFIC_LIGHT_INSET_CLASS,
+} from '@/lib/platform';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
 import { findPaneInLayout } from '@/lib/tabs/controller';
 import {
@@ -112,9 +116,8 @@ export const TabBar = memo(function TabBar() {
       data-tauri-drag-region
       className={cn(
         'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
-        // On macOS the bar is sized so the OS traffic-light buttons (fixed
-        // ~16px below the window top) land vertically centered in it.
-        isMac ? 'h-8 pl-[78px]' : 'h-10',
+        TAB_BAR_HEIGHT_CLASS,
+        isMac && TRAFFIC_LIGHT_INSET_CLASS,
       )}
     >
       <div

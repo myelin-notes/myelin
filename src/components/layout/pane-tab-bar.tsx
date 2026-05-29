@@ -8,7 +8,11 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { useMessages } from '@/lib/i18n';
-import { isMac } from '@/lib/platform';
+import {
+  isMac,
+  TAB_BAR_HEIGHT_CLASS,
+  TRAFFIC_LIGHT_INSET_CLASS,
+} from '@/lib/platform';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
@@ -120,11 +124,10 @@ export const PaneTabBar = memo(function PaneTabBar({
       data-pane-tab-bar
       className={cn(
         'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
-        // Match TabBar height so the macOS traffic lights center in the
-        // top-left pane's bar; keep all panes' bars the same height.
-        isMac ? 'h-8' : 'h-10',
+        TAB_BAR_HEIGHT_CLASS,
         !isFocused && 'opacity-75',
-        isMac && isTopLeft && 'pl-[78px]',
+        // Only the top-left pane's bar sits under the macOS traffic lights.
+        isMac && isTopLeft && TRAFFIC_LIGHT_INSET_CLASS,
       )}
     >
       <div
