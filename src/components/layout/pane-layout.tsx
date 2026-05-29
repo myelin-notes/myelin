@@ -296,7 +296,9 @@ function PaneView({ node, isTopLeft }: { node: PaneNode; isTopLeft: boolean }) {
           pane={node}
           isFocused={isFocused}
           isTopLeft={isTopLeft}
-          windowDraggable={false}
+          // The top-left pane sits at the window's top-left, so its bar carries
+          // the window drag handle (titleBarStyle: Overlay has no native one).
+          windowDraggable={isTopLeft}
         />
         <div className="min-h-0 flex-1">
           {activeTab && <PaneContent tab={activeTab} />}
