@@ -16,14 +16,9 @@ const es: typeof en = {
     name: 'Myelin',
     tagline: 'Estudio Digital',
   },
-  sidebar: {
-    newCanvas: 'Nuevo lienzo',
-    nav: {
-      library: 'Biblioteca',
-      graph: 'Grafo',
-      settings: 'Ajustes',
-      help: 'Ayuda',
-    },
+  tabBar: {
+    library: 'Biblioteca',
+    settings: 'Ajustes',
   },
   commandPalette: {
     title: 'Paleta de comandos',

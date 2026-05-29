@@ -14,14 +14,9 @@ const en = {
     name: 'Myelin',
     tagline: 'Digital Studio',
   },
-  sidebar: {
-    newCanvas: 'New Canvas',
-    nav: {
-      library: 'Library',
-      graph: 'Graph',
-      settings: 'Settings',
-      help: 'Help',
-    },
+  tabBar: {
+    library: 'Library',
+    settings: 'Settings',
   },
   commandPalette: {
     title: 'Command Palette',

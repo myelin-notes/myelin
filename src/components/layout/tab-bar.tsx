@@ -70,16 +70,12 @@ export const TabBar = memo(function TabBar({
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
   const handleNewTab = useCallback(() => {
-    controller.openTab({ type: 'library' }, 'Library', pane.id);
-  }, [controller, pane.id]);
+    controller.openTab({ type: 'library' }, strings.tabBar.library, pane.id);
+  }, [controller, pane.id, strings.tabBar.library]);
 
   const handleSettings = useCallback(() => {
-    controller.openTab(
-      { type: 'settings' },
-      strings.sidebar.nav.settings,
-      pane.id,
-    );
-  }, [controller, pane.id, strings.sidebar.nav.settings]);
+    controller.openTab({ type: 'settings' }, strings.tabBar.settings, pane.id);
+  }, [controller, pane.id, strings.tabBar.settings]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -177,8 +173,8 @@ export const TabBar = memo(function TabBar({
         <button
           type="button"
           onClick={handleSettings}
-          aria-label={strings.sidebar.nav.settings}
-          title={strings.sidebar.nav.settings}
+          aria-label={strings.tabBar.settings}
+          title={strings.tabBar.settings}
           className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
           <Settings className="size-3.5" />

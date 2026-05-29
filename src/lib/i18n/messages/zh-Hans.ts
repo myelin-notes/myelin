@@ -16,14 +16,9 @@ const zhHans: typeof en = {
     name: 'Myelin',
     tagline: '数字工作室',
   },
-  sidebar: {
-    newCanvas: '新建画布',
-    nav: {
-      library: '资料库',
-      graph: '关系图',
-      settings: '设置',
-      help: '帮助',
-    },
+  tabBar: {
+    library: '资料库',
+    settings: '设置',
   },
   commandPalette: {
     title: '命令面板',
