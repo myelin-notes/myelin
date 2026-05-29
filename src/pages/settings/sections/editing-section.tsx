@@ -1,5 +1,6 @@
 import { Columns3, Rows3 } from 'lucide-react';
 import { useMessages } from '@/lib/i18n';
+import { isApplePlatform } from '@/lib/platform';
 import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
@@ -7,10 +8,7 @@ import { ToggleRow } from '../components/toggle-row';
 
 type DefaultPageLayout = 'vertical' | 'horizontal';
 
-const MODIFIER_KEY_LABEL =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-    ? '⌘'
-    : 'Ctrl';
+const MODIFIER_KEY_LABEL = isApplePlatform ? '⌘' : 'Ctrl';
 
 export function EditingSection() {
   const strings = useMessages();

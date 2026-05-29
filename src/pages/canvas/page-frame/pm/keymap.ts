@@ -32,6 +32,7 @@ import { goToNextCell } from 'prosemirror-tables';
 import type { EditorView } from 'prosemirror-view';
 import { redo, undo } from 'y-prosemirror';
 import { type Action, comboToPMKey, registry } from '@/lib/keybinds';
+import { isMac } from '@/lib/platform';
 import { parseCalloutMarker } from '../callouts';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { expandMarkdownLinkCommand } from './markdown/links';
@@ -423,8 +424,6 @@ const selectAllPageFrame: Command = (state, dispatch) => {
 };
 
 export function buildKeymap(s: Schema) {
-  const isMac =
-    typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
   const mod = isMac ? 'Mod' : 'Ctrl';
 
   const markBindings: Record<string, Command> = {};

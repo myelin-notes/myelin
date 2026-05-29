@@ -8,6 +8,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { useMessages } from '@/lib/i18n';
+import { isMac } from '@/lib/platform';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
@@ -19,11 +20,6 @@ import {
 import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
-
-// macOS draws the traffic-light buttons over the top-left of the webview
-// (titleBarStyle: Overlay), so the top-left pane's tab bar must be inset.
-const isMac =
-  typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
 
 function paneTabIcon(target: TabTarget) {
   switch (target.type) {
