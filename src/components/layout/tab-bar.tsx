@@ -127,17 +127,11 @@ export const TabBar = memo(function TabBar() {
           ))}
           {dropIndex === tabs.length && <DropIndicator key="drop-end" />}
         </AnimatePresence>
-      </div>
-
-      <div
-        className="flex shrink-0 items-center gap-1 px-2 pb-1"
-        data-tauri-drag-region
-      >
         <button
           type="button"
           onClick={handleNewTab}
           aria-label="New tab"
-          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+          className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
           <Plus className="size-3.5" />
         </button>
