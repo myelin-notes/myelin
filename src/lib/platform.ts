@@ -28,7 +28,7 @@ export const isApplePlatform = /Mac|iPhone|iPad/.test(ua);
 /**
  * Tab-bar height class. On macOS the bar is shorter so the OS traffic-light
  * buttons (fixed ~16px below the window top) land vertically centered in it.
- * Shared by TabBar and PaneTabBar so the geometry can't drift apart.
+ * Shared across every tab bar so the geometry can't drift apart.
  */
 export const TAB_BAR_HEIGHT_CLASS = isMac ? 'h-8' : 'h-10';
 

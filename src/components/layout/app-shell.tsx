@@ -26,7 +26,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
-      <TabBar />
+      {pane && <TabBar pane={pane} isFocused isTopLeft windowDraggable />}
       {activeTab && pane && (
         <PaneIdProvider paneId={pane.id}>
           <PaneDropTarget paneId={pane.id} className="min-h-0 flex-1">

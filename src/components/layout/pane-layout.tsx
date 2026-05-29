@@ -22,7 +22,7 @@ import type {
 } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
 import { PaneContent } from './pane';
-import { PaneTabBar } from './pane-tab-bar';
+import { TabBar } from './tab-bar';
 
 type SplitEdge = 'left' | 'right' | 'top' | 'bottom';
 
@@ -292,7 +292,12 @@ function PaneView({ node, isTopLeft }: { node: PaneNode; isTopLeft: boolean }) {
         )}
         onPointerDown={() => tabController.focusPane(node.id)}
       >
-        <PaneTabBar pane={node} isFocused={isFocused} isTopLeft={isTopLeft} />
+        <TabBar
+          pane={node}
+          isFocused={isFocused}
+          isTopLeft={isTopLeft}
+          windowDraggable={false}
+        />
         <div className="min-h-0 flex-1">
           {activeTab && <PaneContent tab={activeTab} />}
         </div>
