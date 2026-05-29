@@ -135,8 +135,7 @@ export const TabBar = memo(function TabBar({
       )}
     >
       <div
-        className="flex min-w-0 flex-1 items-end gap-px overflow-x-auto pl-2"
-        {...dragRegion}
+        className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
         style={{ scrollbarWidth: 'none' }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -156,15 +155,20 @@ export const TabBar = memo(function TabBar({
           ))}
           {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
         </AnimatePresence>
-        <button
-          type="button"
-          onClick={handleNewTab}
-          aria-label="New tab"
-          className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <Plus className="size-3.5" />
-        </button>
       </div>
+
+      {/* Kept outside the scroll strip so it stays beside the tabs and never
+          scrolls off when they overflow. */}
+      <button
+        type="button"
+        onClick={handleNewTab}
+        aria-label="New tab"
+        className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+      >
+        <Plus className="size-3.5" />
+      </button>
+
+      <div className="flex-1 self-stretch" {...dragRegion} />
 
       <div
         className="flex shrink-0 items-center gap-1 px-2 pb-1"
