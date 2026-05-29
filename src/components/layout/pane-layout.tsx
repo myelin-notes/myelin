@@ -276,7 +276,7 @@ function CenterPreview() {
   );
 }
 
-function PaneView({ node }: { node: PaneNode }) {
+function PaneView({ node, isTopLeft }: { node: PaneNode; isTopLeft: boolean }) {
   const windowState = useWindowState();
   const isFocused = node.id === windowState.focusedPaneId;
   const tabController = useTabController();
@@ -292,7 +292,7 @@ function PaneView({ node }: { node: PaneNode }) {
         )}
         onPointerDown={() => tabController.focusPane(node.id)}
       >
-        <PaneTabBar pane={node} isFocused={isFocused} />
+        <PaneTabBar pane={node} isFocused={isFocused} isTopLeft={isTopLeft} />
         <div className="min-h-0 flex-1">
           {activeTab && <PaneContent tab={activeTab} />}
         </div>
@@ -303,11 +303,13 @@ function PaneView({ node }: { node: PaneNode }) {
 
 const LayoutRenderer = memo(function LayoutRenderer({
   node,
+  isTopLeft,
 }: {
   node: LayoutNode;
+  isTopLeft: boolean;
 }) {
   if (node.type === 'pane') {
-    return <PaneView node={node} />;
+    return <PaneView node={node} isTopLeft={isTopLeft} />;
   }
 
   return (
@@ -323,7 +325,7 @@ const LayoutRenderer = memo(function LayoutRenderer({
             />
           )}
           <Panel defaultSize={node.sizes[i]} minSize={15}>
-            <LayoutRenderer node={child} />
+            <LayoutRenderer node={child} isTopLeft={isTopLeft && i === 0} />
           </Panel>
         </Fragment>
       ))}
@@ -333,5 +335,5 @@ const LayoutRenderer = memo(function LayoutRenderer({
 
 export function PaneLayout() {
   const windowState = useWindowState();
-  return <LayoutRenderer node={windowState.layout} />;
+  return <LayoutRenderer node={windowState.layout} isTopLeft />;
 }

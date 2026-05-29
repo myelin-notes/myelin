@@ -7,6 +7,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import { useMessages } from '@/lib/i18n';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
 import { findPaneInLayout } from '@/lib/tabs/controller';
 import {
@@ -19,6 +20,11 @@ import {
 import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
 import type { Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
+
+// macOS draws the traffic-light buttons over the top-left of the webview
+// (titleBarStyle: Overlay), so the leading edge of the top bar must be inset.
+const isMac =
+  typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
 
 function tabIcon(target: TabTarget) {
   switch (target.type) {
@@ -47,6 +53,7 @@ function DropIndicator() {
 }
 
 export const TabBar = memo(function TabBar() {
+  const strings = useMessages();
   const controller = useTabController();
   const windowState = useWindowState();
   const pane = findPaneInLayout(windowState.layout, windowState.focusedPaneId);
@@ -60,6 +67,10 @@ export const TabBar = memo(function TabBar() {
   const handleNewTab = useCallback(() => {
     controller.openTab({ type: 'library' }, 'Library');
   }, [controller]);
+
+  const handleSettings = useCallback(() => {
+    controller.openTab({ type: 'settings' }, strings.sidebar.nav.settings);
+  }, [controller, strings.sidebar.nav.settings]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -103,7 +114,12 @@ export const TabBar = memo(function TabBar() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-10 shrink-0 select-none items-end border-border-subtle border-b bg-surface"
+      className={cn(
+        'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
+        // On macOS the bar is sized so the OS traffic-light buttons (fixed
+        // ~16px below the window top) land vertically centered in it.
+        isMac ? 'h-8 pl-[78px]' : 'h-10',
+      )}
     >
       <div
         className="flex min-w-0 flex-1 items-end gap-px overflow-x-auto pl-2"
@@ -134,6 +150,21 @@ export const TabBar = memo(function TabBar() {
           className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
           <Plus className="size-3.5" />
+        </button>
+      </div>
+
+      <div
+        className="flex shrink-0 items-center gap-1 px-2 pb-1"
+        data-tauri-drag-region
+      >
+        <button
+          type="button"
+          onClick={handleSettings}
+          aria-label={strings.sidebar.nav.settings}
+          title={strings.sidebar.nav.settings}
+          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        >
+          <Settings className="size-3.5" />
         </button>
       </div>
     </div>

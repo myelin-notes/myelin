@@ -7,6 +7,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import { useMessages } from '@/lib/i18n';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
@@ -18,6 +19,11 @@ import {
 import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
+
+// macOS draws the traffic-light buttons over the top-left of the webview
+// (titleBarStyle: Overlay), so the top-left pane's tab bar must be inset.
+const isMac =
+  typeof navigator !== 'undefined' && /Mac/.test(navigator.platform);
 
 function paneTabIcon(target: TabTarget) {
   switch (target.type) {
@@ -48,12 +54,15 @@ function PaneDropIndicator() {
 interface PaneTabBarProps {
   pane: PaneNode;
   isFocused: boolean;
+  isTopLeft: boolean;
 }
 
 export const PaneTabBar = memo(function PaneTabBar({
   pane,
   isFocused,
+  isTopLeft,
 }: PaneTabBarProps) {
+  const strings = useMessages();
   const controller = useTabController();
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
@@ -61,6 +70,14 @@ export const PaneTabBar = memo(function PaneTabBar({
   const handleNewTab = useCallback(() => {
     controller.openTab({ type: 'library' }, 'Library', pane.id);
   }, [controller, pane.id]);
+
+  const handleSettings = useCallback(() => {
+    controller.openTab(
+      { type: 'settings' },
+      strings.sidebar.nav.settings,
+      pane.id,
+    );
+  }, [controller, pane.id, strings.sidebar.nav.settings]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -106,8 +123,12 @@ export const PaneTabBar = memo(function PaneTabBar({
     <div
       data-pane-tab-bar
       className={cn(
-        'flex h-10 shrink-0 select-none items-end border-border-subtle border-b bg-surface',
+        'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
+        // Match TabBar height so the macOS traffic lights center in the
+        // top-left pane's bar; keep all panes' bars the same height.
+        isMac ? 'h-8' : 'h-10',
         !isFocused && 'opacity-75',
+        isMac && isTopLeft && 'pl-[78px]',
       )}
     >
       <div
@@ -140,6 +161,17 @@ export const PaneTabBar = memo(function PaneTabBar({
           className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
           <Plus className="size-3.5" />
+        </button>
+      </div>
+      <div className="flex shrink-0 items-center gap-1 px-2 pb-1">
+        <button
+          type="button"
+          onClick={handleSettings}
+          aria-label={strings.sidebar.nav.settings}
+          title={strings.sidebar.nav.settings}
+          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        >
+          <Settings className="size-3.5" />
         </button>
       </div>
     </div>
