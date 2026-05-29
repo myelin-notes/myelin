@@ -14,9 +14,12 @@
     "windows": [
       {
         "title": "Myelin",
-        "width": 800,
-        "height": 600,
-        "dragDropEnabled": false
+        "width": 1100,
+        "height": 700,
+        "dragDropEnabled": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "decorations": true
       }
     ],
     "security": {

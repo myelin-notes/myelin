@@ -6,7 +6,7 @@ describe('saveSessionAndCreateVersion', () => {
     const session = {
       id: 'note-1',
       hasUnsyncedChanges: vi.fn(() => true),
-      save: vi.fn(async () => {}),
+      save: vi.fn(async () => true),
     };
     const repository = {
       createFileVersionIfDue: vi.fn(async () => null),
@@ -22,7 +22,7 @@ describe('saveSessionAndCreateVersion', () => {
     const session = {
       id: 'note-1',
       hasUnsyncedChanges: vi.fn(() => false),
-      save: vi.fn(async () => {}),
+      save: vi.fn(async () => false),
     };
     const repository = {
       createFileVersionIfDue: vi.fn(async () => null),
@@ -32,5 +32,21 @@ describe('saveSessionAndCreateVersion', () => {
 
     expect(session.save).toHaveBeenCalledOnce();
     expect(repository.createFileVersionIfDue).not.toHaveBeenCalled();
+  });
+
+  it('creates a version when the save reports changes committed during teardown', async () => {
+    const session = {
+      id: 'note-1',
+      hasUnsyncedChanges: vi.fn(() => false),
+      save: vi.fn(async () => true),
+    };
+    const repository = {
+      createFileVersionIfDue: vi.fn(async () => null),
+    };
+
+    await saveSessionAndCreateVersion(session, repository);
+
+    expect(session.save).toHaveBeenCalledOnce();
+    expect(repository.createFileVersionIfDue).toHaveBeenCalledWith('note-1');
   });
 });

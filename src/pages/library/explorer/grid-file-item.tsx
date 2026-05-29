@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { IS_DEV } from '@/lib/env';
 import { openNote } from '@/lib/note-navigation';
 import { useRepository, type VFSFileNode } from '@/lib/sync';
+import { useTabController } from '@/lib/tabs/context';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
 import { formatExplorerItemAccessibleName } from '../accessibility-labels';
@@ -34,7 +34,7 @@ interface Props {
 
 export function GridFileItem({ file, autoRename, onChanged }: Props) {
   const repository = useRepository();
-  const navigate = useNavigate();
+  const tabController = useTabController();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -66,7 +66,7 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
               draggable={!renaming}
               onClick={() => {
                 if (!renaming) {
-                  openNote(navigate, file);
+                  openNote(tabController, file, file.name);
                 }
               }}
               onDragStart={handleDragStart}

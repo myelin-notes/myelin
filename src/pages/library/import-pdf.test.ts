@@ -48,7 +48,7 @@ describe('PDF library import', () => {
     const ydoc = new YDocManager();
     const session = {
       ydoc,
-      save: vi.fn(async () => {}),
+      save: vi.fn(async () => true),
       close: vi.fn(async () => {}),
     };
     const repository = createRepository(session);

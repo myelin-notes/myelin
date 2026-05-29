@@ -31,6 +31,7 @@ function createSyncTarget() {
       _options: YjsSyncPushOptions,
     ): Promise<YjsSyncPushResult> => ({
       accepted: true,
+      changed: true,
       remoteUpdate: null,
       ...createEmptySnapshot(),
     }),
@@ -76,6 +77,7 @@ describe('NoteSession local change listeners', () => {
       ) => Promise<YjsSyncPushResult>
     >(async (_nodeId, _update, _options) => ({
       accepted: true,
+      changed: true,
       remoteUpdate: null,
       update: ydoc.encodeState(),
       stateVector: ydoc.encodeStateVector(),
@@ -98,6 +100,42 @@ describe('NoteSession local change listeners', () => {
     expect(session.hasUnsyncedChanges()).toBe(true);
 
     await session.save();
+
+    expect(pushUpdates).toHaveBeenCalledTimes(1);
+    expect(session.hasUnsyncedChanges()).toBe(false);
+  });
+
+  it('returns false when the repository accepts a no-op push', async () => {
+    const ydoc = new YDocManager();
+    const pushUpdates = vi.fn<
+      (
+        nodeId: VFSNodeId,
+        update: Uint8Array,
+        options: YjsSyncPushOptions,
+      ) => Promise<YjsSyncPushResult>
+    >(async (_nodeId, _update, _options) => ({
+      accepted: true,
+      remoteUpdate: null,
+      update: ydoc.encodeState(),
+      stateVector: ydoc.encodeStateVector(),
+      revision: 'rev-1',
+      changed: false,
+    }));
+
+    const session = new NoteSession(
+      'note-1',
+      ydoc,
+      {
+        ...createSyncTarget(),
+        pushUpdates,
+      },
+      null,
+      ydoc.encodeStateVector(),
+    );
+
+    session.ydoc.doc.getText('content').insert(0, 'hello');
+
+    await expect(session.save()).resolves.toBe(false);
 
     expect(pushUpdates).toHaveBeenCalledTimes(1);
     expect(session.hasUnsyncedChanges()).toBe(false);
@@ -189,6 +227,7 @@ describe('NoteSession local change listeners', () => {
       ) => Promise<YjsSyncPushResult>
     >(async (_nodeId, _update, _options) => ({
       accepted: true,
+      changed: true,
       remoteUpdate: null,
       update: ydoc.encodeState(),
       stateVector: ydoc.encodeStateVector(),
@@ -232,6 +271,7 @@ describe('NoteSession local change listeners', () => {
           resolvePush = () =>
             resolve({
               accepted: true,
+              changed: true,
               remoteUpdate: null,
               update: ydoc.encodeState(),
               stateVector: ydoc.encodeStateVector(),
@@ -269,5 +309,72 @@ describe('NoteSession local change listeners', () => {
     expect(lastStatusPhase).toBe('closed');
 
     unsubscribeStatus();
+  });
+
+  it('runs a queued save before close when close is scheduled first', async () => {
+    const ydoc = new YDocManager();
+    const events: string[] = [];
+    let resolvePush: (() => void) | undefined;
+    const pushUpdates = vi.fn<
+      (
+        nodeId: VFSNodeId,
+        update: Uint8Array,
+        options: YjsSyncPushOptions,
+      ) => Promise<YjsSyncPushResult>
+    >(
+      () =>
+        new Promise<YjsSyncPushResult>((resolve) => {
+          events.push('push-start');
+          resolvePush = () => {
+            events.push('push-resolve');
+            resolve({
+              accepted: true,
+              changed: true,
+              remoteUpdate: null,
+              update: ydoc.encodeState(),
+              stateVector: ydoc.encodeStateVector(),
+              revision: 'rev-1',
+            });
+          };
+        }),
+    );
+
+    const session = new NoteSession(
+      'note-1',
+      ydoc,
+      {
+        ...createSyncTarget(),
+        pushUpdates,
+      },
+      null,
+      ydoc.encodeStateVector(),
+    );
+    session.subscribeStatus((status) => {
+      if (status.phase === 'closed') {
+        events.push('closed');
+      }
+    });
+
+    session.ydoc.doc.getText('content').insert(0, 'queued');
+
+    const closePromise = Promise.resolve().then(async () => {
+      events.push('close-called');
+      await session.close();
+    });
+    const savePromise = session.save();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(events).toEqual(['close-called', 'push-start']);
+
+    resolvePush?.();
+    await Promise.all([savePromise, closePromise]);
+
+    expect(pushUpdates).toHaveBeenCalledTimes(1);
+    expect(events).toEqual([
+      'close-called',
+      'push-start',
+      'push-resolve',
+      'closed',
+    ]);
   });
 });

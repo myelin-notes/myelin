@@ -1,6 +1,5 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { AllSelection } from 'prosemirror-state';
-import { useNavigate } from 'react-router-dom';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import type { ActionBinding } from '@/lib/keybinds';
@@ -53,8 +52,6 @@ export function useCanvasEngine({
   onInsertEmbed,
   embedFiles,
 }: UseCanvasEngineArgs) {
-  const navigate = useNavigate();
-
   usePageCanvasBindings({
     canvasRef,
     wheelRef,
@@ -158,16 +155,10 @@ export function useCanvasEngine({
   );
   useKeybindings(keyBindings);
 
-  const back = useCallback(async () => {
-    await saving.saveBeforeExit();
-    navigate('/library');
-  }, [navigate, saving.saveBeforeExit]);
-
   return {
     drawableCanvasRef,
     ...canvasViewState,
     ...sessionController,
     ...saving,
-    back,
   };
 }

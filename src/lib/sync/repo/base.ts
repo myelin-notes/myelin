@@ -62,6 +62,20 @@ import type {
 
 const logger = new Logger('BaseRepository');
 
+function byteArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.byteLength !== right.byteLength) {
+    return false;
+  }
+
+  for (let index = 0; index < left.byteLength; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export abstract class BaseRepository
   implements
     Repository,
@@ -582,6 +596,7 @@ export abstract class BaseRepository
       );
       return {
         accepted: false,
+        changed: false,
         remoteUpdate: options.localStateVector
           ? Y.encodeStateAsUpdate(remote.doc, options.localStateVector)
           : remote.bytes,
@@ -591,12 +606,32 @@ export abstract class BaseRepository
       };
     }
 
+    const previousBytes = Y.encodeStateAsUpdate(remote.doc);
     if (update.byteLength > 0) {
       Y.applyUpdate(remote.doc, update);
     }
-    const links = extractStoredNoteLinks(remote.doc);
-
     const mergedBytes = Y.encodeStateAsUpdate(remote.doc);
+    const stateVector = Y.encodeStateVector(remote.doc);
+
+    if (byteArraysEqual(previousBytes, mergedBytes)) {
+      logger.debug('Accepted no-op repository document push', {
+        repositoryKind: this.kind,
+        nodeId,
+        revision: remote.revision,
+        stateVectorByteLength: stateVector.byteLength,
+        ...summarizeYDoc(remote.doc),
+      });
+      return {
+        accepted: true,
+        changed: false,
+        remoteUpdate: null,
+        stateVector,
+        revision: remote.revision,
+        update: remote.bytes,
+      };
+    }
+
+    const links = extractStoredNoteLinks(remote.doc);
     const revision = await this.saveFileBytes(
       nodeId,
       mergedBytes,
@@ -611,14 +646,15 @@ export abstract class BaseRepository
       repositoryKind: this.kind,
       nodeId,
       revision,
-      stateVectorByteLength: Y.encodeStateVector(remote.doc).byteLength,
+      stateVectorByteLength: stateVector.byteLength,
       ...summarizeYDoc(remote.doc),
     });
 
     return {
       accepted: true,
+      changed: true,
       remoteUpdate: null,
-      stateVector: Y.encodeStateVector(remote.doc),
+      stateVector,
       revision,
       update: mergedBytes,
     };

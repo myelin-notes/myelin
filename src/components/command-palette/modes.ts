@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText } from 'lucide-react';
-import type { NavigateFunction } from 'react-router-dom';
 import type { Messages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note-navigation';
 import type { Repository, VFSFileNode, VFSNode } from '@/lib/sync';
+import type { TabStateController } from '@/lib/tabs/controller';
 import type { CommandPaletteItem, CommandPaletteModeState } from './types';
 import { filterCommandPaletteEntries } from './utils';
 
@@ -43,14 +43,14 @@ export function useCommandMode({
 export function useNotesMode({
   active,
   closePalette,
-  navigate,
+  tabController,
   query,
   repository,
   strings,
 }: {
   active: boolean;
   closePalette: () => void;
-  navigate: NavigateFunction;
+  tabController: TabStateController;
   query: string;
   repository: Repository;
   strings: Messages;
@@ -129,12 +129,12 @@ export function useNotesMode({
       icon: FileText,
       onSelect: () => {
         closePalette();
-        openNote(navigate, note);
+        openNote(tabController, note, note.name);
       },
     }));
   }, [
     closePalette,
-    navigate,
+    tabController,
     noteResults,
     query,
     strings.commandPalette.noteResultDescription,

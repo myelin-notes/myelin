@@ -1,15 +1,12 @@
-import type { NavigateFunction } from 'react-router-dom';
 import type { FileType, Repository, VFSNodeId } from '@/lib/sync';
+import type { TabStateController } from '@/lib/tabs/controller';
+import type { TabTarget } from '@/lib/tabs/types';
 import { parseNoteLinkTarget } from './note-link-target';
 
 export interface NoteRouteTarget {
   fileType: FileType;
   id: VFSNodeId;
   pageFrameName?: string | null;
-  pageFrameId?: string | null;
-}
-
-export interface NoteRouteState {
   pageFrameId?: string | null;
 }
 
@@ -21,27 +18,34 @@ export interface NoteLinkRouteTarget {
 
 export type NoteLinkRepository = Pick<Repository, 'createFile' | 'getNode'>;
 
-export function getNotePath({
-  fileType,
-  id,
-  pageFrameName,
-}: NoteRouteTarget): string {
-  const path = `/${fileType}/${id}`;
-  return pageFrameName ? `${path}#${encodeURIComponent(pageFrameName)}` : path;
+function noteTargetToTabTarget(target: NoteRouteTarget): TabTarget {
+  if (target.fileType === 'mcanvas') {
+    return {
+      type: 'canvas',
+      id: target.id,
+      pageFrameName: target.pageFrameName ?? null,
+      pageFrameId: target.pageFrameId ?? null,
+    };
+  }
+  return {
+    type: 'image',
+    id: target.id,
+    fileType: target.fileType,
+  };
 }
 
 export function openNote(
-  navigate: NavigateFunction,
+  controller: TabStateController,
   target: NoteRouteTarget,
+  title?: string,
 ): void {
-  const state: NoteRouteState | undefined = target.pageFrameId
-    ? { pageFrameId: target.pageFrameId }
-    : undefined;
-  navigate(getNotePath(target), { viewTransition: true, state });
+  const tabTarget = noteTargetToTabTarget(target);
+  const tabTitle = title ?? target.id;
+  controller.openTab(tabTarget, tabTitle);
 }
 
 export async function openNoteLink(
-  navigate: NavigateFunction,
+  controller: TabStateController,
   repository: NoteLinkRepository,
   currentNoteId: VFSNodeId,
   target: NoteLinkRouteTarget,
@@ -55,10 +59,14 @@ export async function openNoteLink(
     noteId = await repository.createFile(noteTitle, 'mcanvas', parentId);
   }
 
-  openNote(navigate, {
-    fileType: 'mcanvas',
-    id: noteId,
-    pageFrameName: parsedTarget?.pageFrameName ?? null,
-    pageFrameId: target.pageFrameId ?? null,
-  });
+  openNote(
+    controller,
+    {
+      fileType: 'mcanvas',
+      id: noteId,
+      pageFrameName: parsedTarget?.pageFrameName ?? null,
+      pageFrameId: target.pageFrameId ?? null,
+    },
+    noteTitle,
+  );
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import en from '@/lib/i18n/messages/en';
 import { registry } from '@/lib/keybinds';
 import {
-  commandPalettePageFromPathname,
+  commandPalettePageFromTabTarget,
   createCommandPaletteItems,
 } from './items';
 import type { CommandPalettePage } from './types';
@@ -26,13 +26,25 @@ function commandIdsForPage(currentPage: CommandPalettePage): string[] {
   }).map((item) => item.id);
 }
 
-describe('commandPalettePageFromPathname', () => {
-  it('maps app routes to command palette pages', () => {
-    expect(commandPalettePageFromPathname('/')).toBe('library');
-    expect(commandPalettePageFromPathname('/library')).toBe('library');
-    expect(commandPalettePageFromPathname('/mcanvas/note-1')).toBe('canvas');
-    expect(commandPalettePageFromPathname('/settings')).toBe('settings');
-    expect(commandPalettePageFromPathname('/missing')).toBe('unknown');
+describe('commandPalettePageFromTabTarget', () => {
+  it('maps tab targets to command palette pages', () => {
+    expect(commandPalettePageFromTabTarget(null)).toBe('library');
+    expect(commandPalettePageFromTabTarget({ type: 'library' })).toBe(
+      'library',
+    );
+    expect(
+      commandPalettePageFromTabTarget({ type: 'canvas', id: 'note-1' }),
+    ).toBe('canvas');
+    expect(commandPalettePageFromTabTarget({ type: 'settings' })).toBe(
+      'settings',
+    );
+    expect(
+      commandPalettePageFromTabTarget({
+        type: 'image',
+        id: 'img-1',
+        fileType: 'png',
+      }),
+    ).toBe('unknown');
   });
 });
 

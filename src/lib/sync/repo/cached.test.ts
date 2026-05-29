@@ -1203,6 +1203,7 @@ describe('CachedRepository', () => {
 
     vi.spyOn(cache, 'pushUpdates').mockResolvedValueOnce({
       accepted: false,
+      changed: false,
       update: null,
       stateVector: new Uint8Array(),
       revision: 'cache-conflict',

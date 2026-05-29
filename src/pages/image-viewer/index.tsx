@@ -5,13 +5,14 @@ import {
   FileImage,
   LoaderCircle,
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
 import {
   getMimeTypeForFileType,
   isImageFileType,
   useRepository,
   type VFSFileNode,
+  type VFSNodeId,
 } from '@/lib/sync';
+import { usePaneId, useTabController } from '@/lib/tabs/context';
 
 type ImageViewerState =
   | { status: 'loading' }
@@ -22,9 +23,13 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function ImageViewerPage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+interface ImageViewerPageProps {
+  id: VFSNodeId;
+}
+
+export function ImageViewerPage({ id }: ImageViewerPageProps) {
+  const tabController = useTabController();
+  const paneId = usePaneId();
   const repository = useRepository();
   const [state, setState] = useState<ImageViewerState>({ status: 'loading' });
   const [imageFailed, setImageFailed] = useState(false);
@@ -79,7 +84,16 @@ export function ImageViewerPage() {
   }, [id, repository]);
 
   const goBack = () => {
-    navigate('/library');
+    const pane = tabController.getPane(paneId);
+    if (!pane) {
+      return;
+    }
+    const tab = pane.tabs.find(
+      (t) => t.target.type === 'image' && t.target.id === id,
+    );
+    if (tab) {
+      tabController.closeTab(tab.id, paneId);
+    }
   };
 
   return (

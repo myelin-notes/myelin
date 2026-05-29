@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { useMessages } from '@/lib/i18n';
@@ -18,6 +17,7 @@ import {
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
+import { useTabController, useWindowState } from '@/lib/tabs/context';
 import { UserPrefs } from '@/lib/user-prefs';
 import { useCanvasCommandContext } from '@/pages/canvas/command-context';
 import {
@@ -26,7 +26,7 @@ import {
   MARKDOWN_FILE_ACCEPT,
 } from '@/pages/library/import-markdown';
 import {
-  commandPalettePageFromPathname,
+  commandPalettePageFromTabTarget,
   commandPaletteShortcut,
   createCommandPaletteItems,
 } from './items';
@@ -81,8 +81,8 @@ export function useCommandPalette(): {
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const { getHandlers: getCanvasCommandHandlers } = useCanvasCommandContext();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const tabController = useTabController();
+  const windowState = useWindowState();
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<CommandPaletteMode>('commands');
@@ -93,7 +93,13 @@ export function useCommandPalette(): {
   const [activeKeybindingActions, setActiveKeybindingActions] = useState<
     Action[]
   >(() => keybindings.getCommandPaletteActions());
-  const currentPage = commandPalettePageFromPathname(location.pathname);
+  const focusedPane = tabController.getPane(windowState.focusedPaneId);
+  const focusedTab = focusedPane
+    ? (focusedPane.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null)
+    : null;
+  const currentPage = commandPalettePageFromTabTarget(
+    focusedTab?.target ?? null,
+  );
   const canRefreshRepository = useManualRepositoryRefreshAvailable(
     repositoryStatus.config,
     repositoryStatus.initializing,
@@ -131,7 +137,7 @@ export function useCommandPalette(): {
         null,
       );
       const id = await repository.createFile(name, 'mcanvas', null);
-      navigate(`/mcanvas/${id}`);
+      tabController.openTab({ type: 'canvas', id }, name);
     } catch (error) {
       logger.error('Failed to create note from command palette', error);
       toast.error(strings.commandPalette.errors.createNote, {
@@ -140,7 +146,7 @@ export function useCommandPalette(): {
     }
   }, [
     closePalette,
-    navigate,
+    tabController,
     repository,
     strings.commandPalette.errors.createNote,
     strings.library.createNew.untitledCanvas,
@@ -150,10 +156,10 @@ export function useCommandPalette(): {
     closePalette();
     const current = UserPrefs.get('explorerViewMode');
     UserPrefs.set('explorerViewMode', current === 'tree' ? 'grid' : 'tree');
-    if (!location.pathname.startsWith('/library')) {
-      navigate('/library');
+    if (focusedTab?.target.type !== 'library') {
+      tabController.openTab({ type: 'library' }, 'Library');
     }
-  }, [closePalette, location.pathname, navigate]);
+  }, [closePalette, focusedTab?.target.type, tabController]);
 
   const triggerLibraryMarkdownImport = useCallback(async () => {
     closePalette();
@@ -174,7 +180,7 @@ export function useCommandPalette(): {
         parentId: null,
         fallbackTitle: strings.library.createNew.untitledCanvas,
       });
-      navigate(`/mcanvas/${id}`);
+      tabController.openTab({ type: 'canvas', id }, file.name);
     } catch (error) {
       toast.error(strings.library.importMarkdown.failed, {
         description: errorDescription(error),
@@ -185,7 +191,7 @@ export function useCommandPalette(): {
   }, [
     closePalette,
     isImportingMarkdown,
-    navigate,
+    tabController,
     repository,
     strings.library.createNew.untitledCanvas,
     strings.library.importMarkdown.failed,
@@ -321,7 +327,7 @@ export function useCommandPalette(): {
   const notesMode = useNotesMode({
     active: open && mode === 'notes',
     closePalette,
-    navigate,
+    tabController,
     query,
     repository,
     strings,

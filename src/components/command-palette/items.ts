@@ -13,6 +13,7 @@ import {
   getActionCopy,
   getActionIcon,
 } from '@/lib/keybinds/messages';
+import type { TabTarget } from '@/lib/tabs/types';
 import type {
   CommandPaletteItem,
   CommandPaletteMode,
@@ -132,19 +133,22 @@ export function commandPaletteShortcut(): string {
   return registry.format('app:command-palette');
 }
 
-export function commandPalettePageFromPathname(
-  pathname: string,
+export function commandPalettePageFromTabTarget(
+  target: TabTarget | null,
 ): CommandPalettePage {
-  if (pathname === '/' || isRoute(pathname, '/library')) {
+  if (!target) {
     return 'library';
   }
-  if (isRoute(pathname, '/mcanvas')) {
-    return 'canvas';
+  switch (target.type) {
+    case 'library':
+      return 'library';
+    case 'canvas':
+      return 'canvas';
+    case 'settings':
+      return 'settings';
+    case 'image':
+      return 'unknown';
   }
-  if (isRoute(pathname, '/settings')) {
-    return 'settings';
-  }
-  return 'unknown';
 }
 
 function isCommandPaletteItemVisible(
@@ -185,8 +189,4 @@ function createKeybindingCommandPaletteItems({
         },
       ];
     });
-}
-
-function isRoute(pathname: string, route: string): boolean {
-  return pathname === route || pathname.startsWith(`${route}/`);
 }
