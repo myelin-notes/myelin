@@ -12,10 +12,6 @@ const es: typeof en = {
     never: 'Nunca',
     or: 'o',
   },
-  app: {
-    name: 'Myelin',
-    tagline: 'Estudio Digital',
-  },
   tabBar: {
     library: 'Biblioteca',
     settings: 'Ajustes',

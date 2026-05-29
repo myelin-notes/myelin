@@ -10,10 +10,6 @@ const en = {
     never: 'Never',
     or: 'or',
   },
-  app: {
-    name: 'Myelin',
-    tagline: 'Digital Studio',
-  },
   tabBar: {
     library: 'Library',
     settings: 'Settings',

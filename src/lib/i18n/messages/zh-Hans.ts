@@ -12,10 +12,6 @@ const zhHans: typeof en = {
     never: '从不',
     or: '或',
   },
-  app: {
-    name: 'Myelin',
-    tagline: '数字工作室',
-  },
   tabBar: {
     library: '资料库',
     settings: '设置',
