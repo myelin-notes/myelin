@@ -222,7 +222,7 @@ const zhHans: typeof en = {
     pageFrameEditing: {
       title: '页面框编辑',
       eyebrow: '文档视图',
-      defaultOrientation: {
+      defaultPageLayout: {
         label: '默认页面布局',
         description: '选择新页面框的内容排列方式。PDF 仅支持页面或分栏。',
         options: {

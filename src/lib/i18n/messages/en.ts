@@ -228,7 +228,7 @@ const en = {
     pageFrameEditing: {
       title: 'Page Frame Editing',
       eyebrow: 'Document View',
-      defaultOrientation: {
+      defaultPageLayout: {
         label: 'Default page layout',
         description:
           'Choose how new page frames arrange content. PDFs use Pages or Columns only.',

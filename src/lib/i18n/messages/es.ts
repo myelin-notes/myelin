@@ -231,7 +231,7 @@ const es: typeof en = {
     pageFrameEditing: {
       title: 'Edición de marcos de página',
       eyebrow: 'Vista de documento',
-      defaultOrientation: {
+      defaultPageLayout: {
         label: 'Diseño de página predeterminado',
         description:
           'Elige cómo los nuevos marcos de página organizan su contenido. Los PDF solo usan Páginas o Columnas.',

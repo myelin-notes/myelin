@@ -193,11 +193,7 @@ export class PageFrameElement extends DrawableElement {
       },
       pageLayout: (v) => {
         this._pageLayout =
-          v === 'horizontal'
-            ? 'horizontal'
-            : v === 'continuous'
-              ? 'continuous'
-              : 'vertical';
+          v === 'horizontal' || v === 'continuous' ? v : 'vertical';
       },
     });
   }
@@ -263,13 +259,19 @@ export class PageFrameElement extends DrawableElement {
       return this._pageHeight;
     }
     if (this._pageLayout === 'continuous') {
-      // One uninterrupted sheet: as tall as the content (plus the page's top
-      // and bottom padding), but never shorter than a single page so an empty
-      // frame still reads as a page.
-      const content = this._measuredContentHeight ?? 0;
-      return Math.max(this._pageHeight, content + PAGE_PADDING * 2);
+      return this.continuousStripHeight(this._measuredContentHeight);
     }
     return n * this._pageHeight + Math.max(0, n - 1) * PAGE_GAP;
+  }
+
+  /**
+   * Height of a continuous (single-sheet) frame: as tall as the content plus
+   * the page's top and bottom padding, but never shorter than a single page so
+   * an empty frame still reads as a page. `content` is the editor's natural
+   * height (CSS px), or `null` if it hasn't been measured yet.
+   */
+  private continuousStripHeight(content: number | null): number {
+    return Math.max(this._pageHeight, (content ?? 0) + PAGE_PADDING * 2);
   }
 
   public get localBoundingBox(): DOMRect {
@@ -539,13 +541,22 @@ export class PageFrameElement extends DrawableElement {
     }
     // Continuous frames have no page breaks: harvest them as a single page
     // sized to the whole strip (krilla allows an arbitrarily tall page), which
-    // matches what's on screen exactly.
+    // matches what's on screen exactly. Measure the editor's live height here
+    // rather than reading the cached `totalHeight` — the cache is only kept
+    // fresh by the pagination rAF loop, so a freshly-mounted frame could still
+    // report `null` and collapse the export box to a single page.
     const continuous = this._pageLayout === 'continuous';
+    const editorDom = this.pmEditor?.view?.dom;
+    const pageHeight = continuous
+      ? this.continuousStripHeight(
+          editorDom instanceof HTMLElement ? editorDom.offsetHeight : null,
+        )
+      : this._pageHeight;
     const { request, warnings } = await harvestPageFramePdf({
       contentDiv,
       numPages: continuous ? 1 : this._numPages,
       pageWidth: this._pageWidth,
-      pageHeight: continuous ? this.totalHeight : this._pageHeight,
+      pageHeight,
       pageLayout: this._pageLayout === 'horizontal' ? 'horizontal' : 'vertical',
       offset: { x: this.offset.x, y: this.offset.y },
       selfUuid: this.uuid,

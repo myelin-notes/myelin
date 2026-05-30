@@ -18,20 +18,18 @@ export function EditingSection() {
   const linkRequireModifier = useUserPref('linkRequireModifier');
   const alwaysRenameNoteReferences = useUserPref('alwaysRenameNoteReferences');
 
-  const orientationOptions =
-    strings.settings.pageFrameEditing.defaultOrientation.options;
-  const orientationRowOptions: ReadonlyArray<
-    OptionsRowOption<DefaultPageLayout>
-  > = [
-    { value: 'vertical', label: orientationOptions.vertical, Icon: Rows3 },
+  const layoutOptions =
+    strings.settings.pageFrameEditing.defaultPageLayout.options;
+  const layoutRowOptions: ReadonlyArray<OptionsRowOption<DefaultPageLayout>> = [
+    { value: 'vertical', label: layoutOptions.vertical, Icon: Rows3 },
     {
       value: 'continuous',
-      label: orientationOptions.continuous,
+      label: layoutOptions.continuous,
       Icon: GalleryVertical,
     },
     {
       value: 'horizontal',
-      label: orientationOptions.horizontal,
+      label: layoutOptions.horizontal,
       Icon: Columns3,
     },
   ];
@@ -70,11 +68,11 @@ export function EditingSection() {
         <OptionsRow
           value={defaultPageLayout}
           onChange={handleDefaultPageLayout}
-          label={strings.settings.pageFrameEditing.defaultOrientation.label}
+          label={strings.settings.pageFrameEditing.defaultPageLayout.label}
           description={
-            strings.settings.pageFrameEditing.defaultOrientation.description
+            strings.settings.pageFrameEditing.defaultPageLayout.description
           }
-          options={orientationRowOptions}
+          options={layoutRowOptions}
         />
         <ToggleRow
           checked={pageFrameEditFitWholePage}

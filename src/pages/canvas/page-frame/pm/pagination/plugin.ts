@@ -9,6 +9,7 @@ import {
   type PreparedTextWithSegments,
   prepareWithSegments,
 } from '@chenglou/pretext';
+import type { PageLayout } from '../../../elements/page-frame-constants';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   type Break,
@@ -1510,18 +1511,15 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
   return true;
 }
 
-function isHorizontalPageLayout(view: EditorView): boolean {
-  return (
-    view.dom.closest('.pm-editor')?.getAttribute('data-page-layout') ===
-    'horizontal'
-  );
-}
-
-function isContinuousPageLayout(view: EditorView): boolean {
-  return (
-    view.dom.closest('.pm-editor')?.getAttribute('data-page-layout') ===
-    'continuous'
-  );
+function getPageLayout(view: EditorView): PageLayout | null {
+  const value = view.dom
+    .closest('.pm-editor')
+    ?.getAttribute('data-page-layout');
+  return value === 'horizontal' ||
+    value === 'vertical' ||
+    value === 'continuous'
+    ? value
+    : null;
 }
 
 // scrollWidth that exactly equals N*stride - gap can drift to N*stride - gap + ε
@@ -1708,7 +1706,8 @@ export function paginationPlugin(
         const metrics = run?.metrics ?? null;
 
         try {
-          if (isContinuousPageLayout(editorView)) {
+          const pageLayout = getPageLayout(editorView);
+          if (pageLayout === 'continuous') {
             // One uninterrupted strip: no page breaks. Report the editor's
             // natural height so the frame can size its single sheet, and clear
             // any breaks left over from a previous paginated layout.
@@ -1733,7 +1732,7 @@ export function paginationPlugin(
             return;
           }
 
-          if (isHorizontalPageLayout(editorView)) {
+          if (pageLayout === 'horizontal') {
             const pageCount = getHorizontalPageCount(editorView);
             const changed =
               prevBreaks.length > 0 || pageCount !== prevPageCount;
