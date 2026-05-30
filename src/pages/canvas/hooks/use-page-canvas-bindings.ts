@@ -31,11 +31,13 @@ export function usePageCanvasBindings({
 
   const handleCanvasDrop = useEffectEvent((event: DragEvent) => {
     event.preventDefault();
-    if (event.dataTransfer?.files?.length) {
+    const canvas = canvasRef.current;
+    if (canvas && event.dataTransfer?.files?.length) {
+      const rect = canvas.getBoundingClientRect();
       embedFiles(
         Array.from(event.dataTransfer.files),
-        event.pageX,
-        event.pageY,
+        event.clientX - rect.left,
+        event.clientY - rect.top,
       );
     }
   });

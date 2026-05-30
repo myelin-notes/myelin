@@ -267,8 +267,14 @@ export class CanvasViewport {
     return new DOMRect(tl.x, tl.y, screenW / this._zoom, screenH / this._zoom);
   }
 
-  public getPoint(evt: PointerEvent): Vector2 {
-    return this.screenToWorld({ x: evt.pageX, y: evt.pageY });
+  /** Pointer position in canvas-local screen pixels (origin = canvas top-left). */
+  public getScreenPoint(evt: { clientX: number; clientY: number }): Vector2 {
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+  }
+
+  public getPoint(evt: { clientX: number; clientY: number }): Vector2 {
+    return this.screenToWorld(this.getScreenPoint(evt));
   }
 
   /**

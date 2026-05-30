@@ -147,10 +147,8 @@ export function useCanvasInserts({
       if (dc.editingElement || dc.isPlacing) {
         return;
       }
-      const worldPos = dc.viewport.screenToWorld({
-        x: e.pageX,
-        y: e.pageY,
-      });
+      const screenPos = dc.viewport.getScreenPoint(e);
+      const worldPos = dc.viewport.screenToWorld(screenPos);
       const hit = dc.elements.some(
         (el) => !el.hidden && CollisionHelper.inBox(worldPos, el.boundingBox),
       );
@@ -160,11 +158,11 @@ export function useCanvasInserts({
       }
       const now = performance.now();
       const prev = lastClickRef.current;
-      lastClickRef.current = { t: now, x: e.pageX, y: e.pageY };
+      lastClickRef.current = { t: now, x: screenPos.x, y: screenPos.y };
       if (
         !prev ||
         now - prev.t > 250 ||
-        Math.hypot(e.pageX - prev.x, e.pageY - prev.y) > 4
+        Math.hypot(screenPos.x - prev.x, screenPos.y - prev.y) > 4
       ) {
         return;
       }
@@ -172,8 +170,8 @@ export function useCanvasInserts({
       setInsertOpen(false);
       setEmbedOpen(false);
       setContextInsert({
-        screenX: e.pageX,
-        screenY: e.pageY,
+        screenX: screenPos.x,
+        screenY: screenPos.y,
         worldPos,
       });
     },

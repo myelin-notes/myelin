@@ -1127,7 +1127,7 @@ export class DrawableCanvas {
 
   private initEventListeners(canvas: HTMLCanvasElement) {
     this._handlePointerMove = (evt) => {
-      this.screenPosition = { x: evt.pageX, y: evt.pageY };
+      this.screenPosition = this.viewport.getScreenPoint(evt);
       this.state.update(evt);
       const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
       this.toolSelected.hover?.(this, mouseWorld);
