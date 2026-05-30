@@ -7,15 +7,15 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
-import { writeFile } from '@tauri-apps/plugin-fs';
+import { bytesToBase64, exportPdf } from '@/lib/pdf-export/client';
 import { Logger } from '@/lib/logger';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
 import {
-  createPdfExportBytes,
+  buildPdfElementRequest,
   type PdfElementExportPage,
   type PdfElementExportSource,
-} from '../pdf-export';
+} from '../pdf-element-export';
 import {
   createDefaultPdfPageOrder,
   getPdfDocumentPageSizes,
@@ -384,11 +384,12 @@ export class PdfElement extends DrawableElement {
         return;
       }
 
-      const bytes = await createPdfExportBytes(
+      const request = buildPdfElementRequest(
         source,
         this._exportElementsProvider?.() ?? [],
       );
-      await writeFile(path, bytes);
+      request.originalPdfB64 = bytesToBase64(source.pdfBytes);
+      await exportPdf(request, path);
       toast.success('Exported to PDF');
     } catch (err) {
       logger.error('Export to PDF failed', err, {

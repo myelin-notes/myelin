@@ -4,6 +4,8 @@ import {
   getStrokePoints,
 } from 'perfect-freehand';
 import * as Y from 'yjs';
+import { parseCssColor } from '@/lib/pdf-export/color';
+import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import { LOCAL_ORIGIN } from '../ydoc-manager';
 import { DrawableElement } from './drawable-element';
@@ -112,6 +114,27 @@ export class StrokeElement extends DrawableElement {
 
     ctx.fillStyle = this.style.color;
     ctx.fill(this.cachedPath);
+  }
+
+  public override drawToPdf(ctx: PdfHarvestContext): void {
+    if (this.points.length === 0) {
+      return;
+    }
+    // Same outline perfect-freehand produces on screen, as a filled vector path.
+    const outline = getStroke(this.points, {
+      simulatePressure: !this.hasPressure,
+      size: this.style.size,
+    });
+    if (outline.length < 3) {
+      return;
+    }
+    const pts: number[] = [];
+    for (const [x, y] of outline) {
+      const p = ctx.worldToPagePt(x, y);
+      pts.push(p.x, p.y);
+    }
+    const { rgb, opacity } = parseCssColor(this.style.color);
+    ctx.push({ t: 'path', pts, closed: true, fill: rgb, opacity });
   }
 
   protected isOverLocal(

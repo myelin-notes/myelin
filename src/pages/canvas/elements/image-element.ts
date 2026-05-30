@@ -1,5 +1,6 @@
 import { Crop as CropIcon } from 'lucide-react';
 import type * as Y from 'yjs';
+import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import type { Messages } from '@/lib/i18n/messages';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { YDocManager } from '../ydoc-manager';
@@ -151,6 +152,56 @@ export class ImageElement extends DrawableElement {
       this._cropW,
       this._cropH,
     );
+  }
+
+  public override drawToPdf(ctx: PdfHarvestContext): void {
+    if (!this._bitmap || this._cropW <= 0 || this._cropH <= 0) {
+      return;
+    }
+    const b64 = this.cropToPngBase64();
+    if (!b64) {
+      return;
+    }
+    const bb = this.boundingBox;
+    const p0 = ctx.worldToPagePt(bb.x, bb.y);
+    const p1 = ctx.worldToPagePt(bb.right, bb.bottom);
+    const imageRef = ctx.addImageBase64(b64);
+    ctx.push({
+      t: 'image',
+      x: Math.min(p0.x, p1.x),
+      y: Math.min(p0.y, p1.y),
+      w: Math.abs(p1.x - p0.x),
+      h: Math.abs(p1.y - p0.y),
+      imageRef,
+    });
+  }
+
+  /** Rasterize the cropped region to a base64 PNG (sync via toDataURL). */
+  private cropToPngBase64(): string | null {
+    if (!this._bitmap) {
+      return null;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(this._cropW));
+    canvas.height = Math.max(1, Math.round(this._cropH));
+    const c = canvas.getContext('2d');
+    if (!c) {
+      return null;
+    }
+    c.drawImage(
+      this._bitmap,
+      this._cropX,
+      this._cropY,
+      this._cropW,
+      this._cropH,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+    const url = canvas.toDataURL('image/png');
+    const comma = url.indexOf(',');
+    return comma >= 0 ? url.slice(comma + 1) : null;
   }
 
   protected isOverLocal(
