@@ -423,10 +423,16 @@ async function harvestCodeBlocks(
     const cloneEl = cloneBlocks[i];
     // Rasterize the LIVE Monaco block (the clone's Monaco DOM is inert/incomplete).
     const liveEl = liveBlocks[i] ?? cloneEl;
-    const r = cloneEl.getBoundingClientRect();
-    if (r.width <= 0 || r.height <= 0) {
+    // Position comes from the clone (pagination is baked into it); the box size comes
+    // from the live element we actually rasterize, so the PNG fills its box without
+    // stretch even if the two ever lay out at slightly different sizes.
+    const cloneRect = cloneEl.getBoundingClientRect();
+    const liveRect = liveEl.getBoundingClientRect();
+    if (cloneRect.width <= 0 || cloneRect.height <= 0) {
       continue;
     }
+    const boxW = liveRect.width > 0 ? liveRect.width : cloneRect.width;
+    const boxH = liveRect.height > 0 ? liveRect.height : cloneRect.height;
 
     let dataUrl: string;
     try {
@@ -446,14 +452,14 @@ async function harvestCodeBlocks(
     }
     const ref = h.imagesB64.push(dataUrl.slice(comma + 1)) - 1;
 
-    const localX = r.left - h.originX;
-    const localY = r.top - h.originY;
+    const localX = cloneRect.left - h.originX;
+    const localY = cloneRect.top - h.originY;
     pushAt(h, localX, localY, (x, y) => ({
       t: 'image',
       x,
       y,
-      w: pxToPt(r.width),
-      h: pxToPt(r.height),
+      w: pxToPt(boxW),
+      h: pxToPt(boxH),
       imageRef: ref,
     }));
   }
