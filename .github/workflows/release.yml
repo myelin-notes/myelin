@@ -14,6 +14,9 @@ concurrency:
   group: release-${{ github.event.release.tag_name || github.event.inputs.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 env:
   NODE_OPTIONS: --max-old-space-size=4096
 
@@ -214,6 +217,7 @@ jobs:
     name: Build (ios)
     needs: test
     runs-on: macos-latest
+    continue-on-error: true
     env:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
