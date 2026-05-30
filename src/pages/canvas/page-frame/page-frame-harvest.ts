@@ -236,7 +236,15 @@ interface HarvestedLine {
 
 /**
  * Split a text node into per-line fragments. `getClientRects()` yields one rect per
- * visual line; we binary-search the character offsets where each line starts.
+ * visual line; we assign each character to a line by its own rect's top.
+ *
+ * A binary search would assume `getBoundingClientRect().top` is monotonic in the
+ * character offset, but a boxless character (collapsed whitespace at a wrap point, a
+ * soft hyphen) returns an empty/zero rect, breaking that assumption and misplacing
+ * characters. Instead we walk every character: those with real geometry advance the
+ * line monotonically, and boxless ones inherit the line of the next character that
+ * does have geometry (so a collapsed character leading a wrapped line joins it). This
+ * is O(n) per node rather than O(lines·log n) — acceptable for export.
  */
 function splitTextNodeIntoLines(node: Text): HarvestedLine[] {
   const text = node.textContent ?? '';
@@ -255,34 +263,36 @@ function splitTextNodeIntoLines(node: Text): HarvestedLine[] {
     return [{ text, rect: lines[0] }];
   }
 
-  const starts = [0];
-  for (let k = 1; k < lines.length; k++) {
-    const targetTop = lines[k].top;
-    let lo = starts[k - 1] + 1;
-    let hi = text.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (charTop(node, mid) >= targetTop - 1) {
-        hi = mid;
-      } else {
-        lo = mid + 1;
+  const tops = lines.map((r) => r.top);
+  const lineOf = new Array<number>(text.length).fill(-1);
+  const charRange = document.createRange();
+  let line = 0;
+  for (let i = 0; i < text.length; i++) {
+    charRange.setStart(node, i);
+    charRange.setEnd(node, i + 1);
+    const rc = charRange.getBoundingClientRect();
+    if (rc.width > 0 || rc.height > 0) {
+      while (line < tops.length - 1 && rc.top >= tops[line + 1] - 1) {
+        line++;
       }
+      lineOf[i] = line;
     }
-    starts.push(lo);
   }
-  starts.push(text.length);
+  // Boxless chars (lineOf === -1) inherit the nearest geometried char to the right.
+  let next = lines.length - 1;
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (lineOf[i] === -1) {
+      lineOf[i] = next;
+    } else {
+      next = lineOf[i];
+    }
+  }
 
-  return lines.map((rect, k) => ({
-    text: text.slice(starts[k], starts[k + 1]),
-    rect,
-  }));
-}
-
-function charTop(node: Text, i: number): number {
-  const r = document.createRange();
-  r.setStart(node, i);
-  r.setEnd(node, Math.min(i + 1, (node.textContent ?? '').length));
-  return r.getBoundingClientRect().top;
+  const texts = lines.map(() => '');
+  for (let i = 0; i < text.length; i++) {
+    texts[lineOf[i]] += text[i];
+  }
+  return lines.map((rect, k) => ({ text: texts[k], rect }));
 }
 
 function harvestDecorations(h: Harvester, root: HTMLElement): void {
