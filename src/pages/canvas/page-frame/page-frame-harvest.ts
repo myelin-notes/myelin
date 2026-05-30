@@ -7,6 +7,7 @@
  */
 
 import { toPng } from 'html-to-image';
+import { Logger } from '@/lib/logger';
 import { parseCssColor } from '@/lib/pdf-export/color';
 import type {
   ExportPage,
@@ -20,6 +21,8 @@ import {
 } from '@/lib/pdf-export/coords';
 import { resolveFont } from '@/lib/pdf-export/fonts';
 import { PAGE_GAP } from '../elements/page-frame-constants';
+
+const logger = new Logger('PageFramePdfExport');
 
 export interface PageFramePdfSource {
   /** The live `.pm-editor` content element (cloned internally). */
@@ -397,7 +400,11 @@ async function harvestCodeBlocks(
     let dataUrl: string;
     try {
       dataUrl = await toPng(liveEl, { pixelRatio: 2 });
-    } catch {
+    } catch (error) {
+      logger.warn('Failed to rasterize code block for PDF export', {
+        error,
+        index: i,
+      });
       continue;
     }
     const comma = dataUrl.indexOf(',');
