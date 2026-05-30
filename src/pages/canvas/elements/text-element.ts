@@ -243,7 +243,10 @@ export class TextElement extends DrawableElement {
       if (!text) {
         continue;
       }
-      const p = ctx.worldToPagePt(this.offset.x, this.offset.y + i * lh + ascent);
+      const p = ctx.worldToPagePt(
+        this.offset.x,
+        this.offset.y + i * lh + ascent,
+      );
       ctx.push({
         t: 'text',
         x: p.x,

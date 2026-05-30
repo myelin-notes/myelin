@@ -9,10 +9,12 @@ import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
+import { exportPdf as exportPdfToRust } from '@/lib/pdf-export/client';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
+import { harvestPageFramePdf } from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
 import type { YDocManager } from '../ydoc-manager';
@@ -412,7 +414,29 @@ export class PageFrameElement extends DrawableElement {
           void this.exportMarkdown();
         },
       },
+      {
+        id: 'export-pdf',
+        label: 'Export to PDF',
+        icon: DownloadIcon,
+        onSelect: () => {
+          void this.exportPdf();
+        },
+      },
     ];
+  }
+
+  /** Sanitize the display name into a filesystem-safe export filename stem. */
+  private getSafeExportName(): string {
+    return (
+      [...this._displayName]
+        .map((char) =>
+          char.charCodeAt(0) <= 0x1f || '/\\:*?"<>|'.includes(char)
+            ? '-'
+            : char,
+        )
+        .join('')
+        .trim() || DEFAULT_PAGE_FRAME_DISPLAY_NAME
+    );
   }
 
   private async exportMarkdown(): Promise<void> {
@@ -425,17 +449,8 @@ export class PageFrameElement extends DrawableElement {
     // and menu close both paint smoothly while the doc is processed.
     const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
     try {
-      const safeName =
-        [...this._displayName]
-          .map((char) =>
-            char.charCodeAt(0) <= 0x1f || '/\\:*?"<>|'.includes(char)
-              ? '-'
-              : char,
-          )
-          .join('')
-          .trim() || DEFAULT_PAGE_FRAME_DISPLAY_NAME;
       const path = await save({
-        defaultPath: `${safeName}.md`,
+        defaultPath: `${this.getSafeExportName()}.md`,
         filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
       });
       if (!path) {
@@ -446,6 +461,36 @@ export class PageFrameElement extends DrawableElement {
       toast.success('Exported to Markdown');
     } catch (err) {
       logger.error('Export to Markdown failed', err, { uuid: this.uuid });
+      toast.error('Export failed', {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private async exportPdf(): Promise<void> {
+    const contentDiv = this.contentDiv;
+    if (!contentDiv) {
+      return;
+    }
+    try {
+      const path = await save({
+        defaultPath: `${this.getSafeExportName()}.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      });
+      if (!path) {
+        return;
+      }
+      const request = await harvestPageFramePdf({
+        contentDiv,
+        numPages: this._numPages,
+        pageWidth: this._pageWidth,
+        pageHeight: this._pageHeight,
+        pageLayout: this._pageLayout,
+      });
+      await exportPdfToRust(request, path);
+      toast.success('Exported to PDF');
+    } catch (err) {
+      logger.error('Export to PDF failed', err, { uuid: this.uuid });
       toast.error('Export failed', {
         description: err instanceof Error ? err.message : String(err),
       });

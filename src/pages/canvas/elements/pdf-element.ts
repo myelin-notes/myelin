@@ -7,8 +7,8 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
-import { bytesToBase64, exportPdf } from '@/lib/pdf-export/client';
 import { Logger } from '@/lib/logger';
+import { bytesToBase64, exportPdf } from '@/lib/pdf-export/client';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
 import {

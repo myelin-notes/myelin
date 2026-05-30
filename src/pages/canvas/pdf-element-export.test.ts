@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import {
   buildPdfElementRequest,

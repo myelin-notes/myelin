@@ -56,11 +56,15 @@ function byte(h: string): number {
 }
 
 function clamp255(n: number): number {
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n)) {
+    return 0;
+  }
   return Math.max(0, Math.min(255, Math.round(n)));
 }
 
 function clamp01(n: number): number {
-  if (!Number.isFinite(n)) return 1;
+  if (!Number.isFinite(n)) {
+    return 1;
+  }
   return Math.max(0, Math.min(1, n));
 }

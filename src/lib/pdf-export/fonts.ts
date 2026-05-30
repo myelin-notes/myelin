@@ -32,8 +32,12 @@ export function familyToKey(fontFamily: string): FontKey {
 }
 
 function parseWeight(fontWeight: string): number {
-  if (fontWeight === 'normal') return 400;
-  if (fontWeight === 'bold') return 700;
+  if (fontWeight === 'normal') {
+    return 400;
+  }
+  if (fontWeight === 'bold') {
+    return 700;
+  }
   const n = Number.parseInt(fontWeight, 10);
   return Number.isFinite(n) ? n : 400;
 }
