@@ -223,11 +223,12 @@ const zhHans: typeof en = {
       title: '页面框编辑',
       eyebrow: '文档视图',
       defaultOrientation: {
-        label: '默认页面方向',
-        description: '选择新页面框和 PDF 的页面排列方式。',
+        label: '默认页面布局',
+        description: '选择新页面框的内容排列方式。PDF 仅支持页面或分栏。',
         options: {
-          vertical: '纵向',
-          horizontal: '横向',
+          vertical: '页面',
+          horizontal: '分栏',
+          continuous: '连续',
         },
       },
       fitWholePage: {

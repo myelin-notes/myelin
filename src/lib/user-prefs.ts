@@ -34,7 +34,7 @@ const PREFS = {
     'page-frame-edit-fit-whole-page',
     true,
   ),
-  defaultPageLayout: pref<'vertical' | 'horizontal'>(
+  defaultPageLayout: pref<'vertical' | 'horizontal' | 'continuous'>(
     'default-page-layout',
     'vertical',
   ),

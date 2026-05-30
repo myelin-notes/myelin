@@ -1,4 +1,4 @@
-import { Columns3, Rows3 } from 'lucide-react';
+import { Columns3, GalleryVertical, Rows3 } from 'lucide-react';
 import { useMessages } from '@/lib/i18n';
 import { isApplePlatform } from '@/lib/platform';
 import { useUserPref } from '@/lib/use-user-pref';
@@ -6,7 +6,7 @@ import { UserPrefs } from '@/lib/user-prefs';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
 import { ToggleRow } from '../components/toggle-row';
 
-type DefaultPageLayout = 'vertical' | 'horizontal';
+type DefaultPageLayout = 'vertical' | 'horizontal' | 'continuous';
 
 const MODIFIER_KEY_LABEL = isApplePlatform ? '⌘' : 'Ctrl';
 
@@ -24,6 +24,11 @@ export function EditingSection() {
     OptionsRowOption<DefaultPageLayout>
   > = [
     { value: 'vertical', label: orientationOptions.vertical, Icon: Rows3 },
+    {
+      value: 'continuous',
+      label: orientationOptions.continuous,
+      Icon: GalleryVertical,
+    },
     {
       value: 'horizontal',
       label: orientationOptions.horizontal,

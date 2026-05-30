@@ -232,12 +232,13 @@ const es: typeof en = {
       title: 'Edición de marcos de página',
       eyebrow: 'Vista de documento',
       defaultOrientation: {
-        label: 'Orientación predeterminada de página',
+        label: 'Diseño de página predeterminado',
         description:
-          'Elige cómo los nuevos marcos de página y PDF organizan sus páginas.',
+          'Elige cómo los nuevos marcos de página organizan su contenido. Los PDF solo usan Páginas o Columnas.',
         options: {
-          vertical: 'Vertical',
-          horizontal: 'Horizontal',
+          vertical: 'Páginas',
+          horizontal: 'Columnas',
+          continuous: 'Continuo',
         },
       },
       fitWholePage: {

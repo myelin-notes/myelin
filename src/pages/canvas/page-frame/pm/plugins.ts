@@ -72,7 +72,7 @@ function checkListPlugin(schema: Schema): Plugin {
 
 export function buildPlugins(
   yXmlFragment: Y.XmlFragment,
-  onPageCount?: (pageCount: number) => void,
+  onLayout?: (pageCount: number, contentHeight: number | null) => void,
   resolveNoteLink?: ResolveNoteLink,
 ): Plugin[] {
   const plugins: Plugin[] = [
@@ -89,7 +89,7 @@ export function buildPlugins(
     checkListPlugin(schema),
     calloutCaretAnchorCleanupPlugin(),
     buildKeymap(schema),
-    paginationPlugin(onPageCount),
+    paginationPlugin(onLayout),
     selectionHighlightPlugin(),
     wordSelectionDragPlugin(),
     tableEditing(),

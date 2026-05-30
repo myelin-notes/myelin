@@ -48,12 +48,13 @@ export class PageFrameEditorState {
    * Create a persistent EditorView mounted into the given container.
    * Starts non-editable. Call `setEditable(true)` to enable editing.
    *
-   * `onPageCount`, when provided, is invoked whenever the pagination plugin
-   * computes a new page count for the document.
+   * `onLayout`, when provided, is invoked whenever the pagination plugin
+   * recomputes the document layout: the page count, plus the natural content
+   * height for `continuous` layout (`null` in paginated/column layouts).
    */
   createView(
     container: HTMLElement,
-    onPageCount?: (pageCount: number) => void,
+    onLayout?: (pageCount: number, contentHeight: number | null) => void,
   ): EditorView {
     if (this._view) {
       this.destroyView();
@@ -63,7 +64,7 @@ export class PageFrameEditorState {
       schema,
       plugins: buildPlugins(
         this._yXmlFragment,
-        onPageCount,
+        onLayout,
         this._resolveNoteLink,
       ),
     });
