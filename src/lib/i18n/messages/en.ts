@@ -228,12 +228,14 @@ const en = {
     pageFrameEditing: {
       title: 'Page Frame Editing',
       eyebrow: 'Document View',
-      defaultOrientation: {
-        label: 'Default page orientation',
-        description: 'Choose how new page frames and PDFs arrange pages.',
+      defaultPageLayout: {
+        label: 'Default page layout',
+        description:
+          'Choose how new page frames arrange content. PDFs use Pages or Columns only.',
         options: {
-          vertical: 'Vertical',
-          horizontal: 'Horizontal',
+          vertical: 'Pages',
+          horizontal: 'Columns',
+          continuous: 'Continuous',
         },
       },
       fitWholePage: {

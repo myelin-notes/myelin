@@ -178,7 +178,9 @@ export class PdfElement extends DrawableElement {
 
   constructor(uuid: string, pageLayout: PageLayout = 'vertical') {
     super(uuid, ElementType.PDF);
-    this._pageLayout = pageLayout;
+    // A PDF is inherently paginated, so the page-frame-only `continuous` layout
+    // doesn't apply: fall back to vertical pages.
+    this._pageLayout = pageLayout === 'horizontal' ? 'horizontal' : 'vertical';
   }
 
   public setExportElementsProvider(
@@ -299,14 +301,14 @@ export class PdfElement extends DrawableElement {
     return [
       {
         id: 'layout-vertical',
-        label: 'Vertical pages',
+        label: 'Pages',
         icon: RowsIcon,
         checked: this._pageLayout === 'vertical',
         onSelect: () => this.setPageLayout('vertical'),
       },
       {
         id: 'layout-horizontal',
-        label: 'Horizontal pages',
+        label: 'Columns',
         icon: ColumnsIcon,
         checked: this._pageLayout === 'horizontal',
         onSelect: () => this.setPageLayout('horizontal'),

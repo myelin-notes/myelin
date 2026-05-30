@@ -9,6 +9,7 @@ import {
   type PreparedTextWithSegments,
   prepareWithSegments,
 } from '@chenglou/pretext';
+import type { PageLayout } from '../../../elements/page-frame-constants';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   type Break,
@@ -1510,11 +1511,15 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
   return true;
 }
 
-function isHorizontalPageLayout(view: EditorView): boolean {
-  return (
-    view.dom.closest('.pm-editor')?.getAttribute('data-page-layout') ===
-    'horizontal'
-  );
+function getPageLayout(view: EditorView): PageLayout | null {
+  const value = view.dom
+    .closest('.pm-editor')
+    ?.getAttribute('data-page-layout');
+  return value === 'horizontal' ||
+    value === 'vertical' ||
+    value === 'continuous'
+    ? value
+    : null;
 }
 
 // scrollWidth that exactly equals N*stride - gap can drift to N*stride - gap + ε
@@ -1566,6 +1571,22 @@ function observeLayoutInvalidations(
     });
   }
 
+  // Switching between vertical and continuous changes no editor styles, so the
+  // ResizeObserver above never fires for that toggle. Watch the layout
+  // attribute directly so changing modes always triggers a fresh pass (clearing
+  // or re-inserting page breaks as needed).
+  const layoutHost = view.dom.closest('.pm-editor');
+  if (layoutHost && typeof MutationObserver !== 'undefined') {
+    const layoutObserver = new MutationObserver(requestFollowUpPagination);
+    layoutObserver.observe(layoutHost, {
+      attributes: true,
+      attributeFilter: ['data-page-layout'],
+    });
+    cleanup.push(() => {
+      layoutObserver.disconnect();
+    });
+  }
+
   const fontSet = document.fonts;
 
   void fontSet.ready.then(requestFollowUpPagination);
@@ -1586,7 +1607,7 @@ function observeLayoutInvalidations(
 }
 
 export function paginationPlugin(
-  onPageCount?: (pageCount: number) => void,
+  onLayout?: (pageCount: number, contentHeight: number | null) => void,
 ): Plugin {
   return new Plugin<PaginationState>({
     key: paginationKey,
@@ -1685,7 +1706,33 @@ export function paginationPlugin(
         const metrics = run?.metrics ?? null;
 
         try {
-          if (isHorizontalPageLayout(editorView)) {
+          const pageLayout = getPageLayout(editorView);
+          if (pageLayout === 'continuous') {
+            // One uninterrupted strip: no page breaks. Report the editor's
+            // natural height so the frame can size its single sheet, and clear
+            // any breaks left over from a previous paginated layout.
+            const contentHeight = editorView.dom.offsetHeight;
+            onLayout?.(1, contentHeight);
+
+            if (prevBreaks.length > 0 || prevPageCount !== 1) {
+              const tr = editorView.state.tr;
+              tr.setMeta(paginationKey, {
+                decos: DecorationSet.empty,
+                breaks: [],
+                pageCount: 1,
+              });
+              tr.setMeta(PM_ADD_TO_HISTORY, false);
+              editorView.dispatch(tr);
+            }
+            syncBlockquoteRuleStyles(editorView);
+
+            if (remainingFollowUpPasses > 0) {
+              schedule(remainingFollowUpPasses - 1);
+            }
+            return;
+          }
+
+          if (pageLayout === 'horizontal') {
             const pageCount = getHorizontalPageCount(editorView);
             const changed =
               prevBreaks.length > 0 || pageCount !== prevPageCount;
@@ -1695,7 +1742,7 @@ export function paginationPlugin(
             }
 
             if (pageCount !== prevPageCount) {
-              onPageCount?.(pageCount);
+              onLayout?.(pageCount, null);
             }
 
             const tr = editorView.state.tr;
@@ -1763,7 +1810,7 @@ export function paginationPlugin(
           }
 
           if (pageCount !== prevPageCount) {
-            onPageCount?.(pageCount);
+            onLayout?.(pageCount, null);
           }
 
           const buildDecorationsStartedAt = metrics ? performance.now() : 0;

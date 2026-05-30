@@ -1,5 +1,6 @@
 import {
   Columns3 as ColumnsIcon,
+  GalleryVertical as ContinuousIcon,
   Download as DownloadIcon,
   Rows3 as RowsIcon,
 } from 'lucide-react';
@@ -38,6 +39,7 @@ import {
   normalizePageFrameDisplayName,
   PAGE_GAP,
   PAGE_HEIGHT,
+  PAGE_PADDING,
   PAGE_WIDTH,
   type PageLayout,
 } from './page-frame-constants';
@@ -61,6 +63,12 @@ export class PageFrameElement extends DrawableElement {
   private _pageLayout: PageLayout;
   private _editing = false;
   private _numPages = 1;
+  /**
+   * Natural editor content height (CSS px), reported by the pagination plugin
+   * while in `continuous` layout. `null` in paginated/column layouts, where the
+   * frame's height is derived from page math instead.
+   */
+  private _measuredContentHeight: number | null = null;
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
     null;
   private _noteLinkResolver?: NoteLinkResolver;
@@ -184,7 +192,8 @@ export class PageFrameElement extends DrawableElement {
         this._pageHeight = v as number;
       },
       pageLayout: (v) => {
-        this._pageLayout = v === 'horizontal' ? 'horizontal' : 'vertical';
+        this._pageLayout =
+          v === 'horizontal' || v === 'continuous' ? v : 'vertical';
       },
     });
   }
@@ -227,6 +236,14 @@ export class PageFrameElement extends DrawableElement {
   public set numPages(n: number) {
     this._numPages = n;
   }
+  /**
+   * Record the editor's natural content height for `continuous` layout. Pass
+   * `null` from paginated/column layouts so the geometry getters fall back to
+   * page math.
+   */
+  public setMeasuredContentHeight(height: number | null): void {
+    this._measuredContentHeight = height;
+  }
 
   public get totalWidth(): number {
     const n = this._numPages;
@@ -241,7 +258,20 @@ export class PageFrameElement extends DrawableElement {
     if (this._pageLayout === 'horizontal') {
       return this._pageHeight;
     }
+    if (this._pageLayout === 'continuous') {
+      return this.continuousStripHeight(this._measuredContentHeight);
+    }
     return n * this._pageHeight + Math.max(0, n - 1) * PAGE_GAP;
+  }
+
+  /**
+   * Height of a continuous (single-sheet) frame: as tall as the content plus
+   * the page's top and bottom padding, but never shorter than a single page so
+   * an empty frame still reads as a page. `content` is the editor's natural
+   * height (CSS px), or `null` if it hasn't been measured yet.
+   */
+  private continuousStripHeight(content: number | null): number {
+    return Math.max(this._pageHeight, (content ?? 0) + PAGE_PADDING * 2);
   }
 
   public get localBoundingBox(): DOMRect {
@@ -321,22 +351,38 @@ export class PageFrameElement extends DrawableElement {
               x: this.offset.x + (this._pageWidth * sx) / 2,
               y: this.offset.y + (this._pageHeight * sy) / 2,
             };
-      const pageStride =
-        this._pageLayout === 'horizontal'
-          ? this._pageWidth + PAGE_GAP
-          : this._pageHeight + PAGE_GAP;
-      const localFocus =
-        this._pageLayout === 'horizontal'
-          ? (focusWorld.x - this.offset.x) / sx
-          : (focusWorld.y - this.offset.y) / sy;
-      const pageIndex = Math.min(
-        Math.max(0, this._numPages - 1),
-        Math.max(0, Math.floor(localFocus / pageStride)),
-      );
-      const pageLeft =
-        this._pageLayout === 'horizontal' ? pageIndex * pageStride : 0;
-      const pageTop =
-        this._pageLayout === 'horizontal' ? 0 : pageIndex * pageStride;
+      let pageLeft: number;
+      let pageTop: number;
+      if (this._pageLayout === 'continuous') {
+        // No discrete pages to snap to: frame a page-height window centered on
+        // the cursor, clamped to the strip.
+        pageLeft = 0;
+        const localFocusY = (focusWorld.y - this.offset.y) / sy;
+        pageTop = Math.max(
+          0,
+          Math.min(
+            localFocusY - this._pageHeight / 2,
+            this.totalHeight - this._pageHeight,
+          ),
+        );
+      } else {
+        const pageStride =
+          this._pageLayout === 'horizontal'
+            ? this._pageWidth + PAGE_GAP
+            : this._pageHeight + PAGE_GAP;
+        const localFocus =
+          this._pageLayout === 'horizontal'
+            ? (focusWorld.x - this.offset.x) / sx
+            : (focusWorld.y - this.offset.y) / sy;
+        const pageIndex = Math.min(
+          Math.max(0, this._numPages - 1),
+          Math.max(0, Math.floor(localFocus / pageStride)),
+        );
+        pageLeft =
+          this._pageLayout === 'horizontal' ? pageIndex * pageStride : 0;
+        pageTop =
+          this._pageLayout === 'horizontal' ? 0 : pageIndex * pageStride;
+      }
       const focusRect = new DOMRect(
         this.offset.x + pageLeft * sx,
         this.offset.y + pageTop * sy,
@@ -398,14 +444,21 @@ export class PageFrameElement extends DrawableElement {
     return [
       {
         id: 'layout-vertical',
-        label: 'Vertical pages',
+        label: 'Pages',
         icon: RowsIcon,
         checked: this._pageLayout === 'vertical',
         onSelect: () => this.setPageLayout('vertical'),
       },
       {
+        id: 'layout-continuous',
+        label: 'Continuous',
+        icon: ContinuousIcon,
+        checked: this._pageLayout === 'continuous',
+        onSelect: () => this.setPageLayout('continuous'),
+      },
+      {
         id: 'layout-horizontal',
-        label: 'Horizontal pages',
+        label: 'Columns',
         icon: ColumnsIcon,
         checked: this._pageLayout === 'horizontal',
         onSelect: () => this.setPageLayout('horizontal'),
@@ -486,12 +539,25 @@ export class PageFrameElement extends DrawableElement {
     if (!path) {
       return { cancelled: true };
     }
+    // Continuous frames have no page breaks: harvest them as a single page
+    // sized to the whole strip (krilla allows an arbitrarily tall page), which
+    // matches what's on screen exactly. Measure the editor's live height here
+    // rather than reading the cached `totalHeight` — the cache is only kept
+    // fresh by the pagination rAF loop, so a freshly-mounted frame could still
+    // report `null` and collapse the export box to a single page.
+    const continuous = this._pageLayout === 'continuous';
+    const editorDom = this.pmEditor?.view?.dom;
+    const pageHeight = continuous
+      ? this.continuousStripHeight(
+          editorDom instanceof HTMLElement ? editorDom.offsetHeight : null,
+        )
+      : this._pageHeight;
     const { request, warnings } = await harvestPageFramePdf({
       contentDiv,
-      numPages: this._numPages,
+      numPages: continuous ? 1 : this._numPages,
       pageWidth: this._pageWidth,
-      pageHeight: this._pageHeight,
-      pageLayout: this._pageLayout,
+      pageHeight,
+      pageLayout: this._pageLayout === 'horizontal' ? 'horizontal' : 'vertical',
       offset: { x: this.offset.x, y: this.offset.y },
       selfUuid: this.uuid,
       overlays: includeAnnotations

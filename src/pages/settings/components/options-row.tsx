@@ -31,8 +31,10 @@ export function OptionsRow<T extends string>({
         </span>
       </span>
       <span
-        className="grid w-full shrink-0 gap-1 rounded-lg bg-card/70 p-1 ring-1 ring-border-ghost sm:w-64"
-        style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
+        className="grid w-full shrink-0 gap-1 rounded-lg bg-card/70 p-1 ring-1 ring-border-ghost sm:w-auto"
+        style={{
+          gridTemplateColumns: `repeat(${options.length}, minmax(max-content, 1fr))`,
+        }}
       >
         {options.map(({ value: optionValue, label: optionLabel, Icon }) => {
           const selected = value === optionValue;
@@ -43,7 +45,7 @@ export function OptionsRow<T extends string>({
               aria-pressed={selected}
               onClick={() => onChange(optionValue)}
               className={cn(
-                'flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-medium text-xs transition-colors',
+                'flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 font-medium text-xs transition-colors',
                 selected
                   ? 'bg-accent-dark text-text-on-dark shadow-sm'
                   : 'text-text-muted hover:text-text-primary',

@@ -1,4 +1,4 @@
-import { Columns3, Rows3 } from 'lucide-react';
+import { Columns3, GalleryVertical, Rows3 } from 'lucide-react';
 import { useMessages } from '@/lib/i18n';
 import { isApplePlatform } from '@/lib/platform';
 import { useUserPref } from '@/lib/use-user-pref';
@@ -6,7 +6,7 @@ import { UserPrefs } from '@/lib/user-prefs';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
 import { ToggleRow } from '../components/toggle-row';
 
-type DefaultPageLayout = 'vertical' | 'horizontal';
+type DefaultPageLayout = 'vertical' | 'horizontal' | 'continuous';
 
 const MODIFIER_KEY_LABEL = isApplePlatform ? '⌘' : 'Ctrl';
 
@@ -18,15 +18,18 @@ export function EditingSection() {
   const linkRequireModifier = useUserPref('linkRequireModifier');
   const alwaysRenameNoteReferences = useUserPref('alwaysRenameNoteReferences');
 
-  const orientationOptions =
-    strings.settings.pageFrameEditing.defaultOrientation.options;
-  const orientationRowOptions: ReadonlyArray<
-    OptionsRowOption<DefaultPageLayout>
-  > = [
-    { value: 'vertical', label: orientationOptions.vertical, Icon: Rows3 },
+  const layoutOptions =
+    strings.settings.pageFrameEditing.defaultPageLayout.options;
+  const layoutRowOptions: ReadonlyArray<OptionsRowOption<DefaultPageLayout>> = [
+    { value: 'vertical', label: layoutOptions.vertical, Icon: Rows3 },
+    {
+      value: 'continuous',
+      label: layoutOptions.continuous,
+      Icon: GalleryVertical,
+    },
     {
       value: 'horizontal',
-      label: orientationOptions.horizontal,
+      label: layoutOptions.horizontal,
       Icon: Columns3,
     },
   ];
@@ -65,11 +68,11 @@ export function EditingSection() {
         <OptionsRow
           value={defaultPageLayout}
           onChange={handleDefaultPageLayout}
-          label={strings.settings.pageFrameEditing.defaultOrientation.label}
+          label={strings.settings.pageFrameEditing.defaultPageLayout.label}
           description={
-            strings.settings.pageFrameEditing.defaultOrientation.description
+            strings.settings.pageFrameEditing.defaultPageLayout.description
           }
-          options={orientationRowOptions}
+          options={layoutRowOptions}
         />
         <ToggleRow
           checked={pageFrameEditFitWholePage}

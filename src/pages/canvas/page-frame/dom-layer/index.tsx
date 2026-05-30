@@ -6,6 +6,7 @@ import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
 import { FrameChrome } from '../../elements/frame-chrome';
 import { getFrameChromeMenuButtonRect } from '../../elements/frame-chrome-layout';
+import type { PageLayout } from '../../elements/page-frame-constants';
 import {
   PAGE_CORNER_RADIUS,
   PAGE_GAP,
@@ -137,24 +138,29 @@ function syncPageChrome(
   numPages: number,
   pageWidth: number,
   pageHeight: number,
-  pageLayout: 'vertical' | 'horizontal',
+  pageLayout: PageLayout,
+  stripHeight: number,
 ): void {
-  while (refs.pageChromeDivs.length < numPages) {
+  // Continuous layout is a single uninterrupted sheet sized to the whole strip,
+  // not a run of fixed-height pages.
+  const chromeCount = pageLayout === 'continuous' ? 1 : numPages;
+  while (refs.pageChromeDivs.length < chromeCount) {
     const div = document.createElement('div');
     Object.assign(div.style, PAGE_CHROME_STYLE);
     refs.viewportDiv.insertBefore(div, refs.contentDiv);
     refs.pageChromeDivs.push(div);
   }
-  while (refs.pageChromeDivs.length > numPages) {
+  while (refs.pageChromeDivs.length > chromeCount) {
     refs.pageChromeDivs.pop()!.remove();
   }
-  for (let p = 0; p < numPages; p++) {
+  for (let p = 0; p < chromeCount; p++) {
     refs.pageChromeDivs[p].style.left =
       pageLayout === 'horizontal' ? `${p * (pageWidth + PAGE_GAP)}px` : '0px';
     refs.pageChromeDivs[p].style.top =
       pageLayout === 'horizontal' ? '0px' : `${p * (pageHeight + PAGE_GAP)}px`;
     refs.pageChromeDivs[p].style.width = `${pageWidth}px`;
-    refs.pageChromeDivs[p].style.height = `${pageHeight}px`;
+    refs.pageChromeDivs[p].style.height =
+      pageLayout === 'continuous' ? `${stripHeight}px` : `${pageHeight}px`;
   }
 }
 
@@ -162,7 +168,7 @@ function syncEditorLayout(
   refs: FrameRefs,
   pageWidth: number,
   pageHeight: number,
-  pageLayout: 'vertical' | 'horizontal',
+  pageLayout: PageLayout,
 ): void {
   refs.contentDiv.dataset.pageLayout = pageLayout;
 
@@ -221,8 +227,9 @@ function createFrameRefs(
   container.appendChild(chrome.root);
 
   frame.mountDOM(frameDiv, contentDiv);
-  frame.pmEditor?.createView(contentDiv, (pageCount) => {
+  frame.pmEditor?.createView(contentDiv, (pageCount, contentHeight) => {
     frame.numPages = pageCount;
+    frame.setMeasuredContentHeight(contentHeight);
   });
 
   return {
@@ -471,7 +478,14 @@ export function PageFrameDomLayer({
 
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
         syncEditorLayout(refs, pageWidth, pageHeight, pageLayout);
-        syncPageChrome(refs, frame.numPages, pageWidth, pageHeight, pageLayout);
+        syncPageChrome(
+          refs,
+          frame.numPages,
+          pageWidth,
+          pageHeight,
+          pageLayout,
+          contentHeight,
+        );
       }
 
       removeStaleFrames(frameMap.current, activeFrames);
