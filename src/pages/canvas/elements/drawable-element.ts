@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import type { Messages } from '@/lib/i18n/messages';
+import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
@@ -201,6 +202,12 @@ export abstract class DrawableElement {
     this.draw2D(ctx, deltaTime);
     ctx.restore();
   }
+
+  /**
+   * Emit native PDF draw commands for this element when it overlays a PDF element
+   * being exported. No-op by default; drawable overlays (ink, text, image) override.
+   */
+  public drawToPdf(_ctx: PdfHarvestContext): void {}
 
   /**
    * Draw the selection outline + handles. Lives on a separate always-on-top

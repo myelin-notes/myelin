@@ -43,6 +43,11 @@ import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
 import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
+import {
+  type ExportTarget,
+  setExportDialogOpener,
+} from './export/export-controller';
+import { ExportDialog } from './export/export-dialog';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
@@ -107,6 +112,7 @@ function CanvasViewInner({
 
   const [zoomLocked, setZoomLocked] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
   const onToggleZoomLock = useCallback(() => {
     setZoomLocked((prev) => {
       const next = !prev;
@@ -121,6 +127,11 @@ function CanvasViewInner({
   useEffect(() => {
     setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
     return () => setChromeMenuOpener(() => {});
+  }, []);
+
+  useEffect(() => {
+    setExportDialogOpener((target) => setExportTarget(target));
+    return () => setExportDialogOpener(null);
   }, []);
 
   const embedFiles = useEmbedFiles(drawableCanvasRef);
@@ -522,6 +533,10 @@ function CanvasViewInner({
       <RenameReferencesDialog
         prompt={engine.pageFrameRenamePrompt}
         onChoice={engine.choosePageFrameRenameReferences}
+      />
+      <ExportDialog
+        target={exportTarget}
+        onClose={() => setExportTarget(null)}
       />
       {id && (
         <VersionHistoryDialog

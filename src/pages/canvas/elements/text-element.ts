@@ -4,6 +4,9 @@ import {
   layoutWithLines,
   prepareWithSegments,
 } from '@chenglou/pretext';
+import { parseCssColor } from '@/lib/pdf-export/color';
+import { familyToKey } from '@/lib/pdf-export/fonts';
+import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
@@ -219,6 +222,43 @@ export class TextElement extends DrawableElement {
     const lh = this._cachedLineHeight;
     for (let i = 0; i < this._cachedLines.length; i++) {
       ctx.fillText(this._cachedLines[i].text, 0, i * lh);
+    }
+  }
+
+  public override drawToPdf(ctx: PdfHarvestContext): void {
+    if (!this._text || this._cachedLines.length === 0) {
+      return;
+    }
+    // draw2D counter-scales the element so text renders at native font size; in
+    // world space the block therefore starts at `offset` with line height `lh`.
+    const { rgb, opacity } = parseCssColor(this._style.color);
+    const font = familyToKey(this._style.fontFamily);
+    const fontSize = this._style.fontSize;
+    const lh = this._cachedLineHeight;
+    const ascent = fontSize * 0.8;
+    const sizePt = fontSize * ctx.ptPerWorldY;
+
+    for (let i = 0; i < this._cachedLines.length; i++) {
+      const text = this._cachedLines[i].text;
+      if (!text) {
+        continue;
+      }
+      const p = ctx.worldToPagePt(
+        this.offset.x,
+        this.offset.y + i * lh + ascent,
+      );
+      ctx.push({
+        t: 'text',
+        x: p.x,
+        baselineY: p.y,
+        text,
+        font,
+        weight: 400,
+        italic: false,
+        sizePt,
+        color: rgb,
+        opacity,
+      });
     }
   }
 

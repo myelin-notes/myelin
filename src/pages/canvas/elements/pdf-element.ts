@@ -4,18 +4,23 @@ import {
   Rows3 as RowsIcon,
 } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
-import { writeFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
+import { bytesToBase64, exportPdf } from '@/lib/pdf-export/client';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
 import {
-  createPdfExportBytes,
+  type ExportOptions,
+  type ExportResult,
+  type ExportTarget,
+  openExportDialog,
+} from '../export/export-controller';
+import {
+  buildPdfElementRequest,
   type PdfElementExportPage,
   type PdfElementExportSource,
-} from '../pdf-export';
+} from '../pdf-element-export';
 import {
   createDefaultPdfPageOrder,
   getPdfDocumentPageSizes,
@@ -307,14 +312,21 @@ export class PdfElement extends DrawableElement {
         onSelect: () => this.setPageLayout('horizontal'),
       },
       {
-        id: 'export-pdf',
-        label: 'Export to PDF',
+        id: 'export',
+        label: 'Export',
         icon: DownloadIcon,
-        onSelect: () => {
-          void this.exportPdf();
-        },
+        onSelect: () => openExportDialog(this.buildExportTarget()),
       },
     ];
+  }
+
+  private buildExportTarget(): ExportTarget {
+    return {
+      title: this._fileName || 'PDF',
+      formats: ['pdf'],
+      supportsAnnotations: true,
+      run: (options) => this.runExport(options),
+    };
   }
 
   public get totalWidth(): number {
@@ -369,36 +381,27 @@ export class PdfElement extends DrawableElement {
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
-  private async exportPdf(): Promise<void> {
+  private async runExport({
+    includeAnnotations,
+  }: ExportOptions): Promise<ExportResult> {
     const source = this.getExportSource();
     if (!source) {
-      return;
+      return {};
     }
-
-    try {
-      const path = await save({
-        defaultPath: this.getDefaultExportFileName(),
-        filters: [{ name: 'PDF', extensions: ['pdf'] }],
-      });
-      if (!path) {
-        return;
-      }
-
-      const bytes = await createPdfExportBytes(
-        source,
-        this._exportElementsProvider?.() ?? [],
-      );
-      await writeFile(path, bytes);
-      toast.success('Exported to PDF');
-    } catch (err) {
-      logger.error('Export to PDF failed', err, {
-        uuid: this.uuid,
-        fileName: this._fileName,
-      });
-      toast.error('Export failed', {
-        description: err instanceof Error ? err.message : String(err),
-      });
+    const path = await save({
+      defaultPath: this.getDefaultExportFileName(),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (!path) {
+      return { cancelled: true };
     }
+    const overlays = includeAnnotations
+      ? (this._exportElementsProvider?.() ?? [])
+      : [];
+    const request = buildPdfElementRequest(source, overlays);
+    request.originalPdfB64 = bytesToBase64(source.pdfBytes);
+    await exportPdf(request, path);
+    return {};
   }
 
   private getExportSource(): PdfElementExportSource | null {

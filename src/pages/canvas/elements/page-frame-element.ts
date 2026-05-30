@@ -4,15 +4,21 @@ import {
   Rows3 as RowsIcon,
 } from 'lucide-react';
 import { Selection } from 'prosemirror-state';
-import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
+import { exportPdf as exportPdfToRust } from '@/lib/pdf-export/client';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
+import {
+  type ExportOptions,
+  type ExportResult,
+  type ExportTarget,
+  openExportDialog,
+} from '../export/export-controller';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
+import { harvestPageFramePdf } from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
 import type { YDocManager } from '../ydoc-manager';
@@ -48,8 +54,6 @@ const MIN_PAGE_WIDTH = 240;
 const EDIT_MODE_WIDTH_RATIO = 0.65;
 const EDIT_MODE_HEIGHT_RATIO = 0.86;
 
-const logger = new Logger('PageFrameElement');
-
 export class PageFrameElement extends DrawableElement {
   private _pageWidth = PAGE_WIDTH;
   private _pageHeight = PAGE_HEIGHT;
@@ -57,6 +61,8 @@ export class PageFrameElement extends DrawableElement {
   private _pageLayout: PageLayout;
   private _editing = false;
   private _numPages = 1;
+  private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
+    null;
   private _noteLinkResolver?: NoteLinkResolver;
   private _onDisplayNameRenamed?: (
     uuid: string,
@@ -405,51 +411,101 @@ export class PageFrameElement extends DrawableElement {
         onSelect: () => this.setPageLayout('horizontal'),
       },
       {
-        id: 'export-markdown',
-        label: 'Export to Markdown',
+        id: 'export',
+        label: 'Export',
         icon: DownloadIcon,
-        onSelect: () => {
-          void this.exportMarkdown();
-        },
+        onSelect: () => openExportDialog(this.buildExportTarget()),
       },
     ];
   }
 
-  private async exportMarkdown(): Promise<void> {
+  private buildExportTarget(): ExportTarget {
+    return {
+      title: this._displayName || DEFAULT_PAGE_FRAME_DISPLAY_NAME,
+      formats: ['pdf', 'markdown'],
+      supportsAnnotations: true,
+      run: (options) => this.runExport(options),
+    };
+  }
+
+  private runExport({
+    format,
+    includeAnnotations,
+  }: ExportOptions): Promise<ExportResult> {
+    return format === 'markdown'
+      ? this.runMarkdownExport()
+      : this.runPdfExport(includeAnnotations);
+  }
+
+  /** Sanitize the display name into a filesystem-safe export filename stem. */
+  private getSafeExportName(): string {
+    return (
+      [...this._displayName]
+        .map((char) =>
+          char.charCodeAt(0) <= 0x1f || '/\\:*?"<>|'.includes(char)
+            ? '-'
+            : char,
+        )
+        .join('')
+        .trim() || DEFAULT_PAGE_FRAME_DISPLAY_NAME
+    );
+  }
+
+  private async runMarkdownExport(): Promise<ExportResult> {
     const view = this.pmEditor?.view;
     if (!view) {
-      return;
+      return {};
     }
     // Kick off serialization in the background — it runs in chunked async
     // batches that yield to the event loop, so the save dialog animation
     // and menu close both paint smoothly while the doc is processed.
     const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
-    try {
-      const safeName =
-        [...this._displayName]
-          .map((char) =>
-            char.charCodeAt(0) <= 0x1f || '/\\:*?"<>|'.includes(char)
-              ? '-'
-              : char,
-          )
-          .join('')
-          .trim() || DEFAULT_PAGE_FRAME_DISPLAY_NAME;
-      const path = await save({
-        defaultPath: `${safeName}.md`,
-        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
-      });
-      if (!path) {
-        return;
-      }
-      const md = await mdPromise;
-      await writeTextFile(path, md);
-      toast.success('Exported to Markdown');
-    } catch (err) {
-      logger.error('Export to Markdown failed', err, { uuid: this.uuid });
-      toast.error('Export failed', {
-        description: err instanceof Error ? err.message : String(err),
-      });
+    const path = await save({
+      defaultPath: `${this.getSafeExportName()}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+    });
+    if (!path) {
+      return { cancelled: true };
     }
+    const md = await mdPromise;
+    await writeTextFile(path, md);
+    return {};
+  }
+
+  private async runPdfExport(
+    includeAnnotations: boolean,
+  ): Promise<ExportResult> {
+    const contentDiv = this.contentDiv;
+    if (!contentDiv) {
+      return {};
+    }
+    const path = await save({
+      defaultPath: `${this.getSafeExportName()}.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (!path) {
+      return { cancelled: true };
+    }
+    const { request, warnings } = await harvestPageFramePdf({
+      contentDiv,
+      numPages: this._numPages,
+      pageWidth: this._pageWidth,
+      pageHeight: this._pageHeight,
+      pageLayout: this._pageLayout,
+      offset: { x: this.offset.x, y: this.offset.y },
+      selfUuid: this.uuid,
+      overlays: includeAnnotations
+        ? (this._exportElementsProvider?.() ?? [])
+        : undefined,
+    });
+    await exportPdfToRust(request, path);
+    return { warnings };
+  }
+
+  public setExportElementsProvider(
+    provider: () => readonly DrawableElement[],
+  ): void {
+    this._exportElementsProvider = provider;
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}

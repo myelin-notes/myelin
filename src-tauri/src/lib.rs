@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod iroh_transport;
+mod pdf_export;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,6 +26,7 @@ pub fn run() {
             iroh_transport::iroh_join,
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
+            pdf_export::export_pdf,
         ]);
 
     #[cfg(debug_assertions)]
