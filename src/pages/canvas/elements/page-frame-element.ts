@@ -422,7 +422,7 @@ export class PageFrameElement extends DrawableElement {
   private buildExportTarget(): ExportTarget {
     return {
       title: this._displayName || DEFAULT_PAGE_FRAME_DISPLAY_NAME,
-      formats: ['markdown', 'pdf'],
+      formats: ['pdf', 'markdown'],
       supportsAnnotations: true,
       run: (options) => this.runExport(options),
     };
