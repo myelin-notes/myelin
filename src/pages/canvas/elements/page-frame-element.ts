@@ -4,15 +4,19 @@ import {
   Rows3 as RowsIcon,
 } from 'lucide-react';
 import { Selection } from 'prosemirror-state';
-import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
 import { exportPdf as exportPdfToRust } from '@/lib/pdf-export/client';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
+import {
+  type ExportOptions,
+  type ExportResult,
+  type ExportTarget,
+  openExportDialog,
+} from '../export/export-controller';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
 import { harvestPageFramePdf } from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
@@ -49,8 +53,6 @@ export {
 const MIN_PAGE_WIDTH = 240;
 const EDIT_MODE_WIDTH_RATIO = 0.65;
 const EDIT_MODE_HEIGHT_RATIO = 0.86;
-
-const logger = new Logger('PageFrameElement');
 
 export class PageFrameElement extends DrawableElement {
   private _pageWidth = PAGE_WIDTH;
@@ -407,22 +409,27 @@ export class PageFrameElement extends DrawableElement {
         onSelect: () => this.setPageLayout('horizontal'),
       },
       {
-        id: 'export-markdown',
-        label: 'Export to Markdown',
+        id: 'export',
+        label: 'Export',
         icon: DownloadIcon,
-        onSelect: () => {
-          void this.exportMarkdown();
-        },
-      },
-      {
-        id: 'export-pdf',
-        label: 'Export to PDF',
-        icon: DownloadIcon,
-        onSelect: () => {
-          void this.exportPdf();
-        },
+        onSelect: () => openExportDialog(this.buildExportTarget()),
       },
     ];
+  }
+
+  private buildExportTarget(): ExportTarget {
+    return {
+      title: this._displayName || DEFAULT_PAGE_FRAME_DISPLAY_NAME,
+      formats: ['markdown', 'pdf'],
+      supportsAnnotations: false,
+      run: (options) => this.runExport(options),
+    };
+  }
+
+  private runExport({ format }: ExportOptions): Promise<ExportResult> {
+    return format === 'markdown'
+      ? this.runMarkdownExport()
+      : this.runPdfExport();
   }
 
   /** Sanitize the display name into a filesystem-safe export filename stem. */
@@ -439,62 +446,48 @@ export class PageFrameElement extends DrawableElement {
     );
   }
 
-  private async exportMarkdown(): Promise<void> {
+  private async runMarkdownExport(): Promise<ExportResult> {
     const view = this.pmEditor?.view;
     if (!view) {
-      return;
+      return {};
     }
     // Kick off serialization in the background — it runs in chunked async
     // batches that yield to the event loop, so the save dialog animation
     // and menu close both paint smoothly while the doc is processed.
     const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
-    try {
-      const path = await save({
-        defaultPath: `${this.getSafeExportName()}.md`,
-        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
-      });
-      if (!path) {
-        return;
-      }
-      const md = await mdPromise;
-      await writeTextFile(path, md);
-      toast.success('Exported to Markdown');
-    } catch (err) {
-      logger.error('Export to Markdown failed', err, { uuid: this.uuid });
-      toast.error('Export failed', {
-        description: err instanceof Error ? err.message : String(err),
-      });
+    const path = await save({
+      defaultPath: `${this.getSafeExportName()}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+    });
+    if (!path) {
+      return { cancelled: true };
     }
+    const md = await mdPromise;
+    await writeTextFile(path, md);
+    return {};
   }
 
-  private async exportPdf(): Promise<void> {
+  private async runPdfExport(): Promise<ExportResult> {
     const contentDiv = this.contentDiv;
     if (!contentDiv) {
-      return;
+      return {};
     }
-    try {
-      const path = await save({
-        defaultPath: `${this.getSafeExportName()}.pdf`,
-        filters: [{ name: 'PDF', extensions: ['pdf'] }],
-      });
-      if (!path) {
-        return;
-      }
-      const request = await harvestPageFramePdf({
-        contentDiv,
-        numPages: this._numPages,
-        pageWidth: this._pageWidth,
-        pageHeight: this._pageHeight,
-        pageLayout: this._pageLayout,
-      });
-      await exportPdfToRust(request, path);
-      toast.success('Exported to PDF');
-    } catch (err) {
-      logger.error('Export to PDF failed', err, { uuid: this.uuid });
-      toast.error('Export failed', {
-        description: err instanceof Error ? err.message : String(err),
-      });
+    const path = await save({
+      defaultPath: `${this.getSafeExportName()}.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (!path) {
+      return { cancelled: true };
     }
+    const { request, warnings } = await harvestPageFramePdf({
+      contentDiv,
+      numPages: this._numPages,
+      pageWidth: this._pageWidth,
+      pageHeight: this._pageHeight,
+      pageLayout: this._pageLayout,
+    });
+    await exportPdfToRust(request, path);
+    return { warnings };
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}

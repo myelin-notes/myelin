@@ -46,9 +46,15 @@ interface Harvester {
   originY: number;
 }
 
+export interface PageFrameHarvestResult {
+  request: PdfExportRequest;
+  /** Non-fatal warnings (e.g. code blocks that failed to rasterize). */
+  warnings: string[];
+}
+
 export async function harvestPageFramePdf(
   source: PageFramePdfSource,
-): Promise<PdfExportRequest> {
+): Promise<PageFrameHarvestResult> {
   const { clone, container } = buildOffscreenClone(source);
   document.body.appendChild(container);
   try {
@@ -76,9 +82,20 @@ export async function harvestPageFramePdf(
 
     harvestDecorations(h, clone);
     harvestText(h, clone);
-    await harvestCodeBlocks(h, clone, source.contentDiv);
+    const failedBlocks = await harvestCodeBlocks(h, clone, source.contentDiv);
 
-    return { kind: 'pageframe', pages, imagesB64: h.imagesB64 };
+    const warnings: string[] = [];
+    if (failedBlocks > 0) {
+      const plural = failedBlocks === 1 ? '' : 's';
+      warnings.push(
+        `${failedBlocks} code block${plural} couldn't be rendered and ${failedBlocks === 1 ? 'was' : 'were'} omitted.`,
+      );
+    }
+
+    return {
+      request: { kind: 'pageframe', pages, imagesB64: h.imagesB64 },
+      warnings,
+    };
   } finally {
     container.remove();
   }
@@ -384,9 +401,10 @@ async function harvestCodeBlocks(
   h: Harvester,
   clone: HTMLElement,
   live: HTMLElement,
-): Promise<void> {
+): Promise<number> {
   const cloneBlocks = clone.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTOR);
   const liveBlocks = live.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTOR);
+  let failed = 0;
 
   for (let i = 0; i < cloneBlocks.length; i++) {
     const cloneEl = cloneBlocks[i];
@@ -401,6 +419,7 @@ async function harvestCodeBlocks(
     try {
       dataUrl = await toPng(liveEl, { pixelRatio: 2 });
     } catch (error) {
+      failed++;
       logger.warn('Failed to rasterize code block for PDF export', {
         error,
         index: i,
@@ -409,6 +428,7 @@ async function harvestCodeBlocks(
     }
     const comma = dataUrl.indexOf(',');
     if (comma < 0) {
+      failed++;
       continue;
     }
     const ref = h.imagesB64.push(dataUrl.slice(comma + 1)) - 1;
@@ -424,6 +444,7 @@ async function harvestCodeBlocks(
       imageRef: ref,
     }));
   }
+  return failed;
 }
 
 function circlePath(cx: number, cy: number, r: number): PageItem {
