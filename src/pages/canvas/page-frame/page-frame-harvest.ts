@@ -17,10 +17,16 @@ import type {
 import {
   localToPage,
   type PageGeometry,
+  POINTS_PER_PX,
   pxToPt,
 } from '@/lib/pdf-export/coords';
 import { resolveFont } from '@/lib/pdf-export/fonts';
+import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import { PAGE_GAP } from '../elements/page-frame-constants';
+import {
+  type PdfExportOverlayElement,
+  rectsIntersect,
+} from '../pdf-element-export';
 
 const logger = new Logger('PageFramePdfExport');
 
@@ -31,6 +37,12 @@ export interface PageFramePdfSource {
   pageWidth: number;
   pageHeight: number;
   pageLayout: 'vertical' | 'horizontal';
+  /** This frame's world offset (content top-left) — needed to place overlays. */
+  offset: { x: number; y: number };
+  /** This frame's uuid, so it isn't stamped onto itself as an overlay. */
+  selfUuid: string;
+  /** Canvas elements to stamp on top as annotations (empty to skip). */
+  overlays?: readonly PdfExportOverlayElement[];
 }
 
 const CODE_BLOCK_SELECTOR = '.pm-monaco-code-block';
@@ -83,6 +95,7 @@ export async function harvestPageFramePdf(
     harvestDecorations(h, clone);
     harvestText(h, clone);
     const failedBlocks = await harvestCodeBlocks(h, clone, source.contentDiv);
+    harvestOverlays(h, source);
 
     const warnings: string[] = [];
     if (failedBlocks > 0) {
@@ -445,6 +458,51 @@ async function harvestCodeBlocks(
     }));
   }
   return failed;
+}
+
+/**
+ * Stamp overlapping canvas elements (ink/text/images) onto the frame's pages, the
+ * same way the PDF element overlays annotations. The frame is unscaled, so one world
+ * px maps to one CSS px; each element draws itself in its page's PDF-point space.
+ */
+function harvestOverlays(h: Harvester, source: PageFramePdfSource): void {
+  const overlays = source.overlays;
+  if (!overlays || overlays.length === 0) {
+    return;
+  }
+  const horizontal = source.pageLayout === 'horizontal';
+
+  for (let p = 0; p < h.pages.length; p++) {
+    const pageWorldX =
+      source.offset.x + (horizontal ? p * (source.pageWidth + PAGE_GAP) : 0);
+    const pageWorldY =
+      source.offset.y + (horizontal ? 0 : p * (source.pageHeight + PAGE_GAP));
+    const pageBounds = new DOMRect(
+      pageWorldX,
+      pageWorldY,
+      source.pageWidth,
+      source.pageHeight,
+    );
+
+    const ctx: PdfHarvestContext = {
+      ptPerWorldY: POINTS_PER_PX,
+      worldToPagePt: (wx, wy) => ({
+        x: (wx - pageWorldX) * POINTS_PER_PX,
+        y: (wy - pageWorldY) * POINTS_PER_PX,
+      }),
+      push: (item) => h.pages[p].items.push(item),
+      addImageBase64: (b64) => h.imagesB64.push(b64) - 1,
+    };
+
+    for (const element of overlays) {
+      if (element.uuid === source.selfUuid || element.hidden) {
+        continue;
+      }
+      if (rectsIntersect(element.boundingBox, pageBounds)) {
+        element.drawToPdf(ctx);
+      }
+    }
+  }
 }
 
 function circlePath(cx: number, cy: number, r: number): PageItem {

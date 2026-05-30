@@ -356,6 +356,7 @@ export class DrawableCanvas {
       element.setOnDisplayNameRenamed((uuid, newName, oldName) => {
         this.onPageFrameRenamed?.(uuid, newName, oldName);
       });
+      element.setExportElementsProvider(() => this.elements);
     }
     if (element instanceof PdfElement) {
       element.setExportElementsProvider(() => this.elements);

@@ -61,6 +61,8 @@ export class PageFrameElement extends DrawableElement {
   private _pageLayout: PageLayout;
   private _editing = false;
   private _numPages = 1;
+  private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
+    null;
   private _noteLinkResolver?: NoteLinkResolver;
   private _onDisplayNameRenamed?: (
     uuid: string,
@@ -421,15 +423,18 @@ export class PageFrameElement extends DrawableElement {
     return {
       title: this._displayName || DEFAULT_PAGE_FRAME_DISPLAY_NAME,
       formats: ['markdown', 'pdf'],
-      supportsAnnotations: false,
+      supportsAnnotations: true,
       run: (options) => this.runExport(options),
     };
   }
 
-  private runExport({ format }: ExportOptions): Promise<ExportResult> {
+  private runExport({
+    format,
+    includeAnnotations,
+  }: ExportOptions): Promise<ExportResult> {
     return format === 'markdown'
       ? this.runMarkdownExport()
-      : this.runPdfExport();
+      : this.runPdfExport(includeAnnotations);
   }
 
   /** Sanitize the display name into a filesystem-safe export filename stem. */
@@ -467,7 +472,9 @@ export class PageFrameElement extends DrawableElement {
     return {};
   }
 
-  private async runPdfExport(): Promise<ExportResult> {
+  private async runPdfExport(
+    includeAnnotations: boolean,
+  ): Promise<ExportResult> {
     const contentDiv = this.contentDiv;
     if (!contentDiv) {
       return {};
@@ -485,9 +492,20 @@ export class PageFrameElement extends DrawableElement {
       pageWidth: this._pageWidth,
       pageHeight: this._pageHeight,
       pageLayout: this._pageLayout,
+      offset: { x: this.offset.x, y: this.offset.y },
+      selfUuid: this.uuid,
+      overlays: includeAnnotations
+        ? (this._exportElementsProvider?.() ?? [])
+        : undefined,
     });
     await exportPdfToRust(request, path);
     return { warnings };
+  }
+
+  public setExportElementsProvider(
+    provider: () => readonly DrawableElement[],
+  ): void {
+    this._exportElementsProvider = provider;
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
