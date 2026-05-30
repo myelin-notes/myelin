@@ -17,6 +17,11 @@ use krilla::text::TextDirection;
 use super::contract::{ExportKind, ExportPage, PageItem, PageRef, PdfExportRequest};
 use super::fonts::FontRegistry;
 
+/// CSS px per PDF point. The webview drives the `opsz` (optical size) axis off the
+/// CSS px font-size (`font-optical-sizing: auto`), so the embedded font instance must
+/// be selected with the px-equivalent size, not the point size, to match advances.
+const PX_PER_PT: f32 = 96.0 / 72.0;
+
 pub fn render(req: PdfExportRequest) -> Result<Vec<u8>, String> {
     let images = decode_images(&req.images_b64)?;
     let mut fonts = FontRegistry::new();
@@ -102,7 +107,7 @@ fn draw_item(
             opacity,
         } => {
             let f = fonts
-                .get(*font, *italic, *weight, *size_pt)
+                .get(*font, *italic, *weight, *size_pt * PX_PER_PT)
                 .ok_or("failed to load font instance")?;
             surface.set_stroke(None);
             surface.set_fill(Some(fill(*color, *opacity)));
