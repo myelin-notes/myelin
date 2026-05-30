@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useMessages } from '@/lib/i18n';
 export type ConflictResolution = 'rename' | 'replace';
 
@@ -207,37 +208,30 @@ export function ImportDialog({
             )}
 
             {phase.data.conflict && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-50/50 p-3 dark:bg-amber-950/20">
-                <div className="mb-2 flex items-center gap-2 font-medium text-amber-700 text-sm dark:text-amber-400">
+              <div className="rounded-lg bg-amber-500/10 p-3">
+                <div className="mb-2.5 flex items-center gap-2 font-medium text-amber-700 text-sm">
                   <AlertTriangle className="size-4 shrink-0" />
                   {strings.library.importDialog.conflict.label}
                 </div>
-                <div className="flex flex-col gap-1.5 pl-6">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
-                    <input
-                      type="radio"
-                      name="conflict"
-                      checked={phase.conflictResolution === 'rename'}
-                      onChange={() =>
-                        setPhase({ ...phase, conflictResolution: 'rename' })
-                      }
-                      className="accent-accent-dark"
-                    />
+                <RadioGroup
+                  className="gap-2 pl-6"
+                  value={phase.conflictResolution}
+                  onValueChange={(value) =>
+                    setPhase({
+                      ...phase,
+                      conflictResolution: value as ConflictResolution,
+                    })
+                  }
+                >
+                  <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-secondary">
+                    <RadioGroupItem value="rename" />
                     {strings.library.importDialog.conflict.rename}
                   </label>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
-                    <input
-                      type="radio"
-                      name="conflict"
-                      checked={phase.conflictResolution === 'replace'}
-                      onChange={() =>
-                        setPhase({ ...phase, conflictResolution: 'replace' })
-                      }
-                      className="accent-accent-dark"
-                    />
+                  <label className="flex cursor-pointer items-center gap-2.5 text-sm text-text-secondary">
+                    <RadioGroupItem value="replace" />
                     {strings.library.importDialog.conflict.replace}
                   </label>
-                </div>
+                </RadioGroup>
               </div>
             )}
           </div>
@@ -274,7 +268,7 @@ export function ImportDialog({
         {phase.kind === 'summary' && (
           <div className="flex flex-col gap-3 py-2">
             <div className="flex items-center gap-2 font-medium text-sm text-text-primary">
-              <CheckCircle2 className="size-4 shrink-0 text-green-600 dark:text-green-400" />
+              <CheckCircle2 className="size-4 shrink-0 text-text-success" />
               {strings.library.importDialog.summary.title}
             </div>
             <div className="rounded-lg bg-surface p-3">

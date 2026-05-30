@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FileText as FileTextIcon, Loader2 as LoaderIcon } from 'lucide-react';
+import { Loader2 as LoaderIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import type { ExportFormat, ExportTarget } from './export-controller';
 
@@ -80,52 +81,69 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
     >
       <DialogContent
         showCloseButton={!busy}
-        className="z-[110]"
+        className="z-[110] sm:max-w-md"
         overlayClassName="z-[110]"
       >
         <DialogHeader>
           <DialogTitle>Export</DialogTitle>
-          <DialogDescription>{target?.title}</DialogDescription>
+          {target?.title && (
+            <DialogDescription>{target.title}</DialogDescription>
+          )}
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           {showFormatPicker && (
-            <div className="flex flex-col gap-1.5">
-              <span className="font-medium text-muted-foreground text-xs">
+            <div className="flex flex-col gap-2">
+              <span className="font-medium text-[0.7rem] text-muted-foreground uppercase tracking-wider">
                 Format
               </span>
-              <div className="flex gap-1.5">
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
                 {target?.formats.map((f) => (
-                  <Button
+                  <button
                     key={f}
                     type="button"
-                    variant={format === f ? 'default' : 'outline'}
-                    size="sm"
                     disabled={busy}
+                    aria-pressed={format === f}
                     onClick={() => setFormat(f)}
+                    className={cn(
+                      'rounded-md px-3 py-1.5 font-medium text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
+                      format === f
+                        ? 'bg-card text-foreground shadow-2xs'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
                   >
-                    <FileTextIcon />
                     {FORMAT_LABELS[f]}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>
           )}
 
           {showAnnotations && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+            <div className="flex items-center justify-between gap-4">
+              <label
+                htmlFor="export-annotations"
+                className="flex cursor-pointer flex-col gap-0.5"
+              >
+                <span className="font-medium text-sm">Include annotations</span>
+                <span className="text-muted-foreground text-xs">
+                  Drawings and notes on the page
+                </span>
+              </label>
+              <Switch
+                id="export-annotations"
                 checked={includeAnnotations}
                 disabled={busy}
-                onChange={(e) => setIncludeAnnotations(e.target.checked)}
+                onCheckedChange={setIncludeAnnotations}
               />
-              Include annotations
-            </label>
+            </div>
           )}
 
           {error !== null && (
-            <p className="text-destructive text-sm" role="alert">
+            <p
+              className="rounded-md bg-error-soft px-3 py-2 text-error-text text-sm"
+              role="alert"
+            >
               {error}
             </p>
           )}

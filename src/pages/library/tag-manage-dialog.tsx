@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Tag, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -93,8 +93,7 @@ export function TagManageDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[380px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <Tag className="size-5 text-text-muted" />
+          <DialogTitle className="text-xl">
             {strings.library.tagDialog.title}
           </DialogTitle>
           <DialogDescription>

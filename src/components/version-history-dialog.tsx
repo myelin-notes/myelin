@@ -192,7 +192,7 @@ export function VersionHistoryDialog({
           )}
         </div>
 
-        <DialogFooter className="m-0">
+        <DialogFooter className="px-5 pb-5">
           <Button
             type="button"
             onClick={restoreSelectedVersion}
