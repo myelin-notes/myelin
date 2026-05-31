@@ -3,11 +3,14 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
 } from 'react';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { createWindowStateWithTab, TabStateController } from './controller';
+import { listenForTabDrops } from './multi-window';
 import type { PaneId, Tab, WindowState } from './types';
 
 function readInitTab(): Tab | null {
@@ -29,14 +32,21 @@ const PaneIdContext = createContext<PaneId | null>(null);
 
 export function TabStateProvider({ children }: { children: ReactNode }) {
   const controller = useMemo(() => {
+    const closeWindow = () => {
+      void getCurrentWebviewWindow().close();
+    };
     const initTab = readInitTab();
     if (initTab) {
-      return new TabStateController(createWindowStateWithTab(initTab));
+      return new TabStateController(
+        createWindowStateWithTab(initTab),
+        closeWindow,
+      );
     }
-    return new TabStateController();
+    return new TabStateController(undefined, closeWindow);
   }, []);
 
   useTabCloseShortcut(controller);
+  useAdoptDroppedTabs(controller);
 
   return (
     <TabControllerContext.Provider value={controller}>
@@ -45,12 +55,32 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Adopt tabs dropped onto this window from another window (reverse tear-off).
+function useAdoptDroppedTabs(controller: TabStateController) {
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void listenForTabDrops((tab) => {
+      controller.openTab(tab.target, tab.title);
+    }).then((fn) => {
+      if (disposed) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [controller]);
+}
+
 function useTabCloseShortcut(controller: TabStateController) {
   const handleClose = useCallback(
     (e: KeyboardEvent) => {
-      if (controller.getTotalTabCount() <= 1) {
-        return;
-      }
       const pane = controller.getFocusedPane();
       if (!pane) {
         return;

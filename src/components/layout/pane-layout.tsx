@@ -276,7 +276,15 @@ function CenterPreview() {
   );
 }
 
-function PaneView({ node, isTopLeft }: { node: PaneNode; isTopLeft: boolean }) {
+function PaneView({
+  node,
+  isTopLeft,
+  isTopRight,
+}: {
+  node: PaneNode;
+  isTopLeft: boolean;
+  isTopRight: boolean;
+}) {
   const windowState = useWindowState();
   const isFocused = node.id === windowState.focusedPaneId;
   const tabController = useTabController();
@@ -296,6 +304,7 @@ function PaneView({ node, isTopLeft }: { node: PaneNode; isTopLeft: boolean }) {
           pane={node}
           isFocused={isFocused}
           isTopLeft={isTopLeft}
+          isTopRight={isTopRight}
           // The top-left pane sits at the window's top-left, so its bar carries
           // the window drag handle (titleBarStyle: Overlay has no native one).
           windowDraggable={isTopLeft}
@@ -311,13 +320,19 @@ function PaneView({ node, isTopLeft }: { node: PaneNode; isTopLeft: boolean }) {
 const LayoutRenderer = memo(function LayoutRenderer({
   node,
   isTopLeft,
+  isTopRight,
 }: {
   node: LayoutNode;
   isTopLeft: boolean;
+  isTopRight: boolean;
 }) {
   if (node.type === 'pane') {
-    return <PaneView node={node} isTopLeft={isTopLeft} />;
+    return (
+      <PaneView node={node} isTopLeft={isTopLeft} isTopRight={isTopRight} />
+    );
   }
+
+  const lastIndex = node.children.length - 1;
 
   return (
     <Group orientation={node.direction}>
@@ -332,7 +347,17 @@ const LayoutRenderer = memo(function LayoutRenderer({
             />
           )}
           <Panel defaultSize={node.sizes[i]} minSize={15}>
-            <LayoutRenderer node={child} isTopLeft={isTopLeft && i === 0} />
+            <LayoutRenderer
+              node={child}
+              isTopLeft={isTopLeft && i === 0}
+              // A horizontal split puts the top-right corner in the last child;
+              // a vertical split stacks rows, so the top row (first child) owns
+              // both top corners.
+              isTopRight={
+                isTopRight &&
+                (node.direction === 'horizontal' ? i === lastIndex : i === 0)
+              }
+            />
           </Panel>
         </Fragment>
       ))}
@@ -342,5 +367,5 @@ const LayoutRenderer = memo(function LayoutRenderer({
 
 export function PaneLayout() {
   const windowState = useWindowState();
-  return <LayoutRenderer node={windowState.layout} isTopLeft />;
+  return <LayoutRenderer node={windowState.layout} isTopLeft isTopRight />;
 }

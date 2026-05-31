@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "Myelin",
+        "width": 1100,
+        "height": 700,
+        "dragDropEnabled": false,
+        "decorations": false
+      }
+    ]
+  }
+}
