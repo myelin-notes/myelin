@@ -20,6 +20,13 @@ const isTouchDevice =
 export const isMac = /Mac/.test(ua) && !isTouchDevice;
 
 /**
+ * Running on Windows (desktop). The window is frameless here (decorations:
+ * false), so the tab bar doubles as the title bar and carries our own
+ * minimize/maximize/close controls — see {@link WindowControls}.
+ */
+export const isWindows = /Win/.test(ua);
+
+/**
  * Running on an Apple platform — macOS or iOS — where ⌘ is the primary
  * keyboard modifier. Use for keybindings and shortcut rendering.
  */

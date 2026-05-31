@@ -1,4 +1,5 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { isWindows } from '@/lib/platform';
 import type { Tab } from './types';
 
 export function spawnWindow(tab: Tab): Promise<void> {
@@ -10,7 +11,9 @@ export function spawnWindow(tab: Tab): Promise<void> {
     height: 700,
     titleBarStyle: 'overlay',
     hiddenTitle: true,
-    decorations: true,
+    // Windows is frameless (the tab bar is the title bar); macOS keeps native
+    // decorations so titleBarStyle: Overlay can draw the traffic lights.
+    decorations: !isWindows,
   });
 
   return new Promise((resolve, reject) => {

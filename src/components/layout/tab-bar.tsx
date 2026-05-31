@@ -10,6 +10,7 @@ import {
 import { useMessages } from '@/lib/i18n';
 import {
   isMac,
+  isWindows,
   TAB_BAR_HEIGHT_CLASS,
   TRAFFIC_LIGHT_INSET_CLASS,
 } from '@/lib/platform';
@@ -24,6 +25,7 @@ import {
 import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
+import { WindowControls } from './window-controls';
 
 function tabIcon(target: TabTarget) {
   switch (target.type) {
@@ -55,6 +57,7 @@ interface TabBarProps {
   pane: PaneNode;
   isFocused: boolean;
   isTopLeft: boolean;
+  isTopRight: boolean;
   windowDraggable: boolean;
 }
 
@@ -62,6 +65,7 @@ export const TabBar = memo(function TabBar({
   pane,
   isFocused,
   isTopLeft,
+  isTopRight,
   windowDraggable,
 }: TabBarProps) {
   const strings = useMessages();
@@ -167,7 +171,13 @@ export const TabBar = memo(function TabBar({
       <div className="flex-1 self-stretch" {...dragRegion} />
 
       <div
-        className="flex shrink-0 items-center gap-1 px-2 pb-1"
+        className={cn(
+          'flex shrink-0 items-center gap-1 px-2',
+          // Frameless Windows centers the gear over the full bar height so it
+          // lines up with the full-height window controls; elsewhere it sits on
+          // the tab baseline.
+          isWindows ? 'self-stretch' : 'pb-1',
+        )}
         {...dragRegion}
       >
         <button
@@ -180,6 +190,10 @@ export const TabBar = memo(function TabBar({
           <Settings className="size-3.5" />
         </button>
       </div>
+
+      {/* Frameless Windows has no native title bar, so the top-right pane's
+          bar carries the window controls (sits right of the settings button). */}
+      {isWindows && isTopRight && <WindowControls />}
     </div>
   );
 });
