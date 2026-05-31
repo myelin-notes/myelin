@@ -3,11 +3,13 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
 } from 'react';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { createWindowStateWithTab, TabStateController } from './controller';
+import { listenForTabDrops } from './multi-window';
 import type { PaneId, Tab, WindowState } from './types';
 
 function readInitTab(): Tab | null {
@@ -37,12 +39,36 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useTabCloseShortcut(controller);
+  useAdoptDroppedTabs(controller);
 
   return (
     <TabControllerContext.Provider value={controller}>
       {children}
     </TabControllerContext.Provider>
   );
+}
+
+// Adopt tabs dropped onto this window from another window (reverse tear-off).
+function useAdoptDroppedTabs(controller: TabStateController) {
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void listenForTabDrops((tab) => {
+      controller.openTab(tab.target, tab.title);
+    }).then((fn) => {
+      if (disposed) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [controller]);
 }
 
 function useTabCloseShortcut(controller: TabStateController) {

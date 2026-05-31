@@ -22,7 +22,11 @@ import {
   setupDragGhost,
   TAB_DRAG_MIME,
 } from '@/lib/tabs/drag';
-import { isTabDragOutsideWindow, spawnWindow } from '@/lib/tabs/multi-window';
+import {
+  dropTabOntoWindow,
+  isTabDragOutsideWindow,
+  spawnWindow,
+} from '@/lib/tabs/multi-window';
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
 import { WindowControls } from './window-controls';
@@ -254,15 +258,26 @@ const TabItem = memo(function TabItem({
     (e: React.DragEvent) => {
       onDragStateChange(null);
       if (
-        e.dataTransfer.dropEffect === 'none' &&
-        isTabDragOutsideWindow(e.nativeEvent)
+        e.dataTransfer.dropEffect !== 'none' ||
+        !isTabDragOutsideWindow(e.nativeEvent)
       ) {
-        void spawnWindow(tab)
-          .then(() => {
-            controller.closeTab(tab.id, paneId);
-          })
-          .catch(() => undefined);
+        return;
       }
+
+      // Screen coords are read synchronously; the native event is reused once
+      // the handler returns.
+      const { screenX, screenY } = e.nativeEvent;
+      void (async () => {
+        try {
+          const adopted = await dropTabOntoWindow(tab, screenX, screenY);
+          if (!adopted) {
+            await spawnWindow(tab);
+          }
+          controller.closeTab(tab.id, paneId);
+        } catch {
+          // Leave the tab in place if the transfer/spawn failed.
+        }
+      })();
     },
     [controller, tab, paneId, onDragStateChange],
   );
