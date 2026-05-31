@@ -343,11 +343,16 @@ export function createWindowStateWithTab(tab: Tab): WindowState {
 export class TabStateController {
   private state: WindowState;
   private readonly listeners = new Set<() => void>();
+  private readonly onEmpty?: () => void;
 
-  constructor(initialState?: WindowState) {
+  // `onEmpty` runs when the last pane is closed, i.e. the window has no tabs
+  // left. The window layer uses it to close the native window. Without it, the
+  // window falls back to a fresh default state (used by tests).
+  constructor(initialState?: WindowState, onEmpty?: () => void) {
     this.state = initialState
       ? normalizeWindowState(initialState)
       : createDefaultWindowState();
+    this.onEmpty = onEmpty;
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -668,6 +673,10 @@ export class TabStateController {
     const layout = removePane(state.layout, paneId);
 
     if (!layout) {
+      if (this.onEmpty) {
+        this.onEmpty();
+        return;
+      }
       this.commit(createDefaultWindowState());
       return;
     }

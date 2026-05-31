@@ -7,6 +7,7 @@ import {
   useMemo,
   useSyncExternalStore,
 } from 'react';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { createWindowStateWithTab, TabStateController } from './controller';
 import { listenForTabDrops } from './multi-window';
@@ -31,11 +32,17 @@ const PaneIdContext = createContext<PaneId | null>(null);
 
 export function TabStateProvider({ children }: { children: ReactNode }) {
   const controller = useMemo(() => {
+    const closeWindow = () => {
+      void getCurrentWebviewWindow().close();
+    };
     const initTab = readInitTab();
     if (initTab) {
-      return new TabStateController(createWindowStateWithTab(initTab));
+      return new TabStateController(
+        createWindowStateWithTab(initTab),
+        closeWindow,
+      );
     }
-    return new TabStateController();
+    return new TabStateController(undefined, closeWindow);
   }, []);
 
   useTabCloseShortcut(controller);
@@ -74,9 +81,6 @@ function useAdoptDroppedTabs(controller: TabStateController) {
 function useTabCloseShortcut(controller: TabStateController) {
   const handleClose = useCallback(
     (e: KeyboardEvent) => {
-      if (controller.getTotalTabCount() <= 1) {
-        return;
-      }
       const pane = controller.getFocusedPane();
       if (!pane) {
         return;
