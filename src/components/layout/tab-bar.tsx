@@ -323,7 +323,7 @@ const TabItem = memo(function TabItem({
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               className={cn(
-                'group relative flex h-8 min-w-[100px] max-w-[200px] cursor-grab items-center gap-2 px-3 transition-[colors,opacity] duration-150 active:cursor-grabbing',
+                'group relative flex h-8 min-w-[100px] max-w-[200px] items-center gap-2 px-3 transition-[colors,opacity] duration-150',
                 isActive
                   ? '-mb-px rounded-t-lg border border-border-subtle border-b-0 bg-page text-text-primary'
                   : 'mb-0 text-text-muted hover:text-text-secondary',
