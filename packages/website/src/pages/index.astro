@@ -1,7 +1,7 @@
 ---
 import { buttonVariants, cn } from '@myelin/ui';
 import Base from '../layouts/Base.astro';
-import NoteMock from '../components/NoteMock.astro';
+import NeuralField from '../components/NeuralField.tsx';
 
 const cta = cn(buttonVariants(), 'h-11 rounded-2xl px-6 text-sm');
 
@@ -110,8 +110,10 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
         </div>
       </div>
 
-      <div class="lg:col-span-5 lg:pl-6">
-        <NoteMock />
+      <div class="rise lg:col-span-5" style="animation-delay:.36s">
+        <div class="relative mx-auto aspect-square w-full max-w-md">
+          <NeuralField client:load />
+        </div>
       </div>
     </div>
   </section>
