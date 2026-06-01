@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "packages/ui",
+    "packages/website"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -15,9 +19,18 @@
     "format": "biome format --write .",
     "tauri": "node ./scripts/tauri.mjs",
     "tauri:mac-deep-links:check": "node scripts/tauri-deep-links.mjs check",
-    "tauri:mac-deep-links:clear": "node scripts/tauri-deep-links.mjs clear"
+    "tauri:mac-deep-links:clear": "node scripts/tauri-deep-links.mjs clear",
+    "website:dev": "yarn workspace @myelin/website dev",
+    "website:build": "yarn workspace @myelin/website build"
+  },
+  "resolutions": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "19.2.3"
   },
   "dependencies": {
+    "@myelin/ui": "*",
     "@base-ui/react": "^1.3.0",
     "@chenglou/pretext": "^0.0.4",
     "@sentry/react": "^10.49.0",

@@ -1,0 +1,269 @@
+---
+import { buttonVariants, cn } from '@myelin/ui';
+import Base from '../layouts/Base.astro';
+
+const ctaPrimary = cn(buttonVariants(), 'h-11 px-6 text-sm rounded-2xl');
+const ctaSecondary = cn(
+  buttonVariants({ variant: 'outline' }),
+  'h-11 px-6 text-sm rounded-2xl',
+);
+
+const platforms = ['Mac', 'Windows', 'Linux', 'iPad', 'Android'];
+
+const features = [
+  {
+    title: 'Co-author in real time',
+    body: 'Invite people to a note and write together, live. No save button, no merge conflicts — every keystroke and stroke lands as it happens.',
+  },
+  {
+    title: 'Capture anywhere, find instantly',
+    body: 'Handwriting, PDFs, and images turn into searchable text. Retrieve any idea you have ever filed away in a single keystroke.',
+  },
+  {
+    title: 'Sync through your own GitHub',
+    body: 'Your notes live in a Git repository you control — durable, portable, and entirely yours. No account required to get started.',
+  },
+  {
+    title: 'A different lens on every screen',
+    body: 'Desktop for deep work, tablet for sketching with the pencil, phone for quick capture. One workspace seen through three surfaces.',
+  },
+];
+
+const tiers = [
+  {
+    name: 'Free',
+    price: '$0',
+    cadence: 'forever',
+    blurb: 'Everything you need to think and write on your own devices.',
+    features: [
+      'Native apps for every platform',
+      'Sync through your own GitHub',
+      'Full editor — text, ink, PDFs, tables',
+      'Local-first, offline-ready',
+    ],
+    cta: { label: 'Download free', href: '#download', style: ctaSecondary },
+    featured: false,
+  },
+  {
+    name: 'Pro',
+    price: '$8',
+    cadence: 'per month',
+    blurb: 'Collaboration and retrieval for people who work with others.',
+    features: [
+      'Real-time co-authoring with invite links',
+      'Managed Myelin Cloud sync',
+      'Search and OCR across everything',
+      'Priority support',
+    ],
+    cta: { label: 'Get Pro', href: '#download', style: ctaPrimary },
+    featured: true,
+  },
+];
+---
+
+<Base title="Myelin — one workspace, every device">
+  <!-- Hero -->
+  <section class="relative overflow-hidden">
+    <div
+      class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px]"
+      style="background: radial-gradient(60% 120% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);"
+    >
+    </div>
+    <div class="mx-auto max-w-4xl px-6 pt-24 pb-16 text-center">
+      <p
+        class="mb-5 inline-flex items-center rounded-full border border-border-subtle bg-card px-3 py-1 text-xs font-medium tracking-wide text-text-secondary uppercase"
+      >
+        Notes that move with you
+      </p>
+      <h1
+        class="font-heading text-5xl leading-[1.05] font-semibold tracking-tight text-text-primary sm:text-6xl"
+      >
+        Every device is a lens onto the same workspace
+      </h1>
+      <p class="mx-auto mt-6 max-w-2xl text-lg text-text-secondary">
+        Open a note on your laptop and your iPad and they stay in lockstep —
+        sketch with the pencil while you type, and co-author with your team in
+        real time. Native everywhere, synced through a GitHub repository you
+        own.
+      </p>
+      <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+        <a href="#download" class={ctaPrimary}>Download free</a>
+        <a href="#sync" class={ctaSecondary}>See how sync works</a>
+      </div>
+      <p class="mt-6 text-sm text-text-muted">
+        {platforms.join('  ·  ')}
+      </p>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="mx-auto max-w-6xl px-6 py-20">
+    <div class="max-w-2xl">
+      <h2
+        class="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+      >
+        Built for the way you actually work
+      </h2>
+      <p class="mt-4 text-lg text-text-secondary">
+        Myelin treats every screen as a first-class authoring surface, not a
+        viewer that syncs after the fact.
+      </p>
+    </div>
+    <div class="mt-12 grid gap-5 sm:grid-cols-2">
+      {
+        features.map((feature) => (
+          <article
+            class="rounded-3xl border border-border-subtle bg-card p-7 shadow-ambient"
+          >
+            <h3 class="text-lg font-semibold text-text-primary">
+              {feature.title}
+            </h3>
+            <p class="mt-3 text-text-secondary">{feature.body}</p>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- Sync -->
+  <section id="sync" class="border-y border-border-subtle bg-surface">
+    <div
+      class="mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 lg:grid-cols-2"
+    >
+      <div>
+        <h2
+          class="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+        >
+          Your notes, your repository
+        </h2>
+        <p class="mt-4 text-lg text-text-secondary">
+          On the free plan, Myelin syncs through a GitHub repository you own.
+          Your workspace is plain, portable data that you can read, back up, and
+          move whenever you like — there is no lock-in to walk away from.
+        </p>
+        <p class="mt-4 text-text-secondary">
+          Need to collaborate without handing out repository access? Pro adds
+          managed Myelin Cloud sync and invite-link sharing on top, so you can
+          bring people in with a single link.
+        </p>
+      </div>
+      <div
+        class="rounded-3xl border border-border-subtle bg-card p-8 shadow-elevated"
+      >
+        <div class="flex flex-col gap-4">
+          <div class="flex items-center gap-3">
+            <span
+              class="flex size-9 items-center justify-center rounded-xl bg-accent-green text-text-green"
+              aria-hidden="true">↻</span
+            >
+            <div>
+              <p class="font-medium text-text-primary">Laptop</p>
+              <p class="text-sm text-text-muted">editing · live</p>
+            </div>
+          </div>
+          <div
+            class="ml-4 border-l-2 border-dashed border-border-divider pl-7 text-sm text-text-muted"
+          >
+            same workspace, in lockstep
+          </div>
+          <div class="flex items-center gap-3">
+            <span
+              class="flex size-9 items-center justify-center rounded-xl bg-tag text-text-tag"
+              aria-hidden="true">✎</span
+            >
+            <div>
+              <p class="font-medium text-text-primary">iPad</p>
+              <p class="text-sm text-text-muted">sketching · live</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="mx-auto max-w-6xl px-6 py-20">
+    <div class="max-w-2xl">
+      <h2
+        class="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+      >
+        Start free, upgrade when you collaborate
+      </h2>
+      <p class="mt-4 text-lg text-text-secondary">
+        The full editor is free forever. Pro is for working with other people.
+      </p>
+    </div>
+    <div class="mt-12 grid gap-6 lg:grid-cols-2">
+      {
+        tiers.map((tier) => (
+          <article
+            class={cn(
+              'flex flex-col rounded-3xl border p-8',
+              tier.featured
+                ? 'border-primary bg-card shadow-elevated'
+                : 'border-border-subtle bg-card shadow-ambient',
+            )}
+          >
+            <div class="flex items-baseline justify-between">
+              <h3 class="text-xl font-semibold text-text-primary">
+                {tier.name}
+              </h3>
+              {tier.featured && (
+                <span class="rounded-full bg-accent-green px-3 py-1 text-xs font-medium text-text-green">
+                  Most popular
+                </span>
+              )}
+            </div>
+            <div class="mt-4 flex items-baseline gap-1.5">
+              <span class="font-heading text-4xl font-semibold text-text-primary">
+                {tier.price}
+              </span>
+              <span class="text-sm text-text-muted">{tier.cadence}</span>
+            </div>
+            <p class="mt-3 text-text-secondary">{tier.blurb}</p>
+            <ul class="mt-6 flex flex-col gap-3 text-text-secondary">
+              {tier.features.map((item) => (
+                <li class="flex items-start gap-2.5">
+                  <span class="mt-1 text-text-green" aria-hidden="true">
+                    ✓
+                  </span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <a href={tier.cta.href} class={cn(tier.cta.style, 'mt-8 w-full')}>
+              {tier.cta.label}
+            </a>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- Download -->
+  <section id="download" class="border-t border-border-subtle bg-surface">
+    <div class="mx-auto max-w-3xl px-6 py-20 text-center">
+      <h2
+        class="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+      >
+        Download Myelin
+      </h2>
+      <p class="mx-auto mt-4 max-w-xl text-lg text-text-secondary">
+        One workspace, native on every platform. Pick yours and pick up where
+        you left off on any other.
+      </p>
+      <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+        {
+          platforms.map((platform) => (
+            <a
+              href="#"
+              class={cn(buttonVariants({ variant: 'outline' }), 'h-10 px-5')}
+            >
+              {platform}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+</Base>
