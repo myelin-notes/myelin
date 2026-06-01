@@ -1,31 +1,30 @@
 ---
 import { buttonVariants, cn } from '@myelin/ui';
 import Base from '../layouts/Base.astro';
+import NoteMock from '../components/NoteMock.astro';
 
-const ctaPrimary = cn(buttonVariants(), 'h-11 px-6 text-sm rounded-2xl');
-const ctaSecondary = cn(
-  buttonVariants({ variant: 'outline' }),
-  'h-11 px-6 text-sm rounded-2xl',
-);
-
-const platforms = ['Mac', 'Windows', 'Linux', 'iPad', 'Android'];
+const cta = cn(buttonVariants(), 'h-11 rounded-2xl px-6 text-sm');
 
 const features = [
   {
-    title: 'Co-author in real time',
-    body: 'Invite people to a note and write together, live. No save button, no merge conflicts — every keystroke and stroke lands as it happens.',
+    index: '01',
+    title: 'Write together, live',
+    body: 'Invite people into a note and edit the same page at the same time. Changes land as they happen, with no merge conflicts to settle afterward.',
   },
   {
-    title: 'Capture anywhere, find instantly',
-    body: 'Handwriting, PDFs, and images turn into searchable text. Retrieve any idea you have ever filed away in a single keystroke.',
+    index: '02',
+    title: 'Find anything you have written',
+    body: 'Handwriting, PDFs, and images become searchable text. Reach any idea you have filed away in a single keystroke.',
   },
   {
+    index: '03',
     title: 'Sync through your own GitHub',
-    body: 'Your notes live in a Git repository you control — durable, portable, and entirely yours. No account required to get started.',
+    body: 'Your library lives in a Git repository you control. Portable, durable, and yours. No account needed to begin.',
   },
   {
-    title: 'A different lens on every screen',
-    body: 'Desktop for deep work, tablet for sketching with the pencil, phone for quick capture. One workspace seen through three surfaces.',
+    index: '04',
+    title: 'Built like a studio, not a database',
+    body: 'A serif for reading, a sans for the controls, tonal surfaces, and room to think. The workspace stays out of the way while you work.',
   },
 ];
 
@@ -34,147 +33,198 @@ const tiers = [
     name: 'Free',
     price: '$0',
     cadence: 'forever',
-    blurb: 'Everything you need to think and write on your own devices.',
-    features: [
-      'Native apps for every platform',
+    blurb: 'Everything you need to think on your own devices.',
+    items: [
+      'Native apps for Mac, Windows, Linux, iPad, Android',
       'Sync through your own GitHub',
-      'Full editor — text, ink, PDFs, tables',
-      'Local-first, offline-ready',
+      'The complete editor: text, ink, PDFs, tables',
+      'Local-first, ready offline',
     ],
-    cta: { label: 'Download free', href: '#download', style: ctaSecondary },
-    featured: false,
+    cta: 'Download free',
+    emphasized: false,
   },
   {
     name: 'Pro',
     price: '$8',
     cadence: 'per month',
-    blurb: 'Collaboration and retrieval for people who work with others.',
-    features: [
+    blurb: 'For the work you do with other people.',
+    items: [
       'Real-time co-authoring with invite links',
       'Managed Myelin Cloud sync',
       'Search and OCR across everything',
       'Priority support',
     ],
-    cta: { label: 'Get Pro', href: '#download', style: ctaPrimary },
-    featured: true,
+    cta: 'Get Pro',
+    emphasized: true,
   },
 ];
+
+const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
 ---
 
 <Base title="Myelin — one workspace, every device">
   <!-- Hero -->
-  <section class="relative overflow-hidden">
+  <section class="mx-auto max-w-6xl px-6 lg:px-10">
     <div
-      class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px]"
-      style="background: radial-gradient(60% 120% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);"
+      class="grid items-center gap-y-20 pt-16 pb-24 lg:grid-cols-12 lg:gap-x-10 lg:pt-24 lg:pb-32"
     >
-    </div>
-    <div class="mx-auto max-w-4xl px-6 pt-24 pb-16 text-center">
-      <p
-        class="mb-5 inline-flex items-center rounded-full border border-border-subtle bg-card px-3 py-1 text-xs font-medium tracking-wide text-text-secondary uppercase"
-      >
-        Notes that move with you
-      </p>
-      <h1
-        class="font-heading text-5xl leading-[1.05] font-semibold tracking-tight text-text-primary sm:text-6xl"
-      >
-        Every device is a lens onto the same workspace
-      </h1>
-      <p class="mx-auto mt-6 max-w-2xl text-lg text-text-secondary">
-        Open a note on your laptop and your iPad and they stay in lockstep —
-        sketch with the pencil while you type, and co-author with your team in
-        real time. Native everywhere, synced through a GitHub repository you
-        own.
-      </p>
-      <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
-        <a href="#download" class={ctaPrimary}>Download free</a>
-        <a href="#sync" class={ctaSecondary}>See how sync works</a>
+      <div class="lg:col-span-7">
+        <p
+          class="kicker rise text-text-muted"
+          style="animation-delay:.05s"
+        >
+          A native knowledge workspace
+        </p>
+        <h1
+          class="rise mt-6 font-heading text-[clamp(2.9rem,6.4vw,5.25rem)] leading-[0.98] font-medium tracking-[-0.02em] text-text-primary"
+          style="animation-delay:.12s"
+        >
+          The workspace that keeps every device in <em
+            class="font-normal text-accent-navy italic">lockstep</em
+          >
+        </h1>
+        <p
+          class="rise mt-7 max-w-xl text-lg leading-relaxed text-text-secondary"
+          style="animation-delay:.2s"
+        >
+          Open a note on your laptop and your iPad at once. Sketch with the
+          pencil while you type, and watch both halves grow together. No save
+          step, no reconciliation. Myelin is native on every platform and syncs
+          through a GitHub repository you own.
+        </p>
+        <div
+          class="rise mt-10 flex flex-wrap items-center gap-x-7 gap-y-4"
+          style="animation-delay:.28s"
+        >
+          <a href="#download" class={cta}>Download Myelin</a>
+          <a
+            href="#sync"
+            class="group inline-flex items-center gap-2 text-sm font-medium text-text-primary"
+          >
+            See how sync works
+            <span
+              class="transition-transform duration-300 group-hover:translate-x-1"
+              aria-hidden="true">→</span
+            >
+          </a>
+        </div>
       </div>
-      <p class="mt-6 text-sm text-text-muted">
-        {platforms.join('  ·  ')}
+
+      <div class="lg:col-span-5 lg:pl-6">
+        <NoteMock />
+      </div>
+    </div>
+  </section>
+
+  <!-- Manifesto -->
+  <section class="bg-surface">
+    <div class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
+      <p class="kicker text-text-muted">The idea</p>
+      <blockquote
+        class="mt-6 max-w-4xl font-heading text-[clamp(1.9rem,4vw,3.25rem)] leading-[1.12] font-normal text-text-primary"
+      >
+        Every device is a different lens onto the same workspace.
+      </blockquote>
+      <p class="mt-8 max-w-md text-text-secondary">
+        Desktop for deep work. Tablet for sketching. Phone for capture. One
+        library underneath, always current.
       </p>
     </div>
   </section>
 
   <!-- Features -->
-  <section id="features" class="mx-auto max-w-6xl px-6 py-20">
-    <div class="max-w-2xl">
+  <section id="workspace" class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
+    <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
+      <p class="kicker text-text-muted lg:col-span-3">02 / What it does</p>
       <h2
-        class="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+        class="font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary lg:col-span-9"
       >
         Built for the way you actually work
       </h2>
-      <p class="mt-4 text-lg text-text-secondary">
-        Myelin treats every screen as a first-class authoring surface, not a
-        viewer that syncs after the fact.
-      </p>
     </div>
-    <div class="mt-12 grid gap-5 sm:grid-cols-2">
+
+    <ul class="mt-16 lg:mt-20">
       {
         features.map((feature) => (
-          <article
-            class="rounded-3xl border border-border-subtle bg-card p-7 shadow-ambient"
-          >
-            <h3 class="text-lg font-semibold text-text-primary">
+          <li class="grid gap-x-10 gap-y-3 py-9 lg:grid-cols-12">
+            <span
+              class="font-heading text-3xl font-normal text-text-muted/45 lg:col-span-2"
+              aria-hidden="true"
+            >
+              {feature.index}
+            </span>
+            <h3 class="text-xl font-semibold text-text-primary lg:col-span-4">
               {feature.title}
             </h3>
-            <p class="mt-3 text-text-secondary">{feature.body}</p>
-          </article>
+            <p class="max-w-md text-text-secondary lg:col-span-6">
+              {feature.body}
+            </p>
+          </li>
         ))
       }
-    </div>
+    </ul>
   </section>
 
   <!-- Sync -->
-  <section id="sync" class="border-y border-border-subtle bg-surface">
+  <section id="sync" class="bg-surface">
     <div
-      class="mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 lg:grid-cols-2"
+      class="mx-auto grid max-w-6xl gap-x-10 gap-y-14 px-6 py-24 lg:grid-cols-12 lg:px-10 lg:py-32"
     >
-      <div>
+      <div class="lg:col-span-5">
+        <p class="kicker text-text-muted">03 / Sync</p>
         <h2
-          class="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+          class="mt-6 font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary"
         >
-          Your notes, your repository
+          Your library, your repository
         </h2>
-        <p class="mt-4 text-lg text-text-secondary">
-          On the free plan, Myelin syncs through a GitHub repository you own.
-          Your workspace is plain, portable data that you can read, back up, and
-          move whenever you like — there is no lock-in to walk away from.
+        <p class="mt-7 text-text-secondary">
+          On the free plan, Myelin syncs through a GitHub repository you own. It
+          is plain, portable data you can read, back up, and move whenever you
+          like.
         </p>
         <p class="mt-4 text-text-secondary">
-          Need to collaborate without handing out repository access? Pro adds
-          managed Myelin Cloud sync and invite-link sharing on top, so you can
-          bring people in with a single link.
+          To bring other people in without handing out repository access, Pro
+          adds managed Myelin Cloud sync and invite links, so a single link is
+          all it takes.
         </p>
       </div>
-      <div
-        class="rounded-3xl border border-border-subtle bg-card p-8 shadow-elevated"
-      >
-        <div class="flex flex-col gap-4">
-          <div class="flex items-center gap-3">
-            <span
-              class="flex size-9 items-center justify-center rounded-xl bg-accent-green text-text-green"
-              aria-hidden="true">↻</span
-            >
+
+      <div class="lg:col-span-7 lg:pl-10">
+        <div class="rounded-3xl bg-card p-8 shadow-elevated lg:p-10">
+          <div class="flex items-center justify-between gap-6">
             <div>
-              <p class="font-medium text-text-primary">Laptop</p>
-              <p class="text-sm text-text-muted">editing · live</p>
+              <p class="kicker text-text-muted">Laptop</p>
+              <p class="mt-2 font-heading text-lg text-text-primary">
+                editing the paragraph
+              </p>
             </div>
-          </div>
-          <div
-            class="ml-4 border-l-2 border-dashed border-border-divider pl-7 text-sm text-text-muted"
-          >
-            same workspace, in lockstep
-          </div>
-          <div class="flex items-center gap-3">
             <span
-              class="flex size-9 items-center justify-center rounded-xl bg-tag text-text-tag"
-              aria-hidden="true">✎</span
+              class="inline-flex items-center gap-2 rounded-full bg-bg-success-soft px-3 py-1.5 text-xs font-medium text-text-green"
             >
+              <span class="size-1.5 rounded-full bg-accent-green"></span>
+              live
+            </span>
+          </div>
+
+          <div class="my-7 flex items-center gap-4">
+            <span class="h-px flex-1 bg-border-divider"></span>
+            <span class="kicker text-text-muted">same note</span>
+            <span class="h-px flex-1 bg-border-divider"></span>
+          </div>
+
+          <div class="flex items-center justify-between gap-6">
             <div>
-              <p class="font-medium text-text-primary">iPad</p>
-              <p class="text-sm text-text-muted">sketching · live</p>
+              <p class="kicker text-text-muted">iPad</p>
+              <p class="mt-2 font-heading text-lg text-text-primary">
+                sketching the diagram
+              </p>
             </div>
+            <span
+              class="inline-flex items-center gap-2 rounded-full bg-bg-success-soft px-3 py-1.5 text-xs font-medium text-text-green"
+            >
+              <span class="size-1.5 rounded-full bg-accent-green"></span>
+              live
+            </span>
           </div>
         </div>
       </div>
@@ -182,82 +232,98 @@ const tiers = [
   </section>
 
   <!-- Pricing -->
-  <section id="pricing" class="mx-auto max-w-6xl px-6 py-20">
-    <div class="max-w-2xl">
+  <section id="pricing" class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
+    <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
+      <p class="kicker text-text-muted lg:col-span-3">04 / Pricing</p>
       <h2
-        class="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+        class="font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary lg:col-span-9"
       >
-        Start free, upgrade when you collaborate
+        Free to think alone. Pro to think together
       </h2>
-      <p class="mt-4 text-lg text-text-secondary">
-        The full editor is free forever. Pro is for working with other people.
-      </p>
     </div>
-    <div class="mt-12 grid gap-6 lg:grid-cols-2">
+
+    <div class="mt-16 grid gap-8 lg:mt-20 lg:grid-cols-2 lg:gap-12">
       {
         tiers.map((tier) => (
-          <article
+          <div
             class={cn(
-              'flex flex-col rounded-3xl border p-8',
-              tier.featured
-                ? 'border-primary bg-card shadow-elevated'
-                : 'border-border-subtle bg-card shadow-ambient',
+              'flex flex-col rounded-3xl p-9 lg:p-10',
+              tier.emphasized ? 'bg-surface' : '',
             )}
           >
-            <div class="flex items-baseline justify-between">
-              <h3 class="text-xl font-semibold text-text-primary">
+            <div class="flex items-center gap-3">
+              <h3 class="text-lg font-semibold text-text-primary">
                 {tier.name}
               </h3>
-              {tier.featured && (
-                <span class="rounded-full bg-accent-green px-3 py-1 text-xs font-medium text-text-green">
-                  Most popular
+              {tier.emphasized && (
+                <span class="rounded-md bg-accent-green px-2 py-0.5 text-xs font-medium text-text-green">
+                  for teams
                 </span>
               )}
             </div>
-            <div class="mt-4 flex items-baseline gap-1.5">
-              <span class="font-heading text-4xl font-semibold text-text-primary">
+            <div class="mt-5 flex items-baseline gap-2">
+              <span class="font-heading text-5xl font-medium text-text-primary">
                 {tier.price}
               </span>
               <span class="text-sm text-text-muted">{tier.cadence}</span>
             </div>
-            <p class="mt-3 text-text-secondary">{tier.blurb}</p>
-            <ul class="mt-6 flex flex-col gap-3 text-text-secondary">
-              {tier.features.map((item) => (
-                <li class="flex items-start gap-2.5">
-                  <span class="mt-1 text-text-green" aria-hidden="true">
-                    ✓
-                  </span>
+            <p class="mt-4 text-text-secondary">{tier.blurb}</p>
+
+            <ul class="mt-8 flex flex-col gap-4">
+              {tier.items.map((item) => (
+                <li class="flex items-start gap-3 text-text-secondary">
+                  <svg
+                    class="mt-1 size-4 shrink-0"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 8.5 6.5 12 13 4.5"
+                      stroke="var(--text-green)"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
                   <span>{item}</span>
                 </li>
               ))}
             </ul>
-            <a href={tier.cta.href} class={cn(tier.cta.style, 'mt-8 w-full')}>
-              {tier.cta.label}
+
+            <a
+              href="#download"
+              class={cn(
+                tier.emphasized
+                  ? cn(buttonVariants(), 'h-11 rounded-2xl px-6')
+                  : cn(buttonVariants({ variant: 'outline' }), 'h-11 rounded-2xl px-6'),
+                'mt-9 w-full',
+              )}
+            >
+              {tier.cta}
             </a>
-          </article>
+          </div>
         ))
       }
     </div>
   </section>
 
   <!-- Download -->
-  <section id="download" class="border-t border-border-subtle bg-surface">
-    <div class="mx-auto max-w-3xl px-6 py-20 text-center">
+  <section id="download" class="bg-primary text-text-on-dark">
+    <div class="mx-auto max-w-6xl px-6 py-28 lg:px-10 lg:py-36">
+      <p class="kicker text-text-on-dark/55">Start where you are</p>
       <h2
-        class="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl"
+        class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em]"
       >
-        Download Myelin
+        Bring Myelin to your desk, and pick up where you left off on every other
+        screen
       </h2>
-      <p class="mx-auto mt-4 max-w-xl text-lg text-text-secondary">
-        One workspace, native on every platform. Pick yours and pick up where
-        you left off on any other.
-      </p>
-      <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+      <div class="mt-12 flex flex-wrap gap-3">
         {
           platforms.map((platform) => (
             <a
               href="#"
-              class={cn(buttonVariants({ variant: 'outline' }), 'h-10 px-5')}
+              class="rounded-xl bg-white/10 px-5 py-2.5 text-sm font-medium text-text-on-dark transition-colors hover:bg-white/20"
             >
               {platform}
             </a>

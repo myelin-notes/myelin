@@ -1,0 +1,84 @@
+---
+// A pair of overlapping note sheets: the document lens (laptop) and the
+// sketch lens (tablet), held in lockstep. Pure CSS/SVG, no imagery assets.
+---
+
+<div class="relative mx-auto w-full max-w-md select-none">
+  <!-- Tablet lens: sketch surface, set behind and tilted -->
+  <figure
+    class="absolute -top-10 -left-8 hidden w-56 rotate-[-7deg] rounded-2xl bg-card p-5 shadow-elevated lg:block"
+    aria-hidden="true"
+  >
+    <figcaption class="kicker mb-3 text-text-muted">Tablet · ink</figcaption>
+    <svg viewBox="0 0 180 120" class="w-full" fill="none">
+      <path
+        d="M12 84 C 40 30, 70 30, 96 78 S 150 96, 168 40"
+        stroke="var(--accent-dark)"
+        stroke-width="2"
+        stroke-linecap="round"
+        opacity="0.55"></path>
+      <path
+        d="M20 98 C 60 88, 110 92, 162 70"
+        stroke="var(--accent)"
+        stroke-width="3.5"
+        stroke-linecap="round"></path>
+      <circle cx="96" cy="78" r="3.5" fill="var(--accent-dark)"></circle>
+    </svg>
+  </figure>
+
+  <!-- Document lens: the raised page -->
+  <figure class="rise relative rounded-3xl bg-card p-7 shadow-elevated">
+    <div class="mb-5 flex items-center justify-between">
+      <span class="kicker text-text-muted">Field notes</span>
+      <span
+        class="inline-flex items-center gap-1.5 text-xs font-medium text-text-green"
+      >
+        <span class="size-2 rounded-full bg-accent-green"></span>
+        2 editing
+      </span>
+    </div>
+
+    <h3
+      class="font-heading text-2xl leading-tight font-medium text-text-primary"
+    >
+      Synaptic pruning
+    </h3>
+
+    <p class="mt-3 font-heading text-[0.98rem] leading-relaxed text-text-secondary">
+      The brain keeps what it uses and lets the rest fall away. A note works the
+      same way: the ideas you return to thicken, the others
+      <span class="relative whitespace-nowrap">
+        thin out
+        <svg
+          class="absolute -bottom-1 left-0 w-full"
+          viewBox="0 0 120 8"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M2 5 C 30 2, 90 2, 118 5"
+            stroke="var(--accent)"
+            stroke-width="3"
+            stroke-linecap="round"></path>
+        </svg>
+      </span>.
+    </p>
+
+    <div class="mt-6 flex gap-2">
+      <span class="rounded-md bg-tag px-2.5 py-1 text-xs text-text-tag"
+        >neuroscience</span
+      >
+      <span class="rounded-md bg-tag px-2.5 py-1 text-xs text-text-tag"
+        >memory</span
+      >
+    </div>
+  </figure>
+
+  <!-- Lockstep tether between the two lenses -->
+  <span
+    class="absolute -bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-3.5 py-1.5 text-xs font-medium text-text-on-dark shadow-ambient"
+  >
+    <span class="size-1.5 rounded-full bg-accent-green"></span>
+    in lockstep
+  </span>
+</div>

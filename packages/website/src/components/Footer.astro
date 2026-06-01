@@ -2,34 +2,61 @@
 import { Wordmark } from '@myelin/ui';
 
 const year = 2026;
+
+const columns = [
+  {
+    heading: 'Product',
+    links: [
+      { label: 'Workspace', href: '#workspace' },
+      { label: 'Sync', href: '#sync' },
+      { label: 'Pricing', href: '#pricing' },
+    ],
+  },
+  {
+    heading: 'Get it',
+    links: [
+      { label: 'Download', href: '#download' },
+      { label: 'Release notes', href: '#' },
+      { label: 'GitHub sync', href: '#sync' },
+    ],
+  },
+];
 ---
 
-<footer class="border-t border-border-subtle">
-  <div
-    class="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-12 sm:flex-row sm:items-center sm:justify-between"
-  >
-    <div class="flex flex-col gap-2">
-      <Wordmark />
-      <p class="text-sm text-text-muted">
-        A knowledge workspace that stays in lockstep across every device.
+<footer class="mx-auto max-w-6xl px-6 lg:px-10">
+  <div class="h-px w-full bg-border-ghost"></div>
+  <div class="grid gap-12 py-16 lg:grid-cols-12">
+    <div class="lg:col-span-5">
+      <Wordmark className="text-[1.35rem]" />
+      <p class="mt-4 max-w-xs text-sm leading-relaxed text-text-muted">
+        A native knowledge workspace that keeps every device you own in
+        lockstep.
       </p>
     </div>
-    <nav class="flex flex-wrap gap-x-8 gap-y-3 text-sm" aria-label="Footer">
-      <a href="#features" class="text-text-secondary hover:text-text-primary"
-        >Features</a
-      >
-      <a href="#sync" class="text-text-secondary hover:text-text-primary"
-        >Sync</a
-      >
-      <a href="#pricing" class="text-text-secondary hover:text-text-primary"
-        >Pricing</a
-      >
-      <a href="#download" class="text-text-secondary hover:text-text-primary"
-        >Download</a
-      >
-    </nav>
+
+    {
+      columns.map((column) => (
+        <nav class="lg:col-span-3" aria-label={column.heading}>
+          <p class="kicker text-text-muted">{column.heading}</p>
+          <ul class="mt-5 flex flex-col gap-3">
+            {column.links.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  class="text-sm text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ))
+    }
   </div>
-  <div class="mx-auto max-w-6xl px-6 pb-10">
-    <p class="text-xs text-text-muted">© {year} Myelin</p>
+
+  <div class="flex items-center justify-between pb-12">
+    <p class="kicker text-text-muted">© {year} Myelin</p>
+    <p class="kicker text-text-muted">Mac · Windows · Linux · iPad · Android</p>
   </div>
 </footer>

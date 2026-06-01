@@ -10,7 +10,7 @@ interface Props {
 
 const {
   title,
-  description = 'Myelin is a knowledge workspace where every device is a different lens onto the same notes — co-author in real time, sync through your own GitHub.',
+  description = 'Myelin is a native knowledge workspace that keeps every device you own in lockstep. Co-author in real time, sync through your own GitHub.',
 } = Astro.props;
 ---
 
@@ -23,11 +23,13 @@ const {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>
-  <body class="min-h-dvh">
-    <Nav />
-    <main>
-      <slot />
-    </main>
-    <Footer />
+  <body class="grain bg-page">
+    <div class="relative z-10">
+      <Nav />
+      <main>
+        <slot />
+      </main>
+      <Footer />
+    </div>
   </body>
 </html>
