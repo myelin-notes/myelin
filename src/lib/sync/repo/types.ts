@@ -1,3 +1,4 @@
+import type { ReindexItem } from '@/lib/note-index';
 import type { NoteSession } from '../session';
 import type { VFSNodeId } from '../types';
 
@@ -127,9 +128,7 @@ export interface Repository {
   getFolderChain(folderId: VFSNodeId | null): Promise<VFSFolderNode[]>;
   searchNodes(query: string): Promise<NodeSearchResult[]>;
   /** Candidate notes for the content-index startup backfill. */
-  listIndexBackfillItems(): Promise<
-    { nodeId: VFSNodeId; path: string; fileType: FileType }[]
-  >;
+  listIndexBackfillItems(): Promise<ReindexItem[]>;
   getNodesByAnyTag(tags: string[]): Promise<VFSNode[]>;
   listTags(): Promise<RepositoryTag[]>;
   getStats(): Promise<RepositoryStats>;

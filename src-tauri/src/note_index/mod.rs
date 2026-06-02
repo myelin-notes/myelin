@@ -8,7 +8,7 @@
 mod extract;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -118,7 +118,7 @@ fn process_node(
     node_id: &str,
     path: &str,
     file_type: &str,
-    node_dir: &PathBuf,
+    node_dir: &Path,
 ) -> Result<bool, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("read {path}: {e}"))?;
 
@@ -126,35 +126,56 @@ fn process_node(
     hasher.update(&bytes);
     let source_hash = format!("{:x}", hasher.finalize());
 
+    // Run every applicable provider independently: one provider failing (e.g. a
+    // flaky OCR pass later) is logged and skipped, never aborting the others.
     let mut changed = false;
     for provider in providers.iter().filter(|p| p.applies_to(file_type)) {
-        let artifact = node_dir.join(format!("{}.json", provider.kind()));
-
-        if let Ok(existing) = std::fs::read(&artifact) {
-            if let Ok(record) = serde_json::from_slice::<NoteIndexRecord>(&existing) {
-                if record.source_hash == source_hash && record.schema_version == SCHEMA_VERSION {
-                    continue;
-                }
-            }
+        match build_provider_artifact(provider.as_ref(), &bytes, &source_hash, node_id, node_dir) {
+            Ok(true) => changed = true,
+            Ok(false) => {}
+            Err(e) => eprintln!(
+                "note_index: provider {} failed for {node_id}: {e}",
+                provider.kind()
+            ),
         }
-
-        let text = provider.build(&bytes)?;
-        let record = NoteIndexRecord {
-            node_id: node_id.to_string(),
-            provider_kind: provider.kind().to_string(),
-            source_hash: source_hash.clone(),
-            schema_version: SCHEMA_VERSION,
-            text,
-            updated_at: now_ms(),
-        };
-
-        std::fs::create_dir_all(node_dir).map_err(|e| format!("create index dir: {e}"))?;
-        let json = serde_json::to_vec(&record).map_err(|e| format!("serialize index: {e}"))?;
-        std::fs::write(&artifact, json).map_err(|e| format!("write index: {e}"))?;
-        changed = true;
     }
 
     Ok(changed)
+}
+
+/// Build and persist one provider's artifact. Returns `true` if (re)written,
+/// `false` if the existing artifact was already fresh.
+fn build_provider_artifact(
+    provider: &dyn IndexProvider,
+    bytes: &[u8],
+    source_hash: &str,
+    node_id: &str,
+    node_dir: &Path,
+) -> Result<bool, String> {
+    let artifact = node_dir.join(format!("{}.json", provider.kind()));
+
+    if let Ok(existing) = std::fs::read(&artifact) {
+        if let Ok(record) = serde_json::from_slice::<NoteIndexRecord>(&existing) {
+            if record.source_hash == source_hash && record.schema_version == SCHEMA_VERSION {
+                return Ok(false);
+            }
+        }
+    }
+
+    let text = provider.build(bytes)?;
+    let record = NoteIndexRecord {
+        node_id: node_id.to_string(),
+        provider_kind: provider.kind().to_string(),
+        source_hash: source_hash.to_string(),
+        schema_version: SCHEMA_VERSION,
+        text,
+        updated_at: now_ms(),
+    };
+
+    std::fs::create_dir_all(node_dir).map_err(|e| format!("create index dir: {e}"))?;
+    let json = serde_json::to_vec(&record).map_err(|e| format!("serialize index: {e}"))?;
+    std::fs::write(&artifact, json).map_err(|e| format!("write index: {e}"))?;
+    Ok(true)
 }
 
 fn schedule(
@@ -283,6 +304,19 @@ mod tests {
         }
     }
 
+    struct FailingProvider;
+    impl IndexProvider for FailingProvider {
+        fn kind(&self) -> &'static str {
+            "failing"
+        }
+        fn applies_to(&self, file_type: &str) -> bool {
+            file_type == "mcanvas"
+        }
+        fn build(&self, _bytes: &[u8]) -> Result<String, String> {
+            Err("boom".into())
+        }
+    }
+
     #[test]
     fn runs_every_applicable_provider_then_skips_when_fresh() {
         let base = std::env::temp_dir().join("note_index_multi_provider_test");
@@ -306,6 +340,28 @@ mod tests {
         let changed_again =
             process_node(&providers, "node1", path, "mcanvas", &node_dir).unwrap();
         assert!(!changed_again);
+
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn a_failing_provider_does_not_block_the_others() {
+        let base = std::env::temp_dir().join("note_index_failing_provider_test");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let note_path = base.join("note.myelin");
+        std::fs::write(&note_path, include_bytes!("test_fixture.bin")).unwrap();
+        let node_dir = base.join("idx");
+
+        // Failing provider runs first; it must not abort the one after it.
+        let providers: Vec<Box<dyn IndexProvider>> =
+            vec![Box::new(FailingProvider), Box::new(NoteTextProvider)];
+        let path = note_path.to_str().unwrap();
+
+        let changed = process_node(&providers, "node1", path, "mcanvas", &node_dir).unwrap();
+        assert!(changed);
+        assert!(node_dir.join("note-text.json").exists());
+        assert!(!node_dir.join("failing.json").exists());
 
         std::fs::remove_dir_all(&base).ok();
     }

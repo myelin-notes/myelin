@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
-import { noteIndexService } from '@/lib/note-index';
+import { noteIndexService, type ReindexItem } from '@/lib/note-index';
 import { summarizeYDoc } from '@/lib/note-state-summary';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { NoteSession } from '../session';
@@ -246,11 +246,9 @@ export abstract class BaseRepository
     return searchNodeResults(manifest, query, noteIndexService.getContent());
   }
 
-  async listIndexBackfillItems(): Promise<
-    { nodeId: VFSNodeId; path: string; fileType: FileType }[]
-  > {
+  async listIndexBackfillItems(): Promise<ReindexItem[]> {
     const { manifest } = await this.loadManifestImpl();
-    const items: { nodeId: VFSNodeId; path: string; fileType: FileType }[] = [];
+    const items: ReindexItem[] = [];
     for (const node of getIndexableFileNodes(manifest)) {
       const path = await this.getStoredAbsolutePath(node.id);
       if (path) {

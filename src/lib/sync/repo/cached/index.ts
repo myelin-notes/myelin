@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
+import type { ReindexItem } from '@/lib/note-index';
 import { summarizeNoteBytes } from '@/lib/note-state-summary';
 import { NoteSession } from '../../session';
 import type {
@@ -323,9 +324,7 @@ export class CachedRepository
     return this.cache.searchNodes(query);
   }
 
-  async listIndexBackfillItems(): Promise<
-    { nodeId: VFSNodeId; path: string; fileType: FileType }[]
-  > {
+  async listIndexBackfillItems(): Promise<ReindexItem[]> {
     return this.cache.listIndexBackfillItems();
   }
 
