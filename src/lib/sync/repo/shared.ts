@@ -457,14 +457,23 @@ export function getRecentFiles(
     .slice(0, limit);
 }
 
-/** Canvas notes eligible for content indexing (non-system mcanvas files). */
-export function getIndexableFileNodes(manifest: VFSManifest): VFSFileNode[] {
-  return Object.values(manifest.nodes).filter(
-    (node): node is VFSFileNode =>
-      node.type === 'file' &&
-      node.fileType === 'mcanvas' &&
-      !isSystemNode(node),
-  );
+/**
+ * A user file node that may be offered to the index engine. The engine (Rust
+ * `IndexProvider::applies_to`) is the authority on which file types actually get
+ * indexed; here we only exclude system nodes (e.g. version-history snapshots),
+ * which the engine has no way to recognize from a path + file type alone.
+ */
+export function isIndexCandidateFileNode(
+  node: VFSNode | null | undefined,
+): node is VFSFileNode {
+  return node?.type === 'file' && !isSystemNode(node);
+}
+
+/** User files to offer the index engine on backfill (engine filters by type). */
+export function getIndexCandidateFileNodes(
+  manifest: VFSManifest,
+): VFSFileNode[] {
+  return Object.values(manifest.nodes).filter(isIndexCandidateFileNode);
 }
 
 export function getBacklinks(

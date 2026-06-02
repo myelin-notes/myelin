@@ -141,6 +141,17 @@ fn process_node(
     file_type: &str,
     index_file: &Path,
 ) -> Result<bool, String> {
+    // The engine is the single authority on which file types are indexable.
+    // If no provider handles this type, do no work and write no artifact — the
+    // frontend offers every non-system file, so non-indexable types land here.
+    let applicable: Vec<&Box<dyn IndexProvider>> = providers
+        .iter()
+        .filter(|p| p.applies_to(file_type))
+        .collect();
+    if applicable.is_empty() {
+        return Ok(false);
+    }
+
     let bytes = std::fs::read(path).map_err(|e| format!("read {path}: {e}"))?;
 
     let mut hasher = Sha256::new();
@@ -159,7 +170,7 @@ fn process_node(
     // that fails (e.g. a flaky OCR pass later) is logged and skipped, never
     // aborting the others.
     let mut parts: Vec<String> = Vec::new();
-    for provider in providers.iter().filter(|p| p.applies_to(file_type)) {
+    for provider in applicable {
         match provider.build(&bytes) {
             Ok(text) if !text.is_empty() => parts.push(text),
             Ok(_) => {}
@@ -367,6 +378,26 @@ mod tests {
         let changed_again =
             process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
         assert!(!changed_again);
+
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn skips_types_no_provider_applies_to_without_writing() {
+        let base = std::env::temp_dir().join("note_index_non_applicable_type_test");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let image_path = base.join("photo.png");
+        std::fs::write(&image_path, [0u8, 1, 2, 3]).unwrap();
+        let index_file = base.join("idx").join("node1.json");
+
+        let providers: Vec<Box<dyn IndexProvider>> = vec![Box::new(NoteTextProvider)];
+        let path = image_path.to_str().unwrap();
+
+        // No provider handles "png": nothing is written and no rewrite is signalled.
+        let changed = process_node(&providers, "node1", path, "png", &index_file).unwrap();
+        assert!(!changed);
+        assert!(!index_file.exists());
 
         std::fs::remove_dir_all(&base).ok();
     }
