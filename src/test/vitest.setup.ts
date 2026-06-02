@@ -39,6 +39,17 @@ vi.mock('@/lib/thumbnails', () => ({
   subscribeThumbnail: () => () => {},
 }));
 
+vi.mock('@/lib/note-index', () => ({
+  noteIndexService: {
+    init: async () => {},
+    reset: () => {},
+    getContent: () => new Map<string, string>(),
+    requestReindex: () => {},
+    startBackfill: () => {},
+    removeIndex: async () => {},
+  },
+}));
+
 vi.mock('@/lib/sync/repo/github-credentials', () => ({
   getGitHubToken: vi.fn(async () => 'test-token'),
   hasGitHubToken: vi.fn(async () => true),

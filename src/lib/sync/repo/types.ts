@@ -1,3 +1,4 @@
+import type { ReindexItem } from '@/lib/note-index';
 import type { NoteSession } from '../session';
 import type { VFSNodeId } from '../types';
 
@@ -103,6 +104,13 @@ export interface NoteBacklink extends StoredNoteLink {
   sourceName: string;
 }
 
+export interface NodeSearchResult {
+  node: VFSNode;
+  score: number;
+  /** Snippet around the matched indexed content, or null if name/tags matched. */
+  contentSnippet: string | null;
+}
+
 export interface RepositoryCapabilities {
   polling: boolean;
   liveSync: boolean;
@@ -118,7 +126,9 @@ export interface Repository {
     folderId: VFSNodeId | null,
   ): Promise<[VFSFolderNode[], VFSFileNode[]]>;
   getFolderChain(folderId: VFSNodeId | null): Promise<VFSFolderNode[]>;
-  searchNodes(query: string): Promise<VFSNode[]>;
+  searchNodes(query: string): Promise<NodeSearchResult[]>;
+  /** Candidate notes for the content-index startup backfill. */
+  listIndexBackfillItems(): Promise<ReindexItem[]>;
   getNodesByAnyTag(tags: string[]): Promise<VFSNode[]>;
   listTags(): Promise<RepositoryTag[]>;
   getStats(): Promise<RepositoryStats>;
@@ -151,6 +161,8 @@ export interface Repository {
   addTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   removeTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   getRevealPath(nodeId: VFSNodeId): Promise<string | null>;
+  /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
+  getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;
 
   getCustomColors(): Promise<string[]>;
   addCustomColor(color: string): Promise<string[]>;

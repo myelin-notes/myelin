@@ -25,6 +25,7 @@ dist-ssr
 *.sln
 *.sw?
 .claude/**local**
+.claude/worktrees/
 .vscode
 
 # Sentry Config File

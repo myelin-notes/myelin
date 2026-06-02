@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
+import { noteIndexService, type ReindexItem } from '@/lib/note-index';
 import { summarizeYDoc } from '@/lib/note-state-summary';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { NoteSession } from '../session';
@@ -27,6 +28,7 @@ import {
   getBacklinks,
   getFileVersionNodes,
   getFolderChain,
+  getIndexableFileNodes,
   getNodesByAnyTag,
   getRecentFiles,
   getStats,
@@ -37,7 +39,7 @@ import {
   moveNodeInManifest,
   normalizeCustomColor,
   type RepositorySnapshot,
-  searchNodes,
+  searchNodeResults,
   setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
@@ -48,6 +50,7 @@ import type {
   CreateFileOptions,
   FileType,
   FileVersion,
+  NodeSearchResult,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
@@ -138,15 +141,24 @@ export abstract class BaseRepository
     nodeId: VFSNodeId,
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
+    let fileType: FileType | null = null;
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
+        fileType = node.fileType;
         if (node.fileType === 'mcanvas' && links) {
           setStoredNoteLinks(manifest, nodeId, links);
         }
       }
     });
+
+    if (fileType === 'mcanvas') {
+      const path = await this.getStoredAbsolutePath(nodeId);
+      if (path) {
+        noteIndexService.requestReindex(nodeId, path, fileType);
+      }
+    }
   }
 
   getRuntimeStatus(): RepositoryRuntimeStatus {
@@ -229,9 +241,21 @@ export abstract class BaseRepository
     return getFolderChain(manifest, folderId);
   }
 
-  async searchNodes(query: string): Promise<VFSNode[]> {
+  async searchNodes(query: string): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifestImpl();
-    return searchNodes(manifest, query);
+    return searchNodeResults(manifest, query, noteIndexService.getContent());
+  }
+
+  async listIndexBackfillItems(): Promise<ReindexItem[]> {
+    const { manifest } = await this.loadManifestImpl();
+    const items: ReindexItem[] = [];
+    for (const node of getIndexableFileNodes(manifest)) {
+      const path = await this.getStoredAbsolutePath(node.id);
+      if (path) {
+        items.push({ nodeId: node.id, path, fileType: node.fileType });
+      }
+    }
+    return items;
   }
 
   async getNodesByAnyTag(tags: string[]): Promise<VFSNode[]> {
@@ -433,6 +457,7 @@ export abstract class BaseRepository
       deletedFiles.map(async (file) => {
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
+        await noteIndexService.removeIndex(file.id);
       }),
     );
   }
@@ -483,6 +508,10 @@ export abstract class BaseRepository
   }
 
   async getRevealPath(_nodeId: VFSNodeId): Promise<string | null> {
+    return null;
+  }
+
+  async getStoredAbsolutePath(_nodeId: VFSNodeId): Promise<string | null> {
     return null;
   }
 

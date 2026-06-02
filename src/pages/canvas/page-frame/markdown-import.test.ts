@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
-import type { Repository } from '@/lib/sync';
+import type { Repository, VFSNode } from '@/lib/sync';
 import { ElementType } from '../elements/element-type';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
@@ -65,31 +65,32 @@ describe('markdown canvas import', () => {
     const ydoc = new YDocManager();
     const repository = {
       searchNodes: async (query: string) => {
-        if (query === 'Alpha Note') {
-          return [
-            {
-              id: 'note-1',
-              name: 'Alpha Note',
-              type: 'file',
-              fileType: 'mcanvas',
-              parentId: null,
-              tags: [],
-              createdAt: 0,
-              modifiedAt: 0,
-            },
-            {
-              id: 'note-2',
-              name: 'Alpha Note',
-              type: 'file',
-              fileType: 'mcanvas',
-              parentId: null,
-              tags: [],
-              createdAt: 0,
-              modifiedAt: 0,
-            },
-          ];
-        }
-        return [];
+        const nodes: VFSNode[] =
+          query === 'Alpha Note'
+            ? [
+                {
+                  id: 'note-1',
+                  name: 'Alpha Note',
+                  type: 'file',
+                  fileType: 'mcanvas',
+                  parentId: null,
+                  tags: [],
+                  createdAt: 0,
+                  modifiedAt: 0,
+                },
+                {
+                  id: 'note-2',
+                  name: 'Alpha Note',
+                  type: 'file',
+                  fileType: 'mcanvas',
+                  parentId: null,
+                  tags: [],
+                  createdAt: 0,
+                  modifiedAt: 0,
+                },
+              ]
+            : [];
+        return nodes.map((node) => ({ node, score: 1, contentSnippet: null }));
       },
       getFolderChain: async () => [],
     } satisfies Pick<Repository, 'searchNodes' | 'getFolderChain'>;

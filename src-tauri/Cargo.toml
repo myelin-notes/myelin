@@ -36,6 +36,7 @@ n0-future = "0.3.2"
 sha2 = "0.10.9"
 krilla = { version = "0.8.1", features = ["pdf"] }
 base64 = "0.22.1"
+yrs = "0.26.0"
 
 [profile.dev.package.scrypt]
 opt-level = 3

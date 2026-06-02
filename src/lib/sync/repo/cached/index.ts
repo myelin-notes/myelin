@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
+import type { ReindexItem } from '@/lib/note-index';
 import { summarizeNoteBytes } from '@/lib/note-state-summary';
 import { NoteSession } from '../../session';
 import type {
@@ -44,6 +45,7 @@ import type {
   CreateFileOptions,
   FileType,
   FileVersion,
+  NodeSearchResult,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
@@ -318,8 +320,12 @@ export class CachedRepository
     return this.cache.getFolderChain(folderId);
   }
 
-  async searchNodes(query: string): Promise<VFSNode[]> {
+  async searchNodes(query: string): Promise<NodeSearchResult[]> {
     return this.cache.searchNodes(query);
+  }
+
+  async listIndexBackfillItems(): Promise<ReindexItem[]> {
+    return this.cache.listIndexBackfillItems();
   }
 
   async getNodesByAnyTag(tags: string[]): Promise<VFSNode[]> {
@@ -566,6 +572,10 @@ export class CachedRepository
 
   async getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
     return this.cache.getRevealPath(nodeId);
+  }
+
+  async getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
+    return this.cache.getStoredAbsolutePath(nodeId);
   }
 
   async getCustomColors(): Promise<string[]> {

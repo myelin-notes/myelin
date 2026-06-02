@@ -15,6 +15,11 @@ function isFileNode(node: VFSNode): node is VFSFileNode {
   return node.type === 'file';
 }
 
+interface NoteEntry {
+  note: VFSFileNode;
+  snippet: string | null;
+}
+
 export function useCommandMode({
   commandItems,
   query,
@@ -55,7 +60,7 @@ export function useNotesMode({
   repository: Repository;
   strings: Messages;
 }): CommandPaletteModeState {
-  const [noteResults, setNoteResults] = useState<VFSFileNode[]>([]);
+  const [noteResults, setNoteResults] = useState<NoteEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const loadRequestRef = useRef(0);
 
@@ -71,16 +76,28 @@ export function useNotesMode({
 
     const trimmed = query.trim();
 
+    const loadEntries = (): Promise<NoteEntry[]> =>
+      trimmed
+        ? repository.searchNodes(trimmed).then((results) =>
+            results
+              .filter((result) => isFileNode(result.node))
+              .map((result) => ({
+                note: result.node as VFSFileNode,
+                snippet: result.contentSnippet,
+              })),
+          )
+        : repository
+            .getRecentFiles(6)
+            .then((notes) => notes.map((note) => ({ note, snippet: null })));
+
     const loadNotes = () => {
       setLoading(true);
-      void (
-        trimmed ? repository.searchNodes(trimmed) : repository.getRecentFiles(6)
-      )
-        .then((nodes) => {
+      void loadEntries()
+        .then((entries) => {
           if (requestId !== loadRequestRef.current) {
             return;
           }
-          setNoteResults(nodes.filter(isFileNode));
+          setNoteResults(entries);
         })
         .catch((error) => {
           if (requestId !== loadRequestRef.current) {
@@ -116,13 +133,14 @@ export function useNotesMode({
 
   const items = useMemo<CommandPaletteItem[]>(() => {
     const trimmed = query.trim();
-    return noteResults.map((note) => ({
+    return noteResults.map(({ note, snippet }) => ({
       id: `note:${note.id}`,
       label: note.name,
       description:
-        note.tags.length > 0
+        snippet ??
+        (note.tags.length > 0
           ? note.tags.map((tag) => `#${tag}`).join(' ')
-          : strings.commandPalette.noteResultDescription,
+          : strings.commandPalette.noteResultDescription),
       section: trimmed
         ? strings.commandPalette.sections.notes
         : strings.commandPalette.sections.recent,

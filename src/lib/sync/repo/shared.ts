@@ -1,10 +1,11 @@
 import * as Y from 'yjs';
-import { searchItems } from '@/lib/search';
+import { type SearchField, type SearchHit, searchItems } from '@/lib/search';
 import {
   type FileType,
   FileTypes,
   type FileVersion,
   ImageFileTypes,
+  type NodeSearchResult,
   type NoteBacklink,
   type RepositoryStats,
   type RepositoryTag,
@@ -302,23 +303,91 @@ export function getFolderChain(
   return chain;
 }
 
-export function searchNodes(manifest: VFSManifest, query: string): VFSNode[] {
+const SNIPPET_RADIUS = 80;
+
+function nodeSearchFields(
+  indexContent?: ReadonlyMap<VFSNodeId, string>,
+): SearchField<VFSNode>[] {
+  return [
+    { name: 'name', weight: 4, getValue: (node) => node.name },
+    { name: 'tags', weight: 3, getValue: (node) => node.tags },
+    { name: 'kind', getValue: (node) => node.type },
+    {
+      name: 'fileType',
+      getValue: (node) => (node.type === 'file' ? node.fileType : ''),
+    },
+    {
+      name: 'content',
+      weight: 2,
+      getValue: (node) => indexContent?.get(node.id) ?? '',
+    },
+  ];
+}
+
+function searchNodeHits(
+  manifest: VFSManifest,
+  query: string,
+  indexContent?: ReadonlyMap<VFSNodeId, string>,
+): SearchHit<VFSNode>[] {
   return searchItems(
     Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
     query,
-    {
-      getId: (node) => node.id,
-      fields: [
-        { name: 'name', weight: 4, getValue: (node) => node.name },
-        { name: 'tags', weight: 3, getValue: (node) => node.tags },
-        { name: 'kind', getValue: (node) => node.type },
-        {
-          name: 'fileType',
-          getValue: (node) => (node.type === 'file' ? node.fileType : ''),
-        },
-      ],
-    },
-  ).map((hit) => hit.item);
+    { getId: (node) => node.id, fields: nodeSearchFields(indexContent) },
+  );
+}
+
+/**
+ * Build a short snippet around the first query term that matched a node's
+ * indexed content. Returns null when the match came only from name/tags.
+ */
+function buildContentSnippet(
+  content: string | undefined,
+  hit: SearchHit<VFSNode>,
+): string | null {
+  if (!content) {
+    return null;
+  }
+  const contentTerms = Object.entries(hit.match)
+    .filter(([, fields]) => fields.includes('content'))
+    .map(([term]) => term.toLowerCase());
+  if (contentTerms.length === 0) {
+    return null;
+  }
+
+  const lower = content.toLowerCase();
+  let index = -1;
+  for (const term of contentTerms) {
+    const at = lower.indexOf(term);
+    if (at !== -1 && (index === -1 || at < index)) {
+      index = at;
+    }
+  }
+  if (index === -1) {
+    return null;
+  }
+
+  const start = Math.max(0, index - SNIPPET_RADIUS);
+  const end = Math.min(content.length, index + SNIPPET_RADIUS);
+  let snippet = content.slice(start, end).replace(/\s+/g, ' ').trim();
+  if (start > 0) {
+    snippet = `...${snippet}`;
+  }
+  if (end < content.length) {
+    snippet = `${snippet}...`;
+  }
+  return snippet;
+}
+
+export function searchNodeResults(
+  manifest: VFSManifest,
+  query: string,
+  indexContent?: ReadonlyMap<VFSNodeId, string>,
+): NodeSearchResult[] {
+  return searchNodeHits(manifest, query, indexContent).map((hit) => ({
+    node: hit.item,
+    score: hit.score,
+    contentSnippet: buildContentSnippet(indexContent?.get(hit.item.id), hit),
+  }));
 }
 
 export function getNodesByAnyTag(
@@ -386,6 +455,16 @@ export function getRecentFiles(
     )
     .sort((a, b) => b.modifiedAt - a.modifiedAt)
     .slice(0, limit);
+}
+
+/** Canvas notes eligible for content indexing (non-system mcanvas files). */
+export function getIndexableFileNodes(manifest: VFSManifest): VFSFileNode[] {
+  return Object.values(manifest.nodes).filter(
+    (node): node is VFSFileNode =>
+      node.type === 'file' &&
+      node.fileType === 'mcanvas' &&
+      !isSystemNode(node),
+  );
 }
 
 export function getBacklinks(

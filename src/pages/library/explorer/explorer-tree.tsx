@@ -124,7 +124,9 @@ export function ExplorerTree({
     try {
       let nextNodes: VFSNode[];
       if (isSearching) {
-        nextNodes = await repository.searchNodes(searchQuery!.trim());
+        nextNodes = (await repository.searchNodes(searchQuery!.trim())).map(
+          (result) => result.node,
+        );
         if (isFiltering) {
           const tagSet = new Set(filterTags);
           nextNodes = nextNodes.filter((n) =>
