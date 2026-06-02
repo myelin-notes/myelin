@@ -155,7 +155,15 @@ export function RepositoryProvider({
         void noteIndexService
           .init(getRepositoryStorageKey(resolvedConfig))
           .then(() => repository.listIndexBackfillItems())
-          .then((items) => noteIndexService.startBackfill(items))
+          .then((items) => {
+            // A repo switch may have run cleanup (reset + next init) while this
+            // chain was resolving; bail so we don't backfill the previous repo's
+            // items under the now-current repo.
+            if (disposed) {
+              return;
+            }
+            noteIndexService.startBackfill(items);
+          })
           .catch((error) => {
             logger.error('Failed to start note-index backfill', error);
           });
