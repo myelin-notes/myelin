@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
-import { getIndexContent, removeIndex, requestReindex } from '@/lib/note-index';
+import { noteIndexService } from '@/lib/note-index';
 import { summarizeYDoc } from '@/lib/note-state-summary';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { NoteSession } from '../session';
@@ -156,7 +156,7 @@ export abstract class BaseRepository
     if (fileType === 'mcanvas') {
       const path = await this.getStoredAbsolutePath(nodeId);
       if (path) {
-        requestReindex(nodeId, path, fileType);
+        noteIndexService.requestReindex(nodeId, path, fileType);
       }
     }
   }
@@ -243,7 +243,7 @@ export abstract class BaseRepository
 
   async searchNodes(query: string): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifestImpl();
-    return searchNodeResults(manifest, query, getIndexContent());
+    return searchNodeResults(manifest, query, noteIndexService.getContent());
   }
 
   async listIndexBackfillItems(): Promise<
@@ -459,7 +459,7 @@ export abstract class BaseRepository
       deletedFiles.map(async (file) => {
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
-        await removeIndex(file.id);
+        await noteIndexService.removeIndex(file.id);
       }),
     );
   }

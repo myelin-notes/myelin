@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NoteIndexService } from './service';
 
 const invoke = vi.fn();
 let listenHandler: ((event: { payload: { nodeId: string } }) => void) | null =
@@ -28,7 +29,6 @@ vi.mock('./cache', () => ({
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 beforeEach(() => {
-  vi.resetModules();
   invoke.mockReset();
   invoke.mockResolvedValue(undefined);
   readNodeText.mockReset();
@@ -37,10 +37,10 @@ beforeEach(() => {
   listenHandler = null;
 });
 
-describe('note-index service', () => {
-  it('requestReindex invokes the engine with camelCase args', async () => {
-    const svc = await import('./service');
-    svc.requestReindex('n1', '/files/n1.mcanvas', 'mcanvas');
+describe('NoteIndexService', () => {
+  it('requestReindex invokes the engine with camelCase args', () => {
+    const service = new NoteIndexService();
+    service.requestReindex('n1', '/files/n1.mcanvas', 'mcanvas');
     expect(invoke).toHaveBeenCalledWith('reindex_note', {
       nodeId: 'n1',
       path: '/files/n1.mcanvas',
@@ -50,16 +50,16 @@ describe('note-index service', () => {
 
   it('updates the corpus and notifies on an index-updated event', async () => {
     readNodeText.mockResolvedValue('hello indexed world');
-    const svc = await import('./service');
+    const service = new NoteIndexService();
     const subscriber = vi.fn();
-    svc.subscribeIndex(subscriber);
-    await svc.initNoteIndex();
+    service.subscribe(subscriber);
+    await service.init();
     expect(listenHandler).toBeTruthy();
 
     listenHandler?.({ payload: { nodeId: 'n1' } });
     await flush();
 
-    expect(svc.getIndexContent().get('n1')).toBe('hello indexed world');
+    expect(service.getContent().get('n1')).toBe('hello indexed world');
     expect(subscriber).toHaveBeenCalled();
   });
 
@@ -68,36 +68,36 @@ describe('note-index service', () => {
     readNodeText.mockImplementation(async (id: string) =>
       id === 'n1' ? 'first note' : 'second note',
     );
-    const svc = await import('./service');
-    await svc.initNoteIndex();
+    const service = new NoteIndexService();
+    await service.init();
 
-    expect(svc.getIndexContent().get('n1')).toBe('first note');
-    expect(svc.getIndexContent().get('n2')).toBe('second note');
+    expect(service.getContent().get('n1')).toBe('first note');
+    expect(service.getContent().get('n2')).toBe('second note');
   });
 
   it('removeIndex clears the corpus entry and invokes remove_index', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1']);
     readNodeText.mockResolvedValue('doomed text');
-    const svc = await import('./service');
-    await svc.initNoteIndex();
-    expect(svc.getIndexContent().get('n1')).toBe('doomed text');
+    const service = new NoteIndexService();
+    await service.init();
+    expect(service.getContent().get('n1')).toBe('doomed text');
 
-    await svc.removeIndex('n1');
+    await service.removeIndex('n1');
 
-    expect(svc.getIndexContent().has('n1')).toBe(false);
+    expect(service.getContent().has('n1')).toBe(false);
     expect(invoke).toHaveBeenCalledWith('remove_index', { nodeId: 'n1' });
   });
 
-  it('startBackfill forwards items and skips empty batches', async () => {
-    const svc = await import('./service');
+  it('startBackfill forwards items and skips empty batches', () => {
+    const service = new NoteIndexService();
     const items = [
       { nodeId: 'n1', path: '/files/n1.mcanvas', fileType: 'mcanvas' },
     ];
-    svc.startBackfill(items);
+    service.startBackfill(items);
     expect(invoke).toHaveBeenCalledWith('reindex_batch', { items });
 
     invoke.mockClear();
-    svc.startBackfill([]);
+    service.startBackfill([]);
     expect(invoke).not.toHaveBeenCalled();
   });
 });

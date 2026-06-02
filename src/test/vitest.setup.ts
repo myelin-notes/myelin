@@ -40,12 +40,14 @@ vi.mock('@/lib/thumbnails', () => ({
 }));
 
 vi.mock('@/lib/note-index', () => ({
-  getIndexContent: () => new Map<string, string>(),
-  initNoteIndex: async () => {},
-  removeIndex: async () => {},
-  requestReindex: () => {},
-  startBackfill: () => {},
-  subscribeIndex: () => () => {},
+  noteIndexService: {
+    init: async () => {},
+    getContent: () => new Map<string, string>(),
+    subscribe: () => () => {},
+    requestReindex: () => {},
+    startBackfill: () => {},
+    removeIndex: async () => {},
+  },
 }));
 
 vi.mock('@/lib/sync/repo/github-credentials', () => ({
