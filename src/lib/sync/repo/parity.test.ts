@@ -93,7 +93,9 @@ describe('Repository business logic parity', () => {
       expect(rootFiles.map((file) => file.id)).toEqual([fileId]);
       expect(docsFiles.map((file) => file.id)).toEqual([rawFileId]);
       expect(
-        (await repository.searchNodes('Renamed')).map((node) => node.id),
+        (await repository.searchNodes('Renamed')).map(
+          (result) => result.node.id,
+        ),
       ).toEqual([fileId]);
       expect(
         (await repository.getNodesByAnyTag(['alpha']))

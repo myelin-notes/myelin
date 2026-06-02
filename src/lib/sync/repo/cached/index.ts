@@ -44,8 +44,8 @@ import type {
   CreateFileOptions,
   FileType,
   FileVersion,
+  NodeSearchResult,
   NoteBacklink,
-  NoteSearchResult,
   Repository,
   RepositoryCapabilities,
   RepositoryStats,
@@ -319,12 +319,8 @@ export class CachedRepository
     return this.cache.getFolderChain(folderId);
   }
 
-  async searchNodes(query: string): Promise<VFSNode[]> {
+  async searchNodes(query: string): Promise<NodeSearchResult[]> {
     return this.cache.searchNodes(query);
-  }
-
-  async searchNotes(query: string): Promise<NoteSearchResult[]> {
-    return this.cache.searchNotes(query);
   }
 
   async listIndexBackfillItems(): Promise<

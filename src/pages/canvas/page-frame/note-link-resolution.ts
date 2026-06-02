@@ -161,7 +161,7 @@ export async function resolveNoteLinkIdByTitle(
   }
 
   const matches = await repository.searchNodes(parsedTarget.noteName);
-  const notes = matches.filter(isCanvasNote);
+  const notes = matches.map((result) => result.node).filter(isCanvasNote);
   if (!parsedTarget.isPath) {
     const match = notes.find((node) => node.name === parsedTarget.noteName);
     return match?.id ?? null;
@@ -257,7 +257,7 @@ async function searchNoteAutocompleteItems(
     return [];
   }
 
-  const notes = matches.filter(isCanvasNote);
+  const notes = matches.map((result) => result.node).filter(isCanvasNote);
   const titleCounts = new Map<string, number>();
   for (const note of notes) {
     titleCounts.set(note.name, (titleCounts.get(note.name) ?? 0) + 1);

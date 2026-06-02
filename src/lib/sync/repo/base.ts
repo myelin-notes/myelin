@@ -39,8 +39,7 @@ import {
   moveNodeInManifest,
   normalizeCustomColor,
   type RepositorySnapshot,
-  searchNodes,
-  searchNoteResults,
+  searchNodeResults,
   setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
@@ -51,8 +50,8 @@ import type {
   CreateFileOptions,
   FileType,
   FileVersion,
+  NodeSearchResult,
   NoteBacklink,
-  NoteSearchResult,
   Repository,
   RepositoryCapabilities,
   RepositoryStats,
@@ -242,14 +241,9 @@ export abstract class BaseRepository
     return getFolderChain(manifest, folderId);
   }
 
-  async searchNodes(query: string): Promise<VFSNode[]> {
+  async searchNodes(query: string): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifestImpl();
-    return searchNodes(manifest, query, getIndexContent());
-  }
-
-  async searchNotes(query: string): Promise<NoteSearchResult[]> {
-    const { manifest } = await this.loadManifestImpl();
-    return searchNoteResults(manifest, query, getIndexContent());
+    return searchNodeResults(manifest, query, getIndexContent());
   }
 
   async listIndexBackfillItems(): Promise<

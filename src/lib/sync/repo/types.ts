@@ -103,7 +103,7 @@ export interface NoteBacklink extends StoredNoteLink {
   sourceName: string;
 }
 
-export interface NoteSearchResult {
+export interface NodeSearchResult {
   node: VFSNode;
   score: number;
   /** Snippet around the matched indexed content, or null if name/tags matched. */
@@ -125,8 +125,7 @@ export interface Repository {
     folderId: VFSNodeId | null,
   ): Promise<[VFSFolderNode[], VFSFileNode[]]>;
   getFolderChain(folderId: VFSNodeId | null): Promise<VFSFolderNode[]>;
-  searchNodes(query: string): Promise<VFSNode[]>;
-  searchNotes(query: string): Promise<NoteSearchResult[]>;
+  searchNodes(query: string): Promise<NodeSearchResult[]>;
   /** Candidate notes for the content-index startup backfill. */
   listIndexBackfillItems(): Promise<
     { nodeId: VFSNodeId; path: string; fileType: FileType }[]

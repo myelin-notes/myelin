@@ -78,7 +78,7 @@ export function useNotesMode({
 
     const loadEntries = (): Promise<NoteEntry[]> =>
       trimmed
-        ? repository.searchNotes(trimmed).then((results) =>
+        ? repository.searchNodes(trimmed).then((results) =>
             results
               .filter((result) => isFileNode(result.node))
               .map((result) => ({

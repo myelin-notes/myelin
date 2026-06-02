@@ -5,8 +5,8 @@ import {
   FileTypes,
   type FileVersion,
   ImageFileTypes,
+  type NodeSearchResult,
   type NoteBacklink,
-  type NoteSearchResult,
   type RepositoryStats,
   type RepositoryTag,
   type StoredNoteLink,
@@ -378,19 +378,11 @@ function buildContentSnippet(
   return snippet;
 }
 
-export function searchNodes(
+export function searchNodeResults(
   manifest: VFSManifest,
   query: string,
   indexContent?: ReadonlyMap<VFSNodeId, string>,
-): VFSNode[] {
-  return searchNodeHits(manifest, query, indexContent).map((hit) => hit.item);
-}
-
-export function searchNoteResults(
-  manifest: VFSManifest,
-  query: string,
-  indexContent?: ReadonlyMap<VFSNodeId, string>,
-): NoteSearchResult[] {
+): NodeSearchResult[] {
   return searchNodeHits(manifest, query, indexContent).map((hit) => ({
     node: hit.item,
     score: hit.score,

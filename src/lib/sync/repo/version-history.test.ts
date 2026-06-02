@@ -42,7 +42,7 @@ describe('repository file version history', () => {
     expect(rootFolders).toHaveLength(0);
     expect(rootFiles.map((file) => file.id)).toEqual([fileId]);
     expect(
-      (await repository.searchNodes('Photo')).map((node) => node.id),
+      (await repository.searchNodes('Photo')).map((result) => result.node.id),
     ).toEqual([fileId]);
     expect(await repository.getStats()).toEqual({
       totalFiles: 1,

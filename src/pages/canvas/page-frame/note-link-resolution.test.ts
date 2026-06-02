@@ -49,6 +49,12 @@ function createFileNode(
   };
 }
 
+// searchNodes returns ranked results ({ node, score, contentSnippet }); these
+// resolution tests only care about the nodes, so wrap fixtures with this.
+function toResult(node: VFSNode) {
+  return { node, score: 1, contentSnippet: null };
+}
+
 function createSnapshot(update: Uint8Array | null): YjsSyncSnapshot {
   return {
     update,
@@ -78,10 +84,12 @@ describe('resolveNoteLinkIdByTitle', () => {
     const projectFolder = createFolderNode('folder-projects', 'Projects');
     const archiveFolder = createFolderNode('folder-archive', 'Archive');
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-project', 'Alpha', projectFolder.id),
-        createFileNode('note-archive', 'Alpha', archiveFolder.id),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [
+          createFileNode('note-project', 'Alpha', projectFolder.id),
+          createFileNode('note-archive', 'Alpha', archiveFolder.id),
+        ].map(toResult),
+      ),
       getFolderChain: vi.fn(async (folderId: string | null) => {
         if (folderId === projectFolder.id) {
           return [projectFolder];
@@ -102,9 +110,9 @@ describe('resolveNoteLinkIdByTitle', () => {
 
   it('resolves note targets with page-frame names by note title', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'Alpha', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'Alpha', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
     } satisfies Pick<Repository, 'searchNodes' | 'getFolderChain'>;
 
@@ -119,9 +127,11 @@ describe('resolveNoteLinkIdByTitle', () => {
   it('resolves path targets with page-frame names by folder path and title', async () => {
     const archiveFolder = createFolderNode('folder-archive', 'Archive');
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-archive', 'Alpha', archiveFolder.id),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-archive', 'Alpha', archiveFolder.id)].map(
+          toResult,
+        ),
+      ),
       getFolderChain: vi.fn(async () => [archiveFolder]),
     } satisfies Pick<Repository, 'searchNodes' | 'getFolderChain'>;
 
@@ -134,10 +144,12 @@ describe('resolveNoteLinkIdByTitle', () => {
 
   it('keeps title-only resolution on exact note names', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-first', 'Alpha', null),
-        createFileNode('note-second', 'Alpha', 'folder-1'),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [
+          createFileNode('note-first', 'Alpha', null),
+          createFileNode('note-second', 'Alpha', 'folder-1'),
+        ].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
     } satisfies Pick<Repository, 'searchNodes' | 'getFolderChain'>;
 
@@ -154,10 +166,12 @@ describe('searchNoteLinkAutocompleteItems', () => {
     const projectFolder = createFolderNode('folder-projects', 'Projects');
     const archiveFolder = createFolderNode('folder-archive', 'Archive');
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-project', 'Alpha', projectFolder.id),
-        createFileNode('note-archive', 'Alpha', archiveFolder.id),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [
+          createFileNode('note-project', 'Alpha', projectFolder.id),
+          createFileNode('note-archive', 'Alpha', archiveFolder.id),
+        ].map(toResult),
+      ),
       getFolderChain: vi.fn(async (folderId: string | null) => {
         if (folderId === projectFolder.id) {
           return [projectFolder];
@@ -196,7 +210,7 @@ describe('searchNoteLinkAutocompleteItems', () => {
       createFileNode('note-beta', 'Beta', projectFolder.id),
     ];
     const repository = {
-      searchNodes: vi.fn(async () => nodes),
+      searchNodes: vi.fn(async () => nodes.map(toResult)),
       getFolderChain: vi.fn(async (folderId: string | null) => {
         if (folderId === projectFolder.id) {
           return [projectFolder];
@@ -239,9 +253,9 @@ describe('searchNoteLinkAutocompleteItems', () => {
 
   it('suggests page-frame names after a note target fragment', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'Alpha', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'Alpha', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () =>
         createSnapshot(createPageFrameUpdate(['Research Notes', 'Draft'])),
@@ -271,9 +285,9 @@ describe('searchNoteLinkAutocompleteItems', () => {
 
   it('escapes hash in suggested frame names but leaves pipe alone', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'Alpha', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'Alpha', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () =>
         createSnapshot(createPageFrameUpdate(['Plan #2 | draft'])),
@@ -301,9 +315,9 @@ describe('searchNoteLinkAutocompleteItems', () => {
 
   it('resolves frame queries with escaped hash in note target', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'A#B', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'A#B', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () =>
         createSnapshot(createPageFrameUpdate(['Research Notes'])),
@@ -333,9 +347,11 @@ describe('searchNoteLinkAutocompleteItems', () => {
   it('suggests page-frame names for slash-delimited note targets', async () => {
     const projectFolder = createFolderNode('folder-projects', 'Projects');
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-project', 'Alpha', projectFolder.id),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-project', 'Alpha', projectFolder.id)].map(
+          toResult,
+        ),
+      ),
       getFolderChain: vi.fn(async () => [projectFolder]),
       loadDocument: vi.fn(async () =>
         createSnapshot(createPageFrameUpdate(['Data Frame', 'Notes'])),
@@ -366,9 +382,9 @@ describe('searchNoteLinkAutocompleteItems', () => {
 describe('resolveNoteLinkRefByTitle', () => {
   it('returns noteId only when target has no page-frame fragment', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'Alpha', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'Alpha', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
     };
 
@@ -379,9 +395,9 @@ describe('resolveNoteLinkRefByTitle', () => {
 
   it('resolves both noteId and pageFrameId by matching displayName', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'Alpha', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'Alpha', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () =>
         createSnapshot(createPageFrameUpdate(['Research Notes', 'Draft'])),
@@ -395,9 +411,9 @@ describe('resolveNoteLinkRefByTitle', () => {
 
   it('matches frame names containing hash via escape and pipe as literal', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'Alpha', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'Alpha', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () =>
         createSnapshot(createPageFrameUpdate(['Plan #2 | draft'])),
@@ -411,9 +427,9 @@ describe('resolveNoteLinkRefByTitle', () => {
 
   it('returns null pageFrameId when no displayName matches', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'Alpha', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'Alpha', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () =>
         createSnapshot(createPageFrameUpdate(['Research Notes'])),
@@ -427,9 +443,9 @@ describe('resolveNoteLinkRefByTitle', () => {
 
   it('caches loadDocument results across repeated lookups', async () => {
     const repository = {
-      searchNodes: vi.fn(async () => [
-        createFileNode('note-alpha', 'Alpha', null),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [createFileNode('note-alpha', 'Alpha', null)].map(toResult),
+      ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () =>
         createSnapshot(createPageFrameUpdate(['Draft'])),

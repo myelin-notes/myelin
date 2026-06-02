@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { VFSFileNode, VFSFolderNode, VFSNode } from '@/lib/sync';
+import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import type { YjsSyncSnapshot } from '@/lib/sync/types';
 import { YDocManager } from '../ydoc-manager';
 import { addMarkdownPageFrameToYDoc } from './markdown-import';
@@ -59,7 +59,7 @@ describe('getNoteLinkPreview', () => {
     );
     const repository = {
       getNode: vi.fn(async () => createFileNode('note-1', 'Alpha Note')),
-      searchNodes: vi.fn(async () => [] as VFSNode[]),
+      searchNodes: vi.fn(async () => []),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(update)),
     } satisfies NoteLinkPreviewSource;
@@ -82,10 +82,12 @@ describe('getNoteLinkPreview', () => {
     const update = await createNoteUpdate('Resolved body.');
     const repository = {
       getNode: vi.fn(async () => createFileNode('note-2', 'Resolved Note')),
-      searchNodes: vi.fn(async () => [
-        createFolderNode('folder-1', 'Folder'),
-        createFileNode('note-2', 'Resolved Note'),
-      ]),
+      searchNodes: vi.fn(async () =>
+        [
+          createFolderNode('folder-1', 'Folder'),
+          createFileNode('note-2', 'Resolved Note'),
+        ].map((node) => ({ node, score: 1, contentSnippet: null })),
+      ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(update)),
     } satisfies NoteLinkPreviewSource;
