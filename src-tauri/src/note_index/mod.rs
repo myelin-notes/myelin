@@ -202,10 +202,9 @@ fn schedule(
             }
         };
 
-        let work_providers = providers.clone();
         let work_node = node_id.clone();
         let result = tauri::async_runtime::spawn_blocking(move || {
-            process_node(&work_providers, &work_node, &path, &file_type, &node_dir)
+            process_node(&providers, &work_node, &path, &file_type, &node_dir)
         })
         .await;
 
