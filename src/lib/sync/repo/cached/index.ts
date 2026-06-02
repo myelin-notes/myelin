@@ -45,6 +45,7 @@ import type {
   FileType,
   FileVersion,
   NoteBacklink,
+  NoteSearchResult,
   Repository,
   RepositoryCapabilities,
   RepositoryStats,
@@ -322,6 +323,16 @@ export class CachedRepository
     return this.cache.searchNodes(query);
   }
 
+  async searchNotes(query: string): Promise<NoteSearchResult[]> {
+    return this.cache.searchNotes(query);
+  }
+
+  async listIndexBackfillItems(): Promise<
+    { nodeId: VFSNodeId; path: string; fileType: FileType }[]
+  > {
+    return this.cache.listIndexBackfillItems();
+  }
+
   async getNodesByAnyTag(tags: string[]): Promise<VFSNode[]> {
     return this.cache.getNodesByAnyTag(tags);
   }
@@ -566,6 +577,10 @@ export class CachedRepository
 
   async getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
     return this.cache.getRevealPath(nodeId);
+  }
+
+  async getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
+    return this.cache.getStoredAbsolutePath(nodeId);
   }
 
   async getCustomColors(): Promise<string[]> {

@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { Logger } from '@/lib/logger';
+import { initNoteIndex, startBackfill } from '@/lib/note-index';
 import type {
   ActiveRepository,
   RepositoryConfig,
@@ -146,6 +147,15 @@ export function RepositoryProvider({
           ...current,
           initializing: false,
         }));
+
+        // Hydrate the search corpus and backfill any unindexed notes in the
+        // background. Rust skips notes whose content hash is unchanged.
+        void initNoteIndex()
+          .then(() => repository.listIndexBackfillItems())
+          .then((items) => startBackfill(items))
+          .catch((error) => {
+            logger.error('Failed to start note-index backfill', error);
+          });
       })
       .catch((error) => {
         if (disposed) {

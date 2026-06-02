@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod iroh_transport;
+mod note_index;
 mod pdf_export;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -21,12 +22,16 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .manage(iroh_transport::IrohState::new())
+        .manage(note_index::IndexEngineState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
             iroh_transport::iroh_join,
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
             pdf_export::export_pdf,
+            note_index::reindex_note,
+            note_index::reindex_batch,
+            note_index::remove_index,
         ]);
 
     #[cfg(debug_assertions)]
