@@ -43,15 +43,15 @@ impl IndexProvider for NoteTextProvider {
     }
 }
 
-/// On-disk artifact for one (node, provider) pair, read by the TS client. A
-/// node can have several (e.g. typed text + OCR), each stored and staleness-
-/// tracked independently under the node's index directory. Cross-language
-/// contract — keep in sync with `src/lib/note-index/cache.ts`.
+/// On-disk index artifact for one node, read by the TS client. Holds the
+/// combined text of every applicable provider (typed text now, OCR later).
+/// `source_hash` is over the note bytes, so any edit reindexes; bump
+/// `SCHEMA_VERSION` when the set of providers or their output changes.
+/// Cross-language contract — keep in sync with `src/lib/note-index/cache.ts`.
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct NoteIndexRecord {
     node_id: String,
-    provider_kind: String,
     source_hash: String,
     schema_version: u32,
     text: String,
@@ -102,12 +102,12 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-fn node_index_dir(app: &AppHandle, node_id: &str) -> Result<PathBuf, String> {
+fn index_path(app: &AppHandle, node_id: &str) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_cache_dir()
         .map_err(|e| format!("resolve cache dir: {e}"))?;
-    Ok(dir.join(INDEX_DIR).join(node_id))
+    Ok(dir.join(INDEX_DIR).join(format!("{node_id}.json")))
 }
 
 /// The heavy synchronous unit of work: read the note once, then run every
@@ -118,7 +118,7 @@ fn process_node(
     node_id: &str,
     path: &str,
     file_type: &str,
-    node_dir: &Path,
+    index_file: &Path,
 ) -> Result<bool, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("read {path}: {e}"))?;
 
@@ -126,35 +126,7 @@ fn process_node(
     hasher.update(&bytes);
     let source_hash = format!("{:x}", hasher.finalize());
 
-    // Run every applicable provider independently: one provider failing (e.g. a
-    // flaky OCR pass later) is logged and skipped, never aborting the others.
-    let mut changed = false;
-    for provider in providers.iter().filter(|p| p.applies_to(file_type)) {
-        match build_provider_artifact(provider.as_ref(), &bytes, &source_hash, node_id, node_dir) {
-            Ok(true) => changed = true,
-            Ok(false) => {}
-            Err(e) => eprintln!(
-                "note_index: provider {} failed for {node_id}: {e}",
-                provider.kind()
-            ),
-        }
-    }
-
-    Ok(changed)
-}
-
-/// Build and persist one provider's artifact. Returns `true` if (re)written,
-/// `false` if the existing artifact was already fresh.
-fn build_provider_artifact(
-    provider: &dyn IndexProvider,
-    bytes: &[u8],
-    source_hash: &str,
-    node_id: &str,
-    node_dir: &Path,
-) -> Result<bool, String> {
-    let artifact = node_dir.join(format!("{}.json", provider.kind()));
-
-    if let Ok(existing) = std::fs::read(&artifact) {
+    if let Ok(existing) = std::fs::read(index_file) {
         if let Ok(record) = serde_json::from_slice::<NoteIndexRecord>(&existing) {
             if record.source_hash == source_hash && record.schema_version == SCHEMA_VERSION {
                 return Ok(false);
@@ -162,19 +134,34 @@ fn build_provider_artifact(
         }
     }
 
-    let text = provider.build(bytes)?;
+    // Run every applicable provider in turn, combining their text. A provider
+    // that fails (e.g. a flaky OCR pass later) is logged and skipped, never
+    // aborting the others.
+    let mut parts: Vec<String> = Vec::new();
+    for provider in providers.iter().filter(|p| p.applies_to(file_type)) {
+        match provider.build(&bytes) {
+            Ok(text) if !text.is_empty() => parts.push(text),
+            Ok(_) => {}
+            Err(e) => eprintln!(
+                "note_index: provider {} failed for {node_id}: {e}",
+                provider.kind()
+            ),
+        }
+    }
+
     let record = NoteIndexRecord {
         node_id: node_id.to_string(),
-        provider_kind: provider.kind().to_string(),
-        source_hash: source_hash.to_string(),
+        source_hash,
         schema_version: SCHEMA_VERSION,
-        text,
+        text: parts.join("\n\n"),
         updated_at: now_ms(),
     };
 
-    std::fs::create_dir_all(node_dir).map_err(|e| format!("create index dir: {e}"))?;
+    if let Some(parent) = index_file.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("create index dir: {e}"))?;
+    }
     let json = serde_json::to_vec(&record).map_err(|e| format!("serialize index: {e}"))?;
-    std::fs::write(&artifact, json).map_err(|e| format!("write index: {e}"))?;
+    std::fs::write(index_file, json).map_err(|e| format!("write index: {e}"))?;
     Ok(true)
 }
 
@@ -215,7 +202,7 @@ fn schedule(
             Err(_) => return,
         };
 
-        let node_dir = match node_index_dir(&app, &node_id) {
+        let index_file = match index_path(&app, &node_id) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("note_index: {e}");
@@ -225,7 +212,7 @@ fn schedule(
 
         let work_node = node_id.clone();
         let result = tauri::async_runtime::spawn_blocking(move || {
-            process_node(&providers, &work_node, &path, &file_type, &node_dir)
+            process_node(&providers, &work_node, &path, &file_type, &index_file)
         })
         .await;
 
@@ -279,8 +266,8 @@ pub fn reindex_batch(app: AppHandle, state: State<'_, IndexEngineState>, items: 
 
 #[tauri::command]
 pub fn remove_index(app: AppHandle, node_id: String) -> Result<(), String> {
-    let dir = node_index_dir(&app, &node_id)?;
-    match std::fs::remove_dir_all(&dir) {
+    let path = index_path(&app, &node_id)?;
+    match std::fs::remove_file(&path) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(format!("remove index: {e}")),
@@ -317,28 +304,35 @@ mod tests {
         }
     }
 
+    fn read_text(index_file: &Path) -> String {
+        let bytes = std::fs::read(index_file).unwrap();
+        let record: NoteIndexRecord = serde_json::from_slice(&bytes).unwrap();
+        record.text
+    }
+
     #[test]
-    fn runs_every_applicable_provider_then_skips_when_fresh() {
+    fn combines_every_applicable_provider_then_skips_when_fresh() {
         let base = std::env::temp_dir().join("note_index_multi_provider_test");
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(&base).unwrap();
         let note_path = base.join("note.myelin");
         std::fs::write(&note_path, include_bytes!("test_fixture.bin")).unwrap();
-        let node_dir = base.join("idx");
+        let index_file = base.join("idx").join("node1.json");
 
         let providers: Vec<Box<dyn IndexProvider>> =
             vec![Box::new(NoteTextProvider), Box::new(DummyProvider)];
         let path = note_path.to_str().unwrap();
 
-        // First run: each provider writes its own artifact under the node dir.
-        let changed = process_node(&providers, "node1", path, "mcanvas", &node_dir).unwrap();
+        // First run: one file holds the combined text of both providers.
+        let changed = process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
         assert!(changed);
-        assert!(node_dir.join("note-text.json").exists());
-        assert!(node_dir.join("dummy.json").exists());
+        let text = read_text(&index_file);
+        assert!(text.contains("Indexed Heading Title"));
+        assert!(text.contains("dummy index text"));
 
-        // Second run: both artifacts are fresh, so nothing is rewritten.
+        // Second run: the file is fresh, so nothing is rewritten.
         let changed_again =
-            process_node(&providers, "node1", path, "mcanvas", &node_dir).unwrap();
+            process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
         assert!(!changed_again);
 
         std::fs::remove_dir_all(&base).ok();
@@ -351,17 +345,16 @@ mod tests {
         std::fs::create_dir_all(&base).unwrap();
         let note_path = base.join("note.myelin");
         std::fs::write(&note_path, include_bytes!("test_fixture.bin")).unwrap();
-        let node_dir = base.join("idx");
+        let index_file = base.join("idx").join("node1.json");
 
         // Failing provider runs first; it must not abort the one after it.
         let providers: Vec<Box<dyn IndexProvider>> =
             vec![Box::new(FailingProvider), Box::new(NoteTextProvider)];
         let path = note_path.to_str().unwrap();
 
-        let changed = process_node(&providers, "node1", path, "mcanvas", &node_dir).unwrap();
+        let changed = process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
         assert!(changed);
-        assert!(node_dir.join("note-text.json").exists());
-        assert!(!node_dir.join("failing.json").exists());
+        assert!(read_text(&index_file).contains("Indexed Heading Title"));
 
         std::fs::remove_dir_all(&base).ok();
     }

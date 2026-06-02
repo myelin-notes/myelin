@@ -10,49 +10,35 @@ const INDEX_DIR = 'NoteIndex';
 const SUFFIX = '.json';
 
 /**
- * On-disk index artifact for one (node, provider) pair. Written by the Rust
- * engine, read here. A node's directory holds one of these per provider that
- * has indexed it. Field shape is a cross-language contract (see
- * `src-tauri/src/note_index/mod.rs`).
+ * On-disk index artifact for one node. Written by the Rust engine, read here.
+ * `text` is the combined output of every provider that indexed the node. The
+ * field shape is a cross-language contract (see `src-tauri/src/note_index/mod.rs`).
  */
 export interface NoteIndexRecord {
   nodeId: VFSNodeId;
-  providerKind: string;
   sourceHash: string;
   schemaVersion: number;
   text: string;
   updatedAt: number;
 }
 
-function nodeDir(nodeId: VFSNodeId): string {
-  return `${INDEX_DIR}/${nodeId}`;
+function relPath(nodeId: VFSNodeId): string {
+  return `${INDEX_DIR}/${nodeId}${SUFFIX}`;
 }
 
-/** Combined searchable text from every provider that has indexed this node. */
+/** Combined searchable text for a node, or null if it has no index yet. */
 export async function readNodeText(nodeId: VFSNodeId): Promise<string | null> {
-  const dir = nodeDir(nodeId);
-  if (!(await exists(dir, { baseDir: BaseDirectory.AppCache }))) {
+  const rel = relPath(nodeId);
+  if (!(await exists(rel, { baseDir: BaseDirectory.AppCache }))) {
     return null;
   }
-  const entries = await readDir(dir, { baseDir: BaseDirectory.AppCache });
-  const texts: string[] = [];
-  for (const entry of entries) {
-    if (!entry.isFile || !entry.name.endsWith(SUFFIX)) {
-      continue;
-    }
-    try {
-      const json = await readTextFile(`${dir}/${entry.name}`, {
-        baseDir: BaseDirectory.AppCache,
-      });
-      const record = JSON.parse(json) as NoteIndexRecord;
-      if (record.text) {
-        texts.push(record.text);
-      }
-    } catch {
-      // Skip an unreadable or partially-written artifact.
-    }
+  try {
+    const json = await readTextFile(rel, { baseDir: BaseDirectory.AppCache });
+    const record = JSON.parse(json) as NoteIndexRecord;
+    return record.text.length > 0 ? record.text : null;
+  } catch {
+    return null;
   }
-  return texts.length > 0 ? texts.join('\n\n') : null;
 }
 
 export async function listIndexedNodeIds(): Promise<VFSNodeId[]> {
@@ -61,6 +47,6 @@ export async function listIndexedNodeIds(): Promise<VFSNodeId[]> {
   }
   const entries = await readDir(INDEX_DIR, { baseDir: BaseDirectory.AppCache });
   return entries
-    .filter((entry) => entry.isDirectory)
-    .map((entry) => entry.name as VFSNodeId);
+    .filter((entry) => entry.isFile && entry.name.endsWith(SUFFIX))
+    .map((entry) => entry.name.slice(0, -SUFFIX.length) as VFSNodeId);
 }
