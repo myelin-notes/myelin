@@ -1,0 +1,21 @@
+---
+interface Props {
+  src: string;
+  alt: string;
+  eager?: boolean;
+}
+
+const { src, alt, eager = false } = Astro.props;
+---
+
+<div class="rounded-3xl bg-surface p-3 shadow-elevated lg:p-4">
+  <img
+    src={src}
+    alt={alt}
+    width="1600"
+    height="1000"
+    loading={eager ? 'eager' : 'lazy'}
+    decoding="async"
+    class="block aspect-[16/10] w-full rounded-2xl border border-border-divider object-cover"
+  />
+</div>
