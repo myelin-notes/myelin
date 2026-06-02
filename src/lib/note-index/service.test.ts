@@ -61,11 +61,9 @@ describe('NoteIndexService', () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it('updates the corpus and notifies on an index-updated event for the active repo', async () => {
+  it('updates the corpus on an index-updated event for the active repo', async () => {
     readNodeText.mockResolvedValue('hello indexed world');
     const service = new NoteIndexService();
-    const subscriber = vi.fn();
-    service.subscribe(subscriber);
     await service.init('repo-a');
     expect(listenHandler).toBeTruthy();
 
@@ -73,7 +71,6 @@ describe('NoteIndexService', () => {
     await flush();
 
     expect(service.getContent().get('n1')).toBe('hello indexed world');
-    expect(subscriber).toHaveBeenCalled();
   });
 
   it('ignores index-updated events for a different repo', async () => {

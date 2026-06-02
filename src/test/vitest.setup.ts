@@ -44,7 +44,6 @@ vi.mock('@/lib/note-index', () => ({
     init: async () => {},
     reset: () => {},
     getContent: () => new Map<string, string>(),
-    subscribe: () => () => {},
     requestReindex: () => {},
     startBackfill: () => {},
     removeIndex: async () => {},

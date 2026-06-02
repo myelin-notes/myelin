@@ -43,7 +43,6 @@ function yieldToIdle(): Promise<void> {
 export class NoteIndexService {
   /** node id -> extracted text. The synchronous corpus the search layer reads. */
   private readonly contentByNode = new Map<VFSNodeId, string>();
-  private readonly subscribers = new Set<() => void>();
   private unlisten: UnlistenFn | null = null;
   /**
    * The repository the corpus currently reflects. Index artifacts are namespaced
@@ -79,19 +78,11 @@ export class NoteIndexService {
   reset(): void {
     this.repoId = null;
     this.contentByNode.clear();
-    this.notify();
   }
 
   /** The synchronous index corpus, keyed by node id, for the search layer. */
   getContent(): ReadonlyMap<VFSNodeId, string> {
     return this.contentByNode;
-  }
-
-  subscribe(callback: () => void): () => void {
-    this.subscribers.add(callback);
-    return () => {
-      this.subscribers.delete(callback);
-    };
   }
 
   /** Queue a single note for (debounced) reindexing in the Rust engine. */
@@ -124,7 +115,6 @@ export class NoteIndexService {
       return;
     }
     this.contentByNode.delete(nodeId);
-    this.notify();
     try {
       await invoke('remove_index', { repoId, nodeId });
     } catch (err) {
@@ -151,17 +141,6 @@ export class NoteIndexService {
       }
       await yieldToIdle();
     }
-    this.notify();
-  }
-
-  private notify(): void {
-    for (const callback of this.subscribers) {
-      try {
-        callback();
-      } catch (err) {
-        logger.error('Subscriber threw', err);
-      }
-    }
   }
 
   private async refresh(nodeId: VFSNodeId, repoId: string): Promise<void> {
@@ -176,7 +155,6 @@ export class NoteIndexService {
       } else {
         this.contentByNode.delete(nodeId);
       }
-      this.notify();
     } catch (err) {
       logger.error('Failed to refresh index', err, { nodeId });
     }
