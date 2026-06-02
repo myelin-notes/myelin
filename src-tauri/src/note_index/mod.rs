@@ -103,18 +103,24 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Index artifacts are namespaced per repository: `NoteIndex/<repo_id>/<node_id>.json`.
-/// `repo_id` is derived by the frontend; reject anything that could escape the
-/// cache dir as defense-in-depth.
-fn index_path(app: &AppHandle, repo_id: &str, node_id: &str) -> Result<PathBuf, String> {
-    if repo_id.is_empty()
-        || repo_id.contains('/')
-        || repo_id.contains('\\')
-        || repo_id == "."
-        || repo_id == ".."
+/// Reject path components that could escape the cache dir. Both `repo_id` and
+/// `node_id` are frontend-derived and get joined into the index path.
+fn validate_path_component(label: &str, value: &str) -> Result<(), String> {
+    if value.is_empty()
+        || value.contains('/')
+        || value.contains('\\')
+        || value == "."
+        || value == ".."
     {
-        return Err(format!("invalid repo id: {repo_id}"));
+        return Err(format!("invalid {label}: {value}"));
     }
+    Ok(())
+}
+
+/// Index artifacts are namespaced per repository: `NoteIndex/<repo_id>/<node_id>.json`.
+fn index_path(app: &AppHandle, repo_id: &str, node_id: &str) -> Result<PathBuf, String> {
+    validate_path_component("repo id", repo_id)?;
+    validate_path_component("node id", node_id)?;
     let dir = app
         .path()
         .app_cache_dir()
