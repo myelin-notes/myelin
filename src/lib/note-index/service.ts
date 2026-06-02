@@ -45,36 +45,40 @@ export class NoteIndexService {
   private readonly contentByNode = new Map<VFSNodeId, string>();
   private readonly subscribers = new Set<() => void>();
   private unlisten: UnlistenFn | null = null;
+  /**
+   * The repository the corpus currently reflects. Index artifacts are namespaced
+   * per repo on disk, and reindex/remove target this repo. Null between a
+   * {@link reset} and the next {@link init} (e.g. mid repository switch).
+   */
+  private repoId: string | null = null;
 
   /**
-   * Wire up the engine: listen for completion events and hydrate the in-memory
-   * corpus from previously-written artifacts. Idempotent; call once at startup.
+   * Point the service at a repository: register the completion listener (once)
+   * and hydrate the in-memory corpus from that repo's previously-written
+   * artifacts. Call on startup and after every repository switch (paired with
+   * {@link reset} on teardown).
    */
-  async init(): Promise<void> {
-    if (this.unlisten) {
-      return;
+  async init(repoId: string): Promise<void> {
+    this.repoId = repoId;
+    if (!this.unlisten) {
+      this.unlisten = await listen<{ nodeId: VFSNodeId; repoId: string }>(
+        'index-updated',
+        (event) => {
+          void this.refresh(event.payload.nodeId, event.payload.repoId);
+        },
+      );
     }
-    this.unlisten = await listen<{ nodeId: VFSNodeId }>(
-      'index-updated',
-      (event) => {
-        void this.refresh(event.payload.nodeId);
-      },
-    );
+    await this.hydrate(repoId);
+  }
 
-    let ids: VFSNodeId[];
-    try {
-      ids = await cache.listIndexedNodeIds();
-    } catch (err) {
-      logger.error('Failed to list indexed nodes', err);
-      return;
-    }
-    for (const id of ids) {
-      const text = await cache.readNodeText(id).catch(() => null);
-      if (text) {
-        this.contentByNode.set(id, text);
-      }
-      await yieldToIdle();
-    }
+  /**
+   * Drop the corpus and detach from the active repository. The completion
+   * listener stays registered (it is engine-wide, not per-repo); events for a
+   * non-current repo are ignored until the next {@link init}.
+   */
+  reset(): void {
+    this.repoId = null;
+    this.contentByNode.clear();
     this.notify();
   }
 
@@ -92,29 +96,62 @@ export class NoteIndexService {
 
   /** Queue a single note for (debounced) reindexing in the Rust engine. */
   requestReindex(nodeId: VFSNodeId, path: string, fileType: string): void {
-    void invoke('reindex_note', { nodeId, path, fileType }).catch((err) => {
-      logger.error('reindex_note failed', err, { nodeId });
-    });
+    const repoId = this.repoId;
+    if (!repoId) {
+      return;
+    }
+    void invoke('reindex_note', { repoId, nodeId, path, fileType }).catch(
+      (err) => {
+        logger.error('reindex_note failed', err, { nodeId });
+      },
+    );
   }
 
   /** Hand the engine a batch of stale/missing candidates (startup backfill). */
   startBackfill(items: ReindexItem[]): void {
-    if (items.length === 0) {
+    const repoId = this.repoId;
+    if (!repoId || items.length === 0) {
       return;
     }
-    void invoke('reindex_batch', { items }).catch((err) => {
+    void invoke('reindex_batch', { repoId, items }).catch((err) => {
       logger.error('reindex_batch failed', err);
     });
   }
 
   async removeIndex(nodeId: VFSNodeId): Promise<void> {
+    const repoId = this.repoId;
+    if (!repoId) {
+      return;
+    }
     this.contentByNode.delete(nodeId);
     this.notify();
     try {
-      await invoke('remove_index', { nodeId });
+      await invoke('remove_index', { repoId, nodeId });
     } catch (err) {
       logger.error('remove_index failed', err, { nodeId });
     }
+  }
+
+  private async hydrate(repoId: string): Promise<void> {
+    let ids: VFSNodeId[];
+    try {
+      ids = await cache.listIndexedNodeIds(repoId);
+    } catch (err) {
+      logger.error('Failed to list indexed nodes', err);
+      return;
+    }
+    for (const id of ids) {
+      // A repository switch during hydration supersedes this pass.
+      if (this.repoId !== repoId) {
+        return;
+      }
+      const text = await cache.readNodeText(repoId, id).catch(() => null);
+      if (text) {
+        this.contentByNode.set(id, text);
+      }
+      await yieldToIdle();
+    }
+    this.notify();
   }
 
   private notify(): void {
@@ -127,9 +164,13 @@ export class NoteIndexService {
     }
   }
 
-  private async refresh(nodeId: VFSNodeId): Promise<void> {
+  private async refresh(nodeId: VFSNodeId, repoId: string): Promise<void> {
+    // Ignore completions for a repo we have since switched away from.
+    if (repoId !== this.repoId) {
+      return;
+    }
     try {
-      const text = await cache.readNodeText(nodeId);
+      const text = await cache.readNodeText(repoId, nodeId);
       if (text) {
         this.contentByNode.set(nodeId, text);
       } else {

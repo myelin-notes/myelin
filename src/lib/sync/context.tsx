@@ -9,10 +9,11 @@ import {
 } from 'react';
 import { Logger } from '@/lib/logger';
 import { noteIndexService } from '@/lib/note-index';
-import type {
-  ActiveRepository,
-  RepositoryConfig,
-  RepositoryRuntimeStatus,
+import {
+  type ActiveRepository,
+  getRepositoryStorageKey,
+  type RepositoryConfig,
+  type RepositoryRuntimeStatus,
 } from './repo/config';
 import { createRepository } from './repo/factory';
 import {
@@ -149,9 +150,10 @@ export function RepositoryProvider({
         }));
 
         // Hydrate the search corpus and backfill any unindexed notes in the
-        // background. Rust skips notes whose content hash is unchanged.
+        // background. The index cache is namespaced per repository; Rust skips
+        // notes whose content hash is unchanged.
         void noteIndexService
-          .init()
+          .init(getRepositoryStorageKey(resolvedConfig))
           .then(() => repository.listIndexBackfillItems())
           .then((items) => noteIndexService.startBackfill(items))
           .catch((error) => {
@@ -173,6 +175,8 @@ export function RepositoryProvider({
     return () => {
       disposed = true;
       unsubscribeStatus();
+      // Drop the previous repo's search corpus so it can't leak into the next.
+      noteIndexService.reset();
       void repository.dispose().catch((error) => {
         logger.error('Failed to dispose repository', error);
       });

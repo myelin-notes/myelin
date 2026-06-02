@@ -61,6 +61,7 @@ struct NoteIndexRecord {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct IndexUpdatedPayload {
+    repo_id: String,
     node_id: String,
 }
 
@@ -102,12 +103,26 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-fn index_path(app: &AppHandle, node_id: &str) -> Result<PathBuf, String> {
+/// Index artifacts are namespaced per repository: `NoteIndex/<repo_id>/<node_id>.json`.
+/// `repo_id` is derived by the frontend; reject anything that could escape the
+/// cache dir as defense-in-depth.
+fn index_path(app: &AppHandle, repo_id: &str, node_id: &str) -> Result<PathBuf, String> {
+    if repo_id.is_empty()
+        || repo_id.contains('/')
+        || repo_id.contains('\\')
+        || repo_id == "."
+        || repo_id == ".."
+    {
+        return Err(format!("invalid repo id: {repo_id}"));
+    }
     let dir = app
         .path()
         .app_cache_dir()
         .map_err(|e| format!("resolve cache dir: {e}"))?;
-    Ok(dir.join(INDEX_DIR).join(format!("{node_id}.json")))
+    Ok(dir
+        .join(INDEX_DIR)
+        .join(repo_id)
+        .join(format!("{node_id}.json")))
 }
 
 /// The heavy synchronous unit of work: read the note once, then run every
@@ -168,6 +183,7 @@ fn process_node(
 fn schedule(
     app: AppHandle,
     state: &IndexEngineState,
+    repo_id: String,
     node_id: String,
     path: String,
     file_type: String,
@@ -177,9 +193,12 @@ fn schedule(
     let pending = state.pending.clone();
     let semaphore = state.semaphore.clone();
 
+    // Key by repo + node so the same note in two repos debounces independently.
+    let pending_key = format!("{repo_id}/{node_id}");
+
     let generation = {
         let mut guard = pending.lock().unwrap();
-        let counter = guard.entry(node_id.clone()).or_insert(0);
+        let counter = guard.entry(pending_key.clone()).or_insert(0);
         *counter += 1;
         *counter
     };
@@ -192,7 +211,7 @@ fn schedule(
         // Superseded by a newer request during the debounce window?
         {
             let guard = pending.lock().unwrap();
-            if guard.get(&node_id) != Some(&generation) {
+            if guard.get(&pending_key) != Some(&generation) {
                 return;
             }
         }
@@ -202,7 +221,7 @@ fn schedule(
             Err(_) => return,
         };
 
-        let index_file = match index_path(&app, &node_id) {
+        let index_file = match index_path(&app, &repo_id, &node_id) {
             Ok(p) => p,
             Err(e) => {
                 eprintln!("note_index: {e}");
@@ -218,8 +237,8 @@ fn schedule(
 
         {
             let mut guard = pending.lock().unwrap();
-            if guard.get(&node_id) == Some(&generation) {
-                guard.remove(&node_id);
+            if guard.get(&pending_key) == Some(&generation) {
+                guard.remove(&pending_key);
             }
         }
 
@@ -228,6 +247,7 @@ fn schedule(
                 let _ = app.emit(
                     "index-updated",
                     IndexUpdatedPayload {
+                        repo_id: repo_id.clone(),
                         node_id: node_id.clone(),
                     },
                 );
@@ -243,19 +263,26 @@ fn schedule(
 pub fn reindex_note(
     app: AppHandle,
     state: State<'_, IndexEngineState>,
+    repo_id: String,
     node_id: String,
     path: String,
     file_type: String,
 ) {
-    schedule(app, &state, node_id, path, file_type, DEBOUNCE_MS);
+    schedule(app, &state, repo_id, node_id, path, file_type, DEBOUNCE_MS);
 }
 
 #[tauri::command]
-pub fn reindex_batch(app: AppHandle, state: State<'_, IndexEngineState>, items: Vec<ReindexItem>) {
+pub fn reindex_batch(
+    app: AppHandle,
+    state: State<'_, IndexEngineState>,
+    repo_id: String,
+    items: Vec<ReindexItem>,
+) {
     for item in items {
         schedule(
             app.clone(),
             &state,
+            repo_id.clone(),
             item.node_id,
             item.path,
             item.file_type,
@@ -265,8 +292,8 @@ pub fn reindex_batch(app: AppHandle, state: State<'_, IndexEngineState>, items: 
 }
 
 #[tauri::command]
-pub fn remove_index(app: AppHandle, node_id: String) -> Result<(), String> {
-    let path = index_path(&app, &node_id)?;
+pub fn remove_index(app: AppHandle, repo_id: String, node_id: String) -> Result<(), String> {
+    let path = index_path(&app, &repo_id, &node_id)?;
     match std::fs::remove_file(&path) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),

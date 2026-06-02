@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NoteIndexService } from './service';
 
 const invoke = vi.fn();
-let listenHandler: ((event: { payload: { nodeId: string } }) => void) | null =
-  null;
+let listenHandler:
+  | ((event: { payload: { nodeId: string; repoId: string } }) => void)
+  | null = null;
 const readNodeText = vi.fn();
 const listIndexedNodeIds = vi.fn();
 
@@ -14,7 +15,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 vi.mock('@tauri-apps/api/event', () => ({
   listen: async (
     _name: string,
-    handler: (event: { payload: { nodeId: string } }) => void,
+    handler: (event: { payload: { nodeId: string; repoId: string } }) => void,
   ) => {
     listenHandler = handler;
     return () => {};
@@ -38,63 +39,109 @@ beforeEach(() => {
 });
 
 describe('NoteIndexService', () => {
-  it('requestReindex invokes the engine with camelCase args', () => {
+  it('requestReindex invokes the engine with the active repo and camelCase args', async () => {
     const service = new NoteIndexService();
+    await service.init('repo-a');
     service.requestReindex('n1', '/files/n1.mcanvas', 'mcanvas');
     expect(invoke).toHaveBeenCalledWith('reindex_note', {
+      repoId: 'repo-a',
       nodeId: 'n1',
       path: '/files/n1.mcanvas',
       fileType: 'mcanvas',
     });
   });
 
-  it('updates the corpus and notifies on an index-updated event', async () => {
+  it('skips reindex/backfill/remove while no repo is active', async () => {
+    const service = new NoteIndexService();
+    service.requestReindex('n1', '/files/n1.mcanvas', 'mcanvas');
+    service.startBackfill([
+      { nodeId: 'n1', path: '/files/n1.mcanvas', fileType: 'mcanvas' },
+    ]);
+    await service.removeIndex('n1');
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('updates the corpus and notifies on an index-updated event for the active repo', async () => {
     readNodeText.mockResolvedValue('hello indexed world');
     const service = new NoteIndexService();
     const subscriber = vi.fn();
     service.subscribe(subscriber);
-    await service.init();
+    await service.init('repo-a');
     expect(listenHandler).toBeTruthy();
 
-    listenHandler?.({ payload: { nodeId: 'n1' } });
+    listenHandler?.({ payload: { nodeId: 'n1', repoId: 'repo-a' } });
     await flush();
 
     expect(service.getContent().get('n1')).toBe('hello indexed world');
     expect(subscriber).toHaveBeenCalled();
   });
 
-  it('hydrates the corpus from existing artifacts at startup', async () => {
+  it('ignores index-updated events for a different repo', async () => {
+    readNodeText.mockResolvedValue('stale repo text');
+    const service = new NoteIndexService();
+    await service.init('repo-a');
+
+    listenHandler?.({ payload: { nodeId: 'n1', repoId: 'repo-b' } });
+    await flush();
+
+    expect(service.getContent().has('n1')).toBe(false);
+  });
+
+  it('hydrates the corpus from the active repo artifacts at startup', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1', 'n2']);
-    readNodeText.mockImplementation(async (id: string) =>
+    readNodeText.mockImplementation(async (_repoId: string, id: string) =>
       id === 'n1' ? 'first note' : 'second note',
     );
     const service = new NoteIndexService();
-    await service.init();
+    await service.init('repo-a');
 
+    expect(listIndexedNodeIds).toHaveBeenCalledWith('repo-a');
     expect(service.getContent().get('n1')).toBe('first note');
     expect(service.getContent().get('n2')).toBe('second note');
+  });
+
+  it('reset clears the corpus and detaches from the active repo', async () => {
+    listIndexedNodeIds.mockResolvedValue(['n1']);
+    readNodeText.mockResolvedValue('old repo text');
+    const service = new NoteIndexService();
+    await service.init('repo-a');
+    expect(service.getContent().get('n1')).toBe('old repo text');
+
+    service.reset();
+    expect(service.getContent().has('n1')).toBe(false);
+
+    // With no active repo, triggers are no-ops.
+    service.requestReindex('n1', '/files/n1.mcanvas', 'mcanvas');
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it('removeIndex clears the corpus entry and invokes remove_index', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1']);
     readNodeText.mockResolvedValue('doomed text');
     const service = new NoteIndexService();
-    await service.init();
+    await service.init('repo-a');
     expect(service.getContent().get('n1')).toBe('doomed text');
 
     await service.removeIndex('n1');
 
     expect(service.getContent().has('n1')).toBe(false);
-    expect(invoke).toHaveBeenCalledWith('remove_index', { nodeId: 'n1' });
+    expect(invoke).toHaveBeenCalledWith('remove_index', {
+      repoId: 'repo-a',
+      nodeId: 'n1',
+    });
   });
 
-  it('startBackfill forwards items and skips empty batches', () => {
+  it('startBackfill forwards items with the active repo and skips empty batches', async () => {
     const service = new NoteIndexService();
+    await service.init('repo-a');
     const items = [
       { nodeId: 'n1', path: '/files/n1.mcanvas', fileType: 'mcanvas' },
     ];
     service.startBackfill(items);
-    expect(invoke).toHaveBeenCalledWith('reindex_batch', { items });
+    expect(invoke).toHaveBeenCalledWith('reindex_batch', {
+      repoId: 'repo-a',
+      items,
+    });
 
     invoke.mockClear();
     service.startBackfill([]);

@@ -22,13 +22,20 @@ export interface NoteIndexRecord {
   updatedAt: number;
 }
 
-function relPath(nodeId: VFSNodeId): string {
-  return `${INDEX_DIR}/${nodeId}${SUFFIX}`;
+function repoDir(repoId: string): string {
+  return `${INDEX_DIR}/${repoId}`;
+}
+
+function relPath(repoId: string, nodeId: VFSNodeId): string {
+  return `${repoDir(repoId)}/${nodeId}${SUFFIX}`;
 }
 
 /** Combined searchable text for a node, or null if it has no index yet. */
-export async function readNodeText(nodeId: VFSNodeId): Promise<string | null> {
-  const rel = relPath(nodeId);
+export async function readNodeText(
+  repoId: string,
+  nodeId: VFSNodeId,
+): Promise<string | null> {
+  const rel = relPath(repoId, nodeId);
   if (!(await exists(rel, { baseDir: BaseDirectory.AppCache }))) {
     return null;
   }
@@ -41,11 +48,12 @@ export async function readNodeText(nodeId: VFSNodeId): Promise<string | null> {
   }
 }
 
-export async function listIndexedNodeIds(): Promise<VFSNodeId[]> {
-  if (!(await exists(INDEX_DIR, { baseDir: BaseDirectory.AppCache }))) {
+export async function listIndexedNodeIds(repoId: string): Promise<VFSNodeId[]> {
+  const dir = repoDir(repoId);
+  if (!(await exists(dir, { baseDir: BaseDirectory.AppCache }))) {
     return [];
   }
-  const entries = await readDir(INDEX_DIR, { baseDir: BaseDirectory.AppCache });
+  const entries = await readDir(dir, { baseDir: BaseDirectory.AppCache });
   return entries
     .filter((entry) => entry.isFile && entry.name.endsWith(SUFFIX))
     .map((entry) => entry.name.slice(0, -SUFFIX.length) as VFSNodeId);

@@ -42,6 +42,7 @@ vi.mock('@/lib/thumbnails', () => ({
 vi.mock('@/lib/note-index', () => ({
   noteIndexService: {
     init: async () => {},
+    reset: () => {},
     getContent: () => new Map<string, string>(),
     subscribe: () => () => {},
     requestReindex: () => {},
