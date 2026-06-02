@@ -32,30 +32,40 @@ const tiers = [
   {
     name: 'Free',
     price: '$0',
-    cadence: 'forever',
-    blurb: 'Everything you need to think on your own devices.',
+    cadence: '/ forever',
+    blurb:
+      'The whole editor. For anyone trying Myelin or keeping notes on their own machine.',
     items: [
-      'Native apps for Mac, Windows, Linux, iPad, Android',
+      'Unlimited local notes',
+      'Hybrid canvas, typed + ink',
+      'PDF, image, and Markdown import and export',
       'Sync through your own GitHub',
-      'The complete editor: text, ink, PDFs, tables',
-      'Local-first, ready offline',
+      'Co-edit live through a shared GitHub repo',
+      'Local-first, offline-always',
+      'Local search over titles, tags, and indexed local content once search ships',
     ],
-    cta: 'Download free',
+    cta: 'Download Myelin',
     emphasized: false,
   },
   {
     name: 'Pro',
     price: '$8',
-    cadence: 'per month',
-    blurb: 'For the work you do with other people.',
+    cadence: '/ month · $72 / year',
+    blurb:
+      'For students, researchers, and writers who live in their notes — on their own or together.',
     items: [
-      'Real-time co-authoring with invite links',
-      'Managed Myelin Cloud sync',
-      'Search and OCR across everything',
-      'Priority support',
+      'Everything in Free',
+      'Managed collaboration — invite people to a note by link, no GitHub needed',
+      'Full-content search across notes, PDFs, and handwriting',
+      'Semantic search — find notes by idea, not exact wording',
+      'OCR — reading text out of handwriting and scanned PDFs, on all platforms',
+      'Persistent version history and restore',
+      'Managed Myelin Cloud sync and backup',
+      'Priority support and early access',
     ],
-    cta: 'Get Pro',
+    cta: 'Start 14-day trial',
     emphasized: true,
+    flag: 'Most chosen',
   },
 ];
 
@@ -244,46 +254,67 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
       </h2>
     </div>
 
-    <div class="mt-16 grid gap-8 lg:mt-20 lg:grid-cols-2 lg:gap-12">
+    <div class="mt-16 grid gap-6 md:mx-auto md:max-w-3xl lg:mt-20 lg:grid-cols-2">
       {
         tiers.map((tier) => (
           <div
             class={cn(
-              'flex flex-col rounded-3xl p-9 lg:p-10',
-              tier.emphasized ? 'bg-surface' : '',
+              'relative flex flex-col gap-5 rounded-[16px] p-8 shadow-ambient transition duration-500 ease-out hover:-translate-y-1 hover:shadow-elevated',
+              tier.emphasized
+                ? 'bg-primary text-text-on-dark lg:scale-[1.03]'
+                : 'bg-card text-text-primary',
             )}
           >
-            <div class="flex items-center gap-3">
-              <h3 class="text-lg font-semibold text-text-primary">
+            {tier.flag && (
+              <span class="absolute top-5 right-5 rounded-[10px] bg-accent-green px-2.5 py-1 text-[10px] font-bold tracking-[0.14em] text-text-green uppercase">
+                {tier.flag}
+              </span>
+            )}
+            <div>
+              <h3 class="font-heading text-2xl font-medium tracking-tight">
                 {tier.name}
               </h3>
-              {tier.emphasized && (
-                <span class="rounded-md bg-accent-green px-2 py-0.5 text-xs font-medium text-text-green">
-                  for teams
-                </span>
-              )}
+              <p
+                class={cn(
+                  'mt-1.5 max-w-[34ch] text-[13px] leading-relaxed',
+                  tier.emphasized ? 'text-[#cbd2dc]' : 'text-text-muted',
+                )}
+              >
+                {tier.blurb}
+              </p>
             </div>
-            <div class="mt-5 flex items-baseline gap-2">
-              <span class="font-heading text-5xl font-medium text-text-primary">
+            <div class="flex items-baseline gap-1.5">
+              <span class="font-heading text-[44px] leading-none font-light tracking-tight">
                 {tier.price}
               </span>
-              <span class="text-sm text-text-muted">{tier.cadence}</span>
+              <span
+                class={cn(
+                  'text-[13px]',
+                  tier.emphasized ? 'text-[#aab3c1]' : 'text-text-muted',
+                )}
+              >
+                {tier.cadence}
+              </span>
             </div>
-            <p class="mt-4 text-text-secondary">{tier.blurb}</p>
 
-            <ul class="mt-8 flex flex-col gap-4">
+            <ul
+              class={cn(
+                'grid gap-2.5 text-sm',
+                tier.emphasized ? 'text-[#d6dce5]' : 'text-text-secondary',
+              )}
+            >
               {tier.items.map((item) => (
-                <li class="flex items-start gap-3 text-text-secondary">
+                <li class="grid grid-cols-[18px_1fr] gap-2.5">
                   <svg
-                    class="mt-1 size-4 shrink-0"
-                    viewBox="0 0 16 16"
+                    class="mt-1 size-4"
+                    viewBox="0 0 24 24"
                     fill="none"
                     aria-hidden="true"
                   >
                     <path
-                      d="M3 8.5 6.5 12 13 4.5"
-                      stroke="var(--text-green)"
-                      stroke-width="1.6"
+                      d="m5 12 5 5 9-11"
+                      stroke={tier.emphasized ? 'var(--bg-accent-green)' : 'var(--text-green)'}
+                      stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
                     />
@@ -296,13 +327,14 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
             <a
               href="#download"
               class={cn(
-                tier.emphasized
-                  ? cn(buttonVariants(), 'h-11 rounded-2xl px-6')
-                  : cn(buttonVariants({ variant: 'outline' }), 'h-11 rounded-2xl px-6'),
-                'mt-9 w-full',
+                'mt-auto inline-flex items-center gap-1.5 pt-4 text-sm font-medium',
+                tier.emphasized ? 'text-text-on-dark' : 'text-text-primary',
               )}
             >
               {tier.cta}
+              <span class={tier.emphasized ? 'text-accent-green' : 'text-text-green'}>
+                →
+              </span>
             </a>
           </div>
         ))
