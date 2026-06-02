@@ -5,21 +5,33 @@ import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { IS_DEV } from '@/lib/env';
 import { openNote } from '@/lib/note-navigation';
-import { useRepository, type VFSFileNode } from '@/lib/sync';
+import {
+  type NodeSearchResult,
+  useRepository,
+  type VFSFileNode,
+} from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
+import { cn } from '@/lib/utils';
 import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
 import { RenameReferencesDialog } from './rename-references-dialog';
+import { SearchHighlight } from './search-highlight';
 import { useExplorerItem } from './use-explorer-item';
 
 interface FileItemProps {
   file: VFSFileNode;
+  searchMatch?: NodeSearchResult;
   autoRename?: boolean;
   onChanged: () => Promise<void>;
 }
 
-export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
+export function FileItem({
+  file,
+  searchMatch,
+  autoRename,
+  onChanged,
+}: FileItemProps) {
   const repository = useRepository();
   const tabController = useTabController();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
@@ -41,6 +53,9 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
     renameReferencesOnRename: file.fileType === 'mcanvas',
   });
 
+  const matchedTerms = searchMatch?.matchedTerms ?? [];
+  const snippet = searchMatch?.contentSnippet ?? null;
+
   return (
     <>
       <ContextMenu>
@@ -59,37 +74,54 @@ export function FileItem({ file, autoRename, onChanged }: FileItemProps) {
                   ? undefined
                   : formatExplorerItemAccessibleName(file.name, file.tags)
               }
-              className="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-2 transition-all duration-200 hover:bg-hover-tint"
+              className={cn(
+                'group flex w-full cursor-pointer gap-3 rounded-lg px-4 py-2 transition-all duration-200 hover:bg-hover-tint',
+                snippet ? 'items-start' : 'items-center',
+              )}
             />
           }
         >
-          <FileText className="size-3 shrink-0 text-text-muted transition-colors duration-200 group-hover:text-text-secondary" />
+          <FileText
+            className={cn(
+              'size-3 shrink-0 text-text-muted transition-colors duration-200 group-hover:text-text-secondary',
+              snippet && 'mt-1',
+            )}
+          />
           {renaming ? (
             <input
               {...renameInputProps}
               className="min-w-0 flex-1 border-primary border-b-2 bg-transparent font-normal text-sm text-text-secondary outline-none"
             />
           ) : (
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-normal text-sm text-text-secondary transition-colors duration-200 group-hover:text-text-primary">
-                {file.name}
-              </span>
-              {file.tags.length > 0 && (
-                <div className="flex shrink-0 items-center gap-1">
-                  {file.tags.slice(0, 2).map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                  {file.tags.length > 2 && (
-                    <span className="text-[9px] text-text-muted">
-                      +{file.tags.length - 2}
-                    </span>
-                  )}
-                </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-normal text-sm text-text-secondary transition-colors duration-200 group-hover:text-text-primary">
+                  <SearchHighlight text={file.name} terms={matchedTerms} />
+                </span>
+                {file.tags.length > 0 && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    {file.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                    {file.tags.length > 2 && (
+                      <span className="text-[9px] text-text-muted">
+                        +{file.tags.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              {snippet && (
+                <SearchHighlight
+                  text={snippet}
+                  terms={matchedTerms}
+                  className="line-clamp-1 text-text-muted text-xs leading-snug"
+                />
               )}
             </div>
           )}

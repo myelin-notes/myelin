@@ -13,6 +13,7 @@ import {
   type FileType,
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
+  type NodeSearchResult,
   type RepositoryConfig,
   useRepository,
   useRepositoryStatus,
@@ -27,6 +28,7 @@ import { useDropTarget } from './use-drop-target';
 
 const logger = new Logger('ExplorerTree');
 const SEARCH_DEBOUNCE_MS = 150;
+const EMPTY_SEARCH_MATCHES: ReadonlyMap<string, NodeSearchResult> = new Map();
 
 type RepositorySetupState = 'checking' | 'ready' | 'setup-required';
 
@@ -75,6 +77,8 @@ export function ExplorerTree({
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const [nodes, setNodes] = useState<VFSNode[]>([]);
+  const [searchMatches, setSearchMatches] =
+    useState<ReadonlyMap<string, NodeSearchResult>>(EMPTY_SEARCH_MATCHES);
   const [loading, setLoading] = useState(true);
   const [repositorySetupState, setRepositorySetupState] =
     useState<RepositorySetupState>(() =>
@@ -123,16 +127,20 @@ export function ExplorerTree({
     setLoading(true);
     try {
       let nextNodes: VFSNode[];
+      let nextMatches: ReadonlyMap<string, NodeSearchResult> =
+        EMPTY_SEARCH_MATCHES;
       if (isSearching) {
-        nextNodes = (await repository.searchNodes(searchQuery!.trim())).map(
-          (result) => result.node,
-        );
+        let results = await repository.searchNodes(searchQuery!.trim());
         if (isFiltering) {
           const tagSet = new Set(filterTags);
-          nextNodes = nextNodes.filter((n) =>
-            n.tags.some((t) => tagSet.has(t)),
+          results = results.filter((r) =>
+            r.node.tags.some((t) => tagSet.has(t)),
           );
         }
+        nextNodes = results.map((result) => result.node);
+        nextMatches = new Map(
+          results.map((result) => [result.node.id, result]),
+        );
       } else if (isFiltering) {
         nextNodes = await repository.getNodesByAnyTag(filterTags);
       } else {
@@ -142,6 +150,7 @@ export function ExplorerTree({
 
       if (requestId === loadRequestRef.current) {
         setNodes(nextNodes);
+        setSearchMatches(nextMatches);
       }
     } catch (err) {
       if (requestId === loadRequestRef.current) {
@@ -335,6 +344,7 @@ export function ExplorerTree({
             <GridFileItem
               key={node.id}
               file={node}
+              searchMatch={searchMatches.get(node.id)}
               autoRename={node.id === renamingNewId}
               onChanged={reloadAndNotify}
             />
@@ -354,6 +364,7 @@ export function ExplorerTree({
           <FileItem
             key={node.id}
             file={node}
+            searchMatch={searchMatches.get(node.id)}
             autoRename={node.id === renamingNewId}
             onChanged={reloadAndNotify}
           />

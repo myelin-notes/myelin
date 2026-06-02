@@ -90,7 +90,12 @@ describe('markdown canvas import', () => {
                 },
               ]
             : [];
-        return nodes.map((node) => ({ node, score: 1, contentSnippet: null }));
+        return nodes.map((node) => ({
+          node,
+          score: 1,
+          contentSnippet: null,
+          matchedTerms: [],
+        }));
       },
       getFolderChain: async () => [],
     } satisfies Pick<Repository, 'searchNodes' | 'getFolderChain'>;

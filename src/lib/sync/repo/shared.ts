@@ -387,6 +387,7 @@ export function searchNodeResults(
     node: hit.item,
     score: hit.score,
     contentSnippet: buildContentSnippet(indexContent?.get(hit.item.id), hit),
+    matchedTerms: hit.terms,
   }));
 }
 
