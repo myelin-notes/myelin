@@ -34,6 +34,7 @@ import {
   getStats,
   getUniqueFileName,
   isFileVersionNode as isConcreteFileVersionNode,
+  isSystemNode,
   listDirectoryNodes,
   listTags,
   moveNodeInManifest,
@@ -142,18 +143,21 @@ export abstract class BaseRepository
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
     let fileType: FileType | null = null;
+    let indexable = false;
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
         fileType = node.fileType;
+        // Version-history snapshots are system nodes; never index them.
+        indexable = !isSystemNode(node);
         if (node.fileType === 'mcanvas' && links) {
           setStoredNoteLinks(manifest, nodeId, links);
         }
       }
     });
 
-    if (fileType === 'mcanvas') {
+    if (fileType === 'mcanvas' && indexable) {
       const path = await this.getStoredAbsolutePath(nodeId);
       if (path) {
         noteIndexService.requestReindex(nodeId, path, fileType);
