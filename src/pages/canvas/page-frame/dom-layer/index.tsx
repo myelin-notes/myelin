@@ -30,6 +30,7 @@ import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
+import { getPageFramePmScreenRectForPos } from '../pm/screen-rect';
 import type { PageFrameAutocompleteKind } from '../use-page-frame-autocomplete';
 
 const FRAME_STYLE: Record<string, string> = {
@@ -533,23 +534,19 @@ export function PageFrameDomLayer({
         return;
       }
       const sel = view.state.selection;
-      // coordsAtPos can throw if the position is stale (mid-transaction)
-      let rect: { left: number; right: number; top: number; bottom: number };
-      try {
-        rect = view.coordsAtPos(sel.head);
-      } catch {
+      // Anchored on the editor's own frame DOM so the caret rect lands in true
+      // screen pixels wherever the canvas sits in the window. Returns null if
+      // the position is stale (mid-transaction) or the DOM isn't mounted.
+      const screenRect = getPageFramePmScreenRectForPos(view, sel.head);
+      if (!screenRect) {
         return;
       }
 
-      // The viewport div has a fixed CSS zoom of DPR (not in
-      // getBoundingClientRect) plus transform: scale(zoom/DPR) (IS in
-      // getBoundingClientRect). Multiply by DPR to get screen coords.
       const zoom = dc.viewport.zoom;
-      const dpr = getDevicePixelRatio();
-      const screenLeft = rect.left * dpr;
-      const screenRight = rect.right * dpr;
-      const screenBottom = rect.bottom * dpr;
-      const screenTop = rect.top * dpr;
+      const screenLeft = screenRect.left;
+      const screenRight = screenRect.right;
+      const screenBottom = screenRect.bottom;
+      const screenTop = screenRect.top;
 
       const margin = 120;
       const viewportLeft = margin;

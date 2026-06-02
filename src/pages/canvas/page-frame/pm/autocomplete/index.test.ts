@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   PageFrameAutocompleteController,
   type PageFrameAutocompleteItem,
-  scalePageFrameAutocompleteAnchorRect,
 } from './index';
 
 function deferred<T>() {
@@ -136,29 +135,6 @@ describe('PageFrameAutocompleteController', () => {
       open: false,
       status: 'closed',
       activeIndex: -1,
-    });
-  });
-});
-
-describe('scalePageFrameAutocompleteAnchorRect', () => {
-  it('scales editor coords into screen pixels', () => {
-    expect(
-      scalePageFrameAutocompleteAnchorRect(
-        {
-          left: 10,
-          right: 14,
-          top: 20,
-          bottom: 28,
-        },
-        2,
-      ),
-    ).toEqual({
-      left: 20,
-      right: 28,
-      top: 40,
-      bottom: 56,
-      width: 8,
-      height: 16,
     });
   });
 });

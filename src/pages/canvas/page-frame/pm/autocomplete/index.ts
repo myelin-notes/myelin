@@ -1,4 +1,8 @@
 import type { EditorView } from 'prosemirror-view';
+import {
+  getPageFramePmScreenRectForPos,
+  type PageFramePmScreenRect,
+} from '../screen-rect';
 
 export interface PageFrameAutocompleteItem {
   id: string;
@@ -64,14 +68,7 @@ export interface PageFrameAutocompleteControllerOptions {
   limit?: number;
 }
 
-export interface PageFrameAutocompleteAnchorRect {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-  width: number;
-  height: number;
-}
+export type PageFrameAutocompleteAnchorRect = PageFramePmScreenRect;
 
 type KeyEventLike = Pick<KeyboardEvent, 'key' | 'preventDefault'>;
 type PageFrameAutocompleteListener = () => void;
@@ -108,40 +105,11 @@ function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
-export function scalePageFrameAutocompleteAnchorRect(
-  rect: Pick<
-    PageFrameAutocompleteAnchorRect,
-    'left' | 'right' | 'top' | 'bottom'
-  >,
-  devicePixelRatio: number,
-): PageFrameAutocompleteAnchorRect {
-  const left = rect.left * devicePixelRatio;
-  const right = rect.right * devicePixelRatio;
-  const top = rect.top * devicePixelRatio;
-  const bottom = rect.bottom * devicePixelRatio;
-  return {
-    left,
-    right,
-    top,
-    bottom,
-    width: Math.max(1, right - left),
-    height: Math.max(1, bottom - top),
-  };
-}
-
 export function getPageFrameAutocompleteAnchorRect(
   view: EditorView,
   position: number,
-  devicePixelRatio: number = window.devicePixelRatio || 1,
 ): PageFrameAutocompleteAnchorRect | null {
-  try {
-    return scalePageFrameAutocompleteAnchorRect(
-      view.coordsAtPos(position),
-      devicePixelRatio,
-    );
-  } catch {
-    return null;
-  }
+  return getPageFramePmScreenRectForPos(view, position);
 }
 
 export class PageFrameAutocompleteController {
