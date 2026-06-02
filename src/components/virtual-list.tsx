@@ -4,9 +4,11 @@ import {
   type RefObject,
   useCallback,
   useLayoutEffect,
-  useRef,
+  useMemo,
 } from 'react';
 import { cn } from '@/lib/utils';
+import { useListContainer } from './use-list-container';
+import { useMeasuredHeights } from './use-measured-heights';
 import { useVirtualizer } from './use-virtualizer';
 
 interface VirtualListProps {
@@ -16,7 +18,8 @@ interface VirtualListProps {
   count: number;
   /** Height estimate for a row before it has been measured. */
   estimateHeight: (index: number) => number;
-  /** Stable key per row. Measured heights are cached by this key. */
+  /** Stable key per row. Measured heights are cached by this key, so they
+   *  survive reordering as long as the key follows the content. */
   getRowKey: (index: number) => string;
   /** Vertical gap between rows, in pixels. */
   gap: number;
@@ -34,14 +37,14 @@ interface VirtualListProps {
 }
 
 /**
- * Reusable windowing list: renders only the rows that intersect the scroll
- * viewport (plus overscan), each absolutely positioned within a relative
- * container of the full content height. Row heights are measured as rows mount
- * and reflow automatically — see {@link useVirtualizer}.
+ * Reusable single-column windowing list: renders only the rows that intersect
+ * the scroll viewport (plus overscan), each absolutely positioned within a
+ * relative container of the full content height. Rows are measured as they
+ * mount and reflow automatically.
  *
  * The list does not own a scrollbar; pass `scrollRef` to whichever ancestor
- * scrolls. Rows may be any height, so multi-column layouts work by having
- * `renderRow` lay out several items per row.
+ * scrolls. For multi-column layouts that must preserve item identity across
+ * reordering, use VirtualGrid instead.
  */
 export function VirtualList({
   scrollRef,
@@ -56,39 +59,34 @@ export function VirtualList({
   className,
   containerProps,
 }: VirtualListProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const widthObserverRef = useRef<ResizeObserver | null>(null);
-  const onWidthChangeRef = useRef(onWidthChange);
-  onWidthChangeRef.current = onWidthChange;
+  const { containerRef, setContainerEl } = useListContainer(onWidthChange);
+  const measured = useMeasuredHeights();
 
-  // Callback ref keeps the container element in sync and reports its width,
-  // surviving the element un/remounting as the caller toggles surrounding
-  // states (loading, empty, populated).
-  const setContainerEl = useCallback((el: HTMLDivElement | null) => {
-    widthObserverRef.current?.disconnect();
-    containerRef.current = el;
-    if (!el) {
-      return;
+  const liveKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (let i = 0; i < count; i++) {
+      keys.add(getRowKey(i));
     }
-    onWidthChangeRef.current?.(el.clientWidth);
-    const observer = new ResizeObserver(() =>
-      onWidthChangeRef.current?.(el.clientWidth),
-    );
-    observer.observe(el);
-    widthObserverRef.current = observer;
-  }, []);
+    return keys;
+  }, [count, getRowKey]);
+  measured.prune(liveKeys);
 
-  const { totalHeight, virtualRows, measureRow, scrollToIndex } =
-    useVirtualizer({
-      scrollRef,
-      containerRef,
-      count,
-      estimateHeight,
-      getRowKey,
-      gap,
-      overscan,
-      pinnedIndex,
-    });
+  const rowHeight = useCallback(
+    (index: number) =>
+      measured.getHeight(getRowKey(index)) ?? estimateHeight(index),
+    [measured, getRowKey, estimateHeight],
+  );
+
+  const { totalHeight, virtualRows, scrollToIndex } = useVirtualizer({
+    scrollRef,
+    containerRef,
+    count,
+    rowHeight,
+    heightsVersion: measured.version,
+    gap,
+    overscan,
+    pinnedIndex,
+  });
 
   useLayoutEffect(() => {
     if (pinnedIndex != null && pinnedIndex >= 0) {
@@ -96,23 +94,32 @@ export function VirtualList({
     }
   }, [pinnedIndex, scrollToIndex]);
 
+  const {
+    className: extraClassName,
+    style: extraStyle,
+    ...restProps
+  } = containerProps ?? {};
+
   return (
     <div
       ref={setContainerEl}
-      {...containerProps}
-      className={cn('relative', className)}
-      style={{ height: totalHeight }}
+      {...restProps}
+      className={cn('relative', extraClassName, className)}
+      style={{ ...extraStyle, height: totalHeight }}
     >
-      {virtualRows.map((virtualRow) => (
-        <div
-          key={getRowKey(virtualRow.index)}
-          ref={measureRow(virtualRow.index)}
-          className="absolute inset-x-0"
-          style={{ top: virtualRow.start }}
-        >
-          {renderRow(virtualRow.index)}
-        </div>
-      ))}
+      {virtualRows.map((virtualRow) => {
+        const key = getRowKey(virtualRow.index);
+        return (
+          <div
+            key={key}
+            ref={measured.measure(key)}
+            className="absolute inset-x-0"
+            style={{ top: virtualRow.start }}
+          >
+            {renderRow(virtualRow.index)}
+          </div>
+        );
+      })}
     </div>
   );
 }
