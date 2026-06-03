@@ -8,45 +8,25 @@ import { languages } from '@codemirror/language-data';
 import { EditorView } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 
-const LANGUAGE_BY_FENCE: Record<string, string> = {
-  c: 'c',
-  cpp: 'cpp',
-  cs: 'c#',
-  css: 'css',
-  go: 'go',
-  htm: 'html',
-  html: 'html',
-  java: 'java',
-  js: 'javascript',
-  json: 'json',
-  jsx: 'jsx',
-  md: 'markdown',
-  py: 'python',
-  php: 'php',
-  rs: 'rust',
-  sh: 'shell',
-  shell: 'shell',
-  sql: 'sql',
-  ts: 'typescript',
-  tsx: 'tsx',
-  xml: 'xml',
-  yml: 'yaml',
-};
-
 /**
  * Code-block documents are literal markdown fenced code blocks (the ``` fence
  * lines are part of the text). Parsing them AS markdown keeps the fences out
  * of the inner language's parse — a bare ``` would otherwise e.g. open an
  * unterminated template literal in JS/TS — and mounts the right grammar for
  * the interior based on the fence info string, lazily via language-data.
+ *
+ * Fence tokens are resolved against language names/aliases (`python`, `js`,
+ * `c#`), falling back to file extensions (`py`, `rs`, `htm`, `md`).
  */
 export function codeBlockLanguage(): LanguageSupport {
   return markdown({
     addKeymap: false,
     codeLanguages: (info: string) => {
       const normalized = info.toLowerCase();
-      const name = LANGUAGE_BY_FENCE[normalized] ?? normalized;
-      return LanguageDescription.matchLanguageName(languages, name, true);
+      return (
+        LanguageDescription.matchLanguageName(languages, normalized, true) ??
+        LanguageDescription.matchFilename(languages, `x.${normalized}`)
+      );
     },
   });
 }
