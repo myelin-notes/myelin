@@ -1,3 +1,4 @@
+import { markdown } from '@codemirror/lang-markdown';
 import {
   HighlightStyle,
   LanguageDescription,
@@ -33,24 +34,21 @@ const LANGUAGE_BY_FENCE: Record<string, string> = {
 };
 
 /**
- * Resolve a fenced-code language token (e.g. `ts`, `py`, `rust`) to a
- * CodeMirror language. Grammars load on demand so they stay out of the main
- * chunk. Returns null for plaintext / unknown tokens.
+ * Code-block documents are literal markdown fenced code blocks (the ``` fence
+ * lines are part of the text). Parsing them AS markdown keeps the fences out
+ * of the inner language's parse — a bare ``` would otherwise e.g. open an
+ * unterminated template literal in JS/TS — and mounts the right grammar for
+ * the interior based on the fence info string, lazily via language-data.
  */
-export function loadCodeBlockLanguage(
-  language: string | null,
-): Promise<LanguageSupport> | null {
-  if (!language) {
-    return null;
-  }
-  const normalized = language.toLowerCase();
-  const name = LANGUAGE_BY_FENCE[normalized] ?? normalized;
-  const description = LanguageDescription.matchLanguageName(
-    languages,
-    name,
-    true,
-  );
-  return description ? description.load() : null;
+export function codeBlockLanguage(): LanguageSupport {
+  return markdown({
+    addKeymap: false,
+    codeLanguages: (info: string) => {
+      const normalized = info.toLowerCase();
+      const name = LANGUAGE_BY_FENCE[normalized] ?? normalized;
+      return LanguageDescription.matchLanguageName(languages, name, true);
+    },
+  });
 }
 
 /** GitHub-light token palette, mirrored from the previous Monaco theme. */

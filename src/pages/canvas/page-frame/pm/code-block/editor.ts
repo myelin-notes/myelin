@@ -1,7 +1,6 @@
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting } from '@codemirror/language';
 import {
-  Compartment,
   EditorSelection,
   type Extension,
   Prec,
@@ -21,7 +20,7 @@ import type { CodeBlockExternalSelection } from './selection-sync';
 import {
   codeBlockEditorTheme,
   codeBlockHighlightStyle,
-  loadCodeBlockLanguage,
+  codeBlockLanguage,
 } from './theme';
 
 export type CodeBlockEditorDirection = -1 | 1;
@@ -73,7 +72,6 @@ interface CodeBlockEditorCallbacks {
 
 interface CodeBlockEditorOptions {
   callbacks: CodeBlockEditorCallbacks;
-  initialLanguage: string | null;
   initialValue: string;
 }
 
@@ -150,8 +148,6 @@ const externalSelectionField = StateField.define<DecorationSet>({
 
 export class CodeBlockEditor {
   private readonly view: EditorView;
-  private readonly languageCompartment = new Compartment();
-  private currentLanguage: string | null = null;
   private readonly handleWheel = (event: WheelEvent): void => {
     if (event.ctrlKey || !this.view.hasFocus) {
       return;
@@ -222,7 +218,7 @@ export class CodeBlockEditor {
 
     const extensions: Extension[] = [
       lineNumbers(),
-      this.languageCompartment.of([]),
+      codeBlockLanguage(),
       syntaxHighlighting(codeBlockHighlightStyle),
       codeBlockEditorTheme,
       delimiterField,
@@ -264,7 +260,6 @@ export class CodeBlockEditor {
       parent: this.editorEl,
     });
     this.editorEl.addEventListener('wheel', this.handleWheel);
-    this.setLanguage(options.initialLanguage);
   }
 
   getValue(): string {
@@ -313,31 +308,6 @@ export class CodeBlockEditor {
 
   hasTextFocus(): boolean {
     return this.view.hasFocus;
-  }
-
-  setLanguage(language: string | null): void {
-    if (language === this.currentLanguage) {
-      return;
-    }
-    this.currentLanguage = language;
-
-    const support = loadCodeBlockLanguage(language);
-    if (!support) {
-      this.view.dispatch({
-        effects: this.languageCompartment.reconfigure([]),
-      });
-      return;
-    }
-
-    void support.then((languageSupport) => {
-      // A newer setLanguage call may have superseded this one while loading.
-      if (this.currentLanguage !== language) {
-        return;
-      }
-      this.view.dispatch({
-        effects: this.languageCompartment.reconfigure(languageSupport),
-      });
-    });
   }
 
   setDelimiterLines(lineNumbers: readonly number[]): void {

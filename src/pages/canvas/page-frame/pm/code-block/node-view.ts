@@ -26,30 +26,26 @@ const OPENING_FENCE_RE = /^```(\w+)?$/;
 interface FenceSource {
   closingFenceLine: number | null;
   delimiterLines: readonly number[];
-  language: string | null;
 }
 
 function parseFenceSource(text: string): FenceSource {
   const lines = text.split('\n');
   const closingFenceLine = lines.length;
-  const openingFenceMatch = OPENING_FENCE_RE.exec(lines[0]);
 
   if (
-    !openingFenceMatch ||
+    !OPENING_FENCE_RE.test(lines[0]) ||
     closingFenceLine <= 1 ||
     lines[closingFenceLine - 1] !== '```'
   ) {
     return {
       closingFenceLine: null,
       delimiterLines: [],
-      language: null,
     };
   }
 
   return {
     closingFenceLine,
     delimiterLines: [1, closingFenceLine],
-    language: openingFenceMatch[1] ?? null,
   };
 }
 
@@ -242,7 +238,6 @@ export class CodeBlockNodeView implements NodeView {
     // Dynamic import keeps the CodeMirror runtime out of the main chunk; it
     // only loads when the first code block renders.
     const { CodeBlockEditor } = await import('./editor');
-    const source = parseFenceSource(this.node.textContent);
     const editor = new CodeBlockEditor(this.editorEl, {
       callbacks: {
         onBoundaryInput: (event) => this.handleBoundaryKeyDown(event),
@@ -254,7 +249,6 @@ export class CodeBlockNodeView implements NodeView {
         onSelectionChange: () => this.forwardSelectionUpdate(),
         onUndo: () => undo(this.view.state, this.view.dispatch),
       },
-      initialLanguage: source.language,
       initialValue: this.node.textContent,
     });
 
@@ -465,7 +459,6 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
 
-    this.editor.setLanguage(source.language);
     this.editor.setDelimiterLines(source.delimiterLines);
   }
 
