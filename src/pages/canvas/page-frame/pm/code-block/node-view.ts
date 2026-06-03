@@ -7,6 +7,7 @@ import {
   CODE_BLOCK_CLEAR_SELECTION_EVENT,
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
 } from '@/lib/events';
+import { isOpeningFenceLine } from '../markdown/parse-fences';
 import { CONTENT_HEIGHT } from '../pagination/core';
 import { schema } from '../schema';
 import type {
@@ -21,10 +22,6 @@ import {
   getCodeBlockExternalSelection,
 } from './selection-sync';
 
-// Accept any non-space info token (c#, c++, objective-c) to stay in sync with
-// the fence-language resolver in theme.ts.
-const OPENING_FENCE_RE = /^```\S*$/;
-
 interface FenceSource {
   closingFenceLine: number | null;
   delimiterLines: readonly number[];
@@ -35,7 +32,7 @@ function parseFenceSource(text: string): FenceSource {
   const closingFenceLine = lines.length;
 
   if (
-    !OPENING_FENCE_RE.test(lines[0]) ||
+    !isOpeningFenceLine(lines[0]) ||
     closingFenceLine <= 1 ||
     lines[closingFenceLine - 1] !== '```'
   ) {
