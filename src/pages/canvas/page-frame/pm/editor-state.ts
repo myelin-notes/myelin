@@ -10,7 +10,7 @@ import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
 
-const CODE_BLOCK_NODE_VIEW_SELECTOR = '.pm-monaco-code-block';
+const CODE_BLOCK_NODE_VIEW_SELECTOR = '.pm-code-block';
 
 /**
  * Manages ProseMirror document state for a single PageFrameElement.

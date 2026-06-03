@@ -474,7 +474,6 @@ export function PageFrameDomLayer({
         refs.viewportDiv.style.width = `${contentWidth}px`;
         refs.viewportDiv.style.height = `${contentHeight}px`;
         refs.viewportDiv.style.zoom = `${dpr}`;
-        refs.viewportDiv.style.setProperty('--vp-zoom', `${dpr}`);
         refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
 
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';

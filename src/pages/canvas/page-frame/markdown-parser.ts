@@ -12,6 +12,7 @@
 
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
 import { parseCalloutMarker } from './callouts';
+import { OPENING_FENCE_TOKEN_RE } from './pm/markdown/parse-fences';
 
 export function parseMarkdownToDoc(md: string, schema: Schema): PMNode {
   const blocks = parseBlocks(md.replace(/\r\n/g, '\n'));
@@ -164,9 +165,10 @@ function parseBlocks(md: string): BlockToken[] {
     if (FENCE_RE.test(trimmed)) {
       // The page-frame's codeBlock stores fence delimiters as part of its
       // text content (see fenceMarkdownNormalizationPlugin). The opening
-      // fence must match /^```(\w+)?$/ and the closing must be exactly
-      // "```" — otherwise the plugin unwraps the block back to paragraphs.
-      const langMatch = trimmed.match(/^```(\w+)?/);
+      // fence must satisfy isOpeningFenceLine (``` + optional info token)
+      // and the closing must be exactly "```" — otherwise the plugin
+      // unwraps the block back to paragraphs.
+      const langMatch = trimmed.match(OPENING_FENCE_TOKEN_RE);
       const openFence = langMatch?.[1] ? `\`\`\`${langMatch[1]}` : '```';
       i++;
       const codeLines: string[] = [];

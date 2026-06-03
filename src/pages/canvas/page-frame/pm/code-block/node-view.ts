@@ -7,50 +7,44 @@ import {
   CODE_BLOCK_CLEAR_SELECTION_EVENT,
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
 } from '@/lib/events';
+import { isOpeningFenceLine } from '../markdown/parse-fences';
 import { CONTENT_HEIGHT } from '../pagination/core';
 import { schema } from '../schema';
-import {
-  type CodeBlockEditorBoundaryInput,
-  type CodeBlockEditorDirection,
-  type CodeBlockEditorEscapeUnit,
-  createMonacoCodeBlockEditor,
-  type MonacoCodeBlockEditor,
-} from './monaco-editor';
+import type {
+  CodeBlockEditor,
+  CodeBlockEditorBoundaryInput,
+  CodeBlockEditorDirection,
+  CodeBlockEditorEscapeUnit,
+} from './editor';
 import {
   type CodeBlockExternalSelection,
   type CodeBlockExternalSelectionDetail,
   getCodeBlockExternalSelection,
 } from './selection-sync';
 
-const OPENING_FENCE_RE = /^```(\w+)?$/;
-
 interface FenceSource {
   closingFenceLine: number | null;
   delimiterLines: readonly number[];
-  language: string | null;
 }
 
 function parseFenceSource(text: string): FenceSource {
   const lines = text.split('\n');
   const closingFenceLine = lines.length;
-  const openingFenceMatch = OPENING_FENCE_RE.exec(lines[0]);
 
   if (
-    !openingFenceMatch ||
+    !isOpeningFenceLine(lines[0]) ||
     closingFenceLine <= 1 ||
     lines[closingFenceLine - 1] !== '```'
   ) {
     return {
       closingFenceLine: null,
       delimiterLines: [],
-      language: null,
     };
   }
 
   return {
     closingFenceLine,
     delimiterLines: [1, closingFenceLine],
-    language: openingFenceMatch[1] ?? null,
   };
 }
 
@@ -91,7 +85,7 @@ export class CodeBlockNodeView implements NodeView {
   public readonly dom: HTMLDivElement;
 
   private readonly editorEl: HTMLDivElement;
-  private editor: MonacoCodeBlockEditor | null = null;
+  private editor: CodeBlockEditor | null = null;
   private destroyed = false;
   private selectionDragStartedOutside = false;
   private updating = false;
@@ -149,7 +143,7 @@ export class CodeBlockNodeView implements NodeView {
     private getPos: () => number,
   ) {
     this.dom = document.createElement('div');
-    this.dom.className = 'pm-monaco-code-block';
+    this.dom.className = 'pm-code-block';
     this.dom.addEventListener(
       CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
       this.handleExternalSelection,
@@ -163,7 +157,7 @@ export class CodeBlockNodeView implements NodeView {
     this.view.dom.addEventListener('mousedown', this.handleViewMouseDown, true);
 
     this.editorEl = document.createElement('div');
-    this.editorEl.className = 'pm-monaco-code-block__editor';
+    this.editorEl.className = 'pm-code-block__editor';
     this.dom.appendChild(this.editorEl);
 
     void this.initEditor();
@@ -240,8 +234,10 @@ export class CodeBlockNodeView implements NodeView {
   }
 
   private async initEditor(): Promise<void> {
-    const source = parseFenceSource(this.node.textContent);
-    const editor = await createMonacoCodeBlockEditor(this.editorEl, {
+    // Dynamic import keeps the CodeMirror runtime out of the main chunk; it
+    // only loads when the first code block renders.
+    const { CodeBlockEditor } = await import('./editor');
+    const editor = new CodeBlockEditor(this.editorEl, {
       callbacks: {
         onBoundaryInput: (event) => this.handleBoundaryKeyDown(event),
         onContentChange: () => this.forwardContentUpdate(),
@@ -252,7 +248,6 @@ export class CodeBlockNodeView implements NodeView {
         onSelectionChange: () => this.forwardSelectionUpdate(),
         onUndo: () => undo(this.view.state, this.view.dispatch),
       },
-      initialLanguage: source.language,
       initialValue: this.node.textContent,
     });
 
@@ -281,10 +276,6 @@ export class CodeBlockNodeView implements NodeView {
 
     const nextText = this.editor.getValue();
     const selection = this.editor.getSelection();
-    if (!selection) {
-      return;
-    }
-
     const offset = this.getPos() + 1;
     const selFrom = offset + selection.from;
     const selTo = offset + selection.to;
@@ -322,10 +313,6 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     const selection = this.editor.getSelection();
-    if (!selection) {
-      return;
-    }
-
     const offset = this.getPos() + 1;
     const selFrom = offset + selection.from;
     const selTo = offset + selection.to;
@@ -403,7 +390,7 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     const selection = this.editor.getSelection();
-    if (!selection?.empty) {
+    if (!selection.empty) {
       return false;
     }
 
@@ -414,7 +401,7 @@ export class CodeBlockNodeView implements NodeView {
 
     const position = this.editor.getCursorPosition();
     const lineMaxColumn = this.editor.getLineMaxColumn(source.closingFenceLine);
-    if (!position || lineMaxColumn == null) {
+    if (lineMaxColumn == null) {
       return false;
     }
     if (
@@ -471,7 +458,6 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
 
-    this.editor.setLanguage(source.language);
     this.editor.setDelimiterLines(source.delimiterLines);
   }
 
@@ -503,7 +489,7 @@ export class CodeBlockNodeView implements NodeView {
 
     const editorSelection = this.editor.getSelection();
     return (
-      editorSelection?.from === selection.from &&
+      editorSelection.from === selection.from &&
       editorSelection.to === selection.to
     );
   }
