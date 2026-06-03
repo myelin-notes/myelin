@@ -114,13 +114,10 @@ export const codeBlockEditorTheme = EditorView.theme({
     minWidth: '3ch',
     padding: '0 6px 0 12px',
   },
-  '.cm-cursor, .cm-dropCursor': {
-    borderLeftColor: '#1F2328',
+  // Native selection/caret (no drawSelection() extension installed).
+  '::selection': {
+    backgroundColor: '#0969DA26',
   },
-  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection':
-    {
-      backgroundColor: '#0969DA26',
-    },
   '&.cm-focused': {
     outline: 'none',
   },

@@ -890,14 +890,6 @@ input[type="range"].tool-slider::-moz-range-track {
   overflow: hidden;
 }
 
-.pm-editor .ProseMirror .pm-code-block .cm-editor {
-  background: transparent;
-}
-
-.pm-editor .ProseMirror .pm-code-block .cm-editor.cm-focused {
-  outline: none;
-}
-
 .pm-editor .ProseMirror .pm-code-block__external-selection {
   background: Highlight;
 }

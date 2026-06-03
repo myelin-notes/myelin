@@ -21,7 +21,9 @@ import {
   getCodeBlockExternalSelection,
 } from './selection-sync';
 
-const OPENING_FENCE_RE = /^```(\w+)?$/;
+// Accept any non-space info token (c#, c++, objective-c) to stay in sync with
+// the fence-language resolver in theme.ts.
+const OPENING_FENCE_RE = /^```\S*$/;
 
 interface FenceSource {
   closingFenceLine: number | null;
