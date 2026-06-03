@@ -102,6 +102,10 @@ export function subscribeThumbnail(
   };
 }
 
+export async function clearAllThumbnails(): Promise<void> {
+  await cache.clearAll();
+}
+
 export async function removeThumbnail(nodeId: VFSNodeId): Promise<void> {
   await cache.removeEntry(nodeId);
   bumpVersion(nodeId);

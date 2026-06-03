@@ -50,6 +50,15 @@ export async function writeBlob(nodeId: VFSNodeId, blob: Blob): Promise<void> {
   }
 }
 
+export async function clearAll(): Promise<void> {
+  if (await exists(THUMBNAILS_DIR, { baseDir: BaseDirectory.AppCache })) {
+    await removeFile(THUMBNAILS_DIR, {
+      baseDir: BaseDirectory.AppCache,
+      recursive: true,
+    });
+  }
+}
+
 export async function removeEntry(nodeId: VFSNodeId): Promise<void> {
   const rel = relPath(nodeId);
   if (await exists(rel, { baseDir: BaseDirectory.AppCache })) {

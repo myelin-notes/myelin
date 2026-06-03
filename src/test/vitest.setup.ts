@@ -31,6 +31,7 @@ beforeEach(() => {
 });
 
 vi.mock('@/lib/thumbnails', () => ({
+  clearAllThumbnails: async () => {},
   getThumbnailUrl: async () => null,
   regenerateThumbnailNow: async () => {},
   registerThumbnailProducer: () => () => {},
