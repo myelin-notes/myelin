@@ -13,6 +13,9 @@ export const explorerGridBodyClass =
 export const explorerGridTitleClass =
   'line-clamp-2 text-[15px] leading-5 text-text-primary transition-colors duration-200 group-hover:text-accent-dark';
 
+export const explorerGridSnippetClass =
+  'line-clamp-2 text-[11px] text-text-muted leading-snug';
+
 export const explorerGridRenameInputClass =
   'w-full border-primary border-b-2 bg-transparent pb-1 font-normal text-sm text-text-primary outline-none';
 

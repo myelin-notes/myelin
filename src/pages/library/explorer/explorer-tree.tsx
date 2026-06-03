@@ -16,6 +16,7 @@ import {
   type FileType,
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
+  type NodeSearchResult,
   type RepositoryConfig,
   useRepository,
   useRepositoryStatus,
@@ -30,6 +31,7 @@ import { useDropTarget } from './use-drop-target';
 
 const logger = new Logger('ExplorerTree');
 const SEARCH_DEBOUNCE_MS = 150;
+const EMPTY_SEARCH_MATCHES: ReadonlyMap<string, NodeSearchResult> = new Map();
 
 // Grid layout matches `repeat(auto-fill, minmax(198px, 1fr))` with a 16px gap.
 const GRID_MIN_COLUMN = 198;
@@ -86,6 +88,8 @@ export function ExplorerTree({
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const [nodes, setNodes] = useState<VFSNode[]>([]);
+  const [searchMatches, setSearchMatches] =
+    useState<ReadonlyMap<string, NodeSearchResult>>(EMPTY_SEARCH_MATCHES);
   const [loading, setLoading] = useState(true);
   const [repositorySetupState, setRepositorySetupState] =
     useState<RepositorySetupState>(() =>
@@ -134,16 +138,20 @@ export function ExplorerTree({
     setLoading(true);
     try {
       let nextNodes: VFSNode[];
+      let nextMatches: ReadonlyMap<string, NodeSearchResult> =
+        EMPTY_SEARCH_MATCHES;
       if (isSearching) {
-        nextNodes = (await repository.searchNodes(searchQuery!.trim())).map(
-          (result) => result.node,
-        );
+        let results = await repository.searchNodes(searchQuery!.trim());
         if (isFiltering) {
           const tagSet = new Set(filterTags);
-          nextNodes = nextNodes.filter((n) =>
-            n.tags.some((t) => tagSet.has(t)),
+          results = results.filter((r) =>
+            r.node.tags.some((t) => tagSet.has(t)),
           );
         }
+        nextNodes = results.map((result) => result.node);
+        nextMatches = new Map(
+          results.map((result) => [result.node.id, result]),
+        );
       } else if (isFiltering) {
         nextNodes = await repository.getNodesByAnyTag(filterTags);
       } else {
@@ -153,6 +161,7 @@ export function ExplorerTree({
 
       if (requestId === loadRequestRef.current) {
         setNodes(nextNodes);
+        setSearchMatches(nextMatches);
       }
     } catch (err) {
       if (requestId === loadRequestRef.current) {
@@ -317,7 +326,7 @@ export function ExplorerTree({
   const estimateCardHeight = Math.round((cardWidth * 10) / 16) + 84;
 
   const getNodeKey = useCallback(
-    (index: number) => sortedNodes[index].id,
+    (index: number) => sortedNodes[index]?.id ?? String(index),
     [sortedNodes],
   );
 
@@ -339,6 +348,9 @@ export function ExplorerTree({
   const renderNode = useCallback(
     (index: number) => {
       const node = sortedNodes[index];
+      if (!node) {
+        return null;
+      }
       if (viewMode === 'grid') {
         return node.type === 'folder' ? (
           <GridFolderItem
@@ -352,6 +364,7 @@ export function ExplorerTree({
         ) : (
           <GridFileItem
             file={node}
+            searchMatch={searchMatches.get(node.id)}
             autoRename={node.id === renamingNewId}
             onChanged={reloadAndNotify}
           />
@@ -369,12 +382,20 @@ export function ExplorerTree({
       ) : (
         <FileItem
           file={node}
+          searchMatch={searchMatches.get(node.id)}
           autoRename={node.id === renamingNewId}
           onChanged={reloadAndNotify}
         />
       );
     },
-    [sortedNodes, viewMode, renamingNewId, onNavigate, reloadAndNotify],
+    [
+      sortedNodes,
+      viewMode,
+      renamingNewId,
+      onNavigate,
+      reloadAndNotify,
+      searchMatches,
+    ],
   );
 
   if (loading || repositorySetupState === 'checking') {

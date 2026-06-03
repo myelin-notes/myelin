@@ -109,6 +109,8 @@ export interface NodeSearchResult {
   score: number;
   /** Snippet around the matched indexed content, or null if name/tags matched. */
   contentSnippet: string | null;
+  /** Lowercased document terms that matched the query, for highlighting. */
+  matchedTerms: string[];
 }
 
 export interface RepositoryCapabilities {

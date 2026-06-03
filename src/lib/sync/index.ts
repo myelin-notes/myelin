@@ -78,6 +78,7 @@ export {
 export type {
   FileType,
   FileVersion,
+  NodeSearchResult,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,

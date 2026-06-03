@@ -4,7 +4,11 @@ import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { IS_DEV } from '@/lib/env';
 import { openNote } from '@/lib/note-navigation';
-import { useRepository, type VFSFileNode } from '@/lib/sync';
+import {
+  type NodeSearchResult,
+  useRepository,
+  type VFSFileNode,
+} from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';
@@ -17,6 +21,7 @@ import {
   explorerGridMediaClass,
   explorerGridPlaceholderStyle,
   explorerGridRenameInputClass,
+  explorerGridSnippetClass,
   explorerGridTagClass,
   explorerGridTagOverflowClass,
   explorerGridTagsClass,
@@ -24,15 +29,22 @@ import {
 } from './grid-item-styles';
 import { ItemContextMenu } from './item-context-menu';
 import { RenameReferencesDialog } from './rename-references-dialog';
+import { SearchHighlight } from './search-highlight';
 import { useExplorerItem } from './use-explorer-item';
 
 interface Props {
   file: VFSFileNode;
+  searchMatch?: NodeSearchResult;
   autoRename?: boolean;
   onChanged: () => Promise<void>;
 }
 
-export function GridFileItem({ file, autoRename, onChanged }: Props) {
+export function GridFileItem({
+  file,
+  searchMatch,
+  autoRename,
+  onChanged,
+}: Props) {
   const repository = useRepository();
   const tabController = useTabController();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
@@ -43,19 +55,25 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
 
   const {
     renaming,
+    dragging,
     startRenaming,
     handleRemove,
     handleDragStart,
+    handleDragEnd,
     renameInputProps,
     renameReferencesPrompt,
     chooseRenameReferences,
   } = useExplorerItem({
     nodeId: file.id,
     name: file.name,
+    dragKind: 'file',
     onChanged,
     initialRenaming: autoRename,
     renameReferencesOnRename: file.fileType === 'mcanvas',
   });
+
+  const matchedTerms = searchMatch?.matchedTerms ?? [];
+  const snippet = searchMatch?.contentSnippet ?? null;
 
   return (
     <>
@@ -70,12 +88,13 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
                 }
               }}
               onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
               aria-label={
                 renaming
                   ? undefined
                   : formatExplorerItemAccessibleName(file.name, file.tags)
               }
-              className={explorerGridCardClass}
+              className={cn(explorerGridCardClass, dragging && 'opacity-40')}
             />
           }
         >
@@ -114,8 +133,15 @@ export function GridFileItem({ file, autoRename, onChanged }: Props) {
                   className={cn('block', explorerGridTitleClass)}
                   title={file.name}
                 >
-                  {file.name}
+                  <SearchHighlight text={file.name} terms={matchedTerms} />
                 </span>
+                {snippet && (
+                  <SearchHighlight
+                    text={snippet}
+                    terms={matchedTerms}
+                    className={explorerGridSnippetClass}
+                  />
+                )}
                 {file.tags.length > 0 && (
                   <div className={explorerGridTagsClass}>
                     {file.tags.slice(0, 2).map((tag) => (

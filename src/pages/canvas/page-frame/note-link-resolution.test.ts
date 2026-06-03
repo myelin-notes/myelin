@@ -52,7 +52,7 @@ function createFileNode(
 // searchNodes returns ranked results ({ node, score, contentSnippet }); these
 // resolution tests only care about the nodes, so wrap fixtures with this.
 function toResult(node: VFSNode) {
-  return { node, score: 1, contentSnippet: null };
+  return { node, score: 1, contentSnippet: null, matchedTerms: [] };
 }
 
 function createSnapshot(update: Uint8Array | null): YjsSyncSnapshot {

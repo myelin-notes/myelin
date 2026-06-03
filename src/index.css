@@ -1327,3 +1327,10 @@ input[type="range"].tool-slider::-moz-range-track {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* See suppress-hover.ts: kills the phantom :hover left on the explorer list
+   when it reflows under a stationary cursor after a drag-and-drop. Cleared on
+   the next real pointer movement. */
+body.dnd-suppress-hover * {
+  pointer-events: none !important;
+}

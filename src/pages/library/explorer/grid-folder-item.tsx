@@ -42,13 +42,16 @@ export function GridFolderItem({
 
   const {
     renaming,
+    dragging,
     startRenaming,
     handleRemove,
     handleDragStart,
+    handleDragEnd,
     renameInputProps,
   } = useExplorerItem({
     nodeId: id,
     name,
+    dragKind: 'folder',
     onChanged: onMoved,
     initialRenaming: autoRename,
   });
@@ -71,6 +74,7 @@ export function GridFolderItem({
                 }
               }}
               onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
               {...dropTargetProps}
               aria-label={
                 renaming
@@ -80,6 +84,7 @@ export function GridFolderItem({
               className={cn(
                 explorerGridCardClass,
                 dragOver && explorerGridCardDragOverClass,
+                dragging && 'opacity-40',
               )}
             />
           }

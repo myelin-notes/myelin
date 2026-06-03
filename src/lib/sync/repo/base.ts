@@ -28,12 +28,13 @@ import {
   getBacklinks,
   getFileVersionNodes,
   getFolderChain,
-  getIndexableFileNodes,
+  getIndexCandidateFileNodes,
   getNodesByAnyTag,
   getRecentFiles,
   getStats,
   getUniqueFileName,
   isFileVersionNode as isConcreteFileVersionNode,
+  isIndexCandidateFileNode,
   listDirectoryNodes,
   listTags,
   moveNodeInManifest,
@@ -141,22 +142,26 @@ export abstract class BaseRepository
     nodeId: VFSNodeId,
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
-    let fileType: FileType | null = null;
+    let candidateFileType: FileType | null = null;
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
-        fileType = node.fileType;
+        // Offer non-system files to the engine; it decides by type what to index.
+        // Version-history snapshots are system nodes and are never offered.
+        if (isIndexCandidateFileNode(node)) {
+          candidateFileType = node.fileType;
+        }
         if (node.fileType === 'mcanvas' && links) {
           setStoredNoteLinks(manifest, nodeId, links);
         }
       }
     });
 
-    if (fileType === 'mcanvas') {
+    if (candidateFileType !== null) {
       const path = await this.getStoredAbsolutePath(nodeId);
       if (path) {
-        noteIndexService.requestReindex(nodeId, path, fileType);
+        noteIndexService.requestReindex(nodeId, path, candidateFileType);
       }
     }
   }
@@ -249,7 +254,7 @@ export abstract class BaseRepository
   async listIndexBackfillItems(): Promise<ReindexItem[]> {
     const { manifest } = await this.loadManifestImpl();
     const items: ReindexItem[] = [];
-    for (const node of getIndexableFileNodes(manifest)) {
+    for (const node of getIndexCandidateFileNodes(manifest)) {
       const path = await this.getStoredAbsolutePath(node.id);
       if (path) {
         items.push({ nodeId: node.id, path, fileType: node.fileType });

@@ -86,7 +86,12 @@ describe('getNoteLinkPreview', () => {
         [
           createFolderNode('folder-1', 'Folder'),
           createFileNode('note-2', 'Resolved Note'),
-        ].map((node) => ({ node, score: 1, contentSnippet: null })),
+        ].map((node) => ({
+          node,
+          score: 1,
+          contentSnippet: null,
+          matchedTerms: [],
+        })),
       ),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(update)),
