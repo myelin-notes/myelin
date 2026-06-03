@@ -264,6 +264,7 @@ export class CodeBlockEditor {
       parent: this.editorEl,
     });
     this.editorEl.addEventListener('wheel', this.handleWheel);
+    this.setLanguage(options.initialLanguage);
   }
 
   getValue(): string {
@@ -413,13 +414,4 @@ export class CodeBlockEditor {
     const scroller = this.view.scrollDOM;
     return scroller.scrollHeight > scroller.clientHeight + 1;
   }
-}
-
-export async function createCodeBlockEditor(
-  editorEl: HTMLDivElement,
-  options: CodeBlockEditorOptions,
-): Promise<CodeBlockEditor> {
-  const editor = new CodeBlockEditor(editorEl, options);
-  editor.setLanguage(options.initialLanguage);
-  return editor;
 }

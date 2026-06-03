@@ -241,9 +241,9 @@ export class CodeBlockNodeView implements NodeView {
   private async initEditor(): Promise<void> {
     // Dynamic import keeps the CodeMirror runtime out of the main chunk; it
     // only loads when the first code block renders.
-    const { createCodeBlockEditor } = await import('./editor');
+    const { CodeBlockEditor } = await import('./editor');
     const source = parseFenceSource(this.node.textContent);
-    const editor = await createCodeBlockEditor(this.editorEl, {
+    const editor = new CodeBlockEditor(this.editorEl, {
       callbacks: {
         onBoundaryInput: (event) => this.handleBoundaryKeyDown(event),
         onContentChange: () => this.forwardContentUpdate(),
