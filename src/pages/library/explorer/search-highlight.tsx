@@ -48,7 +48,7 @@ export function SearchHighlight({
 }
 
 /** Find merged, non-overlapping match ranges for any term, case-insensitive. */
-function findMatchRanges(
+export function findMatchRanges(
   text: string,
   terms: readonly string[],
 ): Array<[number, number]> {
