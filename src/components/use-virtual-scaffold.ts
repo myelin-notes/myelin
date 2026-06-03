@@ -1,4 +1,4 @@
-import { type HTMLAttributes, type RefObject, useMemo } from 'react';
+import { type HTMLAttributes, type RefObject, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useListContainer } from './use-list-container';
 import {
@@ -27,6 +27,7 @@ export function useVirtualScaffold(
 ): VirtualScaffold {
   const { containerRef, setContainerEl } = useListContainer(onWidthChange);
   const measured = useMeasuredHeights();
+  const { prune } = measured;
 
   const liveKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -35,7 +36,13 @@ export function useVirtualScaffold(
     }
     return keys;
   }, [itemCount, getItemKey]);
-  measured.prune(liveKeys);
+
+  // Pruning only affects future `getHeight` reads for keys that have already
+  // left the set, so it can run after commit rather than mutating the cache
+  // mid-render.
+  useEffect(() => {
+    prune(liveKeys);
+  }, [prune, liveKeys]);
 
   return { containerRef, setContainerEl, measured };
 }
