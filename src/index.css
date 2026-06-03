@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "katex/dist/katex.min.css";
 
 @font-face {
   font-family: "Inter";
@@ -943,6 +944,55 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-md-inline-code::before {
   inset-inline: -0.22em;
   background: rgba(28, 39, 56, 0.08);
+}
+
+.pm-editor .ProseMirror .pm-md-math {
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+/* Inline math source while the selection is elsewhere — a widget renders
+   the KaTeX formula in its place. */
+.pm-editor .ProseMirror .pm-math-source-hidden {
+  display: none;
+}
+
+.pm-editor .ProseMirror .pm-math-inline {
+  cursor: pointer;
+}
+
+.pm-editor .ProseMirror .pm-math-block {
+  margin: 1.15em 0;
+}
+
+.pm-editor .ProseMirror .pm-math-block-preview {
+  padding: 0.4em 0;
+  text-align: center;
+  cursor: pointer;
+  overflow-x: auto;
+}
+
+.pm-editor .ProseMirror .pm-math-block-source {
+  display: none;
+  margin: 0;
+  padding: 0.6em 0.9em;
+  border-radius: var(--radius-lg);
+  background: rgba(230, 234, 240, 0.52);
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  white-space: pre-wrap;
+}
+
+.pm-editor .ProseMirror .pm-math-block--editing .pm-math-block-source {
+  display: block;
+}
+
+.pm-editor .ProseMirror .pm-math-block--editing .pm-math-block-preview {
+  display: none;
 }
 
 .pm-editor .ProseMirror .pm-md-note-link {

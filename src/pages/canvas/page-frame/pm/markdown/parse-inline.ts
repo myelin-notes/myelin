@@ -149,6 +149,65 @@ function parseDoubleBracketDelimited(
   }
 }
 
+function isEscaped(text: string, index: number): boolean {
+  return index > 0 && text[index - 1] === '\\';
+}
+
+function parseInlineMath(
+  text: string,
+  blocked: boolean[],
+  ranges: InlinePreviewRange[],
+): void {
+  for (let i = 0; i < text.length; i++) {
+    if (blocked[i] || text[i] !== '$' || isEscaped(text, i)) {
+      continue;
+    }
+
+    // Not an opening delimiter: part of a `$$` run, or followed by
+    // whitespace/another `$` (currency like "$ 5" or block math).
+    const next = text[i + 1] ?? '';
+    const prev = i > 0 ? text[i - 1] : '';
+    if (prev === '$' || next === '$' || next === '' || /\s/.test(next)) {
+      continue;
+    }
+
+    // The closing delimiter is the first unescaped `$` after the opening.
+    // If that `$` is preceded by whitespace (e.g. "$5 and $10"), the whole
+    // candidate is abandoned — math content may not contain a bare `$`.
+    let close = -1;
+    for (let j = i + 1; j < text.length; j++) {
+      const char = text[j];
+      if (char === '\n') {
+        break;
+      }
+      if (char !== '$' || isEscaped(text, j)) {
+        continue;
+      }
+      if (blocked[j] || /\s/.test(text[j - 1])) {
+        break;
+      }
+      close = j;
+      break;
+    }
+
+    if (close === -1) {
+      continue;
+    }
+
+    if (
+      hasBarrier(text, i + 1, close) ||
+      !hasVisibleContent(text, i + 1, close) ||
+      rangeHasBlocked(blocked, i, close + 1)
+    ) {
+      continue;
+    }
+
+    pushRange(ranges, 'math', i, i + 1, i + 1, close, close, close + 1);
+    markBlocked(blocked, i, close + 1);
+    i = close;
+  }
+}
+
 function parseTripleAsteriskDelimited(
   text: string,
   blocked: boolean[],
@@ -257,6 +316,7 @@ export function parseInlineMarkdown(text: string): ParsedInlineMarkdown {
 
   parseInlineCode(text, blocked, ranges);
   parseDoubleBracketDelimited(text, blocked, ranges);
+  parseInlineMath(text, blocked, ranges);
   parseTripleAsteriskDelimited(text, blocked, ranges);
   parseAsteriskDelimited(text, blocked, ranges, '**', 'bold');
   parseAsteriskDelimited(text, blocked, ranges, '*', 'italic');

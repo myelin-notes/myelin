@@ -12,7 +12,7 @@ const FENCE = '```';
 export const OPENING_FENCE_TOKEN_RE = /^```([^\s`]*)/;
 const OPENING_FENCE_RE = new RegExp(`${OPENING_FENCE_TOKEN_RE.source}$`);
 
-function splitLines(text: string): Omit<FenceLine, 'kind'>[] {
+export function splitLines(text: string): Omit<FenceLine, 'kind'>[] {
   if (text.length === 0) {
     return [];
   }

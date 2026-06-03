@@ -1,9 +1,13 @@
 import type { NodeViewConstructor } from 'prosemirror-view';
 import { CodeBlockNodeView } from './code-block/node-view';
+import { MathBlockNodeView } from './math/block-node-view';
 import { PageFrameTableNodeView } from './table/node-view';
 
 export function buildNodeViews(): Record<string, NodeViewConstructor> {
   return {
+    mathBlock(node) {
+      return new MathBlockNodeView(node);
+    },
     codeBlock(node, view, getPos) {
       if (typeof getPos !== 'function') {
         throw new Error('codeBlock node view requires a stable getPos');

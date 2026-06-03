@@ -19,7 +19,7 @@ import {
   getChangedRangesForTransactions,
 } from './range-tracking';
 
-function isPlainTextParagraph(
+export function isPlainTextParagraph(
   node: PMNode,
   paragraphType: PMNode['type'],
 ): boolean {
@@ -109,7 +109,10 @@ export function fenceMarkdownInputRules(schema: Schema): Plugin {
   });
 }
 
-function buildParagraphsFromCodeText(schema: Schema, text: string): PMNode[] {
+export function buildParagraphsFromCodeText(
+  schema: Schema,
+  text: string,
+): PMNode[] {
   const paragraphType = schema.nodes.paragraph;
   const lines = text.split('\n');
   const normalizedLines = lines.length > 0 ? lines : [''];
@@ -171,7 +174,7 @@ function mapSelectionPointThroughFenceReplacement(
   );
 }
 
-function mapSelectionPointAfterFenceReplacement(
+export function mapSelectionPointAfterFenceReplacement(
   selectionPos: number,
   target: InvalidFenceReplacement,
   tr: Transaction,
@@ -184,7 +187,7 @@ function mapSelectionPointAfterFenceReplacement(
   return tr.mapping.map(selectionPos);
 }
 
-interface InvalidFenceReplacement {
+export interface InvalidFenceReplacement {
   from: number;
   to: number;
   node: PMNode;

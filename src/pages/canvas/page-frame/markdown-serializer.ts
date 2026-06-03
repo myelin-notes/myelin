@@ -7,6 +7,7 @@
 
 import type { Mark, Node as PMNode } from 'prosemirror-model';
 import { parseCalloutMarker } from './callouts';
+import { parseInlineMarkdown } from './pm/markdown/parse-inline';
 
 export function serializeDocToMarkdown(doc: PMNode): string {
   const parts: string[] = [];
@@ -100,6 +101,9 @@ function serializeBlock(node: PMNode): string | null {
       // part of the code block's own text content — the editor renders
       // them as visual fences. Emit the text verbatim to avoid nesting.
       return node.textContent;
+    case 'mathBlock':
+      // Math blocks store their $$ fence lines as text, like codeBlock.
+      return node.textContent;
     case 'table':
       return serializeTable(node);
     case 'horizontalRule':
@@ -151,7 +155,7 @@ function serializeInline(node: PMNode): string {
       openMarks(child.marks);
       out += child.marks.some((mark) => mark.type.name === 'noteLink')
         ? (child.text ?? '')
-        : escapeMarkdown(child.text ?? '');
+        : escapeMarkdownPreservingMath(child.text ?? '');
     } else {
       closeMarks([]);
       out += renderInlineAtom(child);
@@ -276,6 +280,33 @@ function textTail(s: string): string {
 
 function escapeMarkdown(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/([*_`[\]])/g, '\\$1');
+}
+
+/**
+ * Escapes markdown like `escapeMarkdown`, but emits inline-math spans
+ * (`$...$`) verbatim — LaTeX is full of backslashes that must not be
+ * doubled (e.g. `$e^{i\pi}$`).
+ */
+function escapeMarkdownPreservingMath(text: string): string {
+  if (!text.includes('$')) {
+    return escapeMarkdown(text);
+  }
+
+  const mathRanges = parseInlineMarkdown(text).ranges.filter(
+    (range) => range.kind === 'math',
+  );
+  if (mathRanges.length === 0) {
+    return escapeMarkdown(text);
+  }
+
+  let out = '';
+  let last = 0;
+  for (const range of mathRanges) {
+    out += escapeMarkdown(text.slice(last, range.open.from));
+    out += text.slice(range.open.from, range.close.to);
+    last = range.close.to;
+  }
+  return out + escapeMarkdown(text.slice(last));
 }
 
 function escapeTableCell(text: string): string {

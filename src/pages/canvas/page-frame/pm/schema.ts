@@ -195,6 +195,18 @@ const codeBlock: NodeSpec = {
   parseDOM: [{ tag: 'pre', preserveWhitespace: 'full' }],
 };
 
+const mathBlock: NodeSpec = {
+  content: 'text*',
+  group: 'block textblock',
+  marks: '',
+  code: true,
+  defining: true,
+  toDOM() {
+    return ['div', { class: 'pm-math-block' }, 0];
+  },
+  parseDOM: [{ tag: 'div.pm-math-block', preserveWhitespace: 'full' }],
+};
+
 const horizontalRule: NodeSpec = {
   group: 'block',
   toDOM() {
@@ -396,6 +408,7 @@ export const schema = new Schema({
     blockquote,
     hardBreak,
     codeBlock,
+    mathBlock,
     horizontalRule,
     mention,
     ...tableSpecs,
