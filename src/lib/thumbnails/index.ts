@@ -4,6 +4,7 @@ export type {
   ThumbnailRenderOptions,
 } from './service';
 export {
+  clearAllThumbnails,
   getThumbnailUrl,
   regenerateThumbnailNow,
   registerThumbnailProducer,
