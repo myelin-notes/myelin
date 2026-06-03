@@ -24,6 +24,10 @@ export function createItemDragImage(
   const element = document.createElement('div');
   element.style.cssText = [
     'position: fixed',
+    // Verified on macOS WKWebView: negative-coordinate placement snapshots
+    // fine. Don't "fix" this to `top: 0` + `transform: translateX(-9999px)` —
+    // that variant produces NO drag image at all there (the snapshot follows
+    // the transformed paint position, so it captures nothing).
     'top: -1000px',
     'left: -1000px',
     'display: inline-flex',
