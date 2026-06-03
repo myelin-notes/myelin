@@ -387,17 +387,20 @@ export class CodeBlockEditor {
   syncLayout(
     options: CodeBlockEditorLayoutOptions = {},
   ): CodeBlockEditorLayout {
-    const contentHeight = Math.max(
-      MIN_OUTER_HEIGHT_PX,
-      Math.ceil(this.view.contentHeight),
-    );
-    const maxHeight =
+    // The editor auto-sizes to its content via CSS (min-height floor +
+    // max-height cap, scrolling past the cap). We then read offsetHeight — the
+    // rendered CSS-px height, which (unlike CodeMirror's contentHeight) is
+    // immune to the canvas's ancestor `zoom`/`transform: scale` and matches the
+    // coordinate space pagination measures blocks in.
+    const cap =
       options.maxOuterHeightPx === undefined
-        ? contentHeight
+        ? null
         : Math.max(MIN_OUTER_HEIGHT_PX, Math.floor(options.maxOuterHeightPx));
-    const height = Math.min(contentHeight, maxHeight);
-    this.editorEl.style.height = `${height}px`;
-    this.view.requestMeasure();
+    this.view.dom.style.minHeight = `${MIN_OUTER_HEIGHT_PX}px`;
+    this.view.dom.style.maxHeight = cap === null ? '' : `${cap}px`;
+
+    const measured = this.view.dom.offsetHeight;
+    const height = measured > 0 ? measured : MIN_OUTER_HEIGHT_PX;
     return { outerHeightPx: height };
   }
 

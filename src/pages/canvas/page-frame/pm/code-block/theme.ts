@@ -110,11 +110,12 @@ export { codeBlockHighlightStyle };
 
 /** Editor chrome: transparent surface, GitHub-light gutter and selection. */
 export const codeBlockEditorTheme = EditorView.theme({
+  // The editor grows to fit its content; syncLayout sets max-height so it caps
+  // at the page-frame content height and scrolls past that.
   '&': {
     color: '#1F2328',
     backgroundColor: 'transparent',
     fontSize: '14px',
-    height: '100%',
   },
   '.cm-scroller': {
     fontFamily:
