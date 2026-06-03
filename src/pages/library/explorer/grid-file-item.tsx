@@ -55,15 +55,18 @@ export function GridFileItem({
 
   const {
     renaming,
+    dragging,
     startRenaming,
     handleRemove,
     handleDragStart,
+    handleDragEnd,
     renameInputProps,
     renameReferencesPrompt,
     chooseRenameReferences,
   } = useExplorerItem({
     nodeId: file.id,
     name: file.name,
+    dragKind: 'file',
     onChanged,
     initialRenaming: autoRename,
     renameReferencesOnRename: file.fileType === 'mcanvas',
@@ -85,12 +88,13 @@ export function GridFileItem({
                 }
               }}
               onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
               aria-label={
                 renaming
                   ? undefined
                   : formatExplorerItemAccessibleName(file.name, file.tags)
               }
-              className={explorerGridCardClass}
+              className={cn(explorerGridCardClass, dragging && 'opacity-40')}
             />
           }
         >

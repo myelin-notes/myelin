@@ -39,15 +39,18 @@ export function FileItem({
 
   const {
     renaming,
+    dragging,
     startRenaming,
     handleRemove,
     handleDragStart,
+    handleDragEnd,
     renameInputProps,
     renameReferencesPrompt,
     chooseRenameReferences,
   } = useExplorerItem({
     nodeId: file.id,
     name: file.name,
+    dragKind: 'file',
     onChanged,
     initialRenaming: autoRename,
     renameReferencesOnRename: file.fileType === 'mcanvas',
@@ -69,6 +72,7 @@ export function FileItem({
                 }
               }}
               onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
               aria-label={
                 renaming
                   ? undefined
@@ -77,6 +81,7 @@ export function FileItem({
               className={cn(
                 'group flex w-full cursor-pointer gap-3 rounded-lg px-4 py-2 transition-all duration-200 hover:bg-hover-tint',
                 snippet ? 'items-start' : 'items-center',
+                dragging && 'opacity-40',
               )}
             />
           }
