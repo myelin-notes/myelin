@@ -283,10 +283,6 @@ export class CodeBlockNodeView implements NodeView {
 
     const nextText = this.editor.getValue();
     const selection = this.editor.getSelection();
-    if (!selection) {
-      return;
-    }
-
     const offset = this.getPos() + 1;
     const selFrom = offset + selection.from;
     const selTo = offset + selection.to;
@@ -324,10 +320,6 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     const selection = this.editor.getSelection();
-    if (!selection) {
-      return;
-    }
-
     const offset = this.getPos() + 1;
     const selFrom = offset + selection.from;
     const selTo = offset + selection.to;
@@ -405,7 +397,7 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     const selection = this.editor.getSelection();
-    if (!selection?.empty) {
+    if (!selection.empty) {
       return false;
     }
 
@@ -416,7 +408,7 @@ export class CodeBlockNodeView implements NodeView {
 
     const position = this.editor.getCursorPosition();
     const lineMaxColumn = this.editor.getLineMaxColumn(source.closingFenceLine);
-    if (!position || lineMaxColumn == null) {
+    if (lineMaxColumn == null) {
       return false;
     }
     if (
@@ -505,7 +497,7 @@ export class CodeBlockNodeView implements NodeView {
 
     const editorSelection = this.editor.getSelection();
     return (
-      editorSelection?.from === selection.from &&
+      editorSelection.from === selection.from &&
       editorSelection.to === selection.to
     );
   }

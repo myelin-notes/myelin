@@ -280,7 +280,7 @@ export class CodeBlockEditor {
     });
   }
 
-  getSelection(): CodeBlockEditorSelection | null {
+  getSelection(): CodeBlockEditorSelection {
     const range = this.view.state.selection.main;
     return { empty: range.empty, from: range.from, to: range.to };
   }
@@ -348,7 +348,7 @@ export class CodeBlockEditor {
     this.view.dispatch({ effects: setExternalSelectionEffect.of(selection) });
   }
 
-  getCursorPosition(): CodeBlockEditorCursorPosition | null {
+  getCursorPosition(): CodeBlockEditorCursorPosition {
     const head = this.view.state.selection.main.head;
     const line = this.view.state.doc.lineAt(head);
     return { column: head - line.from + 1, lineNumber: line.number };
