@@ -21,41 +21,6 @@ import {
 } from '../markdown/range-tracking';
 import { isMathFenceLine, parseMathMarkdown } from './parse-math-block';
 
-/**
- * Enter on a paragraph containing exactly `$$` opens a math block with an
- * empty content line and the cursor on it.
- */
-export const openMathBlockOnEnter: Command = (state, dispatch) => {
-  const { empty, $from } = state.selection;
-  const { mathBlock, paragraph } = state.schema.nodes;
-  if (
-    !empty ||
-    $from.parent.type !== paragraph ||
-    $from.parent.textContent !== '$$' ||
-    !isPlainTextParagraph($from.parent, paragraph)
-  ) {
-    return false;
-  }
-
-  const blockStart = $from.before();
-  const blockEnd = $from.after();
-  const parentDepth = $from.depth - 1;
-  const index = $from.index(parentDepth);
-  if (!$from.node(parentDepth).canReplaceWith(index, index + 1, mathBlock)) {
-    return false;
-  }
-
-  if (dispatch) {
-    const text = '$$\n\n$$';
-    const node = mathBlock.create(null, state.schema.text(text));
-    let tr = state.tr.replaceWith(blockStart, blockEnd, node);
-    // Cursor on the empty content line between the fences.
-    tr = tr.setSelection(TextSelection.create(tr.doc, blockStart + 1 + 3));
-    dispatch(tr.scrollIntoView());
-  }
-  return true;
-};
-
 function buildClosedMathInputRule(schema: Schema): InputRule {
   return new InputRule(/^\$\$$/, (state, _match, start) => {
     const mathBlockType = schema.nodes.mathBlock;

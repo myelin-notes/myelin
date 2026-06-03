@@ -40,7 +40,7 @@ import {
   buildTextOffsetMap,
   type TextOffsetMap,
 } from './markdown/text-offset-map';
-import { exitMathBlock, openMathBlockOnEnter } from './math/block-commands';
+import { exitMathBlock } from './math/block-commands';
 import { schema } from './schema';
 import { exitTableOnLastRow, goToNextTableRow } from './table/commands';
 
@@ -446,7 +446,6 @@ export function buildKeymap(s: Schema) {
     Enter: chainCommands(
       exitFencedCodeBlock,
       exitMathBlock,
-      openMathBlockOnEnter,
       newlineInCode,
       goToNextTableRow,
       splitFlatListItem,

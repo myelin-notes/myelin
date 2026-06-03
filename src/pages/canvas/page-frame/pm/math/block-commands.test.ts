@@ -6,17 +6,7 @@ import {
 } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
 import { schema } from '../schema';
-import {
-  exitMathBlock,
-  mathBlockNormalizationPlugin,
-  openMathBlockOnEnter,
-} from './block-commands';
-
-function paragraph(text: string): PMNode {
-  return text.length > 0
-    ? schema.nodes.paragraph.create(null, schema.text(text))
-    : schema.nodes.paragraph.create();
-}
+import { exitMathBlock, mathBlockNormalizationPlugin } from './block-commands';
 
 function mathBlock(text: string): PMNode {
   return schema.nodes.mathBlock.create(null, schema.text(text));
@@ -41,30 +31,6 @@ function applyCommand(
   expect(command(state, (nextTr) => (tr = nextTr))).toBe(true);
   return state.apply(tr!);
 }
-
-describe('openMathBlockOnEnter', () => {
-  it('converts a `$$` paragraph into a math block with the cursor on the content line', () => {
-    const doc = schema.nodes.doc.create(null, [paragraph('$$')]);
-    const state = stateWithSelection(doc, 3); // end of "$$"
-
-    const nextState = applyCommand(state, openMathBlockOnEnter);
-    expect(nextState.doc.toJSON()).toEqual({
-      type: 'doc',
-      content: [
-        { type: 'mathBlock', content: [{ type: 'text', text: '$$\n\n$$' }] },
-      ],
-    });
-    // Cursor sits on the empty line between the fences.
-    expect(nextState.selection.from).toBe(4);
-    expect(nextState.selection.empty).toBe(true);
-  });
-
-  it('does not fire on other paragraphs', () => {
-    const doc = schema.nodes.doc.create(null, [paragraph('$$x')]);
-    const state = stateWithSelection(doc, 4);
-    expect(openMathBlockOnEnter(state, undefined)).toBe(false);
-  });
-});
 
 describe('exitMathBlock', () => {
   it('exits when the cursor is on the closing fence line', () => {
