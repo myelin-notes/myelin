@@ -144,8 +144,9 @@ fn process_node(
     // The engine is the single authority on which file types are indexable.
     // If no provider handles this type, do no work and write no artifact — the
     // frontend offers every non-system file, so non-indexable types land here.
-    let applicable: Vec<&Box<dyn IndexProvider>> = providers
+    let applicable: Vec<&dyn IndexProvider> = providers
         .iter()
+        .map(Box::as_ref)
         .filter(|p| p.applies_to(file_type))
         .collect();
     if applicable.is_empty() {
