@@ -1,4 +1,5 @@
 import {
+  type RefObject,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -7,6 +8,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { VirtualGrid } from '@/components/virtual-grid';
+import { VirtualList } from '@/components/virtual-list';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import {
@@ -27,6 +30,11 @@ import { useDropTarget } from './use-drop-target';
 
 const logger = new Logger('ExplorerTree');
 const SEARCH_DEBOUNCE_MS = 150;
+
+// Grid layout matches `repeat(auto-fill, minmax(198px, 1fr))` with a 16px gap.
+const GRID_MIN_COLUMN = 198;
+const GRID_GAP = 16;
+const TREE_GAP = 4;
 
 type RepositorySetupState = 'checking' | 'ready' | 'setup-required';
 
@@ -52,6 +60,8 @@ export type ViewMode = 'tree' | 'grid';
 
 interface ExplorerTreeProps {
   ref?: React.Ref<ExplorerTreeHandle>;
+  /** Scroll container the list lives inside (the library page's <main>). */
+  scrollRef: RefObject<HTMLElement | null>;
   currentFolderId: string | null;
   onNavigate: (folderId: string) => void;
   onChanged?: () => void;
@@ -62,6 +72,7 @@ interface ExplorerTreeProps {
 }
 
 export function ExplorerTree({
+  scrollRef,
   currentFolderId,
   onNavigate,
   ref,
@@ -291,58 +302,46 @@ export function ExplorerTree({
     onMoved: reloadAndNotify,
   });
 
-  if (loading || repositorySetupState === 'checking') {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-border-subtle border-t-text-secondary" />
-      </div>
-    );
-  }
+  // Container width drives the grid column count; reported by the list.
+  const [containerWidth, setContainerWidth] = useState(0);
 
-  const containerClass =
-    viewMode === 'grid'
-      ? 'grid min-h-[80px] grid-cols-[repeat(auto-fill,minmax(198px,1fr))] gap-4 rounded-xl transition-colors'
-      : 'flex min-h-[80px] flex-col gap-1 rounded-xl transition-colors';
+  const columns = Math.max(
+    1,
+    Math.floor((containerWidth + GRID_GAP) / (GRID_MIN_COLUMN + GRID_GAP)),
+  );
+  const cardWidth =
+    containerWidth > 0
+      ? (containerWidth - (columns - 1) * GRID_GAP) / columns
+      : GRID_MIN_COLUMN;
+  // 16:10 media + a rough body estimate; corrected once cards are measured.
+  const estimateCardHeight = Math.round((cardWidth * 10) / 16) + 84;
 
-  return (
-    <div
-      {...(isFiltering || isSearching || repositorySetupState !== 'ready'
-        ? {}
-        : dropTargetProps)}
-      className={cn(
-        containerClass,
-        dragOver &&
-          !isFiltering &&
-          !isSearching &&
-          repositorySetupState === 'ready'
-          ? 'bg-accent/10'
-          : '',
-      )}
-    >
-      {sortedNodes.map((node) => {
-        if (viewMode === 'grid') {
-          return node.type === 'folder' ? (
-            <GridFolderItem
-              key={node.id}
-              id={node.id}
-              name={node.name}
-              tags={node.tags}
-              autoRename={node.id === renamingNewId}
-              onNavigate={() => onNavigate(node.id)}
-              onMoved={reloadAndNotify}
-            />
-          ) : (
-            <GridFileItem
-              key={node.id}
-              file={node}
-              autoRename={node.id === renamingNewId}
-              onChanged={reloadAndNotify}
-            />
-          );
-        }
+  const getNodeKey = useCallback(
+    (index: number) => sortedNodes[index].id,
+    [sortedNodes],
+  );
+
+  const estimateTreeHeight = useCallback(
+    (index: number) => (sortedNodes[index]?.type === 'folder' ? 44 : 36),
+    [sortedNodes],
+  );
+
+  const pinnedIndex = useMemo(() => {
+    if (!renamingNewId) {
+      return -1;
+    }
+    return sortedNodes.findIndex((node) => node.id === renamingNewId);
+  }, [sortedNodes, renamingNewId]);
+
+  const canDrop =
+    !isFiltering && !isSearching && repositorySetupState === 'ready';
+
+  const renderNode = useCallback(
+    (index: number) => {
+      const node = sortedNodes[index];
+      if (viewMode === 'grid') {
         return node.type === 'folder' ? (
-          <FolderItem
-            key={node.id}
+          <GridFolderItem
             id={node.id}
             name={node.name}
             tags={node.tags}
@@ -351,21 +350,51 @@ export function ExplorerTree({
             onMoved={reloadAndNotify}
           />
         ) : (
-          <FileItem
-            key={node.id}
+          <GridFileItem
             file={node}
             autoRename={node.id === renamingNewId}
             onChanged={reloadAndNotify}
           />
         );
-      })}
-      {nodes.length === 0 && (
-        <span
-          className={cn(
-            'px-4 py-3 text-sm text-text-muted',
-            viewMode === 'grid' ? 'col-span-full' : '',
-          )}
-        >
+      }
+      return node.type === 'folder' ? (
+        <FolderItem
+          id={node.id}
+          name={node.name}
+          tags={node.tags}
+          autoRename={node.id === renamingNewId}
+          onNavigate={() => onNavigate(node.id)}
+          onMoved={reloadAndNotify}
+        />
+      ) : (
+        <FileItem
+          file={node}
+          autoRename={node.id === renamingNewId}
+          onChanged={reloadAndNotify}
+        />
+      );
+    },
+    [sortedNodes, viewMode, renamingNewId, onNavigate, reloadAndNotify],
+  );
+
+  if (loading || repositorySetupState === 'checking') {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-border-subtle border-t-text-secondary" />
+      </div>
+    );
+  }
+
+  if (sortedNodes.length === 0) {
+    return (
+      <div
+        {...(canDrop ? dropTargetProps : {})}
+        className={cn(
+          'min-h-[80px] rounded-xl transition-colors',
+          dragOver && canDrop ? 'bg-accent/10' : '',
+        )}
+      >
+        <span className="block px-4 py-3 text-sm text-text-muted">
           {repositorySetupState === 'setup-required'
             ? strings.library.explorerTree.repositorySetupRequired
             : isSearching
@@ -374,7 +403,47 @@ export function ExplorerTree({
                 ? strings.library.explorerTree.emptyFilter
                 : strings.library.explorerTree.emptyDefault}
         </span>
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  const containerClassName = cn(
+    'min-h-[80px] rounded-xl transition-colors',
+    dragOver && canDrop ? 'bg-accent/10' : '',
+  );
+  const containerProps = canDrop ? dropTargetProps : undefined;
+
+  if (viewMode === 'grid') {
+    return (
+      <VirtualGrid
+        scrollRef={scrollRef}
+        itemCount={sortedNodes.length}
+        columns={columns}
+        cardWidth={cardWidth}
+        columnGap={GRID_GAP}
+        rowGap={GRID_GAP}
+        estimateItemHeight={estimateCardHeight}
+        getItemKey={getNodeKey}
+        renderItem={renderNode}
+        pinnedIndex={pinnedIndex}
+        onWidthChange={setContainerWidth}
+        className={containerClassName}
+        containerProps={containerProps}
+      />
+    );
+  }
+
+  return (
+    <VirtualList
+      scrollRef={scrollRef}
+      count={sortedNodes.length}
+      estimateHeight={estimateTreeHeight}
+      getRowKey={getNodeKey}
+      gap={TREE_GAP}
+      pinnedIndex={pinnedIndex}
+      renderRow={renderNode}
+      className={containerClassName}
+      containerProps={containerProps}
+    />
   );
 }

@@ -89,6 +89,7 @@ export function LibraryPage() {
   const repositoryStatus = useRepositoryStatus();
   const tabController = useTabController();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
+  const scrollRef = useRef<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const goodnotesZipInputRef = useRef<HTMLInputElement>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -460,6 +461,7 @@ export function LibraryPage() {
       </a>
 
       <main
+        ref={scrollRef}
         id="library-main"
         className="flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
@@ -702,6 +704,7 @@ export function LibraryPage() {
 
               <ExplorerTree
                 ref={explorerRef}
+                scrollRef={scrollRef}
                 currentFolderId={currentFolderId}
                 onNavigate={setCurrentFolderId}
                 onChanged={refreshLibraryData}
