@@ -9,12 +9,11 @@ import {
 } from '@/lib/events';
 import { CONTENT_HEIGHT } from '../pagination/core';
 import { schema } from '../schema';
-import {
-  type CodeBlockEditor,
-  type CodeBlockEditorBoundaryInput,
-  type CodeBlockEditorDirection,
-  type CodeBlockEditorEscapeUnit,
-  createCodeBlockEditor,
+import type {
+  CodeBlockEditor,
+  CodeBlockEditorBoundaryInput,
+  CodeBlockEditorDirection,
+  CodeBlockEditorEscapeUnit,
 } from './editor';
 import {
   type CodeBlockExternalSelection,
@@ -240,6 +239,9 @@ export class CodeBlockNodeView implements NodeView {
   }
 
   private async initEditor(): Promise<void> {
+    // Dynamic import keeps the CodeMirror runtime out of the main chunk; it
+    // only loads when the first code block renders.
+    const { createCodeBlockEditor } = await import('./editor');
     const source = parseFenceSource(this.node.textContent);
     const editor = await createCodeBlockEditor(this.editorEl, {
       callbacks: {
