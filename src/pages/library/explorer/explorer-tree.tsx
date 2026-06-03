@@ -326,7 +326,7 @@ export function ExplorerTree({
   const estimateCardHeight = Math.round((cardWidth * 10) / 16) + 84;
 
   const getNodeKey = useCallback(
-    (index: number) => sortedNodes[index].id,
+    (index: number) => sortedNodes[index]?.id ?? String(index),
     [sortedNodes],
   );
 
@@ -348,6 +348,9 @@ export function ExplorerTree({
   const renderNode = useCallback(
     (index: number) => {
       const node = sortedNodes[index];
+      if (!node) {
+        return null;
+      }
       if (viewMode === 'grid') {
         return node.type === 'folder' ? (
           <GridFolderItem
