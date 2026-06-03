@@ -36,11 +36,20 @@ describe('mathPreviewPlugin', () => {
     expect(replace).toMatchObject({ from: 3, to: 8 });
   });
 
-  it('shows the raw source while the selection touches the range', () => {
+  it('shows the raw source while the selection is inside the range', () => {
     const doc = schema.nodes.doc.create(null, [paragraph('a $x^2$ b')]);
     const { plugin, state } = createState(doc, 5);
 
     expect(findDecorations(plugin, state)).toHaveLength(0);
+  });
+
+  it('keeps the preview when the cursor sits at a boundary', () => {
+    const doc = schema.nodes.doc.create(null, [paragraph('a $x^2$ b')]);
+    // Just before the opening `$` and just after the closing `$`.
+    const before = createState(doc, 3);
+    expect(findDecorations(before.plugin, before.state)).toHaveLength(2);
+    const after = createState(doc, 8);
+    expect(findDecorations(after.plugin, after.state)).toHaveLength(2);
   });
 
   it('updates decorations as the selection moves in and out', () => {

@@ -5,6 +5,7 @@ import {
   PluginKey,
   type Selection,
   TextSelection,
+  type Transaction,
 } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
 import { parseInlineMarkdown } from '../markdown/parse-inline';
@@ -17,14 +18,42 @@ import { renderKatex } from './render';
 
 const mathPreviewKey = new PluginKey<DecorationSet>('math-preview');
 
-const REPLACE_SPEC_KIND = 'math-inline-replace';
-
+/**
+ * Strictly inside the range — a cursor sitting at either boundary keeps the
+ * rendered preview, so typing next to a formula doesn't flash its source.
+ */
 function selectionTouches(
   selection: Selection,
   from: number,
   to: number,
 ): boolean {
-  return selection.from <= to && selection.to >= from;
+  return selection.from < to && selection.to > from;
+}
+
+interface InlineMathRange {
+  from: number;
+  to: number;
+  src: string;
+}
+
+function inlineMathRanges(node: PMNode, pos: number): InlineMathRange[] {
+  const { text, posAt } = buildTextOffsetMap(node, pos);
+  if (!text.includes('$')) {
+    return [];
+  }
+
+  const ranges: InlineMathRange[] = [];
+  for (const range of parseInlineMarkdown(text).ranges) {
+    if (range.kind !== 'math') {
+      continue;
+    }
+    ranges.push({
+      from: posAt[range.open.from],
+      to: posAt[range.close.to],
+      src: text.slice(range.contentFrom, range.contentTo),
+    });
+  }
+  return ranges;
 }
 
 /**
@@ -53,40 +82,41 @@ function buildMathDecorationsForTextblock(
     return [];
   }
 
-  const { text, posAt } = buildTextOffsetMap(node, pos);
-  if (!text.includes('$')) {
-    return [];
-  }
-
   const decorations: Decoration[] = [];
-  for (const range of parseInlineMarkdown(text).ranges) {
-    if (range.kind !== 'math') {
-      continue;
-    }
-
-    const from = posAt[range.open.from];
-    const to = posAt[range.close.to];
+  for (const { from, to, src } of inlineMathRanges(node, pos)) {
     if (selectionTouches(selection, from, to)) {
       continue;
     }
 
-    const src = text.slice(range.contentFrom, range.contentTo);
     decorations.push(
       Decoration.inline(
         from,
         to,
         { class: 'pm-math-source-hidden' },
+        { inclusiveStart: false, inclusiveEnd: false },
+      ),
+      Decoration.widget(
+        from,
+        (view, getPos) => {
+          const el = renderKatex(src, false);
+          // Clicking a rendered formula reveals its source with the cursor
+          // at the start (just inside the opening `$`).
+          el.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+            const pos = getPos();
+            if (pos !== undefined) {
+              setCursor(view, pos + 1);
+              view.focus();
+            }
+          });
+          return el;
+        },
         {
-          kind: REPLACE_SPEC_KIND,
-          inclusiveStart: false,
-          inclusiveEnd: false,
+          key: `math:${src}`,
+          ignoreSelection: true,
+          stopEvent: () => true,
         },
       ),
-      Decoration.widget(from, () => renderKatex(src, false), {
-        key: `math:${src}`,
-        ignoreSelection: true,
-        kind: REPLACE_SPEC_KIND,
-      }),
     );
   }
   return decorations;
@@ -104,6 +134,15 @@ function buildMathDecorations(state: EditorState): Decoration[] {
     return false;
   });
   return decorations;
+}
+
+function setCursor(
+  view: { state: EditorState; dispatch: (tr: Transaction) => void },
+  pos: number,
+): void {
+  view.dispatch(
+    view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)),
+  );
 }
 
 function addEnclosingTextblock(
@@ -176,32 +215,64 @@ export function mathPreviewPlugin(): Plugin<DecorationSet> {
       decorations(state) {
         return mathPreviewKey.getState(state) ?? DecorationSet.empty;
       },
-      handleClick(view, pos, event) {
-        const target = event.target;
+      // The browser can't place a caret reliably around display:none source
+      // text, so default horizontal arrow movement skips or misplaces the
+      // cursor at rendered formulas. Step into/over them explicitly.
+      handleKeyDown(view, event) {
         if (
-          !(target instanceof Element) ||
-          !target.closest('.pm-math-inline')
+          (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
+          event.shiftKey ||
+          event.altKey ||
+          event.metaKey ||
+          event.ctrlKey
         ) {
           return false;
         }
 
-        const set = mathPreviewKey.getState(view.state);
-        const replace = set
-          ?.find(pos - 1, pos + 1)
-          .find(
-            (deco) =>
-              deco.spec.kind === REPLACE_SPEC_KIND && deco.to > deco.from,
-          );
-        if (!replace) {
+        const { selection } = view.state;
+        if (!selection.empty) {
+          return false;
+        }
+        const $pos = selection.$from;
+        const parent = $pos.parent;
+        if (!parent.isTextblock || parent.type.spec.code) {
           return false;
         }
 
-        view.dispatch(
-          view.state.tr.setSelection(
-            TextSelection.create(view.state.doc, replace.from + 1),
-          ),
-        );
-        return true;
+        const cursor = selection.from;
+        for (const { from, to } of inlineMathRanges(parent, $pos.before())) {
+          if (event.key === 'ArrowRight') {
+            // Approach → boundary → just inside the opening delimiter
+            // (reveals the source) → ... → boundary after, one explicit
+            // step at a time. Default movement would skip the hidden text.
+            if (cursor === from - 1) {
+              setCursor(view, from);
+              return true;
+            }
+            if (cursor === from) {
+              setCursor(view, from + 1);
+              return true;
+            }
+            if (cursor === to - 1) {
+              setCursor(view, to);
+              return true;
+            }
+          } else {
+            if (cursor === to + 1) {
+              setCursor(view, to);
+              return true;
+            }
+            if (cursor === to) {
+              setCursor(view, to - 1);
+              return true;
+            }
+            if (cursor === from + 1) {
+              setCursor(view, from);
+              return true;
+            }
+          }
+        }
+        return false;
       },
     },
   });

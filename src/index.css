@@ -954,13 +954,13 @@ input[type="range"].tool-slider::-moz-range-track {
 }
 
 /* Inline math source while the selection is elsewhere — a widget renders
-   the KaTeX formula in its place. */
+   the KaTeX formula in its place. Hidden via font-size:0 rather than
+   display:none so caret geometry stays valid: the canvas follow-cursor pan
+   reads view.coordsAtPos(selection.head), and display:none positions
+   resolve to bogus screen rects that fling the viewport. */
 .pm-editor .ProseMirror .pm-math-source-hidden {
-  display: none;
-}
-
-.pm-editor .ProseMirror .pm-math-inline {
-  cursor: pointer;
+  font-size: 0;
+  letter-spacing: 0;
 }
 
 .pm-editor .ProseMirror .pm-math-block {
@@ -970,7 +970,6 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-math-block-preview {
   padding: 0.4em 0;
   text-align: center;
-  cursor: pointer;
   overflow-x: auto;
 }
 
