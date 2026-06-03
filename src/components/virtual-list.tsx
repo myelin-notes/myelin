@@ -4,11 +4,11 @@ import {
   type RefObject,
   useCallback,
   useLayoutEffect,
-  useMemo,
 } from 'react';
-import { cn } from '@/lib/utils';
-import { useListContainer } from './use-list-container';
-import { useMeasuredHeights } from './use-measured-heights';
+import {
+  mergeContainerProps,
+  useVirtualScaffold,
+} from './use-virtual-scaffold';
 import { useVirtualizer } from './use-virtualizer';
 
 interface VirtualListProps {
@@ -59,17 +59,11 @@ export function VirtualList({
   className,
   containerProps,
 }: VirtualListProps) {
-  const { containerRef, setContainerEl } = useListContainer(onWidthChange);
-  const measured = useMeasuredHeights();
-
-  const liveKeys = useMemo(() => {
-    const keys = new Set<string>();
-    for (let i = 0; i < count; i++) {
-      keys.add(getRowKey(i));
-    }
-    return keys;
-  }, [count, getRowKey]);
-  measured.prune(liveKeys);
+  const { containerRef, setContainerEl, measured } = useVirtualScaffold(
+    count,
+    getRowKey,
+    onWidthChange,
+  );
 
   const rowHeight = useCallback(
     (index: number) =>
@@ -94,18 +88,10 @@ export function VirtualList({
     }
   }, [pinnedIndex, scrollToIndex]);
 
-  const {
-    className: extraClassName,
-    style: extraStyle,
-    ...restProps
-  } = containerProps ?? {};
-
   return (
     <div
       ref={setContainerEl}
-      {...restProps}
-      className={cn('relative', extraClassName, className)}
-      style={{ ...extraStyle, height: totalHeight }}
+      {...mergeContainerProps(containerProps, className, totalHeight)}
     >
       {virtualRows.map((virtualRow) => {
         const key = getRowKey(virtualRow.index);

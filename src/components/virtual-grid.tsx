@@ -4,11 +4,11 @@ import {
   type RefObject,
   useCallback,
   useLayoutEffect,
-  useMemo,
 } from 'react';
-import { cn } from '@/lib/utils';
-import { useListContainer } from './use-list-container';
-import { useMeasuredHeights } from './use-measured-heights';
+import {
+  mergeContainerProps,
+  useVirtualScaffold,
+} from './use-virtual-scaffold';
 import { useVirtualizer } from './use-virtualizer';
 
 interface VirtualGridProps {
@@ -68,19 +68,13 @@ export function VirtualGrid({
   className,
   containerProps,
 }: VirtualGridProps) {
-  const { containerRef, setContainerEl } = useListContainer(onWidthChange);
-  const measured = useMeasuredHeights();
+  const { containerRef, setContainerEl, measured } = useVirtualScaffold(
+    itemCount,
+    getItemKey,
+    onWidthChange,
+  );
 
   const rowCount = Math.ceil(itemCount / Math.max(1, columns));
-
-  const liveKeys = useMemo(() => {
-    const keys = new Set<string>();
-    for (let i = 0; i < itemCount; i++) {
-      keys.add(getItemKey(i));
-    }
-    return keys;
-  }, [itemCount, getItemKey]);
-  measured.prune(liveKeys);
 
   // A row is as tall as its tallest item.
   const rowHeight = useCallback(
@@ -124,18 +118,10 @@ export function VirtualGrid({
     }
   }, [pinnedRow, scrollToIndex]);
 
-  const {
-    className: extraClassName,
-    style: extraStyle,
-    ...restProps
-  } = containerProps ?? {};
-
   return (
     <div
       ref={setContainerEl}
-      {...restProps}
-      className={cn('relative', extraClassName, className)}
-      style={{ ...extraStyle, height: totalHeight }}
+      {...mergeContainerProps(containerProps, className, totalHeight)}
     >
       {virtualRows.flatMap((virtualRow) => {
         const cells: ReactNode[] = [];
