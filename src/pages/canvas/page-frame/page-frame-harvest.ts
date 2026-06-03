@@ -2,8 +2,8 @@
  * Harvest a page frame's rendered, paginated DOM into a display-list request for the
  * Rust renderer. The pagination is READ from the settled DOM (never recomputed), so
  * each PDF page's content matches the on-screen page exactly. Text is emitted as
- * selectable runs; code blocks are rasterized in place (Monaco can't be harvested
- * reliably).
+ * selectable runs; code blocks are rasterized in place (the code editor can't be
+ * harvested reliably).
  */
 
 import { toPng } from 'html-to-image';
@@ -45,7 +45,7 @@ export interface PageFramePdfSource {
   overlays?: readonly PdfExportOverlayElement[];
 }
 
-const CODE_BLOCK_SELECTOR = '.pm-monaco-code-block';
+const CODE_BLOCK_SELECTOR = '.pm-code-block';
 const ASCENT_RATIO = 0.8;
 const RULE_GRAY: [number, number, number] = [195, 199, 202];
 const TABLE_BORDER_GRAY: [number, number, number] = [210, 214, 218];
@@ -431,7 +431,7 @@ async function harvestCodeBlocks(
 
   for (let i = 0; i < cloneBlocks.length; i++) {
     const cloneEl = cloneBlocks[i];
-    // Rasterize the LIVE Monaco block (the clone's Monaco DOM is inert/incomplete).
+    // Rasterize the LIVE editor block (the clone's editor DOM is inert/incomplete).
     const liveEl = liveBlocks[i] ?? cloneEl;
     // Position comes from the clone (pagination is baked into it); the box size comes
     // from the live element we actually rasterize, so the PNG fills its box without

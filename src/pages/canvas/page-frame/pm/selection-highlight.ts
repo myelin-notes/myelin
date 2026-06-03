@@ -7,7 +7,7 @@ import {
 } from './code-block/selection-sync';
 
 const CODE_BLOCK_NODE_NAME = 'codeBlock';
-const CODE_BLOCK_NODE_VIEW_SELECTOR = '.pm-monaco-code-block';
+const CODE_BLOCK_NODE_VIEW_SELECTOR = '.pm-code-block';
 
 function dispatchExternalSelection(
   dom: HTMLElement,

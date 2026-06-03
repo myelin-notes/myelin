@@ -10,12 +10,12 @@ import {
 import { CONTENT_HEIGHT } from '../pagination/core';
 import { schema } from '../schema';
 import {
+  type CodeBlockEditor,
   type CodeBlockEditorBoundaryInput,
   type CodeBlockEditorDirection,
   type CodeBlockEditorEscapeUnit,
-  createMonacoCodeBlockEditor,
-  type MonacoCodeBlockEditor,
-} from './monaco-editor';
+  createCodeBlockEditor,
+} from './editor';
 import {
   type CodeBlockExternalSelection,
   type CodeBlockExternalSelectionDetail,
@@ -91,7 +91,7 @@ export class CodeBlockNodeView implements NodeView {
   public readonly dom: HTMLDivElement;
 
   private readonly editorEl: HTMLDivElement;
-  private editor: MonacoCodeBlockEditor | null = null;
+  private editor: CodeBlockEditor | null = null;
   private destroyed = false;
   private selectionDragStartedOutside = false;
   private updating = false;
@@ -149,7 +149,7 @@ export class CodeBlockNodeView implements NodeView {
     private getPos: () => number,
   ) {
     this.dom = document.createElement('div');
-    this.dom.className = 'pm-monaco-code-block';
+    this.dom.className = 'pm-code-block';
     this.dom.addEventListener(
       CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
       this.handleExternalSelection,
@@ -163,7 +163,7 @@ export class CodeBlockNodeView implements NodeView {
     this.view.dom.addEventListener('mousedown', this.handleViewMouseDown, true);
 
     this.editorEl = document.createElement('div');
-    this.editorEl.className = 'pm-monaco-code-block__editor';
+    this.editorEl.className = 'pm-code-block__editor';
     this.dom.appendChild(this.editorEl);
 
     void this.initEditor();
@@ -241,7 +241,7 @@ export class CodeBlockNodeView implements NodeView {
 
   private async initEditor(): Promise<void> {
     const source = parseFenceSource(this.node.textContent);
-    const editor = await createMonacoCodeBlockEditor(this.editorEl, {
+    const editor = await createCodeBlockEditor(this.editorEl, {
       callbacks: {
         onBoundaryInput: (event) => this.handleBoundaryKeyDown(event),
         onContentChange: () => this.forwardContentUpdate(),
