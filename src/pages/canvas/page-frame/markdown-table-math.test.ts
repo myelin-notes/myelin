@@ -63,17 +63,32 @@ describe('markdown table inline-math serialization', () => {
     expect(md).not.toContain('\\\\');
   });
 
-  it('serializes cell math without doubling, but re-parse drops the backslash (parser limitation)', () => {
-    // The serializer now emits `$e^{i\pi}$` correctly (single backslash).
+  it('round-trips cell math with its LaTeX backslashes intact', () => {
     const once = serializeDocToMarkdown(tableDoc('$e^{i\\pi}$'));
     expect(once).toContain('$e^{i\\pi}$');
 
-    // Re-parsing is NOT yet a perfect round-trip: `splitTableRow` in
-    // markdown-parser.ts unescapes every `\x` to `x` while splitting cells,
-    // which strips LaTeX backslashes that are not pipe escapes. Fixing that
-    // requires a math-aware parser change (out of scope here). This assertion
-    // documents the current behavior so the limitation is visible.
-    const twice = serializeDocToMarkdown(parseMarkdownToDoc(once, schema));
-    expect(twice).toContain('$e^{ipi}$');
+    // `splitTableRow` only unescapes `\|`; other `\X` sequences (LaTeX
+    // backslashes) pass through to parseInline, so re-parsing preserves the
+    // formula and the round-trip is stable.
+    const reparsed = parseMarkdownToDoc(once, schema);
+    expect(reparsed.textContent).toContain('$e^{i\\pi}$');
+    expect(serializeDocToMarkdown(reparsed)).toBe(once);
+  });
+
+  it('keeps an escaped backslash before a cell boundary as a unit', () => {
+    // Doc cell text `a\` serializes as `a\\`; on re-parse `\\` must be
+    // consumed as one escape (kept for parseInline) so the following `|`
+    // still splits the row instead of being read as an escaped pipe.
+    const once = serializeDocToMarkdown(tableDoc('a\\'));
+    const reparsed = parseMarkdownToDoc(once, schema);
+    const cells: string[] = [];
+    reparsed.descendants((node) => {
+      if (node.type.name === 'table_cell') {
+        cells.push(node.textContent);
+      }
+      return true;
+    });
+    expect(cells).toEqual(['a\\', 'z']);
+    expect(serializeDocToMarkdown(reparsed)).toBe(once);
   });
 });

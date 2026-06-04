@@ -69,7 +69,12 @@ function splitTableRow(line: string): string[] {
   for (let i = 0; i < source.length; i += 1) {
     const char = source[i];
     if (char === '\\' && i + 1 < source.length) {
-      current += source[i + 1];
+      // Only `\|` is a split-level escape; every other `\X` passes through
+      // intact (as a unit, so `\\|` keeps the backslash and splits on the
+      // pipe) for parseInline to handle — unescaping here would strip LaTeX
+      // backslashes from cell math and double-unescape markdown escapes.
+      const next = source[i + 1];
+      current += next === '|' ? '|' : `\\${next}`;
       i += 1;
       continue;
     }
