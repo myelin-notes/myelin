@@ -14,6 +14,7 @@ import {
   getChangedRangesForTransaction,
 } from '../markdown/range-tracking';
 import { buildTextOffsetMap } from '../markdown/text-offset-map';
+import { positionMathBlockSources } from './block-node-view';
 import { renderKatex } from './render';
 
 const mathPreviewKey = new PluginKey<DecorationSet>('math-preview');
@@ -164,6 +165,14 @@ function addEnclosingTextblock(
 export function mathPreviewPlugin(): Plugin<DecorationSet> {
   return new Plugin({
     key: mathPreviewKey,
+    view(view) {
+      positionMathBlockSources(view.dom);
+      return {
+        update(view) {
+          positionMathBlockSources(view.dom);
+        },
+      };
+    },
     state: {
       init(_, state) {
         return DecorationSet.create(state.doc, buildMathDecorations(state));

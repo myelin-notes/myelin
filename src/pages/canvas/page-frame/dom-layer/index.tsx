@@ -477,6 +477,24 @@ export function PageFrameDomLayer({
         refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
 
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
+
+        // PM's scrollIntoView (and the browser's own caret scrolling) can
+        // scroll these overflow:hidden clip boxes when an overlay like the
+        // math source panel pokes past the frame — shifting the whole page.
+        // Zero them like the container below; the follow-cursor pan is the
+        // only thing that should move content.
+        if (refs.frameDiv.scrollTop !== 0 || refs.frameDiv.scrollLeft !== 0) {
+          refs.frameDiv.scrollTop = 0;
+          refs.frameDiv.scrollLeft = 0;
+        }
+        if (
+          refs.viewportDiv.scrollTop !== 0 ||
+          refs.viewportDiv.scrollLeft !== 0
+        ) {
+          refs.viewportDiv.scrollTop = 0;
+          refs.viewportDiv.scrollLeft = 0;
+        }
+
         syncEditorLayout(refs, pageWidth, pageHeight, pageLayout);
         syncPageChrome(
           refs,
