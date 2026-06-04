@@ -526,6 +526,12 @@ export function PageFrameDomLayer({
     }
 
     let pendingRaf = 0;
+    // Follow only when the caret actually moved (or the doc changed under
+    // it). PM updates also fire for layout-only transactions; panning on
+    // those would yank the viewport back to the caret while the user is
+    // scrolling elsewhere in the frame.
+    let lastHead = -1;
+    let lastDoc = view.state.doc;
     const followCursor = () => {
       pendingRaf = 0;
       const dc = canvasRef.current;
@@ -533,13 +539,20 @@ export function PageFrameDomLayer({
         return;
       }
       const sel = view.state.selection;
+      if (sel.head === lastHead && view.state.doc === lastDoc) {
+        return;
+      }
       // Anchored on the editor's own frame DOM so the caret rect lands in true
       // screen pixels wherever the canvas sits in the window. Returns null if
-      // the position is stale (mid-transaction) or the DOM isn't mounted.
+      // the position is stale (mid-transaction) or the DOM isn't mounted —
+      // commit lastHead/lastDoc only after a successful measure so the next
+      // update retries instead of silently dropping the follow.
       const screenRect = getPageFramePmScreenRectForPos(view, sel.head);
       if (!screenRect) {
         return;
       }
+      lastHead = sel.head;
+      lastDoc = view.state.doc;
 
       const zoom = dc.viewport.zoom;
       const screenLeft = screenRect.left;

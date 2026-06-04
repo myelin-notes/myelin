@@ -1493,6 +1493,14 @@ function syncBlockquoteRuleStyles(view: EditorView): void {
   }
 }
 
+// Spacer heights come from sub-pixel DOM measurements and wobble by
+// fractions of a pixel between passes (inserting a spacer shifts the rects
+// the next pass measures). Exact float equality reads that noise as a layout
+// change, so the settle loop never converges and dispatches a pagination
+// transaction every frame. Anything under half a pixel is visually identical;
+// real layout changes move spacers by at least a line height.
+const SPACER_EPSILON = 0.5;
+
 function breaksEqual(a: Break[], b: Break[]): boolean {
   if (a.length !== b.length) {
     return false;
@@ -1501,7 +1509,7 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
     if (a[i].pos !== b[i].pos) {
       return false;
     }
-    if (a[i].spacer !== b[i].spacer) {
+    if (Math.abs(a[i].spacer - b[i].spacer) > SPACER_EPSILON) {
       return false;
     }
     if (a[i].kind !== b[i].kind) {
