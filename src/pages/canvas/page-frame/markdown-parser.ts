@@ -13,6 +13,7 @@
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
 import { parseCalloutMarker } from './callouts';
 import { OPENING_FENCE_TOKEN_RE } from './pm/markdown/parse-fences';
+import { parseInlineMarkdown } from './pm/markdown/parse-inline';
 import {
   isMathFenceLine,
   SINGLE_LINE_MATH_BLOCK_RE,
@@ -358,26 +359,6 @@ function findClosingDelimiterRun(
   return -1;
 }
 
-function findInlineMathEnd(text: string, from: number): number {
-  const prev = from > 0 ? text[from - 1] : '';
-  const next = text[from + 1] ?? '';
-  if (prev === '$' || next === '' || next === '$' || /\s/.test(next)) {
-    return -1;
-  }
-
-  for (let j = from + 1; j < text.length; j++) {
-    const char = text[j];
-    if (char === '\n') {
-      return -1;
-    }
-    if (char !== '$' || text[j - 1] === '\\') {
-      continue;
-    }
-    return /\s/.test(text[j - 1]) ? -1 : j;
-  }
-  return -1;
-}
-
 function scanInline(
   text: string,
   schema: Schema,
@@ -386,6 +367,18 @@ function scanInline(
   const nodes: PMNode[] = [];
   let buf = '';
   let i = 0;
+
+  // Inline-math spans are derived from the shared inline parser so the
+  // importer, the live-preview decorations, and the serializer all agree on
+  // which `$...$` runs are math. This inherits parse-inline's precedence
+  // rules (inline code / note links win via its `blocked` array) and its
+  // `\$` escape handling, avoiding a parallel scanner that could disagree.
+  const mathEndByStart = new Map<number, number>();
+  for (const range of parseInlineMarkdown(text).ranges) {
+    if (range.kind === 'math') {
+      mathEndByStart.set(range.open.from, range.close.to);
+    }
+  }
 
   const pushText = () => {
     if (buf.length > 0) {
@@ -398,7 +391,11 @@ function scanInline(
     const ch = text[i];
 
     if (ch === '\\' && i + 1 < text.length) {
-      buf += text[i + 1];
+      // Keep the backslash before a `$` so the live-preview parser
+      // (parse-inline's `isEscaped`) still treats it as an escaped, non-math
+      // dollar. Stripping it would turn `\$a\$` into `$a$`, which reloads as
+      // live math — the opposite of what the escape requested.
+      buf += text[i + 1] === '$' ? `\\$` : text[i + 1];
       i += 2;
       continue;
     }
@@ -462,12 +459,13 @@ function scanInline(
     }
 
     // Inline math: $...$ stays literal text, backslashes intact — the math
-    // preview plugin renders it. Mirrors parseInlineMath's delimiter rules.
+    // preview plugin renders it. The span boundaries come from the shared
+    // inline parser (see mathEndByStart) so importer and preview agree.
     if (ch === '$') {
-      const end = findInlineMathEnd(text, i);
-      if (end !== -1) {
-        buf += text.slice(i, end + 1);
-        i = end + 1;
+      const end = mathEndByStart.get(i);
+      if (end !== undefined) {
+        buf += text.slice(i, end);
+        i = end;
         continue;
       }
     }

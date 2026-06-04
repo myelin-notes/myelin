@@ -227,7 +227,20 @@ function serializeTableCell(cell: PMNode): string {
     parts.push(block.textContent);
   });
 
-  return escapeTableCell(parts.join('<br>'));
+  return escapeTableCellPipes(parts.join('<br>'));
+}
+
+/**
+ * Escapes the literal pipes in already-serialized cell content so they
+ * don't split the row on re-parse. The input is the output of
+ * {@link serializeInline}, which has already escaped markdown specials and
+ * emitted `$...$` math verbatim — re-running {@link escapeMarkdown} here
+ * would double LaTeX backslashes (`$e^{i\pi}$` → `$e^{i\\pi}$`) and grow
+ * escapes across save cycles. Pipes are escaped everywhere (including inside
+ * math) because the table parser unescapes `\|` back to a literal `|`.
+ */
+function escapeTableCellPipes(text: string): string {
+  return text.replace(/\|/g, '\\|');
 }
 
 function renderTableRow(cells: readonly string[]): string {
@@ -307,8 +320,4 @@ function escapeMarkdownPreservingMath(text: string): string {
     last = range.close.to;
   }
   return out + escapeMarkdown(text.slice(last));
-}
-
-function escapeTableCell(text: string): string {
-  return escapeMarkdown(text).replace(/\|/g, '\\|');
 }

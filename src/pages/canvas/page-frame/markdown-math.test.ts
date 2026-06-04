@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseMarkdownToDoc } from './markdown-parser';
 import { serializeDocToMarkdown } from './markdown-serializer';
+import { parseInlineMarkdown } from './pm/markdown/parse-inline';
 import { schema } from './pm/schema';
 
 describe('markdown math round-trip', () => {
@@ -57,5 +58,51 @@ describe('markdown math round-trip', () => {
     const md = 'costs $100 and $x^2$ total';
     const doc = parseMarkdownToDoc(md, schema);
     expect(serializeDocToMarkdown(doc)).toBe(`${md}\n`);
+  });
+
+  it('gives an inline code span precedence over a math candidate', () => {
+    // `$a `b` c$` — the backtick code span wins, so the `$...$` is NOT math.
+    const md = 'x $a `b` c$ y';
+    const doc = parseMarkdownToDoc(md, schema);
+    // The doc must contain a code mark for "b" (not literal math text).
+    let hasCode = false;
+    doc.descendants((node) => {
+      if (node.isText && node.marks.some((m) => m.type.name === 'code')) {
+        hasCode = true;
+      }
+    });
+    expect(hasCode).toBe(true);
+    // And the round-trip must be stable (no backtick escaping).
+    expect(serializeDocToMarkdown(doc)).toBe(`${md}\n`);
+  });
+
+  it('keeps escaped dollars out of live math (\\$a\\$ is not math)', () => {
+    // The escape is honored: the doc text keeps the backslashes so the
+    // live-preview parser does not treat `$a$` as math.
+    const doc = parseMarkdownToDoc('\\$a\\$', schema);
+    expect(doc.textContent).toBe('\\$a\\$');
+    expect(
+      parseInlineMarkdown(doc.textContent).ranges.some(
+        (range) => range.kind === 'math',
+      ),
+    ).toBe(false);
+  });
+
+  it('reaches a stable fixed point for escaped dollars across saves', () => {
+    // The serializer doubles backslashes (`\` -> `\\`) and cannot emit a bare
+    // `\$`, so the literal text drifts once on first save. What must hold is
+    // that further saves are stable AND the dollars never become live math.
+    for (const md of ['\\$a\\$', '\\$5']) {
+      const once = serializeDocToMarkdown(parseMarkdownToDoc(md, schema));
+      const twice = serializeDocToMarkdown(parseMarkdownToDoc(once, schema));
+      const thrice = serializeDocToMarkdown(parseMarkdownToDoc(twice, schema));
+      expect(twice).toBe(once);
+      expect(thrice).toBe(once);
+      expect(
+        parseInlineMarkdown(
+          parseMarkdownToDoc(once, schema).textContent,
+        ).ranges.some((range) => range.kind === 'math'),
+      ).toBe(false);
+    }
   });
 });
