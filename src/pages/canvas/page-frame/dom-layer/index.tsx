@@ -33,12 +33,16 @@ import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
 import { getPageFramePmScreenRectForPos } from '../pm/screen-rect';
 import type { PageFrameAutocompleteKind } from '../use-page-frame-autocomplete';
 
+// `clip` rather than `hidden`: hidden boxes are still programmatically
+// scrollable, so the browser's caret-reveal (and PM's scrollIntoView) can
+// scroll them when an overlay pokes past the clip edge — shifting the page
+// inside its chrome. Clip boxes can't scroll at all.
 const FRAME_STYLE: Record<string, string> = {
   transformOrigin: '0 0',
   position: 'absolute',
   left: '0px',
   top: '0px',
-  overflow: 'hidden',
+  overflow: 'clip',
 };
 
 const VIEWPORT_STYLE: Record<string, string> = {
@@ -46,7 +50,7 @@ const VIEWPORT_STYLE: Record<string, string> = {
   position: 'absolute',
   left: '0px',
   top: '0px',
-  overflow: 'hidden',
+  overflow: 'clip',
 };
 
 const CONTENT_STYLE: Record<string, string> = {
@@ -477,24 +481,6 @@ export function PageFrameDomLayer({
         refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
 
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
-
-        // PM's scrollIntoView (and the browser's own caret scrolling) can
-        // scroll these overflow:hidden clip boxes when an overlay like the
-        // math source panel pokes past the frame — shifting the whole page.
-        // Zero them like the container below; the follow-cursor pan is the
-        // only thing that should move content.
-        if (refs.frameDiv.scrollTop !== 0 || refs.frameDiv.scrollLeft !== 0) {
-          refs.frameDiv.scrollTop = 0;
-          refs.frameDiv.scrollLeft = 0;
-        }
-        if (
-          refs.viewportDiv.scrollTop !== 0 ||
-          refs.viewportDiv.scrollLeft !== 0
-        ) {
-          refs.viewportDiv.scrollTop = 0;
-          refs.viewportDiv.scrollLeft = 0;
-        }
-
         syncEditorLayout(refs, pageWidth, pageHeight, pageLayout);
         syncPageChrome(
           refs,

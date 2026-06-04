@@ -1,10 +1,11 @@
 import type { Node as PMNode } from 'prosemirror-model';
-import type { NodeView } from 'prosemirror-view';
+import type { EditorView, NodeView } from 'prosemirror-view';
 import { PM_EDITOR_CLASS } from '../constants';
 import { stripMathDelimiters } from './parse-math-block';
 import { renderKatex } from './render';
 
 const SOURCE_GAP = 4;
+const SOURCE_SCROLL_MARGIN = 8;
 
 /**
  * Renders a math block as a KaTeX preview plus an editable raw-source view.
@@ -18,6 +19,24 @@ export class MathBlockNodeView implements NodeView {
   private preview: HTMLDivElement;
   private source: HTMLPreElement;
   private node: PMNode;
+  // Without this the canvas pan handler swallows wheel events, so a
+  // page-capped preview can never scroll. Mirrors CodeBlockEditor.handleWheel:
+  // only consume the event while the block is being edited (the code block's
+  // hasFocus equivalent), and never for ctrl-wheel (pinch zoom).
+  private readonly handleWheel = (event: WheelEvent): void => {
+    if (
+      event.ctrlKey ||
+      !this.dom.classList.contains('pm-math-block--editing')
+    ) {
+      return;
+    }
+    const overflowing =
+      this.preview.scrollHeight > this.preview.clientHeight + 1 ||
+      this.preview.scrollWidth > this.preview.clientWidth + 1;
+    if (overflowing) {
+      event.stopPropagation();
+    }
+  };
 
   constructor(node: PMNode) {
     this.node = node;
@@ -28,6 +47,7 @@ export class MathBlockNodeView implements NodeView {
     this.preview = document.createElement('div');
     this.preview.className = 'pm-math-block-preview pm-page-capped';
     this.preview.contentEditable = 'false';
+    this.preview.addEventListener('wheel', this.handleWheel);
 
     this.source = document.createElement('pre');
     this.source.className = 'pm-math-block-source';
@@ -87,6 +107,43 @@ export class MathBlockNodeView implements NodeView {
  * the content), while the doc extent covers the flush right after content
  * grows — the frame only resizes to match one rAF later.
  */
+/**
+ * Keep the caret visible inside the source panel's own scroller. Page frames
+ * never scroll — the canvas follow-cursor pan keeps the caret on screen — so
+ * the editor suppresses ProseMirror's ancestor scroll-walk entirely
+ * (`handleScrollToSelection`) and this handles the one legitimate internal
+ * scroller instead.
+ */
+export function scrollMathSourceCaretIntoView(view: EditorView): void {
+  const { $head } = view.state.selection;
+  if ($head.parent.type.name !== 'mathBlock') {
+    return;
+  }
+
+  const block = view.nodeDOM($head.before());
+  if (!(block instanceof HTMLElement)) {
+    return;
+  }
+  const panel = block.querySelector<HTMLElement>('.pm-math-block-source');
+  if (!panel || panel.scrollHeight <= panel.clientHeight) {
+    return;
+  }
+
+  const rect = panel.getBoundingClientRect();
+  if (rect.height === 0) {
+    return;
+  }
+  const caret = view.coordsAtPos($head.pos);
+  // Screen px → the panel's local units (canvas zoom + frame DPR zoom).
+  const scale = rect.height / panel.offsetHeight;
+  const margin = SOURCE_SCROLL_MARGIN * scale;
+  if (caret.bottom > rect.bottom - margin) {
+    panel.scrollTop += (caret.bottom - (rect.bottom - margin)) / scale;
+  } else if (caret.top < rect.top + margin) {
+    panel.scrollTop -= (rect.top + margin - caret.top) / scale;
+  }
+}
+
 export function positionMathBlockSources(viewDom: HTMLElement): void {
   // Horizontal layout flows in columns where vertical clamping makes no
   // sense — keep the CSS default there.

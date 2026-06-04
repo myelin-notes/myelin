@@ -6,6 +6,7 @@ import {
   PM_UPDATE_EVENT,
 } from '@/lib/events';
 import type { ResolveNoteLink } from './markdown/note-links';
+import { scrollMathSourceCaretIntoView } from './math/block-node-view';
 import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
@@ -81,6 +82,15 @@ export class PageFrameEditorState {
       state,
       editable: (_state) => editable(),
       nodeViews: buildNodeViews(),
+      // Page frames never scroll internally — the canvas follow-cursor pan
+      // keeps the caret on screen. PM's default ancestor scroll-walk would
+      // scroll the frame's clip boxes (or the canvas page root) and desync
+      // the DOM from the canvas-drawn chrome. The math source panel is the
+      // one internal scroller whose caret PM would otherwise manage.
+      handleScrollToSelection(view) {
+        scrollMathSourceCaretIntoView(view);
+        return true;
+      },
       dispatchTransaction(this: EditorView, tr: Transaction) {
         // `this` is the EditorView (bound by ProseMirror via .call())
         const hadNestedFocus =
