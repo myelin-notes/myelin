@@ -40,7 +40,7 @@ import {
   buildTextOffsetMap,
   type TextOffsetMap,
 } from './markdown/text-offset-map';
-import { exitMathBlock } from './math/block-commands';
+import { exitMathBlock, selectAllInMathBlock } from './math/block-commands';
 import { schema } from './schema';
 import { exitTableOnLastRow, goToNextTableRow } from './table/commands';
 
@@ -441,7 +441,7 @@ export function buildKeymap(s: Schema) {
     [`${mod}-z`]: undo,
     [`${mod}-shift-z`]: redo,
     ...(isApplePlatform ? {} : { [`${mod}-y`]: redo }),
-    [`${mod}-a`]: selectAllPageFrame,
+    [`${mod}-a`]: chainCommands(selectAllInMathBlock, selectAllPageFrame),
 
     Enter: chainCommands(
       exitFencedCodeBlock,

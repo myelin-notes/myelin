@@ -148,6 +148,39 @@ export function mathBlockNormalizationPlugin(schema: Schema): Plugin {
   );
 }
 
+/**
+ * Mod-A inside a math block selects the block's LaTeX content (between the
+ * `$$` fences) instead of the whole document, so the raw-source editor feels
+ * self-contained like a code block. The fences stay unselected so typing over
+ * the selection replaces the formula without dissolving the block.
+ */
+export const selectAllInMathBlock: Command = (state, dispatch) => {
+  const { $from, $to } = state.selection;
+  if (
+    !$from.sameParent($to) ||
+    $from.parent.type !== state.schema.nodes.mathBlock
+  ) {
+    return false;
+  }
+
+  const blockStart = $from.start();
+  const contentLines = parseMathMarkdown($from.parent.textContent).lines.filter(
+    (line) => line.kind === 'content',
+  );
+  const first = contentLines[0];
+  const last = contentLines[contentLines.length - 1];
+  const selection =
+    first && last
+      ? TextSelection.create(
+          state.doc,
+          blockStart + first.from,
+          blockStart + last.to,
+        )
+      : TextSelection.create(state.doc, blockStart, $from.end());
+  dispatch?.(state.tr.setSelection(selection));
+  return true;
+};
+
 export const exitMathBlock: Command = (state, dispatch) => {
   const { empty, $from, $to } = state.selection;
   if (

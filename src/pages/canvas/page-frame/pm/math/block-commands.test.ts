@@ -11,6 +11,7 @@ import {
   exitMathBlock,
   mathBlockInputRules,
   mathBlockNormalizationPlugin,
+  selectAllInMathBlock,
 } from './block-commands';
 
 function mathBlock(text: string): PMNode {
@@ -120,6 +121,43 @@ describe('exitMathBlock', () => {
     const doc = schema.nodes.doc.create(null, [mathBlock('$$\nx\n$$')]);
     const state = stateWithSelection(doc, 5); // inside "x" line
     expect(exitMathBlock(state, undefined)).toBe(false);
+  });
+});
+
+describe('selectAllInMathBlock', () => {
+  it('selects the content between the fences', () => {
+    const doc = schema.nodes.doc.create(null, [mathBlock('$$\nx + y\n$$')]);
+    const state = stateWithSelection(doc, 5); // inside "x + y" line
+
+    const nextState = applyCommand(state, selectAllInMathBlock);
+    const { from, to } = nextState.selection;
+    expect(nextState.doc.textBetween(from, to)).toBe('x + y');
+  });
+
+  it('spans multiple content lines', () => {
+    const doc = schema.nodes.doc.create(null, [mathBlock('$$\na\nb\n$$')]);
+    const state = stateWithSelection(doc, 4);
+
+    const nextState = applyCommand(state, selectAllInMathBlock);
+    const { from, to } = nextState.selection;
+    expect(nextState.doc.textBetween(from, to)).toBe('a\nb');
+  });
+
+  it('falls back to the full source when there is no content', () => {
+    const doc = schema.nodes.doc.create(null, [mathBlock('$$\n$$')]);
+    const state = stateWithSelection(doc, 2);
+
+    const nextState = applyCommand(state, selectAllInMathBlock);
+    const { from, to } = nextState.selection;
+    expect(nextState.doc.textBetween(from, to)).toBe('$$\n$$');
+  });
+
+  it('does nothing outside a math block', () => {
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, schema.text('plain')),
+    ]);
+    const state = stateWithSelection(doc, 3);
+    expect(selectAllInMathBlock(state, undefined)).toBe(false);
   });
 });
 
