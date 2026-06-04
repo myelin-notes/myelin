@@ -964,6 +964,7 @@ input[type="range"].tool-slider::-moz-range-track {
 }
 
 .pm-editor .ProseMirror .pm-math-block {
+  position: relative;
   margin: 1.15em 0;
 }
 
@@ -973,12 +974,24 @@ input[type="range"].tool-slider::-moz-range-track {
   overflow-x: auto;
 }
 
+/* The source editor floats over content below the block instead of sitting in
+   flow, so toggling edit mode never changes the block's height — pagination
+   stays keyed off the preview, which is what print/export produces. */
 .pm-editor .ProseMirror .pm-math-block-source {
   display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
   margin: 0;
   padding: 0.6em 0.9em;
+  border: 1px solid rgba(149, 157, 165, 0.28);
   border-radius: var(--radius-lg);
-  background: rgba(230, 234, 240, 0.52);
+  background: var(--bg-card);
+  box-shadow: 0 8px 18px rgba(25, 28, 30, 0.12);
+  max-height: 320px;
+  overflow-y: auto;
   font-family:
     "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
     "Source Code Pro", Menlo, Consolas, monospace;
@@ -986,12 +999,21 @@ input[type="range"].tool-slider::-moz-range-track {
   white-space: pre-wrap;
 }
 
-.pm-editor .ProseMirror .pm-math-block--editing .pm-math-block-source {
+/* Scoped to [contenteditable="true"] so the editor panel hides when the page
+   frame itself leaves edit mode (selection may persist inside the block). */
+.pm-editor
+  .ProseMirror[contenteditable="true"]
+  .pm-math-block--editing
+  .pm-math-block-source {
   display: block;
 }
 
-.pm-editor .ProseMirror .pm-math-block--editing .pm-math-block-preview {
-  display: none;
+.pm-editor
+  .ProseMirror[contenteditable="true"]
+  .pm-math-block--editing
+  .pm-math-block-preview {
+  border-radius: var(--radius-lg);
+  background: rgba(230, 234, 240, 0.4);
 }
 
 .pm-editor .ProseMirror .pm-md-note-link {

@@ -67,8 +67,12 @@ function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
     if (height <= 0) {
       return;
     }
+    // mathBlock's visible content is the rendered preview; its PM text (the
+    // raw source) is hidden, so inline breaks inside it would be invisible.
     const isBreakableTextBlock =
-      node.isTextblock && node.type.name !== 'codeBlock';
+      node.isTextblock &&
+      node.type.name !== 'codeBlock' &&
+      node.type.name !== 'mathBlock';
     result.push({
       pos,
       dom,
