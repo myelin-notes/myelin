@@ -4,9 +4,14 @@ import {
   TextSelection,
   type Transaction,
 } from 'prosemirror-state';
+import type { EditorView } from 'prosemirror-view';
 import { describe, expect, it } from 'vitest';
 import { schema } from '../schema';
-import { exitMathBlock, mathBlockNormalizationPlugin } from './block-commands';
+import {
+  exitMathBlock,
+  mathBlockInputRules,
+  mathBlockNormalizationPlugin,
+} from './block-commands';
 
 function mathBlock(text: string): PMNode {
   return schema.nodes.mathBlock.create(null, schema.text(text));
@@ -31,6 +36,74 @@ function applyCommand(
   expect(command(state, (nextTr) => (tr = nextTr))).toBe(true);
   return state.apply(tr!);
 }
+
+/**
+ * Drives the inputRules plugin's handleTextInput with a minimal fake view,
+ * simulating the user typing `text` at the cursor. Returns the resulting
+ * state, or null when no rule fired.
+ */
+function typeText(state: EditorState, text: string): EditorState | null {
+  const plugin = mathBlockInputRules(schema);
+  const withPlugin = state.reconfigure({ plugins: [plugin] });
+  let result: EditorState | null = null;
+  const view = {
+    state: withPlugin,
+    composing: false,
+    dispatch(tr: Transaction) {
+      result = withPlugin.apply(tr);
+    },
+  } as unknown as EditorView;
+
+  const { from, to } = withPlugin.selection;
+  const handled = plugin.props.handleTextInput?.call(
+    plugin,
+    view,
+    from,
+    to,
+    text,
+    () => withPlugin.tr.insertText(text, from, to),
+  );
+  return handled ? result : null;
+}
+
+describe('single-line math input rule', () => {
+  it('converts a $$...$$ paragraph when the final $ is typed', () => {
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, schema.text('$$x^2$')),
+    ]);
+    const state = stateWithSelection(doc, 7); // end of paragraph
+
+    const nextState = typeText(state, '$');
+    expect(nextState).not.toBeNull();
+    expect(nextState!.doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'mathBlock',
+          content: [{ type: 'text', text: '$$\nx^2\n$$' }],
+        },
+      ],
+    });
+  });
+
+  it('does not fire mid-paragraph when text follows the cursor', () => {
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, schema.text('$$x^2$ tail')),
+    ]);
+    const state = stateWithSelection(doc, 7); // right after "$$x^2$"
+
+    expect(typeText(state, '$')).toBeNull();
+  });
+
+  it('does not convert an empty $$$$ line', () => {
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, schema.text('$$$')),
+    ]);
+    const state = stateWithSelection(doc, 4);
+
+    expect(typeText(state, '$')).toBeNull();
+  });
+});
 
 describe('exitMathBlock', () => {
   it('exits when the cursor is on the closing fence line', () => {

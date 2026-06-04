@@ -1,25 +1,18 @@
 import { exitCode } from 'prosemirror-commands';
 import { InputRule, inputRules } from 'prosemirror-inputrules';
-import { Fragment, type Node as PMNode, type Schema } from 'prosemirror-model';
+import type { Schema } from 'prosemirror-model';
 import type { Plugin } from 'prosemirror-state';
+import { type Command, TextSelection } from 'prosemirror-state';
 import {
-  type Command,
-  Plugin as StatePlugin,
-  TextSelection,
-} from 'prosemirror-state';
-import {
-  buildParagraphsFromCodeText,
-  type InvalidFenceReplacement,
+  buildNormalizationPlugin,
   isPlainTextParagraph,
-  mapSelectionPointAfterFenceReplacement,
 } from '../markdown/fence-commands';
 import { findFenceLineAtOffset } from '../markdown/parse-fences';
 import {
-  type ChangedRange,
-  collectAffectedTextblocks,
-  getChangedRangesForTransactions,
-} from '../markdown/range-tracking';
-import { isMathFenceLine, parseMathMarkdown } from './parse-math-block';
+  isMathFenceLine,
+  parseMathMarkdown,
+  SINGLE_LINE_MATH_BLOCK_RE,
+} from './parse-math-block';
 
 function buildClosedMathInputRule(schema: Schema): InputRule {
   return new InputRule(/^\$\$$/, (state, _match, start) => {
@@ -88,81 +81,71 @@ function buildClosedMathInputRule(schema: Schema): InputRule {
   });
 }
 
-export function mathBlockInputRules(schema: Schema): Plugin {
-  return inputRules({
-    rules: [buildClosedMathInputRule(schema)],
+/**
+ * Converts a single-line `$$...$$` paragraph into a math block the moment the
+ * final `$` is typed. This mirrors the markdown importer, which canonicalizes
+ * single-line block math into the multi-line form (`$$\n...\n$$`); without this
+ * rule such math stays plain text in the live editor until a save/reload.
+ *
+ * At input-rule time the typed `$` is not in the doc yet, so the paragraph's
+ * text is `$$...$` while the match text (`match[0]`) is the full `$$...$$`.
+ */
+function buildSingleLineMathInputRule(schema: Schema): InputRule {
+  return new InputRule(SINGLE_LINE_MATH_BLOCK_RE, (state, match, start) => {
+    const mathBlockType = schema.nodes.mathBlock;
+    const paragraphType = schema.nodes.paragraph;
+    const content = match[1];
+
+    const $start = state.doc.resolve(start);
+    const paragraph = $start.parent;
+    if (!isPlainTextParagraph(paragraph, paragraphType)) {
+      return null;
+    }
+
+    // The match must span the whole paragraph with the typed `$` landing at
+    // its end — otherwise text after the cursor would be replaced away.
+    if (paragraph.textContent !== match[0].slice(0, -1)) {
+      return null;
+    }
+
+    const parentDepth = $start.depth - 1;
+    if (parentDepth < 0) {
+      return null;
+    }
+
+    const parent = $start.node(parentDepth);
+    const index = $start.index(parentDepth);
+    if (!parent.canReplaceWith(index, index + 1, mathBlockType)) {
+      return null;
+    }
+
+    const blockStartPos = $start.before();
+    const blockEndPos = blockStartPos + paragraph.nodeSize;
+    const mathText = `$$\n${content}\n$$`;
+    const mathNode = mathBlockType.create(null, state.schema.text(mathText));
+    let tr = state.tr.replaceWith(blockStartPos, blockEndPos, mathNode);
+    tr = tr.setSelection(
+      TextSelection.create(tr.doc, blockStartPos + 1 + mathText.length),
+    );
+    return tr.scrollIntoView();
   });
 }
 
-function collectInvalidMathReplacements(
-  doc: PMNode,
-  schema: Schema,
-  ranges: ChangedRange[],
-): InvalidFenceReplacement[] {
-  return collectAffectedTextblocks(
-    doc,
-    ranges,
-    (node) => node.type === schema.nodes.mathBlock,
-  )
-    .filter(({ node }) => {
-      const parsed = parseMathMarkdown(node.textContent);
-      return !(parsed.hasOpeningFence && parsed.hasClosingFence);
-    })
-    .map(({ pos, node }) => ({
-      from: pos,
-      to: pos + node.nodeSize,
-      node,
-    }));
+export function mathBlockInputRules(schema: Schema): Plugin {
+  return inputRules({
+    rules: [
+      buildClosedMathInputRule(schema),
+      buildSingleLineMathInputRule(schema),
+    ],
+  });
 }
 
 export function mathBlockNormalizationPlugin(schema: Schema): Plugin {
-  return new StatePlugin({
-    appendTransaction(transactions, _oldState, newState) {
-      const changedRanges = getChangedRangesForTransactions(
-        transactions,
-        newState.doc.content.size,
-      );
-      if (changedRanges.length === 0) {
-        return null;
-      }
-
-      const target = collectInvalidMathReplacements(
-        newState.doc,
-        schema,
-        changedRanges,
-      )[0];
-      if (!target) {
-        return null;
-      }
-
-      const paragraphs = buildParagraphsFromCodeText(
-        schema,
-        target.node.textContent,
-      );
-      const tr = newState.tr.replaceWith(
-        target.from,
-        target.to,
-        Fragment.fromArray(paragraphs),
-      );
-      const mappedAnchor = mapSelectionPointAfterFenceReplacement(
-        newState.selection.anchor,
-        target,
-        tr,
-      );
-      const mappedHead = mapSelectionPointAfterFenceReplacement(
-        newState.selection.head,
-        target,
-        tr,
-      );
-      tr.setSelection(
-        TextSelection.between(
-          tr.doc.resolve(mappedAnchor),
-          tr.doc.resolve(mappedHead),
-        ),
-      );
-      return tr;
-    },
-  });
+  return buildNormalizationPlugin(
+    schema,
+    (node) => node.type === schema.nodes.mathBlock,
+    parseMathMarkdown,
+  );
 }
 
 export const exitMathBlock: Command = (state, dispatch) => {

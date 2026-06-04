@@ -9,7 +9,7 @@ function katexToString(src: string, displayMode: boolean): string {
   if (html === undefined) {
     html = katex.renderToString(src, { throwOnError: false, displayMode });
     if (htmlCache.size >= CACHE_LIMIT) {
-      htmlCache.clear();
+      htmlCache.delete(htmlCache.keys().next().value!);
     }
     htmlCache.set(key, html);
   }
