@@ -7,8 +7,8 @@ import {
   CODE_BLOCK_CLEAR_SELECTION_EVENT,
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
 } from '@/lib/events';
+import { PM_EDITOR_CLASS } from '../constants';
 import { isOpeningFenceLine } from '../markdown/parse-fences';
-import { CONTENT_HEIGHT } from '../pagination/core';
 import { schema } from '../schema';
 import type {
   CodeBlockEditor,
@@ -86,6 +86,7 @@ export class CodeBlockNodeView implements NodeView {
 
   private readonly editorEl: HTMLDivElement;
   private editor: CodeBlockEditor | null = null;
+  private layoutObserver: MutationObserver | null = null;
   private destroyed = false;
   private selectionDragStartedOutside = false;
   private updating = false;
@@ -160,6 +161,18 @@ export class CodeBlockNodeView implements NodeView {
     this.editorEl.className = 'pm-code-block__editor';
     this.dom.appendChild(this.editorEl);
 
+    // The .pm-page-capped max-height tracks data-page-layout, which the frame
+    // can flip after this view mounts (e.g. switching to continuous in
+    // settings) — re-measure the outer height when it does.
+    const layoutHost = this.view.dom.closest(`.${PM_EDITOR_CLASS}`);
+    if (layoutHost) {
+      this.layoutObserver = new MutationObserver(() => this.syncHeight());
+      this.layoutObserver.observe(layoutHost, {
+        attributes: true,
+        attributeFilter: ['data-page-layout'],
+      });
+    }
+
     void this.initEditor();
   }
 
@@ -210,6 +223,8 @@ export class CodeBlockNodeView implements NodeView {
 
   destroy(): void {
     this.destroyed = true;
+    this.layoutObserver?.disconnect();
+    this.layoutObserver = null;
     this.dom.removeEventListener(
       CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
       this.handleExternalSelection,
@@ -512,7 +527,7 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
 
-    const layout = this.editor.syncLayout({ maxOuterHeightPx: CONTENT_HEIGHT });
+    const layout = this.editor.syncLayout();
     this.dom.style.height = `${layout.outerHeightPx}px`;
   }
 }

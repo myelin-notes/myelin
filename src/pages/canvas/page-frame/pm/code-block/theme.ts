@@ -88,8 +88,8 @@ export { codeBlockHighlightStyle };
 
 /** Editor chrome: transparent surface, GitHub-light gutter and selection. */
 export const codeBlockEditorTheme = EditorView.theme({
-  // The editor grows to fit its content; syncLayout sets max-height so it caps
-  // at the page-frame content height and scrolls past that.
+  // The editor grows to fit its content; the shared .pm-page-capped CSS rule
+  // caps it at the page-frame content height and it scrolls past that.
   '&': {
     color: '#1F2328',
     backgroundColor: 'transparent',
@@ -110,9 +110,12 @@ export const codeBlockEditorTheme = EditorView.theme({
     color: '#8c959f',
     border: 'none',
   },
+  // No minWidth: `ch` resolves inconsistently under page-frame scaling, and
+  // CodeMirror already sizes the gutter to the widest line number via its
+  // hidden spacer element.
   '.cm-lineNumbers .cm-gutterElement': {
-    minWidth: '3ch',
-    padding: '0 6px 0 12px',
+    minWidth: '1ch',
+    padding: '0 6px 0 18px',
   },
   // Native selection/caret (no drawSelection() extension installed).
   '::selection': {

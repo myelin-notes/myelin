@@ -22,7 +22,7 @@ export class MathBlockNodeView implements NodeView {
     this.dom.className = 'pm-math-block';
 
     this.preview = document.createElement('div');
-    this.preview.className = 'pm-math-block-preview';
+    this.preview.className = 'pm-math-block-preview pm-page-capped';
     this.preview.contentEditable = 'false';
 
     const source = document.createElement('pre');

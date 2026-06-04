@@ -877,6 +877,14 @@ input[type="range"].tool-slider::-moz-range-track {
   font: inherit;
 }
 
+/* Blocks that can't break across pages (code blocks, math previews, embeds)
+   cap at the pagination CONTENT_HEIGHT (784px) and scroll past it. Continuous
+   layout has no pages to overflow, so the cap lifts there. Scroll behavior is
+   each block's own concern (overflow on itself or an inner scroller). */
+.pm-editor:not([data-page-layout="continuous"]) .ProseMirror .pm-page-capped {
+  max-height: 784px;
+}
+
 .pm-editor .ProseMirror .pm-code-block {
   /* Keep the outer wrapper in normal flow so pagination sees the same block
      coordinates as neighboring paragraphs. */
@@ -971,7 +979,7 @@ input[type="range"].tool-slider::-moz-range-track {
 .pm-editor .ProseMirror .pm-math-block-preview {
   padding: 0.4em 0;
   text-align: center;
-  overflow-x: auto;
+  overflow: auto;
 }
 
 /* The source editor floats over content below the block instead of sitting in
@@ -1203,7 +1211,6 @@ input[type="range"].tool-slider::-moz-range-track {
   max-width: 100%;
   width: max-content;
   margin: 0.25em 0 0.5em;
-  max-height: 784px;
   overflow: auto;
   border-radius: 8px;
 }

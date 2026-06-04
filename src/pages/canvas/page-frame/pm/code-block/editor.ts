@@ -52,10 +52,6 @@ interface CodeBlockEditorLayout {
   outerHeightPx: number;
 }
 
-interface CodeBlockEditorLayoutOptions {
-  maxOuterHeightPx?: number;
-}
-
 interface CodeBlockEditorCallbacks {
   onBoundaryInput: (event: CodeBlockEditorBoundaryInput) => void;
   onContentChange: () => void;
@@ -259,6 +255,9 @@ export class CodeBlockEditor {
       extensions,
       parent: this.editorEl,
     });
+    // Page-height cap comes from the shared .pm-page-capped CSS rule; the
+    // .cm-scroller (overflow: auto) scrolls past it.
+    this.view.dom.classList.add('pm-page-capped');
     this.editorEl.addEventListener('wheel', this.handleWheel);
   }
 
@@ -355,20 +354,13 @@ export class CodeBlockEditor {
       : range.head === this.view.state.doc.length;
   }
 
-  syncLayout(
-    options: CodeBlockEditorLayoutOptions = {},
-  ): CodeBlockEditorLayout {
-    // The editor auto-sizes to its content via CSS (min-height floor +
-    // max-height cap, scrolling past the cap). We then read offsetHeight — the
-    // rendered CSS-px height, which (unlike CodeMirror's contentHeight) is
-    // immune to the canvas's ancestor `zoom`/`transform: scale` and matches the
-    // coordinate space pagination measures blocks in.
-    const cap =
-      options.maxOuterHeightPx === undefined
-        ? null
-        : Math.max(MIN_OUTER_HEIGHT_PX, Math.floor(options.maxOuterHeightPx));
+  syncLayout(): CodeBlockEditorLayout {
+    // The editor auto-sizes to its content via CSS (min-height floor + the
+    // .pm-page-capped max-height, scrolling past the cap). We then read
+    // offsetHeight — the rendered CSS-px height, which (unlike CodeMirror's
+    // contentHeight) is immune to the canvas's ancestor `zoom`/`transform:
+    // scale` and matches the coordinate space pagination measures blocks in.
     this.view.dom.style.minHeight = `${MIN_OUTER_HEIGHT_PX}px`;
-    this.view.dom.style.maxHeight = cap === null ? '' : `${cap}px`;
 
     const measured = this.view.dom.offsetHeight;
     const height = measured > 0 ? measured : MIN_OUTER_HEIGHT_PX;
