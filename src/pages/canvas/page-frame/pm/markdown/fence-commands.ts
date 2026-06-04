@@ -18,8 +18,9 @@ import {
   collectAffectedTextblocks,
   getChangedRangesForTransactions,
 } from './range-tracking';
+import type { ParsedFenceMarkdown } from './types';
 
-function isPlainTextParagraph(
+export function isPlainTextParagraph(
   node: PMNode,
   paragraphType: PMNode['type'],
 ): boolean {
@@ -196,18 +197,15 @@ function findInvalidFenceReplacement(
   return targets[0] ?? null;
 }
 
-function collectInvalidFenceReplacements(
+function collectInvalidReplacements(
   doc: PMNode,
-  schema: Schema,
   ranges: ChangedRange[],
+  isTarget: (node: PMNode) => boolean,
+  parse: (text: string) => ParsedFenceMarkdown,
 ): InvalidFenceReplacement[] {
-  return collectAffectedTextblocks(
-    doc,
-    ranges,
-    (node) => node.type === schema.nodes.codeBlock,
-  )
+  return collectAffectedTextblocks(doc, ranges, isTarget)
     .filter(({ node }) => {
-      const parsed = parseFenceMarkdown(node.textContent);
+      const parsed = parse(node.textContent);
       return !(parsed.hasOpeningFence && parsed.hasClosingFence);
     })
     .map(({ pos, node }) => ({
@@ -217,7 +215,17 @@ function collectInvalidFenceReplacements(
     }));
 }
 
-export function fenceMarkdownNormalizationPlugin(schema: Schema): Plugin {
+/**
+ * Builds an `appendTransaction` plugin that unwraps a fenced block (code or
+ * math) back into plain paragraphs once its delimiters are no longer valid.
+ * `isTarget` selects the node type to watch and `parse` decides whether a
+ * given block still has both fences.
+ */
+export function buildNormalizationPlugin(
+  schema: Schema,
+  isTarget: (node: PMNode) => boolean,
+  parse: (text: string) => ParsedFenceMarkdown,
+): Plugin {
   return new StatePlugin({
     appendTransaction(transactions, _oldState, newState) {
       const changedRanges = getChangedRangesForTransactions(
@@ -229,7 +237,12 @@ export function fenceMarkdownNormalizationPlugin(schema: Schema): Plugin {
       }
 
       const target = findInvalidFenceReplacement(
-        collectInvalidFenceReplacements(newState.doc, schema, changedRanges),
+        collectInvalidReplacements(
+          newState.doc,
+          changedRanges,
+          isTarget,
+          parse,
+        ),
       );
       if (!target) {
         return null;
@@ -263,6 +276,14 @@ export function fenceMarkdownNormalizationPlugin(schema: Schema): Plugin {
       return tr;
     },
   });
+}
+
+export function fenceMarkdownNormalizationPlugin(schema: Schema): Plugin {
+  return buildNormalizationPlugin(
+    schema,
+    (node) => node.type === schema.nodes.codeBlock,
+    parseFenceMarkdown,
+  );
 }
 
 export const exitFencedCodeBlock: Command = (state, dispatch) => {
