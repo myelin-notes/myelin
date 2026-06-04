@@ -213,6 +213,11 @@ export class CodeBlockEditor {
     ];
 
     const extensions: Extension[] = [
+      // Page-height cap comes from the shared .pm-page-capped CSS rule; the
+      // .cm-scroller (overflow: auto) scrolls past it. Applied via
+      // editorAttributes because CodeMirror owns view.dom's class attribute
+      // and wipes externally added classes on update.
+      EditorView.editorAttributes.of({ class: 'pm-page-capped' }),
       lineNumbers(),
       codeBlockLanguage(),
       syntaxHighlighting(codeBlockHighlightStyle),
@@ -255,9 +260,6 @@ export class CodeBlockEditor {
       extensions,
       parent: this.editorEl,
     });
-    // Page-height cap comes from the shared .pm-page-capped CSS rule; the
-    // .cm-scroller (overflow: auto) scrolls past it.
-    this.view.dom.classList.add('pm-page-capped');
     this.editorEl.addEventListener('wheel', this.handleWheel);
   }
 
