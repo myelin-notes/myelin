@@ -6,7 +6,6 @@ import {
   PM_UPDATE_EVENT,
 } from '@/lib/events';
 import type { ResolveNoteLink } from './markdown/note-links';
-import { scrollMathSourceCaretIntoView } from './math/block-node-view';
 import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
@@ -85,10 +84,9 @@ export class PageFrameEditorState {
       // Page frames never scroll internally — the canvas follow-cursor pan
       // keeps the caret on screen. PM's default ancestor scroll-walk would
       // scroll the frame's clip boxes (or the canvas page root) and desync
-      // the DOM from the canvas-drawn chrome. The math source panel is the
-      // one internal scroller whose caret PM would otherwise manage.
-      handleScrollToSelection(view) {
-        scrollMathSourceCaretIntoView(view);
+      // the DOM from the canvas-drawn chrome. The nested CodeMirror editors
+      // (code blocks, math source) manage their own caret visibility.
+      handleScrollToSelection() {
         return true;
       },
       dispatchTransaction(this: EditorView, tr: Transaction) {
@@ -96,13 +94,13 @@ export class PageFrameEditorState {
         const hadNestedFocus =
           document.activeElement instanceof HTMLElement &&
           this.dom.contains(document.activeElement);
-        const wasInCodeBlock =
-          this.state.selection.$from.parent.type === schema.nodes.codeBlock;
+        const inNestedEditor = (state: EditorState) =>
+          state.selection.$from.parent.type === schema.nodes.codeBlock ||
+          state.selection.$from.parent.type === schema.nodes.mathBlock;
+        const wasInNestedEditor = inNestedEditor(this.state);
         const newState = this.state.apply(tr);
         this.updateState(newState);
-        const isInCodeBlock =
-          newState.selection.$from.parent.type === schema.nodes.codeBlock;
-        if (hadNestedFocus && wasInCodeBlock && !isInCodeBlock) {
+        if (hadNestedFocus && wasInNestedEditor && !inNestedEditor(newState)) {
           this.focus();
         }
         this.dom.dispatchEvent(new Event(PM_UPDATE_EVENT));

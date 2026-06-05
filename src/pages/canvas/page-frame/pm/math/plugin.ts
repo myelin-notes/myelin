@@ -69,7 +69,13 @@ function buildMathDecorationsForTextblock(
   selection: Selection,
 ): Decoration[] {
   if (node.type.name === 'mathBlock') {
-    if (!selectionTouches(selection, pos, pos + node.nodeSize)) {
+    // Editing requires the selection to be contained inside the block's
+    // content, not merely overlapping it: a cross-block range keeps the
+    // preview, and containment guarantees at most one block edits at a
+    // time — the source editor is a single shared CodeMirror instance.
+    const from = pos + 1;
+    const to = pos + node.nodeSize - 1;
+    if (selection.from < from || selection.to > to) {
       return [];
     }
     return [

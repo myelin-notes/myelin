@@ -127,7 +127,9 @@
 
 /* The source editor floats over content below the block instead of sitting in
    flow, so toggling edit mode never changes the block's height — pagination
-   stays keyed off the preview, which is what print/export produces. */
+   stays keyed off the preview, which is what print/export produces. The panel
+   hosts the shared CodeMirror instance; fonts, wrapping, scrolling and the
+   height cap live in its theme (math/source-editor.ts). */
 .pm-editor .ProseMirror .pm-math-block-source {
   display: none;
   position: absolute;
@@ -135,27 +137,23 @@
   left: 0;
   right: 0;
   z-index: 5;
-  margin: 0;
-  padding: 0.6em 0.9em;
+  padding: 0.35em 0.5em;
   border: 1px solid rgba(149, 157, 165, 0.28);
   border-radius: var(--radius-lg);
   background: var(--bg-card);
   box-shadow: 0 8px 18px rgba(25, 28, 30, 0.12);
-  max-height: 320px;
-  overflow-y: auto;
-  font-family:
-    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
-    "Source Code Pro", Menlo, Consolas, monospace;
   font-size: 0.92em;
-  white-space: pre-wrap;
 }
 
 /* Scoped to [contenteditable="true"] so the editor panel hides when the page
-   frame itself leaves edit mode (selection may persist inside the block). */
+   frame itself leaves edit mode (selection may persist inside the block).
+   :has(.cm-editor) keeps the panel hidden until the shared CodeMirror
+   instance is actually attached — it loads lazily, and another block (e.g.
+   in a second page frame) may be borrowing it. */
 .pm-editor
   .ProseMirror[contenteditable="true"]
   .pm-math-block--editing
-  .pm-math-block-source {
+  .pm-math-block-source:has(.cm-editor) {
   display: block;
 }
 

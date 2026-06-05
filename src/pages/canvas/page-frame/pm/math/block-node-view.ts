@@ -1,28 +1,68 @@
+import { exitCode, joinBackward } from 'prosemirror-commands';
 import type { Node as PMNode } from 'prosemirror-model';
+import { TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
+import { redo, undo } from 'y-prosemirror';
 import { PM_EDITOR_CLASS } from '../constants';
-import { stripMathDelimiters } from './parse-math-block';
+import type {
+  NestedEditorDirection,
+  NestedEditorEscapeUnit,
+} from '../nested-editor/editor';
+import {
+  escapeNestedEditor,
+  forwardNestedContentUpdate,
+  forwardNestedSelectionUpdate,
+} from '../nested-editor/pm-sync';
+import { exitMathBlock } from './block-commands';
+import { parseMathMarkdown, stripMathDelimiters } from './parse-math-block';
 import { renderKatex } from './render';
+import type { MathSourceEditor, MathSourceEditorOwner } from './source-editor';
 
 const SOURCE_GAP = 4;
-const SOURCE_SCROLL_MARGIN = 8;
 
 /**
- * Renders a math block as a KaTeX preview plus an editable raw-source view.
+ * Renders a math block as a KaTeX preview plus a floating raw-source editor.
  * The math preview plugin toggles `pm-math-block--editing` on the wrapper
- * (via a node decoration) when the selection is inside the block; CSS swaps
- * which of the two children is visible.
+ * (via a node decoration) while the selection is contained in the block; CSS
+ * shows the source panel only then — and only once the shared CodeMirror
+ * editor is actually attached to it.
+ *
+ * The source editor is one shared CodeMirror instance (see ./source-editor)
+ * re-parented into the active block's panel rather than constructed per
+ * block. The ProseMirror document stays the source of truth: CodeMirror
+ * edits and selection moves are forwarded as transactions, mirroring
+ * CodeBlockNodeView.
  */
 export class MathBlockNodeView implements NodeView {
   dom: HTMLDivElement;
-  contentDOM: HTMLElement;
   private preview: HTMLDivElement;
-  private source: HTMLPreElement;
+  private source: HTMLDivElement;
   private node: PMNode;
+  private editor: MathSourceEditor | null = null;
+  private destroyed = false;
+  private updating = false;
+  private initializing = false;
+
+  private readonly owner: MathSourceEditorOwner = {
+    onContentChange: () => this.forwardContentUpdate(),
+    onDeleteEmptyBlock: () => this.deleteEmptyBlock(),
+    onEnter: () => this.handleEnter(),
+    onEscapeRequest: (unit, dir) => this.maybeEscape(unit, dir),
+    onExitBlock: () => this.exitBlock(),
+    onRedo: () => {
+      redo(this.view.state);
+    },
+    onSelectAll: () => this.selectAllContent(),
+    onSelectionChange: () => this.forwardSelectionUpdate(),
+    onUndo: () => {
+      undo(this.view.state);
+    },
+  };
+
   // Without this the canvas pan handler swallows wheel events, so a
-  // page-capped preview can never scroll. Mirrors CodeBlockEditor.handleWheel:
-  // only consume the event while the block is being edited (the code block's
-  // hasFocus equivalent), and never for ctrl-wheel (pinch zoom).
+  // page-capped preview can never scroll. Mirrors MathSourceEditor's wheel
+  // handling: only consume the event while the block is being edited, and
+  // never for ctrl-wheel (pinch zoom).
   private readonly handleWheel = (event: WheelEvent): void => {
     if (
       event.ctrlKey ||
@@ -38,7 +78,29 @@ export class MathBlockNodeView implements NodeView {
     }
   };
 
-  constructor(node: PMNode) {
+  // Clicking the rendered formula opens the source editor with the cursor at
+  // the end of the LaTeX. ProseMirror may skip NodeView.setSelection while
+  // the view itself isn't focused, so open the editor directly as well.
+  private readonly handlePreviewMouseDown = (event: MouseEvent): void => {
+    if (event.button !== 0 || !this.view.editable) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const end = this.getPos() + this.node.nodeSize - 1;
+    this.view.dispatch(
+      this.view.state.tr.setSelection(
+        TextSelection.create(this.view.state.doc, end),
+      ),
+    );
+    this.openEditor();
+  };
+
+  constructor(
+    node: PMNode,
+    private readonly view: EditorView,
+    private readonly getPos: () => number,
+  ) {
     this.node = node;
 
     this.dom = document.createElement('div');
@@ -48,11 +110,10 @@ export class MathBlockNodeView implements NodeView {
     this.preview.className = 'pm-math-block-preview pm-page-capped';
     this.preview.contentEditable = 'false';
     this.preview.addEventListener('wheel', this.handleWheel);
+    this.preview.addEventListener('mousedown', this.handlePreviewMouseDown);
 
-    this.source = document.createElement('pre');
+    this.source = document.createElement('div');
     this.source.className = 'pm-math-block-source';
-    this.contentDOM = document.createElement('code');
-    this.source.appendChild(this.contentDOM);
 
     this.dom.append(this.preview, this.source);
     this.renderPreview();
@@ -67,21 +128,177 @@ export class MathBlockNodeView implements NodeView {
     this.node = node;
     if (changed) {
       this.renderPreview();
+      if (!this.updating && this.editor?.ownedBy(this.owner)) {
+        this.updating = true;
+        try {
+          this.editor.setValue(node.textContent);
+        } finally {
+          this.updating = false;
+        }
+      }
     }
     return true;
   }
 
-  ignoreMutation(mutation: MutationRecord | { type: 'selection' }): boolean {
-    if (mutation.type === 'selection') {
+  setSelection(anchor: number, head: number): void {
+    if (this.editor) {
+      this.attachAndSelect(anchor, head);
+      return;
+    }
+    this.openEditor();
+  }
+
+  stopEvent(event: Event): boolean {
+    return this.source.contains(event.target as Node);
+  }
+
+  ignoreMutation(): boolean {
+    return true;
+  }
+
+  destroy(): void {
+    this.destroyed = true;
+    this.preview.removeEventListener('wheel', this.handleWheel);
+    this.preview.removeEventListener('mousedown', this.handlePreviewMouseDown);
+    this.editor?.release(this.owner);
+    this.editor = null;
+  }
+
+  private openEditor(): void {
+    if (this.editor) {
+      this.syncSelectionFromView();
+      return;
+    }
+    if (this.initializing) {
+      return;
+    }
+    this.initializing = true;
+    // Dynamic import keeps the CodeMirror runtime out of the main chunk
+    // (same pattern as code blocks); the module resolves to one shared
+    // instance.
+    void import('./source-editor')
+      .then((module) => module.getSharedMathSourceEditor())
+      .then((editor) => {
+        this.initializing = false;
+        if (this.destroyed) {
+          return;
+        }
+        this.editor = editor;
+        this.syncSelectionFromView();
+      });
+  }
+
+  /**
+   * Attach using the current ProseMirror selection — the request that
+   * triggered loading may be stale by the time the editor module resolves.
+   */
+  private syncSelectionFromView(): void {
+    const start = this.getPos() + 1;
+    const end = start + this.node.content.size;
+    const { anchor, head, from, to } = this.view.state.selection;
+    if (from < start || to > end) {
+      return;
+    }
+    this.attachAndSelect(anchor - start, head - start);
+  }
+
+  private attachAndSelect(anchor: number, head: number): void {
+    if (!this.editor) {
+      return;
+    }
+    this.updating = true;
+    try {
+      this.editor.attach(this.source, this.owner, this.node.textContent);
+      this.editor.setSelection(anchor, head);
+    } finally {
+      this.updating = false;
+    }
+    // The panel just became visible (or changed owner/height); the preview
+    // plugin's view-update hook won't run again until the next transaction.
+    positionMathBlockSources(this.view.dom);
+  }
+
+  private forwardContentUpdate(): void {
+    if (this.updating || !this.editor?.ownedBy(this.owner)) {
+      return;
+    }
+
+    forwardNestedContentUpdate(
+      this.view,
+      this.getPos() + 1,
+      this.node.textContent,
+      this.editor,
+    );
+  }
+
+  private forwardSelectionUpdate(): void {
+    if (this.updating || !this.editor?.ownedBy(this.owner)) {
+      return;
+    }
+
+    if (this.editor.getValue() !== this.node.textContent) {
+      this.forwardContentUpdate();
+      return;
+    }
+
+    forwardNestedSelectionUpdate(this.view, this.getPos() + 1, this.editor);
+  }
+
+  private maybeEscape(
+    unit: NestedEditorEscapeUnit,
+    dir: NestedEditorDirection,
+  ): boolean {
+    if (!this.editor?.isCursorAtBoundary(unit, dir)) {
       return false;
     }
-    // Attribute mutations on the source panel are positioning writes from
-    // positionMathBlockSources — re-parsing them would loop: re-parse →
-    // reposition → mutation → …
-    if (mutation.type === 'attributes' && mutation.target === this.source) {
-      return true;
+
+    escapeNestedEditor(this.view, this.getPos(), this.node.nodeSize, dir);
+    return true;
+  }
+
+  /** Enter on the closing `$$` line exits the block, like the PM keymap did. */
+  private handleEnter(): boolean {
+    if (!exitMathBlock(this.view.state, this.view.dispatch)) {
+      return false;
     }
-    return this.preview.contains(mutation.target as Node);
+    this.view.focus();
+    return true;
+  }
+
+  private exitBlock(): void {
+    if (exitCode(this.view.state, this.view.dispatch)) {
+      this.view.focus();
+    }
+  }
+
+  /** Backspace once the source is empty removes the block itself. */
+  private deleteEmptyBlock(): boolean {
+    if (!joinBackward(this.view.state, this.view.dispatch)) {
+      return false;
+    }
+    this.view.focus();
+    return true;
+  }
+
+  /**
+   * Mod-A selects the LaTeX between the `$$` fences (mirroring
+   * selectAllInMathBlock) so typing over the selection replaces the formula
+   * without dissolving the block.
+   */
+  private selectAllContent(): boolean {
+    if (!this.editor?.ownedBy(this.owner)) {
+      return false;
+    }
+    const lines = parseMathMarkdown(this.node.textContent).lines.filter(
+      (line) => line.kind === 'content',
+    );
+    const first = lines[0];
+    const last = lines[lines.length - 1];
+    if (!first || !last) {
+      return false;
+    }
+    this.editor.setSelection(first.from, last.to);
+    return true;
   }
 
   private renderPreview(): void {
@@ -107,43 +324,6 @@ export class MathBlockNodeView implements NodeView {
  * the content), while the doc extent covers the flush right after content
  * grows — the frame only resizes to match one rAF later.
  */
-/**
- * Keep the caret visible inside the source panel's own scroller. Page frames
- * never scroll — the canvas follow-cursor pan keeps the caret on screen — so
- * the editor suppresses ProseMirror's ancestor scroll-walk entirely
- * (`handleScrollToSelection`) and this handles the one legitimate internal
- * scroller instead.
- */
-export function scrollMathSourceCaretIntoView(view: EditorView): void {
-  const { $head } = view.state.selection;
-  if ($head.parent.type.name !== 'mathBlock') {
-    return;
-  }
-
-  const block = view.nodeDOM($head.before());
-  if (!(block instanceof HTMLElement)) {
-    return;
-  }
-  const panel = block.querySelector<HTMLElement>('.pm-math-block-source');
-  if (!panel || panel.scrollHeight <= panel.clientHeight) {
-    return;
-  }
-
-  const rect = panel.getBoundingClientRect();
-  if (rect.height === 0) {
-    return;
-  }
-  const caret = view.coordsAtPos($head.pos);
-  // Screen px → the panel's local units (canvas zoom + frame DPR zoom).
-  const scale = rect.height / panel.offsetHeight;
-  const margin = SOURCE_SCROLL_MARGIN * scale;
-  if (caret.bottom > rect.bottom - margin) {
-    panel.scrollTop += (caret.bottom - (rect.bottom - margin)) / scale;
-  } else if (caret.top < rect.top + margin) {
-    panel.scrollTop -= (rect.top + margin - caret.top) / scale;
-  }
-}
-
 export function positionMathBlockSources(viewDom: HTMLElement): void {
   // Horizontal layout flows in columns where vertical clamping makes no
   // sense — keep the CSS default there.

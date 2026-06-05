@@ -86,6 +86,30 @@ describe('mathPreviewPlugin', () => {
     expect(findDecorations(plugin, outside)).toHaveLength(0);
   });
 
+  it('keeps the preview when a selection spans the math block', () => {
+    const mathBlock = schema.nodes.mathBlock.create(
+      null,
+      schema.text('$$\nx\n$$'),
+    );
+    const doc = schema.nodes.doc.create(null, [
+      paragraph('before'),
+      mathBlock,
+      paragraph('after'),
+    ]);
+
+    // From inside the first paragraph to inside the last — the block is
+    // touched but the selection is not contained in it, so it must keep the
+    // preview (only contained selections open the shared source editor).
+    const plugin = mathPreviewPlugin();
+    let state = EditorState.create({ schema, doc, plugins: [plugin] });
+    state = state.apply(
+      state.tr.setSelection(
+        TextSelection.create(state.doc, 2, state.doc.content.size - 2),
+      ),
+    );
+    expect(findDecorations(plugin, state)).toHaveLength(0);
+  });
+
   it('rebuilds decorations for edited blocks', () => {
     const doc = schema.nodes.doc.create(null, [
       paragraph('a $x^2$ b'),
