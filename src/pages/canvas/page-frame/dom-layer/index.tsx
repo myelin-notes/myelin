@@ -30,7 +30,10 @@ import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
-import { getPageFramePmScreenRectForPos } from '../pm/screen-rect';
+import {
+  getPageFramePmScreenRectForNestedCaret,
+  getPageFramePmScreenRectForPos,
+} from '../pm/screen-rect';
 import type { PageFrameAutocompleteKind } from '../use-page-frame-autocomplete';
 
 // `clip` rather than `hidden`: hidden boxes are still programmatically
@@ -556,8 +559,13 @@ export function PageFrameDomLayer({
       // screen pixels wherever the canvas sits in the window. Returns null if
       // the position is stale (mid-transaction) or the DOM isn't mounted —
       // commit lastHead/lastDoc only after a successful measure so the next
-      // update retries instead of silently dropping the follow.
-      const screenRect = getPageFramePmScreenRectForPos(view, sel.head);
+      // update retries instead of silently dropping the follow. When the
+      // caret sits inside a nested CodeMirror editor (code block, math
+      // source), measure the native selection — PM's coordsAtPos degrades to
+      // the block boundary there and would pan the canvas to the block.
+      const screenRect =
+        getPageFramePmScreenRectForNestedCaret(view) ??
+        getPageFramePmScreenRectForPos(view, sel.head);
       if (!screenRect) {
         return;
       }
