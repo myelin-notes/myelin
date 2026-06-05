@@ -174,8 +174,13 @@
    frame itself leaves edit mode (selection may persist inside the block).
    :has(.cm-editor) keeps the panel hidden until the shared CodeMirror
    instance is actually attached — it loads lazily, and another block (e.g.
-   in a second page frame) may be borrowing it. */
-.pm-editor
+   in a second page frame) may be borrowing it.
+   :not([data-view-animating]) keeps it hidden while the canvas camera is
+   animating (set by the dom-layer sync loop): painting the panel during the
+   double-click-to-edit zoom roughly doubles the frame hitch, and the panel
+   isn't usable until the camera lands. The entrance animation then plays on
+   reveal, right at settle. */
+.pm-editor:not([data-view-animating])
   .ProseMirror[contenteditable="true"]
   .pm-math-block--editing
   .pm-math-block-source:has(.cm-editor) {

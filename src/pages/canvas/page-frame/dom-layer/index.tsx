@@ -30,6 +30,7 @@ import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
+import { positionMathBlockSources } from '../pm/math/block-node-view';
 import {
   getPageFramePmScreenRectForNestedCaret,
   getPageFramePmScreenRectForPos,
@@ -419,6 +420,7 @@ export function PageFrameDomLayer({
 
       const zoom = dc.viewport.zoom;
       const offset = dc.viewport.offset;
+      const viewAnimating = dc.viewport.isAnimatingView;
       const frames = dc.getElementsByType(
         ElementType.PAGE_FRAME,
       ) as PageFrameElement[];
@@ -490,6 +492,23 @@ export function PageFrameDomLayer({
         refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
 
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
+        // Editing chrome (the math source panel) is display:none while the
+        // view animates: painting it mid-zoom roughly doubles the edit-enter
+        // frame hitch, and it isn't readable until the camera lands anyway.
+        // Same-value guard — observers aside, attribute writes dirty style.
+        if ('viewAnimating' in refs.contentDiv.dataset !== viewAnimating) {
+          if (viewAnimating) {
+            refs.contentDiv.dataset.viewAnimating = '';
+          } else {
+            delete refs.contentDiv.dataset.viewAnimating;
+            // The panel skipped its clamp while hidden (offsetHeight was 0);
+            // re-clamp now that it's visible. No-op when nothing is editing.
+            const editorDom = refs.frame.pmEditor?.view?.dom;
+            if (editorDom instanceof HTMLElement) {
+              positionMathBlockSources(editorDom);
+            }
+          }
+        }
         syncEditorLayout(refs, pageWidth, pageHeight, pageLayout);
         syncPageChrome(
           refs,
