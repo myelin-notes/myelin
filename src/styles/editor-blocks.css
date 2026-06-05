@@ -129,7 +129,13 @@
    flow, so toggling edit mode never changes the block's height — pagination
    stays keyed off the preview, which is what print/export produces. The panel
    hosts the shared CodeMirror instance; fonts, wrapping, scrolling and the
-   height cap live in its theme (math/source-editor.ts). */
+   height cap live in its theme (math/source-editor.ts).
+
+   Chrome mirrors the app's popup surfaces (dropdown/context menus, the
+   floating toolbar): borderless popover sheet, rounded-xl, ambient +
+   elevated shadows (shadow tokens live in @theme inline, so the values are
+   inlined here like widgets.css does). No backdrop blur — inside the zoomed
+   page frame that would promote an expensively rasterized layer. */
 .pm-editor .ProseMirror .pm-math-block-source {
   display: none;
   position: absolute;
@@ -137,12 +143,20 @@
   left: 0;
   right: 0;
   z-index: 5;
-  padding: 0.35em 0.5em;
-  border: 1px solid rgba(149, 157, 165, 0.28);
-  border-radius: var(--radius-lg);
-  background: var(--bg-card);
-  box-shadow: 0 8px 18px rgba(25, 28, 30, 0.12);
+  padding: 0.5em 0.65em;
+  border-radius: var(--radius-xl);
+  background: var(--popover);
+  box-shadow:
+    0 0 32px 0 rgba(25, 28, 30, 0.06),
+    0 18px 40px -24px rgba(28, 39, 56, 0.18);
   font-size: 0.92em;
+}
+
+@keyframes pm-math-source-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.98);
+  }
 }
 
 /* Scoped to [contenteditable="true"] so the editor panel hides when the page
@@ -155,6 +169,10 @@
   .pm-math-block--editing
   .pm-math-block-source:has(.cm-editor) {
   display: block;
+  /* Same fade/zoom entrance as the app's menus and popups (animate-in
+     fade-in-0 zoom-in-95); restarts naturally on each display flip. */
+  animation: pm-math-source-in 100ms ease-out;
+  transform-origin: top center;
 }
 
 .pm-editor
