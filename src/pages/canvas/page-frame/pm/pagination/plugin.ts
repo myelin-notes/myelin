@@ -1391,15 +1391,38 @@ interface BlockquoteRuleSegment {
   top: number;
 }
 
-function clearBlockquoteRuleStyle(blockquote: HTMLElement): void {
-  blockquote.style.removeProperty('--pm-blockquote-rule-images');
-  blockquote.style.removeProperty('--pm-blockquote-rule-positions');
-  blockquote.style.removeProperty('--pm-blockquote-rule-sizes');
-  blockquote.style.removeProperty('--pm-blockquote-rule-repeats');
-  blockquote.style.removeProperty('--pm-callout-fill-images');
-  blockquote.style.removeProperty('--pm-callout-fill-positions');
-  blockquote.style.removeProperty('--pm-callout-fill-sizes');
-  blockquote.style.removeProperty('--pm-callout-fill-repeats');
+const BLOCKQUOTE_RULE_PROPS = [
+  '--pm-blockquote-rule-images',
+  '--pm-blockquote-rule-positions',
+  '--pm-blockquote-rule-sizes',
+  '--pm-blockquote-rule-repeats',
+  '--pm-callout-fill-images',
+  '--pm-callout-fill-positions',
+  '--pm-callout-fill-sizes',
+  '--pm-callout-fill-repeats',
+] as const;
+
+/**
+ * Write only the properties that actually changed ('' means "not set").
+ * This runs on every pagination pass, so unconditional writes — including
+ * the old clear-then-set pattern — dirty style and force a layer flush even
+ * when nothing moved.
+ */
+function applyBlockquoteRuleStyle(
+  blockquote: HTMLElement,
+  values: Record<string, string>,
+): void {
+  for (const prop of BLOCKQUOTE_RULE_PROPS) {
+    const value = values[prop] ?? '';
+    if (blockquote.style.getPropertyValue(prop) === value) {
+      continue;
+    }
+    if (value === '') {
+      blockquote.style.removeProperty(prop);
+    } else {
+      blockquote.style.setProperty(prop, value);
+    }
+  }
 }
 
 function collectBlockquoteRuleSegments(
@@ -1437,63 +1460,50 @@ function syncBlockquoteRuleStyles(view: EditorView): void {
   const blockquotes = view.dom.querySelectorAll<HTMLElement>('blockquote');
 
   for (const blockquote of blockquotes) {
-    clearBlockquoteRuleStyle(blockquote);
-
+    const values: Record<string, string> = {};
     const segments = collectBlockquoteRuleSegments(blockquote);
-    if (segments === null) {
-      continue;
-    }
-    if (segments.length === 0) {
-      blockquote.style.setProperty('--pm-blockquote-rule-images', 'none');
-      if (blockquote.classList.contains('pm-callout')) {
-        blockquote.style.setProperty('--pm-callout-fill-images', 'none');
+    const isCallout = blockquote.classList.contains('pm-callout');
+
+    if (segments !== null && segments.length === 0) {
+      values['--pm-blockquote-rule-images'] = 'none';
+      if (isCallout) {
+        values['--pm-callout-fill-images'] = 'none';
       }
-      continue;
-    }
-
-    const image =
-      'linear-gradient(var(--pm-blockquote-rule-color), var(--pm-blockquote-rule-color))';
-    blockquote.style.setProperty(
-      '--pm-blockquote-rule-images',
-      segments.map(() => image).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-blockquote-rule-positions',
-      segments.map((segment) => `0 ${segment.top}px`).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-blockquote-rule-sizes',
-      segments
+    } else if (segments !== null) {
+      const image =
+        'linear-gradient(var(--pm-blockquote-rule-color), var(--pm-blockquote-rule-color))';
+      values['--pm-blockquote-rule-images'] = segments
+        .map(() => image)
+        .join(', ');
+      values['--pm-blockquote-rule-positions'] = segments
+        .map((segment) => `0 ${segment.top}px`)
+        .join(', ');
+      values['--pm-blockquote-rule-sizes'] = segments
         .map((segment) => `var(--pm-blockquote-rule-width) ${segment.height}px`)
-        .join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-blockquote-rule-repeats',
-      segments.map(() => 'no-repeat').join(', '),
-    );
+        .join(', ');
+      values['--pm-blockquote-rule-repeats'] = segments
+        .map(() => 'no-repeat')
+        .join(', ');
 
-    if (!blockquote.classList.contains('pm-callout')) {
-      continue;
+      if (isCallout) {
+        const calloutFillImage =
+          'linear-gradient(var(--pm-callout-fill-color), var(--pm-callout-fill-color))';
+        values['--pm-callout-fill-images'] = segments
+          .map(() => calloutFillImage)
+          .join(', ');
+        values['--pm-callout-fill-positions'] = segments
+          .map((segment) => `0 ${segment.top}px`)
+          .join(', ');
+        values['--pm-callout-fill-sizes'] = segments
+          .map((segment) => `100% ${segment.height}px`)
+          .join(', ');
+        values['--pm-callout-fill-repeats'] = segments
+          .map(() => 'no-repeat')
+          .join(', ');
+      }
     }
 
-    const calloutFillImage =
-      'linear-gradient(var(--pm-callout-fill-color), var(--pm-callout-fill-color))';
-    blockquote.style.setProperty(
-      '--pm-callout-fill-images',
-      segments.map(() => calloutFillImage).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-callout-fill-positions',
-      segments.map((segment) => `0 ${segment.top}px`).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-callout-fill-sizes',
-      segments.map((segment) => `100% ${segment.height}px`).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-callout-fill-repeats',
-      segments.map(() => 'no-repeat').join(', '),
-    );
+    applyBlockquoteRuleStyle(blockquote, values);
   }
 }
 

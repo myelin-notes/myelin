@@ -175,7 +175,13 @@ function syncEditorLayout(
   pageHeight: number,
   pageLayout: PageLayout,
 ): void {
-  refs.contentDiv.dataset.pageLayout = pageLayout;
+  // Same-value guard: this runs every frame from the sync loop, and the
+  // pagination plugin (plus code-block node views) watch this attribute with
+  // MutationObservers that fire on every write — unguarded, that schedules a
+  // repagination pass every frame forever.
+  if (refs.contentDiv.dataset.pageLayout !== pageLayout) {
+    refs.contentDiv.dataset.pageLayout = pageLayout;
+  }
 
   const editorDom = refs.frame.pmEditor?.view?.dom;
   if (!(editorDom instanceof HTMLElement)) {

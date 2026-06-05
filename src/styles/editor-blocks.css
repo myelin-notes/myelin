@@ -1,0 +1,169 @@
+.pm-editor .ProseMirror pre {
+  margin: 1.15em 0;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(195, 199, 202, 0.32);
+  border-radius: 18px;
+  background: rgba(242, 244, 246, 0.92);
+  color: var(--text-primary);
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.pm-editor .ProseMirror pre code {
+  font: inherit;
+}
+
+/* Blocks that can't break across pages (code blocks, math previews, embeds)
+   cap at the pagination CONTENT_HEIGHT (784px) and scroll past it. Continuous
+   layout has no pages to overflow, so the cap lifts there. Scroll behavior is
+   each block's own concern (overflow on itself or an inner scroller). */
+.pm-editor:not([data-page-layout="continuous"]) .ProseMirror .pm-page-capped {
+  max-height: 784px;
+}
+
+.pm-editor .ProseMirror .pm-code-block {
+  /* Keep the outer wrapper in normal flow so pagination sees the same block
+     coordinates as neighboring paragraphs. */
+  margin: 1.15em 0;
+  overflow: hidden;
+  overflow: clip;
+  border-radius: var(--radius-lg);
+  background: rgba(230, 234, 240, 0.52);
+}
+
+.pm-editor .ProseMirror .pm-code-block__editor {
+  overflow: hidden;
+}
+
+.pm-editor .ProseMirror .pm-code-block__external-selection {
+  background: Highlight;
+}
+
+/* The * descendant variant overrides the markdown highlighter's CodeMark /
+   CodeInfo token colors — CodeMirror nests highlight spans inside the
+   delimiter mark span, and inherited color loses to the inner span's own. */
+.pm-editor .ProseMirror .pm-code-block__delimiter,
+.pm-editor .ProseMirror .pm-code-block__delimiter * {
+  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
+}
+
+.pm-editor .ProseMirror .pm-md-delim {
+  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
+}
+
+.pm-editor .ProseMirror .pm-md-bold {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.pm-editor .ProseMirror .pm-md-italic {
+  font-style: italic;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code,
+.pm-editor .ProseMirror .pm-md-note-link {
+  position: relative;
+  z-index: 0;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code::before,
+.pm-editor .ProseMirror .pm-md-note-link::before {
+  content: "";
+  position: absolute;
+  inset-block: -0.08em;
+  pointer-events: none;
+  border-radius: 0.35rem;
+  z-index: -1;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code {
+  border-radius: 0.35rem;
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Consolas, monospace;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code::before {
+  inset-inline: -0.22em;
+  background: rgba(28, 39, 56, 0.08);
+}
+
+.pm-editor .ProseMirror .pm-md-math {
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+/* Inline math source while the selection is elsewhere — a widget renders
+   the KaTeX formula in its place. Hidden via font-size:0 rather than
+   display:none so caret geometry stays valid: the canvas follow-cursor pan
+   reads view.coordsAtPos(selection.head), and display:none positions
+   resolve to bogus screen rects that fling the viewport. */
+.pm-editor .ProseMirror .pm-math-source-hidden {
+  font-size: 0;
+  letter-spacing: 0;
+}
+
+.pm-editor .ProseMirror .pm-math-block {
+  position: relative;
+  margin: 1.15em 0;
+}
+
+/* overflow: clip at rest — a scrollable box would promote every math block
+   to its own WebKit composited async-scroll layer (rastered at DPR² via the
+   frame's zoom trick). The editing rule below restores scrolling for the one
+   block being edited; wheel over a resting block pans the canvas anyway. */
+.pm-editor .ProseMirror .pm-math-block-preview {
+  padding: 0.4em 0;
+  text-align: center;
+  overflow: clip;
+}
+
+/* The source editor floats over content below the block instead of sitting in
+   flow, so toggling edit mode never changes the block's height — pagination
+   stays keyed off the preview, which is what print/export produces. */
+.pm-editor .ProseMirror .pm-math-block-source {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 0.6em 0.9em;
+  border: 1px solid rgba(149, 157, 165, 0.28);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: 0 8px 18px rgba(25, 28, 30, 0.12);
+  max-height: 320px;
+  overflow-y: auto;
+  font-family:
+    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  white-space: pre-wrap;
+}
+
+/* Scoped to [contenteditable="true"] so the editor panel hides when the page
+   frame itself leaves edit mode (selection may persist inside the block). */
+.pm-editor
+  .ProseMirror[contenteditable="true"]
+  .pm-math-block--editing
+  .pm-math-block-source {
+  display: block;
+}
+
+.pm-editor
+  .ProseMirror[contenteditable="true"]
+  .pm-math-block--editing
+  .pm-math-block-preview {
+  border-radius: var(--radius-lg);
+  background: rgba(230, 234, 240, 0.4);
+  overflow: auto;
+}
