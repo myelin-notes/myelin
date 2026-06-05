@@ -107,6 +107,7 @@ interface TestablePdfElement {
     pageSize: PdfPageSize,
     renderScale: number,
     zoom: number,
+    fastScroll?: boolean,
   ) => void;
 }
 
@@ -650,7 +651,15 @@ describe('PdfElement page rendering', () => {
       0,
       0,
     );
-    expect(renderCanvas.width).toBe(1);
-    expect(renderCanvas.height).toBe(1);
+    // The staging canvas returns to the pool at size and is reused by the
+    // next render instead of being reallocated.
+    expect(renderCanvas.width).toBe(1250);
+    expect(renderCanvas.height).toBe(1500);
+
+    element.requestPageRender(pageDom, 0, pageSize, 2, 1.2);
+    vi.advanceTimersByTime(120);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[1][0].canvas).toBe(
+      renderCanvas,
+    );
   });
 });
