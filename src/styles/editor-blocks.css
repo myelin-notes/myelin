@@ -131,11 +131,13 @@
    hosts the shared CodeMirror instance; fonts, wrapping, scrolling and the
    height cap live in its theme (math/source-editor.ts).
 
-   Chrome mirrors the app's popup surfaces (dropdown/context menus, the
-   floating toolbar): borderless popover sheet, rounded-xl, ambient +
-   elevated shadows (shadow tokens live in @theme inline, so the values are
-   inlined here like widgets.css does). No backdrop blur — inside the zoomed
-   page frame that would promote an expensively rasterized layer. */
+   Chrome reads as a floating code surface: the same tinted fill and quiet
+   1px line as code blocks (pre, .pm-code-block) rather than a white sheet —
+   white-on-white over the page had no tonal separation. Solid fill (no
+   translucency or backdrop blur: it floats over page text, and blur inside
+   the zoomed page frame would promote an expensively rasterized layer);
+   ambient + elevated shadows mark it as floating (tokens live in @theme
+   inline, so the values are inlined here like widgets.css does). */
 .pm-editor .ProseMirror .pm-math-block-source {
   display: none;
   position: absolute;
@@ -144,8 +146,9 @@
   right: 0;
   z-index: 5;
   padding: 0.5em 0.65em;
+  border: 1px solid rgba(195, 199, 202, 0.32);
   border-radius: var(--radius-xl);
-  background: var(--popover);
+  background: var(--bg-surface);
   box-shadow:
     0 0 32px 0 rgba(25, 28, 30, 0.06),
     0 18px 40px -24px rgba(28, 39, 56, 0.18);
@@ -157,6 +160,14 @@
     opacity: 0;
     transform: translateY(-2px) scale(0.98);
   }
+}
+
+/* The lint tooltip mounts inside the editor DOM, so the document's
+   `.ProseMirror li` bottom margin (editor-base.css) leaks into the
+   diagnostic <li> and pads the tooltip with phantom height. CodeMirror's
+   own margin reset loses that specificity contest — out-rank it here. */
+.pm-editor .ProseMirror .cm-diagnostic {
+  margin: 0;
 }
 
 /* Scoped to [contenteditable="true"] so the editor panel hides when the page

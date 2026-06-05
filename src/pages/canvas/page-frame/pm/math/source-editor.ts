@@ -1,6 +1,7 @@
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { LanguageDescription, syntaxHighlighting } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
+import { type Diagnostic, linter } from '@codemirror/lint';
 import { type Extension, Prec } from '@codemirror/state';
 import { EditorView, type KeyBinding, keymap } from '@codemirror/view';
 import { codeBlockHighlightStyle } from '../code-block/theme';
@@ -9,6 +10,8 @@ import {
   type NestedEditorKeyCallbacks,
   nestedEditorKeyBindings,
 } from '../nested-editor/editor';
+import { parseMathMarkdown, stripMathDelimiters } from './parse-math-block';
+import { mathParseError } from './render';
 
 /**
  * Callbacks of the node view currently borrowing the shared editor. The
@@ -54,7 +57,61 @@ const mathSourceEditorTheme = EditorView.theme({
   '&.cm-focused': {
     outline: 'none',
   },
+  // Lint tooltip chrome, restyled from CodeMirror's defaults to match the
+  // app's tooltip (components/ui/tooltip.tsx): dark ink sheet, light text,
+  // rounded-md, 12px — high contrast against the light panel beneath it.
+  // The lint ul (.cm-tooltip-lint) nests inside the generic .cm-tooltip
+  // wrapper, and lint hovers are the only tooltips here, so style the
+  // wrapper directly.
+  '.cm-tooltip': {
+    border: 'none',
+    borderRadius: 'var(--radius-md)',
+    backgroundColor: 'var(--foreground)',
+    maxWidth: '320px',
+    overflow: 'hidden',
+  },
+  '.cm-diagnostic': {
+    padding: '6px 12px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: '12px',
+    lineHeight: '1.4',
+    color: 'var(--background)',
+  },
+  // Severity already lives in the squiggle; CodeMirror's default 5px #d11
+  // side stripe is exactly the accent-bar pattern the app avoids.
+  '.cm-diagnostic-error': {
+    borderLeft: 'none',
+  },
 });
+
+/**
+ * KaTeX parse errors as CodeMirror diagnostics — a squiggle under the
+ * offending span with the message in the lint tooltip. The error's position
+ * is an offset into the stripped source (content lines joined by `\n`), so
+ * walk the content lines to map it back to a document offset.
+ */
+function mathDiagnostics(view: EditorView): Diagnostic[] {
+  const text = view.state.doc.toString();
+  const error = mathParseError(stripMathDelimiters(text));
+  if (!error) {
+    return [];
+  }
+
+  const content = parseMathMarkdown(text).lines.filter(
+    (line) => line.kind === 'content',
+  );
+  let from = content[content.length - 1]?.to ?? 0;
+  let remaining = error.position;
+  for (const line of content) {
+    if (remaining <= line.text.length) {
+      from = line.from + remaining;
+      break;
+    }
+    remaining -= line.text.length + 1;
+  }
+  const to = Math.min(from + Math.max(error.length, 1), text.length);
+  return [{ from, to, severity: 'error', message: error.rawMessage }];
+}
 
 /**
  * The floating LaTeX source editor for math blocks. A single instance is
@@ -94,6 +151,7 @@ export class MathSourceEditor extends NestedEditor {
         language,
         syntaxHighlighting(codeBlockHighlightStyle),
         mathSourceEditorTheme,
+        linter(mathDiagnostics, { delay: 250 }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             ownerRef.current?.onContentChange();
