@@ -462,11 +462,16 @@ input[type="range"].tool-slider::-moz-range-track {
   word-break: break-word;
 }
 
-.pm-editor .ProseMirror > *:first-child {
+/* The doubled .ProseMirror outranks later block rules with equal specificity
+   (.pm-math-block, .pm-code-block, pre, h1…) that set their own margins —
+   otherwise a first block's margin-top collapses through the ProseMirror root
+   and shifts the whole doc below the page chrome's content top, which
+   pagination (keyed off the root's offsetTop) can't see. */
+.pm-editor .ProseMirror.ProseMirror > *:first-child {
   margin-top: 0;
 }
 
-.pm-editor .ProseMirror > *:last-child {
+.pm-editor .ProseMirror.ProseMirror > *:last-child {
   margin-bottom: 0;
 }
 
