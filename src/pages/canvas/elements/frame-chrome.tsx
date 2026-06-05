@@ -70,12 +70,6 @@ export class FrameChrome {
       overflow: 'visible',
       borderRadius: `${CHROME_CORNER_RADIUS}px`,
     } as Partial<CSSStyleDeclaration>);
-    this.root.style.setProperty(
-      '--frame-chrome-header-height',
-      `${CHROME_HEADER_HEIGHT}px`,
-    );
-    this.root.style.setProperty('--frame-chrome-inner-width', '0px');
-    this.root.style.setProperty('--frame-chrome-zoom', '1');
     this.root.dataset.frameChrome = 'true';
 
     this.contentSlot = document.createElement('div');
@@ -147,15 +141,15 @@ export class FrameChrome {
     this.root.style.width = `${chromeWidth * zoom}px`;
     this.root.style.height = `${chromeHeight * zoom}px`;
     this.root.style.borderRadius = `${CHROME_CORNER_RADIUS * zoom}px`;
-    this.root.style.setProperty(
-      '--frame-chrome-header-height',
-      `${CHROME_HEADER_HEIGHT * zoom}px`,
-    );
-    this.root.style.setProperty(
-      '--frame-chrome-inner-width',
-      `${chromeWidth}px`,
-    );
-    this.root.style.setProperty('--frame-chrome-zoom', String(zoom));
+    // Imperative writes on the header elements themselves — NOT custom
+    // properties on this.root: the root is an ancestor of the whole editor
+    // subtree, and inherited custom-property changes there forced a
+    // full-subtree style recalc on every zoom frame.
+    this.viewRef.current?.syncHeaderGeometry({
+      headerHeight: CHROME_HEADER_HEIGHT * zoom,
+      innerWidth: chromeWidth,
+      zoom,
+    });
 
     this.contentSlot.style.transform = `translate(${CHROME_SIDE_PADDING * zoom}px, ${CHROME_HEADER_HEIGHT * zoom}px)`;
     this.contentSlot.style.width = `${contentWidth * zoom}px`;

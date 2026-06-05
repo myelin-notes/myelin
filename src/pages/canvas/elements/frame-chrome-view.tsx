@@ -15,6 +15,17 @@ import {
 
 export interface FrameChromeViewHandle {
   startTitleRename: () => void;
+  /**
+   * Writes the zoom-dependent header geometry imperatively. These values
+   * change every frame while zooming; routing them as CSS custom properties
+   * on the chrome root (an ancestor of the whole editor subtree) forced a
+   * full-subtree style recalc per frame because custom properties inherit.
+   */
+  syncHeaderGeometry: (params: {
+    headerHeight: number;
+    innerWidth: number;
+    zoom: number;
+  }) => void;
 }
 
 interface FrameChromeViewProps {
@@ -43,6 +54,8 @@ export const FrameChromeView = forwardRef<
   ref,
 ) {
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const headerClipRef = useRef<HTMLDivElement>(null);
+  const headerInnerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const shouldFocusTitleInput = useRef(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -83,6 +96,16 @@ export const FrameChromeView = forwardRef<
         setDraftTitle(fileName ?? '');
         setIsEditingTitle(true);
       },
+      syncHeaderGeometry: ({ headerHeight, innerWidth, zoom }) => {
+        const clip = headerClipRef.current;
+        const inner = headerInnerRef.current;
+        if (!clip || !inner) {
+          return;
+        }
+        clip.style.height = `${headerHeight}px`;
+        inner.style.width = `${innerWidth}px`;
+        inner.style.transform = `scale(${zoom})`;
+      },
     }),
     [canRenameTitle, fileName, isEditingTitle],
   );
@@ -119,19 +142,22 @@ export const FrameChromeView = forwardRef<
         }}
       >
         <div
+          ref={headerClipRef}
           className="pointer-events-none absolute top-0 right-0 left-0 overflow-hidden"
-          style={{ height: 'var(--frame-chrome-header-height)' }}
+          // height set imperatively via syncHeaderGeometry (changes per
+          // frame while zooming) — keep it out of JSX so React re-renders
+          // don't fight the imperative writes.
         >
           <div
+            ref={headerInnerRef}
             className="pointer-events-none absolute top-0 left-0 flex items-center text-text-primary"
             style={{
-              width: 'var(--frame-chrome-inner-width)',
               height: `${CHROME_HEADER_HEIGHT}px`,
               paddingLeft: `${CHROME_SIDE_PADDING}px`,
               paddingRight: `${CHROME_SIDE_PADDING}px`,
               gap: '14px',
               fontFamily: 'Inter, Arial, sans-serif',
-              transform: 'scale(var(--frame-chrome-zoom))',
+              // width and transform set imperatively via syncHeaderGeometry
               transformOrigin: '0 0',
             }}
           >
