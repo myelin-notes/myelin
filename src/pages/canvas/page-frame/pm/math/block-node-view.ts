@@ -332,13 +332,20 @@ export function positionMathBlockSources(viewDom: HTMLElement): void {
     return;
   }
 
+  // Bail before any layout reads when nothing is editing — this runs on
+  // every transaction (keystroke), and the common case has no open panel.
+  const panels = viewDom.querySelectorAll<HTMLElement>(
+    '.pm-math-block--editing .pm-math-block-source',
+  );
+  if (panels.length === 0) {
+    return;
+  }
+
   // Frame bottom expressed in the doc element's coordinate space.
   const frameBottom = editor.clientHeight - viewDom.offsetTop - SOURCE_GAP;
   const bound = Math.max(viewDom.clientHeight, frameBottom);
 
-  for (const panel of viewDom.querySelectorAll<HTMLElement>(
-    '.pm-math-block--editing .pm-math-block-source',
-  )) {
+  for (const panel of panels) {
     const block = panel.parentElement;
     const panelHeight = panel.offsetHeight;
     if (!block || panelHeight === 0) {
