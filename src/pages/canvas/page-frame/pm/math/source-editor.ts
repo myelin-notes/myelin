@@ -100,6 +100,17 @@ function mathDiagnostics(view: EditorView): Diagnostic[] {
   const content = parseMathMarkdown(text).lines.filter(
     (line) => line.kind === 'content',
   );
+
+  // katex's bundled types declare position/length as required numbers, but
+  // ParseError leaves them undefined when thrown without a token/lexer.
+  // Without a position there's nothing to map back, so underline the whole
+  // stripped range rather than produce a NaN-ranged diagnostic.
+  if (error.position === undefined) {
+    const from = content[0]?.from ?? 0;
+    const to = content[content.length - 1]?.to ?? text.length;
+    return [{ from, to, severity: 'error', message: error.rawMessage }];
+  }
+
   let from = content[content.length - 1]?.to ?? 0;
   let remaining = error.position;
   for (const line of content) {
@@ -109,7 +120,7 @@ function mathDiagnostics(view: EditorView): Diagnostic[] {
     }
     remaining -= line.text.length + 1;
   }
-  const to = Math.min(from + Math.max(error.length, 1), text.length);
+  const to = Math.min(from + Math.max(error.length ?? 1, 1), text.length);
   return [{ from, to, severity: 'error', message: error.rawMessage }];
 }
 
