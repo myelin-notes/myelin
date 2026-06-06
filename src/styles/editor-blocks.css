@@ -17,11 +17,14 @@
 }
 
 /* Blocks that can't break across pages (code blocks, math previews, embeds)
-   cap at the pagination CONTENT_HEIGHT (784px) and scroll past it. Continuous
-   layout has no pages to overflow, so the cap lifts there. Scroll behavior is
-   each block's own concern (overflow on itself or an inner scroller). */
+   cap at the pagination CONTENT_HEIGHT and scroll past it. Continuous layout
+   has no pages to overflow, so the cap lifts there. Scroll behavior is each
+   block's own concern (overflow on itself or an inner scroller).
+   --pm-content-height is set from the CONTENT_HEIGHT constant
+   (pagination/core.ts) by the pagination plugin so the two can't drift; the
+   784px fallback mirrors its current value for pre-pagination paints. */
 .pm-editor:not([data-page-layout="continuous"]) .ProseMirror .pm-page-capped {
-  max-height: 784px;
+  max-height: var(--pm-content-height, 784px);
 }
 
 .pm-editor .ProseMirror .pm-code-block {

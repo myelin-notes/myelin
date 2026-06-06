@@ -13,6 +13,7 @@ import type { PageLayout } from '../../../elements/page-frame-constants';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   type Break,
+  CONTENT_HEIGHT,
   calculateBreakLayout,
   PAGE_BREAK_GAP,
   PAGE_GAP,
@@ -1598,6 +1599,12 @@ function observeLayoutInvalidations(
   // attribute directly so changing modes always triggers a fresh pass (clearing
   // or re-inserting page breaks as needed).
   const layoutHost = view.dom.closest('.pm-editor');
+  if (layoutHost instanceof HTMLElement) {
+    // Single source of truth for the page-break cap: page-capped blocks in
+    // editor-blocks.css read this var so the CONTENT_HEIGHT constant and the
+    // CSS max-height can't drift apart.
+    layoutHost.style.setProperty('--pm-content-height', `${CONTENT_HEIGHT}px`);
+  }
   if (layoutHost && typeof MutationObserver !== 'undefined') {
     const layoutObserver = new MutationObserver(requestFollowUpPagination);
     layoutObserver.observe(layoutHost, {
