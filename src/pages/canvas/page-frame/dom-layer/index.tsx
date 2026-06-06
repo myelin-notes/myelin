@@ -564,6 +564,25 @@ export function PageFrameDomLayer({
     // scrolling elsewhere in the frame.
     let lastHead = -1;
     let lastDoc = view.state.doc;
+    // Selection moves placed by pointer don't pan: the user is pointing at
+    // something already on screen. Without this, clicking a math block near
+    // the viewport edge yanks the canvas — the click parks the caret at the
+    // END of the LaTeX source, inside a panel that opens below the block and
+    // off-screen. Track the pointer here rather than relying on PM's
+    // `pointer` meta because the moves arrive as native selectionchange
+    // events from the nested CodeMirror editors, not PM transactions.
+    let pointerActive = false;
+    let lastPointerUp = 0;
+    const handlePointerDown = () => {
+      pointerActive = true;
+    };
+    const handlePointerEnd = () => {
+      pointerActive = false;
+      lastPointerUp = performance.now();
+    };
+    // Grace period after pointerup: the click's selectionchange can land a
+    // frame or two later.
+    const POINTER_GRACE_MS = 150;
     const followCursor = () => {
       pendingRaf = 0;
       const dc = canvasRef.current;
@@ -572,6 +591,17 @@ export function PageFrameDomLayer({
       }
       const sel = view.state.selection;
       if (sel.head === lastHead && view.state.doc === lastDoc) {
+        return;
+      }
+      if (
+        pointerActive ||
+        performance.now() - lastPointerUp < POINTER_GRACE_MS
+      ) {
+        // Commit as seen: the async math-source attach that follows a click
+        // re-fires selectionchange with the same head after the grace
+        // expires, and must not replay this move as a follow.
+        lastHead = sel.head;
+        lastDoc = view.state.doc;
         return;
       }
       // Anchored on the editor's own frame DOM so the caret rect lands in true
@@ -629,6 +659,9 @@ export function PageFrameDomLayer({
 
     view.dom.addEventListener(PM_UPDATE_EVENT, schedule);
     document.addEventListener('selectionchange', schedule);
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('pointerup', handlePointerEnd, true);
+    document.addEventListener('pointercancel', handlePointerEnd, true);
 
     return () => {
       if (pendingRaf !== 0) {
@@ -636,6 +669,9 @@ export function PageFrameDomLayer({
       }
       view.dom.removeEventListener(PM_UPDATE_EVENT, schedule);
       document.removeEventListener('selectionchange', schedule);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('pointerup', handlePointerEnd, true);
+      document.removeEventListener('pointercancel', handlePointerEnd, true);
     };
   }, [editingElement, canvasRef]);
 
