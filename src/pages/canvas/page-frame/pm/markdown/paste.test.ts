@@ -1,6 +1,6 @@
 import { EditorState } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
-import { parseMarkdownToDoc } from '../../markdown-parser';
+import { parseMarkdownToDoc } from '../../markdown/parser';
 import { schema } from '../schema';
 import {
   buildMarkdownPasteSlice,

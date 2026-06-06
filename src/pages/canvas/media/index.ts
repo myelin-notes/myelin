@@ -1,5 +1,5 @@
 import type { DrawableCanvas } from '../drawable-canvas';
-import type { NoteLinkResolveSource } from '../page-frame/note-link-resolution';
+import type { NoteLinkResolveSource } from '../page-frame/note-link/resolution';
 import { imageImportHandler } from './images';
 import { markdownImportHandler } from './markdown';
 import { pdfImportHandler } from './pdf';

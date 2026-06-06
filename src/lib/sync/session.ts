@@ -1,5 +1,5 @@
 import { Logger } from '@/lib/logger';
-import { summarizeYDocManager } from '@/lib/note-state-summary';
+import { summarizeYDocManager } from '@/lib/note/state-summary';
 import {
   FRAGMENT_SWEEP_ORIGIN,
   PEER_ORIGIN,

@@ -24,7 +24,7 @@ import {
   importMarkdownFile,
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
-} from '@/pages/library/import-markdown';
+} from '@/pages/library/import/markdown';
 import {
   commandPalettePageFromTabTarget,
   commandPaletteShortcut,

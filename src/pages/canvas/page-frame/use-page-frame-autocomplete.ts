@@ -6,7 +6,7 @@ import {
   type NoteLinkSearchSource,
   type PageFrameNameCache,
   searchNoteLinkAutocompleteItems,
-} from './note-link-resolution';
+} from './note-link/resolution';
 import {
   PageFrameAutocompleteController,
   type PageFrameAutocompleteItem,

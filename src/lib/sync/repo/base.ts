@@ -1,7 +1,7 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
+import { summarizeYDoc } from '@/lib/note/state-summary';
 import { noteIndexService, type ReindexItem } from '@/lib/note-index';
-import { summarizeYDoc } from '@/lib/note-state-summary';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { NoteSession } from '../session';
 import type {

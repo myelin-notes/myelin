@@ -4,7 +4,7 @@ import { Logger } from '@/lib/logger';
 import {
   describeElementType,
   summarizeDrawableElements,
-} from '@/lib/note-state-summary';
+} from '@/lib/note/state-summary';
 import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasViewport } from './canvas-viewport';

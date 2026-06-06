@@ -5,7 +5,7 @@ import {
 } from 'y-prosemirror';
 import * as Y from 'yjs';
 import { ElementType } from '../elements/element-type';
-import { parseMarkdownToDoc } from '../page-frame/markdown-parser';
+import { parseMarkdownToDoc } from '../page-frame/markdown/parser';
 import { schema } from '../page-frame/pm/schema';
 import { YDocManager } from '../ydoc-manager';
 import {

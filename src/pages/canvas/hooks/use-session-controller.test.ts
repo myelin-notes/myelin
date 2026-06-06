@@ -31,7 +31,7 @@ vi.mock('@/pages/canvas/elements/page-frame-element', () => ({
   PageFrameElement: class PageFrameElement {},
 }));
 
-vi.mock('@/pages/canvas/page-frame/note-link-resolution', () => ({
+vi.mock('@/pages/canvas/page-frame/note-link/resolution', () => ({
   resolveNoteLinkRefByTitle: resolveNoteLinkRefByTitleMock,
 }));
 

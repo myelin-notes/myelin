@@ -4,7 +4,7 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { IS_DEV } from '@/lib/env';
-import { openNote } from '@/lib/note-navigation';
+import { openNote } from '@/lib/note/navigation';
 import {
   type NodeSearchResult,
   useRepository,

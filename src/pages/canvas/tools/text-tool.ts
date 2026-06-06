@@ -2,7 +2,7 @@ import { Type as TypeIcon } from 'lucide-react';
 import type { MessageGetter } from '@/lib/i18n';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import { TextElement, type TextStyle } from '../elements/text-element';
+import { TextElement, type TextStyle } from '../elements/text/element';
 import type { FontEntry, ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const TEXT_COLORS = [
