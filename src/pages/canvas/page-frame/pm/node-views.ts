@@ -5,8 +5,17 @@ import { PageFrameTableNodeView } from './table/node-view';
 
 export function buildNodeViews(): Record<string, NodeViewConstructor> {
   return {
-    mathBlock(node) {
-      return new MathBlockNodeView(node);
+    mathBlock(node, view, getPos) {
+      if (typeof getPos !== 'function') {
+        throw new Error('mathBlock node view requires a stable getPos');
+      }
+      return new MathBlockNodeView(node, view, () => {
+        const pos = getPos();
+        if (typeof pos !== 'number') {
+          throw new Error('mathBlock node view position is unavailable');
+        }
+        return pos;
+      });
     },
     codeBlock(node, view, getPos) {
       if (typeof getPos !== 'function') {

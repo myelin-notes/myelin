@@ -16,6 +16,20 @@ function katexToString(src: string, displayMode: boolean): string {
   return html;
 }
 
+/**
+ * The ParseError for a block's LaTeX source, or null when it renders (or
+ * fails with something other than a parse error). Feeds the source editor's
+ * lint extension; positions are offsets into `src`, the stripped source.
+ */
+export function mathParseError(src: string): katex.ParseError | null {
+  try {
+    katex.renderToString(src, { throwOnError: true, displayMode: true });
+    return null;
+  } catch (error) {
+    return error instanceof katex.ParseError ? error : null;
+  }
+}
+
 export function renderKatex(src: string, displayMode: boolean): HTMLElement {
   const el = document.createElement(displayMode ? 'div' : 'span');
   el.className = displayMode ? 'pm-math-block-render' : 'pm-math-inline';

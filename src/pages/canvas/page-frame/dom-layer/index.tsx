@@ -30,15 +30,23 @@ import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
-import { getPageFramePmScreenRectForPos } from '../pm/screen-rect';
+import { positionMathBlockSources } from '../pm/math/block-node-view';
+import {
+  getPageFramePmScreenRectForNestedCaret,
+  getPageFramePmScreenRectForPos,
+} from '../pm/screen-rect';
 import type { PageFrameAutocompleteKind } from '../use-page-frame-autocomplete';
 
+// `clip` rather than `hidden`: hidden boxes are still programmatically
+// scrollable, so the browser's caret-reveal (and PM's scrollIntoView) can
+// scroll them when an overlay pokes past the clip edge — shifting the page
+// inside its chrome. Clip boxes can't scroll at all.
 const FRAME_STYLE: Record<string, string> = {
   transformOrigin: '0 0',
   position: 'absolute',
   left: '0px',
   top: '0px',
-  overflow: 'hidden',
+  overflow: 'clip',
 };
 
 const VIEWPORT_STYLE: Record<string, string> = {
@@ -46,7 +54,7 @@ const VIEWPORT_STYLE: Record<string, string> = {
   position: 'absolute',
   left: '0px',
   top: '0px',
-  overflow: 'hidden',
+  overflow: 'clip',
 };
 
 const CONTENT_STYLE: Record<string, string> = {
@@ -171,7 +179,13 @@ function syncEditorLayout(
   pageHeight: number,
   pageLayout: PageLayout,
 ): void {
-  refs.contentDiv.dataset.pageLayout = pageLayout;
+  // Same-value guard: this runs every frame from the sync loop, and the
+  // pagination plugin (plus code-block node views) watch this attribute with
+  // MutationObservers that fire on every write — unguarded, that schedules a
+  // repagination pass every frame forever.
+  if (refs.contentDiv.dataset.pageLayout !== pageLayout) {
+    refs.contentDiv.dataset.pageLayout = pageLayout;
+  }
 
   const editorDom = refs.frame.pmEditor?.view?.dom;
   if (!(editorDom instanceof HTMLElement)) {
@@ -406,6 +420,7 @@ export function PageFrameDomLayer({
 
       const zoom = dc.viewport.zoom;
       const offset = dc.viewport.offset;
+      const viewAnimating = dc.viewport.isAnimatingView;
       const frames = dc.getElementsByType(
         ElementType.PAGE_FRAME,
       ) as PageFrameElement[];
@@ -477,6 +492,23 @@ export function PageFrameDomLayer({
         refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
 
         refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
+        // Editing chrome (the math source panel) is display:none while the
+        // view animates: painting it mid-zoom roughly doubles the edit-enter
+        // frame hitch, and it isn't readable until the camera lands anyway.
+        // Same-value guard — observers aside, attribute writes dirty style.
+        if ('viewAnimating' in refs.contentDiv.dataset !== viewAnimating) {
+          if (viewAnimating) {
+            refs.contentDiv.dataset.viewAnimating = '';
+          } else {
+            delete refs.contentDiv.dataset.viewAnimating;
+            // The panel skipped its clamp while hidden (offsetHeight was 0);
+            // re-clamp now that it's visible. No-op when nothing is editing.
+            const editorDom = refs.frame.pmEditor?.view?.dom;
+            if (editorDom instanceof HTMLElement) {
+              positionMathBlockSources(editorDom);
+            }
+          }
+        }
         syncEditorLayout(refs, pageWidth, pageHeight, pageLayout);
         syncPageChrome(
           refs,
@@ -532,6 +564,25 @@ export function PageFrameDomLayer({
     // scrolling elsewhere in the frame.
     let lastHead = -1;
     let lastDoc = view.state.doc;
+    // Selection moves placed by pointer don't pan: the user is pointing at
+    // something already on screen. Without this, clicking a math block near
+    // the viewport edge yanks the canvas — the click parks the caret at the
+    // END of the LaTeX source, inside a panel that opens below the block and
+    // off-screen. Track the pointer here rather than relying on PM's
+    // `pointer` meta because the moves arrive as native selectionchange
+    // events from the nested CodeMirror editors, not PM transactions.
+    let pointerActive = false;
+    let lastPointerUp = 0;
+    const handlePointerDown = () => {
+      pointerActive = true;
+    };
+    const handlePointerEnd = () => {
+      pointerActive = false;
+      lastPointerUp = performance.now();
+    };
+    // Grace period after pointerup: the click's selectionchange can land a
+    // frame or two later.
+    const POINTER_GRACE_MS = 150;
     const followCursor = () => {
       pendingRaf = 0;
       const dc = canvasRef.current;
@@ -542,12 +593,28 @@ export function PageFrameDomLayer({
       if (sel.head === lastHead && view.state.doc === lastDoc) {
         return;
       }
+      if (
+        pointerActive ||
+        performance.now() - lastPointerUp < POINTER_GRACE_MS
+      ) {
+        // Commit as seen: the async math-source attach that follows a click
+        // re-fires selectionchange with the same head after the grace
+        // expires, and must not replay this move as a follow.
+        lastHead = sel.head;
+        lastDoc = view.state.doc;
+        return;
+      }
       // Anchored on the editor's own frame DOM so the caret rect lands in true
       // screen pixels wherever the canvas sits in the window. Returns null if
       // the position is stale (mid-transaction) or the DOM isn't mounted —
       // commit lastHead/lastDoc only after a successful measure so the next
-      // update retries instead of silently dropping the follow.
-      const screenRect = getPageFramePmScreenRectForPos(view, sel.head);
+      // update retries instead of silently dropping the follow. When the
+      // caret sits inside a nested CodeMirror editor (code block, math
+      // source), measure the native selection — PM's coordsAtPos degrades to
+      // the block boundary there and would pan the canvas to the block.
+      const screenRect =
+        getPageFramePmScreenRectForNestedCaret(view) ??
+        getPageFramePmScreenRectForPos(view, sel.head);
       if (!screenRect) {
         return;
       }
@@ -592,6 +659,9 @@ export function PageFrameDomLayer({
 
     view.dom.addEventListener(PM_UPDATE_EVENT, schedule);
     document.addEventListener('selectionchange', schedule);
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('pointerup', handlePointerEnd, true);
+    document.addEventListener('pointercancel', handlePointerEnd, true);
 
     return () => {
       if (pendingRaf !== 0) {
@@ -599,6 +669,9 @@ export function PageFrameDomLayer({
       }
       view.dom.removeEventListener(PM_UPDATE_EVENT, schedule);
       document.removeEventListener('selectionchange', schedule);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('pointerup', handlePointerEnd, true);
+      document.removeEventListener('pointercancel', handlePointerEnd, true);
     };
   }, [editingElement, canvasRef]);
 

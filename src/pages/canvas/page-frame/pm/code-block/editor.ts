@@ -11,27 +11,22 @@ import {
   Decoration,
   type DecorationSet,
   EditorView,
-  type KeyBinding,
   keymap,
   lineNumbers,
   type ViewUpdate,
 } from '@codemirror/view';
+import {
+  clamp,
+  NestedEditor,
+  type NestedEditorKeyCallbacks,
+  nestedEditorKeyBindings,
+} from '../nested-editor/editor';
 import type { CodeBlockExternalSelection } from './selection-sync';
 import {
   codeBlockEditorTheme,
   codeBlockHighlightStyle,
   codeBlockLanguage,
 } from './theme';
-
-export type CodeBlockEditorDirection = -1 | 1;
-
-export type CodeBlockEditorEscapeUnit = 'char' | 'line';
-
-interface CodeBlockEditorSelection {
-  empty: boolean;
-  from: number;
-  to: number;
-}
 
 interface CodeBlockEditorCursorPosition {
   column: number;
@@ -52,22 +47,11 @@ interface CodeBlockEditorLayout {
   outerHeightPx: number;
 }
 
-interface CodeBlockEditorLayoutOptions {
-  maxOuterHeightPx?: number;
-}
-
-interface CodeBlockEditorCallbacks {
+interface CodeBlockEditorCallbacks extends NestedEditorKeyCallbacks {
   onBoundaryInput: (event: CodeBlockEditorBoundaryInput) => void;
   onContentChange: () => void;
   onContentSizeChange: () => void;
-  onEscapeRequest: (
-    unit: CodeBlockEditorEscapeUnit,
-    dir: CodeBlockEditorDirection,
-  ) => boolean;
-  onExitCodeBlock: () => void;
-  onRedo: () => void;
   onSelectionChange: () => void;
-  onUndo: () => void;
 }
 
 interface CodeBlockEditorOptions {
@@ -76,10 +60,6 @@ interface CodeBlockEditorOptions {
 }
 
 const MIN_OUTER_HEIGHT_PX = 72;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 const setDelimiterLines = StateEffect.define<readonly number[]>();
 const setExternalSelectionEffect =
@@ -146,77 +126,17 @@ const externalSelectionField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-export class CodeBlockEditor {
-  private readonly view: EditorView;
-  private readonly handleWheel = (event: WheelEvent): void => {
-    if (event.ctrlKey || !this.view.hasFocus) {
-      return;
-    }
-    if (!this.hasVerticalOverflow()) {
-      return;
-    }
-    event.stopPropagation();
-  };
-
+export class CodeBlockEditor extends NestedEditor {
   constructor(
     private readonly editorEl: HTMLDivElement,
     options: CodeBlockEditorOptions,
   ) {
-    const escapeBindings: KeyBinding[] = [
-      {
-        key: 'ArrowUp',
-        run: () => options.callbacks.onEscapeRequest('line', -1),
-      },
-      {
-        key: 'ArrowDown',
-        run: () => options.callbacks.onEscapeRequest('line', 1),
-      },
-      {
-        key: 'ArrowLeft',
-        run: () => options.callbacks.onEscapeRequest('char', -1),
-      },
-      {
-        key: 'ArrowRight',
-        run: () => options.callbacks.onEscapeRequest('char', 1),
-      },
-      {
-        key: 'Mod-Enter',
-        run: () => {
-          options.callbacks.onExitCodeBlock();
-          return true;
-        },
-      },
-      {
-        key: 'Shift-Enter',
-        run: () => {
-          options.callbacks.onExitCodeBlock();
-          return true;
-        },
-      },
-      {
-        key: 'Mod-z',
-        run: () => {
-          options.callbacks.onUndo();
-          return true;
-        },
-      },
-      {
-        key: 'Mod-Shift-z',
-        run: () => {
-          options.callbacks.onRedo();
-          return true;
-        },
-      },
-      {
-        key: 'Mod-y',
-        run: () => {
-          options.callbacks.onRedo();
-          return true;
-        },
-      },
-    ];
-
     const extensions: Extension[] = [
+      // Page-height cap comes from the shared .pm-page-capped CSS rule; the
+      // .cm-scroller (overflow: auto) scrolls past it. Applied via
+      // editorAttributes because CodeMirror owns view.dom's class attribute
+      // and wipes externally added classes on update.
+      EditorView.editorAttributes.of({ class: 'pm-page-capped' }),
       lineNumbers(),
       codeBlockLanguage(),
       syntaxHighlighting(codeBlockHighlightStyle),
@@ -250,46 +170,12 @@ export class CodeBlockEditor {
           },
         }),
       ),
-      Prec.highest(keymap.of(escapeBindings)),
+      Prec.highest(keymap.of(nestedEditorKeyBindings(() => options.callbacks))),
       keymap.of([...defaultKeymap, indentWithTab]),
     ];
 
-    this.view = new EditorView({
-      doc: options.initialValue,
-      extensions,
-      parent: this.editorEl,
-    });
+    super({ doc: options.initialValue, extensions, parent: editorEl });
     this.editorEl.addEventListener('wheel', this.handleWheel);
-  }
-
-  getValue(): string {
-    return this.view.state.doc.toString();
-  }
-
-  setValue(value: string): void {
-    if (value === this.getValue()) {
-      return;
-    }
-    this.view.dispatch({
-      changes: { from: 0, insert: value, to: this.view.state.doc.length },
-    });
-  }
-
-  getSelection(): CodeBlockEditorSelection {
-    const range = this.view.state.selection.main;
-    return { empty: range.empty, from: range.from, to: range.to };
-  }
-
-  setSelection(anchor: number, head: number): void {
-    const length = this.view.state.doc.length;
-    this.view.focus();
-    this.view.dispatch({
-      scrollIntoView: true,
-      selection: EditorSelection.range(
-        clamp(anchor, 0, length),
-        clamp(head, 0, length),
-      ),
-    });
   }
 
   clearSelection(): void {
@@ -300,14 +186,6 @@ export class CodeBlockEditor {
       return;
     }
     this.view.dispatch({ selection: EditorSelection.cursor(range.head) });
-  }
-
-  focus(): void {
-    this.view.focus();
-  }
-
-  hasTextFocus(): boolean {
-    return this.view.hasFocus;
   }
 
   setDelimiterLines(lineNumbers: readonly number[]): void {
@@ -335,40 +213,13 @@ export class CodeBlockEditor {
     return this.view.posAtCoords({ x: left, y: top });
   }
 
-  isCursorAtBoundary(
-    unit: CodeBlockEditorEscapeUnit,
-    dir: CodeBlockEditorDirection,
-  ): boolean {
-    const range = this.view.state.selection.main;
-    if (!range.empty) {
-      return false;
-    }
-
-    if (unit === 'line') {
-      const lineNumber = this.view.state.doc.lineAt(range.head).number;
-      const edgeLine = dir < 0 ? 1 : this.view.state.doc.lines;
-      return lineNumber === edgeLine;
-    }
-
-    return dir < 0
-      ? range.head === 0
-      : range.head === this.view.state.doc.length;
-  }
-
-  syncLayout(
-    options: CodeBlockEditorLayoutOptions = {},
-  ): CodeBlockEditorLayout {
-    // The editor auto-sizes to its content via CSS (min-height floor +
-    // max-height cap, scrolling past the cap). We then read offsetHeight — the
-    // rendered CSS-px height, which (unlike CodeMirror's contentHeight) is
-    // immune to the canvas's ancestor `zoom`/`transform: scale` and matches the
-    // coordinate space pagination measures blocks in.
-    const cap =
-      options.maxOuterHeightPx === undefined
-        ? null
-        : Math.max(MIN_OUTER_HEIGHT_PX, Math.floor(options.maxOuterHeightPx));
+  syncLayout(): CodeBlockEditorLayout {
+    // The editor auto-sizes to its content via CSS (min-height floor + the
+    // .pm-page-capped max-height, scrolling past the cap). We then read
+    // offsetHeight — the rendered CSS-px height, which (unlike CodeMirror's
+    // contentHeight) is immune to the canvas's ancestor `zoom`/`transform:
+    // scale` and matches the coordinate space pagination measures blocks in.
     this.view.dom.style.minHeight = `${MIN_OUTER_HEIGHT_PX}px`;
-    this.view.dom.style.maxHeight = cap === null ? '' : `${cap}px`;
 
     const measured = this.view.dom.offsetHeight;
     const height = measured > 0 ? measured : MIN_OUTER_HEIGHT_PX;
@@ -378,10 +229,5 @@ export class CodeBlockEditor {
   dispose(): void {
     this.editorEl.removeEventListener('wheel', this.handleWheel);
     this.view.destroy();
-  }
-
-  private hasVerticalOverflow(): boolean {
-    const scroller = this.view.scrollDOM;
-    return scroller.scrollHeight > scroller.clientHeight + 1;
   }
 }

@@ -81,18 +81,26 @@ export class PageFrameEditorState {
       state,
       editable: (_state) => editable(),
       nodeViews: buildNodeViews(),
+      // Page frames never scroll internally — the canvas follow-cursor pan
+      // keeps the caret on screen. PM's default ancestor scroll-walk would
+      // scroll the frame's clip boxes (or the canvas page root) and desync
+      // the DOM from the canvas-drawn chrome. The nested CodeMirror editors
+      // (code blocks, math source) manage their own caret visibility.
+      handleScrollToSelection() {
+        return true;
+      },
       dispatchTransaction(this: EditorView, tr: Transaction) {
         // `this` is the EditorView (bound by ProseMirror via .call())
         const hadNestedFocus =
           document.activeElement instanceof HTMLElement &&
           this.dom.contains(document.activeElement);
-        const wasInCodeBlock =
-          this.state.selection.$from.parent.type === schema.nodes.codeBlock;
+        const inNestedEditor = (state: EditorState) =>
+          state.selection.$from.parent.type === schema.nodes.codeBlock ||
+          state.selection.$from.parent.type === schema.nodes.mathBlock;
+        const wasInNestedEditor = inNestedEditor(this.state);
         const newState = this.state.apply(tr);
         this.updateState(newState);
-        const isInCodeBlock =
-          newState.selection.$from.parent.type === schema.nodes.codeBlock;
-        if (hadNestedFocus && wasInCodeBlock && !isInCodeBlock) {
+        if (hadNestedFocus && wasInNestedEditor && !inNestedEditor(newState)) {
           this.focus();
         }
         this.dom.dispatchEvent(new Event(PM_UPDATE_EVENT));

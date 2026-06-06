@@ -1,21 +1,24 @@
 import { exitCode } from 'prosemirror-commands';
 import { redo, undo } from 'prosemirror-history';
 import type { Node as PMNode } from 'prosemirror-model';
-import { Selection, TextSelection } from 'prosemirror-state';
+import { TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import {
   CODE_BLOCK_CLEAR_SELECTION_EVENT,
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
 } from '@/lib/events';
+import { PM_EDITOR_CLASS } from '../constants';
 import { isOpeningFenceLine } from '../markdown/parse-fences';
-import { CONTENT_HEIGHT } from '../pagination/core';
-import { schema } from '../schema';
 import type {
-  CodeBlockEditor,
-  CodeBlockEditorBoundaryInput,
-  CodeBlockEditorDirection,
-  CodeBlockEditorEscapeUnit,
-} from './editor';
+  NestedEditorDirection,
+  NestedEditorEscapeUnit,
+} from '../nested-editor/editor';
+import {
+  escapeNestedEditor,
+  forwardNestedContentUpdate,
+  forwardNestedSelectionUpdate,
+} from '../nested-editor/pm-sync';
+import type { CodeBlockEditor, CodeBlockEditorBoundaryInput } from './editor';
 import {
   type CodeBlockExternalSelection,
   type CodeBlockExternalSelectionDetail,
@@ -48,44 +51,12 @@ function parseFenceSource(text: string): FenceSource {
   };
 }
 
-function findTextDiff(current: string, next: string) {
-  if (current === next) {
-    return null;
-  }
-
-  let start = 0;
-  let currentEnd = current.length;
-  let nextEnd = next.length;
-
-  while (
-    start < currentEnd &&
-    start < nextEnd &&
-    current.charCodeAt(start) === next.charCodeAt(start)
-  ) {
-    start += 1;
-  }
-
-  while (
-    currentEnd > start &&
-    nextEnd > start &&
-    current.charCodeAt(currentEnd - 1) === next.charCodeAt(nextEnd - 1)
-  ) {
-    currentEnd -= 1;
-    nextEnd -= 1;
-  }
-
-  return {
-    from: start,
-    insert: next.slice(start, nextEnd),
-    to: currentEnd,
-  };
-}
-
 export class CodeBlockNodeView implements NodeView {
   public readonly dom: HTMLDivElement;
 
   private readonly editorEl: HTMLDivElement;
   private editor: CodeBlockEditor | null = null;
+  private layoutObserver: MutationObserver | null = null;
   private destroyed = false;
   private selectionDragStartedOutside = false;
   private updating = false;
@@ -160,6 +131,18 @@ export class CodeBlockNodeView implements NodeView {
     this.editorEl.className = 'pm-code-block__editor';
     this.dom.appendChild(this.editorEl);
 
+    // The .pm-page-capped max-height tracks data-page-layout, which the frame
+    // can flip after this view mounts (e.g. switching to continuous in
+    // settings) — re-measure the outer height when it does.
+    const layoutHost = this.view.dom.closest(`.${PM_EDITOR_CLASS}`);
+    if (layoutHost) {
+      this.layoutObserver = new MutationObserver(() => this.syncHeight());
+      this.layoutObserver.observe(layoutHost, {
+        attributes: true,
+        attributeFilter: ['data-page-layout'],
+      });
+    }
+
     void this.initEditor();
   }
 
@@ -210,6 +193,8 @@ export class CodeBlockNodeView implements NodeView {
 
   destroy(): void {
     this.destroyed = true;
+    this.layoutObserver?.disconnect();
+    this.layoutObserver = null;
     this.dom.removeEventListener(
       CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
       this.handleExternalSelection,
@@ -243,7 +228,7 @@ export class CodeBlockNodeView implements NodeView {
         onContentChange: () => this.forwardContentUpdate(),
         onContentSizeChange: () => this.syncHeight(),
         onEscapeRequest: (unit, dir) => this.maybeEscape(unit, dir),
-        onExitCodeBlock: () => this.exitCodeBlock(),
+        onExitBlock: () => this.exitCodeBlock(),
         onRedo: () => redo(this.view.state, this.view.dispatch),
         onSelectionChange: () => this.forwardSelectionUpdate(),
         onUndo: () => undo(this.view.state, this.view.dispatch),
@@ -274,32 +259,12 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
 
-    const nextText = this.editor.getValue();
-    const selection = this.editor.getSelection();
-    const offset = this.getPos() + 1;
-    const selFrom = offset + selection.from;
-    const selTo = offset + selection.to;
-    const pmSelection = this.view.state.selection;
-    const diff = findTextDiff(this.node.textContent, nextText);
-
-    if (!diff && pmSelection.from === selFrom && pmSelection.to === selTo) {
-      return;
-    }
-
-    const tr = this.view.state.tr;
-    if (diff) {
-      if (diff.insert.length > 0) {
-        tr.replaceWith(
-          offset + diff.from,
-          offset + diff.to,
-          schema.text(diff.insert),
-        );
-      } else {
-        tr.delete(offset + diff.from, offset + diff.to);
-      }
-    }
-    tr.setSelection(TextSelection.create(tr.doc, selFrom, selTo));
-    this.view.dispatch(tr);
+    forwardNestedContentUpdate(
+      this.view,
+      this.getPos() + 1,
+      this.node.textContent,
+      this.editor,
+    );
   }
 
   private forwardSelectionUpdate(): void {
@@ -312,20 +277,7 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
 
-    const selection = this.editor.getSelection();
-    const offset = this.getPos() + 1;
-    const selFrom = offset + selection.from;
-    const selTo = offset + selection.to;
-    const pmSelection = this.view.state.selection;
-    if (pmSelection.from === selFrom && pmSelection.to === selTo) {
-      return;
-    }
-
-    this.view.dispatch(
-      this.view.state.tr.setSelection(
-        TextSelection.create(this.view.state.doc, selFrom, selTo),
-      ),
-    );
+    forwardNestedSelectionUpdate(this.view, this.getPos() + 1, this.editor);
   }
 
   private selectThroughMousePoint(clientX: number, clientY: number): boolean {
@@ -364,21 +316,14 @@ export class CodeBlockNodeView implements NodeView {
   }
 
   private maybeEscape(
-    unit: CodeBlockEditorEscapeUnit,
-    dir: CodeBlockEditorDirection,
+    unit: NestedEditorEscapeUnit,
+    dir: NestedEditorDirection,
   ): boolean {
     if (!this.editor?.isCursorAtBoundary(unit, dir)) {
       return false;
     }
 
-    const targetPos = this.getPos() + (dir < 0 ? 0 : this.node.nodeSize);
-    const nextSelection = Selection.near(
-      this.view.state.doc.resolve(targetPos),
-      dir,
-    );
-    const tr = this.view.state.tr.setSelection(nextSelection).scrollIntoView();
-    this.view.dispatch(tr);
-    this.view.focus();
+    escapeNestedEditor(this.view, this.getPos(), this.node.nodeSize, dir);
     return true;
   }
 
@@ -512,7 +457,7 @@ export class CodeBlockNodeView implements NodeView {
       return;
     }
 
-    const layout = this.editor.syncLayout({ maxOuterHeightPx: CONTENT_HEIGHT });
+    const layout = this.editor.syncLayout();
     this.dom.style.height = `${layout.outerHeightPx}px`;
   }
 }

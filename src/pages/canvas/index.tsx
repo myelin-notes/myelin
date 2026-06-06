@@ -397,12 +397,15 @@ function CanvasViewInner({
     [],
   );
 
+  // overflow-clip (not -hidden): hidden boxes are still programmatically
+  // scrollable, so the browser's caret-reveal for offscreen page-frame
+  // carets can scroll them and desync the DOM from the canvas.
   return (
-    <div className="relative h-full w-full overflow-hidden bg-page">
+    <div className="relative h-full w-full overflow-clip bg-page">
       <div
         ref={thumbnailRootRef}
         data-thumbnail-root="true"
-        className="absolute inset-0 overflow-hidden bg-page"
+        className="absolute inset-0 overflow-clip bg-page"
       >
         {/* Background canvas: dot grid */}
         <canvas

@@ -14,6 +14,7 @@ import {
   getChangedRangesForTransaction,
 } from '../markdown/range-tracking';
 import { buildTextOffsetMap } from '../markdown/text-offset-map';
+import { positionMathBlockSources } from './block-node-view';
 import { renderKatex } from './render';
 
 const mathPreviewKey = new PluginKey<DecorationSet>('math-preview');
@@ -68,7 +69,13 @@ function buildMathDecorationsForTextblock(
   selection: Selection,
 ): Decoration[] {
   if (node.type.name === 'mathBlock') {
-    if (!selectionTouches(selection, pos, pos + node.nodeSize)) {
+    // Editing requires the selection to be contained inside the block's
+    // content, not merely overlapping it: a cross-block range keeps the
+    // preview, and containment guarantees at most one block edits at a
+    // time — the source editor is a single shared CodeMirror instance.
+    const from = pos + 1;
+    const to = pos + node.nodeSize - 1;
+    if (selection.from < from || selection.to > to) {
       return [];
     }
     return [
@@ -164,6 +171,14 @@ function addEnclosingTextblock(
 export function mathPreviewPlugin(): Plugin<DecorationSet> {
   return new Plugin({
     key: mathPreviewKey,
+    view(view) {
+      positionMathBlockSources(view.dom);
+      return {
+        update(view) {
+          positionMathBlockSources(view.dom);
+        },
+      };
+    },
     state: {
       init(_, state) {
         return DecorationSet.create(state.doc, buildMathDecorations(state));
