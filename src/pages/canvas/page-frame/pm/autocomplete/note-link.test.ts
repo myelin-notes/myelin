@@ -1,6 +1,6 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
-import { parseMarkdownToDoc } from '../../markdown-parser';
+import { parseMarkdownToDoc } from '../../markdown/parser';
 import { buildResolvedNoteLinkTransaction } from '../markdown/note-links';
 import { schema } from '../schema';
 import {

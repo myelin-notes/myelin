@@ -1,7 +1,7 @@
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameElement } from '../elements/page-frame-element';
-import { writeMarkdownToPageFrameFragment } from '../page-frame/markdown-import';
+import { writeMarkdownToPageFrameFragment } from '../page-frame/markdown/import';
 import type { MediaImportOptions } from './index';
 
 export async function markdownImportHandler(

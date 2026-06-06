@@ -11,7 +11,7 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
-import { summarizeNoteBytes } from '@/lib/note-state-summary';
+import { summarizeNoteBytes } from '@/lib/note/state-summary';
 import { BaseRepository } from './base';
 import {
   computeRevision,

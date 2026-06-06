@@ -4,8 +4,8 @@ import {
   type Transaction,
 } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
-import { parseMarkdownToDoc } from '../markdown-parser';
-import { serializeDocToMarkdown } from '../markdown-serializer';
+import { parseMarkdownToDoc } from '../markdown/parser';
+import { serializeDocToMarkdown } from '../markdown/serializer';
 import {
   calloutCaretAnchorCleanupPlugin,
   deleteBackwardInCallout,

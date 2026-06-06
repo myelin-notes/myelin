@@ -25,7 +25,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
-import { openNote } from '@/lib/note-navigation';
+import { openNote } from '@/lib/note/navigation';
 import {
   type FileType,
   useRepository,
@@ -48,29 +48,29 @@ import {
   type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
-import { ImportDialog, type ImportSource } from './import-dialog';
+import { ImportDialog, type ImportSource } from './import/dialog';
 import {
   importStorageFile,
   isStorageFile,
   STORAGE_FILE_ACCEPT,
-} from './import-files';
+} from './import/files';
 import {
   GOODNOTES_ZIP_FILE_ACCEPT,
   importGoodnotesZip,
   isZipFile,
-} from './import-goodnotes';
+} from './import/goodnotes';
 import {
   importMarkdownFile,
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
-} from './import-markdown';
-import { createObsidianVaultImportSource } from './import-obsidian-source';
+} from './import/markdown';
+import { createObsidianVaultImportSource } from './import/obsidian-source';
 import {
   importPdfFile,
   isNativeGoodnotesFile,
   isPdfFile,
   PDF_FILE_ACCEPT,
-} from './import-pdf';
+} from './import/pdf';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 

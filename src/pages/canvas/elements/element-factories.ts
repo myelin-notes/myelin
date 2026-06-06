@@ -4,7 +4,7 @@ import { ImageElement } from './image-element';
 import { PageFrameElement } from './page-frame-element';
 import { PdfElement } from './pdf-element';
 import { StrokeElement } from './stroke-element';
-import { TextElement } from './text-element';
+import { TextElement } from './text/element';
 
 export type ElementFactory = (uuid: string) => DrawableElement;
 
