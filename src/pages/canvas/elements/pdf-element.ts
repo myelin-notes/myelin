@@ -782,14 +782,26 @@ export class PdfElement extends DrawableElement {
     }
   }
 
-  private disposePageDom(pageDom: PdfPageDom): void {
+  private disposePageDom(
+    pageDom: PdfPageDom,
+    livePageIndices?: Set<number>,
+  ): void {
     // Renders no longer cleanup() per pass, so release pdf.js's page caches
     // when the page's dom is evicted instead.
     const cachedPageIndex =
       pageDom.rendered?.pageIndex ?? pageDom.rendering?.pageIndex;
     this.releasePageRender(pageDom, true);
     pageDom.root.remove();
-    if (this._pdfDocument && cachedPageIndex !== undefined) {
+    // Skip cleanup when another surviving dom still uses this page index:
+    // scroll jitter at the retain edge can evict then immediately re-create a
+    // page whose render is rAF/debounce-scheduled, so cleanup() (which only
+    // refuses while a render is in flight) would wipe caches the pending
+    // render is about to reuse.
+    if (
+      this._pdfDocument &&
+      cachedPageIndex !== undefined &&
+      !livePageIndices?.has(cachedPageIndex)
+    ) {
       cleanupPdfPage(this._pdfDocument, cachedPageIndex);
     }
   }
@@ -1192,9 +1204,23 @@ export class PdfElement extends DrawableElement {
   }
 
   private removeInactivePageDoms(activePagePositions: Set<number>): void {
+    const livePageIndices = new Set<number>();
     for (const [pagePosition, pageDom] of this._pageDoms) {
       if (!activePagePositions.has(pagePosition)) {
-        this.disposePageDom(pageDom);
+        continue;
+      }
+      const pageIndex =
+        pageDom.rendered?.pageIndex ??
+        pageDom.rendering?.pageIndex ??
+        pageDom.pendingRender?.key.pageIndex;
+      if (pageIndex !== undefined) {
+        livePageIndices.add(pageIndex);
+      }
+    }
+
+    for (const [pagePosition, pageDom] of this._pageDoms) {
+      if (!activePagePositions.has(pagePosition)) {
+        this.disposePageDom(pageDom, livePageIndices);
         this._pageDoms.delete(pagePosition);
       }
     }
