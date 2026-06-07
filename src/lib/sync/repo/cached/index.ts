@@ -332,8 +332,8 @@ export class CachedRepository
     return this.cache.getNodesByAnyTag(tags);
   }
 
-  async listTags(): Promise<RepositoryTag[]> {
-    return this.cache.listTags();
+  async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
+    return this.cache.listTags(includeAncestors);
   }
 
   async getStats(): Promise<RepositoryStats> {

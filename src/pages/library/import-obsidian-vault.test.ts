@@ -175,6 +175,35 @@ describe('Obsidian vault import', () => {
     }
   });
 
+  it('imports hierarchical frontmatter tags without persisting ancestors', async () => {
+    const storage = getRepositoryTestStorage();
+    await storage.writeTextFile(
+      '/hier-vault/Note.md',
+      ['---', 'tags:', '  - parent/child', '---', '', 'Body'].join('\n'),
+    );
+
+    const repository = new LocalRepository('obsidian-hier-import');
+    const result = await importObsidianVault({
+      repository,
+      parentId: null,
+      vaultPath: '/hier-vault',
+      vaultName: 'HierVault',
+    });
+
+    expect(result.notesImported).toBe(1);
+
+    const [, vaultFiles] = await repository.listDirectory(result.rootFolderId);
+    const note = vaultFiles.find((file) => file.name === 'Note')!;
+    expect(note.tags).toEqual(['parent/child']);
+
+    expect((await repository.listTags()).map((entry) => entry.tag)).toEqual([
+      'parent/child',
+    ]);
+    expect(
+      (await repository.listTags(true)).map((entry) => entry.tag).sort(),
+    ).toEqual(['parent', 'parent/child']);
+  });
+
   it('removes the imported root folder when a fatal import error occurs', async () => {
     const storage = getRepositoryTestStorage();
     await storage.writeTextFile('/vault/Broken.md', 'Broken');
