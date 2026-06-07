@@ -97,6 +97,97 @@ describe('ShapeElement persistence', () => {
   });
 });
 
+describe('ShapeElement resize', () => {
+  /** Bind a shape to a real Y.Map (seeds the points Y.Array) and return the map. */
+  function bind(shape: ShapeElement) {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.SHAPE, shape.uuid, {
+      offsetX: shape.offset.x,
+      offsetY: shape.offset.y,
+      scaleX: shape.scale.x,
+      scaleY: shape.scale.y,
+      ...shape.getYMapProps(),
+    });
+    shape.bindToYMap(yMap);
+    return yMap;
+  }
+
+  /** The corner handle whose anchor is the top-left (drag grows right/down). */
+  function bottomRightHandle(shape: ShapeElement) {
+    const handle = shape
+      .getHandles()
+      .find(
+        (h) => h.scaleX && h.scaleY && h.anchorFx === 0 && h.anchorFy === 0,
+      );
+    if (!handle) {
+      throw new Error('no bottom-right handle');
+    }
+    return handle;
+  }
+
+  it('bakes a rect resize into geometry and leaves scale at 1', () => {
+    const shape = new ShapeElement('rs', 'rect', [0, 0, 100, 60], {
+      color: '#000',
+      size: 8,
+    });
+    const yMap = bind(shape);
+    const h = bottomRightHandle(shape);
+
+    shape.beginResize();
+    shape.applyResize({
+      handle: h,
+      originalScale: { x: 1, y: 1 },
+      originalOffset: { x: 0, y: 0 },
+      ratioX: 2,
+      ratioY: 2,
+      anchorWorld: h.anchor,
+    });
+    shape.endResize();
+
+    // Scale is untouched — the points moved instead, so stroke width is constant.
+    expect(shape.scale).toEqual({ x: 1, y: 1 });
+    expect(shape.localBoundingBox.width).toBeCloseTo(200);
+    expect(shape.localBoundingBox.height).toBeCloseTo(120);
+    // Top-left anchor stays pinned.
+    expect(shape.boundingBox.x).toBeCloseTo(0);
+    expect(shape.boundingBox.y).toBeCloseTo(0);
+
+    // The new geometry is persisted to the Y.Array and survives a reload.
+    const reloaded = new ShapeElement('rs', 'rect', [0, 0, 0, 0], {
+      color: 'x',
+      size: 1,
+    });
+    reloaded.bindToYMap(yMap);
+    expect(reloaded.scale).toEqual({ x: 1, y: 1 });
+    expect(reloaded.localBoundingBox.width).toBeCloseTo(200);
+    expect(reloaded.localBoundingBox.height).toBeCloseTo(120);
+  });
+
+  it('moves line endpoints on resize (no render scale)', () => {
+    const shape = new ShapeElement('ls', 'line', [0, 0, 100, 40], {
+      color: '#000',
+      size: 8,
+    });
+    bind(shape);
+    const h = bottomRightHandle(shape);
+
+    shape.beginResize();
+    shape.applyResize({
+      handle: h,
+      originalScale: { x: 1, y: 1 },
+      originalOffset: { x: 0, y: 0 },
+      ratioX: 2,
+      ratioY: 2,
+      anchorWorld: h.anchor,
+    });
+    shape.endResize();
+
+    expect(shape.scale).toEqual({ x: 1, y: 1 });
+    expect(shape.localBoundingBox.width).toBeCloseTo(200);
+    expect(shape.localBoundingBox.height).toBeCloseTo(80);
+  });
+});
+
 function makePdfCtx(): { ctx: PdfHarvestContext; items: PageItem[] } {
   const items: PageItem[] = [];
   const ctx: PdfHarvestContext = {

@@ -1,9 +1,15 @@
 import * as Y from 'yjs';
 import { parseCssColor } from '@/lib/pdf-export/color';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
+import type { Vector2 } from '../drawable-canvas';
 import type { ShapeType } from '../shape-recognizer';
 import { LOCAL_ORIGIN } from '../ydoc-manager';
-import { DrawableElement, ResizeHandles } from './drawable-element';
+import {
+  DrawableElement,
+  MIN_SCALE,
+  type ResizeHandle,
+  ResizeHandles,
+} from './drawable-element';
 import { ElementType } from './element-type';
 import type { StrokeStyle } from './stroke-element';
 
@@ -26,6 +32,9 @@ export class ShapeElement extends DrawableElement {
 
   /** Yjs backing array mirroring `geom`. */
   private _yPoints: Y.Array<number> | null = null;
+
+  /** Pre-drag geometry snapshot; resize ratios are cumulative from drag start. */
+  private resizeBaseGeom: number[] | null = null;
 
   public constructor(
     uuid: string,
@@ -128,6 +137,63 @@ export class ShapeElement extends DrawableElement {
     return this.shapeType === 'line'
       ? ResizeHandles.Corners
       : ResizeHandles.All;
+  }
+
+  public override beginResize(): void {
+    // applyResize receives a ratio cumulative from the drag start, so each
+    // update re-derives the geometry from this baseline rather than compounding.
+    this.resizeBaseGeom = [...this.geom];
+  }
+
+  /**
+   * Resize by baking the drag ratio into the geometry and leaving `scale` at 1.
+   * Unlike the base implementation (which scales via a render-time ctx.scale and
+   * stretches the stroke width), this moves the shape's points so the outline
+   * thickness stays `style.size`. Offset math mirrors the base to keep the
+   * anchor side pinned.
+   */
+  public override applyResize(opts: {
+    handle: ResizeHandle;
+    originalScale: Vector2;
+    originalOffset: Vector2;
+    ratioX: number;
+    ratioY: number;
+    anchorWorld: Vector2;
+  }): void {
+    const { handle: h, originalOffset, ratioX, ratioY, anchorWorld } = opts;
+    const base = this.resizeBaseGeom ?? this.geom;
+    const sx = h.scaleX ? Math.max(MIN_SCALE, ratioX) : 1;
+    const sy = h.scaleY ? Math.max(MIN_SCALE, ratioY) : 1;
+    this.setGeom(scaleGeom(this.shapeType, base, sx, sy));
+
+    // Re-pin the anchor side against the freshly scaled local bbox.
+    const local = this.localBoundingBox;
+    const localAnchorX = local.x + local.width * h.anchorFx;
+    const localAnchorY = local.y + local.height * h.anchorFy;
+    const newOffsetX = h.scaleX
+      ? anchorWorld.x - h.anchorPad.x - localAnchorX
+      : originalOffset.x;
+    const newOffsetY = h.scaleY
+      ? anchorWorld.y - h.anchorPad.y - localAnchorY
+      : originalOffset.y;
+    this.setOffset(newOffsetX, newOffsetY);
+  }
+
+  public override endResize(): void {
+    this.resizeBaseGeom = null;
+    this.updateBounds();
+  }
+
+  /** Replace the geometry and mirror it into the backing Y.Array. */
+  private setGeom(geom: number[]): void {
+    this.geom = geom;
+    this.updateBoundingBox();
+    if (this._yPoints) {
+      this._yPoints.doc!.transact(() => {
+        this._yPoints!.delete(0, this._yPoints!.length);
+        this._yPoints!.push(geom);
+      }, LOCAL_ORIGIN);
+    }
   }
 
   protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
@@ -281,6 +347,25 @@ export class ShapeElement extends DrawableElement {
       }
     }
   }
+}
+
+function scaleGeom(
+  shapeType: ShapeType,
+  geom: number[],
+  sx: number,
+  sy: number,
+): number[] {
+  // Geometry lives in a local frame anchored at (0,0); scaling about the origin
+  // resizes the shape while keeping that anchor fixed.
+  if (shapeType === 'rect' || shapeType === 'ellipse') {
+    return [geom[0] * sx, geom[1] * sy, geom[2] * sx, geom[3] * sy];
+  }
+  const out = new Array<number>(geom.length);
+  for (let i = 0; i + 1 < geom.length; i += 2) {
+    out[i] = geom[i] * sx;
+    out[i + 1] = geom[i + 1] * sy;
+  }
+  return out;
 }
 
 function rectCorners(g: number[]): [number, number][] {
