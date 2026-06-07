@@ -186,6 +186,15 @@ describe('recognizeShape', () => {
     expect(Math.hypot(r.geom[2] - 200, r.geom[3] - 50)).toBeLessThan(15);
   });
 
+  it('classifies a wobbly freehand line', () => {
+    // ~3% perpendicular wobble — typical of a hand-drawn line and well within
+    // LINE_DEVIATION_RATIO (6%), but rejected by the old MIN_CONFIDENCE double
+    // gate that capped the effective tolerance at ~1.8%.
+    const r = recognizeShape(jitter(lineStroke(0, 0, 220, 60), 6, 7))!;
+    expect(r).not.toBeNull();
+    expect(r.shapeType).toBe('line');
+  });
+
   it('rejects a too-short stroke', () => {
     expect(recognizeShape(lineStroke(0, 0, 5, 0, 10))).toBeNull();
   });

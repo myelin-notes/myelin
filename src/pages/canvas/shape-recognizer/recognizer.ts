@@ -291,14 +291,17 @@ export function recognizeShape(
   const deviationRatio = maxDev / longSide;
   const lineSpan = dist(a, b);
   if (deviationRatio < LINE_DEVIATION_RATIO && lineSpan >= MIN_LINE_SPAN) {
-    const confidence = 1 - deviationRatio / LINE_DEVIATION_RATIO;
-    if (confidence >= MIN_CONFIDENCE) {
-      return {
-        shapeType: 'line',
-        geom: [a[0], a[1], b[0], b[1]],
-        confidence,
-      };
-    }
+    // Acceptance is governed solely by LINE_DEVIATION_RATIO (max wobble as a
+    // fraction of the long side). The generic MIN_CONFIDENCE gate used for the
+    // closed shapes is deliberately NOT applied here: combined with the linear
+    // confidence falloff it shrank the effective straightness tolerance to
+    // ~1.8%, far tighter than a hand-drawn line, so freehand lines silently
+    // failed to snap.
+    return {
+      shapeType: 'line',
+      geom: [a[0], a[1], b[0], b[1]],
+      confidence: 1 - deviationRatio / LINE_DEVIATION_RATIO,
+    };
   }
 
   const closeRatio = span / L;
