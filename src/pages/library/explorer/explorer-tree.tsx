@@ -26,8 +26,8 @@ import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
 import { cn } from '@/lib/utils';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
-import { GridFileItem } from './grid-file-item';
-import { GridFolderItem } from './grid-folder-item';
+import { GridFileItem } from './grid/file-item';
+import { GridFolderItem } from './grid/folder-item';
 import { useDropTarget } from './use-drop-target';
 
 const logger = new Logger('ExplorerTree');

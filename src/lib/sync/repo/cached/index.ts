@@ -1,7 +1,7 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
+import { summarizeNoteBytes } from '@/lib/note/state-summary';
 import type { ReindexItem } from '@/lib/note-index';
-import { summarizeNoteBytes } from '@/lib/note-state-summary';
 import { NoteSession } from '../../session';
 import type {
   YjsSyncPushOptions,

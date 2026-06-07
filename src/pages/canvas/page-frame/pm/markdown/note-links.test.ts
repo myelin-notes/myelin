@@ -2,8 +2,8 @@ import { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { describe, expect, it, vi } from 'vitest';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
-import { parseMarkdownToDoc } from '../../markdown-parser';
-import { serializeDocToMarkdown } from '../../markdown-serializer';
+import { parseMarkdownToDoc } from '../../markdown/parser';
+import { serializeDocToMarkdown } from '../../markdown/serializer';
 import { schema } from '../schema';
 import {
   buildNormalizedNoteLinkTransaction,

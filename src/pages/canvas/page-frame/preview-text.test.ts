@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { YDocManager } from '../ydoc-manager';
-import { addMarkdownPageFrameToYDoc } from './markdown-import';
+import { addMarkdownPageFrameToYDoc } from './markdown/import';
 import { extractCanvasPreviewText } from './preview-text';
 
 async function createNoteUpdate(markdown: string): Promise<Uint8Array> {

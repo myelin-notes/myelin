@@ -44,7 +44,7 @@ import {
   CHROME_SIDE_PADDING,
   FrameChrome,
   getFrameChromeControlsLayer,
-} from './frame-chrome';
+} from './frame/chrome';
 import {
   PAGE_GAP,
   PAGE_HEIGHT,

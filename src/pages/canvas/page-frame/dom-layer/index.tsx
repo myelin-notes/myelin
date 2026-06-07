@@ -4,8 +4,8 @@ import { getDevicePixelRatio } from '@/lib/utils';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
-import { FrameChrome } from '../../elements/frame-chrome';
-import { getFrameChromeMenuButtonRect } from '../../elements/frame-chrome-layout';
+import { FrameChrome } from '../../elements/frame/chrome';
+import { getFrameChromeMenuButtonRect } from '../../elements/frame/chrome-layout';
 import type { PageLayout } from '../../elements/page-frame-constants';
 import {
   PAGE_CORNER_RADIUS,
@@ -17,11 +17,11 @@ import {
 import type {
   NoteLinkPreview,
   NoteLinkPreviewTarget,
-} from '../note-link-preview';
+} from '../note-link/preview';
 import {
   type NoteLinkPreviewHit,
   NoteLinkPreviewPopover,
-} from '../note-link-preview-popover';
+} from '../note-link/preview-popover';
 import type {
   PageFrameAutocompleteController,
   PageFrameAutocompleteItem,

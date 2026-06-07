@@ -5,7 +5,7 @@ import {
   escapeNoteLinkSegment,
   joinNoteLinkTitle,
   splitNoteLinkTargetFrame,
-} from '@/lib/note-link-syntax';
+} from '@/lib/note/link-syntax';
 import type { VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import { PM_ADD_TO_HISTORY } from '../constants';
