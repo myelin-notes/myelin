@@ -4,4 +4,5 @@ export enum ElementType {
   IMAGE = 2,
   PAGE_FRAME = 3,
   PDF = 4,
+  SHAPE = 5,
 }

@@ -29,6 +29,11 @@ export class StrokeElement extends DrawableElement {
     return this.style;
   }
 
+  /** World-space [x, y] coordinates of the recorded stroke points. */
+  public get xyPoints(): [number, number][] {
+    return this.points.map((p) => [p[0], p[1]]);
+  }
+
   public get pressureEnabled(): boolean {
     return this.hasPressure;
   }

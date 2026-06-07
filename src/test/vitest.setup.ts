@@ -1,5 +1,43 @@
 import { beforeEach, vi } from 'vitest';
 
+// The `node` test environment has no DOMRect. Provide a minimal stand-in so
+// canvas elements that compute geometry (localBoundingBox / boundingBox) can be
+// unit-tested without a full DOM.
+if (typeof globalThis.DOMRect === 'undefined') {
+  class DOMRectPolyfill {
+    public readonly left: number;
+    public readonly top: number;
+    public readonly right: number;
+    public readonly bottom: number;
+    public constructor(
+      public readonly x = 0,
+      public readonly y = 0,
+      public readonly width = 0,
+      public readonly height = 0,
+    ) {
+      this.left = Math.min(x, x + width);
+      this.top = Math.min(y, y + height);
+      this.right = Math.max(x, x + width);
+      this.bottom = Math.max(y, y + height);
+    }
+  }
+  Object.defineProperty(globalThis, 'DOMRect', {
+    configurable: true,
+    value: DOMRectPolyfill,
+  });
+}
+
+// StrokeElement allocates a Path2D in its constructor for on-screen rendering.
+// The `node` environment has none; a no-op stand-in lets stroke geometry be
+// unit-tested without a canvas (draw2D is never exercised in those tests).
+if (typeof globalThis.Path2D === 'undefined') {
+  class Path2DPolyfill {}
+  Object.defineProperty(globalThis, 'Path2D', {
+    configurable: true,
+    value: Path2DPolyfill,
+  });
+}
+
 const memoryLocalStorage = new Map<string, string>();
 
 Object.defineProperty(globalThis, 'localStorage', {

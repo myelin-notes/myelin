@@ -238,6 +238,15 @@ export class DrawableCanvas {
   }
 
   /**
+   * Run a mutation inside a single Yjs transaction. Nested element-map
+   * transacts flatten into this one, so a multi-step edit (e.g. the pen's
+   * stroke→shape swap) coalesces into one undo-stack item.
+   */
+  public transact(fn: () => void): void {
+    this._ydoc.transact(fn);
+  }
+
+  /**
    * Populate _elements from the current Y.Array state.
    * Called once on construction for loaded documents.
    */
