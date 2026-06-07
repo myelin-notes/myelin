@@ -10,6 +10,7 @@ import {
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
+import { normalizeTagInput } from '@/lib/sync/repo/tag-hierarchy';
 import { cn } from '@/lib/utils';
 
 const logger = new Logger('TagManageDialog');
@@ -72,15 +73,17 @@ export function TagManageDialog({
   };
 
   const handleCreateTag = async () => {
-    const trimmed = newTag.trim();
-    if (!trimmed) {
+    const normalized = normalizeTagInput(newTag);
+    if (!normalized) {
       setIsAdding(false);
       return;
     }
-    await repository.addTag(nodeId, trimmed);
-    setNodeTags((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
-    if (!allTags.includes(trimmed)) {
-      setAllTags((prev) => [...prev, trimmed]);
+    await repository.addTag(nodeId, normalized);
+    setNodeTags((prev) =>
+      prev.includes(normalized) ? prev : [...prev, normalized],
+    );
+    if (!allTags.includes(normalized)) {
+      setAllTags((prev) => [...prev, normalized]);
     }
     setNewTag('');
     setIsAdding(false);

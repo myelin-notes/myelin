@@ -22,6 +22,7 @@ import {
   useRepositoryStatus,
   type VFSNode,
 } from '@/lib/sync';
+import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
 import { cn } from '@/lib/utils';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
@@ -143,9 +144,8 @@ export function ExplorerTree({
       if (isSearching) {
         let results = await repository.searchNodes(searchQuery!.trim());
         if (isFiltering) {
-          const tagSet = new Set(filterTags);
           results = results.filter((r) =>
-            r.node.tags.some((t) => tagSet.has(t)),
+            nodeMatchesAnyTag(r.node.tags, filterTags!),
           );
         }
         nextNodes = results.map((result) => result.node);

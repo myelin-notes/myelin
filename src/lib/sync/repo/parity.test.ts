@@ -84,6 +84,7 @@ describe('Repository business logic parity', () => {
       await repository.addTag(rawFileId, 'alpha');
       await repository.addTag(rawFileId, 'beta');
       await repository.removeTag(rawFileId, 'beta');
+      await repository.addTag(rawFileId, 'uni/math');
       await repository.addCustomColor('#ABCDEF');
 
       const [rootFolders, rootFiles] = await repository.listDirectory(null);
@@ -103,8 +104,29 @@ describe('Repository business logic parity', () => {
           .sort(),
       ).toEqual([fileId, rawFileId].sort());
       expect(
+        (await repository.getNodesByAnyTag(['uni'])).map((node) => node.id),
+      ).toEqual([rawFileId]);
+      expect(
+        (await repository.getNodesByAnyTag(['uni/math'])).map(
+          (node) => node.id,
+        ),
+      ).toEqual([rawFileId]);
+      expect(await repository.getNodesByAnyTag(['unique'])).toEqual([]);
+      expect(await repository.getNodesByAnyTag(['uni/ma'])).toEqual([]);
+      expect(
         (await repository.listTags()).map((tag) => tag.tag).sort(),
-      ).toEqual(['alpha']);
+      ).toEqual(['alpha', 'uni/math']);
+
+      const hierarchicalTags = await repository.listTags(true);
+      const hierarchicalByTag = new Map(
+        hierarchicalTags.map((entry) => [entry.tag, entry.count]),
+      );
+      expect(hierarchicalByTag.has('alpha')).toBe(true);
+      expect(hierarchicalByTag.has('uni')).toBe(true);
+      expect(hierarchicalByTag.has('uni/math')).toBe(true);
+      expect(hierarchicalByTag.get('uni')).toBe(
+        (await repository.getNodesByAnyTag(['uni'])).length,
+      );
       expect(await repository.getCustomColors()).toEqual(['#abcdef']);
       expect(
         Array.from((await repository.readFileBytes(rawFileId)) ?? []),

@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { type SearchField, type SearchHit, searchItems } from '@/lib/search';
+import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import {
   type FileType,
   FileTypes,
@@ -395,9 +396,8 @@ export function getNodesByAnyTag(
   manifest: VFSManifest,
   tags: string[],
 ): VFSNode[] {
-  const tagSet = new Set(tags);
   return Object.values(manifest.nodes).filter(
-    (node) => !isSystemNode(node) && node.tags.some((tag) => tagSet.has(tag)),
+    (node) => !isSystemNode(node) && nodeMatchesAnyTag(node.tags, tags),
   );
 }
 
@@ -410,6 +410,29 @@ export function listTags(manifest: VFSManifest): RepositoryTag[] {
     }
     for (const tag of node.tags) {
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export function listHierarchicalTags(manifest: VFSManifest): RepositoryTag[] {
+  const counts = new Map<string, number>();
+
+  for (const node of Object.values(manifest.nodes)) {
+    if (isSystemNode(node)) {
+      continue;
+    }
+    const prefixes = new Set<string>();
+    for (const tag of node.tags) {
+      for (const prefix of expandTagWithAncestors(tag)) {
+        prefixes.add(prefix);
+      }
+    }
+    for (const prefix of prefixes) {
+      counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
     }
   }
 
