@@ -91,8 +91,10 @@ export default defineConfig(async ({ mode }) => {
           }
         : undefined,
       watch: {
-        // 3. tell Vite to ignore watching `src-tauri`
-        ignored: ['**/src-tauri/**'],
+        // 3. tell Vite to ignore watching `src-tauri` and nested git
+        // worktrees (separate checkouts under `.claude/worktrees/` whose
+        // edits would otherwise trigger spurious full-reloads here).
+        ignored: ['**/src-tauri/**', '**/.claude/worktrees/**'],
       },
     },
   };
