@@ -118,7 +118,7 @@ export class PenTool implements ITool {
     this.interrupt(canvas);
   }
 
-  public interrupt(canvas: DrawableCanvas): void {
+  public interrupt(_canvas: DrawableCanvas): void {
     this.clearDwellTimer();
     if (this.currentStroke) {
       this.currentStroke.updateBounds();
@@ -132,7 +132,6 @@ export class PenTool implements ITool {
     this.snapped = false;
     this.dwellAnchor = null;
     this.recognitionAttemptedForAnchor = false;
-    canvas.updateBounding();
   }
 
   private clearDwellTimer(): void {

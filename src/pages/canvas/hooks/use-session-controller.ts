@@ -203,7 +203,6 @@ export class CanvasSessionController {
           centerWorld.y - frame.totalHeight / 2,
         );
         frame.updateBounds();
-        drawableCanvas.updateBounding();
         await session.save();
       }
 

@@ -360,7 +360,6 @@ export class SelectTool implements ITool {
       }
     }
 
-    canvas.updateBounding();
     this.lastClickTime = Date.now();
     this.lastClickPos = { ...this.startPoint };
     this.reset();

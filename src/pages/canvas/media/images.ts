@@ -21,5 +21,4 @@ export async function imageImportHandler(
     world.y - img.naturalHeight / 2,
   );
   img.updateBounds();
-  canvas.updateBounding();
 }

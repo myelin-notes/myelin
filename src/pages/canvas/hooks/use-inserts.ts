@@ -64,7 +64,6 @@ export function useCanvasInserts({
       );
       frame.setOffset(worldPos.x, worldPos.y);
       frame.updateBounds();
-      dc.updateBounding();
       frame.select();
     },
     [drawableCanvasRef],

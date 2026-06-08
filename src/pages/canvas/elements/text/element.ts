@@ -164,14 +164,12 @@ export class TextElement extends DrawableElement {
 
     if (!newText.trim()) {
       canvas.removeElement(this);
-      canvas.updateBounding();
       return;
     }
 
     if (newText !== this._oldText) {
       this.setText(newText);
       this.updateBounds();
-      canvas.updateBounding();
     }
   }
 

@@ -220,7 +220,6 @@ function CanvasViewInner({
         centerWorld.y - frame.totalHeight / 2,
       );
       frame.updateBounds();
-      dc.updateBounding();
       dc.focusPageFrameById(frame.uuid);
       return;
     }
