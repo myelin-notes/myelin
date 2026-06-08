@@ -186,6 +186,7 @@ export class PdfElement extends DrawableElement {
   private _pageOrderCustom = false;
   private _stagingCanvasPool = new CanvasPool(STAGING_CANVAS_POOL_SIZE);
   private _lastSyncScreenOffset: { x: number; y: number } | null = null;
+  private _thumbnailPageCanvas: HTMLCanvasElement | null = null;
 
   constructor(uuid: string, pageLayout: PageLayout = 'vertical') {
     super(uuid, ElementType.PDF);
@@ -394,6 +395,79 @@ export class PdfElement extends DrawableElement {
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
+  /**
+   * Render the first page into a cached offscreen canvas so the thumbnail can
+   * blit it. Uses a dedicated canvas (not the on-screen staging pool) so
+   * thumbnail rendering never evicts or contends with live page renders.
+   */
+  public override async prepareThumbnail(maxScale: number): Promise<void> {
+    this._thumbnailPageCanvas = null;
+
+    const pdfDocument = this._pdfDocument;
+    if (!pdfDocument) {
+      return;
+    }
+
+    const firstPage = this.getLayout().pages[0];
+    if (!firstPage || firstPage.kind !== 'pdf') {
+      return;
+    }
+
+    const elementScale = Math.max(
+      getPositiveScale(this._scale.x),
+      getPositiveScale(this._scale.y),
+    );
+    const renderScale = getPdfRenderScale({
+      pageSize: firstPage.size,
+      zoom: 1,
+      elementScale: elementScale * maxScale,
+      dpr: 1,
+    });
+
+    const canvas = document.createElement('canvas');
+    try {
+      await renderPdfPageToCanvas({
+        document: pdfDocument,
+        pageIndex: firstPage.originalIndex,
+        canvas,
+        renderScale,
+      }).promise;
+    } catch (error) {
+      if (!isPdfRenderCancelled(error)) {
+        logger.error('Failed to render PDF thumbnail page', error, {
+          uuid: this.uuid,
+          fileName: this._fileName,
+        });
+      }
+      return;
+    }
+
+    this._thumbnailPageCanvas = canvas;
+  }
+
+  public override drawThumbnail(
+    ctx: CanvasRenderingContext2D,
+    _deltaTime: number,
+  ): void {
+    const canvas = this._thumbnailPageCanvas;
+    if (!canvas) {
+      return;
+    }
+
+    const firstPage = this.getLayout().pages[0];
+    if (!firstPage) {
+      return;
+    }
+
+    ctx.drawImage(
+      canvas,
+      firstPage.localLeft,
+      firstPage.localTop,
+      firstPage.size.w,
+      firstPage.size.h,
+    );
+  }
+
   private async runExport({
     includeAnnotations,
   }: ExportOptions): Promise<ExportResult> {
@@ -478,6 +552,7 @@ export class PdfElement extends DrawableElement {
     this._loadGeneration++;
     this.cancelPageRenders();
     this._stagingCanvasPool.drain();
+    this._thumbnailPageCanvas = null;
     this._lastSyncScreenOffset = null;
     void this._pdfDocument?.destroy();
     this._pdfDocument = null;
