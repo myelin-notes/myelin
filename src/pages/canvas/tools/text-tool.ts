@@ -233,15 +233,10 @@ export class TextTool implements ITool {
     if (key !== 'color' && key !== 'fontSize' && key !== 'fontFamily') {
       return;
     }
-    let touched = false;
     for (const el of canvas.elements) {
       if (el instanceof TextElement && el.isSelected) {
         el.setStyle({ [key]: value } as Partial<TextStyle>);
-        touched = true;
       }
-    }
-    if (touched) {
-      canvas.updateBounding();
     }
   }
 }

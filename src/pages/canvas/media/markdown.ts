@@ -27,5 +27,4 @@ export async function markdownImportHandler(
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });
   pf.setOffset(world.x - pf.pageWidth / 2, world.y - pf.pageHeight / 2);
   pf.updateBounds();
-  canvas.updateBounding();
 }

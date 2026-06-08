@@ -117,7 +117,6 @@ function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
       ydoc.removeElementMap(el.yMap);
     }
   });
-  const updateBounding = vi.fn();
   const transact = vi.fn((fn: () => void) => {
     if (opts.realTransact) {
       ydoc.transact(fn);
@@ -149,7 +148,6 @@ function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
     addElement,
     removeElement,
     transact,
-    updateBounding,
   } as unknown as DrawableCanvas;
 
   return {
@@ -159,7 +157,6 @@ function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
     addElement,
     removeElement,
     transact,
-    updateBounding,
   };
 }
 
@@ -288,7 +285,7 @@ describe('PenTool draw-and-hold recognition', () => {
   });
 
   it('does not snap a random squiggle and keeps drawing', () => {
-    const { canvas, created, removeElement, updateBounding } = makeCanvas();
+    const { canvas, created, removeElement } = makeCanvas();
     const tool = makeTool();
     tool.start(canvas, {} as PointerEvent);
     const stroke = created[0] as StrokeElement;
@@ -304,7 +301,6 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(stroke.xyPoints.length).toBe(before + 1);
 
     tool.finish(canvas, {} as PointerEvent);
-    expect(updateBounding).toHaveBeenCalled();
   });
 
   it('re-arms the dwell timer when the pen moves > DWELL_MOVE_PX', () => {

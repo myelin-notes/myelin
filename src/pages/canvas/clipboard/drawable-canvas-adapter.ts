@@ -195,7 +195,6 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
     }
 
     canvas.selectElementsByUuid(insertedUuids);
-    canvas.updateBounding();
     return { pastedElementUuids: insertedUuids };
   }
 }
