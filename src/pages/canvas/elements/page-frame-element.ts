@@ -4,7 +4,9 @@ import {
   Download as DownloadIcon,
   Rows3 as RowsIcon,
 } from 'lucide-react';
+import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { Selection } from 'prosemirror-state';
+import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
@@ -22,6 +24,8 @@ import { serializeDocToMarkdownChunked } from '../page-frame/markdown/serializer
 import { harvestPageFramePdf } from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
+import { schema } from '../page-frame/pm/schema';
+import { renderPageFrameThumbnail } from '../page-frame/thumbnail/render';
 import type { YDocManager } from '../ydoc-manager';
 import {
   DrawableElement,
@@ -37,6 +41,7 @@ import {
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
   normalizePageFrameDisplayName,
+  PAGE_CORNER_RADIUS,
   PAGE_GAP,
   PAGE_HEIGHT,
   PAGE_PADDING,
@@ -575,4 +580,52 @@ export class PageFrameElement extends DrawableElement {
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
+
+  /**
+   * Resolve the current ProseMirror doc for thumbnailing: prefer the live editor
+   * doc while editing, otherwise convert the Y.XmlFragment with the same helper
+   * the editor uses. Returns `null` if there's no content to draw.
+   */
+  private getThumbnailDoc(): ProseMirrorNode | null {
+    const liveDoc = this.pmEditor?.view?.state.doc;
+    if (liveDoc) {
+      return liveDoc;
+    }
+    const fragment = this._yXmlFragment;
+    if (!fragment || fragment.length === 0) {
+      return null;
+    }
+    return yXmlFragmentToProseMirrorRootNode(fragment, schema);
+  }
+
+  /**
+   * Paint the first page's white background and the document text into the
+   * off-screen thumbnail context. Runs in element-local coordinates (origin at
+   * the top-left of page 0), matching `drawThumbnail`'s caller transform.
+   */
+  public override drawThumbnail(
+    ctx: CanvasRenderingContext2D,
+    _deltaTime: number,
+  ): void {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, this._pageWidth, this._pageHeight, PAGE_CORNER_RADIUS);
+    ctx.fill();
+
+    const doc = this.getThumbnailDoc();
+    if (!doc) {
+      return;
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, this._pageWidth, this._pageHeight);
+    ctx.clip();
+    ctx.translate(PAGE_PADDING, PAGE_PADDING);
+    renderPageFrameThumbnail(doc, ctx, {
+      width: this._pageWidth - PAGE_PADDING * 2,
+      maxHeight: this._pageHeight - PAGE_PADDING * 2,
+    });
+    ctx.restore();
+  }
 }

@@ -53,6 +53,22 @@ function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
 }
 
+function unionBoundingBoxes(
+  elements: readonly DrawableElement[],
+): DOMRect | null {
+  const boxes = elements
+    .map((e) => e.boundingBox)
+    .filter((b) => b.width > 0 || b.height > 0);
+  if (boxes.length === 0) {
+    return null;
+  }
+  const left = Math.min(...boxes.map((b) => b.left));
+  const top = Math.min(...boxes.map((b) => b.top));
+  const right = Math.max(...boxes.map((b) => b.right));
+  const bottom = Math.max(...boxes.map((b) => b.bottom));
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
 export type ElementReorderDirection = 'higher' | 'lower';
 
 export interface ElementOrderItem {
@@ -874,17 +890,18 @@ export class DrawableCanvas {
    * treats that as "no clamp" so fresh documents stay fully pannable.
    */
   public getContentBounds(): DOMRect | null {
-    const boxes = this.elements
-      .map((e) => e.boundingBox)
-      .filter((b) => b.width > 0 || b.height > 0);
-    if (boxes.length === 0) {
-      return null;
-    }
-    const left = Math.min(...boxes.map((b) => b.left));
-    const top = Math.min(...boxes.map((b) => b.top));
-    const right = Math.max(...boxes.map((b) => b.right));
-    const bottom = Math.max(...boxes.map((b) => b.bottom));
-    return new DOMRect(left, top, right - left, bottom - top);
+    return unionBoundingBoxes(this.elements);
+  }
+
+  /**
+   * Union of non-hidden element bounding boxes, for thumbnail rendering.
+   * Empty content -> a zero-size DOMRect.
+   */
+  public get contentBounds(): DOMRect {
+    return (
+      unionBoundingBoxes(this.elements.filter((e) => !e.hidden)) ??
+      new DOMRect(0, 0, 0, 0)
+    );
   }
 
   public get elements(): DrawableElement[] {

@@ -581,6 +581,67 @@ describe('PdfElement metadata loading', () => {
   });
 });
 
+interface TestablePdfThumbnail extends TestablePdfLayoutState {
+  _pdfDocument: PDFDocumentProxy | null;
+  _thumbnailPageCanvas: HTMLCanvasElement | null;
+}
+
+describe('PdfElement thumbnail rendering', () => {
+  it('renders the first page into the thumbnail cache and blits it', async () => {
+    const element = new PdfElement('pdf-uuid');
+    const state = element as unknown as TestablePdfThumbnail;
+    state._pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+    ];
+    state._pageOrder = [
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 1 },
+    ];
+    state._layout = null;
+    state._pdfDocument = {
+      numPages: 2,
+      destroy: vi.fn(async () => {}),
+    } as unknown as PDFDocumentProxy;
+
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    await element.prepareThumbnail(0.5);
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[0][0].pageIndex).toBe(0);
+    expect(state._thumbnailPageCanvas).not.toBeNull();
+
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    element.drawThumbnail(ctx, 0);
+
+    const firstPage = state.getLayout().pages[0];
+    expect(ctx.drawImage).toHaveBeenCalledWith(
+      state._thumbnailPageCanvas,
+      firstPage.localLeft,
+      firstPage.localTop,
+      612,
+      792,
+    );
+  });
+
+  it('is a no-op when the pdf document is not loaded', async () => {
+    const element = new PdfElement('pdf-uuid');
+    const state = element as unknown as TestablePdfThumbnail;
+    state._pdfDocument = null;
+
+    await element.prepareThumbnail(0.5);
+
+    expect(renderPdfPageToCanvas).not.toHaveBeenCalled();
+    expect(state._thumbnailPageCanvas).toBeNull();
+
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    element.drawThumbnail(ctx, 0);
+    expect(ctx.drawImage).not.toHaveBeenCalled();
+  });
+});
+
 describe('PdfElement page rendering', () => {
   it('debounces zoom-driven rerenders after the page has rendered once', () => {
     const pageSize = { w: 612, h: 792 };
