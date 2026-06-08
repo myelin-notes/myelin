@@ -111,6 +111,8 @@ export function describeElementType(type: number | null | undefined): string {
       return 'page-frame';
     case ElementType.PDF:
       return 'pdf';
+    case ElementType.LATEX:
+      return 'latex';
     default:
       return `unknown:${String(type)}`;
   }

@@ -481,6 +481,10 @@ const es: typeof en = {
         label: 'Imagen o PDF',
         description: 'Arrastra archivos o pega una URL',
       },
+      latex: {
+        label: 'LaTeX',
+        description: 'Un bloque para escribir ecuaciones',
+      },
     },
     toolShelf: {
       title: 'Menú de herramientas',

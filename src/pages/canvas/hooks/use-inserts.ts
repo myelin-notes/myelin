@@ -7,6 +7,7 @@ import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
 } from '@/pages/canvas/elements/frame/chrome';
+import { LatexElement } from '@/pages/canvas/elements/latex/element';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
@@ -69,6 +70,27 @@ export function useCanvasInserts({
     [drawableCanvasRef],
   );
 
+  const placeLatexAt = useCallback(
+    (worldPos: Vector2) => {
+      const dc = drawableCanvasRef.current;
+      if (!dc) {
+        return;
+      }
+      const latex = dc.addElement((uuid) => {
+        const el = new LatexElement(uuid);
+        el.setOffset(worldPos.x, worldPos.y);
+        return el;
+      });
+      latex.select();
+      dc.updateBounding();
+      // Placement runs inside a canvas pointerdown; entering edit now would
+      // register a click-outside listener that the same event, still bubbling
+      // to document, immediately trips. Defer past this event.
+      requestAnimationFrame(() => dc.enterElementEdit(latex));
+    },
+    [drawableCanvasRef],
+  );
+
   const onInsertFrame = useCallback(() => {
     const dc = drawableCanvasRef.current;
     if (!dc) {
@@ -87,6 +109,20 @@ export function useCanvasInserts({
       onPlace: placeFrameAt,
     });
   }, [drawableCanvasRef, placeFrameAt]);
+
+  const onInsertLatex = useCallback(() => {
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
+    }
+    setInsertOpen(false);
+    setEmbedOpen(false);
+    setContextInsert(null);
+    dc.startPlacement({
+      getBounds: () => ({ x: 0, y: 0, width: 140, height: 44 }),
+      onPlace: placeLatexAt,
+    });
+  }, [drawableCanvasRef, placeLatexAt]);
 
   const onInsertEmbed = useCallback(() => {
     setInsertOpen(false);
@@ -118,6 +154,14 @@ export function useCanvasInserts({
     placeFrameAt(contextInsert.worldPos);
     setContextInsert(null);
   }, [contextInsert, placeFrameAt]);
+
+  const onContextInsertLatex = useCallback(() => {
+    if (!contextInsert) {
+      return;
+    }
+    placeLatexAt(contextInsert.worldPos);
+    setContextInsert(null);
+  }, [contextInsert, placeLatexAt]);
 
   const onContextInsertEmbed = useCallback(() => {
     if (!contextInsert) {
@@ -200,8 +244,10 @@ export function useCanvasInserts({
     closeContextInsert,
     onInsertFrame,
     onInsertEmbed,
+    onInsertLatex,
     onContextInsertFrame,
     onContextInsertEmbed,
+    onContextInsertLatex,
     onCanvasClick,
     submitEmbed,
     closeEmbed,

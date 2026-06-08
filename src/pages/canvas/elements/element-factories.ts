@@ -1,6 +1,7 @@
 import type { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 import { ImageElement } from './image-element';
+import { LatexElement } from './latex/element';
 import { PageFrameElement } from './page-frame-element';
 import { PdfElement } from './pdf-element';
 import { ShapeElement } from './shape-element';
@@ -24,4 +25,5 @@ export const ELEMENT_FACTORIES: Record<ElementType, ElementFactory> = {
       color: '#191c1e',
       size: 8,
     }),
+  [ElementType.LATEX]: (uuid) => new LatexElement(uuid),
 };

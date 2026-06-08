@@ -5,4 +5,5 @@ export enum ElementType {
   PAGE_FRAME = 3,
   PDF = 4,
   SHAPE = 5,
+  LATEX = 6,
 }
