@@ -165,7 +165,9 @@ export class LatexElement extends DrawableElement {
     this._raster = null;
     this.syncToYMap({ latex });
     this.updateBounds();
-    this._canvas?.updateBounding();
+    // Recompute content bounds + repaint the selection at the new size (the
+    // element is selected while editing, which is the only time setLatex runs).
+    this.onTransformChanged?.();
   }
 
   // DOM overlay paints the formula; nothing to draw on the 2D canvas.
@@ -257,12 +259,43 @@ export class LatexElement extends DrawableElement {
     });
     root.style.left = `${screen.x}px`;
     root.style.top = `${screen.y}px`;
-    root.style.width = `${this._natural.width}px`;
-    root.style.height = `${this._natural.height}px`;
     root.style.transform = `scale(${this._scale.x * zoom}, ${this._scale.y * zoom})`;
+    root.dataset.editing = this._editing ? 'true' : 'false';
+
+    this.syncNaturalSize(root);
 
     if (this._editing && this._editOverlay) {
       this._editOverlay.reposition(this.screenEditRect(viewport));
+    }
+  }
+
+  /**
+   * Keep `_natural` in lockstep with the actually-rendered formula. The preview
+   * shrink-wraps its content (CSS `width: max-content`), so its layout size is
+   * the true formula size — including whatever the synchronous offscreen probe
+   * got wrong before KaTeX's web fonts loaded. The selection box and hit-test
+   * both derive from `_natural`, so reading it back keeps them on the glyphs at
+   * every zoom; `offsetWidth/Height` ignore the element's scale transform, so
+   * they report the unscaled natural size directly.
+   */
+  private syncNaturalSize(root: HTMLDivElement): void {
+    if (!this._latex.trim()) {
+      root.style.width = `${EMPTY_WIDTH}px`;
+      root.style.height = `${EMPTY_HEIGHT}px`;
+      return;
+    }
+    root.style.width = '';
+    root.style.height = '';
+    const width = root.offsetWidth;
+    const height = root.offsetHeight;
+    if (
+      width > 0 &&
+      height > 0 &&
+      (width !== this._natural.width || height !== this._natural.height)
+    ) {
+      this._natural = { width, height };
+      // Refresh content bounds + repaint the selection outline at the new size.
+      this.onTransformChanged?.();
     }
   }
 
@@ -298,14 +331,26 @@ export class LatexElement extends DrawableElement {
     top: number;
     width: number;
   } {
+    // Anchor to the preview's real on-screen rect (true page coords) so the
+    // panel sits flush below it like the page frame's source editor —
+    // worldToScreen is canvas-local, which drifts off the preview by however
+    // far the canvas is offset within the page. Fall back to the viewport math
+    // only before the preview's first sync.
+    const root = this._root;
+    if (root) {
+      const r = root.getBoundingClientRect();
+      return {
+        left: r.left,
+        top: r.bottom + EDIT_PANEL_GAP,
+        width: Math.max(EDIT_PANEL_MIN_WIDTH, r.width),
+      };
+    }
     const box = this.boundingBox;
     const topLeft = viewport.worldToScreen({ x: box.x, y: box.y });
-    const widthPx = box.width * viewport.zoom;
-    const heightPx = box.height * viewport.zoom;
     return {
       left: topLeft.x,
-      top: topLeft.y + heightPx + EDIT_PANEL_GAP,
-      width: Math.max(EDIT_PANEL_MIN_WIDTH, widthPx),
+      top: topLeft.y + box.height * viewport.zoom + EDIT_PANEL_GAP,
+      width: Math.max(EDIT_PANEL_MIN_WIDTH, box.width * viewport.zoom),
     };
   }
 
@@ -337,7 +382,6 @@ export class LatexElement extends DrawableElement {
 
     if (!this._latex.trim() && canvas) {
       canvas.removeElement(this);
-      canvas.updateBounding();
     }
   }
 }

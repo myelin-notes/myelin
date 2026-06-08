@@ -81,8 +81,8 @@ export function useCanvasInserts({
         el.setOffset(worldPos.x, worldPos.y);
         return el;
       });
+      latex.updateBounds();
       latex.select();
-      dc.updateBounding();
       // Placement runs inside a canvas pointerdown; entering edit now would
       // register a click-outside listener that the same event, still bubbling
       // to document, immediately trips. Defer past this event.

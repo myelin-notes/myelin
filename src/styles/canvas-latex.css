@@ -12,6 +12,16 @@
   color: #1a1a1a;
 }
 
+/* While editing, tint the preview like the page frame's math block
+   (.pm-math-block--editing .pm-math-block-preview) so it reads as the active
+   surface the source panel hangs off. The tint hugs the box exactly — no
+   box-shadow spread — so its left edge lines up with the source panel below,
+   which anchors to this box's layout rect. */
+.canvas-latex-block[data-editing="true"] {
+  border-radius: var(--radius-lg);
+  background: rgba(230, 234, 240, 0.55);
+}
+
 /* KaTeX display mode wraps content in .katex-display with a 1em block margin
    and centered text — both throw off the natural-size measurement and offset
    the formula inside its box. Zero them so the rendered box hugs the formula,
