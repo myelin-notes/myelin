@@ -26,6 +26,7 @@ import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
 import { schema } from '../page-frame/pm/schema';
 import { renderPageFrameThumbnail } from '../page-frame/thumbnail/render';
+import { prepareExportOverlays } from '../pdf-element-export';
 import type { YDocManager } from '../ydoc-manager';
 import {
   DrawableElement,
@@ -557,6 +558,10 @@ export class PageFrameElement extends DrawableElement {
           editorDom instanceof HTMLElement ? editorDom.offsetHeight : null,
         )
       : this._pageHeight;
+    const overlays = includeAnnotations
+      ? (this._exportElementsProvider?.() ?? [])
+      : [];
+    await prepareExportOverlays(overlays);
     const { request, warnings } = await harvestPageFramePdf({
       contentDiv,
       numPages: continuous ? 1 : this._numPages,
@@ -565,9 +570,7 @@ export class PageFrameElement extends DrawableElement {
       pageLayout: this._pageLayout === 'horizontal' ? 'horizontal' : 'vertical',
       offset: { x: this.offset.x, y: this.offset.y },
       selfUuid: this.uuid,
-      overlays: includeAnnotations
-        ? (this._exportElementsProvider?.() ?? [])
-        : undefined,
+      overlays: includeAnnotations ? overlays : undefined,
     });
     await exportPdfToRust(request, path);
     return { warnings };

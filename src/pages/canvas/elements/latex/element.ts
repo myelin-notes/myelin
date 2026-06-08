@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import type { CanvasViewport } from '../../canvas-viewport';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import { renderKatex } from '../../page-frame/pm/math/render';
@@ -16,6 +17,9 @@ const EMPTY_HEIGHT = 44;
 const PLACEHOLDER = 'Add LaTeX…';
 const EDIT_PANEL_MIN_WIDTH = 240;
 const EDIT_PANEL_GAP = 6;
+// KaTeX is HTML, so PDF/thumbnail export rasterizes it. Render at 3x so the
+// bitmap stays crisp when the block is scaled up or printed.
+const RASTER_PIXEL_RATIO = 3;
 
 interface Size {
   width: number;
@@ -84,6 +88,10 @@ export class LatexElement extends DrawableElement {
   private _editOverlay: LatexEditOverlayHandle | null = null;
   private _canvas: DrawableCanvas | null = null;
 
+  // Rasterized formula for PDF/thumbnail export, keyed by the source it was
+  // rendered from so a stale bitmap is never drawn after an edit.
+  private _raster: { latex: string; canvas: HTMLCanvasElement } | null = null;
+
   constructor(uuid: string, latex = '') {
     super(uuid, ElementType.LATEX);
     this._latex = latex;
@@ -102,6 +110,7 @@ export class LatexElement extends DrawableElement {
         this.remeasure();
         // Repaint on the next sync; the editor (if open) owns its own text.
         this._renderedLatex = null;
+        this._raster = null;
       },
     });
   }
@@ -153,6 +162,7 @@ export class LatexElement extends DrawableElement {
     this._latex = latex;
     this.remeasure();
     this._renderedLatex = null;
+    this._raster = null;
     this.syncToYMap({ latex });
     this.updateBounds();
     this._canvas?.updateBounding();
@@ -160,6 +170,77 @@ export class LatexElement extends DrawableElement {
 
   // DOM overlay paints the formula; nothing to draw on the 2D canvas.
   protected draw2D(): void {}
+
+  /**
+   * Rasterize the current formula to a bitmap for the synchronous export draws
+   * (drawToPdf / drawThumbnail). KaTeX has no vector output, so both export
+   * paths blit this raster; the shared helper is the page frame's.
+   */
+  private async ensureRaster(): Promise<void> {
+    const latex = this._latex;
+    if (!latex.trim()) {
+      this._raster = null;
+      return;
+    }
+    if (this._raster?.latex === latex) {
+      return;
+    }
+    const { rasterizeKatex } = await import(
+      '../../page-frame/pm/math/rasterize'
+    );
+    const canvas = await rasterizeKatex(latex, RASTER_PIXEL_RATIO);
+    // Drop a result the source has since moved past.
+    if (canvas && this._latex === latex) {
+      this._raster = { latex, canvas };
+    }
+  }
+
+  public override prepareForPdf(): Promise<void> {
+    return this.ensureRaster();
+  }
+
+  public override drawToPdf(ctx: PdfHarvestContext): void {
+    const raster = this._raster;
+    if (!raster || raster.latex !== this._latex) {
+      return;
+    }
+    const url = raster.canvas.toDataURL('image/png');
+    const comma = url.indexOf(',');
+    if (comma < 0) {
+      return;
+    }
+    const ref = ctx.addImageBase64(url.slice(comma + 1));
+    const bb = this.boundingBox;
+    const p0 = ctx.worldToPagePt(bb.x, bb.y);
+    const p1 = ctx.worldToPagePt(bb.right, bb.bottom);
+    ctx.push({
+      t: 'image',
+      x: Math.min(p0.x, p1.x),
+      y: Math.min(p0.y, p1.y),
+      w: Math.abs(p1.x - p0.x),
+      h: Math.abs(p1.y - p0.y),
+      imageRef: ref,
+    });
+  }
+
+  public override prepareThumbnail(): Promise<void> {
+    return this.ensureRaster();
+  }
+
+  public override drawThumbnail(ctx: CanvasRenderingContext2D): void {
+    const raster = this._raster;
+    if (!raster || raster.latex !== this._latex) {
+      return;
+    }
+    // Caller has applied the element's offset + scale, so draw in local space.
+    ctx.drawImage(
+      raster.canvas,
+      0,
+      0,
+      this._natural.width,
+      this._natural.height,
+    );
+  }
 
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
     const root = this._root ?? this.createDom(host);
@@ -189,6 +270,7 @@ export class LatexElement extends DrawableElement {
     this._root?.remove();
     this._root = null;
     this._renderedLatex = null;
+    this._raster = null;
   }
 
   private createDom(host: HTMLElement): HTMLDivElement {

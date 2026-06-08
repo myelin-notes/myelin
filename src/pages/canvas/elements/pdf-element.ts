@@ -21,6 +21,7 @@ import {
   buildPdfElementRequest,
   type PdfElementExportPage,
   type PdfElementExportSource,
+  prepareExportOverlays,
 } from '../pdf-element-export';
 import {
   cleanupPdfPage,
@@ -485,6 +486,7 @@ export class PdfElement extends DrawableElement {
     const overlays = includeAnnotations
       ? (this._exportElementsProvider?.() ?? [])
       : [];
+    await prepareExportOverlays(overlays);
     const request = buildPdfElementRequest(source, overlays);
     request.originalPdfB64 = bytesToBase64(source.pdfBytes);
     await exportPdf(request, path);
