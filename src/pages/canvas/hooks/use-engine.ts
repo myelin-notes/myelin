@@ -60,7 +60,7 @@ export function useCanvasEngine({
   });
   useCanvasThumbnailProducer({
     id,
-    canvasRef,
+    drawableCanvasRef,
     thumbnailRootRef,
   });
 

@@ -210,6 +210,21 @@ export abstract class DrawableElement {
   public drawToPdf(_ctx: PdfHarvestContext): void {}
 
   /**
+   * Render this element into an off-screen thumbnail context. Async-rendering
+   * elements (e.g. PDF) override to prepare their raster ahead of `drawThumbnail`.
+   * No-op by default.
+   */
+  public async prepareThumbnail(_maxScale: number): Promise<void> {}
+
+  /**
+   * Render this element into an off-screen thumbnail context. Reuses the 2D
+   * draw pass by default; DOM-backed elements override to paint their content.
+   */
+  public drawThumbnail(ctx: CanvasRenderingContext2D, deltaTime: number): void {
+    this.draw2D(ctx, deltaTime);
+  }
+
+  /**
    * Draw the selection outline + handles. Lives on a separate always-on-top
    * canvas so it's visible above DOM-backed editing chrome.
    */
