@@ -345,6 +345,16 @@ export abstract class DrawableElement {
   }
 
   /**
+   * Whether editing this element locks the viewport to single-axis pan (and
+   * routes wheel/two-finger gestures to scrolling the element). This is a
+   * paged-surface behavior — only multi-page elements like the page frame want
+   * it; free-floating editors (text, LaTeX) should pan the canvas freely.
+   */
+  public get locksViewportPanWhileEditing(): boolean {
+    return false;
+  }
+
+  /**
    * Hook for binding extra shared Yjs state that does not live on the
    * element's main Y.Map.
    */

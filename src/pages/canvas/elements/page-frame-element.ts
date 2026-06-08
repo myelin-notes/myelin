@@ -335,6 +335,10 @@ export class PageFrameElement extends DrawableElement {
     return true;
   }
 
+  public override get locksViewportPanWhileEditing(): boolean {
+    return true;
+  }
+
   public override bindSharedYState(ydoc: YDocManager): void {
     this.bindYProseMirror(ydoc.getXmlFragment(this.uuid));
   }
