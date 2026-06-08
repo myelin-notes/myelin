@@ -2,7 +2,7 @@ import { EditorState, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { parseMarkdownToDoc } from '../../markdown-parser';
+import { parseMarkdownToDoc } from '../../markdown/parser';
 import { schema } from '../schema';
 import {
   buildNormalizedLinkTransaction,

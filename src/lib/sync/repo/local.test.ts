@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { ElementType } from '@/pages/canvas/elements/element-type';
-import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
-import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown-serializer';
+import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/import';
+import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown/serializer';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {

@@ -32,7 +32,7 @@ export const SemanticTags = memo(function SemanticTags({
     let cancelled = false;
 
     setLoaded(false);
-    Promise.all([repository.listTags(), repository.getStats()])
+    Promise.all([repository.listTags(true), repository.getStats()])
       .then(([allTags, nextStats]) => {
         if (cancelled) {
           return;
@@ -60,6 +60,7 @@ export const SemanticTags = memo(function SemanticTags({
       return;
     }
 
+    // `tags` holds the synthesized (includeAncestors) list, so exact membership is intentionally correct for hierarchical filters.
     const existing = new Set(tags.map((entry) => entry.tag));
     const pruned = new Set([...activeTags].filter((tag) => existing.has(tag)));
     if (pruned.size !== activeTags.size) {

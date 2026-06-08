@@ -20,7 +20,7 @@ import {
   type ExportTarget,
   openExportDialog,
 } from '../export/export-controller';
-import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
+import { serializeDocToMarkdownChunked } from '../page-frame/markdown/serializer';
 import { harvestPageFramePdf } from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
@@ -37,7 +37,7 @@ import {
   CHROME_BOTTOM_PADDING,
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
-} from './frame-chrome';
+} from './frame/chrome';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
   normalizePageFrameDisplayName,

@@ -6,7 +6,7 @@ import {
   CHROME_BOTTOM_PADDING,
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
-} from '@/pages/canvas/elements/frame-chrome';
+} from '@/pages/canvas/elements/frame/chrome';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,

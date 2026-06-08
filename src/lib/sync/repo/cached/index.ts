@@ -1,7 +1,7 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
+import { summarizeNoteBytes } from '@/lib/note/state-summary';
 import type { ReindexItem } from '@/lib/note-index';
-import { summarizeNoteBytes } from '@/lib/note-state-summary';
 import { NoteSession } from '../../session';
 import type {
   YjsSyncPushOptions,
@@ -332,8 +332,8 @@ export class CachedRepository
     return this.cache.getNodesByAnyTag(tags);
   }
 
-  async listTags(): Promise<RepositoryTag[]> {
-    return this.cache.listTags();
+  async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
+    return this.cache.listTags(includeAncestors);
   }
 
   async getStats(): Promise<RepositoryStats> {

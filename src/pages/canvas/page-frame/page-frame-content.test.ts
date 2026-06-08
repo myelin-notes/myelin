@@ -3,8 +3,8 @@ import {
   prosemirrorToYDoc,
   yXmlFragmentToProseMirrorRootNode,
 } from 'y-prosemirror';
-import { parseMarkdownToDoc } from './markdown-parser';
-import { serializeDocToMarkdown } from './markdown-serializer';
+import { parseMarkdownToDoc } from './markdown/parser';
+import { serializeDocToMarkdown } from './markdown/serializer';
 import { normalizeAndResolveNoteLinksDoc } from './pm/markdown/note-links';
 import { schema } from './pm/schema';
 

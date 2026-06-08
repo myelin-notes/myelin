@@ -21,7 +21,7 @@ import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
 import {
   type PageFrameNameCache,
   resolveNoteLinkRefByTitle,
-} from '@/pages/canvas/page-frame/note-link-resolution';
+} from '@/pages/canvas/page-frame/note-link/resolution';
 import { buildRenamePageFrameLinkReferencesTransaction } from '@/pages/canvas/page-frame/pm/markdown/note-links';
 import { schema as pageFrameSchema } from '@/pages/canvas/page-frame/pm/schema';
 import type { ITool } from '@/pages/canvas/tools/tool';

@@ -23,7 +23,7 @@ import { IS_DEV } from '@/lib/env';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { openNote, openNoteLink } from '@/lib/note-navigation';
+import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -58,7 +58,7 @@ import { PageFrameDomLayer } from './page-frame/dom-layer';
 import {
   getNoteLinkPreview,
   type NoteLinkPreviewTarget,
-} from './page-frame/note-link-preview';
+} from './page-frame/note-link/preview';
 import type { NoteLinkOpenRequestDetail } from './page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomplete';
 

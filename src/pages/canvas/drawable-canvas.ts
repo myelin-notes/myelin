@@ -4,7 +4,7 @@ import { Logger } from '@/lib/logger';
 import {
   describeElementType,
   summarizeDrawableElements,
-} from '@/lib/note-state-summary';
+} from '@/lib/note/state-summary';
 import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasViewport } from './canvas-viewport';
@@ -251,6 +251,15 @@ export class DrawableCanvas {
 
   public get ydoc(): YDocManager {
     return this._ydoc;
+  }
+
+  /**
+   * Run a mutation inside a single Yjs transaction. Nested element-map
+   * transacts flatten into this one, so a multi-step edit (e.g. the pen's
+   * stroke→shape swap) coalesces into one undo-stack item.
+   */
+  public transact(fn: () => void): void {
+    this._ydoc.transact(fn);
   }
 
   /**

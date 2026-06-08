@@ -1,7 +1,7 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
+import { summarizeYDoc } from '@/lib/note/state-summary';
 import { noteIndexService, type ReindexItem } from '@/lib/note-index';
-import { summarizeYDoc } from '@/lib/note-state-summary';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { NoteSession } from '../session';
 import type {
@@ -36,6 +36,7 @@ import {
   isFileVersionNode as isConcreteFileVersionNode,
   isIndexCandidateFileNode,
   listDirectoryNodes,
+  listHierarchicalTags,
   listTags,
   moveNodeInManifest,
   normalizeCustomColor,
@@ -268,9 +269,11 @@ export abstract class BaseRepository
     return getNodesByAnyTag(manifest, tags);
   }
 
-  async listTags(): Promise<RepositoryTag[]> {
+  async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
     const { manifest } = await this.loadManifestImpl();
-    return listTags(manifest);
+    return includeAncestors
+      ? listHierarchicalTags(manifest)
+      : listTags(manifest);
   }
 
   async getStats(): Promise<RepositoryStats> {
