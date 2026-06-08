@@ -3,11 +3,10 @@ import {
   getStrokeOutlinePoints,
   getStrokePoints,
 } from 'perfect-freehand';
-import * as Y from 'yjs';
+import type * as Y from 'yjs';
 import { parseCssColor } from '@/lib/pdf-export/color';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
-import { LOCAL_ORIGIN } from '../ydoc-manager';
 import { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 
@@ -16,14 +15,21 @@ export interface StrokeStyle {
   size: number;
 }
 
+/**
+ * While a stroke is being drawn its points are buffered in memory and pushed to
+ * Yjs no more than this often. One write within the UndoManager's capture
+ * window keeps the whole stroke (creation → points) in a single undo step
+ * without paying a transaction per pointer sample.
+ */
+const POINT_FLUSH_INTERVAL_MS = 300;
+
 export class StrokeElement extends DrawableElement {
   protected box: DOMRect;
   protected dirty: boolean = true;
   protected cachedPath: Path2D;
-  protected cachedPoints: number[][];
 
-  /** Yjs backing array for points (flat: [x,y,p, x,y,p, ...]). */
-  private _yPoints: Y.Array<number> | null = null;
+  /** Wall-clock of the last Yjs flush, for throttling live writes. */
+  private lastFlush: number = 0;
 
   public get strokeStyle(): StrokeStyle {
     return this.style;
@@ -31,7 +37,13 @@ export class StrokeElement extends DrawableElement {
 
   /** World-space [x, y] coordinates of the recorded stroke points. */
   public get xyPoints(): [number, number][] {
-    return this.points.map((p) => [p[0], p[1]]);
+    const pts = this.points;
+    const n = (pts.length / 3) | 0;
+    const out = new Array<[number, number]>(n);
+    for (let i = 0; i < n; i++) {
+      out[i] = [pts[i * 3], pts[i * 3 + 1]];
+    }
+    return out;
   }
 
   public get pressureEnabled(): boolean {
@@ -43,20 +55,22 @@ export class StrokeElement extends DrawableElement {
       color: this.style.color,
       size: this.style.size,
       hasPressure: this.hasPressure,
-      points: new Y.Array<number>(),
+      // Flat [x,y,p, ...] stored as a single Y.Map value rather than a
+      // Y.Array<number>: one CRDT item instead of one per coordinate.
+      points: [...this.points],
     };
   }
 
   public constructor(
     uuid: string,
-    protected points: [number, number, number][],
+    /** Flat point buffer: [x, y, pressure, x, y, pressure, ...]. */
+    protected points: number[],
     protected hasPressure: boolean,
     protected style: StrokeStyle,
   ) {
     super(uuid, ElementType.STROKE);
     this.box = new DOMRect(0, 0, 0, 0);
     this.cachedPath = new Path2D();
-    this.cachedPoints = [];
   }
 
   public override bindToYMap(yMap: Y.Map<unknown>): void {
@@ -67,54 +81,68 @@ export class StrokeElement extends DrawableElement {
       },
       size: (v) => {
         this.style.size = v as number;
+        this.dirty = true;
       },
       hasPressure: (v) => {
         this.hasPressure = v as boolean;
+        this.dirty = true;
       },
       points: (v) => {
-        this._yPoints = v as Y.Array<number>;
-        this.rebuildPointsFromYArray();
+        this.points = (v as number[]).slice();
+        this.dirty = true;
         this.updateBounds();
       },
     });
   }
 
-  private rebuildPointsFromYArray(): void {
-    if (!this._yPoints) {
-      return;
-    }
-    const flat = this._yPoints.toArray();
-    const len = Math.floor(flat.length / 3);
-    this.points = new Array(len);
-    for (let i = 0; i < len; i++) {
-      this.points[i] = [flat[i * 3], flat[i * 3 + 1], flat[i * 3 + 2]];
-    }
+  public addPoint(x: number, y: number, pressure: number | undefined) {
+    this.points.push(x, y, pressure ?? 0);
     this.dirty = true;
+
+    // Throttled live flush so a long stroke stays in one undo group; the final
+    // state is always persisted by commit() on pointer-up.
+    const now = Date.now();
+    if (now - this.lastFlush >= POINT_FLUSH_INTERVAL_MS) {
+      this.lastFlush = now;
+      this.flushPoints();
+    }
   }
 
-  public addPoint(x: number, y: number, pressure: number | undefined) {
-    const p = pressure ?? 0;
-    this.points = [...this.points, [x, y, p]];
-    this.dirty = true;
-    if (this._yPoints) {
-      this._yPoints.doc!.transact(() => {
-        this._yPoints!.push([x, y, p]);
-      }, LOCAL_ORIGIN);
+  /** Persist the full point buffer to Yjs. Called when the stroke is finished. */
+  public commit(): void {
+    this.flushPoints();
+  }
+
+  private flushPoints(): void {
+    if (this.yMap) {
+      this.syncToYMap({ points: [...this.points] });
     }
+  }
+
+  /** Materialize the flat buffer as perfect-freehand input tuples (transient). */
+  private toTuples(): [number, number, number][] {
+    const pts = this.points;
+    const n = (pts.length / 3) | 0;
+    const out = new Array<[number, number, number]>(n);
+    for (let i = 0; i < n; i++) {
+      const j = i * 3;
+      out[i] = [pts[j], pts[j + 1], pts[j + 2]];
+    }
+    return out;
   }
 
   public draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
-    if (this.points.length === 0) {
+    if (this.points.length < 3) {
       return;
     }
     if (this.dirty) {
-      this.cachedPoints = getStroke(this.points, {
+      // The outline is only needed to build the Path2D; it is not retained.
+      const outline = getStroke(this.toTuples(), {
         simulatePressure: !this.hasPressure,
         size: this.style.size,
       });
-      this.cachedPath = new Path2D(
-        this.getSvgPathFromStroke(this.cachedPoints),
-      );
+      this.cachedPath = new Path2D(this.getSvgPathFromStroke(outline));
+      this.dirty = false;
     }
 
     ctx.fillStyle = this.style.color;
@@ -122,11 +150,11 @@ export class StrokeElement extends DrawableElement {
   }
 
   public override drawToPdf(ctx: PdfHarvestContext): void {
-    if (this.points.length === 0) {
+    if (this.points.length < 3) {
       return;
     }
     // Same outline perfect-freehand produces on screen, as a filled vector path.
-    const outline = getStroke(this.points, {
+    const outline = getStroke(this.toTuples(), {
       simulatePressure: !this.hasPressure,
       size: this.style.size,
     });
@@ -148,11 +176,33 @@ export class StrokeElement extends DrawableElement {
     radius: number,
     _ctx: CanvasRenderingContext2D,
   ): boolean {
-    return CollisionHelper.isPathOverlappingCircle(
-      this.cachedPoints,
-      { x, y },
-      radius,
-    );
+    // Hit-test the raw centerline inflated by the stroke half-width, instead of
+    // the perfect-freehand outline. Avoids storing (or recomputing) the outline
+    // and is what the eraser walks every pointer move.
+    const pts = this.points;
+    if (pts.length < 2) {
+      return false;
+    }
+    const tol = radius + this.style.size / 2;
+    const circle = { x, y };
+    const a = { x: pts[0], y: pts[1] };
+    if (CollisionHelper.inCircle(a, circle, tol)) {
+      return true;
+    }
+    const b = { x: 0, y: 0 };
+    for (let i = 3; i + 1 < pts.length; i += 3) {
+      b.x = pts[i];
+      b.y = pts[i + 1];
+      if (CollisionHelper.inCircle(b, circle, tol)) {
+        return true;
+      }
+      if (CollisionHelper.doesSegmentIntersectCircle(a, b, circle, tol)) {
+        return true;
+      }
+      a.x = b.x;
+      a.y = b.y;
+    }
+    return false;
   }
 
   public get localBoundingBox(): DOMRect {
@@ -160,11 +210,13 @@ export class StrokeElement extends DrawableElement {
   }
 
   protected updateBoundingBox() {
-    if (this.points.length === 0) {
+    if (this.points.length < 3) {
       return;
     }
 
-    const outlinePoints = getStrokeOutlinePoints(getStrokePoints(this.points));
+    const outlinePoints = getStrokeOutlinePoints(
+      getStrokePoints(this.toTuples()),
+    );
 
     let minX = Number.POSITIVE_INFINITY;
     let minY = Number.POSITIVE_INFINITY;

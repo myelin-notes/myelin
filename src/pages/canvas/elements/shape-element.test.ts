@@ -74,7 +74,7 @@ describe('ShapeElement persistence', () => {
     expect(reloaded.localBoundingBox.height).toBe(80);
   });
 
-  it('seeds an empty points Y.Array and survives a re-bind (reload)', () => {
+  it('stores geometry directly as a flat value and survives a re-bind (reload)', () => {
     const ydoc = new YDocManager();
     const src = new ShapeElement('s5', 'rect', [0, 0, 120, 90], STYLE);
     const yMap = ydoc.createElementMap(ElementType.SHAPE, 's5', {
@@ -84,11 +84,10 @@ describe('ShapeElement persistence', () => {
       scaleY: 1,
       ...src.getYMapProps(),
     });
-    const points = yMap.get('points') as { length: number };
-    expect(points.length).toBe(0);
+    // Geometry is a single flat array value, written at creation (no seeding).
+    expect(yMap.get('geom')).toEqual([0, 0, 120, 90]);
 
     src.bindToYMap(yMap);
-    expect(points.length).toBe(4); // geom written once
 
     const reloaded = new ShapeElement('s5', 'rect', [0, 0, 0, 0], STYLE);
     reloaded.bindToYMap(yMap);

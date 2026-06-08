@@ -1,9 +1,8 @@
-import * as Y from 'yjs';
+import type * as Y from 'yjs';
 import { parseCssColor } from '@/lib/pdf-export/color';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import type { Vector2 } from '../drawable-canvas';
 import type { ShapeType } from '../shape-recognizer';
-import { LOCAL_ORIGIN } from '../ydoc-manager';
 import {
   DrawableElement,
   MIN_SCALE,
@@ -27,12 +26,6 @@ const MIN_PDF_WORLD_SIZE = 1;
 export class ShapeElement extends DrawableElement {
   protected box: DOMRect = new DOMRect(0, 0, 0, 0);
 
-  /** Local-space geometry seeded from the constructor (for empty-Y.Array hydration). */
-  private readonly initialGeom: number[];
-
-  /** Yjs backing array mirroring `geom`. */
-  private _yPoints: Y.Array<number> | null = null;
-
   /** Pre-drag geometry snapshot; resize ratios are cumulative from drag start. */
   private resizeBaseGeom: number[] | null = null;
 
@@ -43,7 +36,6 @@ export class ShapeElement extends DrawableElement {
     protected style: StrokeStyle,
   ) {
     super(uuid, ElementType.SHAPE);
-    this.initialGeom = [...geom];
     this.updateBoundingBox();
   }
 
@@ -52,7 +44,9 @@ export class ShapeElement extends DrawableElement {
       shapeType: this.shapeType,
       color: this.style.color,
       size: this.style.size,
-      points: new Y.Array<number>(),
+      // Flat geometry stored directly as one Y.Map value; the shape's geometry
+      // is fully known at construction, so there is nothing to seed later.
+      geom: [...this.geom],
     };
   }
 
@@ -69,26 +63,11 @@ export class ShapeElement extends DrawableElement {
       size: (v) => {
         this.style.size = v as number;
       },
-      points: (v) => {
-        this._yPoints = v as Y.Array<number>;
-        // Fresh shapes (created by the pen swap) get an empty Y.Array; seed it
-        // once from the constructor geometry so it round-trips on reload.
-        if (this._yPoints.length === 0 && this.initialGeom.length > 0) {
-          this._yPoints.doc!.transact(() => {
-            this._yPoints!.push(this.initialGeom);
-          }, LOCAL_ORIGIN);
-        }
-        this.rebuildGeomFromYArray();
+      geom: (v) => {
+        this.geom = (v as number[]).slice();
         this.updateBounds();
       },
     });
-  }
-
-  private rebuildGeomFromYArray(): void {
-    if (!this._yPoints) {
-      return;
-    }
-    this.geom = this._yPoints.toArray();
   }
 
   public get localBoundingBox(): DOMRect {
@@ -184,16 +163,11 @@ export class ShapeElement extends DrawableElement {
     this.updateBounds();
   }
 
-  /** Replace the geometry and mirror it into the backing Y.Array. */
+  /** Replace the geometry and mirror it into the backing Y.Map value. */
   private setGeom(geom: number[]): void {
     this.geom = geom;
     this.updateBoundingBox();
-    if (this._yPoints) {
-      this._yPoints.doc!.transact(() => {
-        this._yPoints!.delete(0, this._yPoints!.length);
-        this._yPoints!.push(geom);
-      }, LOCAL_ORIGIN);
-    }
+    this.syncToYMap({ geom: [...geom] });
   }
 
   protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {

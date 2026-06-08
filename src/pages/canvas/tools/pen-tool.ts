@@ -120,7 +120,13 @@ export class PenTool implements ITool {
 
   public interrupt(canvas: DrawableCanvas): void {
     this.clearDwellTimer();
-    (this.currentShape ?? this.currentStroke)?.updateBounds();
+    if (this.currentStroke) {
+      this.currentStroke.updateBounds();
+      // Persist the buffered points once, now that the stroke is finished.
+      this.currentStroke.commit();
+    } else {
+      this.currentShape?.updateBounds();
+    }
     this.currentStroke = null;
     this.currentShape = null;
     this.snapped = false;
