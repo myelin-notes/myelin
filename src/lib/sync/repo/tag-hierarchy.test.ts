@@ -3,6 +3,7 @@ import {
   expandTagWithAncestors,
   nodeMatchesAnyTag,
   normalizeTagInput,
+  orderTagsHierarchically,
   tagMatchesQuery,
 } from './tag-hierarchy';
 
@@ -84,5 +85,50 @@ describe('normalizeTagInput', () => {
   it('does not strip a leading hash', () => {
     expect(normalizeTagInput('#a')).toBe('#a');
     expect(normalizeTagInput('#a/b')).toBe('#a/b');
+  });
+});
+
+describe('orderTagsHierarchically', () => {
+  const order = (tags: { tag: string; count: number }[]) =>
+    orderTagsHierarchically(tags).map((entry) => entry.tag);
+
+  it('places each parent immediately before its descendant subtree', () => {
+    expect(
+      order([
+        { tag: 'uni', count: 10 },
+        { tag: 'work', count: 8 },
+        { tag: 'uni/math', count: 6 },
+        { tag: 'uni/math/calc', count: 4 },
+      ]),
+    ).toEqual(['uni', 'uni/math', 'uni/math/calc', 'work']);
+  });
+
+  it('keeps families ordered by count and sorts siblings by count', () => {
+    expect(
+      order([
+        { tag: 'a', count: 5 },
+        { tag: 'b', count: 9 },
+        { tag: 'a/low', count: 1 },
+        { tag: 'a/high', count: 4 },
+      ]),
+    ).toEqual(['b', 'a', 'a/high', 'a/low']);
+  });
+
+  it('leaves a flat list untouched', () => {
+    expect(
+      order([
+        { tag: 'x', count: 3 },
+        { tag: 'y', count: 2 },
+      ]),
+    ).toEqual(['x', 'y']);
+  });
+
+  it('treats a tag whose parent is absent as a root rather than dropping it', () => {
+    expect(
+      order([
+        { tag: 'orphan/child', count: 7 },
+        { tag: 'solo', count: 2 },
+      ]),
+    ).toEqual(['orphan/child', 'solo']);
   });
 });
