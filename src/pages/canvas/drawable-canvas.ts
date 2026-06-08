@@ -5,8 +5,8 @@ import {
   describeElementType,
   summarizeDrawableElements,
 } from '@/lib/note/state-summary';
-import { UserPrefs } from '@/lib/user-prefs';
 import { StateMachine } from '../../lib/utils/state-machine';
+import { CanvasRenderer } from './canvas-renderer';
 import { CanvasViewport } from './canvas-viewport';
 import { ElementStore } from './element-store';
 import type { DrawableElement } from './elements/drawable-element';
@@ -18,6 +18,7 @@ import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
+import { PlacementController } from './placement-controller';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
@@ -145,14 +146,9 @@ export class DrawableCanvas {
   public readonly ctx: CanvasRenderingContext2D;
   public readonly viewport: CanvasViewport;
   private readonly canvas: HTMLCanvasElement;
-  private bgCtx: CanvasRenderingContext2D | null = null;
-  private bgCanvas: HTMLCanvasElement | null = null;
-  private overlayCtx: CanvasRenderingContext2D | null = null;
-  private overlayCanvas: HTMLCanvasElement | null = null;
+  private readonly renderer: CanvasRenderer;
   private readonly state: StateMachine<InteractState>;
   public readonly tools: ITool[];
-  private bgPattern: CanvasPattern | null = null;
-  private unsubBgPref: (() => void) | null = null;
 
   private spaceDown: boolean = false;
   private screenPosition: Vector2 = { x: 0, y: 0 };
@@ -189,11 +185,11 @@ export class DrawableCanvas {
   private _editDomRoot: HTMLElement | null = null;
   private _cleanupEditListeners: (() => void) | null = null;
 
-  // One-shot placement state — orthogonal to tools. When set, the next
-  // primary-button click finalizes placement and the state clears.
-  private _placement: PlacementGhost | null = null;
-  private _placementCleanup: (() => void) | null = null;
-  private onPlacementEnd?: () => void;
+  // One-shot placement state — orthogonal to tools. When active, the next
+  // primary-button click finalizes placement and the state clears. The
+  // controller owns the ghost + Escape listener; the canvas drives lifecycle
+  // (cursor, edit-mode exit, change notification).
+  private readonly _placement = new PlacementController();
 
   /**
    * Listeners notified when selection, element set, element order, edit mode,
@@ -217,6 +213,7 @@ export class DrawableCanvas {
     this.canvas = canvas;
     this.canvas.style.zIndex = '10';
     this.ctx = ctx!;
+    this.renderer = new CanvasRenderer(this.ctx, canvas);
     this.viewport = new CanvasViewport(canvas);
     this.viewport.setContentBoundsProvider(() => this.getContentBounds());
     this.state = new StateMachine(InteractState.Idle);
@@ -227,11 +224,6 @@ export class DrawableCanvas {
 
     this.initEventListeners(canvas);
     this.initStates();
-    this.resizeCanvas(window.innerWidth, window.innerHeight);
-    this.buildBgPattern(UserPrefs.get('canvasBackground'));
-    this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
-      this.buildBgPattern(bg);
-    });
 
     // Hydrate existing elements from Y.Doc (for loaded documents)
     this.hydrateFromYDoc();
@@ -527,9 +519,7 @@ export class DrawableCanvas {
   }
 
   public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
-    this.bgCanvas = canvas;
-    this.bgCtx = canvas.getContext('2d', { alpha: true });
-    this.resizeBgCanvas(window.innerWidth, window.innerHeight);
+    this.renderer.setBackgroundCanvas(canvas);
   }
 
   /**
@@ -538,9 +528,7 @@ export class DrawableCanvas {
    * lowered to z=2 to avoid strokes bleeding onto edited text).
    */
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
-    this.overlayCanvas = canvas;
-    this.overlayCtx = canvas.getContext('2d', { alpha: true });
-    this.resizeOverlayCanvas(window.innerWidth, window.innerHeight);
+    this.renderer.setOverlayCanvas(canvas);
   }
 
   public setDomOverlayHost(host: HTMLElement): void {
@@ -552,50 +540,36 @@ export class DrawableCanvas {
   }
 
   public setOnPlacementEnd(callback: (() => void) | undefined) {
-    this.onPlacementEnd = callback;
+    this._placement.setOnPlacementEnd(callback);
   }
 
   public get isPlacing(): boolean {
-    return this._placement !== null;
+    return this._placement.isActive;
   }
 
   public startPlacement(ghost: PlacementGhost): void {
     if (this._editingElement) {
       this.exitElementEdit();
     }
-    if (this._placement) {
+    if (this._placement.isActive) {
       this.endPlacement();
     }
-    this._placement = ghost;
+    this._placement.start(ghost);
     this._toolCursor = 'copy';
     this.updateCursor();
     this.notifyChange();
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        this.endPlacement();
-      }
-    };
-    document.addEventListener('keydown', handleKey);
-    this._placementCleanup = () => {
-      document.removeEventListener('keydown', handleKey);
-    };
   }
 
   public cancelPlacement(): void {
-    if (this._placement) {
+    if (this._placement.isActive) {
       this.endPlacement();
     }
   }
 
   private endPlacement(): void {
-    this._placement = null;
-    this._placementCleanup?.();
-    this._placementCleanup = null;
+    this._placement.end();
     this._toolCursor = 'default';
     this.updateCursor();
-    this.onPlacementEnd?.();
     this.notifyChange();
   }
 
@@ -758,11 +732,10 @@ export class DrawableCanvas {
     if (this._editingElement) {
       this.exitElementEdit();
     }
-    if (this._placement) {
+    if (this._placement.isActive) {
       this.endPlacement();
     }
-    this.unsubBgPref?.();
-    this.unsubBgPref = null;
+    this.renderer.destroy();
     this._ydoc.elements.unobserveDeep(this._handleYElementsChange);
     for (const element of this._store.all()) {
       element.disposeDOM();
@@ -776,80 +749,16 @@ export class DrawableCanvas {
   }
 
   public redraw(deltaTime: number) {
-    const dpr = window.devicePixelRatio || 1;
-    const logicalW = this.canvas.width / dpr;
-    const logicalH = this.canvas.height / dpr;
-
-    const zoom = this.viewport.zoom;
-    const offset = this.viewport.offset;
-
-    // Background canvas: dot grid + chrome (when not editing)
-    if (this.bgCtx && this.bgCanvas) {
-      const bgW = this.bgCanvas.width / dpr;
-      const bgH = this.bgCanvas.height / dpr;
-      this.bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.bgCtx.clearRect(0, 0, bgW, bgH);
-
-      if (this.bgPattern) {
-        this.bgCtx.save();
-        this.bgCtx.scale(zoom, zoom);
-        this.bgCtx.translate(offset.x, offset.y);
-        this.bgCtx.fillStyle = this.bgPattern;
-        this.bgCtx.fillRect(
-          -offset.x - bgW / zoom,
-          -offset.y - bgH / zoom,
-          (bgW * 3) / zoom,
-          (bgH * 3) / zoom,
-        );
-        this.bgCtx.restore();
-      }
-    }
-
-    // Foreground canvas: element content + tool cursor
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.ctx.clearRect(0, 0, logicalW, logicalH);
-
-    this.ctx.save();
-    this.ctx.scale(zoom, zoom);
-    this.ctx.translate(offset.x, offset.y);
-
-    for (const element of this.elements) {
-      element.draw(this.ctx, deltaTime);
-    }
-    // Cursor: compute fresh from screen position so it's correct even if
-    // the user wheel-zoomed without moving the mouse since.
-    const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
-    if (this._placement) {
-      this.drawPlacementGhost(this.ctx, mouseWorld);
-    } else {
-      this.toolSelected.drawCursor(this.ctx, mouseWorld);
-    }
-    this.ctx.restore();
-
-    // Overlay canvas: selection outline + handles. Always above DOM chrome
-    // so selection stays visible while a page frame is being edited (the
-    // foreground canvas is lowered below chrome in that mode).
-    if (this.overlayCtx && this.overlayCanvas) {
-      const overlayW = this.overlayCanvas.width / dpr;
-      const overlayH = this.overlayCanvas.height / dpr;
-      this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.overlayCtx.clearRect(0, 0, overlayW, overlayH);
-      this.overlayCtx.save();
-      this.overlayCtx.scale(zoom, zoom);
-      this.overlayCtx.translate(offset.x, offset.y);
-      const editing = this._editingElement;
-      for (const element of this.elements) {
-        element.drawSelectionOverlay(this.overlayCtx, element === editing);
-      }
-      this.overlayCtx.restore();
-    }
-
-    const host = this._domOverlayHost;
-    if (host) {
-      for (const element of this.elements) {
-        element.syncDOM(this.viewport, host);
-      }
-    }
+    this.renderer.redraw(
+      deltaTime,
+      this.viewport,
+      this.elements,
+      this._editingElement,
+      this.toolSelected,
+      this.screenPosition,
+      this._placement,
+      this._domOverlayHost,
+    );
   }
 
   /**
@@ -1000,7 +909,7 @@ export class DrawableCanvas {
   }
 
   public selectAllElements(): void {
-    if (this._editingElement || this._placement) {
+    if (this._editingElement || this._placement.isActive) {
       return;
     }
     for (const element of this._store.all()) {
@@ -1122,10 +1031,10 @@ export class DrawableCanvas {
 
     this._handlePointerDown = (evt) => {
       // One-shot placement intercepts primary-button clicks regardless of tool.
-      if (this._placement) {
+      if (this._placement.isActive) {
         if (evt.button === 0) {
           const worldPos = this.viewport.getPoint(evt);
-          this._placement.onPlace(worldPos);
+          this._placement.ghost?.onPlace(worldPos);
         }
         this.endPlacement();
         return;
@@ -1163,9 +1072,7 @@ export class DrawableCanvas {
     window.addEventListener('pointerup', this._handlePointerUp);
 
     this._handleResize = () => {
-      this.resizeCanvas(window.innerWidth, window.innerHeight);
-      this.resizeBgCanvas(window.innerWidth, window.innerHeight);
-      this.resizeOverlayCanvas(window.innerWidth, window.innerHeight);
+      this.renderer.handleWindowResize(window.innerWidth, window.innerHeight);
     };
     window.addEventListener('resize', this._handleResize);
   }
@@ -1290,89 +1197,6 @@ export class DrawableCanvas {
     this.toolSelected = this.tools[to];
     this._toolCursor = 'default';
     this.updateCursor();
-  }
-
-  private drawPlacementGhost(ctx: CanvasRenderingContext2D, worldPos: Vector2) {
-    if (!this._placement) {
-      return;
-    }
-    const b = this._placement.getBounds();
-    const x = worldPos.x + b.x;
-    const y = worldPos.y + b.y;
-
-    ctx.fillStyle = 'rgba(208, 225, 251, 0.18)';
-    ctx.beginPath();
-    ctx.roundRect(x, y, b.width, b.height, 6);
-    ctx.fill();
-
-    ctx.strokeStyle = '#2f3e46';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.roundRect(x, y, b.width, b.height, 6);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  private buildBgPattern(style: 'grid' | 'dots' | 'blank') {
-    if (style === 'blank') {
-      this.bgPattern = null;
-      return;
-    }
-
-    const spacing = 24;
-    const tile = new OffscreenCanvas(spacing, spacing);
-    const pctx = tile.getContext('2d')!;
-    const color = 'rgba(164, 168, 172, 0.35)';
-
-    if (style === 'dots') {
-      pctx.fillStyle = color;
-      pctx.beginPath();
-      pctx.arc(spacing / 2, spacing / 2, 0.75, 0, Math.PI * 2);
-      pctx.fill();
-    } else {
-      // grid
-      pctx.strokeStyle = color;
-      pctx.lineWidth = 0.5;
-      pctx.beginPath();
-      pctx.moveTo(spacing, 0);
-      pctx.lineTo(spacing, spacing);
-      pctx.moveTo(0, spacing);
-      pctx.lineTo(spacing, spacing);
-      pctx.stroke();
-    }
-
-    this.bgPattern = this.ctx.createPattern(tile, 'repeat');
-  }
-
-  private resizeCanvas(width: number, height: number) {
-    const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
-  }
-
-  private resizeBgCanvas(width: number, height: number) {
-    if (!this.bgCanvas) {
-      return;
-    }
-    const dpr = window.devicePixelRatio || 1;
-    this.bgCanvas.width = width * dpr;
-    this.bgCanvas.height = height * dpr;
-    this.bgCanvas.style.width = `${width}px`;
-    this.bgCanvas.style.height = `${height}px`;
-  }
-
-  private resizeOverlayCanvas(width: number, height: number) {
-    if (!this.overlayCanvas) {
-      return;
-    }
-    const dpr = window.devicePixelRatio || 1;
-    this.overlayCanvas.width = width * dpr;
-    this.overlayCanvas.height = height * dpr;
-    this.overlayCanvas.style.width = `${width}px`;
-    this.overlayCanvas.style.height = `${height}px`;
   }
 
   public setSpaceDown(value: boolean) {
