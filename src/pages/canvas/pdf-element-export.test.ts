@@ -49,7 +49,13 @@ function overlayElement(
   hidden = false,
   drawToPdf: (ctx: PdfHarvestContext) => void = () => {},
 ): PdfExportOverlayElement {
-  return { uuid, boundingBox, hidden, drawToPdf };
+  return {
+    uuid,
+    boundingBox,
+    hidden,
+    drawToPdf,
+    prepareForPdf: () => Promise.resolve(),
+  };
 }
 
 function exportSource(

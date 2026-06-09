@@ -462,6 +462,10 @@ const zhHans: typeof en = {
         label: '图片或 PDF',
         description: '拖入文件或粘贴链接',
       },
+      latex: {
+        label: 'LaTeX',
+        description: '可书写公式的数学块',
+      },
     },
     toolShelf: {
       title: '工具盘',

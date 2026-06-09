@@ -9,6 +9,7 @@
 @import "./styles/editor-base.css";
 @import "./styles/editor-tables.css";
 @import "./styles/editor-blocks.css";
+@import "./styles/canvas-latex.css";
 @import "./styles/editor-inline.css";
 @import "./styles/widgets.css";
 @import "./styles/embeds.css";

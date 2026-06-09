@@ -372,10 +372,16 @@ function CanvasViewInner({
       <InsertPopover
         onInsertFrame={inserts.onInsertFrame}
         onInsertEmbed={inserts.onInsertEmbed}
+        onInsertLatex={inserts.onInsertLatex}
         onClose={inserts.closeInsert}
       />
     ),
-    [inserts.closeInsert, inserts.onInsertEmbed, inserts.onInsertFrame],
+    [
+      inserts.closeInsert,
+      inserts.onInsertEmbed,
+      inserts.onInsertFrame,
+      inserts.onInsertLatex,
+    ],
   );
   const embedComposer = useMemo(
     () => (
@@ -506,6 +512,7 @@ function CanvasViewInner({
             <InsertPopover
               onInsertFrame={inserts.onContextInsertFrame}
               onInsertEmbed={inserts.onContextInsertEmbed}
+              onInsertLatex={inserts.onContextInsertLatex}
               onClose={inserts.closeContextInsert}
             />
           </div>

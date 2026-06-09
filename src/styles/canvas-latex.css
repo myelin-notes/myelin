@@ -1,0 +1,63 @@
+/* Free-floating canvas LaTeX block. Shares KaTeX rendering with the page
+   frame math block (renderKatex), but lives in the canvas DOM overlay rather
+   than ProseMirror, so it needs its own positioning + source-panel chrome
+   (the page frame's rules are scoped to .pm-editor). */
+
+.canvas-latex-block {
+  position: absolute;
+  transform-origin: 0 0;
+  /* Selection + hit-testing happen on the canvas; the overlay never takes
+     pointer input. */
+  pointer-events: none;
+  color: #1a1a1a;
+}
+
+/* While editing, tint the preview like the page frame's math block
+   (.pm-math-block--editing .pm-math-block-preview) so it reads as the active
+   surface the source panel hangs off. The tint hugs the box exactly — no
+   box-shadow spread — so its left edge lines up with the source panel below,
+   which anchors to this box's layout rect. */
+.canvas-latex-block[data-editing="true"] {
+  border-radius: var(--radius-lg);
+  background: rgba(230, 234, 240, 0.55);
+}
+
+/* KaTeX display mode wraps content in .katex-display with a 1em block margin
+   and centered text — both throw off the natural-size measurement and offset
+   the formula inside its box. Zero them so the rendered box hugs the formula,
+   matching the geometric bounding box used for selection. */
+.canvas-latex-block .katex-display {
+  margin: 0;
+  text-align: left;
+}
+
+/* Hint shown before any LaTeX is typed. */
+.canvas-latex-block[data-empty="true"]::after {
+  content: attr(data-placeholder);
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 0.5em;
+  color: var(--text-muted, #9aa3ab);
+  font-family: var(--font-sans);
+  font-size: 16px;
+}
+
+/* Source editor: floats at screen scale (unscaled, always readable) just below
+   the block, hosting the shared CodeMirror math editor. Chrome mirrors the
+   page frame's .pm-math-block-source (editor-blocks.css). */
+.canvas-latex-edit {
+  position: absolute;
+  z-index: 20;
+}
+
+.canvas-latex-source {
+  padding: 0.5em 0.65em;
+  border: 1px solid rgba(195, 199, 202, 0.32);
+  border-radius: var(--radius-xl);
+  background: var(--bg-surface);
+  box-shadow:
+    0 0 32px 0 rgba(25, 28, 30, 0.06),
+    0 18px 40px -24px rgba(28, 39, 56, 0.18);
+  font-size: 14px;
+}

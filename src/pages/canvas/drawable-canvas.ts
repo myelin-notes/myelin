@@ -622,7 +622,9 @@ export class DrawableCanvas {
   public syncViewportEditModePan(): void {
     const element = this._editingElement;
     const viewportEditMode =
-      element !== null && !this.isCanvasInteractiveEditMode;
+      element !== null &&
+      !this.isCanvasInteractiveEditMode &&
+      element.locksViewportPanWhileEditing;
     this.viewport.setEditMode(viewportEditMode, {
       panAxis:
         element !== null &&

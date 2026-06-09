@@ -476,6 +476,10 @@ const en = {
         label: 'Image or PDF',
         description: 'Drop in files or paste a URL',
       },
+      latex: {
+        label: 'LaTeX',
+        description: 'A math block you can write equations in',
+      },
     },
     toolShelf: {
       title: 'Tool Shelf',
