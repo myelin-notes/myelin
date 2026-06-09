@@ -85,6 +85,9 @@ export function createLatexEditOverlay(
       editor = shared;
       shared.attach(source, owner, value);
       shared.setSelection(value.length, value.length);
+      // Type immediately on insert — don't rely on setSelection's focus
+      // side-effect, which makes the intent implicit and fragile.
+      shared.focus();
     });
 
   return {

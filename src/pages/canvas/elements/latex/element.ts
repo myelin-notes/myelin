@@ -2,6 +2,7 @@ import type * as Y from 'yjs';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import type { CanvasViewport } from '../../canvas-viewport';
 import type { DrawableCanvas } from '../../drawable-canvas';
+import { mountLatexProbe } from '../../page-frame/pm/math/latex-probe';
 import { renderKatex } from '../../page-frame/pm/math/render';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
@@ -30,10 +31,10 @@ const measureCache = new Map<string, Size>();
 const MEASURE_CACHE_LIMIT = 500;
 
 /**
- * Natural rendered size of a block formula (CSS px at scale 1). Renders the
- * shared KaTeX output into a hidden probe and reads its box — the only
- * reliable way to size HTML/font content. Cached per source since KaTeX
- * layout is the expensive part.
+ * Natural rendered size of a block formula (CSS px at scale 1). Mounts the
+ * shared KaTeX probe and reads its box — the only reliable way to size
+ * HTML/font content. Cached per source since KaTeX layout is the expensive
+ * part.
  */
 function measureLatex(latex: string): Size {
   const cached = measureCache.get(latex);
@@ -41,19 +42,13 @@ function measureLatex(latex: string): Size {
     return cached;
   }
 
-  const probe = document.createElement('div');
-  probe.className = 'canvas-latex-block';
-  Object.assign(probe.style, {
-    position: 'absolute',
-    left: '-99999px',
-    top: '0',
-    visibility: 'hidden',
-    width: 'max-content',
-  } as Partial<CSSStyleDeclaration>);
-  probe.appendChild(renderKatex(latex, true));
-  document.body.appendChild(probe);
-  const rect = probe.getBoundingClientRect();
-  probe.remove();
+  const { node, cleanup } = mountLatexProbe(latex);
+  let rect: DOMRect;
+  try {
+    rect = node.getBoundingClientRect();
+  } finally {
+    cleanup();
+  }
 
   const size: Size = {
     width: Math.max(1, Math.ceil(rect.width)),
@@ -107,10 +102,14 @@ export class LatexElement extends DrawableElement {
     this.bindYFields(yMap, {
       latex: (v) => {
         this._latex = typeof v === 'string' ? v : '';
+        // Remote/undo edits land here (setLatex handles local typing).
+        // remeasure already covers updateBounds (whose only job is to
+        // remeasure); the matching repaint nudge keeps a selected block's
+        // outline on the formula now instead of one syncDOM frame later.
         this.remeasure();
-        // Repaint on the next sync; the editor (if open) owns its own text.
         this._renderedLatex = null;
         this._raster = null;
+        this.onTransformChanged?.();
       },
     });
   }
