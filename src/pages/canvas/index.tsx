@@ -26,6 +26,7 @@ import { Logger } from '@/lib/logger';
 import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
+import { regenerateThumbnailNow } from '@/lib/thumbnails';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
@@ -123,6 +124,9 @@ function CanvasViewInner({
   const onRecenterViewport = useCallback(() => {
     drawableCanvasRef.current?.viewport.animateRecenter();
   }, []);
+  const onRegenerateThumbnail = useCallback(() => {
+    void regenerateThumbnailNow(id);
+  }, [id]);
 
   useEffect(() => {
     setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
@@ -471,6 +475,7 @@ function CanvasViewInner({
         zoomLocked={zoomLocked}
         onToggleZoomLock={onToggleZoomLock}
         onRecenter={onRecenterViewport}
+        onRegenerateThumbnail={onRegenerateThumbnail}
       />
       {engine.ready && (
         <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />

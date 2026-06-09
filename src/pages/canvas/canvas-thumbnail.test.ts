@@ -86,7 +86,7 @@ describe('renderCanvasThumbnail', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null for zero-size content bounds', async () => {
+  it('returns null for zero-size region', async () => {
     const renderCanvasThumbnail = await importRender();
     const result = await renderCanvasThumbnail(
       asElements([makeElement()]),
@@ -94,6 +94,40 @@ describe('renderCanvasThumbnail', () => {
       600,
     );
     expect(result).toBeNull();
+  });
+
+  it('culls elements outside the region', async () => {
+    const renderCanvasThumbnail = await importRender();
+    const inView = makeElement({ boundingBox: new DOMRect(10, 10, 50, 50) });
+    const offscreen = makeElement({
+      boundingBox: new DOMRect(1000, 1000, 50, 50),
+    });
+
+    await renderCanvasThumbnail(
+      asElements([inView, offscreen]),
+      new DOMRect(0, 0, 100, 100),
+      600,
+    );
+
+    expect(inView.drawThumbnail).toHaveBeenCalledTimes(1);
+    expect(offscreen.drawThumbnail).not.toHaveBeenCalled();
+    expect(offscreen.prepareThumbnail).not.toHaveBeenCalled();
+  });
+
+  it('returns null when no element intersects the region', async () => {
+    const renderCanvasThumbnail = await importRender();
+    const offscreen = makeElement({
+      boundingBox: new DOMRect(1000, 1000, 50, 50),
+    });
+
+    const result = await renderCanvasThumbnail(
+      asElements([offscreen]),
+      new DOMRect(0, 0, 100, 100),
+      600,
+    );
+
+    expect(result).toBeNull();
+    expect(offscreen.drawThumbnail).not.toHaveBeenCalled();
   });
 
   it('draws elements in order', async () => {

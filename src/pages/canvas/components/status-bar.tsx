@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Crosshair, Lock, Unlock } from 'lucide-react';
+import { Crosshair, ImageDown, Lock, Unlock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { IS_DEV } from '@/lib/env';
 import { useLocale, useMessages } from '@/lib/i18n';
@@ -11,6 +11,7 @@ interface StatusBarProps {
   zoomLocked: boolean;
   onToggleZoomLock: () => void;
   onRecenter: () => void;
+  onRegenerateThumbnail: () => void;
 }
 
 export const StatusBar = memo(function StatusBar({
@@ -19,6 +20,7 @@ export const StatusBar = memo(function StatusBar({
   zoomLocked,
   onToggleZoomLock,
   onRecenter,
+  onRegenerateThumbnail,
 }: StatusBarProps) {
   const strings = useMessages();
   const locale = useLocale();
@@ -72,6 +74,15 @@ export const StatusBar = memo(function StatusBar({
           <span className="pr-1 font-medium text-text-muted text-xs tabular-nums">
             {strings.canvas.statusBar.fps(fps)}
           </span>
+          <button
+            type="button"
+            onClick={onRegenerateThumbnail}
+            aria-label="Regenerate thumbnail"
+            title="Regenerate thumbnail (debug)"
+            className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
+          >
+            <ImageDown className="h-3.5 w-3.5" />
+          </button>
         </>
       )}
     </motion.div>
