@@ -79,6 +79,71 @@ describe('thumbnail service', () => {
     expect(cache.writeBlob).toHaveBeenCalledTimes(1);
   });
 
+  it('flushes a pending unregister regeneration after an inflight render', async () => {
+    const nodeId = 'thumbnail-unregister-inflight-flush' as VFSNodeId;
+    let finishFirstRender!: (blob: Blob) => void;
+    let renderCount = 0;
+    const firstRender = new Promise<Blob>((resolve) => {
+      finishFirstRender = resolve;
+    });
+    const render = vi.fn(() => {
+      renderCount += 1;
+      if (renderCount === 1) {
+        return firstRender;
+      }
+      return Promise.resolve(new Blob(['final-thumbnail']));
+    });
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    const initialRender = regenerateThumbnailNow(nodeId);
+    expect(render).toHaveBeenCalledTimes(1);
+
+    requestThumbnailRegeneration(nodeId);
+    unregister();
+    unregister();
+
+    finishFirstRender(new Blob(['initial-thumbnail']));
+    await initialRender;
+
+    await vi.waitFor(() => {
+      expect(render).toHaveBeenCalledTimes(2);
+    });
+    expect(cache.writeBlob).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not remove a newer producer after an old unregister flush finishes', async () => {
+    const nodeId = 'thumbnail-unregister-new-producer' as VFSNodeId;
+    let finishOldRender!: (blob: Blob) => void;
+    const oldRender = new Promise<Blob>((resolve) => {
+      finishOldRender = resolve;
+    });
+    const unregisterOld = registerThumbnailProducer(nodeId, {
+      render: vi.fn(() => oldRender),
+    });
+
+    const initialRender = regenerateThumbnailNow(nodeId);
+    requestThumbnailRegeneration(nodeId);
+    unregisterOld();
+
+    const newRender = vi.fn(async () => new Blob(['new-thumbnail']));
+    const unregisterNew = registerThumbnailProducer(nodeId, {
+      render: newRender,
+    });
+
+    finishOldRender(new Blob(['old-thumbnail']));
+    await initialRender;
+
+    await vi.waitFor(() => {
+      expect(newRender).toHaveBeenCalledTimes(1);
+    });
+
+    await regenerateThumbnailNow(nodeId);
+
+    expect(newRender).toHaveBeenCalledTimes(2);
+
+    unregisterNew();
+  });
+
   it('does not render on unregister without a pending regeneration', () => {
     const nodeId = 'thumbnail-unregister-idle' as VFSNodeId;
     const render = vi.fn(async () => new Blob(['thumbnail']));
