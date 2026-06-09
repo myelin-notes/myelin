@@ -214,7 +214,10 @@ export abstract class DrawableElement {
    * elements (e.g. PDF) override to prepare their raster ahead of `drawThumbnail`.
    * No-op by default.
    */
-  public async prepareThumbnail(_maxScale: number): Promise<void> {}
+  public async prepareThumbnail(
+    _maxScale: number,
+    _region: DOMRect,
+  ): Promise<void> {}
 
   /**
    * Prepare any async resource `drawToPdf` needs before a synchronous harvest

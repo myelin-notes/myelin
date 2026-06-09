@@ -33,7 +33,7 @@ export function useCanvasThumbnailProducer({
         }
         return renderCanvasThumbnail(
           canvas.elements,
-          canvas.contentBounds,
+          canvas.viewport.getWorldRect(),
           maxSize,
         );
       },
