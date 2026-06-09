@@ -20,6 +20,7 @@ import {
 import {
   buildPdfElementRequest,
   type PdfElementExportPage,
+  type PdfElementExportPdfPage,
   type PdfElementExportSource,
   prepareExportOverlays,
 } from '../pdf-element-export';
@@ -187,7 +188,11 @@ export class PdfElement extends DrawableElement {
   private _pageOrderCustom = false;
   private _stagingCanvasPool = new CanvasPool(STAGING_CANVAS_POOL_SIZE);
   private _lastSyncScreenOffset: { x: number; y: number } | null = null;
-  private _thumbnailPageCanvas: HTMLCanvasElement | null = null;
+  private _thumbnailPages: {
+    canvas: HTMLCanvasElement;
+    page: PdfElementExportPdfPage;
+  }[] = [];
+  private _pdfLoadPromise: Promise<void> | null = null;
 
   constructor(uuid: string, pageLayout: PageLayout = 'vertical') {
     super(uuid, ElementType.PDF);
@@ -258,7 +263,11 @@ export class PdfElement extends DrawableElement {
       pdfData: (v) => {
         const isReplacingPdf = this._pdfBytes !== null;
         this._pdfBytes = cloneBytes(v as Uint8Array);
-        void this.loadPdfBytes(this._pdfBytes, true, isReplacingPdf);
+        this._pdfLoadPromise = this.loadPdfBytes(
+          this._pdfBytes,
+          true,
+          isReplacingPdf,
+        );
       },
       fileName: (v) => {
         this._fileName = (v as string) ?? '';
@@ -284,7 +293,7 @@ export class PdfElement extends DrawableElement {
       fileName,
     });
 
-    void this.loadPdfBytes(this._pdfBytes, false, false);
+    this._pdfLoadPromise = this.loadPdfBytes(this._pdfBytes, false, false);
   }
 
   public get fileName(): string {
@@ -397,76 +406,89 @@ export class PdfElement extends DrawableElement {
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
   /**
-   * Render the first page into a cached offscreen canvas so the thumbnail can
-   * blit it. Uses a dedicated canvas (not the on-screen staging pool) so
-   * thumbnail rendering never evicts or contends with live page renders.
+   * Render the pages visible in the capture region into cached offscreen
+   * canvases so the thumbnail can blit them. Uses dedicated canvases (not the
+   * on-screen staging pool) so thumbnail rendering never evicts or contends
+   * with live page renders.
    */
-  public override async prepareThumbnail(maxScale: number): Promise<void> {
-    this._thumbnailPageCanvas = null;
+  public override async prepareThumbnail(
+    scale: number,
+    region: DOMRect,
+  ): Promise<void> {
+    this._thumbnailPages = [];
+
+    // The capture can fire before the PDF bytes finish opening; wait for the
+    // in-flight load instead of producing a blank thumbnail.
+    await this._pdfLoadPromise;
 
     const pdfDocument = this._pdfDocument;
     if (!pdfDocument) {
       return;
     }
 
-    const firstPage = this.getLayout().pages[0];
-    if (!firstPage || firstPage.kind !== 'pdf') {
-      return;
-    }
+    const scaleX = getPositiveScale(this._scale.x);
+    const scaleY = getPositiveScale(this._scale.y);
 
-    const elementScale = Math.max(
-      getPositiveScale(this._scale.x),
-      getPositiveScale(this._scale.y),
-    );
-    const renderScale = getPdfRenderScale({
-      pageSize: firstPage.size,
-      zoom: 1,
-      elementScale: elementScale * maxScale,
-      dpr: 1,
-    });
-
-    const canvas = document.createElement('canvas');
-    try {
-      await renderPdfPageToCanvas({
-        document: pdfDocument,
-        pageIndex: firstPage.originalIndex,
-        canvas,
-        renderScale,
-      }).promise;
-    } catch (error) {
-      if (!isPdfRenderCancelled(error)) {
-        logger.error('Failed to render PDF thumbnail page', error, {
-          uuid: this.uuid,
-          fileName: this._fileName,
-        });
+    for (const page of this.getLayout().pages) {
+      if (
+        page.kind !== 'pdf' ||
+        !this.isPageVisible(
+          region,
+          page.localLeft,
+          page.localTop,
+          page.size,
+          scaleX,
+          scaleY,
+        )
+      ) {
+        continue;
       }
-      return;
-    }
 
-    this._thumbnailPageCanvas = canvas;
+      // The thumbnail context is scaled by `scale`, which plays the role the
+      // viewport zoom plays for the live render.
+      const renderScale = getPdfRenderScale({
+        pageSize: page.size,
+        zoom: scale,
+        elementScale: Math.max(scaleX, scaleY),
+        dpr: 1,
+      });
+
+      const canvas = document.createElement('canvas');
+      try {
+        await renderPdfPageToCanvas({
+          document: pdfDocument,
+          pageIndex: page.originalIndex,
+          canvas,
+          renderScale,
+        }).promise;
+      } catch (error) {
+        if (!isPdfRenderCancelled(error)) {
+          logger.error('Failed to render PDF thumbnail page', error, {
+            uuid: this.uuid,
+            fileName: this._fileName,
+            pageIndex: page.originalIndex,
+          });
+        }
+        continue;
+      }
+
+      this._thumbnailPages.push({ canvas, page });
+    }
   }
 
   public override drawThumbnail(
     ctx: CanvasRenderingContext2D,
     _deltaTime: number,
   ): void {
-    const canvas = this._thumbnailPageCanvas;
-    if (!canvas) {
-      return;
+    for (const { canvas, page } of this._thumbnailPages) {
+      ctx.drawImage(
+        canvas,
+        page.localLeft,
+        page.localTop,
+        page.size.w,
+        page.size.h,
+      );
     }
-
-    const firstPage = this.getLayout().pages[0];
-    if (!firstPage) {
-      return;
-    }
-
-    ctx.drawImage(
-      canvas,
-      firstPage.localLeft,
-      firstPage.localTop,
-      firstPage.size.w,
-      firstPage.size.h,
-    );
   }
 
   private async runExport({
@@ -554,7 +576,7 @@ export class PdfElement extends DrawableElement {
     this._loadGeneration++;
     this.cancelPageRenders();
     this._stagingCanvasPool.drain();
-    this._thumbnailPageCanvas = null;
+    this._thumbnailPages = [];
     this._lastSyncScreenOffset = null;
     void this._pdfDocument?.destroy();
     this._pdfDocument = null;

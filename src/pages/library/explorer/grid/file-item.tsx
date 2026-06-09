@@ -49,9 +49,10 @@ export function GridFileItem({
   const tabController = useTabController();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [loadedThumbUrl, setLoadedThumbUrl] = useState<string | null>(null);
   const thumbUrl = useThumbnailUrl(file.id);
   const hasThumb = typeof thumbUrl === 'string';
+  const imgLoaded = hasThumb && loadedThumbUrl === thumbUrl;
 
   const {
     renaming,
@@ -112,7 +113,7 @@ export function GridFileItem({
                 alt=""
                 aria-hidden
                 draggable={false}
-                onLoad={() => setImgLoaded(true)}
+                onLoad={() => setLoadedThumbUrl(thumbUrl)}
                 className={cn(
                   'relative h-full w-full object-cover object-top transition-opacity duration-500 ease-out',
                   imgLoaded ? 'opacity-100' : 'opacity-0',

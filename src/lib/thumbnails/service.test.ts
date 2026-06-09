@@ -62,4 +62,30 @@ describe('thumbnail service', () => {
 
     unregister();
   });
+
+  it('flushes a pending regeneration when the producer unregisters', async () => {
+    const nodeId = 'thumbnail-unregister-flush' as VFSNodeId;
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    requestThumbnailRegeneration(nodeId);
+    unregister();
+
+    expect(render).toHaveBeenCalledWith(600, { reason: 'immediate' });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(cache.writeBlob).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render on unregister without a pending regeneration', () => {
+    const nodeId = 'thumbnail-unregister-idle' as VFSNodeId;
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    unregister();
+
+    expect(render).not.toHaveBeenCalled();
+  });
 });

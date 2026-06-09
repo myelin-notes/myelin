@@ -114,6 +114,58 @@ describe('renderCanvasThumbnail', () => {
     expect(offscreen.prepareThumbnail).not.toHaveBeenCalled();
   });
 
+  it('keeps elements inside the 16:10-expanded region', async () => {
+    const renderCanvasThumbnail = await importRender();
+    // A 100x100 region snaps to (-30, 0, 160, 100); this element only
+    // intersects the expanded part.
+    const inExpanded = makeElement({
+      boundingBox: new DOMRect(-25, 10, 10, 10),
+    });
+
+    await renderCanvasThumbnail(
+      asElements([inExpanded]),
+      new DOMRect(0, 0, 100, 100),
+      600,
+    );
+
+    expect(inExpanded.drawThumbnail).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the snapped region to prepareThumbnail', async () => {
+    const renderCanvasThumbnail = await importRender();
+    const element = makeElement();
+
+    await renderCanvasThumbnail(
+      asElements([element]),
+      new DOMRect(0, 0, 100, 100),
+      600,
+    );
+
+    expect(element.prepareThumbnail).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ x: -30, y: 0, width: 160, height: 100 }),
+    );
+  });
+
+  it('renders a 16:10 canvas regardless of input region aspect', async () => {
+    const renderCanvasThumbnail = await importRender();
+    const { getScratchCanvasContext } = await import('@/lib/scratch-canvas');
+
+    await renderCanvasThumbnail(
+      asElements([makeElement()]),
+      new DOMRect(0, 0, 100, 200),
+      600,
+    );
+    expect(getScratchCanvasContext).toHaveBeenLastCalledWith(320, 200);
+
+    await renderCanvasThumbnail(
+      asElements([makeElement()]),
+      new DOMRect(0, 0, 320, 100),
+      600,
+    );
+    expect(getScratchCanvasContext).toHaveBeenLastCalledWith(320, 200);
+  });
+
   it('returns null when no element intersects the region', async () => {
     const renderCanvasThumbnail = await importRender();
     const offscreen = makeElement({

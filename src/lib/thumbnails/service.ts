@@ -36,9 +36,20 @@ export function registerThumbnailProducer(
 ): () => void {
   producers.set(nodeId, producer);
   return () => {
-    if (producers.get(nodeId) === producer) {
-      producers.delete(nodeId);
+    if (producers.get(nodeId) !== producer) {
+      return;
     }
+    const pending = debounceTimers.get(nodeId);
+    if (pending !== undefined) {
+      globalThis.clearTimeout(pending);
+      debounceTimers.delete(nodeId);
+      // Flush while the producer is still registered: a final snapshot on
+      // close beats silently dropping the latest edits.
+      void runGenerate(nodeId, 'immediate').catch((err) => {
+        logger.error('Unregister flush failed', err, { nodeId });
+      });
+    }
+    producers.delete(nodeId);
   };
 }
 
