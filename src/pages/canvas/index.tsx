@@ -490,12 +490,13 @@ function CanvasViewInner({
       />
 
       {/* Frame chrome controls (hamburger buttons). Sits above the foreground
-          canvas so clicks reach the buttons first. Pointer-events-none by
-          default; individual buttons opt in. */}
+          canvas so clicks reach the buttons first. Below UI chrome (toolbars,
+          modals at z-100+). Pointer-events-none by default; individual buttons
+          opt in. */}
       <div
         id="canvas-chrome-controls"
         className="pointer-events-none absolute inset-0 overflow-hidden"
-        style={{ zIndex: 100 }}
+        style={{ zIndex: 20 }}
       />
 
       <StatusBar
