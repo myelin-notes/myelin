@@ -71,7 +71,7 @@ function drawWaveform(
     const x = i * (barW + gap);
     const barH = Math.max(minBarH, waveform[i] * height * 0.85);
     const y = (height - barH) / 2;
-    ctx2d.fillStyle = x + barW < cx ? '#2f3e46' : '#d0d5db';
+    ctx2d.fillStyle = x + barW < cx ? '#1c2738' : '#d0d5db';
     ctx2d.beginPath();
     ctx2d.roundRect(x, y, barW, barH, 1);
     ctx2d.fill();
@@ -154,6 +154,42 @@ export const AudioPlayerView = forwardRef<
       cancelled = true;
     };
   }, [audioBytes]);
+
+  // Animate recording visualization on the waveform canvas.
+  useEffect(() => {
+    const canvas = waveformCanvasRef.current;
+    if (!isRecording || !canvas) {
+      return;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return;
+    }
+    let frameId: number;
+    function animate() {
+      const t = performance.now() / 1000;
+      ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
+      const BARS = 40;
+      const barW = 2;
+      const gap = (canvas!.width - BARS * barW) / (BARS - 1);
+      for (let i = 0; i < BARS; i++) {
+        const x = i * (barW + gap);
+        const freq = 1.5 + (i % 5) * 0.3;
+        const phase = i * 0.4;
+        const amp = 0.3 + 0.4 * Math.abs(Math.sin(i * 0.2));
+        const v = 0.5 + amp * Math.sin(t * freq + phase);
+        const barH = Math.max(3, v * canvas!.height * 0.85);
+        const y = (canvas!.height - barH) / 2;
+        ctx!.fillStyle = `rgba(224, 62, 62, ${0.5 + 0.5 * v})`;
+        ctx!.beginPath();
+        ctx!.roundRect(x, y, barW, barH, 1);
+        ctx!.fill();
+      }
+      frameId = requestAnimationFrame(animate);
+    }
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, [isRecording]);
 
   // Redraw waveform canvas whenever the waveform data or playhead moves.
   useLayoutEffect(() => {
@@ -329,18 +365,16 @@ export const AudioPlayerView = forwardRef<
       <button
         type="button"
         className="canvas-audio-btn"
-        style={{ pointerEvents: 'auto' }}
         onClick={handleButtonClick}
       >
         <ButtonIcon size={16} />
       </button>
-      {isRecording && <div className="canvas-audio-rec-dot" />}
       <div className="canvas-audio-body">
         <canvas
           ref={waveformCanvasRef}
           className="canvas-audio-waveform"
           width={188}
-          height={32}
+          height={28}
         />
         <span className="canvas-audio-time">{timeLabel}</span>
       </div>

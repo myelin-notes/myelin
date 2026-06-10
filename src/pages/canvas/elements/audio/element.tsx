@@ -6,6 +6,7 @@ import type * as Y from 'yjs';
 import type { CanvasViewport } from '../../canvas-viewport';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
+import { getFrameChromeControlsLayer } from '../frame/chrome';
 import { AudioPlayerView, type AudioPlayerViewHandle } from './player-view';
 
 const NATURAL_WIDTH = 280;
@@ -177,7 +178,7 @@ export class AudioElement extends DrawableElement {
     const root = document.createElement('div');
     root.className = 'canvas-audio-block';
     root.dataset.elementUuid = this.uuid;
-    host.appendChild(root);
+    (getFrameChromeControlsLayer() ?? host).appendChild(root);
     this._root = root;
 
     this._reactRoot = createRoot(root);
