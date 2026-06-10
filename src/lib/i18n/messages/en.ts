@@ -480,6 +480,10 @@ const en = {
         label: 'LaTeX',
         description: 'A math block you can write equations in',
       },
+      audio: {
+        label: 'Audio',
+        description: 'Record or import a voice memo',
+      },
     },
     toolShelf: {
       title: 'Tool Shelf',

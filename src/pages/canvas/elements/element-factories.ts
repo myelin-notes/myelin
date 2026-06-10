@@ -1,3 +1,4 @@
+import { AudioElement } from './audio/element';
 import type { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
 import { ImageElement } from './image-element';
@@ -26,4 +27,5 @@ export const ELEMENT_FACTORIES: Record<ElementType, ElementFactory> = {
       size: 8,
     }),
   [ElementType.LATEX]: (uuid) => new LatexElement(uuid),
+  [ElementType.AUDIO]: (uuid) => new AudioElement(uuid),
 };

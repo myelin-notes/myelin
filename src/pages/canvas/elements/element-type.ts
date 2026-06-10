@@ -6,4 +6,5 @@ export enum ElementType {
   PDF = 4,
   SHAPE = 5,
   LATEX = 6,
+  AUDIO = 7,
 }

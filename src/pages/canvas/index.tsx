@@ -406,6 +406,7 @@ function CanvasViewInner({
         onInsertFrame={inserts.onInsertFrame}
         onInsertEmbed={inserts.onInsertEmbed}
         onInsertLatex={inserts.onInsertLatex}
+        onInsertAudio={inserts.onInsertAudio}
         onClose={inserts.closeInsert}
       />
     ),
@@ -414,6 +415,7 @@ function CanvasViewInner({
       inserts.onInsertEmbed,
       inserts.onInsertFrame,
       inserts.onInsertLatex,
+      inserts.onInsertAudio,
     ],
   );
   const embedComposer = useMemo(
@@ -548,6 +550,7 @@ function CanvasViewInner({
               onInsertFrame={inserts.onContextInsertFrame}
               onInsertEmbed={inserts.onContextInsertEmbed}
               onInsertLatex={inserts.onContextInsertLatex}
+              onInsertAudio={inserts.onContextInsertAudio}
               onClose={inserts.closeContextInsert}
             />
           </div>

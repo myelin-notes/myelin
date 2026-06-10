@@ -466,6 +466,10 @@ const zhHans: typeof en = {
         label: 'LaTeX',
         description: '可书写公式的数学块',
       },
+      audio: {
+        label: '音频',
+        description: '录制或导入语音备忘',
+      },
     },
     toolShelf: {
       title: '工具盘',

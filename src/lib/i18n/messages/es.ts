@@ -485,6 +485,10 @@ const es: typeof en = {
         label: 'LaTeX',
         description: 'Un bloque para escribir ecuaciones',
       },
+      audio: {
+        label: 'Audio',
+        description: 'Graba o importa una nota de voz',
+      },
     },
     toolShelf: {
       title: 'Menú de herramientas',

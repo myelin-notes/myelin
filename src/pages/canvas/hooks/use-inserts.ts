@@ -2,6 +2,7 @@ import { type RefObject, useCallback, useRef, useState } from 'react';
 import { UserPrefs } from '@/lib/user-prefs';
 import { CollisionHelper } from '@/lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
+import { AudioElement } from '@/pages/canvas/elements/audio/element';
 import {
   CHROME_BOTTOM_PADDING,
   CHROME_HEADER_HEIGHT,
@@ -70,6 +71,23 @@ export function useCanvasInserts({
     [drawableCanvasRef],
   );
 
+  const placeAudioAt = useCallback(
+    (worldPos: Vector2) => {
+      const dc = drawableCanvasRef.current;
+      if (!dc) {
+        return;
+      }
+      const el = dc.addElement((uuid) => {
+        const audio = new AudioElement(uuid);
+        audio.setOffset(worldPos.x, worldPos.y);
+        return audio;
+      });
+      el.updateBounds();
+      el.select();
+    },
+    [drawableCanvasRef],
+  );
+
   const placeLatexAt = useCallback(
     (worldPos: Vector2) => {
       const dc = drawableCanvasRef.current;
@@ -124,6 +142,20 @@ export function useCanvasInserts({
     });
   }, [drawableCanvasRef, placeLatexAt]);
 
+  const onInsertAudio = useCallback(() => {
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
+    }
+    setInsertOpen(false);
+    setEmbedOpen(false);
+    setContextInsert(null);
+    dc.startPlacement({
+      getBounds: () => ({ x: 0, y: 0, width: 280, height: 72 }),
+      onPlace: placeAudioAt,
+    });
+  }, [drawableCanvasRef, placeAudioAt]);
+
   const onInsertEmbed = useCallback(() => {
     setInsertOpen(false);
     setContextInsert(null);
@@ -162,6 +194,14 @@ export function useCanvasInserts({
     placeLatexAt(contextInsert.worldPos);
     setContextInsert(null);
   }, [contextInsert, placeLatexAt]);
+
+  const onContextInsertAudio = useCallback(() => {
+    if (!contextInsert) {
+      return;
+    }
+    placeAudioAt(contextInsert.worldPos);
+    setContextInsert(null);
+  }, [contextInsert, placeAudioAt]);
 
   const onContextInsertEmbed = useCallback(() => {
     if (!contextInsert) {
@@ -245,9 +285,11 @@ export function useCanvasInserts({
     onInsertFrame,
     onInsertEmbed,
     onInsertLatex,
+    onInsertAudio,
     onContextInsertFrame,
     onContextInsertEmbed,
     onContextInsertLatex,
+    onContextInsertAudio,
     onCanvasClick,
     submitEmbed,
     closeEmbed,

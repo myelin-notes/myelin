@@ -1,0 +1,90 @@
+.canvas-audio-block {
+  position: absolute;
+  transform-origin: 0 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.canvas-audio-inner {
+  width: 280px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 10px;
+  background: var(--bg-surface, #f2f4f6);
+  border: 1px solid var(--border, rgba(195, 199, 202, 0.3));
+  border-radius: 14px;
+  box-shadow:
+    0 0 32px 0 rgba(25, 28, 30, 0.04),
+    0 4px 12px -4px rgba(28, 39, 56, 0.1);
+  box-sizing: border-box;
+}
+
+.canvas-audio-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #2f3e46;
+  border: none;
+  cursor: pointer;
+  color: #ffffff;
+  padding: 0;
+  line-height: 0;
+  transition: background 0.12s;
+}
+
+.canvas-audio-btn:hover {
+  background: #3d5260;
+}
+
+.canvas-audio-btn:active {
+  background: #1f2d33;
+}
+
+.canvas-audio-block[data-recording="true"] .canvas-audio-btn {
+  background: #dc2626;
+}
+
+.canvas-audio-block[data-recording="true"] .canvas-audio-btn:hover {
+  background: #b91c1c;
+}
+
+.canvas-audio-rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
+  flex-shrink: 0;
+  animation: canvas-audio-pulse 1s ease-in-out infinite;
+}
+
+@keyframes canvas-audio-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.canvas-audio-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.canvas-audio-waveform {
+  display: block;
+  width: 100%;
+  height: 32px;
+}
+
+.canvas-audio-time {
+  font-family: var(--font-sans, sans-serif);
+  font-size: 10px;
+  color: var(--text-muted, #9aa3ab);
+  line-height: 1;
+}
