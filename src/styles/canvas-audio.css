@@ -53,6 +53,15 @@
   transform: scale(0.93);
 }
 
+.canvas-audio-inner[data-recording-state='requesting'] .canvas-audio-btn {
+  background: #5f6f85;
+  cursor: wait;
+}
+
+.canvas-audio-inner[data-recording-state='requesting'] .canvas-audio-btn:hover {
+  background: #5f6f85;
+}
+
 .canvas-audio-inner[data-recording='true'] .canvas-audio-btn {
   background: #e03e3e;
 }
@@ -82,4 +91,8 @@
   color: #9aa3ab;
   line-height: 1;
   letter-spacing: 0.01em;
+}
+
+.canvas-audio-inner[data-recording-state='error'] .canvas-audio-time {
+  color: #c73333;
 }

@@ -15,6 +15,8 @@ import {
 
 const WAVEFORM_BARS = 80;
 
+type RecordingState = 'idle' | 'requesting' | 'recording' | 'error';
+
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
@@ -97,7 +99,7 @@ export const AudioPlayerView = forwardRef<
   const [audioBytes, setAudioBytes] = useState<Uint8Array | null>(null);
   const [duration, setDuration] = useState(0);
   const [mimeType, setMimeType] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [waveform, setWaveform] = useState<Float32Array | null>(null);
@@ -109,6 +111,8 @@ export const AudioPlayerView = forwardRef<
   const recordStartRef = useRef(0);
   const recordTickRef = useRef(0);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
+  const isRecording = recordingState === 'recording';
+  const isRequestingRecording = recordingState === 'requesting';
 
   // Stable ref for the onRecorded callback so recording closures always see
   // the current value without widening effect dependency lists.
@@ -131,6 +135,7 @@ export const AudioPlayerView = forwardRef<
       setAudioBytes(data ? new Uint8Array(data) : null);
       setDuration(dur);
       setMimeType(mime);
+      setRecordingState('idle');
       setIsPlaying(false);
       setCurrentTime(0);
       setWaveform(null);
@@ -208,56 +213,72 @@ export const AudioPlayerView = forwardRef<
   // --- Recording ---
 
   async function startRecording() {
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      return;
-    }
-
-    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : '';
-
-    const recorder = new MediaRecorder(
-      stream,
-      mime ? { mimeType: mime } : undefined,
-    );
-    recordChunksRef.current = [];
-    mediaRecorderRef.current = recorder;
-    recordStartRef.current = Date.now();
-
-    setIsRecording(true);
+    setRecordingState('requesting');
     setCurrentTime(0);
 
-    recordTickRef.current = window.setInterval(() => {
-      setCurrentTime((Date.now() - recordStartRef.current) / 1000);
-    }, 200);
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        recordChunksRef.current.push(e.data);
+    let stream: MediaStream | null = null;
+    try {
+      if (
+        !navigator.mediaDevices?.getUserMedia ||
+        typeof MediaRecorder === 'undefined'
+      ) {
+        setRecordingState('error');
+        return;
       }
-    };
 
-    recorder.onstop = () => {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recordingStream = stream;
+
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : '';
+
+      const recorder = new MediaRecorder(
+        stream,
+        mime ? { mimeType: mime } : undefined,
+      );
+      recordChunksRef.current = [];
+      mediaRecorderRef.current = recorder;
+      recordStartRef.current = Date.now();
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          recordChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        clearInterval(recordTickRef.current);
+        recordingStream.getTracks().forEach((t) => {
+          t.stop();
+        });
+        void finalizeRecording(recorder.mimeType);
+      };
+
+      recorder.start(100);
+      setRecordingState('recording');
+
       clearInterval(recordTickRef.current);
-      stream.getTracks().forEach((t) => {
+      recordTickRef.current = window.setInterval(() => {
+        setCurrentTime((Date.now() - recordStartRef.current) / 1000);
+      }, 200);
+    } catch {
+      clearInterval(recordTickRef.current);
+      mediaRecorderRef.current = null;
+      stream?.getTracks().forEach((t) => {
         t.stop();
       });
-      void finalizeRecording(recorder.mimeType);
-    };
-
-    recorder.start(100);
+      setRecordingState('error');
+    }
   }
 
   function stopRecording() {
     const recorder = mediaRecorderRef.current;
     mediaRecorderRef.current = null;
     clearInterval(recordTickRef.current);
-    setIsRecording(false);
+    setRecordingState('idle');
     if (recorder && recorder.state !== 'inactive') {
       recorder.stop();
     }
@@ -330,6 +351,9 @@ export const AudioPlayerView = forwardRef<
   }
 
   function handleButtonClick() {
+    if (isRequestingRecording) {
+      return;
+    }
     if (isRecording) {
       stopRecording();
     } else if (audioBytes) {
@@ -351,21 +375,41 @@ export const AudioPlayerView = forwardRef<
         : PlayIcon
       : MicIcon;
 
-  const timeLabel = isRecording
-    ? formatTime(currentTime)
-    : audioBytes
-      ? `${formatTime(currentTime)} / ${formatTime(duration)}`
-      : 'Tap to record';
+  const timeLabel = isRequestingRecording
+    ? 'Requesting microphone...'
+    : recordingState === 'error'
+      ? 'Microphone unavailable'
+      : isRecording
+        ? formatTime(currentTime)
+        : audioBytes
+          ? `${formatTime(currentTime)} / ${formatTime(duration)}`
+          : 'Tap to record';
+
+  const buttonLabel = isRequestingRecording
+    ? 'Requesting microphone access'
+    : isRecording
+      ? 'Stop recording'
+      : audioBytes
+        ? isPlaying
+          ? 'Pause audio'
+          : 'Play audio'
+        : recordingState === 'error'
+          ? 'Try recording again'
+          : 'Start recording';
 
   return (
     <div
       className="canvas-audio-inner"
       data-recording={isRecording ? 'true' : 'false'}
+      data-recording-state={recordingState}
     >
       <button
         type="button"
         className="canvas-audio-btn"
         onClick={handleButtonClick}
+        disabled={isRequestingRecording}
+        aria-label={buttonLabel}
+        title={buttonLabel}
       >
         <ButtonIcon size={16} />
       </button>
