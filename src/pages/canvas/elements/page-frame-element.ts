@@ -21,12 +21,18 @@ import {
   openExportDialog,
 } from '../export/export-controller';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown/serializer';
-import { harvestPageFramePdf } from '../page-frame/page-frame-harvest';
+import {
+  harvestPageFramePdf,
+  type PageFramePdfSource,
+} from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
 import { schema } from '../page-frame/pm/schema';
 import { renderPageFrameThumbnail } from '../page-frame/thumbnail/render';
-import { prepareExportOverlays } from '../pdf-element-export';
+import {
+  type PdfExportOverlayElement,
+  prepareExportOverlays,
+} from '../pdf-element-export';
 import type { YDocManager } from '../ydoc-manager';
 import {
   DrawableElement,
@@ -549,6 +555,26 @@ export class PageFrameElement extends DrawableElement {
     if (!path) {
       return { cancelled: true };
     }
+    const overlays = includeAnnotations
+      ? (this._exportElementsProvider?.() ?? [])
+      : [];
+    const source = this.getPdfExportSource(overlays);
+    if (!source) {
+      return {};
+    }
+    await prepareExportOverlays(overlays);
+    const { request, warnings } = await harvestPageFramePdf(source);
+    await exportPdfToRust(request, path);
+    return { warnings };
+  }
+
+  public getPdfExportSource(
+    overlays?: readonly PdfExportOverlayElement[],
+  ): PageFramePdfSource | null {
+    const contentDiv = this.contentDiv;
+    if (!contentDiv) {
+      return null;
+    }
     // Continuous frames have no page breaks: harvest them as a single page
     // sized to the whole strip (krilla allows an arbitrarily tall page), which
     // matches what's on screen exactly. Measure the editor's live height here
@@ -562,22 +588,18 @@ export class PageFrameElement extends DrawableElement {
           editorDom instanceof HTMLElement ? editorDom.offsetHeight : null,
         )
       : this._pageHeight;
-    const overlays = includeAnnotations
-      ? (this._exportElementsProvider?.() ?? [])
-      : [];
-    await prepareExportOverlays(overlays);
-    const { request, warnings } = await harvestPageFramePdf({
+
+    return {
       contentDiv,
       numPages: continuous ? 1 : this._numPages,
       pageWidth: this._pageWidth,
       pageHeight,
       pageLayout: this._pageLayout === 'horizontal' ? 'horizontal' : 'vertical',
+      scale: { x: this.scale.x, y: this.scale.y },
       offset: { x: this.offset.x, y: this.offset.y },
       selfUuid: this.uuid,
-      overlays: includeAnnotations ? overlays : undefined,
-    });
-    await exportPdfToRust(request, path);
-    return { warnings };
+      overlays,
+    };
   }
 
   public setExportElementsProvider(
