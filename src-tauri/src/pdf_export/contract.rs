@@ -70,6 +70,16 @@ pub enum PageItem {
         /// Index into `PdfExportRequest::images_b64`.
         image_ref: usize,
     },
+    PdfPage {
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        /// Index into `PdfExportRequest::pdfs_b64`.
+        pdf_ref: usize,
+        /// Zero-based page index in the referenced PDF.
+        page_index: usize,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,6 +95,7 @@ pub struct ExportPage {
 pub enum ExportKind {
     Pageframe,
     PdfElement,
+    Canvas,
 }
 
 /// For `pdfElement` exports, each output page maps to an original page index or a
@@ -107,6 +118,9 @@ pub struct PdfExportRequest {
     /// Base64-encoded PNG blobs referenced by `PageItem::Image.image_ref`.
     #[serde(default)]
     pub images_b64: Vec<String>,
+    /// Base64-encoded PDF blobs referenced by `PageItem::PdfPage.pdf_ref`.
+    #[serde(default)]
+    pub pdfs_b64: Vec<String>,
     /// Base64-encoded original PDF bytes (pdfElement only).
     #[serde(default)]
     pub original_pdf_b64: Option<String>,

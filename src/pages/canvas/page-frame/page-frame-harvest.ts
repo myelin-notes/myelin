@@ -37,6 +37,7 @@ export interface PageFramePdfSource {
   pageWidth: number;
   pageHeight: number;
   pageLayout: 'vertical' | 'horizontal';
+  scale?: { x: number; y: number };
   /** This frame's world offset (content top-left) — needed to place overlays. */
   offset: { x: number; y: number };
   /** This frame's uuid, so it isn't stamped onto itself as an overlay. */

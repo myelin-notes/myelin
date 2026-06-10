@@ -494,7 +494,7 @@ export class PdfElement extends DrawableElement {
   private async runExport({
     includeAnnotations,
   }: ExportOptions): Promise<ExportResult> {
-    const source = this.getExportSource();
+    const source = this.getPdfExportSource();
     if (!source) {
       return {};
     }
@@ -515,7 +515,7 @@ export class PdfElement extends DrawableElement {
     return {};
   }
 
-  private getExportSource(): PdfElementExportSource | null {
+  public getPdfExportSource(): PdfElementExportSource | null {
     if (!this._pdfBytes) {
       return null;
     }

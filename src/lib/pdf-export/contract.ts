@@ -61,6 +61,17 @@ export type PageItem =
       h: number;
       /** Index into PdfExportRequest.imagesB64. */
       imageRef: number;
+    }
+  | {
+      t: 'pdfPage';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      /** Index into PdfExportRequest.pdfsB64. */
+      pdfRef: number;
+      /** Zero-based page index in the referenced PDF. */
+      pageIndex: number;
     };
 
 export interface ExportPage {
@@ -73,12 +84,14 @@ export interface ExportPage {
 export type PageRef = number | 'blank';
 
 export interface PdfExportRequest {
-  kind: 'pageframe' | 'pdfElement';
+  kind: 'pageframe' | 'pdfElement' | 'canvas';
   pages: ExportPage[];
   /** pdfElement only. */
   pageMap?: PageRef[];
   /** Base64 PNG blobs referenced by image items. */
   imagesB64?: string[];
+  /** Base64 PDF blobs referenced by pdfPage items. */
+  pdfsB64?: string[];
   /** Base64 original PDF bytes (pdfElement only). */
   originalPdfB64?: string;
 }

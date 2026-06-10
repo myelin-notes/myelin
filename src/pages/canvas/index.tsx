@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { History, WifiOff, X as XIcon } from 'lucide-react';
+import { Download, History, WifiOff, X as XIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ import { regenerateThumbnailNow } from '@/lib/thumbnails';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
+import { buildCanvasPdfExportTarget } from './canvas-pdf-export';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { useCanvasCommandContext } from './command-context';
@@ -167,6 +168,15 @@ function CanvasViewInner({
     embedFiles,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
+  const onExportCanvasPdf = useCallback(() => {
+    const canvas = drawableCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    setExportTarget(
+      buildCanvasPdfExportTarget(canvas, engine.fileName || 'Canvas'),
+    );
+  }, [engine.fileName]);
 
   useEffect(() => {
     if (engine.fileName) {
@@ -350,6 +360,23 @@ function CanvasViewInner({
                   type="button"
                   variant="ghost"
                   size="icon-xs"
+                  onClick={onExportCanvasPdf}
+                  aria-label="Export canvas as PDF"
+                  disabled={!engine.ready}
+                />
+              }
+            >
+              <Download className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Export canvas as PDF</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => setVersionHistoryOpen(true)}
                   aria-label={strings.versionHistory.title}
                   disabled={!id}
@@ -366,7 +393,9 @@ function CanvasViewInner({
     );
   }, [
     handleOpenBacklinkSource,
+    onExportCanvasPdf,
     id,
+    engine.ready,
     liveDiscoveryPauseError,
     strings.canvas.peerSync.livePaused,
     strings.versionHistory.title,
@@ -461,12 +490,13 @@ function CanvasViewInner({
       />
 
       {/* Frame chrome controls (hamburger buttons). Sits above the foreground
-          canvas so clicks reach the buttons first. Pointer-events-none by
-          default; individual buttons opt in. */}
+          canvas so clicks reach the buttons first. Below UI chrome (toolbars,
+          modals at z-100+). Pointer-events-none by default; individual buttons
+          opt in. */}
       <div
         id="canvas-chrome-controls"
         className="pointer-events-none absolute inset-0 overflow-hidden"
-        style={{ zIndex: 100 }}
+        style={{ zIndex: 20 }}
       />
 
       <StatusBar
