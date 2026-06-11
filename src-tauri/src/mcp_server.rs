@@ -66,6 +66,7 @@ pub struct McpFrontendToolResponse {
 struct HttpRequest {
     method: String,
     path: String,
+    origin: Option<String>,
     body: Vec<u8>,
 }
 
@@ -200,8 +201,21 @@ async fn handle_connection(
     state: McpServerState,
 ) -> Result<(), Error> {
     let request = read_http_request(&mut stream).await?;
+    // Reject cross-origin browser requests (MCP spec: validate Origin to
+    // prevent DNS rebinding). Native MCP clients send no Origin header.
+    if request
+        .origin
+        .as_deref()
+        .is_some_and(|origin| !is_localhost_origin(origin))
+    {
+        let response = http_response(
+            403,
+            "Forbidden",
+            Some(json!({ "error": "Origin not allowed" }).to_string()),
+        );
+        return stream.write_all(response.as_bytes()).await;
+    }
     let response = match request.method.as_str() {
-        "OPTIONS" => http_response(204, "No Content", None),
         "POST" if request.path == "/mcp" => {
             let response = handle_json_rpc(app, state, &request.body).await;
             match response {
@@ -415,6 +429,7 @@ async fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, Error>
     Ok(HttpRequest {
         method,
         path,
+        origin: headers.get("origin").cloned(),
         body,
     })
 }
@@ -426,14 +441,19 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
         .map(|index| index + 4)
 }
 
+fn is_localhost_origin(origin: &str) -> bool {
+    let Some(rest) = origin.strip_prefix("http://") else {
+        return false;
+    };
+    let host = rest.split(':').next().unwrap_or(rest);
+    host == "127.0.0.1" || host == "localhost"
+}
+
 fn http_response(status: u16, reason: &str, body: Option<String>) -> String {
     let body = body.unwrap_or_default();
     format!(
         "HTTP/1.1 {status} {reason}\r\n\
          Content-Type: application/json\r\n\
-         Access-Control-Allow-Origin: *\r\n\
-         Access-Control-Allow-Methods: POST, OPTIONS\r\n\
-         Access-Control-Allow-Headers: content-type, mcp-protocol-version\r\n\
          Content-Length: {}\r\n\
          Connection: close\r\n\r\n{}",
         body.len(),
