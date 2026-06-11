@@ -35,7 +35,8 @@
     "active": true,
     "targets": "all",
     "resources": {
-      "resources/scribble-models/": "scribble-models/"
+      "resources/scribble-models/": "scribble-models/",
+      "resources/LICENSES/": "LICENSES/"
     },
     "icon": [
       "icons/32x32.png",
