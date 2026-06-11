@@ -1,4 +1,3 @@
-import type * as Y from 'yjs';
 import type {
   NodeSearchResult,
   NoteBacklink,
@@ -21,10 +20,11 @@ import {
   DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
   writeMarkdownToPageFrameFragment,
 } from '@/pages/canvas/page-frame/markdown/import';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import type { McpReadableRepository } from './read-model';
 import {
   buildMcpNoteReadModel,
+  findElementMap,
+  loadMcpNote,
   readMcpCanvasText,
   readMcpImage,
   readMcpLatex,
@@ -392,19 +392,6 @@ function findPageFrameCount(session: NoteSession): number {
   return count;
 }
 
-function findElementMap(
-  session: NoteSession,
-  elementId: string,
-): Y.Map<unknown> {
-  for (let index = 0; index < session.ydoc.elements.length; index++) {
-    const yMap = session.ydoc.elements.get(index);
-    if (yMap.get('uuid') === elementId) {
-      return yMap;
-    }
-  }
-  throw new Error(`Element not found: ${elementId}`);
-}
-
 async function noteListItem(
   repository: Repository,
   indexedTextByNode: ReadonlyMap<VFSNodeId, string>,
@@ -485,17 +472,6 @@ async function requireCanvasNote(
     throw new Error(`Node is not a canvas note: ${noteId}`);
   }
   return node;
-}
-
-async function loadYDocForNote(
-  repository: McpReadableRepository,
-  noteId: VFSNodeId,
-): Promise<YDocManager> {
-  await requireCanvasNote(repository, noteId);
-  const snapshot = await repository.loadDocument(noteId);
-  return snapshot.update
-    ? YDocManager.fromUpdate(snapshot.update)
-    : new YDocManager();
 }
 
 async function targetLinkInfo(
@@ -862,7 +838,7 @@ export class McpToolService {
   private async readLinks(args: unknown): Promise<unknown> {
     const input = objectArg(args);
     const noteId = requiredString(input, 'noteId');
-    const ydoc = await loadYDocForNote(this.options.repository, noteId);
+    const { ydoc } = await loadMcpNote(this.options.repository, noteId);
     const links = extractStoredNoteLinks(ydoc.doc);
     return {
       noteId,
@@ -1125,7 +1101,7 @@ export class McpToolService {
     let session: NoteSession | null = null;
     try {
       session = await this.options.repository.openSession(noteId);
-      const yMap = findElementMap(session, pageFrameId);
+      const yMap = findElementMap(session.ydoc, pageFrameId);
       if (yMap.get('type') !== ElementType.PAGE_FRAME) {
         throw new Error(`Element is not a page frame: ${pageFrameId}`);
       }
@@ -1212,7 +1188,7 @@ export class McpToolService {
 
     try {
       session = await this.options.repository.openSession(noteId);
-      const yMap = findElementMap(session, pageFrameId);
+      const yMap = findElementMap(session.ydoc, pageFrameId);
       if (yMap.get('type') !== ElementType.PAGE_FRAME) {
         throw new Error(`Element is not a page frame: ${pageFrameId}`);
       }

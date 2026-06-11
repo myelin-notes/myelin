@@ -239,7 +239,7 @@ function pdfResourceUri(noteId: VFSNodeId, elementId: string): string {
   return `myelin://notes/${encodeURIComponent(noteId)}/pdfs/${encodeURIComponent(elementId)}`;
 }
 
-async function loadMcpNote(
+export async function loadMcpNote(
   repository: McpReadableRepository,
   noteId: VFSNodeId,
 ): Promise<LoadedMcpNote> {
@@ -271,7 +271,10 @@ async function loadMcpNote(
   };
 }
 
-function findElementMap(ydoc: YDocManager, elementId: string): Y.Map<unknown> {
+export function findElementMap(
+  ydoc: YDocManager,
+  elementId: string,
+): Y.Map<unknown> {
   for (let index = 0; index < ydoc.elements.length; index++) {
     const yMap = ydoc.elements.get(index);
     if (getElementId(yMap) === elementId) {
