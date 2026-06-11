@@ -5,6 +5,17 @@ import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/i
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { McpToolService } from './tools';
 
+let repositoryCounter = 0;
+
+async function createEmptyRepository() {
+  repositoryCounter += 1;
+  const repository = new LocalRepository(
+    `repositories/mcp-tools-${repositoryCounter}`,
+  );
+  await repository.initialize();
+  return repository;
+}
+
 async function createRepositoryWithNote(markdown = '# Original\n\nBody') {
   const repository = new LocalRepository();
   await repository.initialize();
@@ -24,6 +35,22 @@ async function createRepositoryWithNote(markdown = '# Original\n\nBody') {
     ydoc.encodeState(),
   );
   return { repository, noteId, firstFrameId, secondFrameId };
+}
+
+async function createLinkedNotes() {
+  const repository = await createEmptyRepository();
+  const targetId = await repository.createFile('MCP Target', 'mcanvas', null);
+  const ydoc = new YDocManager();
+  await addMarkdownPageFrameToYDoc(ydoc, 'See [[MCP Target]] for context.', {
+    repository,
+  });
+  const sourceId = await repository.createFile(
+    'MCP Source',
+    'mcanvas',
+    null,
+    ydoc.encodeState(),
+  );
+  return { repository, sourceId, targetId };
 }
 
 describe('MCP tool service', () => {
@@ -65,6 +92,124 @@ describe('MCP tool service', () => {
     ).resolves.toMatchObject({
       displayName: 'First',
       plainText: 'Original\nBody',
+    });
+  });
+
+  it('searches notes, lists recent notes, and lists tags', async () => {
+    const repository = await createEmptyRepository();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    const alpha = (await service.callTool('create_note', {
+      title: 'Alpha Knowledge',
+      markdown: '# Alpha\n\nBody',
+    })) as { note: { id: string } };
+    const beta = (await service.callTool('create_note', {
+      title: 'Beta Research',
+    })) as { note: { id: string } };
+    await service.callTool('edit_tags', {
+      nodeId: alpha.note.id,
+      set: ['knowledge/project'],
+    });
+
+    await expect(
+      service.callTool('search_notes', {
+        query: 'Alpha',
+        tag: 'knowledge/project',
+      }),
+    ).resolves.toMatchObject({
+      matches: [
+        {
+          note: {
+            id: alpha.note.id,
+            title: 'Alpha Knowledge',
+          },
+        },
+      ],
+    });
+    await expect(
+      service.callTool('list_recent_notes', { limit: 10 }),
+    ).resolves.toMatchObject({
+      notes: expect.arrayContaining([
+        expect.objectContaining({ id: alpha.note.id }),
+        expect.objectContaining({ id: beta.note.id }),
+      ]),
+    });
+
+    const tags = (await service.callTool('list_tags', {
+      includeAncestors: true,
+    })) as { tags: Array<{ tag: string; count: number }> };
+    const tagsByName = new Map(
+      tags.tags.map((entry) => [entry.tag, entry.count]),
+    );
+    expect(tagsByName.get('knowledge')).toBe(1);
+    expect(tagsByName.get('knowledge/project')).toBe(1);
+  });
+
+  it('reads links, backlinks, and renames note references', async () => {
+    const { repository, sourceId, targetId } = await createLinkedNotes();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    await expect(
+      service.callTool('read_links', { noteId: sourceId }),
+    ).resolves.toMatchObject({
+      noteId: sourceId,
+      links: [
+        {
+          targetId,
+          targetTitle: 'MCP Target',
+          targetName: 'MCP Target',
+          targetPath: ['MCP Target'],
+          targetExists: true,
+          snippet: 'See [[MCP Target]] for context.',
+        },
+      ],
+    });
+    await expect(
+      service.callTool('read_backlinks', { noteId: targetId }),
+    ).resolves.toMatchObject({
+      noteId: targetId,
+      backlinks: [
+        {
+          sourceId,
+          sourceName: 'MCP Source',
+          sourcePath: ['MCP Source'],
+          targetId,
+          targetTitle: 'MCP Target',
+        },
+      ],
+    });
+
+    await expect(
+      service.callTool('rename_node', {
+        nodeId: targetId,
+        newName: 'Renamed MCP Target',
+      }),
+    ).resolves.toMatchObject({
+      node: {
+        id: targetId,
+        name: 'Renamed MCP Target',
+      },
+      referenceUpdates: {
+        sourceCount: 1,
+        linkCount: 1,
+      },
+    });
+    await expect(
+      service.callTool('read_links', { noteId: sourceId }),
+    ).resolves.toMatchObject({
+      links: [
+        {
+          targetId,
+          targetTitle: 'Renamed MCP Target',
+          targetName: 'Renamed MCP Target',
+        },
+      ],
     });
   });
 
@@ -297,6 +442,52 @@ describe('MCP tool service', () => {
     ).resolves.toMatchObject({
       plainText: 'Second body',
     });
+  });
+
+  it('deletes page frames only with confirmation', async () => {
+    const { repository, noteId, firstFrameId } =
+      await createRepositoryWithNote();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    await expect(
+      service.callTool('delete_page_frame', {
+        noteId,
+        pageFrameId: firstFrameId,
+        confirm: false,
+      }),
+    ).rejects.toThrow('delete_page_frame requires confirm=true');
+
+    await expect(
+      service.callTool('delete_page_frame', {
+        noteId,
+        pageFrameId: firstFrameId,
+        confirm: true,
+      }),
+    ).resolves.toMatchObject({
+      deleted: {
+        noteId,
+        pageFrameId: firstFrameId,
+        plainText: 'Original\nBody',
+      },
+    });
+
+    const note = await service.callTool('read_note', { noteId });
+    expect(
+      (note as { elements: Array<{ kind: string; id: string }> }).elements,
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'page-frame', id: firstFrameId }),
+      ]),
+    );
+    await expect(
+      service.callTool('read_page_frame', {
+        noteId,
+        pageFrameId: firstFrameId,
+      }),
+    ).rejects.toThrow('Element not found');
   });
 
   it('exposes non-page-frame readers', async () => {

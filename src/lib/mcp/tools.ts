@@ -1,18 +1,27 @@
 import type * as Y from 'yjs';
 import type {
+  NodeSearchResult,
+  NoteBacklink,
   NoteSession,
   Repository,
+  StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
   VFSNodeId,
 } from '@/lib/sync';
+import { extractStoredNoteLinks } from '@/lib/sync/repo/note-link-index';
+import {
+  type RenameNoteReferencesResult,
+  renameNoteReferences,
+} from '@/lib/sync/repo/rename-note-references';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import {
   addMarkdownPageFrameToYDoc,
   DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
   writeMarkdownToPageFrameFragment,
 } from '@/pages/canvas/page-frame/markdown/import';
+import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import type { McpReadableRepository } from './read-model';
 import {
   buildMcpNoteReadModel,
@@ -34,6 +43,7 @@ import type {
 } from './types';
 
 type ToolHandler = (args: unknown) => Promise<unknown>;
+type CanvasNoteSearchResult = NodeSearchResult & { node: VFSFileNode };
 
 const DEFAULT_NOTE_LIMIT = 50;
 const CREATE_FRAME_OFFSET_STEP = 48;
@@ -145,6 +155,33 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     }),
   },
   {
+    name: 'search_notes',
+    description:
+      'Search Myelin canvas notes and return ranked matches with snippets.',
+    inputSchema: textSchema(
+      {
+        query: { type: 'string' },
+        tag: { type: 'string' },
+        limit: { type: 'number' },
+      },
+      ['query'],
+    ),
+  },
+  {
+    name: 'list_recent_notes',
+    description: 'List recently modified Myelin canvas notes.',
+    inputSchema: textSchema({
+      limit: { type: 'number' },
+    }),
+  },
+  {
+    name: 'list_tags',
+    description: 'List tags used by notes, files, and folders.',
+    inputSchema: textSchema({
+      includeAncestors: { type: 'boolean' },
+    }),
+  },
+  {
     name: 'list_directory',
     description:
       'List the immediate notes, files, and folders in one Myelin folder. Omit folderId for the root.',
@@ -156,6 +193,16 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     name: 'read_note',
     description:
       'Read structured note inventory, including page frames, floating text, assets, drawings, and cached indexed text.',
+    inputSchema: textSchema({ noteId: { type: 'string' } }, ['noteId']),
+  },
+  {
+    name: 'read_links',
+    description: 'Read outgoing note links from one canvas note.',
+    inputSchema: textSchema({ noteId: { type: 'string' } }, ['noteId']),
+  },
+  {
+    name: 'read_backlinks',
+    description: 'Read notes that link to one canvas note.',
     inputSchema: textSchema({ noteId: { type: 'string' } }, ['noteId']),
   },
   {
@@ -266,6 +313,19 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     ),
   },
   {
+    name: 'rename_node',
+    description:
+      'Rename a note, file, or folder. Canvas-note backlinks are rewritten unless updateReferences=false.',
+    inputSchema: textSchema(
+      {
+        nodeId: { type: 'string' },
+        newName: { type: 'string' },
+        updateReferences: { type: 'boolean' },
+      },
+      ['nodeId', 'newName'],
+    ),
+  },
+  {
     name: 'delete_node',
     description:
       'Delete a note, file, or folder. Requires confirm=true; non-empty folders also require recursive=true.',
@@ -276,6 +336,19 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
         recursive: { type: 'boolean' },
       },
       ['nodeId', 'confirm'],
+    ),
+  },
+  {
+    name: 'delete_page_frame',
+    description:
+      'Delete one page frame from a canvas note. Requires confirm=true.',
+    inputSchema: textSchema(
+      {
+        noteId: { type: 'string' },
+        pageFrameId: { type: 'string' },
+        confirm: { type: 'boolean' },
+      },
+      ['noteId', 'pageFrameId', 'confirm'],
     ),
   },
   {
@@ -394,6 +467,105 @@ async function requireNode(
   return node;
 }
 
+async function requireCanvasNote(
+  repository: Repository,
+  noteId: VFSNodeId,
+): Promise<VFSFileNode> {
+  const node = await requireNode(repository, noteId);
+  if (node.type !== 'file' || node.fileType !== 'mcanvas') {
+    throw new Error(`Node is not a canvas note: ${noteId}`);
+  }
+  return node;
+}
+
+async function loadYDocForNote(
+  repository: McpReadableRepository,
+  noteId: VFSNodeId,
+): Promise<YDocManager> {
+  await requireCanvasNote(repository, noteId);
+  const snapshot = await repository.loadDocument(noteId);
+  return snapshot.update
+    ? YDocManager.fromUpdate(snapshot.update)
+    : new YDocManager();
+}
+
+async function targetLinkInfo(
+  repository: Repository,
+  targetId: VFSNodeId | null,
+): Promise<{
+  targetName: string | null;
+  targetPath: string[] | null;
+  targetExists: boolean;
+}> {
+  if (!targetId) {
+    return {
+      targetName: null,
+      targetPath: null,
+      targetExists: false,
+    };
+  }
+
+  const target = await repository.getNode(targetId);
+  if (!target) {
+    return {
+      targetName: null,
+      targetPath: null,
+      targetExists: false,
+    };
+  }
+
+  return {
+    targetName: target.name,
+    targetPath: await nodePath(repository, target),
+    targetExists: true,
+  };
+}
+
+async function outgoingLinkItem(
+  repository: Repository,
+  link: StoredNoteLink,
+): Promise<{
+  targetId: VFSNodeId | null;
+  targetTitle: string;
+  targetPageFrameId: string | null;
+  targetName: string | null;
+  targetPath: string[] | null;
+  targetExists: boolean;
+  snippet: string;
+}> {
+  return {
+    targetId: link.targetId,
+    targetTitle: link.title,
+    targetPageFrameId: link.pageFrameId,
+    ...(await targetLinkInfo(repository, link.targetId)),
+    snippet: link.snippet,
+  };
+}
+
+async function backlinkItem(
+  repository: Repository,
+  backlink: NoteBacklink,
+): Promise<{
+  sourceId: VFSNodeId;
+  sourceName: string;
+  sourcePath: string[] | null;
+  targetId: VFSNodeId | null;
+  targetTitle: string;
+  targetPageFrameId: string | null;
+  snippet: string;
+}> {
+  const source = await repository.getNode(backlink.sourceId);
+  return {
+    sourceId: backlink.sourceId,
+    sourceName: backlink.sourceName,
+    sourcePath: source ? await nodePath(repository, source) : null,
+    targetId: backlink.targetId,
+    targetTitle: backlink.title,
+    targetPageFrameId: backlink.pageFrameId,
+    snippet: backlink.snippet,
+  };
+}
+
 async function optionalFolderId(
   repository: Repository,
   folderId: string | undefined,
@@ -480,8 +652,13 @@ export class McpToolService {
   async callTool(name: string, args: unknown): Promise<unknown> {
     const handlers: Record<string, ToolHandler> = {
       list_notes: (input) => this.listNotes(input),
+      search_notes: (input) => this.searchNotes(input),
+      list_recent_notes: (input) => this.listRecentNotes(input),
+      list_tags: (input) => this.listTags(input),
       list_directory: (input) => this.listDirectory(input),
       read_note: (input) => this.readNote(input),
+      read_links: (input) => this.readLinks(input),
+      read_backlinks: (input) => this.readBacklinks(input),
       read_page_frame: (input) => this.readPageFrame(input),
       read_canvas_text: (input) => this.readCanvasText(input),
       read_latex: (input) => this.readLatex(input),
@@ -494,7 +671,9 @@ export class McpToolService {
       create_note: (input) => this.createNote(input),
       create_folder: (input) => this.createFolder(input),
       move_node: (input) => this.moveNode(input),
+      rename_node: (input) => this.renameNode(input),
       delete_node: (input) => this.deleteNode(input),
+      delete_page_frame: (input) => this.deletePageFrame(input),
       edit_tags: (input) => this.editTags(input),
     };
     const handler = handlers[name];
@@ -544,6 +723,70 @@ export class McpToolService {
     };
   }
 
+  private async searchNotes(args: unknown): Promise<{
+    matches: Array<{
+      note: McpNoteListItem;
+      score: number;
+      contentSnippet: string | null;
+      matchedTerms: string[];
+    }>;
+  }> {
+    const input = objectArg(args);
+    const query = requiredTrimmedString(input, 'query');
+    const tag = optionalString(input, 'tag')?.trim();
+    const limit = optionalLimit(input);
+    const results = await this.options.repository.searchNodes(query);
+    const matches = results
+      .filter(
+        (result): result is CanvasNoteSearchResult =>
+          result.node.type === 'file' && isCanvasNote(result.node),
+      )
+      .filter((result) => !tag || result.node.tags.includes(tag))
+      .slice(0, limit);
+
+    return {
+      matches: await Promise.all(
+        matches.map(async (result) => ({
+          note: await noteListItem(
+            this.options.repository,
+            this.indexedTextByNode,
+            result.node,
+          ),
+          score: result.score,
+          contentSnippet: result.contentSnippet,
+          matchedTerms: [...result.matchedTerms],
+        })),
+      ),
+    };
+  }
+
+  private async listRecentNotes(
+    args: unknown,
+  ): Promise<{ notes: McpNoteListItem[] }> {
+    const input = objectArg(args);
+    const limit = optionalLimit(input);
+    const files = await this.options.repository.getRecentFiles(200);
+    const notes = files.filter(isCanvasNote).slice(0, limit);
+    return {
+      notes: await Promise.all(
+        notes.map((note) =>
+          noteListItem(this.options.repository, this.indexedTextByNode, note),
+        ),
+      ),
+    };
+  }
+
+  private async listTags(
+    args: unknown,
+  ): Promise<{ tags: Array<{ tag: string; count: number }> }> {
+    const input = objectArg(args);
+    return {
+      tags: await this.options.repository.listTags(
+        optionalBoolean(input, 'includeAncestors') ?? false,
+      ),
+    };
+  }
+
   private async listDirectory(args: unknown): Promise<McpDirectoryListing> {
     const input = objectArg(args);
     const folderId = await optionalFolderId(
@@ -582,6 +825,34 @@ export class McpToolService {
     return buildMcpNoteReadModel(this.options.repository, noteId, {
       indexedText: this.indexedTextByNode.get(noteId) ?? null,
     });
+  }
+
+  private async readLinks(args: unknown): Promise<unknown> {
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const ydoc = await loadYDocForNote(this.options.repository, noteId);
+    const links = extractStoredNoteLinks(ydoc.doc);
+    return {
+      noteId,
+      links: await Promise.all(
+        links.map((link) => outgoingLinkItem(this.options.repository, link)),
+      ),
+    };
+  }
+
+  private async readBacklinks(args: unknown): Promise<unknown> {
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    await requireCanvasNote(this.options.repository, noteId);
+    const backlinks = await this.options.repository.getBacklinks(noteId);
+    return {
+      noteId,
+      backlinks: await Promise.all(
+        backlinks.map((backlink) =>
+          backlinkItem(this.options.repository, backlink),
+        ),
+      ),
+    };
   }
 
   private async readPageFrame(args: unknown): Promise<unknown> {
@@ -737,6 +1008,42 @@ export class McpToolService {
     return nodeListItem(this.options.repository, moved);
   }
 
+  private async renameNode(args: unknown): Promise<{
+    node: McpNodeListItem;
+    referenceUpdates: RenameNoteReferencesResult | null;
+  }> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const nodeId = requiredString(input, 'nodeId');
+    const newName = requiredTrimmedString(input, 'newName');
+    const node = await requireNode(this.options.repository, nodeId);
+    const shouldUpdateReferences =
+      optionalBoolean(input, 'updateReferences') !== false &&
+      node.type === 'file' &&
+      node.fileType === 'mcanvas';
+    const backlinks = shouldUpdateReferences
+      ? await this.options.repository.getBacklinks(nodeId)
+      : undefined;
+
+    await this.options.repository.renameNode(nodeId, newName);
+    const referenceUpdates = shouldUpdateReferences
+      ? await renameNoteReferences(
+          this.options.repository,
+          nodeId,
+          newName,
+          backlinks,
+        )
+      : null;
+
+    return {
+      node: await nodeListItem(
+        this.options.repository,
+        await requireNode(this.options.repository, nodeId),
+      ),
+      referenceUpdates,
+    };
+  }
+
   private async deleteNode(
     args: unknown,
   ): Promise<{ deleted: McpNodeListItem }> {
@@ -765,6 +1072,37 @@ export class McpToolService {
 
     await this.options.repository.deleteNode(nodeId);
     return { deleted };
+  }
+
+  private async deletePageFrame(
+    args: unknown,
+  ): Promise<{ deleted: McpPageFrameContent }> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const pageFrameId = requiredString(input, 'pageFrameId');
+    if (optionalBoolean(input, 'confirm') !== true) {
+      throw new Error('delete_page_frame requires confirm=true.');
+    }
+
+    const deleted = await readMcpPageFrame(
+      this.options.repository,
+      noteId,
+      pageFrameId,
+    );
+    let session: NoteSession | null = null;
+    try {
+      session = await this.options.repository.openSession(noteId);
+      const yMap = findElementMap(session, pageFrameId);
+      if (yMap.get('type') !== ElementType.PAGE_FRAME) {
+        throw new Error(`Element is not a page frame: ${pageFrameId}`);
+      }
+      session.ydoc.removeElementMap(yMap);
+      await session.save();
+      return { deleted };
+    } finally {
+      await session?.close().catch(() => {});
+    }
   }
 
   private async editTags(args: unknown): Promise<McpNodeListItem> {
