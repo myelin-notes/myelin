@@ -359,6 +359,17 @@ fn mcp_tool_definitions() -> Value {
             }
         },
         {
+            "name": "list_directory",
+            "description": "List the immediate notes, files, and folders in one Myelin folder. Omit folderId for the root.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "folderId": { "type": "string" }
+                },
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "read_note",
             "description": "Read structured note inventory, including page frames, floating text, assets, drawings, and cached indexed text.",
             "inputSchema": {
@@ -470,6 +481,75 @@ fn mcp_tool_definitions() -> Value {
                     "markdown": { "type": "string" }
                 },
                 "required": ["noteId", "pageFrameId", "markdown"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "create_note",
+            "description": "Create a new canvas note, optionally with an initial markdown page frame.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string" },
+                    "parentId": { "type": "string" },
+                    "markdown": { "type": "string" }
+                },
+                "required": ["title"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "create_folder",
+            "description": "Create a new folder.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" },
+                    "parentId": { "type": "string" }
+                },
+                "required": ["name"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "move_node",
+            "description": "Move a note, file, or folder to another folder.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "nodeId": { "type": "string" },
+                    "newParentId": { "type": "string" }
+                },
+                "required": ["nodeId"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "delete_node",
+            "description": "Delete a note, file, or folder. Requires confirm=true; non-empty folders also require recursive=true.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "nodeId": { "type": "string" },
+                    "confirm": { "type": "boolean" },
+                    "recursive": { "type": "boolean" }
+                },
+                "required": ["nodeId", "confirm"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "edit_tags",
+            "description": "Edit tags on a note, file, or folder. Provide set to replace tags, or add/remove arrays for incremental edits.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "nodeId": { "type": "string" },
+                    "set": { "type": "array", "items": { "type": "string" } },
+                    "add": { "type": "array", "items": { "type": "string" } },
+                    "remove": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["nodeId"],
                 "additionalProperties": false
             }
         }

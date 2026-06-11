@@ -117,6 +117,156 @@ describe('MCP tool service', () => {
     });
   });
 
+  it('creates folders and notes and lists directories', async () => {
+    const repository = new LocalRepository();
+    await repository.initialize();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    const folder = (await service.callTool('create_folder', {
+      name: 'Projects',
+    })) as { id: string };
+    const note = (await service.callTool('create_note', {
+      title: 'MCP Created',
+      parentId: folder.id,
+      markdown: '# Created\n\nBody',
+    })) as {
+      note: { id: string; title: string; path: string[] };
+      elements: Array<{ kind: string }>;
+    };
+
+    expect(note).toMatchObject({
+      note: {
+        title: 'MCP Created',
+        path: ['Projects', 'MCP Created'],
+      },
+    });
+    expect(note.elements).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'page-frame' })]),
+    );
+
+    const rootListing = (await service.callTool('list_directory', {})) as {
+      folders: Array<{ id: string; name: string; type: string }>;
+    };
+    expect(rootListing.folders).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: folder.id,
+          name: 'Projects',
+          type: 'folder',
+        }),
+      ]),
+    );
+    await expect(
+      service.callTool('list_directory', { folderId: folder.id }),
+    ).resolves.toMatchObject({
+      folder: expect.objectContaining({ id: folder.id }),
+      files: [
+        expect.objectContaining({
+          id: note.note.id,
+          name: 'MCP Created',
+          type: 'file',
+          fileType: 'mcanvas',
+        }),
+      ],
+    });
+  });
+
+  it('moves nodes and edits tags', async () => {
+    const repository = new LocalRepository();
+    await repository.initialize();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    const source = (await service.callTool('create_folder', {
+      name: 'Source',
+    })) as { id: string };
+    const destination = (await service.callTool('create_folder', {
+      name: 'Destination',
+    })) as { id: string };
+    const note = (await service.callTool('create_note', {
+      title: 'Move Me',
+      parentId: source.id,
+    })) as { note: { id: string } };
+
+    await expect(
+      service.callTool('move_node', {
+        nodeId: note.note.id,
+        newParentId: destination.id,
+      }),
+    ).resolves.toMatchObject({
+      id: note.note.id,
+      parentId: destination.id,
+      path: ['Destination', 'Move Me'],
+    });
+
+    await expect(
+      service.callTool('edit_tags', {
+        nodeId: note.note.id,
+        set: ['alpha', ' alpha ', ''],
+        add: ['beta'],
+        remove: ['alpha'],
+      }),
+    ).resolves.toMatchObject({
+      id: note.note.id,
+      tags: ['beta'],
+    });
+    await expect(
+      service.callTool('edit_tags', { nodeId: note.note.id }),
+    ).rejects.toThrow('edit_tags requires set, add, or remove');
+  });
+
+  it('guards destructive deletes', async () => {
+    const repository = new LocalRepository();
+    await repository.initialize();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    const folder = (await service.callTool('create_folder', {
+      name: 'Delete Me',
+    })) as { id: string };
+    const note = (await service.callTool('create_note', {
+      title: 'Nested Note',
+      parentId: folder.id,
+    })) as { note: { id: string } };
+
+    await expect(
+      service.callTool('delete_node', {
+        nodeId: note.note.id,
+        confirm: false,
+      }),
+    ).rejects.toThrow('delete_node requires confirm=true');
+    await expect(
+      service.callTool('delete_node', {
+        nodeId: folder.id,
+        confirm: true,
+      }),
+    ).rejects.toThrow(
+      'delete_node requires recursive=true to delete a non-empty folder',
+    );
+
+    await expect(
+      service.callTool('delete_node', {
+        nodeId: folder.id,
+        confirm: true,
+        recursive: true,
+      }),
+    ).resolves.toMatchObject({
+      deleted: expect.objectContaining({
+        id: folder.id,
+        type: 'folder',
+      }),
+    });
+    await expect(repository.getNode(folder.id)).resolves.toBeNull();
+    await expect(repository.getNode(note.note.id)).resolves.toBeNull();
+  });
+
   it('replaces only the target page frame', async () => {
     const { repository, noteId, firstFrameId, secondFrameId } =
       await createRepositoryWithNote();

@@ -156,3 +156,32 @@ export interface McpNoteListItem {
   modifiedAt: number;
   preview: string | null;
 }
+
+export interface McpNodeListItemBase {
+  id: VFSNodeId;
+  name: string;
+  type: 'file' | 'folder';
+  parentId: VFSNodeId | null;
+  path: string[];
+  tags: string[];
+  createdAt: number;
+  modifiedAt: number;
+}
+
+export interface McpFileListItem extends McpNodeListItemBase {
+  type: 'file';
+  fileType: FileType;
+}
+
+export interface McpFolderListItem extends McpNodeListItemBase {
+  type: 'folder';
+  childCount: number;
+}
+
+export type McpNodeListItem = McpFileListItem | McpFolderListItem;
+
+export interface McpDirectoryListing {
+  folder: McpFolderListItem | null;
+  folders: McpFolderListItem[];
+  files: McpFileListItem[];
+}

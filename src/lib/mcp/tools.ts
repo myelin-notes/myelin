@@ -3,6 +3,8 @@ import type {
   NoteSession,
   Repository,
   VFSFileNode,
+  VFSFolderNode,
+  VFSNode,
   VFSNodeId,
 } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
@@ -22,6 +24,10 @@ import {
   readMcpPdf,
 } from './read-model';
 import type {
+  McpDirectoryListing,
+  McpFileListItem,
+  McpFolderListItem,
+  McpNodeListItem,
   McpNoteListItem,
   McpPageFrameContent,
   McpToolDefinition,
@@ -55,6 +61,44 @@ function requiredString(args: Record<string, unknown>, key: string): string {
   return value;
 }
 
+function requiredTrimmedString(
+  args: Record<string, unknown>,
+  key: string,
+): string {
+  const value = requiredString(args, key).trim();
+  if (!value) {
+    throw new Error(`Missing required string argument: ${key}`);
+  }
+  return value;
+}
+
+function optionalBoolean(
+  args: Record<string, unknown>,
+  key: string,
+): boolean | undefined {
+  const value = args[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function optionalStringArray(
+  args: Record<string, unknown>,
+  key: string,
+): string[] | undefined {
+  if (!(key in args)) {
+    return undefined;
+  }
+  const value = args[key];
+  if (!Array.isArray(value)) {
+    throw new Error(`Expected string array argument: ${key}`);
+  }
+  return value.map((item) => {
+    if (typeof item !== 'string') {
+      throw new Error(`Expected string array argument: ${key}`);
+    }
+    return item;
+  });
+}
+
 function optionalNumber(
   args: Record<string, unknown>,
   key: string,
@@ -85,6 +129,10 @@ function textSchema(
   };
 }
 
+function stringArraySchema(): Record<string, unknown> {
+  return { type: 'array', items: { type: 'string' } };
+}
+
 export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'list_notes',
@@ -94,6 +142,14 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
       folderId: { type: 'string' },
       tag: { type: 'string' },
       limit: { type: 'number' },
+    }),
+  },
+  {
+    name: 'list_directory',
+    description:
+      'List the immediate notes, files, and folders in one Myelin folder. Omit folderId for the root.',
+    inputSchema: textSchema({
+      folderId: { type: 'string' },
     }),
   },
   {
@@ -174,6 +230,68 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
       ['noteId', 'pageFrameId', 'markdown'],
     ),
   },
+  {
+    name: 'create_note',
+    description:
+      'Create a new canvas note, optionally with an initial markdown page frame.',
+    inputSchema: textSchema(
+      {
+        title: { type: 'string' },
+        parentId: { type: 'string' },
+        markdown: { type: 'string' },
+      },
+      ['title'],
+    ),
+  },
+  {
+    name: 'create_folder',
+    description: 'Create a new folder.',
+    inputSchema: textSchema(
+      {
+        name: { type: 'string' },
+        parentId: { type: 'string' },
+      },
+      ['name'],
+    ),
+  },
+  {
+    name: 'move_node',
+    description: 'Move a note, file, or folder to another folder.',
+    inputSchema: textSchema(
+      {
+        nodeId: { type: 'string' },
+        newParentId: { type: 'string' },
+      },
+      ['nodeId'],
+    ),
+  },
+  {
+    name: 'delete_node',
+    description:
+      'Delete a note, file, or folder. Requires confirm=true; non-empty folders also require recursive=true.',
+    inputSchema: textSchema(
+      {
+        nodeId: { type: 'string' },
+        confirm: { type: 'boolean' },
+        recursive: { type: 'boolean' },
+      },
+      ['nodeId', 'confirm'],
+    ),
+  },
+  {
+    name: 'edit_tags',
+    description:
+      'Edit tags on a note, file, or folder. Provide set to replace tags, or add/remove arrays for incremental edits.',
+    inputSchema: textSchema(
+      {
+        nodeId: { type: 'string' },
+        set: stringArraySchema(),
+        add: stringArraySchema(),
+        remove: stringArraySchema(),
+      },
+      ['nodeId'],
+    ),
+  },
 ];
 
 function isCanvasNote(node: VFSFileNode): boolean {
@@ -221,6 +339,96 @@ async function noteListItem(
     modifiedAt: node.modifiedAt,
     preview: indexedTextByNode.get(node.id)?.slice(0, 500) ?? null,
   };
+}
+
+function normalizeTags(tags: string[]): string[] {
+  const normalized = tags
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+  return [...new Set(normalized)];
+}
+
+async function nodePath(
+  repository: Repository,
+  node: VFSNode,
+): Promise<string[]> {
+  const path = await repository.getFolderChain(node.parentId);
+  return [...path.map((folder) => folder.name), node.name];
+}
+
+async function nodeListItem(
+  repository: Repository,
+  node: VFSNode,
+): Promise<McpNodeListItem> {
+  const base = {
+    id: node.id,
+    name: node.name,
+    parentId: node.parentId,
+    path: await nodePath(repository, node),
+    tags: [...node.tags],
+    createdAt: node.createdAt,
+    modifiedAt: node.modifiedAt,
+  };
+  if (node.type === 'folder') {
+    return {
+      ...base,
+      type: 'folder',
+      childCount: node.children.length,
+    };
+  }
+  return {
+    ...base,
+    type: 'file',
+    fileType: node.fileType,
+  };
+}
+
+async function requireNode(
+  repository: Repository,
+  nodeId: VFSNodeId,
+): Promise<VFSNode> {
+  const node = await repository.getNode(nodeId);
+  if (!node) {
+    throw new Error(`Node not found: ${nodeId}`);
+  }
+  return node;
+}
+
+async function optionalFolderId(
+  repository: Repository,
+  folderId: string | undefined,
+  key: string,
+): Promise<VFSNodeId | null> {
+  if (!folderId) {
+    return null;
+  }
+  const node = await requireNode(repository, folderId);
+  if (node.type !== 'folder') {
+    throw new Error(`${key} is not a folder: ${folderId}`);
+  }
+  return folderId;
+}
+
+async function folderListItem(
+  repository: Repository,
+  folder: VFSFolderNode,
+): Promise<McpFolderListItem> {
+  const item = await nodeListItem(repository, folder);
+  if (item.type !== 'folder') {
+    throw new Error(`Node is not a folder: ${folder.id}`);
+  }
+  return item;
+}
+
+async function fileListItem(
+  repository: Repository,
+  file: VFSFileNode,
+): Promise<McpFileListItem> {
+  const item = await nodeListItem(repository, file);
+  if (item.type !== 'file') {
+    throw new Error(`Node is not a file: ${file.id}`);
+  }
+  return item;
 }
 
 async function collectDirectoryNotes(
@@ -272,6 +480,7 @@ export class McpToolService {
   async callTool(name: string, args: unknown): Promise<unknown> {
     const handlers: Record<string, ToolHandler> = {
       list_notes: (input) => this.listNotes(input),
+      list_directory: (input) => this.listDirectory(input),
       read_note: (input) => this.readNote(input),
       read_page_frame: (input) => this.readPageFrame(input),
       read_canvas_text: (input) => this.readCanvasText(input),
@@ -282,6 +491,11 @@ export class McpToolService {
       create_page_frame: (input) => this.createPageFrame(input),
       replace_page_frame_markdown: (input) =>
         this.replacePageFrameMarkdown(input),
+      create_note: (input) => this.createNote(input),
+      create_folder: (input) => this.createFolder(input),
+      move_node: (input) => this.moveNode(input),
+      delete_node: (input) => this.deleteNode(input),
+      edit_tags: (input) => this.editTags(input),
     };
     const handler = handlers[name];
     if (!handler) {
@@ -326,6 +540,38 @@ export class McpToolService {
           .map((note) =>
             noteListItem(this.options.repository, this.indexedTextByNode, note),
           ),
+      ),
+    };
+  }
+
+  private async listDirectory(args: unknown): Promise<McpDirectoryListing> {
+    const input = objectArg(args);
+    const folderId = await optionalFolderId(
+      this.options.repository,
+      optionalString(input, 'folderId'),
+      'folderId',
+    );
+    const [folders, files] =
+      await this.options.repository.listDirectory(folderId);
+    const folderNode =
+      folderId === null
+        ? null
+        : ((await requireNode(
+            this.options.repository,
+            folderId,
+          )) as VFSFolderNode);
+
+    return {
+      folder: folderNode
+        ? await folderListItem(this.options.repository, folderNode)
+        : null,
+      folders: await Promise.all(
+        folders.map((folder) =>
+          folderListItem(this.options.repository, folder),
+        ),
+      ),
+      files: await Promise.all(
+        files.map((file) => fileListItem(this.options.repository, file)),
       ),
     };
   }
@@ -397,6 +643,157 @@ export class McpToolService {
         'Direct MCP writes are disabled. Enable direct MCP writes in Myelin settings to use this tool.',
       );
     }
+  }
+
+  private async createNote(args: unknown): Promise<unknown> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const parentId = await optionalFolderId(
+      this.options.repository,
+      optionalString(input, 'parentId'),
+      'parentId',
+    );
+    const title = await this.options.repository.getUniqueFileName(
+      requiredTrimmedString(input, 'title'),
+      parentId,
+    );
+    const markdown = optionalString(input, 'markdown');
+    let createdId: VFSNodeId | null = null;
+    let session: NoteSession | null = null;
+
+    try {
+      createdId = await this.options.repository.createFile(
+        title,
+        'mcanvas',
+        parentId,
+      );
+      if (markdown !== undefined) {
+        session = await this.options.repository.openSession(createdId);
+        await addMarkdownPageFrameToYDoc(session.ydoc, markdown, {
+          repository: this.options.repository,
+        });
+        await session.save();
+        await session.close();
+        session = null;
+      }
+
+      const noteId = createdId;
+      createdId = null;
+      return buildMcpNoteReadModel(this.options.repository, noteId, {
+        indexedText: null,
+      });
+    } catch (error) {
+      if (session) {
+        await session.close().catch(() => {});
+      }
+      if (createdId) {
+        await this.options.repository.deleteNode(createdId).catch(() => {});
+      }
+      throw error;
+    }
+  }
+
+  private async createFolder(args: unknown): Promise<McpFolderListItem> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const parentId = await optionalFolderId(
+      this.options.repository,
+      optionalString(input, 'parentId'),
+      'parentId',
+    );
+    const name = await this.options.repository.getUniqueFileName(
+      requiredTrimmedString(input, 'name'),
+      parentId,
+    );
+    const folderId = await this.options.repository.createFolder(name, parentId);
+    const folder = await requireNode(this.options.repository, folderId);
+    if (folder.type !== 'folder') {
+      throw new Error(`Created node is not a folder: ${folderId}`);
+    }
+    return folderListItem(this.options.repository, folder);
+  }
+
+  private async moveNode(args: unknown): Promise<McpNodeListItem> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const nodeId = requiredString(input, 'nodeId');
+    const node = await requireNode(this.options.repository, nodeId);
+    const newParentId = await optionalFolderId(
+      this.options.repository,
+      optionalString(input, 'newParentId'),
+      'newParentId',
+    );
+    if (nodeId === newParentId) {
+      throw new Error('A node cannot be moved into itself.');
+    }
+
+    await this.options.repository.moveNode(nodeId, newParentId);
+    const moved = await requireNode(this.options.repository, nodeId);
+    if (node.parentId !== newParentId && moved.parentId !== newParentId) {
+      throw new Error(
+        'Could not move node. The target folder may be inside the moved folder.',
+      );
+    }
+    return nodeListItem(this.options.repository, moved);
+  }
+
+  private async deleteNode(
+    args: unknown,
+  ): Promise<{ deleted: McpNodeListItem }> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const nodeId = requiredString(input, 'nodeId');
+    if (optionalBoolean(input, 'confirm') !== true) {
+      throw new Error('delete_node requires confirm=true.');
+    }
+
+    const node = await requireNode(this.options.repository, nodeId);
+    const deleted = await nodeListItem(this.options.repository, node);
+    if (node.type === 'folder') {
+      const [folders, files] = await this.options.repository.listDirectory(
+        node.id,
+      );
+      if (
+        folders.length + files.length > 0 &&
+        optionalBoolean(input, 'recursive') !== true
+      ) {
+        throw new Error(
+          'delete_node requires recursive=true to delete a non-empty folder.',
+        );
+      }
+    }
+
+    await this.options.repository.deleteNode(nodeId);
+    return { deleted };
+  }
+
+  private async editTags(args: unknown): Promise<McpNodeListItem> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const nodeId = requiredString(input, 'nodeId');
+    await requireNode(this.options.repository, nodeId);
+
+    const set = optionalStringArray(input, 'set');
+    const add = optionalStringArray(input, 'add');
+    const remove = optionalStringArray(input, 'remove');
+    if (set === undefined && add === undefined && remove === undefined) {
+      throw new Error('edit_tags requires set, add, or remove.');
+    }
+
+    if (set !== undefined) {
+      await this.options.repository.setTags(nodeId, normalizeTags(set));
+    }
+    for (const tag of normalizeTags(add ?? [])) {
+      await this.options.repository.addTag(nodeId, tag);
+    }
+    for (const tag of normalizeTags(remove ?? [])) {
+      await this.options.repository.removeTag(nodeId, tag);
+    }
+
+    return nodeListItem(
+      this.options.repository,
+      await requireNode(this.options.repository, nodeId),
+    );
   }
 
   private async createPageFrame(args: unknown): Promise<McpPageFrameContent> {
