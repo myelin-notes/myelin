@@ -9,6 +9,7 @@ import {
   ImageFileTypes,
   type NodeSearchResult,
   type NoteBacklink,
+  type RepositoryNoteGraph,
   type RepositoryStats,
   type RepositoryTag,
   type StoredNoteLink,
@@ -604,6 +605,37 @@ export function getBacklinks(
   }
 
   return backlinks;
+}
+
+function isGraphCanvasNode(
+  node: VFSNode | null | undefined,
+): node is VFSFileNode {
+  return node?.type === 'file' && node.fileType === 'mcanvas' && !isSystemNode(node);
+}
+
+export function getNoteGraph(manifest: VFSManifest): RepositoryNoteGraph {
+  const nodes = Object.values(manifest.nodes)
+    .filter(isGraphCanvasNode)
+    .map((node) => ({
+      id: node.id,
+      name: node.name,
+    }));
+
+  const canvasNodeIds = new Set(nodes.map((node) => node.id));
+  const links = Object.entries(manifest.linksBySource).flatMap(
+    ([sourceId, sourceLinks]) => {
+      if (!canvasNodeIds.has(sourceId)) {
+        return [];
+      }
+
+      return sourceLinks.map((link) => ({
+        ...link,
+        sourceId,
+      }));
+    },
+  );
+
+  return { nodes, links };
 }
 
 export function setStoredNoteLinks(

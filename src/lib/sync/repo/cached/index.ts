@@ -49,6 +49,7 @@ import type {
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
+  RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
   SearchNodesOptions,
@@ -350,6 +351,10 @@ export class CachedRepository
 
   async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
     return this.cache.getBacklinks(noteId);
+  }
+
+  async getNoteGraph(): Promise<RepositoryNoteGraph> {
+    return this.cache.getNoteGraph();
   }
 
   async getUniqueFileName(

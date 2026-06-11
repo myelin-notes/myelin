@@ -1,5 +1,8 @@
 import { gzipSync } from 'node:zlib';
 import * as Y from 'yjs';
+import type { VFSNodeId } from '@/lib/sync';
+import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/import';
+import { YDocManager } from '@/pages/canvas/ydoc-manager';
 
 function normalizePath(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/\/+/g, '/');
@@ -700,6 +703,21 @@ export function createPluginHttpModule() {
       }
       throw new Error(`Unsupported mock HTTP host: ${host}`);
     },
+  };
+}
+
+export async function createCanvasNoteState(
+  markdown: string,
+  resolveNoteLinkId?: (title: string) => Promise<VFSNodeId | null>,
+): Promise<{
+  update: Uint8Array;
+  stateVector: Uint8Array;
+}> {
+  const ydoc = new YDocManager();
+  await addMarkdownPageFrameToYDoc(ydoc, markdown, { resolveNoteLinkId });
+  return {
+    update: ydoc.encodeState(),
+    stateVector: ydoc.encodeStateVector(),
   };
 }
 

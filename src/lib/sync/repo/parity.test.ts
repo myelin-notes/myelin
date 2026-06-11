@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  createCanvasNoteState,
   createNoteState,
   readNoteText,
   resetRepositoryTestDoubles,
@@ -131,6 +132,38 @@ describe('Repository business logic parity', () => {
       expect(
         Array.from((await repository.readFileBytes(rawFileId)) ?? []),
       ).toEqual([4, 5]);
+
+      const graphSourceId = await repository.createFile(
+        'Graph Source',
+        'mcanvas',
+        null,
+      );
+      const graphTargetId = await repository.createFile(
+        'Graph Target',
+        'mcanvas',
+        null,
+      );
+      const graphNote = await createCanvasNoteState(
+        'See [[Graph Target]].',
+        async (title) => (title === 'Graph Target' ? graphTargetId : null),
+      );
+      await repository.pushUpdates(graphSourceId, graphNote.update, {
+        baseRevision: null,
+        localStateVector: graphNote.stateVector,
+      });
+
+      expect(
+        (await repository.getNoteGraph()).nodes.map((node) => node.id).sort(),
+      ).toEqual([fileId, graphSourceId, graphTargetId].sort());
+      expect(await repository.getNoteGraph()).toMatchObject({
+        links: [
+          {
+            sourceId: graphSourceId,
+            targetId: graphTargetId,
+            title: 'Graph Target',
+          },
+        ],
+      });
 
       await repository.removeCustomColor('#abcdef');
       await repository.deleteNode(folderId);
