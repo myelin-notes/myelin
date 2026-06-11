@@ -481,6 +481,8 @@ const zhHans: typeof en = {
       tryRecordingAgain: '重新尝试录音',
       playAudio: '播放音频',
       pauseAudio: '暂停音频',
+      transcribe: '转录音频',
+      transcribing: '正在转录音频…',
     },
     toolShelf: {
       title: '工具盘',

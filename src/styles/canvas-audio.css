@@ -96,3 +96,34 @@
 .canvas-audio-inner[data-recording-state='error'] .canvas-audio-time {
   color: #c73333;
 }
+
+.canvas-audio-transcribe {
+  pointer-events: auto;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #9aa3ab;
+  padding: 0;
+  line-height: 0;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
+}
+
+.canvas-audio-transcribe:hover {
+  background: rgba(28, 39, 56, 0.06);
+  color: #1c2738;
+}
+
+.canvas-audio-transcribe:disabled {
+  cursor: wait;
+  color: #9aa3ab;
+  background: transparent;
+}

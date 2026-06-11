@@ -495,6 +495,8 @@ const en = {
       tryRecordingAgain: 'Try recording again',
       playAudio: 'Play audio',
       pauseAudio: 'Pause audio',
+      transcribe: 'Transcribe audio',
+      transcribing: 'Transcribing audio…',
     },
     toolShelf: {
       title: 'Tool Shelf',

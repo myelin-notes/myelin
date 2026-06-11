@@ -36,6 +36,10 @@ export class AudioElement extends DrawableElement {
     this.setAudioData(data, 'recording.webm', duration, mimeType, transcript);
   };
 
+  private readonly _onTranscribed = (transcript: string) => {
+    this.setTranscript(transcript);
+  };
+
   constructor(uuid: string) {
     super(uuid, ElementType.AUDIO);
   }
@@ -69,6 +73,7 @@ export class AudioElement extends DrawableElement {
       },
       transcript: (v) => {
         this._transcript = typeof v === 'string' ? v : '';
+        this.render();
       },
       audioData: (v) => {
         this._audioData = v instanceof Uint8Array ? new Uint8Array(v) : null;
@@ -109,10 +114,11 @@ export class AudioElement extends DrawableElement {
     this.render();
   }
 
-  /** Called by the media import handler once file transcription completes. */
+  /** Called by the player view once on-demand transcription completes. */
   public setTranscript(transcript: string): void {
     this._transcript = transcript;
     this.syncToYMap({ transcript });
+    this.render();
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -214,7 +220,9 @@ export class AudioElement extends DrawableElement {
             duration={this._duration}
             mimeType={this._mimeType}
             waveform={this._waveform}
+            transcript={this._transcript}
             onRecorded={this._onRecorded}
+            onTranscribed={this._onTranscribed}
           />
         </I18nProvider>,
       );

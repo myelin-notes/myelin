@@ -500,6 +500,8 @@ const es: typeof en = {
       tryRecordingAgain: 'Intentar grabar de nuevo',
       playAudio: 'Reproducir audio',
       pauseAudio: 'Pausar audio',
+      transcribe: 'Transcribir audio',
+      transcribing: 'Transcribiendo audio…',
     },
     toolShelf: {
       title: 'Menú de herramientas',

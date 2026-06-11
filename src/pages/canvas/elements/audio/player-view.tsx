@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  Captions as CaptionsIcon,
+  LoaderCircle,
   Mic as MicIcon,
   Pause as PauseIcon,
   Play as PlayIcon,
@@ -8,6 +10,7 @@ import {
 import {
   type AudioTranscriptionSession,
   startAudioTranscription,
+  transcribeAudioBuffer,
 } from '@/lib/audio-transcription/service';
 import { useMessages } from '@/lib/i18n';
 
@@ -91,12 +94,14 @@ interface AudioPlayerViewProps {
   duration: number;
   mimeType: string;
   waveform: Float32Array | null;
+  transcript: string;
   onRecorded: (
     data: Uint8Array,
     duration: number,
     mimeType: string,
     transcript: string,
   ) => void;
+  onTranscribed: (transcript: string) => void;
 }
 
 export function AudioPlayerView({
@@ -105,12 +110,15 @@ export function AudioPlayerView({
   duration,
   mimeType,
   waveform,
+  transcript,
   onRecorded,
+  onTranscribed,
 }: AudioPlayerViewProps) {
   const strings = useMessages().canvas.audioPlayer;
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -380,6 +388,28 @@ export function AudioPlayerView({
     setIsPlaying(false);
   }
 
+  // Recordings are transcribed live; this is the on-demand path for imported
+  // audio (and the retry path for recordings whose transcription failed).
+  async function handleTranscribe() {
+    if (!audioBytes || isTranscribing) {
+      return;
+    }
+    setIsTranscribing(true);
+    try {
+      const { buffer } = await decodeAudio(audioBytes);
+      const text = await transcribeAudioBuffer(elementId, buffer);
+      if (!disposedRef.current && text) {
+        onTranscribed(text);
+      }
+    } catch {
+      // The button stays visible as the retry affordance.
+    } finally {
+      if (!disposedRef.current) {
+        setIsTranscribing(false);
+      }
+    }
+  }
+
   function handleButtonClick() {
     if (isRequestingRecording) {
       return;
@@ -448,6 +478,24 @@ export function AudioPlayerView({
         />
         <span className="canvas-audio-time">{timeLabel}</span>
       </div>
+      {audioBytes && !transcript && (
+        <button
+          type="button"
+          className="canvas-audio-transcribe"
+          onClick={handleTranscribe}
+          disabled={isTranscribing}
+          aria-label={
+            isTranscribing ? strings.transcribing : strings.transcribe
+          }
+          title={isTranscribing ? strings.transcribing : strings.transcribe}
+        >
+          {isTranscribing ? (
+            <LoaderCircle size={14} className="animate-spin" />
+          ) : (
+            <CaptionsIcon size={14} />
+          )}
+        </button>
+      )}
     </div>
   );
 }

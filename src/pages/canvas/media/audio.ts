@@ -1,4 +1,3 @@
-import { transcribeAudioBuffer } from '@/lib/audio-transcription/service';
 import type { DrawableCanvas } from '../drawable-canvas';
 import {
   AUDIO_NATURAL_HEIGHT,
@@ -17,27 +16,19 @@ export async function audioImportHandler(
   const bytes = new Uint8Array(arrayBuffer);
   const mimeType = blob.type || '';
 
-  let decoded: AudioBuffer | null = null;
   let duration = 0;
   try {
-    const result = await decodeAudio(bytes);
-    decoded = result.buffer;
-    duration = result.duration;
+    duration = (await decodeAudio(bytes)).duration;
   } catch {
     // duration stays 0
   }
 
+  // Imports are not transcribed automatically — the player view offers an
+  // on-demand transcribe button instead, since a full-file whisper run over
+  // an arbitrarily long import is too expensive to fire unprompted.
   const fileName = blob instanceof File ? blob.name : 'audio';
   const el = canvas.addElement((uuid) => new AudioElement(uuid));
   el.setAudioData(bytes, fileName, duration, mimeType);
-
-  if (decoded) {
-    void transcribeAudioBuffer(el.uuid, decoded).then((transcript) => {
-      if (transcript) {
-        el.setTranscript(transcript);
-      }
-    });
-  }
 
   const dpr = window.devicePixelRatio || 1;
   const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
