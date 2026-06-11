@@ -13,7 +13,7 @@ const SUFFIX = '.json';
  * On-disk index artifact for one node. Written by the Rust engine, read here.
  * `text` is the combined output of every provider that indexed the node, and
  * `providers` holds the per-provider entries it was assembled from. The
- * field shape is a cross-language contract (see `src-tauri/src/note_index/mod.rs`).
+ * field shape is a cross-language contract (see `src-tauri/src/note_index/store.rs`).
  */
 export interface NoteIndexRecord {
   nodeId: VFSNodeId;
