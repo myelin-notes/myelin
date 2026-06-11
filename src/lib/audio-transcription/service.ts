@@ -7,6 +7,9 @@ const logger = new Logger('AudioTranscription');
 const SEGMENT_EVENT = 'audio-transcription-segment';
 const FINISHED_EVENT = 'audio-transcription-finished';
 
+/** Decoded file samples are pushed in chunks to bound per-invoke payload size. */
+const IMPORT_CHUNK_SAMPLES = 65_536;
+
 interface AudioTranscriptionSegmentPayload {
   sessionId: string;
   elementId: string;
@@ -24,12 +27,12 @@ interface AudioTranscriptionFinishedPayload {
 
 interface StartAudioTranscriptionOptions {
   elementId: string;
-  mimeType: string;
   stream: MediaStream;
 }
 
 export interface AudioTranscriptionSession {
-  finish(): Promise<void>;
+  /** Resolves with the full transcript once the backend flushes its final segments. */
+  finish(): Promise<string>;
 }
 
 interface PcmCapture {
@@ -38,29 +41,76 @@ interface PcmCapture {
 
 export async function startAudioTranscription({
   elementId,
-  mimeType,
   stream,
 }: StartAudioTranscriptionOptions): Promise<AudioTranscriptionSession | null> {
-  let sessionId: string | null = null;
-  let session: TauriAudioTranscriptionSession | null = null;
+  const session = new TauriAudioTranscriptionSession(
+    crypto.randomUUID(),
+    elementId,
+  );
   try {
-    sessionId = await invoke<string>('start_audio_transcription', {
-      elementId,
-      mimeType,
-    });
-    session = new TauriAudioTranscriptionSession(sessionId, elementId);
+    // Listen before invoking so a fast-failing worker can't emit FINISHED
+    // before any listener exists.
     await session.startListening();
+    await invoke('start_audio_transcription', {
+      sessionId: session.sessionId,
+      elementId,
+    });
     await session.startCapture(stream);
     return session;
   } catch (error) {
-    if (session) {
-      await session.finish();
-    } else if (sessionId) {
-      await invoke('finish_audio_transcription', { sessionId }).catch(() => {});
-    }
+    void invoke('finish_audio_transcription', {
+      sessionId: session.sessionId,
+    }).catch(() => {});
+    await session.close();
     logger.warn('Live audio transcription unavailable', error, { elementId });
     return null;
   }
+}
+
+/** Transcribe an already-decoded audio file (the media import path). */
+export async function transcribeAudioBuffer(
+  elementId: string,
+  buffer: AudioBuffer,
+): Promise<string | null> {
+  const session = new TauriAudioTranscriptionSession(
+    crypto.randomUUID(),
+    elementId,
+  );
+  try {
+    await session.startListening();
+    await invoke('start_audio_transcription', {
+      sessionId: session.sessionId,
+      elementId,
+    });
+  } catch (error) {
+    void invoke('finish_audio_transcription', {
+      sessionId: session.sessionId,
+    }).catch(() => {});
+    await session.close();
+    logger.warn('Audio transcription unavailable', error, { elementId });
+    return null;
+  }
+
+  const mono = mixToMono(buffer);
+  for (let offset = 0; offset < mono.length; offset += IMPORT_CHUNK_SAMPLES) {
+    session.enqueueSamples(
+      mono.subarray(offset, offset + IMPORT_CHUNK_SAMPLES),
+      buffer.sampleRate,
+    );
+  }
+  return session.finish();
+}
+
+function mixToMono(buffer: AudioBuffer): Float32Array {
+  const channels = buffer.numberOfChannels;
+  const mono = new Float32Array(buffer.length);
+  for (let channel = 0; channel < channels; channel++) {
+    const data = buffer.getChannelData(channel);
+    for (let i = 0; i < buffer.length; i++) {
+      mono[i] += data[i] / channels;
+    }
+  }
+  return mono;
 }
 
 class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
@@ -68,12 +118,16 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
   private unlistenFinished: UnlistenFn | null = null;
   private capture: PcmCapture | null = null;
   private sampleSendQueue: Promise<void> = Promise.resolve();
-  private acceptsSamples = true;
-  private closed = false;
-  private finishRequested = false;
+  private stopped = false;
+  private finishPromise: Promise<string> | null = null;
+  private readonly segments: string[] = [];
+  private resolveClosed!: () => void;
+  private readonly closedPromise = new Promise<void>((resolve) => {
+    this.resolveClosed = resolve;
+  });
 
   public constructor(
-    private readonly sessionId: string,
+    public readonly sessionId: string,
     private readonly elementId: string,
   ) {}
 
@@ -83,7 +137,7 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
         if (event.payload.sessionId !== this.sessionId) {
           return;
         }
-        console.log('[AudioTranscription]', event.payload.text, event.payload);
+        this.segments.push(event.payload.text);
       }),
       listen<AudioTranscriptionFinishedPayload>(FINISHED_EVENT, (event) => {
         if (event.payload.sessionId !== this.sessionId) {
@@ -108,14 +162,18 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
     });
   }
 
-  public async finish(): Promise<void> {
-    if (this.finishRequested) {
-      return;
-    }
-    this.finishRequested = true;
-    this.acceptsSamples = false;
+  public finish(): Promise<string> {
+    this.finishPromise ??= this.doFinish();
+    return this.finishPromise;
+  }
+
+  private async doFinish(): Promise<string> {
+    // Stop capture first so nothing new is enqueued, then drain the backlog
+    // before refusing samples — the import path enqueues the whole file and
+    // finishes immediately.
     await this.stopCapture();
     await this.sampleSendQueue;
+    this.stopped = true;
 
     try {
       await invoke('finish_audio_transcription', {
@@ -127,10 +185,18 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
         elementId: this.elementId,
       });
     }
+
+    // The backend emits FINISHED after flushing its final segments; the
+    // FINISHED handler calls close(), which resolves this promise.
+    await this.closedPromise;
+    return this.segments
+      .map((segment) => segment.trim())
+      .filter(Boolean)
+      .join(' ');
   }
 
-  private enqueueSamples(samples: Float32Array, sampleRate: number): void {
-    if (this.closed || this.finishRequested || !this.acceptsSamples) {
+  public enqueueSamples(samples: Float32Array, sampleRate: number): void {
+    if (this.stopped) {
       return;
     }
 
@@ -143,43 +209,50 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
     samples: Float32Array,
     sampleRate: number,
   ): Promise<void> {
-    if (this.closed || this.finishRequested || !this.acceptsSamples) {
+    // Re-checked at execution time: the queue can hold a backlog spanning
+    // invoke round-trips during which close() or a push failure may have run.
+    if (this.stopped) {
       return;
     }
 
     try {
-      await invoke('push_audio_transcription_samples', {
-        sessionId: this.sessionId,
-        samples: Array.from(samples),
-        sampleRate,
-      });
-    } catch (error) {
-      if (this.closed || this.finishRequested) {
-        return;
-      }
-      this.acceptsSamples = false;
-      await this.stopCapture();
-      if (isClosedSessionError(error)) {
+      const accepted = await invoke<boolean>(
+        'push_audio_transcription_samples',
+        new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
+        {
+          headers: {
+            'x-session-id': this.sessionId,
+            'x-sample-rate': String(sampleRate),
+          },
+        },
+      );
+      if (!accepted && !this.stopped) {
+        this.stopped = true;
+        await this.stopCapture();
         logger.debug('Live audio transcription sample stream closed', {
           elementId: this.elementId,
-          error: String(error),
         });
+      }
+    } catch (error) {
+      if (this.stopped) {
         return;
       }
+      this.stopped = true;
+      await this.stopCapture();
       logger.warn('Failed to stream audio samples for transcription', error, {
         elementId: this.elementId,
       });
     }
   }
 
-  private async close(): Promise<void> {
-    this.closed = true;
-    this.acceptsSamples = false;
+  public async close(): Promise<void> {
+    this.stopped = true;
     await this.stopCapture();
     this.unlistenSegment?.();
     this.unlistenFinished?.();
     this.unlistenSegment = null;
     this.unlistenFinished = null;
+    this.resolveClosed();
   }
 
   private async stopCapture(): Promise<void> {
@@ -199,18 +272,7 @@ async function startPcmCapture(
   stream: MediaStream,
   onSamples: (samples: Float32Array, sampleRate: number) => void,
 ): Promise<PcmCapture> {
-  const AudioContextCtor =
-    globalThis.AudioContext ??
-    (
-      globalThis as typeof globalThis & {
-        webkitAudioContext?: typeof AudioContext;
-      }
-    ).webkitAudioContext;
-  if (!AudioContextCtor) {
-    throw new Error('AudioContext unavailable');
-  }
-
-  const audioContext = new AudioContextCtor();
+  const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(stream);
   const processor = audioContext.createScriptProcessor(4096, 1, 1);
   const mute = audioContext.createGain();
@@ -246,12 +308,4 @@ async function startPcmCapture(
       await audioContext.close();
     },
   };
-}
-
-function isClosedSessionError(error: unknown): boolean {
-  const message = String(error);
-  return (
-    message.includes('audio transcription session closed') ||
-    message.includes('audio transcription session not found')
-  );
 }

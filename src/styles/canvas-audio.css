@@ -62,11 +62,11 @@
   background: #5f6f85;
 }
 
-.canvas-audio-inner[data-recording='true'] .canvas-audio-btn {
+.canvas-audio-inner[data-recording-state='recording'] .canvas-audio-btn {
   background: #e03e3e;
 }
 
-.canvas-audio-inner[data-recording='true'] .canvas-audio-btn:hover {
+.canvas-audio-inner[data-recording-state='recording'] .canvas-audio-btn:hover {
   background: #c73333;
 }
 

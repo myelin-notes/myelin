@@ -3,13 +3,15 @@
 //! Mirrors the JS reference in `src/pages/canvas/page-frame/preview-text.ts`:
 //! page-frame rich text lives in `pf-<uuid>` XML fragments (walked here and
 //! joined with `\n` at block boundaries, like ProseMirror's `textBetween`),
-//! while standalone TEXT elements store their string directly on the element map.
+//! while standalone TEXT elements store their string directly on the element map,
+//! and AUDIO elements store their whisper transcript as a `transcript` string.
 
 use yrs::updates::decoder::Decode;
 use yrs::{Any, Array, Doc, GetString, Map, Out, ReadTxn, Transact, Update, XmlFragment, XmlOut};
 
 const TYPE_TEXT: i64 = 1;
 const TYPE_PAGE_FRAME: i64 = 3;
+const TYPE_AUDIO: i64 = 7;
 
 fn any_to_i64(any: &Any) -> Option<i64> {
     match any {
@@ -118,6 +120,16 @@ pub fn extract_note_text(bytes: &[u8]) -> Result<String, String> {
                 if let Some(Out::Any(a)) = map.get(&txn, "text") {
                     if let Some(text) = any_to_string(&a) {
                         let trimmed = text.trim();
+                        if !trimmed.is_empty() {
+                            parts.push(trimmed.to_string());
+                        }
+                    }
+                }
+            }
+            Some(TYPE_AUDIO) => {
+                if let Some(Out::Any(a)) = map.get(&txn, "transcript") {
+                    if let Some(transcript) = any_to_string(&a) {
+                        let trimmed = transcript.trim();
                         if !trimmed.is_empty() {
                             parts.push(trimmed.to_string());
                         }

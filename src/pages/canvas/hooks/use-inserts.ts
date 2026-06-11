@@ -2,7 +2,11 @@ import { type RefObject, useCallback, useRef, useState } from 'react';
 import { UserPrefs } from '@/lib/user-prefs';
 import { CollisionHelper } from '@/lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
-import { AudioElement } from '@/pages/canvas/elements/audio/element';
+import {
+  AUDIO_NATURAL_HEIGHT,
+  AUDIO_NATURAL_WIDTH,
+  AudioElement,
+} from '@/pages/canvas/elements/audio/element';
 import {
   CHROME_BOTTOM_PADDING,
   CHROME_HEADER_HEIGHT,
@@ -151,7 +155,12 @@ export function useCanvasInserts({
     setEmbedOpen(false);
     setContextInsert(null);
     dc.startPlacement({
-      getBounds: () => ({ x: 0, y: 0, width: 280, height: 72 }),
+      getBounds: () => ({
+        x: 0,
+        y: 0,
+        width: AUDIO_NATURAL_WIDTH,
+        height: AUDIO_NATURAL_HEIGHT,
+      }),
       onPlace: placeAudioAt,
     });
   }, [drawableCanvasRef, placeAudioAt]);

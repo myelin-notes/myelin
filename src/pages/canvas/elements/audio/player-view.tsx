@@ -1,11 +1,4 @@
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Mic as MicIcon,
   Pause as PauseIcon,
@@ -16,6 +9,7 @@ import {
   type AudioTranscriptionSession,
   startAudioTranscription,
 } from '@/lib/audio-transcription/service';
+import { useMessages } from '@/lib/i18n';
 
 const WAVEFORM_BARS = 80;
 
@@ -27,7 +21,14 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-async function decodeWaveform(bytes: Uint8Array): Promise<Float32Array> {
+export interface DecodedAudio {
+  buffer: AudioBuffer;
+  waveform: Float32Array;
+  duration: number;
+}
+
+/** Single decode shared by the element, the player, and the import handler. */
+export async function decodeAudio(bytes: Uint8Array): Promise<DecodedAudio> {
   const ctx = new AudioContext();
   try {
     const buffer = bytes.buffer.slice(
@@ -40,7 +41,7 @@ async function decodeWaveform(bytes: Uint8Array): Promise<Float32Array> {
       1,
       Math.floor(channel.length / WAVEFORM_BARS),
     );
-    const result = new Float32Array(WAVEFORM_BARS);
+    const waveform = new Float32Array(WAVEFORM_BARS);
     for (let i = 0; i < WAVEFORM_BARS; i++) {
       let peak = 0;
       const start = i * samplesPerBar;
@@ -51,22 +52,22 @@ async function decodeWaveform(bytes: Uint8Array): Promise<Float32Array> {
           peak = abs;
         }
       }
-      result[i] = peak;
+      waveform[i] = peak;
     }
-    return result;
+    return { buffer: decoded, waveform, duration: decoded.duration };
   } finally {
     ctx.close();
   }
 }
 
-function drawWaveform(
+/** Does not clear the canvas — drawThumbnail paints onto an existing card. */
+export function drawWaveform(
   ctx2d: CanvasRenderingContext2D,
   waveform: Float32Array,
   width: number,
   height: number,
   progress: number,
 ): void {
-  ctx2d.clearRect(0, 0, width, height);
   const bars = waveform.length;
   const barW = 2;
   const gap = (width - bars * barW) / (bars - 1);
@@ -84,30 +85,32 @@ function drawWaveform(
   }
 }
 
-export interface AudioPlayerViewHandle {
-  setAudioData(
-    data: Uint8Array | null,
-    duration: number,
-    mimeType: string,
-  ): void;
-}
-
 interface AudioPlayerViewProps {
   elementId: string;
-  onRecorded: (data: Uint8Array, duration: number, mimeType: string) => void;
+  audioBytes: Uint8Array | null;
+  duration: number;
+  mimeType: string;
+  waveform: Float32Array | null;
+  onRecorded: (
+    data: Uint8Array,
+    duration: number,
+    mimeType: string,
+    transcript: string,
+  ) => void;
 }
 
-export const AudioPlayerView = forwardRef<
-  AudioPlayerViewHandle,
-  AudioPlayerViewProps
->(function AudioPlayerView({ elementId, onRecorded }, ref) {
-  const [audioBytes, setAudioBytes] = useState<Uint8Array | null>(null);
-  const [duration, setDuration] = useState(0);
-  const [mimeType, setMimeType] = useState('');
+export function AudioPlayerView({
+  elementId,
+  audioBytes,
+  duration,
+  mimeType,
+  waveform,
+  onRecorded,
+}: AudioPlayerViewProps) {
+  const strings = useMessages().canvas.audioPlayer;
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [waveform, setWaveform] = useState<Float32Array | null>(null);
 
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -119,52 +122,47 @@ export const AudioPlayerView = forwardRef<
   const recordStartRef = useRef(0);
   const recordTickRef = useRef(0);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
+  const disposedRef = useRef(false);
   const isRecording = recordingState === 'recording';
   const isRequestingRecording = recordingState === 'requesting';
 
-  // Stable ref for the onRecorded callback so recording closures always see
-  // the current value without widening effect dependency lists.
-  const onRecordedRef = useRef(onRecorded);
-  useLayoutEffect(() => {
-    onRecordedRef.current = onRecorded;
-  });
-
-  useImperativeHandle(ref, () => ({
-    setAudioData(data, dur, mime) {
-      // Reset local playback state when Yjs delivers a new audio blob.
-      if (audioElRef.current) {
-        audioElRef.current.pause();
-        audioElRef.current = null;
+  // Tear down recording resources when the element is deleted mid-recording.
+  useEffect(
+    () => () => {
+      disposedRef.current = true;
+      clearInterval(recordTickRef.current);
+      const recorder = mediaRecorderRef.current;
+      mediaRecorderRef.current = null;
+      if (recorder && recorder.state !== 'inactive') {
+        // Skip finalizeRecording — the element is gone; just stop the mic.
+        recorder.onstop = null;
+        recorder.stop();
+        recorder.stream.getTracks().forEach((t) => {
+          t.stop();
+        });
       }
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
-      setAudioBytes(data ? new Uint8Array(data) : null);
-      setDuration(dur);
-      setMimeType(mime);
-      setRecordingState('idle');
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setWaveform(null);
+      void transcriptionSessionRef.current?.finish();
+      transcriptionSessionRef.current = null;
     },
-  }));
+    [],
+  );
 
-  // Decode waveform whenever audioBytes changes.
+  // Drop the player bound to the previous blob when a new one arrives
+  // (re-recording or a remote Yjs update), and on unmount.
   useEffect(() => {
     if (!audioBytes) {
       return;
     }
-    let cancelled = false;
-    decodeWaveform(audioBytes)
-      .then((wf) => {
-        if (!cancelled) {
-          setWaveform(wf);
-        }
-      })
-      .catch(() => {});
     return () => {
-      cancelled = true;
+      audioElRef.current?.pause();
+      audioElRef.current = null;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setRecordingState('idle');
     };
   }, [audioBytes]);
 
@@ -215,10 +213,9 @@ export const AudioPlayerView = forwardRef<
       return;
     }
     const progress = duration > 0 ? currentTime / duration : 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawWaveform(ctx, waveform, canvas.width, canvas.height, progress);
   }, [waveform, currentTime, duration]);
-
-  // --- Recording ---
 
   async function startRecording() {
     setRecordingState('requesting');
@@ -236,6 +233,12 @@ export const AudioPlayerView = forwardRef<
 
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recordingStream = stream;
+      if (disposedRef.current) {
+        recordingStream.getTracks().forEach((t) => {
+          t.stop();
+        });
+        return;
+      }
 
       const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -249,9 +252,15 @@ export const AudioPlayerView = forwardRef<
       );
       const transcriptionSession = await startAudioTranscription({
         elementId,
-        mimeType: recorder.mimeType,
         stream: recordingStream,
       });
+      if (disposedRef.current) {
+        recordingStream.getTracks().forEach((t) => {
+          t.stop();
+        });
+        void transcriptionSession?.finish();
+        return;
+      }
       recordChunksRef.current = [];
       mediaRecorderRef.current = recorder;
       transcriptionSessionRef.current = transcriptionSession;
@@ -270,8 +279,7 @@ export const AudioPlayerView = forwardRef<
         });
         const transcription = transcriptionSessionRef.current;
         transcriptionSessionRef.current = null;
-        void transcription?.finish();
-        void finalizeRecording(recorder.mimeType);
+        void finalizeRecording(recorder.mimeType, transcription);
       };
 
       recorder.start(100);
@@ -303,7 +311,11 @@ export const AudioPlayerView = forwardRef<
     }
   }
 
-  async function finalizeRecording(recordedMimeType: string) {
+  async function finalizeRecording(
+    recordedMimeType: string,
+    transcription: AudioTranscriptionSession | null,
+  ) {
+    const transcriptPromise = transcription?.finish() ?? Promise.resolve('');
     const chunks = recordChunksRef.current;
     recordChunksRef.current = [];
 
@@ -317,18 +329,17 @@ export const AudioPlayerView = forwardRef<
 
     let dur = 0;
     try {
-      const ctx = new AudioContext();
-      const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
-      dur = decoded.duration;
-      ctx.close();
+      dur = (await decodeAudio(bytes)).duration;
     } catch {
       dur = (Date.now() - recordStartRef.current) / 1000;
     }
 
-    onRecordedRef.current(bytes, dur, recordedMimeType);
+    const transcript = await transcriptPromise.catch(() => '');
+    if (disposedRef.current) {
+      return;
+    }
+    onRecorded(bytes, dur, recordedMimeType, transcript);
   }
-
-  // --- Playback ---
 
   function startPlayback() {
     if (!audioBytes) {
@@ -395,33 +406,29 @@ export const AudioPlayerView = forwardRef<
       : MicIcon;
 
   const timeLabel = isRequestingRecording
-    ? 'Requesting microphone...'
+    ? strings.requestingMic
     : recordingState === 'error'
-      ? 'Microphone unavailable'
+      ? strings.micUnavailable
       : isRecording
         ? formatTime(currentTime)
         : audioBytes
           ? `${formatTime(currentTime)} / ${formatTime(duration)}`
-          : 'Tap to record';
+          : strings.tapToRecord;
 
   const buttonLabel = isRequestingRecording
-    ? 'Requesting microphone access'
+    ? strings.requestingMicAccess
     : isRecording
-      ? 'Stop recording'
+      ? strings.stopRecording
       : audioBytes
         ? isPlaying
-          ? 'Pause audio'
-          : 'Play audio'
+          ? strings.pauseAudio
+          : strings.playAudio
         : recordingState === 'error'
-          ? 'Try recording again'
-          : 'Start recording';
+          ? strings.tryRecordingAgain
+          : strings.startRecording;
 
   return (
-    <div
-      className="canvas-audio-inner"
-      data-recording={isRecording ? 'true' : 'false'}
-      data-recording-state={recordingState}
-    >
+    <div className="canvas-audio-inner" data-recording-state={recordingState}>
       <button
         type="button"
         className="canvas-audio-btn"
@@ -443,4 +450,4 @@ export const AudioPlayerView = forwardRef<
       </div>
     </div>
   );
-});
+}

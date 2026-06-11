@@ -485,6 +485,17 @@ const en = {
         description: 'Record or import a voice memo',
       },
     },
+    audioPlayer: {
+      requestingMic: 'Requesting microphone...',
+      requestingMicAccess: 'Requesting microphone access',
+      micUnavailable: 'Microphone unavailable',
+      tapToRecord: 'Tap to record',
+      startRecording: 'Start recording',
+      stopRecording: 'Stop recording',
+      tryRecordingAgain: 'Try recording again',
+      playAudio: 'Play audio',
+      pauseAudio: 'Pause audio',
+    },
     toolShelf: {
       title: 'Tool Shelf',
       empty: 'Wheel disabled - right-click will not open it.',

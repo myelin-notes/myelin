@@ -16,6 +16,29 @@ pub fn run() {
                 .join("stronghold-salt.txt");
             app.handle()
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
+
+            // WebKitGTK denies getUserMedia by default; enable media streams
+            // and allow microphone permission requests so audio recording works.
+            #[cfg(target_os = "linux")]
+            app.get_webview_window("main")
+                .expect("main window missing")
+                .with_webview(|webview| {
+                    use webkit2gtk::{prelude::*, UserMediaPermissionRequest};
+                    let webview = webview.inner();
+                    if let Some(settings) = webview.settings() {
+                        settings.set_enable_media_stream(true);
+                        settings.set_enable_webrtc(true);
+                    }
+                    webview.connect_permission_request(|_, request| {
+                        if let Some(request) = request.downcast_ref::<UserMediaPermissionRequest>() {
+                            request.allow();
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                })?;
+
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())

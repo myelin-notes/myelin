@@ -18,7 +18,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Semaphore;
 
 /// Bump to invalidate every artifact when the extraction format changes.
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 const INDEX_DIR: &str = "NoteIndex";
 const DEBOUNCE_MS: u64 = 800;
 const MAX_CONCURRENCY: usize = 2;

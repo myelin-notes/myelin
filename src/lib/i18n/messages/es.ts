@@ -490,6 +490,17 @@ const es: typeof en = {
         description: 'Graba o importa una nota de voz',
       },
     },
+    audioPlayer: {
+      requestingMic: 'Solicitando micrófono...',
+      requestingMicAccess: 'Solicitando acceso al micrófono',
+      micUnavailable: 'Micrófono no disponible',
+      tapToRecord: 'Toca para grabar',
+      startRecording: 'Iniciar grabación',
+      stopRecording: 'Detener grabación',
+      tryRecordingAgain: 'Intentar grabar de nuevo',
+      playAudio: 'Reproducir audio',
+      pauseAudio: 'Pausar audio',
+    },
     toolShelf: {
       title: 'Menú de herramientas',
       empty: 'Rueda desactivada; el clic derecho no la abrirá.',

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { startAudioTranscription } from './service';
+import { startAudioTranscription, transcribeAudioBuffer } from './service';
 
 type EventCallback = (event: { payload: unknown }) => void;
 type FakeProcessor = {
@@ -10,6 +10,8 @@ type FakeProcessor = {
 
 const invokeMock = vi.hoisted(() => vi.fn());
 const listeners = vi.hoisted(() => new Map<string, Set<EventCallback>>());
+const loggerDebug = vi.hoisted(() => vi.fn());
+const loggerWarn = vi.hoisted(() => vi.fn());
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
@@ -26,10 +28,55 @@ vi.mock('@tauri-apps/api/event', () => ({
   }),
 }));
 
+vi.mock('@/lib/logger', () => ({
+  Logger: class {
+    debug = loggerDebug;
+    info = vi.fn();
+    warn = loggerWarn;
+    error = vi.fn();
+  },
+}));
+
 function emit(eventName: string, payload: unknown): void {
   for (const callback of listeners.get(eventName) ?? []) {
     callback({ payload });
   }
+}
+
+function listenerCount(): number {
+  let count = 0;
+  for (const callbacks of listeners.values()) {
+    count += callbacks.size;
+  }
+  return count;
+}
+
+function invokesOf(command: string): unknown[][] {
+  return invokeMock.mock.calls.filter(([cmd]) => cmd === command);
+}
+
+function startedSessionId(): string {
+  const [, args] = invokesOf('start_audio_transcription')[0];
+  return (args as { sessionId: string }).sessionId;
+}
+
+function emitSegment(sessionId: string, text: string): void {
+  emit('audio-transcription-segment', {
+    sessionId,
+    elementId: 'audio-1',
+    text,
+    startSeconds: 0,
+    endSeconds: 1,
+    languageCode: 'en',
+  });
+}
+
+function emitFinished(sessionId: string, error: string | null = null): void {
+  emit('audio-transcription-finished', {
+    sessionId,
+    elementId: 'audio-1',
+    error,
+  });
 }
 
 describe('audio transcription service', () => {
@@ -64,49 +111,26 @@ describe('audio transcription service', () => {
     }
   }
 
-  afterEach(() => {
-    invokeMock.mockReset();
-    listeners.clear();
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-    processor = null;
-    audioContext = null;
-  });
+  function stubAudioContext(
+    Ctor: typeof FakeAudioContext = FakeAudioContext,
+  ): void {
+    vi.stubGlobal('AudioContext', Ctor as unknown as typeof AudioContext);
+  }
 
-  it('streams samples and logs matching transcript segments', async () => {
-    vi.stubGlobal(
-      'AudioContext',
-      FakeAudioContext as unknown as typeof AudioContext,
-    );
+  function mockInvokeDefaults(): void {
     invokeMock.mockImplementation(async (command: string) =>
-      command === 'start_audio_transcription' ? 'session-1' : undefined,
+      command === 'push_audio_transcription_samples' ? true : undefined,
     );
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  }
 
-    const session = await startAudioTranscription({
+  async function start() {
+    return startAudioTranscription({
       elementId: 'audio-1',
-      mimeType: 'audio/webm',
       stream: {} as MediaStream,
     });
+  }
 
-    expect(session).not.toBeNull();
-    emit('audio-transcription-segment', {
-      sessionId: 'other-session',
-      elementId: 'audio-1',
-      text: 'ignored',
-      startSeconds: 0,
-      endSeconds: 1,
-      languageCode: 'en',
-    });
-    emit('audio-transcription-segment', {
-      sessionId: 'session-1',
-      elementId: 'audio-1',
-      text: 'hello world',
-      startSeconds: 0,
-      endSeconds: 1,
-      languageCode: 'en',
-    });
-
+  function emitSamples(): void {
     processor?.onaudioprocess?.({
       inputBuffer: {
         length: 3,
@@ -117,28 +141,212 @@ describe('audio transcription service', () => {
             : new Float32Array([1, -0.5, -1]),
       },
     } as unknown as AudioProcessingEvent);
+  }
+
+  afterEach(() => {
+    invokeMock.mockReset();
+    loggerDebug.mockReset();
+    loggerWarn.mockReset();
+    listeners.clear();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    processor = null;
+    audioContext = null;
+  });
+
+  it('streams raw PCM and resolves the accumulated transcript on finish', async () => {
+    stubAudioContext();
+    mockInvokeDefaults();
+
+    const session = await start();
+    expect(session).not.toBeNull();
+    const sessionId = startedSessionId();
+
+    emitSegment('other-session', 'ignored');
+    emitSegment(sessionId, ' hello');
+    emitSegment(sessionId, 'world ');
+
+    emitSamples();
+    await vi.waitFor(() => {
+      expect(invokesOf('push_audio_transcription_samples')).toHaveLength(1);
+    });
+    const [, payload, options] = invokesOf(
+      'push_audio_transcription_samples',
+    )[0];
+    expect(payload).toBeInstanceOf(Uint8Array);
+    const bytes = payload as Uint8Array;
+    const samples = Array.from(
+      new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4),
+    );
+    expect(samples).toEqual([0.5, 0, 0]);
+    expect(options).toEqual({
+      headers: { 'x-session-id': sessionId, 'x-sample-rate': '32000' },
+    });
+
+    const finishPromise = session!.finish();
+    await vi.waitFor(() => {
+      expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
+    });
+    emitFinished(sessionId);
+
+    expect(await finishPromise).toBe('hello world');
+    expect(audioContext?.close).toHaveBeenCalled();
+    expect(listenerCount()).toBe(0);
+  });
+
+  it('returns null and removes listeners when the start invoke rejects', async () => {
+    stubAudioContext();
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'start_audio_transcription') {
+        throw new Error('model missing');
+      }
+      return undefined;
+    });
+
+    const session = await start();
+
+    expect(session).toBeNull();
+    expect(listenerCount()).toBe(0);
+    expect(loggerWarn).toHaveBeenCalled();
+  });
+
+  it('finishes the backend session and removes listeners when capture fails', async () => {
+    class BrokenAudioContext extends FakeAudioContext {
+      public override resume = vi.fn(async () => {
+        throw new Error('no audio');
+      });
+    }
+    stubAudioContext(BrokenAudioContext);
+    mockInvokeDefaults();
+
+    const session = await start();
+
+    expect(session).toBeNull();
+    expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
+    const [, args] = invokesOf('finish_audio_transcription')[0];
+    expect(args).toEqual({ sessionId: startedSessionId() });
+    expect(listenerCount()).toBe(0);
+  });
+
+  it('closes on a backend FINISHED event and stops pushing samples', async () => {
+    stubAudioContext();
+    mockInvokeDefaults();
+
+    await start();
+    emitFinished(startedSessionId(), 'worker exploded');
 
     await vi.waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith(
-        'push_audio_transcription_samples',
-        {
-          sessionId: 'session-1',
-          samples: [0.5, 0, 0],
-          sampleRate: 32_000,
-        },
-      );
+      expect(audioContext?.close).toHaveBeenCalled();
+      expect(listenerCount()).toBe(0);
     });
-    await session!.finish();
+    expect(loggerWarn).toHaveBeenCalled();
 
-    expect(log).toHaveBeenCalledTimes(1);
-    expect(log).toHaveBeenCalledWith(
-      '[AudioTranscription]',
-      'hello world',
-      expect.objectContaining({ text: 'hello world' }),
-    );
-    expect(invokeMock).toHaveBeenCalledWith('finish_audio_transcription', {
-      sessionId: 'session-1',
+    emitSamples();
+    await Promise.resolve();
+    expect(invokesOf('push_audio_transcription_samples')).toHaveLength(0);
+  });
+
+  it('invokes finish exactly once when finish is called twice', async () => {
+    stubAudioContext();
+    mockInvokeDefaults();
+
+    const session = await start();
+    const first = session!.finish();
+    const second = session!.finish();
+    await vi.waitFor(() => {
+      expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
     });
-    expect(audioContext?.close).toHaveBeenCalled();
+    emitFinished(startedSessionId());
+    await Promise.all([first, second]);
+
+    expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
+  });
+
+  it('stops capture without warning when the backend reports the session gone', async () => {
+    stubAudioContext();
+    invokeMock.mockImplementation(async (command: string) =>
+      command === 'push_audio_transcription_samples' ? false : undefined,
+    );
+
+    await start();
+    emitSamples();
+
+    await vi.waitFor(() => {
+      expect(audioContext?.close).toHaveBeenCalled();
+    });
+    expect(loggerDebug).toHaveBeenCalled();
+    expect(loggerWarn).not.toHaveBeenCalled();
+
+    emitSamples();
+    await Promise.resolve();
+    expect(invokesOf('push_audio_transcription_samples')).toHaveLength(1);
+  });
+
+  it('stops capture and warns when a sample push fails', async () => {
+    stubAudioContext();
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'push_audio_transcription_samples') {
+        throw new Error('ipc exploded');
+      }
+      return undefined;
+    });
+
+    await start();
+    emitSamples();
+
+    await vi.waitFor(() => {
+      expect(audioContext?.close).toHaveBeenCalled();
+    });
+    expect(loggerWarn).toHaveBeenCalled();
+
+    emitSamples();
+    await Promise.resolve();
+    expect(invokesOf('push_audio_transcription_samples')).toHaveLength(1);
+  });
+
+  it('drops samples emitted after finish resolves', async () => {
+    stubAudioContext();
+    mockInvokeDefaults();
+
+    const session = await start();
+    const finishPromise = session!.finish();
+    await vi.waitFor(() => {
+      expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
+    });
+    emitFinished(startedSessionId());
+    await finishPromise;
+
+    emitSamples();
+    await Promise.resolve();
+    expect(invokesOf('push_audio_transcription_samples')).toHaveLength(0);
+  });
+
+  it('transcribes a decoded audio buffer in chunks', async () => {
+    mockInvokeDefaults();
+    const length = 70_000;
+    const data = new Float32Array(length).fill(0.25);
+    const buffer = {
+      length,
+      numberOfChannels: 1,
+      sampleRate: 44_100,
+      getChannelData: () => data,
+    } as unknown as AudioBuffer;
+
+    const transcriptPromise = transcribeAudioBuffer('audio-1', buffer);
+
+    await vi.waitFor(() => {
+      expect(invokesOf('push_audio_transcription_samples')).toHaveLength(2);
+    });
+    const chunkLengths = invokesOf('push_audio_transcription_samples').map(
+      ([, payload]) => (payload as Uint8Array).byteLength / 4,
+    );
+    expect(chunkLengths).toEqual([65_536, length - 65_536]);
+
+    const sessionId = startedSessionId();
+    emitSegment(sessionId, 'hola mundo');
+    emitFinished(sessionId);
+
+    expect(await transcriptPromise).toBe('hola mundo');
+    expect(listenerCount()).toBe(0);
   });
 });

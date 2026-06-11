@@ -1,39 +1,39 @@
-import type { RefObject } from 'react';
-import { createRef } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import type * as Y from 'yjs';
+import { I18nProvider } from '@/lib/i18n';
 import type { CanvasViewport } from '../../canvas-viewport';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
-import { AudioPlayerView, type AudioPlayerViewHandle } from './player-view';
+import { AudioPlayerView, decodeAudio, drawWaveform } from './player-view';
 
-const NATURAL_WIDTH = 280;
-const NATURAL_HEIGHT = 72;
+export const AUDIO_NATURAL_WIDTH = 280;
+export const AUDIO_NATURAL_HEIGHT = 64;
 
 export class AudioElement extends DrawableElement {
   private _audioData: Uint8Array | null = null;
   private _fileName: string = '';
   private _duration: number = 0;
   private _mimeType: string = '';
+  private _transcript: string = '';
 
-  // Waveform kept for drawThumbnail — decoded lazily after audio data arrives.
+  // Decoded lazily after audio data arrives; rendered into the view as a
+  // prop and used by drawThumbnail.
   private _waveform: Float32Array | null = null;
   private _waveformForData: Uint8Array | null = null;
 
   private _root: HTMLDivElement | null = null;
   private _reactRoot: Root | null = null;
-  private _viewRef: RefObject<AudioPlayerViewHandle | null> =
-    createRef<AudioPlayerViewHandle | null>();
 
   // Bound once so the React component always gets a stable reference.
   private readonly _onRecorded = (
     data: Uint8Array,
     duration: number,
     mimeType: string,
+    transcript: string,
   ) => {
-    this.setAudioData(data, 'recording.webm', duration, mimeType);
+    this.setAudioData(data, 'recording.webm', duration, mimeType, transcript);
   };
 
   constructor(uuid: string) {
@@ -45,6 +45,7 @@ export class AudioElement extends DrawableElement {
       fileName: this._fileName,
       duration: this._duration,
       mimeType: this._mimeType,
+      transcript: this._transcript,
     };
     if (this._audioData) {
       props.audioData = new Uint8Array(this._audioData);
@@ -60,18 +61,19 @@ export class AudioElement extends DrawableElement {
       },
       duration: (v) => {
         this._duration = typeof v === 'number' ? v : 0;
+        this.render();
       },
       mimeType: (v) => {
         this._mimeType = typeof v === 'string' ? v : '';
+        this.render();
+      },
+      transcript: (v) => {
+        this._transcript = typeof v === 'string' ? v : '';
       },
       audioData: (v) => {
         this._audioData = v instanceof Uint8Array ? new Uint8Array(v) : null;
-        this._viewRef.current?.setAudioData(
-          this._audioData,
-          this._duration,
-          this._mimeType,
-        );
         this.scheduleWaveformDecode();
+        this.render();
       },
     });
   }
@@ -89,19 +91,28 @@ export class AudioElement extends DrawableElement {
     fileName: string,
     duration: number,
     mimeType: string,
+    transcript: string = '',
   ): void {
     this._audioData = new Uint8Array(data);
     this._fileName = fileName;
     this._duration = duration;
     this._mimeType = mimeType;
+    this._transcript = transcript;
     this.syncToYMap({
       audioData: this._audioData,
       fileName,
       duration,
       mimeType,
+      transcript,
     });
-    this._viewRef.current?.setAudioData(this._audioData, duration, mimeType);
     this.scheduleWaveformDecode();
+    this.render();
+  }
+
+  /** Called by the media import handler once file transcription completes. */
+  public setTranscript(transcript: string): void {
+    this._transcript = transcript;
+    this.syncToYMap({ transcript });
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -113,11 +124,13 @@ export class AudioElement extends DrawableElement {
   }
 
   public get localBoundingBox(): DOMRect {
-    return new DOMRect(0, 0, NATURAL_WIDTH, NATURAL_HEIGHT);
+    return new DOMRect(0, 0, AUDIO_NATURAL_WIDTH, AUDIO_NATURAL_HEIGHT);
   }
 
   protected isOverLocal(x: number, y: number): boolean {
-    return x >= 0 && x <= NATURAL_WIDTH && y >= 0 && y <= NATURAL_HEIGHT;
+    return (
+      x >= 0 && x <= AUDIO_NATURAL_WIDTH && y >= 0 && y <= AUDIO_NATURAL_HEIGHT
+    );
   }
 
   protected updateBoundingBox(): void {}
@@ -129,26 +142,26 @@ export class AudioElement extends DrawableElement {
     ctx.save();
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.roundRect(0, 0, NATURAL_WIDTH, NATURAL_HEIGHT, 10);
+    ctx.roundRect(0, 0, AUDIO_NATURAL_WIDTH, AUDIO_NATURAL_HEIGHT, 10);
     ctx.fill();
 
     ctx.strokeStyle = 'rgba(195, 199, 202, 0.6)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(0, 0, NATURAL_WIDTH, NATURAL_HEIGHT, 10);
+    ctx.roundRect(0, 0, AUDIO_NATURAL_WIDTH, AUDIO_NATURAL_HEIGHT, 10);
     ctx.stroke();
 
     const wf = this._waveform;
     if (wf) {
       ctx.save();
       ctx.translate(52, 0);
-      drawWaveformToCanvas(ctx, wf, NATURAL_WIDTH - 64, NATURAL_HEIGHT, 0);
+      drawWaveform(ctx, wf, AUDIO_NATURAL_WIDTH - 64, AUDIO_NATURAL_HEIGHT, 0);
       ctx.restore();
     }
 
-    ctx.fillStyle = '#2f3e46';
+    ctx.fillStyle = '#1c2738';
     ctx.beginPath();
-    ctx.arc(28, NATURAL_HEIGHT / 2, 16, 0, Math.PI * 2);
+    ctx.arc(28, AUDIO_NATURAL_HEIGHT / 2, 16, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -182,26 +195,30 @@ export class AudioElement extends DrawableElement {
     this._root = root;
 
     this._reactRoot = createRoot(root);
-    flushSync(() => {
-      this._reactRoot!.render(
-        <AudioPlayerView
-          ref={this._viewRef}
-          elementId={this.uuid}
-          onRecorded={this._onRecorded}
-        />,
-      );
-    });
-
-    // Push any audio data that arrived from Yjs before the DOM was created.
-    if (this._audioData) {
-      this._viewRef.current?.setAudioData(
-        this._audioData,
-        this._duration,
-        this._mimeType,
-      );
-    }
+    this.render();
 
     return root;
+  }
+
+  /** No-op until the React root is mounted lazily in syncDOM. */
+  private render(): void {
+    if (!this._reactRoot) {
+      return;
+    }
+    flushSync(() => {
+      this._reactRoot!.render(
+        <I18nProvider>
+          <AudioPlayerView
+            elementId={this.uuid}
+            audioBytes={this._audioData}
+            duration={this._duration}
+            mimeType={this._mimeType}
+            waveform={this._waveform}
+            onRecorded={this._onRecorded}
+          />
+        </I18nProvider>,
+      );
+    });
   }
 
   private scheduleWaveformDecode(): void {
@@ -212,62 +229,14 @@ export class AudioElement extends DrawableElement {
     this._waveformForData = data;
     this._waveform = null;
 
-    const ctx = new AudioContext();
-    const buffer = data.buffer.slice(
-      data.byteOffset,
-      data.byteOffset + data.byteLength,
-    );
-    ctx
-      .decodeAudioData(buffer as ArrayBuffer)
-      .then((decoded) => {
-        ctx.close();
+    decodeAudio(data)
+      .then(({ waveform }) => {
         if (data !== this._audioData) {
           return;
         }
-        const channel = decoded.getChannelData(0);
-        const bars = 80;
-        const samplesPerBar = Math.max(1, Math.floor(channel.length / bars));
-        const result = new Float32Array(bars);
-        for (let i = 0; i < bars; i++) {
-          let peak = 0;
-          const start = i * samplesPerBar;
-          const end = Math.min(start + samplesPerBar, channel.length);
-          for (let j = start; j < end; j++) {
-            const abs = Math.abs(channel[j]);
-            if (abs > peak) {
-              peak = abs;
-            }
-          }
-          result[i] = peak;
-        }
-        this._waveform = result;
+        this._waveform = waveform;
+        this.render();
       })
-      .catch(() => {
-        ctx.close();
-      });
-  }
-}
-
-function drawWaveformToCanvas(
-  ctx: CanvasRenderingContext2D,
-  waveform: Float32Array,
-  width: number,
-  height: number,
-  progress: number,
-): void {
-  const bars = waveform.length;
-  const barW = 2;
-  const gap = (width - bars * barW) / (bars - 1);
-  const cx = width * progress;
-  const minBarH = 3;
-
-  for (let i = 0; i < bars; i++) {
-    const x = i * (barW + gap);
-    const barH = Math.max(minBarH, waveform[i] * height * 0.85);
-    const y = (height - barH) / 2;
-    ctx.fillStyle = x + barW < cx ? '#2f3e46' : '#d0d5db';
-    ctx.beginPath();
-    ctx.roundRect(x, y, barW, barH, 1);
-    ctx.fill();
+      .catch(() => {});
   }
 }

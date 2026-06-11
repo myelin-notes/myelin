@@ -471,6 +471,17 @@ const zhHans: typeof en = {
         description: '录制或导入语音备忘',
       },
     },
+    audioPlayer: {
+      requestingMic: '正在请求麦克风...',
+      requestingMicAccess: '正在请求麦克风权限',
+      micUnavailable: '麦克风不可用',
+      tapToRecord: '点按录音',
+      startRecording: '开始录音',
+      stopRecording: '停止录音',
+      tryRecordingAgain: '重新尝试录音',
+      playAudio: '播放音频',
+      pauseAudio: '暂停音频',
+    },
     toolShelf: {
       title: '工具盘',
       empty: '轮盘已停用，右键点击将不会打开',

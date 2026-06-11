@@ -2,27 +2,30 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex, MutexGuard};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
 
 use scribble::{
     Backend, BackendStream, Opts, OutputType, Scribble, Segment, SegmentEncoder, WhisperBackend,
 };
 use serde::Serialize;
+use tauri::ipc::{InvokeBody, Request};
 use tauri::{path::BaseDirectory, AppHandle, Emitter, Manager, State};
 
 const MODEL_DIR: &str = "scribble-models";
-const DEFAULT_MODEL_FILE: &str = "ggml-base.en.bin";
+const DEFAULT_MODEL_FILE: &str = "ggml-base.bin";
 const DEFAULT_VAD_MODEL_FILE: &str = "ggml-silero-v6.2.0.bin";
-const MODEL_PATH_ENV: &str = "MYELIN_SCRIBBLE_MODEL_PATH";
-const VAD_MODEL_PATH_ENV: &str = "MYELIN_SCRIBBLE_VAD_MODEL_PATH";
 const SEGMENT_EVENT: &str = "audio-transcription-segment";
 const FINISHED_EVENT: &str = "audio-transcription-finished";
 const TARGET_SAMPLE_RATE: u32 = 16_000;
 const MIN_FINAL_TRANSCRIPTION_SAMPLES: u64 = TARGET_SAMPLE_RATE as u64;
+/// A live session pushes samples roughly every 85 ms, so a receiver that stays
+/// quiet this long means the frontend abandoned the session (reload, crash).
+const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 type SampleSender = mpsc::SyncSender<TranscriptionMessage>;
 type Sessions = Arc<Mutex<HashMap<String, SampleSender>>>;
-type SharedScribble = Arc<Mutex<Scribble<WhisperBackend>>>;
+type SharedScribble = Arc<Scribble<WhisperBackend>>;
 type ScribbleEngine = Arc<Mutex<Option<SharedScribble>>>;
 
 enum TranscriptionMessage {
@@ -33,7 +36,6 @@ enum TranscriptionMessage {
 pub struct TranscriptionState {
     sessions: Sessions,
     engine: ScribbleEngine,
-    next_id: AtomicU64,
 }
 
 impl TranscriptionState {
@@ -41,7 +43,6 @@ impl TranscriptionState {
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
             engine: Arc::new(Mutex::new(None)),
-            next_id: AtomicU64::new(1),
         }
     }
 }
@@ -71,42 +72,40 @@ struct AudioTranscriptionFinishedPayload {
     error: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn start_audio_transcription(
     app: AppHandle,
     state: State<'_, TranscriptionState>,
+    session_id: String,
     element_id: String,
-    mime_type: String,
-) -> Result<String, String> {
+) -> Result<(), String> {
     let paths = resolve_model_paths(&app)?;
-    let session_id = format!(
-        "{}-{}",
-        current_timestamp_ms(),
-        state.next_id.fetch_add(1, Ordering::Relaxed)
-    );
     let (tx, rx) = mpsc::sync_channel::<TranscriptionMessage>(64);
 
     {
-        let mut sessions = lock_or_recover(&state.sessions);
+        let mut sessions = state.sessions.lock().expect("sessions mutex poisoned");
         sessions.insert(session_id.clone(), tx);
     }
 
     let sessions = state.sessions.clone();
     let engine = state.engine.clone();
-    let thread_session_id = session_id.clone();
     std::thread::spawn(move || {
         let result = catch_unwind(AssertUnwindSafe(|| {
             run_transcription_session(
                 app.clone(),
-                engine,
+                engine.clone(),
                 paths,
-                thread_session_id.clone(),
+                session_id.clone(),
                 element_id.clone(),
-                mime_type,
                 rx,
             )
         }))
         .unwrap_or_else(|panic| {
+            // The panic may have corrupted the cached engine and poisoned its
+            // mutex; drop it so the next session re-initializes from scratch.
+            *engine
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
             Err(format!(
                 "transcription worker panicked: {}",
                 panic_payload_message(panic)
@@ -114,67 +113,91 @@ pub fn start_audio_transcription(
         });
 
         {
-            let mut sessions = lock_or_recover(&sessions);
-            sessions.remove(&thread_session_id);
+            let mut sessions = sessions.lock().expect("sessions mutex poisoned");
+            sessions.remove(&session_id);
         }
 
         let error = result.err();
         let _ = app.emit(
             FINISHED_EVENT,
             AudioTranscriptionFinishedPayload {
-                session_id: thread_session_id,
+                session_id,
                 element_id,
                 error,
             },
         );
     });
 
-    Ok(session_id)
+    Ok(())
 }
 
-#[tauri::command]
+/// Accepts a raw little-endian f32 PCM payload. Returns `Ok(false)` when the
+/// session is gone (finished or abandoned) — a benign condition the frontend
+/// treats as end-of-stream rather than an error.
+#[tauri::command(async)]
 pub fn push_audio_transcription_samples(
     state: State<'_, TranscriptionState>,
-    session_id: String,
-    samples: Vec<f32>,
-    sample_rate: u32,
-) -> Result<(), String> {
+    request: Request<'_>,
+) -> Result<bool, String> {
+    let session_id = header_string(&request, "x-session-id")?;
+    let sample_rate: u32 = header_string(&request, "x-sample-rate")?
+        .parse()
+        .map_err(|e| format!("invalid x-sample-rate header: {e}"))?;
+    let samples: Vec<f32> = match request.body() {
+        // The raw body is not guaranteed 4-byte aligned, so decode bytewise.
+        InvokeBody::Raw(bytes) => bytes
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
+            .collect(),
+        InvokeBody::Json(_) => return Err("expected raw PCM sample payload".to_string()),
+    };
+
     let tx = {
-        let sessions = lock_or_recover(&state.sessions);
+        let sessions = state.sessions.lock().expect("sessions mutex poisoned");
         sessions.get(&session_id).cloned()
-    }
-    .ok_or_else(|| format!("audio transcription session not found: {session_id}"))?;
+    };
+    let Some(tx) = tx else {
+        return Ok(false);
+    };
 
     let message = TranscriptionMessage::Samples {
         samples,
         sample_rate,
     };
-
     if tx.send(message).is_ok() {
-        return Ok(());
+        return Ok(true);
     }
 
-    let mut sessions = lock_or_recover(&state.sessions);
+    let mut sessions = state.sessions.lock().expect("sessions mutex poisoned");
     sessions.remove(&session_id);
-    Err(format!("audio transcription session closed: {session_id}"))
+    Ok(false)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn finish_audio_transcription(
     state: State<'_, TranscriptionState>,
     session_id: String,
 ) -> Result<(), String> {
     let tx = {
-        let sessions = lock_or_recover(&state.sessions);
+        let sessions = state.sessions.lock().expect("sessions mutex poisoned");
         sessions.get(&session_id).cloned()
     };
     if let Some(tx) = tx {
         if tx.try_send(TranscriptionMessage::Finish).is_err() {
-            let mut sessions = lock_or_recover(&state.sessions);
+            let mut sessions = state.sessions.lock().expect("sessions mutex poisoned");
             sessions.remove(&session_id);
         }
     }
     Ok(())
+}
+
+fn header_string(request: &Request<'_>, name: &str) -> Result<String, String> {
+    request
+        .headers()
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.to_string())
+        .ok_or_else(|| format!("missing {name} header"))
 }
 
 fn run_transcription_session(
@@ -183,7 +206,6 @@ fn run_transcription_session(
     paths: ModelPaths,
     session_id: String,
     element_id: String,
-    _mime_type: String,
     rx: mpsc::Receiver<TranscriptionMessage>,
 ) -> Result<(), String> {
     let scribble = get_or_init_scribble(&engine, paths)?;
@@ -196,64 +218,64 @@ fn run_transcription_session(
         incremental_min_window_seconds: 1,
     };
 
-    let result = {
-        let guard = lock_or_recover(&scribble);
-        let last_emitted_end_samples = Arc::new(AtomicU64::new(0));
-        let mut writer = TranscriptionEventWriter::new(
-            app,
-            session_id,
-            element_id,
-            last_emitted_end_samples.clone(),
-        );
-        let mut stream = guard
-            .backend()
-            .create_stream(&opts, &mut writer)
-            .map_err(|e| format!("create scribble stream: {e}"))?;
-        let mut resampler = PcmResampler::new();
-        let mut sent_samples_16k = 0u64;
+    let last_emitted_end_samples = Arc::new(AtomicU64::new(0));
+    let mut writer = TranscriptionEventWriter::new(
+        app,
+        session_id,
+        element_id,
+        last_emitted_end_samples.clone(),
+    );
+    let mut stream = scribble
+        .backend()
+        .create_stream(&opts, &mut writer)
+        .map_err(|e| format!("create scribble stream: {e}"))?;
+    let mut resampler = PcmResampler::new();
+    let mut sent_samples_16k = 0u64;
 
-        for message in rx {
-            match message {
-                TranscriptionMessage::Samples {
-                    samples,
-                    sample_rate,
-                } => {
-                    let samples_16k = resampler.push(&samples, sample_rate);
-                    if !samples_16k.is_empty() {
-                        sent_samples_16k =
-                            sent_samples_16k.saturating_add(samples_16k.len() as u64);
-                        stream
-                            .on_samples(&samples_16k)
-                            .map_err(|e| format!("transcribe samples: {e}"))?;
-                    }
+    loop {
+        match rx.recv_timeout(SESSION_IDLE_TIMEOUT) {
+            Ok(TranscriptionMessage::Samples {
+                samples,
+                sample_rate,
+            }) => {
+                let samples_16k = resampler.push(&samples, sample_rate);
+                if !samples_16k.is_empty() {
+                    sent_samples_16k = sent_samples_16k.saturating_add(samples_16k.len() as u64);
+                    stream
+                        .on_samples(&samples_16k)
+                        .map_err(|e| format!("transcribe samples: {e}"))?;
                 }
-                TranscriptionMessage::Finish => break,
             }
+            // Timeout and disconnect both mean the session is over.
+            Ok(TranscriptionMessage::Finish) | Err(_) => break,
         }
+    }
 
-        let pending_samples = sent_samples_16k.saturating_sub(
-            last_emitted_end_samples
-                .load(Ordering::Relaxed)
-                .min(sent_samples_16k),
-        );
-        if pending_samples >= MIN_FINAL_TRANSCRIPTION_SAMPLES {
-            stream
-                .finish()
-                .map_err(|e| format!("finish transcription stream: {e}"))?;
-        }
-        drop(stream);
-        writer
-            .close()
-            .map_err(|e| format!("close transcription encoder: {e}"))
-    };
-    result.map_err(|e| format!("transcribe audio: {e}"))
+    let pending_samples = sent_samples_16k.saturating_sub(
+        last_emitted_end_samples
+            .load(Ordering::Relaxed)
+            .min(sent_samples_16k),
+    );
+    if pending_samples >= MIN_FINAL_TRANSCRIPTION_SAMPLES {
+        stream
+            .finish()
+            .map_err(|e| format!("finish transcription stream: {e}"))?;
+    }
+    drop(stream);
+    writer
+        .close()
+        .map_err(|e| format!("close transcription encoder: {e}"))
 }
 
 fn get_or_init_scribble(
     engine: &ScribbleEngine,
     paths: ModelPaths,
 ) -> Result<SharedScribble, String> {
-    let mut guard = lock_or_recover(engine);
+    // A previous worker panic can leave the mutex poisoned even after the
+    // panic path resets the value to None, so recover the (valid) inner state.
+    let mut guard = engine
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     if let Some(scribble) = guard.as_ref() {
         return Ok(scribble.clone());
     }
@@ -263,7 +285,7 @@ fn get_or_init_scribble(
         paths.vad_model_path.to_string_lossy(),
     )
     .map_err(|e| format!("initialize scribble: {e}"))?;
-    let scribble = Arc::new(Mutex::new(scribble));
+    let scribble = Arc::new(scribble);
     *guard = Some(scribble.clone());
     Ok(scribble)
 }
@@ -275,18 +297,18 @@ struct ModelPaths {
 }
 
 fn resolve_model_paths(app: &AppHandle) -> Result<ModelPaths, String> {
-    let model_path = resolve_model_file_path(app, MODEL_PATH_ENV, DEFAULT_MODEL_FILE)?;
-    let vad_model_path = resolve_model_file_path(app, VAD_MODEL_PATH_ENV, DEFAULT_VAD_MODEL_FILE)?;
+    let model_path = bundled_model_path(app, DEFAULT_MODEL_FILE)?;
+    let vad_model_path = bundled_model_path(app, DEFAULT_VAD_MODEL_FILE)?;
 
     if !model_path.is_file() {
         return Err(format!(
-            "Scribble model missing at '{}'. Set {MODEL_PATH_ENV} or place the model in app data/{MODEL_DIR}.",
+            "Bundled scribble model missing at '{}' — check that resources/{MODEL_DIR} is present (git lfs pull).",
             model_path.display()
         ));
     }
     if !vad_model_path.is_file() {
         return Err(format!(
-            "Scribble VAD model missing at '{}'. Set {VAD_MODEL_PATH_ENV} or place the model in app data/{MODEL_DIR}.",
+            "Bundled scribble VAD model missing at '{}' — check that resources/{MODEL_DIR} is present (git lfs pull).",
             vad_model_path.display()
         ));
     }
@@ -297,23 +319,6 @@ fn resolve_model_paths(app: &AppHandle) -> Result<ModelPaths, String> {
     })
 }
 
-fn resolve_model_file_path(
-    app: &AppHandle,
-    env_var: &str,
-    file_name: &str,
-) -> Result<PathBuf, String> {
-    if let Some(path) = std::env::var_os(env_var).map(PathBuf::from) {
-        return Ok(path);
-    }
-
-    let bundled_path = bundled_model_path(app, file_name)?;
-    if bundled_path.is_file() {
-        return Ok(bundled_path);
-    }
-
-    app_model_path(app, file_name)
-}
-
 fn bundled_model_path(app: &AppHandle, file_name: &str) -> Result<PathBuf, String> {
     app.path()
         .resolve(
@@ -321,21 +326,6 @@ fn bundled_model_path(app: &AppHandle, file_name: &str) -> Result<PathBuf, Strin
             BaseDirectory::Resource,
         )
         .map_err(|e| format!("resolve bundled model path: {e}"))
-}
-
-fn app_model_path(app: &AppHandle, file_name: &str) -> Result<PathBuf, String> {
-    let app_data = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| format!("resolve app data dir: {e}"))?;
-    Ok(app_data.join(MODEL_DIR).join(file_name))
-}
-
-fn current_timestamp_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
 }
 
 fn panic_payload_message(panic: Box<dyn std::any::Any + Send>) -> String {
@@ -348,14 +338,7 @@ fn panic_payload_message(panic: Box<dyn std::any::Any + Send>) -> String {
     "unknown panic".to_string()
 }
 
-fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
 struct PcmResampler {
-    sample_rate: Option<u32>,
     input: Vec<f32>,
     position: f64,
 }
@@ -363,34 +346,26 @@ struct PcmResampler {
 impl PcmResampler {
     fn new() -> Self {
         Self {
-            sample_rate: None,
             input: Vec::new(),
             position: 0.0,
         }
     }
 
     fn push(&mut self, samples: &[f32], sample_rate: u32) -> Vec<f32> {
-        if sample_rate == 0 || samples.is_empty() {
+        if samples.is_empty() {
             return Vec::new();
         }
 
         if sample_rate == TARGET_SAMPLE_RATE {
-            self.reset();
-            return sanitize_samples(samples);
+            return samples
+                .iter()
+                .copied()
+                .filter_map(sanitize_sample)
+                .collect();
         }
 
-        if self.sample_rate != Some(sample_rate) {
-            self.reset();
-            self.sample_rate = Some(sample_rate);
-        }
-
-        self.input.extend(samples.iter().filter_map(|sample| {
-            if sample.is_finite() {
-                Some(sample.clamp(-1.0, 1.0))
-            } else {
-                None
-            }
-        }));
+        self.input
+            .extend(samples.iter().copied().filter_map(sanitize_sample));
 
         let mut output = Vec::new();
         let step = sample_rate as f64 / TARGET_SAMPLE_RATE as f64;
@@ -411,25 +386,14 @@ impl PcmResampler {
 
         output
     }
-
-    fn reset(&mut self) {
-        self.sample_rate = None;
-        self.input.clear();
-        self.position = 0.0;
-    }
 }
 
-fn sanitize_samples(samples: &[f32]) -> Vec<f32> {
-    samples
-        .iter()
-        .filter_map(|sample| {
-            if sample.is_finite() {
-                Some(sample.clamp(-1.0, 1.0))
-            } else {
-                None
-            }
-        })
-        .collect()
+fn sanitize_sample(sample: f32) -> Option<f32> {
+    if sample.is_finite() {
+        Some(sample.clamp(-1.0, 1.0))
+    } else {
+        None
+    }
 }
 
 struct TranscriptionEventWriter {
