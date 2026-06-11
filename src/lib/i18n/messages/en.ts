@@ -376,6 +376,8 @@ const en = {
         description:
           'Permit agents to create page frames and replace page-frame Markdown.',
       },
+      startFailed: (port: number) =>
+        `Couldn't start the MCP server on port ${port}`,
     },
     keybinds: {
       title: 'Keybinds',

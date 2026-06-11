@@ -1,6 +1,8 @@
 import { useEffect, useEffectEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { toast } from 'sonner';
+import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { noteIndexService } from '@/lib/note-index';
 import { useRepository } from '@/lib/sync';
@@ -41,9 +43,17 @@ async function respond(
 
 export function McpRuntime() {
   const repository = useRepository();
+  const strings = useMessages();
   const enabled = useUserPref('mcpEnabled');
   const port = useUserPref('mcpPort');
   const allowDirectWrites = useUserPref('mcpAllowDirectWrites');
+
+  const handleStartFailed = useEffectEvent((error: unknown) => {
+    logger.error('Failed to start MCP server', error, { port });
+    toast.error(strings.settings.mcp.startFailed(port), {
+      description: errorMessage(error),
+    });
+  });
 
   const handleToolCall = useEffectEvent((payload: McpBridgeToolCallPayload) => {
     const service = new McpToolService({
@@ -87,7 +97,7 @@ export function McpRuntime() {
     }
 
     void enqueue(start).catch((error) => {
-      logger.error('Failed to start MCP server', error, { port });
+      handleStartFailed(error);
     });
 
     return () => {

@@ -381,6 +381,8 @@ const es: typeof en = {
         description:
           'Permite que los agentes creen marcos de página y reemplacen Markdown de marcos de página.',
       },
+      startFailed: (port: number) =>
+        `No se pudo iniciar el servidor MCP en el puerto ${port}`,
     },
     keybinds: {
       title: 'Atajos de teclado',

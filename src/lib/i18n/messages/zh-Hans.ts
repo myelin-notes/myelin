@@ -362,6 +362,7 @@ const zhHans: typeof en = {
         label: '允许直接 MCP 写入',
         description: '允许代理创建页面框并替换页面框 Markdown。',
       },
+      startFailed: (port: number) => `无法在端口 ${port} 上启动 MCP 服务器`,
     },
     keybinds: {
       title: '快捷键',
