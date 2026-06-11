@@ -63,22 +63,56 @@ Reuse only the canvas pieces that are already general enough:
   content-bound clamping.
 - The existing requestAnimationFrame loop pattern from the canvas page.
 
+Before graph code imports `CanvasViewport`, decouple it from `DrawableCanvas`:
+
+- Move the shared `Vector2` type out of `drawable-canvas.ts` into a neutral
+  canvas-local file, or make `canvas-viewport.ts` define the type itself.
+- Keep edit-mode behavior dormant for the graph view. The graph controller
+  should use normal pan/zoom only and must not import `DrawableCanvas`.
+- Do not move graph code into `src/pages/canvas/`; the shared direction is from
+  graph to the small canvas viewport utility, not into the note editor engine.
+
 Do not reuse `DrawableCanvas` directly. It is coupled to Yjs note elements,
 editing tools, selection handles, DOM overlays, and note-specific commands.
 
 ## Repository Data
 
 The current repository API exposes backlinks for one note. A global graph needs
-one efficient read, so add a concrete method similar to:
+one efficient read, so add this concrete method:
 
 ```ts
-getNoteGraph(): Promise<NoteGraphSource>
+getNoteGraph(): Promise<RepositoryNoteGraph>
 ```
 
-The repository-facing source type should live beside the repository interface if
-TypeScript needs a named contract there. Render and layout types stay
-feature-local under `src/pages/graph/`; the repository layer must not import
-from a page module.
+The repository-facing source types should live beside the repository interface.
+Render and layout types stay feature-local under `src/pages/graph/`; the
+repository layer must not import from a page module.
+
+Concrete repository projection:
+
+```ts
+export interface RepositoryNoteGraphNode {
+  id: VFSNodeId;
+  name: string;
+}
+
+export interface RepositoryNoteGraphLink {
+  sourceId: VFSNodeId;
+  targetId: VFSNodeId | null;
+  pageFrameId: string | null;
+  title: string;
+  snippet: string;
+}
+
+export interface RepositoryNoteGraph {
+  nodes: RepositoryNoteGraphNode[];
+  links: RepositoryNoteGraphLink[];
+}
+```
+
+This is a read-only projection from the existing manifest. It does not require
+a manifest migration and should not expose full manifest nodes to the graph
+builder.
 
 The source data should include:
 
@@ -106,6 +140,16 @@ The graph canvas should own a lightweight force layout:
 - Nodes are drawn as circles with labels at readable zoom levels.
 - Edge arrows or direction cues can be subtle; the inspector carries precise
   direction details.
+
+V1 performance constraints:
+
+- Optimize for small and medium workspaces up to roughly 250 canvas notes.
+- Stop or cool the simulation once average node movement is below a small
+  threshold for several frames.
+- For larger graphs, run fewer simulation ticks per frame, hide labels until
+  zoomed in, and show a compact notice that layout may settle more slowly.
+- Do not add worker-based layout, virtualization, or spatial indexing in v1
+  unless testing shows the simpler loop cannot stay interactive.
 
 Rendering should be DPR-aware and clear/redraw each frame. Hit testing should
 run in world coordinates and use a screen-space minimum radius so nodes remain
@@ -144,7 +188,9 @@ iteration can also open the same tab focused on the current note.
 - Wheel or trackpad: pan, matching canvas behavior.
 - Pinch or ctrl-wheel: zoom.
 - Fit button: animate viewport to graph bounds.
-- Search: highlight and center the matched note when selected.
+- Search: show matching note results from the current graph; selecting a result
+  centers and selects that node. A no-match state shows compact inline text and
+  does not change the current graph selection.
 - Keyboard: Escape clears selection, Enter opens the selected note when focus is
   on the graph canvas or inspector action.
 
@@ -153,6 +199,8 @@ iteration can also open the same tab focused on the current note.
 - No canvas notes: show a quiet empty state with an action back to Library.
 - Canvas notes but no links: show isolated nodes and explain that explicit note
   links will connect them.
+- Stale or unresolved link targets: exclude them from graph edges and graph
+  counts in v1. Do not warn unless the repository graph load itself fails.
 - Repository setup unavailable: match Library's repository setup messaging.
 - Graph load failure: log through `Logger` and show a compact retry state.
 
@@ -173,6 +221,14 @@ Repository tests:
 - Cached repository delegates the graph API correctly.
 - GitHub repository behavior follows existing repository parity expectations.
 
+Tab and command tests:
+
+- `TabTarget` supports `graph`, and target equality treats graph tabs as a
+  single workspace-level tab.
+- `PaneContent` routes a graph tab to `GraphPage`.
+- Command palette exposes an Open Graph command on the right pages and opens the
+  graph tab through the tab controller.
+
 Controller tests where practical:
 
 - Hit testing selects the nearest node within clickable radius.
@@ -181,11 +237,26 @@ Controller tests where practical:
 
 Manual Tauri verification:
 
+- Run final UI verification in the Tauri app using Tauri MCP where available,
+  or computer use if Tauri MCP cannot attach. Browser or Playwright verification
+  can supplement unit checks but does not satisfy the project requirement.
 - Open Graph tab from Library or command palette.
 - Pan and zoom the canvas.
 - Select a node and verify inspector counts/lists.
 - Double-click a node and verify the note opens.
-- Verify empty and no-link states using test repositories.
+- Verify empty, no-link, duplicate-link, stale-link, and resolved-link states
+  using small fixture repositories.
+
+## Implementation Success Criteria
+
+- Graph data loads from a single repository graph projection, not from repeated
+  backlink calls or document parsing during render.
+- Graph-specific render/layout code lives under `src/pages/graph/`.
+- The repository layer does not import from `src/pages/graph/`.
+- `CanvasViewport` reuse does not introduce a dependency on `DrawableCanvas`.
+- Explicit links produce directed graph edges; tags and folders produce none.
+- Tab and command palette integration are covered by tests.
+- Final UI behavior is verified in Tauri, not browser-only tooling.
 
 ## Implementation Notes
 
