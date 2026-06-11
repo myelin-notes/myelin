@@ -44,6 +44,9 @@ const PREFS = {
     'always-rename-note-references',
     false,
   ),
+  mcpEnabled: pref<boolean>('mcp-enabled', false),
+  mcpPort: pref<number>('mcp-port', 3846),
+  mcpAllowDirectWrites: pref<boolean>('mcp-allow-direct-writes', false),
   language: pref<string>('language', 'en'),
   repositoryConfig: pref<RepositoryConfig>('repository-config', {
     kind: 'local',

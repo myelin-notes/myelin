@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod iroh_transport;
+mod mcp_server;
 mod note_index;
 mod pdf_export;
 
@@ -22,6 +23,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .manage(iroh_transport::IrohState::new())
+        .manage(mcp_server::McpServerState::new())
         .manage(note_index::IndexEngineState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
@@ -29,6 +31,10 @@ pub fn run() {
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
             pdf_export::export_pdf,
+            mcp_server::mcp_start,
+            mcp_server::mcp_stop,
+            mcp_server::mcp_status,
+            mcp_server::mcp_respond,
             note_index::reindex_note,
             note_index::reindex_batch,
             note_index::remove_index,

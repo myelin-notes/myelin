@@ -361,6 +361,30 @@ const es: typeof en = {
         },
       },
     },
+    mcp: {
+      title: 'Model Context Protocol',
+      eyebrow: 'Agentes de IA',
+      enabled: {
+        label: 'Habilitar servidor MCP local',
+        description:
+          'Expone esta app de Myelin en ejecución a agentes de IA locales en 127.0.0.1.',
+      },
+      port: {
+        label: 'Puerto local',
+        description:
+          'El servidor se reinicia en el nuevo puerto al salir del campo.',
+      },
+      endpoint: {
+        label: 'Endpoint',
+      },
+      directWrites: {
+        label: 'Permitir escrituras MCP directas',
+        description:
+          'Permite que los agentes creen marcos de página y reemplacen Markdown de marcos de página.',
+      },
+      startFailed: (port: number) =>
+        `No se pudo iniciar el servidor MCP en el puerto ${port}`,
+    },
     keybinds: {
       title: 'Atajos de teclado',
       resetAll: 'Restablecer todo',
