@@ -5,7 +5,7 @@ import type {
   PdfExportRequest,
 } from '@/lib/pdf-export/contract';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
-import type { Vector2 } from './drawable-canvas';
+import type { Vector2 } from './geometry';
 import type { DrawableElement } from './elements/drawable-element';
 import type { PdfPageSize } from './pdf-renderer';
 

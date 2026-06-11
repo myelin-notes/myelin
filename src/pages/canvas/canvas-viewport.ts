@@ -1,5 +1,5 @@
 import { type AnimationPlaybackControls, animate } from 'motion';
-import type { Vector2 } from './drawable-canvas';
+import type { Vector2 } from './geometry';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
 

@@ -26,8 +26,9 @@ import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
 import type { ITool } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
+import type { Vector2 } from './geometry';
 
-export type Vector2 = { x: number; y: number };
+export type { Vector2 } from './geometry';
 
 export interface PlacementGhost {
   /** Bounds of the ghost rectangle, relative to the pointer's world position. */

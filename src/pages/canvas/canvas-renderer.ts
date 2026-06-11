@@ -1,6 +1,6 @@
 import { UserPrefs } from '@/lib/user-prefs';
 import type { CanvasViewport } from './canvas-viewport';
-import type { Vector2 } from './drawable-canvas';
+import type { Vector2 } from './geometry';
 import type { DrawableElement } from './elements/drawable-element';
 import type { PlacementController } from './placement-controller';
 import type { ITool } from './tools/tool';
