@@ -17,6 +17,7 @@ function commandIdsForPage(currentPage: CommandPalettePage): string[] {
     isRefreshingRepository: false,
     canRefreshRepository: false,
     createNote: async () => {},
+    openGraph: () => {},
     openPalette: () => {},
     refreshRepository: async () => {},
     toggleLibraryView: () => {},
@@ -35,6 +36,7 @@ describe('commandPalettePageFromTabTarget', () => {
     expect(
       commandPalettePageFromTabTarget({ type: 'canvas', id: 'note-1' }),
     ).toBe('canvas');
+    expect(commandPalettePageFromTabTarget({ type: 'graph' })).toBe('graph');
     expect(commandPalettePageFromTabTarget({ type: 'settings' })).toBe(
       'settings',
     );
@@ -50,7 +52,11 @@ describe('commandPalettePageFromTabTarget', () => {
 
 describe('createCommandPaletteItems', () => {
   it('keeps global commands available on every page', () => {
-    expect(commandIdsForPage('settings')).toEqual(['open-note', 'create-note']);
+    expect(commandIdsForPage('settings')).toEqual([
+      'open-note',
+      'create-note',
+      'open-graph',
+    ]);
   });
 
   it('shows library commands only on the library page', () => {
@@ -71,6 +77,7 @@ describe('createCommandPaletteItems', () => {
       isRefreshingRepository: false,
       canRefreshRepository: true,
       createNote: async () => {},
+      openGraph: () => {},
       openPalette: () => {},
       refreshRepository: async () => {},
       toggleLibraryView: () => {},
@@ -104,6 +111,7 @@ describe('createCommandPaletteItems', () => {
       isRefreshingRepository: false,
       canRefreshRepository: false,
       createNote: async () => {},
+      openGraph: () => {},
       openPalette: () => {},
       refreshRepository: async () => {},
       toggleLibraryView: () => {},
@@ -126,5 +134,29 @@ describe('createCommandPaletteItems', () => {
 
     items.find((item) => item.id === 'action:canvas:undo')?.onSelect();
     expect(triggered).toEqual(['canvas:undo']);
+  });
+
+  it('opens graph from command items', () => {
+    const opened: string[] = [];
+    const items = createCommandPaletteItems({
+      activeKeybindingActions: [],
+      currentPage: 'library',
+      strings: en,
+      isImportingMarkdown: false,
+      isRefreshingRepository: false,
+      canRefreshRepository: false,
+      createNote: async () => {},
+      openGraph: () => opened.push('graph'),
+      openPalette: () => {},
+      refreshRepository: async () => {},
+      toggleLibraryView: () => {},
+      triggerKeybindingAction: () => {},
+      triggerCanvasMarkdownImport: () => {},
+      triggerLibraryMarkdownImport: () => {},
+    });
+
+    items.find((item) => item.id === 'open-graph')?.onSelect();
+
+    expect(opened).toEqual(['graph']);
   });
 });

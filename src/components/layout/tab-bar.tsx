@@ -1,5 +1,13 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import { BookOpen, Columns2, Plus, Rows2, Settings, X } from 'lucide-react';
+import {
+  BookOpen,
+  Columns2,
+  Network,
+  Plus,
+  Rows2,
+  Settings,
+  X,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ContextMenu,
@@ -35,6 +43,8 @@ function tabIcon(target: TabTarget) {
   switch (target.type) {
     case 'library':
       return <BookOpen className="size-3 shrink-0" />;
+    case 'graph':
+      return <Network className="size-3 shrink-0" />;
     case 'settings':
       return <Settings className="size-3 shrink-0" />;
     default:

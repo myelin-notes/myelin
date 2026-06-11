@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { Tab } from '@/lib/tabs/types';
 import { CanvasView } from '@/pages/canvas';
+import { GraphPage } from '@/pages/graph';
 import { ImageViewerPage } from '@/pages/image-viewer';
 import { LibraryPage } from '@/pages/library';
 import { SettingsPage } from '@/pages/settings';
@@ -15,6 +16,8 @@ export const PaneContent = memo(function PaneContent({
   switch (tab.target.type) {
     case 'library':
       return <LibraryPage />;
+    case 'graph':
+      return <GraphPage />;
     case 'settings':
       return <SettingsPage />;
     case 'canvas':

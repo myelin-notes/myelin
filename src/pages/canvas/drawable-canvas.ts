@@ -17,6 +17,7 @@ import {
 import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
+import type { Vector2 } from './geometry';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
 import { PlacementController } from './placement-controller';
 import { EraserTool } from './tools/eraser-tool';
@@ -26,7 +27,6 @@ import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
 import type { ITool } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
-import type { Vector2 } from './geometry';
 
 export type { Vector2 } from './geometry';
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { NoteGraph } from './types';
 import {
   createGraphLayout,
   getGraphBounds,
   hitTestGraphNode,
   tickGraphLayout,
 } from './graph-canvas-controller';
+import type { NoteGraph } from './types';
 
 const graph: NoteGraph = {
   nodes: [
@@ -32,7 +32,9 @@ describe('graph layout helpers', () => {
     const first = createGraphLayout(graph);
     const second = createGraphLayout(graph);
 
-    expect(first.nodes.map((node) => ({ id: node.id, x: node.x, y: node.y }))).toEqual(
+    expect(
+      first.nodes.map((node) => ({ id: node.id, x: node.x, y: node.y })),
+    ).toEqual(
       second.nodes.map((node) => ({ id: node.id, x: node.x, y: node.y })),
     );
   });
@@ -44,7 +46,9 @@ describe('graph layout helpers', () => {
     expect(hitTestGraphNode(layout, { x: node.x + 4, y: node.y }, 1)?.id).toBe(
       node.id,
     );
-    expect(hitTestGraphNode(layout, { x: node.x + 80, y: node.y }, 1)).toBeNull();
+    expect(
+      hitTestGraphNode(layout, { x: node.x + 80, y: node.y }, 1),
+    ).toBeNull();
   });
 
   it('computes graph bounds including node radius', () => {

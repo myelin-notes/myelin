@@ -59,12 +59,12 @@ describe('buildNoteGraph', () => {
   it('precomputes incoming and outgoing edge lists for the inspector', () => {
     const graph = buildNoteGraph(source);
 
-    expect(graph.nodesById.get('a')?.outgoingEdges.map((edge) => edge.id)).toEqual([
-      'a->b',
-    ]);
-    expect(graph.nodesById.get('b')?.incomingEdges.map((edge) => edge.id)).toEqual([
-      'a->b',
-    ]);
+    expect(
+      graph.nodesById.get('a')?.outgoingEdges.map((edge) => edge.id),
+    ).toEqual(['a->b']);
+    expect(
+      graph.nodesById.get('b')?.incomingEdges.map((edge) => edge.id),
+    ).toEqual(['a->b']);
     expect(graph.nodesById.get('c')?.incomingEdges).toEqual([]);
   });
 });

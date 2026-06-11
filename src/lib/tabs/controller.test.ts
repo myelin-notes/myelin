@@ -119,6 +119,22 @@ describe('TabStateController', () => {
     expectValidWindowState(controller.getSnapshot());
   });
 
+  it('reuses the workspace graph tab in the same pane', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+
+    const firstId = controller.openTab({ type: 'graph' }, 'Graph', paneId);
+    const secondId = controller.openTab(
+      { type: 'graph' },
+      'Graph again',
+      paneId,
+    );
+
+    expect(secondId).toBe(firstId);
+    expect(tabTitles(rootPane(controller))).toEqual(['Library', 'Graph again']);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
   it('replaces the last closed pane with a valid default state', () => {
     const controller = new TabStateController();
     const pane = focusedPane(controller);

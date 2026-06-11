@@ -16,8 +16,8 @@ import { renameNoteReferences } from './rename-note-references';
 import {
   createEmptyManifest,
   createFileNode,
-  getNoteGraph,
   getNoteFileName,
+  getNoteGraph,
   getStoredFileName,
   MANIFEST_PATH,
 } from './shared';

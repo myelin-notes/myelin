@@ -39,6 +39,10 @@ const es: typeof en = {
         label: 'Crear nota',
         description: 'Crear un lienzo en la raíz de la biblioteca',
       },
+      openGraph: {
+        label: 'Abrir grafo',
+        description: 'Mapear enlaces explícitos entre notas de lienzo',
+      },
       importMarkdown: {
         label: 'Importar Markdown',
         description: 'Crear un lienzo desde un archivo Markdown',
@@ -201,6 +205,23 @@ const es: typeof en = {
       createNew: 'Crear nueva etiqueta',
       placeholder: 'Nombre de la etiqueta...',
     },
+  },
+  graph: {
+    title: 'Grafo',
+    explicitLinks: 'Enlaces explícitos',
+    searchPlaceholder: 'Buscar en el grafo...',
+    fit: 'Ajustar',
+    openNote: 'Abrir nota',
+    emptySelection: 'Selecciona una nota para inspeccionar sus enlaces.',
+    noCanvasNotes: 'Aún no hay notas de lienzo.',
+    noLinks: 'Agrega enlaces explícitos entre notas para conectar este grafo.',
+    loadFailed: 'No se pudo cargar el grafo.',
+    outgoing: 'Enlaces salientes',
+    backlinks: 'Backlinks',
+    graphStats: (notes: number, links: number) =>
+      `${notes} nota${notes === 1 ? '' : 's'}, ${links} enlace${links === 1 ? '' : 's'}`,
+    linkCount: (incoming: number, outgoing: number) =>
+      `${outgoing} salientes, ${incoming} backlink${incoming === 1 ? '' : 's'}`,
   },
   versionHistory: {
     title: 'Historial de versiones',

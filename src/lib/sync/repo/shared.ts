@@ -610,7 +610,9 @@ export function getBacklinks(
 function isGraphCanvasNode(
   node: VFSNode | null | undefined,
 ): node is VFSFileNode {
-  return node?.type === 'file' && node.fileType === 'mcanvas' && !isSystemNode(node);
+  return (
+    node?.type === 'file' && node.fileType === 'mcanvas' && !isSystemNode(node)
+  );
 }
 
 export function getNoteGraph(manifest: VFSManifest): RepositoryNoteGraph {

@@ -3,6 +3,7 @@ import {
   FileText,
   Grid2X2,
   Keyboard,
+  Network,
   Plus,
   RefreshCw,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ export interface CommandPaletteItemContext {
   isRefreshingRepository: boolean;
   canRefreshRepository: boolean;
   createNote: () => Promise<void>;
+  openGraph: () => void;
   openPalette: (mode: CommandPaletteMode) => void;
   refreshRepository: () => void;
   toggleLibraryView: () => void;
@@ -44,6 +46,7 @@ export function createCommandPaletteItems({
   isRefreshingRepository,
   canRefreshRepository,
   createNote,
+  openGraph,
   openPalette,
   refreshRepository,
   toggleLibraryView,
@@ -69,6 +72,15 @@ export function createCommandPaletteItems({
       section: strings.commandPalette.sections.commands,
       icon: Plus,
       onSelect: createNote,
+    },
+    {
+      id: 'open-graph',
+      label: strings.commandPalette.commands.openGraph.label,
+      description: strings.commandPalette.commands.openGraph.description,
+      keywords: ['graph', 'map', 'links', 'backlinks'],
+      section: strings.commandPalette.sections.commands,
+      icon: Network,
+      onSelect: openGraph,
     },
     {
       id: 'import-markdown-library',
@@ -142,6 +154,8 @@ export function commandPalettePageFromTabTarget(
   switch (target.type) {
     case 'library':
       return 'library';
+    case 'graph':
+      return 'graph';
     case 'canvas':
       return 'canvas';
     case 'settings':

@@ -39,6 +39,10 @@ const zhHans: typeof en = {
         label: '创建笔记',
         description: '在资料库根目录创建新画布',
       },
+      openGraph: {
+        label: '打开图谱',
+        description: '映射画布笔记之间的显式链接',
+      },
       importMarkdown: {
         label: '导入 Markdown',
         description: '从 Markdown 文件创建画布',
@@ -193,6 +197,23 @@ const zhHans: typeof en = {
       createNew: '创建新标签',
       placeholder: '标签名称...',
     },
+  },
+  graph: {
+    title: '图谱',
+    explicitLinks: '显式链接',
+    searchPlaceholder: '搜索图谱...',
+    fit: '适应',
+    openNote: '打开笔记',
+    emptySelection: '选择一条笔记以查看它的链接。',
+    noCanvasNotes: '还没有画布笔记。',
+    noLinks: '添加显式笔记链接来连接此图谱。',
+    loadFailed: '无法加载图谱。',
+    outgoing: '传出链接',
+    backlinks: '反向链接',
+    graphStats: (notes: number, links: number) =>
+      `${notes} 条笔记，${links} 条链接`,
+    linkCount: (incoming: number, outgoing: number) =>
+      `${outgoing} 条传出，${incoming} 条反向链接`,
   },
   versionHistory: {
     title: '版本历史',

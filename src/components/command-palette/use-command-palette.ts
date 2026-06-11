@@ -152,6 +152,11 @@ export function useCommandPalette(): {
     strings.library.createNew.untitledCanvas,
   ]);
 
+  const openGraph = useCallback(() => {
+    closePalette();
+    tabController.openTab({ type: 'graph' }, strings.graph.title);
+  }, [closePalette, strings.graph.title, tabController]);
+
   const toggleLibraryView = useCallback(() => {
     closePalette();
     const current = UserPrefs.get('explorerViewMode');
@@ -278,6 +283,7 @@ export function useCommandPalette(): {
         isRefreshingRepository,
         canRefreshRepository,
         createNote,
+        openGraph,
         openPalette,
         refreshRepository,
         toggleLibraryView,
@@ -292,6 +298,7 @@ export function useCommandPalette(): {
       currentPage,
       isImportingMarkdown,
       isRefreshingRepository,
+      openGraph,
       openPalette,
       refreshRepository,
       strings,
