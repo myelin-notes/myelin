@@ -31,7 +31,11 @@ pub fn run() {
                     }
                     webview.connect_permission_request(|_, request| {
                         if let Some(request) = request.downcast_ref::<UserMediaPermissionRequest>() {
-                            request.allow();
+                            if request.is_for_audio_device() && !request.is_for_video_device() {
+                                request.allow();
+                            } else {
+                                request.deny();
+                            }
                             true
                         } else {
                             false
