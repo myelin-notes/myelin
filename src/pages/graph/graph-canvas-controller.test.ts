@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   createGraphLayout,
   getGraphBounds,
+  graphEdgeAlpha,
+  graphNodeRadius,
   hitTestGraphNode,
+  shouldDrawGraphNodeLabel,
   tickGraphLayout,
 } from './graph-canvas-controller';
 import type { NoteGraph } from './types';
@@ -26,6 +29,20 @@ const graph: NoteGraph = {
 
 graph.nodesById.set('a', graph.nodes[0]);
 graph.nodesById.set('b', graph.nodes[1]);
+
+function graphWithNodeCount(totalNodes: number): NoteGraph {
+  const nodes = Array.from({ length: totalNodes }, (_, index) => ({
+    id: `node-${index}`,
+    name: `Node ${index}`,
+    incomingEdges: [],
+    outgoingEdges: [],
+  }));
+  return {
+    nodes,
+    edges: [],
+    nodesById: new Map(nodes.map((node) => [node.id, node])),
+  };
+}
 
 describe('graph layout helpers', () => {
   it('creates deterministic node positions', () => {
@@ -66,5 +83,30 @@ describe('graph layout helpers', () => {
     tickGraphLayout(layout, 1 / 60);
 
     expect(layout.alpha).toBeLessThan(initialAlpha);
+  });
+
+  it('scales visual weight down for dense graphs', () => {
+    expect(graphNodeRadius(1000)).toBeLessThan(graphNodeRadius(20));
+    expect(graphEdgeAlpha(1000)).toBeLessThan(graphEdgeAlpha(20));
+    expect(createGraphLayout(graphWithNodeCount(1000)).nodes[0].radius).toBe(
+      graphNodeRadius(1000),
+    );
+  });
+
+  it('keeps dense graph labels focused on selected nodes', () => {
+    expect(
+      shouldDrawGraphNodeLabel({
+        selected: false,
+        totalNodes: 1000,
+        zoom: 3,
+      }),
+    ).toBe(false);
+    expect(
+      shouldDrawGraphNodeLabel({
+        selected: true,
+        totalNodes: 1000,
+        zoom: 0.2,
+      }),
+    ).toBe(true);
   });
 });

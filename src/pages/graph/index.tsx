@@ -102,8 +102,13 @@ export function GraphPage() {
     }
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    const width = Math.max(1, Math.floor(rect.width * dpr));
+    const height = Math.max(1, Math.floor(rect.height * dpr));
+    if (canvas.width === width && canvas.height === height) {
+      return;
+    }
+    canvas.width = width;
+    canvas.height = height;
   }, []);
 
   useEffect(() => {
@@ -197,7 +202,7 @@ export function GraphPage() {
   );
 
   return (
-    <div className="grid h-full w-full grid-cols-1 overflow-hidden bg-page lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid h-full w-full grid-cols-1 grid-rows-[minmax(0,1fr)_13rem] overflow-hidden bg-page lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[minmax(0,1fr)]">
       <section className="relative min-h-0 min-w-0">
         <div className="pointer-events-none absolute top-6 left-8 z-10">
           <h1 className="font-heading font-normal text-4xl text-text-primary leading-none">
@@ -235,6 +240,7 @@ export function GraphPage() {
                 type="button"
                 onClick={() => {
                   setSelectedId(node.id);
+                  controllerRef.current?.focusNode(node.id);
                   setQuery('');
                 }}
                 className="rounded-lg px-3 py-2 text-left text-sm text-text-secondary hover:bg-hover-tint hover:text-text-primary"

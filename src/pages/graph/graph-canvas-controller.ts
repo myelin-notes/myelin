@@ -2,7 +2,9 @@ import { CanvasViewport } from '@/pages/canvas/canvas-viewport';
 import type { Vector2 } from '@/pages/canvas/geometry';
 import type { NoteGraph, NoteGraphEdge, NoteGraphNode } from './types';
 
-const NODE_RADIUS = 30;
+const SMALL_GRAPH_NODE_RADIUS = 24;
+const DENSE_GRAPH_NODE_RADIUS = 8;
+const DENSE_GRAPH_NODE_COUNT = 250;
 const MIN_HIT_RADIUS_SCREEN = 14;
 const LINK_DISTANCE = 150;
 const REPULSION = 9000;
@@ -54,7 +56,50 @@ function initialPosition(id: string, index: number, total: number): Vector2 {
   };
 }
 
+export function graphNodeRadius(totalNodes: number): number {
+  if (totalNodes <= 100) {
+    return SMALL_GRAPH_NODE_RADIUS;
+  }
+  if (totalNodes >= 1000) {
+    return DENSE_GRAPH_NODE_RADIUS;
+  }
+
+  const density = (totalNodes - 100) / 900;
+  return SMALL_GRAPH_NODE_RADIUS - density * 16;
+}
+
+export function graphEdgeAlpha(totalNodes: number): number {
+  if (totalNodes <= 100) {
+    return 0.68;
+  }
+  if (totalNodes >= 1000) {
+    return 0.3;
+  }
+
+  const density = (totalNodes - 100) / 900;
+  return 0.68 - density * 0.38;
+}
+
+export function shouldDrawGraphNodeLabel({
+  selected,
+  totalNodes,
+  zoom,
+}: {
+  selected: boolean;
+  totalNodes: number;
+  zoom: number;
+}): boolean {
+  if (selected) {
+    return true;
+  }
+  if (totalNodes > DENSE_GRAPH_NODE_COUNT) {
+    return false;
+  }
+  return zoom >= (totalNodes > 100 ? 1.2 : 0.45);
+}
+
 export function createGraphLayout(graph: NoteGraph): GraphLayout {
+  const nodeRadius = graphNodeRadius(graph.nodes.length);
   const nodes = graph.nodes.map((node, index) => {
     const point = initialPosition(node.id, index, graph.nodes.length);
     return {
@@ -64,7 +109,7 @@ export function createGraphLayout(graph: NoteGraph): GraphLayout {
       y: point.y,
       vx: 0,
       vy: 0,
-      radius: NODE_RADIUS,
+      radius: nodeRadius,
       source: node,
     };
   });
@@ -198,6 +243,19 @@ export class GraphCanvasController {
     });
   }
 
+  public focusNode(id: string): void {
+    const node = this.layout.nodes.find((candidate) => candidate.id === id);
+    if (!node) {
+      return;
+    }
+
+    const size = Math.max(220, node.radius * 16);
+    this.viewport.animateViewToFitRect(
+      new DOMRect(node.x - size / 2, node.y - size / 2, size, size),
+      { widthRatio: 0.42, heightRatio: 0.42 },
+    );
+  }
+
   public redraw(deltaTime: number): void {
     tickGraphLayout(this.layout, deltaTime);
     this.draw();
@@ -225,8 +283,8 @@ export class GraphCanvasController {
   }
 
   private drawEdges(): void {
-    this.ctx.strokeStyle = 'rgba(141, 154, 167, 0.72)';
-    this.ctx.lineWidth = 1.4 / this.viewport.zoom;
+    this.ctx.strokeStyle = `rgba(141, 154, 167, ${graphEdgeAlpha(this.layout.nodes.length)})`;
+    this.ctx.lineWidth = 1.1 / this.viewport.zoom;
     for (const edge of this.layout.edges) {
       this.ctx.beginPath();
       this.ctx.moveTo(edge.source.x, edge.source.y);
@@ -239,16 +297,45 @@ export class GraphCanvasController {
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
     this.ctx.font = `${12 / this.viewport.zoom}px Inter, sans-serif`;
+    const totalNodes = this.layout.nodes.length;
     for (const node of this.layout.nodes) {
       const selected = node.id === this.selectedId;
-      this.ctx.fillStyle = selected ? '#1c2738' : '#ffffff';
+      const radius = selected
+        ? Math.max(node.radius + 4, node.radius * 1.4)
+        : node.radius;
+      this.ctx.fillStyle = selected ? '#1c2738' : 'rgba(255, 255, 255, 0.95)';
       this.ctx.beginPath();
-      this.ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+      this.ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
       this.ctx.fill();
-      if (this.viewport.zoom >= 0.45) {
-        this.ctx.fillStyle = selected ? '#ffffff' : '#43474a';
-        this.ctx.fillText(node.label, node.x, node.y);
+      this.ctx.strokeStyle = selected
+        ? 'rgba(28, 39, 56, 0.42)'
+        : 'rgba(141, 154, 167, 0.2)';
+      this.ctx.lineWidth = selected
+        ? 1.4 / this.viewport.zoom
+        : 0.8 / this.viewport.zoom;
+      this.ctx.stroke();
+      if (
+        shouldDrawGraphNodeLabel({
+          selected,
+          totalNodes,
+          zoom: this.viewport.zoom,
+        })
+      ) {
+        this.drawNodeLabel(node, selected, radius);
       }
     }
+  }
+
+  private drawNodeLabel(
+    node: GraphLayoutNode,
+    selected: boolean,
+    radius: number,
+  ): void {
+    const y = selected ? node.y - radius - 10 / this.viewport.zoom : node.y;
+    this.ctx.lineWidth = 3 / this.viewport.zoom;
+    this.ctx.strokeStyle = 'rgba(247, 249, 251, 0.9)';
+    this.ctx.strokeText(node.label, node.x, y);
+    this.ctx.fillStyle = selected ? '#1c2738' : '#43474a';
+    this.ctx.fillText(node.label, node.x, y);
   }
 }
