@@ -10,6 +10,15 @@ import type { McpBridgeToolCallPayload } from './types';
 
 const logger = new Logger('McpRuntime');
 
+// Serializes mcp_start/mcp_stop so a cleanup's stop can never overtake the
+// next effect run's start (and vice versa) — Tauri invokes are not ordered.
+let queue: Promise<unknown> = Promise.resolve();
+function enqueue<T>(op: () => Promise<T>): Promise<T> {
+  const next = queue.then(op, op);
+  queue = next.catch(() => {});
+  return next;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -77,14 +86,14 @@ export function McpRuntime() {
       logger.info('Started MCP server', { port });
     }
 
-    void start().catch((error) => {
+    void enqueue(start).catch((error) => {
       logger.error('Failed to start MCP server', error, { port });
     });
 
     return () => {
       disposed = true;
       unlisten?.();
-      void invoke('mcp_stop').catch((error) => {
+      void enqueue(() => invoke('mcp_stop')).catch((error) => {
         logger.error('Failed to stop MCP server', error);
       });
     };
