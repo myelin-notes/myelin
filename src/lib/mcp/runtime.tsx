@@ -5,7 +5,7 @@ import { Logger } from '@/lib/logger';
 import { noteIndexService } from '@/lib/note-index';
 import { useRepository } from '@/lib/sync';
 import { useUserPref } from '@/lib/use-user-pref';
-import { McpToolService } from './tools';
+import { MCP_TOOL_DEFINITIONS, McpToolService } from './tools';
 import type { McpBridgeToolCallPayload } from './types';
 
 const logger = new Logger('McpRuntime');
@@ -70,7 +70,10 @@ export function McpRuntime() {
         unlisten = null;
         return;
       }
-      await invoke('mcp_start', { port });
+      await invoke('mcp_start', {
+        port,
+        toolDefinitions: MCP_TOOL_DEFINITIONS,
+      });
       logger.info('Started MCP server', { port });
     }
 

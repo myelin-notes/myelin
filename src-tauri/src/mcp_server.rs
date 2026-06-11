@@ -30,6 +30,7 @@ pub struct McpServerState {
 struct McpServerInner {
     runtime: Mutex<Option<McpServerRuntime>>,
     pending: Mutex<HashMap<String, oneshot::Sender<McpFrontendToolResponse>>>,
+    tool_definitions: Mutex<Value>,
     next_request_id: AtomicU64,
 }
 
@@ -81,6 +82,7 @@ impl McpServerState {
             inner: Arc::new(McpServerInner {
                 runtime: Mutex::new(None),
                 pending: Mutex::new(HashMap::new()),
+                tool_definitions: Mutex::new(json!([])),
                 next_request_id: AtomicU64::new(1),
             }),
         }
@@ -108,7 +110,13 @@ pub async fn mcp_start(
     app: AppHandle,
     state: State<'_, McpServerState>,
     port: u16,
+    tool_definitions: Value,
 ) -> Result<McpServerStatus, String> {
+    if !tool_definitions.is_array() {
+        return Err("MCP tool definitions must be an array".to_string());
+    }
+    *state.inner.tool_definitions.lock().await = tool_definitions;
+
     let mut runtime = state.inner.runtime.lock().await;
     if runtime.as_ref().is_some_and(|active| active.port == port) {
         return Ok(status_for_port(Some(port)));
@@ -248,7 +256,10 @@ async fn handle_json_rpc(
             }
         })),
         "ping" => Ok(json!({})),
-        "tools/list" => Ok(json!({ "tools": mcp_tool_definitions() })),
+        "tools/list" => {
+            let tools = state.inner.tool_definitions.lock().await.clone();
+            Ok(json!({ "tools": tools }))
+        }
         "tools/call" => call_frontend_tool(app, state, request.params).await,
         _ => Err((-32601, format!("Method not found: {}", request.method))),
     };
@@ -340,220 +351,6 @@ fn rpc_error(id: Option<Value>, code: i64, message: &str) -> Value {
             "message": message
         }
     })
-}
-
-fn mcp_tool_definitions() -> Value {
-    json!([
-        {
-            "name": "list_notes",
-            "description": "List Myelin canvas notes with compact metadata and previews.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "query": { "type": "string" },
-                    "folderId": { "type": "string" },
-                    "tag": { "type": "string" },
-                    "limit": { "type": "number" }
-                },
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "list_directory",
-            "description": "List the immediate notes, files, and folders in one Myelin folder. Omit folderId for the root.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "folderId": { "type": "string" }
-                },
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "read_note",
-            "description": "Read structured note inventory, including page frames, floating text, assets, drawings, and cached indexed text.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "noteId": { "type": "string" } },
-                "required": ["noteId"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "read_page_frame",
-            "description": "Read full markdown and plain text for one page frame.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "noteId": { "type": "string" },
-                    "pageFrameId": { "type": "string" }
-                },
-                "required": ["noteId", "pageFrameId"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "read_canvas_text",
-            "description": "Read one floating canvas text element.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "noteId": { "type": "string" },
-                    "elementId": { "type": "string" }
-                },
-                "required": ["noteId", "elementId"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "read_latex",
-            "description": "Read one floating LaTeX element.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "noteId": { "type": "string" },
-                    "elementId": { "type": "string" }
-                },
-                "required": ["noteId", "elementId"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "read_image",
-            "description": "Read metadata for one image element.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "noteId": { "type": "string" },
-                    "elementId": { "type": "string" }
-                },
-                "required": ["noteId", "elementId"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "read_pdf",
-            "description": "Read metadata for one PDF element.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "noteId": { "type": "string" },
-                    "elementId": { "type": "string" }
-                },
-                "required": ["noteId", "elementId"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "read_note_full",
-            "description": "Read a note inventory plus full page-frame, canvas text, and LaTeX contents.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "noteId": { "type": "string" } },
-                "required": ["noteId"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "create_page_frame",
-            "description": "Create a new page frame from markdown in an existing note.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "noteId": { "type": "string" },
-                    "markdown": { "type": "string" },
-                    "displayName": { "type": "string" },
-                    "x": { "type": "number" },
-                    "y": { "type": "number" }
-                },
-                "required": ["noteId", "markdown"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "replace_page_frame_markdown",
-            "description": "Replace one existing page frame with markdown.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "noteId": { "type": "string" },
-                    "pageFrameId": { "type": "string" },
-                    "markdown": { "type": "string" }
-                },
-                "required": ["noteId", "pageFrameId", "markdown"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "create_note",
-            "description": "Create a new canvas note, optionally with an initial markdown page frame.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "title": { "type": "string" },
-                    "parentId": { "type": "string" },
-                    "markdown": { "type": "string" }
-                },
-                "required": ["title"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "create_folder",
-            "description": "Create a new folder.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "name": { "type": "string" },
-                    "parentId": { "type": "string" }
-                },
-                "required": ["name"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "move_node",
-            "description": "Move a note, file, or folder to another folder.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "nodeId": { "type": "string" },
-                    "newParentId": { "type": "string" }
-                },
-                "required": ["nodeId"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "delete_node",
-            "description": "Delete a note, file, or folder. Requires confirm=true; non-empty folders also require recursive=true.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "nodeId": { "type": "string" },
-                    "confirm": { "type": "boolean" },
-                    "recursive": { "type": "boolean" }
-                },
-                "required": ["nodeId", "confirm"],
-                "additionalProperties": false
-            }
-        },
-        {
-            "name": "edit_tags",
-            "description": "Edit tags on a note, file, or folder. Provide set to replace tags, or add/remove arrays for incremental edits.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "nodeId": { "type": "string" },
-                    "set": { "type": "array", "items": { "type": "string" } },
-                    "add": { "type": "array", "items": { "type": "string" } },
-                    "remove": { "type": "array", "items": { "type": "string" } }
-                },
-                "required": ["nodeId"],
-                "additionalProperties": false
-            }
-        }
-    ])
 }
 
 async fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, Error> {
