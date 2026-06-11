@@ -12,6 +12,10 @@ import {
   Play as PlayIcon,
   Square as SquareIcon,
 } from 'lucide-react';
+import {
+  type AudioTranscriptionSession,
+  startAudioTranscription,
+} from '@/lib/audio-transcription/service';
 
 const WAVEFORM_BARS = 80;
 
@@ -89,13 +93,14 @@ export interface AudioPlayerViewHandle {
 }
 
 interface AudioPlayerViewProps {
+  elementId: string;
   onRecorded: (data: Uint8Array, duration: number, mimeType: string) => void;
 }
 
 export const AudioPlayerView = forwardRef<
   AudioPlayerViewHandle,
   AudioPlayerViewProps
->(function AudioPlayerView({ onRecorded }, ref) {
+>(function AudioPlayerView({ elementId, onRecorded }, ref) {
   const [audioBytes, setAudioBytes] = useState<Uint8Array | null>(null);
   const [duration, setDuration] = useState(0);
   const [mimeType, setMimeType] = useState('');
@@ -107,6 +112,9 @@ export const AudioPlayerView = forwardRef<
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const transcriptionSessionRef = useRef<AudioTranscriptionSession | null>(
+    null,
+  );
   const recordChunksRef = useRef<Blob[]>([]);
   const recordStartRef = useRef(0);
   const recordTickRef = useRef(0);
@@ -239,8 +247,14 @@ export const AudioPlayerView = forwardRef<
         stream,
         mime ? { mimeType: mime } : undefined,
       );
+      const transcriptionSession = await startAudioTranscription({
+        elementId,
+        mimeType: recorder.mimeType,
+        stream: recordingStream,
+      });
       recordChunksRef.current = [];
       mediaRecorderRef.current = recorder;
+      transcriptionSessionRef.current = transcriptionSession;
       recordStartRef.current = Date.now();
 
       recorder.ondataavailable = (e) => {
@@ -254,6 +268,9 @@ export const AudioPlayerView = forwardRef<
         recordingStream.getTracks().forEach((t) => {
           t.stop();
         });
+        const transcription = transcriptionSessionRef.current;
+        transcriptionSessionRef.current = null;
+        void transcription?.finish();
         void finalizeRecording(recorder.mimeType);
       };
 
@@ -267,6 +284,8 @@ export const AudioPlayerView = forwardRef<
     } catch {
       clearInterval(recordTickRef.current);
       mediaRecorderRef.current = null;
+      void transcriptionSessionRef.current?.finish();
+      transcriptionSessionRef.current = null;
       stream?.getTracks().forEach((t) => {
         t.stop();
       });

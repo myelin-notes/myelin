@@ -184,7 +184,11 @@ export class AudioElement extends DrawableElement {
     this._reactRoot = createRoot(root);
     flushSync(() => {
       this._reactRoot!.render(
-        <AudioPlayerView ref={this._viewRef} onRecorded={this._onRecorded} />,
+        <AudioPlayerView
+          ref={this._viewRef}
+          elementId={this.uuid}
+          onRecorded={this._onRecorded}
+        />,
       );
     });
 

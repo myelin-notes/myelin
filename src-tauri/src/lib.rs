@@ -3,6 +3,7 @@ use tauri::Manager;
 mod iroh_transport;
 mod note_index;
 mod pdf_export;
+mod transcription;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +24,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(iroh_transport::IrohState::new())
         .manage(note_index::IndexEngineState::new())
+        .manage(transcription::TranscriptionState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
             iroh_transport::iroh_join,
@@ -32,6 +34,9 @@ pub fn run() {
             note_index::reindex_note,
             note_index::reindex_batch,
             note_index::remove_index,
+            transcription::start_audio_transcription,
+            transcription::push_audio_transcription_samples,
+            transcription::finish_audio_transcription,
         ]);
 
     #[cfg(debug_assertions)]
