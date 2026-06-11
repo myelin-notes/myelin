@@ -606,6 +606,7 @@ async function fileListItem(
 async function collectDirectoryNotes(
   repository: Repository,
   folderId: VFSNodeId | null,
+  tag: string | undefined,
   notes: VFSFileNode[],
   limit: number,
 ): Promise<void> {
@@ -618,7 +619,7 @@ async function collectDirectoryNotes(
     if (notes.length >= limit) {
       return;
     }
-    if (isCanvasNote(file)) {
+    if (isCanvasNote(file) && (!tag || file.tags.includes(tag))) {
       notes.push(file);
     }
   }
@@ -626,8 +627,17 @@ async function collectDirectoryNotes(
     if (notes.length >= limit) {
       return;
     }
-    await collectDirectoryNotes(repository, folder.id, notes, limit);
+    await collectDirectoryNotes(repository, folder.id, tag, notes, limit);
   }
+}
+
+async function noteIsInFolder(
+  repository: Repository,
+  note: VFSFileNode,
+  folderId: VFSNodeId,
+): Promise<boolean> {
+  const chain = await repository.getFolderChain(note.parentId);
+  return chain.some((folder) => folder.id === folderId);
 }
 
 export class McpToolService {
@@ -690,35 +700,48 @@ export class McpToolService {
     const query = optionalString(input, 'query')?.trim();
     const tag = optionalString(input, 'tag')?.trim();
     const limit = optionalLimit(input);
+    const folderId = await optionalFolderId(
+      this.options.repository,
+      optionalString(input, 'folderId'),
+      'folderId',
+    );
     let notes: VFSFileNode[];
 
     if (query) {
       const results = await this.options.repository.searchNodes(query);
-      notes = results
+      const candidates = results
         .map((result) => result.node)
         .filter((node): node is VFSFileNode => node.type === 'file')
         .filter(isCanvasNote)
-        .slice(0, limit);
+        .filter((node) => !tag || node.tags.includes(tag));
+      const scoped = folderId
+        ? (
+            await Promise.all(
+              candidates.map(async (note) =>
+                (await noteIsInFolder(this.options.repository, note, folderId))
+                  ? note
+                  : null,
+              ),
+            )
+          ).filter((note): note is VFSFileNode => note !== null)
+        : candidates;
+      notes = scoped.slice(0, limit);
     } else {
       notes = [];
       await collectDirectoryNotes(
         this.options.repository,
-        optionalString(input, 'folderId') ?? null,
+        folderId,
+        tag,
         notes,
         limit,
       );
     }
 
-    const filtered = tag
-      ? notes.filter((note) => note.tags.includes(tag))
-      : notes;
     return {
       notes: await Promise.all(
-        filtered
-          .slice(0, limit)
-          .map((note) =>
-            noteListItem(this.options.repository, this.indexedTextByNode, note),
-          ),
+        notes.map((note) =>
+          noteListItem(this.options.repository, this.indexedTextByNode, note),
+        ),
       ),
     };
   }

@@ -148,6 +148,53 @@ describe('MCP tool service', () => {
     expect(tagsByName.get('knowledge/project')).toBe(1);
   });
 
+  it('applies tag filters before the limit in list_notes', async () => {
+    const repository = await createEmptyRepository();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    await service.callTool('create_note', { title: 'Untagged A' });
+    await service.callTool('create_note', { title: 'Untagged B' });
+    const tagged = (await service.callTool('create_note', {
+      title: 'Tagged',
+    })) as { note: { id: string } };
+    await service.callTool('edit_tags', {
+      nodeId: tagged.note.id,
+      set: ['focus'],
+    });
+
+    await expect(
+      service.callTool('list_notes', { tag: 'focus', limit: 1 }),
+    ).resolves.toMatchObject({
+      notes: [expect.objectContaining({ id: tagged.note.id })],
+    });
+  });
+
+  it('scopes list_notes queries to a folder', async () => {
+    const repository = await createEmptyRepository();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    const folder = (await service.callTool('create_folder', {
+      name: 'Scoped',
+    })) as { id: string };
+    const inside = (await service.callTool('create_note', {
+      title: 'Match Inside',
+      parentId: folder.id,
+    })) as { note: { id: string } };
+    await service.callTool('create_note', { title: 'Match Outside' });
+
+    await expect(
+      service.callTool('list_notes', { query: 'Match', folderId: folder.id }),
+    ).resolves.toMatchObject({
+      notes: [expect.objectContaining({ id: inside.note.id })],
+    });
+  });
+
   it('reads links, backlinks, and renames note references', async () => {
     const { repository, sourceId, targetId } = await createLinkedNotes();
     const service = new McpToolService({
