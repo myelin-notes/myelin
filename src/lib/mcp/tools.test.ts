@@ -491,6 +491,30 @@ describe('MCP tool service', () => {
     });
   });
 
+  it('clears a page frame with empty markdown', async () => {
+    const { repository, noteId, firstFrameId } =
+      await createRepositoryWithNote();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    await service.callTool('replace_page_frame_markdown', {
+      noteId,
+      pageFrameId: firstFrameId,
+      markdown: '',
+    });
+
+    await expect(
+      service.callTool('read_page_frame', {
+        noteId,
+        pageFrameId: firstFrameId,
+      }),
+    ).resolves.toMatchObject({
+      plainText: '',
+    });
+  });
+
   it('deletes page frames only with confirmation', async () => {
     const { repository, noteId, firstFrameId } =
       await createRepositoryWithNote();

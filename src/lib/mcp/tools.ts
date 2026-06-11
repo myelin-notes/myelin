@@ -71,6 +71,15 @@ function requiredString(args: Record<string, unknown>, key: string): string {
   return value;
 }
 
+// Unlike requiredString, allows the empty string (e.g. clearing a frame).
+function requiredText(args: Record<string, unknown>, key: string): string {
+  const value = optionalString(args, key);
+  if (value === undefined) {
+    throw new Error(`Missing required string argument: ${key}`);
+  }
+  return value;
+}
+
 function requiredTrimmedString(
   args: Record<string, unknown>,
   key: string,
@@ -1161,7 +1170,7 @@ export class McpToolService {
     this.assertWritesAllowed();
     const input = objectArg(args);
     const noteId = requiredString(input, 'noteId');
-    const markdown = requiredString(input, 'markdown');
+    const markdown = requiredText(input, 'markdown');
     const displayName = optionalString(input, 'displayName');
     let session: NoteSession | null = null;
 
@@ -1198,7 +1207,7 @@ export class McpToolService {
     const input = objectArg(args);
     const noteId = requiredString(input, 'noteId');
     const pageFrameId = requiredString(input, 'pageFrameId');
-    const markdown = requiredString(input, 'markdown');
+    const markdown = requiredText(input, 'markdown');
     let session: NoteSession | null = null;
 
     try {
