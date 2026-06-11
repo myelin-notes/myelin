@@ -14,7 +14,7 @@ use tauri::{path::BaseDirectory, AppHandle, Emitter, Manager, State};
 
 const MODEL_DIR: &str = "scribble-models";
 const DEFAULT_MODEL_FILE: &str = "ggml-base.bin";
-const DEFAULT_VAD_MODEL_FILE: &str = "ggml-silero-v6.2.0.bin";
+const VAD_STUB_FILE: &str = "scribble-vad-stub.bin";
 const SEGMENT_EVENT: &str = "audio-transcription-segment";
 const FINISHED_EVENT: &str = "audio-transcription-finished";
 const TARGET_SAMPLE_RATE: u32 = 16_000;
@@ -212,6 +212,8 @@ fn run_transcription_session(
     let opts = Opts {
         model_key: None,
         enable_translate_to_english: false,
+        // Scribble's streaming path ignores this flag; VAD is unused, so the
+        // "VAD model" we hand Scribble::new is an empty stub (see resolve_model_paths).
         enable_voice_activity_detection: false,
         language: None,
         output_type: OutputType::Json,
@@ -298,7 +300,6 @@ struct ModelPaths {
 
 fn resolve_model_paths(app: &AppHandle) -> Result<ModelPaths, String> {
     let model_path = bundled_model_path(app, DEFAULT_MODEL_FILE)?;
-    let vad_model_path = bundled_model_path(app, DEFAULT_VAD_MODEL_FILE)?;
 
     if !model_path.is_file() {
         return Err(format!(
@@ -306,11 +307,21 @@ fn resolve_model_paths(app: &AppHandle) -> Result<ModelPaths, String> {
             model_path.display()
         ));
     }
+
+    // Scribble 0.5.4 requires the VAD model path to point at an existing file
+    // even though the streaming path never loads it (VAD only applies to its
+    // transcribe() pipeline, which we don't use). Hand it an empty stub
+    // instead of bundling the real silero model.
+    let data_dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("resolve app local data dir: {e}"))?;
+    let vad_model_path = data_dir.join(VAD_STUB_FILE);
     if !vad_model_path.is_file() {
-        return Err(format!(
-            "Bundled scribble VAD model missing at '{}' — check that resources/{MODEL_DIR} is present (git lfs pull).",
-            vad_model_path.display()
-        ));
+        std::fs::create_dir_all(&data_dir)
+            .map_err(|e| format!("create app local data dir: {e}"))?;
+        std::fs::write(&vad_model_path, [])
+            .map_err(|e| format!("create VAD stub file: {e}"))?;
     }
 
     Ok(ModelPaths {
