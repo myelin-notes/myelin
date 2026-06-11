@@ -215,8 +215,8 @@ async fn handle_connection(
         );
         return stream.write_all(response.as_bytes()).await;
     }
-    let response = match request.method.as_str() {
-        "POST" if request.path == "/mcp" => {
+    let response = match (request.method.as_str(), request.path.as_str()) {
+        ("POST", "/mcp") => {
             let response = handle_json_rpc(app, state, &request.body).await;
             match response {
                 RpcHttpResponse::Accepted => http_response(202, "Accepted", None),
@@ -225,6 +225,12 @@ async fn handle_connection(
                 }
             }
         }
+        // No SSE stream is offered; the spec expects 405 for other methods.
+        (_, "/mcp") => http_response(
+            405,
+            "Method Not Allowed",
+            Some(json!({ "error": "Method not allowed" }).to_string()),
+        ),
         _ => http_response(
             404,
             "Not Found",

@@ -17,8 +17,7 @@ async function createEmptyRepository() {
 }
 
 async function createRepositoryWithNote(markdown = '# Original\n\nBody') {
-  const repository = new LocalRepository();
-  await repository.initialize();
+  const repository = await createEmptyRepository();
   const ydoc = new YDocManager();
   const firstFrameId = await addMarkdownPageFrameToYDoc(ydoc, markdown, {
     displayName: 'First',
@@ -310,8 +309,7 @@ describe('MCP tool service', () => {
   });
 
   it('creates folders and notes and lists directories', async () => {
-    const repository = new LocalRepository();
-    await repository.initialize();
+    const repository = await createEmptyRepository();
     const service = new McpToolService({
       repository,
       allowDirectWrites: () => true,
@@ -367,8 +365,7 @@ describe('MCP tool service', () => {
   });
 
   it('moves nodes and edits tags', async () => {
-    const repository = new LocalRepository();
-    await repository.initialize();
+    const repository = await createEmptyRepository();
     const service = new McpToolService({
       repository,
       allowDirectWrites: () => true,
@@ -413,8 +410,7 @@ describe('MCP tool service', () => {
   });
 
   it('guards destructive deletes', async () => {
-    const repository = new LocalRepository();
-    await repository.initialize();
+    const repository = await createEmptyRepository();
     const service = new McpToolService({
       repository,
       allowDirectWrites: () => true,
