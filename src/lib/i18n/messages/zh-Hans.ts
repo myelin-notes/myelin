@@ -343,6 +343,26 @@ const zhHans: typeof en = {
         },
       },
     },
+    mcp: {
+      title: 'Model Context Protocol',
+      eyebrow: 'AI 代理',
+      enabled: {
+        label: '启用本地 MCP 服务器',
+        description:
+          '将正在运行的 Myelin 应用暴露给 127.0.0.1 上的本地 AI 代理。',
+      },
+      port: {
+        label: '本地端口',
+        description: '重启服务器后端口更改会生效。',
+      },
+      endpoint: {
+        label: '端点',
+      },
+      directWrites: {
+        label: '允许直接 MCP 写入',
+        description: '允许代理创建页面框并替换页面框 Markdown。',
+      },
+    },
     keybinds: {
       title: '快捷键',
       resetAll: '全部重置',

@@ -356,6 +356,27 @@ const en = {
         },
       },
     },
+    mcp: {
+      title: 'Model Context Protocol',
+      eyebrow: 'AI Agents',
+      enabled: {
+        label: 'Enable local MCP server',
+        description:
+          'Expose this running Myelin app to local AI agents on 127.0.0.1.',
+      },
+      port: {
+        label: 'Local port',
+        description: 'Restarting the server applies port changes.',
+      },
+      endpoint: {
+        label: 'Endpoint',
+      },
+      directWrites: {
+        label: 'Allow direct MCP writes',
+        description:
+          'Permit agents to create page frames and replace page-frame Markdown.',
+      },
+    },
     keybinds: {
       title: 'Keybinds',
       resetAll: 'Reset all',
