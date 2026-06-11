@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   Captions as CaptionsIcon,
   LoaderCircle,
@@ -15,6 +21,7 @@ import {
 import { useMessages } from '@/lib/i18n';
 
 const WAVEFORM_BARS = 80;
+const MAX_WAVEFORM_BACKING_DIMENSION = 4096;
 
 type RecordingState = 'idle' | 'requesting' | 'recording' | 'error';
 
@@ -28,6 +35,112 @@ export interface DecodedAudio {
   buffer: AudioBuffer;
   waveform: Float32Array;
   duration: number;
+}
+
+export interface WaveformCanvasMetrics {
+  cssWidth: number;
+  cssHeight: number;
+  pixelRatio: number;
+  backingWidth: number;
+  backingHeight: number;
+}
+
+export function getWaveformCanvasMetrics(
+  cssWidth: number,
+  cssHeight: number,
+  devicePixelRatio: number,
+): WaveformCanvasMetrics {
+  const safeCssWidth = Math.max(1, cssWidth);
+  const safeCssHeight = Math.max(1, cssHeight);
+  const safeDpr =
+    Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
+      ? devicePixelRatio
+      : 1;
+  const pixelRatio = Math.min(
+    safeDpr,
+    MAX_WAVEFORM_BACKING_DIMENSION / safeCssWidth,
+    MAX_WAVEFORM_BACKING_DIMENSION / safeCssHeight,
+  );
+  return {
+    cssWidth: safeCssWidth,
+    cssHeight: safeCssHeight,
+    pixelRatio,
+    backingWidth: Math.max(1, Math.ceil(safeCssWidth * pixelRatio)),
+    backingHeight: Math.max(1, Math.ceil(safeCssHeight * pixelRatio)),
+  };
+}
+
+function getWaveformCanvasDisplaySize(canvas: HTMLCanvasElement) {
+  const rect = canvas.getBoundingClientRect();
+  const cssWidth = rect.width || canvas.clientWidth || canvas.width;
+  const cssHeight = rect.height || canvas.clientHeight || canvas.height;
+  return { cssWidth, cssHeight };
+}
+
+function prepareWaveformCanvas(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+): WaveformCanvasMetrics {
+  const { cssWidth, cssHeight } = getWaveformCanvasDisplaySize(canvas);
+  const metrics = getWaveformCanvasMetrics(
+    cssWidth,
+    cssHeight,
+    window.devicePixelRatio || 1,
+  );
+  if (
+    canvas.width !== metrics.backingWidth ||
+    canvas.height !== metrics.backingHeight
+  ) {
+    canvas.width = metrics.backingWidth;
+    canvas.height = metrics.backingHeight;
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, metrics.backingWidth, metrics.backingHeight);
+  ctx.setTransform(metrics.pixelRatio, 0, 0, metrics.pixelRatio, 0, 0);
+  return metrics;
+}
+
+function drawRecordingWaveformFrame(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return;
+  }
+  const metrics = prepareWaveformCanvas(canvas, ctx);
+  const t = performance.now() / 1000;
+  const bars = 40;
+  const barW = 2;
+  const gap = (metrics.cssWidth - bars * barW) / (bars - 1);
+  for (let i = 0; i < bars; i++) {
+    const x = i * (barW + gap);
+    const freq = 1.5 + (i % 5) * 0.3;
+    const phase = i * 0.4;
+    const amp = 0.3 + 0.4 * Math.abs(Math.sin(i * 0.2));
+    const v = 0.5 + amp * Math.sin(t * freq + phase);
+    const barH = Math.max(3, v * metrics.cssHeight * 0.85);
+    const y = (metrics.cssHeight - barH) / 2;
+    ctx.fillStyle = `rgba(224, 62, 62, ${0.5 + 0.5 * v})`;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, 1);
+    ctx.fill();
+  }
+}
+
+function drawPlaybackWaveformCanvas(
+  canvas: HTMLCanvasElement,
+  waveform: Float32Array | null,
+  currentTime: number,
+  duration: number,
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return;
+  }
+  const metrics = prepareWaveformCanvas(canvas, ctx);
+  if (!waveform) {
+    return;
+  }
+  const progress = duration > 0 ? currentTime / duration : 0;
+  drawWaveform(ctx, waveform, metrics.cssWidth, metrics.cssHeight, progress);
 }
 
 /** Single decode shared by the element, the player, and the import handler. */
@@ -133,6 +246,17 @@ export function AudioPlayerView({
   const disposedRef = useRef(false);
   const isRecording = recordingState === 'recording';
   const isRequestingRecording = recordingState === 'requesting';
+  const redrawAfterResize = useEffectEvent(() => {
+    const canvas = waveformCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    if (isRecording) {
+      drawRecordingWaveformFrame(canvas);
+    } else {
+      drawPlaybackWaveformCanvas(canvas, waveform, currentTime, duration);
+    }
+  });
 
   // Tear down recording resources when the element is deleted mid-recording.
   useEffect(
@@ -176,33 +300,14 @@ export function AudioPlayerView({
 
   // Animate recording visualization on the waveform canvas.
   useEffect(() => {
-    const canvas = waveformCanvasRef.current;
-    if (!isRecording || !canvas) {
-      return;
-    }
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
+    if (!isRecording) {
       return;
     }
     let frameId: number;
     function animate() {
-      const t = performance.now() / 1000;
-      ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
-      const BARS = 40;
-      const barW = 2;
-      const gap = (canvas!.width - BARS * barW) / (BARS - 1);
-      for (let i = 0; i < BARS; i++) {
-        const x = i * (barW + gap);
-        const freq = 1.5 + (i % 5) * 0.3;
-        const phase = i * 0.4;
-        const amp = 0.3 + 0.4 * Math.abs(Math.sin(i * 0.2));
-        const v = 0.5 + amp * Math.sin(t * freq + phase);
-        const barH = Math.max(3, v * canvas!.height * 0.85);
-        const y = (canvas!.height - barH) / 2;
-        ctx!.fillStyle = `rgba(224, 62, 62, ${0.5 + 0.5 * v})`;
-        ctx!.beginPath();
-        ctx!.roundRect(x, y, barW, barH, 1);
-        ctx!.fill();
+      const canvas = waveformCanvasRef.current;
+      if (canvas) {
+        drawRecordingWaveformFrame(canvas);
       }
       frameId = requestAnimationFrame(animate);
     }
@@ -212,18 +317,25 @@ export function AudioPlayerView({
 
   // Redraw waveform canvas whenever the waveform data or playhead moves.
   useLayoutEffect(() => {
+    if (!isRecording) {
+      const canvas = waveformCanvasRef.current;
+      if (canvas) {
+        drawPlaybackWaveformCanvas(canvas, waveform, currentTime, duration);
+      }
+    }
+  }, [waveform, currentTime, duration, isRecording]);
+
+  useLayoutEffect(() => {
     const canvas = waveformCanvasRef.current;
-    if (!canvas || !waveform) {
+    if (!canvas || typeof ResizeObserver === 'undefined') {
       return;
     }
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return;
-    }
-    const progress = duration > 0 ? currentTime / duration : 0;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawWaveform(ctx, waveform, canvas.width, canvas.height, progress);
-  }, [waveform, currentTime, duration]);
+    const observer = new ResizeObserver(() => {
+      redrawAfterResize();
+    });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
 
   async function startRecording() {
     setRecordingState('requesting');

@@ -177,13 +177,30 @@ export class AudioElement extends DrawableElement {
     const root = this._root ?? this.mountReact(host);
 
     const zoom = viewport.zoom;
+    const scaleX = this._scale.x * zoom;
+    const scaleY = this._scale.y * zoom;
+    const visualScale = Math.max(
+      0.05,
+      (Math.abs(scaleX) + Math.abs(scaleY)) / 2,
+    );
     const screen = viewport.worldToScreen({
       x: this.offset.x,
       y: this.offset.y,
     });
     root.style.left = `${screen.x}px`;
     root.style.top = `${screen.y}px`;
-    root.style.transform = `scale(${this._scale.x * zoom}, ${this._scale.y * zoom})`;
+    const width = `${AUDIO_NATURAL_WIDTH * Math.abs(scaleX)}px`;
+    if (root.style.width !== width) {
+      root.style.width = width;
+    }
+    const height = `${AUDIO_NATURAL_HEIGHT * Math.abs(scaleY)}px`;
+    if (root.style.height !== height) {
+      root.style.height = height;
+    }
+    const scale = `${visualScale}`;
+    if (root.style.getPropertyValue('--canvas-audio-scale') !== scale) {
+      root.style.setProperty('--canvas-audio-scale', scale);
+    }
   }
 
   public override disposeDOM(): void {
