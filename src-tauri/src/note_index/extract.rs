@@ -3,8 +3,9 @@
 //! Mirrors the JS reference in `src/pages/canvas/page-frame/preview-text.ts`:
 //! page-frame rich text lives in `pf-<uuid>` XML fragments (walked here and
 //! joined with `\n` at block boundaries, like ProseMirror's `textBetween`),
-//! while standalone TEXT elements store their string directly on the element map,
-//! and AUDIO elements store their whisper transcript as a `transcript` string.
+//! while standalone TEXT elements store their string directly on the element map.
+//! AUDIO elements store their whisper transcript as a `transcript` string,
+//! extracted separately by the audio-transcript provider.
 
 use yrs::updates::decoder::Decode;
 use yrs::{Any, Array, Doc, GetString, Map, Out, ReadTxn, Transact, Update, XmlFragment, XmlOut};
@@ -85,17 +86,22 @@ fn normalize(input: &str) -> String {
     out.trim().to_string()
 }
 
+fn decode_doc(bytes: &[u8]) -> Result<Doc, String> {
+    let doc = Doc::new();
+    let update = Update::decode_v1(bytes).map_err(|e| format!("decode update: {e}"))?;
+    doc.transact_mut()
+        .apply_update(update)
+        .map_err(|e| format!("apply update: {e}"))?;
+    Ok(doc)
+}
+
 /// Extract searchable plain text from a note's full Yjs update bytes.
 pub fn extract_note_text(bytes: &[u8]) -> Result<String, String> {
     if bytes.is_empty() {
         return Ok(String::new());
     }
 
-    let doc = Doc::new();
-    let update = Update::decode_v1(bytes).map_err(|e| format!("decode update: {e}"))?;
-    doc.transact_mut()
-        .apply_update(update)
-        .map_err(|e| format!("apply update: {e}"))?;
+    let doc = decode_doc(bytes)?;
 
     // Acquire the root array BEFORE opening the read txn — get_or_insert_* opens
     // its own write txn and would deadlock against a held read txn.
@@ -120,16 +126,6 @@ pub fn extract_note_text(bytes: &[u8]) -> Result<String, String> {
                 if let Some(Out::Any(a)) = map.get(&txn, "text") {
                     if let Some(text) = any_to_string(&a) {
                         let trimmed = text.trim();
-                        if !trimmed.is_empty() {
-                            parts.push(trimmed.to_string());
-                        }
-                    }
-                }
-            }
-            Some(TYPE_AUDIO) => {
-                if let Some(Out::Any(a)) = map.get(&txn, "transcript") {
-                    if let Some(transcript) = any_to_string(&a) {
-                        let trimmed = transcript.trim();
                         if !trimmed.is_empty() {
                             parts.push(trimmed.to_string());
                         }
@@ -163,6 +159,45 @@ pub fn extract_note_text(bytes: &[u8]) -> Result<String, String> {
     Ok(normalize(&parts.join("\n\n")))
 }
 
+/// Extract whisper transcripts from a note's AUDIO elements.
+pub fn extract_audio_transcripts(bytes: &[u8]) -> Result<String, String> {
+    if bytes.is_empty() {
+        return Ok(String::new());
+    }
+
+    let doc = decode_doc(bytes)?;
+    let elements = doc.get_or_insert_array("elements");
+
+    let txn = doc.transact();
+    let mut parts: Vec<String> = Vec::new();
+
+    for item in elements.iter(&txn) {
+        let map = match item {
+            Out::YMap(m) => m,
+            _ => continue,
+        };
+
+        let element_type = match map.get(&txn, "type") {
+            Some(Out::Any(a)) => any_to_i64(&a),
+            _ => None,
+        };
+        if element_type != Some(TYPE_AUDIO) {
+            continue;
+        }
+
+        if let Some(Out::Any(a)) = map.get(&txn, "transcript") {
+            if let Some(transcript) = any_to_string(&a) {
+                let trimmed = transcript.trim();
+                if !trimmed.is_empty() {
+                    parts.push(trimmed.to_string());
+                }
+            }
+        }
+    }
+
+    Ok(normalize(&parts.join("\n\n")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,5 +222,32 @@ mod tests {
     #[test]
     fn empty_bytes_yield_empty_string() {
         assert_eq!(extract_note_text(&[]).unwrap(), "");
+        assert_eq!(extract_audio_transcripts(&[]).unwrap(), "");
+    }
+
+    /// Encode a doc whose elements array holds one AUDIO element map.
+    fn audio_note_bytes(transcript: &str) -> Vec<u8> {
+        use yrs::{MapPrelim, StateVector};
+
+        let doc = Doc::new();
+        let elements = doc.get_or_insert_array("elements");
+        let mut txn = doc.transact_mut();
+        let map = elements.push_back(&mut txn, MapPrelim::default());
+        map.insert(&mut txn, "type", TYPE_AUDIO);
+        map.insert(&mut txn, "transcript", transcript);
+        txn.encode_state_as_update_v1(&StateVector::default())
+    }
+
+    #[test]
+    fn audio_transcripts_extracted_separately_from_note_text() {
+        let bytes = audio_note_bytes("  hello transcribed   world  ");
+        assert_eq!(
+            extract_audio_transcripts(&bytes).unwrap(),
+            "hello transcribed world"
+        );
+        // The note-text provider no longer reports transcripts.
+        assert_eq!(extract_note_text(&bytes).unwrap(), "");
+        // And the fixture (no audio elements) yields no transcript text.
+        assert_eq!(extract_audio_transcripts(FIXTURE).unwrap(), "");
     }
 }

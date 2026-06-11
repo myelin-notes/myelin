@@ -43,6 +43,22 @@ impl IndexProvider for NoteTextProvider {
     }
 }
 
+/// Whisper transcripts are generated at capture time and persisted on the
+/// AUDIO element; this provider only pulls them out of the note bytes.
+struct AudioTranscriptProvider;
+
+impl IndexProvider for AudioTranscriptProvider {
+    fn kind(&self) -> &'static str {
+        "audio-transcript"
+    }
+    fn applies_to(&self, file_type: &str) -> bool {
+        file_type == "mcanvas"
+    }
+    fn build(&self, bytes: &[u8]) -> Result<String, String> {
+        extract::extract_audio_transcripts(bytes)
+    }
+}
+
 /// On-disk index artifact for one node, read by the TS client. Holds the
 /// combined text of every applicable provider (typed text now, OCR later).
 /// `source_hash` is over the note bytes, so any edit reindexes; bump
@@ -83,7 +99,10 @@ pub struct IndexEngineState {
 impl IndexEngineState {
     pub fn new() -> Self {
         Self {
-            providers: Arc::new(vec![Box::new(NoteTextProvider)]),
+            providers: Arc::new(vec![
+                Box::new(NoteTextProvider),
+                Box::new(AudioTranscriptProvider),
+            ]),
             pending: Arc::new(Mutex::new(HashMap::new())),
             semaphore: Arc::new(Semaphore::new(MAX_CONCURRENCY)),
         }
