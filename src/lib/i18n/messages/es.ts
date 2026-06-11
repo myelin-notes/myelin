@@ -371,7 +371,8 @@ const es: typeof en = {
       },
       port: {
         label: 'Puerto local',
-        description: 'Reiniciar el servidor aplica los cambios de puerto.',
+        description:
+          'El servidor se reinicia en el nuevo puerto al salir del campo.',
       },
       endpoint: {
         label: 'Endpoint',

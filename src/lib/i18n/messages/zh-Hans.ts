@@ -353,7 +353,7 @@ const zhHans: typeof en = {
       },
       port: {
         label: '本地端口',
-        description: '重启服务器后端口更改会生效。',
+        description: '离开输入框后，服务器将在新端口上重启。',
       },
       endpoint: {
         label: '端点',

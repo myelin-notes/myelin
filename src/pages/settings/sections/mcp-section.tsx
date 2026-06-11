@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import { type KeyboardEvent, useState } from 'react';
 import { useMessages } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -12,6 +12,7 @@ export function McpSection() {
   const mcpEnabled = useUserPref('mcpEnabled');
   const mcpPort = useUserPref('mcpPort');
   const mcpAllowDirectWrites = useUserPref('mcpAllowDirectWrites');
+  const [portDraft, setPortDraft] = useState<string | null>(null);
   const endpoint = `http://127.0.0.1:${mcpPort}/mcp`;
 
   const handleEnabled = () => {
@@ -22,14 +23,24 @@ export function McpSection() {
     UserPrefs.set('mcpAllowDirectWrites', !mcpAllowDirectWrites);
   };
 
-  const handlePortChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextPort = Number(event.currentTarget.value);
+  const commitPort = () => {
+    if (portDraft === null) {
+      return;
+    }
+    const nextPort = Number(portDraft);
     if (
       Number.isInteger(nextPort) &&
       nextPort >= MIN_PORT &&
       nextPort <= MAX_PORT
     ) {
       UserPrefs.set('mcpPort', nextPort);
+    }
+    setPortDraft(null);
+  };
+
+  const handlePortKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
     }
   };
 
@@ -61,8 +72,10 @@ export function McpSection() {
             type="number"
             min={MIN_PORT}
             max={MAX_PORT}
-            value={mcpPort}
-            onChange={handlePortChange}
+            value={portDraft ?? mcpPort}
+            onChange={(event) => setPortDraft(event.currentTarget.value)}
+            onBlur={commitPort}
+            onKeyDown={handlePortKeyDown}
             className="h-9 w-24 rounded-lg bg-card px-3 text-right text-sm text-text-primary outline-none ring-1 ring-border-subtle/70 transition-shadow focus:ring-2 focus:ring-accent-navy/20"
           />
         </label>

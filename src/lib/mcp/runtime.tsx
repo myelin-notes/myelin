@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent } from 'react';
+import { toast } from 'sonner';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { toast } from 'sonner';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { noteIndexService } from '@/lib/note-index';

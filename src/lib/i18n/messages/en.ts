@@ -366,7 +366,8 @@ const en = {
       },
       port: {
         label: 'Local port',
-        description: 'Restarting the server applies port changes.',
+        description:
+          'The server restarts on the new port when you leave the field.',
       },
       endpoint: {
         label: 'Endpoint',
