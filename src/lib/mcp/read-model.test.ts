@@ -7,6 +7,7 @@ import {
   buildMcpNoteReadModel,
   readMcpCanvasText,
   readMcpLatex,
+  readMcpNoteFull,
   readMcpPageFrame,
   readMcpPdf,
 } from './read-model';
@@ -150,5 +151,27 @@ describe('MCP read model', () => {
       fileName: 'Paper.pdf',
       textAvailable: false,
     });
+  });
+
+  it('reads the full note model in one pass', async () => {
+    const { repository, noteId, pageFrameId } = await createRepositoryNote();
+
+    const full = await readMcpNoteFull(repository, noteId, {
+      indexedText: 'Indexed note text',
+    });
+
+    expect(full.indexedText).toBe('Indexed note text');
+    expect(full.pageFrames).toEqual([
+      expect.objectContaining({
+        pageFrameId,
+        plainText: 'Heading\nFrame body',
+      }),
+    ]);
+    expect(full.canvasTexts).toEqual([
+      expect.objectContaining({ elementId: 'text-1', text: 'Floating text' }),
+    ]);
+    expect(full.latexBlocks).toEqual([
+      expect.objectContaining({ elementId: 'latex-1', latex: 'E = mc^2' }),
+    ]);
   });
 });

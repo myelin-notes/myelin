@@ -435,16 +435,18 @@ function summarizeElement(
   }
 }
 
-export async function buildMcpNoteReadModel(
-  repository: McpReadableRepository,
-  noteId: VFSNodeId,
+function noteReadModelFromLoaded(
+  loaded: LoadedMcpNote,
   options: { indexedText?: string | null } = {},
-): Promise<McpNoteReadModel> {
-  const loaded = await loadMcpNote(repository, noteId);
+): McpNoteReadModel {
   const elements: McpNoteElementSummary[] = [];
   for (let index = 0; index < loaded.ydoc.elements.length; index++) {
     elements.push(
-      summarizeElement(noteId, loaded.ydoc, loaded.ydoc.elements.get(index)),
+      summarizeElement(
+        loaded.metadata.id,
+        loaded.ydoc,
+        loaded.ydoc.elements.get(index),
+      ),
     );
   }
 
@@ -455,12 +457,22 @@ export async function buildMcpNoteReadModel(
   };
 }
 
-export async function readMcpPageFrame(
+export async function buildMcpNoteReadModel(
   repository: McpReadableRepository,
   noteId: VFSNodeId,
+  options: { indexedText?: string | null } = {},
+): Promise<McpNoteReadModel> {
+  return noteReadModelFromLoaded(
+    await loadMcpNote(repository, noteId),
+    options,
+  );
+}
+
+function pageFrameContentFromYDoc(
+  ydoc: YDocManager,
+  noteId: VFSNodeId,
   pageFrameId: string,
-): Promise<McpPageFrameContent> {
-  const { ydoc } = await loadMcpNote(repository, noteId);
+): McpPageFrameContent {
   const yMap = findElementMap(ydoc, pageFrameId);
   if (getElementType(yMap) !== ElementType.PAGE_FRAME) {
     throw new Error(`Element is not a page frame: ${pageFrameId}`);
@@ -477,12 +489,11 @@ export async function readMcpPageFrame(
   };
 }
 
-export async function readMcpCanvasText(
-  repository: McpReadableRepository,
+function canvasTextContentFromYDoc(
+  ydoc: YDocManager,
   noteId: VFSNodeId,
   elementId: string,
-): Promise<McpCanvasTextContent> {
-  const { ydoc } = await loadMcpNote(repository, noteId);
+): McpCanvasTextContent {
   const yMap = findElementMap(ydoc, elementId);
   if (getElementType(yMap) !== ElementType.TEXT) {
     throw new Error(`Element is not canvas text: ${elementId}`);
@@ -495,12 +506,11 @@ export async function readMcpCanvasText(
   };
 }
 
-export async function readMcpLatex(
-  repository: McpReadableRepository,
+function latexContentFromYDoc(
+  ydoc: YDocManager,
   noteId: VFSNodeId,
   elementId: string,
-): Promise<McpLatexContent> {
-  const { ydoc } = await loadMcpNote(repository, noteId);
+): McpLatexContent {
   const yMap = findElementMap(ydoc, elementId);
   if (getElementType(yMap) !== ElementType.LATEX) {
     throw new Error(`Element is not LaTeX: ${elementId}`);
@@ -511,6 +521,33 @@ export async function readMcpLatex(
     latex: asString(yMap.get('latex')) ?? '',
     bounds: getLatexBounds(yMap),
   };
+}
+
+export async function readMcpPageFrame(
+  repository: McpReadableRepository,
+  noteId: VFSNodeId,
+  pageFrameId: string,
+): Promise<McpPageFrameContent> {
+  const { ydoc } = await loadMcpNote(repository, noteId);
+  return pageFrameContentFromYDoc(ydoc, noteId, pageFrameId);
+}
+
+export async function readMcpCanvasText(
+  repository: McpReadableRepository,
+  noteId: VFSNodeId,
+  elementId: string,
+): Promise<McpCanvasTextContent> {
+  const { ydoc } = await loadMcpNote(repository, noteId);
+  return canvasTextContentFromYDoc(ydoc, noteId, elementId);
+}
+
+export async function readMcpLatex(
+  repository: McpReadableRepository,
+  noteId: VFSNodeId,
+  elementId: string,
+): Promise<McpLatexContent> {
+  const { ydoc } = await loadMcpNote(repository, noteId);
+  return latexContentFromYDoc(ydoc, noteId, elementId);
 }
 
 export async function readMcpImage(
@@ -550,22 +587,21 @@ export async function readMcpNoteFull(
   noteId: VFSNodeId,
   options: { indexedText?: string | null } = {},
 ): Promise<McpNoteFullReadModel> {
-  const note = await buildMcpNoteReadModel(repository, noteId, options);
-  const pageFrames = await Promise.all(
-    note.elements
-      .filter((element) => element.kind === 'page-frame')
-      .map((element) => readMcpPageFrame(repository, noteId, element.id)),
-  );
-  const canvasTexts = await Promise.all(
-    note.elements
-      .filter((element) => element.kind === 'text')
-      .map((element) => readMcpCanvasText(repository, noteId, element.id)),
-  );
-  const latexBlocks = await Promise.all(
-    note.elements
-      .filter((element) => element.kind === 'latex')
-      .map((element) => readMcpLatex(repository, noteId, element.id)),
-  );
+  const loaded = await loadMcpNote(repository, noteId);
+  const note = noteReadModelFromLoaded(loaded, options);
+  const pageFrames = note.elements
+    .filter((element) => element.kind === 'page-frame')
+    .map((element) =>
+      pageFrameContentFromYDoc(loaded.ydoc, noteId, element.id),
+    );
+  const canvasTexts = note.elements
+    .filter((element) => element.kind === 'text')
+    .map((element) =>
+      canvasTextContentFromYDoc(loaded.ydoc, noteId, element.id),
+    );
+  const latexBlocks = note.elements
+    .filter((element) => element.kind === 'latex')
+    .map((element) => latexContentFromYDoc(loaded.ydoc, noteId, element.id));
 
   return {
     ...note,
