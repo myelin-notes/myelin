@@ -22,14 +22,4 @@ describe('getWaveformCanvasMetrics', () => {
     expect(metrics.backingWidth).toBe(4096);
     expect(metrics.backingHeight).toBeLessThanOrEqual(4096);
   });
-
-  it('normalizes invalid display sizes and device pixel ratios', () => {
-    expect(getWaveformCanvasMetrics(0, -4, 0)).toEqual({
-      cssWidth: 1,
-      cssHeight: 1,
-      pixelRatio: 1,
-      backingWidth: 1,
-      backingHeight: 1,
-    });
-  });
 });

@@ -63,7 +63,6 @@ function startedSessionId(): string {
 function emitSegment(sessionId: string, text: string): void {
   emit('audio-transcription-segment', {
     sessionId,
-    elementId: 'audio-1',
     text,
     startSeconds: 0,
     endSeconds: 1,
@@ -74,7 +73,6 @@ function emitSegment(sessionId: string, text: string): void {
 function emitFinished(sessionId: string, error: string | null = null): void {
   emit('audio-transcription-finished', {
     sessionId,
-    elementId: 'audio-1',
     error,
   });
 }

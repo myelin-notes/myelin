@@ -55,7 +55,6 @@ impl Default for TranscriptionState {
 #[serde(rename_all = "camelCase")]
 struct AudioTranscriptionSegmentPayload {
     session_id: String,
-    element_id: String,
     text: String,
     start_seconds: f32,
     end_seconds: f32,
@@ -66,7 +65,6 @@ struct AudioTranscriptionSegmentPayload {
 #[serde(rename_all = "camelCase")]
 struct AudioTranscriptionFinishedPayload {
     session_id: String,
-    element_id: String,
     error: Option<String>,
 }
 
@@ -75,7 +73,6 @@ pub fn start_audio_transcription(
     app: AppHandle,
     state: State<'_, TranscriptionState>,
     session_id: String,
-    element_id: String,
 ) -> Result<(), String> {
     let paths = resolve_model_paths(&app)?;
     let (tx, rx) = mpsc::sync_channel::<TranscriptionMessage>(64);
@@ -89,14 +86,7 @@ pub fn start_audio_transcription(
     let engine = state.engine.clone();
     std::thread::spawn(move || {
         let result = catch_unwind(AssertUnwindSafe(|| {
-            run_transcription_session(
-                app.clone(),
-                engine.clone(),
-                paths,
-                session_id.clone(),
-                element_id.clone(),
-                rx,
-            )
+            run_transcription_session(app.clone(), engine.clone(), paths, session_id.clone(), rx)
         }))
         .unwrap_or_else(|panic| {
             // The panic may have corrupted the cached engine and poisoned its
@@ -128,11 +118,7 @@ pub fn start_audio_transcription(
         let error = result.err();
         let _ = app.emit(
             FINISHED_EVENT,
-            AudioTranscriptionFinishedPayload {
-                session_id,
-                element_id,
-                error,
-            },
+            AudioTranscriptionFinishedPayload { session_id, error },
         );
     });
 
@@ -213,7 +199,6 @@ fn run_transcription_session(
     engine: ScribbleEngine,
     paths: ModelPaths,
     session_id: String,
-    element_id: String,
     rx: mpsc::Receiver<TranscriptionMessage>,
 ) -> Result<(), String> {
     let scribble = get_or_init_scribble(&engine, paths)?;
@@ -228,28 +213,24 @@ fn run_transcription_session(
         incremental_min_window_seconds: 1,
     };
 
-    let mut writer = TranscriptionEventWriter::new(app, session_id, element_id);
+    let mut writer = TranscriptionEventWriter::new(app, session_id);
     let mut stream = scribble
         .backend()
         .create_stream(&opts, &mut writer)
         .map_err(|e| format!("create scribble stream: {e}"))?;
     let mut resampler = PcmResampler::new();
 
-    loop {
-        match rx.recv_timeout(SESSION_IDLE_TIMEOUT) {
-            Ok(TranscriptionMessage::Samples {
-                samples,
-                sample_rate,
-            }) => {
-                let samples_16k = resampler.push(&samples, sample_rate);
-                if !samples_16k.is_empty() {
-                    stream
-                        .on_samples(&samples_16k)
-                        .map_err(|e| format!("transcribe samples: {e}"))?;
-                }
-            }
-            // Timeout and disconnect both mean the session is over.
-            Ok(TranscriptionMessage::Finish) | Err(_) => break,
+    // An explicit Finish, a timeout, and a disconnect all end the session.
+    while let Ok(TranscriptionMessage::Samples {
+        samples,
+        sample_rate,
+    }) = rx.recv_timeout(SESSION_IDLE_TIMEOUT)
+    {
+        let samples_16k = resampler.push(&samples, sample_rate);
+        if !samples_16k.is_empty() {
+            stream
+                .on_samples(&samples_16k)
+                .map_err(|e| format!("transcribe samples: {e}"))?;
         }
     }
 
@@ -410,16 +391,11 @@ fn sanitize_sample(sample: f32) -> Option<f32> {
 struct TranscriptionEventWriter {
     app: AppHandle,
     session_id: String,
-    element_id: String,
 }
 
 impl TranscriptionEventWriter {
-    fn new(app: AppHandle, session_id: String, element_id: String) -> Self {
-        Self {
-            app,
-            session_id,
-            element_id,
-        }
+    fn new(app: AppHandle, session_id: String) -> Self {
+        Self { app, session_id }
     }
 }
 
@@ -429,7 +405,6 @@ impl SegmentEncoder for TranscriptionEventWriter {
             SEGMENT_EVENT,
             AudioTranscriptionSegmentPayload {
                 session_id: self.session_id.clone(),
-                element_id: self.element_id.clone(),
                 text: segment.text.clone(),
                 start_seconds: segment.start_seconds,
                 end_seconds: segment.end_seconds,

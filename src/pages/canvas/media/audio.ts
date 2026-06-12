@@ -1,10 +1,11 @@
+import { getDevicePixelRatio } from '@/lib/utils';
 import type { DrawableCanvas } from '../drawable-canvas';
 import {
   AUDIO_NATURAL_HEIGHT,
   AUDIO_NATURAL_WIDTH,
   AudioElement,
 } from '../elements/audio/element';
-import { decodeAudio } from '../elements/audio/player-view';
+import { decodeAudio } from '../elements/audio/waveform';
 import type { MediaImportOptions } from './index';
 
 export async function audioImportHandler(
@@ -17,10 +18,13 @@ export async function audioImportHandler(
   const mimeType = blob.type || '';
 
   let duration = 0;
+  let waveform: Float32Array | null = null;
   try {
-    duration = (await decodeAudio(bytes)).duration;
+    const decoded = await decodeAudio(bytes);
+    duration = decoded.duration;
+    waveform = decoded.waveform;
   } catch {
-    // duration stays 0
+    // undecodable input: duration stays 0, no waveform
   }
 
   // Imports are not transcribed automatically — the player view offers an
@@ -28,9 +32,9 @@ export async function audioImportHandler(
   // an arbitrarily long import is too expensive to fire unprompted.
   const fileName = blob instanceof File ? blob.name : 'audio';
   const el = canvas.addElement((uuid) => new AudioElement(uuid));
-  el.setAudioData(bytes, fileName, duration, mimeType);
+  el.setAudioData(bytes, fileName, duration, mimeType, waveform);
 
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = getDevicePixelRatio();
   const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
   const cy = options.screenY ?? canvas.ctx.canvas.height / dpr / 2;
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });

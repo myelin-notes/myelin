@@ -19,8 +19,9 @@ import {
   transcribeAudioBuffer,
 } from '@/lib/audio-transcription/service';
 import { useMessages } from '@/lib/i18n';
+import { getDevicePixelRatio } from '@/lib/utils';
+import { decodeAudio, drawWaveform } from './waveform';
 
-const WAVEFORM_BARS = 80;
 const MAX_WAVEFORM_BACKING_DIMENSION = 4096;
 
 type RecordingState = 'idle' | 'requesting' | 'recording' | 'error';
@@ -31,10 +32,9 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export interface DecodedAudio {
-  buffer: AudioBuffer;
-  waveform: Float32Array;
-  duration: number;
+interface WaveformDisplaySize {
+  cssWidth: number;
+  cssHeight: number;
 }
 
 export interface WaveformCanvasMetrics {
@@ -52,12 +52,8 @@ export function getWaveformCanvasMetrics(
 ): WaveformCanvasMetrics {
   const safeCssWidth = Math.max(1, cssWidth);
   const safeCssHeight = Math.max(1, cssHeight);
-  const safeDpr =
-    Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
-      ? devicePixelRatio
-      : 1;
   const pixelRatio = Math.min(
-    safeDpr,
+    devicePixelRatio,
     MAX_WAVEFORM_BACKING_DIMENSION / safeCssWidth,
     MAX_WAVEFORM_BACKING_DIMENSION / safeCssHeight,
   );
@@ -70,7 +66,9 @@ export function getWaveformCanvasMetrics(
   };
 }
 
-function getWaveformCanvasDisplaySize(canvas: HTMLCanvasElement) {
+function getWaveformCanvasDisplaySize(
+  canvas: HTMLCanvasElement,
+): WaveformDisplaySize {
   const rect = canvas.getBoundingClientRect();
   const cssWidth = rect.width || canvas.clientWidth || canvas.width;
   const cssHeight = rect.height || canvas.clientHeight || canvas.height;
@@ -80,12 +78,16 @@ function getWaveformCanvasDisplaySize(canvas: HTMLCanvasElement) {
 function prepareWaveformCanvas(
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
+  displaySize: WaveformDisplaySize | null,
 ): WaveformCanvasMetrics {
-  const { cssWidth, cssHeight } = getWaveformCanvasDisplaySize(canvas);
+  // The ResizeObserver-cached size avoids a forced-reflow measurement here —
+  // this runs every rAF frame while recording.
+  const { cssWidth, cssHeight } =
+    displaySize ?? getWaveformCanvasDisplaySize(canvas);
   const metrics = getWaveformCanvasMetrics(
     cssWidth,
     cssHeight,
-    window.devicePixelRatio || 1,
+    getDevicePixelRatio(),
   );
   if (
     canvas.width !== metrics.backingWidth ||
@@ -100,12 +102,15 @@ function prepareWaveformCanvas(
   return metrics;
 }
 
-function drawRecordingWaveformFrame(canvas: HTMLCanvasElement): void {
+function drawRecordingWaveformFrame(
+  canvas: HTMLCanvasElement,
+  displaySize: WaveformDisplaySize | null,
+): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     return;
   }
-  const metrics = prepareWaveformCanvas(canvas, ctx);
+  const metrics = prepareWaveformCanvas(canvas, ctx, displaySize);
   const t = performance.now() / 1000;
   const bars = 40;
   const barW = 2;
@@ -130,75 +135,18 @@ function drawPlaybackWaveformCanvas(
   waveform: Float32Array | null,
   currentTime: number,
   duration: number,
+  displaySize: WaveformDisplaySize | null,
 ): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     return;
   }
-  const metrics = prepareWaveformCanvas(canvas, ctx);
+  const metrics = prepareWaveformCanvas(canvas, ctx, displaySize);
   if (!waveform) {
     return;
   }
   const progress = duration > 0 ? currentTime / duration : 0;
   drawWaveform(ctx, waveform, metrics.cssWidth, metrics.cssHeight, progress);
-}
-
-/** Single decode shared by the element, the player, and the import handler. */
-export async function decodeAudio(bytes: Uint8Array): Promise<DecodedAudio> {
-  const ctx = new AudioContext();
-  try {
-    const buffer = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength,
-    );
-    const decoded = await ctx.decodeAudioData(buffer as ArrayBuffer);
-    const channel = decoded.getChannelData(0);
-    const samplesPerBar = Math.max(
-      1,
-      Math.floor(channel.length / WAVEFORM_BARS),
-    );
-    const waveform = new Float32Array(WAVEFORM_BARS);
-    for (let i = 0; i < WAVEFORM_BARS; i++) {
-      let peak = 0;
-      const start = i * samplesPerBar;
-      const end = Math.min(start + samplesPerBar, channel.length);
-      for (let j = start; j < end; j++) {
-        const abs = Math.abs(channel[j]);
-        if (abs > peak) {
-          peak = abs;
-        }
-      }
-      waveform[i] = peak;
-    }
-    return { buffer: decoded, waveform, duration: decoded.duration };
-  } finally {
-    ctx.close();
-  }
-}
-
-/** Does not clear the canvas — drawThumbnail paints onto an existing card. */
-export function drawWaveform(
-  ctx2d: CanvasRenderingContext2D,
-  waveform: Float32Array,
-  width: number,
-  height: number,
-  progress: number,
-): void {
-  const bars = waveform.length;
-  const barW = 2;
-  const gap = (width - bars * barW) / (bars - 1);
-  const cx = width * progress;
-  const minBarH = 3;
-
-  for (let i = 0; i < bars; i++) {
-    const x = i * (barW + gap);
-    const barH = Math.max(minBarH, waveform[i] * height * 0.85);
-    const y = (height - barH) / 2;
-    ctx2d.fillStyle = x + barW < cx ? '#1c2738' : '#d0d5db';
-    ctx2d.beginPath();
-    ctx2d.roundRect(x, y, barW, barH, 1);
-    ctx2d.fill();
-  }
 }
 
 interface AudioPlayerViewProps {
@@ -208,7 +156,12 @@ interface AudioPlayerViewProps {
   mimeType: string;
   waveform: Float32Array | null;
   transcript: string;
-  onRecorded: (data: Uint8Array, duration: number, mimeType: string) => void;
+  onRecorded: (
+    data: Uint8Array,
+    duration: number,
+    mimeType: string,
+    waveform: Float32Array | null,
+  ) => void;
   onTranscribed: (transcript: string) => void;
 }
 
@@ -241,19 +194,23 @@ export function AudioPlayerView({
   const recordTickRef = useRef(0);
   const noticeTimerRef = useRef(0);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
+  const displaySizeRef = useRef<WaveformDisplaySize | null>(null);
   const disposedRef = useRef(false);
   const isRecording = recordingState === 'recording';
   const isRequestingRecording = recordingState === 'requesting';
   const redrawAfterResize = useEffectEvent(() => {
     const canvas = waveformCanvasRef.current;
-    if (!canvas) {
+    // While recording, the rAF loop repaints with the new size next frame.
+    if (!canvas || isRecording) {
       return;
     }
-    if (isRecording) {
-      drawRecordingWaveformFrame(canvas);
-    } else {
-      drawPlaybackWaveformCanvas(canvas, waveform, currentTime, duration);
-    }
+    drawPlaybackWaveformCanvas(
+      canvas,
+      waveform,
+      currentTime,
+      duration,
+      displaySizeRef.current,
+    );
   });
 
   // Tear down recording resources when the element is deleted mid-recording.
@@ -307,7 +264,7 @@ export function AudioPlayerView({
     function animate() {
       const canvas = waveformCanvasRef.current;
       if (canvas) {
-        drawRecordingWaveformFrame(canvas);
+        drawRecordingWaveformFrame(canvas, displaySizeRef.current);
       }
       frameId = requestAnimationFrame(animate);
     }
@@ -320,7 +277,13 @@ export function AudioPlayerView({
     if (!isRecording) {
       const canvas = waveformCanvasRef.current;
       if (canvas) {
-        drawPlaybackWaveformCanvas(canvas, waveform, currentTime, duration);
+        drawPlaybackWaveformCanvas(
+          canvas,
+          waveform,
+          currentTime,
+          duration,
+          displaySizeRef.current,
+        );
       }
     }
   }, [waveform, currentTime, duration, isRecording]);
@@ -330,7 +293,14 @@ export function AudioPlayerView({
     if (!canvas || typeof ResizeObserver === 'undefined') {
       return;
     }
-    const observer = new ResizeObserver(() => {
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[entries.length - 1]?.contentRect;
+      if (rect) {
+        displaySizeRef.current = {
+          cssWidth: rect.width,
+          cssHeight: rect.height,
+        };
+      }
       redrawAfterResize();
     });
     observer.observe(canvas);
@@ -458,8 +428,11 @@ export function AudioPlayerView({
     const bytes = new Uint8Array(arrayBuffer);
 
     let dur = 0;
+    let recordedWaveform: Float32Array | null = null;
     try {
-      dur = (await decodeAudio(bytes)).duration;
+      const decoded = await decodeAudio(bytes);
+      dur = decoded.duration;
+      recordedWaveform = decoded.waveform;
     } catch {
       dur = (Date.now() - recordStartRef.current) / 1000;
       // An instant start/stop produces a header-only blob no decoder accepts;
@@ -477,7 +450,7 @@ export function AudioPlayerView({
     // Publish the recording right away — waveform and playback must not wait
     // on whisper. The transcript follows when ready, spinner in the captions
     // slot meanwhile.
-    onRecorded(bytes, dur, recordedMimeType);
+    onRecorded(bytes, dur, recordedMimeType, recordedWaveform);
 
     if (!transcription) {
       return;

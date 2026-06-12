@@ -12,7 +12,6 @@ const IMPORT_CHUNK_SAMPLES = 65_536;
 
 interface AudioTranscriptionSegmentPayload {
   sessionId: string;
-  elementId: string;
   text: string;
   startSeconds: number;
   endSeconds: number;
@@ -21,7 +20,6 @@ interface AudioTranscriptionSegmentPayload {
 
 interface AudioTranscriptionFinishedPayload {
   sessionId: string;
-  elementId: string;
   error: string | null;
 }
 
@@ -43,28 +41,7 @@ export async function startAudioTranscription({
   elementId,
   stream,
 }: StartAudioTranscriptionOptions): Promise<AudioTranscriptionSession | null> {
-  const session = new TauriAudioTranscriptionSession(
-    crypto.randomUUID(),
-    elementId,
-  );
-  try {
-    // Listen before invoking so a fast-failing worker can't emit FINISHED
-    // before any listener exists.
-    await session.startListening();
-    await invoke('start_audio_transcription', {
-      sessionId: session.sessionId,
-      elementId,
-    });
-    await session.startCapture(stream);
-    return session;
-  } catch (error) {
-    void invoke('finish_audio_transcription', {
-      sessionId: session.sessionId,
-    }).catch(() => {});
-    await session.close();
-    logger.warn('Live audio transcription unavailable', error, { elementId });
-    return null;
-  }
+  return openSession(elementId, stream);
 }
 
 /** Transcribe an already-decoded audio file (the media import path). */
@@ -72,22 +49,8 @@ export async function transcribeAudioBuffer(
   elementId: string,
   buffer: AudioBuffer,
 ): Promise<string | null> {
-  const session = new TauriAudioTranscriptionSession(
-    crypto.randomUUID(),
-    elementId,
-  );
-  try {
-    await session.startListening();
-    await invoke('start_audio_transcription', {
-      sessionId: session.sessionId,
-      elementId,
-    });
-  } catch (error) {
-    void invoke('finish_audio_transcription', {
-      sessionId: session.sessionId,
-    }).catch(() => {});
-    await session.close();
-    logger.warn('Audio transcription unavailable', error, { elementId });
+  const session = await openSession(elementId);
+  if (!session) {
     return null;
   }
 
@@ -99,6 +62,36 @@ export async function transcribeAudioBuffer(
     );
   }
   return session.finish();
+}
+
+/** Start a backend session, fully unwinding it (and returning null) on failure. */
+async function openSession(
+  elementId: string,
+  stream?: MediaStream,
+): Promise<TauriAudioTranscriptionSession | null> {
+  const session = new TauriAudioTranscriptionSession(
+    crypto.randomUUID(),
+    elementId,
+  );
+  try {
+    // Listen before invoking so a fast-failing worker can't emit FINISHED
+    // before any listener exists.
+    await session.startListening();
+    await invoke('start_audio_transcription', {
+      sessionId: session.sessionId,
+    });
+    if (stream) {
+      await session.startCapture(stream);
+    }
+    return session;
+  } catch (error) {
+    void invoke('finish_audio_transcription', {
+      sessionId: session.sessionId,
+    }).catch(() => {});
+    await session.close();
+    logger.warn('Audio transcription unavailable', error, { elementId });
+    return null;
+  }
 }
 
 function mixToMono(buffer: AudioBuffer): Float32Array {
@@ -285,19 +278,7 @@ async function startPcmCapture(
 
   mute.gain.value = 0;
   processor.onaudioprocess = (event) => {
-    const input = event.inputBuffer;
-    const frames = input.length;
-    const channels = input.numberOfChannels;
-    const mono = new Float32Array(frames);
-
-    for (let channel = 0; channel < channels; channel++) {
-      const data = input.getChannelData(channel);
-      for (let i = 0; i < frames; i++) {
-        mono[i] += data[i] / channels;
-      }
-    }
-
-    onSamples(mono, audioContext.sampleRate);
+    onSamples(mixToMono(event.inputBuffer), audioContext.sampleRate);
   };
 
   source.connect(processor);

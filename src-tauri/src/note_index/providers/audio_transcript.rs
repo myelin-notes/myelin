@@ -1,7 +1,7 @@
-use yrs::{Array, Map, Out, Transact};
+use yrs::{Array, Doc, Map, Out, Transact};
 
-use super::yjs::{any_to_i64, any_to_string, decode_doc, normalize, TYPE_AUDIO};
-use super::IndexProvider;
+use super::yjs::{any_to_i64, any_to_string, normalize, TYPE_AUDIO};
+use super::{IndexProvider, IndexSource};
 
 /// Whisper transcripts are generated at capture time and persisted on the
 /// AUDIO element; this provider only pulls them out of the note bytes.
@@ -14,18 +14,16 @@ impl IndexProvider for AudioTranscriptProvider {
     fn applies_to(&self, file_type: &str) -> bool {
         file_type == "mcanvas"
     }
-    fn build(&self, bytes: &[u8]) -> Result<String, String> {
-        extract_audio_transcripts(bytes)
+    fn build(&self, source: &IndexSource) -> Result<String, String> {
+        if source.bytes.is_empty() {
+            return Ok(String::new());
+        }
+        extract_audio_transcripts(source.doc()?)
     }
 }
 
 /// Extract whisper transcripts from a note's AUDIO elements.
-fn extract_audio_transcripts(bytes: &[u8]) -> Result<String, String> {
-    if bytes.is_empty() {
-        return Ok(String::new());
-    }
-
-    let doc = decode_doc(bytes)?;
+fn extract_audio_transcripts(doc: &Doc) -> Result<String, String> {
     let elements = doc.get_or_insert_array("elements");
 
     let txn = doc.transact();
@@ -80,19 +78,22 @@ mod tests {
     #[test]
     fn audio_transcripts_extracted_from_audio_elements() {
         let bytes = audio_note_bytes("  hello transcribed   world  ");
+        let source = IndexSource::new(&bytes);
         assert_eq!(
-            extract_audio_transcripts(&bytes).unwrap(),
+            AudioTranscriptProvider.build(&source).unwrap(),
             "hello transcribed world"
         );
     }
 
     #[test]
     fn empty_bytes_yield_empty_string() {
-        assert_eq!(extract_audio_transcripts(&[]).unwrap(), "");
+        let source = IndexSource::new(&[]);
+        assert_eq!(AudioTranscriptProvider.build(&source).unwrap(), "");
     }
 
     #[test]
     fn fixture_without_audio_yields_empty_string() {
-        assert_eq!(extract_audio_transcripts(FIXTURE).unwrap(), "");
+        let source = IndexSource::new(FIXTURE);
+        assert_eq!(AudioTranscriptProvider.build(&source).unwrap(), "");
     }
 }

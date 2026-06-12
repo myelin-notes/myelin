@@ -5,10 +5,10 @@
 //! joined with `\n` at block boundaries, like ProseMirror's `textBetween`),
 //! while standalone TEXT elements store their string directly on the element map.
 
-use yrs::{Array, GetString, Map, Out, ReadTxn, Transact, XmlFragment, XmlOut};
+use yrs::{Array, Doc, GetString, Map, Out, ReadTxn, Transact, XmlFragment, XmlOut};
 
-use super::yjs::{any_to_i64, any_to_string, decode_doc, normalize, TYPE_PAGE_FRAME, TYPE_TEXT};
-use super::IndexProvider;
+use super::yjs::{any_to_i64, any_to_string, normalize, TYPE_PAGE_FRAME, TYPE_TEXT};
+use super::{IndexProvider, IndexSource};
 
 pub(crate) struct NoteTextProvider;
 
@@ -19,8 +19,11 @@ impl IndexProvider for NoteTextProvider {
     fn applies_to(&self, file_type: &str) -> bool {
         file_type == "mcanvas"
     }
-    fn build(&self, bytes: &[u8]) -> Result<String, String> {
-        extract_note_text(bytes)
+    fn build(&self, source: &IndexSource) -> Result<String, String> {
+        if source.bytes.is_empty() {
+            return Ok(String::new());
+        }
+        extract_note_text(source.doc()?)
     }
 }
 
@@ -47,14 +50,8 @@ fn walk_xml<T: ReadTxn>(txn: &T, node: &XmlOut, out: &mut String) {
     }
 }
 
-/// Extract searchable plain text from a note's full Yjs update bytes.
-fn extract_note_text(bytes: &[u8]) -> Result<String, String> {
-    if bytes.is_empty() {
-        return Ok(String::new());
-    }
-
-    let doc = decode_doc(bytes)?;
-
+/// Extract searchable plain text from a note's decoded Yjs doc.
+fn extract_note_text(doc: &Doc) -> Result<String, String> {
     // Acquire the root array BEFORE opening the read txn — get_or_insert_* opens
     // its own write txn and would deadlock against a held read txn.
     let elements = doc.get_or_insert_array("elements");
@@ -115,7 +112,7 @@ fn extract_note_text(bytes: &[u8]) -> Result<String, String> {
 mod tests {
     use super::*;
 
-    use super::super::yjs::TYPE_AUDIO;
+    use super::super::yjs::{decode_doc, TYPE_AUDIO};
     use yrs::{Array, Doc, Map, MapPrelim, ReadTxn, StateVector, Transact};
 
     // A real note's persisted bytes, produced by the app's own YDocManager +
@@ -127,7 +124,8 @@ mod tests {
 
     #[test]
     fn extracts_page_frame_and_text_element() {
-        let text = extract_note_text(FIXTURE).expect("extraction succeeds");
+        let doc = decode_doc(FIXTURE).unwrap();
+        let text = extract_note_text(&doc).expect("extraction succeeds");
         assert!(text.contains("Indexed Heading Title"), "got: {text:?}");
         assert!(text.contains("The quick brown fox jumps over the lazy dog."));
         assert!(text.contains("searchable keyword zebra"));
@@ -137,7 +135,8 @@ mod tests {
 
     #[test]
     fn empty_bytes_yield_empty_string() {
-        assert_eq!(extract_note_text(&[]).unwrap(), "");
+        let source = IndexSource::new(&[]);
+        assert_eq!(NoteTextProvider.build(&source).unwrap(), "");
     }
 
     #[test]
@@ -150,6 +149,6 @@ mod tests {
         map.insert(&mut txn, "transcript", "  hello transcribed   world  ");
         let bytes = txn.encode_state_as_update_v1(&StateVector::default());
 
-        assert_eq!(extract_note_text(&bytes).unwrap(), "");
+        assert_eq!(extract_note_text(&decode_doc(&bytes).unwrap()).unwrap(), "");
     }
 }

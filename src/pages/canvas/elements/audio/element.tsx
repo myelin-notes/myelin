@@ -7,7 +7,8 @@ import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
-import { AudioPlayerView, decodeAudio, drawWaveform } from './player-view';
+import { AudioPlayerView } from './player-view';
+import { decodeAudio, drawWaveform } from './waveform';
 
 export const AUDIO_NATURAL_WIDTH = 280;
 export const AUDIO_NATURAL_HEIGHT = 64;
@@ -41,8 +42,15 @@ export class AudioElement extends DrawableElement {
     data: Uint8Array,
     duration: number,
     mimeType: string,
+    waveform: Float32Array | null,
   ) => {
-    this.setAudioData(data, recordingFileName(mimeType), duration, mimeType);
+    this.setAudioData(
+      data,
+      recordingFileName(mimeType),
+      duration,
+      mimeType,
+      waveform,
+    );
   };
 
   private readonly _onTranscribed = (transcript: string) => {
@@ -99,27 +107,36 @@ export class AudioElement extends DrawableElement {
     return this._duration;
   }
 
-  /** Called by the React component after recording, and by the media import handler. */
+  /**
+   * Called by the React component after recording, and by the media import
+   * handler. Both callers just decoded the bytes, so they pass the waveform
+   * along rather than triggering a second full decode here.
+   */
   public setAudioData(
     data: Uint8Array,
     fileName: string,
     duration: number,
     mimeType: string,
-    transcript: string = '',
+    waveform: Float32Array | null,
   ): void {
     this._audioData = new Uint8Array(data);
     this._fileName = fileName;
     this._duration = duration;
     this._mimeType = mimeType;
-    this._transcript = transcript;
+    this._transcript = '';
     this.syncToYMap({
       audioData: this._audioData,
       fileName,
       duration,
       mimeType,
-      transcript,
+      transcript: '',
     });
-    this.scheduleWaveformDecode();
+    if (waveform) {
+      this._waveform = waveform;
+      this._waveformForData = this._audioData;
+    } else {
+      this.scheduleWaveformDecode();
+    }
     this.render();
   }
 

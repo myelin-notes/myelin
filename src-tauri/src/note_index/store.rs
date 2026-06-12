@@ -4,21 +4,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use super::providers::{sha256_hex, IndexProvider};
+use super::providers::{sha256_hex, IndexProvider, IndexSource};
 
 /// Bump to invalidate every artifact when the extraction format changes.
 const SCHEMA_VERSION: u32 = 3;
 const INDEX_DIR: &str = "NoteIndex";
 
-/// One provider's contribution to a node's artifact. `fingerprint` is the
-/// provider's input digest (or a hash of its output for providers without
-/// one); while an input digest matches, the stored `text` is reused without
-/// re-running `build`.
+/// One provider's contribution to a node's artifact.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProviderEntry {
     kind: String,
-    fingerprint: String,
     text: String,
 }
 
@@ -75,8 +71,8 @@ pub(crate) fn index_path(app: &AppHandle, repo_id: &str, node_id: &str) -> Resul
 }
 
 /// The heavy synchronous unit of work: read the note once, then run every
-/// applicable provider, each with its own per-fingerprint staleness check.
-/// Returns `true` if the node's combined text actually changed.
+/// applicable provider over it. Returns `true` if the node's combined text
+/// actually changed.
 pub(crate) fn process_node(
     providers: &[Box<dyn IndexProvider>],
     node_id: &str,
@@ -111,42 +107,22 @@ pub(crate) fn process_node(
         }
     }
 
-    // Re-run only the providers whose fingerprint changed; the rest reuse
-    // their stored text. A provider that fails (e.g. a flaky OCR pass later)
-    // is logged and keeps its previous entry, never aborting the others.
+    // A provider that fails is logged and keeps its previous entry, never
+    // aborting the others.
+    let source = IndexSource::new(&bytes);
     let mut entries: Vec<ProviderEntry> = Vec::new();
     for provider in applicable {
         let kind = provider.kind();
-        let previous = existing
-            .as_ref()
-            .and_then(|record| record.providers.iter().find(|e| e.kind == kind));
-
-        let fresh = provider.fingerprint(&bytes).and_then(|fingerprint| match fingerprint {
-            Some(fingerprint) => {
-                if let Some(prev) = previous {
-                    if prev.fingerprint == fingerprint {
-                        return Ok(prev.clone());
-                    }
-                }
-                provider.build(&bytes).map(|text| ProviderEntry {
-                    kind: kind.to_string(),
-                    fingerprint,
-                    text,
-                })
-            }
-            // No input digest cheaper than building: build once and
-            // fingerprint the output.
-            None => provider.build(&bytes).map(|text| ProviderEntry {
+        match provider.build(&source) {
+            Ok(text) => entries.push(ProviderEntry {
                 kind: kind.to_string(),
-                fingerprint: sha256_hex(text.as_bytes()),
                 text,
             }),
-        });
-
-        match fresh {
-            Ok(entry) => entries.push(entry),
             Err(e) => {
                 eprintln!("note_index: provider {kind} failed for {node_id}: {e}");
+                let previous = existing
+                    .as_ref()
+                    .and_then(|record| record.providers.iter().find(|e| e.kind == kind));
                 if let Some(prev) = previous {
                     entries.push(prev.clone());
                 }
@@ -196,10 +172,7 @@ mod tests {
         fn applies_to(&self, file_type: &str) -> bool {
             file_type == "mcanvas"
         }
-        fn fingerprint(&self, _bytes: &[u8]) -> Result<Option<String>, String> {
-            Ok(Some("dummy-fp".into()))
-        }
-        fn build(&self, _bytes: &[u8]) -> Result<String, String> {
+        fn build(&self, _source: &IndexSource) -> Result<String, String> {
             Ok("dummy index text".into())
         }
     }
@@ -212,16 +185,12 @@ mod tests {
         fn applies_to(&self, file_type: &str) -> bool {
             file_type == "mcanvas"
         }
-        fn fingerprint(&self, _bytes: &[u8]) -> Result<Option<String>, String> {
-            Err("boom".into())
-        }
-        fn build(&self, _bytes: &[u8]) -> Result<String, String> {
+        fn build(&self, _source: &IndexSource) -> Result<String, String> {
             Err("boom".into())
         }
     }
 
-    /// Constant fingerprint, counted builds — for asserting that `build` is
-    /// skipped while the fingerprint is unchanged.
+    /// Constant output, counted builds.
     struct CountingProvider {
         builds: Arc<AtomicUsize>,
     }
@@ -232,10 +201,7 @@ mod tests {
         fn applies_to(&self, file_type: &str) -> bool {
             file_type == "mcanvas"
         }
-        fn fingerprint(&self, _bytes: &[u8]) -> Result<Option<String>, String> {
-            Ok(Some("constant-fp".into()))
-        }
-        fn build(&self, _bytes: &[u8]) -> Result<String, String> {
+        fn build(&self, _source: &IndexSource) -> Result<String, String> {
             self.builds.fetch_add(1, Ordering::SeqCst);
             Ok("counted text".into())
         }
@@ -296,43 +262,6 @@ mod tests {
     }
 
     #[test]
-    fn unchanged_fingerprint_skips_rebuild_when_the_file_changes() {
-        let base = std::env::temp_dir().join("note_index_fingerprint_reuse_test");
-        let _ = std::fs::remove_dir_all(&base);
-        std::fs::create_dir_all(&base).unwrap();
-        let note_path = base.join("note.myelin");
-        std::fs::write(&note_path, include_bytes!("test_fixture.bin")).unwrap();
-        let index_file = base.join("idx").join("node1.json");
-
-        let builds = Arc::new(AtomicUsize::new(0));
-        let providers: Vec<Box<dyn IndexProvider>> = vec![
-            Box::new(NoteTextProvider),
-            Box::new(CountingProvider {
-                builds: builds.clone(),
-            }),
-        ];
-        let path = note_path.to_str().unwrap();
-
-        let changed = process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
-        assert!(changed);
-        assert_eq!(builds.load(Ordering::SeqCst), 1);
-
-        // The note's text content changes, but the counting provider's
-        // fingerprint doesn't — its build must not re-run.
-        std::fs::write(&note_path, []).unwrap();
-        let changed = process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
-        assert!(changed, "note text was removed, combined text changed");
-        assert_eq!(
-            builds.load(Ordering::SeqCst),
-            1,
-            "build reused via fingerprint"
-        );
-        assert_eq!(read_text(&index_file), "counted text");
-
-        std::fs::remove_dir_all(&base).ok();
-    }
-
-    #[test]
     fn rewrite_with_identical_text_reports_unchanged() {
         let base = std::env::temp_dir().join("note_index_unchanged_text_test");
         let _ = std::fs::remove_dir_all(&base);
@@ -354,7 +283,7 @@ mod tests {
         std::fs::write(&note_path, []).unwrap();
         let changed = process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
         assert!(!changed);
-        assert_eq!(builds.load(Ordering::SeqCst), 1);
+        assert_eq!(builds.load(Ordering::SeqCst), 2);
 
         std::fs::remove_dir_all(&base).ok();
     }

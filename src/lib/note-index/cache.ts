@@ -26,7 +26,6 @@ export interface NoteIndexRecord {
 
 export interface NoteIndexProviderEntry {
   kind: string;
-  fingerprint: string;
   text: string;
 }
 

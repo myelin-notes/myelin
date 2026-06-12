@@ -2,26 +2,42 @@ mod audio_transcript;
 mod note_text;
 mod yjs;
 
+use std::cell::OnceCell;
+
 use sha2::{Digest, Sha256};
+use yrs::Doc;
 
 use audio_transcript::AudioTranscriptProvider;
 
 pub(crate) use note_text::NoteTextProvider;
 
+/// One node's raw bytes plus its Yjs doc, decoded lazily and shared across
+/// providers so each reindex decodes the (potentially multi-MB) update once.
+pub(crate) struct IndexSource<'a> {
+    pub(crate) bytes: &'a [u8],
+    doc: OnceCell<Result<Doc, String>>,
+}
+
+impl<'a> IndexSource<'a> {
+    pub(crate) fn new(bytes: &'a [u8]) -> Self {
+        Self {
+            bytes,
+            doc: OnceCell::new(),
+        }
+    }
+
+    pub(crate) fn doc(&self) -> Result<&Doc, String> {
+        self.doc
+            .get_or_init(|| yjs::decode_doc(self.bytes))
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+}
+
 pub(crate) trait IndexProvider: Send + Sync {
     fn kind(&self) -> &'static str;
     fn applies_to(&self, file_type: &str) -> bool;
-    /// Digest of the provider's *input* slice, cheaper than building. `build`
-    /// is skipped while it matches, so an edit elsewhere in the same file
-    /// doesn't re-run expensive derivations (OCR later should hash its source
-    /// media bytes here). Return Ok(None) when no digest cheaper than
-    /// building exists — the store then builds once and fingerprints the
-    /// output instead.
-    fn fingerprint(&self, bytes: &[u8]) -> Result<Option<String>, String> {
-        let _ = bytes;
-        Ok(None)
-    }
-    fn build(&self, bytes: &[u8]) -> Result<String, String>;
+    fn build(&self, source: &IndexSource) -> Result<String, String>;
 }
 
 pub(crate) fn default_providers() -> Vec<Box<dyn IndexProvider>> {
