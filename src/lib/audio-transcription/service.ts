@@ -274,6 +274,12 @@ async function startPcmCapture(
 ): Promise<PcmCapture> {
   const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(stream);
+  // Deliberately the deprecated ScriptProcessorNode over AudioWorklet: a
+  // worklet module needs bundler plumbing and per-webview verification
+  // (AudioWorklet support in WebKitGTK is unconfirmed). Worst case here is
+  // main-thread starvation dropping samples, which degrades the live
+  // transcript — the recording itself comes from MediaRecorder and is
+  // unaffected, and the transcribe button can regenerate the transcript.
   const processor = audioContext.createScriptProcessor(4096, 1, 1);
   const mute = audioContext.createGain();
 
