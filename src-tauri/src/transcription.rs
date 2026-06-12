@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
@@ -18,7 +17,6 @@ const VAD_STUB_FILE: &str = "scribble-vad-stub.bin";
 const SEGMENT_EVENT: &str = "audio-transcription-segment";
 const FINISHED_EVENT: &str = "audio-transcription-finished";
 const TARGET_SAMPLE_RATE: u32 = 16_000;
-const MIN_FINAL_TRANSCRIPTION_SAMPLES: u64 = TARGET_SAMPLE_RATE as u64;
 /// A live session pushes samples roughly every 85 ms, so a receiver that stays
 /// quiet this long means the frontend abandoned the session (reload, crash).
 const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -220,19 +218,12 @@ fn run_transcription_session(
         incremental_min_window_seconds: 1,
     };
 
-    let last_emitted_end_samples = Arc::new(AtomicU64::new(0));
-    let mut writer = TranscriptionEventWriter::new(
-        app,
-        session_id,
-        element_id,
-        last_emitted_end_samples.clone(),
-    );
+    let mut writer = TranscriptionEventWriter::new(app, session_id, element_id);
     let mut stream = scribble
         .backend()
         .create_stream(&opts, &mut writer)
         .map_err(|e| format!("create scribble stream: {e}"))?;
     let mut resampler = PcmResampler::new();
-    let mut sent_samples_16k = 0u64;
 
     loop {
         match rx.recv_timeout(SESSION_IDLE_TIMEOUT) {
@@ -242,7 +233,6 @@ fn run_transcription_session(
             }) => {
                 let samples_16k = resampler.push(&samples, sample_rate);
                 if !samples_16k.is_empty() {
-                    sent_samples_16k = sent_samples_16k.saturating_add(samples_16k.len() as u64);
                     stream
                         .on_samples(&samples_16k)
                         .map_err(|e| format!("transcribe samples: {e}"))?;
@@ -253,16 +243,11 @@ fn run_transcription_session(
         }
     }
 
-    let pending_samples = sent_samples_16k.saturating_sub(
-        last_emitted_end_samples
-            .load(Ordering::Relaxed)
-            .min(sent_samples_16k),
-    );
-    if pending_samples >= MIN_FINAL_TRANSCRIPTION_SAMPLES {
-        stream
-            .finish()
-            .map_err(|e| format!("finish transcription stream: {e}"))?;
-    }
+    // Always flush: this is what emits the final in-progress segment. Whisper
+    // handles short tails itself (input under 100ms yields zero segments).
+    stream
+        .finish()
+        .map_err(|e| format!("finish transcription stream: {e}"))?;
     drop(stream);
     writer
         .close()
@@ -411,31 +396,20 @@ struct TranscriptionEventWriter {
     app: AppHandle,
     session_id: String,
     element_id: String,
-    last_emitted_end_samples: Arc<AtomicU64>,
 }
 
 impl TranscriptionEventWriter {
-    fn new(
-        app: AppHandle,
-        session_id: String,
-        element_id: String,
-        last_emitted_end_samples: Arc<AtomicU64>,
-    ) -> Self {
+    fn new(app: AppHandle, session_id: String, element_id: String) -> Self {
         Self {
             app,
             session_id,
             element_id,
-            last_emitted_end_samples,
         }
     }
 }
 
 impl SegmentEncoder for TranscriptionEventWriter {
     fn write_segment(&mut self, segment: &Segment) -> scribble::Result<()> {
-        self.last_emitted_end_samples.fetch_max(
-            seconds_to_sample_index(segment.end_seconds),
-            Ordering::Relaxed,
-        );
         let _ = self.app.emit(
             SEGMENT_EVENT,
             AudioTranscriptionSegmentPayload {
@@ -453,13 +427,6 @@ impl SegmentEncoder for TranscriptionEventWriter {
     fn close(&mut self) -> scribble::Result<()> {
         Ok(())
     }
-}
-
-fn seconds_to_sample_index(seconds: f32) -> u64 {
-    if !seconds.is_finite() || seconds <= 0.0 {
-        return 0;
-    }
-    (seconds * TARGET_SAMPLE_RATE as f32).round() as u64
 }
 
 #[cfg(test)]
