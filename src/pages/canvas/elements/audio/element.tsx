@@ -11,6 +11,13 @@ import { AudioPlayerView, decodeAudio, drawWaveform } from './player-view';
 export const AUDIO_NATURAL_WIDTH = 280;
 export const AUDIO_NATURAL_HEIGHT = 64;
 
+/** e.g. 'audio/webm;codecs=opus' → 'recording.webm', 'audio/mp4' → 'recording.m4a' */
+function recordingFileName(mimeType: string): string {
+  const subtype = mimeType.split(';')[0]?.split('/')[1] ?? '';
+  const ext = subtype === 'mp4' ? 'm4a' : subtype;
+  return ext ? `recording.${ext}` : 'recording';
+}
+
 export class AudioElement extends DrawableElement {
   private _audioData: Uint8Array | null = null;
   private _fileName: string = '';
@@ -33,7 +40,13 @@ export class AudioElement extends DrawableElement {
     mimeType: string,
     transcript: string,
   ) => {
-    this.setAudioData(data, 'recording.webm', duration, mimeType, transcript);
+    this.setAudioData(
+      data,
+      recordingFileName(mimeType),
+      duration,
+      mimeType,
+      transcript,
+    );
   };
 
   private readonly _onTranscribed = (transcript: string) => {
