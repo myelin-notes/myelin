@@ -1,6 +1,7 @@
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type KeyboardEvent, useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useResettableTimeout } from '@/hooks/use-resettable-timeout';
 import { useMessages } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -16,17 +17,9 @@ export function McpSection() {
   const mcpAllowDirectWrites = useUserPref('mcpAllowDirectWrites');
   const [portDraft, setPortDraft] = useState<string | null>(null);
   const [copiedInstallPrompt, setCopiedInstallPrompt] = useState(false);
-  const copiedResetTimeoutRef = useRef<number | null>(null);
+  const copiedReset = useResettableTimeout();
   const endpoint = `http://127.0.0.1:${mcpPort}/mcp`;
   const installPrompt = strings.settings.mcp.installPrompt.prompt(endpoint);
-
-  useEffect(() => {
-    return () => {
-      if (copiedResetTimeoutRef.current !== null) {
-        window.clearTimeout(copiedResetTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const handleEnabled = () => {
     UserPrefs.set('mcpEnabled', !mcpEnabled);
@@ -58,16 +51,9 @@ export function McpSection() {
   };
 
   const handleCopyInstallPrompt = async () => {
-    if (copiedResetTimeoutRef.current !== null) {
-      window.clearTimeout(copiedResetTimeoutRef.current);
-      copiedResetTimeoutRef.current = null;
-    }
     await navigator.clipboard.writeText(installPrompt);
     setCopiedInstallPrompt(true);
-    copiedResetTimeoutRef.current = window.setTimeout(() => {
-      setCopiedInstallPrompt(false);
-      copiedResetTimeoutRef.current = null;
-    }, 2000);
+    copiedReset.schedule(() => setCopiedInstallPrompt(false), 2000);
   };
 
   return (
