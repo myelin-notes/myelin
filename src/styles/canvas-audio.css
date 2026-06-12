@@ -10,6 +10,7 @@
    Only the button opts in. The block mounts above the canvas in #canvas-chrome-controls. */
 .canvas-audio-inner {
   pointer-events: none;
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
@@ -142,4 +143,39 @@
   cursor: wait;
   color: var(--text-muted);
   background: transparent;
+}
+
+.canvas-audio-transcribe[data-active='true'] {
+  background: var(--bg-hover-tint);
+  color: var(--text-primary);
+}
+
+/* Expands below the card like an open popover; intentionally overflows the
+   element's 280×64 bounds, so it doesn't affect selection or thumbnails. */
+.canvas-audio-transcript {
+  pointer-events: auto;
+  user-select: text;
+  position: absolute;
+  top: calc(100% + 6px * var(--canvas-audio-scale));
+  left: 0;
+  right: 0;
+  max-height: calc(160px * var(--canvas-audio-scale));
+  overflow-y: auto;
+  padding: calc(10px * var(--canvas-audio-scale))
+    calc(12px * var(--canvas-audio-scale));
+  background: var(--bg-card);
+  border: calc(1px * var(--canvas-audio-scale)) solid
+    rgba(195, 199, 202, 0.5);
+  border-radius: calc(10px * var(--canvas-audio-scale));
+  box-shadow:
+    0 calc(8px * var(--canvas-audio-scale))
+      calc(24px * var(--canvas-audio-scale))
+      calc(-8px * var(--canvas-audio-scale)) rgba(28, 39, 56, 0.18);
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-size: calc(11px * var(--canvas-audio-scale));
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  box-sizing: border-box;
 }

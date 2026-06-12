@@ -483,6 +483,10 @@ const zhHans: typeof en = {
       pauseAudio: '暂停音频',
       transcribe: '转录音频',
       transcribing: '正在转录音频...',
+      showTranscript: '显示转录文本',
+      hideTranscript: '隐藏转录文本',
+      noSpeechDetected: '未检测到语音',
+      transcriptionFailed: '转录失败',
     },
     toolShelf: {
       title: '工具盘',

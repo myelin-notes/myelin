@@ -232,6 +232,8 @@ export function AudioPlayerView({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -242,6 +244,7 @@ export function AudioPlayerView({
   const recordChunksRef = useRef<Blob[]>([]);
   const recordStartRef = useRef(0);
   const recordTickRef = useRef(0);
+  const noticeTimerRef = useRef(0);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
   const disposedRef = useRef(false);
   const isRecording = recordingState === 'recording';
@@ -263,6 +266,7 @@ export function AudioPlayerView({
     () => () => {
       disposedRef.current = true;
       clearInterval(recordTickRef.current);
+      clearTimeout(noticeTimerRef.current);
       const recorder = mediaRecorderRef.current;
       mediaRecorderRef.current = null;
       if (recorder && recorder.state !== 'inactive') {
@@ -295,6 +299,7 @@ export function AudioPlayerView({
       setIsPlaying(false);
       setCurrentTime(0);
       setRecordingState('idle');
+      setShowTranscript(false);
     };
   }, [audioBytes]);
 
@@ -337,9 +342,19 @@ export function AudioPlayerView({
     return () => observer.disconnect();
   }, []);
 
+  /** Show a transient status line (e.g. "No speech detected") in the time slot. */
+  function flashNotice(message: string) {
+    clearTimeout(noticeTimerRef.current);
+    setNotice(message);
+    noticeTimerRef.current = window.setTimeout(() => {
+      setNotice(null);
+    }, 4000);
+  }
+
   async function startRecording() {
     setRecordingState('requesting');
     setCurrentTime(0);
+    setNotice(null);
 
     let stream: MediaStream | null = null;
     try {
@@ -452,6 +467,13 @@ export function AudioPlayerView({
       dur = (await decodeAudio(bytes)).duration;
     } catch {
       dur = (Date.now() - recordStartRef.current) / 1000;
+      // An instant start/stop produces a header-only blob no decoder accepts;
+      // keeping it would leave an unplayable, untranscribable card. Discard it
+      // and return to "tap to record". Longer recordings that fail to decode
+      // are kept with the wall-clock duration.
+      if (dur < 1) {
+        return;
+      }
     }
 
     const transcript = await transcriptPromise.catch(() => '');
@@ -507,18 +529,41 @@ export function AudioPlayerView({
       return;
     }
     setIsTranscribing(true);
+    setNotice(null);
     try {
       const { buffer } = await decodeAudio(audioBytes);
       const text = await transcribeAudioBuffer(elementId, buffer);
-      if (!disposedRef.current && text) {
+      if (disposedRef.current) {
+        return;
+      }
+      if (text) {
         onTranscribed(text);
+        setShowTranscript(true);
+      } else {
+        // null = backend unavailable; '' = whisper ran and heard nothing.
+        flashNotice(
+          text === null
+            ? strings.transcriptionFailed
+            : strings.noSpeechDetected,
+        );
       }
     } catch {
       // The button stays visible as the retry affordance.
+      if (!disposedRef.current) {
+        flashNotice(strings.transcriptionFailed);
+      }
     } finally {
       if (!disposedRef.current) {
         setIsTranscribing(false);
       }
+    }
+  }
+
+  function handleCaptionsClick() {
+    if (transcript) {
+      setShowTranscript((open) => !open);
+    } else {
+      void handleTranscribe();
     }
   }
 
@@ -553,9 +598,18 @@ export function AudioPlayerView({
       ? strings.micUnavailable
       : isRecording
         ? formatTime(currentTime)
-        : audioBytes
-          ? `${formatTime(currentTime)} / ${formatTime(duration)}`
-          : strings.tapToRecord;
+        : (notice ??
+          (audioBytes
+            ? `${formatTime(currentTime)} / ${formatTime(duration)}`
+            : strings.tapToRecord));
+
+  const captionsLabel = transcript
+    ? showTranscript
+      ? strings.hideTranscript
+      : strings.showTranscript
+    : isTranscribing
+      ? strings.transcribing
+      : strings.transcribe;
 
   const buttonLabel = isRequestingRecording
     ? strings.requestingMicAccess
@@ -590,16 +644,15 @@ export function AudioPlayerView({
         />
         <span className="canvas-audio-time">{timeLabel}</span>
       </div>
-      {audioBytes && !transcript && (
+      {audioBytes && (
         <button
           type="button"
           className="canvas-audio-transcribe"
-          onClick={handleTranscribe}
+          data-active={showTranscript && Boolean(transcript)}
+          onClick={handleCaptionsClick}
           disabled={isTranscribing}
-          aria-label={
-            isTranscribing ? strings.transcribing : strings.transcribe
-          }
-          title={isTranscribing ? strings.transcribing : strings.transcribe}
+          aria-label={captionsLabel}
+          title={captionsLabel}
         >
           {isTranscribing ? (
             <LoaderCircle size={14} className="animate-spin" />
@@ -607,6 +660,17 @@ export function AudioPlayerView({
             <CaptionsIcon size={14} />
           )}
         </button>
+      )}
+      {showTranscript && transcript && (
+        <div
+          className="canvas-audio-transcript"
+          onWheel={(e) => {
+            // Scroll the transcript, not the canvas zoom underneath.
+            e.stopPropagation();
+          }}
+        >
+          {transcript}
+        </div>
       )}
     </div>
   );

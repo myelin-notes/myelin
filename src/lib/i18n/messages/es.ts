@@ -502,6 +502,10 @@ const es: typeof en = {
       pauseAudio: 'Pausar audio',
       transcribe: 'Transcribir audio',
       transcribing: 'Transcribiendo audio...',
+      showTranscript: 'Mostrar transcripción',
+      hideTranscript: 'Ocultar transcripción',
+      noSpeechDetected: 'No se detectó voz',
+      transcriptionFailed: 'No se pudo transcribir',
     },
     toolShelf: {
       title: 'Menú de herramientas',

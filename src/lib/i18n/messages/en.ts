@@ -497,6 +497,10 @@ const en = {
       pauseAudio: 'Pause audio',
       transcribe: 'Transcribe audio',
       transcribing: 'Transcribing audio...',
+      showTranscript: 'Show transcript',
+      hideTranscript: 'Hide transcript',
+      noSpeechDetected: 'No speech detected',
+      transcriptionFailed: 'Transcription failed',
     },
     toolShelf: {
       title: 'Tool Shelf',
