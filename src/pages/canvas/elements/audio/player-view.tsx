@@ -208,12 +208,7 @@ interface AudioPlayerViewProps {
   mimeType: string;
   waveform: Float32Array | null;
   transcript: string;
-  onRecorded: (
-    data: Uint8Array,
-    duration: number,
-    mimeType: string,
-    transcript: string,
-  ) => void;
+  onRecorded: (data: Uint8Array, duration: number, mimeType: string) => void;
   onTranscribed: (transcript: string) => void;
 }
 
@@ -476,11 +471,28 @@ export function AudioPlayerView({
       }
     }
 
+    if (disposedRef.current) {
+      return;
+    }
+    // Publish the recording right away — waveform and playback must not wait
+    // on whisper. The transcript follows when ready, spinner in the captions
+    // slot meanwhile.
+    onRecorded(bytes, dur, recordedMimeType);
+
+    if (!transcription) {
+      return;
+    }
+    setIsTranscribing(true);
     const transcript = await transcriptPromise.catch(() => '');
     if (disposedRef.current) {
       return;
     }
-    onRecorded(bytes, dur, recordedMimeType, transcript);
+    setIsTranscribing(false);
+    if (transcript) {
+      onTranscribed(transcript);
+    } else {
+      flashNotice(strings.noSpeechDetected);
+    }
   }
 
   function startPlayback() {

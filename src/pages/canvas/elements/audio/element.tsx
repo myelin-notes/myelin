@@ -35,19 +35,14 @@ export class AudioElement extends DrawableElement {
   private _reactRoot: Root | null = null;
 
   // Bound once so the React component always gets a stable reference.
+  // The transcript follows separately via _onTranscribed once whisper
+  // finishes, so the recording is usable immediately.
   private readonly _onRecorded = (
     data: Uint8Array,
     duration: number,
     mimeType: string,
-    transcript: string,
   ) => {
-    this.setAudioData(
-      data,
-      recordingFileName(mimeType),
-      duration,
-      mimeType,
-      transcript,
-    );
+    this.setAudioData(data, recordingFileName(mimeType), duration, mimeType);
   };
 
   private readonly _onTranscribed = (transcript: string) => {
