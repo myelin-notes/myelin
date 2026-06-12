@@ -344,6 +344,11 @@ fn panic_payload_message(panic: Box<dyn std::any::Any + Send>) -> String {
     "unknown panic".to_string()
 }
 
+/// Linear-interpolation resampler to whisper's 16kHz. No anti-aliasing
+/// filter: content above 8kHz aliases into the band on 48k→16k mic input,
+/// but speech energy up there is negligible and whisper is robust to it.
+/// Chosen over rubato (already in-tree via scribble) because rubato's
+/// fixed-chunk API would still need this buffering layer on top.
 struct PcmResampler {
     input: Vec<f32>,
     position: f64,
