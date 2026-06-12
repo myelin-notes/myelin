@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { ElementType } from './elements/element-type';
-import { YDocManager } from './ydoc-manager';
+import { writeYMap } from './y-fields';
+import { ASYNC_RESULT_ORIGIN, YDocManager } from './ydoc-manager';
 
 function withParagraph(text: string): Y.XmlElement {
   const p = new Y.XmlElement('paragraph');
@@ -70,6 +71,39 @@ describe('YDocManager.removeElementMap', () => {
     expect(fragment.length).toBe(1);
     const restored = fragment.get(0) as Y.XmlElement;
     expect(restored.toString()).toContain('keep me');
+  });
+});
+
+describe('async-result origin writes', () => {
+  it('adds no undo step of its own', () => {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.AUDIO, 'audio-1', {
+      transcript: '',
+    });
+    ydoc.undoManager.stopCapturing();
+
+    writeYMap(yMap, { transcript: 'hello world' }, ASYNC_RESULT_ORIGIN);
+
+    // The next undo skips straight past the transcript write and reverts the
+    // element creation itself.
+    ydoc.undoManager.undo();
+    expect(ydoc.elements.length).toBe(0);
+  });
+
+  it('restores the transcript when undoing the element deletion', () => {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.AUDIO, 'audio-1', {
+      transcript: '',
+    });
+    writeYMap(yMap, { transcript: 'hello world' }, ASYNC_RESULT_ORIGIN);
+    ydoc.undoManager.stopCapturing();
+
+    ydoc.removeElementMap(yMap);
+    expect(ydoc.elements.length).toBe(0);
+
+    ydoc.undoManager.undo();
+    expect(ydoc.elements.length).toBe(1);
+    expect(ydoc.elements.get(0).get('transcript')).toBe('hello world');
   });
 });
 

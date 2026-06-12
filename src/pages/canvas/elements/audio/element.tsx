@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import type * as Y from 'yjs';
 import { I18nProvider } from '@/lib/i18n';
 import type { CanvasViewport } from '../../canvas-viewport';
+import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
@@ -130,7 +131,10 @@ export class AudioElement extends DrawableElement {
   /** Called by the player view once on-demand transcription completes. */
   public setTranscript(transcript: string): void {
     this._transcript = transcript;
-    this.syncToYMap({ transcript });
+    // This lands seconds or minutes after the click that triggered it, so it
+    // must not be undoable or merge into the undo capture window of whatever
+    // the user is editing when it arrives.
+    this.syncToYMap({ transcript }, ASYNC_RESULT_ORIGIN);
     this.render();
   }
 

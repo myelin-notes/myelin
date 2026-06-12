@@ -1,5 +1,5 @@
 import type * as Y from 'yjs';
-import { LOCAL_ORIGIN } from './ydoc-manager';
+import { LOCAL_ORIGIN, type SyncOrigin } from './ydoc-manager';
 
 /**
  * Field mapping: Y.Map key → setter that updates the local cache.
@@ -37,10 +37,11 @@ export function applyYFields(
 export function writeYMap(
   yMap: Y.Map<unknown>,
   updates: Record<string, unknown>,
+  origin: SyncOrigin = LOCAL_ORIGIN,
 ): void {
   yMap.doc!.transact(() => {
     for (const [key, value] of Object.entries(updates)) {
       yMap.set(key, value);
     }
-  }, LOCAL_ORIGIN);
+  }, origin);
 }

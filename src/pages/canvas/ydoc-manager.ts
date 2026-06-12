@@ -10,11 +10,21 @@ export const REPOSITORY_SYNC_ORIGIN = 'repository-sync' as const;
 export type RepositorySyncOrigin = typeof REPOSITORY_SYNC_ORIGIN;
 export const FRAGMENT_SWEEP_ORIGIN = 'fragment-sweep' as const;
 export type FragmentSweepOrigin = typeof FRAGMENT_SWEEP_ORIGIN;
+/**
+ * Late async results (e.g. a transcript landing after whisper finishes):
+ * synced and persisted like local edits, but kept out of undo history so a
+ * Cmd+Z seconds later can't silently revert them. Deleting the element and
+ * undoing still restores these fields — undo of a tracked deletion reverts
+ * its whole delete-set regardless of which origin wrote the data.
+ */
+export const ASYNC_RESULT_ORIGIN = 'async-result' as const;
+export type AsyncResultOrigin = typeof ASYNC_RESULT_ORIGIN;
 export type SyncOrigin =
   | LocalOrigin
   | PeerOrigin
   | RepositorySyncOrigin
-  | FragmentSweepOrigin;
+  | FragmentSweepOrigin
+  | AsyncResultOrigin;
 
 /**
  * Owns a Y.Doc for a single canvas file and provides typed access
