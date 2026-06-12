@@ -8,7 +8,7 @@
 use yrs::{Array, GetString, Map, Out, ReadTxn, Transact, XmlFragment, XmlOut};
 
 use super::yjs::{any_to_i64, any_to_string, decode_doc, normalize, TYPE_PAGE_FRAME, TYPE_TEXT};
-use super::{sha256_hex, IndexProvider};
+use super::IndexProvider;
 
 pub(crate) struct NoteTextProvider;
 
@@ -18,9 +18,6 @@ impl IndexProvider for NoteTextProvider {
     }
     fn applies_to(&self, file_type: &str) -> bool {
         file_type == "mcanvas"
-    }
-    fn fingerprint(&self, bytes: &[u8]) -> Result<String, String> {
-        self.build(bytes).map(|text| sha256_hex(text.as_bytes()))
     }
     fn build(&self, bytes: &[u8]) -> Result<String, String> {
         extract_note_text(bytes)

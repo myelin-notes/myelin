@@ -11,12 +11,16 @@ pub(crate) use note_text::NoteTextProvider;
 pub(crate) trait IndexProvider: Send + Sync {
     fn kind(&self) -> &'static str;
     fn applies_to(&self, file_type: &str) -> bool;
-    /// Cheap digest of the provider-relevant slice of the source bytes.
-    /// `build` re-runs only when this changes, so an edit elsewhere in the
-    /// same file (e.g. typing text) doesn't re-run unrelated derivations.
-    /// Cheap extractors may hash their own output; expensive ones (OCR
-    /// later) should hash their source media bytes instead.
-    fn fingerprint(&self, bytes: &[u8]) -> Result<String, String>;
+    /// Digest of the provider's *input* slice, cheaper than building. `build`
+    /// is skipped while it matches, so an edit elsewhere in the same file
+    /// doesn't re-run expensive derivations (OCR later should hash its source
+    /// media bytes here). Return Ok(None) when no digest cheaper than
+    /// building exists — the store then builds once and fingerprints the
+    /// output instead.
+    fn fingerprint(&self, bytes: &[u8]) -> Result<Option<String>, String> {
+        let _ = bytes;
+        Ok(None)
+    }
     fn build(&self, bytes: &[u8]) -> Result<String, String>;
 }
 

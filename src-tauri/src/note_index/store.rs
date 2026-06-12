@@ -11,8 +11,9 @@ const SCHEMA_VERSION: u32 = 3;
 const INDEX_DIR: &str = "NoteIndex";
 
 /// One provider's contribution to a node's artifact. `fingerprint` is the
-/// provider's digest of its relevant source content; while it matches, the
-/// stored `text` is reused without re-running `build`.
+/// provider's input digest (or a hash of its output for providers without
+/// one); while an input digest matches, the stored `text` is reused without
+/// re-running `build`.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProviderEntry {
@@ -120,17 +121,26 @@ pub(crate) fn process_node(
             .as_ref()
             .and_then(|record| record.providers.iter().find(|e| e.kind == kind));
 
-        let fresh = provider.fingerprint(&bytes).and_then(|fingerprint| {
-            if let Some(prev) = previous {
-                if prev.fingerprint == fingerprint {
-                    return Ok(prev.clone());
+        let fresh = provider.fingerprint(&bytes).and_then(|fingerprint| match fingerprint {
+            Some(fingerprint) => {
+                if let Some(prev) = previous {
+                    if prev.fingerprint == fingerprint {
+                        return Ok(prev.clone());
+                    }
                 }
+                provider.build(&bytes).map(|text| ProviderEntry {
+                    kind: kind.to_string(),
+                    fingerprint,
+                    text,
+                })
             }
-            provider.build(&bytes).map(|text| ProviderEntry {
+            // No input digest cheaper than building: build once and
+            // fingerprint the output.
+            None => provider.build(&bytes).map(|text| ProviderEntry {
                 kind: kind.to_string(),
-                fingerprint,
+                fingerprint: sha256_hex(text.as_bytes()),
                 text,
-            })
+            }),
         });
 
         match fresh {
@@ -186,8 +196,8 @@ mod tests {
         fn applies_to(&self, file_type: &str) -> bool {
             file_type == "mcanvas"
         }
-        fn fingerprint(&self, _bytes: &[u8]) -> Result<String, String> {
-            Ok("dummy-fp".into())
+        fn fingerprint(&self, _bytes: &[u8]) -> Result<Option<String>, String> {
+            Ok(Some("dummy-fp".into()))
         }
         fn build(&self, _bytes: &[u8]) -> Result<String, String> {
             Ok("dummy index text".into())
@@ -202,7 +212,7 @@ mod tests {
         fn applies_to(&self, file_type: &str) -> bool {
             file_type == "mcanvas"
         }
-        fn fingerprint(&self, _bytes: &[u8]) -> Result<String, String> {
+        fn fingerprint(&self, _bytes: &[u8]) -> Result<Option<String>, String> {
             Err("boom".into())
         }
         fn build(&self, _bytes: &[u8]) -> Result<String, String> {
@@ -222,8 +232,8 @@ mod tests {
         fn applies_to(&self, file_type: &str) -> bool {
             file_type == "mcanvas"
         }
-        fn fingerprint(&self, _bytes: &[u8]) -> Result<String, String> {
-            Ok("constant-fp".into())
+        fn fingerprint(&self, _bytes: &[u8]) -> Result<Option<String>, String> {
+            Ok(Some("constant-fp".into()))
         }
         fn build(&self, _bytes: &[u8]) -> Result<String, String> {
             self.builds.fetch_add(1, Ordering::SeqCst);

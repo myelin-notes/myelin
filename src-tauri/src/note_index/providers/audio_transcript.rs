@@ -1,7 +1,7 @@
 use yrs::{Array, Map, Out, Transact};
 
 use super::yjs::{any_to_i64, any_to_string, decode_doc, normalize, TYPE_AUDIO};
-use super::{sha256_hex, IndexProvider};
+use super::IndexProvider;
 
 /// Whisper transcripts are generated at capture time and persisted on the
 /// AUDIO element; this provider only pulls them out of the note bytes.
@@ -13,9 +13,6 @@ impl IndexProvider for AudioTranscriptProvider {
     }
     fn applies_to(&self, file_type: &str) -> bool {
         file_type == "mcanvas"
-    }
-    fn fingerprint(&self, bytes: &[u8]) -> Result<String, String> {
-        self.build(bytes).map(|text| sha256_hex(text.as_bytes()))
     }
     fn build(&self, bytes: &[u8]) -> Result<String, String> {
         extract_audio_transcripts(bytes)
