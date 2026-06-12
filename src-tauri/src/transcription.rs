@@ -113,6 +113,16 @@ pub fn start_audio_transcription(
         {
             let mut sessions = sessions.lock().expect("sessions mutex poisoned");
             sessions.remove(&session_id);
+            // Reclaim the cached engine (~200MB resident) once no session
+            // needs it. The next recording reloads the model; that latency is
+            // absorbed by the sample channel's buffering. Holding the
+            // sessions lock means a session starting right now re-initializes
+            // only after the clear.
+            if sessions.is_empty() {
+                *engine
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+            }
         }
 
         let error = result.err();
