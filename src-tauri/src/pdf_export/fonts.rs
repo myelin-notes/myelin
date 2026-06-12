@@ -8,8 +8,8 @@
 
 use std::collections::HashMap;
 
-use krilla::Data;
 use krilla::text::{Font, Tag};
+use krilla::Data;
 
 use super::contract::FontKey;
 
@@ -50,10 +50,7 @@ impl FontRegistry {
             .or_insert_with(|| face_bytes(key, italic).to_vec().into())
             .clone();
 
-        let coords = [
-            (Tag::new(b"wght"), weight),
-            (Tag::new(b"opsz"), opsz),
-        ];
+        let coords = [(Tag::new(b"wght"), weight), (Tag::new(b"opsz"), opsz)];
         let font = Font::new_variable(data, 0, &coords)?;
         self.cache.insert(ik, font.clone());
         Some(font)

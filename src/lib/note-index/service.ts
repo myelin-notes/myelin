@@ -5,6 +5,7 @@ import type { VFSNodeId } from '@/lib/sync';
 import * as cache from './cache';
 
 const logger = new Logger('NoteIndexService');
+const CURRENT_NOTE_EMBEDDING_MODEL = 'Qdrant/all-MiniLM-L6-v2-onnx';
 
 /**
  * One reindex request, as passed to the Rust engine. The frontend owns the
@@ -184,6 +185,7 @@ export class NoteIndexService {
     const embedding = record?.embedding;
     if (
       embedding &&
+      embedding.model === CURRENT_NOTE_EMBEDDING_MODEL &&
       embedding.vector.length === embedding.dim &&
       embedding.dim > 0
     ) {

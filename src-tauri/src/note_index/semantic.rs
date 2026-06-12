@@ -1,3 +1,4 @@
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -56,7 +57,7 @@ impl SemanticEmbeddingModelHandle {
         app: &AppHandle,
         text: &str,
     ) -> Result<SemanticEmbedding, String> {
-        self.embed(app, format!("passage: {text}"))
+        self.embed(app, text)
     }
 
     pub(crate) fn embed_query(
@@ -64,37 +65,56 @@ impl SemanticEmbeddingModelHandle {
         app: &AppHandle,
         query: &str,
     ) -> Result<SemanticEmbedding, String> {
-        self.embed(app, format!("query: {query}"))
+        self.embed(app, query)
     }
 
-    fn embed(&self, app: &AppHandle, text: String) -> Result<SemanticEmbedding, String> {
-        let mut guard = self
-            .model
-            .lock()
-            .map_err(|_| "semantic model mutex poisoned".to_string())?;
-        if guard.is_none() {
-            *guard = Some(load_model(app)?);
+    fn embed(&self, app: &AppHandle, text: &str) -> Result<SemanticEmbedding, String> {
+        let mut guard = match self.model.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                let mut guard = poisoned.into_inner();
+                *guard = None;
+                self.model.clear_poison();
+                guard
+            }
+        };
+
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            if guard.is_none() {
+                *guard = Some(load_model(app)?);
+            }
+            let model = guard
+                .as_mut()
+                .ok_or_else(|| "semantic model unavailable".to_string())?;
+            let mut embeddings = model
+                .embed(vec![text.to_string()], None)
+                .map_err(|e| format!("embed text: {e}"))?;
+            let vector = embeddings
+                .pop()
+                .ok_or_else(|| "embedding model returned no vectors".to_string())?;
+            if vector.len() != SEMANTIC_DIM {
+                return Err(format!(
+                    "unexpected embedding dimension: got {}, expected {SEMANTIC_DIM}",
+                    vector.len()
+                ));
+            }
+            Ok(SemanticEmbedding {
+                model: SEMANTIC_MODEL_ID.to_string(),
+                dim: SEMANTIC_DIM,
+                vector,
+            })
+        }));
+
+        match result {
+            Ok(result) => result,
+            Err(panic) => {
+                *guard = None;
+                Err(format!(
+                    "semantic embedding panicked: {}",
+                    panic_payload_message(panic)
+                ))
+            }
         }
-        let model = guard
-            .as_mut()
-            .ok_or_else(|| "semantic model unavailable".to_string())?;
-        let mut embeddings = model
-            .embed(vec![text], None)
-            .map_err(|e| format!("embed text: {e}"))?;
-        let vector = embeddings
-            .pop()
-            .ok_or_else(|| "embedding model returned no vectors".to_string())?;
-        if vector.len() != SEMANTIC_DIM {
-            return Err(format!(
-                "unexpected embedding dimension: got {}, expected {SEMANTIC_DIM}",
-                vector.len()
-            ));
-        }
-        Ok(SemanticEmbedding {
-            model: SEMANTIC_MODEL_ID.to_string(),
-            dim: SEMANTIC_DIM,
-            vector,
-        })
     }
 }
 
@@ -125,6 +145,16 @@ fn load_model(app: &AppHandle) -> Result<TextEmbedding, String> {
 fn read_model_file(dir: &PathBuf, name: &str) -> Result<Vec<u8>, String> {
     let path = dir.join(name);
     std::fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))
+}
+
+fn panic_payload_message(panic: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(message) = panic.downcast_ref::<&str>() {
+        return (*message).to_string();
+    }
+    if let Some(message) = panic.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "unknown panic".to_string()
 }
 
 pub(crate) fn is_current_embedding(embedding: &SemanticEmbedding) -> bool {

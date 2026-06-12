@@ -416,13 +416,22 @@ export function searchNodeResultsSemantically(
     }
     const content = indexContent.get(node.id);
     const embedding = indexEmbeddings.get(node.id);
-    if (!content || !embedding || embedding.dim !== queryEmbedding.dim) {
+    if (
+      !content ||
+      !embedding ||
+      embedding.model !== queryEmbedding.model ||
+      embedding.dim !== queryEmbedding.dim
+    ) {
+      return [];
+    }
+    const score = cosineSimilarity(queryEmbedding.vector, embedding.vector);
+    if (score <= 0) {
       return [];
     }
     return [
       {
         node,
-        score: cosineSimilarity(queryEmbedding.vector, embedding.vector),
+        score,
         contentSnippet: buildSemanticSnippet(content),
         matchedTerms: [],
         searchMode: 'semantic' as const,

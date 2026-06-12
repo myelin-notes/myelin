@@ -38,7 +38,11 @@ beforeEach(() => {
   listenHandler = null;
 });
 
-function record(text: string, vector?: number[]) {
+function record(
+  text: string,
+  vector?: number[],
+  model = 'Qdrant/all-MiniLM-L6-v2-onnx',
+) {
   return {
     nodeId: 'n1',
     sourceHash: 'hash',
@@ -46,7 +50,7 @@ function record(text: string, vector?: number[]) {
     text,
     embedding: vector
       ? {
-          model: 'Qdrant/all-MiniLM-L6-v2-onnx',
+          model,
           dim: vector.length,
           vector,
         }
@@ -115,6 +119,16 @@ describe('NoteIndexService', () => {
     expect(service.getContent().get('n1')).toBe('first note');
     expect(service.getContent().get('n2')).toBe('second note');
     expect(service.getEmbeddings().get('n1')?.vector).toEqual([1]);
+  });
+
+  it('hydrates text but ignores embeddings from stale model artifacts', async () => {
+    listIndexedNodeIds.mockResolvedValue(['n1']);
+    readNodeRecord.mockResolvedValue(record('stale model text', [1], 'other'));
+    const service = new NoteIndexService();
+    await service.init('repo-a');
+
+    expect(service.getContent().get('n1')).toBe('stale model text');
+    expect(service.getEmbeddings().has('n1')).toBe(false);
   });
 
   it('reset clears the corpus and detaches from the active repo', async () => {

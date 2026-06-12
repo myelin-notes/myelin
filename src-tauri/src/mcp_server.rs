@@ -131,12 +131,7 @@ pub async fn mcp_start(
         .await
         .map_err(|err| format!("bind MCP server on 127.0.0.1:{port}: {err}"))?;
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
-    tauri::async_runtime::spawn(serve_mcp(
-        listener,
-        app,
-        state.inner().clone(),
-        shutdown_rx,
-    ));
+    tauri::async_runtime::spawn(serve_mcp(listener, app, state.inner().clone(), shutdown_rx));
     *runtime = Some(McpServerRuntime {
         port,
         shutdown: shutdown_tx,
@@ -163,7 +158,12 @@ pub async fn mcp_respond(
     state: State<'_, McpServerState>,
     response: McpFrontendToolResponse,
 ) -> Result<(), String> {
-    let sender = state.inner.pending.lock().await.remove(&response.request_id);
+    let sender = state
+        .inner
+        .pending
+        .lock()
+        .await
+        .remove(&response.request_id);
     if let Some(sender) = sender {
         sender
             .send(response)
@@ -220,9 +220,7 @@ async fn handle_connection(
             let response = handle_json_rpc(app, state, &request.body).await;
             match response {
                 RpcHttpResponse::Accepted => http_response(202, "Accepted", None),
-                RpcHttpResponse::Json(value) => {
-                    http_response(200, "OK", Some(value.to_string()))
-                }
+                RpcHttpResponse::Json(value) => http_response(200, "OK", Some(value.to_string())),
             }
         }
         // No SSE stream is offered; the spec expects 405 for other methods.
@@ -245,18 +243,10 @@ enum RpcHttpResponse {
     Json(Value),
 }
 
-async fn handle_json_rpc(
-    app: AppHandle,
-    state: McpServerState,
-    body: &[u8],
-) -> RpcHttpResponse {
+async fn handle_json_rpc(app: AppHandle, state: McpServerState, body: &[u8]) -> RpcHttpResponse {
     let request: Result<JsonRpcRequest, _> = serde_json::from_slice(body);
     let Ok(request) = request else {
-        return RpcHttpResponse::Json(rpc_error(
-            None,
-            -32700,
-            "Invalid JSON-RPC request",
-        ));
+        return RpcHttpResponse::Json(rpc_error(None, -32700, "Invalid JSON-RPC request"));
     };
 
     if request.id.is_none() {
@@ -302,7 +292,10 @@ async fn call_frontend_tool(
         .get("name")
         .and_then(Value::as_str)
         .ok_or_else(|| (-32602, "tools/call requires params.name".to_string()))?;
-    let arguments = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
+    let arguments = params
+        .get("arguments")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
     let request_id = state
         .inner
         .next_request_id
@@ -379,7 +372,10 @@ async fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, Error>
     let header_end = loop {
         let n = stream.read(&mut chunk).await?;
         if n == 0 {
-            return Err(Error::new(ErrorKind::UnexpectedEof, "closed before headers"));
+            return Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                "closed before headers",
+            ));
         }
         buffer.extend_from_slice(&chunk[..n]);
         if buffer.len() > MAX_REQUEST_BYTES {

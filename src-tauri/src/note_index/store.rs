@@ -110,6 +110,24 @@ pub(crate) fn process_node(
         if record.source_hash == source_hash && (record.text.is_empty() || has_current_embedding) {
             return Ok(false);
         }
+        if record.source_hash == source_hash {
+            let embedding =
+                build_embedding(&record.text, None, Some(record), &mut embedding_builder);
+            let changed = record.embedding != embedding;
+            if changed {
+                let record = NoteIndexRecord {
+                    node_id: node_id.to_string(),
+                    source_hash,
+                    schema_version: SCHEMA_VERSION,
+                    text: record.text.clone(),
+                    embedding,
+                    providers: record.providers.clone(),
+                    updated_at: now_ms(),
+                };
+                write_record(index_file, &record)?;
+            }
+            return Ok(changed);
+        }
     }
 
     // A provider that fails is logged and keeps its previous entry, never
@@ -166,12 +184,16 @@ pub(crate) fn process_node(
         updated_at: now_ms(),
     };
 
+    write_record(index_file, &record)?;
+    Ok(changed)
+}
+
+fn write_record(index_file: &Path, record: &NoteIndexRecord) -> Result<(), String> {
     if let Some(parent) = index_file.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("create index dir: {e}"))?;
     }
-    let json = serde_json::to_vec(&record).map_err(|e| format!("serialize index: {e}"))?;
-    std::fs::write(index_file, json).map_err(|e| format!("write index: {e}"))?;
-    Ok(changed)
+    let json = serde_json::to_vec(record).map_err(|e| format!("serialize index: {e}"))?;
+    std::fs::write(index_file, json).map_err(|e| format!("write index: {e}"))
 }
 
 fn build_embedding(
@@ -350,16 +372,20 @@ mod tests {
         std::fs::write(&note_path, b"note bytes").unwrap();
         let index_file = base.join("idx").join("node1.json");
 
-        let providers: Vec<Box<dyn IndexProvider>> = vec![Box::new(DummyProvider)];
+        let builds = Arc::new(AtomicUsize::new(0));
+        let providers: Vec<Box<dyn IndexProvider>> = vec![Box::new(CountingProvider {
+            builds: builds.clone(),
+        })];
         let path = note_path.to_str().unwrap();
 
         assert!(process_node(&providers, "node1", path, "mcanvas", &index_file, None).unwrap());
+        assert_eq!(builds.load(Ordering::SeqCst), 1);
         assert!(read_record(&index_file).embedding.is_none());
 
         let calls = Cell::new(0);
         let mut embed = |text: &str| {
             calls.set(calls.get() + 1);
-            assert_eq!(text, "dummy index text");
+            assert_eq!(text, "counted text");
             Ok(SemanticEmbedding {
                 model: super::super::semantic::SEMANTIC_MODEL_ID.to_string(),
                 dim: super::super::semantic::SEMANTIC_DIM,
@@ -378,6 +404,7 @@ mod tests {
 
         assert!(changed);
         assert_eq!(calls.get(), 1);
+        assert_eq!(builds.load(Ordering::SeqCst), 1);
         let record = read_record(&index_file);
         assert_eq!(record.embedding.as_ref().map(|e| e.vector.len()), Some(384));
 
@@ -392,6 +419,7 @@ mod tests {
         .unwrap();
         assert!(!changed_again);
         assert_eq!(calls.get(), 1);
+        assert_eq!(builds.load(Ordering::SeqCst), 1);
 
         std::fs::remove_dir_all(&base).ok();
     }
