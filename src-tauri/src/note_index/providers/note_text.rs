@@ -5,24 +5,25 @@
 //! joined with `\n` at block boundaries, like ProseMirror's `textBetween`),
 //! while standalone TEXT elements store their string directly on the element map.
 
-use yrs::updates::decoder::Decode;
-use yrs::{Any, Array, Doc, GetString, Map, Out, ReadTxn, Transact, Update, XmlFragment, XmlOut};
+use yrs::{Array, Doc, GetString, Map, Out, ReadTxn, Transact, XmlFragment, XmlOut};
 
-const TYPE_TEXT: i64 = 1;
-const TYPE_PAGE_FRAME: i64 = 3;
+use super::yjs::{any_to_i64, any_to_string, normalize, TYPE_PAGE_FRAME, TYPE_TEXT};
+use super::{IndexProvider, IndexSource};
 
-fn any_to_i64(any: &Any) -> Option<i64> {
-    match any {
-        Any::BigInt(n) => Some(*n),
-        Any::Number(n) => Some(*n as i64),
-        _ => None,
+pub(crate) struct NoteTextProvider;
+
+impl IndexProvider for NoteTextProvider {
+    fn kind(&self) -> &'static str {
+        "note-text"
     }
-}
-
-fn any_to_string(any: &Any) -> Option<String> {
-    match any {
-        Any::String(s) => Some(s.to_string()),
-        _ => None,
+    fn applies_to(&self, file_type: &str) -> bool {
+        file_type == "mcanvas"
+    }
+    fn build(&self, source: &IndexSource) -> Result<String, String> {
+        if source.bytes.is_empty() {
+            return Ok(String::new());
+        }
+        extract_note_text(source.doc()?)
     }
 }
 
@@ -49,52 +50,8 @@ fn walk_xml<T: ReadTxn>(txn: &T, node: &XmlOut, out: &mut String) {
     }
 }
 
-/// Collapse intra-line whitespace, normalize newlines, cap blank-line runs at
-/// one, and trim — a lightweight echo of `normalizePreviewText`.
-fn normalize(input: &str) -> String {
-    let unified = input.replace("\r\n", "\n").replace('\r', "\n");
-    let mut out = String::with_capacity(unified.len());
-    let mut newline_run = 0usize;
-    let mut pending_space = false;
-
-    for ch in unified.chars() {
-        if ch == '\n' {
-            newline_run += 1;
-            pending_space = false;
-            continue;
-        }
-        if newline_run > 0 {
-            for _ in 0..newline_run.min(2) {
-                out.push('\n');
-            }
-            newline_run = 0;
-        }
-        if ch == ' ' || ch == '\t' || ch == '\u{000B}' || ch == '\u{000C}' {
-            pending_space = true;
-            continue;
-        }
-        if pending_space {
-            out.push(' ');
-            pending_space = false;
-        }
-        out.push(ch);
-    }
-
-    out.trim().to_string()
-}
-
-/// Extract searchable plain text from a note's full Yjs update bytes.
-pub fn extract_note_text(bytes: &[u8]) -> Result<String, String> {
-    if bytes.is_empty() {
-        return Ok(String::new());
-    }
-
-    let doc = Doc::new();
-    let update = Update::decode_v1(bytes).map_err(|e| format!("decode update: {e}"))?;
-    doc.transact_mut()
-        .apply_update(update)
-        .map_err(|e| format!("apply update: {e}"))?;
-
+/// Extract searchable plain text from a note's decoded Yjs doc.
+fn extract_note_text(doc: &Doc) -> Result<String, String> {
     // Acquire the root array BEFORE opening the read txn — get_or_insert_* opens
     // its own write txn and would deadlock against a held read txn.
     let elements = doc.get_or_insert_array("elements");
@@ -155,16 +112,20 @@ pub fn extract_note_text(bytes: &[u8]) -> Result<String, String> {
 mod tests {
     use super::*;
 
+    use super::super::yjs::{decode_doc, TYPE_AUDIO};
+    use yrs::{Array, Doc, Map, MapPrelim, ReadTxn, StateVector, Transact};
+
     // A real note's persisted bytes, produced by the app's own YDocManager +
     // y-prosemirror + schema (Y.encodeStateAsUpdate). Contents: one page frame
     // with a heading + two paragraphs, plus one standalone TEXT element. To
     // regenerate after a schema change, build the same doc in a node script and
     // write `Y.encodeStateAsUpdate(doc)` here.
-    const FIXTURE: &[u8] = include_bytes!("test_fixture.bin");
+    const FIXTURE: &[u8] = include_bytes!("../test_fixture.bin");
 
     #[test]
     fn extracts_page_frame_and_text_element() {
-        let text = extract_note_text(FIXTURE).expect("extraction succeeds");
+        let doc = decode_doc(FIXTURE).unwrap();
+        let text = extract_note_text(&doc).expect("extraction succeeds");
         assert!(text.contains("Indexed Heading Title"), "got: {text:?}");
         assert!(text.contains("The quick brown fox jumps over the lazy dog."));
         assert!(text.contains("searchable keyword zebra"));
@@ -174,6 +135,20 @@ mod tests {
 
     #[test]
     fn empty_bytes_yield_empty_string() {
-        assert_eq!(extract_note_text(&[]).unwrap(), "");
+        let source = IndexSource::new(&[]);
+        assert_eq!(NoteTextProvider.build(&source).unwrap(), "");
+    }
+
+    #[test]
+    fn audio_transcripts_are_not_note_text() {
+        let doc = Doc::new();
+        let elements = doc.get_or_insert_array("elements");
+        let mut txn = doc.transact_mut();
+        let map = elements.push_back(&mut txn, MapPrelim::default());
+        map.insert(&mut txn, "type", TYPE_AUDIO);
+        map.insert(&mut txn, "transcript", "  hello transcribed   world  ");
+        let bytes = txn.encode_state_as_update_v1(&StateVector::default());
+
+        assert_eq!(extract_note_text(&decode_doc(&bytes).unwrap()).unwrap(), "");
     }
 }

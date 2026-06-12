@@ -4,6 +4,7 @@ mod iroh_transport;
 mod mcp_server;
 mod note_index;
 mod pdf_export;
+mod transcription;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +17,33 @@ pub fn run() {
                 .join("stronghold-salt.txt");
             app.handle()
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
+
+            // WebKitGTK denies getUserMedia by default; enable media streams
+            // and allow microphone permission requests so audio recording works.
+            #[cfg(target_os = "linux")]
+            app.get_webview_window("main")
+                .expect("main window missing")
+                .with_webview(|webview| {
+                    use webkit2gtk::{prelude::*, UserMediaPermissionRequest};
+                    let webview = webview.inner();
+                    if let Some(settings) = webview.settings() {
+                        settings.set_enable_media_stream(true);
+                        settings.set_enable_webrtc(true);
+                    }
+                    webview.connect_permission_request(|_, request| {
+                        if let Some(request) = request.downcast_ref::<UserMediaPermissionRequest>() {
+                            if request.is_for_audio_device() && !request.is_for_video_device() {
+                                request.allow();
+                            } else {
+                                request.deny();
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                })?;
+
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())
@@ -25,6 +53,7 @@ pub fn run() {
         .manage(iroh_transport::IrohState::new())
         .manage(mcp_server::McpServerState::new())
         .manage(note_index::IndexEngineState::new())
+        .manage(transcription::TranscriptionState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
             iroh_transport::iroh_join,
@@ -38,6 +67,9 @@ pub fn run() {
             note_index::reindex_note,
             note_index::reindex_batch,
             note_index::remove_index,
+            transcription::start_audio_transcription,
+            transcription::push_audio_transcription_samples,
+            transcription::finish_audio_transcription,
         ]);
 
     #[cfg(debug_assertions)]

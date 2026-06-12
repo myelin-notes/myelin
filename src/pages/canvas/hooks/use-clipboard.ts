@@ -20,7 +20,11 @@ function extractEmbeddableClipboardFiles(event: ClipboardEvent): File[] {
   const files: File[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (item.type.startsWith('image/') || item.type === 'application/pdf') {
+    if (
+      item.type.startsWith('image/') ||
+      item.type.startsWith('audio/') ||
+      item.type === 'application/pdf'
+    ) {
       const file = item.getAsFile();
       if (file) {
         files.push(file);

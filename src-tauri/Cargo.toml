@@ -37,6 +37,11 @@ sha2 = "0.10.9"
 krilla = { version = "0.8.1", features = ["pdf"] }
 base64 = "0.22.1"
 yrs = "0.26.0"
+scribble = "0.5.4"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Match the webkit2gtk version pinned by wry.
+webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 
 [profile.dev.package.scrypt]
 opt-level = 3

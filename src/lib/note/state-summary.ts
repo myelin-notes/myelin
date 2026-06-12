@@ -113,6 +113,8 @@ export function describeElementType(type: number | null | undefined): string {
       return 'pdf';
     case ElementType.LATEX:
       return 'latex';
+    case ElementType.AUDIO:
+      return 'audio';
     default:
       return `unknown:${String(type)}`;
   }

@@ -5,7 +5,7 @@ import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
-import type { YDocManager } from '../ydoc-manager';
+import type { SyncOrigin, YDocManager } from '../ydoc-manager';
 import type { ElementType } from './element-type';
 
 export interface SelectionToolbarItem {
@@ -149,9 +149,12 @@ export abstract class DrawableElement {
   }
 
   /** Write key-value pairs to the backing Y.Map in a single transaction. */
-  protected syncToYMap(updates: Record<string, unknown>): void {
+  protected syncToYMap(
+    updates: Record<string, unknown>,
+    origin?: SyncOrigin,
+  ): void {
     if (this._yMap) {
-      writeYMap(this._yMap, updates);
+      writeYMap(this._yMap, updates, origin);
     }
   }
 
