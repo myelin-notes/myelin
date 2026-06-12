@@ -501,7 +501,7 @@ const es: typeof en = {
       playAudio: 'Reproducir audio',
       pauseAudio: 'Pausar audio',
       transcribe: 'Transcribir audio',
-      transcribing: 'Transcribiendo audio…',
+      transcribing: 'Transcribiendo audio...',
     },
     toolShelf: {
       title: 'Menú de herramientas',

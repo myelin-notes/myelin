@@ -496,7 +496,7 @@ const en = {
       playAudio: 'Play audio',
       pauseAudio: 'Pause audio',
       transcribe: 'Transcribe audio',
-      transcribing: 'Transcribing audio…',
+      transcribing: 'Transcribing audio...',
     },
     toolShelf: {
       title: 'Tool Shelf',
