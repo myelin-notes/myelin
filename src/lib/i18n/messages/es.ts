@@ -374,8 +374,12 @@ const es: typeof en = {
         description:
           'El servidor se reinicia en el nuevo puerto al salir del campo.',
       },
-      endpoint: {
-        label: 'Endpoint',
+      installPrompt: {
+        label: 'Prompt de instalación para el agente',
+        description:
+          'Cópialo en tu agente para conectarlo a esta app en ejecución.',
+        prompt: (endpoint: string) =>
+          `Instala el servidor MCP de Myelin para esta app de escritorio en ejecución. Usa Streamable HTTP con el endpoint ${endpoint}. Nombra el servidor myelin. Este servidor es local en este equipo, así que Myelin debe permanecer abierto con MCP habilitado.`,
       },
       directWrites: {
         label: 'Permitir escrituras MCP directas',

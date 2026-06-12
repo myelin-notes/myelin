@@ -369,8 +369,12 @@ const en = {
         description:
           'The server restarts on the new port when you leave the field.',
       },
-      endpoint: {
-        label: 'Endpoint',
+      installPrompt: {
+        label: 'Agent install prompt',
+        description:
+          'Copy this into your agent to connect it to this running app.',
+        prompt: (endpoint: string) =>
+          `Install the Myelin MCP server for this running desktop app. Use Streamable HTTP with the endpoint ${endpoint}. Name the server myelin. This server is local to this computer, so Myelin must stay open with MCP enabled.`,
       },
       directWrites: {
         label: 'Allow direct MCP writes',

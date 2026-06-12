@@ -355,8 +355,11 @@ const zhHans: typeof en = {
         label: '本地端口',
         description: '离开输入框后，服务器将在新端口上重启。',
       },
-      endpoint: {
-        label: '端点',
+      installPrompt: {
+        label: '代理安装提示词',
+        description: '复制到你的代理中，将它连接到正在运行的此应用。',
+        prompt: (endpoint: string) =>
+          `为正在运行的 Myelin 桌面应用安装 MCP 服务器。使用 Streamable HTTP，端点为 ${endpoint}。将服务器命名为 myelin。此服务器只在本机可用，因此 Myelin 必须保持打开并启用 MCP。`,
       },
       directWrites: {
         label: '允许直接 MCP 写入',
