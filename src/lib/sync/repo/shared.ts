@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import type { NoteEmbedding } from '@/lib/note-index';
 import { type SearchField, type SearchHit, searchItems } from '@/lib/search';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import {
@@ -18,12 +19,6 @@ import {
   type VFSSystemMetadata,
   VideoFileTypes,
 } from './types';
-
-interface SearchEmbedding {
-  model: string;
-  dim: number;
-  vector: readonly number[];
-}
 
 export interface VFSManifest {
   version: number;
@@ -402,9 +397,9 @@ export function searchNodeResults(
 export function searchNodeResultsSemantically(
   manifest: VFSManifest,
   query: string,
-  queryEmbedding: SearchEmbedding,
+  queryEmbedding: NoteEmbedding,
   indexContent: ReadonlyMap<VFSNodeId, string>,
-  indexEmbeddings: ReadonlyMap<VFSNodeId, SearchEmbedding>,
+  indexEmbeddings: ReadonlyMap<VFSNodeId, NoteEmbedding>,
 ): NodeSearchResult[] {
   if (!query.trim()) {
     return searchNodeResults(manifest, query, indexContent);

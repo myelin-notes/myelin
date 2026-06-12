@@ -17,11 +17,7 @@ export interface ReindexItem {
   fileType: string;
 }
 
-export interface NoteEmbedding {
-  model: string;
-  dim: number;
-  vector: number[];
-}
+export type NoteEmbedding = cache.NoteIndexEmbedding;
 
 function yieldToIdle(): Promise<void> {
   return new Promise((resolve) => {
