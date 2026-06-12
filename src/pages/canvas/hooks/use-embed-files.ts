@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { useMessages } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import { SUPPORTED_MEDIA } from '../media';
+import { getMediaImportHandler } from '../media';
 
 export type EmbedFilesFn = (
   files: FileList | File[],
@@ -24,7 +24,7 @@ export function useEmbedFiles(
         return;
       }
       for (const file of files) {
-        const handler = SUPPORTED_MEDIA[file.type];
+        const handler = getMediaImportHandler(file.type);
         if (!handler) {
           toast.error(messages.canvas.embedComposer.errors.unsupportedType, {
             description: messages.canvas.embedComposer.errors.unsupportedDesc(
