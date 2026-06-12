@@ -51,6 +51,7 @@ import type {
   RepositoryCapabilities,
   RepositoryStats,
   RepositoryTag,
+  SearchNodesOptions,
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
@@ -320,8 +321,11 @@ export class CachedRepository
     return this.cache.getFolderChain(folderId);
   }
 
-  async searchNodes(query: string): Promise<NodeSearchResult[]> {
-    return this.cache.searchNodes(query);
+  async searchNodes(
+    query: string,
+    options?: SearchNodesOptions,
+  ): Promise<NodeSearchResult[]> {
+    return this.cache.searchNodes(query, options);
   }
 
   async listIndexBackfillItems(): Promise<ReindexItem[]> {

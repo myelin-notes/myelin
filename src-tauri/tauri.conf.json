@@ -35,6 +35,7 @@
     "active": true,
     "targets": "all",
     "resources": {
+      "resources/embedding-models/": "embedding-models/",
       "resources/scribble-models/": "scribble-models/",
       "resources/LICENSES/": "LICENSES/"
     },

@@ -19,6 +19,12 @@ import {
   VideoFileTypes,
 } from './types';
 
+interface SearchEmbedding {
+  model: string;
+  dim: number;
+  vector: readonly number[];
+}
+
 export interface VFSManifest {
   version: number;
   children: string[];
@@ -389,7 +395,77 @@ export function searchNodeResults(
     score: hit.score,
     contentSnippet: buildContentSnippet(indexContent?.get(hit.item.id), hit),
     matchedTerms: hit.terms,
+    searchMode: 'lexical',
   }));
+}
+
+export function searchNodeResultsSemantically(
+  manifest: VFSManifest,
+  query: string,
+  queryEmbedding: SearchEmbedding,
+  indexContent: ReadonlyMap<VFSNodeId, string>,
+  indexEmbeddings: ReadonlyMap<VFSNodeId, SearchEmbedding>,
+): NodeSearchResult[] {
+  if (!query.trim()) {
+    return searchNodeResults(manifest, query, indexContent);
+  }
+
+  const hits = Object.values(manifest.nodes).flatMap((node) => {
+    if (isSystemNode(node) || node.type !== 'file') {
+      return [];
+    }
+    const content = indexContent.get(node.id);
+    const embedding = indexEmbeddings.get(node.id);
+    if (!content || !embedding || embedding.dim !== queryEmbedding.dim) {
+      return [];
+    }
+    return [
+      {
+        node,
+        score: cosineSimilarity(queryEmbedding.vector, embedding.vector),
+        contentSnippet: buildSemanticSnippet(content),
+        matchedTerms: [],
+        searchMode: 'semantic' as const,
+      },
+    ];
+  });
+
+  return hits.sort((a, b) => b.score - a.score);
+}
+
+function cosineSimilarity(
+  left: readonly number[],
+  right: readonly number[],
+): number {
+  if (left.length !== right.length || left.length === 0) {
+    return 0;
+  }
+
+  let dot = 0;
+  let leftNorm = 0;
+  let rightNorm = 0;
+  for (let index = 0; index < left.length; index++) {
+    const a = left[index] ?? 0;
+    const b = right[index] ?? 0;
+    dot += a * b;
+    leftNorm += a * a;
+    rightNorm += b * b;
+  }
+  if (leftNorm === 0 || rightNorm === 0) {
+    return 0;
+  }
+  return dot / Math.sqrt(leftNorm * rightNorm);
+}
+
+function buildSemanticSnippet(content: string): string | null {
+  const snippet = content.replace(/\s+/g, ' ').trim();
+  if (!snippet) {
+    return null;
+  }
+  if (snippet.length <= SNIPPET_RADIUS * 2) {
+    return snippet;
+  }
+  return `${snippet.slice(0, SNIPPET_RADIUS * 2).trimEnd()}...`;
 }
 
 export function getNodesByAnyTag(

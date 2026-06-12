@@ -66,6 +66,7 @@ const zhHans: typeof en = {
     emptyState: '你的个人知识工作区，创建画布即可开始收集想法、笔记与研究',
     recentlyOpened: '最近打开',
     searchPlaceholder: '搜索工作室...',
+    semanticSearchLabel: '语义搜索',
     explorer: '资源管理器',
     sortLabel: (label: string) => `排序：${label}`,
     sortModes: {

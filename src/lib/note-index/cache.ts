@@ -20,8 +20,15 @@ export interface NoteIndexRecord {
   sourceHash: string;
   schemaVersion: number;
   text: string;
+  embedding?: NoteIndexEmbedding | null;
   providers: NoteIndexProviderEntry[];
   updatedAt: number;
+}
+
+export interface NoteIndexEmbedding {
+  model: string;
+  dim: number;
+  vector: number[];
 }
 
 export interface NoteIndexProviderEntry {
@@ -42,14 +49,21 @@ export async function readNodeText(
   repoId: string,
   nodeId: VFSNodeId,
 ): Promise<string | null> {
+  const record = await readNodeRecord(repoId, nodeId);
+  return record && record.text.length > 0 ? record.text : null;
+}
+
+export async function readNodeRecord(
+  repoId: string,
+  nodeId: VFSNodeId,
+): Promise<NoteIndexRecord | null> {
   const rel = relPath(repoId, nodeId);
   if (!(await exists(rel, { baseDir: BaseDirectory.AppCache }))) {
     return null;
   }
   try {
     const json = await readTextFile(rel, { baseDir: BaseDirectory.AppCache });
-    const record = JSON.parse(json) as NoteIndexRecord;
-    return record.text.length > 0 ? record.text : null;
+    return JSON.parse(json) as NoteIndexRecord;
   } catch {
     return null;
   }

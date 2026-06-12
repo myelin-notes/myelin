@@ -84,6 +84,7 @@ export type {
   RepositoryCapabilities,
   RepositoryStats,
   RepositoryTag,
+  SearchNodesOptions,
   StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,

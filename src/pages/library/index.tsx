@@ -9,6 +9,7 @@ import {
 import {
   ArrowDownAZ,
   ArrowDownZA,
+  BrainCircuit,
   CalendarPlus,
   ChevronRight,
   Clock,
@@ -45,6 +46,7 @@ import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
   type ExplorerTreeHandle,
+  type SearchMode,
   type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
@@ -103,6 +105,7 @@ export function LibraryPage() {
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('lexical');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [importSource, setImportSource] = useState<ImportSource | null>(null);
@@ -131,6 +134,9 @@ export function LibraryPage() {
   useEffect(() => UserPrefs.subscribe('explorerViewMode', setViewMode), []);
   const toggleViewMode = () => {
     UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
+  };
+  const toggleSearchMode = () => {
+    setSearchMode((mode) => (mode === 'semantic' ? 'lexical' : 'semantic'));
   };
 
   const loadRecentFiles = useCallback(async () => {
@@ -551,6 +557,21 @@ export function LibraryPage() {
                     <X className="size-3.5" />
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={toggleSearchMode}
+                  aria-label={strings.library.semanticSearchLabel}
+                  title={strings.library.semanticSearchLabel}
+                  aria-pressed={searchMode === 'semantic'}
+                  className={cn(
+                    'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150',
+                    searchMode === 'semantic'
+                      ? 'bg-tag-active text-text-on-dark'
+                      : 'text-text-muted hover:bg-surface hover:text-text-primary',
+                  )}
+                >
+                  <BrainCircuit className="size-3.5" />
+                </button>
               </div>
 
               <div className="flex items-center justify-between">
@@ -711,6 +732,7 @@ export function LibraryPage() {
                 sortMode={sortMode}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
+                searchMode={searchMode}
                 filterTags={filterTagsArr}
               />
             </div>

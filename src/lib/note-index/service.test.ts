@@ -5,7 +5,7 @@ const invoke = vi.fn();
 let listenHandler:
   | ((event: { payload: { nodeId: string; repoId: string } }) => void)
   | null = null;
-const readNodeText = vi.fn();
+const readNodeRecord = vi.fn();
 const listIndexedNodeIds = vi.fn();
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -23,7 +23,7 @@ vi.mock('@tauri-apps/api/event', () => ({
 }));
 
 vi.mock('./cache', () => ({
-  readNodeText: (...args: unknown[]) => readNodeText(...args),
+  readNodeRecord: (...args: unknown[]) => readNodeRecord(...args),
   listIndexedNodeIds: (...args: unknown[]) => listIndexedNodeIds(...args),
 }));
 
@@ -32,11 +32,29 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 beforeEach(() => {
   invoke.mockReset();
   invoke.mockResolvedValue(undefined);
-  readNodeText.mockReset();
+  readNodeRecord.mockReset();
   listIndexedNodeIds.mockReset();
   listIndexedNodeIds.mockResolvedValue([]);
   listenHandler = null;
 });
+
+function record(text: string, vector?: number[]) {
+  return {
+    nodeId: 'n1',
+    sourceHash: 'hash',
+    schemaVersion: 4,
+    text,
+    embedding: vector
+      ? {
+          model: 'Qdrant/all-MiniLM-L6-v2-onnx',
+          dim: vector.length,
+          vector,
+        }
+      : null,
+    providers: [],
+    updatedAt: 1,
+  };
+}
 
 describe('NoteIndexService', () => {
   it('requestReindex invokes the engine with the active repo and camelCase args', async () => {
@@ -62,7 +80,7 @@ describe('NoteIndexService', () => {
   });
 
   it('updates the corpus on an index-updated event for the active repo', async () => {
-    readNodeText.mockResolvedValue('hello indexed world');
+    readNodeRecord.mockResolvedValue(record('hello indexed world', [0.1, 0.2]));
     const service = new NoteIndexService();
     await service.init('repo-a');
     expect(listenHandler).toBeTruthy();
@@ -71,10 +89,11 @@ describe('NoteIndexService', () => {
     await flush();
 
     expect(service.getContent().get('n1')).toBe('hello indexed world');
+    expect(service.getEmbeddings().get('n1')?.vector).toEqual([0.1, 0.2]);
   });
 
   it('ignores index-updated events for a different repo', async () => {
-    readNodeText.mockResolvedValue('stale repo text');
+    readNodeRecord.mockResolvedValue(record('stale repo text'));
     const service = new NoteIndexService();
     await service.init('repo-a');
 
@@ -86,8 +105,8 @@ describe('NoteIndexService', () => {
 
   it('hydrates the corpus from the active repo artifacts at startup', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1', 'n2']);
-    readNodeText.mockImplementation(async (_repoId: string, id: string) =>
-      id === 'n1' ? 'first note' : 'second note',
+    readNodeRecord.mockImplementation(async (_repoId: string, id: string) =>
+      id === 'n1' ? record('first note', [1]) : record('second note'),
     );
     const service = new NoteIndexService();
     await service.init('repo-a');
@@ -95,17 +114,19 @@ describe('NoteIndexService', () => {
     expect(listIndexedNodeIds).toHaveBeenCalledWith('repo-a');
     expect(service.getContent().get('n1')).toBe('first note');
     expect(service.getContent().get('n2')).toBe('second note');
+    expect(service.getEmbeddings().get('n1')?.vector).toEqual([1]);
   });
 
   it('reset clears the corpus and detaches from the active repo', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1']);
-    readNodeText.mockResolvedValue('old repo text');
+    readNodeRecord.mockResolvedValue(record('old repo text', [1]));
     const service = new NoteIndexService();
     await service.init('repo-a');
     expect(service.getContent().get('n1')).toBe('old repo text');
 
     service.reset();
     expect(service.getContent().has('n1')).toBe(false);
+    expect(service.getEmbeddings().has('n1')).toBe(false);
 
     // With no active repo, triggers are no-ops.
     service.requestReindex('n1', '/files/n1.mcanvas', 'mcanvas');
@@ -114,7 +135,7 @@ describe('NoteIndexService', () => {
 
   it('removeIndex clears the corpus entry and invokes remove_index', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1']);
-    readNodeText.mockResolvedValue('doomed text');
+    readNodeRecord.mockResolvedValue(record('doomed text', [1]));
     const service = new NoteIndexService();
     await service.init('repo-a');
     expect(service.getContent().get('n1')).toBe('doomed text');
@@ -122,6 +143,7 @@ describe('NoteIndexService', () => {
     await service.removeIndex('n1');
 
     expect(service.getContent().has('n1')).toBe(false);
+    expect(service.getEmbeddings().has('n1')).toBe(false);
     expect(invoke).toHaveBeenCalledWith('remove_index', {
       repoId: 'repo-a',
       nodeId: 'n1',

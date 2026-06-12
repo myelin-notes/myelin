@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use super::providers::{sha256_hex, IndexProvider, IndexSource};
+use super::semantic::{is_current_embedding, SemanticEmbedding};
 
 /// Bump to invalidate every artifact when the extraction format changes.
-const SCHEMA_VERSION: u32 = 3;
+const SCHEMA_VERSION: u32 = 4;
 const INDEX_DIR: &str = "NoteIndex";
 
 /// One provider's contribution to a node's artifact.
@@ -31,6 +32,7 @@ struct NoteIndexRecord {
     source_hash: String,
     schema_version: u32,
     text: String,
+    embedding: Option<SemanticEmbedding>,
     providers: Vec<ProviderEntry>,
     updated_at: u64,
 }
@@ -79,6 +81,7 @@ pub(crate) fn process_node(
     path: &str,
     file_type: &str,
     index_file: &Path,
+    mut embedding_builder: Option<&mut dyn FnMut(&str) -> Result<SemanticEmbedding, String>>,
 ) -> Result<bool, String> {
     // The engine is the single authority on which file types are indexable.
     // If no provider handles this type, do no work and write no artifact — the
@@ -100,9 +103,11 @@ pub(crate) fn process_node(
         .and_then(|json| serde_json::from_slice(&json).ok())
         .filter(|record: &NoteIndexRecord| record.schema_version == SCHEMA_VERSION);
 
-    // Identical bytes: no provider's input can have changed.
+    // Identical bytes: no provider's input can have changed. Still retry when
+    // a text-bearing record is missing the current semantic vector.
     if let Some(record) = &existing {
-        if record.source_hash == source_hash {
+        let has_current_embedding = record.embedding.as_ref().is_some_and(is_current_embedding);
+        if record.source_hash == source_hash && (record.text.is_empty() || has_current_embedding) {
             return Ok(false);
         }
     }
@@ -136,13 +141,27 @@ pub(crate) fn process_node(
         .filter(|text| !text.is_empty())
         .collect::<Vec<_>>()
         .join("\n\n");
-    let changed = existing.as_ref().is_none_or(|record| record.text != text);
+    let previous_embedding = existing
+        .as_ref()
+        .and_then(|record| record.embedding.as_ref())
+        .filter(|embedding| is_current_embedding(embedding))
+        .cloned();
+    let embedding = build_embedding(
+        &text,
+        previous_embedding,
+        existing.as_ref(),
+        &mut embedding_builder,
+    );
+    let changed = existing
+        .as_ref()
+        .is_none_or(|record| record.text != text || record.embedding != embedding);
 
     let record = NoteIndexRecord {
         node_id: node_id.to_string(),
         source_hash,
         schema_version: SCHEMA_VERSION,
         text,
+        embedding,
         providers: entries,
         updated_at: now_ms(),
     };
@@ -155,10 +174,39 @@ pub(crate) fn process_node(
     Ok(changed)
 }
 
+fn build_embedding(
+    text: &str,
+    previous_embedding: Option<SemanticEmbedding>,
+    existing: Option<&NoteIndexRecord>,
+    embedding_builder: &mut Option<&mut dyn FnMut(&str) -> Result<SemanticEmbedding, String>>,
+) -> Option<SemanticEmbedding> {
+    if text.is_empty() {
+        return None;
+    }
+
+    if existing.is_some_and(|record| record.text == text) {
+        if let Some(embedding) = previous_embedding {
+            return Some(embedding);
+        }
+    }
+
+    let Some(build) = embedding_builder.as_mut() else {
+        return None;
+    };
+    match build(text) {
+        Ok(embedding) => Some(embedding),
+        Err(e) => {
+            eprintln!("note_index: semantic embedding failed: {e}");
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use std::cell::Cell;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
@@ -208,9 +256,12 @@ mod tests {
     }
 
     fn read_text(index_file: &Path) -> String {
+        read_record(index_file).text
+    }
+
+    fn read_record(index_file: &Path) -> NoteIndexRecord {
         let bytes = std::fs::read(index_file).unwrap();
-        let record: NoteIndexRecord = serde_json::from_slice(&bytes).unwrap();
-        record.text
+        serde_json::from_slice(&bytes).unwrap()
     }
 
     #[test]
@@ -227,7 +278,8 @@ mod tests {
         let path = note_path.to_str().unwrap();
 
         // First run: one file holds the combined text of both providers.
-        let changed = process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
+        let changed =
+            process_node(&providers, "node1", path, "mcanvas", &index_file, None).unwrap();
         assert!(changed);
         let text = read_text(&index_file);
         assert!(text.contains("Indexed Heading Title"));
@@ -235,7 +287,7 @@ mod tests {
 
         // Second run: the file is fresh, so nothing is rewritten.
         let changed_again =
-            process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
+            process_node(&providers, "node1", path, "mcanvas", &index_file, None).unwrap();
         assert!(!changed_again);
 
         std::fs::remove_dir_all(&base).ok();
@@ -254,7 +306,7 @@ mod tests {
         let path = image_path.to_str().unwrap();
 
         // No provider handles "png": nothing is written and no rewrite is signalled.
-        let changed = process_node(&providers, "node1", path, "png", &index_file).unwrap();
+        let changed = process_node(&providers, "node1", path, "png", &index_file, None).unwrap();
         assert!(!changed);
         assert!(!index_file.exists());
 
@@ -276,14 +328,70 @@ mod tests {
         })];
         let path = note_path.to_str().unwrap();
 
-        assert!(process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap());
+        assert!(process_node(&providers, "node1", path, "mcanvas", &index_file, None).unwrap());
 
         // Different bytes, same provider output: the artifact refreshes its
         // source hash but no index-updated event should fire.
         std::fs::write(&note_path, []).unwrap();
-        let changed = process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
+        let changed =
+            process_node(&providers, "node1", path, "mcanvas", &index_file, None).unwrap();
         assert!(!changed);
         assert_eq!(builds.load(Ordering::SeqCst), 2);
+
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn retries_embedding_when_fresh_record_has_no_vector() {
+        let base = std::env::temp_dir().join("note_index_add_embedding_test");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let note_path = base.join("note.myelin");
+        std::fs::write(&note_path, b"note bytes").unwrap();
+        let index_file = base.join("idx").join("node1.json");
+
+        let providers: Vec<Box<dyn IndexProvider>> = vec![Box::new(DummyProvider)];
+        let path = note_path.to_str().unwrap();
+
+        assert!(process_node(&providers, "node1", path, "mcanvas", &index_file, None).unwrap());
+        assert!(read_record(&index_file).embedding.is_none());
+
+        let calls = Cell::new(0);
+        let mut embed = |text: &str| {
+            calls.set(calls.get() + 1);
+            assert_eq!(text, "dummy index text");
+            Ok(SemanticEmbedding {
+                model: super::super::semantic::SEMANTIC_MODEL_ID.to_string(),
+                dim: super::super::semantic::SEMANTIC_DIM,
+                vector: vec![0.25; super::super::semantic::SEMANTIC_DIM],
+            })
+        };
+        let changed = process_node(
+            &providers,
+            "node1",
+            path,
+            "mcanvas",
+            &index_file,
+            Some(&mut embed),
+        )
+        .unwrap();
+
+        assert!(changed);
+        assert_eq!(calls.get(), 1);
+        let record = read_record(&index_file);
+        assert_eq!(record.embedding.as_ref().map(|e| e.vector.len()), Some(384));
+
+        let changed_again = process_node(
+            &providers,
+            "node1",
+            path,
+            "mcanvas",
+            &index_file,
+            Some(&mut embed),
+        )
+        .unwrap();
+        assert!(!changed_again);
+        assert_eq!(calls.get(), 1);
 
         std::fs::remove_dir_all(&base).ok();
     }
@@ -302,7 +410,8 @@ mod tests {
             vec![Box::new(FailingProvider), Box::new(NoteTextProvider)];
         let path = note_path.to_str().unwrap();
 
-        let changed = process_node(&providers, "node1", path, "mcanvas", &index_file).unwrap();
+        let changed =
+            process_node(&providers, "node1", path, "mcanvas", &index_file, None).unwrap();
         assert!(changed);
         assert!(read_text(&index_file).contains("Indexed Heading Title"));
 

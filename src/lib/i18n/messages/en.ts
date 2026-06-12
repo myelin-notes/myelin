@@ -65,6 +65,7 @@ const en = {
       'Your personal knowledge workspace. Create a canvas to start collecting ideas, notes, and research.',
     recentlyOpened: 'Recently Opened',
     searchPlaceholder: 'Search studio...',
+    semanticSearchLabel: 'Semantic search',
     explorer: 'Explorer',
     sortLabel: (label: string) => `Sort: ${label}`,
     sortModes: {
