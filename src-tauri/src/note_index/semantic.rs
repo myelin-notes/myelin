@@ -1,5 +1,5 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use fastembed::{
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 
 const MODEL_DIR: &str = "embedding-models/all-MiniLM-L6-v2";
-pub(crate) const SEMANTIC_MODEL_ID: &str = "Qdrant/all-MiniLM-L6-v2-onnx";
+pub(crate) const SEMANTIC_MODEL_ID: &str = "Xenova/all-MiniLM-L6-v2-quantized";
 pub(crate) const SEMANTIC_DIM: usize = 384;
 
 type SharedTextEmbedding = Arc<Mutex<Option<TextEmbedding>>>;
@@ -123,7 +123,10 @@ fn load_model(app: &AppHandle) -> Result<TextEmbedding, String> {
         .path()
         .resolve(MODEL_DIR, BaseDirectory::Resource)
         .map_err(|e| format!("resolve semantic model path: {e}"))?;
+    load_model_from_dir(&dir)
+}
 
+fn load_model_from_dir(dir: &Path) -> Result<TextEmbedding, String> {
     let model = UserDefinedEmbeddingModel::new(
         read_model_file(&dir, "model.onnx")?,
         TokenizerFiles {
@@ -142,7 +145,7 @@ fn load_model(app: &AppHandle) -> Result<TextEmbedding, String> {
     .map_err(|e| format!("initialize semantic model: {e}"))
 }
 
-fn read_model_file(dir: &PathBuf, name: &str) -> Result<Vec<u8>, String> {
+fn read_model_file(dir: &Path, name: &str) -> Result<Vec<u8>, String> {
     let path = dir.join(name);
     std::fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))
 }
@@ -161,4 +164,45 @@ pub(crate) fn is_current_embedding(embedding: &SemanticEmbedding) -> bool {
     embedding.model == SEMANTIC_MODEL_ID
         && embedding.dim == SEMANTIC_DIM
         && embedding.vector.len() == SEMANTIC_DIM
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Smoke test for the bundled model files: they must load and produce
+    /// embeddings that rank related text above unrelated text.
+    #[test]
+    fn bundled_model_embeds_and_ranks_related_text_higher() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join(MODEL_DIR);
+        let mut model = load_model_from_dir(&dir).unwrap();
+
+        let embeddings = model
+            .embed(
+                vec![
+                    "the cat sat on the mat".to_string(),
+                    "a kitten rests on a rug".to_string(),
+                    "quarterly financial report for shareholders".to_string(),
+                ],
+                None,
+            )
+            .unwrap();
+        assert!(embeddings.iter().all(|v| v.len() == SEMANTIC_DIM));
+
+        let related = cosine(&embeddings[0], &embeddings[1]);
+        let unrelated = cosine(&embeddings[0], &embeddings[2]);
+        assert!(
+            related > unrelated,
+            "related {related} should outrank unrelated {unrelated}"
+        );
+    }
+
+    fn cosine(left: &[f32], right: &[f32]) -> f32 {
+        let dot: f32 = left.iter().zip(right).map(|(a, b)| a * b).sum();
+        let left_norm: f32 = left.iter().map(|a| a * a).sum::<f32>().sqrt();
+        let right_norm: f32 = right.iter().map(|b| b * b).sum::<f32>().sqrt();
+        dot / (left_norm * right_norm)
+    }
 }

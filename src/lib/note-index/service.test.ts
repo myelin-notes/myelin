@@ -41,7 +41,7 @@ beforeEach(() => {
 function record(
   text: string,
   vector?: number[],
-  model = 'Qdrant/all-MiniLM-L6-v2-onnx',
+  model = 'Xenova/all-MiniLM-L6-v2-quantized',
 ) {
   return {
     nodeId: 'n1',

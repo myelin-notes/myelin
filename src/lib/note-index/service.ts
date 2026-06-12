@@ -5,7 +5,7 @@ import type { VFSNodeId } from '@/lib/sync';
 import * as cache from './cache';
 
 const logger = new Logger('NoteIndexService');
-const CURRENT_NOTE_EMBEDDING_MODEL = 'Qdrant/all-MiniLM-L6-v2-onnx';
+const CURRENT_NOTE_EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2-quantized';
 
 /**
  * One reindex request, as passed to the Rust engine. The frontend owns the

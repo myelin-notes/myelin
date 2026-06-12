@@ -15,7 +15,7 @@ third-party model and font assets redistributed with Myelin.
 
 | Bundled asset | License file | Upstream license source |
 | --- | --- | --- |
-| `embedding-models/all-MiniLM-L6-v2/` | `Apache-2.0.txt` | https://huggingface.co/Qdrant/all-MiniLM-L6-v2-onnx |
+| `embedding-models/all-MiniLM-L6-v2/` | `Apache-2.0.txt` | https://huggingface.co/Xenova/all-MiniLM-L6-v2 |
 
 ## Fonts
 
