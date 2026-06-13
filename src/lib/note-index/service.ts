@@ -5,6 +5,7 @@ import type { VFSNodeId } from '@/lib/sync';
 import * as cache from './cache';
 
 const logger = new Logger('NoteIndexService');
+const CURRENT_NOTE_EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2-quantized';
 
 /**
  * One reindex request, as passed to the Rust engine. The frontend owns the
@@ -15,6 +16,8 @@ export interface ReindexItem {
   path: string;
   fileType: string;
 }
+
+export type NoteEmbedding = cache.NoteIndexEmbedding;
 
 function yieldToIdle(): Promise<void> {
   return new Promise((resolve) => {
@@ -43,6 +46,7 @@ function yieldToIdle(): Promise<void> {
 export class NoteIndexService {
   /** node id -> extracted text. The synchronous corpus the search layer reads. */
   private readonly contentByNode = new Map<VFSNodeId, string>();
+  private readonly embeddingByNode = new Map<VFSNodeId, NoteEmbedding>();
   private unlisten: UnlistenFn | null = null;
   /**
    * The repository the corpus currently reflects. Index artifacts are namespaced
@@ -78,11 +82,20 @@ export class NoteIndexService {
   reset(): void {
     this.repoId = null;
     this.contentByNode.clear();
+    this.embeddingByNode.clear();
   }
 
   /** The synchronous index corpus, keyed by node id, for the search layer. */
   getContent(): ReadonlyMap<VFSNodeId, string> {
     return this.contentByNode;
+  }
+
+  getEmbeddings(): ReadonlyMap<VFSNodeId, NoteEmbedding> {
+    return this.embeddingByNode;
+  }
+
+  async embedSearchQuery(query: string): Promise<NoteEmbedding> {
+    return invoke<NoteEmbedding>('embed_search_query', { query });
   }
 
   /** Queue a single note for (debounced) reindexing in the Rust engine. */
@@ -115,6 +128,7 @@ export class NoteIndexService {
       return;
     }
     this.contentByNode.delete(nodeId);
+    this.embeddingByNode.delete(nodeId);
     try {
       await invoke('remove_index', { repoId, nodeId });
     } catch (err) {
@@ -135,10 +149,8 @@ export class NoteIndexService {
       if (this.repoId !== repoId) {
         return;
       }
-      const text = await cache.readNodeText(repoId, id).catch(() => null);
-      if (text) {
-        this.contentByNode.set(id, text);
-      }
+      const record = await cache.readNodeRecord(repoId, id).catch(() => null);
+      this.setRecord(id, record);
       await yieldToIdle();
     }
   }
@@ -149,14 +161,37 @@ export class NoteIndexService {
       return;
     }
     try {
-      const text = await cache.readNodeText(repoId, nodeId);
-      if (text) {
-        this.contentByNode.set(nodeId, text);
-      } else {
-        this.contentByNode.delete(nodeId);
-      }
+      const record = await cache.readNodeRecord(repoId, nodeId);
+      this.setRecord(nodeId, record);
     } catch (err) {
       logger.error('Failed to refresh index', err, { nodeId });
+    }
+  }
+
+  private setRecord(
+    nodeId: VFSNodeId,
+    record: cache.NoteIndexRecord | null,
+  ): void {
+    if (record?.text) {
+      this.contentByNode.set(nodeId, record.text);
+    } else {
+      this.contentByNode.delete(nodeId);
+    }
+
+    const embedding = record?.embedding;
+    if (
+      embedding &&
+      embedding.model === CURRENT_NOTE_EMBEDDING_MODEL &&
+      embedding.vector.length === embedding.dim &&
+      embedding.dim > 0
+    ) {
+      this.embeddingByNode.set(nodeId, {
+        model: embedding.model,
+        dim: embedding.dim,
+        vector: embedding.vector,
+      });
+    } else {
+      this.embeddingByNode.delete(nodeId);
     }
   }
 }

@@ -31,7 +31,8 @@ pub fn run() {
                         settings.set_enable_webrtc(true);
                     }
                     webview.connect_permission_request(|_, request| {
-                        if let Some(request) = request.downcast_ref::<UserMediaPermissionRequest>() {
+                        if let Some(request) = request.downcast_ref::<UserMediaPermissionRequest>()
+                        {
                             if request.is_for_audio_device() && !request.is_for_video_device() {
                                 request.allow();
                             } else {
@@ -67,6 +68,7 @@ pub fn run() {
             note_index::reindex_note,
             note_index::reindex_batch,
             note_index::remove_index,
+            note_index::embed_search_query,
             transcription::start_audio_transcription,
             transcription::push_audio_transcription_samples,
             transcription::finish_audio_transcription,

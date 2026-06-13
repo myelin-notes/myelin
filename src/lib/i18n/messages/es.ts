@@ -67,6 +67,7 @@ const es: typeof en = {
       'Tu espacio personal de conocimiento. Crea un lienzo para empezar a recopilar ideas, notas e investigación.',
     recentlyOpened: 'Abiertos recientemente',
     searchPlaceholder: 'Buscar en el estudio...',
+    semanticSearchLabel: 'Búsqueda semántica',
     explorer: 'Navegador',
     sortLabel: (label: string) => `Ordenar: ${label}`,
     sortModes: {

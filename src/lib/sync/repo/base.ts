@@ -42,6 +42,7 @@ import {
   normalizeCustomColor,
   type RepositorySnapshot,
   searchNodeResults,
+  searchNodeResultsSemantically,
   setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
@@ -58,6 +59,7 @@ import type {
   RepositoryCapabilities,
   RepositoryStats,
   RepositoryTag,
+  SearchNodesOptions,
   StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,
@@ -66,6 +68,7 @@ import type {
 } from './types';
 
 const logger = new Logger('BaseRepository');
+const DEFAULT_SEMANTIC_SEARCH_LIMIT = 50;
 
 function byteArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
   if (left.byteLength !== right.byteLength) {
@@ -247,9 +250,27 @@ export abstract class BaseRepository
     return getFolderChain(manifest, folderId);
   }
 
-  async searchNodes(query: string): Promise<NodeSearchResult[]> {
+  async searchNodes(
+    query: string,
+    options: SearchNodesOptions = {},
+  ): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifestImpl();
-    return searchNodeResults(manifest, query, noteIndexService.getContent());
+    if (options.mode === 'semantic' && query.trim()) {
+      const queryEmbedding = await noteIndexService.embedSearchQuery(query);
+      const limit = options.limit ?? DEFAULT_SEMANTIC_SEARCH_LIMIT;
+      return searchNodeResultsSemantically(
+        manifest,
+        query,
+        queryEmbedding,
+        noteIndexService.getContent(),
+        noteIndexService.getEmbeddings(),
+      ).slice(0, limit);
+    }
+    return searchNodeResults(
+      manifest,
+      query,
+      noteIndexService.getContent(),
+    ).slice(0, options.limit);
   }
 
   async listIndexBackfillItems(): Promise<ReindexItem[]> {

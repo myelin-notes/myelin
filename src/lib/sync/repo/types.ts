@@ -111,6 +111,12 @@ export interface NodeSearchResult {
   contentSnippet: string | null;
   /** Lowercased document terms that matched the query, for highlighting. */
   matchedTerms: string[];
+  searchMode?: 'lexical' | 'semantic';
+}
+
+export interface SearchNodesOptions {
+  mode?: 'lexical' | 'semantic';
+  limit?: number;
 }
 
 export interface RepositoryCapabilities {
@@ -128,7 +134,10 @@ export interface Repository {
     folderId: VFSNodeId | null,
   ): Promise<[VFSFolderNode[], VFSFileNode[]]>;
   getFolderChain(folderId: VFSNodeId | null): Promise<VFSFolderNode[]>;
-  searchNodes(query: string): Promise<NodeSearchResult[]>;
+  searchNodes(
+    query: string,
+    options?: SearchNodesOptions,
+  ): Promise<NodeSearchResult[]>;
   /** Candidate notes for the content-index startup backfill. */
   listIndexBackfillItems(): Promise<ReindexItem[]>;
   getNodesByAnyTag(tags: string[]): Promise<VFSNode[]>;

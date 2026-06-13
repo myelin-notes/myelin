@@ -18,6 +18,7 @@ import {
   isRepositoryFullyConfigured,
   type NodeSearchResult,
   type RepositoryConfig,
+  type SearchNodesOptions,
   useRepository,
   useRepositoryStatus,
   type VFSNode,
@@ -60,6 +61,7 @@ export interface ExplorerTreeHandle {
 
 export type SortMode = 'name-asc' | 'name-desc' | 'modified' | 'created';
 export type ViewMode = 'tree' | 'grid';
+export type SearchMode = NonNullable<SearchNodesOptions['mode']>;
 
 interface ExplorerTreeProps {
   ref?: React.Ref<ExplorerTreeHandle>;
@@ -71,6 +73,7 @@ interface ExplorerTreeProps {
   sortMode?: SortMode;
   viewMode?: ViewMode;
   searchQuery?: string;
+  searchMode?: SearchMode;
   filterTags?: string[];
 }
 
@@ -83,6 +86,7 @@ export function ExplorerTree({
   sortMode = 'name-asc',
   viewMode = 'tree',
   searchQuery,
+  searchMode = 'lexical',
   filterTags,
 }: ExplorerTreeProps) {
   const strings = useMessages();
@@ -142,7 +146,9 @@ export function ExplorerTree({
       let nextMatches: ReadonlyMap<string, NodeSearchResult> =
         EMPTY_SEARCH_MATCHES;
       if (isSearching) {
-        let results = await repository.searchNodes(searchQuery!.trim());
+        let results = await repository.searchNodes(searchQuery!.trim(), {
+          mode: searchMode,
+        });
         if (isFiltering) {
           results = results.filter((r) =>
             nodeMatchesAnyTag(r.node.tags, filterTags!),
@@ -183,6 +189,7 @@ export function ExplorerTree({
     isSearching,
     repository,
     repositorySetupState,
+    searchMode,
     searchQuery,
   ]);
   const reloadNow = useEffectEvent(() => {

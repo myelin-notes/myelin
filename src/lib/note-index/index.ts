@@ -1,5 +1,6 @@
-export type { NoteIndexRecord } from './cache';
+export type { NoteIndexEmbedding, NoteIndexRecord } from './cache';
 export {
+  type NoteEmbedding,
   NoteIndexService,
   noteIndexService,
   type ReindexItem,

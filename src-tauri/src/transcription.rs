@@ -296,8 +296,7 @@ fn resolve_model_paths(app: &AppHandle) -> Result<ModelPaths, String> {
     if !vad_model_path.is_file() {
         std::fs::create_dir_all(&data_dir)
             .map_err(|e| format!("create app local data dir: {e}"))?;
-        std::fs::write(&vad_model_path, [])
-            .map_err(|e| format!("create VAD stub file: {e}"))?;
+        std::fs::write(&vad_model_path, []).map_err(|e| format!("create VAD stub file: {e}"))?;
     }
 
     Ok(ModelPaths {

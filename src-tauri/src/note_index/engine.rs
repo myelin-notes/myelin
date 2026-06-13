@@ -7,6 +7,7 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::Semaphore;
 
 use super::providers::{default_providers, IndexProvider};
+use super::semantic::{SemanticEmbeddingModelHandle, SemanticEmbeddingState};
 use super::store::{index_path, process_node};
 
 const MAX_CONCURRENCY: usize = 2;
@@ -23,6 +24,7 @@ pub struct IndexEngineState {
     /// node id -> latest scheduled generation, for debounce + coalescing.
     pending: Arc<Mutex<HashMap<String, u64>>>,
     semaphore: Arc<Semaphore>,
+    semantic: SemanticEmbeddingState,
 }
 
 impl IndexEngineState {
@@ -31,7 +33,12 @@ impl IndexEngineState {
             providers: Arc::new(default_providers()),
             pending: Arc::new(Mutex::new(HashMap::new())),
             semaphore: Arc::new(Semaphore::new(MAX_CONCURRENCY)),
+            semantic: SemanticEmbeddingState::new(),
         }
+    }
+
+    pub(crate) fn semantic_model_handle(&self) -> SemanticEmbeddingModelHandle {
+        self.semantic.clone_model_handle()
     }
 }
 
@@ -53,6 +60,7 @@ pub(crate) fn schedule(
     let providers = state.providers.clone();
     let pending = state.pending.clone();
     let semaphore = state.semaphore.clone();
+    let semantic = state.semantic_model_handle();
 
     // Key by repo + node so the same note in two repos debounces independently.
     let pending_key = format!("{repo_id}/{node_id}");
@@ -91,8 +99,17 @@ pub(crate) fn schedule(
         };
 
         let work_node = node_id.clone();
+        let work_app = app.clone();
         let result = tauri::async_runtime::spawn_blocking(move || {
-            process_node(&providers, &work_node, &path, &file_type, &index_file)
+            let mut embed = |text: &str| semantic.embed_passage(&work_app, text);
+            process_node(
+                &providers,
+                &work_node,
+                &path,
+                &file_type,
+                &index_file,
+                Some(&mut embed),
+            )
         })
         .await;
 

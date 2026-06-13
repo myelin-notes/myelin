@@ -38,6 +38,7 @@ krilla = { version = "0.8.1", features = ["pdf"] }
 base64 = "0.22.1"
 yrs = "0.26.0"
 scribble = "0.5.4"
+fastembed = { version = "5.16.1", default-features = false, features = ["ort-download-binaries-native-tls"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Match the webkit2gtk version pinned by wry.

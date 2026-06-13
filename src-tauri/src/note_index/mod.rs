@@ -7,6 +7,7 @@
 
 mod engine;
 mod providers;
+mod semantic;
 mod store;
 
 use serde::Deserialize;
@@ -15,6 +16,7 @@ use tauri::{AppHandle, State};
 pub use engine::IndexEngineState;
 
 use engine::schedule;
+use semantic::SemanticEmbedding;
 use store::index_path;
 
 const DEBOUNCE_MS: u64 = 800;
@@ -67,4 +69,16 @@ pub fn remove_index(app: AppHandle, repo_id: String, node_id: String) -> Result<
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(format!("remove index: {e}")),
     }
+}
+
+#[tauri::command]
+pub async fn embed_search_query(
+    app: AppHandle,
+    state: State<'_, IndexEngineState>,
+    query: String,
+) -> Result<SemanticEmbedding, String> {
+    let semantic = state.semantic_model_handle();
+    tauri::async_runtime::spawn_blocking(move || semantic.embed_query(&app, query.trim()))
+        .await
+        .map_err(|e| format!("semantic query task panicked: {e}"))?
 }
