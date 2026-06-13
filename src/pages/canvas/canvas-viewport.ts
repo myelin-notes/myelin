@@ -63,9 +63,14 @@ export class CanvasViewport {
       // viewport owns wheel-driven view changes regardless of edit mode.
       evt.preventDefault();
       if (evt.ctrlKey) {
-        // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures).
+        // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures)
+        // and ctrl+wheel zoom on desktop. Anchor on the cursor so the world
+        // point under the pointer stays put.
         if (!this._zoomLocked) {
-          this.zoomAroundViewportCenter(this._zoom + evt.deltaY * -0.005);
+          this.zoomAroundPoint(
+            this._zoom + evt.deltaY * -0.005,
+            this.getScreenPoint(evt),
+          );
         }
       } else {
         // Two-finger scroll on trackpad / mouse wheel → pan.
@@ -419,26 +424,34 @@ export class CanvasViewport {
   }
 
   /**
-   * Set the zoom level, anchoring the world point currently at the canvas
-   * center so it stays at the canvas center after the zoom.
+   * Set the zoom level, anchoring the world point currently under the given
+   * canvas-local screen point so it stays under that point after the zoom.
    */
-  private zoomAroundViewportCenter(targetZoom: number): void {
+  private zoomAroundPoint(targetZoom: number, screen: Vector2): void {
     const prevZoom = this._zoom;
     this._zoom = Math.min(3, Math.max(0.2, targetZoom));
 
-    const dpr = window.devicePixelRatio || 1;
-    const cx = this.canvas.width / dpr / 2;
-    const cy = this.canvas.height / dpr / 2;
-
-    const wxBefore = cx / prevZoom - this._offset.x;
-    const wyBefore = cy / prevZoom - this._offset.y;
-    const wxAfter = cx / this._zoom - this._offset.x;
-    const wyAfter = cy / this._zoom - this._offset.y;
+    const wxBefore = screen.x / prevZoom - this._offset.x;
+    const wyBefore = screen.y / prevZoom - this._offset.y;
+    const wxAfter = screen.x / this._zoom - this._offset.x;
+    const wyAfter = screen.y / this._zoom - this._offset.y;
 
     this._offset.x += wxAfter - wxBefore;
     this._offset.y += wyAfter - wyBefore;
 
     this._onZoomChange?.(this._zoom);
     this.notifyViewChange();
+  }
+
+  /**
+   * Set the zoom level, anchoring the world point currently at the canvas
+   * center so it stays at the canvas center after the zoom.
+   */
+  private zoomAroundViewportCenter(targetZoom: number): void {
+    const dpr = window.devicePixelRatio || 1;
+    this.zoomAroundPoint(targetZoom, {
+      x: this.canvas.width / dpr / 2,
+      y: this.canvas.height / dpr / 2,
+    });
   }
 }
