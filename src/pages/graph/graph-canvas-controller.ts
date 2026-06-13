@@ -13,15 +13,94 @@ const FRICTION = 0.86;
 const COOLING = 0.985;
 const MIN_ALPHA = 0.02;
 const SELECTION_DURATION = 0.22;
+const EDGE_FLOW_SPEED = 42;
+const EDGE_ARROW_SPACING = 46;
+const EDGE_ARROW_SIZE = 5;
+
+const NODE_FILL_ALPHA = 0.95;
+const NODE_STROKE_ALPHA = 0.2;
+const NODE_STROKE_SELECTED_ALPHA = 0.42;
+const LABEL_HALO_ALPHA = 0.9;
 
 type Rgba = [number, number, number, number];
+type Rgb = [number, number, number];
 
-const NODE_FILL_BASE: Rgba = [255, 255, 255, 0.95];
-const NODE_FILL_SELECTED: Rgba = [28, 39, 56, 1];
-const NODE_STROKE_BASE: Rgba = [141, 154, 167, 0.2];
-const NODE_STROKE_SELECTED: Rgba = [28, 39, 56, 0.42];
-const LABEL_FILL_BASE: Rgba = [67, 71, 74, 1];
-const LABEL_FILL_SELECTED: Rgba = [28, 39, 56, 1];
+export interface GraphPalette {
+  background: string;
+  nodeFillBase: Rgba;
+  nodeFillSelected: Rgba;
+  nodeStrokeBase: Rgba;
+  nodeStrokeSelected: Rgba;
+  labelBase: Rgba;
+  labelSelected: Rgba;
+  labelHalo: string;
+  edge: Rgb;
+  edgeOutgoing: Rgb;
+  edgeIncoming: Rgb;
+}
+
+function rgbaString(color: Rgb, alpha: number): string {
+  return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+}
+
+function withAlpha(color: Rgb, alpha: number): Rgba {
+  return [color[0], color[1], color[2], alpha];
+}
+
+function parseThemeColor(value: string, fallback: Rgb): Rgb {
+  const text = value.trim();
+  const hex = text.startsWith('#') ? text.slice(1) : '';
+  if (hex.length === 3) {
+    return [
+      Number.parseInt(hex[0] + hex[0], 16),
+      Number.parseInt(hex[1] + hex[1], 16),
+      Number.parseInt(hex[2] + hex[2], 16),
+    ];
+  }
+  if (hex.length === 6) {
+    return [
+      Number.parseInt(hex.slice(0, 2), 16),
+      Number.parseInt(hex.slice(2, 4), 16),
+      Number.parseInt(hex.slice(4, 6), 16),
+    ];
+  }
+  const match = text.match(/rgba?\(([^)]+)\)/);
+  if (match) {
+    const parts = match[1].split(',').map((part) => Number.parseFloat(part));
+    if (parts.length >= 3 && parts.slice(0, 3).every((n) => !Number.isNaN(n))) {
+      return [parts[0], parts[1], parts[2]];
+    }
+  }
+  return fallback;
+}
+
+export function resolveGraphPalette(element: HTMLElement): GraphPalette {
+  const styles = getComputedStyle(element);
+  const read = (name: string, fallback: Rgb): Rgb =>
+    parseThemeColor(styles.getPropertyValue(name), fallback);
+
+  const page = read('--bg-page', [247, 249, 251]);
+  const card = read('--bg-card', [255, 255, 255]);
+  const accentDark = read('--accent-dark', [28, 39, 56]);
+  const textSecondary = read('--text-secondary', [67, 71, 74]);
+  const edge = read('--graph-edge', [141, 154, 167]);
+  const edgeOutgoing = read('--graph-edge-outgoing', [42, 157, 111]);
+  const edgeIncoming = read('--accent-dark', [28, 39, 56]);
+
+  return {
+    background: rgbaString(page, 1),
+    nodeFillBase: withAlpha(card, NODE_FILL_ALPHA),
+    nodeFillSelected: withAlpha(accentDark, 1),
+    nodeStrokeBase: withAlpha(edge, NODE_STROKE_ALPHA),
+    nodeStrokeSelected: withAlpha(accentDark, NODE_STROKE_SELECTED_ALPHA),
+    labelBase: withAlpha(textSecondary, 1),
+    labelSelected: withAlpha(accentDark, 1),
+    labelHalo: rgbaString(page, LABEL_HALO_ALPHA),
+    edge,
+    edgeOutgoing,
+    edgeIncoming,
+  };
+}
 
 function lerp(from: number, to: number, t: number): number {
   return from + (to - from) * t;
@@ -256,8 +335,10 @@ export function hitTestGraphNode(
 export class GraphCanvasController {
   public readonly viewport: CanvasViewport;
   private readonly ctx: CanvasRenderingContext2D;
+  private readonly palette: GraphPalette;
   private layout: GraphLayout;
   private selectedId: string | null = null;
+  private elapsed = 0;
 
   public constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -268,6 +349,7 @@ export class GraphCanvasController {
       throw new Error('Could not create graph canvas context');
     }
     this.ctx = ctx;
+    this.palette = resolveGraphPalette(canvas);
     this.viewport = new CanvasViewport(canvas);
     this.layout = createGraphLayout(graph);
     this.viewport.setContentBoundsProvider(() => getGraphBounds(this.layout));
@@ -313,6 +395,7 @@ export class GraphCanvasController {
   public redraw(deltaTime: number): void {
     tickGraphLayout(this.layout, deltaTime);
     tickGraphSelection(this.layout, this.selectedId, deltaTime);
+    this.elapsed += deltaTime;
     this.draw();
   }
 
@@ -326,7 +409,7 @@ export class GraphCanvasController {
     const height = this.canvas.height / dpr;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.clearRect(0, 0, width, height);
-    this.ctx.fillStyle = '#f7f9fb';
+    this.ctx.fillStyle = this.palette.background;
     this.ctx.fillRect(0, 0, width, height);
 
     this.ctx.save();
@@ -338,13 +421,78 @@ export class GraphCanvasController {
   }
 
   private drawEdges(): void {
-    this.ctx.strokeStyle = `rgba(141, 154, 167, ${graphEdgeAlpha(this.layout.nodes.length)})`;
+    this.ctx.strokeStyle = rgbaString(
+      this.palette.edge,
+      graphEdgeAlpha(this.layout.nodes.length),
+    );
     this.ctx.lineWidth = 1.1 / this.viewport.zoom;
     for (const edge of this.layout.edges) {
       this.ctx.beginPath();
       this.ctx.moveTo(edge.source.x, edge.source.y);
       this.ctx.lineTo(edge.target.x, edge.target.y);
       this.ctx.stroke();
+    }
+
+    if (this.selectedId !== null) {
+      this.drawSelectedEdges();
+    }
+  }
+
+  private drawSelectedEdges(): void {
+    for (const edge of this.layout.edges) {
+      const outgoing = edge.source.id === this.selectedId;
+      const incoming = edge.target.id === this.selectedId;
+      if (!outgoing && !incoming) {
+        continue;
+      }
+      const progress = (outgoing ? edge.source : edge.target)
+        .selectionProgress;
+      if (progress <= 0.01) {
+        continue;
+      }
+      const color = outgoing
+        ? this.palette.edgeOutgoing
+        : this.palette.edgeIncoming;
+      this.drawHighlightedEdge(edge, color, easeOutCubic(progress));
+    }
+  }
+
+  private drawHighlightedEdge(
+    edge: GraphLayoutEdge,
+    color: Rgb,
+    intensity: number,
+  ): void {
+    const zoom = this.viewport.zoom;
+    this.ctx.strokeStyle = rgbaString(color, 0.85 * intensity);
+    this.ctx.lineWidth = 1.6 / zoom;
+    this.ctx.beginPath();
+    this.ctx.moveTo(edge.source.x, edge.source.y);
+    this.ctx.lineTo(edge.target.x, edge.target.y);
+    this.ctx.stroke();
+
+    const dx = edge.target.x - edge.source.x;
+    const dy = edge.target.y - edge.source.y;
+    const length = Math.hypot(dx, dy);
+    const start = edge.source.radius;
+    const end = length - edge.target.radius;
+    if (end <= start) {
+      return;
+    }
+
+    const ux = dx / length;
+    const uy = dy / length;
+    const size = EDGE_ARROW_SIZE / zoom;
+    const travel = (this.elapsed * EDGE_FLOW_SPEED) % EDGE_ARROW_SPACING;
+    this.ctx.fillStyle = rgbaString(color, intensity);
+    for (let d = start + travel; d < end; d += EDGE_ARROW_SPACING) {
+      const px = edge.source.x + ux * d;
+      const py = edge.source.y + uy * d;
+      this.ctx.beginPath();
+      this.ctx.moveTo(px + ux * size, py + uy * size);
+      this.ctx.lineTo(px - ux * size * 0.2 - uy * size * 0.7, py - uy * size * 0.2 + ux * size * 0.7);
+      this.ctx.lineTo(px - ux * size * 0.2 + uy * size * 0.7, py - uy * size * 0.2 - ux * size * 0.7);
+      this.ctx.closePath();
+      this.ctx.fill();
     }
   }
 
@@ -359,13 +507,17 @@ export class GraphCanvasController {
       const scaleT = easeOutBack(progress);
       const selectedRadius = Math.max(node.radius + 4, node.radius * 1.4);
       const radius = lerp(node.radius, selectedRadius, scaleT);
-      this.ctx.fillStyle = lerpRgba(NODE_FILL_BASE, NODE_FILL_SELECTED, colorT);
+      this.ctx.fillStyle = lerpRgba(
+        this.palette.nodeFillBase,
+        this.palette.nodeFillSelected,
+        colorT,
+      );
       this.ctx.beginPath();
       this.ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.strokeStyle = lerpRgba(
-        NODE_STROKE_BASE,
-        NODE_STROKE_SELECTED,
+        this.palette.nodeStrokeBase,
+        this.palette.nodeStrokeSelected,
         colorT,
       );
       this.ctx.lineWidth = lerp(0.8, 1.4, colorT) / this.viewport.zoom;
@@ -390,9 +542,13 @@ export class GraphCanvasController {
     const raisedY = node.y - radius - 10 / this.viewport.zoom;
     const y = lerp(node.y, raisedY, colorT);
     this.ctx.lineWidth = 3 / this.viewport.zoom;
-    this.ctx.strokeStyle = 'rgba(247, 249, 251, 0.9)';
+    this.ctx.strokeStyle = this.palette.labelHalo;
     this.ctx.strokeText(node.label, node.x, y);
-    this.ctx.fillStyle = lerpRgba(LABEL_FILL_BASE, LABEL_FILL_SELECTED, colorT);
+    this.ctx.fillStyle = lerpRgba(
+      this.palette.labelBase,
+      this.palette.labelSelected,
+      colorT,
+    );
     this.ctx.fillText(node.label, node.x, y);
   }
 }
