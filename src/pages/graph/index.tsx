@@ -186,6 +186,11 @@ export function GraphPage() {
     [tabController],
   );
 
+  const selectNode = useCallback((id: VFSNodeId) => {
+    setSelectedId(id);
+    controllerRef.current?.focusNode(id);
+  }, []);
+
   const screenPointForEvent = useCallback(
     (
       event:
@@ -323,6 +328,7 @@ export function GraphPage() {
         graph={graph}
         node={selectedNode}
         onOpen={() => openSelectedNode(selectedNode)}
+        onSelect={selectNode}
       />
     </div>
   );
@@ -332,10 +338,12 @@ function GraphInspector({
   graph,
   node,
   onOpen,
+  onSelect,
 }: {
   graph: NoteGraph | null;
   node: NoteGraphNode | null;
   onOpen: () => void;
+  onSelect: (id: VFSNodeId) => void;
 }) {
   const strings = useMessages();
 
@@ -372,6 +380,7 @@ function GraphInspector({
             edges={node.outgoingEdges}
             graph={graph}
             endpoint="target"
+            onSelect={onSelect}
           />
           <GraphEdgeList
             title={strings.graph.backlinks}
@@ -379,6 +388,7 @@ function GraphInspector({
             edges={node.incomingEdges}
             graph={graph}
             endpoint="source"
+            onSelect={onSelect}
           />
         </>
       )}
@@ -392,12 +402,14 @@ function GraphEdgeList({
   edges,
   graph,
   endpoint,
+  onSelect,
 }: {
   title: string;
   emptyText: string;
   edges: NoteGraphEdge[];
   graph: NoteGraph | null;
   endpoint: 'source' | 'target';
+  onSelect: (id: VFSNodeId) => void;
 }) {
   return (
     <section className="min-h-0">
@@ -415,9 +427,11 @@ function GraphEdgeList({
               endpoint === 'source' ? edge.sourceId : edge.targetId;
             const label = graph?.nodesById.get(nodeId)?.name ?? nodeId;
             return (
-              <div
+              <button
                 key={edge.id}
-                className="rounded-lg bg-card px-3 py-2 text-sm text-text-secondary"
+                type="button"
+                onClick={() => onSelect(nodeId)}
+                className="rounded-lg bg-card px-3 py-2 text-left text-sm text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary"
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="min-w-0 truncate">{label}</span>
@@ -427,7 +441,7 @@ function GraphEdgeList({
                     </span>
                   )}
                 </div>
-              </div>
+              </button>
             );
           })
         )}
