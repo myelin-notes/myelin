@@ -13,6 +13,7 @@ import {
   CalendarPlus,
   ChevronRight,
   Clock,
+  Download,
   LayoutGrid,
   List,
   LoaderCircle,
@@ -43,6 +44,7 @@ import { useTabController } from '@/lib/tabs/context';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from './create-new-dropdown';
+import { exportLibraryAsMarkdown } from './export/markdown-export';
 import {
   ExplorerTree,
   type ExplorerTreeHandle,
@@ -108,6 +110,7 @@ export function LibraryPage() {
   const [searchMode, setSearchMode] = useState<SearchMode>('lexical');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingFiles, setIsImportingFiles] = useState(false);
+  const [isExportingLibrary, setIsExportingLibrary] = useState(false);
   const [importSource, setImportSource] = useState<ImportSource | null>(null);
   const isRefreshingRepository = useManualRepositoryRefreshPending();
   const recentFilesRequestRef = useRef(0);
@@ -354,6 +357,43 @@ export function LibraryPage() {
   const handleImportGoodnotesZip = useCallback(() => {
     goodnotesZipInputRef.current?.click();
   }, []);
+
+  const handleExportLibrary = useCallback(async () => {
+    if (isExportingLibrary) {
+      return;
+    }
+    const destination = await openDialog({
+      directory: true,
+      title: strings.library.exportLibrary.chooseFolder,
+    });
+    if (typeof destination !== 'string') {
+      return;
+    }
+    setIsExportingLibrary(true);
+    const toastId = toast.loading(strings.library.exportLibrary.inProgress(0));
+    try {
+      const written = await exportLibraryAsMarkdown(
+        repository,
+        destination,
+        ({ written: count }) => {
+          toast.loading(strings.library.exportLibrary.inProgress(count), {
+            id: toastId,
+          });
+        },
+      );
+      toast.success(strings.library.exportLibrary.done(written), {
+        id: toastId,
+      });
+    } catch (error) {
+      logger.error('Library export failed', error);
+      toast.error(strings.library.exportLibrary.failed, {
+        id: toastId,
+        description: errorDescription(error),
+      });
+    } finally {
+      setIsExportingLibrary(false);
+    }
+  }, [isExportingLibrary, repository, strings]);
 
   useEffect(() => {
     void loadRecentFiles();
@@ -696,6 +736,26 @@ export function LibraryPage() {
                     ) : (
                       <LayoutGrid className="size-4" />
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleExportLibrary()}
+                    disabled={isExportingLibrary}
+                    aria-label={strings.library.exportLibrary.label}
+                    title={strings.library.exportLibrary.label}
+                    className={cn(
+                      'flex size-8 items-center justify-center rounded-lg text-text-secondary transition-colors duration-150',
+                      isExportingLibrary
+                        ? 'cursor-default opacity-60'
+                        : 'cursor-pointer hover:bg-hover-tint hover:text-text-primary',
+                    )}
+                  >
+                    <Download
+                      className={cn(
+                        'size-4',
+                        isExportingLibrary && 'animate-pulse',
+                      )}
+                    />
                   </button>
                   <CreateNewDropdown
                     onNewFolder={handleNewFolder}

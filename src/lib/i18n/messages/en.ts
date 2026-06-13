@@ -92,6 +92,17 @@ const en = {
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
     },
+    exportLibrary: {
+      label: 'Export library',
+      chooseFolder: 'Choose a folder to export your library into',
+      inProgress: (count: number) =>
+        count === 0
+          ? 'Exporting library…'
+          : `Exporting library… (${count} files)`,
+      done: (count: number) =>
+        `Exported ${count} ${count === 1 ? 'file' : 'files'}`,
+      failed: 'Library export failed',
+    },
     importMarkdown: {
       unsupportedFile: 'Choose a Markdown file (.md, .markdown, or .mdx).',
       failed: 'Markdown import failed',

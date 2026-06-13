@@ -93,6 +93,14 @@ const zhHans: typeof en = {
       untitledCanvas: '未命名画布',
       unnamedFolder: '未命名文件夹',
     },
+    exportLibrary: {
+      label: '导出图书馆',
+      chooseFolder: '选择导出图书馆的文件夹',
+      inProgress: (count: number) =>
+        count === 0 ? '正在导出图书馆…' : `正在导出图书馆…（${count} 个文件）`,
+      done: (count: number) => `已导出 ${count} 个文件`,
+      failed: '导出图书馆失败',
+    },
     importMarkdown: {
       unsupportedFile: '请选择 Markdown 文件（.md、.markdown 或 .mdx）',
       failed: 'Markdown 导入失败',

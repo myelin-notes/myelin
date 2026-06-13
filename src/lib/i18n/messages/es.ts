@@ -94,6 +94,17 @@ const es: typeof en = {
       untitledCanvas: 'Lienzo sin título',
       unnamedFolder: 'Carpeta sin nombre',
     },
+    exportLibrary: {
+      label: 'Exportar biblioteca',
+      chooseFolder: 'Elige una carpeta donde exportar tu biblioteca',
+      inProgress: (count: number) =>
+        count === 0
+          ? 'Exportando biblioteca…'
+          : `Exportando biblioteca… (${count} archivos)`,
+      done: (count: number) =>
+        `Se exportaron ${count} ${count === 1 ? 'archivo' : 'archivos'}`,
+      failed: 'Error al exportar la biblioteca',
+    },
     importMarkdown: {
       unsupportedFile: 'Elige un archivo Markdown (.md, .markdown o .mdx).',
       failed: 'No se pudo importar el Markdown',
