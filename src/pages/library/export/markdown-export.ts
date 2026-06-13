@@ -4,14 +4,17 @@
  * Obsidian-style YAML frontmatter header (tags + timestamps), and image/video
  * files are copied verbatim into the matching folders.
  *
+ * Notes are serialized to Markdown here; the actual filesystem writes happen in
+ * the Rust `export_library` command, which can target the user-picked folder
+ * without granting the webview broad fs-write permissions.
+ *
  * Canvas notes can hold non-text content (strokes, shapes, on-canvas images,
  * PDFs) that Markdown can't represent — only the page-frame text is exported,
  * so the result is intentionally lossy for those parts.
  */
 
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
-import { join } from '@tauri-apps/api/path';
-import { mkdir, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import type { Repository, VFSNode, VFSNodeId } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { serializeDocToMarkdownChunked } from '@/pages/canvas/page-frame/markdown/serializer';
@@ -19,24 +22,32 @@ import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 
 export interface ExportProgress {
-  /** Number of files written so far. */
-  written: number;
+  /** Number of files prepared so far. */
+  prepared: number;
 }
 
+/** One filesystem operation for the Rust `export_library` command. */
+type ExportEntry =
+  | { kind: 'dir'; path: string }
+  | { kind: 'text'; path: string; content: string }
+  | { kind: 'copy'; path: string; source: string };
+
 /**
- * Walks the whole library starting at the root and writes it under
- * `destRoot`. Returns the number of files written.
+ * Walks the whole library, serializes notes to Markdown, then writes the tree
+ * under `destRoot` via Rust. Paths in the entry list are relative to the root.
+ * Returns the number of files written.
  */
 export async function exportLibraryAsMarkdown(
   repository: Repository,
   destRoot: string,
   onProgress: (progress: ExportProgress) => void,
 ): Promise<number> {
-  let written = 0;
+  const entries: ExportEntry[] = [];
+  let prepared = 0;
 
   const walk = async (
     folderId: VFSNodeId | null,
-    dirPath: string,
+    relDir: string,
   ): Promise<void> => {
     const [folders, files] = await repository.listDirectory(folderId);
     // Folders and files share one namespace on disk, so dedupe across both.
@@ -46,10 +57,6 @@ export async function exportLibraryAsMarkdown(
       if (file.system) {
         continue; // Skip version-history snapshots.
       }
-      const bytes = await repository.readFileBytes(file.id);
-      if (!bytes) {
-        continue;
-      }
       const isCanvas = file.fileType === 'mcanvas';
       const name = uniqueName(
         used,
@@ -57,15 +64,27 @@ export async function exportLibraryAsMarkdown(
           ? canvasFileName(file.name)
           : mediaFileName(file.name, file.fileType),
       );
-      const fullPath = await join(dirPath, name);
+      const relPath = join(relDir, name);
       if (isCanvas) {
+        const bytes = await repository.readFileBytes(file.id);
+        if (!bytes) {
+          continue;
+        }
         const body = await canvasToMarkdownBody(bytes);
-        await writeTextFile(fullPath, buildFrontmatter(file) + body);
+        entries.push({
+          kind: 'text',
+          path: relPath,
+          content: buildFrontmatter(file) + body,
+        });
       } else {
-        await writeFile(fullPath, bytes);
+        const source = await repository.getStoredAbsolutePath(file.id);
+        if (!source) {
+          continue; // Bytes aren't available on disk; nothing to copy.
+        }
+        entries.push({ kind: 'copy', path: relPath, source });
       }
-      written++;
-      onProgress({ written });
+      prepared++;
+      onProgress({ prepared });
     }
 
     for (const folder of folders) {
@@ -73,14 +92,15 @@ export async function exportLibraryAsMarkdown(
         continue;
       }
       const name = uniqueName(used, sanitizeName(folder.name, 'folder'));
-      const subPath = await join(dirPath, name);
-      await mkdir(subPath, { recursive: true });
-      await walk(folder.id, subPath);
+      const relPath = join(relDir, name);
+      entries.push({ kind: 'dir', path: relPath });
+      await walk(folder.id, relPath);
     }
   };
 
-  await walk(null, destRoot);
-  return written;
+  await walk(null, '');
+  await invoke('export_library', { root: destRoot, entries });
+  return prepared;
 }
 
 /** Concatenate every page frame's text in a canvas into one Markdown body. */
@@ -129,6 +149,11 @@ function buildFrontmatter(node: VFSNode): string {
 /** Quote a YAML scalar only when it contains characters outside a safe set. */
 function yamlScalar(value: string): string {
   return /^[A-Za-z0-9_\-/.]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+/** Join a relative directory and a name with a forward slash (Rust accepts it). */
+function join(relDir: string, name: string): string {
+  return relDir ? `${relDir}/${name}` : name;
 }
 
 function canvasFileName(name: string): string {

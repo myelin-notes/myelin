@@ -375,8 +375,8 @@ export function LibraryPage() {
       const written = await exportLibraryAsMarkdown(
         repository,
         destination,
-        ({ written: count }) => {
-          toast.loading(strings.library.exportLibrary.inProgress(count), {
+        ({ prepared }) => {
+          toast.loading(strings.library.exportLibrary.inProgress(prepared), {
             id: toastId,
           });
         },

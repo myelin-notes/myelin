@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod iroh_transport;
+mod library_export;
 mod mcp_server;
 mod note_index;
 mod pdf_export;
@@ -61,6 +62,7 @@ pub fn run() {
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
             pdf_export::export_pdf,
+            library_export::export_library,
             mcp_server::mcp_start,
             mcp_server::mcp_stop,
             mcp_server::mcp_status,
