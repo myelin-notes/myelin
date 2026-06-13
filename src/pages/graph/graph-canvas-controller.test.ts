@@ -7,6 +7,7 @@ import {
   hitTestGraphNode,
   shouldDrawGraphNodeLabel,
   tickGraphLayout,
+  tickGraphSelection,
 } from './graph-canvas-controller';
 import type { NoteGraph } from './types';
 
@@ -91,6 +92,28 @@ describe('graph layout helpers', () => {
     expect(createGraphLayout(graphWithNodeCount(1000)).nodes[0].radius).toBe(
       graphNodeRadius(1000),
     );
+  });
+
+  it('eases selection progress toward the selected node', () => {
+    const layout = createGraphLayout(graph);
+    expect(layout.nodes.every((node) => node.selectionProgress === 0)).toBe(
+      true,
+    );
+
+    tickGraphSelection(layout, 'a', 1 / 60);
+    const selected = layout.nodes.find((node) => node.id === 'a');
+    const other = layout.nodes.find((node) => node.id === 'b');
+    expect(selected?.selectionProgress).toBeGreaterThan(0);
+    expect(selected?.selectionProgress).toBeLessThan(1);
+    expect(other?.selectionProgress).toBe(0);
+
+    for (let frame = 0; frame < 60; frame += 1) {
+      tickGraphSelection(layout, 'a', 1 / 60);
+    }
+    expect(selected?.selectionProgress).toBe(1);
+
+    tickGraphSelection(layout, null, 10);
+    expect(selected?.selectionProgress).toBe(0);
   });
 
   it('keeps dense graph labels focused on selected nodes', () => {

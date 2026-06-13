@@ -12,6 +12,38 @@ const SPRING = 0.02;
 const FRICTION = 0.86;
 const COOLING = 0.985;
 const MIN_ALPHA = 0.02;
+const SELECTION_DURATION = 0.22;
+
+type Rgba = [number, number, number, number];
+
+const NODE_FILL_BASE: Rgba = [255, 255, 255, 0.95];
+const NODE_FILL_SELECTED: Rgba = [28, 39, 56, 1];
+const NODE_STROKE_BASE: Rgba = [141, 154, 167, 0.2];
+const NODE_STROKE_SELECTED: Rgba = [28, 39, 56, 0.42];
+const LABEL_FILL_BASE: Rgba = [67, 71, 74, 1];
+const LABEL_FILL_SELECTED: Rgba = [28, 39, 56, 1];
+
+function lerp(from: number, to: number, t: number): number {
+  return from + (to - from) * t;
+}
+
+function lerpRgba(from: Rgba, to: Rgba, t: number): string {
+  const r = Math.round(lerp(from[0], to[0], t));
+  const g = Math.round(lerp(from[1], to[1], t));
+  const b = Math.round(lerp(from[2], to[2], t));
+  const a = lerp(from[3], to[3], t);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3;
+}
+
+function easeOutBack(t: number): number {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
+}
 
 export interface GraphLayoutNode {
   id: string;
@@ -21,6 +53,7 @@ export interface GraphLayoutNode {
   vx: number;
   vy: number;
   radius: number;
+  selectionProgress: number;
   source: NoteGraphNode;
 }
 
@@ -110,6 +143,7 @@ export function createGraphLayout(graph: NoteGraph): GraphLayout {
       vx: 0,
       vy: 0,
       radius: nodeRadius,
+      selectionProgress: 0,
       source: node,
     };
   });
@@ -169,6 +203,26 @@ export function tickGraphLayout(layout: GraphLayout, deltaTime: number): void {
     node.y += node.vy * step;
   }
   layout.alpha *= COOLING;
+}
+
+export function tickGraphSelection(
+  layout: GraphLayout,
+  selectedId: string | null,
+  deltaTime: number,
+): void {
+  const stepRaw = deltaTime > 0 ? deltaTime / SELECTION_DURATION : 1;
+  const step = Math.min(stepRaw, 1);
+  for (const node of layout.nodes) {
+    const target = node.id === selectedId ? 1 : 0;
+    if (node.selectionProgress === target) {
+      continue;
+    }
+    if (Math.abs(target - node.selectionProgress) <= step) {
+      node.selectionProgress = target;
+    } else {
+      node.selectionProgress += Math.sign(target - node.selectionProgress) * step;
+    }
+  }
 }
 
 export function getGraphBounds(layout: GraphLayout): DOMRect {
@@ -258,6 +312,7 @@ export class GraphCanvasController {
 
   public redraw(deltaTime: number): void {
     tickGraphLayout(this.layout, deltaTime);
+    tickGraphSelection(this.layout, this.selectedId, deltaTime);
     this.draw();
   }
 
@@ -299,43 +354,45 @@ export class GraphCanvasController {
     this.ctx.font = `${12 / this.viewport.zoom}px Inter, sans-serif`;
     const totalNodes = this.layout.nodes.length;
     for (const node of this.layout.nodes) {
-      const selected = node.id === this.selectedId;
-      const radius = selected
-        ? Math.max(node.radius + 4, node.radius * 1.4)
-        : node.radius;
-      this.ctx.fillStyle = selected ? '#1c2738' : 'rgba(255, 255, 255, 0.95)';
+      const progress = node.selectionProgress;
+      const colorT = easeOutCubic(progress);
+      const scaleT = easeOutBack(progress);
+      const selectedRadius = Math.max(node.radius + 4, node.radius * 1.4);
+      const radius = lerp(node.radius, selectedRadius, scaleT);
+      this.ctx.fillStyle = lerpRgba(NODE_FILL_BASE, NODE_FILL_SELECTED, colorT);
       this.ctx.beginPath();
       this.ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
       this.ctx.fill();
-      this.ctx.strokeStyle = selected
-        ? 'rgba(28, 39, 56, 0.42)'
-        : 'rgba(141, 154, 167, 0.2)';
-      this.ctx.lineWidth = selected
-        ? 1.4 / this.viewport.zoom
-        : 0.8 / this.viewport.zoom;
+      this.ctx.strokeStyle = lerpRgba(
+        NODE_STROKE_BASE,
+        NODE_STROKE_SELECTED,
+        colorT,
+      );
+      this.ctx.lineWidth = lerp(0.8, 1.4, colorT) / this.viewport.zoom;
       this.ctx.stroke();
       if (
         shouldDrawGraphNodeLabel({
-          selected,
+          selected: progress > 0.01,
           totalNodes,
           zoom: this.viewport.zoom,
         })
       ) {
-        this.drawNodeLabel(node, selected, radius);
+        this.drawNodeLabel(node, radius, colorT);
       }
     }
   }
 
   private drawNodeLabel(
     node: GraphLayoutNode,
-    selected: boolean,
     radius: number,
+    colorT: number,
   ): void {
-    const y = selected ? node.y - radius - 10 / this.viewport.zoom : node.y;
+    const raisedY = node.y - radius - 10 / this.viewport.zoom;
+    const y = lerp(node.y, raisedY, colorT);
     this.ctx.lineWidth = 3 / this.viewport.zoom;
     this.ctx.strokeStyle = 'rgba(247, 249, 251, 0.9)';
     this.ctx.strokeText(node.label, node.x, y);
-    this.ctx.fillStyle = selected ? '#1c2738' : '#43474a';
+    this.ctx.fillStyle = lerpRgba(LABEL_FILL_BASE, LABEL_FILL_SELECTED, colorT);
     this.ctx.fillText(node.label, node.x, y);
   }
 }
