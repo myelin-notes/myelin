@@ -2,12 +2,12 @@ import { CanvasViewport } from '@/pages/canvas/canvas-viewport';
 import type { Vector2 } from '@/pages/canvas/geometry';
 import type { NoteGraph, NoteGraphEdge, NoteGraphNode } from './types';
 
-const SMALL_GRAPH_NODE_RADIUS = 24;
+const SMALL_GRAPH_NODE_RADIUS = 16;
 const DENSE_GRAPH_NODE_RADIUS = 8;
 const DENSE_GRAPH_NODE_COUNT = 250;
 const MIN_HIT_RADIUS_SCREEN = 14;
-const LINK_DISTANCE = 150;
-const REPULSION = 9000;
+const LINK_DISTANCE = 200;
+const REPULSION = 14000;
 const SPRING = 0.02;
 const FRICTION = 0.86;
 const COOLING = 0.985;
@@ -21,6 +21,8 @@ const NODE_FILL_ALPHA = 0.95;
 const NODE_STROKE_ALPHA = 0.2;
 const NODE_STROKE_SELECTED_ALPHA = 0.42;
 const LABEL_HALO_ALPHA = 0.9;
+const DIM_ALPHA = 0.14;
+const DIM_DURATION = 0.22;
 
 type Rgba = [number, number, number, number];
 type Rgb = [number, number, number];
@@ -133,6 +135,7 @@ export interface GraphLayoutNode {
   vy: number;
   radius: number;
   selectionProgress: number;
+  dimProgress: number;
   source: NoteGraphNode;
 }
 
@@ -177,7 +180,10 @@ export function graphNodeRadius(totalNodes: number): number {
   }
 
   const density = (totalNodes - 100) / 900;
-  return SMALL_GRAPH_NODE_RADIUS - density * 16;
+  return (
+    SMALL_GRAPH_NODE_RADIUS -
+    density * (SMALL_GRAPH_NODE_RADIUS - DENSE_GRAPH_NODE_RADIUS)
+  );
 }
 
 export function graphEdgeAlpha(totalNodes: number): number {
@@ -223,6 +229,7 @@ export function createGraphLayout(graph: NoteGraph): GraphLayout {
       vy: 0,
       radius: nodeRadius,
       selectionProgress: 0,
+      dimProgress: 0,
       source: node,
     };
   });
@@ -304,6 +311,26 @@ export function tickGraphSelection(
   }
 }
 
+export function tickGraphNodeDim(
+  layout: GraphLayout,
+  highlightedIds: Set<string> | null,
+  deltaTime: number,
+): void {
+  const stepRaw = deltaTime > 0 ? deltaTime / DIM_DURATION : 1;
+  const step = Math.min(stepRaw, 1);
+  for (const node of layout.nodes) {
+    const target = highlightedIds && !highlightedIds.has(node.id) ? 1 : 0;
+    if (node.dimProgress === target) {
+      continue;
+    }
+    if (Math.abs(target - node.dimProgress) <= step) {
+      node.dimProgress = target;
+    } else {
+      node.dimProgress += Math.sign(target - node.dimProgress) * step;
+    }
+  }
+}
+
 export function getGraphBounds(layout: GraphLayout): DOMRect {
   if (layout.nodes.length === 0) {
     return new DOMRect(-100, -100, 200, 200);
@@ -338,6 +365,7 @@ export class GraphCanvasController {
   private readonly palette: GraphPalette;
   private layout: GraphLayout;
   private selectedId: string | null = null;
+  private highlightedIds: Set<string> | null = null;
   private elapsed = 0;
 
   public constructor(
@@ -357,11 +385,28 @@ export class GraphCanvasController {
 
   public setGraph(graph: NoteGraph): void {
     this.layout = createGraphLayout(graph);
+    this.highlightedIds =
+      this.selectedId === null
+        ? null
+        : this.computeHighlightedIds(this.selectedId);
     this.viewport.setContentBoundsProvider(() => getGraphBounds(this.layout));
   }
 
   public setSelectedId(id: string | null): void {
     this.selectedId = id;
+    this.highlightedIds = id === null ? null : this.computeHighlightedIds(id);
+  }
+
+  private computeHighlightedIds(id: string): Set<string> {
+    const ids = new Set<string>([id]);
+    for (const edge of this.layout.edges) {
+      if (edge.source.id === id) {
+        ids.add(edge.target.id);
+      } else if (edge.target.id === id) {
+        ids.add(edge.source.id);
+      }
+    }
+    return ids;
   }
 
   public hitTest(screen: Vector2): GraphLayoutNode | null {
@@ -395,6 +440,7 @@ export class GraphCanvasController {
   public redraw(deltaTime: number): void {
     tickGraphLayout(this.layout, deltaTime);
     tickGraphSelection(this.layout, this.selectedId, deltaTime);
+    tickGraphNodeDim(this.layout, this.highlightedIds, deltaTime);
     this.elapsed += deltaTime;
     this.draw();
   }
@@ -427,11 +473,14 @@ export class GraphCanvasController {
     );
     this.ctx.lineWidth = 1.1 / this.viewport.zoom;
     for (const edge of this.layout.edges) {
+      const dim = Math.min(edge.source.dimProgress, edge.target.dimProgress);
+      this.ctx.globalAlpha = lerp(1, DIM_ALPHA, dim);
       this.ctx.beginPath();
       this.ctx.moveTo(edge.source.x, edge.source.y);
       this.ctx.lineTo(edge.target.x, edge.target.y);
       this.ctx.stroke();
     }
+    this.ctx.globalAlpha = 1;
 
     if (this.selectedId !== null) {
       this.drawSelectedEdges();
@@ -503,6 +552,7 @@ export class GraphCanvasController {
     const totalNodes = this.layout.nodes.length;
     for (const node of this.layout.nodes) {
       const progress = node.selectionProgress;
+      this.ctx.globalAlpha = lerp(1, DIM_ALPHA, node.dimProgress);
       const colorT = easeOutCubic(progress);
       const scaleT = easeOutBack(progress);
       const selectedRadius = Math.max(node.radius + 4, node.radius * 1.4);
@@ -532,6 +582,7 @@ export class GraphCanvasController {
         this.drawNodeLabel(node, radius, colorT);
       }
     }
+    this.ctx.globalAlpha = 1;
   }
 
   private drawNodeLabel(
