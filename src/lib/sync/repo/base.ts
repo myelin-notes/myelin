@@ -156,7 +156,8 @@ export abstract class BaseRepository
         if (isIndexCandidateFileNode(node)) {
           candidateFileType = node.fileType;
         }
-        if (node.fileType === 'mcanvas' && links) {
+        // Snapshots are system nodes; their links must not enter the graph.
+        if (node.fileType === 'mcanvas' && !node.system && links) {
           setStoredNoteLinks(manifest, nodeId, links);
         }
       }

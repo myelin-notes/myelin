@@ -665,6 +665,14 @@ export function deleteNodeFromManifest(
       }
     } else {
       files.push(structuredClone(current));
+      // Version-history snapshots live under the hidden root, not under the
+      // file itself, so deleting the file would orphan them. Drop them too.
+      if (!isFileVersionNode(current)) {
+        for (const version of getFileVersionNodes(manifest, currentId)) {
+          removeChild(manifest, version.parentId, version.id);
+          collect(version.id);
+        }
+      }
     }
 
     delete manifest.linksBySource[currentId];

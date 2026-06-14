@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { noteIndexService } from '@/lib/note-index';
 import {
+  createCanvasNoteState,
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
@@ -278,5 +279,71 @@ describe('repository file version history', () => {
       2,
     ]);
     expect(await repository.listFileVersions(fileId)).toHaveLength(1);
+  });
+
+  it('does not store note links for version-history snapshots', async () => {
+    const repository = new LocalRepository('repositories/version-links-test');
+    await repository.initialize();
+
+    const sourceId = await repository.createFile('Source', 'mcanvas', null);
+    const targetId = await repository.createFile('Target', 'mcanvas', null);
+    const note = await createCanvasNoteState(
+      'See [[Target]] for context.',
+      async (title) => (title === 'Target' ? targetId : null),
+    );
+    await repository.pushUpdates(sourceId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const version = await repository.createFileVersionIfDue(sourceId);
+    expect(version).not.toBeNull();
+
+    const manifest = JSON.parse(
+      getRepositoryTestStorage().readText(
+        'repositories/version-links-test/manifest.json',
+      ) ?? '{}',
+    ) as VFSManifest;
+    expect(manifest.linksBySource[sourceId]).toBeDefined();
+    expect(manifest.linksBySource[version?.id ?? '']).toBeUndefined();
+  });
+
+  it('removes version history and stored bytes when the source file is deleted', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+
+    const repository = new LocalRepository('repositories/version-delete-test');
+    await repository.initialize();
+
+    const fileId = await repository.createFile(
+      'Photo.png',
+      'png',
+      null,
+      new Uint8Array([1]),
+    );
+
+    vi.setSystemTime(new Date('2026-01-01T00:11:00Z'));
+    await repository.writeFileBytes(fileId, new Uint8Array([2]));
+    const version = await repository.createFileVersionIfDue(fileId);
+    expect(version).not.toBeNull();
+    expect(await repository.listFileVersions(fileId)).toHaveLength(1);
+
+    await repository.deleteNode(fileId);
+
+    expect(await repository.listFileVersions(fileId)).toHaveLength(0);
+    expect(await repository.readFileBytes(version?.id ?? '')).toBeNull();
+
+    const manifest = JSON.parse(
+      getRepositoryTestStorage().readText(
+        'repositories/version-delete-test/manifest.json',
+      ) ?? '{}',
+    ) as VFSManifest;
+    expect(manifest.nodes[version?.id ?? '']).toBeUndefined();
+    expect(
+      Object.values(manifest.nodes).some(
+        (node) =>
+          node.type === 'file' && node.system?.kind === 'file-version',
+      ),
+    ).toBe(false);
   });
 });
