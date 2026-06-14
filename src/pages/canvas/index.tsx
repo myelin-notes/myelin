@@ -179,7 +179,11 @@ function CanvasViewInner({
   }, [engine.fileName]);
 
   useEffect(() => {
-    if (engine.fileName) {
+    // engine.fileName lags `id` during a tab switch because CanvasView is
+    // reused (not remounted) and the session opens asynchronously. Only sync
+    // the title once the loaded session actually matches this tab's id,
+    // otherwise we briefly write the previous note's name onto the new tab.
+    if (engine.fileName && engine.noteSession?.id === id) {
       const pane = tabController.getPane(paneId);
       if (!pane) {
         return;
@@ -191,7 +195,7 @@ function CanvasViewInner({
         tabController.updateTabTitle(tab.id, engine.fileName);
       }
     }
-  }, [engine.fileName, tabController, paneId, id]);
+  }, [engine.fileName, engine.noteSession, tabController, paneId, id]);
 
   useEffect(() => {
     if (!engine.ready) {
