@@ -12,9 +12,20 @@
   text-underline-offset: 0.16em;
 }
 
-.pm-editor .ProseMirror .pm-md-note-link::before {
-  inset-inline: -0.14em;
+/*
+ * The green highlight is painted directly on the span (not an absolutely
+ * positioned `::before`) with `box-decoration-break: clone` so every line
+ * fragment of a wrapped note link paints its own padded, rounded rectangle.
+ * Horizontal padding extends the fill ~0.14em past the text and the equal
+ * negative margin cancels the layout shift; the vertical padding/margin pair
+ * reproduces the former `inset-block: -0.08em` extension.
+ */
+.pm-editor .ProseMirror .pm-md-note-link {
+  padding: 0.08em 0.14em;
+  margin: -0.08em -0.14em;
   background: color-mix(in srgb, var(--accent) 22%, transparent);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .pm-editor .ProseMirror .pm-md-note-link.pm-md-delim {
@@ -23,16 +34,18 @@
 
 /*
  * When a note link is split into multiple spans (e.g., by an escape-`\\`
- * decoration), each `::before` would extend by `inset-inline: -0.14em` and
- * stack at the boundaries, doubling the green tint. Pull the extension
- * inward at any split-adjacent boundary so the backgrounds tile without
- * overlap, keeping the outermost edges extended for visual padding.
+ * decoration), each span's padded background would stack at the boundaries,
+ * doubling the green tint. Zero the inner padding/margin at any split-adjacent
+ * boundary so the backgrounds tile without overlap, keeping the outermost
+ * edges extended for visual padding.
  */
-.pm-editor .ProseMirror .pm-md-note-link:has(+ .pm-md-note-link)::before {
-  inset-inline-end: 0;
+.pm-editor .ProseMirror .pm-md-note-link:has(+ .pm-md-note-link) {
+  padding-inline-end: 0;
+  margin-inline-end: 0;
 }
-.pm-editor .ProseMirror .pm-md-note-link + .pm-md-note-link::before {
-  inset-inline-start: 0;
+.pm-editor .ProseMirror .pm-md-note-link + .pm-md-note-link {
+  padding-inline-start: 0;
+  margin-inline-start: 0;
 }
 
 .pm-editor .ProseMirror a.pm-link {
@@ -49,12 +62,15 @@
 }
 
 .pm-editor .ProseMirror .pm-md-inline-code.pm-selection::before,
-.pm-editor .ProseMirror .pm-md-note-link.pm-selection::before,
 .pm-editor .ProseMirror .pm-selection .pm-md-inline-code::before,
-.pm-editor .ProseMirror .pm-selection .pm-md-note-link::before,
-.pm-editor .ProseMirror .pm-md-inline-code:has(.pm-selection)::before,
-.pm-editor .ProseMirror .pm-md-note-link:has(.pm-selection)::before {
+.pm-editor .ProseMirror .pm-md-inline-code:has(.pm-selection)::before {
   opacity: 0;
+}
+
+.pm-editor .ProseMirror .pm-md-note-link.pm-selection,
+.pm-editor .ProseMirror .pm-selection .pm-md-note-link,
+.pm-editor .ProseMirror .pm-md-note-link:has(.pm-selection) {
+  background: transparent;
 }
 
 .pm-editor .ProseMirror .pm-md-inline-code.pm-selection,

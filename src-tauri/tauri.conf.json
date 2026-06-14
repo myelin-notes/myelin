@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.github.wintersteve25.myelin",
   "build": {
-    "beforeDevCommand": "yarn patch && yarn dev",
+    "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "yarn build",
     "frontendDist": "../dist"
