@@ -344,6 +344,23 @@ const zhHans: typeof en = {
         },
       },
     },
+    dataExport: {
+      title: '数据',
+      eyebrow: '工作区',
+      export: {
+        label: '导出为 Obsidian 仓库',
+        description:
+          '将整个工作区保存到文件夹中，作为兼容 Obsidian 的仓库。笔记会转换为带 frontmatter 的 Markdown；其他文件会被复制，并保留文件夹结构。',
+        button: '导出',
+        defaultVaultName: 'Myelin 仓库',
+        loading: '正在导出 Obsidian 仓库...',
+        progress: (current: number, total: number) =>
+          `正在导出 ${current} / ${total}...`,
+        failed: 'Obsidian 仓库导出失败',
+        succeeded: (notes: number, media: number) =>
+          `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
+      },
+    },
     mcp: {
       title: 'Model Context Protocol',
       eyebrow: 'AI 代理',
