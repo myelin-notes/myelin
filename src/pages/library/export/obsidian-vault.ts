@@ -1,14 +1,8 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
-import { join } from '@tauri-apps/api/path';
-import {
-  exists,
-  mkdir,
-  remove,
-  writeFile,
-  writeTextFile,
-} from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { Logger } from '@/lib/logger';
 import type { McpReadableRepository } from '@/lib/mcp/read-model';
+import { bytesToBase64 } from '@/lib/pdf-export/client';
 import type { VFSFileNode, VFSNodeId } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { serializeDocToMarkdownChunked } from '@/pages/canvas/page-frame/markdown/serializer';
@@ -40,6 +34,17 @@ export interface ExportObsidianVaultOptions {
   onProgress?: (progress: ExportProgress) => void;
 }
 
+/**
+ * One file the Rust side writes: a note's markdown {@link text}, a local source
+ * path to {@link copyFrom}, or {@link dataB64} bytes when no local path exists.
+ */
+interface VaultFileEntry {
+  relPath: string;
+  text?: string;
+  copyFrom?: string;
+  dataB64?: string;
+}
+
 interface PlannedFile {
   node: VFSFileNode;
   /** Output directory relative to the vault root. */
@@ -48,13 +53,13 @@ interface PlannedFile {
 }
 
 interface ExportPlan {
-  folders: readonly string[][];
+  folders: string[];
   files: PlannedFile[];
 }
 
 /** Replace filesystem-illegal characters and trim Windows-unsafe trailing dots. */
 function sanitizeName(name: string): string {
-  const cleaned = [...name]
+  return [...name]
     .map((char) =>
       char.charCodeAt(0) <= 0x1f || ILLEGAL_NAME_CHARS.includes(char)
         ? '-'
@@ -63,7 +68,6 @@ function sanitizeName(name: string): string {
     .join('')
     .trim()
     .replace(/[. ]+$/, '');
-  return cleaned;
 }
 
 /** Ensure a file/folder name is unique within its directory (case-insensitive). */
@@ -89,7 +93,7 @@ async function planFolder(
   repository: McpReadableRepository,
   folderId: VFSNodeId | null,
   parentSegments: readonly string[],
-  plan: ExportPlan & { folders: string[][]; files: PlannedFile[] },
+  plan: ExportPlan,
 ): Promise<void> {
   const [folders, files] = await repository.listDirectory(folderId);
   const used = new Set<string>();
@@ -97,7 +101,7 @@ async function planFolder(
   for (const folder of folders) {
     const name = dedupeName(sanitizeName(folder.name) || 'Folder', used);
     const segments = [...parentSegments, name];
-    plan.folders.push(segments);
+    plan.folders.push(segments.join('/'));
     await planFolder(repository, folder.id, segments, plan);
   }
 
@@ -167,20 +171,37 @@ async function noteMarkdownBody(
   return frames.join('\n\n');
 }
 
-async function resolveVaultPath(
-  destDir: string,
-  vaultName: string,
-): Promise<string> {
-  const base = sanitizeName(vaultName) || 'Vault';
-  let candidate = base;
-  let suffix = 2;
-  let path = await join(destDir, candidate);
-  while (await exists(path)) {
-    candidate = `${base} (${suffix})`;
-    suffix += 1;
-    path = await join(destDir, candidate);
+/** Build the markdown body / source bytes a single file contributes, or null to skip. */
+async function buildFileEntry(
+  repository: McpReadableRepository,
+  file: PlannedFile,
+): Promise<{ entry: VaultFileEntry; isNote: boolean } | null> {
+  const relPath = [...file.segments, file.fileName].join('/');
+
+  if (file.node.fileType === 'mcanvas') {
+    const body = await noteMarkdownBody(repository, file.node.id);
+    return {
+      entry: { relPath, text: `${buildFrontmatter(file.node)}${body}\n` },
+      isNote: true,
+    };
   }
-  return path;
+
+  // Prefer copying the stored bytes directly on the Rust side; fall back to
+  // sending the bytes over IPC for repositories that expose no local path.
+  const sourcePath = await repository.getStoredAbsolutePath(file.node.id);
+  if (sourcePath) {
+    return { entry: { relPath, copyFrom: sourcePath }, isNote: false };
+  }
+
+  const bytes = await repository.readFileBytes(file.node.id);
+  if (!bytes) {
+    logger.warn('Skipping file with no stored bytes', {
+      nodeId: file.node.id,
+      name: file.node.name,
+    });
+    return null;
+  }
+  return { entry: { relPath, dataB64: bytesToBase64(bytes) }, isNote: false };
 }
 
 export async function exportObsidianVault({
@@ -189,58 +210,37 @@ export async function exportObsidianVault({
   vaultName,
   onProgress,
 }: ExportObsidianVaultOptions): Promise<ExportObsidianVaultResult> {
-  const plan: ExportPlan & { folders: string[][]; files: PlannedFile[] } = {
-    folders: [],
-    files: [],
-  };
+  const plan: ExportPlan = { folders: [], files: [] };
   await planFolder(repository, null, [], plan);
 
-  const vaultPath = await resolveVaultPath(destDir, vaultName);
+  const entries: VaultFileEntry[] = [];
   let notesExported = 0;
   let filesCopied = 0;
   const total = plan.files.length;
   let current = 0;
 
-  try {
-    await mkdir(vaultPath, { recursive: true });
-    for (const segments of plan.folders) {
-      await mkdir(await join(vaultPath, ...segments), { recursive: true });
+  for (const file of plan.files) {
+    onProgress?.({ current: ++current, total, name: file.node.name });
+    const built = await buildFileEntry(repository, file);
+    if (!built) {
+      continue;
     }
-
-    for (const file of plan.files) {
-      onProgress?.({ current: ++current, total, name: file.node.name });
-      const targetPath = await join(vaultPath, ...file.segments, file.fileName);
-
-      if (file.node.fileType === 'mcanvas') {
-        const body = await noteMarkdownBody(repository, file.node.id);
-        const frontmatter = buildFrontmatter(file.node);
-        await writeTextFile(targetPath, `${frontmatter}${body}\n`);
-        notesExported += 1;
-        continue;
-      }
-
-      const bytes = await repository.readFileBytes(file.node.id);
-      if (!bytes) {
-        logger.warn('Skipping file with no stored bytes', {
-          nodeId: file.node.id,
-          name: file.node.name,
-        });
-        continue;
-      }
-      await writeFile(targetPath, bytes);
+    entries.push(built.entry);
+    if (built.isNote) {
+      notesExported += 1;
+    } else {
       filesCopied += 1;
     }
-
-    return { vaultPath, notesExported, filesCopied };
-  } catch (error) {
-    logger.error('Failed to export Obsidian vault', error, { vaultPath });
-    await remove(vaultPath, { recursive: true }).catch((cleanupError) => {
-      logger.error(
-        'Failed to clean up partial Obsidian vault export',
-        cleanupError,
-        { vaultPath },
-      );
-    });
-    throw error;
   }
+
+  const vaultPath = await invoke<string>('export_obsidian_vault', {
+    request: {
+      destDir,
+      vaultName: sanitizeName(vaultName) || 'Vault',
+      folders: plan.folders,
+      files: entries,
+    },
+  });
+
+  return { vaultPath, notesExported, filesCopied };
 }
