@@ -66,22 +66,25 @@
   font-style: italic;
 }
 
-.pm-editor .ProseMirror .pm-md-inline-code,
-.pm-editor .ProseMirror .pm-md-note-link {
+.pm-editor .ProseMirror .pm-md-inline-code {
   position: relative;
   z-index: 0;
   line-height: inherit;
   vertical-align: baseline;
 }
 
-.pm-editor .ProseMirror .pm-md-inline-code::before,
-.pm-editor .ProseMirror .pm-md-note-link::before {
+.pm-editor .ProseMirror .pm-md-inline-code::before {
   content: "";
   position: absolute;
   inset-block: -0.08em;
   pointer-events: none;
   border-radius: 0.35rem;
   z-index: -1;
+}
+
+.pm-editor .ProseMirror .pm-md-note-link {
+  line-height: inherit;
+  vertical-align: baseline;
 }
 
 .pm-editor .ProseMirror .pm-md-inline-code {
