@@ -1,0 +1,34 @@
+diff --git a/src/backends/whisper/logging.rs b/src/backends/whisper/logging.rs
+index 9259df7..0dc55e4 100644
+--- a/src/backends/whisper/logging.rs
++++ b/src/backends/whisper/logging.rs
+@@ -1,20 +1,17 @@
+-use std::os::raw::{c_char, c_void};
+ use std::sync::Once;
+ 
+-/// A no-op log callback used to silence logs emitted by whisper.cpp.
+-unsafe extern "C" fn whisper_log_callback(
+-    _level: u32,
+-    _c_msg: *const c_char,
+-    _user_data: *mut c_void,
+-) {
+-    // Intentionally left empty.
+-}
+-
+ /// Ensure whisper logging is configured exactly once for the lifetime of the process.
++///
++/// Routes whisper.cpp and GGML logs through whisper-rs's logging hooks. scribble enables
++/// neither the `log_backend` nor `tracing_backend` feature on whisper-rs, so the hooks
++/// compile down to no-ops and the logs are silenced. This is the same observable behavior
++/// as the previous no-op `whisper_log_set` callback: whisper.cpp's `whisper_log_set`
++/// internally forwards to `ggml_log_set`, so both the old and new paths silence the
++/// whisper *and* GGML log streams.
+ pub fn init_whisper_logging() {
+     static INIT: Once = Once::new();
+ 
+-    INIT.call_once(|| unsafe {
+-        whisper_rs::set_log_callback(Some(whisper_log_callback), std::ptr::null_mut());
++    INIT.call_once(|| {
++        whisper_rs::install_logging_hooks();
+     });
+ }
