@@ -733,6 +733,21 @@ export function createNoteState(text: string): {
   };
 }
 
+export async function createCanvasNoteState(
+  markdown: string,
+  resolveNoteLinkId?: (title: string) => Promise<VFSNodeId | null>,
+): Promise<{
+  update: Uint8Array;
+  stateVector: Uint8Array;
+}> {
+  const ydoc = new YDocManager();
+  await addMarkdownPageFrameToYDoc(ydoc, markdown, { resolveNoteLinkId });
+  return {
+    update: ydoc.encodeState(),
+    stateVector: ydoc.encodeStateVector(),
+  };
+}
+
 export function readNoteText(update: Uint8Array | null): string {
   if (!update) {
     return '';

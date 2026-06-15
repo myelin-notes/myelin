@@ -378,6 +378,23 @@ const en = {
         },
       },
     },
+    dataExport: {
+      title: 'Data',
+      eyebrow: 'Workspace',
+      export: {
+        label: 'Export as Obsidian Vault',
+        description:
+          'Save your whole workspace to a folder as an Obsidian-compatible vault. Notes become Markdown with frontmatter; other files are copied and the folder structure is preserved.',
+        button: 'Export',
+        defaultVaultName: 'Myelin Vault',
+        loading: 'Exporting Obsidian vault...',
+        progress: (current: number, total: number) =>
+          `Exporting ${current} of ${total}...`,
+        failed: 'Obsidian vault export failed',
+        succeeded: (notes: number, media: number) =>
+          `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
+      },
+    },
     mcp: {
       title: 'Model Context Protocol',
       eyebrow: 'AI Agents',

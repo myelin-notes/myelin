@@ -383,6 +383,23 @@ const es: typeof en = {
         },
       },
     },
+    dataExport: {
+      title: 'Datos',
+      eyebrow: 'Espacio de trabajo',
+      export: {
+        label: 'Exportar como bóveda de Obsidian',
+        description:
+          'Guarda todo tu espacio de trabajo en una carpeta como una bóveda compatible con Obsidian. Las notas se convierten en Markdown con frontmatter; los demás archivos se copian y se conserva la estructura de carpetas.',
+        button: 'Exportar',
+        defaultVaultName: 'Bóveda de Myelin',
+        loading: 'Exportando bóveda de Obsidian...',
+        progress: (current: number, total: number) =>
+          `Exportando ${current} de ${total}...`,
+        failed: 'No se pudo exportar la bóveda de Obsidian',
+        succeeded: (notes: number, media: number) =>
+          `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
+      },
+    },
     mcp: {
       title: 'Model Context Protocol',
       eyebrow: 'Agentes de IA',

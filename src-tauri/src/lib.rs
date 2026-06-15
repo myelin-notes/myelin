@@ -5,6 +5,7 @@ mod mcp_server;
 mod note_index;
 mod pdf_export;
 mod transcription;
+mod workspace_export;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -61,6 +62,7 @@ pub fn run() {
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
             pdf_export::export_pdf,
+            workspace_export::export_obsidian_vault,
             mcp_server::mcp_start,
             mcp_server::mcp_stop,
             mcp_server::mcp_status,
