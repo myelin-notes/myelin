@@ -166,6 +166,9 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
           typeof typeValue === 'number'
             ? (typeValue as ElementType)
             : ElementType.STROKE;
+        if (type === ElementType.AUDIO) {
+          nextMap.set('creatorPeerId', canvas.localPeerId);
+        }
         const background = isBackgroundElement(type);
         const element = canvas.insertElementMap(nextMap, {
           background,

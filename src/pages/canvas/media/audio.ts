@@ -31,7 +31,9 @@ export async function audioImportHandler(
   // on-demand transcribe button instead, since a full-file whisper run over
   // an arbitrarily long import is too expensive to fire unprompted.
   const fileName = blob instanceof File ? blob.name : 'audio';
-  const el = canvas.addElement((uuid) => new AudioElement(uuid));
+  const el = canvas.addElement(
+    (uuid) => new AudioElement(uuid, canvas.localPeerId),
+  );
   el.setAudioData(bytes, fileName, duration, mimeType, waveform);
 
   const dpr = getDevicePixelRatio();

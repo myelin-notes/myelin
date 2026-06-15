@@ -82,7 +82,7 @@ export function useCanvasInserts({
         return;
       }
       const el = dc.addElement((uuid) => {
-        const audio = new AudioElement(uuid);
+        const audio = new AudioElement(uuid, dc.localPeerId);
         audio.setOffset(worldPos.x, worldPos.y);
         return audio;
       });
