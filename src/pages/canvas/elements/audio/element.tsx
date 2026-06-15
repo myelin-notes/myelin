@@ -26,6 +26,8 @@ export class AudioElement extends DrawableElement {
   private _duration: number = 0;
   private _mimeType: string = '';
   private _transcript: string = '';
+  private _creatorPeerId: string;
+  private _localPeerId: string;
 
   // Decoded lazily after audio data arrives; rendered into the view as a
   // prop and used by drawThumbnail.
@@ -57,8 +59,10 @@ export class AudioElement extends DrawableElement {
     this.setTranscript(transcript);
   };
 
-  constructor(uuid: string) {
+  constructor(uuid: string, localPeerId = '', creatorPeerId = localPeerId) {
     super(uuid, ElementType.AUDIO);
+    this._localPeerId = localPeerId;
+    this._creatorPeerId = creatorPeerId;
   }
 
   public override getYMapProps(): Record<string, unknown> {
@@ -67,6 +71,7 @@ export class AudioElement extends DrawableElement {
       duration: this._duration,
       mimeType: this._mimeType,
       transcript: this._transcript,
+      creatorPeerId: this._creatorPeerId,
     };
     if (this._audioData) {
       props.audioData = new Uint8Array(this._audioData);
@@ -92,6 +97,10 @@ export class AudioElement extends DrawableElement {
         this._transcript = typeof v === 'string' ? v : '';
         this.render();
       },
+      creatorPeerId: (v) => {
+        this._creatorPeerId = typeof v === 'string' ? v : '';
+        this.render();
+      },
       audioData: (v) => {
         this._audioData = v instanceof Uint8Array ? new Uint8Array(v) : null;
         this.scheduleWaveformDecode();
@@ -105,6 +114,23 @@ export class AudioElement extends DrawableElement {
   }
   public get duration(): number {
     return this._duration;
+  }
+  public get creatorPeerId(): string {
+    return this._creatorPeerId;
+  }
+
+  public setLocalPeerId(peerId: string): void {
+    if (this._localPeerId === peerId) {
+      return;
+    }
+    this._localPeerId = peerId;
+    this.render();
+  }
+
+  private get isCreatedByLocalPeer(): boolean {
+    return (
+      this._creatorPeerId.length > 0 && this._creatorPeerId === this._localPeerId
+    );
   }
 
   /**
@@ -267,6 +293,7 @@ export class AudioElement extends DrawableElement {
             mimeType={this._mimeType}
             waveform={this._waveform}
             transcript={this._transcript}
+            isCreator={this.isCreatedByLocalPeer}
             onRecorded={this._onRecorded}
             onTranscribed={this._onTranscribed}
           />

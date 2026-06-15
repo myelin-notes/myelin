@@ -562,6 +562,7 @@ const es: typeof en = {
       requestingMicAccess: 'Solicitando acceso al micrófono',
       micUnavailable: 'Micrófono no disponible',
       tapToRecord: 'Toca para grabar',
+      waitingForRecording: 'Esperando grabación',
       startRecording: 'Iniciar grabación',
       stopRecording: 'Detener grabación',
       tryRecordingAgain: 'Intentar grabar de nuevo',
