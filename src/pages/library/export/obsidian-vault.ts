@@ -1,7 +1,6 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { invoke } from '@tauri-apps/api/core';
 import { Logger } from '@/lib/logger';
-import { bytesToBase64 } from '@/lib/pdf-export/client';
 import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { serializeDocToMarkdownChunked } from '@/pages/canvas/page-frame/markdown/serializer';
@@ -34,14 +33,13 @@ export interface ExportObsidianVaultOptions {
 }
 
 /**
- * One file the Rust side writes: a note's markdown {@link text}, a local source
- * path to {@link copyFrom}, or {@link dataB64} bytes when no local path exists.
+ * One file the Rust side writes: a note's markdown {@link text}, or a local
+ * source path to {@link copyFrom} for media stored on disk.
  */
 interface VaultFileEntry {
   relPath: string;
   text?: string;
   copyFrom?: string;
-  dataB64?: string;
 }
 
 interface PlannedFile {
@@ -170,7 +168,7 @@ async function noteMarkdownBody(
   return frames.join('\n\n');
 }
 
-/** Build the markdown body / source bytes a single file contributes, or null to skip. */
+/** Build the markdown body / source path a single file contributes, or null to skip. */
 async function buildFileEntry(
   repository: ReadableRepository,
   file: PlannedFile,
@@ -185,22 +183,17 @@ async function buildFileEntry(
     };
   }
 
-  // Prefer copying the stored bytes directly on the Rust side; fall back to
-  // sending the bytes over IPC for repositories that expose no local path.
+  // Media is mirrored on disk (local repo, or the local cache of a synced repo),
+  // so the Rust side copies the stored bytes directly from this path.
   const sourcePath = await repository.getStoredAbsolutePath(file.node.id);
-  if (sourcePath) {
-    return { entry: { relPath, copyFrom: sourcePath }, isNote: false };
-  }
-
-  const bytes = await repository.readFileBytes(file.node.id);
-  if (!bytes) {
-    logger.warn('Skipping file with no stored bytes', {
+  if (!sourcePath) {
+    logger.warn('Skipping file with no stored path', {
       nodeId: file.node.id,
       name: file.node.name,
     });
     return null;
   }
-  return { entry: { relPath, dataB64: bytesToBase64(bytes) }, isNote: false };
+  return { entry: { relPath, copyFrom: sourcePath }, isNote: false };
 }
 
 export async function exportObsidianVault({

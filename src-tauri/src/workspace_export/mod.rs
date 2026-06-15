@@ -6,7 +6,6 @@
 
 use std::path::{Path, PathBuf};
 
-use base64::{engine::general_purpose, Engine as _};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -18,8 +17,6 @@ pub struct VaultFile {
     text: Option<String>,
     /// Absolute source path to copy verbatim (media stored locally).
     copy_from: Option<String>,
-    /// Base64 bytes, used when no local source path is available.
-    data_b64: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -103,12 +100,6 @@ fn write_entries(vault_dir: &Path, request: &VaultExportRequest) -> Result<(), S
         } else if let Some(source) = &file.copy_from {
             std::fs::copy(source, &path)
                 .map_err(|e| format!("failed to copy {source} to {}: {e}", path.display()))?;
-        } else if let Some(data) = &file.data_b64 {
-            let bytes = general_purpose::STANDARD
-                .decode(data)
-                .map_err(|e| format!("failed to decode {}: {e}", file.rel_path))?;
-            std::fs::write(&path, bytes)
-                .map_err(|e| format!("failed to write {}: {e}", path.display()))?;
         }
     }
 
