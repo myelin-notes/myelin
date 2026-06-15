@@ -167,6 +167,7 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
             ? (typeValue as ElementType)
             : ElementType.STROKE;
         if (type === ElementType.AUDIO) {
+          // A paste creates a new element, so the paster owns any empty recording slot.
           nextMap.set('creatorPeerId', canvas.localPeerId);
         }
         const background = isBackgroundElement(type);

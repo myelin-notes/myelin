@@ -175,7 +175,6 @@ interface AudioPlayerInteractionOptions {
 
 export interface AudioPlayerInteractionState {
   isWaitingForRemoteAudio: boolean;
-  isWaitingForRemoteTranscript: boolean;
   isCaptionsLoading: boolean;
   primaryButtonDisabled: boolean;
   captionsButtonDisabled: boolean;
@@ -189,11 +188,10 @@ export function getAudioPlayerInteractionState({
 }: AudioPlayerInteractionOptions): AudioPlayerInteractionState {
   const hasAudio = Boolean(audioBytes);
   const isWaitingForRemoteAudio = !hasAudio && !isCreator;
-  const isWaitingForRemoteTranscript = hasAudio && !transcript && !isCreator;
-  const isCaptionsLoading = isTranscribing || isWaitingForRemoteTranscript;
+  const shouldWaitForRemoteTranscript = hasAudio && !transcript && !isCreator;
+  const isCaptionsLoading = isTranscribing || shouldWaitForRemoteTranscript;
   return {
     isWaitingForRemoteAudio,
-    isWaitingForRemoteTranscript,
     isCaptionsLoading,
     primaryButtonDisabled: isWaitingForRemoteAudio,
     captionsButtonDisabled: isCaptionsLoading,
