@@ -104,6 +104,20 @@ export interface NoteBacklink extends StoredNoteLink {
   sourceName: string;
 }
 
+export interface RepositoryNoteGraphNode {
+  id: VFSNodeId;
+  name: string;
+}
+
+export interface RepositoryNoteGraphLink extends StoredNoteLink {
+  sourceId: VFSNodeId;
+}
+
+export interface RepositoryNoteGraph {
+  nodes: RepositoryNoteGraphNode[];
+  links: RepositoryNoteGraphLink[];
+}
+
 export interface NodeSearchResult {
   node: VFSNode;
   score: number;
@@ -145,6 +159,7 @@ export interface Repository {
   getStats(): Promise<RepositoryStats>;
   getRecentFiles(limit?: number): Promise<VFSFileNode[]>;
   getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]>;
+  getNoteGraph(): Promise<RepositoryNoteGraph>;
   getUniqueFileName(
     baseName: string,
     parentId: VFSNodeId | null,

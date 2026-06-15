@@ -37,6 +37,10 @@ const en = {
         label: 'Create note',
         description: 'Start a new canvas in the library root',
       },
+      openGraph: {
+        label: 'Open graph',
+        description: 'Map explicit links between canvas notes',
+      },
       importMarkdown: {
         label: 'Import Markdown',
         description: 'Create a canvas from a Markdown file',
@@ -198,6 +202,23 @@ const en = {
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
     },
+  },
+  graph: {
+    title: 'Graph',
+    explicitLinks: 'Explicit links',
+    searchPlaceholder: 'Search graph...',
+    fit: 'Fit',
+    openNote: 'Open note',
+    emptySelection: 'Select a note to inspect its links.',
+    noCanvasNotes: 'No canvas notes yet.',
+    noLinks: 'Add explicit note links to connect this graph.',
+    loadFailed: 'Could not load graph.',
+    outgoing: 'Outgoing links',
+    backlinks: 'Backlinks',
+    graphStats: (notes: number, links: number) =>
+      `${notes} note${notes === 1 ? '' : 's'}, ${links} link${links === 1 ? '' : 's'}`,
+    linkCount: (incoming: number, outgoing: number) =>
+      `${outgoing} outgoing, ${incoming} backlink${incoming === 1 ? '' : 's'}`,
   },
   versionHistory: {
     title: 'Version History',

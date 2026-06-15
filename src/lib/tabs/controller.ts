@@ -50,6 +50,7 @@ function targetsEqual(a: TabTarget, b: TabTarget): boolean {
 
   switch (a.type) {
     case 'library':
+    case 'graph':
     case 'settings':
       return true;
     case 'canvas':

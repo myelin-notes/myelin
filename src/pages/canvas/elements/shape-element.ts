@@ -1,7 +1,7 @@
 import type * as Y from 'yjs';
 import { parseCssColor } from '@/lib/pdf-export/color';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
-import type { Vector2 } from '../drawable-canvas';
+import type { Vector2 } from '../geometry';
 import type { ShapeType } from '../shape-recognizer';
 import {
   DrawableElement,

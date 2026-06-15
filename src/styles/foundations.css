@@ -205,6 +205,9 @@
   --color-secondary-container: var(--bg-secondary-container);
   --color-primary-container: var(--bg-primary-container);
 
+  --color-graph-edge: var(--graph-edge);
+  --color-graph-edge-outgoing: var(--graph-edge-outgoing);
+
   --shadow-ambient: 0 0 32px 0 rgba(25, 28, 30, 0.06);
   --shadow-elevated: 0 18px 40px -24px rgba(28, 39, 56, 0.18);
 
@@ -265,6 +268,11 @@
   --bg-hover-tint: rgba(25, 28, 30, 0.05);
   --bg-secondary-container: #dce4ed;
   --bg-primary-container: #2a3a50;
+
+  /* Note graph — neutral connective line plus a green accent for a selected
+     node's outgoing links; incoming links reuse --accent-dark. */
+  --graph-edge: #8d9aa7;
+  --graph-edge-outgoing: #2a9d6f;
   --bg-accent-amber: #fbbf24;
   --bg-accent-amber-strong: #f59e0b;
 

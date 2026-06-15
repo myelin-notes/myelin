@@ -30,6 +30,7 @@ import {
   getFolderChain,
   getIndexCandidateFileNodes,
   getNodesByAnyTag,
+  getNoteGraph,
   getRecentFiles,
   getStats,
   getUniqueFileName,
@@ -57,6 +58,7 @@ import type {
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
+  RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
   SearchNodesOptions,
@@ -311,6 +313,11 @@ export abstract class BaseRepository
   async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
     const { manifest } = await this.loadManifestImpl();
     return getBacklinks(manifest, noteId);
+  }
+
+  async getNoteGraph(): Promise<RepositoryNoteGraph> {
+    const { manifest } = await this.loadManifestImpl();
+    return getNoteGraph(manifest);
   }
 
   async getUniqueFileName(

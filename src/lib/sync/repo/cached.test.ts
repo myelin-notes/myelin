@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import {
+  createCanvasNoteState,
   createNoteState,
   getRepositoryTestStorage,
   readNoteText,
@@ -202,6 +203,42 @@ describe('CachedRepository', () => {
       'hello cached repository',
     );
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('serves note graph data from the local cache', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/cached-graph-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/cached-graph-test/outbox.json',
+    );
+
+    await repository.initialize();
+    const sourceId = await repository.createFile('Source', 'mcanvas', null);
+    const targetId = await repository.createFile('Target', 'mcanvas', null);
+
+    const note = await createCanvasNoteState(
+      'See [[Target]].',
+      async (title) => (title === 'Target' ? targetId : null),
+    );
+    await repository.pushUpdates(sourceId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const graph = await expectQuickLocalResult(repository.getNoteGraph());
+
+    expect(graph.nodes.map((node) => node.id).sort()).toEqual(
+      [sourceId, targetId].sort(),
+    );
+    expect(graph.links).toMatchObject([
+      {
+        sourceId,
+        targetId,
+        title: 'Target',
+      },
+    ]);
   });
 
   it('flushes raw video file bytes to remote storage', async () => {
