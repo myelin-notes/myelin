@@ -6,7 +6,14 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Download, History, WifiOff, X as XIcon } from 'lucide-react';
+import {
+  Download,
+  History,
+  Redo2,
+  Undo2,
+  WifiOff,
+  X as XIcon,
+} from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -124,6 +131,12 @@ function CanvasViewInner({
   }, []);
   const onRecenterViewport = useCallback(() => {
     drawableCanvasRef.current?.viewport.animateRecenter();
+  }, []);
+  const onUndo = useCallback(() => {
+    drawableCanvasRef.current?.undo();
+  }, []);
+  const onRedo = useCallback(() => {
+    drawableCanvasRef.current?.redo();
   }, []);
   const onRegenerateThumbnail = useCallback(() => {
     void regenerateThumbnailNow(id);
@@ -343,6 +356,8 @@ function CanvasViewInner({
   const titleTrailing = useMemo(() => {
     const liveSyncPausedTitle =
       liveDiscoveryPauseError?.message ?? strings.canvas.peerSync.livePaused;
+    const undoLabel = strings.settings.keybinds.actions['canvas:undo'].label;
+    const redoLabel = strings.settings.keybinds.actions['canvas:redo'].label;
 
     return (
       <>
@@ -357,6 +372,40 @@ function CanvasViewInner({
           </span>
         )}
         <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={onUndo}
+                  aria-label={undoLabel}
+                  disabled={!engine.ready}
+                />
+              }
+            >
+              <Undo2 className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>{undoLabel}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={onRedo}
+                  aria-label={redoLabel}
+                  disabled={!engine.ready}
+                />
+              }
+            >
+              <Redo2 className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>{redoLabel}</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger
               render={
@@ -398,11 +447,14 @@ function CanvasViewInner({
   }, [
     handleOpenBacklinkSource,
     onExportCanvasPdf,
+    onUndo,
+    onRedo,
     id,
     engine.ready,
     liveDiscoveryPauseError,
     strings.canvas.peerSync.livePaused,
     strings.versionHistory.title,
+    strings.settings.keybinds.actions,
   ]);
   const insertPopover = useMemo(
     () => (
