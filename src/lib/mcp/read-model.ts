@@ -1,11 +1,6 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import type {
-  Repository,
-  VFSFileNode,
-  VFSNodeId,
-  YjsSyncTarget,
-} from '@/lib/sync';
+import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
@@ -37,9 +32,6 @@ import type {
   McpTextElementSummary,
   McpUnknownElementSummary,
 } from './types';
-
-export type McpReadableRepository = Repository &
-  Pick<YjsSyncTarget, 'loadDocument'>;
 
 const MAX_SNIPPET_LENGTH = 500;
 
@@ -240,7 +232,7 @@ function pdfResourceUri(noteId: VFSNodeId, elementId: string): string {
 }
 
 export async function loadMcpNote(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
 ): Promise<LoadedMcpNote> {
   const node = await repository.getNode(noteId);
@@ -461,7 +453,7 @@ function noteReadModelFromLoaded(
 }
 
 export async function buildMcpNoteReadModel(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
   options: { indexedText?: string | null } = {},
 ): Promise<McpNoteReadModel> {
@@ -527,7 +519,7 @@ function latexContentFromYDoc(
 }
 
 export async function readMcpPageFrame(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
   pageFrameId: string,
 ): Promise<McpPageFrameContent> {
@@ -536,7 +528,7 @@ export async function readMcpPageFrame(
 }
 
 export async function readMcpCanvasText(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
   elementId: string,
 ): Promise<McpCanvasTextContent> {
@@ -545,7 +537,7 @@ export async function readMcpCanvasText(
 }
 
 export async function readMcpLatex(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
   elementId: string,
 ): Promise<McpLatexContent> {
@@ -554,7 +546,7 @@ export async function readMcpLatex(
 }
 
 export async function readMcpImage(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
   elementId: string,
 ): Promise<McpImageContent> {
@@ -570,7 +562,7 @@ export async function readMcpImage(
 }
 
 export async function readMcpPdf(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
   elementId: string,
 ): Promise<McpPdfContent> {
@@ -586,7 +578,7 @@ export async function readMcpPdf(
 }
 
 export async function readMcpNoteFull(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
   options: { indexedText?: string | null } = {},
 ): Promise<McpNoteFullReadModel> {

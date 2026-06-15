@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { ElementType } from '@/pages/canvas/elements/element-type';
-import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/import';
 import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown/serializer';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
+  createCanvasNoteState,
   createNoteState,
   getRepositoryTestStorage,
   readNoteText,
@@ -20,22 +20,6 @@ import {
   getStoredFileName,
   MANIFEST_PATH,
 } from './shared';
-import type { VFSNodeId } from './types';
-
-async function createCanvasNoteState(
-  markdown: string,
-  resolveNoteLinkId?: (title: string) => Promise<VFSNodeId | null>,
-): Promise<{
-  update: Uint8Array;
-  stateVector: Uint8Array;
-}> {
-  const ydoc = new YDocManager();
-  await addMarkdownPageFrameToYDoc(ydoc, markdown, { resolveNoteLinkId });
-  return {
-    update: ydoc.encodeState(),
-    stateVector: ydoc.encodeStateVector(),
-  };
-}
 
 function readFirstPageFrameMarkdown(update: Uint8Array | null): string {
   if (!update || update.byteLength === 0) {

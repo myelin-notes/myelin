@@ -341,8 +341,7 @@ describe('repository file version history', () => {
     expect(manifest.nodes[version?.id ?? '']).toBeUndefined();
     expect(
       Object.values(manifest.nodes).some(
-        (node) =>
-          node.type === 'file' && node.system?.kind === 'file-version',
+        (node) => node.type === 'file' && node.system?.kind === 'file-version',
       ),
     ).toBe(false);
   });

@@ -1,9 +1,8 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { invoke } from '@tauri-apps/api/core';
 import { Logger } from '@/lib/logger';
-import type { McpReadableRepository } from '@/lib/mcp/read-model';
 import { bytesToBase64 } from '@/lib/pdf-export/client';
-import type { VFSFileNode, VFSNodeId } from '@/lib/sync';
+import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
 import { ElementType } from '@/pages/canvas/elements/element-type';
 import { serializeDocToMarkdownChunked } from '@/pages/canvas/page-frame/markdown/serializer';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
@@ -26,7 +25,7 @@ export interface ExportObsidianVaultResult {
 }
 
 export interface ExportObsidianVaultOptions {
-  repository: McpReadableRepository;
+  repository: ReadableRepository;
   /** Absolute directory the user picked; the vault is created as a subfolder. */
   destDir: string;
   /** Name of the root vault folder created under {@link destDir}. */
@@ -90,7 +89,7 @@ function dedupeName(fileName: string, used: Set<string>): string {
 }
 
 async function planFolder(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   folderId: VFSNodeId | null,
   parentSegments: readonly string[],
   plan: ExportPlan,
@@ -140,7 +139,7 @@ function buildFrontmatter(node: VFSFileNode): string {
  * Non-page-frame elements (embedded media, canvas text, drawings) are ignored.
  */
 async function noteMarkdownBody(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   noteId: VFSNodeId,
 ): Promise<string> {
   const snapshot = await repository.loadDocument(noteId);
@@ -173,7 +172,7 @@ async function noteMarkdownBody(
 
 /** Build the markdown body / source bytes a single file contributes, or null to skip. */
 async function buildFileEntry(
-  repository: McpReadableRepository,
+  repository: ReadableRepository,
   file: PlannedFile,
 ): Promise<{ entry: VaultFileEntry; isNote: boolean } | null> {
   const relPath = [...file.segments, file.fileName].join('/');

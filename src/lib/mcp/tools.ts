@@ -2,6 +2,7 @@ import type {
   NodeSearchResult,
   NoteBacklink,
   NoteSession,
+  ReadableRepository,
   Repository,
   StoredNoteLink,
   VFSFileNode,
@@ -20,7 +21,6 @@ import {
   DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
   writeMarkdownToPageFrameFragment,
 } from '@/pages/canvas/page-frame/markdown/import';
-import type { McpReadableRepository } from './read-model';
 import {
   buildMcpNoteReadModel,
   findElementMap,
@@ -631,7 +631,7 @@ export class McpToolService {
 
   constructor(
     private readonly options: {
-      repository: McpReadableRepository;
+      repository: ReadableRepository;
       indexedTextByNode?: ReadonlyMap<VFSNodeId, string>;
       allowDirectWrites?: () => boolean;
     },

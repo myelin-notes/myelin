@@ -56,6 +56,10 @@ export interface RepositoryStatusSource {
   ): () => void;
 }
 
+/** A repository that can be read and have its note documents loaded. */
+export type ReadableRepository = Repository &
+  Pick<YjsSyncTarget, 'loadDocument'>;
+
 export type ActiveRepository = Repository &
   YjsSyncTarget &
   RepositoryLifecycle &
