@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { handwritingService } from '@/lib/handwriting';
 import { Logger } from '@/lib/logger';
 import { summarizeYDoc } from '@/lib/note/state-summary';
 import { noteIndexService, type ReindexItem } from '@/lib/note-index';
@@ -169,6 +170,7 @@ export abstract class BaseRepository
       const path = await this.getStoredAbsolutePath(nodeId);
       if (path) {
         noteIndexService.requestReindex(nodeId, path, candidateFileType);
+        handwritingService.requestRecognize(nodeId, path, candidateFileType);
       }
     }
   }
@@ -495,6 +497,7 @@ export abstract class BaseRepository
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
         await noteIndexService.removeIndex(file.id);
+        await handwritingService.removeRecognition(file.id);
       }),
     );
   }

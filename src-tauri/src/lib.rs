@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod handwriting;
 mod iroh_transport;
 mod mcp_server;
 mod note_index;
@@ -55,6 +56,7 @@ pub fn run() {
         .manage(iroh_transport::IrohState::new())
         .manage(mcp_server::McpServerState::new())
         .manage(note_index::IndexEngineState::new())
+        .manage(handwriting::HandwritingState::new())
         .manage(transcription::TranscriptionState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
@@ -71,6 +73,9 @@ pub fn run() {
             note_index::reindex_batch,
             note_index::remove_index,
             note_index::embed_search_query,
+            handwriting::recognize_handwriting,
+            handwriting::recognize_handwriting_batch,
+            handwriting::remove_handwriting,
             transcription::start_audio_transcription,
             transcription::push_audio_transcription_samples,
             transcription::finish_audio_transcription,
