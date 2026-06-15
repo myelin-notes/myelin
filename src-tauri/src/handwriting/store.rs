@@ -174,18 +174,7 @@ pub(crate) fn process_node(
     }
 
     let doc = decode_doc(&bytes)?;
-    let strokes = collect_strokes(&doc);
-
-    // A note that lost all its strokes drops its artifact.
-    if strokes.is_empty() {
-        if artifact.exists() {
-            std::fs::remove_file(artifact).map_err(|e| format!("remove handwriting: {e}"))?;
-            return Ok(true);
-        }
-        return Ok(false);
-    }
-
-    let lines = cluster_lines(strokes);
+    let lines = cluster_lines(collect_strokes(&doc));
 
     // Per-line cache: reuse recognition for lines whose strokes did not move,
     // so a stroke edit only re-recognizes the lines it actually touched.
@@ -209,9 +198,15 @@ pub(crate) fn process_node(
         });
     }
 
-    let changed = existing
+    // Always write the record — even with no strokes — so the source_hash
+    // short-circuit above fires next time and a strokeless note isn't
+    // re-decoded on every save, backfill, or restart. A missing prior record
+    // counts as empty, so a first index of a strokeless note is not a change.
+    let prev_lines = existing
         .as_ref()
-        .is_none_or(|page| page.lines != recognized);
+        .map(|page| page.lines.as_slice())
+        .unwrap_or(&[]);
+    let changed = prev_lines != recognized.as_slice();
 
     let page = RecognizedPage {
         node_id: node_id.to_string(),
@@ -525,7 +520,7 @@ mod tests {
     }
 
     #[test]
-    fn dropping_all_strokes_removes_the_artifact() {
+    fn dropping_all_strokes_writes_an_empty_record() {
         let base = std::env::temp_dir().join("handwriting_empty_strokes_test");
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(&base).unwrap();
@@ -537,14 +532,18 @@ mod tests {
             .unwrap();
         let path = note_path.to_str().unwrap();
         assert!(process_node("node1", path, "mcanvas", &artifact, &recognizer).unwrap());
-        assert!(artifact.exists());
+        assert_eq!(read_page(&artifact).lines.len(), 1);
 
-        // Rewrite with no strokes: the artifact is dropped.
+        // Rewrite with no strokes: the artifact is kept but emptied, recording
+        // the new source hash so the note isn't re-decoded next time.
         std::fs::write(&note_path, note_with_strokes(&[])).unwrap();
         let changed =
             process_node("node1", path, "mcanvas", &artifact, &recognizer).unwrap();
         assert!(changed);
-        assert!(!artifact.exists());
+        assert!(read_page(&artifact).lines.is_empty());
+
+        // Re-running over the now-strokeless bytes short-circuits on the hash.
+        assert!(!process_node("node1", path, "mcanvas", &artifact, &recognizer).unwrap());
 
         std::fs::remove_dir_all(&base).ok();
     }

@@ -89,19 +89,31 @@ pub(crate) fn schedule(
             Err(_) => return,
         };
 
-        let artifact = match artifact_path(&app, &repo_id, &node_id) {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!("handwriting: {e}");
+        // Re-check after acquiring the permit: with one worker, rapid edits
+        // queue behind each other and only the latest generation is worth
+        // running. Returning here leaves the pending entry for the newer
+        // generation that owns it.
+        {
+            let guard = pending.lock().unwrap();
+            if guard.get(&pending_key) != Some(&generation) {
                 return;
             }
-        };
+        }
 
-        let work_node = node_id.clone();
-        let result = tauri::async_runtime::spawn_blocking(move || {
-            process_node(&work_node, &path, &file_type, &artifact, &recognizer)
-        })
-        .await;
+        // One cleanup point for the pending entry, reached whether resolving the
+        // artifact path or the recognition itself fails. (Supersede paths return
+        // earlier without touching it — a newer generation owns it then.)
+        let result: Result<bool, String> = match artifact_path(&app, &repo_id, &node_id) {
+            Ok(artifact) => {
+                let work_node = node_id.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    process_node(&work_node, &path, &file_type, &artifact, &recognizer)
+                })
+                .await
+                .unwrap_or_else(|e| Err(format!("task panicked: {e}")))
+            }
+            Err(e) => Err(e),
+        };
 
         {
             let mut guard = pending.lock().unwrap();
@@ -111,15 +123,14 @@ pub(crate) fn schedule(
         }
 
         match result {
-            Ok(Ok(true)) => {
+            Ok(true) => {
                 let _ = app.emit(
                     "handwriting-updated",
                     HandwritingUpdatedPayload { repo_id, node_id },
                 );
             }
-            Ok(Ok(false)) => {}
-            Ok(Err(e)) => eprintln!("handwriting: recognition failed for {node_id}: {e}"),
-            Err(e) => eprintln!("handwriting: task panicked for {node_id}: {e}"),
+            Ok(false) => {}
+            Err(e) => eprintln!("handwriting: recognition failed for {node_id}: {e}"),
         }
     });
 }
