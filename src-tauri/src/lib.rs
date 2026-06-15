@@ -53,6 +53,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_ocr::init())
         .manage(iroh_transport::IrohState::new())
         .manage(mcp_server::McpServerState::new())
         .manage(note_index::IndexEngineState::new())

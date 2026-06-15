@@ -5,8 +5,9 @@
 //!
 //! This is a *separate producer* from the note index: it runs on its own worker
 //! (see `engine.rs`), writes its own artifact, and the actual line recognition
-//! is the stub at the bottom of this file. Everything around the stub —
-//! clustering, the per-line cache, change detection, artifact I/O — is real.
+//! is delegated to the platform OCR engine (`tauri-plugin-ocr`) at the bottom of
+//! this file. Everything around it — clustering, the per-line cache, change
+//! detection, artifact I/O — lives here.
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -18,6 +19,15 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 use yrs::updates::decoder::Decode;
 use yrs::{Any, Array, Doc, Map, Out, Transact, Update};
+
+/// Trace the recognition pipeline on stderr in debug builds only; release builds
+/// stay quiet. Mirrors the `handwriting:` prefix used for errors in `engine.rs`.
+macro_rules! debug_log {
+    ($($arg:tt)*) => {{
+        #[cfg(debug_assertions)]
+        eprintln!("handwriting: {}", format_args!($($arg)*));
+    }};
+}
 
 /// Bump to invalidate every artifact when the clustering or segment shape
 /// changes.
@@ -175,6 +185,7 @@ pub(crate) fn process_node(
 
     let doc = decode_doc(&bytes)?;
     let lines = cluster_lines(collect_strokes(&doc));
+    debug_log!("node {node_id}: clustered into {} line(s)", lines.len());
 
     // Per-line cache: reuse recognition for lines whose strokes did not move,
     // so a stroke edit only re-recognizes the lines it actually touched.
@@ -183,11 +194,15 @@ pub(crate) fn process_node(
         .map(|page| page.lines.iter().map(|l| (l.hash.as_str(), l)).collect())
         .unwrap_or_default();
 
+    let mut reused = 0usize;
     let mut recognized: Vec<RecognizedLine> = Vec::with_capacity(lines.len());
     for line in &lines {
         let hash = line.hash();
         let text = match cached.get(hash.as_str()) {
-            Some(prev) => prev.text.clone(),
+            Some(prev) => {
+                reused += 1;
+                prev.text.clone()
+            }
             None => recognizer.recognize_line(line)?,
         };
         recognized.push(RecognizedLine {
@@ -197,6 +212,11 @@ pub(crate) fn process_node(
             hash,
         });
     }
+    debug_log!(
+        "node {node_id}: {} line(s) reused from cache, {} recognized",
+        reused,
+        lines.len() - reused
+    );
 
     // Always write the record — even with no strokes — so the source_hash
     // short-circuit above fires next time and a strokeless note isn't
@@ -314,14 +334,29 @@ fn cluster_lines(mut strokes: Vec<Stroke>) -> Vec<Line> {
     lines
 }
 
-/// Turns one text line's strokes into recognized text.
-///
-/// STUB: native handwriting recognition is not wired yet. Returns an empty
-/// string so the surrounding pipeline — clustering, the per-line cache,
-/// artifact I/O, and the `handwriting-updated` event — runs end to end.
-/// Replace the body with the model call (the loaded model handle should live on
-/// this struct, initialized once like the scribble engine in `transcription.rs`);
-/// the signature and everything around it stay as-is.
+/// Rendering parameters for turning a line's strokes into the bitmap handed to
+/// the OCR engine. The recognizer reads text best at a few dozen pixels tall, so
+/// short lines are scaled up and tall ones down toward a target height; the
+/// padding gives the strokes a quiet margin and `MAX_DIM` caps a runaway canvas.
+const RENDER_TARGET_LINE_HEIGHT: f32 = 48.0;
+const RENDER_MIN_SCALE: f32 = 0.5;
+const RENDER_MAX_SCALE: f32 = 6.0;
+const RENDER_PADDING: f32 = 16.0;
+const RENDER_MAX_DIM: usize = 4096;
+/// Half-width of a stroke in rendered pixels.
+const STROKE_RADIUS: f32 = 1.5;
+
+/// An 8-bit grayscale raster of one line's strokes: white background, black ink.
+struct RenderedLine {
+    width: usize,
+    height: usize,
+    pixels: Vec<u8>,
+}
+
+/// Turns one text line's strokes into recognized text by rasterizing them and
+/// running the platform OCR engine (`tauri-plugin-ocr`: Apple's Vision on macOS,
+/// nothing elsewhere — so this is blank on non-Apple systems). A line with no
+/// drawable strokes recognizes as the empty string.
 pub(crate) struct Recognizer;
 
 impl Recognizer {
@@ -329,8 +364,92 @@ impl Recognizer {
         Self
     }
 
-    pub(crate) fn recognize_line(&self, _line: &Line) -> Result<String, String> {
-        Ok(String::new())
+    pub(crate) fn recognize_line(&self, line: &Line) -> Result<String, String> {
+        let Some(rendered) = render_line(line) else {
+            debug_log!("line with {} stroke(s) had nothing to render", line.strokes.len());
+            return Ok(String::new());
+        };
+        debug_log!(
+            "recognizing {} stroke(s) rendered to {}x{}",
+            line.strokes.len(),
+            rendered.width,
+            rendered.height
+        );
+        let image = tauri_plugin_ocr::GrayImage {
+            width: rendered.width,
+            height: rendered.height,
+            pixels: &rendered.pixels,
+        };
+        let text = tauri_plugin_ocr::recognize(&image)?
+            .into_iter()
+            .map(|l| l.text)
+            .collect::<Vec<_>>()
+            .join(" ");
+        debug_log!("recognized text: {text:?}");
+        Ok(text)
+    }
+}
+
+/// Rasterize a line's strokes into a grayscale bitmap. Coordinates are
+/// translated so the line's bounding box sits at the padded origin and scaled
+/// toward `RENDER_TARGET_LINE_HEIGHT`. Returns `None` for a line with no points.
+fn render_line(line: &Line) -> Option<RenderedLine> {
+    let [bx, by, bw, bh] = line.bbox();
+    // A single horizontal stroke has zero height; floor the divisor so scale
+    // stays finite.
+    let scale = (RENDER_TARGET_LINE_HEIGHT / bh.max(1.0)).clamp(RENDER_MIN_SCALE, RENDER_MAX_SCALE);
+
+    let width = (((bw * scale) + 2.0 * RENDER_PADDING).ceil() as usize).clamp(1, RENDER_MAX_DIM);
+    let height = (((bh * scale) + 2.0 * RENDER_PADDING).ceil() as usize).clamp(1, RENDER_MAX_DIM);
+
+    let mut pixels = vec![255u8; width * height];
+    let to_image = |x: f32, y: f32| ((x - bx) * scale + RENDER_PADDING, (y - by) * scale + RENDER_PADDING);
+
+    let mut drew = false;
+    for stroke in &line.strokes {
+        let mut prev: Option<(f32, f32)> = None;
+        for chunk in stroke.points.chunks_exact(3) {
+            let (ix, iy) = to_image(chunk[0], chunk[1]);
+            match prev {
+                Some((px, py)) => draw_segment(&mut pixels, width, height, px, py, ix, iy),
+                None => stamp(&mut pixels, width, height, ix, iy),
+            }
+            drew = true;
+            prev = Some((ix, iy));
+        }
+    }
+
+    drew.then_some(RenderedLine {
+        width,
+        height,
+        pixels,
+    })
+}
+
+/// Draw a black line between two image-space points by stamping disks along it.
+fn draw_segment(pixels: &mut [u8], w: usize, h: usize, x0: f32, y0: f32, x1: f32, y1: f32) {
+    let (dx, dy) = (x1 - x0, y1 - y0);
+    let steps = (dx * dx + dy * dy).sqrt().ceil().max(1.0) as usize;
+    for i in 0..=steps {
+        let t = i as f32 / steps as f32;
+        stamp(pixels, w, h, x0 + dx * t, y0 + dy * t);
+    }
+}
+
+/// Paint a filled black disk of radius `STROKE_RADIUS` centered at `(cx, cy)`.
+fn stamp(pixels: &mut [u8], w: usize, h: usize, cx: f32, cy: f32) {
+    let min_x = ((cx - STROKE_RADIUS).floor() as isize).max(0);
+    let max_x = ((cx + STROKE_RADIUS).ceil() as isize).min(w as isize - 1);
+    let min_y = ((cy - STROKE_RADIUS).floor() as isize).max(0);
+    let max_y = ((cy + STROKE_RADIUS).ceil() as isize).min(h as isize - 1);
+    let r2 = STROKE_RADIUS * STROKE_RADIUS;
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            let (ddx, ddy) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+            if ddx * ddx + ddy * ddy <= r2 {
+                pixels[y as usize * w + x as usize] = 0;
+            }
+        }
     }
 }
 
