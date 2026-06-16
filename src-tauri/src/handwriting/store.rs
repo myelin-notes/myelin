@@ -203,7 +203,15 @@ pub(crate) fn process_node(
                 reused += 1;
                 prev.text.clone()
             }
-            None => recognizer.recognize_line(line)?,
+            None => match recognizer.recognize_line(line) {
+                Ok(text) => text,
+                // A transient OCR failure on one line shouldn't poison the whole
+                // node; leave this line blank and let the rest index.
+                Err(e) => {
+                    debug_log!("node {node_id}: line recognition failed, leaving blank: {e}");
+                    String::new()
+                }
+            },
         };
         recognized.push(RecognizedLine {
             text,
@@ -365,48 +373,108 @@ impl Recognizer {
     }
 
     pub(crate) fn recognize_line(&self, line: &Line) -> Result<String, String> {
-        let Some(rendered) = render_line(line) else {
+        let rendered = render_line(line);
+        if rendered.is_empty() {
             debug_log!("line with {} stroke(s) had nothing to render", line.strokes.len());
             return Ok(String::new());
-        };
+        }
         debug_log!(
-            "recognizing {} stroke(s) rendered to {}x{}",
+            "recognizing {} stroke(s) in {} chunk(s)",
             line.strokes.len(),
-            rendered.width,
-            rendered.height
+            rendered.len()
         );
-        let image = tauri_plugin_ocr::GrayImage {
-            width: rendered.width,
-            height: rendered.height,
-            pixels: &rendered.pixels,
-        };
-        let text = tauri_plugin_ocr::recognize(&image)?
-            .into_iter()
-            .map(|l| l.text)
-            .collect::<Vec<_>>()
-            .join(" ");
+        let mut parts = Vec::new();
+        for r in &rendered {
+            let image = tauri_plugin_ocr::GrayImage {
+                width: r.width,
+                height: r.height,
+                pixels: &r.pixels,
+            };
+            let text = tauri_plugin_ocr::recognize(&image)?
+                .into_iter()
+                .map(|l| l.text)
+                .collect::<Vec<_>>()
+                .join(" ");
+            if !text.is_empty() {
+                parts.push(text);
+            }
+        }
+        let text = parts.join(" ");
         debug_log!("recognized text: {text:?}");
         Ok(text)
     }
 }
 
-/// Rasterize a line's strokes into a grayscale bitmap. Coordinates are
-/// translated so the line's bounding box sits at the padded origin and scaled
-/// toward `RENDER_TARGET_LINE_HEIGHT`. Returns `None` for a line with no points.
-fn render_line(line: &Line) -> Option<RenderedLine> {
-    let [bx, by, bw, bh] = line.bbox();
+/// Rasterize a line's strokes into one or more grayscale bitmaps. The whole line
+/// shares a single height-derived scale so glyphs stay a consistent size, then
+/// the strokes are split left-to-right into chunks no wider than `RENDER_MAX_DIM`
+/// — so a line too long for one bitmap is recognized in pieces rather than
+/// truncated. Almost every line fits in a single chunk. Returns an empty vec for
+/// a line with no points.
+fn render_line(line: &Line) -> Vec<RenderedLine> {
+    let [_, _, _, bh] = line.bbox();
     // A single horizontal stroke has zero height; floor the divisor so scale
     // stays finite.
     let scale = (RENDER_TARGET_LINE_HEIGHT / bh.max(1.0)).clamp(RENDER_MIN_SCALE, RENDER_MAX_SCALE);
+
+    // Widest source-space span whose rendered width fits one padded bitmap.
+    let max_src_width = ((RENDER_MAX_DIM as f32 - 2.0 * RENDER_PADDING) / scale).max(1.0);
+
+    chunk_strokes(&line.strokes, max_src_width)
+        .into_iter()
+        .filter_map(|chunk| render_strokes(&chunk, scale))
+        .collect()
+}
+
+/// Split a line's strokes left-to-right into groups whose horizontal extent fits
+/// `max_src_width`. Strokes are kept whole and the break falls between them, so a
+/// glyph drawn as one stroke is never cut; a lone stroke wider than the limit
+/// gets its own (still-clipped) chunk, which only happens for pathological input.
+fn chunk_strokes(strokes: &[Stroke], max_src_width: f32) -> Vec<Vec<&Stroke>> {
+    let mut sorted: Vec<&Stroke> = strokes.iter().collect();
+    sorted.sort_by(|a, b| a.min_x.total_cmp(&b.min_x));
+
+    let mut chunks: Vec<Vec<&Stroke>> = Vec::new();
+    let mut current: Vec<&Stroke> = Vec::new();
+    let mut start_x = 0.0f32;
+    for s in sorted {
+        if current.is_empty() {
+            start_x = s.min_x;
+        } else if s.max_x - start_x > max_src_width {
+            chunks.push(std::mem::take(&mut current));
+            start_x = s.min_x;
+        }
+        current.push(s);
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    chunks
+}
+
+/// Rasterize one chunk of strokes into a grayscale bitmap at the given scale.
+/// Coordinates are translated so the chunk's bounding box sits at the padded
+/// origin. Returns `None` for a chunk with no drawable points.
+fn render_strokes(strokes: &[&Stroke], scale: f32) -> Option<RenderedLine> {
+    let (mut min_x, mut min_y) = (f32::INFINITY, f32::INFINITY);
+    let (mut max_x, mut max_y) = (f32::NEG_INFINITY, f32::NEG_INFINITY);
+    for s in strokes {
+        min_x = min_x.min(s.min_x);
+        min_y = min_y.min(s.min_y);
+        max_x = max_x.max(s.max_x);
+        max_y = max_y.max(s.max_y);
+    }
+    let (bw, bh) = (max_x - min_x, max_y - min_y);
 
     let width = (((bw * scale) + 2.0 * RENDER_PADDING).ceil() as usize).clamp(1, RENDER_MAX_DIM);
     let height = (((bh * scale) + 2.0 * RENDER_PADDING).ceil() as usize).clamp(1, RENDER_MAX_DIM);
 
     let mut pixels = vec![255u8; width * height];
-    let to_image = |x: f32, y: f32| ((x - bx) * scale + RENDER_PADDING, (y - by) * scale + RENDER_PADDING);
+    let to_image =
+        |x: f32, y: f32| ((x - min_x) * scale + RENDER_PADDING, (y - min_y) * scale + RENDER_PADDING);
 
     let mut drew = false;
-    for stroke in &line.strokes {
+    for stroke in strokes {
         let mut prev: Option<(f32, f32)> = None;
         for chunk in stroke.points.chunks_exact(3) {
             let (ix, iy) = to_image(chunk[0], chunk[1]);
