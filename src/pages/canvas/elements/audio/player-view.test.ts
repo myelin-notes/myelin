@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getWaveformCanvasMetrics } from './player-view';
+import {
+  getAudioPlayerInteractionState,
+  getWaveformCanvasMetrics,
+} from './player-view';
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(),
@@ -21,5 +24,43 @@ describe('getWaveformCanvasMetrics', () => {
 
     expect(metrics.backingWidth).toBe(4096);
     expect(metrics.backingHeight).toBeLessThanOrEqual(4096);
+  });
+});
+
+describe('getAudioPlayerInteractionState', () => {
+  it('disables the primary button for non-creators until audio exists', () => {
+    const state = getAudioPlayerInteractionState({
+      audioBytes: null,
+      transcript: '',
+      isCreator: false,
+      isTranscribing: false,
+    });
+
+    expect(state.primaryButtonDisabled).toBe(true);
+    expect(state.isWaitingForRemoteAudio).toBe(true);
+  });
+
+  it('shows captions as loading for non-creators until transcript exists', () => {
+    const state = getAudioPlayerInteractionState({
+      audioBytes: new Uint8Array([1]),
+      transcript: '',
+      isCreator: false,
+      isTranscribing: false,
+    });
+
+    expect(state.captionsButtonDisabled).toBe(true);
+    expect(state.isCaptionsLoading).toBe(true);
+  });
+
+  it('allows captions once the transcript has synced', () => {
+    const state = getAudioPlayerInteractionState({
+      audioBytes: new Uint8Array([1]),
+      transcript: 'hello',
+      isCreator: false,
+      isTranscribing: false,
+    });
+
+    expect(state.captionsButtonDisabled).toBe(false);
+    expect(state.isCaptionsLoading).toBe(false);
   });
 });

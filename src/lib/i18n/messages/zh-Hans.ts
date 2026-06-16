@@ -539,6 +539,7 @@ const zhHans: typeof en = {
       requestingMicAccess: '正在请求麦克风权限',
       micUnavailable: '麦克风不可用',
       tapToRecord: '点按录音',
+      waitingForRecording: '正在等待录音',
       startRecording: '开始录音',
       stopRecording: '停止录音',
       tryRecordingAgain: '重新尝试录音',

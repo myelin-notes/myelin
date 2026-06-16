@@ -156,6 +156,7 @@ interface AudioPlayerViewProps {
   mimeType: string;
   waveform: Float32Array | null;
   transcript: string;
+  isCreator: boolean;
   onRecorded: (
     data: Uint8Array,
     duration: number,
@@ -165,6 +166,38 @@ interface AudioPlayerViewProps {
   onTranscribed: (transcript: string) => void;
 }
 
+interface AudioPlayerInteractionOptions {
+  audioBytes: Uint8Array | null;
+  transcript: string;
+  isCreator: boolean;
+  isTranscribing: boolean;
+}
+
+export interface AudioPlayerInteractionState {
+  isWaitingForRemoteAudio: boolean;
+  isCaptionsLoading: boolean;
+  primaryButtonDisabled: boolean;
+  captionsButtonDisabled: boolean;
+}
+
+export function getAudioPlayerInteractionState({
+  audioBytes,
+  transcript,
+  isCreator,
+  isTranscribing,
+}: AudioPlayerInteractionOptions): AudioPlayerInteractionState {
+  const hasAudio = Boolean(audioBytes);
+  const isWaitingForRemoteAudio = !hasAudio && !isCreator;
+  const shouldWaitForRemoteTranscript = hasAudio && !transcript && !isCreator;
+  const isCaptionsLoading = isTranscribing || shouldWaitForRemoteTranscript;
+  return {
+    isWaitingForRemoteAudio,
+    isCaptionsLoading,
+    primaryButtonDisabled: isWaitingForRemoteAudio,
+    captionsButtonDisabled: isCaptionsLoading,
+  };
+}
+
 export function AudioPlayerView({
   elementId,
   audioBytes,
@@ -172,6 +205,7 @@ export function AudioPlayerView({
   mimeType,
   waveform,
   transcript,
+  isCreator,
   onRecorded,
   onTranscribed,
 }: AudioPlayerViewProps) {
@@ -198,6 +232,12 @@ export function AudioPlayerView({
   const disposedRef = useRef(false);
   const isRecording = recordingState === 'recording';
   const isRequestingRecording = recordingState === 'requesting';
+  const interaction = getAudioPlayerInteractionState({
+    audioBytes,
+    transcript,
+    isCreator,
+    isTranscribing,
+  });
   const redrawAfterResize = useEffectEvent(() => {
     const canvas = waveformCanvasRef.current;
     // While recording, the rAF loop repaints with the new size next frame.
@@ -317,6 +357,9 @@ export function AudioPlayerView({
   }
 
   async function startRecording() {
+    if (!isCreator) {
+      return;
+    }
     setRecordingState('requesting');
     setCurrentTime(0);
     setNotice(null);
@@ -510,7 +553,7 @@ export function AudioPlayerView({
   // Recordings are transcribed live; this is the on-demand path for imported
   // audio (and the retry path for recordings whose transcription failed).
   async function handleTranscribe() {
-    if (!audioBytes || isTranscribing) {
+    if (!audioBytes || isTranscribing || !isCreator) {
       return;
     }
     setIsTranscribing(true);
@@ -547,13 +590,13 @@ export function AudioPlayerView({
   function handleCaptionsClick() {
     if (transcript) {
       setShowTranscript((open) => !open);
-    } else {
+    } else if (isCreator) {
       void handleTranscribe();
     }
   }
 
   function handleButtonClick() {
-    if (isRequestingRecording) {
+    if (isRequestingRecording || interaction.isWaitingForRemoteAudio) {
       return;
     }
     if (isRecording) {
@@ -586,13 +629,15 @@ export function AudioPlayerView({
         : (notice ??
           (audioBytes
             ? `${formatTime(currentTime)} / ${formatTime(duration)}`
-            : strings.tapToRecord));
+            : interaction.isWaitingForRemoteAudio
+              ? strings.waitingForRecording
+              : strings.tapToRecord));
 
   const captionsLabel = transcript
     ? showTranscript
       ? strings.hideTranscript
       : strings.showTranscript
-    : isTranscribing
+    : interaction.isCaptionsLoading
       ? strings.transcribing
       : strings.transcribe;
 
@@ -604,6 +649,8 @@ export function AudioPlayerView({
         ? isPlaying
           ? strings.pauseAudio
           : strings.playAudio
+        : interaction.isWaitingForRemoteAudio
+          ? strings.waitingForRecording
         : recordingState === 'error'
           ? strings.tryRecordingAgain
           : strings.startRecording;
@@ -614,7 +661,7 @@ export function AudioPlayerView({
         type="button"
         className="canvas-audio-btn"
         onClick={handleButtonClick}
-        disabled={isRequestingRecording}
+        disabled={isRequestingRecording || interaction.primaryButtonDisabled}
         aria-label={buttonLabel}
         title={buttonLabel}
       >
@@ -635,11 +682,11 @@ export function AudioPlayerView({
           className="canvas-audio-transcribe"
           data-active={showTranscript && Boolean(transcript)}
           onClick={handleCaptionsClick}
-          disabled={isTranscribing}
+          disabled={interaction.captionsButtonDisabled}
           aria-label={captionsLabel}
           title={captionsLabel}
         >
-          {isTranscribing ? (
+          {interaction.isCaptionsLoading ? (
             <LoaderCircle size={14} className="animate-spin" />
           ) : (
             <CaptionsIcon size={14} />

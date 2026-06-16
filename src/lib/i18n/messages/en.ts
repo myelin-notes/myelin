@@ -557,6 +557,7 @@ const en = {
       requestingMicAccess: 'Requesting microphone access',
       micUnavailable: 'Microphone unavailable',
       tapToRecord: 'Tap to record',
+      waitingForRecording: 'Waiting for recording',
       startRecording: 'Start recording',
       stopRecording: 'Stop recording',
       tryRecordingAgain: 'Try recording again',

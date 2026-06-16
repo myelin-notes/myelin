@@ -9,6 +9,7 @@ import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasRenderer } from './canvas-renderer';
 import { CanvasViewport } from './canvas-viewport';
 import { ElementStore } from './element-store';
+import { AudioElement } from './elements/audio/element';
 import type { DrawableElement } from './elements/drawable-element';
 import {
   ELEMENT_FACTORIES,
@@ -205,6 +206,7 @@ export class DrawableCanvas {
     ydoc: YDocManager,
     tools?: ITool[],
     resolveNoteLink?: ResolveNoteLink,
+    private readonly _localPeerId = '',
   ) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {
@@ -239,6 +241,10 @@ export class DrawableCanvas {
 
   public get ydoc(): YDocManager {
     return this._ydoc;
+  }
+
+  public get localPeerId(): string {
+    return this._localPeerId;
   }
 
   /**
@@ -366,6 +372,9 @@ export class DrawableCanvas {
     }
     if (element instanceof PdfElement) {
       element.setExportElementsProvider(() => this.elements);
+    }
+    if (element instanceof AudioElement) {
+      element.setLocalPeerId(this._localPeerId);
     }
   }
 

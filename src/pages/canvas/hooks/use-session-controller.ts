@@ -169,6 +169,7 @@ export class CanvasSessionController {
         this.canvasToolsRef.current,
         async (title) =>
           resolveNoteLinkRefByTitle(this.repository, title, frameNameCache),
+        session.localPeerId,
       );
       drawableCanvas.setOnPageFrameRenamed((uuid, newName) => {
         this.handlePageFrameRenamed(noteId, uuid, newName);
