@@ -118,6 +118,9 @@ export class AudioElement extends DrawableElement {
   public get creatorPeerId(): string {
     return this._creatorPeerId;
   }
+  public get transcript(): string {
+    return this._transcript;
+  }
 
   public setLocalPeerId(peerId: string): void {
     if (this._localPeerId === peerId) {
@@ -129,7 +132,8 @@ export class AudioElement extends DrawableElement {
 
   private get isCreatedByLocalPeer(): boolean {
     return (
-      this._creatorPeerId.length > 0 && this._creatorPeerId === this._localPeerId
+      this._creatorPeerId.length > 0 &&
+      this._creatorPeerId === this._localPeerId
     );
   }
 

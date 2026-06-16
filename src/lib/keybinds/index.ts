@@ -24,6 +24,7 @@ declare module './registry' {
     'canvas:undo': true;
     'canvas:redo': true;
     'canvas:select-all': true;
+    'canvas:find': true;
     'canvas:delete': true;
     'canvas:tool-select': true;
     'canvas:tool-pen': true;
@@ -64,6 +65,10 @@ registry.defineDefaults(
 );
 
 registry.defineDefaults({
+  'canvas:find': {
+    key: 'f',
+    mod: true,
+  },
   'canvas:pan': {
     key: ' ',
   },

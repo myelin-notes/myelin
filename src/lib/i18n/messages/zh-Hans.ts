@@ -434,6 +434,10 @@ const zhHans: typeof en = {
           label: '全选',
           description: '选中画布上的全部内容',
         },
+        'canvas:find': {
+          label: '在画布中查找',
+          description: '搜索此画布上的文字和手写内容',
+        },
         'canvas:pan': {
           label: '平移',
           description: '按住以拖动画布',
@@ -495,6 +499,16 @@ const zhHans: typeof en = {
   },
   canvas: {
     kind: '画布',
+    search: {
+      placeholder: '在画布中查找',
+      empty: '此画布上没有匹配项',
+      kinds: {
+        text: '文本',
+        'page-frame': '页面',
+        transcript: '音频',
+        handwriting: '手写',
+      },
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },

@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Logger } from '@/lib/logger';
 import type { ReindexItem } from '@/lib/note-index';
 import type { VFSNodeId } from '@/lib/sync';
+import { type RecognizedPage, readRecognizedPage } from './cache';
 
 const logger = new Logger('HandwritingService');
 
@@ -58,6 +59,15 @@ export class HandwritingService {
         logger.error('recognize_handwriting_batch failed', err);
       },
     );
+  }
+
+  /** Read a node's recognized handwriting from the on-disk artifact. */
+  async readPage(nodeId: VFSNodeId): Promise<RecognizedPage | null> {
+    const repoId = this.repoId;
+    if (!repoId) {
+      return null;
+    }
+    return readRecognizedPage(repoId, nodeId);
   }
 
   async removeRecognition(nodeId: VFSNodeId): Promise<void> {
