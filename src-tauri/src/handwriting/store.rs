@@ -96,32 +96,23 @@ pub(crate) struct Line {
 }
 
 impl Line {
-    fn center_y(&self) -> f32 {
-        let (min_y, max_y) = self.strokes.iter().fold(
+    /// Vertical extent `(min_y, max_y)` over the line's strokes. Backs the
+    /// y-based geometry so the strokes are folded once per query rather than
+    /// once per accessor.
+    fn y_bounds(&self) -> (f32, f32) {
+        self.strokes.iter().fold(
             (f32::INFINITY, f32::NEG_INFINITY),
             |(lo, hi), s| (lo.min(s.min_y), hi.max(s.max_y)),
-        );
-        (min_y + max_y) / 2.0
-    }
-
-    fn height(&self) -> f32 {
-        let (min_y, max_y) = self.strokes.iter().fold(
-            (f32::INFINITY, f32::NEG_INFINITY),
-            |(lo, hi), s| (lo.min(s.min_y), hi.max(s.max_y)),
-        );
-        max_y - min_y
+        )
     }
 
     fn bbox(&self) -> [f32; 4] {
+        let (min_y, max_y) = self.y_bounds();
         let mut min_x = f32::INFINITY;
-        let mut min_y = f32::INFINITY;
         let mut max_x = f32::NEG_INFINITY;
-        let mut max_y = f32::NEG_INFINITY;
         for s in &self.strokes {
             min_x = min_x.min(s.min_x);
-            min_y = min_y.min(s.min_y);
             max_x = max_x.max(s.max_x);
-            max_y = max_y.max(s.max_y);
         }
         [min_x, min_y, max_x - min_x, max_y - min_y]
     }
@@ -321,8 +312,10 @@ fn cluster_lines(mut strokes: Vec<Stroke>) -> Vec<Line> {
     for stroke in strokes {
         let attaches = match lines.last() {
             Some(line) => {
-                let tol = line.height().max(stroke.height()) * LINE_MERGE_RATIO;
-                (stroke.center_y() - line.center_y()).abs() <= tol
+                // Fold the running line once for both its height and center.
+                let (lo, hi) = line.y_bounds();
+                let tol = (hi - lo).max(stroke.height()) * LINE_MERGE_RATIO;
+                (stroke.center_y() - (lo + hi) / 2.0).abs() <= tol
             }
             None => false,
         };
