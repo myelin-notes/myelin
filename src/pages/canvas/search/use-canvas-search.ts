@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { handwritingService } from '@/lib/handwriting';
 import type { ActionBinding } from '@/lib/keybinds';
@@ -199,6 +200,18 @@ export function useCanvasSearch(
     setQueryState('');
   }, []);
 
+  // Read this node's recognized handwriting from disk and re-collect sources
+  // with it merged in. Re-collecting also refreshes the live text/frame/
+  // transcript sources, which is fine — collection is cheap.
+  const refreshHandwritingSources = useCallback(() => {
+    void handwritingService.readPage(nodeId).then((page) => {
+      const current = drawableCanvasRef.current;
+      if (current) {
+        setSources(collectCanvasSearchSources(current, page));
+      }
+    });
+  }, [drawableCanvasRef, nodeId]);
+
   const openSearch = useCallback(() => {
     const dc = drawableCanvasRef.current;
     if (!dc) {
@@ -210,13 +223,29 @@ export function useCanvasSearch(
     setCurrentIndex(0);
     setSources(collectCanvasSearchSources(dc, null));
     // Handwriting is read from disk and merged in once it resolves.
-    void handwritingService.readPage(nodeId).then((page) => {
-      const current = drawableCanvasRef.current;
-      if (current) {
-        setSources(collectCanvasSearchSources(current, page));
-      }
-    });
-  }, [drawableCanvasRef, nodeId, clearActiveHighlight]);
+    refreshHandwritingSources();
+  }, [drawableCanvasRef, clearActiveHighlight, refreshHandwritingSources]);
+
+  // Recognition can land after the find bar is already open; refresh the
+  // handwriting sources when this node's artifact updates so late hits appear
+  // without reopening. New handwriting matches append after the element
+  // matches, so the current position stays put.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const unlisten = listen<{ nodeId: VFSNodeId }>(
+      'handwriting-updated',
+      (event) => {
+        if (event.payload.nodeId === nodeId) {
+          refreshHandwritingSources();
+        }
+      },
+    );
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [open, nodeId, refreshHandwritingSources]);
 
   const close = useCallback(() => {
     clearActiveHighlight();
