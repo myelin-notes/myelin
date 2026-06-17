@@ -13,8 +13,9 @@ const logger = new Logger('HandwritingService');
  * per-line cache, recognition, artifact I/O) all lives in Rust on its own
  * worker. A single {@link handwritingService} instance is shared app-wide.
  *
- * Recognized artifacts are not yet consumed by search — the recognizer itself
- * is stubbed — so this client only schedules and cleans up; it holds no corpus.
+ * The client schedules recognition, exposes reads of the recognized artifact
+ * (search pulls a page on demand via {@link readPage}) and cleans up; it holds
+ * no in-memory corpus.
  */
 export class HandwritingService {
   /**
