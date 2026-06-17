@@ -501,13 +501,9 @@ const zhHans: typeof en = {
     kind: '画布',
     search: {
       placeholder: '在画布中查找',
-      empty: '此画布上没有匹配项',
-      kinds: {
-        text: '文本',
-        'page-frame': '页面',
-        transcript: '音频',
-        handwriting: '手写',
-      },
+      noResults: '无结果',
+      next: '下一个匹配',
+      previous: '上一个匹配',
     },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,

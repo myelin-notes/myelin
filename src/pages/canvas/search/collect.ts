@@ -1,3 +1,4 @@
+import type { Node as PMNode } from 'prosemirror-model';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type { RecognizedPage } from '@/lib/handwriting';
 import type { DrawableCanvas } from '../drawable-canvas';
@@ -5,6 +6,7 @@ import { AudioElement } from '../elements/audio/element';
 import { PageFrameElement } from '../elements/page-frame-element';
 import { TextElement } from '../elements/text/element';
 import { schema } from '../page-frame/pm/schema';
+import { findTextMatches } from '../page-frame/pm/search-highlight';
 
 export type CanvasSearchKind =
   | 'text'
@@ -19,75 +21,76 @@ export interface CanvasSearchRect {
   height: number;
 }
 
-export interface CanvasSearchItem {
-  id: string;
+/**
+ * A searchable thing on the canvas. Page frames carry their reconstructed PM
+ * doc so occurrences can be enumerated with positions; everything else carries
+ * plain text matched at the element/line level.
+ */
+export interface CanvasSearchSource {
   kind: CanvasSearchKind;
-  /** Full searchable text. */
-  text: string;
-  /** World-space rect to animate the viewport to on navigation. */
   rect: CanvasSearchRect;
-  /** Element or stroke uuids to select on navigation. */
   selectUuids: string[];
+  frameUuid?: string;
+  doc?: PMNode;
+  text?: string;
+}
+
+/** One navigable match — an occurrence (page frame) or a whole element/line. */
+export interface CanvasMatch {
+  kind: CanvasSearchKind;
+  rect: CanvasSearchRect;
+  selectUuids: string[];
+  frameUuid?: string;
+  /** Occurrence index within the frame, in reading order (page frames only). */
+  ordinalInFrame?: number;
 }
 
 function rectOf(box: DOMRect): CanvasSearchRect {
   return { x: box.x, y: box.y, width: box.width, height: box.height };
 }
 
-function pageFrameText(dc: DrawableCanvas, uuid: string): string {
-  const fragment = dc.ydoc.getXmlFragment(uuid);
-  if (fragment.length === 0) {
-    return '';
-  }
-  const doc = yXmlFragmentToProseMirrorRootNode(fragment, schema);
-  return doc.textBetween(0, doc.content.size, '\n', ' ').trim();
-}
-
 /**
- * Build the searchable items for the open canvas. Text, page frames, and audio
- * transcripts are read live from the in-memory doc (always fresh); handwriting
- * comes from the recognized artifact (debounce-latent, which is fine for OCR).
- * Each item carries a world-space rect and the uuids to select so a hit can
- * pan the viewport to it and highlight it.
+ * Collect the searchable sources for the open canvas. Text, page frames, and
+ * audio transcripts come live from the in-memory doc (always fresh); handwriting
+ * comes from the recognized artifact.
  */
-export function collectCanvasSearchItems(
+export function collectCanvasSearchSources(
   dc: DrawableCanvas,
   recognized: RecognizedPage | null,
-): CanvasSearchItem[] {
-  const items: CanvasSearchItem[] = [];
+): CanvasSearchSource[] {
+  const sources: CanvasSearchSource[] = [];
 
   for (const element of dc.elements) {
     if (element instanceof TextElement) {
       const text = element.text.trim();
       if (text) {
-        items.push({
-          id: element.uuid,
+        sources.push({
           kind: 'text',
-          text,
           rect: rectOf(element.boundingBox),
           selectUuids: [element.uuid],
+          text,
         });
       }
     } else if (element instanceof PageFrameElement) {
-      const text = pageFrameText(dc, element.uuid);
-      if (text) {
-        items.push({
-          id: element.uuid,
-          kind: 'page-frame',
-          text,
-          rect: rectOf(element.boundingBox),
-          selectUuids: [element.uuid],
-        });
+      const fragment = dc.ydoc.getXmlFragment(element.uuid);
+      if (fragment.length === 0) {
+        continue;
       }
+      sources.push({
+        kind: 'page-frame',
+        rect: rectOf(element.boundingBox),
+        selectUuids: [element.uuid],
+        frameUuid: element.uuid,
+        doc: yXmlFragmentToProseMirrorRootNode(fragment, schema),
+      });
     } else if (element instanceof AudioElement) {
       const text = element.transcript.trim();
       if (text) {
-        items.push({
-          id: element.uuid,
+        sources.push({
           kind: 'transcript',
-          text,
           rect: rectOf(element.boundingBox),
           selectUuids: [element.uuid],
+          text,
         });
       }
     }
@@ -100,15 +103,52 @@ export function collectCanvasSearchItems(
         continue;
       }
       const [x, y, width, height] = line.bbox;
-      items.push({
-        id: `hw:${line.hash}`,
+      sources.push({
         kind: 'handwriting',
-        text,
         rect: { x, y, width, height },
         selectUuids: line.strokeIds,
+        text,
       });
     }
   }
 
-  return items;
+  return sources;
+}
+
+/**
+ * Expand sources into a flat, ordered list of matches for `query` (literal,
+ * case-insensitive). Page frames contribute one match per occurrence; other
+ * sources contribute one match when their text contains the query.
+ */
+export function buildCanvasMatches(
+  sources: CanvasSearchSource[],
+  query: string,
+): CanvasMatch[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return [];
+  }
+
+  const matches: CanvasMatch[] = [];
+  for (const source of sources) {
+    if (source.kind === 'page-frame' && source.doc) {
+      const ranges = findTextMatches(source.doc, needle);
+      for (let index = 0; index < ranges.length; index++) {
+        matches.push({
+          kind: 'page-frame',
+          rect: source.rect,
+          selectUuids: source.selectUuids,
+          frameUuid: source.frameUuid,
+          ordinalInFrame: index,
+        });
+      }
+    } else if (source.text?.toLowerCase().includes(needle)) {
+      matches.push({
+        kind: source.kind,
+        rect: source.rect,
+        selectUuids: source.selectUuids,
+      });
+    }
+  }
+  return matches;
 }

@@ -519,13 +519,9 @@ const en = {
     kind: 'Canvas',
     search: {
       placeholder: 'Find in canvas',
-      empty: 'No matches on this canvas',
-      kinds: {
-        text: 'Text',
-        'page-frame': 'Page',
-        transcript: 'Audio',
-        handwriting: 'Handwriting',
-      },
+      noResults: 'No results',
+      next: 'Next match',
+      previous: 'Previous match',
     },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,

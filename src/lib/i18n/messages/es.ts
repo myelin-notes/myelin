@@ -524,13 +524,9 @@ const es: typeof en = {
     kind: 'Lienzo',
     search: {
       placeholder: 'Buscar en el lienzo',
-      empty: 'Sin coincidencias en este lienzo',
-      kinds: {
-        text: 'Texto',
-        'page-frame': 'Página',
-        transcript: 'Audio',
-        handwriting: 'Escritura',
-      },
+      noResults: 'Sin resultados',
+      next: 'Coincidencia siguiente',
+      previous: 'Coincidencia anterior',
     },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
