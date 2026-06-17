@@ -154,7 +154,10 @@ export interface Repository {
   ): Promise<NodeSearchResult[]>;
   /** Candidate notes for the content-index startup backfill. */
   listIndexBackfillItems(): Promise<ReindexItem[]>;
-  getNodesByAnyTag(tags: string[]): Promise<VFSNode[]>;
+  getNodesByAnyTag(
+    tags: string[],
+    folderId?: VFSNodeId | null,
+  ): Promise<VFSNode[]>;
   listTags(includeAncestors?: boolean): Promise<RepositoryTag[]>;
   getStats(): Promise<RepositoryStats>;
   getRecentFiles(limit?: number): Promise<VFSFileNode[]>;

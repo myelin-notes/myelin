@@ -290,9 +290,12 @@ export abstract class BaseRepository
     return items;
   }
 
-  async getNodesByAnyTag(tags: string[]): Promise<VFSNode[]> {
+  async getNodesByAnyTag(
+    tags: string[],
+    folderId: VFSNodeId | null = null,
+  ): Promise<VFSNode[]> {
     const { manifest } = await this.loadManifestImpl();
-    return getNodesByAnyTag(manifest, tags);
+    return getNodesByAnyTag(manifest, tags, folderId);
   }
 
   async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
