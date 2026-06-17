@@ -611,11 +611,12 @@ export class PageFrameElement extends DrawableElement {
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
   /**
-   * Resolve the current ProseMirror doc for thumbnailing: prefer the live editor
-   * doc while editing, otherwise convert the Y.XmlFragment with the same helper
-   * the editor uses. Returns `null` if there's no content to draw.
+   * Resolve the current ProseMirror doc for reading (thumbnails, search): prefer
+   * the live editor doc — the view is created eagerly and kept alive for every
+   * frame, and it reflects in-flight edits — otherwise convert the Y.XmlFragment
+   * with the same helper the editor uses. Returns `null` if there's no content.
    */
-  private getThumbnailDoc(): ProseMirrorNode | null {
+  public getCurrentDoc(): ProseMirrorNode | null {
     const liveDoc = this.pmEditor?.view?.state.doc;
     if (liveDoc) {
       return liveDoc;
@@ -641,7 +642,7 @@ export class PageFrameElement extends DrawableElement {
     ctx.roundRect(0, 0, this._pageWidth, this._pageHeight, PAGE_CORNER_RADIUS);
     ctx.fill();
 
-    const doc = this.getThumbnailDoc();
+    const doc = this.getCurrentDoc();
     if (!doc) {
       return;
     }

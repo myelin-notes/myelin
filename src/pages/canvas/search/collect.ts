@@ -1,11 +1,9 @@
 import type { Node as PMNode } from 'prosemirror-model';
-import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type { RecognizedPage } from '@/lib/handwriting';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { AudioElement } from '../elements/audio/element';
 import { PageFrameElement } from '../elements/page-frame-element';
 import { TextElement } from '../elements/text/element';
-import { schema } from '../page-frame/pm/schema';
 import { findTextMatches } from '../page-frame/pm/search-highlight';
 
 export type CanvasSearchKind =
@@ -72,17 +70,20 @@ export function collectCanvasSearchSources(
         });
       }
     } else if (element instanceof PageFrameElement) {
-      const fragment = dc.ydoc.getXmlFragment(element.uuid);
-      if (fragment.length === 0) {
-        continue;
+      // The frame's live editor doc is already in memory (views are kept
+      // mounted for every frame), so read it instead of rebuilding the PM tree
+      // from Yjs. Falls back to fragment reconstruction for a not-yet-mounted
+      // frame and returns null when the frame is empty.
+      const doc = element.getCurrentDoc();
+      if (doc) {
+        sources.push({
+          kind: 'page-frame',
+          rect: rectOf(element.boundingBox),
+          selectUuids: [element.uuid],
+          frameUuid: element.uuid,
+          doc,
+        });
       }
-      sources.push({
-        kind: 'page-frame',
-        rect: rectOf(element.boundingBox),
-        selectUuids: [element.uuid],
-        frameUuid: element.uuid,
-        doc: yXmlFragmentToProseMirrorRootNode(fragment, schema),
-      });
     } else if (element instanceof AudioElement) {
       const text = element.transcript.trim();
       if (text) {
