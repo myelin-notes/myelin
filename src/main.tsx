@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { I18nProvider } from '@/lib/i18n';
 import App from './App';
 import { RepositoryProvider } from './lib/sync';
+import { initAutoUpdate } from './lib/updater';
 import './index.css';
 import * as Sentry from '@sentry/react';
 import { MODE } from '@/lib/env';
@@ -24,3 +25,5 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     </I18nProvider>
   </React.StrictMode>,
 );
+
+void initAutoUpdate();

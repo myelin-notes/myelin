@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "capabilities": ["default"],
+      "capabilities": ["default", "updater"],
       "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: blob: data: https: http://asset.localhost; media-src 'self' asset: blob: https: http://asset.localhost; frame-src 'self' https:; connect-src 'self' ipc: http://ipc.localhost ws: wss: stun: turn: turns:",
       "assetProtocol": {
         "enable": true,
@@ -31,9 +31,18 @@
       }
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE5MUM1ODM5QTA2RkRFRUEKUldUcTNtK2dPVmdjR2Z2V3FZSGN4eWdvVkRuRThNSWR4UUtvbXdxeWY0MXJLN3NBSjVKMTNGVnEK",
+      "endpoints": [
+        "https://updates.myelin.app/stable/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "resources": {
       "resources/embedding-models/": "embedding-models/",
       "resources/scribble-models/": "scribble-models/",

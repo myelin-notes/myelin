@@ -12,6 +12,13 @@ mod workspace_export;
 pub fn run() {
     let mut builder = tauri::Builder::default()
         .setup(|app| {
+            #[cfg(desktop)]
+            {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
+
             let salt_path = app
                 .path()
                 .app_local_data_dir()
