@@ -1,0 +1,17 @@
+[package]
+name = "tauri-plugin-ocr"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+
+# Apple's Vision framework backs OCR on macOS. Every other platform has no
+# backend and recognizes nothing, so these deps are macOS-only.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-core-foundation = "0.3"
+objc2-core-graphics = "0.3"
+objc2-vision = "0.3"

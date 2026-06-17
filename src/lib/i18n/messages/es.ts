@@ -457,6 +457,10 @@ const es: typeof en = {
           label: 'Seleccionar todo',
           description: 'Seleccionar todo en el lienzo',
         },
+        'canvas:find': {
+          label: 'Buscar en el lienzo',
+          description: 'Buscar texto y escritura a mano en este lienzo',
+        },
         'canvas:pan': {
           label: 'Desplazar',
           description: 'Mantén pulsado para arrastrar el lienzo',
@@ -518,6 +522,12 @@ const es: typeof en = {
   },
   canvas: {
     kind: 'Lienzo',
+    search: {
+      placeholder: 'Buscar en el lienzo',
+      noResults: 'Sin resultados',
+      next: 'Coincidencia siguiente',
+      previous: 'Coincidencia anterior',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },

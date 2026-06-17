@@ -452,6 +452,10 @@ const en = {
           label: 'Select All',
           description: 'Select everything on the canvas',
         },
+        'canvas:find': {
+          label: 'Find in Canvas',
+          description: 'Search text and handwriting on this canvas',
+        },
         'canvas:pan': {
           label: 'Pan',
           description: 'Hold to drag the canvas',
@@ -513,6 +517,12 @@ const en = {
   },
   canvas: {
     kind: 'Canvas',
+    search: {
+      placeholder: 'Find in canvas',
+      noResults: 'No results',
+      next: 'Next match',
+      previous: 'Previous match',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },

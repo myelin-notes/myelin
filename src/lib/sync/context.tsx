@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { handwritingService } from '@/lib/handwriting';
 import { Logger } from '@/lib/logger';
 import { noteIndexService } from '@/lib/note-index';
 import {
@@ -152,6 +153,7 @@ export function RepositoryProvider({
         // Hydrate the search corpus and backfill any unindexed notes in the
         // background. The index cache is namespaced per repository; Rust skips
         // notes whose content hash is unchanged.
+        handwritingService.init(getRepositoryStorageKey(resolvedConfig));
         void noteIndexService
           .init(getRepositoryStorageKey(resolvedConfig))
           .then(() => repository.listIndexBackfillItems())
@@ -163,6 +165,7 @@ export function RepositoryProvider({
               return;
             }
             noteIndexService.startBackfill(items);
+            handwritingService.startBackfill(items);
           })
           .catch((error) => {
             logger.error('Failed to start note-index backfill', error);
@@ -185,6 +188,7 @@ export function RepositoryProvider({
       unsubscribeStatus();
       // Drop the previous repo's search corpus so it can't leak into the next.
       noteIndexService.reset();
+      handwritingService.reset();
       void repository.dispose().catch((error) => {
         logger.error('Failed to dispose repository', error);
       });

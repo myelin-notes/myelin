@@ -25,6 +25,7 @@ import {
 import { mathPreviewPlugin } from './math/plugin';
 import { paginationPlugin } from './pagination/plugin';
 import { schema } from './schema';
+import { searchHighlightPlugin } from './search-highlight';
 import { selectionHighlightPlugin } from './selection-highlight';
 import { wordSelectionDragPlugin } from './word-selection-drag';
 
@@ -99,6 +100,7 @@ export function buildPlugins(
     buildKeymap(schema),
     paginationPlugin(onLayout),
     selectionHighlightPlugin(),
+    searchHighlightPlugin(),
     wordSelectionDragPlugin(),
     tableEditing(),
   ];

@@ -388,6 +388,16 @@
     margin-block: -2px;
   }
 
+  .pm-search-match {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: 3px;
+  }
+
+  .pm-search-match-current {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
   :root {
     width: 100%;
     height: 100%;

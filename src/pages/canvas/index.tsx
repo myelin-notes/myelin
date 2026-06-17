@@ -42,6 +42,7 @@ import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { useCanvasCommandContext } from './command-context';
 import { BacklinksChip } from './components/backlinks-chip';
+import { CanvasSearch } from './components/canvas-search';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
@@ -70,6 +71,7 @@ import {
 } from './page-frame/note-link/preview';
 import type { NoteLinkOpenRequestDetail } from './page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomplete';
+import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
 
@@ -113,6 +115,7 @@ function CanvasViewInner({
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
   const toolState = useToolState(drawableCanvasRef);
+  const canvasSearch = useCanvasSearch(drawableCanvasRef, id);
 
   const [chromeMenu, setChromeMenu] = useState<{
     anchor: DOMRect;
@@ -632,6 +635,8 @@ function CanvasViewInner({
           />
         )}
       </AnimatePresence>
+
+      <CanvasSearch controller={canvasSearch} />
 
       <RenameReferencesDialog
         prompt={engine.pageFrameRenamePrompt}
