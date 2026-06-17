@@ -67,7 +67,23 @@
   opacity: 0;
 }
 
-.pm-editor .ProseMirror .pm-md-note-link.pm-selection,
+/*
+ * A fully-selected note link renders as a SINGLE span carrying both
+ * `pm-md-note-link` and `pm-selection` — prosemirror-view merges overlapping
+ * inline decorations into one element. Because the green fill now lives on the
+ * span's own `background` (not a `::before`), the selection highlight has to be
+ * repainted here: clearing it to `transparent`, as the nested cases below do,
+ * would leave the link with no highlight at all and white-on-white text.
+ */
+.pm-editor .ProseMirror .pm-md-note-link.pm-selection {
+  background: Highlight;
+}
+
+/*
+ * When the selection only partially overlaps the link, the blue comes from a
+ * separate `.pm-selection` span, so the note-link span must drop its green fill
+ * to let that show through.
+ */
 .pm-editor .ProseMirror .pm-selection .pm-md-note-link,
 .pm-editor .ProseMirror .pm-md-note-link:has(.pm-selection) {
   background: transparent;

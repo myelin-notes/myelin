@@ -333,8 +333,11 @@ export class CachedRepository
     return this.cache.listIndexBackfillItems();
   }
 
-  async getNodesByAnyTag(tags: string[]): Promise<VFSNode[]> {
-    return this.cache.getNodesByAnyTag(tags);
+  async getNodesByAnyTag(
+    tags: string[],
+    folderId: VFSNodeId | null = null,
+  ): Promise<VFSNode[]> {
+    return this.cache.getNodesByAnyTag(tags, folderId);
   }
 
   async listTags(includeAncestors = false): Promise<RepositoryTag[]> {

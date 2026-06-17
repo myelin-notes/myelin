@@ -476,10 +476,39 @@ function buildSemanticSnippet(content: string): string | null {
 export function getNodesByAnyTag(
   manifest: VFSManifest,
   tags: string[],
+  folderId: string | null = null,
 ): VFSNode[] {
   return Object.values(manifest.nodes).filter(
-    (node) => !isSystemNode(node) && nodeMatchesAnyTag(node.tags, tags),
+    (node) =>
+      !isSystemNode(node) &&
+      nodeMatchesAnyTag(node.tags, tags) &&
+      isNodeWithinFolder(manifest, node, folderId),
   );
+}
+
+/**
+ * Whether `node` lives anywhere inside `folderId`'s subtree. A null `folderId`
+ * means the repository root, so every node qualifies.
+ */
+function isNodeWithinFolder(
+  manifest: VFSManifest,
+  node: VFSNode,
+  folderId: string | null,
+): boolean {
+  if (folderId === null) {
+    return true;
+  }
+  let current: VFSNode | undefined = node;
+  while (current) {
+    if (current.parentId === folderId) {
+      return true;
+    }
+    if (current.parentId === null) {
+      return false;
+    }
+    current = manifest.nodes[current.parentId];
+  }
+  return false;
 }
 
 export function listTags(manifest: VFSManifest): RepositoryTag[] {
