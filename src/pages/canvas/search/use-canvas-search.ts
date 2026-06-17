@@ -26,6 +26,14 @@ import {
 /** Frames to keep retrying the highlight while a panned-to frame's view mounts. */
 const HIGHLIGHT_MOUNT_RETRY_FRAMES = 60;
 
+/**
+ * Find-as-you-type debounce. A typing burst restarts a 0.7s camera animation
+ * and dispatches a highlight transaction per keystroke; debouncing the query
+ * collapses a burst into a single match-compute + pan + highlight. next/prev
+ * stay instant — they move `currentIndex`, not the query.
+ */
+const SEARCH_DEBOUNCE_MS = 120;
+
 export interface CanvasSearchController {
   open: boolean;
   query: string;
@@ -34,9 +42,21 @@ export interface CanvasSearchController {
   total: number;
   /** 1-based index of the current match, or 0 when there are none. */
   current: number;
+  /** False while the typed query hasn't yet been matched (debounce in flight). */
+  settled: boolean;
   next: () => void;
   prev: () => void;
   close: () => void;
+}
+
+/** A value that trails `value` by `delayMs`, resetting the timer on each change. */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
 }
 
 /**
@@ -57,10 +77,19 @@ export function useCanvasSearch(
   /** The page frame currently showing a match highlight, if any. */
   const highlightedFrameRef = useRef<string | null>(null);
 
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const matches = useMemo(
-    () => buildCanvasMatches(sources, query),
-    [sources, query],
+    () => buildCanvasMatches(sources, debouncedQuery),
+    [sources, debouncedQuery],
   );
+
+  // Restart at the first match whenever the matched query changes (not on every
+  // keystroke — only once the debounce settles), so find-as-you-type jumps to
+  // the first hit while next/prev keep their position.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: debouncedQuery is a trigger; the body only resets position
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [debouncedQuery]);
   const matchesRef = useRef<CanvasMatch[]>(matches);
   useEffect(() => {
     matchesRef.current = matches;
@@ -152,7 +181,7 @@ export function useCanvasSearch(
     }
     const match = matches[currentIndex];
     if (match) {
-      navigateToMatch(match, query);
+      navigateToMatch(match, debouncedQuery);
     } else {
       clearActiveHighlight();
     }
@@ -160,7 +189,7 @@ export function useCanvasSearch(
     open,
     currentIndex,
     matches,
-    query,
+    debouncedQuery,
     navigateToMatch,
     clearActiveHighlight,
   ]);
@@ -195,8 +224,8 @@ export function useCanvasSearch(
   }, [clearActiveHighlight, closeOverlay]);
 
   const setQuery = useCallback((next: string) => {
+    // Position resets when the debounced query settles, not on each keystroke.
     setQueryState(next);
-    setCurrentIndex(0);
   }, []);
 
   const next = useCallback(() => {
@@ -235,6 +264,7 @@ export function useCanvasSearch(
     setQuery,
     total: matches.length,
     current: matches.length > 0 ? currentIndex + 1 : 0,
+    settled: query === debouncedQuery,
     next,
     prev,
     close,

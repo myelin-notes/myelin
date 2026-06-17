@@ -9,7 +9,7 @@ export function CanvasSearch({
 }: {
   controller: CanvasSearchController;
 }) {
-  const { open, query, setQuery, total, current, next, prev, close } =
+  const { open, query, setQuery, total, current, settled, next, prev, close } =
     controller;
   const strings = useMessages();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -54,12 +54,15 @@ export function CanvasSearch({
   };
 
   const hasQuery = query.trim().length > 0;
-  const counter = !hasQuery
+  // While the debounce is in flight the counter reflects the previous query, so
+  // suppress it until the typed query has actually been matched — otherwise a
+  // fresh keystroke briefly flashes a stale "No results".
+  const counter = !hasQuery || !settled
     ? ''
     : total === 0
       ? strings.canvas.search.noResults
       : `${current}/${total}`;
-  const noMatches = hasQuery && total === 0;
+  const noMatches = hasQuery && settled && total === 0;
 
   return (
     <AnimatePresence>
