@@ -33,7 +33,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE5MUM1ODM5QTA2RkRFRUEKUldUcTNtK2dPVmdjR2Z2V3FZSGN4eWdvVkRuRThNSWR4UUtvbXdxeWY0MXJLN3NBSjVKMTNGVnEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4NUUwOTk0NzhCOEY3RjMKUldUejk3aDRsQWxleUNib3BueFREUVBsTkMvekJoeGxsNDlhR0k1RElNd0Z2bTdTeE5zWmQ0a0oK",
       "endpoints": [
         "https://updates.myelin.app/stable/latest.json"
       ]
