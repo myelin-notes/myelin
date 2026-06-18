@@ -39,7 +39,10 @@ krilla = { version = "0.8.1", features = ["pdf"] }
 base64 = "0.22.1"
 yrs = "0.26.0"
 scribble = "0.5.4"
-fastembed = { version = "5.16.1", default-features = false, features = ["ort-download-binaries-native-tls"] }
+candle-core = "0.10"
+candle-nn = "0.10"
+candle-transformers = "0.10"
+tokenizers = { version = "0.23", default-features = false, features = ["fancy-regex"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

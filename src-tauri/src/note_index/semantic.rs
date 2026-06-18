@@ -2,17 +2,70 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use fastembed::{
-    InitOptionsUserDefined, Pooling, TextEmbedding, TokenizerFiles, UserDefinedEmbeddingModel,
-};
+use candle_core::{Device, Tensor, D};
+use candle_nn::VarBuilder;
+use candle_transformers::models::bert::{BertModel, Config, DTYPE};
 use serde::{Deserialize, Serialize};
 use tauri::{path::BaseDirectory, AppHandle, Manager};
+use tokenizers::{Tokenizer, TruncationDirection, TruncationParams, TruncationStrategy};
 
 const MODEL_DIR: &str = "embedding-models/all-MiniLM-L6-v2";
-pub(crate) const SEMANTIC_MODEL_ID: &str = "Xenova/all-MiniLM-L6-v2-quantized";
+pub(crate) const SEMANTIC_MODEL_ID: &str = "sentence-transformers/all-MiniLM-L6-v2";
 pub(crate) const SEMANTIC_DIM: usize = 384;
+const MAX_TOKENS: usize = 512;
 
-type SharedTextEmbedding = Arc<Mutex<Option<TextEmbedding>>>;
+struct EmbeddingModel {
+    model: BertModel,
+    tokenizer: Tokenizer,
+    device: Device,
+}
+
+impl EmbeddingModel {
+    fn embed(&self, text: &str) -> Result<Vec<f32>, String> {
+        let encoding = self
+            .tokenizer
+            .encode(text, true)
+            .map_err(|e| format!("tokenize text: {e}"))?;
+
+        let ids = encoding.get_ids();
+        if ids.is_empty() {
+            return Err("tokenizer produced no tokens".to_string());
+        }
+        let mask = encoding.get_attention_mask();
+
+        let input_ids = Tensor::new(ids, &self.device)
+            .and_then(|t| t.unsqueeze(0))
+            .map_err(|e| format!("build input tensor: {e}"))?;
+        let token_type_ids = input_ids
+            .zeros_like()
+            .map_err(|e| format!("build token type tensor: {e}"))?;
+        let attention_mask = Tensor::new(mask, &self.device)
+            .and_then(|t| t.unsqueeze(0))
+            .map_err(|e| format!("build attention tensor: {e}"))?;
+
+        let hidden = self
+            .model
+            .forward(&input_ids, &token_type_ids, Some(&attention_mask))
+            .map_err(|e| format!("model forward: {e}"))?;
+
+        mean_pool_normalize(&hidden, &attention_mask).map_err(|e| format!("pool embedding: {e}"))
+    }
+}
+
+/// Attention-masked mean pooling followed by L2 normalization, matching the
+/// sentence-transformers reference behavior for all-MiniLM-L6-v2.
+fn mean_pool_normalize(hidden: &Tensor, attention_mask: &Tensor) -> candle_core::Result<Vec<f32>> {
+    // hidden: [1, seq, hidden]; attention_mask: [1, seq]
+    let mask = attention_mask.to_dtype(hidden.dtype())?.unsqueeze(2)?; // [1, seq, 1]
+    let summed = hidden.broadcast_mul(&mask)?.sum(1)?; // [1, hidden]
+    let counts = mask.sum(1)?; // [1, 1]
+    let mean = summed.broadcast_div(&counts)?; // [1, hidden]
+    let norm = mean.sqr()?.sum_keepdim(D::Minus1)?.sqrt()?; // [1, 1]
+    let normalized = mean.broadcast_div(&norm)?;
+    normalized.squeeze(0)?.to_vec1()
+}
+
+type SharedModel = Arc<Mutex<Option<EmbeddingModel>>>;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +76,7 @@ pub(crate) struct SemanticEmbedding {
 }
 
 pub(crate) struct SemanticEmbeddingState {
-    model: SharedTextEmbedding,
+    model: SharedModel,
 }
 
 impl SemanticEmbeddingState {
@@ -48,7 +101,7 @@ impl Default for SemanticEmbeddingState {
 
 #[derive(Clone)]
 pub(crate) struct SemanticEmbeddingModelHandle {
-    model: SharedTextEmbedding,
+    model: SharedModel,
 }
 
 impl SemanticEmbeddingModelHandle {
@@ -84,14 +137,9 @@ impl SemanticEmbeddingModelHandle {
                 *guard = Some(load_model(app)?);
             }
             let model = guard
-                .as_mut()
+                .as_ref()
                 .ok_or_else(|| "semantic model unavailable".to_string())?;
-            let mut embeddings = model
-                .embed(vec![text.to_string()], None)
-                .map_err(|e| format!("embed text: {e}"))?;
-            let vector = embeddings
-                .pop()
-                .ok_or_else(|| "embedding model returned no vectors".to_string())?;
+            let vector = model.embed(text)?;
             if vector.len() != SEMANTIC_DIM {
                 return Err(format!(
                     "unexpected embedding dimension: got {}, expected {SEMANTIC_DIM}",
@@ -118,7 +166,7 @@ impl SemanticEmbeddingModelHandle {
     }
 }
 
-fn load_model(app: &AppHandle) -> Result<TextEmbedding, String> {
+fn load_model(app: &AppHandle) -> Result<EmbeddingModel, String> {
     let dir = app
         .path()
         .resolve(MODEL_DIR, BaseDirectory::Resource)
@@ -126,23 +174,35 @@ fn load_model(app: &AppHandle) -> Result<TextEmbedding, String> {
     load_model_from_dir(&dir)
 }
 
-fn load_model_from_dir(dir: &Path) -> Result<TextEmbedding, String> {
-    let model = UserDefinedEmbeddingModel::new(
-        read_model_file(&dir, "model.onnx")?,
-        TokenizerFiles {
-            tokenizer_file: read_model_file(&dir, "tokenizer.json")?,
-            config_file: read_model_file(&dir, "config.json")?,
-            special_tokens_map_file: read_model_file(&dir, "special_tokens_map.json")?,
-            tokenizer_config_file: read_model_file(&dir, "tokenizer_config.json")?,
-        },
-    )
-    .with_pooling(Pooling::Mean);
+fn load_model_from_dir(dir: &Path) -> Result<EmbeddingModel, String> {
+    let config: Config = serde_json::from_slice(&read_model_file(dir, "config.json")?)
+        .map_err(|e| format!("parse model config: {e}"))?;
 
-    TextEmbedding::try_new_from_user_defined(
+    let mut tokenizer = Tokenizer::from_file(dir.join("tokenizer.json"))
+        .map_err(|e| format!("load tokenizer: {e}"))?;
+    tokenizer
+        .with_truncation(Some(TruncationParams {
+            max_length: MAX_TOKENS,
+            strategy: TruncationStrategy::LongestFirst,
+            stride: 0,
+            direction: TruncationDirection::Right,
+        }))
+        .map_err(|e| format!("configure tokenizer truncation: {e}"))?;
+
+    let device = Device::Cpu;
+    let weights = dir.join("model.safetensors");
+    // SAFETY: the weights file is a bundled, read-only application resource.
+    let vb = unsafe {
+        VarBuilder::from_mmaped_safetensors(&[weights], DTYPE, &device)
+            .map_err(|e| format!("load model weights: {e}"))?
+    };
+    let model = BertModel::load(vb, &config).map_err(|e| format!("initialize model: {e}"))?;
+
+    Ok(EmbeddingModel {
         model,
-        InitOptionsUserDefined::new().with_intra_threads(2),
-    )
-    .map_err(|e| format!("initialize semantic model: {e}"))
+        tokenizer,
+        device,
+    })
 }
 
 fn read_model_file(dir: &Path, name: &str) -> Result<Vec<u8>, String> {
@@ -177,22 +237,19 @@ mod tests {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("resources")
             .join(MODEL_DIR);
-        let mut model = load_model_from_dir(&dir).unwrap();
+        let model = load_model_from_dir(&dir).unwrap();
 
-        let embeddings = model
-            .embed(
-                vec![
-                    "the cat sat on the mat".to_string(),
-                    "a kitten rests on a rug".to_string(),
-                    "quarterly financial report for shareholders".to_string(),
-                ],
-                None,
-            )
+        let cat = model.embed("the cat sat on the mat").unwrap();
+        let kitten = model.embed("a kitten rests on a rug").unwrap();
+        let report = model
+            .embed("quarterly financial report for shareholders")
             .unwrap();
-        assert!(embeddings.iter().all(|v| v.len() == SEMANTIC_DIM));
+        for v in [&cat, &kitten, &report] {
+            assert_eq!(v.len(), SEMANTIC_DIM);
+        }
 
-        let related = cosine(&embeddings[0], &embeddings[1]);
-        let unrelated = cosine(&embeddings[0], &embeddings[2]);
+        let related = cosine(&cat, &kitten);
+        let unrelated = cosine(&cat, &report);
         assert!(
             related > unrelated,
             "related {related} should outrank unrelated {unrelated}"
