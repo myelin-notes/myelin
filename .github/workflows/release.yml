@@ -19,6 +19,16 @@ permissions:
 
 env:
   NODE_OPTIONS: --max-old-space-size=4096
+  # Defining SOURCE_DATE_EPOCH makes ggml (whisper.cpp, pulled in via scribble ->
+  # whisper-rs) default GGML_NATIVE=OFF, so it builds a portable CPU baseline
+  # instead of auto-detecting the build host's features. Required on the Apple
+  # Silicon runners: native detection mis-enables the ARMv8.6 i8mm intrinsics and
+  # the CPU backend fails to compile ("vmmlaq_s32 ... requires target feature
+  # 'i8mm'"). It also keeps shipped binaries from assuming SIMD features that
+  # users' machines may lack. whisper-rs-sys only forwards WHISPER_*/CMAKE_* env
+  # vars to CMake, so this is the only knob that reaches GGML_NATIVE. Value just
+  # needs to be a valid post-1980 epoch (2024-01-01 here).
+  SOURCE_DATE_EPOCH: "1704067200"
   # Must match the updater endpoint host in src-tauri/tauri.conf.json.
   R2_BUCKET: myelin-updates
   UPDATER_DOMAIN: https://pub-b609df54ffbc4104a99c47d9ac342457.r2.dev
