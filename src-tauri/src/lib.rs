@@ -33,7 +33,10 @@ pub fn run() {
             app.get_webview_window("main")
                 .expect("main window missing")
                 .with_webview(|webview| {
-                    use webkit2gtk::{prelude::*, UserMediaPermissionRequest};
+                    use webkit2gtk::{
+                        glib::prelude::*, PermissionRequestExt, SettingsExt,
+                        UserMediaPermissionRequest, UserMediaPermissionRequestExt, WebViewExt,
+                    };
                     let webview = webview.inner();
                     if let Some(settings) = webview.settings() {
                         settings.set_enable_media_stream(true);
