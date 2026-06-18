@@ -57,11 +57,12 @@ export function CanvasSearch({
   // While the debounce is in flight the counter reflects the previous query, so
   // suppress it until the typed query has actually been matched — otherwise a
   // fresh keystroke briefly flashes a stale "No results".
-  const counter = !hasQuery || !settled
-    ? ''
-    : total === 0
-      ? strings.canvas.search.noResults
-      : `${current}/${total}`;
+  const counter =
+    !hasQuery || !settled
+      ? ''
+      : total === 0
+        ? strings.canvas.search.noResults
+        : `${current}/${total}`;
   const noMatches = hasQuery && settled && total === 0;
 
   return (

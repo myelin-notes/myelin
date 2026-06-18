@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ElementType } from '../element-type';
 import { YDocManager } from '../../ydoc-manager';
+import { ElementType } from '../element-type';
 import { AudioElement } from './element';
 
 describe('AudioElement ownership', () => {

@@ -159,7 +159,10 @@ export function ExplorerTree({
           results.map((result) => [result.node.id, result]),
         );
       } else if (isFiltering) {
-        nextNodes = await repository.getNodesByAnyTag(filterTags, currentFolderId);
+        nextNodes = await repository.getNodesByAnyTag(
+          filterTags,
+          currentFolderId,
+        );
       } else {
         const [dirs, files] = await repository.listDirectory(currentFolderId);
         nextNodes = [...dirs, ...files];

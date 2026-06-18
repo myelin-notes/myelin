@@ -306,7 +306,8 @@ export function tickGraphSelection(
     if (Math.abs(target - node.selectionProgress) <= step) {
       node.selectionProgress = target;
     } else {
-      node.selectionProgress += Math.sign(target - node.selectionProgress) * step;
+      node.selectionProgress +=
+        Math.sign(target - node.selectionProgress) * step;
     }
   }
 }
@@ -494,8 +495,7 @@ export class GraphCanvasController {
       if (!outgoing && !incoming) {
         continue;
       }
-      const progress = (outgoing ? edge.source : edge.target)
-        .selectionProgress;
+      const progress = (outgoing ? edge.source : edge.target).selectionProgress;
       if (progress <= 0.01) {
         continue;
       }
@@ -538,8 +538,14 @@ export class GraphCanvasController {
       const py = edge.source.y + uy * d;
       this.ctx.beginPath();
       this.ctx.moveTo(px + ux * size, py + uy * size);
-      this.ctx.lineTo(px - ux * size * 0.2 - uy * size * 0.7, py - uy * size * 0.2 + ux * size * 0.7);
-      this.ctx.lineTo(px - ux * size * 0.2 + uy * size * 0.7, py - uy * size * 0.2 - ux * size * 0.7);
+      this.ctx.lineTo(
+        px - ux * size * 0.2 - uy * size * 0.7,
+        py - uy * size * 0.2 + ux * size * 0.7,
+      );
+      this.ctx.lineTo(
+        px - ux * size * 0.2 + uy * size * 0.7,
+        py - uy * size * 0.2 - ux * size * 0.7,
+      );
       this.ctx.closePath();
       this.ctx.fill();
     }

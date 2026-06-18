@@ -651,9 +651,9 @@ export function AudioPlayerView({
           : strings.playAudio
         : interaction.isWaitingForRemoteAudio
           ? strings.waitingForRecording
-        : recordingState === 'error'
-          ? strings.tryRecordingAgain
-          : strings.startRecording;
+          : recordingState === 'error'
+            ? strings.tryRecordingAgain
+            : strings.startRecording;
 
   return (
     <div className="canvas-audio-inner" data-recording-state={recordingState}>
