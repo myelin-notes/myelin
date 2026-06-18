@@ -193,6 +193,9 @@ jobs:
             --out latest.json
           cat latest.json
 
+      - name: Prune old prerelease versions
+        run: node scripts/prune-prerelease.mjs
+
       - name: Upload bundles + manifest to R2
         run: |
           for f in incoming/*; do
