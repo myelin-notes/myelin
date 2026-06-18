@@ -21,7 +21,7 @@ env:
   NODE_OPTIONS: --max-old-space-size=4096
   # Must match the updater endpoint host in src-tauri/tauri.conf.json.
   R2_BUCKET: myelin-updates
-  UPDATER_DOMAIN: https://updates.myelin.app
+  UPDATER_DOMAIN: https://pub-b609df54ffbc4104a99c47d9ac342457.r2.dev
 
 jobs:
   test:
