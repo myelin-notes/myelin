@@ -52,8 +52,7 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 [profile.dev.package.scrypt]
 opt-level = 3
 
-[package.metadata.patch]
-crates = ["scribble"]
-
+# Fork carrying the Windows MSVC compilation fix (whisper logging hooks). Pinned
+# to a branch so a clean checkout (CI) resolves it without any local patch step.
 [patch.crates-io]
-scribble = { path = "./target/patch/scribble-0.5.4" }
+scribble = { git = "https://github.com/winterSteve25/scribble", branch = "fix/windows-msvc-compilation" }
