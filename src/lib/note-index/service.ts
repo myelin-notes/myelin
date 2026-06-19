@@ -5,7 +5,6 @@ import type { VFSNodeId } from '@/lib/sync';
 import * as cache from './cache';
 
 const logger = new Logger('NoteIndexService');
-const CURRENT_NOTE_EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2-quantized';
 
 /**
  * One reindex request, as passed to the Rust engine. The frontend owns the
@@ -178,10 +177,13 @@ export class NoteIndexService {
       this.contentByNode.delete(nodeId);
     }
 
+    // Keep any well-formed embedding regardless of model id; search correctness
+    // is enforced downstream by matching the query embedding's model against
+    // each passage's (see searchNodeResultsSemantically). Hardcoding a model id
+    // here previously silently dropped the whole corpus after a model swap.
     const embedding = record?.embedding;
     if (
       embedding &&
-      embedding.model === CURRENT_NOTE_EMBEDDING_MODEL &&
       embedding.vector.length === embedding.dim &&
       embedding.dim > 0
     ) {

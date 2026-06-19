@@ -55,6 +55,25 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 [profile.dev.package.scrypt]
 opt-level = 3
 
+# Embedding inference (candle BERT) is unusably slow at the dev default of
+# opt-level 0. Optimize the embedding crates and the gemm matmul kernels they
+# call (the hot f32 loop lives in gemm-f32 / gemm-common, not the gemm facade).
+# These are external deps that don't change, so they compile once and cache.
+[profile.dev.package.candle-core]
+opt-level = 3
+[profile.dev.package.candle-nn]
+opt-level = 3
+[profile.dev.package.candle-transformers]
+opt-level = 3
+[profile.dev.package.gemm]
+opt-level = 3
+[profile.dev.package.gemm-common]
+opt-level = 3
+[profile.dev.package.gemm-f32]
+opt-level = 3
+[profile.dev.package.half]
+opt-level = 3
+
 # Fork carrying the Windows MSVC compilation fix (whisper logging hooks). Pinned
 # to a branch so a clean checkout (CI) resolves it without any local patch step.
 [patch.crates-io]
