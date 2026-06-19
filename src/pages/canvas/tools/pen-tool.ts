@@ -29,6 +29,8 @@ export class PenTool implements ITool {
   protected currentShape: ShapeElement | null = null;
   protected color: string = '#191c1e';
   protected size: number = 8;
+  /** When false, the dwell-and-recognize shape-snapping path is skipped. */
+  protected recognizeShapes: boolean = true;
 
   private dwellAnchor: Vector2 | null = null;
   private recognitionAttemptedForAnchor: boolean = false;
@@ -83,6 +85,7 @@ export class PenTool implements ITool {
 
   private tryRecognize(canvas: DrawableCanvas): void {
     if (
+      !this.recognizeShapes ||
       this.snapped ||
       this.recognitionAttemptedForAnchor ||
       this.currentStroke === null ||

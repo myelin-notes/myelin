@@ -319,6 +319,36 @@ describe('audio transcription service', () => {
     expect(invokesOf('push_audio_transcription_samples')).toHaveLength(0);
   });
 
+  it('settles finish() within a bounded timeout when FINISHED never arrives', async () => {
+    vi.useFakeTimers();
+    try {
+      stubAudioContext();
+      mockInvokeDefaults();
+
+      const session = await start();
+      const sessionId = startedSessionId();
+      emitSegment(sessionId, ' partial transcript ');
+
+      let settled = false;
+      const finishPromise = session!.finish().then((transcript) => {
+        settled = true;
+        return transcript;
+      });
+
+      // Let the finish invoke resolve, but never emit FINISHED.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
+      expect(settled).toBe(false);
+
+      // Advancing past the fallback timeout must settle finish().
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(settled).toBe(true);
+      expect(await finishPromise).toBe('partial transcript');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('transcribes a decoded audio buffer in chunks', async () => {
     mockInvokeDefaults();
     const length = 70_000;
