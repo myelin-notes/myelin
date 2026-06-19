@@ -50,10 +50,16 @@ const GITHUB_GRAPHQL_URL = `${GITHUB_API_BASE}/graphql`;
 const GITHUB_API_VERSION = '2022-11-28';
 const MAX_MANIFEST_RETRIES = 4;
 
+// Build the binary string in chunks so multi-MB media doesn't pay a
+// per-byte string-concatenation cost. 0x8000 keeps the apply() argument
+// count well under engine call-stack limits.
+const BASE64_CHUNK_SIZE = 0x8000;
+
 function base64EncodeBytes(bytes: Uint8Array): string {
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.byteLength; i += BASE64_CHUNK_SIZE) {
+    const chunk = bytes.subarray(i, i + BASE64_CHUNK_SIZE);
+    binary += String.fromCharCode(...chunk);
   }
   return btoa(binary);
 }
@@ -155,6 +161,9 @@ export class GitHubRepository extends BaseRepository {
     return { manifest: parsed, revision: payload.sha };
   }
 
+  // The abstract signature is string | null (LocalRepository uses null to mean
+  // "no revision"), but putContents always resolves to a non-null commit sha or
+  // throws, so the GitHub manifest revision is never null in practice.
   protected async saveManifestImpl(
     manifest: VFSManifest,
     revision: string | null,

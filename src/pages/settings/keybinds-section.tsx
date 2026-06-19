@@ -101,7 +101,6 @@ function KeybindRow({
 }: {
   action: Action;
   combo: KeyCombo | undefined;
-  isRebound: boolean;
 }) {
   const strings = useMessages();
   const [capturing, setCapturing] = useState(false);
@@ -185,7 +184,7 @@ export function KeybindsSection() {
 
   const grouped = new Map<
     string,
-    { action: Action; combo: KeyCombo | undefined; isRebound: boolean }[]
+    { action: Action; combo: KeyCombo | undefined }[]
   >();
   let hasAnyRebind = false;
   for (const action of actions) {
@@ -193,14 +192,12 @@ export function KeybindsSection() {
     if (!grouped.has(category)) {
       grouped.set(category, []);
     }
-    const isRebound = registry.isRebound(action);
-    if (isRebound) {
+    if (registry.isRebound(action)) {
       hasAnyRebind = true;
     }
     grouped.get(category)!.push({
       action,
       combo: registry.getCombo(action),
-      isRebound,
     });
   }
 
@@ -236,13 +233,8 @@ export function KeybindsSection() {
               </span>
             </div>
             <div className="space-y-1.5">
-              {items.map(({ action, combo, isRebound }) => (
-                <KeybindRow
-                  key={action}
-                  action={action}
-                  combo={combo}
-                  isRebound={isRebound}
-                />
+              {items.map(({ action, combo }) => (
+                <KeybindRow key={action} action={action} combo={combo} />
               ))}
             </div>
           </div>

@@ -131,12 +131,9 @@ impl IrohRuntime {
             .await
     }
 
-    async fn send(
-        &mut self,
-        note_id: &str,
-        transport_id: &str,
-        data: Vec<u8>,
-    ) -> Result<(), String> {
+    /// Look up the topic, validate the transport, and clone out the sender so
+    /// the caller can broadcast without holding the runtime mutex.
+    fn sender_for(&self, note_id: &str, transport_id: &str) -> Result<GossipSender, String> {
         let topic = self
             .topics
             .get(note_id)
@@ -146,17 +143,7 @@ impl IrohRuntime {
             return Err("Transport instance is no longer active".to_string());
         }
 
-        let size = data.len();
-        match topic.sender.broadcast(Bytes::from(data)).await {
-            Ok(()) => {
-                eprintln!("[iroh] broadcast {size} bytes on note {note_id}");
-                Ok(())
-            }
-            Err(err) => {
-                eprintln!("[iroh] broadcast failed ({size} bytes): {err}");
-                Err(format!("Failed to broadcast iroh message: {err}"))
-            }
-        }
+        Ok(topic.sender.clone())
     }
 
     fn leave(&mut self, note_id: &str, transport_id: &str) {
@@ -405,11 +392,25 @@ pub async fn iroh_send(
     transport_id: String,
     data: Vec<u8>,
 ) -> Result<(), String> {
-    let mut runtime = state.runtime.lock().await;
-    let runtime = runtime
-        .as_mut()
-        .ok_or_else(|| "Iroh transport is not initialized".to_string())?;
-    runtime.send(&note_id, &transport_id, data).await
+    let sender = {
+        let mut runtime = state.runtime.lock().await;
+        let runtime = runtime
+            .as_mut()
+            .ok_or_else(|| "Iroh transport is not initialized".to_string())?;
+        runtime.sender_for(&note_id, &transport_id)?
+    };
+
+    let size = data.len();
+    match sender.broadcast(Bytes::from(data)).await {
+        Ok(()) => {
+            eprintln!("[iroh] broadcast {size} bytes on note {note_id}");
+            Ok(())
+        }
+        Err(err) => {
+            eprintln!("[iroh] broadcast failed ({size} bytes): {err}");
+            Err(format!("Failed to broadcast iroh message: {err}"))
+        }
+    }
 }
 
 #[tauri::command]

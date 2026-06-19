@@ -69,8 +69,6 @@ export class TextTool implements ITool {
     const endPos = canvas.viewport.getPoint(event);
 
     if (!this.dragStart) {
-      this.dragStart = null;
-      this.dragCurrent = null;
       return;
     }
 

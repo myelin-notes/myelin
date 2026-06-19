@@ -61,13 +61,7 @@ export async function transcribeAudioBuffer(
     return null;
   }
 
-  const mono = mixToMono(buffer);
-  for (let offset = 0; offset < mono.length; offset += IMPORT_CHUNK_SAMPLES) {
-    session.enqueueSamples(
-      mono.subarray(offset, offset + IMPORT_CHUNK_SAMPLES),
-      buffer.sampleRate,
-    );
-  }
+  session.transcribeSamples(mixToMono(buffer), buffer.sampleRate);
   return session.finish();
 }
 
@@ -212,7 +206,20 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
     }
   }
 
-  public enqueueSamples(samples: Float32Array, sampleRate: number): void {
+  /**
+   * Feed a fully-decoded mono buffer (the file-import path) in bounded chunks
+   * so no single invoke payload grows unboundedly.
+   */
+  public transcribeSamples(mono: Float32Array, sampleRate: number): void {
+    for (let offset = 0; offset < mono.length; offset += IMPORT_CHUNK_SAMPLES) {
+      this.enqueueSamples(
+        mono.subarray(offset, offset + IMPORT_CHUNK_SAMPLES),
+        sampleRate,
+      );
+    }
+  }
+
+  private enqueueSamples(samples: Float32Array, sampleRate: number): void {
     if (this.stopped) {
       return;
     }

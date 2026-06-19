@@ -369,6 +369,7 @@ fn rpc_error(id: Option<Value>, code: i64, message: &str) -> Value {
 async fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, Error> {
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 4096];
+    let mut search_from = 0;
     let header_end = loop {
         let n = stream.read(&mut chunk).await?;
         if n == 0 {
@@ -381,9 +382,12 @@ async fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, Error>
         if buffer.len() > MAX_REQUEST_BYTES {
             return Err(Error::new(ErrorKind::InvalidData, "request too large"));
         }
-        if let Some(index) = find_header_end(&buffer) {
-            break index;
+        // Only the last 3 bytes of the previous buffer can start a boundary that
+        // completes with the newly appended bytes, so resume the scan from there.
+        if let Some(index) = find_header_end(&buffer[search_from..]) {
+            break search_from + index;
         }
+        search_from = buffer.len().saturating_sub(3);
     };
 
     let header_text = std::str::from_utf8(&buffer[..header_end])

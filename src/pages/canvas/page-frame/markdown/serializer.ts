@@ -60,11 +60,8 @@ function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => {
     // `requestIdleCallback` is available in most Chromium/WebKit webviews
     // and yields until the browser has idle time; fall back to a macrotask.
-    const w = window as unknown as {
-      requestIdleCallback?: (cb: () => void, opts: { timeout: number }) => void;
-    };
-    if (typeof w.requestIdleCallback === 'function') {
-      w.requestIdleCallback(() => resolve(), { timeout: 16 });
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => resolve(), { timeout: 16 });
     } else {
       setTimeout(resolve, 0);
     }

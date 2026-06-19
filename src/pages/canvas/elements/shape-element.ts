@@ -234,6 +234,8 @@ export class ShapeElement extends DrawableElement {
       }
       case 'ellipse':
         return distToEllipseBoundary(x, y, g) <= tol;
+      default:
+        return false;
     }
   }
 

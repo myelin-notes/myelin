@@ -322,7 +322,7 @@ export class SelectTool implements ITool {
       }
       case SelectMode.Lasso: {
         this.lassoPath.push(position);
-        const poly = [...this.lassoPath, position];
+        const poly = this.lassoPath;
         for (const e of canvas.elements) {
           const box = e.boundingBox;
           const center: Vector2 = {

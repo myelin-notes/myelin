@@ -173,7 +173,7 @@ export function useExplorerItem({
   const handleRemove = async () => {
     try {
       await repository.deleteNode(nodeId);
-      onChanged();
+      await onChanged();
     } catch (err) {
       logger.error('Failed to delete node', err, { nodeId });
     }
