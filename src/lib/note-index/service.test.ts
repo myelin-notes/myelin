@@ -121,14 +121,15 @@ describe('NoteIndexService', () => {
     expect(service.getEmbeddings().get('n1')?.vector).toEqual([1]);
   });
 
-  it('hydrates text but ignores embeddings from stale model artifacts', async () => {
+  it('hydrates embeddings regardless of model id (staleness enforced downstream)', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1']);
-    readNodeRecord.mockResolvedValue(record('stale model text', [1], 'other'));
+    readNodeRecord.mockResolvedValue(record('other model text', [1], 'other'));
     const service = new NoteIndexService();
     await service.init('repo-a');
 
-    expect(service.getContent().get('n1')).toBe('stale model text');
-    expect(service.getEmbeddings().has('n1')).toBe(false);
+    expect(service.getContent().get('n1')).toBe('other model text');
+    expect(service.getEmbeddings().get('n1')?.model).toBe('other');
+    expect(service.getEmbeddings().get('n1')?.vector).toEqual([1]);
   });
 
   it('reset clears the corpus and detaches from the active repo', async () => {
