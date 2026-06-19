@@ -28,7 +28,8 @@ type SlashInsertAction =
         | 'paragraph'
         | 'blockquote'
         | 'bulletListItem'
-        | 'orderedListItem';
+        | 'orderedListItem'
+        | 'checkListItem';
       attrs?: Record<string, number>;
     }
   | {
@@ -122,6 +123,27 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
       kind: 'block',
       nodeType: 'orderedListItem',
       attrs: { order: 1, indent: 0 },
+    },
+  },
+  {
+    id: 'slash-checklist',
+    title: 'To-do',
+    subtitle: 'Turn this block into a checkable to-do item',
+    detail: '[ ]',
+    keywords: [
+      'todo',
+      'to-do',
+      'task',
+      'checkbox',
+      'checklist',
+      'checkmark',
+      'check',
+      '[]',
+      '[ ]',
+    ],
+    slashAction: {
+      kind: 'block',
+      nodeType: 'checkListItem',
     },
   },
   {
