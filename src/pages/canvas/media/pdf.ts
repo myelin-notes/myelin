@@ -1,4 +1,5 @@
 import { UserPrefs } from '@/lib/user-prefs';
+import { getDevicePixelRatio } from '@/lib/utils';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PdfElement } from '../elements/pdf-element';
 import { getPdfPageSizes } from '../pdf-renderer';
@@ -17,7 +18,7 @@ export async function pdfImportHandler(
   const fileName = blob instanceof File ? blob.name : '';
   pdf.setInitialPdfData(bytes, fileName, pageSizes);
 
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = getDevicePixelRatio();
   const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
   const cy = options.screenY ?? canvas.ctx.canvas.height / dpr / 2;
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });

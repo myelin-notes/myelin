@@ -376,33 +376,35 @@ export class CachedRepositoryOutbox {
       return;
     }
 
+    const raw = await readTextFile(path, { baseDir: BaseDirectory.AppData });
+
+    let changed = false;
     try {
-      const raw = await readTextFile(path, { baseDir: BaseDirectory.AppData });
       const parsed = JSON.parse(raw) as unknown;
       if (!Array.isArray(parsed)) {
         throw new Error('Cached repository outbox must contain a JSON array.');
       }
 
-      let changed = false;
       this.pendingOps = parsed.map((entry) => {
         const normalized = normalizePendingOp(entry);
         changed = changed || normalized.changed;
         return normalized.op;
       });
-
-      if (changed) {
-        await this.write();
-      }
-
-      this.onPendingWritesChanged(this.pendingOps.length);
-      logger.debug('Loaded cached repository outbox', {
-        repositoryKind: this.repositoryKind,
-        outboxPath: path,
-        pendingOps: this.pendingOps.length,
-      });
     } catch {
       await this.quarantineCorruptOutbox(path);
+      return;
     }
+
+    if (changed) {
+      await this.write();
+    }
+
+    this.onPendingWritesChanged(this.pendingOps.length);
+    logger.debug('Loaded cached repository outbox', {
+      repositoryKind: this.repositoryKind,
+      outboxPath: path,
+      pendingOps: this.pendingOps.length,
+    });
   }
 
   private async save(): Promise<void> {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Plus as PlusIcon } from 'lucide-react';
 import { loadGoogleFont } from '@/components/tool-options-panel';
 import {
@@ -208,11 +208,6 @@ export function useToolState(
     () => allWheelItems.filter((_, i) => wheelEnabledIndices.has(i)),
     [allWheelItems, wheelEnabledIndices],
   );
-
-  // Hide options when switching tools
-  useEffect(() => {
-    setOptionsVisible(false);
-  }, []);
 
   const tool = canvasTools[selectedToolIndex];
   // biome-ignore lint/correctness/useExhaustiveDependencies: optionsTick forces recompute when a tool option mutates in place

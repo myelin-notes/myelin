@@ -217,6 +217,15 @@ function CanvasViewInner({
     if (!engine.ready) {
       return;
     }
+    // Like the title effect above, `engine` lags `id` during a tab switch
+    // (CanvasView is reused, not remounted, and the session opens
+    // asynchronously). Until the loaded session matches this tab's id,
+    // drawableCanvasRef.current still points at the previous note's document, so
+    // the focus/create-fallback below would mutate (create a page frame in) the
+    // wrong canvas. Only run once the session actually matches.
+    if (engine.noteSession?.id !== id) {
+      return;
+    }
     if (!targetPageFrameId && !targetPageFrameName) {
       return;
     }
@@ -261,7 +270,13 @@ function CanvasViewInner({
       pageFrameName: targetPageFrameName,
       pageFrameId: targetPageFrameId,
     });
-  }, [engine.ready, targetPageFrameId, targetPageFrameName]);
+  }, [
+    engine.ready,
+    engine.noteSession,
+    id,
+    targetPageFrameId,
+    targetPageFrameName,
+  ]);
 
   const importMarkdownFile = useCallback(
     async (file: File) => {

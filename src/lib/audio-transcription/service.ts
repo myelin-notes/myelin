@@ -10,6 +10,13 @@ const FINISHED_EVENT = 'audio-transcription-finished';
 /** Decoded file samples are pushed in chunks to bound per-invoke payload size. */
 const IMPORT_CHUNK_SAMPLES = 65_536;
 
+/**
+ * After the finish invoke resolves we wait this long for the backend's FINISHED
+ * event before settling finish() ourselves — a crashed worker or dropped IPC
+ * channel can swallow FINISHED, and callers must never hang on it.
+ */
+const FINISH_FALLBACK_TIMEOUT_MS = 5_000;
+
 interface AudioTranscriptionSegmentPayload {
   sessionId: string;
   text: string;
@@ -54,13 +61,7 @@ export async function transcribeAudioBuffer(
     return null;
   }
 
-  const mono = mixToMono(buffer);
-  for (let offset = 0; offset < mono.length; offset += IMPORT_CHUNK_SAMPLES) {
-    session.enqueueSamples(
-      mono.subarray(offset, offset + IMPORT_CHUNK_SAMPLES),
-      buffer.sampleRate,
-    );
-  }
+  session.transcribeSamples(mixToMono(buffer), buffer.sampleRate);
   return session.finish();
 }
 
@@ -180,15 +181,45 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
     }
 
     // The backend emits FINISHED after flushing its final segments; the
-    // FINISHED handler calls close(), which resolves this promise.
-    await this.closedPromise;
+    // FINISHED handler calls close(), which resolves this promise. If FINISHED
+    // never arrives (crashed worker, dropped IPC channel), fall back to
+    // close() after a bounded wait so finish() always settles.
+    await this.waitForClose();
     return this.segments
       .map((segment) => segment.trim())
       .filter(Boolean)
       .join(' ');
   }
 
-  public enqueueSamples(samples: Float32Array, sampleRate: number): void {
+  private async waitForClose(): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(() => {
+        void this.close();
+        resolve();
+      }, FINISH_FALLBACK_TIMEOUT_MS);
+    });
+    try {
+      await Promise.race([this.closedPromise, timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Feed a fully-decoded mono buffer (the file-import path) in bounded chunks
+   * so no single invoke payload grows unboundedly.
+   */
+  public transcribeSamples(mono: Float32Array, sampleRate: number): void {
+    for (let offset = 0; offset < mono.length; offset += IMPORT_CHUNK_SAMPLES) {
+      this.enqueueSamples(
+        mono.subarray(offset, offset + IMPORT_CHUNK_SAMPLES),
+        sampleRate,
+      );
+    }
+  }
+
+  private enqueueSamples(samples: Float32Array, sampleRate: number): void {
     if (this.stopped) {
       return;
     }

@@ -146,13 +146,20 @@ export class CanvasViewport {
       this._touchPanLast = avg;
 
       // Pinch zoom around viewport center (consistent with wheel).
+      // zoomAroundViewportCenter -> zoomAroundPoint already fires
+      // notifyViewChange (which picks up the pan offset above), so only notify
+      // here when no pinch zoom ran.
+      let zoomed = false;
       if (!this._zoomLocked && this._touchPinchLastDist > 0 && dist > 0) {
         this.zoomAroundViewportCenter(
           this._zoom * (dist / this._touchPinchLastDist),
         );
+        zoomed = true;
       }
       this._touchPinchLastDist = dist;
-      this.notifyViewChange();
+      if (!zoomed) {
+        this.notifyViewChange();
+      }
     };
 
     this._handleTouchEnd = (evt) => {

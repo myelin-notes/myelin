@@ -13,7 +13,7 @@ const MAX_POLL_INTERVAL_MS = 60_000;
 const JOIN_RETRY_MS = 30_000;
 const REFRESH_TTL_FRACTION = 0.9;
 
-type Timer = number | NodeJS.Timeout;
+type Timer = ReturnType<typeof setTimeout>;
 
 export interface LiveDiscoveryTransport extends Transport {
   host(): Promise<string>;

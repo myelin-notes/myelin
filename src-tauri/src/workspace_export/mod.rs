@@ -45,7 +45,14 @@ fn safe_join(root: &Path, rel: &str) -> Result<PathBuf, String> {
         if segment.is_empty() || segment == "." {
             continue;
         }
-        if segment == ".." || segment.contains('\\') {
+        // The segment must be a single, plain name. Reject `..`, backslashes and
+        // colons (Windows drive letters / drive-relative paths), and require the
+        // OS to parse it as exactly one Normal component so absolute or
+        // drive-anchored segments cannot reset/escape the vault root.
+        let mut components = Path::new(segment).components();
+        let is_single_normal = matches!(components.next(), Some(std::path::Component::Normal(_)))
+            && components.next().is_none();
+        if segment == ".." || segment.contains('\\') || segment.contains(':') || !is_single_normal {
             return Err(format!("unsafe path segment in {rel}"));
         }
         path.push(segment);
@@ -104,4 +111,41 @@ fn write_entries(vault_dir: &Path, request: &VaultExportRequest) -> Result<(), S
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn safe_join_rejects_drive_letter_segments() {
+        let root = Path::new("/vault/root");
+        for malicious in ["C:", "C:evil", "C:\\Windows\\System32", "..", "a/../b"] {
+            let result = safe_join(root, malicious);
+            assert!(
+                result.is_err(),
+                "expected rejection for {malicious:?}, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn safe_join_does_not_escape_vault_for_drive_letters() {
+        let root = Path::new("/vault/root");
+        // Even if a segment were accepted, the resulting path must stay under root.
+        if let Ok(joined) = safe_join(root, "C:evil") {
+            assert!(
+                joined.starts_with(root),
+                "C:evil escaped vault: {}",
+                joined.display()
+            );
+        }
+    }
+
+    #[test]
+    fn safe_join_accepts_legitimate_names() {
+        let root = Path::new("/vault/root");
+        let joined = safe_join(root, "Notes/Daily/2026-06-18.md").expect("legit path rejected");
+        assert_eq!(joined, root.join("Notes").join("Daily").join("2026-06-18.md"));
+    }
 }
