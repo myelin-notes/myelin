@@ -203,10 +203,7 @@ export function RepositorySection() {
 
                 <AnimatePresence>
                   {remoteAuth.userCode && (
-                    <DeviceCodeDisplay
-                      userCode={remoteAuth.userCode}
-                      onCopy={() => {}}
-                    />
+                    <DeviceCodeDisplay userCode={remoteAuth.userCode} />
                   )}
                 </AnimatePresence>
 

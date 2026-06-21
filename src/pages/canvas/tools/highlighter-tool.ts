@@ -25,6 +25,7 @@ export class HighlighterTool extends PenTool {
     super(getStrings);
     this.color = '#facc15';
     this.size = 36;
+    this.recognizeShapes = false;
   }
 
   get id(): ToolId {

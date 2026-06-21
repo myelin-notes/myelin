@@ -363,7 +363,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'edit_tags',
     description:
-      'Edit tags on a note, file, or folder. Provide set to replace tags, or add/remove arrays for incremental edits.',
+      'Edit tags on a note, file, or folder. Provide set to replace tags, or add/remove arrays for incremental edits. If combined, they apply in order: set (full replace) first, then add, then remove.',
     inputSchema: textSchema(
       {
         nodeId: { type: 'string' },

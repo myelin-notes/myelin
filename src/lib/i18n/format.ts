@@ -21,7 +21,7 @@ export function formatNumber(
 
 export function formatRelativeTime(
   date: Date | string | number,
-  locale: SupportedLocale,
+  locale: SupportedLocale = defaultLocale,
   options?: { style?: Intl.RelativeTimeFormatStyle },
 ): string {
   const diffSeconds = Math.round(

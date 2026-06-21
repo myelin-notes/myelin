@@ -335,8 +335,6 @@ export function recognizeShape(
     };
   }
 
-  const axisAligned = closeRatio; // smaller close gap → cleaner closed shape
-
   if (
     closed &&
     cornerCount === 4 &&
@@ -344,7 +342,7 @@ export function recognizeShape(
     aspect <= RECT_ASPECT_MAX &&
     C < RECT_MAX_CIRC
   ) {
-    const confidence = Math.min(1, 0.7 + (1 - axisAligned) * 0.3);
+    const confidence = Math.min(1, 0.7 + (1 - closeRatio) * 0.3);
     if (confidence >= MIN_CONFIDENCE) {
       return {
         shapeType: 'rect',
@@ -355,7 +353,7 @@ export function recognizeShape(
   }
 
   if (closed && cornerCount === 3 && C < RECT_MAX_CIRC) {
-    const confidence = Math.min(1, 0.7 + (1 - axisAligned) * 0.3);
+    const confidence = Math.min(1, 0.7 + (1 - closeRatio) * 0.3);
     if (confidence >= MIN_CONFIDENCE) {
       return {
         shapeType: 'triangle',

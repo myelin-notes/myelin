@@ -170,14 +170,6 @@ async function readJsonBody(request: Request): Promise<unknown> {
   }
 }
 
-function parseRecordInput(value: unknown): DiscoveryRecordInput | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  return value;
-}
-
 function createRecord(
   input: DiscoveryRecordInput,
   now: number,
@@ -240,8 +232,8 @@ export class LiveDiscoveryRoom {
   }
 
   private async publish(request: Request): Promise<Response> {
-    const input = parseRecordInput(await readJsonBody(request));
-    if (!input) {
+    const input = await readJsonBody(request);
+    if (!isRecord(input)) {
       throw new Error('Invalid JSON body.');
     }
 
@@ -257,10 +249,6 @@ export class LiveDiscoveryRoom {
     }
 
     await this.state.storage.delete(storageKey(recordId));
-    if ((await this.listFreshRecords()).length === 0) {
-      await this.state.storage.deleteAll();
-    }
-
     return empty(204);
   }
 
@@ -289,12 +277,7 @@ export class LiveDiscoveryRoom {
       ),
     );
 
-    const freshRecords = records.slice(0, MAX_RECORDS_PER_ROOM);
-    if (freshRecords.length === 0 && entries.size > 0) {
-      await this.state.storage.deleteAll();
-    }
-
-    return freshRecords;
+    return records.slice(0, MAX_RECORDS_PER_ROOM);
   }
 }
 

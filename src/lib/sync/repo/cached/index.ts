@@ -612,6 +612,13 @@ export class CachedRepository
     );
   }
 
+  // Tri-state return contract, relied on by enqueuePushNote/checkRawConflicts/
+  // applyRawFilePush:
+  //   undefined -> not a raw file (canvas/non-file); skip conflict check entirely
+  //   null      -> raw file whose base content is empty (computeRevision(empty))
+  //   string    -> raw file base content hash
+  // `undefined` (no check) and `null` (empty base) are distinct and must not be
+  // conflated.
   private async getRawFileBaseRevision(
     nodeId: VFSNodeId,
   ): Promise<string | null | undefined> {
@@ -840,6 +847,9 @@ export class CachedRepository
       await this.drainResolvedOps(plan.resolvedOps);
       return true;
     }
+    // Unreachable: every path inside the loop returns; the only `continue` is
+    // guarded by `attempt < 1`, so attempt 1 always returns. Kept to satisfy
+    // the compiler's all-paths-return check.
     return false;
   }
 

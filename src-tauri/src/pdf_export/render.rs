@@ -81,9 +81,7 @@ fn render_page(
     bg_idx: Option<usize>,
 ) -> Result<(), String> {
     let size = Size::from_wh(page.width_pt, page.height_pt).ok_or("invalid page size")?;
-    let mut pg = document.start_page_with(
-        PageSettings::from_wh(page.width_pt, page.height_pt).ok_or("invalid page size")?,
-    );
+    let mut pg = document.start_page_with(PageSettings::new(size));
     let mut surface = pg.surface();
 
     if let (Some(pdf), Some(idx)) = (pdf_doc, bg_idx) {

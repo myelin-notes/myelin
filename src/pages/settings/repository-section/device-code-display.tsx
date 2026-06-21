@@ -5,13 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useResettableTimeout } from '@/hooks/use-resettable-timeout';
 import { useMessages } from '@/lib/i18n';
 
-export function DeviceCodeDisplay({
-  userCode,
-  onCopy,
-}: {
-  userCode: string;
-  onCopy: () => void;
-}) {
+export function DeviceCodeDisplay({ userCode }: { userCode: string }) {
   const strings = useMessages();
   const [copied, setCopied] = useState(false);
   const copiedReset = useResettableTimeout();
@@ -19,7 +13,6 @@ export function DeviceCodeDisplay({
   const handleCopy = async () => {
     await navigator.clipboard.writeText(userCode);
     setCopied(true);
-    onCopy();
     copiedReset.schedule(() => setCopied(false), 2000);
   };
 

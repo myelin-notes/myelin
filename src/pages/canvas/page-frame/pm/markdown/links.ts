@@ -11,12 +11,8 @@ import {
   collectAffectedTextblocks,
   getChangedRangesForTransactions,
 } from './range-tracking';
+import { buildTextOffsetMap } from './text-offset-map';
 import { MARKDOWN_ATOM_CHAR } from './types';
-
-interface TextOffsetMap {
-  text: string;
-  posAt: number[];
-}
 
 interface MarkdownLinkTarget {
   from: number;
@@ -101,33 +97,6 @@ function getOpenableHref(href: string): string | null {
   }
 
   return null;
-}
-
-function buildTextOffsetMap(node: PMNode, pos: number): TextOffsetMap {
-  const parts: string[] = [];
-  const posAt = [pos + 1];
-  let cursorPos = pos + 1;
-
-  node.forEach((child) => {
-    if (child.isText) {
-      const text = child.text ?? '';
-      parts.push(text);
-      for (let index = 0; index < text.length; index++) {
-        cursorPos += 1;
-        posAt.push(cursorPos);
-      }
-      return;
-    }
-
-    parts.push(MARKDOWN_ATOM_CHAR);
-    cursorPos += child.nodeSize;
-    posAt.push(cursorPos);
-  });
-
-  return {
-    text: parts.join(''),
-    posAt,
-  };
 }
 
 function findMarkdownLinkTargets(

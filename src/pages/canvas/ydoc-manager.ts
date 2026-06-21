@@ -44,6 +44,15 @@ export class YDocManager {
 
   constructor(doc?: Y.Doc) {
     this.doc = doc ?? new Y.Doc();
+    // sweepOrphanPageFrameFragments enumerates root types via the undocumented
+    // `doc.share` internal. Assert its shape up front so a Yjs upgrade that
+    // renames/removes it surfaces loudly here instead of silently turning the
+    // orphan-fragment sweep into a no-op.
+    if (typeof this.doc.share?.keys !== 'function') {
+      throw new Error(
+        'Yjs internal doc.share is not a Map; orphan-fragment sweep would silently break.',
+      );
+    }
     this.elements = this.doc.getArray('elements');
     this.undoManager = new Y.UndoManager([this.elements], {
       trackedOrigins: new Set([LOCAL_ORIGIN]),

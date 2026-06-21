@@ -25,6 +25,9 @@ function truncateSnippet(text: string): string {
   return `${truncated}...`;
 }
 
+// Block-level context: returns the block's leading text (up to
+// MAX_SNIPPET_LENGTH). Computed once per block and shared by every link in it,
+// so the snippet is not centered on any individual link's position.
 function getBlockSnippet(node: PMNode): string {
   return truncateSnippet(
     normalizeSnippet(node.textBetween(0, node.content.size, ' ', ' ')),

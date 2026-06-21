@@ -6,7 +6,6 @@ import {
   mkdir,
   open,
   remove as removeFile,
-  stat,
 } from '@tauri-apps/plugin-fs';
 import type { VFSNodeId } from '@/lib/sync';
 
@@ -64,14 +63,4 @@ export async function removeEntry(nodeId: VFSNodeId): Promise<void> {
   if (await exists(rel, { baseDir: BaseDirectory.AppCache })) {
     await removeFile(rel, { baseDir: BaseDirectory.AppCache });
   }
-}
-
-export async function getMtime(nodeId: VFSNodeId): Promise<number | null> {
-  const rel = relPath(nodeId);
-  if (!(await exists(rel, { baseDir: BaseDirectory.AppCache }))) {
-    return null;
-  }
-  const info = await stat(rel, { baseDir: BaseDirectory.AppCache });
-  const mtime = info.mtime;
-  return mtime ? mtime.getTime() : null;
 }

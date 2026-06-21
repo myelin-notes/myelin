@@ -1,4 +1,5 @@
 import { UserPrefs } from '@/lib/user-prefs';
+import { getDevicePixelRatio } from '@/lib/utils';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameElement } from '../elements/page-frame-element';
 import { writeMarkdownToPageFrameFragment } from '../page-frame/markdown/import';
@@ -21,7 +22,7 @@ export async function markdownImportHandler(
     });
   }
 
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = getDevicePixelRatio();
   const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
   const cy = options.screenY ?? canvas.ctx.canvas.height / dpr / 2;
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });

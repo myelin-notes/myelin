@@ -37,10 +37,6 @@ export class ElementStore {
     return this._yMapToElement.get(yMap) ?? null;
   }
 
-  public has(uuid: string): boolean {
-    return this._elements.has(uuid);
-  }
-
   public count(): number {
     return this._elements.size;
   }
@@ -80,14 +76,6 @@ export class ElementStore {
       this._yMapToElement.delete(element.yMap);
     }
     this.invalidateSnapshot();
-  }
-
-  /** Remove the element associated with `yMap`, if any. */
-  public removeByYMap(yMap: Y.Map<unknown>): void {
-    const element = this._yMapToElement.get(yMap);
-    if (element) {
-      this.remove(element.uuid);
-    }
   }
 
   /**

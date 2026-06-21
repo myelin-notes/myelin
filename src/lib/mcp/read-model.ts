@@ -463,12 +463,12 @@ export async function buildMcpNoteReadModel(
   );
 }
 
-function pageFrameContentFromYDoc(
+function pageFrameContentFromYMap(
   ydoc: YDocManager,
   noteId: VFSNodeId,
   pageFrameId: string,
+  yMap: Y.Map<unknown>,
 ): McpPageFrameContent {
-  const yMap = findElementMap(ydoc, pageFrameId);
   if (getElementType(yMap) !== ElementType.PAGE_FRAME) {
     throw new Error(`Element is not a page frame: ${pageFrameId}`);
   }
@@ -484,12 +484,24 @@ function pageFrameContentFromYDoc(
   };
 }
 
-function canvasTextContentFromYDoc(
+function pageFrameContentFromYDoc(
   ydoc: YDocManager,
   noteId: VFSNodeId,
+  pageFrameId: string,
+): McpPageFrameContent {
+  return pageFrameContentFromYMap(
+    ydoc,
+    noteId,
+    pageFrameId,
+    findElementMap(ydoc, pageFrameId),
+  );
+}
+
+function canvasTextContentFromYMap(
+  noteId: VFSNodeId,
   elementId: string,
+  yMap: Y.Map<unknown>,
 ): McpCanvasTextContent {
-  const yMap = findElementMap(ydoc, elementId);
   if (getElementType(yMap) !== ElementType.TEXT) {
     throw new Error(`Element is not canvas text: ${elementId}`);
   }
@@ -501,12 +513,23 @@ function canvasTextContentFromYDoc(
   };
 }
 
-function latexContentFromYDoc(
+function canvasTextContentFromYDoc(
   ydoc: YDocManager,
   noteId: VFSNodeId,
   elementId: string,
+): McpCanvasTextContent {
+  return canvasTextContentFromYMap(
+    noteId,
+    elementId,
+    findElementMap(ydoc, elementId),
+  );
+}
+
+function latexContentFromYMap(
+  noteId: VFSNodeId,
+  elementId: string,
+  yMap: Y.Map<unknown>,
 ): McpLatexContent {
-  const yMap = findElementMap(ydoc, elementId);
   if (getElementType(yMap) !== ElementType.LATEX) {
     throw new Error(`Element is not LaTeX: ${elementId}`);
   }
@@ -516,6 +539,18 @@ function latexContentFromYDoc(
     latex: asString(yMap.get('latex')) ?? '',
     bounds: getLatexBounds(yMap),
   };
+}
+
+function latexContentFromYDoc(
+  ydoc: YDocManager,
+  noteId: VFSNodeId,
+  elementId: string,
+): McpLatexContent {
+  return latexContentFromYMap(
+    noteId,
+    elementId,
+    findElementMap(ydoc, elementId),
+  );
 }
 
 export async function readMcpPageFrame(
@@ -584,19 +619,35 @@ export async function readMcpNoteFull(
 ): Promise<McpNoteFullReadModel> {
   const loaded = await loadMcpNote(repository, noteId);
   const note = noteReadModelFromLoaded(loaded, options);
+
+  // Index every element yMap once so the per-element content builders below
+  // don't each re-scan ydoc.elements (which would be O(elements²)).
+  const yMapsById = new Map<string, Y.Map<unknown>>();
+  for (let index = 0; index < loaded.ydoc.elements.length; index++) {
+    const yMap = loaded.ydoc.elements.get(index);
+    yMapsById.set(getElementId(yMap), yMap);
+  }
+
   const pageFrames = note.elements
     .filter((element) => element.kind === 'page-frame')
     .map((element) =>
-      pageFrameContentFromYDoc(loaded.ydoc, noteId, element.id),
+      pageFrameContentFromYMap(
+        loaded.ydoc,
+        noteId,
+        element.id,
+        yMapsById.get(element.id)!,
+      ),
     );
   const canvasTexts = note.elements
     .filter((element) => element.kind === 'text')
     .map((element) =>
-      canvasTextContentFromYDoc(loaded.ydoc, noteId, element.id),
+      canvasTextContentFromYMap(noteId, element.id, yMapsById.get(element.id)!),
     );
   const latexBlocks = note.elements
     .filter((element) => element.kind === 'latex')
-    .map((element) => latexContentFromYDoc(loaded.ydoc, noteId, element.id));
+    .map((element) =>
+      latexContentFromYMap(noteId, element.id, yMapsById.get(element.id)!),
+    );
 
   return {
     ...note,
