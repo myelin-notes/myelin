@@ -11,6 +11,11 @@ import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/i
 import { getPdfPageSizes } from '@/pages/canvas/pdf-renderer';
 import { addPdfElementToYDoc } from '@/pages/library/import/pdf';
 import type { ImportProgress } from './dialog';
+import {
+  createImportedFolders,
+  getImportParentId,
+  getPathBasename,
+} from './import-tree';
 
 const logger = new Logger('ObsidianVaultImport');
 
@@ -71,18 +76,11 @@ export interface ImportObsidianVaultOptions {
 }
 
 export function getPathName(path: string): string {
-  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
-  return normalized.split('/').pop()?.trim() || 'Obsidian Vault';
+  return getPathBasename(path, 'Obsidian Vault');
 }
 
 function joinRelativePath(segments: readonly string[]): string {
   return segments.join('/');
-}
-
-function getParentPath(path: string): string {
-  const parts = path.split('/');
-  parts.pop();
-  return parts.join('/');
 }
 
 function getMarkdownNoteName(fileName: string): string {
@@ -327,40 +325,6 @@ export async function scanVault(vaultPath: string): Promise<ScannedVault> {
   return scanned;
 }
 
-async function createImportedFolders(
-  repository: Repository,
-  rootFolderId: string,
-  folderPaths: Set<string>,
-): Promise<Map<string, string>> {
-  const folderIds = new Map<string, string>();
-  const sortedFolderPaths = [...folderPaths].sort(
-    (left, right) => left.split('/').length - right.split('/').length,
-  );
-
-  for (const folderPath of sortedFolderPaths) {
-    const parentPath = getParentPath(folderPath);
-    const parentId = parentPath ? folderIds.get(parentPath) : rootFolderId;
-    const name = folderPath.split('/').pop();
-    if (!name || !parentId) {
-      continue;
-    }
-
-    folderIds.set(folderPath, await repository.createFolder(name, parentId));
-  }
-
-  return folderIds;
-}
-
-function getImportParentId(
-  rootFolderId: string,
-  folderIds: ReadonlyMap<string, string>,
-  folderPath: string,
-): string {
-  return folderPath
-    ? (folderIds.get(folderPath) ?? rootFolderId)
-    : rootFolderId;
-}
-
 function normalizeNoteLinkTarget(target: string): string | null {
   const withoutAlias = target.split('|', 1)[0]?.trim() ?? '';
   const withoutFragment = withoutAlias.split(/[#^]/, 1)[0]?.trim() ?? '';
@@ -454,7 +418,7 @@ async function importPdfVaultFile({
 }: {
   file: Extract<VaultImportFile, { kind: 'pdf' }>;
   repository: Repository;
-  parentId: string;
+  parentId: string | null;
 }): Promise<void> {
   const bytes = await readFile(file.absolutePath);
   const pageSizes = await getPdfPageSizes(bytes);
@@ -479,7 +443,7 @@ async function importStorageVaultFile({
 }: {
   file: Extract<VaultImportFile, { kind: 'storage' }>;
   repository: Repository;
-  parentId: string;
+  parentId: string | null;
 }): Promise<void> {
   await repository.createFile(
     file.name,

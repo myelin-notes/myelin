@@ -95,6 +95,7 @@ const es: typeof en = {
       importFiles: 'Importar archivos',
       importGoodnotesZip: 'Importar ZIP de Goodnotes',
       importObsidianVault: 'Importar bóveda de Obsidian',
+      importWorkspaceJson: 'Importar espacio de trabajo JSON',
       untitledCanvas: 'Lienzo sin título',
       unnamedFolder: 'Carpeta sin nombre',
     },
@@ -127,6 +128,9 @@ const es: typeof en = {
     importDialog: {
       title: 'Importar bóveda de Obsidian',
       scanning: 'Escaneando bóveda...',
+      jsonTitle: 'Importar espacio de trabajo JSON',
+      jsonScanning: 'Escaneando carpeta...',
+      jsonNoFiles: 'No se encontraron notas JSON ni multimedia en esta carpeta',
       notes: (count: number) => `${count} nota${count === 1 ? '' : 's'}`,
       media: (count: number) =>
         `${count} archivo${count === 1 ? '' : 's'} multimedia`,
@@ -396,6 +400,19 @@ const es: typeof en = {
         progress: (current: number, total: number) =>
           `Exportando ${current} de ${total}...`,
         failed: 'No se pudo exportar la bóveda de Obsidian',
+        succeeded: (notes: number, media: number) =>
+          `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
+      },
+      exportJson: {
+        label: 'Exportar espacio de trabajo como JSON',
+        description:
+          'Guarda todo tu espacio de trabajo en una carpeta como JSON. Cada nota se convierte en un archivo JSON que codifica sus trazos, texto y multimedia incrustada (binarios en base64); los demás archivos se copian y se conserva la estructura de carpetas.',
+        button: 'Exportar',
+        defaultExportName: 'Exportación JSON de Myelin',
+        loading: 'Exportando espacio de trabajo como JSON...',
+        progress: (current: number, total: number) =>
+          `Exportando ${current} de ${total}...`,
+        failed: 'No se pudo exportar como JSON',
         succeeded: (notes: number, media: number) =>
           `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
       },

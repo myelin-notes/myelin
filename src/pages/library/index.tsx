@@ -74,6 +74,7 @@ import {
   isPdfFile,
   PDF_FILE_ACCEPT,
 } from './import/pdf';
+import { createWorkspaceJsonImportSource } from './import/workspace-json-source';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
@@ -110,6 +111,9 @@ export function LibraryPage() {
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [importSource, setImportSource] = useState<ImportSource | null>(null);
+  const [importType, setImportType] = useState<
+    'obsidian_vault' | 'workspace_json'
+  >('obsidian_vault');
   const isRefreshingRepository = useManualRepositoryRefreshPending();
   const recentFilesRequestRef = useRef(0);
   const cycleSortMode = () => {
@@ -321,9 +325,35 @@ export function LibraryPage() {
       return;
     }
 
+    setImportType('obsidian_vault');
     setImportSource(
       createObsidianVaultImportSource({
         vaultPath: selected,
+        repository,
+        parentId: currentFolderId,
+        strings,
+      }),
+    );
+  }, [isImportingFiles, importSource, repository, currentFolderId, strings]);
+
+  const handleImportWorkspaceJson = useCallback(async () => {
+    if (isImportingFiles || importSource !== null) {
+      return;
+    }
+
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      recursive: true,
+    });
+    if (!selected || Array.isArray(selected)) {
+      return;
+    }
+
+    setImportType('workspace_json');
+    setImportSource(
+      createWorkspaceJsonImportSource({
+        dirPath: selected,
         repository,
         parentId: currentFolderId,
         strings,
@@ -335,10 +365,9 @@ export function LibraryPage() {
     (rootFolderId: string) => {
       setCurrentFolderId(rootFolderId);
       triggerRefresh();
-      // The dialog-based ImportSource is only ever an Obsidian vault today.
-      trackEvent('import_completed', { import_type: 'obsidian_vault' });
+      trackEvent('import_completed', { import_type: importType });
     },
-    [triggerRefresh],
+    [triggerRefresh, importType],
   );
 
   const handleNewFolder = useCallback(() => {
@@ -723,6 +752,7 @@ export function LibraryPage() {
                     onImportFiles={handleImportFiles}
                     onImportGoodnotesZip={handleImportGoodnotesZip}
                     onImportObsidianVault={handleImportObsidianVault}
+                    onImportWorkspaceJson={handleImportWorkspaceJson}
                     importDisabled={isImportingFiles || importSource !== null}
                   />
                   <input

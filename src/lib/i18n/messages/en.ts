@@ -93,6 +93,7 @@ const en = {
       importFiles: 'Import Files',
       importGoodnotesZip: 'Import Goodnotes ZIP',
       importObsidianVault: 'Import Obsidian Vault',
+      importWorkspaceJson: 'Import Workspace JSON',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
     },
@@ -125,6 +126,9 @@ const en = {
     importDialog: {
       title: 'Import Obsidian Vault',
       scanning: 'Scanning vault...',
+      jsonTitle: 'Import Workspace JSON',
+      jsonScanning: 'Scanning folder...',
+      jsonNoFiles: 'No JSON notes or media found in this folder',
       notes: (count: number) => `${count} note${count === 1 ? '' : 's'}`,
       media: (count: number) => `${count} media file${count === 1 ? '' : 's'}`,
       skippedFiles: (count: number) =>
@@ -391,6 +395,19 @@ const en = {
         progress: (current: number, total: number) =>
           `Exporting ${current} of ${total}...`,
         failed: 'Obsidian vault export failed',
+        succeeded: (notes: number, media: number) =>
+          `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
+      },
+      exportJson: {
+        label: 'Export Workspace as JSON',
+        description:
+          'Save your whole workspace to a folder as JSON. Each note becomes a JSON file encoding its strokes, text, and embedded media (binaries as base64); other files are copied and the folder structure is preserved.',
+        button: 'Export',
+        defaultExportName: 'Myelin JSON Export',
+        loading: 'Exporting workspace as JSON...',
+        progress: (current: number, total: number) =>
+          `Exporting ${current} of ${total}...`,
+        failed: 'JSON export failed',
         succeeded: (notes: number, media: number) =>
           `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
       },

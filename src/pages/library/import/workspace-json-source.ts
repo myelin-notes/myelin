@@ -4,64 +4,58 @@ import type { ImportSource } from './dialog';
 import { resolveImportRootName } from './import-tree';
 import {
   getPathName,
-  importObsidianVault,
-  type ScannedVault,
-  scanVault,
-} from './obsidian-vault';
+  importWorkspaceJson,
+  type ScannedWorkspace,
+  scanWorkspaceJson,
+} from './workspace-json';
 
-export function createObsidianVaultImportSource({
-  vaultPath,
+export function createWorkspaceJsonImportSource({
+  dirPath,
   repository,
   parentId,
   strings,
 }: {
-  vaultPath: string;
+  dirPath: string;
   repository: Repository;
   parentId: string | null;
   strings: Messages;
 }): ImportSource {
-  let scanned: ScannedVault | null = null;
+  let scanned: ScannedWorkspace | null = null;
   let conflictNodeId: string | null = null;
-  const vaultName = getPathName(vaultPath);
+  const rootName = getPathName(dirPath);
+  const dialogStrings = strings.library.importDialog;
 
   return {
-    title: strings.library.importDialog.title,
-    scanningLabel: strings.library.importDialog.scanning,
-    emptyLabel: strings.library.importDialog.noFiles,
+    title: dialogStrings.jsonTitle,
+    scanningLabel: dialogStrings.jsonScanning,
+    emptyLabel: dialogStrings.jsonNoFiles,
 
     async scan() {
-      scanned = await scanVault(vaultPath);
-
-      const noteCount = scanned.files.filter(
-        (f) => f.kind === 'markdown',
-      ).length;
-      const mediaCount = scanned.files.filter(
-        (f) => f.kind !== 'markdown',
-      ).length;
+      scanned = await scanWorkspaceJson(dirPath);
 
       const [folders] = await repository.listDirectory(parentId);
       const conflictFolder = folders.find(
-        (f) => f.name.toLowerCase() === vaultName.toLowerCase(),
+        (folder) => folder.name.toLowerCase() === rootName.toLowerCase(),
       );
       conflictNodeId = conflictFolder?.id ?? null;
 
       return {
-        name: vaultName,
+        name: rootName,
         lines: [
           {
             icon: 'note' as const,
-            text: strings.library.importDialog.notes(noteCount),
+            text: dialogStrings.notes(scanned.notes.length),
           },
           {
             icon: 'media' as const,
-            text: strings.library.importDialog.media(mediaCount),
+            text: dialogStrings.media(scanned.media.length),
           },
         ],
         skippedText:
           scanned.skippedFiles > 0
-            ? strings.library.importDialog.skippedFiles(scanned.skippedFiles)
+            ? dialogStrings.skippedFiles(scanned.skippedFiles)
             : null,
-        isEmpty: scanned.files.length === 0,
+        isEmpty: scanned.notes.length === 0 && scanned.media.length === 0,
         conflict: conflictNodeId ? { nodeId: conflictNodeId } : null,
       };
     },
@@ -74,29 +68,29 @@ export function createObsidianVaultImportSource({
       const resolvedName = await resolveImportRootName({
         repository,
         parentId,
-        name: vaultName,
+        name: rootName,
         conflictNodeId,
         conflictResolution,
       });
 
-      const result = await importObsidianVault({
+      const result = await importWorkspaceJson({
         repository,
         parentId,
-        vaultPath,
-        vaultName: resolvedName,
+        dirPath,
+        rootName: resolvedName,
         scanned,
         onProgress,
       });
 
       return {
         rootFolderId: result.rootFolderId,
-        text: strings.library.importDialog.summary.imported(
+        text: dialogStrings.summary.imported(
           result.notesImported,
           result.mediaImported,
         ),
         skippedText:
           result.skippedFiles > 0
-            ? strings.library.importDialog.summary.skipped(result.skippedFiles)
+            ? dialogStrings.summary.skipped(result.skippedFiles)
             : null,
       };
     },
