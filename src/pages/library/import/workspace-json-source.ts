@@ -1,6 +1,7 @@
 import type { Messages } from '@/lib/i18n';
 import type { Repository } from '@/lib/sync';
 import type { ImportSource } from './dialog';
+import { resolveImportRootName } from './import-tree';
 import {
   getPathName,
   importWorkspaceJson,
@@ -64,14 +65,19 @@ export function createWorkspaceJsonImportSource({
         throw new Error('Must scan before importing');
       }
 
-      if (conflictNodeId && conflictResolution === 'replace') {
-        await repository.deleteNode(conflictNodeId);
-      }
+      const resolvedName = await resolveImportRootName({
+        repository,
+        parentId,
+        name: rootName,
+        conflictNodeId,
+        conflictResolution,
+      });
 
       const result = await importWorkspaceJson({
         repository,
         parentId,
         dirPath,
+        rootName: resolvedName,
         scanned,
         onProgress,
       });

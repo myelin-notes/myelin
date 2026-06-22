@@ -1,6 +1,7 @@
 import type { Messages } from '@/lib/i18n';
 import type { Repository } from '@/lib/sync';
 import type { ImportSource } from './dialog';
+import { resolveImportRootName } from './import-tree';
 import {
   getPathName,
   importObsidianVault,
@@ -70,18 +71,19 @@ export function createObsidianVaultImportSource({
         throw new Error('Must scan before importing');
       }
 
-      if (conflictNodeId && conflictResolution === 'replace') {
-        await repository.deleteNode(conflictNodeId);
-      }
+      const resolvedName = await resolveImportRootName({
+        repository,
+        parentId,
+        name: vaultName,
+        conflictNodeId,
+        conflictResolution,
+      });
 
       const result = await importObsidianVault({
         repository,
         parentId,
         vaultPath,
-        vaultName:
-          conflictNodeId && conflictResolution === 'rename'
-            ? undefined
-            : vaultName,
+        vaultName: resolvedName,
         scanned,
         onProgress,
       });

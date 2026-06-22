@@ -1,10 +1,45 @@
 import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { ConflictResolution } from './dialog';
 
 /** Drop the last '/'-separated segment, yielding the parent folder path. */
 export function getParentPath(path: string): string {
   const parts = path.split('/');
   parts.pop();
   return parts.join('/');
+}
+
+/** Last path segment, normalized, or `fallback` if the path has no usable name. */
+export function getPathBasename(path: string, fallback: string): string {
+  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  return normalized.split('/').pop()?.trim() || fallback;
+}
+
+/**
+ * Resolve the name to give an imported root folder when one already exists.
+ * `replace` deletes the existing folder and keeps the name; `rename` returns a
+ * unique sibling name (e.g. "Name 2") so both are kept. No conflict → name as-is.
+ */
+export async function resolveImportRootName({
+  repository,
+  parentId,
+  name,
+  conflictNodeId,
+  conflictResolution,
+}: {
+  repository: Repository;
+  parentId: VFSNodeId | null;
+  name: string;
+  conflictNodeId: VFSNodeId | null;
+  conflictResolution: ConflictResolution;
+}): Promise<string> {
+  if (!conflictNodeId) {
+    return name;
+  }
+  if (conflictResolution === 'replace') {
+    await repository.deleteNode(conflictNodeId);
+    return name;
+  }
+  return repository.getUniqueFileName(name, parentId);
 }
 
 /**

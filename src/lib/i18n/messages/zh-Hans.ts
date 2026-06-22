@@ -390,7 +390,7 @@ const zhHans: typeof en = {
         description:
           '将整个工作区保存到文件夹中，作为 JSON。每个笔记会编码为 JSON 文件，包含其笔迹、文本和嵌入的媒体（二进制以 base64 编码）；其他文件会被复制，并保留文件夹结构。',
         button: '导出',
-        defaultVaultName: 'Myelin JSON 导出',
+        defaultExportName: 'Myelin JSON 导出',
         loading: '正在将工作区导出为 JSON...',
         progress: (current: number, total: number) =>
           `正在导出 ${current} / ${total}...`,

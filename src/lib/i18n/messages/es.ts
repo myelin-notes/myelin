@@ -408,7 +408,7 @@ const es: typeof en = {
         description:
           'Guarda todo tu espacio de trabajo en una carpeta como JSON. Cada nota se convierte en un archivo JSON que codifica sus trazos, texto y multimedia incrustada (binarios en base64); los demás archivos se copian y se conserva la estructura de carpetas.',
         button: 'Exportar',
-        defaultVaultName: 'Exportación JSON de Myelin',
+        defaultExportName: 'Exportación JSON de Myelin',
         loading: 'Exportando espacio de trabajo como JSON...',
         progress: (current: number, total: number) =>
           `Exportando ${current} de ${total}...`,

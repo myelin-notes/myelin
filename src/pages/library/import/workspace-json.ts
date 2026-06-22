@@ -20,7 +20,11 @@ import {
   type NoteJson,
 } from '@/pages/library/export/workspace-json-format';
 import type { ImportProgress } from './dialog';
-import { createImportedFolders, getImportParentId } from './import-tree';
+import {
+  createImportedFolders,
+  getImportParentId,
+  getPathBasename,
+} from './import-tree';
 
 const logger = new Logger('WorkspaceJsonImport');
 
@@ -66,8 +70,7 @@ export interface ScannedWorkspace {
 }
 
 export function getPathName(path: string): string {
-  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
-  return normalized.split('/').pop()?.trim() || 'Workspace';
+  return getPathBasename(path, 'Workspace');
 }
 
 /** Convert a base64-marked binary back to bytes; otherwise recurse structurally. */
@@ -88,7 +91,14 @@ function decodeJsonValue(value: unknown): unknown {
   return value;
 }
 
-/** Rebuild every element of a note into a freshly opened session's Y.Doc. */
+/**
+ * Rebuild every element of a note into a freshly opened session's Y.Doc.
+ *
+ * `type`/`uuid` are the element identity; `content` is the reserved key holding
+ * page-frame ProseMirror JSON (written to the XmlFragment, not the Y.Map). Every
+ * other field is a Y.Map prop and is assumed to be a scalar or a base64-marked
+ * binary — nested Yjs types are not reconstructed (none exist on elements today).
+ */
 export function rebuildNote(ydoc: YDocManager, note: NoteJson): void {
   for (const element of note.elements) {
     const { type, uuid, content, ...rest } = element as {
@@ -237,53 +247,22 @@ export async function importWorkspaceJson({
   }
 
   let rootFolderId: VFSNodeId | null = null;
+  let folderIds: Map<string, VFSNodeId>;
   let current = 0;
+  let notesImported = 0;
+  let mediaImported = 0;
+  let failedFiles = 0;
   const total = scanned.notes.length + scanned.media.length;
 
+  // Fatal setup (creating the destination folders) aborts and rolls back.
+  // Per-file failures below are isolated so one bad file can't discard the rest.
   try {
     rootFolderId = await repository.createFolder(rootName, parentId);
-    const folderIds = await createImportedFolders(
+    folderIds = await createImportedFolders(
       repository,
       rootFolderId,
       scanned.folderPaths,
     );
-
-    for (const file of scanned.notes) {
-      const fallbackName =
-        file.absolutePath
-          .replace(/\\/g, '/')
-          .split('/')
-          .pop()
-          ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
-      onProgress?.({ current: ++current, total, fileName: fallbackName });
-      const note = parseNote(
-        await readTextFile(file.absolutePath),
-        file.absolutePath,
-      );
-      await importNote({
-        note,
-        repository,
-        parentId: getImportParentId(rootFolderId, folderIds, file.folderPath),
-        fallbackName,
-      });
-    }
-
-    for (const file of scanned.media) {
-      onProgress?.({ current: ++current, total, fileName: file.name });
-      await repository.createFile(
-        file.name,
-        file.fileType,
-        getImportParentId(rootFolderId, folderIds, file.folderPath),
-        await readFile(file.absolutePath),
-      );
-    }
-
-    return {
-      rootFolderId,
-      notesImported: scanned.notes.length,
-      mediaImported: scanned.media.length,
-      skippedFiles: scanned.skippedFiles,
-    };
   } catch (error) {
     logger.error('Failed to import workspace JSON', error, {
       dirPath,
@@ -298,4 +277,59 @@ export async function importWorkspaceJson({
     }
     throw error;
   }
+
+  for (const file of scanned.notes) {
+    const fallbackName =
+      file.absolutePath
+        .replace(/\\/g, '/')
+        .split('/')
+        .pop()
+        ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
+    onProgress?.({ current: ++current, total, fileName: fallbackName });
+    try {
+      const note = parseNote(
+        await readTextFile(file.absolutePath),
+        file.absolutePath,
+      );
+      await importNote({
+        note,
+        repository,
+        parentId: getImportParentId(rootFolderId, folderIds, file.folderPath),
+        fallbackName,
+      });
+      notesImported += 1;
+    } catch (error) {
+      failedFiles += 1;
+      logger.warn('Skipping note that failed to import', {
+        path: file.absolutePath,
+        error,
+      });
+    }
+  }
+
+  for (const file of scanned.media) {
+    onProgress?.({ current: ++current, total, fileName: file.name });
+    try {
+      await repository.createFile(
+        file.name,
+        file.fileType,
+        getImportParentId(rootFolderId, folderIds, file.folderPath),
+        await readFile(file.absolutePath),
+      );
+      mediaImported += 1;
+    } catch (error) {
+      failedFiles += 1;
+      logger.warn('Skipping media that failed to import', {
+        path: file.absolutePath,
+        error,
+      });
+    }
+  }
+
+  return {
+    rootFolderId,
+    notesImported,
+    mediaImported,
+    skippedFiles: scanned.skippedFiles + failedFiles,
+  };
 }

@@ -81,7 +81,7 @@ export function DataSection() {
       const result = await exportWorkspaceJson({
         repository,
         destDir: selected,
-        exportName: dataStrings.exportJson.defaultVaultName,
+        exportName: dataStrings.exportJson.defaultExportName,
         onProgress: ({ current, total }) => {
           toast.loading(dataStrings.exportJson.progress(current, total), {
             id: toastId,

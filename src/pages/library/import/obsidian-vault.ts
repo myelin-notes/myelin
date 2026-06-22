@@ -11,7 +11,11 @@ import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/i
 import { getPdfPageSizes } from '@/pages/canvas/pdf-renderer';
 import { addPdfElementToYDoc } from '@/pages/library/import/pdf';
 import type { ImportProgress } from './dialog';
-import { createImportedFolders, getImportParentId } from './import-tree';
+import {
+  createImportedFolders,
+  getImportParentId,
+  getPathBasename,
+} from './import-tree';
 
 const logger = new Logger('ObsidianVaultImport');
 
@@ -72,8 +76,7 @@ export interface ImportObsidianVaultOptions {
 }
 
 export function getPathName(path: string): string {
-  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
-  return normalized.split('/').pop()?.trim() || 'Obsidian Vault';
+  return getPathBasename(path, 'Obsidian Vault');
 }
 
 function joinRelativePath(segments: readonly string[]): string {

@@ -7,6 +7,7 @@ import {
   NOTE_JSON_VERSION,
   type NoteJson,
 } from '@/pages/library/export/workspace-json-format';
+import { resolveImportRootName } from './import-tree';
 import { rebuildNote } from './workspace-json';
 
 /** Build a note with a page frame (text), a stroke, and an image (binary). */
@@ -89,5 +90,62 @@ describe('workspace JSON round-trip', () => {
     expect(image?.get('imageData')).toEqual(
       new Uint8Array([0, 1, 2, 200, 254, 255]),
     );
+  });
+});
+
+describe('resolveImportRootName', () => {
+  function makeRepo() {
+    const deleted: string[] = [];
+    return {
+      deleted,
+      repository: {
+        deleteNode: async (id: string) => {
+          deleted.push(id);
+        },
+        getUniqueFileName: async (name: string) => `${name} 2`,
+      },
+    };
+  }
+
+  it('returns the name unchanged when there is no conflict', async () => {
+    const { repository, deleted } = makeRepo();
+    const name = await resolveImportRootName({
+      // biome-ignore lint/suspicious/noExplicitAny: minimal repository stub
+      repository: repository as any,
+      parentId: null,
+      name: 'Workspace',
+      conflictNodeId: null,
+      conflictResolution: 'rename',
+    });
+    expect(name).toBe('Workspace');
+    expect(deleted).toEqual([]);
+  });
+
+  it('deletes the existing folder and keeps the name on replace', async () => {
+    const { repository, deleted } = makeRepo();
+    const name = await resolveImportRootName({
+      // biome-ignore lint/suspicious/noExplicitAny: minimal repository stub
+      repository: repository as any,
+      parentId: null,
+      name: 'Workspace',
+      conflictNodeId: 'existing-id',
+      conflictResolution: 'replace',
+    });
+    expect(name).toBe('Workspace');
+    expect(deleted).toEqual(['existing-id']);
+  });
+
+  it('resolves a unique sibling name (no delete) on rename', async () => {
+    const { repository, deleted } = makeRepo();
+    const name = await resolveImportRootName({
+      // biome-ignore lint/suspicious/noExplicitAny: minimal repository stub
+      repository: repository as any,
+      parentId: null,
+      name: 'Workspace',
+      conflictNodeId: 'existing-id',
+      conflictResolution: 'rename',
+    });
+    expect(name).toBe('Workspace 2');
+    expect(deleted).toEqual([]);
   });
 });
