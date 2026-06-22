@@ -6,6 +6,7 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { IS_DEV, PERSIST_DEBUG_LOGS } from '@/lib/env';
+import { isErrorTrackingEnabled, posthog } from '@/lib/posthog';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -322,6 +323,37 @@ function createEntry(
   };
 }
 
+function reportErrorToPostHog(
+  subsystem: string,
+  message: string,
+  errorOrMeta?: unknown,
+  maybeMeta?: Record<string, unknown>,
+): void {
+  if (!isErrorTrackingEnabled()) {
+    return;
+  }
+
+  try {
+    if (isErrorLike(errorOrMeta)) {
+      posthog.captureException(errorOrMeta, {
+        subsystem,
+        message,
+        ...(maybeMeta ?? {}),
+      });
+      return;
+    }
+
+    const extra = isPlainObject(errorOrMeta) ? errorOrMeta : {};
+    posthog.captureException(new Error(message), {
+      subsystem,
+      ...extra,
+      ...(maybeMeta ?? {}),
+    });
+  } catch {
+    // Swallow PostHog failures. Logging must not break app code.
+  }
+}
+
 export class Logger {
   public constructor(private readonly subsystem: string) {}
 
@@ -351,6 +383,7 @@ export class Logger {
     emitEntry(
       createEntry('error', this.subsystem, message, errorOrMeta, maybeMeta),
     );
+    reportErrorToPostHog(this.subsystem, message, errorOrMeta, maybeMeta);
   }
 }
 
