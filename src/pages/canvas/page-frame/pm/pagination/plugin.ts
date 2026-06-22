@@ -13,6 +13,7 @@ import type { PageLayout } from '../../../elements/page-frame-constants';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {
   type Break,
+  CONTENT_HEIGHT,
   calculateBreakLayout,
   PAGE_BREAK_GAP,
   PAGE_GAP,
@@ -67,8 +68,12 @@ function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
     if (height <= 0) {
       return;
     }
+    // mathBlock's visible content is the rendered preview; its PM text (the
+    // raw source) is hidden, so inline breaks inside it would be invisible.
     const isBreakableTextBlock =
-      node.isTextblock && node.type.name !== 'codeBlock';
+      node.isTextblock &&
+      node.type.name !== 'codeBlock' &&
+      node.type.name !== 'mathBlock';
     result.push({
       pos,
       dom,
@@ -1387,15 +1392,38 @@ interface BlockquoteRuleSegment {
   top: number;
 }
 
-function clearBlockquoteRuleStyle(blockquote: HTMLElement): void {
-  blockquote.style.removeProperty('--pm-blockquote-rule-images');
-  blockquote.style.removeProperty('--pm-blockquote-rule-positions');
-  blockquote.style.removeProperty('--pm-blockquote-rule-sizes');
-  blockquote.style.removeProperty('--pm-blockquote-rule-repeats');
-  blockquote.style.removeProperty('--pm-callout-fill-images');
-  blockquote.style.removeProperty('--pm-callout-fill-positions');
-  blockquote.style.removeProperty('--pm-callout-fill-sizes');
-  blockquote.style.removeProperty('--pm-callout-fill-repeats');
+const BLOCKQUOTE_RULE_PROPS = [
+  '--pm-blockquote-rule-images',
+  '--pm-blockquote-rule-positions',
+  '--pm-blockquote-rule-sizes',
+  '--pm-blockquote-rule-repeats',
+  '--pm-callout-fill-images',
+  '--pm-callout-fill-positions',
+  '--pm-callout-fill-sizes',
+  '--pm-callout-fill-repeats',
+] as const;
+
+/**
+ * Write only the properties that actually changed ('' means "not set").
+ * This runs on every pagination pass, so unconditional writes — including
+ * the old clear-then-set pattern — dirty style and force a layer flush even
+ * when nothing moved.
+ */
+function applyBlockquoteRuleStyle(
+  blockquote: HTMLElement,
+  values: Record<string, string>,
+): void {
+  for (const prop of BLOCKQUOTE_RULE_PROPS) {
+    const value = values[prop] ?? '';
+    if (blockquote.style.getPropertyValue(prop) === value) {
+      continue;
+    }
+    if (value === '') {
+      blockquote.style.removeProperty(prop);
+    } else {
+      blockquote.style.setProperty(prop, value);
+    }
+  }
 }
 
 function collectBlockquoteRuleSegments(
@@ -1433,65 +1461,60 @@ function syncBlockquoteRuleStyles(view: EditorView): void {
   const blockquotes = view.dom.querySelectorAll<HTMLElement>('blockquote');
 
   for (const blockquote of blockquotes) {
-    clearBlockquoteRuleStyle(blockquote);
-
+    const values: Record<string, string> = {};
     const segments = collectBlockquoteRuleSegments(blockquote);
-    if (segments === null) {
-      continue;
-    }
-    if (segments.length === 0) {
-      blockquote.style.setProperty('--pm-blockquote-rule-images', 'none');
-      if (blockquote.classList.contains('pm-callout')) {
-        blockquote.style.setProperty('--pm-callout-fill-images', 'none');
+    const isCallout = blockquote.classList.contains('pm-callout');
+
+    if (segments !== null && segments.length === 0) {
+      values['--pm-blockquote-rule-images'] = 'none';
+      if (isCallout) {
+        values['--pm-callout-fill-images'] = 'none';
       }
-      continue;
-    }
-
-    const image =
-      'linear-gradient(var(--pm-blockquote-rule-color), var(--pm-blockquote-rule-color))';
-    blockquote.style.setProperty(
-      '--pm-blockquote-rule-images',
-      segments.map(() => image).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-blockquote-rule-positions',
-      segments.map((segment) => `0 ${segment.top}px`).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-blockquote-rule-sizes',
-      segments
+    } else if (segments !== null) {
+      const image =
+        'linear-gradient(var(--pm-blockquote-rule-color), var(--pm-blockquote-rule-color))';
+      values['--pm-blockquote-rule-images'] = segments
+        .map(() => image)
+        .join(', ');
+      values['--pm-blockquote-rule-positions'] = segments
+        .map((segment) => `0 ${segment.top}px`)
+        .join(', ');
+      values['--pm-blockquote-rule-sizes'] = segments
         .map((segment) => `var(--pm-blockquote-rule-width) ${segment.height}px`)
-        .join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-blockquote-rule-repeats',
-      segments.map(() => 'no-repeat').join(', '),
-    );
+        .join(', ');
+      values['--pm-blockquote-rule-repeats'] = segments
+        .map(() => 'no-repeat')
+        .join(', ');
 
-    if (!blockquote.classList.contains('pm-callout')) {
-      continue;
+      if (isCallout) {
+        const calloutFillImage =
+          'linear-gradient(var(--pm-callout-fill-color), var(--pm-callout-fill-color))';
+        values['--pm-callout-fill-images'] = segments
+          .map(() => calloutFillImage)
+          .join(', ');
+        values['--pm-callout-fill-positions'] = segments
+          .map((segment) => `0 ${segment.top}px`)
+          .join(', ');
+        values['--pm-callout-fill-sizes'] = segments
+          .map((segment) => `100% ${segment.height}px`)
+          .join(', ');
+        values['--pm-callout-fill-repeats'] = segments
+          .map(() => 'no-repeat')
+          .join(', ');
+      }
     }
 
-    const calloutFillImage =
-      'linear-gradient(var(--pm-callout-fill-color), var(--pm-callout-fill-color))';
-    blockquote.style.setProperty(
-      '--pm-callout-fill-images',
-      segments.map(() => calloutFillImage).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-callout-fill-positions',
-      segments.map((segment) => `0 ${segment.top}px`).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-callout-fill-sizes',
-      segments.map((segment) => `100% ${segment.height}px`).join(', '),
-    );
-    blockquote.style.setProperty(
-      '--pm-callout-fill-repeats',
-      segments.map(() => 'no-repeat').join(', '),
-    );
+    applyBlockquoteRuleStyle(blockquote, values);
   }
 }
+
+// Spacer heights come from sub-pixel DOM measurements and wobble by
+// fractions of a pixel between passes (inserting a spacer shifts the rects
+// the next pass measures). Exact float equality reads that noise as a layout
+// change, so the settle loop never converges and dispatches a pagination
+// transaction every frame. Anything under half a pixel is visually identical;
+// real layout changes move spacers by at least a line height.
+const SPACER_EPSILON = 0.5;
 
 function breaksEqual(a: Break[], b: Break[]): boolean {
   if (a.length !== b.length) {
@@ -1501,7 +1524,7 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
     if (a[i].pos !== b[i].pos) {
       return false;
     }
-    if (a[i].spacer !== b[i].spacer) {
+    if (Math.abs(a[i].spacer - b[i].spacer) > SPACER_EPSILON) {
       return false;
     }
     if (a[i].kind !== b[i].kind) {
@@ -1576,6 +1599,12 @@ function observeLayoutInvalidations(
   // attribute directly so changing modes always triggers a fresh pass (clearing
   // or re-inserting page breaks as needed).
   const layoutHost = view.dom.closest('.pm-editor');
+  if (layoutHost instanceof HTMLElement) {
+    // Single source of truth for the page-break cap: page-capped blocks in
+    // editor-blocks.css read this var so the CONTENT_HEIGHT constant and the
+    // CSS max-height can't drift apart.
+    layoutHost.style.setProperty('--pm-content-height', `${CONTENT_HEIGHT}px`);
+  }
   if (layoutHost && typeof MutationObserver !== 'undefined') {
     const layoutObserver = new MutationObserver(requestFollowUpPagination);
     layoutObserver.observe(layoutHost, {

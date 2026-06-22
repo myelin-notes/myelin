@@ -40,6 +40,7 @@ export { noopTransport, type Transport } from './live/transport';
 export {
   type ActiveRepository,
   DEFAULT_REPOSITORY_CONFIG,
+  type ReadableRepository,
   type RepositoryConfig,
   type RepositoryLifecycle,
 } from './repo/config';
@@ -78,11 +79,16 @@ export {
 export type {
   FileType,
   FileVersion,
+  NodeSearchResult,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
+  RepositoryNoteGraph,
+  RepositoryNoteGraphLink,
+  RepositoryNoteGraphNode,
   RepositoryStats,
   RepositoryTag,
+  SearchNodesOptions,
   StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,

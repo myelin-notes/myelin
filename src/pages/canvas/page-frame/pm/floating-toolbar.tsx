@@ -24,9 +24,9 @@ import { ColorSwatch } from '@/components/color-swatch';
 import { CustomColorSwatch } from '@/components/custom-color-swatch';
 import { useCustomColors } from '@/lib/custom-colors';
 import { PM_UPDATE_EVENT } from '@/lib/events';
-import { getDevicePixelRatio } from '@/lib/utils';
 import { PEN_COLORS } from '../../tools/pen-tool';
 import { schema } from './schema';
+import { getPageFramePmScreenRectForPos } from './screen-rect';
 
 interface FloatingToolbarProps {
   view: EditorView;
@@ -125,9 +125,9 @@ function setAttributedMark(
   view.focus();
 }
 
-// Convert PM coords (pre-zoom) to screen pixels. The page-frame viewport has
-// `zoom: devicePixelRatio` which isn't reflected in getBoundingClientRect /
-// coordsAtPos — so rect values must be scaled by DPR to land on-screen.
+// Screen-pixel rect for the current selection, anchored on the editor's own
+// frame DOM so it tracks the page-frame's zoom/scale regardless of where the
+// canvas sits in the window.
 function selectionScreenRect(
   view: EditorView,
 ): { centerX: number; top: number; bottom: number } | null {
@@ -135,18 +135,16 @@ function selectionScreenRect(
   if (empty) {
     return null;
   }
-  const dpr = getDevicePixelRatio();
-  try {
-    const start = view.coordsAtPos(from);
-    const end = view.coordsAtPos(to);
-    return {
-      centerX: ((start.left + end.right) / 2) * dpr,
-      top: Math.min(start.top, end.top) * dpr,
-      bottom: Math.max(start.bottom, end.bottom) * dpr,
-    };
-  } catch {
+  const start = getPageFramePmScreenRectForPos(view, from);
+  const end = getPageFramePmScreenRectForPos(view, to);
+  if (!(start && end)) {
     return null;
   }
+  return {
+    centerX: (start.left + end.right) / 2,
+    top: Math.min(start.top, end.top),
+    bottom: Math.max(start.bottom, end.bottom),
+  };
 }
 
 function setsEqual(a: Set<string>, b: Set<string>): boolean {

@@ -1,5 +1,13 @@
+import { Logger } from '@/lib/logger';
+import { clearAllThumbnails } from '@/lib/thumbnails';
 import { UserPrefs } from '@/lib/user-prefs';
-import { DEFAULT_REPOSITORY_CONFIG, type RepositoryConfig } from './config';
+import {
+  DEFAULT_REPOSITORY_CONFIG,
+  getRepositoryStorageKey,
+  type RepositoryConfig,
+} from './config';
+
+const logger = new Logger('RepositorySettings');
 
 function normalizeRepositoryConfig(config: RepositoryConfig): RepositoryConfig {
   switch (config.kind) {
@@ -21,7 +29,18 @@ export function getRepositoryConfig(): RepositoryConfig {
 }
 
 export function setRepositoryConfig(config: RepositoryConfig): void {
-  UserPrefs.set('repositoryConfig', normalizeRepositoryConfig(config));
+  const next = normalizeRepositoryConfig(config);
+  const switched =
+    getRepositoryStorageKey(next) !==
+    getRepositoryStorageKey(getRepositoryConfig());
+  UserPrefs.set('repositoryConfig', next);
+  if (switched) {
+    // Thumbnails are cached by node ID with no repo namespace; clear them on
+    // switch so the old repo's entries don't orphan on disk.
+    void clearAllThumbnails().catch((err) => {
+      logger.error('Failed to clear thumbnails on repository switch', err);
+    });
+  }
 }
 
 export function subscribeRepositoryConfig(

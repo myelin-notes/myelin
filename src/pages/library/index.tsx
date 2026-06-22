@@ -9,6 +9,7 @@ import {
 import {
   ArrowDownAZ,
   ArrowDownZA,
+  BrainCircuit,
   CalendarPlus,
   ChevronRight,
   Clock,
@@ -25,7 +26,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
-import { openNote } from '@/lib/note-navigation';
+import { openNote } from '@/lib/note/navigation';
 import {
   type FileType,
   useRepository,
@@ -45,32 +46,33 @@ import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
   type ExplorerTreeHandle,
+  type SearchMode,
   type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
-import { ImportDialog, type ImportSource } from './import-dialog';
+import { ImportDialog, type ImportSource } from './import/dialog';
 import {
   importStorageFile,
   isStorageFile,
   STORAGE_FILE_ACCEPT,
-} from './import-files';
+} from './import/files';
 import {
   GOODNOTES_ZIP_FILE_ACCEPT,
   importGoodnotesZip,
   isZipFile,
-} from './import-goodnotes';
+} from './import/goodnotes';
 import {
   importMarkdownFile,
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
-} from './import-markdown';
-import { createObsidianVaultImportSource } from './import-obsidian-source';
+} from './import/markdown';
+import { createObsidianVaultImportSource } from './import/obsidian-source';
 import {
   importPdfFile,
   isNativeGoodnotesFile,
   isPdfFile,
   PDF_FILE_ACCEPT,
-} from './import-pdf';
+} from './import/pdf';
 import { RecentCard } from './recent-card';
 import { SemanticTags } from './semantic-tags';
 
@@ -89,6 +91,7 @@ export function LibraryPage() {
   const repositoryStatus = useRepositoryStatus();
   const tabController = useTabController();
   const explorerRef = useRef<ExplorerTreeHandle>(null);
+  const scrollRef = useRef<HTMLElement | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const goodnotesZipInputRef = useRef<HTMLInputElement>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -102,6 +105,7 @@ export function LibraryPage() {
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('lexical');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [importSource, setImportSource] = useState<ImportSource | null>(null);
@@ -130,6 +134,9 @@ export function LibraryPage() {
   useEffect(() => UserPrefs.subscribe('explorerViewMode', setViewMode), []);
   const toggleViewMode = () => {
     UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
+  };
+  const toggleSearchMode = () => {
+    setSearchMode((mode) => (mode === 'semantic' ? 'lexical' : 'semantic'));
   };
 
   const loadRecentFiles = useCallback(async () => {
@@ -460,6 +467,7 @@ export function LibraryPage() {
       </a>
 
       <main
+        ref={scrollRef}
         id="library-main"
         className="flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
@@ -549,6 +557,21 @@ export function LibraryPage() {
                     <X className="size-3.5" />
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={toggleSearchMode}
+                  aria-label={strings.library.semanticSearchLabel}
+                  title={strings.library.semanticSearchLabel}
+                  aria-pressed={searchMode === 'semantic'}
+                  className={cn(
+                    'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150',
+                    searchMode === 'semantic'
+                      ? 'bg-tag-active text-text-on-dark'
+                      : 'text-text-muted hover:bg-surface hover:text-text-primary',
+                  )}
+                >
+                  <BrainCircuit className="size-3.5" />
+                </button>
               </div>
 
               <div className="flex items-center justify-between">
@@ -702,12 +725,14 @@ export function LibraryPage() {
 
               <ExplorerTree
                 ref={explorerRef}
+                scrollRef={scrollRef}
                 currentFolderId={currentFolderId}
                 onNavigate={setCurrentFolderId}
                 onChanged={refreshLibraryData}
                 sortMode={sortMode}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
+                searchMode={searchMode}
                 filterTags={filterTagsArr}
               />
             </div>

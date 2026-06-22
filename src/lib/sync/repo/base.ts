@@ -1,6 +1,8 @@
 import * as Y from 'yjs';
+import { handwritingService } from '@/lib/handwriting';
 import { Logger } from '@/lib/logger';
-import { summarizeYDoc } from '@/lib/note-state-summary';
+import { summarizeYDoc } from '@/lib/note/state-summary';
+import { noteIndexService, type ReindexItem } from '@/lib/note-index';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { NoteSession } from '../session';
 import type {
@@ -27,17 +29,22 @@ import {
   getBacklinks,
   getFileVersionNodes,
   getFolderChain,
+  getIndexCandidateFileNodes,
   getNodesByAnyTag,
+  getNoteGraph,
   getRecentFiles,
   getStats,
   getUniqueFileName,
   isFileVersionNode as isConcreteFileVersionNode,
+  isIndexCandidateFileNode,
   listDirectoryNodes,
+  listHierarchicalTags,
   listTags,
   moveNodeInManifest,
   normalizeCustomColor,
   type RepositorySnapshot,
-  searchNodes,
+  searchNodeResults,
+  searchNodeResultsSemantically,
   setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
@@ -48,11 +55,14 @@ import type {
   CreateFileOptions,
   FileType,
   FileVersion,
+  NodeSearchResult,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
+  RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
+  SearchNodesOptions,
   StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,
@@ -61,6 +71,7 @@ import type {
 } from './types';
 
 const logger = new Logger('BaseRepository');
+const DEFAULT_SEMANTIC_SEARCH_LIMIT = 50;
 
 function byteArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
   if (left.byteLength !== right.byteLength) {
@@ -138,15 +149,30 @@ export abstract class BaseRepository
     nodeId: VFSNodeId,
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
+    let candidateFileType: FileType | null = null;
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
-        if (node.fileType === 'mcanvas' && links) {
+        // Offer non-system files to the engine; it decides by type what to index.
+        // Version-history snapshots are system nodes and are never offered.
+        if (isIndexCandidateFileNode(node)) {
+          candidateFileType = node.fileType;
+        }
+        // Snapshots are system nodes; their links must not enter the graph.
+        if (node.fileType === 'mcanvas' && !node.system && links) {
           setStoredNoteLinks(manifest, nodeId, links);
         }
       }
     });
+
+    if (candidateFileType !== null) {
+      const path = await this.getStoredAbsolutePath(nodeId);
+      if (path) {
+        noteIndexService.requestReindex(nodeId, path, candidateFileType);
+        handwritingService.requestRecognize(nodeId, path, candidateFileType);
+      }
+    }
   }
 
   getRuntimeStatus(): RepositoryRuntimeStatus {
@@ -229,19 +255,54 @@ export abstract class BaseRepository
     return getFolderChain(manifest, folderId);
   }
 
-  async searchNodes(query: string): Promise<VFSNode[]> {
+  async searchNodes(
+    query: string,
+    options: SearchNodesOptions = {},
+  ): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifestImpl();
-    return searchNodes(manifest, query);
+    if (options.mode === 'semantic' && query.trim()) {
+      const queryEmbedding = await noteIndexService.embedSearchQuery(query);
+      const limit = options.limit ?? DEFAULT_SEMANTIC_SEARCH_LIMIT;
+      return searchNodeResultsSemantically(
+        manifest,
+        query,
+        queryEmbedding,
+        noteIndexService.getContent(),
+        noteIndexService.getEmbeddings(),
+      ).slice(0, limit);
+    }
+    return searchNodeResults(
+      manifest,
+      query,
+      noteIndexService.getContent(),
+    ).slice(0, options.limit);
   }
 
-  async getNodesByAnyTag(tags: string[]): Promise<VFSNode[]> {
+  async listIndexBackfillItems(): Promise<ReindexItem[]> {
     const { manifest } = await this.loadManifestImpl();
-    return getNodesByAnyTag(manifest, tags);
+    const items: ReindexItem[] = [];
+    for (const node of getIndexCandidateFileNodes(manifest)) {
+      const path = await this.getStoredAbsolutePath(node.id);
+      if (path) {
+        items.push({ nodeId: node.id, path, fileType: node.fileType });
+      }
+    }
+    return items;
   }
 
-  async listTags(): Promise<RepositoryTag[]> {
+  async getNodesByAnyTag(
+    tags: string[],
+    folderId: VFSNodeId | null = null,
+  ): Promise<VFSNode[]> {
     const { manifest } = await this.loadManifestImpl();
-    return listTags(manifest);
+    return getNodesByAnyTag(manifest, tags, folderId);
+  }
+
+  async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
+    const { manifest } = await this.loadManifestImpl();
+    return includeAncestors
+      ? listHierarchicalTags(manifest)
+      : listTags(manifest);
   }
 
   async getStats(): Promise<RepositoryStats> {
@@ -257,6 +318,11 @@ export abstract class BaseRepository
   async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
     const { manifest } = await this.loadManifestImpl();
     return getBacklinks(manifest, noteId);
+  }
+
+  async getNoteGraph(): Promise<RepositoryNoteGraph> {
+    const { manifest } = await this.loadManifestImpl();
+    return getNoteGraph(manifest);
   }
 
   async getUniqueFileName(
@@ -433,6 +499,8 @@ export abstract class BaseRepository
       deletedFiles.map(async (file) => {
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
+        await noteIndexService.removeIndex(file.id);
+        await handwritingService.removeRecognition(file.id);
       }),
     );
   }
@@ -483,6 +551,10 @@ export abstract class BaseRepository
   }
 
   async getRevealPath(_nodeId: VFSNodeId): Promise<string | null> {
+    return null;
+  }
+
+  async getStoredAbsolutePath(_nodeId: VFSNodeId): Promise<string | null> {
     return null;
   }
 

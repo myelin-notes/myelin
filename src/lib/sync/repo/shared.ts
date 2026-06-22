@@ -1,11 +1,15 @@
 import * as Y from 'yjs';
-import { searchItems } from '@/lib/search';
+import type { NoteEmbedding } from '@/lib/note-index';
+import { type SearchField, type SearchHit, searchItems } from '@/lib/search';
+import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import {
   type FileType,
   FileTypes,
   type FileVersion,
   ImageFileTypes,
+  type NodeSearchResult,
   type NoteBacklink,
+  type RepositoryNoteGraph,
   type RepositoryStats,
   type RepositoryTag,
   type StoredNoteLink,
@@ -302,33 +306,209 @@ export function getFolderChain(
   return chain;
 }
 
-export function searchNodes(manifest: VFSManifest, query: string): VFSNode[] {
+const SNIPPET_RADIUS = 80;
+
+function nodeSearchFields(
+  indexContent?: ReadonlyMap<VFSNodeId, string>,
+): SearchField<VFSNode>[] {
+  return [
+    { name: 'name', weight: 4, getValue: (node) => node.name },
+    { name: 'tags', weight: 3, getValue: (node) => node.tags },
+    { name: 'kind', getValue: (node) => node.type },
+    {
+      name: 'fileType',
+      getValue: (node) => (node.type === 'file' ? node.fileType : ''),
+    },
+    {
+      name: 'content',
+      weight: 2,
+      getValue: (node) => indexContent?.get(node.id) ?? '',
+    },
+  ];
+}
+
+function searchNodeHits(
+  manifest: VFSManifest,
+  query: string,
+  indexContent?: ReadonlyMap<VFSNodeId, string>,
+): SearchHit<VFSNode>[] {
   return searchItems(
     Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
     query,
-    {
-      getId: (node) => node.id,
-      fields: [
-        { name: 'name', weight: 4, getValue: (node) => node.name },
-        { name: 'tags', weight: 3, getValue: (node) => node.tags },
-        { name: 'kind', getValue: (node) => node.type },
-        {
-          name: 'fileType',
-          getValue: (node) => (node.type === 'file' ? node.fileType : ''),
-        },
-      ],
-    },
-  ).map((hit) => hit.item);
+    { getId: (node) => node.id, fields: nodeSearchFields(indexContent) },
+  );
+}
+
+/**
+ * Build a short snippet around the first query term that matched a node's
+ * indexed content. Returns null when the match came only from name/tags.
+ */
+function buildContentSnippet(
+  content: string | undefined,
+  hit: SearchHit<VFSNode>,
+): string | null {
+  if (!content) {
+    return null;
+  }
+  const contentTerms = Object.entries(hit.match)
+    .filter(([, fields]) => fields.includes('content'))
+    .map(([term]) => term.toLowerCase());
+  if (contentTerms.length === 0) {
+    return null;
+  }
+
+  const lower = content.toLowerCase();
+  let index = -1;
+  for (const term of contentTerms) {
+    const at = lower.indexOf(term);
+    if (at !== -1 && (index === -1 || at < index)) {
+      index = at;
+    }
+  }
+  if (index === -1) {
+    return null;
+  }
+
+  const start = Math.max(0, index - SNIPPET_RADIUS);
+  const end = Math.min(content.length, index + SNIPPET_RADIUS);
+  let snippet = content.slice(start, end).replace(/\s+/g, ' ').trim();
+  if (start > 0) {
+    snippet = `...${snippet}`;
+  }
+  if (end < content.length) {
+    snippet = `${snippet}...`;
+  }
+  return snippet;
+}
+
+export function searchNodeResults(
+  manifest: VFSManifest,
+  query: string,
+  indexContent?: ReadonlyMap<VFSNodeId, string>,
+): NodeSearchResult[] {
+  return searchNodeHits(manifest, query, indexContent).map((hit) => ({
+    node: hit.item,
+    score: hit.score,
+    contentSnippet: buildContentSnippet(indexContent?.get(hit.item.id), hit),
+    matchedTerms: hit.terms,
+    searchMode: 'lexical',
+  }));
+}
+
+export function searchNodeResultsSemantically(
+  manifest: VFSManifest,
+  query: string,
+  queryEmbedding: NoteEmbedding,
+  indexContent: ReadonlyMap<VFSNodeId, string>,
+  indexEmbeddings: ReadonlyMap<VFSNodeId, NoteEmbedding>,
+): NodeSearchResult[] {
+  if (!query.trim()) {
+    return searchNodeResults(manifest, query, indexContent);
+  }
+
+  const hits = Object.values(manifest.nodes).flatMap((node) => {
+    if (isSystemNode(node) || node.type !== 'file') {
+      return [];
+    }
+    const content = indexContent.get(node.id);
+    const embedding = indexEmbeddings.get(node.id);
+    if (
+      !content ||
+      !embedding ||
+      embedding.model !== queryEmbedding.model ||
+      embedding.dim !== queryEmbedding.dim
+    ) {
+      return [];
+    }
+    const score = cosineSimilarity(queryEmbedding.vector, embedding.vector);
+    if (score <= 0) {
+      return [];
+    }
+    return [
+      {
+        node,
+        score,
+        contentSnippet: buildSemanticSnippet(content),
+        matchedTerms: [],
+        searchMode: 'semantic' as const,
+      },
+    ];
+  });
+
+  return hits.sort((a, b) => b.score - a.score);
+}
+
+function cosineSimilarity(
+  left: readonly number[],
+  right: readonly number[],
+): number {
+  if (left.length !== right.length || left.length === 0) {
+    return 0;
+  }
+
+  let dot = 0;
+  let leftNorm = 0;
+  let rightNorm = 0;
+  for (let index = 0; index < left.length; index++) {
+    const a = left[index] ?? 0;
+    const b = right[index] ?? 0;
+    dot += a * b;
+    leftNorm += a * a;
+    rightNorm += b * b;
+  }
+  if (leftNorm === 0 || rightNorm === 0) {
+    return 0;
+  }
+  return dot / Math.sqrt(leftNorm * rightNorm);
+}
+
+function buildSemanticSnippet(content: string): string | null {
+  const snippet = content.replace(/\s+/g, ' ').trim();
+  if (!snippet) {
+    return null;
+  }
+  if (snippet.length <= SNIPPET_RADIUS * 2) {
+    return snippet;
+  }
+  return `${snippet.slice(0, SNIPPET_RADIUS * 2).trimEnd()}...`;
 }
 
 export function getNodesByAnyTag(
   manifest: VFSManifest,
   tags: string[],
+  folderId: string | null = null,
 ): VFSNode[] {
-  const tagSet = new Set(tags);
   return Object.values(manifest.nodes).filter(
-    (node) => !isSystemNode(node) && node.tags.some((tag) => tagSet.has(tag)),
+    (node) =>
+      !isSystemNode(node) &&
+      nodeMatchesAnyTag(node.tags, tags) &&
+      isNodeWithinFolder(manifest, node, folderId),
   );
+}
+
+/**
+ * Whether `node` lives anywhere inside `folderId`'s subtree. A null `folderId`
+ * means the repository root, so every node qualifies.
+ */
+function isNodeWithinFolder(
+  manifest: VFSManifest,
+  node: VFSNode,
+  folderId: string | null,
+): boolean {
+  if (folderId === null) {
+    return true;
+  }
+  let current: VFSNode | undefined = node;
+  while (current) {
+    if (current.parentId === folderId) {
+      return true;
+    }
+    if (current.parentId === null) {
+      return false;
+    }
+    current = manifest.nodes[current.parentId];
+  }
+  return false;
 }
 
 export function listTags(manifest: VFSManifest): RepositoryTag[] {
@@ -340,6 +520,29 @@ export function listTags(manifest: VFSManifest): RepositoryTag[] {
     }
     for (const tag of node.tags) {
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export function listHierarchicalTags(manifest: VFSManifest): RepositoryTag[] {
+  const counts = new Map<string, number>();
+
+  for (const node of Object.values(manifest.nodes)) {
+    if (isSystemNode(node)) {
+      continue;
+    }
+    const prefixes = new Set<string>();
+    for (const tag of node.tags) {
+      for (const prefix of expandTagWithAncestors(tag)) {
+        prefixes.add(prefix);
+      }
+    }
+    for (const prefix of prefixes) {
+      counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
     }
   }
 
@@ -388,6 +591,25 @@ export function getRecentFiles(
     .slice(0, limit);
 }
 
+/**
+ * A user file node that may be offered to the index engine. The engine (Rust
+ * `IndexProvider::applies_to`) is the authority on which file types actually get
+ * indexed; here we only exclude system nodes (e.g. version-history snapshots),
+ * which the engine has no way to recognize from a path + file type alone.
+ */
+export function isIndexCandidateFileNode(
+  node: VFSNode | null | undefined,
+): node is VFSFileNode {
+  return node?.type === 'file' && !isSystemNode(node);
+}
+
+/** User files to offer the index engine on backfill (engine filters by type). */
+export function getIndexCandidateFileNodes(
+  manifest: VFSManifest,
+): VFSFileNode[] {
+  return Object.values(manifest.nodes).filter(isIndexCandidateFileNode);
+}
+
 export function getBacklinks(
   manifest: VFSManifest,
   noteId: VFSNodeId,
@@ -412,6 +634,39 @@ export function getBacklinks(
   }
 
   return backlinks;
+}
+
+function isGraphCanvasNode(
+  node: VFSNode | null | undefined,
+): node is VFSFileNode {
+  return (
+    node?.type === 'file' && node.fileType === 'mcanvas' && !isSystemNode(node)
+  );
+}
+
+export function getNoteGraph(manifest: VFSManifest): RepositoryNoteGraph {
+  const nodes = Object.values(manifest.nodes)
+    .filter(isGraphCanvasNode)
+    .map((node) => ({
+      id: node.id,
+      name: node.name,
+    }));
+
+  const canvasNodeIds = new Set(nodes.map((node) => node.id));
+  const links = Object.entries(manifest.linksBySource).flatMap(
+    ([sourceId, sourceLinks]) => {
+      if (!canvasNodeIds.has(sourceId)) {
+        return [];
+      }
+
+      return sourceLinks.map((link) => ({
+        ...link,
+        sourceId,
+      }));
+    },
+  );
+
+  return { nodes, links };
 }
 
 export function setStoredNoteLinks(
@@ -473,6 +728,14 @@ export function deleteNodeFromManifest(
       }
     } else {
       files.push(structuredClone(current));
+      // Version-history snapshots live under the hidden root, not under the
+      // file itself, so deleting the file would orphan them. Drop them too.
+      if (!isFileVersionNode(current)) {
+        for (const version of getFileVersionNodes(manifest, currentId)) {
+          removeChild(manifest, version.parentId, version.id);
+          collect(version.id);
+        }
+      }
     }
 
     delete manifest.linksBySource[currentId];

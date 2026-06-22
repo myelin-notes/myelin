@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { ElementType } from '@/pages/canvas/elements/element-type';
-import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown-import';
-import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown-serializer';
+import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown/serializer';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
+  createCanvasNoteState,
   createNoteState,
   getRepositoryTestStorage,
   readNoteText,
@@ -17,25 +17,10 @@ import {
   createEmptyManifest,
   createFileNode,
   getNoteFileName,
+  getNoteGraph,
   getStoredFileName,
   MANIFEST_PATH,
 } from './shared';
-import type { VFSNodeId } from './types';
-
-async function createCanvasNoteState(
-  markdown: string,
-  resolveNoteLinkId?: (title: string) => Promise<VFSNodeId | null>,
-): Promise<{
-  update: Uint8Array;
-  stateVector: Uint8Array;
-}> {
-  const ydoc = new YDocManager();
-  await addMarkdownPageFrameToYDoc(ydoc, markdown, { resolveNoteLinkId });
-  return {
-    update: ydoc.encodeState(),
-    stateVector: ydoc.encodeStateVector(),
-  };
-}
 
 function readFirstPageFrameMarkdown(update: Uint8Array | null): string {
   if (!update || update.byteLength === 0) {
@@ -199,6 +184,110 @@ describe('LocalRepository', () => {
     await repository.deleteNode(sourceId);
 
     expect(await repository.getBacklinks(targetId)).toEqual([]);
+  });
+
+  it('returns a note graph projection for non-system canvas notes', async () => {
+    const repository = new LocalRepository('repositories/note-graph-test');
+    await repository.initialize();
+
+    const sourceId = await repository.createFile('Source', 'mcanvas', null);
+    const targetId = await repository.createFile('Target', 'mcanvas', null);
+    const otherId = await repository.createFile('Other', 'mcanvas', null);
+    await repository.createFile('Image', 'png', null, new Uint8Array([1]));
+
+    const note = await createCanvasNoteState(
+      'See [[Target]], [[Target]], and [[Missing]].',
+      async (title) => (title === 'Target' ? targetId : null),
+    );
+
+    await repository.pushUpdates(sourceId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    expect(await repository.getNoteGraph()).toEqual({
+      nodes: [
+        { id: sourceId, name: 'Source' },
+        { id: targetId, name: 'Target' },
+        { id: otherId, name: 'Other' },
+      ],
+      links: [
+        {
+          sourceId,
+          targetId,
+          pageFrameId: null,
+          title: 'Target',
+          snippet: 'See [[Target]], [[Target]], and [[Missing]].',
+        },
+        {
+          sourceId,
+          targetId,
+          pageFrameId: null,
+          title: 'Target',
+          snippet: 'See [[Target]], [[Target]], and [[Missing]].',
+        },
+        {
+          sourceId,
+          targetId: null,
+          pageFrameId: null,
+          title: 'Missing',
+          snippet: 'See [[Target]], [[Target]], and [[Missing]].',
+        },
+      ],
+    });
+  });
+
+  it('excludes system canvas files from the note graph projection', () => {
+    const manifest = createEmptyManifest();
+    const userId = 'user-note';
+    const systemId = 'system-note';
+    const now = Date.now();
+
+    manifest.nodes[userId] = createFileNode(
+      userId,
+      'User Note',
+      'mcanvas',
+      null,
+      now,
+    );
+    manifest.nodes[systemId] = createFileNode(
+      systemId,
+      'System Note',
+      'mcanvas',
+      null,
+      now,
+      {
+        kind: 'file-version',
+        sourceFileId: userId,
+        sourceFileType: 'mcanvas',
+        sourceName: 'User Note',
+        sourceRevision: 'rev',
+        capturedAt: now,
+        byteLength: 10,
+      },
+    );
+    manifest.children.push(userId, systemId);
+    manifest.linksBySource[userId] = [
+      {
+        targetId: systemId,
+        pageFrameId: null,
+        title: 'System Note',
+        snippet: 'Old snapshot',
+      },
+    ];
+
+    expect(getNoteGraph(manifest)).toEqual({
+      nodes: [{ id: userId, name: 'User Note' }],
+      links: [
+        {
+          sourceId: userId,
+          targetId: systemId,
+          pageFrameId: null,
+          title: 'System Note',
+          snippet: 'Old snapshot',
+        },
+      ],
+    });
   });
 
   it('renames note references from backlink sources', async () => {

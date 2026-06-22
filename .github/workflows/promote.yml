@@ -1,0 +1,35 @@
+name: Promote to stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version already published to the prerelease channel (e.g. 0.2.1)
+        required: true
+
+concurrency:
+  group: promote-stable
+  cancel-in-progress: false
+
+env:
+  R2_BUCKET: myelin-updates
+  UPDATER_DOMAIN: https://pub-b609df54ffbc4104a99c47d9ac342457.r2.dev
+
+jobs:
+  promote:
+    name: Promote ${{ github.event.inputs.version }} to stable
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VERSION: ${{ github.event.inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Promote prerelease -> stable
+        run: node scripts/promote-release.mjs

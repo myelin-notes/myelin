@@ -11,7 +11,7 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
-import { summarizeNoteBytes } from '@/lib/note-state-summary';
+import { summarizeNoteBytes } from '@/lib/note/state-summary';
 import { BaseRepository } from './base';
 import {
   computeRevision,
@@ -60,6 +60,10 @@ export class LocalRepository extends BaseRepository {
   }
 
   async getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
+    return this.getStoredAbsolutePath(nodeId);
+  }
+
+  async getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
     const { manifest } = await this.loadManifestImpl();
     const node = manifest.nodes[nodeId];
     if (!node || node.type !== 'file') {

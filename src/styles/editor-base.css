@@ -1,0 +1,148 @@
+.pm-editor .ProseMirror {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* The doubled .ProseMirror outranks later block rules with equal specificity
+   (.pm-math-block, .pm-code-block, pre, h1…) that set their own margins —
+   otherwise a first block's margin-top collapses through the ProseMirror root
+   and shifts the whole doc below the page chrome's content top, which
+   pagination (keyed off the root's offsetTop) can't see. */
+.pm-editor .ProseMirror.ProseMirror > *:first-child {
+  margin-top: 0;
+}
+
+.pm-editor .ProseMirror.ProseMirror > *:last-child {
+  margin-bottom: 0;
+}
+
+.pm-editor .ProseMirror p,
+.pm-editor .ProseMirror li {
+  margin: 0 0 0.9em;
+}
+
+.pm-editor .ProseMirror .bullet-list-item,
+.pm-editor .ProseMirror .ordered-list-item,
+.pm-editor .ProseMirror .check-list-item {
+  padding-left: 1.5em;
+  position: relative;
+}
+
+.pm-editor .ProseMirror .bullet-list-item::before {
+  content: '\2022';
+  position: absolute;
+  left: 0.35em;
+}
+
+.pm-editor .ProseMirror .ordered-list-item::before {
+  content: attr(data-order) '.';
+  position: absolute;
+  left: 0.1em;
+}
+
+.pm-editor .ProseMirror .check-list-item > input[type="checkbox"] {
+  accent-color: var(--accent-dark);
+  height: 1em;
+  left: 0;
+  margin: 0;
+  position: absolute;
+  top: calc((1.65em - 1em) / 2);
+  width: 1em;
+}
+
+.pm-editor .ProseMirror [data-indent="1"] { margin-left: 1.5em; }
+.pm-editor .ProseMirror [data-indent="2"] { margin-left: 3em; }
+.pm-editor .ProseMirror [data-indent="3"] { margin-left: 4.5em; }
+.pm-editor .ProseMirror [data-indent="4"] { margin-left: 6em; }
+
+.pm-editor .ProseMirror h1,
+.pm-editor .ProseMirror h2,
+.pm-editor .ProseMirror h3 {
+  margin: 1.35em 0 0.5em;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-weight: 560;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.pm-editor .ProseMirror h1 {
+  font-size: 2.35rem;
+}
+
+.pm-editor .ProseMirror h2 {
+  font-size: 1.8rem;
+}
+
+.pm-editor .ProseMirror h3 {
+  font-size: 1.4rem;
+}
+
+.pm-editor .ProseMirror blockquote {
+  --pm-blockquote-rule-color: rgba(195, 199, 202, 0.5);
+  --pm-blockquote-rule-width: 2px;
+  margin: 1.15em 0;
+  padding-left: calc(1rem + var(--pm-blockquote-rule-width));
+  color: var(--text-secondary);
+  background-image: var(
+    --pm-blockquote-rule-images,
+    linear-gradient(
+      var(--pm-blockquote-rule-color),
+      var(--pm-blockquote-rule-color)
+    )
+  );
+  background-position: var(--pm-blockquote-rule-positions, 0 0);
+  background-size: var(--pm-blockquote-rule-sizes, var(--pm-blockquote-rule-width) 100%);
+  background-repeat: var(--pm-blockquote-rule-repeats, no-repeat);
+  background-origin: border-box;
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout {
+  --pm-callout-fill-color: color-mix(
+    in srgb,
+    var(--bg-surface) 78%,
+    transparent
+  );
+  --pm-blockquote-rule-color: rgba(47, 62, 70, 0.28);
+  padding-block: 0.85rem;
+  padding-right: 1rem;
+  border-radius: var(--radius-lg);
+  background-image:
+    var(
+      --pm-blockquote-rule-images,
+      linear-gradient(
+        var(--pm-blockquote-rule-color),
+        var(--pm-blockquote-rule-color)
+      )
+    ),
+    var(
+      --pm-callout-fill-images,
+      linear-gradient(var(--pm-callout-fill-color), var(--pm-callout-fill-color))
+    );
+  background-position:
+    var(--pm-blockquote-rule-positions, 0 0),
+    var(--pm-callout-fill-positions, 0 0);
+  background-size:
+    var(
+      --pm-blockquote-rule-sizes,
+      var(--pm-blockquote-rule-width) 100%
+    ),
+    var(--pm-callout-fill-sizes, 100% 100%);
+  background-repeat:
+    var(--pm-blockquote-rule-repeats, no-repeat),
+    var(--pm-callout-fill-repeats, no-repeat);
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout .pm-callout-marker {
+  color: color-mix(in srgb, var(--text-muted) 68%, transparent);
+  font-weight: 520;
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout .pm-callout-title {
+  color: var(--text-primary);
+  font-weight: 650;
+}

@@ -6,7 +6,14 @@ import {
   useRef,
   useState,
 } from 'react';
-import { History, WifiOff, X as XIcon } from 'lucide-react';
+import {
+  Download,
+  History,
+  Redo2,
+  Undo2,
+  WifiOff,
+  X as XIcon,
+} from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -23,16 +30,19 @@ import { IS_DEV } from '@/lib/env';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { openNote, openNoteLink } from '@/lib/note-navigation';
+import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
+import { regenerateThumbnailNow } from '@/lib/thumbnails';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
+import { buildCanvasPdfExportTarget } from './canvas-pdf-export';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
 import { useCanvasCommandContext } from './command-context';
 import { BacklinksChip } from './components/backlinks-chip';
+import { CanvasSearch } from './components/canvas-search';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
@@ -58,9 +68,10 @@ import { PageFrameDomLayer } from './page-frame/dom-layer';
 import {
   getNoteLinkPreview,
   type NoteLinkPreviewTarget,
-} from './page-frame/note-link-preview';
+} from './page-frame/note-link/preview';
 import type { NoteLinkOpenRequestDetail } from './page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomplete';
+import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
 
@@ -104,6 +115,7 @@ function CanvasViewInner({
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
   const toolState = useToolState(drawableCanvasRef);
+  const canvasSearch = useCanvasSearch(drawableCanvasRef, id);
 
   const [chromeMenu, setChromeMenu] = useState<{
     anchor: DOMRect;
@@ -123,6 +135,15 @@ function CanvasViewInner({
   const onRecenterViewport = useCallback(() => {
     drawableCanvasRef.current?.viewport.animateRecenter();
   }, []);
+  const onUndo = useCallback(() => {
+    drawableCanvasRef.current?.undo();
+  }, []);
+  const onRedo = useCallback(() => {
+    drawableCanvasRef.current?.redo();
+  }, []);
+  const onRegenerateThumbnail = useCallback(() => {
+    void regenerateThumbnailNow(id);
+  }, [id]);
 
   useEffect(() => {
     setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
@@ -163,9 +184,22 @@ function CanvasViewInner({
     embedFiles,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
+  const onExportCanvasPdf = useCallback(() => {
+    const canvas = drawableCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    setExportTarget(
+      buildCanvasPdfExportTarget(canvas, engine.fileName || 'Canvas'),
+    );
+  }, [engine.fileName]);
 
   useEffect(() => {
-    if (engine.fileName) {
+    // engine.fileName lags `id` during a tab switch because CanvasView is
+    // reused (not remounted) and the session opens asynchronously. Only sync
+    // the title once the loaded session actually matches this tab's id,
+    // otherwise we briefly write the previous note's name onto the new tab.
+    if (engine.fileName && engine.noteSession?.id === id) {
       const pane = tabController.getPane(paneId);
       if (!pane) {
         return;
@@ -177,10 +211,19 @@ function CanvasViewInner({
         tabController.updateTabTitle(tab.id, engine.fileName);
       }
     }
-  }, [engine.fileName, tabController, paneId, id]);
+  }, [engine.fileName, engine.noteSession, tabController, paneId, id]);
 
   useEffect(() => {
     if (!engine.ready) {
+      return;
+    }
+    // Like the title effect above, `engine` lags `id` during a tab switch
+    // (CanvasView is reused, not remounted, and the session opens
+    // asynchronously). Until the loaded session matches this tab's id,
+    // drawableCanvasRef.current still points at the previous note's document, so
+    // the focus/create-fallback below would mutate (create a page frame in) the
+    // wrong canvas. Only run once the session actually matches.
+    if (engine.noteSession?.id !== id) {
       return;
     }
     if (!targetPageFrameId && !targetPageFrameName) {
@@ -220,7 +263,6 @@ function CanvasViewInner({
         centerWorld.y - frame.totalHeight / 2,
       );
       frame.updateBounds();
-      dc.updateBounding();
       dc.focusPageFrameById(frame.uuid);
       return;
     }
@@ -228,7 +270,13 @@ function CanvasViewInner({
       pageFrameName: targetPageFrameName,
       pageFrameId: targetPageFrameId,
     });
-  }, [engine.ready, targetPageFrameId, targetPageFrameName]);
+  }, [
+    engine.ready,
+    engine.noteSession,
+    id,
+    targetPageFrameId,
+    targetPageFrameName,
+  ]);
 
   const importMarkdownFile = useCallback(
     async (file: File) => {
@@ -326,6 +374,8 @@ function CanvasViewInner({
   const titleTrailing = useMemo(() => {
     const liveSyncPausedTitle =
       liveDiscoveryPauseError?.message ?? strings.canvas.peerSync.livePaused;
+    const undoLabel = strings.settings.keybinds.actions['canvas:undo'].label;
+    const redoLabel = strings.settings.keybinds.actions['canvas:redo'].label;
 
     return (
       <>
@@ -340,6 +390,57 @@ function CanvasViewInner({
           </span>
         )}
         <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={onUndo}
+                  aria-label={undoLabel}
+                  disabled={!engine.ready}
+                />
+              }
+            >
+              <Undo2 className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>{undoLabel}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={onRedo}
+                  aria-label={redoLabel}
+                  disabled={!engine.ready}
+                />
+              }
+            >
+              <Redo2 className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>{redoLabel}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={onExportCanvasPdf}
+                  aria-label="Export canvas as PDF"
+                  disabled={!engine.ready}
+                />
+              }
+            >
+              <Download className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Export canvas as PDF</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger
               render={
@@ -363,20 +464,33 @@ function CanvasViewInner({
     );
   }, [
     handleOpenBacklinkSource,
+    onExportCanvasPdf,
+    onUndo,
+    onRedo,
     id,
+    engine.ready,
     liveDiscoveryPauseError,
     strings.canvas.peerSync.livePaused,
     strings.versionHistory.title,
+    strings.settings.keybinds.actions,
   ]);
   const insertPopover = useMemo(
     () => (
       <InsertPopover
         onInsertFrame={inserts.onInsertFrame}
         onInsertEmbed={inserts.onInsertEmbed}
+        onInsertLatex={inserts.onInsertLatex}
+        onInsertAudio={inserts.onInsertAudio}
         onClose={inserts.closeInsert}
       />
     ),
-    [inserts.closeInsert, inserts.onInsertEmbed, inserts.onInsertFrame],
+    [
+      inserts.closeInsert,
+      inserts.onInsertEmbed,
+      inserts.onInsertFrame,
+      inserts.onInsertLatex,
+      inserts.onInsertAudio,
+    ],
   );
   const embedComposer = useMemo(
     () => (
@@ -397,12 +511,15 @@ function CanvasViewInner({
     [],
   );
 
+  // overflow-clip (not -hidden): hidden boxes are still programmatically
+  // scrollable, so the browser's caret-reveal for offscreen page-frame
+  // carets can scroll them and desync the DOM from the canvas.
   return (
-    <div className="relative h-full w-full overflow-hidden bg-page">
+    <div className="relative h-full w-full overflow-clip bg-page">
       <div
         ref={thumbnailRootRef}
         data-thumbnail-root="true"
-        className="absolute inset-0 overflow-hidden bg-page"
+        className="absolute inset-0 overflow-clip bg-page"
       >
         {/* Background canvas: dot grid */}
         <canvas
@@ -449,12 +566,13 @@ function CanvasViewInner({
       />
 
       {/* Frame chrome controls (hamburger buttons). Sits above the foreground
-          canvas so clicks reach the buttons first. Pointer-events-none by
-          default; individual buttons opt in. */}
+          canvas so clicks reach the buttons first. Below UI chrome (toolbars,
+          modals at z-100+). Pointer-events-none by default; individual buttons
+          opt in. */}
       <div
         id="canvas-chrome-controls"
         className="pointer-events-none absolute inset-0 overflow-hidden"
-        style={{ zIndex: 100 }}
+        style={{ zIndex: 20 }}
       />
 
       <StatusBar
@@ -463,6 +581,7 @@ function CanvasViewInner({
         zoomLocked={zoomLocked}
         onToggleZoomLock={onToggleZoomLock}
         onRecenter={onRecenterViewport}
+        onRegenerateThumbnail={onRegenerateThumbnail}
       />
       {engine.ready && (
         <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />
@@ -504,6 +623,8 @@ function CanvasViewInner({
             <InsertPopover
               onInsertFrame={inserts.onContextInsertFrame}
               onInsertEmbed={inserts.onContextInsertEmbed}
+              onInsertLatex={inserts.onContextInsertLatex}
+              onInsertAudio={inserts.onContextInsertAudio}
               onClose={inserts.closeContextInsert}
             />
           </div>
@@ -529,6 +650,8 @@ function CanvasViewInner({
           />
         )}
       </AnimatePresence>
+
+      <CanvasSearch controller={canvasSearch} />
 
       <RenameReferencesDialog
         prompt={engine.pageFrameRenamePrompt}

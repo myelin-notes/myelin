@@ -1,0 +1,261 @@
+.pm-editor .ProseMirror .pm-table-node {
+  position: relative;
+  margin: 1.2em 0;
+  overflow: visible;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th,
+.pm-editor .ProseMirror .pm-table-node__table td {
+  position: relative;
+  min-width: var(--default-cell-min-width, 120px);
+  padding: 0.78rem 1rem;
+  border-right: 1px solid rgba(195, 199, 202, 0.22);
+  border-bottom: 1px solid rgba(195, 199, 202, 0.22);
+  vertical-align: top;
+  background: var(--bg-card);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th {
+  background: var(--bg-surface);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+  border-bottom-color: rgba(195, 199, 202, 0.32);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tr > th:first-child,
+.pm-editor .ProseMirror .pm-table-node__table tr > td:first-child {
+  border-left: 1px solid rgba(195, 199, 202, 0.22);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > th,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > td,
+.pm-editor
+  .ProseMirror
+  .pm-table-node__table
+  tbody
+  > tr[data-page-break="table-row"]
+  + tr
+  > th,
+.pm-editor
+  .ProseMirror
+  .pm-table-node__table
+  tbody
+  > tr[data-page-break="table-row"]
+  + tr
+  > td {
+  border-top: 1px solid rgba(195, 199, 202, 0.22);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > th:first-child,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > td:first-child {
+  border-top-left-radius: var(--radius-xl);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > th:last-child,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > td:last-child {
+  border-top-right-radius: var(--radius-xl);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child > th:first-child,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child > td:first-child {
+  border-bottom-left-radius: var(--radius-xl);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child > th:last-child,
+.pm-editor .ProseMirror .pm-table-node__table tbody > tr:last-child > td:last-child {
+  border-bottom-right-radius: var(--radius-xl);
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th > *:first-child,
+.pm-editor .ProseMirror .pm-table-node__table td > *:first-child {
+  margin-top: 0;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table th > *:last-child,
+.pm-editor .ProseMirror .pm-table-node__table td > *:last-child {
+  margin-bottom: 0;
+}
+
+.pm-editor .ProseMirror .pm-table-node__page-break-row {
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__page-break-cell {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.pm-editor .ProseMirror .pm-table-node__page-break-spacer {
+  display: block;
+  width: 100%;
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__cell-page-break {
+  --pm-table-cell-break-mask-left: 0px;
+  --pm-table-cell-break-mask-width: 100%;
+  --pm-table-cell-break-border-left: 0px;
+  --pm-table-cell-break-border-width: 100%;
+  --pm-table-cell-break-gap-start: 0px;
+  --pm-table-cell-break-gap-end: 0px;
+  --pm-table-cell-break-border: rgba(195, 199, 202, 0.22);
+  --pm-table-cell-break-dot-color: rgba(164, 168, 172, 0.35);
+  position: relative;
+  z-index: 2;
+}
+
+.pm-editor .ProseMirror .pm-table-node__cell-page-break::before,
+.pm-editor .ProseMirror .pm-table-node__cell-page-break::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  height: var(--pm-table-cell-break-height);
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__cell-page-break::before {
+  left: var(--pm-table-cell-break-mask-left);
+  width: var(--pm-table-cell-break-mask-width);
+  z-index: 1;
+  background:
+    linear-gradient(
+      to bottom,
+      #fff 0,
+      #fff var(--pm-table-cell-break-gap-start),
+      transparent var(--pm-table-cell-break-gap-start),
+      transparent var(--pm-table-cell-break-gap-end),
+      #fff var(--pm-table-cell-break-gap-end),
+      #fff 100%
+    ),
+    radial-gradient(
+        circle,
+        var(--pm-table-cell-break-dot-color) 0 0.75px,
+        transparent 0.8px
+      )
+      12px 12px / 24px 24px,
+    var(--background);
+}
+
+.pm-editor .ProseMirror .pm-table-node__cell-page-break::after {
+  left: var(--pm-table-cell-break-border-left);
+  width: var(--pm-table-cell-break-border-width);
+  z-index: 2;
+  background:
+    linear-gradient(
+      var(--pm-table-cell-break-border),
+      var(--pm-table-cell-break-border)
+    )
+    0 0 / 100% 1px no-repeat,
+    linear-gradient(
+      var(--pm-table-cell-break-border),
+      var(--pm-table-cell-break-border)
+    )
+    0 100% / 100% 1px no-repeat;
+}
+
+.pm-editor .ProseMirror .pm-table-node__table .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(28, 39, 56, 0.08);
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle-target {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle-target--column-boundary {
+  transform: translateX(-50%);
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle-target--row-boundary {
+  transform: translateY(-50%);
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle-target--column-delete {
+  transform: translateY(-50%);
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle-target--row-delete {
+  transform: translateX(-50%);
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(149, 157, 165, 0.28);
+  padding: 0;
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--accent-dark);
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(25, 28, 30, 0.12);
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.96);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle--delete {
+  color: #b42318;
+}
+
+.pm-editor
+  .ProseMirror
+  .pm-table-node__handle-target--visible
+  .pm-table-node__handle--delete {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.pm-editor
+  .ProseMirror
+  .pm-table-node__handle-target:hover
+  .pm-table-node__handle,
+.pm-editor
+  .ProseMirror
+  .pm-table-node__handle-target:focus-within
+  .pm-table-node__handle,
+.pm-editor
+  .ProseMirror
+  .pm-table-node__handle:focus-visible,
+.pm-editor
+  .ProseMirror
+  .pm-table-node__handle:active {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle:focus-visible {
+  outline: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handle:hover {
+  box-shadow: 0 12px 22px rgba(25, 28, 30, 0.18);
+}

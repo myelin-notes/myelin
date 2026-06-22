@@ -25,7 +25,6 @@ export function CommandPaletteList({
   const pointerHoverSuspendedRef = useRef(true);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const activeItemId = items[activeIndex]?.id;
-  let previousSection = '';
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -58,8 +57,7 @@ export function CommandPaletteList({
     >
       {items.map((item, index) => {
         const Icon = item.icon;
-        const showSection = item.section !== previousSection;
-        previousSection = item.section;
+        const showSection = item.section !== items[index - 1]?.section;
         const active = index === activeIndex;
         const hovered = index === hoveredIndex;
 

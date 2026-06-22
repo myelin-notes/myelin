@@ -1,3 +1,4 @@
+import type { ReindexItem } from '@/lib/note-index';
 import type { NoteSession } from '../session';
 import type { VFSNodeId } from '../types';
 
@@ -103,6 +104,35 @@ export interface NoteBacklink extends StoredNoteLink {
   sourceName: string;
 }
 
+export interface RepositoryNoteGraphNode {
+  id: VFSNodeId;
+  name: string;
+}
+
+export interface RepositoryNoteGraphLink extends StoredNoteLink {
+  sourceId: VFSNodeId;
+}
+
+export interface RepositoryNoteGraph {
+  nodes: RepositoryNoteGraphNode[];
+  links: RepositoryNoteGraphLink[];
+}
+
+export interface NodeSearchResult {
+  node: VFSNode;
+  score: number;
+  /** Snippet around the matched indexed content, or null if name/tags matched. */
+  contentSnippet: string | null;
+  /** Lowercased document terms that matched the query, for highlighting. */
+  matchedTerms: string[];
+  searchMode?: 'lexical' | 'semantic';
+}
+
+export interface SearchNodesOptions {
+  mode?: 'lexical' | 'semantic';
+  limit?: number;
+}
+
 export interface RepositoryCapabilities {
   polling: boolean;
   liveSync: boolean;
@@ -118,12 +148,21 @@ export interface Repository {
     folderId: VFSNodeId | null,
   ): Promise<[VFSFolderNode[], VFSFileNode[]]>;
   getFolderChain(folderId: VFSNodeId | null): Promise<VFSFolderNode[]>;
-  searchNodes(query: string): Promise<VFSNode[]>;
-  getNodesByAnyTag(tags: string[]): Promise<VFSNode[]>;
-  listTags(): Promise<RepositoryTag[]>;
+  searchNodes(
+    query: string,
+    options?: SearchNodesOptions,
+  ): Promise<NodeSearchResult[]>;
+  /** Candidate notes for the content-index startup backfill. */
+  listIndexBackfillItems(): Promise<ReindexItem[]>;
+  getNodesByAnyTag(
+    tags: string[],
+    folderId?: VFSNodeId | null,
+  ): Promise<VFSNode[]>;
+  listTags(includeAncestors?: boolean): Promise<RepositoryTag[]>;
   getStats(): Promise<RepositoryStats>;
   getRecentFiles(limit?: number): Promise<VFSFileNode[]>;
   getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]>;
+  getNoteGraph(): Promise<RepositoryNoteGraph>;
   getUniqueFileName(
     baseName: string,
     parentId: VFSNodeId | null,
@@ -151,6 +190,8 @@ export interface Repository {
   addTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   removeTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   getRevealPath(nodeId: VFSNodeId): Promise<string | null>;
+  /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
+  getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;
 
   getCustomColors(): Promise<string[]>;
   addCustomColor(color: string): Promise<string[]>;

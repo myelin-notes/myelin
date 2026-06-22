@@ -107,6 +107,7 @@ interface TestablePdfElement {
     pageSize: PdfPageSize,
     renderScale: number,
     zoom: number,
+    fastScroll?: boolean,
   ) => void;
 }
 
@@ -580,6 +581,167 @@ describe('PdfElement metadata loading', () => {
   });
 });
 
+interface TestablePdfThumbnail extends TestablePdfLayoutState {
+  _pdfDocument: PDFDocumentProxy | null;
+  _pdfLoadPromise: Promise<void> | null;
+  _thumbnailPages: { canvas: HTMLCanvasElement; page: unknown }[];
+}
+
+function createThumbnailElement(): TestablePdfThumbnail {
+  const element = new PdfElement('pdf-uuid') as unknown as TestablePdfThumbnail;
+  element._pageSizes = [
+    { w: 612, h: 792 },
+    { w: 300, h: 150 },
+  ];
+  element._pageOrder = [
+    { kind: 'pdf', originalIndex: 0 },
+    { kind: 'pdf', originalIndex: 1 },
+  ];
+  element._layout = null;
+  element._pdfDocument = {
+    numPages: 2,
+    destroy: vi.fn(async () => {}),
+  } as unknown as PDFDocumentProxy;
+  return element;
+}
+
+describe('PdfElement thumbnail rendering', () => {
+  it('renders only the page intersecting the capture region and blits it', async () => {
+    const state = createThumbnailElement();
+    const element = state as unknown as PdfElement;
+
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    // Vertical layout: page 1 starts at localTop 792 + PAGE_GAP, well below
+    // this region even with the render margin.
+    await element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 400));
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[0][0].pageIndex).toBe(0);
+    expect(state._thumbnailPages).toHaveLength(1);
+
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    element.drawThumbnail(ctx, 0);
+
+    const firstPage = state.getLayout().pages[0];
+    expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+    expect(ctx.drawImage).toHaveBeenCalledWith(
+      state._thumbnailPages[0].canvas,
+      firstPage.localLeft,
+      firstPage.localTop,
+      612,
+      792,
+    );
+  });
+
+  it('skips pages before the region and renders the visible one in place', async () => {
+    const state = createThumbnailElement();
+    const element = state as unknown as PdfElement;
+
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    // Region scrolled past page 0 (bottom 792 + margin 80 < top 900).
+    await element.prepareThumbnail(0.5, new DOMRect(0, 900, 612, 200));
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[0][0].pageIndex).toBe(1);
+
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    element.drawThumbnail(ctx, 0);
+
+    const secondPage = state.getLayout().pages[1];
+    expect(ctx.drawImage).toHaveBeenCalledWith(
+      state._thumbnailPages[0].canvas,
+      secondPage.localLeft,
+      secondPage.localTop,
+      300,
+      150,
+    );
+  });
+
+  it('renders every page intersecting the capture region', async () => {
+    const state = createThumbnailElement();
+    const element = state as unknown as PdfElement;
+
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    await element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 1500));
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[0][0].pageIndex).toBe(0);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[1][0].pageIndex).toBe(1);
+    expect(state._thumbnailPages).toHaveLength(2);
+
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    element.drawThumbnail(ctx, 0);
+    expect(ctx.drawImage).toHaveBeenCalledTimes(2);
+  });
+
+  it('rasterizes at the thumbnail scale instead of full resolution', async () => {
+    const state = createThumbnailElement();
+    const element = state as unknown as PdfElement;
+
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    await element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 400));
+
+    // getPdfRenderScale(zoom: 0.5, elementScale: 1, dpr: 1) rounds the 0.5
+    // product up to the nearest 0.25 step: exactly 0.5.
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[0][0].renderScale).toBe(
+      0.5,
+    );
+  });
+
+  it('is a no-op when the pdf document is not loaded', async () => {
+    const element = new PdfElement('pdf-uuid');
+    const state = element as unknown as TestablePdfThumbnail;
+    state._pdfDocument = null;
+
+    await element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 792));
+
+    expect(renderPdfPageToCanvas).not.toHaveBeenCalled();
+    expect(state._thumbnailPages).toHaveLength(0);
+
+    const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    element.drawThumbnail(ctx, 0);
+    expect(ctx.drawImage).not.toHaveBeenCalled();
+  });
+
+  it('waits for an in-flight pdf load before rendering', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(ydoc, [{ w: 612, h: 792 }]);
+    let openPdf!: (document: PDFDocumentProxy) => void;
+    vi.mocked(openPdfDocument).mockReturnValueOnce(
+      new Promise((resolve) => {
+        openPdf = resolve;
+      }),
+    );
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+
+    const prepared = element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 792));
+    expect(renderPdfPageToCanvas).not.toHaveBeenCalled();
+
+    openPdf({
+      numPages: 1,
+      destroy: vi.fn(async () => {}),
+    } as unknown as PDFDocumentProxy);
+    await prepared;
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(1);
+    expect(
+      (element as unknown as TestablePdfThumbnail)._thumbnailPages,
+    ).toHaveLength(1);
+  });
+});
+
 describe('PdfElement page rendering', () => {
   it('debounces zoom-driven rerenders after the page has rendered once', () => {
     const pageSize = { w: 612, h: 792 };
@@ -650,7 +812,15 @@ describe('PdfElement page rendering', () => {
       0,
       0,
     );
-    expect(renderCanvas.width).toBe(1);
-    expect(renderCanvas.height).toBe(1);
+    // The staging canvas returns to the pool at size and is reused by the
+    // next render instead of being reallocated.
+    expect(renderCanvas.width).toBe(1250);
+    expect(renderCanvas.height).toBe(1500);
+
+    element.requestPageRender(pageDom, 0, pageSize, 2, 1.2);
+    vi.advanceTimersByTime(120);
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[1][0].canvas).toBe(
+      renderCanvas,
+    );
   });
 });

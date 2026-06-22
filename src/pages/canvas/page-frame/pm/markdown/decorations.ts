@@ -11,6 +11,7 @@ const INLINE_CLASS_BY_KIND: Record<InlinePreviewKind, string> = {
   italic: 'pm-md-italic',
   inlineCode: 'pm-md-inline-code',
   noteLink: 'pm-md-note-link',
+  math: 'pm-md-math',
 };
 
 function addInlineDecorations(
@@ -19,7 +20,12 @@ function addInlineDecorations(
   decorations: Decoration[],
 ): void {
   const { text, posAt } = buildTextOffsetMap(node, pos);
-  if (!text.includes('`') && !text.includes('*') && !text.includes('[')) {
+  if (
+    !text.includes('`') &&
+    !text.includes('*') &&
+    !text.includes('[') &&
+    !text.includes('$')
+  ) {
     return;
   }
 

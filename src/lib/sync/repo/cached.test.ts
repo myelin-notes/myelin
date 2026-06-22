@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import {
+  createCanvasNoteState,
   createNoteState,
   getRepositoryTestStorage,
   readNoteText,
@@ -202,6 +203,42 @@ describe('CachedRepository', () => {
       'hello cached repository',
     );
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('serves note graph data from the local cache', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/cached-graph-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/cached-graph-test/outbox.json',
+    );
+
+    await repository.initialize();
+    const sourceId = await repository.createFile('Source', 'mcanvas', null);
+    const targetId = await repository.createFile('Target', 'mcanvas', null);
+
+    const note = await createCanvasNoteState(
+      'See [[Target]].',
+      async (title) => (title === 'Target' ? targetId : null),
+    );
+    await repository.pushUpdates(sourceId, note.update, {
+      baseRevision: null,
+      localStateVector: note.stateVector,
+    });
+
+    const graph = await expectQuickLocalResult(repository.getNoteGraph());
+
+    expect(graph.nodes.map((node) => node.id).sort()).toEqual(
+      [sourceId, targetId].sort(),
+    );
+    expect(graph.links).toMatchObject([
+      {
+        sourceId,
+        targetId,
+        title: 'Target',
+      },
+    ]);
   });
 
   it('flushes raw video file bytes to remote storage', async () => {
@@ -830,7 +867,7 @@ describe('CachedRepository', () => {
     );
     await repository.renameNode(fileId, 'Renamed local note');
     await repository.moveNode(fileId, null);
-    await repository.setTags(fileId, ['local']);
+    await repository.setTags(fileId, ['uni/math']);
     await repository.addCustomColor('#ABCDEF');
 
     const [rootFolders, rootFiles] = await repository.listDirectory(null);
@@ -842,8 +879,11 @@ describe('CachedRepository', () => {
       id: fileId,
       name: 'Renamed local note',
       parentId: null,
-      tags: ['local'],
+      tags: ['uni/math'],
     });
+    expect(
+      (await repository.getNodesByAnyTag(['uni'])).map((node) => node.id),
+    ).toEqual([fileId]);
     expect(await repository.getCustomColors()).toEqual(['#abcdef']);
     expect(remoteBeforeFlush.manifest).toEqual(createEmptyManifest());
     expect(remoteBeforeFlush.notes).toEqual({});
@@ -860,10 +900,44 @@ describe('CachedRepository', () => {
       id: fileId,
       name: 'Renamed local note',
       parentId: null,
-      tags: ['local'],
+      tags: ['uni/math'],
     });
+    expect(
+      (await repository.getNodesByAnyTag(['uni'])).map((node) => node.id),
+    ).toEqual([fileId]);
+    expect(
+      (await repository.listTags(true)).map((entry) => entry.tag).sort(),
+    ).toEqual(['uni', 'uni/math']);
     expect(await remote.getCustomColors()).toEqual(['#abcdef']);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('counts a shared ancestor once when a node carries sibling hierarchical tags', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/hierarchical-dedupe-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/hierarchical-dedupe-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const fileId = await repository.createFile('Note', 'mcanvas', null);
+    await repository.setTags(fileId, ['uni/math', 'uni/math/calc']);
+
+    const hierarchicalByTag = new Map(
+      (await repository.listTags(true)).map((entry) => [
+        entry.tag,
+        entry.count,
+      ]),
+    );
+    const uniMatches = (await repository.getNodesByAnyTag(['uni'])).length;
+
+    expect(uniMatches).toBe(1);
+    expect(hierarchicalByTag.get('uni')).toBe(uniMatches);
+    expect(hierarchicalByTag.get('uni/math')).toBe(1);
+    expect(hierarchicalByTag.get('uni/math/calc')).toBe(1);
   });
 
   it('collapses create and delete work into a single pending delete before flush', async () => {

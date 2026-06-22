@@ -3,8 +3,10 @@ import { motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
 import { KeybindsSection } from './keybinds-section';
 import { AppearanceSection } from './sections/appearance-section';
+import { DataSection } from './sections/data-section';
 import { EditingSection } from './sections/editing-section';
 import { LanguageSection } from './sections/language-section';
+import { McpSection } from './sections/mcp-section';
 import { SyncSection } from './sections/sync-section';
 import { SettingsRail } from './settings-rail';
 import { SETTINGS_SECTIONS, type SettingsSectionId } from './settings-sections';
@@ -71,6 +73,8 @@ export function SettingsPage() {
               <LanguageSection />
               <EditingSection />
               <SyncSection />
+              <DataSection />
+              <McpSection />
               <KeybindsSection />
             </div>
           </div>

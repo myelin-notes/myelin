@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  createCanvasNoteState,
   createNoteState,
   readNoteText,
   resetRepositoryTestDoubles,
@@ -84,6 +85,7 @@ describe('Repository business logic parity', () => {
       await repository.addTag(rawFileId, 'alpha');
       await repository.addTag(rawFileId, 'beta');
       await repository.removeTag(rawFileId, 'beta');
+      await repository.addTag(rawFileId, 'uni/math');
       await repository.addCustomColor('#ABCDEF');
 
       const [rootFolders, rootFiles] = await repository.listDirectory(null);
@@ -93,7 +95,9 @@ describe('Repository business logic parity', () => {
       expect(rootFiles.map((file) => file.id)).toEqual([fileId]);
       expect(docsFiles.map((file) => file.id)).toEqual([rawFileId]);
       expect(
-        (await repository.searchNodes('Renamed')).map((node) => node.id),
+        (await repository.searchNodes('Renamed')).map(
+          (result) => result.node.id,
+        ),
       ).toEqual([fileId]);
       expect(
         (await repository.getNodesByAnyTag(['alpha']))
@@ -101,12 +105,65 @@ describe('Repository business logic parity', () => {
           .sort(),
       ).toEqual([fileId, rawFileId].sort());
       expect(
+        (await repository.getNodesByAnyTag(['uni'])).map((node) => node.id),
+      ).toEqual([rawFileId]);
+      expect(
+        (await repository.getNodesByAnyTag(['uni/math'])).map(
+          (node) => node.id,
+        ),
+      ).toEqual([rawFileId]);
+      expect(await repository.getNodesByAnyTag(['unique'])).toEqual([]);
+      expect(await repository.getNodesByAnyTag(['uni/ma'])).toEqual([]);
+      expect(
         (await repository.listTags()).map((tag) => tag.tag).sort(),
-      ).toEqual(['alpha']);
+      ).toEqual(['alpha', 'uni/math']);
+
+      const hierarchicalTags = await repository.listTags(true);
+      const hierarchicalByTag = new Map(
+        hierarchicalTags.map((entry) => [entry.tag, entry.count]),
+      );
+      expect(hierarchicalByTag.has('alpha')).toBe(true);
+      expect(hierarchicalByTag.has('uni')).toBe(true);
+      expect(hierarchicalByTag.has('uni/math')).toBe(true);
+      expect(hierarchicalByTag.get('uni')).toBe(
+        (await repository.getNodesByAnyTag(['uni'])).length,
+      );
       expect(await repository.getCustomColors()).toEqual(['#abcdef']);
       expect(
         Array.from((await repository.readFileBytes(rawFileId)) ?? []),
       ).toEqual([4, 5]);
+
+      const graphSourceId = await repository.createFile(
+        'Graph Source',
+        'mcanvas',
+        null,
+      );
+      const graphTargetId = await repository.createFile(
+        'Graph Target',
+        'mcanvas',
+        null,
+      );
+      const graphNote = await createCanvasNoteState(
+        'See [[Graph Target]].',
+        async (title) => (title === 'Graph Target' ? graphTargetId : null),
+      );
+      await repository.pushUpdates(graphSourceId, graphNote.update, {
+        baseRevision: null,
+        localStateVector: graphNote.stateVector,
+      });
+
+      expect(
+        (await repository.getNoteGraph()).nodes.map((node) => node.id).sort(),
+      ).toEqual([fileId, graphSourceId, graphTargetId].sort());
+      expect(await repository.getNoteGraph()).toMatchObject({
+        links: [
+          {
+            sourceId: graphSourceId,
+            targetId: graphTargetId,
+            title: 'Graph Target',
+          },
+        ],
+      });
 
       await repository.removeCustomColor('#abcdef');
       await repository.deleteNode(folderId);

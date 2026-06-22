@@ -2,23 +2,18 @@ import { useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
+import { useResettableTimeout } from '@/hooks/use-resettable-timeout';
 import { useMessages } from '@/lib/i18n';
 
-export function DeviceCodeDisplay({
-  userCode,
-  onCopy,
-}: {
-  userCode: string;
-  onCopy: () => void;
-}) {
+export function DeviceCodeDisplay({ userCode }: { userCode: string }) {
   const strings = useMessages();
   const [copied, setCopied] = useState(false);
+  const copiedReset = useResettableTimeout();
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(userCode);
     setCopied(true);
-    onCopy();
-    setTimeout(() => setCopied(false), 2000);
+    copiedReset.schedule(() => setCopied(false), 2000);
   };
 
   return (

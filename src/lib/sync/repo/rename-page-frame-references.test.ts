@@ -8,7 +8,7 @@ import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
 } from '@/pages/canvas/elements/page-frame-constants';
-import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown-serializer';
+import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown/serializer';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { renamePageFrameReferences } from './rename-page-frame-references';

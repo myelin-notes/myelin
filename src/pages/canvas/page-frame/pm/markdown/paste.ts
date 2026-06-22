@@ -1,6 +1,6 @@
 import { type Node as PMNode, type Schema, Slice } from 'prosemirror-model';
 import { type EditorState, Plugin, type Transaction } from 'prosemirror-state';
-import { parseMarkdownToDoc } from '../../markdown-parser';
+import { parseMarkdownToDoc } from '../../markdown/parser';
 
 export function hasParsedMarkdownBlock(doc: PMNode): boolean {
   let hasBlock = false;

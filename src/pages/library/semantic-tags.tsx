@@ -1,8 +1,9 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
+import { orderTagsHierarchically } from '@/lib/sync/repo/tag-hierarchy';
 import { cn } from '@/lib/utils';
 import { formatSemanticTagAccessibleName } from './accessibility-labels';
 
@@ -32,7 +33,7 @@ export const SemanticTags = memo(function SemanticTags({
     let cancelled = false;
 
     setLoaded(false);
-    Promise.all([repository.listTags(), repository.getStats()])
+    Promise.all([repository.listTags(true), repository.getStats()])
       .then(([allTags, nextStats]) => {
         if (cancelled) {
           return;
@@ -60,6 +61,7 @@ export const SemanticTags = memo(function SemanticTags({
       return;
     }
 
+    // `tags` holds the synthesized (includeAncestors) list, so exact membership is intentionally correct for hierarchical filters.
     const existing = new Set(tags.map((entry) => entry.tag));
     const pruned = new Set([...activeTags].filter((tag) => existing.has(tag)));
     if (pruned.size !== activeTags.size) {
@@ -80,6 +82,10 @@ export const SemanticTags = memo(function SemanticTags({
   const clearAll = () => {
     onActiveTagsChanged(new Set());
   };
+
+  // Keep each parent chip next to its descendants while preserving the
+  // count-descending order between unrelated tag families.
+  const orderedTags = useMemo(() => orderTagsHierarchically(tags), [tags]);
 
   return (
     <div className="flex flex-col gap-6 rounded-xl bg-surface p-6 ring-1 ring-border-subtle/70 sm:p-8">
@@ -105,7 +111,7 @@ export const SemanticTags = memo(function SemanticTags({
             {strings.library.semanticTags.empty}
           </p>
         )}
-        {tags.map(({ tag, count }) => {
+        {orderedTags.map(({ tag, count }) => {
           const isActive = activeTags.has(tag);
           const formattedCount = formatNumber(count, locale);
           return (

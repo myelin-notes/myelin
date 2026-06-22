@@ -10,11 +10,21 @@ export const REPOSITORY_SYNC_ORIGIN = 'repository-sync' as const;
 export type RepositorySyncOrigin = typeof REPOSITORY_SYNC_ORIGIN;
 export const FRAGMENT_SWEEP_ORIGIN = 'fragment-sweep' as const;
 export type FragmentSweepOrigin = typeof FRAGMENT_SWEEP_ORIGIN;
+/**
+ * Late async results (e.g. a transcript landing after whisper finishes):
+ * synced and persisted like local edits, but kept out of undo history so a
+ * Cmd+Z seconds later can't silently revert them. Deleting the element and
+ * undoing still restores these fields — undo of a tracked deletion reverts
+ * its whole delete-set regardless of which origin wrote the data.
+ */
+export const ASYNC_RESULT_ORIGIN = 'async-result' as const;
+export type AsyncResultOrigin = typeof ASYNC_RESULT_ORIGIN;
 export type SyncOrigin =
   | LocalOrigin
   | PeerOrigin
   | RepositorySyncOrigin
-  | FragmentSweepOrigin;
+  | FragmentSweepOrigin
+  | AsyncResultOrigin;
 
 /**
  * Owns a Y.Doc for a single canvas file and provides typed access
@@ -34,6 +44,15 @@ export class YDocManager {
 
   constructor(doc?: Y.Doc) {
     this.doc = doc ?? new Y.Doc();
+    // sweepOrphanPageFrameFragments enumerates root types via the undocumented
+    // `doc.share` internal. Assert its shape up front so a Yjs upgrade that
+    // renames/removes it surfaces loudly here instead of silently turning the
+    // orphan-fragment sweep into a no-op.
+    if (typeof this.doc.share?.keys !== 'function') {
+      throw new Error(
+        'Yjs internal doc.share is not a Map; orphan-fragment sweep would silently break.',
+      );
+    }
     this.elements = this.doc.getArray('elements');
     this.undoManager = new Y.UndoManager([this.elements], {
       trackedOrigins: new Set([LOCAL_ORIGIN]),

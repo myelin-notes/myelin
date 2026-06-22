@@ -1,5 +1,9 @@
 import { CachedRepository } from './cached';
-import type { ActiveRepository, RepositoryConfig } from './config';
+import {
+  type ActiveRepository,
+  getRepositoryStorageKey,
+  type RepositoryConfig,
+} from './config';
 import { GitHubRepository } from './github';
 import { LocalRepository } from './local';
 import {
@@ -7,20 +11,6 @@ import {
   RepositorySetupIncompleteError,
 } from './readiness';
 import type { CreateFileOptions, FileType } from './types';
-
-function normalizeOutboxKeyPart(value: string): string {
-  return value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_') || 'default';
-}
-
-function getGitHubStorageKey(
-  config: Extract<RepositoryConfig, { kind: 'github' }>,
-): string {
-  return [
-    normalizeOutboxKeyPart(config.owner),
-    normalizeOutboxKeyPart(config.repo),
-    normalizeOutboxKeyPart(config.branch ?? 'main'),
-  ].join('__');
-}
 
 function guardNoteCreation(
   repository: ActiveRepository,
@@ -62,8 +52,7 @@ export function createRepository(config: RepositoryConfig): ActiveRepository {
       break;
     }
     case 'github': {
-      const storageKey = getGitHubStorageKey(config);
-      const cacheRoot = `repositories/github/${storageKey}`;
+      const cacheRoot = `repositories/github/${getRepositoryStorageKey(config)}`;
       repository = new CachedRepository(
         new GitHubRepository({
           owner: config.owner,

@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use base64::Engine;
-use krilla::Document;
 use krilla::color::rgb;
 use krilla::geom::{PathBuilder, Point, Size, Transform};
 use krilla::image::Image;
@@ -13,6 +12,7 @@ use krilla::paint::{Fill, Stroke};
 use krilla::pdf::{Pdf, PdfDocument};
 use krilla::surface::Surface;
 use krilla::text::TextDirection;
+use krilla::Document;
 
 use super::contract::{ExportKind, ExportPage, PageItem, PageRef, PdfExportRequest};
 use super::fonts::FontRegistry;
@@ -24,13 +24,14 @@ const PX_PER_PT: f32 = 96.0 / 72.0;
 
 pub fn render(req: PdfExportRequest) -> Result<Vec<u8>, String> {
     let images = decode_images(&req.images_b64)?;
+    let pdfs = decode_pdfs(&req.pdfs_b64)?;
     let mut fonts = FontRegistry::new();
     let mut document = Document::new();
 
     match req.kind {
-        ExportKind::Pageframe => {
+        ExportKind::Pageframe | ExportKind::Canvas => {
             for page in &req.pages {
-                render_page(&mut document, &mut fonts, &images, page, None, None)?;
+                render_page(&mut document, &mut fonts, &images, &pdfs, page, None, None)?;
             }
         }
         ExportKind::PdfElement => {
@@ -39,7 +40,8 @@ pub fn render(req: PdfExportRequest) -> Result<Vec<u8>, String> {
                 .as_ref()
                 .ok_or("pdfElement export missing original PDF")?;
             let pdf_bytes = b64_decode(pdf_b64)?;
-            let pdf = Pdf::new(pdf_bytes).map_err(|e| format!("failed to parse original PDF: {e:?}"))?;
+            let pdf =
+                Pdf::new(pdf_bytes).map_err(|e| format!("failed to parse original PDF: {e:?}"))?;
             let pdf_doc = PdfDocument::new(Arc::new(pdf));
             let map = req
                 .page_map
@@ -51,7 +53,15 @@ pub fn render(req: PdfExportRequest) -> Result<Vec<u8>, String> {
                     Some(PageRef::Index(idx)) => Some(*idx),
                     _ => None,
                 };
-                render_page(&mut document, &mut fonts, &images, page, Some(&pdf_doc), bg_idx)?;
+                render_page(
+                    &mut document,
+                    &mut fonts,
+                    &images,
+                    &pdfs,
+                    page,
+                    Some(&pdf_doc),
+                    bg_idx,
+                )?;
             }
         }
     }
@@ -65,14 +75,13 @@ fn render_page(
     document: &mut Document,
     fonts: &mut FontRegistry,
     images: &[Image],
+    pdfs: &[PdfDocument],
     page: &ExportPage,
     pdf_doc: Option<&PdfDocument>,
     bg_idx: Option<usize>,
 ) -> Result<(), String> {
     let size = Size::from_wh(page.width_pt, page.height_pt).ok_or("invalid page size")?;
-    let mut pg = document.start_page_with(
-        PageSettings::from_wh(page.width_pt, page.height_pt).ok_or("invalid page size")?,
-    );
+    let mut pg = document.start_page_with(PageSettings::new(size));
     let mut surface = pg.surface();
 
     if let (Some(pdf), Some(idx)) = (pdf_doc, bg_idx) {
@@ -80,7 +89,7 @@ fn render_page(
     }
 
     for item in &page.items {
-        draw_item(&mut surface, fonts, images, item)?;
+        draw_item(&mut surface, fonts, images, pdfs, item)?;
     }
 
     surface.finish();
@@ -92,6 +101,7 @@ fn draw_item(
     surface: &mut Surface,
     fonts: &mut FontRegistry,
     images: &[Image],
+    pdfs: &[PdfDocument],
     item: &PageItem,
 ) -> Result<(), String> {
     match item {
@@ -182,6 +192,20 @@ fn draw_item(
             surface.draw_image(image, size);
             surface.pop();
         }
+        PageItem::PdfPage {
+            x,
+            y,
+            w,
+            h,
+            pdf_ref,
+            page_index,
+        } => {
+            let pdf = pdfs.get(*pdf_ref).ok_or("pdf_ref out of range")?;
+            let size = Size::from_wh(*w, *h).ok_or("invalid pdf page size")?;
+            surface.push_transform(&Transform::from_translate(*x, *y));
+            surface.draw_pdf_page(pdf, size, *page_index);
+            surface.pop();
+        }
     }
     Ok(())
 }
@@ -246,6 +270,17 @@ fn decode_images(images_b64: &[String]) -> Result<Vec<Image>, String> {
         .map(|b| {
             let bytes = b64_decode(b)?;
             Image::from_png(bytes.into(), false).map_err(|e| format!("failed to decode PNG: {e}"))
+        })
+        .collect()
+}
+
+fn decode_pdfs(pdfs_b64: &[String]) -> Result<Vec<PdfDocument>, String> {
+    pdfs_b64
+        .iter()
+        .map(|b| {
+            let bytes = b64_decode(b)?;
+            let pdf = Pdf::new(bytes).map_err(|e| format!("failed to parse PDF source: {e:?}"))?;
+            Ok(PdfDocument::new(Arc::new(pdf)))
         })
         .collect()
 }

@@ -55,11 +55,9 @@ function makeImageElement() {
 
 function makeCanvas(elements: ImageElement[], point: Vector2) {
   const enterElementEdit = vi.fn();
-  const updateBounding = vi.fn();
   const canvas = {
     elements,
     enterElementEdit,
-    updateBounding,
     viewport: {
       getPoint: vi.fn(() => point),
     },

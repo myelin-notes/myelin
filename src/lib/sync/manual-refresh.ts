@@ -51,6 +51,8 @@ function schedule(): void {
 }
 
 export function enqueueManualRepositoryRefresh(task: RefreshTask): void {
+  // Coalescing: if a task is already queued, drop the incoming one. Manual
+  // refreshes are idempotent triggers, so the queued task is sufficient.
   if (queued !== null) {
     return;
   }

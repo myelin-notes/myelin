@@ -3,10 +3,16 @@ import { UserPrefs } from '@/lib/user-prefs';
 import { CollisionHelper } from '@/lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
 import {
+  AUDIO_NATURAL_HEIGHT,
+  AUDIO_NATURAL_WIDTH,
+  AudioElement,
+} from '@/pages/canvas/elements/audio/element';
+import {
   CHROME_BOTTOM_PADDING,
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
-} from '@/pages/canvas/elements/frame-chrome';
+} from '@/pages/canvas/elements/frame/chrome';
+import { LatexElement } from '@/pages/canvas/elements/latex/element';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
@@ -64,8 +70,45 @@ export function useCanvasInserts({
       );
       frame.setOffset(worldPos.x, worldPos.y);
       frame.updateBounds();
-      dc.updateBounding();
       frame.select();
+    },
+    [drawableCanvasRef],
+  );
+
+  const placeAudioAt = useCallback(
+    (worldPos: Vector2) => {
+      const dc = drawableCanvasRef.current;
+      if (!dc) {
+        return;
+      }
+      const el = dc.addElement((uuid) => {
+        const audio = new AudioElement(uuid, dc.localPeerId);
+        audio.setOffset(worldPos.x, worldPos.y);
+        return audio;
+      });
+      el.updateBounds();
+      el.select();
+    },
+    [drawableCanvasRef],
+  );
+
+  const placeLatexAt = useCallback(
+    (worldPos: Vector2) => {
+      const dc = drawableCanvasRef.current;
+      if (!dc) {
+        return;
+      }
+      const latex = dc.addElement((uuid) => {
+        const el = new LatexElement(uuid);
+        el.setOffset(worldPos.x, worldPos.y);
+        return el;
+      });
+      latex.updateBounds();
+      latex.select();
+      // Placement runs inside a canvas pointerdown; entering edit now would
+      // register a click-outside listener that the same event, still bubbling
+      // to document, immediately trips. Defer past this event.
+      requestAnimationFrame(() => dc.enterElementEdit(latex));
     },
     [drawableCanvasRef],
   );
@@ -88,6 +131,39 @@ export function useCanvasInserts({
       onPlace: placeFrameAt,
     });
   }, [drawableCanvasRef, placeFrameAt]);
+
+  const onInsertLatex = useCallback(() => {
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
+    }
+    setInsertOpen(false);
+    setEmbedOpen(false);
+    setContextInsert(null);
+    dc.startPlacement({
+      getBounds: () => ({ x: 0, y: 0, width: 140, height: 44 }),
+      onPlace: placeLatexAt,
+    });
+  }, [drawableCanvasRef, placeLatexAt]);
+
+  const onInsertAudio = useCallback(() => {
+    const dc = drawableCanvasRef.current;
+    if (!dc) {
+      return;
+    }
+    setInsertOpen(false);
+    setEmbedOpen(false);
+    setContextInsert(null);
+    dc.startPlacement({
+      getBounds: () => ({
+        x: 0,
+        y: 0,
+        width: AUDIO_NATURAL_WIDTH,
+        height: AUDIO_NATURAL_HEIGHT,
+      }),
+      onPlace: placeAudioAt,
+    });
+  }, [drawableCanvasRef, placeAudioAt]);
 
   const onInsertEmbed = useCallback(() => {
     setInsertOpen(false);
@@ -119,6 +195,22 @@ export function useCanvasInserts({
     placeFrameAt(contextInsert.worldPos);
     setContextInsert(null);
   }, [contextInsert, placeFrameAt]);
+
+  const onContextInsertLatex = useCallback(() => {
+    if (!contextInsert) {
+      return;
+    }
+    placeLatexAt(contextInsert.worldPos);
+    setContextInsert(null);
+  }, [contextInsert, placeLatexAt]);
+
+  const onContextInsertAudio = useCallback(() => {
+    if (!contextInsert) {
+      return;
+    }
+    placeAudioAt(contextInsert.worldPos);
+    setContextInsert(null);
+  }, [contextInsert, placeAudioAt]);
 
   const onContextInsertEmbed = useCallback(() => {
     if (!contextInsert) {
@@ -201,8 +293,12 @@ export function useCanvasInserts({
     closeContextInsert,
     onInsertFrame,
     onInsertEmbed,
+    onInsertLatex,
+    onInsertAudio,
     onContextInsertFrame,
     onContextInsertEmbed,
+    onContextInsertLatex,
+    onContextInsertAudio,
     onCanvasClick,
     submitEmbed,
     closeEmbed,

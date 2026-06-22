@@ -119,6 +119,59 @@ describe('TabStateController', () => {
     expectValidWindowState(controller.getSnapshot());
   });
 
+  it('reuses the workspace graph tab in the same pane', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+
+    const firstId = controller.openTab({ type: 'graph' }, 'Graph', paneId);
+    const secondId = controller.openTab(
+      { type: 'graph' },
+      'Graph again',
+      paneId,
+    );
+
+    expect(secondId).toBe(firstId);
+    expect(tabTitles(rootPane(controller))).toEqual(['Library', 'Graph again']);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
+  it('focuses an existing tab in another pane when navigating without a pane', () => {
+    const controller = new TabStateController();
+    const rootPaneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha', rootPaneId);
+    const otherPaneId = controller.splitPane(rootPaneId, 'horizontal');
+    controller.focusPane(otherPaneId);
+
+    // No paneId => navigation: should reuse the tab in the root pane rather
+    // than open a duplicate in the focused pane.
+    const reopenedId = controller.openTab({ type: 'canvas', id: 'alpha' }, 'A');
+
+    expect(reopenedId).toBe(alphaId);
+    expect(tabTitles(controller.getPane(rootPaneId)!)).toEqual([
+      'Library',
+      'A',
+    ]);
+    expect(tabTitles(controller.getPane(otherPaneId)!)).toEqual(['Library']);
+    expect(controller.getSnapshot().focusedPaneId).toBe(rootPaneId);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
+  it('keeps an explicit pane scoped when a target is open elsewhere', () => {
+    const controller = new TabStateController();
+    const rootPaneId = focusedPane(controller).id;
+    openCanvas(controller, 'alpha', 'Alpha', rootPaneId);
+    const otherPaneId = controller.splitPane(rootPaneId, 'horizontal');
+
+    const dupId = openCanvas(controller, 'alpha', 'Alpha copy', otherPaneId);
+
+    expect(tabTitles(controller.getPane(otherPaneId)!)).toEqual([
+      'Library',
+      'Alpha copy',
+    ]);
+    expect(controller.getPane(otherPaneId)!.activeTabId).toBe(dupId);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
   it('replaces the last closed pane with a valid default state', () => {
     const controller = new TabStateController();
     const pane = focusedPane(controller);

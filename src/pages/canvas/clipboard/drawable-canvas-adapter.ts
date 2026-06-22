@@ -166,6 +166,10 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
           typeof typeValue === 'number'
             ? (typeValue as ElementType)
             : ElementType.STROKE;
+        if (type === ElementType.AUDIO) {
+          // A paste creates a new element, so the paster owns any empty recording slot.
+          nextMap.set('creatorPeerId', canvas.localPeerId);
+        }
         const background = isBackgroundElement(type);
         const element = canvas.insertElementMap(nextMap, {
           background,
@@ -195,7 +199,6 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
     }
 
     canvas.selectElementsByUuid(insertedUuids);
-    canvas.updateBounding();
     return { pastedElementUuids: insertedUuids };
   }
 }

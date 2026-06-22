@@ -40,6 +40,7 @@ import {
   buildTextOffsetMap,
   type TextOffsetMap,
 } from './markdown/text-offset-map';
+import { exitMathBlock, selectAllInMathBlock } from './math/block-commands';
 import { schema } from './schema';
 import { exitTableOnLastRow, goToNextTableRow } from './table/commands';
 
@@ -440,10 +441,11 @@ export function buildKeymap(s: Schema) {
     [`${mod}-z`]: undo,
     [`${mod}-shift-z`]: redo,
     ...(isApplePlatform ? {} : { [`${mod}-y`]: redo }),
-    [`${mod}-a`]: selectAllPageFrame,
+    [`${mod}-a`]: chainCommands(selectAllInMathBlock, selectAllPageFrame),
 
     Enter: chainCommands(
       exitFencedCodeBlock,
+      exitMathBlock,
       newlineInCode,
       goToNextTableRow,
       splitFlatListItem,
@@ -487,7 +489,11 @@ function arrowHandler(
       state.doc.resolve(side > 0 ? $head.after() : $head.before()),
       side,
     );
-    if (nextSelection.$head.parent.type !== schema.nodes.codeBlock) {
+    const nextParentType = nextSelection.$head.parent.type;
+    if (
+      nextParentType !== schema.nodes.codeBlock &&
+      nextParentType !== schema.nodes.mathBlock
+    ) {
       return false;
     }
 

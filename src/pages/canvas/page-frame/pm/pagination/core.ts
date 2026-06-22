@@ -1,6 +1,8 @@
 export const PAGE_HEIGHT = 880;
 export const PAGE_PADDING = 48;
 export const PAGE_GAP = 40;
+// Also surfaced to CSS as --pm-content-height (see plugin.ts / editor-blocks.css)
+// so the page-capped block max-height tracks this constant.
 export const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 784
 export const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
 

@@ -92,11 +92,6 @@ export function useMessages() {
   return useI18n().messages;
 }
 
-export function useMessagesGetter() {
-  const result = useMessages();
-  return () => result;
-}
-
 export {
   localeLabels,
   type MessageGetter,

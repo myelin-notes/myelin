@@ -1,3 +1,4 @@
+import { getDevicePixelRatio } from '@/lib/utils';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { ImageElement } from '../elements/image-element';
 import type { MediaImportOptions } from './index';
@@ -12,7 +13,7 @@ export async function imageImportHandler(
   await img.setImageData(data);
 
   // Place at given screen position (or center of viewport)
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = getDevicePixelRatio();
   const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
   const cy = options.screenY ?? canvas.ctx.canvas.height / dpr / 2;
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });
@@ -21,5 +22,4 @@ export async function imageImportHandler(
     world.y - img.naturalHeight / 2,
   );
   img.updateBounds();
-  canvas.updateBounding();
 }

@@ -92,4 +92,72 @@ describe('parseInlineMarkdown', () => {
       ],
     });
   });
+
+  it('parses dollar-delimited math as an inline preview range', () => {
+    expect(parseInlineMarkdown('$x^2$')).toEqual({
+      ranges: [
+        {
+          kind: 'math',
+          open: { from: 0, to: 1 },
+          contentFrom: 1,
+          contentTo: 4,
+          close: { from: 4, to: 5 },
+        },
+      ],
+    });
+  });
+
+  it('parses two separate math ranges side by side', () => {
+    expect(parseInlineMarkdown('$a$ b $c$').ranges.map((r) => r.kind)).toEqual([
+      'math',
+      'math',
+    ]);
+  });
+
+  it('does not treat currency amounts as math', () => {
+    expect(parseInlineMarkdown('costs $100 and $200 total').ranges).toEqual([]);
+  });
+
+  it('matches the later candidate when an earlier dollar cannot close', () => {
+    expect(parseInlineMarkdown('$a $b$')).toEqual({
+      ranges: [
+        {
+          kind: 'math',
+          open: { from: 3, to: 4 },
+          contentFrom: 4,
+          contentTo: 5,
+          close: { from: 5, to: 6 },
+        },
+      ],
+    });
+  });
+
+  it('ignores escaped dollar signs', () => {
+    expect(parseInlineMarkdown('\\$5 and \\$10').ranges).toEqual([]);
+  });
+
+  it('does not parse math inside inline code', () => {
+    expect(parseInlineMarkdown('`$x$`').ranges.map((r) => r.kind)).toEqual([
+      'inlineCode',
+    ]);
+  });
+
+  it('does not parse math inside note links', () => {
+    expect(
+      parseInlineMarkdown('[[a $b$ c]]').ranges.map((r) => r.kind),
+    ).toEqual(['noteLink']);
+  });
+
+  it('does not pair dollars across a newline', () => {
+    expect(parseInlineMarkdown('$a\nb$').ranges).toEqual([]);
+  });
+
+  it('does not treat double dollars as inline math', () => {
+    expect(parseInlineMarkdown('a $$ b').ranges).toEqual([]);
+    expect(parseInlineMarkdown('$$x$$').ranges).toEqual([]);
+  });
+
+  it('ignores an unclosed dollar', () => {
+    expect(parseInlineMarkdown('paid $5').ranges).toEqual([]);
+  });
 });

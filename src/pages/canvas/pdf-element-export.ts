@@ -5,8 +5,8 @@ import type {
   PdfExportRequest,
 } from '@/lib/pdf-export/contract';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
-import type { Vector2 } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
+import type { Vector2 } from './geometry';
 import type { PdfPageSize } from './pdf-renderer';
 
 export interface PdfElementExportSource {
@@ -44,8 +44,19 @@ export type PdfExportPage = PdfElementExportPage & {
 /** Overlay elements draw themselves natively onto the embedded PDF page. */
 export type PdfExportOverlayElement = Pick<
   DrawableElement,
-  'uuid' | 'boundingBox' | 'hidden' | 'drawToPdf'
+  'uuid' | 'boundingBox' | 'hidden' | 'drawToPdf' | 'prepareForPdf'
 >;
+
+/**
+ * Await every overlay's async PDF preparation (raster bitmaps, etc.) before the
+ * synchronous harvest pass — `drawToPdf` can't await, so its inputs must be
+ * ready first.
+ */
+export async function prepareExportOverlays(
+  elements: readonly PdfExportOverlayElement[],
+): Promise<void> {
+  await Promise.all(elements.map((element) => element.prepareForPdf()));
+}
 
 export function getPdfOverlayCandidates(
   target: Pick<PdfElementExportSource, 'uuid' | 'boundingBox'>,

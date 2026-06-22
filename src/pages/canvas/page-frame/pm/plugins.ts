@@ -18,8 +18,14 @@ import {
 import { markdownPastePlugin } from './markdown/paste';
 import { markdownPreviewPlugin } from './markdown/plugin';
 import { prefixMarkdownInputRules } from './markdown/prefix-rules';
+import {
+  mathBlockInputRules,
+  mathBlockNormalizationPlugin,
+} from './math/block-commands';
+import { mathPreviewPlugin } from './math/plugin';
 import { paginationPlugin } from './pagination/plugin';
 import { schema } from './schema';
+import { searchHighlightPlugin } from './search-highlight';
 import { selectionHighlightPlugin } from './selection-highlight';
 import { wordSelectionDragPlugin } from './word-selection-drag';
 
@@ -81,16 +87,20 @@ export function buildPlugins(
     prefixMarkdownInputRules(schema),
     fenceMarkdownInputRules(schema),
     fenceMarkdownNormalizationPlugin(schema),
+    mathBlockInputRules(schema),
+    mathBlockNormalizationPlugin(schema),
     noteLinkMarkdownPlugin(schema, resolveNoteLink),
     embedPreviewPlugin(),
     linkMarkdownPlugin(schema),
     markdownPastePlugin(),
     markdownPreviewPlugin(),
+    mathPreviewPlugin(),
     checkListPlugin(schema),
     calloutCaretAnchorCleanupPlugin(),
     buildKeymap(schema),
     paginationPlugin(onLayout),
     selectionHighlightPlugin(),
+    searchHighlightPlugin(),
     wordSelectionDragPlugin(),
     tableEditing(),
   ];

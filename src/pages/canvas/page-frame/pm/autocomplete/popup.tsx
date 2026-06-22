@@ -13,8 +13,8 @@ import { cn } from '@/lib/utils';
 import type {
   NoteLinkPreview,
   NoteLinkPreviewTarget,
-} from '../../note-link-preview';
-import { NoteLinkPreviewCard } from '../../note-link-preview-card';
+} from '../../note-link/preview';
+import { NoteLinkPreviewCard } from '../../note-link/preview-card';
 import {
   getPageFrameAutocompleteAnchorRect,
   type PageFrameAutocompleteController,

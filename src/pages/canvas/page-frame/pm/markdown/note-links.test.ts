@@ -2,8 +2,8 @@ import { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { describe, expect, it, vi } from 'vitest';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
-import { parseMarkdownToDoc } from '../../markdown-parser';
-import { serializeDocToMarkdown } from '../../markdown-serializer';
+import { parseMarkdownToDoc } from '../../markdown/parser';
+import { serializeDocToMarkdown } from '../../markdown/serializer';
 import { schema } from '../schema';
 import {
   buildNormalizedNoteLinkTransaction,
@@ -56,6 +56,36 @@ describe('noteLinkMarkdownPlugin', () => {
         },
       ],
     });
+  });
+
+  it('forms a note-link across a hard break (soft line break) inside [[...]]', () => {
+    // Regression guard for an intentional behavior: buildTextOffsetMap maps a
+    // hardBreak to '\n', which parseInlineMarkdown does NOT treat as a barrier
+    // (only MARKDOWN_ATOM_CHAR is). So a [[...]] spanning a soft line break IS
+    // recognized as a note-link, matching the decoration layer that already
+    // renders the preview across hard breaks. (Previously note-links.ts used a
+    // local offset map that mapped hardBreak to MARKDOWN_ATOM_CHAR, which
+    // blocked the link — a silent inconsistency with decorations.)
+    const doc = schema.nodes.doc.create(null, [
+      schema.nodes.paragraph.create(null, [
+        schema.text('[[Foo'),
+        schema.nodes.hardBreak.create(),
+        schema.text('Bar]]'),
+      ]),
+    ]);
+    const state = createEditorState(doc);
+
+    const tr = buildNormalizedNoteLinkTransaction(state, schema);
+    expect(tr).not.toBeNull();
+
+    const titles: string[] = [];
+    state.apply(tr!).doc.descendants((node) => {
+      const mark = node.marks.find((m) => m.type === schema.marks.noteLink);
+      if (mark) {
+        titles.push(mark.attrs.title as string);
+      }
+    });
+    expect(titles).toContain('Foo\nBar');
   });
 
   it('updates note-link title metadata when typed title changes', () => {

@@ -5,7 +5,7 @@ import {
   escapeNoteLinkSegment,
   joinNoteLinkTitle,
   splitNoteLinkTargetFrame,
-} from '@/lib/note-link-syntax';
+} from '@/lib/note/link-syntax';
 import type { VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 import { PM_ADD_TO_HISTORY } from '../constants';
@@ -20,14 +20,9 @@ import {
   collectAffectedTextblocks,
   getChangedRangesForTransactions,
 } from './range-tracking';
-import { MARKDOWN_ATOM_CHAR } from './types';
+import { buildTextOffsetMap } from './text-offset-map';
 
 export type { NoteLinkRef, ResolveNoteLink };
-
-interface TextOffsetMap {
-  text: string;
-  posAt: number[];
-}
 
 interface NoteLinkCoverage {
   title: string;
@@ -90,33 +85,6 @@ function findNoteLinkElement(
   }
 
   return null;
-}
-
-function buildTextOffsetMap(node: PMNode, pos: number): TextOffsetMap {
-  const parts: string[] = [];
-  const posAt = [pos + 1];
-  let cursorPos = pos + 1;
-
-  node.forEach((child) => {
-    if (child.isText) {
-      const text = child.text ?? '';
-      parts.push(text);
-      for (let i = 0; i < text.length; i++) {
-        cursorPos += 1;
-        posAt.push(cursorPos);
-      }
-      return;
-    }
-
-    parts.push(MARKDOWN_ATOM_CHAR);
-    cursorPos += child.nodeSize;
-    posAt.push(cursorPos);
-  });
-
-  return {
-    text: parts.join(''),
-    posAt,
-  };
 }
 
 function sameCoverage(

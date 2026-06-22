@@ -4,10 +4,12 @@ import { Logger } from '@/lib/logger';
 import {
   describeElementType,
   summarizeDrawableElements,
-} from '@/lib/note-state-summary';
-import { UserPrefs } from '@/lib/user-prefs';
+} from '@/lib/note/state-summary';
 import { StateMachine } from '../../lib/utils/state-machine';
+import { CanvasRenderer } from './canvas-renderer';
 import { CanvasViewport } from './canvas-viewport';
+import { ElementStore } from './element-store';
+import { AudioElement } from './elements/audio/element';
 import type { DrawableElement } from './elements/drawable-element';
 import {
   ELEMENT_FACTORIES,
@@ -16,7 +18,9 @@ import {
 import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
+import type { Vector2 } from './geometry';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
+import { PlacementController } from './placement-controller';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
@@ -25,7 +29,7 @@ import { TextTool } from './tools/text-tool';
 import type { ITool } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
-export type Vector2 = { x: number; y: number };
+export type { Vector2 } from './geometry';
 
 export interface PlacementGhost {
   /** Bounds of the ghost rectangle, relative to the pointer's world position. */
@@ -51,6 +55,22 @@ function isBackgroundElement(type: ElementType): boolean {
 
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
+}
+
+function unionBoundingBoxes(
+  elements: readonly DrawableElement[],
+): DOMRect | null {
+  const boxes = elements
+    .map((e) => e.boundingBox)
+    .filter((b) => b.width > 0 || b.height > 0);
+  if (boxes.length === 0) {
+    return null;
+  }
+  const left = Math.min(...boxes.map((b) => b.left));
+  const top = Math.min(...boxes.map((b) => b.top));
+  const right = Math.max(...boxes.map((b) => b.right));
+  const bottom = Math.max(...boxes.map((b) => b.bottom));
+  return new DOMRect(left, top, right - left, bottom - top);
 }
 
 export type ElementReorderDirection = 'higher' | 'lower';
@@ -128,28 +148,17 @@ export class DrawableCanvas {
   public readonly ctx: CanvasRenderingContext2D;
   public readonly viewport: CanvasViewport;
   private readonly canvas: HTMLCanvasElement;
-  private bgCtx: CanvasRenderingContext2D | null = null;
-  private bgCanvas: HTMLCanvasElement | null = null;
-  private overlayCtx: CanvasRenderingContext2D | null = null;
-  private overlayCanvas: HTMLCanvasElement | null = null;
+  private readonly renderer: CanvasRenderer;
   private readonly state: StateMachine<InteractState>;
   public readonly tools: ITool[];
-  private bgPattern: CanvasPattern | null = null;
-  private unsubBgPref: (() => void) | null = null;
 
   private spaceDown: boolean = false;
   private screenPosition: Vector2 = { x: 0, y: 0 };
 
-  /** Element lookup keyed by stable uuid. */
-  private _elements = new Map<string, DrawableElement>();
-  /** Ordered list of element uuids in z-order (background first, foreground last). */
-  private _elementOrder: string[] = [];
-  /** Cached array snapshot for the public `elements` getter; null when stale. */
-  private _orderedSnapshot: DrawableElement[] | null = null;
+  /** Owns the element collections and keeps them mutating as a unit. */
+  private readonly _store = new ElementStore(() => this.notifyChange());
   private _ydoc: YDocManager;
   private _domOverlayHost: HTMLElement | null = null;
-  /** Maps Y.Map instances to their DrawableElement wrappers. */
-  private _yMapToElement = new Map<Y.Map<unknown>, DrawableElement>();
   private _toolCursor: string = 'default';
   private toolSelected: ITool;
   private readonly resolveNoteLink?: ResolveNoteLink;
@@ -178,11 +187,11 @@ export class DrawableCanvas {
   private _editDomRoot: HTMLElement | null = null;
   private _cleanupEditListeners: (() => void) | null = null;
 
-  // One-shot placement state — orthogonal to tools. When set, the next
-  // primary-button click finalizes placement and the state clears.
-  private _placement: PlacementGhost | null = null;
-  private _placementCleanup: (() => void) | null = null;
-  private onPlacementEnd?: () => void;
+  // One-shot placement state — orthogonal to tools. When active, the next
+  // primary-button click finalizes placement and the state clears. The
+  // controller owns the ghost + Escape listener; the canvas drives lifecycle
+  // (cursor, edit-mode exit, change notification).
+  private readonly _placement = new PlacementController();
 
   /**
    * Listeners notified when selection, element set, element order, edit mode,
@@ -197,6 +206,7 @@ export class DrawableCanvas {
     ydoc: YDocManager,
     tools?: ITool[],
     resolveNoteLink?: ResolveNoteLink,
+    private readonly _localPeerId = '',
   ) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {
@@ -206,6 +216,7 @@ export class DrawableCanvas {
     this.canvas = canvas;
     this.canvas.style.zIndex = '10';
     this.ctx = ctx!;
+    this.renderer = new CanvasRenderer(this.ctx, canvas);
     this.viewport = new CanvasViewport(canvas);
     this.viewport.setContentBoundsProvider(() => this.getContentBounds());
     this.state = new StateMachine(InteractState.Idle);
@@ -216,11 +227,6 @@ export class DrawableCanvas {
 
     this.initEventListeners(canvas);
     this.initStates();
-    this.resizeCanvas(window.innerWidth, window.innerHeight);
-    this.buildBgPattern(UserPrefs.get('canvasBackground'));
-    this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
-      this.buildBgPattern(bg);
-    });
 
     // Hydrate existing elements from Y.Doc (for loaded documents)
     this.hydrateFromYDoc();
@@ -237,8 +243,21 @@ export class DrawableCanvas {
     return this._ydoc;
   }
 
+  public get localPeerId(): string {
+    return this._localPeerId;
+  }
+
   /**
-   * Populate _elements from the current Y.Array state.
+   * Run a mutation inside a single Yjs transaction. Nested element-map
+   * transacts flatten into this one, so a multi-step edit (e.g. the pen's
+   * stroke→shape swap) coalesces into one undo-stack item.
+   */
+  public transact(fn: () => void): void {
+    this._ydoc.transact(fn);
+  }
+
+  /**
+   * Populate the element store from the current Y.Array state.
    * Called once on construction for loaded documents.
    */
   private hydrateFromYDoc(): void {
@@ -246,16 +265,10 @@ export class DrawableCanvas {
       const yMap = this._ydoc.elements.get(i);
       const element = this.createElementFromYMap(yMap);
       if (element) {
-        this._elements.set(element.uuid, element);
-        this._yMapToElement.set(yMap, element);
+        this._store.add(element, yMap, this._store.count());
       }
     }
     this.rebuildElementOrderFromYDoc();
-  }
-
-  private invalidateOrderSnapshot(): void {
-    this._orderedSnapshot = null;
-    this.notifyChange();
   }
 
   public onChange(listener: () => void): () => void {
@@ -290,7 +303,7 @@ export class DrawableCanvas {
 
     for (let i = 0; i < this._ydoc.elements.length; i++) {
       const yMap = this._ydoc.elements.get(i);
-      const element = this._yMapToElement.get(yMap);
+      const element = this._store.byYMap(yMap);
       if (!element) {
         continue;
       }
@@ -314,8 +327,7 @@ export class DrawableCanvas {
       return a.arrayIndex - b.arrayIndex;
     });
 
-    this._elementOrder = ordered.map(({ element }) => element.uuid);
-    this.invalidateOrderSnapshot();
+    this._store.setOrder(ordered.map(({ element }) => element.uuid));
   }
 
   /**
@@ -361,6 +373,9 @@ export class DrawableCanvas {
     if (element instanceof PdfElement) {
       element.setExportElementsProvider(() => this.elements);
     }
+    if (element instanceof AudioElement) {
+      element.setLocalPeerId(this._localPeerId);
+    }
   }
 
   public setOnPageFrameRenamed(
@@ -382,7 +397,6 @@ export class DrawableCanvas {
       return;
     }
 
-    let changedElementFields = false;
     let changedElementOrder = false;
     const insertedMaps = new Set<Y.Map<unknown>>();
 
@@ -405,9 +419,7 @@ export class DrawableCanvas {
         if (event.keysChanged.has(ELEMENT_Z_ORDER_KEY)) {
           changedElementOrder = true;
         }
-        changedElementFields =
-          this.syncElementFromYMapEvent(yMap, event.keysChanged) ||
-          changedElementFields;
+        this.syncElementFromYMapEvent(yMap, event.keysChanged);
         continue;
       }
 
@@ -415,14 +427,10 @@ export class DrawableCanvas {
         event instanceof Y.YArrayEvent &&
         event.target !== this._ydoc.elements
       ) {
-        changedElementFields =
-          this.syncElementFromNestedEvent(event) || changedElementFields;
+        this.syncElementFromNestedEvent(event);
       }
     }
 
-    if (changedElementFields) {
-      this.updateBounding();
-    }
     if (changedElementOrder) {
       this.rebuildElementOrderFromYDoc();
     }
@@ -451,7 +459,7 @@ export class DrawableCanvas {
     yMap: Y.Map<unknown>,
     keysChanged: Set<unknown>,
   ): boolean {
-    const element = this._yMapToElement.get(yMap);
+    const element = this._store.byYMap(yMap);
     if (!element) {
       return false;
     }
@@ -470,7 +478,7 @@ export class DrawableCanvas {
     }
 
     const yMap = this._ydoc.elements.get(elementPosition);
-    const element = this._yMapToElement.get(yMap);
+    const element = this._store.byYMap(yMap);
     if (!element) {
       return false;
     }
@@ -488,12 +496,10 @@ export class DrawableCanvas {
       if ('insert' in delta) {
         const inserted = delta.insert as Y.Map<unknown>[];
         for (const yMap of inserted) {
-          if (!this._yMapToElement.has(yMap)) {
+          if (!this._store.byYMap(yMap)) {
             const element = this.createElementFromYMap(yMap);
             if (element) {
-              this._elements.set(element.uuid, element);
-              this._elementOrder.splice(position, 0, element.uuid);
-              this._yMapToElement.set(yMap, element);
+              this._store.add(element, yMap, position);
             }
           }
           position++;
@@ -507,24 +513,15 @@ export class DrawableCanvas {
       currentYMaps.add(this._ydoc.elements.get(i));
     }
     const removedUuids = new Set<string>();
-    for (const element of this._elements.values()) {
+    for (const element of this._store.all()) {
       if (element.yMap && !currentYMaps.has(element.yMap)) {
-        this._yMapToElement.delete(element.yMap);
         element.disposeDOM();
         removedUuids.add(element.uuid);
       }
     }
-    if (removedUuids.size > 0) {
-      for (const uuid of removedUuids) {
-        this._elements.delete(uuid);
-      }
-      this._elementOrder = this._elementOrder.filter(
-        (uuid) => !removedUuids.has(uuid),
-      );
-    }
+    this._store.removeMany(removedUuids);
 
     this.rebuildElementOrderFromYDoc();
-    this.updateBounding();
     logger.debug('Applied external canvas element change', {
       origin: String(event.transaction.origin ?? 'unknown'),
       ...summarizeDrawableElements(this.elements),
@@ -532,9 +529,7 @@ export class DrawableCanvas {
   }
 
   public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
-    this.bgCanvas = canvas;
-    this.bgCtx = canvas.getContext('2d', { alpha: true });
-    this.resizeBgCanvas(window.innerWidth, window.innerHeight);
+    this.renderer.setBackgroundCanvas(canvas);
   }
 
   /**
@@ -543,9 +538,7 @@ export class DrawableCanvas {
    * lowered to z=2 to avoid strokes bleeding onto edited text).
    */
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
-    this.overlayCanvas = canvas;
-    this.overlayCtx = canvas.getContext('2d', { alpha: true });
-    this.resizeOverlayCanvas(window.innerWidth, window.innerHeight);
+    this.renderer.setOverlayCanvas(canvas);
   }
 
   public setDomOverlayHost(host: HTMLElement): void {
@@ -557,50 +550,36 @@ export class DrawableCanvas {
   }
 
   public setOnPlacementEnd(callback: (() => void) | undefined) {
-    this.onPlacementEnd = callback;
+    this._placement.setOnPlacementEnd(callback);
   }
 
   public get isPlacing(): boolean {
-    return this._placement !== null;
+    return this._placement.isActive;
   }
 
   public startPlacement(ghost: PlacementGhost): void {
     if (this._editingElement) {
       this.exitElementEdit();
     }
-    if (this._placement) {
+    if (this._placement.isActive) {
       this.endPlacement();
     }
-    this._placement = ghost;
+    this._placement.start(ghost);
     this._toolCursor = 'copy';
     this.updateCursor();
     this.notifyChange();
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        this.endPlacement();
-      }
-    };
-    document.addEventListener('keydown', handleKey);
-    this._placementCleanup = () => {
-      document.removeEventListener('keydown', handleKey);
-    };
   }
 
   public cancelPlacement(): void {
-    if (this._placement) {
+    if (this._placement.isActive) {
       this.endPlacement();
     }
   }
 
   private endPlacement(): void {
-    this._placement = null;
-    this._placementCleanup?.();
-    this._placementCleanup = null;
+    this._placement.end();
     this._toolCursor = 'default';
     this.updateCursor();
-    this.onPlacementEnd?.();
     this.notifyChange();
   }
 
@@ -653,7 +632,9 @@ export class DrawableCanvas {
   public syncViewportEditModePan(): void {
     const element = this._editingElement;
     const viewportEditMode =
-      element !== null && !this.isCanvasInteractiveEditMode;
+      element !== null &&
+      !this.isCanvasInteractiveEditMode &&
+      element.locksViewportPanWhileEditing;
     this.viewport.setEditMode(viewportEditMode, {
       panAxis:
         element !== null &&
@@ -763,19 +744,15 @@ export class DrawableCanvas {
     if (this._editingElement) {
       this.exitElementEdit();
     }
-    if (this._placement) {
+    if (this._placement.isActive) {
       this.endPlacement();
     }
-    this.unsubBgPref?.();
-    this.unsubBgPref = null;
+    this.renderer.destroy();
     this._ydoc.elements.unobserveDeep(this._handleYElementsChange);
-    for (const element of this._elements.values()) {
+    for (const element of this._store.all()) {
       element.disposeDOM();
     }
-    this._elements.clear();
-    this._elementOrder = [];
-    this.invalidateOrderSnapshot();
-    this._yMapToElement.clear();
+    this._store.clear();
     this.viewport.destroy();
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
@@ -784,80 +761,16 @@ export class DrawableCanvas {
   }
 
   public redraw(deltaTime: number) {
-    const dpr = window.devicePixelRatio || 1;
-    const logicalW = this.canvas.width / dpr;
-    const logicalH = this.canvas.height / dpr;
-
-    const zoom = this.viewport.zoom;
-    const offset = this.viewport.offset;
-
-    // Background canvas: dot grid + chrome (when not editing)
-    if (this.bgCtx && this.bgCanvas) {
-      const bgW = this.bgCanvas.width / dpr;
-      const bgH = this.bgCanvas.height / dpr;
-      this.bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.bgCtx.clearRect(0, 0, bgW, bgH);
-
-      if (this.bgPattern) {
-        this.bgCtx.save();
-        this.bgCtx.scale(zoom, zoom);
-        this.bgCtx.translate(offset.x, offset.y);
-        this.bgCtx.fillStyle = this.bgPattern;
-        this.bgCtx.fillRect(
-          -offset.x - bgW / zoom,
-          -offset.y - bgH / zoom,
-          (bgW * 3) / zoom,
-          (bgH * 3) / zoom,
-        );
-        this.bgCtx.restore();
-      }
-    }
-
-    // Foreground canvas: element content + tool cursor
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.ctx.clearRect(0, 0, logicalW, logicalH);
-
-    this.ctx.save();
-    this.ctx.scale(zoom, zoom);
-    this.ctx.translate(offset.x, offset.y);
-
-    for (const element of this.elements) {
-      element.draw(this.ctx, deltaTime);
-    }
-    // Cursor: compute fresh from screen position so it's correct even if
-    // the user wheel-zoomed without moving the mouse since.
-    const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
-    if (this._placement) {
-      this.drawPlacementGhost(this.ctx, mouseWorld);
-    } else {
-      this.toolSelected.drawCursor(this.ctx, mouseWorld);
-    }
-    this.ctx.restore();
-
-    // Overlay canvas: selection outline + handles. Always above DOM chrome
-    // so selection stays visible while a page frame is being edited (the
-    // foreground canvas is lowered below chrome in that mode).
-    if (this.overlayCtx && this.overlayCanvas) {
-      const overlayW = this.overlayCanvas.width / dpr;
-      const overlayH = this.overlayCanvas.height / dpr;
-      this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.overlayCtx.clearRect(0, 0, overlayW, overlayH);
-      this.overlayCtx.save();
-      this.overlayCtx.scale(zoom, zoom);
-      this.overlayCtx.translate(offset.x, offset.y);
-      const editing = this._editingElement;
-      for (const element of this.elements) {
-        element.drawSelectionOverlay(this.overlayCtx, element === editing);
-      }
-      this.overlayCtx.restore();
-    }
-
-    const host = this._domOverlayHost;
-    if (host) {
-      for (const element of this.elements) {
-        element.syncDOM(this.viewport, host);
-      }
-    }
+    this.renderer.redraw(
+      deltaTime,
+      this.viewport,
+      this.elements,
+      this._editingElement,
+      this.toolSelected,
+      this.screenPosition,
+      this._placement,
+      this._domOverlayHost,
+    );
   }
 
   /**
@@ -865,35 +778,26 @@ export class DrawableCanvas {
    * treats that as "no clamp" so fresh documents stay fully pannable.
    */
   public getContentBounds(): DOMRect | null {
-    const boxes = this.elements
-      .map((e) => e.boundingBox)
-      .filter((b) => b.width > 0 || b.height > 0);
-    if (boxes.length === 0) {
-      return null;
-    }
-    const left = Math.min(...boxes.map((b) => b.left));
-    const top = Math.min(...boxes.map((b) => b.top));
-    const right = Math.max(...boxes.map((b) => b.right));
-    const bottom = Math.max(...boxes.map((b) => b.bottom));
-    return new DOMRect(left, top, right - left, bottom - top);
+    return unionBoundingBoxes(this.elements);
+  }
+
+  /**
+   * Union of non-hidden element bounding boxes, for thumbnail rendering.
+   * Empty content -> a zero-size DOMRect.
+   */
+  public get contentBounds(): DOMRect {
+    return (
+      unionBoundingBoxes(this.elements.filter((e) => !e.hidden)) ??
+      new DOMRect(0, 0, 0, 0)
+    );
   }
 
   public get elements(): DrawableElement[] {
-    if (!this._orderedSnapshot) {
-      const snapshot: DrawableElement[] = [];
-      for (const uuid of this._elementOrder) {
-        const element = this._elements.get(uuid);
-        if (element) {
-          snapshot.push(element);
-        }
-      }
-      this._orderedSnapshot = snapshot;
-    }
-    return this._orderedSnapshot;
+    return this._store.getOrdered();
   }
 
   public getElementByUuid(uuid: string): DrawableElement | null {
-    return this._elements.get(uuid) ?? null;
+    return this._store.byUuid(uuid);
   }
 
   public getSelectedElements(): DrawableElement[] {
@@ -974,21 +878,23 @@ export class DrawableCanvas {
       return false;
     }
 
-    this._elementOrder = moveElementOrderForSelection(
-      this.getElementOrderItems(),
-      selectedUuids,
-      direction,
+    this._store.setOrder(
+      moveElementOrderForSelection(
+        this.getElementOrderItems(),
+        selectedUuids,
+        direction,
+      ),
     );
-    this.invalidateOrderSnapshot();
     this.persistCurrentElementOrder();
     return true;
   }
 
   private persistCurrentElementOrder(): void {
+    const order = this._store.order();
     this._ydoc.undoManager.stopCapturing();
     this._ydoc.transact(() => {
-      for (let i = 0; i < this._elementOrder.length; i++) {
-        const yMap = this._elements.get(this._elementOrder[i])?.yMap;
+      for (let i = 0; i < order.length; i++) {
+        const yMap = this._store.byUuid(order[i])?.yMap;
         if (!yMap) {
           continue;
         }
@@ -1002,7 +908,7 @@ export class DrawableCanvas {
   }
 
   public clearSelection(): void {
-    for (const element of this._elements.values()) {
+    for (const element of this._store.all()) {
       element.unselect();
     }
   }
@@ -1010,33 +916,34 @@ export class DrawableCanvas {
   public selectElementsByUuid(uuids: readonly string[]): void {
     this.clearSelection();
     for (const uuid of uuids) {
-      this._elements.get(uuid)?.select();
+      this._store.byUuid(uuid)?.select();
     }
   }
 
   public selectAllElements(): void {
-    if (this._editingElement || this._placement) {
+    if (this._editingElement || this._placement.isActive) {
       return;
     }
-    for (const element of this._elements.values()) {
+    for (const element of this._store.all()) {
       element.select();
     }
   }
 
   private getZOrderForInsertion(position: number, background: boolean): number {
     const layer = background ? 0 : 1;
+    const order = this._store.order();
     let before: DrawableElement | null = null;
     let after: DrawableElement | null = null;
 
     for (let i = position - 1; i >= 0; i--) {
-      const element = this._elements.get(this._elementOrder[i]);
+      const element = this._store.byUuid(order[i]);
       if (element && getElementLayer(element.type) === layer) {
         before = element;
         break;
       }
     }
-    for (let i = position; i < this._elementOrder.length; i++) {
-      const element = this._elements.get(this._elementOrder[i]);
+    for (let i = position; i < order.length; i++) {
+      const element = this._store.byUuid(order[i]);
       if (element && getElementLayer(element.type) === layer) {
         after = element;
         break;
@@ -1068,11 +975,12 @@ export class DrawableCanvas {
       isBackgroundElement(
         (yMap.get('type') as ElementType | undefined) ?? ElementType.STROKE,
       );
+    const orderLength = this._store.order().length;
     const position = Math.max(
       0,
       Math.min(
-        options?.position ?? (background ? 0 : this._elementOrder.length),
-        this._elementOrder.length,
+        options?.position ?? (background ? 0 : orderLength),
+        orderLength,
       ),
     );
 
@@ -1088,10 +996,7 @@ export class DrawableCanvas {
       return null;
     }
 
-    this._elements.set(element.uuid, element);
-    this._elementOrder.splice(position, 0, element.uuid);
-    this._yMapToElement.set(yMap, element);
-    this.invalidateOrderSnapshot();
+    this._store.add(element, yMap, position);
     return element;
   }
 
@@ -1138,10 +1043,10 @@ export class DrawableCanvas {
 
     this._handlePointerDown = (evt) => {
       // One-shot placement intercepts primary-button clicks regardless of tool.
-      if (this._placement) {
+      if (this._placement.isActive) {
         if (evt.button === 0) {
           const worldPos = this.viewport.getPoint(evt);
-          this._placement.onPlace(worldPos);
+          this._placement.ghost?.onPlace(worldPos);
         }
         this.endPlacement();
         return;
@@ -1179,9 +1084,7 @@ export class DrawableCanvas {
     window.addEventListener('pointerup', this._handlePointerUp);
 
     this._handleResize = () => {
-      this.resizeCanvas(window.innerWidth, window.innerHeight);
-      this.resizeBgCanvas(window.innerWidth, window.innerHeight);
-      this.resizeOverlayCanvas(window.innerWidth, window.innerHeight);
+      this.renderer.handleWindowResize(window.innerWidth, window.innerHeight);
     };
     window.addEventListener('resize', this._handleResize);
   }
@@ -1200,7 +1103,7 @@ export class DrawableCanvas {
 
     // Build the Y.Map properties from the element's current state
     const background = isBackgroundElement(element.type);
-    const position = background ? 0 : this._elementOrder.length;
+    const position = background ? 0 : this._store.order().length;
     const props: Record<string, unknown> = {
       offsetX: element.offset.x,
       offsetY: element.offset.y,
@@ -1215,18 +1118,14 @@ export class DrawableCanvas {
     let yMap: Y.Map<unknown>;
     if (background) {
       yMap = this._ydoc.insertElementMap(0, element.type, uuid, props);
-      this._elementOrder.unshift(uuid);
     } else {
       yMap = this._ydoc.createElementMap(element.type, uuid, props);
-      this._elementOrder.push(uuid);
     }
-    this._elements.set(uuid, element);
 
     // Bind element to its Y.Map
     element.bindToYMap(yMap);
-    this._yMapToElement.set(yMap, element);
     this.bindElementSharedYState(element);
-    this.invalidateOrderSnapshot();
+    this._store.add(element, yMap, position);
 
     logger.debug('Added canvas element', {
       uuid: element.uuid,
@@ -1241,14 +1140,8 @@ export class DrawableCanvas {
     const yMap = element.yMap;
     if (yMap) {
       this._ydoc.removeElementMap(yMap);
-      this._yMapToElement.delete(yMap);
     }
-    if (this._elements.delete(element.uuid)) {
-      this._elementOrder = this._elementOrder.filter(
-        (uuid) => uuid !== element.uuid,
-      );
-      this.invalidateOrderSnapshot();
-    }
+    this._store.remove(element.uuid);
     element.disposeDOM();
     logger.debug('Removed canvas element', {
       uuid: element.uuid,
@@ -1262,7 +1155,7 @@ export class DrawableCanvas {
       return;
     }
     const selected: DrawableElement[] = [];
-    for (const element of this._elements.values()) {
+    for (const element of this._store.all()) {
       if (element.isSelected) {
         selected.push(element);
       }
@@ -1276,21 +1169,15 @@ export class DrawableCanvas {
         const yMap = e.yMap;
         if (yMap) {
           this._ydoc.removeElementMap(yMap);
-          this._yMapToElement.delete(yMap);
         }
       }
     });
     const removedUuids = new Set<string>();
     for (const e of selected) {
       e.disposeDOM();
-      this._elements.delete(e.uuid);
       removedUuids.add(e.uuid);
     }
-    this._elementOrder = this._elementOrder.filter(
-      (uuid) => !removedUuids.has(uuid),
-    );
-    this.invalidateOrderSnapshot();
-    this.updateBounding();
+    this._store.removeMany(removedUuids);
     logger.debug('Deleted selected canvas elements', {
       deletedElements: selected.map((element) => ({
         uuid: element.uuid,
@@ -1316,118 +1203,12 @@ export class DrawableCanvas {
 
   public switchTool(to: number) {
     this.toolSelected.interrupt(this);
-    for (const e of this._elements.values()) {
+    for (const e of this._store.all()) {
       e.unselect();
     }
     this.toolSelected = this.tools[to];
     this._toolCursor = 'default';
     this.updateCursor();
-  }
-
-  public updateBounding() {
-    let minX = Number.MAX_VALUE;
-    let minY = Number.MAX_VALUE;
-    let maxX = Number.MIN_VALUE;
-    let maxY = Number.MIN_VALUE;
-
-    for (const element of this._elements.values()) {
-      const rect = element.boundingBox;
-      if (rect.left < minX) {
-        minX = rect.left;
-      }
-      if (rect.right > maxX) {
-        maxX = rect.right;
-      }
-      if (rect.top < minY) {
-        minY = rect.top;
-      }
-      if (rect.bottom > maxY) {
-        maxY = rect.bottom;
-      }
-    }
-  }
-
-  private drawPlacementGhost(ctx: CanvasRenderingContext2D, worldPos: Vector2) {
-    if (!this._placement) {
-      return;
-    }
-    const b = this._placement.getBounds();
-    const x = worldPos.x + b.x;
-    const y = worldPos.y + b.y;
-
-    ctx.fillStyle = 'rgba(208, 225, 251, 0.18)';
-    ctx.beginPath();
-    ctx.roundRect(x, y, b.width, b.height, 6);
-    ctx.fill();
-
-    ctx.strokeStyle = '#2f3e46';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.roundRect(x, y, b.width, b.height, 6);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  private buildBgPattern(style: 'grid' | 'dots' | 'blank') {
-    if (style === 'blank') {
-      this.bgPattern = null;
-      return;
-    }
-
-    const spacing = 24;
-    const tile = new OffscreenCanvas(spacing, spacing);
-    const pctx = tile.getContext('2d')!;
-    const color = 'rgba(164, 168, 172, 0.35)';
-
-    if (style === 'dots') {
-      pctx.fillStyle = color;
-      pctx.beginPath();
-      pctx.arc(spacing / 2, spacing / 2, 0.75, 0, Math.PI * 2);
-      pctx.fill();
-    } else {
-      // grid
-      pctx.strokeStyle = color;
-      pctx.lineWidth = 0.5;
-      pctx.beginPath();
-      pctx.moveTo(spacing, 0);
-      pctx.lineTo(spacing, spacing);
-      pctx.moveTo(0, spacing);
-      pctx.lineTo(spacing, spacing);
-      pctx.stroke();
-    }
-
-    this.bgPattern = this.ctx.createPattern(tile, 'repeat');
-  }
-
-  private resizeCanvas(width: number, height: number) {
-    const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
-  }
-
-  private resizeBgCanvas(width: number, height: number) {
-    if (!this.bgCanvas) {
-      return;
-    }
-    const dpr = window.devicePixelRatio || 1;
-    this.bgCanvas.width = width * dpr;
-    this.bgCanvas.height = height * dpr;
-    this.bgCanvas.style.width = `${width}px`;
-    this.bgCanvas.style.height = `${height}px`;
-  }
-
-  private resizeOverlayCanvas(width: number, height: number) {
-    if (!this.overlayCanvas) {
-      return;
-    }
-    const dpr = window.devicePixelRatio || 1;
-    this.overlayCanvas.width = width * dpr;
-    this.overlayCanvas.height = height * dpr;
-    this.overlayCanvas.style.width = `${width}px`;
-    this.overlayCanvas.style.height = `${height}px`;
   }
 
   public setSpaceDown(value: boolean) {
@@ -1437,12 +1218,10 @@ export class DrawableCanvas {
 
   public undo() {
     this._ydoc.undoManager.undo();
-    this.updateBounding();
   }
 
   public redo() {
     this._ydoc.undoManager.redo();
-    this.updateBounding();
   }
 
   public static makeTools(getStrings: MessageGetter): ITool[] {

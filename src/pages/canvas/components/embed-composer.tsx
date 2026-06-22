@@ -23,7 +23,11 @@ type UrlState =
 const URL_PATTERN = /^https?:\/\/\S+/i;
 
 function isSupportedFile(file: File): boolean {
-  if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+  if (
+    file.type.startsWith('image/') ||
+    file.type.startsWith('audio/') ||
+    file.type === 'application/pdf'
+  ) {
     return true;
   }
   if (file.type === 'text/markdown' || file.type === 'text/x-markdown') {
@@ -461,7 +465,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,application/pdf,text/markdown,text/x-markdown,.md,.markdown,.mdx"
+        accept="image/*,audio/*,application/pdf,text/markdown,text/x-markdown,.md,.markdown,.mdx"
         multiple
         className="hidden"
         onChange={handleFileInput}

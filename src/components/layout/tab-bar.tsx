@@ -1,5 +1,13 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import { BookOpen, Columns2, Plus, Rows2, Settings, X } from 'lucide-react';
+import {
+  BookOpen,
+  Columns2,
+  Network,
+  Plus,
+  Rows2,
+  Settings,
+  X,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ContextMenu,
@@ -35,6 +43,8 @@ function tabIcon(target: TabTarget) {
   switch (target.type) {
     case 'library':
       return <BookOpen className="size-3 shrink-0" />;
+    case 'graph':
+      return <Network className="size-3 shrink-0" />;
     case 'settings':
       return <Settings className="size-3 shrink-0" />;
     default:
@@ -80,6 +90,10 @@ export const TabBar = memo(function TabBar({
   const handleNewTab = useCallback(() => {
     controller.openTab({ type: 'library' }, strings.tabBar.library, pane.id);
   }, [controller, pane.id, strings.tabBar.library]);
+
+  const handleGraph = useCallback(() => {
+    controller.openTab({ type: 'graph' }, strings.graph.title, pane.id);
+  }, [controller, pane.id, strings.graph.title]);
 
   const handleSettings = useCallback(() => {
     controller.openTab({ type: 'settings' }, strings.tabBar.settings, pane.id);
@@ -186,6 +200,15 @@ export const TabBar = memo(function TabBar({
       >
         <button
           type="button"
+          onClick={handleGraph}
+          aria-label={strings.graph.title}
+          title={strings.graph.title}
+          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        >
+          <Network className="size-3.5" />
+        </button>
+        <button
+          type="button"
           onClick={handleSettings}
           aria-label={strings.tabBar.settings}
           title={strings.tabBar.settings}
@@ -196,7 +219,7 @@ export const TabBar = memo(function TabBar({
       </div>
 
       {/* Frameless Windows has no native title bar, so the top-right pane's
-          bar carries the window controls (sits right of the settings button). */}
+          bar carries the window controls (sits right of the utility buttons). */}
       {isWindows && isTopRight && <WindowControls />}
     </div>
   );

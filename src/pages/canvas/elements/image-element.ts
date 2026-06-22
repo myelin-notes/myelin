@@ -72,15 +72,19 @@ export class ImageElement extends DrawableElement {
       },
       cropX: (v) => {
         this._cropX = v as number;
+        this.updateBox();
       },
       cropY: (v) => {
         this._cropY = v as number;
+        this.updateBox();
       },
       cropW: (v) => {
         this._cropW = v as number;
+        this.updateBox();
       },
       cropH: (v) => {
         this._cropH = v as number;
+        this.updateBox();
       },
       imageData: (v) => {
         const blob = new Blob([(v as Uint8Array).slice()]);

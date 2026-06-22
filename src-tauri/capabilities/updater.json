@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "updater",
+  "description": "Desktop auto-update: check for, download, install, and relaunch into new versions",
+  "platforms": ["macOS", "windows", "linux"],
+  "windows": ["*"],
+  "permissions": ["updater:default", "process:default", "process:allow-restart"]
+}

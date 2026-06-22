@@ -269,7 +269,7 @@ export function renderEmbedHost(
   hint: EmbedHint,
 ): EmbedHost {
   const host = document.createElement('div');
-  host.className = 'pm-embed-host';
+  host.className = 'pm-embed-host pm-page-capped';
   host.contentEditable = 'false';
 
   let cancelled = false;

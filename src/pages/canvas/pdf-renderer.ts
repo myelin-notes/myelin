@@ -275,7 +275,6 @@ export function renderPdfPageToCanvas(params: {
   const promise = (async () => {
     const page = await params.document.getPage(params.pageIndex + 1);
     if (cancelled) {
-      page.cleanup();
       throw createRenderCancelledError();
     }
 
@@ -297,11 +296,11 @@ export function renderPdfPageToCanvas(params: {
       viewport,
       background: 'rgb(255,255,255)',
     });
-    try {
-      await renderTask.promise;
-    } finally {
-      page.cleanup();
-    }
+    // No page.cleanup() here: keeping the page's operator-list/font caches
+    // makes re-renders (scroll back, zoom step) nearly free instead of a
+    // full worker round-trip. Callers clean up via cleanupPdfPage when a
+    // page's DOM is evicted.
+    await renderTask.promise;
   })();
 
   return {
@@ -311,6 +310,23 @@ export function renderPdfPageToCanvas(params: {
       renderTask?.cancel();
     },
   };
+}
+
+/**
+ * Release pdf.js's cached resources for one page. Best effort: getPage is
+ * served from pdf.js's internal page cache, and cleanup() refuses (returns
+ * false) while a render is still in flight.
+ */
+export function cleanupPdfPage(
+  document: PDFDocumentProxy,
+  pageIndex: number,
+): void {
+  void document.getPage(pageIndex + 1).then(
+    (page) => {
+      page.cleanup();
+    },
+    () => undefined,
+  );
 }
 
 export function isPdfRenderCancelled(error: unknown): boolean {

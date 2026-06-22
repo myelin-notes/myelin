@@ -37,6 +37,10 @@ const en = {
         label: 'Create note',
         description: 'Start a new canvas in the library root',
       },
+      openGraph: {
+        label: 'Open graph',
+        description: 'Map explicit links between canvas notes',
+      },
       importMarkdown: {
         label: 'Import Markdown',
         description: 'Create a canvas from a Markdown file',
@@ -65,6 +69,7 @@ const en = {
       'Your personal knowledge workspace. Create a canvas to start collecting ideas, notes, and research.',
     recentlyOpened: 'Recently Opened',
     searchPlaceholder: 'Search studio...',
+    semanticSearchLabel: 'Semantic search',
     explorer: 'Explorer',
     sortLabel: (label: string) => `Sort: ${label}`,
     sortModes: {
@@ -197,6 +202,23 @@ const en = {
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
     },
+  },
+  graph: {
+    title: 'Graph',
+    explicitLinks: 'Explicit links',
+    searchPlaceholder: 'Search graph...',
+    fit: 'Fit',
+    openNote: 'Open note',
+    emptySelection: 'Select a note to inspect its links.',
+    noCanvasNotes: 'No canvas notes yet.',
+    noLinks: 'Add explicit note links to connect this graph.',
+    loadFailed: 'Could not load graph.',
+    outgoing: 'Outgoing links',
+    backlinks: 'Backlinks',
+    graphStats: (notes: number, links: number) =>
+      `${notes} note${notes === 1 ? '' : 's'}, ${links} link${links === 1 ? '' : 's'}`,
+    linkCount: (incoming: number, outgoing: number) =>
+      `${outgoing} outgoing, ${incoming} backlink${incoming === 1 ? '' : 's'}`,
   },
   versionHistory: {
     title: 'Version History',
@@ -356,6 +378,51 @@ const en = {
         },
       },
     },
+    dataExport: {
+      title: 'Data',
+      eyebrow: 'Workspace',
+      export: {
+        label: 'Export as Obsidian Vault',
+        description:
+          'Save your whole workspace to a folder as an Obsidian-compatible vault. Notes become Markdown with frontmatter; other files are copied and the folder structure is preserved.',
+        button: 'Export',
+        defaultVaultName: 'Myelin Vault',
+        loading: 'Exporting Obsidian vault...',
+        progress: (current: number, total: number) =>
+          `Exporting ${current} of ${total}...`,
+        failed: 'Obsidian vault export failed',
+        succeeded: (notes: number, media: number) =>
+          `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
+      },
+    },
+    mcp: {
+      title: 'Model Context Protocol',
+      eyebrow: 'AI Agents',
+      enabled: {
+        label: 'Enable local MCP server',
+        description:
+          'Expose this running Myelin app to local AI agents on 127.0.0.1.',
+      },
+      port: {
+        label: 'Local port',
+        description:
+          'The server restarts on the new port when you leave the field.',
+      },
+      installPrompt: {
+        label: 'Agent install prompt',
+        description:
+          'Copy this into your agent to connect it to this running app.',
+        prompt: (endpoint: string) =>
+          `Install the Myelin MCP server for this running desktop app. Use Streamable HTTP with the endpoint ${endpoint}. Name the server myelin. This server is local to this computer, so Myelin must stay open with MCP enabled.`,
+      },
+      directWrites: {
+        label: 'Allow direct MCP writes',
+        description:
+          'Permit agents to create page frames and replace page-frame Markdown.',
+      },
+      startFailed: (port: number) =>
+        `Couldn't start the MCP server on port ${port}`,
+    },
     keybinds: {
       title: 'Keybinds',
       resetAll: 'Reset all',
@@ -384,6 +451,10 @@ const en = {
         'canvas:select-all': {
           label: 'Select All',
           description: 'Select everything on the canvas',
+        },
+        'canvas:find': {
+          label: 'Find in Canvas',
+          description: 'Search text and handwriting on this canvas',
         },
         'canvas:pan': {
           label: 'Pan',
@@ -446,6 +517,12 @@ const en = {
   },
   canvas: {
     kind: 'Canvas',
+    search: {
+      placeholder: 'Find in canvas',
+      noResults: 'No results',
+      next: 'Next match',
+      previous: 'Previous match',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },
@@ -476,6 +553,32 @@ const en = {
         label: 'Image or PDF',
         description: 'Drop in files or paste a URL',
       },
+      latex: {
+        label: 'LaTeX',
+        description: 'A math block you can write equations in',
+      },
+      audio: {
+        label: 'Audio',
+        description: 'Record or import a voice memo',
+      },
+    },
+    audioPlayer: {
+      requestingMic: 'Requesting microphone...',
+      requestingMicAccess: 'Requesting microphone access',
+      micUnavailable: 'Microphone unavailable',
+      tapToRecord: 'Tap to record',
+      waitingForRecording: 'Waiting for recording',
+      startRecording: 'Start recording',
+      stopRecording: 'Stop recording',
+      tryRecordingAgain: 'Try recording again',
+      playAudio: 'Play audio',
+      pauseAudio: 'Pause audio',
+      transcribe: 'Transcribe audio',
+      transcribing: 'Transcribing audio...',
+      showTranscript: 'Show transcript',
+      hideTranscript: 'Hide transcript',
+      noSpeechDetected: 'No speech detected',
+      transcriptionFailed: 'Transcription failed',
     },
     toolShelf: {
       title: 'Tool Shelf',

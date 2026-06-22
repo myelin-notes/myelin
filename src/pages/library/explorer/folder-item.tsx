@@ -28,13 +28,16 @@ export function FolderItem({
 
   const {
     renaming,
+    dragging,
     startRenaming,
     handleRemove,
     handleDragStart,
+    handleDragEnd,
     renameInputProps,
   } = useExplorerItem({
     nodeId: id,
     name,
+    dragKind: 'folder',
     onChanged: onMoved,
     initialRenaming: autoRename,
   });
@@ -57,6 +60,7 @@ export function FolderItem({
                 }
               }}
               onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
               {...dropTargetProps}
               aria-label={
                 renaming
@@ -67,7 +71,7 @@ export function FolderItem({
                 dragOver
                   ? 'bg-accent/15 ring-1 ring-accent/40'
                   : 'hover:bg-hover-tint'
-              }`}
+              } ${dragging ? 'opacity-40' : ''}`}
             />
           }
         >

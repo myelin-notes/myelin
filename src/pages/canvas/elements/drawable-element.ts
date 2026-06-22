@@ -5,7 +5,7 @@ import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
-import type { YDocManager } from '../ydoc-manager';
+import type { SyncOrigin, YDocManager } from '../ydoc-manager';
 import type { ElementType } from './element-type';
 
 export interface SelectionToolbarItem {
@@ -149,9 +149,12 @@ export abstract class DrawableElement {
   }
 
   /** Write key-value pairs to the backing Y.Map in a single transaction. */
-  protected syncToYMap(updates: Record<string, unknown>): void {
+  protected syncToYMap(
+    updates: Record<string, unknown>,
+    origin?: SyncOrigin,
+  ): void {
     if (this._yMap) {
-      writeYMap(this._yMap, updates);
+      writeYMap(this._yMap, updates, origin);
     }
   }
 
@@ -208,6 +211,31 @@ export abstract class DrawableElement {
    * being exported. No-op by default; drawable overlays (ink, text, image) override.
    */
   public drawToPdf(_ctx: PdfHarvestContext): void {}
+
+  /**
+   * Render this element into an off-screen thumbnail context. Async-rendering
+   * elements (e.g. PDF) override to prepare their raster ahead of `drawThumbnail`.
+   * No-op by default.
+   */
+  public async prepareThumbnail(
+    _maxScale: number,
+    _region: DOMRect,
+  ): Promise<void> {}
+
+  /**
+   * Prepare any async resource `drawToPdf` needs before a synchronous harvest
+   * pass (e.g. rasterizing HTML/math to a bitmap). The export path awaits this
+   * for each overlay element before harvesting. No-op by default.
+   */
+  public async prepareForPdf(): Promise<void> {}
+
+  /**
+   * Render this element into an off-screen thumbnail context. Reuses the 2D
+   * draw pass by default; DOM-backed elements override to paint their content.
+   */
+  public drawThumbnail(ctx: CanvasRenderingContext2D, deltaTime: number): void {
+    this.draw2D(ctx, deltaTime);
+  }
 
   /**
    * Draw the selection outline + handles. Lives on a separate always-on-top
@@ -319,6 +347,16 @@ export abstract class DrawableElement {
    * The selection outline still renders on the overlay canvas above chrome.
    */
   public get lowersCanvasWhileEditing(): boolean {
+    return false;
+  }
+
+  /**
+   * Whether editing this element locks the viewport to single-axis pan (and
+   * routes wheel/two-finger gestures to scrolling the element). This is a
+   * paged-surface behavior — only multi-page elements like the page frame want
+   * it; free-floating editors (text, LaTeX) should pan the canvas freely.
+   */
+  public get locksViewportPanWhileEditing(): boolean {
     return false;
   }
 

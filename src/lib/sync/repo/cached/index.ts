@@ -1,6 +1,7 @@
 import * as Y from 'yjs';
 import { Logger } from '@/lib/logger';
-import { summarizeNoteBytes } from '@/lib/note-state-summary';
+import { summarizeNoteBytes } from '@/lib/note/state-summary';
+import type { ReindexItem } from '@/lib/note-index';
 import { NoteSession } from '../../session';
 import type {
   YjsSyncPushOptions,
@@ -44,11 +45,14 @@ import type {
   CreateFileOptions,
   FileType,
   FileVersion,
+  NodeSearchResult,
   NoteBacklink,
   Repository,
   RepositoryCapabilities,
+  RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
+  SearchNodesOptions,
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
@@ -318,16 +322,26 @@ export class CachedRepository
     return this.cache.getFolderChain(folderId);
   }
 
-  async searchNodes(query: string): Promise<VFSNode[]> {
-    return this.cache.searchNodes(query);
+  async searchNodes(
+    query: string,
+    options?: SearchNodesOptions,
+  ): Promise<NodeSearchResult[]> {
+    return this.cache.searchNodes(query, options);
   }
 
-  async getNodesByAnyTag(tags: string[]): Promise<VFSNode[]> {
-    return this.cache.getNodesByAnyTag(tags);
+  async listIndexBackfillItems(): Promise<ReindexItem[]> {
+    return this.cache.listIndexBackfillItems();
   }
 
-  async listTags(): Promise<RepositoryTag[]> {
-    return this.cache.listTags();
+  async getNodesByAnyTag(
+    tags: string[],
+    folderId: VFSNodeId | null = null,
+  ): Promise<VFSNode[]> {
+    return this.cache.getNodesByAnyTag(tags, folderId);
+  }
+
+  async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
+    return this.cache.listTags(includeAncestors);
   }
 
   async getStats(): Promise<RepositoryStats> {
@@ -340,6 +354,10 @@ export class CachedRepository
 
   async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
     return this.cache.getBacklinks(noteId);
+  }
+
+  async getNoteGraph(): Promise<RepositoryNoteGraph> {
+    return this.cache.getNoteGraph();
   }
 
   async getUniqueFileName(
@@ -568,6 +586,10 @@ export class CachedRepository
     return this.cache.getRevealPath(nodeId);
   }
 
+  async getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
+    return this.cache.getStoredAbsolutePath(nodeId);
+  }
+
   async getCustomColors(): Promise<string[]> {
     return this.cache.getCustomColors();
   }
@@ -590,6 +612,13 @@ export class CachedRepository
     );
   }
 
+  // Tri-state return contract, relied on by enqueuePushNote/checkRawConflicts/
+  // applyRawFilePush:
+  //   undefined -> not a raw file (canvas/non-file); skip conflict check entirely
+  //   null      -> raw file whose base content is empty (computeRevision(empty))
+  //   string    -> raw file base content hash
+  // `undefined` (no check) and `null` (empty base) are distinct and must not be
+  // conflated.
   private async getRawFileBaseRevision(
     nodeId: VFSNodeId,
   ): Promise<string | null | undefined> {
@@ -818,6 +847,9 @@ export class CachedRepository
       await this.drainResolvedOps(plan.resolvedOps);
       return true;
     }
+    // Unreachable: every path inside the loop returns; the only `continue` is
+    // guarded by `attempt < 1`, so attempt 1 always returns. Kept to satisfy
+    // the compiler's all-paths-return check.
     return false;
   }
 

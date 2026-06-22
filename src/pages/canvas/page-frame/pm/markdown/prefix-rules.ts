@@ -27,10 +27,13 @@ export function buildPrefixMarkdownRules(schema: Schema) {
     }),
     textblockTypeInputRule(/^>\s$/, schema.nodes.blockquote),
     textblockTypeInputRule(/^[-*]\s$/, schema.nodes.bulletListItem),
-    new InputRule(/^\[([ xX])\]\s$/, (state, match, start, end) => {
+    new InputRule(/^\[([ xX]?)\]\s$/, (state, match, start, end) => {
       const { $from } = state.selection;
       const node = $from.parent;
-      if (node.type !== schema.nodes.bulletListItem) {
+      if (
+        node.type !== schema.nodes.paragraph &&
+        node.type !== schema.nodes.bulletListItem
+      ) {
         return null;
       }
       return state.tr

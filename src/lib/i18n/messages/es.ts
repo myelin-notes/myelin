@@ -39,6 +39,10 @@ const es: typeof en = {
         label: 'Crear nota',
         description: 'Crear un lienzo en la raíz de la biblioteca',
       },
+      openGraph: {
+        label: 'Abrir grafo',
+        description: 'Mapear enlaces explícitos entre notas de lienzo',
+      },
       importMarkdown: {
         label: 'Importar Markdown',
         description: 'Crear un lienzo desde un archivo Markdown',
@@ -67,6 +71,7 @@ const es: typeof en = {
       'Tu espacio personal de conocimiento. Crea un lienzo para empezar a recopilar ideas, notas e investigación.',
     recentlyOpened: 'Abiertos recientemente',
     searchPlaceholder: 'Buscar en el estudio...',
+    semanticSearchLabel: 'Búsqueda semántica',
     explorer: 'Navegador',
     sortLabel: (label: string) => `Ordenar: ${label}`,
     sortModes: {
@@ -200,6 +205,23 @@ const es: typeof en = {
       createNew: 'Crear nueva etiqueta',
       placeholder: 'Nombre de la etiqueta...',
     },
+  },
+  graph: {
+    title: 'Grafo',
+    explicitLinks: 'Enlaces explícitos',
+    searchPlaceholder: 'Buscar en el grafo...',
+    fit: 'Ajustar',
+    openNote: 'Abrir nota',
+    emptySelection: 'Selecciona una nota para inspeccionar sus enlaces.',
+    noCanvasNotes: 'Aún no hay notas de lienzo.',
+    noLinks: 'Agrega enlaces explícitos entre notas para conectar este grafo.',
+    loadFailed: 'No se pudo cargar el grafo.',
+    outgoing: 'Enlaces salientes',
+    backlinks: 'Backlinks',
+    graphStats: (notes: number, links: number) =>
+      `${notes} nota${notes === 1 ? '' : 's'}, ${links} enlace${links === 1 ? '' : 's'}`,
+    linkCount: (incoming: number, outgoing: number) =>
+      `${outgoing} salientes, ${incoming} backlink${incoming === 1 ? '' : 's'}`,
   },
   versionHistory: {
     title: 'Historial de versiones',
@@ -361,6 +383,51 @@ const es: typeof en = {
         },
       },
     },
+    dataExport: {
+      title: 'Datos',
+      eyebrow: 'Espacio de trabajo',
+      export: {
+        label: 'Exportar como bóveda de Obsidian',
+        description:
+          'Guarda todo tu espacio de trabajo en una carpeta como una bóveda compatible con Obsidian. Las notas se convierten en Markdown con frontmatter; los demás archivos se copian y se conserva la estructura de carpetas.',
+        button: 'Exportar',
+        defaultVaultName: 'Bóveda de Myelin',
+        loading: 'Exportando bóveda de Obsidian...',
+        progress: (current: number, total: number) =>
+          `Exportando ${current} de ${total}...`,
+        failed: 'No se pudo exportar la bóveda de Obsidian',
+        succeeded: (notes: number, media: number) =>
+          `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
+      },
+    },
+    mcp: {
+      title: 'Model Context Protocol',
+      eyebrow: 'Agentes de IA',
+      enabled: {
+        label: 'Habilitar servidor MCP local',
+        description:
+          'Expone esta app de Myelin en ejecución a agentes de IA locales en 127.0.0.1.',
+      },
+      port: {
+        label: 'Puerto local',
+        description:
+          'El servidor se reinicia en el nuevo puerto al salir del campo.',
+      },
+      installPrompt: {
+        label: 'Prompt de instalación para el agente',
+        description:
+          'Cópialo en tu agente para conectarlo a esta app en ejecución.',
+        prompt: (endpoint: string) =>
+          `Instala el servidor MCP de Myelin para esta app de escritorio en ejecución. Usa Streamable HTTP con el endpoint ${endpoint}. Nombra el servidor myelin. Este servidor es local en este equipo, así que Myelin debe permanecer abierto con MCP habilitado.`,
+      },
+      directWrites: {
+        label: 'Permitir escrituras MCP directas',
+        description:
+          'Permite que los agentes creen marcos de página y reemplacen Markdown de marcos de página.',
+      },
+      startFailed: (port: number) =>
+        `No se pudo iniciar el servidor MCP en el puerto ${port}`,
+    },
     keybinds: {
       title: 'Atajos de teclado',
       resetAll: 'Restablecer todo',
@@ -389,6 +456,10 @@ const es: typeof en = {
         'canvas:select-all': {
           label: 'Seleccionar todo',
           description: 'Seleccionar todo en el lienzo',
+        },
+        'canvas:find': {
+          label: 'Buscar en el lienzo',
+          description: 'Buscar texto y escritura a mano en este lienzo',
         },
         'canvas:pan': {
           label: 'Desplazar',
@@ -451,6 +522,12 @@ const es: typeof en = {
   },
   canvas: {
     kind: 'Lienzo',
+    search: {
+      placeholder: 'Buscar en el lienzo',
+      noResults: 'Sin resultados',
+      next: 'Coincidencia siguiente',
+      previous: 'Coincidencia anterior',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },
@@ -481,6 +558,32 @@ const es: typeof en = {
         label: 'Imagen o PDF',
         description: 'Arrastra archivos o pega una URL',
       },
+      latex: {
+        label: 'LaTeX',
+        description: 'Un bloque para escribir ecuaciones',
+      },
+      audio: {
+        label: 'Audio',
+        description: 'Graba o importa una nota de voz',
+      },
+    },
+    audioPlayer: {
+      requestingMic: 'Solicitando micrófono...',
+      requestingMicAccess: 'Solicitando acceso al micrófono',
+      micUnavailable: 'Micrófono no disponible',
+      tapToRecord: 'Toca para grabar',
+      waitingForRecording: 'Esperando grabación',
+      startRecording: 'Iniciar grabación',
+      stopRecording: 'Detener grabación',
+      tryRecordingAgain: 'Intentar grabar de nuevo',
+      playAudio: 'Reproducir audio',
+      pauseAudio: 'Pausar audio',
+      transcribe: 'Transcribir audio',
+      transcribing: 'Transcribiendo audio...',
+      showTranscript: 'Mostrar transcripción',
+      hideTranscript: 'Ocultar transcripción',
+      noSpeechDetected: 'No se detectó voz',
+      transcriptionFailed: 'No se pudo transcribir',
     },
     toolShelf: {
       title: 'Menú de herramientas',

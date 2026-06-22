@@ -19,6 +19,19 @@ permissions:
 
 env:
   NODE_OPTIONS: --max-old-space-size=4096
+  # Defining SOURCE_DATE_EPOCH makes ggml (whisper.cpp, pulled in via scribble ->
+  # whisper-rs) default GGML_NATIVE=OFF, so it builds a portable CPU baseline
+  # instead of auto-detecting the build host's features. Required on the Apple
+  # Silicon runners: native detection mis-enables the ARMv8.6 i8mm intrinsics and
+  # the CPU backend fails to compile ("vmmlaq_s32 ... requires target feature
+  # 'i8mm'"). It also keeps shipped binaries from assuming SIMD features that
+  # users' machines may lack. whisper-rs-sys only forwards WHISPER_*/CMAKE_* env
+  # vars to CMake, so this is the only knob that reaches GGML_NATIVE. Value just
+  # needs to be a valid post-1980 epoch (2024-01-01 here).
+  SOURCE_DATE_EPOCH: "1704067200"
+  # Must match the updater endpoint host in src-tauri/tauri.conf.json.
+  R2_BUCKET: myelin-updates
+  UPDATER_DOMAIN: https://pub-b609df54ffbc4104a99c47d9ac342457.r2.dev
 
 jobs:
   test:
@@ -108,9 +121,30 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ github.event.release.id }}
           args: ${{ matrix.args }}
+
+      - name: Stage updater artifacts
+        shell: bash
+        run: |
+          mkdir -p updater-out
+          # Copy every signed updater bundle alongside its .sig. Globbing by
+          # .sig keeps us platform-agnostic: each .sig names its own bundle.
+          while IFS= read -r sig; do
+            cp "$sig" updater-out/
+            cp "${sig%.sig}" updater-out/
+          done < <(find src-tauri/target -type f -name '*.sig')
+
+      - name: Upload updater artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-${{ matrix.platform }}${{ matrix.args && format('-{0}', matrix.args) || '' }}
+          path: updater-out/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload workflow artifacts
         if: github.event_name == 'workflow_dispatch'
@@ -122,6 +156,58 @@ jobs:
             src-tauri/target/release/bundle/**/*
           if-no-files-found: ignore
           retention-days: 14
+
+  publish-prerelease:
+    name: Publish prerelease to R2
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download updater artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: updater-*
+          path: incoming
+          merge-multiple: true
+
+      - name: Assemble manifest
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          node scripts/build-updater-manifest.mjs \
+            --dir incoming \
+            --version "$VERSION" \
+            --base-url "$UPDATER_DOMAIN/prerelease/$VERSION" \
+            --out latest.json
+          cat latest.json
+
+      - name: Prune old prerelease versions
+        run: node scripts/prune-prerelease.mjs
+
+      - name: Upload bundles + manifest to R2
+        run: |
+          for f in incoming/*; do
+            npx --yes wrangler@4 r2 object put \
+              "$R2_BUCKET/prerelease/$VERSION/$(basename "$f")" --file "$f" --remote
+          done
+          # Versioned copy lets promotion later fetch this exact version's manifest.
+          npx --yes wrangler@4 r2 object put \
+            "$R2_BUCKET/prerelease/$VERSION/latest.json" --file latest.json --remote
+          # The channel-root manifest is the live switch the app polls. Upload last.
+          npx --yes wrangler@4 r2 object put \
+            "$R2_BUCKET/prerelease/latest.json" --file latest.json --remote
 
   android:
     name: Build (android)

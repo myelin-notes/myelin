@@ -4,7 +4,9 @@ import {
   Download as DownloadIcon,
   Rows3 as RowsIcon,
 } from 'lucide-react';
+import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { Selection } from 'prosemirror-state';
+import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
@@ -18,10 +20,19 @@ import {
   type ExportTarget,
   openExportDialog,
 } from '../export/export-controller';
-import { serializeDocToMarkdownChunked } from '../page-frame/markdown-serializer';
-import { harvestPageFramePdf } from '../page-frame/page-frame-harvest';
+import { serializeDocToMarkdownChunked } from '../page-frame/markdown/serializer';
+import {
+  harvestPageFramePdf,
+  type PageFramePdfSource,
+} from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
+import { schema } from '../page-frame/pm/schema';
+import { renderPageFrameThumbnail } from '../page-frame/thumbnail/render';
+import {
+  type PdfExportOverlayElement,
+  prepareExportOverlays,
+} from '../pdf-element-export';
 import type { YDocManager } from '../ydoc-manager';
 import {
   DrawableElement,
@@ -33,10 +44,11 @@ import {
   CHROME_BOTTOM_PADDING,
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
-} from './frame-chrome';
+} from './frame/chrome';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
   normalizePageFrameDisplayName,
+  PAGE_CORNER_RADIUS,
   PAGE_GAP,
   PAGE_HEIGHT,
   PAGE_PADDING,
@@ -329,6 +341,10 @@ export class PageFrameElement extends DrawableElement {
     return true;
   }
 
+  public override get locksViewportPanWhileEditing(): boolean {
+    return true;
+  }
+
   public override bindSharedYState(ydoc: YDocManager): void {
     this.bindYProseMirror(ydoc.getXmlFragment(this.uuid));
   }
@@ -539,6 +555,26 @@ export class PageFrameElement extends DrawableElement {
     if (!path) {
       return { cancelled: true };
     }
+    const overlays = includeAnnotations
+      ? (this._exportElementsProvider?.() ?? [])
+      : [];
+    const source = this.getPdfExportSource(overlays);
+    if (!source) {
+      return {};
+    }
+    await prepareExportOverlays(overlays);
+    const { request, warnings } = await harvestPageFramePdf(source);
+    await exportPdfToRust(request, path);
+    return { warnings };
+  }
+
+  public getPdfExportSource(
+    overlays?: readonly PdfExportOverlayElement[],
+  ): PageFramePdfSource | null {
+    const contentDiv = this.contentDiv;
+    if (!contentDiv) {
+      return null;
+    }
     // Continuous frames have no page breaks: harvest them as a single page
     // sized to the whole strip (krilla allows an arbitrarily tall page), which
     // matches what's on screen exactly. Measure the editor's live height here
@@ -552,20 +588,18 @@ export class PageFrameElement extends DrawableElement {
           editorDom instanceof HTMLElement ? editorDom.offsetHeight : null,
         )
       : this._pageHeight;
-    const { request, warnings } = await harvestPageFramePdf({
+
+    return {
       contentDiv,
       numPages: continuous ? 1 : this._numPages,
       pageWidth: this._pageWidth,
       pageHeight,
       pageLayout: this._pageLayout === 'horizontal' ? 'horizontal' : 'vertical',
+      scale: { x: this.scale.x, y: this.scale.y },
       offset: { x: this.offset.x, y: this.offset.y },
       selfUuid: this.uuid,
-      overlays: includeAnnotations
-        ? (this._exportElementsProvider?.() ?? [])
-        : undefined,
-    });
-    await exportPdfToRust(request, path);
-    return { warnings };
+      overlays,
+    };
   }
 
   public setExportElementsProvider(
@@ -575,4 +609,53 @@ export class PageFrameElement extends DrawableElement {
   }
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
+
+  /**
+   * Resolve the current ProseMirror doc for reading (thumbnails, search): prefer
+   * the live editor doc — the view is created eagerly and kept alive for every
+   * frame, and it reflects in-flight edits — otherwise convert the Y.XmlFragment
+   * with the same helper the editor uses. Returns `null` if there's no content.
+   */
+  public getCurrentDoc(): ProseMirrorNode | null {
+    const liveDoc = this.pmEditor?.view?.state.doc;
+    if (liveDoc) {
+      return liveDoc;
+    }
+    const fragment = this._yXmlFragment;
+    if (!fragment || fragment.length === 0) {
+      return null;
+    }
+    return yXmlFragmentToProseMirrorRootNode(fragment, schema);
+  }
+
+  /**
+   * Paint the first page's white background and the document text into the
+   * off-screen thumbnail context. Runs in element-local coordinates (origin at
+   * the top-left of page 0), matching `drawThumbnail`'s caller transform.
+   */
+  public override drawThumbnail(
+    ctx: CanvasRenderingContext2D,
+    _deltaTime: number,
+  ): void {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, this._pageWidth, this._pageHeight, PAGE_CORNER_RADIUS);
+    ctx.fill();
+
+    const doc = this.getCurrentDoc();
+    if (!doc) {
+      return;
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, this._pageWidth, this._pageHeight);
+    ctx.clip();
+    ctx.translate(PAGE_PADDING, PAGE_PADDING);
+    renderPageFrameThumbnail(doc, ctx, {
+      width: this._pageWidth - PAGE_PADDING * 2,
+      maxHeight: this._pageHeight - PAGE_PADDING * 2,
+    });
+    ctx.restore();
+  }
 }

@@ -2,8 +2,8 @@
  * Harvest a page frame's rendered, paginated DOM into a display-list request for the
  * Rust renderer. The pagination is READ from the settled DOM (never recomputed), so
  * each PDF page's content matches the on-screen page exactly. Text is emitted as
- * selectable runs; code blocks are rasterized in place (Monaco can't be harvested
- * reliably).
+ * selectable runs; code blocks are rasterized in place (the code editor can't be
+ * harvested reliably).
  */
 
 import { toPng } from 'html-to-image';
@@ -37,6 +37,7 @@ export interface PageFramePdfSource {
   pageWidth: number;
   pageHeight: number;
   pageLayout: 'vertical' | 'horizontal';
+  scale?: { x: number; y: number };
   /** This frame's world offset (content top-left) — needed to place overlays. */
   offset: { x: number; y: number };
   /** This frame's uuid, so it isn't stamped onto itself as an overlay. */
@@ -45,7 +46,7 @@ export interface PageFramePdfSource {
   overlays?: readonly PdfExportOverlayElement[];
 }
 
-const CODE_BLOCK_SELECTOR = '.pm-monaco-code-block';
+const CODE_BLOCK_SELECTOR = '.pm-code-block';
 const ASCENT_RATIO = 0.8;
 const RULE_GRAY: [number, number, number] = [195, 199, 202];
 const TABLE_BORDER_GRAY: [number, number, number] = [210, 214, 218];
@@ -94,7 +95,7 @@ export async function harvestPageFramePdf(
 
     harvestDecorations(h, clone);
     harvestText(h, clone);
-    const failedBlocks = await harvestCodeBlocks(h, clone, source.contentDiv);
+    const failedBlocks = await harvestCodeBlocks(h, clone);
     harvestOverlays(h, source);
 
     const warnings: string[] = [];
@@ -423,30 +424,21 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
 async function harvestCodeBlocks(
   h: Harvester,
   clone: HTMLElement,
-  live: HTMLElement,
 ): Promise<number> {
   const cloneBlocks = clone.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTOR);
-  const liveBlocks = live.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTOR);
   let failed = 0;
 
   for (let i = 0; i < cloneBlocks.length; i++) {
     const cloneEl = cloneBlocks[i];
-    // Rasterize the LIVE Monaco block (the clone's Monaco DOM is inert/incomplete).
-    const liveEl = liveBlocks[i] ?? cloneEl;
-    // Position comes from the clone (pagination is baked into it); the box size comes
-    // from the live element we actually rasterize, so the PNG fills its box without
-    // stretch even if the two ever lay out at slightly different sizes.
     const cloneRect = cloneEl.getBoundingClientRect();
-    const liveRect = liveEl.getBoundingClientRect();
     if (cloneRect.width <= 0 || cloneRect.height <= 0) {
       continue;
     }
-    const boxW = liveRect.width > 0 ? liveRect.width : cloneRect.width;
-    const boxH = liveRect.height > 0 ? liveRect.height : cloneRect.height;
+    alignCodeBlockGutter(cloneEl);
 
     let dataUrl: string;
     try {
-      dataUrl = await toPng(liveEl, { pixelRatio: 2 });
+      dataUrl = await toPng(cloneEl, { pixelRatio: 2 });
     } catch (error) {
       failed++;
       logger.warn('Failed to rasterize code block for PDF export', {
@@ -468,12 +460,40 @@ async function harvestCodeBlocks(
       t: 'image',
       x,
       y,
-      w: pxToPt(boxW),
-      h: pxToPt(boxH),
+      w: pxToPt(cloneRect.width),
+      h: pxToPt(cloneRect.height),
       imageRef: ref,
     }));
   }
   return failed;
+}
+
+/**
+ * CodeMirror only measures line heights for editors that have been visible in
+ * the window: a code block that was never scrolled into view keeps the height
+ * oracle's defaults (14px rows) in its gutter inline styles, so the cloned
+ * gutter drifts out of alignment with the content lines (which lay out
+ * naturally). Rebuild the gutter rows from the content line geometry before
+ * rasterizing.
+ */
+function alignCodeBlockGutter(block: HTMLElement): void {
+  const gutter = block.querySelector<HTMLElement>('.cm-lineNumbers');
+  if (!gutter) {
+    return;
+  }
+  const lines = block.querySelectorAll<HTMLElement>('.cm-line');
+  const gutterEls = Array.from(
+    gutter.querySelectorAll<HTMLElement>('.cm-gutterElement'),
+    // CodeMirror's first gutter element is a hidden width spacer.
+  ).filter((el) => el.style.visibility !== 'hidden');
+  let prevBottom = gutter.getBoundingClientRect().top;
+  const count = Math.min(lines.length, gutterEls.length);
+  for (let i = 0; i < count; i++) {
+    const r = lines[i].getBoundingClientRect();
+    gutterEls[i].style.marginTop = `${r.top - prevBottom}px`;
+    gutterEls[i].style.height = `${r.height}px`;
+    prevBottom = r.top + r.height;
+  }
 }
 
 /**

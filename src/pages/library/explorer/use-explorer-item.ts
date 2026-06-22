@@ -3,7 +3,9 @@ import { Logger } from '@/lib/logger';
 import { type NoteBacklink, useRepository, type VFSNodeId } from '@/lib/sync';
 import { renameNoteReferences } from '@/lib/sync/repo/rename-note-references';
 import { UserPrefs } from '@/lib/user-prefs';
+import { createItemDragImage, type DragItemKind } from './create-drag-image';
 import { evaluateRenameDecision } from './rename-decision';
+import { suppressHoverUntilPointerMove } from './suppress-hover';
 
 const logger = new Logger('ExplorerItem');
 
@@ -23,6 +25,7 @@ interface PendingRenameReferencesPrompt extends RenameReferencesPrompt {
 interface UseExplorerItemOptions {
   nodeId: string;
   name: string;
+  dragKind: DragItemKind;
   onChanged: () => void | Promise<void>;
   initialRenaming?: boolean;
   renameReferencesOnRename?: boolean;
@@ -31,12 +34,14 @@ interface UseExplorerItemOptions {
 export function useExplorerItem({
   nodeId,
   name,
+  dragKind,
   onChanged,
   initialRenaming,
   renameReferencesOnRename,
 }: UseExplorerItemOptions) {
   const repository = useRepository();
   const [renaming, setRenaming] = useState(initialRenaming ?? false);
+  const [dragging, setDragging] = useState(false);
   const [renameValue, setRenameValue] = useState(name);
   const [pendingReferencesPrompt, setPendingReferencesPrompt] =
     useState<PendingRenameReferencesPrompt | null>(null);
@@ -168,10 +173,10 @@ export function useExplorerItem({
   const handleRemove = async () => {
     try {
       await repository.deleteNode(nodeId);
-      onChanged();
     } catch (err) {
       logger.error('Failed to delete node', err, { nodeId });
     }
+    await onChanged();
   };
 
   const handleDragStart = (e: React.DragEvent) => {
@@ -180,6 +185,17 @@ export function useExplorerItem({
       JSON.stringify({ nodeId }),
     );
     e.dataTransfer.effectAllowed = 'move';
+
+    const { element, cleanup } = createItemDragImage(name, dragKind);
+    e.dataTransfer.setDragImage(element, 16, element.offsetHeight / 2);
+    requestAnimationFrame(cleanup);
+
+    setDragging(true);
+  };
+
+  const handleDragEnd = () => {
+    setDragging(false);
+    suppressHoverUntilPointerMove();
   };
 
   const renameInputProps = {
@@ -201,9 +217,11 @@ export function useExplorerItem({
 
   return {
     renaming,
+    dragging,
     startRenaming,
     handleRemove,
     handleDragStart,
+    handleDragEnd,
     renameInputProps,
     renameReferencesPrompt: pendingReferencesPrompt
       ? {

@@ -1,0 +1,120 @@
+.pm-editor .ProseMirror .pm-md-note-link {
+  color: var(--accent-dark);
+  border-radius: 0.35rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--accent-dark) 45%,
+    transparent
+  );
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+/*
+ * The green highlight is painted directly on the span (not an absolutely
+ * positioned `::before`) with `box-decoration-break: clone` so every line
+ * fragment of a wrapped note link paints its own padded, rounded rectangle.
+ * Horizontal padding extends the fill ~0.14em past the text and the equal
+ * negative margin cancels the layout shift; the vertical padding/margin pair
+ * reproduces the former `inset-block: -0.08em` extension.
+ */
+.pm-editor .ProseMirror .pm-md-note-link {
+  padding: 0.08em 0.14em;
+  margin: -0.08em -0.14em;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.pm-editor .ProseMirror .pm-md-note-link.pm-md-delim {
+  color: color-mix(in srgb, var(--accent-dark) 40%, transparent);
+}
+
+/*
+ * When a note link is split into multiple spans (e.g., by an escape-`\\`
+ * decoration), each span's padded background would stack at the boundaries,
+ * doubling the green tint. Zero the inner padding/margin at any split-adjacent
+ * boundary so the backgrounds tile without overlap, keeping the outermost
+ * edges extended for visual padding.
+ */
+.pm-editor .ProseMirror .pm-md-note-link:has(+ .pm-md-note-link) {
+  padding-inline-end: 0;
+  margin-inline-end: 0;
+}
+.pm-editor .ProseMirror .pm-md-note-link + .pm-md-note-link {
+  padding-inline-start: 0;
+  margin-inline-start: 0;
+}
+
+.pm-editor .ProseMirror a.pm-link {
+  color: var(--text-link);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+.pm-editor .ProseMirror a.pm-link:hover {
+  text-decoration-thickness: 0.12em;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code.pm-selection::before,
+.pm-editor .ProseMirror .pm-selection .pm-md-inline-code::before,
+.pm-editor .ProseMirror .pm-md-inline-code:has(.pm-selection)::before {
+  opacity: 0;
+}
+
+/*
+ * A fully-selected note link renders as a SINGLE span carrying both
+ * `pm-md-note-link` and `pm-selection` — prosemirror-view merges overlapping
+ * inline decorations into one element. Because the green fill now lives on the
+ * span's own `background` (not a `::before`), the selection highlight has to be
+ * repainted here: clearing it to `transparent`, as the nested cases below do,
+ * would leave the link with no highlight at all and white-on-white text.
+ */
+.pm-editor .ProseMirror .pm-md-note-link.pm-selection {
+  background: Highlight;
+}
+
+/*
+ * When the selection only partially overlaps the link, the blue comes from a
+ * separate `.pm-selection` span, so the note-link span must drop its green fill
+ * to let that show through.
+ */
+.pm-editor .ProseMirror .pm-selection .pm-md-note-link,
+.pm-editor .ProseMirror .pm-md-note-link:has(.pm-selection) {
+  background: transparent;
+}
+
+.pm-editor .ProseMirror .pm-md-inline-code.pm-selection,
+.pm-editor .ProseMirror .pm-md-note-link.pm-selection,
+.pm-editor .ProseMirror .pm-selection .pm-md-inline-code,
+.pm-editor .ProseMirror .pm-selection .pm-md-note-link,
+.pm-editor .ProseMirror .pm-selection a.pm-link,
+.pm-editor .ProseMirror .pm-md-inline-code:has(.pm-selection),
+.pm-editor .ProseMirror .pm-md-note-link:has(.pm-selection),
+.pm-editor .ProseMirror .pm-md-inline-code .pm-selection,
+.pm-editor .ProseMirror .pm-md-note-link .pm-selection,
+.pm-editor .ProseMirror a.pm-link .pm-selection {
+  border-radius: 0;
+  color: HighlightText;
+}
+
+.pm-editor .ProseMirror .pm-md-note-link.pm-selection,
+.pm-editor .ProseMirror .pm-selection .pm-md-note-link,
+.pm-editor .ProseMirror .pm-md-note-link .pm-selection,
+.pm-editor .ProseMirror .pm-selection a.pm-link,
+.pm-editor .ProseMirror a.pm-link .pm-selection {
+  text-decoration-color: currentColor;
+}
+
+.pm-editor .ProseMirror .pm-md-code-fence {
+  letter-spacing: 0.015em;
+}
+
+.pm-editor .ProseMirror .pm-md-code-content {
+  color: var(--text-primary);
+}

@@ -3,6 +3,8 @@ import {
   FilePlus2 as FilePlusIcon,
   ImagePlus as ImagePlusIcon,
   type LucideIcon,
+  Mic as MicIcon,
+  Sigma as SigmaIcon,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
@@ -11,6 +13,8 @@ import { getInsertHotkey } from '@/pages/canvas/tools/tool-keybinds';
 interface InsertPopoverProps {
   onInsertFrame: () => void;
   onInsertEmbed: () => void;
+  onInsertLatex: () => void;
+  onInsertAudio: () => void;
   onClose: () => void;
 }
 
@@ -28,6 +32,8 @@ interface InsertItem {
 export function InsertPopover({
   onInsertFrame,
   onInsertEmbed,
+  onInsertLatex,
+  onInsertAudio,
   onClose,
 }: InsertPopoverProps) {
   const strings = useMessages();
@@ -82,6 +88,22 @@ export function InsertPopover({
       description: strings.canvas.insert.embed.description,
       hotkey: getInsertHotkey('embed'),
       onSelect: onInsertEmbed,
+    },
+    {
+      key: 'latex',
+      icon: SigmaIcon,
+      label: strings.canvas.insert.latex.label,
+      description: strings.canvas.insert.latex.description,
+      hotkey: '',
+      onSelect: onInsertLatex,
+    },
+    {
+      key: 'audio',
+      icon: MicIcon,
+      label: strings.canvas.insert.audio.label,
+      description: strings.canvas.insert.audio.description,
+      hotkey: '',
+      onSelect: onInsertAudio,
     },
   ];
 

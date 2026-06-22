@@ -35,10 +35,30 @@ export function registerThumbnailProducer(
   producer: ThumbnailProducer,
 ): () => void {
   producers.set(nodeId, producer);
+  let disposed = false;
   return () => {
-    if (producers.get(nodeId) === producer) {
-      producers.delete(nodeId);
+    if (disposed || producers.get(nodeId) !== producer) {
+      return;
     }
+    disposed = true;
+    const pending = debounceTimers.get(nodeId);
+    if (pending !== undefined) {
+      globalThis.clearTimeout(pending);
+      debounceTimers.delete(nodeId);
+      // Flush while the producer is still registered: a final snapshot on
+      // close beats silently dropping the latest edits.
+      void runGenerate(nodeId, 'immediate')
+        .catch((err) => {
+          logger.error('Unregister flush failed', err, { nodeId });
+        })
+        .finally(() => {
+          if (producers.get(nodeId) === producer) {
+            producers.delete(nodeId);
+          }
+        });
+      return;
+    }
+    producers.delete(nodeId);
   };
 }
 
@@ -100,6 +120,10 @@ export function subscribeThumbnail(
       subscribers.delete(nodeId);
     }
   };
+}
+
+export async function clearAllThumbnails(): Promise<void> {
+  await cache.clearAll();
 }
 
 export async function removeThumbnail(nodeId: VFSNodeId): Promise<void> {

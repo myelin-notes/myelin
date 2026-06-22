@@ -8,6 +8,7 @@ import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { Logger } from '@/lib/logger';
 import { bytesToBase64, exportPdf } from '@/lib/pdf-export/client';
+import { CanvasPool } from '../canvas-pool';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
 import {
@@ -19,9 +20,12 @@ import {
 import {
   buildPdfElementRequest,
   type PdfElementExportPage,
+  type PdfElementExportPdfPage,
   type PdfElementExportSource,
+  prepareExportOverlays,
 } from '../pdf-element-export';
 import {
+  cleanupPdfPage,
   createDefaultPdfPageOrder,
   getPdfDocumentPageSizes,
   getPdfRenderScale,
@@ -42,7 +46,7 @@ import {
   CHROME_SIDE_PADDING,
   FrameChrome,
   getFrameChromeControlsLayer,
-} from './frame-chrome';
+} from './frame/chrome';
 import {
   PAGE_GAP,
   PAGE_HEIGHT,
@@ -58,6 +62,13 @@ const logger = new Logger('PdfElement');
 const DEFAULT_PAGE_SIZE: PdfPageSize = { w: PAGE_WIDTH, h: PAGE_HEIGHT };
 const PAGE_RENDER_MARGIN = PAGE_GAP * 2;
 const PDF_RENDER_DEBOUNCE_MS = 120;
+// Screen-px viewport movement per sync frame above which a scroll counts as
+// "fast": first renders of newly visible pages are debounced instead of
+// started immediately, so a fling doesn't queue a worker render per page.
+const FAST_SCROLL_PX_PER_FRAME = 24;
+// Staging canvases kept (at size) between renders to avoid reallocating a
+// page-sized backing store for every render.
+const STAGING_CANVAS_POOL_SIZE = 2;
 const GAP_BUTTON_SIZE = 24;
 const DELETE_BUTTON_SIZE = 24;
 const DELETE_BUTTON_OFFSET = 16;
@@ -175,6 +186,13 @@ export class PdfElement extends DrawableElement {
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
     null;
   private _pageOrderCustom = false;
+  private _stagingCanvasPool = new CanvasPool(STAGING_CANVAS_POOL_SIZE);
+  private _lastSyncScreenOffset: { x: number; y: number } | null = null;
+  private _thumbnailPages: {
+    canvas: HTMLCanvasElement;
+    page: PdfElementExportPdfPage;
+  }[] = [];
+  private _pdfLoadPromise: Promise<void> | null = null;
 
   constructor(uuid: string, pageLayout: PageLayout = 'vertical') {
     super(uuid, ElementType.PDF);
@@ -245,7 +263,11 @@ export class PdfElement extends DrawableElement {
       pdfData: (v) => {
         const isReplacingPdf = this._pdfBytes !== null;
         this._pdfBytes = cloneBytes(v as Uint8Array);
-        void this.loadPdfBytes(this._pdfBytes, true, isReplacingPdf);
+        this._pdfLoadPromise = this.loadPdfBytes(
+          this._pdfBytes,
+          true,
+          isReplacingPdf,
+        );
       },
       fileName: (v) => {
         this._fileName = (v as string) ?? '';
@@ -271,7 +293,7 @@ export class PdfElement extends DrawableElement {
       fileName,
     });
 
-    void this.loadPdfBytes(this._pdfBytes, false, false);
+    this._pdfLoadPromise = this.loadPdfBytes(this._pdfBytes, false, false);
   }
 
   public get fileName(): string {
@@ -383,10 +405,96 @@ export class PdfElement extends DrawableElement {
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
+  /**
+   * Render the pages visible in the capture region into cached offscreen
+   * canvases so the thumbnail can blit them. Uses dedicated canvases (not the
+   * on-screen staging pool) so thumbnail rendering never evicts or contends
+   * with live page renders.
+   */
+  public override async prepareThumbnail(
+    scale: number,
+    region: DOMRect,
+  ): Promise<void> {
+    this._thumbnailPages = [];
+
+    // The capture can fire before the PDF bytes finish opening; wait for the
+    // in-flight load instead of producing a blank thumbnail.
+    await this._pdfLoadPromise;
+
+    const pdfDocument = this._pdfDocument;
+    if (!pdfDocument) {
+      return;
+    }
+
+    const scaleX = getPositiveScale(this._scale.x);
+    const scaleY = getPositiveScale(this._scale.y);
+
+    for (const page of this.getLayout().pages) {
+      if (
+        page.kind !== 'pdf' ||
+        !this.isPageVisible(
+          region,
+          page.localLeft,
+          page.localTop,
+          page.size,
+          scaleX,
+          scaleY,
+        )
+      ) {
+        continue;
+      }
+
+      // The thumbnail context is scaled by `scale`, which plays the role the
+      // viewport zoom plays for the live render.
+      const renderScale = getPdfRenderScale({
+        pageSize: page.size,
+        zoom: scale,
+        elementScale: Math.max(scaleX, scaleY),
+        dpr: 1,
+      });
+
+      const canvas = document.createElement('canvas');
+      try {
+        await renderPdfPageToCanvas({
+          document: pdfDocument,
+          pageIndex: page.originalIndex,
+          canvas,
+          renderScale,
+        }).promise;
+      } catch (error) {
+        if (!isPdfRenderCancelled(error)) {
+          logger.error('Failed to render PDF thumbnail page', error, {
+            uuid: this.uuid,
+            fileName: this._fileName,
+            pageIndex: page.originalIndex,
+          });
+        }
+        continue;
+      }
+
+      this._thumbnailPages.push({ canvas, page });
+    }
+  }
+
+  public override drawThumbnail(
+    ctx: CanvasRenderingContext2D,
+    _deltaTime: number,
+  ): void {
+    for (const { canvas, page } of this._thumbnailPages) {
+      ctx.drawImage(
+        canvas,
+        page.localLeft,
+        page.localTop,
+        page.size.w,
+        page.size.h,
+      );
+    }
+  }
+
   private async runExport({
     includeAnnotations,
   }: ExportOptions): Promise<ExportResult> {
-    const source = this.getExportSource();
+    const source = this.getPdfExportSource();
     if (!source) {
       return {};
     }
@@ -400,13 +508,14 @@ export class PdfElement extends DrawableElement {
     const overlays = includeAnnotations
       ? (this._exportElementsProvider?.() ?? [])
       : [];
+    await prepareExportOverlays(overlays);
     const request = buildPdfElementRequest(source, overlays);
     request.originalPdfB64 = bytesToBase64(source.pdfBytes);
     await exportPdf(request, path);
     return {};
   }
 
-  private getExportSource(): PdfElementExportSource | null {
+  public getPdfExportSource(): PdfElementExportSource | null {
     if (!this._pdfBytes) {
       return null;
     }
@@ -466,6 +575,9 @@ export class PdfElement extends DrawableElement {
     super.disposeDOM();
     this._loadGeneration++;
     this.cancelPageRenders();
+    this._stagingCanvasPool.drain();
+    this._thumbnailPages = [];
+    this._lastSyncScreenOffset = null;
     void this._pdfDocument?.destroy();
     this._pdfDocument = null;
     this._pageDoms.clear();
@@ -769,9 +881,28 @@ export class PdfElement extends DrawableElement {
     }
   }
 
-  private disposePageDom(pageDom: PdfPageDom): void {
+  private disposePageDom(
+    pageDom: PdfPageDom,
+    livePageIndices?: Set<number>,
+  ): void {
+    // Renders no longer cleanup() per pass, so release pdf.js's page caches
+    // when the page's dom is evicted instead.
+    const cachedPageIndex =
+      pageDom.rendered?.pageIndex ?? pageDom.rendering?.pageIndex;
     this.releasePageRender(pageDom, true);
     pageDom.root.remove();
+    // Skip cleanup when another surviving dom still uses this page index:
+    // scroll jitter at the retain edge can evict then immediately re-create a
+    // page whose render is rAF/debounce-scheduled, so cleanup() (which only
+    // refuses while a render is in flight) would wipe caches the pending
+    // render is about to reuse.
+    if (
+      this._pdfDocument &&
+      cachedPageIndex !== undefined &&
+      !livePageIndices?.has(cachedPageIndex)
+    ) {
+      cleanupPdfPage(this._pdfDocument, cachedPageIndex);
+    }
   }
 
   private releasePageRender(
@@ -823,6 +954,19 @@ export class PdfElement extends DrawableElement {
     const dpr = window.devicePixelRatio || 1;
     const activePagePositions = new Set<number>();
 
+    const screenOffset = {
+      x: viewport.offset.x * zoom,
+      y: viewport.offset.y * zoom,
+    };
+    const lastOffset = this._lastSyncScreenOffset;
+    this._lastSyncScreenOffset = screenOffset;
+    const fastScroll =
+      lastOffset !== null &&
+      Math.max(
+        Math.abs(screenOffset.x - lastOffset.x),
+        Math.abs(screenOffset.y - lastOffset.y),
+      ) > FAST_SCROLL_PX_PER_FRAME;
+
     if (!this.isLayoutVisible(worldRect, layout, scaleX, scaleY)) {
       this.removeInactivePageDoms(activePagePositions);
       return;
@@ -833,34 +977,53 @@ export class PdfElement extends DrawableElement {
       layout,
       scaleX,
       scaleY,
+      PAGE_RENDER_MARGIN,
+    );
+    // Rendered bitmaps within a viewport's reach of the visible range are
+    // kept alive instead of evicted, so scrolling back doesn't re-render
+    // through the pdf.js worker. The retained count scales with 1/zoom while
+    // bitmap size scales with zoom², keeping memory roughly constant.
+    const retainMargin =
+      PAGE_RENDER_MARGIN +
+      (this._pageLayout === 'horizontal' ? worldRect.width : worldRect.height);
+    const retainRange = this.getVisiblePageRange(
+      worldRect,
+      layout,
+      scaleX,
+      scaleY,
+      retainMargin,
     );
     for (
-      let pagePosition = visibleRange.start;
-      pagePosition < visibleRange.end;
+      let pagePosition = retainRange.start;
+      pagePosition < retainRange.end;
       pagePosition++
     ) {
       const page = layout.pages[pagePosition];
 
-      if (
-        !this.isPageVisible(
+      const visible =
+        pagePosition >= visibleRange.start &&
+        pagePosition < visibleRange.end &&
+        this.isPageVisible(
           worldRect,
           page.localLeft,
           page.localTop,
           page.size,
           scaleX,
           scaleY,
-        )
-      ) {
-        continue;
-      }
+        );
 
       let pageDom = this._pageDoms.get(pagePosition);
       if (!pageDom) {
+        if (!visible) {
+          continue;
+        }
         pageDom = this.createPageDom(contentRoot);
         this._pageDoms.set(pagePosition, pageDom);
       }
       activePagePositions.add(pagePosition);
 
+      // Geometry syncs for retained pages too — a stale transform from a
+      // previous zoom level could place an off-range dom inside the viewport.
       const cssLeft = page.localLeft * scaleX * zoom;
       const cssTop = page.localTop * scaleY * zoom;
       const cssWidth = page.size.w * scaleX * zoom;
@@ -869,6 +1032,11 @@ export class PdfElement extends DrawableElement {
       pageDom.root.style.transform = `translate(${cssLeft}px, ${cssTop}px)`;
       pageDom.root.style.width = `${cssWidth}px`;
       pageDom.root.style.height = `${cssHeight}px`;
+
+      if (!visible) {
+        // Retain-only: keep the dom and its rendered bitmap, render nothing.
+        continue;
+      }
 
       const renderScale = getPdfRenderScale({
         pageSize: page.size,
@@ -883,6 +1051,7 @@ export class PdfElement extends DrawableElement {
           page.size,
           renderScale,
           zoom,
+          fastScroll,
         );
       } else {
         this.releasePageRender(pageDom, true);
@@ -1134,9 +1303,23 @@ export class PdfElement extends DrawableElement {
   }
 
   private removeInactivePageDoms(activePagePositions: Set<number>): void {
+    const livePageIndices = new Set<number>();
     for (const [pagePosition, pageDom] of this._pageDoms) {
       if (!activePagePositions.has(pagePosition)) {
-        this.disposePageDom(pageDom);
+        continue;
+      }
+      const pageIndex =
+        pageDom.rendered?.pageIndex ??
+        pageDom.rendering?.pageIndex ??
+        pageDom.pendingRender?.key.pageIndex;
+      if (pageIndex !== undefined) {
+        livePageIndices.add(pageIndex);
+      }
+    }
+
+    for (const [pagePosition, pageDom] of this._pageDoms) {
+      if (!activePagePositions.has(pagePosition)) {
+        this.disposePageDom(pageDom, livePageIndices);
         this._pageDoms.delete(pagePosition);
       }
     }
@@ -1165,12 +1348,11 @@ export class PdfElement extends DrawableElement {
     layout: PdfLayout,
     scaleX: number,
     scaleY: number,
+    margin: number,
   ): { start: number; end: number } {
     if (this._pageLayout === 'horizontal') {
-      const localLeft =
-        (worldRect.left - PAGE_RENDER_MARGIN - this.offset.x) / scaleX;
-      const localRight =
-        (worldRect.right + PAGE_RENDER_MARGIN - this.offset.x) / scaleX;
+      const localLeft = (worldRect.left - margin - this.offset.x) / scaleX;
+      const localRight = (worldRect.right + margin - this.offset.x) / scaleX;
 
       return {
         start: this.findFirstPageEndingAtOrAfter(layout, localLeft),
@@ -1178,10 +1360,8 @@ export class PdfElement extends DrawableElement {
       };
     }
 
-    const localTop =
-      (worldRect.top - PAGE_RENDER_MARGIN - this.offset.y) / scaleY;
-    const localBottom =
-      (worldRect.bottom + PAGE_RENDER_MARGIN - this.offset.y) / scaleY;
+    const localTop = (worldRect.top - margin - this.offset.y) / scaleY;
+    const localBottom = (worldRect.bottom + margin - this.offset.y) / scaleY;
 
     return {
       start: this.findFirstPageEndingAtOrAfter(layout, localTop),
@@ -1259,6 +1439,7 @@ export class PdfElement extends DrawableElement {
     pageSize: PdfPageSize,
     renderScale: number,
     zoom: number,
+    fastScroll: boolean,
   ): void {
     const pdfDocument = this._pdfDocument;
     if (!pdfDocument) {
@@ -1281,14 +1462,16 @@ export class PdfElement extends DrawableElement {
       pageDom.pendingRender &&
       isSameRenderKey(pageDom.pendingRender.key, key)
     ) {
-      if (pageDom.pendingRender.zoom === zoom) {
+      // While scrolling fast, keep pushing the debounce out so the render
+      // fires once the viewport settles instead of mid-fling.
+      if (!fastScroll && pageDom.pendingRender.zoom === zoom) {
         return;
       }
       this.schedulePageRender(pageDom, pageIndex, pageSize, renderScale, zoom);
       return;
     }
 
-    if (pageDom.rendered?.pageIndex === pageIndex) {
+    if (fastScroll || pageDom.rendered?.pageIndex === pageIndex) {
       this.schedulePageRender(pageDom, pageIndex, pageSize, renderScale, zoom);
       return;
     }
@@ -1333,7 +1516,7 @@ export class PdfElement extends DrawableElement {
     pageDom.renderHandle?.cancel();
     pageDom.rendering = { pageIndex, renderScale };
 
-    const renderCanvas = document.createElement('canvas');
+    const renderCanvas = this._stagingCanvasPool.acquire();
     const handle = renderPdfPageToCanvas({
       document: pdfDocument,
       pageIndex,
@@ -1374,8 +1557,7 @@ export class PdfElement extends DrawableElement {
         });
       })
       .finally(() => {
-        renderCanvas.width = 1;
-        renderCanvas.height = 1;
+        this._stagingCanvasPool.release(renderCanvas);
       });
   }
 

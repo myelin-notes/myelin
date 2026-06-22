@@ -7,11 +7,14 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { handwritingService } from '@/lib/handwriting';
 import { Logger } from '@/lib/logger';
-import type {
-  ActiveRepository,
-  RepositoryConfig,
-  RepositoryRuntimeStatus,
+import { noteIndexService } from '@/lib/note-index';
+import {
+  type ActiveRepository,
+  getRepositoryStorageKey,
+  type RepositoryConfig,
+  type RepositoryRuntimeStatus,
 } from './repo/config';
 import { createRepository } from './repo/factory';
 import {
@@ -146,6 +149,27 @@ export function RepositoryProvider({
           ...current,
           initializing: false,
         }));
+
+        // Hydrate the search corpus and backfill any unindexed notes in the
+        // background. The index cache is namespaced per repository; Rust skips
+        // notes whose content hash is unchanged.
+        handwritingService.init(getRepositoryStorageKey(resolvedConfig));
+        void noteIndexService
+          .init(getRepositoryStorageKey(resolvedConfig))
+          .then(() => repository.listIndexBackfillItems())
+          .then((items) => {
+            // A repo switch may have run cleanup (reset + next init) while this
+            // chain was resolving; bail so we don't backfill the previous repo's
+            // items under the now-current repo.
+            if (disposed) {
+              return;
+            }
+            noteIndexService.startBackfill(items);
+            handwritingService.startBackfill(items);
+          })
+          .catch((error) => {
+            logger.error('Failed to start note-index backfill', error);
+          });
       })
       .catch((error) => {
         if (disposed) {
@@ -162,6 +186,9 @@ export function RepositoryProvider({
     return () => {
       disposed = true;
       unsubscribeStatus();
+      // Drop the previous repo's search corpus so it can't leak into the next.
+      noteIndexService.reset();
+      handwritingService.reset();
       void repository.dispose().catch((error) => {
         logger.error('Failed to dispose repository', error);
       });

@@ -39,6 +39,10 @@ const zhHans: typeof en = {
         label: '创建笔记',
         description: '在资料库根目录创建新画布',
       },
+      openGraph: {
+        label: '打开图谱',
+        description: '映射画布笔记之间的显式链接',
+      },
       importMarkdown: {
         label: '导入 Markdown',
         description: '从 Markdown 文件创建画布',
@@ -66,6 +70,7 @@ const zhHans: typeof en = {
     emptyState: '你的个人知识工作区，创建画布即可开始收集想法、笔记与研究',
     recentlyOpened: '最近打开',
     searchPlaceholder: '搜索工作室...',
+    semanticSearchLabel: '语义搜索',
     explorer: '资源管理器',
     sortLabel: (label: string) => `排序：${label}`,
     sortModes: {
@@ -192,6 +197,23 @@ const zhHans: typeof en = {
       createNew: '创建新标签',
       placeholder: '标签名称...',
     },
+  },
+  graph: {
+    title: '图谱',
+    explicitLinks: '显式链接',
+    searchPlaceholder: '搜索图谱...',
+    fit: '适应',
+    openNote: '打开笔记',
+    emptySelection: '选择一条笔记以查看它的链接。',
+    noCanvasNotes: '还没有画布笔记。',
+    noLinks: '添加显式笔记链接来连接此图谱。',
+    loadFailed: '无法加载图谱。',
+    outgoing: '传出链接',
+    backlinks: '反向链接',
+    graphStats: (notes: number, links: number) =>
+      `${notes} 条笔记，${links} 条链接`,
+    linkCount: (incoming: number, outgoing: number) =>
+      `${outgoing} 条传出，${incoming} 条反向链接`,
   },
   versionHistory: {
     title: '版本历史',
@@ -343,6 +365,47 @@ const zhHans: typeof en = {
         },
       },
     },
+    dataExport: {
+      title: '数据',
+      eyebrow: '工作区',
+      export: {
+        label: '导出为 Obsidian 仓库',
+        description:
+          '将整个工作区保存到文件夹中，作为兼容 Obsidian 的仓库。笔记会转换为带 frontmatter 的 Markdown；其他文件会被复制，并保留文件夹结构。',
+        button: '导出',
+        defaultVaultName: 'Myelin 仓库',
+        loading: '正在导出 Obsidian 仓库...',
+        progress: (current: number, total: number) =>
+          `正在导出 ${current} / ${total}...`,
+        failed: 'Obsidian 仓库导出失败',
+        succeeded: (notes: number, media: number) =>
+          `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
+      },
+    },
+    mcp: {
+      title: 'Model Context Protocol',
+      eyebrow: 'AI 代理',
+      enabled: {
+        label: '启用本地 MCP 服务器',
+        description:
+          '将正在运行的 Myelin 应用暴露给 127.0.0.1 上的本地 AI 代理。',
+      },
+      port: {
+        label: '本地端口',
+        description: '离开输入框后，服务器将在新端口上重启。',
+      },
+      installPrompt: {
+        label: '代理安装提示词',
+        description: '复制到你的代理中，将它连接到正在运行的此应用。',
+        prompt: (endpoint: string) =>
+          `为正在运行的 Myelin 桌面应用安装 MCP 服务器。使用 Streamable HTTP，端点为 ${endpoint}。将服务器命名为 myelin。此服务器只在本机可用，因此 Myelin 必须保持打开并启用 MCP。`,
+      },
+      directWrites: {
+        label: '允许直接 MCP 写入',
+        description: '允许代理创建页面框并替换页面框 Markdown。',
+      },
+      startFailed: (port: number) => `无法在端口 ${port} 上启动 MCP 服务器`,
+    },
     keybinds: {
       title: '快捷键',
       resetAll: '全部重置',
@@ -370,6 +433,10 @@ const zhHans: typeof en = {
         'canvas:select-all': {
           label: '全选',
           description: '选中画布上的全部内容',
+        },
+        'canvas:find': {
+          label: '在画布中查找',
+          description: '搜索此画布上的文字和手写内容',
         },
         'canvas:pan': {
           label: '平移',
@@ -432,6 +499,12 @@ const zhHans: typeof en = {
   },
   canvas: {
     kind: '画布',
+    search: {
+      placeholder: '在画布中查找',
+      noResults: '无结果',
+      next: '下一个匹配',
+      previous: '上一个匹配',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },
@@ -462,6 +535,32 @@ const zhHans: typeof en = {
         label: '图片或 PDF',
         description: '拖入文件或粘贴链接',
       },
+      latex: {
+        label: 'LaTeX',
+        description: '可书写公式的数学块',
+      },
+      audio: {
+        label: '音频',
+        description: '录制或导入语音备忘',
+      },
+    },
+    audioPlayer: {
+      requestingMic: '正在请求麦克风...',
+      requestingMicAccess: '正在请求麦克风权限',
+      micUnavailable: '麦克风不可用',
+      tapToRecord: '点按录音',
+      waitingForRecording: '正在等待录音',
+      startRecording: '开始录音',
+      stopRecording: '停止录音',
+      tryRecordingAgain: '重新尝试录音',
+      playAudio: '播放音频',
+      pauseAudio: '暂停音频',
+      transcribe: '转录音频',
+      transcribing: '正在转录音频...',
+      showTranscript: '显示转录文本',
+      hideTranscript: '隐藏转录文本',
+      noSpeechDetected: '未检测到语音',
+      transcriptionFailed: '转录失败',
     },
     toolShelf: {
       title: '工具盘',
