@@ -400,6 +400,15 @@ const es: typeof en = {
           `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
       },
     },
+    privacy: {
+      title: 'Privacidad',
+      eyebrow: 'Datos de uso',
+      analytics: {
+        label: 'Compartir análisis de uso anónimos',
+        description:
+          'Envía análisis de producto e informes de errores anónimos para ayudar a mejorar Myelin. Cuando está desactivado, no se envía nada.',
+      },
+    },
     mcp: {
       title: 'Model Context Protocol',
       eyebrow: 'Agentes de IA',

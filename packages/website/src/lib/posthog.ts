@@ -9,10 +9,11 @@ const POSTHOG_HOST = (
 
 let initialized = false;
 
-// Initialize PostHog on the marketing site purely as an error tracker, mirroring
-// the desktop app. Events are tagged `source: 'website'` so they can be told
-// apart from the app. No-ops when no project key is configured.
-export function initWebErrorTracking(): void {
+// Initialize PostHog on the marketing site. Unlike the desktop app — where
+// product analytics are gated behind a setting — the website captures pageviews
+// and events unconditionally. Events are tagged `source: 'website'` so they can
+// be told apart from the app. No-ops when no project key is configured.
+export function initWebAnalytics(): void {
   if (initialized || !POSTHOG_KEY) {
     return;
   }
@@ -20,8 +21,8 @@ export function initWebErrorTracking(): void {
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
     autocapture: false,
-    capture_pageview: false,
-    capture_pageleave: false,
+    capture_pageview: true,
+    capture_pageleave: true,
     disable_session_recording: true,
     capture_exceptions: true,
   });
@@ -30,4 +31,15 @@ export function initWebErrorTracking(): void {
     source: 'website',
   });
   initialized = true;
+}
+
+// Capture a custom product event. No-ops until analytics are initialized.
+export function trackWebEvent(
+  event: string,
+  properties?: Record<string, unknown>,
+): void {
+  if (!initialized) {
+    return;
+  }
+  posthog.capture(event, properties);
 }

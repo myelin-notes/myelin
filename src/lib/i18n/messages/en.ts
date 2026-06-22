@@ -395,6 +395,15 @@ const en = {
           `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
       },
     },
+    privacy: {
+      title: 'Privacy',
+      eyebrow: 'Usage Data',
+      analytics: {
+        label: 'Share anonymous usage analytics',
+        description:
+          'Send anonymous product analytics and error reports to help improve Myelin. When off, nothing is sent.',
+      },
+    },
     mcp: {
       title: 'Model Context Protocol',
       eyebrow: 'AI Agents',

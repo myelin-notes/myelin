@@ -7,6 +7,7 @@ import { DataSection } from './sections/data-section';
 import { EditingSection } from './sections/editing-section';
 import { LanguageSection } from './sections/language-section';
 import { McpSection } from './sections/mcp-section';
+import { PrivacySection } from './sections/privacy-section';
 import { SyncSection } from './sections/sync-section';
 import { SettingsRail } from './settings-rail';
 import { SETTINGS_SECTIONS, type SettingsSectionId } from './settings-sections';
@@ -74,6 +75,7 @@ export function SettingsPage() {
               <EditingSection />
               <SyncSection />
               <DataSection />
+              <PrivacySection />
               <McpSection />
               <KeybindsSection />
             </div>

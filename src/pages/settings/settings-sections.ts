@@ -7,6 +7,7 @@ import {
   Keyboard,
   Languages,
   PenLine,
+  ShieldCheck,
 } from 'lucide-react';
 
 export type SettingsSectionId =
@@ -15,6 +16,7 @@ export type SettingsSectionId =
   | 'editing'
   | 'sync'
   | 'data'
+  | 'privacy'
   | 'mcp'
   | 'keybinds';
 
@@ -26,6 +28,7 @@ export interface SettingsSectionMeta {
     | 'pageFrameEditing'
     | 'repository'
     | 'dataExport'
+    | 'privacy'
     | 'mcp'
     | 'keybinds';
   icon: ComponentType<{ className?: string }>;
@@ -37,6 +40,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: 'editing', titleKey: 'pageFrameEditing', icon: PenLine },
   { id: 'sync', titleKey: 'repository', icon: Cloud },
   { id: 'data', titleKey: 'dataExport', icon: HardDriveDownload },
+  { id: 'privacy', titleKey: 'privacy', icon: ShieldCheck },
   { id: 'mcp', titleKey: 'mcp', icon: Bot },
   { id: 'keybinds', titleKey: 'keybinds', icon: Keyboard },
 ] as const;
