@@ -23,6 +23,10 @@ const {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>
+  <script>
+    import { initWebErrorTracking } from '../lib/posthog';
+    initWebErrorTracking();
+  </script>
   <body class="grain bg-page">
     <div class="relative z-10">
       <Nav />
