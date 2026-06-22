@@ -19,16 +19,12 @@ import {
   NOTE_JSON_VERSION,
   type NoteJson,
 } from '@/pages/library/export/workspace-json-format';
+import type { ImportProgress } from './dialog';
+import { createImportedFolders, getImportParentId } from './import-tree';
 
 const logger = new Logger('WorkspaceJsonImport');
 
 const JSON_EXTENSION_RE = /\.json$/i;
-
-export interface ImportProgress {
-  current: number;
-  total: number;
-  name: string;
-}
 
 export interface ImportWorkspaceJsonResult {
   rootFolderId: VFSNodeId;
@@ -72,12 +68,6 @@ export interface ScannedWorkspace {
 export function getPathName(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
   return normalized.split('/').pop()?.trim() || 'Workspace';
-}
-
-function getParentPath(path: string): string {
-  const parts = path.split('/');
-  parts.pop();
-  return parts.join('/');
 }
 
 /** Convert a base64-marked binary back to bytes; otherwise recurse structurally. */
@@ -176,39 +166,6 @@ async function scanDirectory(
   }
 }
 
-async function createImportedFolders(
-  repository: Repository,
-  rootFolderId: VFSNodeId,
-  folderPaths: Set<string>,
-): Promise<Map<string, VFSNodeId>> {
-  const folderIds = new Map<string, VFSNodeId>();
-  const sorted = [...folderPaths].sort(
-    (left, right) => left.split('/').length - right.split('/').length,
-  );
-
-  for (const folderPath of sorted) {
-    const parentPath = getParentPath(folderPath);
-    const parentId = parentPath ? folderIds.get(parentPath) : rootFolderId;
-    const name = folderPath.split('/').pop();
-    if (!name || !parentId) {
-      continue;
-    }
-    folderIds.set(folderPath, await repository.createFolder(name, parentId));
-  }
-
-  return folderIds;
-}
-
-function getImportParentId(
-  rootFolderId: VFSNodeId,
-  folderIds: ReadonlyMap<string, VFSNodeId>,
-  folderPath: string,
-): VFSNodeId {
-  return folderPath
-    ? (folderIds.get(folderPath) ?? rootFolderId)
-    : rootFolderId;
-}
-
 function parseNote(raw: string, absolutePath: string): NoteJson {
   const note = JSON.parse(raw) as NoteJson;
   if (note.version !== NOTE_JSON_VERSION) {
@@ -230,7 +187,7 @@ async function importNote({
 }: {
   note: NoteJson;
   repository: Repository;
-  parentId: VFSNodeId;
+  parentId: VFSNodeId | null;
   fallbackName: string;
 }): Promise<void> {
   const baseName = note.name?.trim() || fallbackName;
@@ -298,7 +255,7 @@ export async function importWorkspaceJson({
           .split('/')
           .pop()
           ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
-      onProgress?.({ current: ++current, total, name: fallbackName });
+      onProgress?.({ current: ++current, total, fileName: fallbackName });
       const note = parseNote(
         await readTextFile(file.absolutePath),
         file.absolutePath,
@@ -312,7 +269,7 @@ export async function importWorkspaceJson({
     }
 
     for (const file of scanned.media) {
-      onProgress?.({ current: ++current, total, name: file.name });
+      onProgress?.({ current: ++current, total, fileName: file.name });
       await repository.createFile(
         file.name,
         file.fileType,

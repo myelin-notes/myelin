@@ -1,6 +1,11 @@
 import { type Unzipped, unzip } from 'fflate';
 import type { Repository, VFSNodeId } from '@/lib/sync';
 import type { ImportProgress } from './dialog';
+import {
+  createImportedFolders,
+  getImportParentId,
+  getParentPath,
+} from './import-tree';
 import { importPdfFile } from './pdf';
 
 export const GOODNOTES_ZIP_FILE_ACCEPT =
@@ -55,12 +60,6 @@ function normalizeZipPath(path: string): string | null {
   return segments.join('/');
 }
 
-function getFolderPath(path: string): string {
-  const parts = path.split('/');
-  parts.pop();
-  return parts.join('/');
-}
-
 function addFolderAncestors(
   folderPaths: Set<string>,
   folderPath: string,
@@ -105,7 +104,7 @@ async function readGoodnotesZipEntries(
 
     pdfEntries.push({
       path,
-      folderPath: getFolderPath(path),
+      folderPath: getParentPath(path),
       fileName,
       bytes,
     });
@@ -125,51 +124,6 @@ function unzipArchive(bytes: Uint8Array): Promise<Unzipped> {
       resolve(archive);
     });
   });
-}
-
-async function createImportedFolders({
-  repository,
-  parentId,
-  folderPaths,
-}: {
-  repository: Repository;
-  parentId: VFSNodeId | null;
-  folderPaths: Set<string>;
-}): Promise<Map<string, VFSNodeId>> {
-  const folderIds = new Map<string, VFSNodeId>();
-  const sortedFolderPaths = [...folderPaths].sort(
-    (left, right) =>
-      left.split('/').length - right.split('/').length ||
-      left.localeCompare(right),
-  );
-
-  for (const folderPath of sortedFolderPaths) {
-    const parentPath = getFolderPath(folderPath);
-    const folderParentId = parentPath ? folderIds.get(parentPath) : parentId;
-    const name = folderPath.split('/').pop();
-    if (!name) {
-      continue;
-    }
-
-    folderIds.set(
-      folderPath,
-      await repository.createFolder(name, folderParentId ?? null),
-    );
-  }
-
-  return folderIds;
-}
-
-function getImportParentId({
-  parentId,
-  folderIds,
-  folderPath,
-}: {
-  parentId: VFSNodeId | null;
-  folderIds: ReadonlyMap<string, VFSNodeId>;
-  folderPath: string;
-}): VFSNodeId | null {
-  return folderPath ? (folderIds.get(folderPath) ?? parentId) : parentId;
 }
 
 function getFocusFolderId(
@@ -213,11 +167,7 @@ export async function importGoodnotesZip({
       addFolderAncestors(folderPaths, entry.folderPath);
     }
 
-    folderIds = await createImportedFolders({
-      repository,
-      parentId,
-      folderPaths,
-    });
+    folderIds = await createImportedFolders(repository, parentId, folderPaths);
 
     for (let index = 0; index < pdfEntries.length; index++) {
       const entry = pdfEntries[index];
@@ -231,11 +181,7 @@ export async function importGoodnotesZip({
           type: 'application/pdf',
         }),
         repository,
-        parentId: getImportParentId({
-          parentId,
-          folderIds,
-          folderPath: entry.folderPath,
-        }),
+        parentId: getImportParentId(parentId, folderIds, entry.folderPath),
         fallbackTitle,
       });
       if (!entry.folderPath) {

@@ -73,8 +73,7 @@ export function createWorkspaceJsonImportSource({
         parentId,
         dirPath,
         scanned,
-        onProgress: ({ current, total, name }) =>
-          onProgress({ current, total, fileName: name }),
+        onProgress,
       });
 
       return {
