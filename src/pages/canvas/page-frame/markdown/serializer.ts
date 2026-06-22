@@ -289,7 +289,7 @@ function textTail(s: string): string {
 }
 
 function escapeMarkdown(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/([*_`[\]])/g, '\\$1');
+  return text.replace(/\\/g, '\\\\').replace(/([*_`[\]~])/g, '\\$1');
 }
 
 /**

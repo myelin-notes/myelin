@@ -385,20 +385,33 @@ export class TabStateController {
     const preferredPaneId = paneId ?? state.focusedPaneId;
     const pane =
       findPane(state.layout, preferredPaneId) ?? findFirstPane(state.layout);
-    const existing = pane.tabs.find((tab) => targetsEqual(tab.target, target));
+    // When no pane is specified the caller is navigating to a document (link,
+    // command palette, dropped tab), so focus any existing tab anywhere in the
+    // layout to avoid two live editors on the same node. An explicit paneId is
+    // a deliberate placement and stays scoped to that pane.
+    const match =
+      paneId === undefined
+        ? findTabByTargetInLayout(state.layout, target)
+        : (() => {
+            const tab = pane.tabs.find((candidate) =>
+              targetsEqual(candidate.target, target),
+            );
+            return tab ? { tab, paneId: pane.id } : null;
+          })();
 
-    if (existing) {
+    if (match) {
+      const matchPane = findPane(state.layout, match.paneId)!;
       this.commit({
         layout: replacePane(state.layout, {
-          ...pane,
-          tabs: pane.tabs.map((tab) =>
-            tab.id === existing.id ? { ...tab, target, title } : tab,
+          ...matchPane,
+          tabs: matchPane.tabs.map((tab) =>
+            tab.id === match.tab.id ? { ...tab, target, title } : tab,
           ),
-          activeTabId: existing.id,
+          activeTabId: match.tab.id,
         }),
-        focusedPaneId: pane.id,
+        focusedPaneId: matchPane.id,
       });
-      return existing.id;
+      return match.tab.id;
     }
 
     const tab: Tab = {

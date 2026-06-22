@@ -278,12 +278,31 @@ export class GitHubRepository extends BaseRepository {
   // Sends an authenticated GET; on a 403/429 with a Retry-After or
   // X-RateLimit-Reset hint, sleeps once and retries. Re-issues authHeaders()
   // each attempt so a refreshed token is picked up.
-  private async fetchWithRateLimitRetry(
+  private fetchWithRateLimitRetry(
     url: string,
     init: { maxRedirections?: number } = {},
   ): Promise<Response> {
-    const send = async () =>
-      fetch(url, { method: 'GET', headers: await this.authHeaders(), ...init });
+    return this.sendWithRateLimitRetry(url, async () => ({
+      method: 'GET',
+      headers: await this.authHeaders(),
+      ...init,
+    }));
+  }
+
+  // Shared rate-limit-honoring transport. buildInit is re-invoked per attempt
+  // so authHeaders() (and any refreshed token) is picked up on retry. On a
+  // 403/429 with a Retry-After or X-RateLimit-Reset hint, sleeps once and
+  // retries; otherwise returns the response for the caller to handle.
+  private async sendWithRateLimitRetry(
+    url: string,
+    buildInit: () => Promise<{
+      method: string;
+      headers: Record<string, string>;
+      body?: string;
+      maxRedirections?: number;
+    }>,
+  ): Promise<Response> {
+    const send = async () => fetch(url, await buildInit());
     let response = await send();
     if (isRateLimited(response)) {
       const delayMs = readRateLimitDelayMs(response);
@@ -349,19 +368,22 @@ export class GitHubRepository extends BaseRepository {
     sha: string | null,
     message: string,
   ): Promise<string> {
-    const response = await fetch(this.contentsUrl(path), {
-      method: 'PUT',
-      headers: {
-        ...(await this.authHeaders()),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message,
-        content: base64EncodeBytes(bytes),
-        branch: this.config.branch,
-        ...(sha ? { sha } : {}),
+    const response = await this.sendWithRateLimitRetry(
+      this.contentsUrl(path),
+      async () => ({
+        method: 'PUT',
+        headers: {
+          ...(await this.authHeaders()),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          content: base64EncodeBytes(bytes),
+          branch: this.config.branch,
+          ...(sha ? { sha } : {}),
+        }),
       }),
-    });
+    );
 
     if (!response.ok) {
       throw await this.failureError('GitHub write request failed', response);
@@ -376,14 +398,17 @@ export class GitHubRepository extends BaseRepository {
     sha: string,
     message: string,
   ): Promise<void> {
-    const response = await fetch(this.contentsUrl(path), {
-      method: 'DELETE',
-      headers: {
-        ...(await this.authHeaders()),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message, sha, branch: this.config.branch }),
-    });
+    const response = await this.sendWithRateLimitRetry(
+      this.contentsUrl(path),
+      async () => ({
+        method: 'DELETE',
+        headers: {
+          ...(await this.authHeaders()),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message, sha, branch: this.config.branch }),
+      }),
+    );
 
     if (response.status === 404) {
       return;

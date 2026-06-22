@@ -36,6 +36,7 @@ export function RepositoryShutdownGate() {
     phase: 'idle',
     totalPending: 0,
   });
+  const [isShuttingDown, setIsShuttingDown] = useState(false);
   const [canForceQuit, setCanForceQuit] = useState(false);
   const shuttingDownRef = useRef(false);
   const repositoryRef = useRef(repository);
@@ -54,6 +55,7 @@ export function RepositoryShutdownGate() {
             return;
           }
           shuttingDownRef.current = true;
+          setIsShuttingDown(true);
 
           const totalPending =
             repositoryRef.current.getRuntimeStatus().pendingRemoteWrites;
@@ -100,7 +102,7 @@ export function RepositoryShutdownGate() {
   }, []);
 
   useEffect(() => {
-    if (shutdownState.phase !== 'flushing') {
+    if (!isShuttingDown) {
       return;
     }
     const timer = window.setTimeout(() => {
@@ -109,7 +111,7 @@ export function RepositoryShutdownGate() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [shutdownState.phase]);
+  }, [isShuttingDown]);
 
   const forceQuit = useCallback(() => {
     void getCurrentWindow()
@@ -119,7 +121,7 @@ export function RepositoryShutdownGate() {
       });
   }, []);
 
-  if (shutdownState.phase !== 'flushing') {
+  if (!isShuttingDown) {
     return null;
   }
 
@@ -133,7 +135,9 @@ export function RepositoryShutdownGate() {
         <div className="flex items-center justify-between text-text-secondary text-xs">
           <div className="flex items-center gap-2.5">
             <Loader2 className="size-4 shrink-0 animate-spin" />
-            {copy.progress(shutdownState.totalPending)}
+            {shutdownState.phase === 'flushing'
+              ? copy.progress(shutdownState.totalPending)
+              : copy.title}
           </div>
           {canForceQuit && (
             <Tooltip>
