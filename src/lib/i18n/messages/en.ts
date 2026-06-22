@@ -407,6 +407,18 @@ const en = {
         succeeded: (notes: number, media: number) =>
           `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
       },
+      importJson: {
+        label: 'Import Workspace from JSON',
+        description:
+          'Import a folder previously exported as JSON. Notes are rebuilt from their JSON files with strokes, text, and embedded media; other files are imported and the folder structure is preserved.',
+        button: 'Import',
+        loading: 'Importing workspace from JSON...',
+        progress: (current: number, total: number) =>
+          `Importing ${current} of ${total}...`,
+        failed: 'JSON import failed',
+        succeeded: (notes: number, media: number) =>
+          `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
+      },
     },
     privacy: {
       title: 'Privacy',

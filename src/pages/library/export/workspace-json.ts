@@ -7,6 +7,12 @@ import { ElementType } from '@/pages/canvas/elements/element-type';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
+  BYTES_MARKER,
+  base64EncodeBytes,
+  NOTE_JSON_VERSION,
+  type NoteJson,
+} from './workspace-json-format';
+import {
   type ExportPlan,
   type ExportProgress,
   type PlannedFile,
@@ -16,11 +22,6 @@ import {
 } from './workspace-plan';
 
 const logger = new Logger('WorkspaceJsonExport');
-
-/** Schema version stamped on each exported note, for future import migration. */
-export const NOTE_JSON_VERSION = 1;
-
-const BASE64_CHUNK_SIZE = 0x8000;
 
 export interface ExportWorkspaceJsonResult {
   vaultPath: string;
@@ -37,23 +38,15 @@ export interface ExportWorkspaceJsonOptions {
   onProgress?: (progress: ExportProgress) => void;
 }
 
-function base64EncodeBytes(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i += BASE64_CHUNK_SIZE) {
-    const chunk = bytes.subarray(i, i + BASE64_CHUNK_SIZE);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
-
 /**
  * Convert a value read out of an element's Y.Map into JSON-safe data. Binary
- * payloads (e.g. an image's bytes) become base64 strings; everything else is
- * passed through, recursing into arrays and plain objects.
+ * payloads (e.g. an image's bytes) become a {@link BYTES_MARKER} wrapper so the
+ * importer can decode them back; everything else is passed through, recursing
+ * into arrays and plain objects.
  */
 function toJsonValue(value: unknown): unknown {
   if (value instanceof Uint8Array) {
-    return base64EncodeBytes(value);
+    return { [BYTES_MARKER]: base64EncodeBytes(value) };
   }
   if (value instanceof Y.AbstractType) {
     return value.toJSON();
@@ -97,6 +90,17 @@ function elementJson(
   return element;
 }
 
+/** Serialize every element of a note's Y.Doc to JSON-safe objects. */
+export function serializeNoteElements(
+  ydoc: YDocManager,
+): Record<string, unknown>[] {
+  const elements: Record<string, unknown>[] = [];
+  for (let index = 0; index < ydoc.elements.length; index++) {
+    elements.push(elementJson(ydoc, ydoc.elements.get(index)));
+  }
+  return elements;
+}
+
 /** Encode a canvas note as a JSON document carrying all of its elements. */
 async function noteJson(
   repository: ReadableRepository,
@@ -107,19 +111,14 @@ async function noteJson(
     ? YDocManager.fromUpdate(snapshot.update)
     : new YDocManager();
 
-  const elements: Record<string, unknown>[] = [];
-  for (let index = 0; index < ydoc.elements.length; index++) {
-    elements.push(elementJson(ydoc, ydoc.elements.get(index)));
-  }
-
-  const note = {
+  const note: NoteJson = {
     version: NOTE_JSON_VERSION,
     name: node.name,
     fileType: node.fileType,
     tags: node.tags,
     createdAt: node.createdAt,
     modifiedAt: node.modifiedAt,
-    elements,
+    elements: serializeNoteElements(ydoc),
   };
   return `${JSON.stringify(note, null, 2)}\n`;
 }

@@ -412,6 +412,18 @@ const es: typeof en = {
         succeeded: (notes: number, media: number) =>
           `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
       },
+      importJson: {
+        label: 'Importar espacio de trabajo desde JSON',
+        description:
+          'Importa una carpeta exportada previamente como JSON. Las notas se reconstruyen desde sus archivos JSON con trazos, texto y multimedia incrustada; los demás archivos se importan y se conserva la estructura de carpetas.',
+        button: 'Importar',
+        loading: 'Importando espacio de trabajo desde JSON...',
+        progress: (current: number, total: number) =>
+          `Importando ${current} de ${total}...`,
+        failed: 'No se pudo importar el JSON',
+        succeeded: (notes: number, media: number) =>
+          `Se importaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
+      },
     },
     privacy: {
       title: 'Privacidad',
