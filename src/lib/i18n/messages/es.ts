@@ -399,6 +399,19 @@ const es: typeof en = {
         succeeded: (notes: number, media: number) =>
           `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
       },
+      exportJson: {
+        label: 'Exportar espacio de trabajo como JSON',
+        description:
+          'Guarda todo tu espacio de trabajo en una carpeta como JSON. Cada nota se convierte en un archivo JSON que codifica sus trazos, texto y multimedia incrustada (binarios en base64); los demás archivos se copian y se conserva la estructura de carpetas.',
+        button: 'Exportar',
+        defaultVaultName: 'Exportación JSON de Myelin',
+        loading: 'Exportando espacio de trabajo como JSON...',
+        progress: (current: number, total: number) =>
+          `Exportando ${current} de ${total}...`,
+        failed: 'No se pudo exportar como JSON',
+        succeeded: (notes: number, media: number) =>
+          `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
+      },
     },
     privacy: {
       title: 'Privacidad',

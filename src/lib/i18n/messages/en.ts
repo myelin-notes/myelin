@@ -394,6 +394,19 @@ const en = {
         succeeded: (notes: number, media: number) =>
           `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
       },
+      exportJson: {
+        label: 'Export Workspace as JSON',
+        description:
+          'Save your whole workspace to a folder as JSON. Each note becomes a JSON file encoding its strokes, text, and embedded media (binaries as base64); other files are copied and the folder structure is preserved.',
+        button: 'Export',
+        defaultVaultName: 'Myelin JSON Export',
+        loading: 'Exporting workspace as JSON...',
+        progress: (current: number, total: number) =>
+          `Exporting ${current} of ${total}...`,
+        failed: 'JSON export failed',
+        succeeded: (notes: number, media: number) =>
+          `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
+      },
     },
     privacy: {
       title: 'Privacy',

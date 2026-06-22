@@ -6,16 +6,16 @@ import { ElementType } from '@/pages/canvas/elements/element-type';
 import { serializeDocToMarkdownChunked } from '@/pages/canvas/page-frame/markdown/serializer';
 import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import {
+  type ExportPlan,
+  type ExportProgress,
+  type PlannedFile,
+  planFolder,
+  sanitizeName,
+  type VaultFileEntry,
+} from './workspace-plan';
 
 const logger = new Logger('ObsidianVaultExport');
-
-const ILLEGAL_NAME_CHARS = '/\\:*?"<>|';
-
-export interface ExportProgress {
-  current: number;
-  total: number;
-  name: string;
-}
 
 export interface ExportObsidianVaultResult {
   vaultPath: string;
@@ -30,84 +30,6 @@ export interface ExportObsidianVaultOptions {
   /** Name of the root vault folder created under {@link destDir}. */
   vaultName: string;
   onProgress?: (progress: ExportProgress) => void;
-}
-
-/**
- * One file the Rust side writes: a note's markdown {@link text}, or a local
- * source path to {@link copyFrom} for media stored on disk.
- */
-interface VaultFileEntry {
-  relPath: string;
-  text?: string;
-  copyFrom?: string;
-}
-
-interface PlannedFile {
-  node: VFSFileNode;
-  /** Output directory relative to the vault root. */
-  segments: readonly string[];
-  fileName: string;
-}
-
-interface ExportPlan {
-  folders: string[];
-  files: PlannedFile[];
-}
-
-/** Replace filesystem-illegal characters and trim Windows-unsafe trailing dots. */
-function sanitizeName(name: string): string {
-  return [...name]
-    .map((char) =>
-      char.charCodeAt(0) <= 0x1f || ILLEGAL_NAME_CHARS.includes(char)
-        ? '-'
-        : char,
-    )
-    .join('')
-    .trim()
-    .replace(/[. ]+$/, '');
-}
-
-/** Ensure a file/folder name is unique within its directory (case-insensitive). */
-function dedupeName(fileName: string, used: Set<string>): string {
-  if (!used.has(fileName.toLowerCase())) {
-    used.add(fileName.toLowerCase());
-    return fileName;
-  }
-  const dot = fileName.lastIndexOf('.');
-  const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
-  const ext = dot > 0 ? fileName.slice(dot) : '';
-  let suffix = 2;
-  let candidate = `${stem} (${suffix})${ext}`;
-  while (used.has(candidate.toLowerCase())) {
-    suffix += 1;
-    candidate = `${stem} (${suffix})${ext}`;
-  }
-  used.add(candidate.toLowerCase());
-  return candidate;
-}
-
-async function planFolder(
-  repository: ReadableRepository,
-  folderId: VFSNodeId | null,
-  parentSegments: readonly string[],
-  plan: ExportPlan,
-): Promise<void> {
-  const [folders, files] = await repository.listDirectory(folderId);
-  const used = new Set<string>();
-
-  for (const folder of folders) {
-    const name = dedupeName(sanitizeName(folder.name) || 'Folder', used);
-    const segments = [...parentSegments, name];
-    plan.folders.push(segments.join('/'));
-    await planFolder(repository, folder.id, segments, plan);
-  }
-
-  for (const file of files) {
-    const isNote = file.fileType === 'mcanvas';
-    const base = sanitizeName(file.name) || (isNote ? 'Untitled' : 'file');
-    const fileName = dedupeName(isNote ? `${base}.md` : base, used);
-    plan.files.push({ node: file, segments: parentSegments, fileName });
-  }
 }
 
 function yamlScalar(value: string): string {
@@ -203,7 +125,7 @@ export async function exportObsidianVault({
   onProgress,
 }: ExportObsidianVaultOptions): Promise<ExportObsidianVaultResult> {
   const plan: ExportPlan = { folders: [], files: [] };
-  await planFolder(repository, null, [], plan);
+  await planFolder(repository, null, [], plan, 'md');
 
   const entries: VaultFileEntry[] = [];
   let notesExported = 0;
