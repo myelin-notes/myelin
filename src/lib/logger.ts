@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/react';
 import {
   BaseDirectory,
   exists,
@@ -323,37 +322,6 @@ function createEntry(
   };
 }
 
-function reportErrorToSentry(
-  subsystem: string,
-  message: string,
-  errorOrMeta?: unknown,
-  maybeMeta?: Record<string, unknown>,
-): void {
-  try {
-    if (isErrorLike(errorOrMeta)) {
-      Sentry.captureException(errorOrMeta, {
-        level: 'error',
-        tags: { subsystem },
-        contexts: {
-          logger: { subsystem, message, ...(maybeMeta ?? {}) },
-        },
-      });
-      return;
-    }
-
-    const extra = isPlainObject(errorOrMeta) ? errorOrMeta : {};
-    Sentry.captureMessage(message, {
-      level: 'error',
-      tags: { subsystem },
-      contexts: {
-        logger: { subsystem, ...extra, ...(maybeMeta ?? {}) },
-      },
-    });
-  } catch {
-    // Swallow Sentry failures. Logging must not break app code.
-  }
-}
-
 export class Logger {
   public constructor(private readonly subsystem: string) {}
 
@@ -383,7 +351,6 @@ export class Logger {
     emitEntry(
       createEntry('error', this.subsystem, message, errorOrMeta, maybeMeta),
     );
-    reportErrorToSentry(this.subsystem, message, errorOrMeta, maybeMeta);
   }
 }
 

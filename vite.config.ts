@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import svgr from 'vite-plugin-svgr';
-import { sentryVitePlugin } from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
@@ -59,11 +58,6 @@ export default defineConfig(async ({ mode }) => {
       }),
       tailwindcss(),
       svgr(),
-      sentryVitePlugin({
-        authToken: process.env.SENTRY_AUTH_TOKEN,
-        org: 'zihuan-zhang',
-        project: 'myelin',
-      }),
     ],
     resolve: {
       alias: {

@@ -7,7 +7,6 @@
 // are documented here for discoverability but must be read there directly:
 //   - MYELIN_TAURI_DEV_PORT — dev server port override, defaults to 1420
 //   - TAURI_DEV_HOST       — host override for the Tauri dev server
-//   - SENTRY_AUTH_TOKEN    — upload source maps to Sentry during build
 //
 // Runtime Vite env vars:
 //   - VITE_LIVE_DISCOVERY_URL — optional Cloudflare Worker URL for automatic
