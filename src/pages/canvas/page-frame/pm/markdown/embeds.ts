@@ -43,6 +43,8 @@ function embedKey(hit: EmbedHit): string {
   return `embed:${hit.url}::${hit.alt ?? ''}`;
 }
 
+const embedHostDestroyers = new WeakMap<Node, () => void>();
+
 function buildBlockDecorations(node: PMNode, pos: number): Decoration[] {
   const hits = findEmbedHitsForBlock(node);
   if (hits.length === 0) {
@@ -53,13 +55,21 @@ function buildBlockDecorations(node: PMNode, pos: number): Decoration[] {
     Decoration.widget(
       widgetPos,
       () => {
-        const { dom } = renderEmbedHost(hit.url, hit.alt, null);
+        const { dom, destroy } = renderEmbedHost(hit.url, hit.alt, null);
+        embedHostDestroyers.set(dom, destroy);
         return dom;
       },
       {
         side: -1 - index,
         key: embedKey(hit),
         ignoreSelection: true,
+        destroy: (dom) => {
+          const destroy = embedHostDestroyers.get(dom);
+          if (destroy) {
+            embedHostDestroyers.delete(dom);
+            destroy();
+          }
+        },
       },
     ),
   );

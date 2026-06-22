@@ -1,3 +1,4 @@
+import type { Node as PMNode } from 'prosemirror-model';
 import { describe, expect, it } from 'vitest';
 import { parseInlineMarkdown } from '../pm/markdown/parse-inline';
 import { schema } from '../pm/schema';
@@ -106,3 +107,45 @@ describe('markdown math round-trip', () => {
     }
   });
 });
+
+describe('markdown strikethrough escaping round-trip', () => {
+  it('escapes literal ~~ so it does not re-parse as a strikethrough mark', () => {
+    // A user typing literal `~~foo~~` (e.g. pasted prose/code) must not turn
+    // into a strikethrough on the next import.
+    const doc = parseMarkdownToDoc('a \\~\\~foo\\~\\~ b', schema);
+    expect(doc.textContent).toBe('a ~~foo~~ b');
+    const noStrike = !markNames(doc).includes('strikethrough');
+    expect(noStrike).toBe(true);
+
+    const md = serializeDocToMarkdown(doc);
+    expect(md).toBe('a \\~\\~foo\\~\\~ b\n');
+
+    // Round-trip stays literal: no strikethrough mark reintroduced.
+    const reparsed = parseMarkdownToDoc(md, schema);
+    expect(reparsed.textContent).toBe('a ~~foo~~ b');
+    expect(markNames(reparsed)).not.toContain('strikethrough');
+    expect(serializeDocToMarkdown(reparsed)).toBe(md);
+  });
+
+  it('still serializes a real strikethrough mark as ~~...~~', () => {
+    const doc = parseMarkdownToDoc('a ~~struck~~ b', schema);
+    expect(markNames(doc)).toContain('strikethrough');
+    const md = serializeDocToMarkdown(doc);
+    expect(md).toBe('a ~~struck~~ b\n');
+    // And it round-trips back into a strikethrough mark.
+    const reparsed = parseMarkdownToDoc(md, schema);
+    expect(markNames(reparsed)).toContain('strikethrough');
+    expect(serializeDocToMarkdown(reparsed)).toBe(md);
+  });
+});
+
+function markNames(doc: PMNode): string[] {
+  const names: string[] = [];
+  doc.descendants((node) => {
+    for (const mark of node.marks) {
+      names.push(mark.type.name);
+    }
+    return true;
+  });
+  return names;
+}

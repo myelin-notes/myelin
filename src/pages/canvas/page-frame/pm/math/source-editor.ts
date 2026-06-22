@@ -221,7 +221,13 @@ let sharedEditor: Promise<MathSourceEditor> | null = null;
  * instead of constructing one per block.
  */
 export function getSharedMathSourceEditor(): Promise<MathSourceEditor> {
-  sharedEditor ??= createSharedMathSourceEditor();
+  // Don't cache a rejection: if construction fails (e.g. language-data's
+  // lazy load throws), clear the slot so the next caller retries instead of
+  // re-awaiting the same failed promise for the lifetime of the app.
+  sharedEditor ??= createSharedMathSourceEditor().catch((error) => {
+    sharedEditor = null;
+    throw error;
+  });
   return sharedEditor;
 }
 

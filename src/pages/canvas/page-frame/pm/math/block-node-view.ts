@@ -185,6 +185,13 @@ export class MathBlockNodeView implements NodeView {
         }
         this.editor = editor;
         this.syncSelectionFromView();
+      })
+      .catch((error) => {
+        // A transient chunk-load failure (or CodeMirror/language-data init
+        // throw) must not lock the block: clearing the flag lets a later
+        // click retry rather than early-returning at the guard forever.
+        this.initializing = false;
+        console.error('Failed to load math source editor', error);
       });
   }
 
