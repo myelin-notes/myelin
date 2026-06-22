@@ -20,7 +20,7 @@ export function initErrorTracking(): void {
     disable_session_recording: true,
     capture_exceptions: true,
   });
-  posthog.register({ environment: MODE, source: 'desktop-app' });
+  posthog.register({ environment: MODE, source: 'app' });
   initialized = true;
 }
 
