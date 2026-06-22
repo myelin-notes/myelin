@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { trackEvent } from '@/lib/analytics';
 import { useLocale, useMessages } from '@/lib/i18n';
 import {
   type FileType,
@@ -119,6 +120,12 @@ export function VersionHistoryDialog({
     try {
       await onBeforeRestore?.();
       await repository.restoreFileVersion(fileId, selectedVersion.id);
+      trackEvent('version_restored', {
+        file_type: fileType,
+        version_age_seconds: Math.round(
+          (Date.now() - selectedVersion.capturedAt) / 1000,
+        ),
+      });
       await onRestored?.();
       toast.success(strings.versionHistory.restored);
       onOpenChange(false);
@@ -132,6 +139,7 @@ export function VersionHistoryDialog({
     }
   }, [
     fileId,
+    fileType,
     onBeforeRestore,
     onOpenChange,
     onRestored,

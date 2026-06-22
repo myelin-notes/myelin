@@ -15,6 +15,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import {
   isMac,
@@ -295,6 +296,7 @@ const TabItem = memo(function TabItem({
           const adopted = await dropTabOntoWindow(tab, screenX, screenY);
           if (!adopted) {
             await spawnWindow(tab);
+            trackEvent('window_spawned', { target_type: tab.target.type });
           }
           controller.closeTab(tab.id, paneId);
         } catch {

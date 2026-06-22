@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { trackEvent } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import type { ExportFormat, ExportTarget } from './export-controller';
 
@@ -59,6 +60,11 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
       } else {
         toast.success('Export complete');
       }
+      trackEvent('export_completed', {
+        format,
+        include_annotations: includeAnnotations,
+        had_warnings: !!result.warnings?.length,
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { useKeybindings } from '@/hooks/useKeybindings';
+import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { type Action, type ActionBinding, keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
@@ -114,6 +115,7 @@ export function useCommandPalette(): {
     setMode(nextMode);
     setQuery('');
     setOpen(true);
+    trackEvent('command_palette_opened', { mode: nextMode });
   }, []);
 
   const handleQueryChange = useCallback((nextQuery: string) => {
@@ -351,6 +353,12 @@ export function useCommandPalette(): {
   const runItem = useCallback((item: CommandPaletteItem) => {
     if (item.disabled) {
       return;
+    }
+    if (!item.id.startsWith('note:')) {
+      trackEvent('command_executed', {
+        command_id: item.id,
+        command_type: item.id.startsWith('action:') ? 'keybinding' : 'built_in',
+      });
     }
     void Promise.resolve(item.onSelect()).catch((error) => {
       logger.error('Command palette item failed', error, { id: item.id });

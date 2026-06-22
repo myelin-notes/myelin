@@ -13,6 +13,7 @@ import {
   Play as PlayIcon,
   Square as SquareIcon,
 } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics';
 import {
   type AudioTranscriptionSession,
   startAudioTranscription,
@@ -504,6 +505,11 @@ export function AudioPlayerView({
       return;
     }
     setIsTranscribing(false);
+    trackEvent('transcription_completed', {
+      duration_seconds: Math.round(dur),
+      transcript_length: transcript.length,
+      had_speech: transcript.length > 0,
+    });
     if (transcript) {
       onTranscribed(transcript);
     } else {

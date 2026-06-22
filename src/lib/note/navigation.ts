@@ -1,7 +1,16 @@
+import { trackEvent } from '@/lib/analytics';
 import type { FileType, Repository, VFSNodeId } from '@/lib/sync';
 import type { TabStateController } from '@/lib/tabs/controller';
 import type { TabTarget } from '@/lib/tabs/types';
 import { parseNoteLinkTarget } from './link-target';
+
+export type NoteOpenSource =
+  | 'explorer'
+  | 'recent_files'
+  | 'search'
+  | 'graph'
+  | 'note_link'
+  | 'backlink';
 
 export interface NoteRouteTarget {
   fileType: FileType;
@@ -37,11 +46,13 @@ function noteTargetToTabTarget(target: NoteRouteTarget): TabTarget {
 export function openNote(
   controller: TabStateController,
   target: NoteRouteTarget,
-  title?: string,
+  title: string | undefined,
+  source: NoteOpenSource,
 ): void {
   const tabTarget = noteTargetToTabTarget(target);
   const tabTitle = title ?? target.id;
   controller.openTab(tabTarget, tabTitle);
+  trackEvent('note_opened', { file_type: target.fileType, source });
 }
 
 export async function openNoteLink(
@@ -68,5 +79,6 @@ export async function openNoteLink(
       pageFrameId: target.pageFrameId ?? null,
     },
     noteTitle,
+    'note_link',
   );
 }

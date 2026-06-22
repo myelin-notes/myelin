@@ -3,6 +3,7 @@ import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { TimeAgo } from '@/components/time-ago';
 import { Button } from '@/components/ui/button';
+import { trackEvent } from '@/lib/analytics';
 import { type Messages, useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import {
@@ -51,6 +52,13 @@ export function RepositorySection() {
   const RemoteAuthIcon = Github;
 
   const handleKindChange = (kind: RepoKind) => {
+    if (kind !== config.kind) {
+      trackEvent('sync_mode_changed', {
+        new_kind: kind,
+        previous_kind: config.kind,
+      });
+    }
+
     if (kind === 'local') {
       setRepositoryConfig({ kind: 'local' });
       return;
