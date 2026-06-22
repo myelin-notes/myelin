@@ -1,78 +1,36 @@
 ---
 import { buttonVariants, cn } from '@myelin/ui';
 import Base from '../layouts/Base.astro';
+import Shot from '../components/Shot.astro';
 import NeuralField from '../components/NeuralField.tsx';
 
 const cta = cn(buttonVariants(), 'h-11 rounded-2xl px-6 text-sm');
 
-const features = [
-  {
-    index: '01',
-    title: 'Write together, live',
-    body: 'Invite people into a note and edit the same page at the same time. Changes land as they happen, with no merge conflicts to settle afterward.',
-  },
-  {
-    index: '02',
-    title: 'Find anything you have written',
-    body: 'Handwriting, PDFs, and images become searchable text. Reach any idea you have filed away in a single keystroke.',
-  },
-  {
-    index: '03',
-    title: 'Sync through your own GitHub',
-    body: 'Your library lives in a Git repository you control. Portable, durable, and yours. No account needed to begin.',
-  },
-  {
-    index: '04',
-    title: 'Built like a studio, not a database',
-    body: 'A serif for reading, a sans for the controls, tonal surfaces, and room to think. The workspace stays out of the way while you work.',
-  },
+// Edit these once installers are published. Placeholders for now.
+const downloads = [
+  { name: 'macOS', href: '#' },
+  { name: 'Windows', href: '#' },
+  { name: 'Linux', href: '#' },
+  { name: 'iPad', href: '#' },
+  { name: 'Android', href: '#' },
 ];
 
-const tiers = [
-  {
-    name: 'Free',
-    price: '$0',
-    cadence: '/ forever',
-    blurb:
-      'The whole editor. For anyone trying Myelin or keeping notes on their own machine.',
-    items: [
-      'Unlimited local notes',
-      'Hybrid canvas, typed + ink',
-      'PDF, image, and Markdown import and export',
-      'Sync through your own GitHub',
-      'Co-edit live through a shared GitHub repo',
-      'Local-first, offline-always',
-      'Local search over titles, tags, and indexed local content once search ships',
-    ],
-    cta: 'Download Myelin',
-    emphasized: false,
-  },
-  {
-    name: 'Pro',
-    price: '$8',
-    cadence: '/ month · $72 / year',
-    blurb:
-      'For students, researchers, and writers who live in their notes — on their own or together.',
-    items: [
-      'Everything in Free',
-      'Managed collaboration — invite people to a note by link, no GitHub needed',
-      'Full-content search across notes, PDFs, and handwriting',
-      'Semantic search — find notes by idea, not exact wording',
-      'OCR — reading text out of handwriting and scanned PDFs, on all platforms',
-      'Persistent version history and restore',
-      'Managed Myelin Cloud sync and backup',
-      'Priority support and early access',
-    ],
-    cta: 'Start 14-day trial',
-    emphasized: true,
-    flag: 'Most chosen',
-  },
-];
+// Edit this once a feedback channel is live.
+const feedbackHref = '#';
 
-const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
+const ownership = [
+  'Local-first storage that works offline',
+  'Sync through your own GitHub repository',
+  'Live editing across your own computers over a direct connection',
+  'Version history with restore',
+  'Export to Markdown, PDF, an Obsidian vault, or a complete workspace file that preserves everything',
+];
 ---
 
-<Base title="Myelin — one workspace, every device">
+<Base
+  title="Myelin — handwriting, type, and PDFs in one note"
+  description="Myelin is a native, local-first canvas where handwriting, type, PDFs, images, and audio live in one note, kept on your own machine. Free while it is in early access."
+>
   <!-- Hero -->
   <section class="mx-auto max-w-6xl px-6 lg:px-10">
     <div
@@ -83,24 +41,24 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
           class="kicker rise text-text-muted"
           style="animation-delay:.05s"
         >
-          A native knowledge workspace
+          A native knowledge workspace · free during early access
         </p>
         <h1
           class="rise mt-6 font-heading text-[clamp(2.9rem,6.4vw,5.25rem)] leading-[0.98] font-medium tracking-[-0.02em] text-text-primary"
           style="animation-delay:.12s"
         >
-          The workspace that keeps every device in <em
-            class="font-normal text-accent-navy italic">lockstep</em
+          Handwriting, type, and PDFs in <em
+            class="font-normal text-accent-navy italic">one note</em
           >
         </h1>
         <p
           class="rise mt-7 max-w-xl text-lg leading-relaxed text-text-secondary"
           style="animation-delay:.2s"
         >
-          Open a note on your laptop and your iPad at once. Sketch with the
-          pencil while you type, and watch both halves grow together. No save
-          step, no reconciliation. Myelin is native on every platform and syncs
-          through a GitHub repository you own.
+          Myelin is a native, local-first canvas where you write with the pen,
+          type in rich text, annotate PDFs, and drop in images and audio — all
+          in the same document, all kept on your own machine. Most tools make
+          you pick one lane. This is the workspace that is both.
         </p>
         <div
           class="rise mt-10 flex flex-wrap items-center gap-x-7 gap-y-4"
@@ -108,10 +66,10 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
         >
           <a href="#download" class={cta}>Download Myelin</a>
           <a
-            href="#sync"
+            href="#workspace"
             class="group inline-flex items-center gap-2 text-sm font-medium text-text-primary"
           >
-            See how sync works
+            See what it does
             <span
               class="transition-transform duration-300 group-hover:translate-x-1"
               aria-hidden="true">→</span
@@ -128,6 +86,16 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
     </div>
   </section>
 
+  <!-- Showcase -->
+  <section class="mx-auto max-w-6xl px-6 pb-8 lg:px-10">
+    <Shot src="/shots/hero.png" alt="A Myelin note with typed text, highlights, and handwritten annotations on one canvas" eager />
+    <div class="mt-6 grid gap-6 lg:grid-cols-3">
+      <Shot src="/shots/ink.png" alt="A rich-text note marked up with pen annotations and a hand-drawn arrow" />
+      <Shot src="/shots/pdf.png" alt="A PDF embedded in a note with handwritten annotations on the page" />
+      <Shot src="/shots/links.png" alt="A note link with a hover preview of the linked note" />
+    </div>
+  </section>
+
   <!-- Manifesto -->
   <section class="bg-surface">
     <div class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
@@ -135,70 +103,185 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
       <blockquote
         class="mt-6 max-w-4xl font-heading text-[clamp(1.9rem,4vw,3.25rem)] leading-[1.12] font-normal text-text-primary"
       >
-        Every device is a different lens onto the same workspace.
+        One canvas instead of five apps
       </blockquote>
-      <p class="mt-8 max-w-md text-text-secondary">
-        Desktop for deep work. Tablet for sketching. Phone for capture. One
-        library underneath, always current.
+      <p class="mt-8 max-w-2xl text-text-secondary">
+        Most tools make you pick a lane: a handwriting app for the pen, a
+        document editor for prose, a separate reader for the PDF, another window
+        for the recording. Myelin puts them on one infinite canvas. Sketch a
+        diagram with the pen, type the paragraph next to it, paste in a
+        screenshot, embed the PDF and mark it up, and record the voice note that
+        explains it — in a single document. The workspace stays quiet and out of
+        the way while you think.
       </p>
     </div>
   </section>
 
-  <!-- Features -->
-  <section id="workspace" class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
-    <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-      <p class="kicker text-text-muted lg:col-span-3">02 / What it does</p>
-      <h2
-        class="font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary lg:col-span-9"
-      >
-        Built for the way you actually work
-      </h2>
+  <!-- Canvas -->
+  <section
+    id="workspace"
+    class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32"
+  >
+    <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
+      <div class="lg:col-span-5">
+        <p class="kicker text-text-muted">01 / The canvas</p>
+        <h2
+          class="mt-6 font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary"
+        >
+          Write by hand or by keyboard, on the same page
+        </h2>
+        <p class="mt-7 text-text-secondary">
+          Draw with a pressure-sensitive pen and let rough strokes snap into
+          clean lines, rectangles, ellipses, and triangles when you pause.
+          Highlight, erase, and pick colors from a radial wheel. Drop in
+          editable text boxes, or open a rich-text frame with headings, lists,
+          tables, code blocks, and LaTeX math.
+        </p>
+        <ul class="mt-7 grid gap-2.5 text-sm text-text-secondary">
+          {
+            [
+              'Pressure-sensitive pen with shape recognition for lines, rectangles, ellipses, and triangles',
+              'Highlighter, eraser, and a radial color wheel',
+              'Rich-text frames with headings, lists, tables, code blocks, and LaTeX math',
+              'Select, move, rotate, resize, and reorder any element, with full undo and redo',
+            ].map((item) => (
+              <li class="grid grid-cols-[18px_1fr] gap-2.5">
+                <svg class="mt-1 size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m5 12 5 5 9-11" stroke="var(--text-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{item}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <div class="lg:col-span-7 lg:pl-6">
+        <Shot src="/shots/ink.png" alt="Handwritten annotations and a code block in a Myelin note" />
+      </div>
     </div>
-
-    <ul class="mt-16 lg:mt-20">
-      {
-        features.map((feature) => (
-          <li class="grid gap-x-10 gap-y-3 py-9 lg:grid-cols-12">
-            <span
-              class="font-heading text-3xl font-normal text-text-muted/45 lg:col-span-2"
-              aria-hidden="true"
-            >
-              {feature.index}
-            </span>
-            <h3 class="text-xl font-semibold text-text-primary lg:col-span-4">
-              {feature.title}
-            </h3>
-            <p class="max-w-md text-text-secondary lg:col-span-6">
-              {feature.body}
-            </p>
-          </li>
-        ))
-      }
-    </ul>
   </section>
 
-  <!-- Sync -->
+  <!-- PDFs and audio -->
+  <section class="bg-surface">
+    <div
+      class="mx-auto grid max-w-6xl items-start gap-x-10 gap-y-12 px-6 py-24 lg:grid-cols-12 lg:px-10 lg:py-32"
+    >
+      <div class="order-2 lg:order-1 lg:col-span-7 lg:pr-6">
+        <Shot src="/shots/pdf.png" alt="A multi-page PDF annotated by hand inside a note" />
+      </div>
+      <div class="order-1 lg:order-2 lg:col-span-5">
+        <p class="kicker text-text-muted">02 / PDFs and audio</p>
+        <h2
+          class="mt-6 font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary"
+        >
+          Bring in PDFs and recordings, and work on them in place
+        </h2>
+        <p class="mt-7 text-text-secondary">
+          Embed a multi-page PDF, reorder its pages, insert blank pages, and
+          draw annotations directly on top. Record audio straight into a note
+          with a live waveform, and Whisper transcribes it on-device as you
+          speak, with nothing sent to the cloud. The transcript becomes part of
+          the note, and part of what you can search.
+        </p>
+        <ul class="mt-7 grid gap-2.5 text-sm text-text-secondary">
+          {
+            [
+              'Embed and annotate multi-page PDFs, and reorder, delete, or insert pages',
+              'Import from GoodNotes exports and Obsidian vaults',
+              'Record audio with live, on-device Whisper transcription',
+              'Embed images with drag-to-resize and crop',
+            ].map((item) => (
+              <li class="grid grid-cols-[18px_1fr] gap-2.5">
+                <svg class="mt-1 size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m5 12 5 5 9-11" stroke="var(--text-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{item}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Search -->
+  <section id="search" class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
+    <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
+      <div class="lg:col-span-5">
+        <p class="kicker text-text-muted">03 / Search</p>
+        <h2
+          class="mt-6 font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary"
+        >
+          Find anything you have written, including by hand
+        </h2>
+        <p class="mt-7 text-text-secondary">
+          Search your whole library by keyword, or switch to semantic search to
+          find notes by idea rather than exact wording. The embedding model runs
+          locally on your device, so semantic search makes no network calls of
+          its own. Inside a note, a find bar matches text, page frames, audio
+          transcripts, and recognized handwriting.
+        </p>
+        <ul class="mt-7 grid gap-2.5 text-sm text-text-secondary">
+          {
+            [
+              'Keyword and on-device semantic search across your library',
+              'In-note find across text, page frames, and audio transcripts',
+              'Handwriting recognition and search on macOS, via Apple Vision',
+            ].map((item) => (
+              <li class="grid grid-cols-[18px_1fr] gap-2.5">
+                <svg class="mt-1 size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m5 12 5 5 9-11" stroke="var(--text-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{item}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <div class="lg:col-span-7 lg:pl-6">
+        <Shot src="/shots/library.png" alt="The Myelin library with note cards, folders, semantic tags, and search" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Ownership / sync -->
   <section id="sync" class="bg-surface">
     <div
       class="mx-auto grid max-w-6xl gap-x-10 gap-y-14 px-6 py-24 lg:grid-cols-12 lg:px-10 lg:py-32"
     >
       <div class="lg:col-span-5">
-        <p class="kicker text-text-muted">03 / Sync</p>
+        <p class="kicker text-text-muted">04 / Local-first</p>
         <h2
           class="mt-6 font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary"
         >
-          Your library, your repository
+          Your notes live on your machine, across your machines
         </h2>
         <p class="mt-7 text-text-secondary">
-          On the free plan, Myelin syncs through a GitHub repository you own. It
-          is plain, portable data you can read, back up, and move whenever you
-          like.
+          Myelin keeps your library on your own disk and works fully offline.
+          When you want a note on more than one of your computers, you can sync
+          through a GitHub repository you own, or edit it live on two machines at
+          once: changes connect directly between your devices, coordinated by a
+          small discovery service that helps them find each other but never
+          stores your notes.
         </p>
         <p class="mt-4 text-text-secondary">
-          To bring other people in without handing out repository access, Pro
-          adds managed Myelin Cloud sync and invite links, so a single link is
-          all it takes.
+          Your notes never leave your control. Myelin will not lock you out —
+          your library stays yours whether or not you keep using Myelin, and you
+          can export your whole workspace to a complete file that preserves
+          everything, any time.
         </p>
+        <ul class="mt-7 grid gap-2.5 text-sm text-text-secondary">
+          {
+            ownership.map((item) => (
+              <li class="grid grid-cols-[18px_1fr] gap-2.5">
+                <svg class="mt-1 size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m5 12 5 5 9-11" stroke="var(--text-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{item}</span>
+              </li>
+            ))
+          }
+        </ul>
       </div>
 
       <div class="lg:col-span-7 lg:pl-10">
@@ -226,7 +309,7 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
 
           <div class="flex items-center justify-between gap-6">
             <div>
-              <p class="kicker text-text-muted">iPad</p>
+              <p class="kicker text-text-muted">Desktop</p>
               <p class="mt-2 font-heading text-lg text-text-primary">
                 sketching the diagram
               </p>
@@ -243,127 +326,40 @@ const platforms = ['macOS', 'Windows', 'Linux', 'iPadOS', 'Android'];
     </div>
   </section>
 
-  <!-- Pricing -->
-  <section id="pricing" class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
-    <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-      <p class="kicker text-text-muted lg:col-span-3">04 / Pricing</p>
-      <h2
-        class="font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary lg:col-span-9"
-      >
-        Free to think alone. Pro to think together
-      </h2>
-    </div>
-
-    <div class="mt-16 grid gap-6 md:mx-auto md:max-w-3xl lg:mt-20 lg:grid-cols-2">
-      {
-        tiers.map((tier) => (
-          <div
-            class={cn(
-              'relative flex flex-col gap-5 rounded-[16px] p-8 shadow-ambient transition duration-500 ease-out hover:-translate-y-1 hover:shadow-elevated',
-              tier.emphasized
-                ? 'bg-primary text-text-on-dark lg:scale-[1.03]'
-                : 'bg-card text-text-primary',
-            )}
-          >
-            {tier.flag && (
-              <span class="absolute top-5 right-5 rounded-[10px] bg-accent-green px-2.5 py-1 text-[10px] font-bold tracking-[0.14em] text-text-green uppercase">
-                {tier.flag}
-              </span>
-            )}
-            <div>
-              <h3 class="font-heading text-2xl font-medium tracking-tight">
-                {tier.name}
-              </h3>
-              <p
-                class={cn(
-                  'mt-1.5 max-w-[34ch] text-[13px] leading-relaxed',
-                  tier.emphasized ? 'text-[#cbd2dc]' : 'text-text-muted',
-                )}
-              >
-                {tier.blurb}
-              </p>
-            </div>
-            <div class="flex items-baseline gap-1.5">
-              <span class="font-heading text-[44px] leading-none font-light tracking-tight">
-                {tier.price}
-              </span>
-              <span
-                class={cn(
-                  'text-[13px]',
-                  tier.emphasized ? 'text-[#aab3c1]' : 'text-text-muted',
-                )}
-              >
-                {tier.cadence}
-              </span>
-            </div>
-
-            <ul
-              class={cn(
-                'grid gap-2.5 text-sm',
-                tier.emphasized ? 'text-[#d6dce5]' : 'text-text-secondary',
-              )}
-            >
-              {tier.items.map((item) => (
-                <li class="grid grid-cols-[18px_1fr] gap-2.5">
-                  <svg
-                    class="mt-1 size-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="m5 12 5 5 9-11"
-                      stroke={tier.emphasized ? 'var(--bg-accent-green)' : 'var(--text-green)'}
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-
-            <a
-              href="#download"
-              class={cn(
-                'mt-auto inline-flex items-center gap-1.5 pt-4 text-sm font-medium',
-                tier.emphasized ? 'text-text-on-dark' : 'text-text-primary',
-              )}
-            >
-              {tier.cta}
-              <span class={tier.emphasized ? 'text-accent-green' : 'text-text-green'}>
-                →
-              </span>
-            </a>
-          </div>
-        ))
-      }
-    </div>
-  </section>
-
-  <!-- Download -->
+  <!-- Early access / download -->
   <section id="download" class="bg-primary text-text-on-dark">
     <div class="mx-auto max-w-6xl px-6 py-28 lg:px-10 lg:py-36">
-      <p class="kicker text-text-on-dark/55">Start where you are</p>
+      <p class="kicker text-text-on-dark/55">Early access · download</p>
       <h2
         class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em]"
       >
-        Bring Myelin to your desk, and pick up where you left off on every other
-        screen
+        Free while Myelin is in early access
       </h2>
+      <p class="mt-7 max-w-2xl text-text-on-dark/75">
+        Myelin is in early access and free to use right now. The whole editor is
+        in your hands: the canvas, pen and handwriting tools, PDFs and audio,
+        import and export, local-first storage, GitHub sync, and live editing
+        across your own computers. No account is needed to start — sign in with
+        GitHub only when you want to sync.
+      </p>
       <div class="mt-12 flex flex-wrap gap-3">
         {
-          platforms.map((platform) => (
+          downloads.map((platform) => (
             <a
-              href="#"
+              href={platform.href}
               class="rounded-xl bg-white/10 px-5 py-2.5 text-sm font-medium text-text-on-dark transition-colors hover:bg-white/20"
             >
-              {platform}
+              {platform.name}
             </a>
           ))
         }
       </div>
+      <p class="mt-10 text-sm text-text-on-dark/55">
+        Found a bug or have a request?{' '}
+        <a href={feedbackHref} class="text-text-on-dark underline underline-offset-4">
+          Tell us
+        </a>.
+      </p>
     </div>
   </section>
 </Base>
