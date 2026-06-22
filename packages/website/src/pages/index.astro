@@ -429,6 +429,7 @@ const faqs = [
           downloads.map((platform) => (
             <a
               href={platform.href}
+              data-download-platform={platform.name}
               class="rounded-xl bg-white/10 px-5 py-2.5 text-sm font-medium text-text-on-dark transition-colors hover:bg-white/20"
             >
               {platform.name}
@@ -444,4 +445,18 @@ const faqs = [
       </p>
     </div>
   </section>
+
+  <script>
+    import { trackWebEvent } from '../lib/posthog';
+
+    for (const el of document.querySelectorAll<HTMLElement>(
+      '[data-download-platform]',
+    )) {
+      el.addEventListener('click', () => {
+        trackWebEvent('download_clicked', {
+          platform: el.dataset.downloadPlatform,
+        });
+      });
+    }
+  </script>
 </Base>
