@@ -93,6 +93,7 @@ const en = {
       importFiles: 'Import Files',
       importGoodnotesZip: 'Import Goodnotes ZIP',
       importObsidianVault: 'Import Obsidian Vault',
+      importWorkspaceJson: 'Import Workspace JSON',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
     },
@@ -125,6 +126,9 @@ const en = {
     importDialog: {
       title: 'Import Obsidian Vault',
       scanning: 'Scanning vault...',
+      jsonTitle: 'Import Workspace JSON',
+      jsonScanning: 'Scanning folder...',
+      jsonNoFiles: 'No JSON notes or media found in this folder',
       notes: (count: number) => `${count} note${count === 1 ? '' : 's'}`,
       media: (count: number) => `${count} media file${count === 1 ? '' : 's'}`,
       skippedFiles: (count: number) =>
@@ -406,18 +410,6 @@ const en = {
         failed: 'JSON export failed',
         succeeded: (notes: number, media: number) =>
           `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
-      },
-      importJson: {
-        label: 'Import Workspace from JSON',
-        description:
-          'Import a folder previously exported as JSON. Notes are rebuilt from their JSON files with strokes, text, and embedded media; other files are imported and the folder structure is preserved.',
-        button: 'Import',
-        loading: 'Importing workspace from JSON...',
-        progress: (current: number, total: number) =>
-          `Importing ${current} of ${total}...`,
-        failed: 'JSON import failed',
-        succeeded: (notes: number, media: number) =>
-          `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
       },
     },
     privacy: {

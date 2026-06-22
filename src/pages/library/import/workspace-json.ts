@@ -42,6 +42,10 @@ export interface ImportWorkspaceJsonOptions {
   parentId: VFSNodeId | null;
   /** Absolute path to the exported workspace folder the user picked. */
   dirPath: string;
+  /** Name for the created root folder; defaults to the picked folder's name. */
+  rootName?: string;
+  /** Pre-scanned result to avoid re-walking the directory. */
+  scanned?: ScannedWorkspace;
   onProgress?: (progress: ImportProgress) => void;
 }
 
@@ -57,7 +61,7 @@ interface ScannedMedia {
   fileType: FileType;
 }
 
-interface ScannedWorkspace {
+export interface ScannedWorkspace {
   /** Relative folder paths, including empty folders, '/'-separated. */
   folderPaths: Set<string>;
   notes: ScannedNote[];
@@ -65,7 +69,7 @@ interface ScannedWorkspace {
   skippedFiles: number;
 }
 
-function getPathName(path: string): string {
+export function getPathName(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
   return normalized.split('/').pop()?.trim() || 'Workspace';
 }
@@ -248,12 +252,9 @@ async function importNote({
   }
 }
 
-export async function importWorkspaceJson({
-  repository,
-  parentId,
-  dirPath,
-  onProgress,
-}: ImportWorkspaceJsonOptions): Promise<ImportWorkspaceJsonResult> {
+export async function scanWorkspaceJson(
+  dirPath: string,
+): Promise<ScannedWorkspace> {
   const scanned: ScannedWorkspace = {
     folderPaths: new Set(),
     notes: [],
@@ -261,6 +262,18 @@ export async function importWorkspaceJson({
     skippedFiles: 0,
   };
   await scanDirectory(dirPath, [], scanned);
+  return scanned;
+}
+
+export async function importWorkspaceJson({
+  repository,
+  parentId,
+  dirPath,
+  rootName = getPathName(dirPath),
+  scanned: preScanned,
+  onProgress,
+}: ImportWorkspaceJsonOptions): Promise<ImportWorkspaceJsonResult> {
+  const scanned = preScanned ?? (await scanWorkspaceJson(dirPath));
 
   if (scanned.notes.length === 0 && scanned.media.length === 0) {
     throw new Error('No JSON notes or media found in the selected folder.');
@@ -271,10 +284,7 @@ export async function importWorkspaceJson({
   const total = scanned.notes.length + scanned.media.length;
 
   try {
-    rootFolderId = await repository.createFolder(
-      getPathName(dirPath),
-      parentId,
-    );
+    rootFolderId = await repository.createFolder(rootName, parentId);
     const folderIds = await createImportedFolders(
       repository,
       rootFolderId,

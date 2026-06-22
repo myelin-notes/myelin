@@ -94,6 +94,7 @@ const zhHans: typeof en = {
       importFiles: '导入文件',
       importGoodnotesZip: '导入 Goodnotes ZIP',
       importObsidianVault: '导入 Obsidian 仓库',
+      importWorkspaceJson: '导入工作区 JSON',
       untitledCanvas: '未命名画布',
       unnamedFolder: '未命名文件夹',
     },
@@ -124,6 +125,9 @@ const zhHans: typeof en = {
     importDialog: {
       title: '导入 Obsidian 仓库',
       scanning: '正在扫描仓库...',
+      jsonTitle: '导入工作区 JSON',
+      jsonScanning: '正在扫描文件夹...',
+      jsonNoFiles: '此文件夹中未找到 JSON 笔记或媒体文件',
       notes: (count: number) => `${count} 个笔记`,
       media: (count: number) => `${count} 个媒体文件`,
       skippedFiles: (count: number) => `${count} 个不受支持的文件将被跳过`,
@@ -393,18 +397,6 @@ const zhHans: typeof en = {
         failed: 'JSON 导出失败',
         succeeded: (notes: number, media: number) =>
           `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
-      },
-      importJson: {
-        label: '从 JSON 导入工作区',
-        description:
-          '导入先前以 JSON 导出的文件夹。笔记会从其 JSON 文件重建，包含笔迹、文本和嵌入的媒体；其他文件会被导入，并保留文件夹结构。',
-        button: '导入',
-        loading: '正在从 JSON 导入工作区...',
-        progress: (current: number, total: number) =>
-          `正在导入 ${current} / ${total}...`,
-        failed: 'JSON 导入失败',
-        succeeded: (notes: number, media: number) =>
-          `已导入 ${notes} 个笔记和 ${media} 个媒体文件`,
       },
     },
     privacy: {

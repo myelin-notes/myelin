@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import {
+  FileJson,
   FileText,
   FolderInput,
   FolderPlus,
@@ -26,6 +27,7 @@ interface CreateNewDropdownProps {
   onImportFiles?: () => void;
   onImportGoodnotesZip?: () => void;
   onImportObsidianVault?: () => void;
+  onImportWorkspaceJson?: () => void;
   importDisabled?: boolean;
 }
 
@@ -35,6 +37,7 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
   onImportFiles,
   onImportGoodnotesZip,
   onImportObsidianVault,
+  onImportWorkspaceJson,
   importDisabled = false,
 }: CreateNewDropdownProps) {
   const strings = useMessages();
@@ -89,6 +92,14 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
         >
           <FolderInput className="size-4" />
           {strings.library.createNew.importObsidianVault}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={itemClass}
+          disabled={importDisabled}
+          onClick={() => onImportWorkspaceJson?.()}
+        >
+          <FileJson className="size-4" />
+          {strings.library.createNew.importWorkspaceJson}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
