@@ -18,12 +18,16 @@ const downloads = [
 // Edit this once a feedback channel is live.
 const feedbackHref = '#';
 
-const ownership = [
+const localFirst = [
   'Local-first storage that works offline',
-  'Sync through your own GitHub repository',
-  'Live editing across your own computers over a direct connection',
   'Version history with restore',
   'Export to Markdown, PDF, an Obsidian vault, or a complete workspace file that preserves everything',
+];
+
+const sync = [
+  'Sync through your own GitHub repository',
+  'Live editing across your own computers over a direct connection',
+  'No Myelin account required — sign in with GitHub only when you want to sync',
 ];
 ---
 
@@ -244,35 +248,61 @@ const ownership = [
     </div>
   </section>
 
-  <!-- Ownership / sync -->
-  <section id="sync" class="bg-surface">
-    <div
-      class="mx-auto grid max-w-6xl gap-x-10 gap-y-14 px-6 py-24 lg:grid-cols-12 lg:px-10 lg:py-32"
-    >
+  <!-- Local-first -->
+  <section id="local" class="bg-surface">
+    <div class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
+      <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
+        <p class="kicker text-text-muted lg:col-span-3">04 / Local-first</p>
+        <h2
+          class="font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary lg:col-span-9"
+        >
+          Your notes live on your machine
+        </h2>
+      </div>
+      <div class="mt-12 grid gap-x-10 gap-y-8 lg:grid-cols-12 lg:mt-16">
+        <p class="text-text-secondary lg:col-span-6 lg:col-start-4">
+          Myelin keeps your library on your own disk and works fully offline.
+          Your notes never leave your control. Version history keeps snapshots
+          you can look back on and restore, and you can export your whole
+          workspace to a complete file that preserves everything — any time, no
+          questions asked.
+        </p>
+        <ul class="grid gap-2.5 text-sm text-text-secondary lg:col-span-3">
+          {
+            localFirst.map((item) => (
+              <li class="grid grid-cols-[18px_1fr] gap-2.5">
+                <svg class="mt-1 size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m5 12 5 5 9-11" stroke="var(--text-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{item}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sync -->
+  <section id="sync" class="mx-auto max-w-6xl px-6 py-24 lg:px-10 lg:py-32">
+    <div class="grid gap-x-10 gap-y-14 lg:grid-cols-12">
       <div class="lg:col-span-5">
-        <p class="kicker text-text-muted">04 / Local-first</p>
+        <p class="kicker text-text-muted">05 / Sync</p>
         <h2
           class="mt-6 font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-text-primary"
         >
-          Your notes live on your machine, across your machines
+          Across your own computers, when you want it
         </h2>
         <p class="mt-7 text-text-secondary">
-          Myelin keeps your library on your own disk and works fully offline.
-          When you want a note on more than one of your computers, you can sync
-          through a GitHub repository you own, or edit it live on two machines at
-          once: changes connect directly between your devices, coordinated by a
-          small discovery service that helps them find each other but never
-          stores your notes.
-        </p>
-        <p class="mt-4 text-text-secondary">
-          Your notes never leave your control. Myelin will not lock you out —
-          your library stays yours whether or not you keep using Myelin, and you
-          can export your whole workspace to a complete file that preserves
-          everything, any time.
+          Sync is optional, and it is yours. Sync a note through a GitHub
+          repository you own, or edit it live on two machines at once: changes
+          connect directly between your devices, coordinated by a small
+          discovery service that helps them find each other but never stores
+          your notes.
         </p>
         <ul class="mt-7 grid gap-2.5 text-sm text-text-secondary">
           {
-            ownership.map((item) => (
+            sync.map((item) => (
               <li class="grid grid-cols-[18px_1fr] gap-2.5">
                 <svg class="mt-1 size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="m5 12 5 5 9-11" stroke="var(--text-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -323,6 +353,25 @@ const ownership = [
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Promise -->
+  <section class="bg-surface">
+    <div class="mx-auto max-w-4xl px-6 py-24 text-center lg:px-10 lg:py-32">
+      <p class="kicker text-text-muted">A promise</p>
+      <h2
+        class="mt-6 font-heading text-[clamp(2rem,4vw,3.5rem)] leading-[1.08] font-medium tracking-[-0.015em] text-text-primary"
+      >
+        We will never take your notes away
+      </h2>
+      <p class="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-text-secondary">
+        Your notes stay on your disk and stay open to you, full stop. We will
+        never put your own notes behind a paywall, and we will never lock you
+        out — not if you stop paying, not if you stop using Myelin. Whatever
+        happens, you can export your entire workspace to a complete file that
+        preserves everything and walk away with all of it.
+      </p>
     </div>
   </section>
 
