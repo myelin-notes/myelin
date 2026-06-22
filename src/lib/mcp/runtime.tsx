@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent } from 'react';
 import { toast } from 'sonner';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { noteIndexService } from '@/lib/note-index';
@@ -61,6 +62,7 @@ export function McpRuntime() {
       indexedTextByNode: noteIndexService.getContent(),
       allowDirectWrites: () => allowDirectWrites,
     });
+    trackEvent('mcp_tool_called', { tool_name: payload.toolName });
     void service
       .callTool(payload.toolName, payload.arguments)
       .then((result) => respond(payload.requestId, { result }))

@@ -5,7 +5,12 @@ import { openNote, openNoteLink } from './navigation';
 describe('note navigation', () => {
   it('opens a canvas note as a tab', () => {
     const controller = new TabStateController();
-    openNote(controller, { fileType: 'mcanvas', id: 'note-123' });
+    openNote(
+      controller,
+      { fileType: 'mcanvas', id: 'note-123' },
+      undefined,
+      'explorer',
+    );
 
     const state = controller.getSnapshot();
     const pane = state.layout.type === 'pane' ? state.layout : null;

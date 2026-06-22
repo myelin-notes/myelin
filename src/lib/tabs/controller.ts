@@ -1,3 +1,4 @@
+import { trackEvent } from '@/lib/analytics';
 import type {
   LayoutNode,
   PaneId,
@@ -411,6 +412,10 @@ export class TabStateController {
         }),
         focusedPaneId: matchPane.id,
       });
+      trackEvent('tab_opened', {
+        target_type: target.type,
+        is_new_document: false,
+      });
       return match.tab.id;
     }
 
@@ -434,6 +439,10 @@ export class TabStateController {
       focusedPaneId: pane.id,
     });
 
+    trackEvent('tab_opened', {
+      target_type: target.type,
+      is_new_document: true,
+    });
     return tab.id;
   }
 
@@ -606,6 +615,8 @@ export class TabStateController {
       ...state,
       layout: replaceNode(state.layout, pane.id, split),
     });
+
+    trackEvent('pane_split', { direction });
 
     return newPane.id;
   }

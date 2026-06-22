@@ -2,6 +2,7 @@ import { type KeyboardEvent, useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useResettableTimeout } from '@/hooks/use-resettable-timeout';
+import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
@@ -23,6 +24,7 @@ export function McpSection() {
 
   const handleEnabled = () => {
     UserPrefs.set('mcpEnabled', !mcpEnabled);
+    trackEvent('mcp_enabled', { enabled: !mcpEnabled });
   };
 
   const handleDirectWrites = () => {

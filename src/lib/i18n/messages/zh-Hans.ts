@@ -382,6 +382,15 @@ const zhHans: typeof en = {
           `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
       },
     },
+    privacy: {
+      title: '隐私',
+      eyebrow: '使用数据',
+      analytics: {
+        label: '共享匿名使用分析',
+        description:
+          '发送匿名的产品使用分析和错误报告，帮助改进 Myelin。关闭后将不会发送任何内容。',
+      },
+    },
     mcp: {
       title: 'Model Context Protocol',
       eyebrow: 'AI 代理',

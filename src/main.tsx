@@ -2,19 +2,14 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { I18nProvider } from '@/lib/i18n';
 import App from './App';
+import { trackEvent } from './lib/analytics';
+import { initErrorTracking } from './lib/posthog';
 import { RepositoryProvider } from './lib/sync';
 import { initAutoUpdate } from './lib/updater';
 import './index.css';
-import * as Sentry from '@sentry/react';
-import { MODE } from '@/lib/env';
 
-Sentry.init({
-  dsn: 'https://accc52ccd8d9f95fa75ef02fe44db0ca@o4511254895001600.ingest.us.sentry.io/4511254923247616',
-  environment: MODE,
-  // Setting this option to true will send default PII data to Sentry.
-  // For example, automatic IP address collection on events
-  sendDefaultPii: true,
-});
+initErrorTracking();
+trackEvent('app_opened');
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

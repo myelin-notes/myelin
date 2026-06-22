@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useRef, useState } from 'react';
+import { trackEvent } from '@/lib/analytics';
 import { UserPrefs } from '@/lib/user-prefs';
 import { CollisionHelper } from '@/lib/utils/collision-helper';
 import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
@@ -71,6 +72,10 @@ export function useCanvasInserts({
       frame.setOffset(worldPos.x, worldPos.y);
       frame.updateBounds();
       frame.select();
+      trackEvent('page_frame_created', {
+        insertion_method: 'menu',
+        layout: UserPrefs.get('defaultPageLayout'),
+      });
     },
     [drawableCanvasRef],
   );
@@ -88,6 +93,10 @@ export function useCanvasInserts({
       });
       el.updateBounds();
       el.select();
+      trackEvent('element_inserted', {
+        element_type: 'audio',
+        insertion_method: 'menu',
+      });
     },
     [drawableCanvasRef],
   );
@@ -105,6 +114,10 @@ export function useCanvasInserts({
       });
       latex.updateBounds();
       latex.select();
+      trackEvent('element_inserted', {
+        element_type: 'latex',
+        insertion_method: 'menu',
+      });
       // Placement runs inside a canvas pointerdown; entering edit now would
       // register a click-outside listener that the same event, still bubbling
       // to document, immediately trips. Defer past this event.

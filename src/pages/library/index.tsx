@@ -23,6 +23,7 @@ import {
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { trackEvent } from '@/lib/analytics';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
@@ -228,6 +229,11 @@ export function LibraryPage() {
         }
       }
       triggerRefresh();
+      trackEvent('import_completed', {
+        import_type: 'storage',
+        file_count: supportedFiles.length,
+        partial_failure: supportedFiles.length !== files.length,
+      });
 
       if (supportedFiles.length !== files.length) {
         toast.error(strings.library.importFiles.someUnsupported);
@@ -262,6 +268,11 @@ export function LibraryPage() {
       });
       setCurrentFolderId(result.focusFolderId);
       triggerRefresh();
+      trackEvent('import_completed', {
+        import_type: 'goodnotes_zip',
+        file_count: result.pdfsImported,
+        partial_failure: result.skippedFiles > 0,
+      });
       if (result.skippedFiles > 0) {
         toast.info(
           strings.library.importGoodnotesZip.skipped(result.skippedFiles),
@@ -324,6 +335,8 @@ export function LibraryPage() {
     (rootFolderId: string) => {
       setCurrentFolderId(rootFolderId);
       triggerRefresh();
+      // The dialog-based ImportSource is only ever an Obsidian vault today.
+      trackEvent('import_completed', { import_type: 'obsidian_vault' });
     },
     [triggerRefresh],
   );
@@ -334,15 +347,20 @@ export function LibraryPage() {
 
   const handleNewFile = useCallback(
     (title: string, type: FileType) => {
-      void explorerRef.current?.startNewFile(title, type).catch((error) => {
-        logger.error('Failed to create explorer file', error, {
-          currentFolderId,
-          fileType: type,
+      void explorerRef.current
+        ?.startNewFile(title, type)
+        .then(() => {
+          trackEvent('note_created', { file_type: type });
+        })
+        .catch((error) => {
+          logger.error('Failed to create explorer file', error, {
+            currentFolderId,
+            fileType: type,
+          });
+          toast.error(strings.commandPalette.errors.createNote, {
+            description: errorDescription(error),
+          });
         });
-        toast.error(strings.commandPalette.errors.createNote, {
-          description: errorDescription(error),
-        });
-      });
     },
     [currentFolderId, strings.commandPalette.errors.createNote],
   );
@@ -524,7 +542,9 @@ export function LibraryPage() {
                       title={file.name}
                       tags={file.tags}
                       featured={i === 0}
-                      onClick={() => openNote(tabController, file, file.name)}
+                      onClick={() =>
+                        openNote(tabController, file, file.name, 'recent_files')
+                      }
                     />
                   </motion.div>
                 ))}

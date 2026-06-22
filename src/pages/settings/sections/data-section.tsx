@@ -3,6 +3,7 @@ import { FolderOutput } from 'lucide-react';
 import { toast } from 'sonner';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { Button } from '@/components/ui/button';
+import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
@@ -42,6 +43,11 @@ export function DataSection() {
             id: toastId,
           });
         },
+      });
+      trackEvent('export_completed', {
+        format: 'obsidian_vault',
+        notes_exported: result.notesExported,
+        files_copied: result.filesCopied,
       });
       toast.success(
         dataStrings.export.succeeded(result.notesExported, result.filesCopied),

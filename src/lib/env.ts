@@ -7,11 +7,13 @@
 // are documented here for discoverability but must be read there directly:
 //   - MYELIN_TAURI_DEV_PORT — dev server port override, defaults to 1420
 //   - TAURI_DEV_HOST       — host override for the Tauri dev server
-//   - SENTRY_AUTH_TOKEN    — upload source maps to Sentry during build
 //
 // Runtime Vite env vars:
 //   - VITE_LIVE_DISCOVERY_URL — optional Cloudflare Worker URL for automatic
 //     live sync peer discovery
+//   - VITE_POSTHOG_KEY  — PostHog project API key; error tracking is disabled
+//     when unset
+//   - VITE_POSTHOG_HOST — PostHog ingestion host, defaults to us.i.posthog.com
 
 export const IS_DEV = import.meta.env.DEV;
 export const MODE = import.meta.env.MODE;
@@ -33,3 +35,11 @@ export const PERSIST_DEBUG_LOGS =
 export const PAGINATION_PROFILING =
   String(import.meta.env.VITE_PAGINATION_PROFILING ?? '').toLowerCase() ===
   'true';
+
+export const POSTHOG_KEY = (import.meta.env.VITE_POSTHOG_KEY ?? '').trim();
+
+export const POSTHOG_HOST = (
+  import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com'
+)
+  .trim()
+  .replace(/\/+$/, '');

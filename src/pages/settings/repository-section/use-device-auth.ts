@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 
@@ -120,6 +121,7 @@ export function useDeviceAuth<TBegin extends DeviceAuthBeginPayload>(
       if (result.status === 'complete') {
         setTokenPresent(true);
         setAuthError(null);
+        trackEvent('github_auth_completed', { credential_id: credentialId });
       } else {
         loggerRef.current.error('Device auth flow failed', undefined, {
           credentialId,
@@ -133,6 +135,10 @@ export function useDeviceAuth<TBegin extends DeviceAuthBeginPayload>(
       }
       loggerRef.current.error('Device auth sign-in threw', error, {
         credentialId,
+      });
+      trackEvent('github_auth_failed', {
+        credential_id: credentialId,
+        error_message: error instanceof Error ? error.name : 'unknown',
       });
       setAuthError(
         error instanceof Error

@@ -7,10 +7,12 @@ import {
   Plugin as StatePlugin,
   TextSelection,
 } from 'prosemirror-state';
+import { trackEvent } from '@/lib/analytics';
 import {
   findFenceLineAtOffset,
   isClosingFenceLine,
   isOpeningFenceLine,
+  OPENING_FENCE_TOKEN_RE,
   parseFenceMarkdown,
 } from './parse-fences';
 import {
@@ -60,6 +62,7 @@ function buildClosedFenceInputRule(schema: Schema): InputRule {
     const closingIndex = $start.index(parentDepth);
     let blockStartPos = $start.before();
     let openingIndex = -1;
+    let openingFenceText = '';
 
     for (let index = closingIndex - 1; index >= 0; index--) {
       const sibling = parent.child(index);
@@ -71,6 +74,7 @@ function buildClosedFenceInputRule(schema: Schema): InputRule {
 
       if (isOpeningFenceLine(sibling.textContent)) {
         openingIndex = index;
+        openingFenceText = sibling.textContent;
         break;
       }
     }
@@ -100,6 +104,8 @@ function buildClosedFenceInputRule(schema: Schema): InputRule {
     tr = tr.setSelection(
       TextSelection.create(tr.doc, blockStartPos + 1 + codeText.length),
     );
+    const lang = OPENING_FENCE_TOKEN_RE.exec(openingFenceText)?.[1] ?? '';
+    trackEvent('code_block_created', { language: lang || 'none' });
     return tr.scrollIntoView();
   });
 }

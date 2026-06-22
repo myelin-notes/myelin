@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/react';
 import {
   BaseDirectory,
   exists,
@@ -7,6 +6,7 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { IS_DEV, PERSIST_DEBUG_LOGS } from '@/lib/env';
+import { isErrorTrackingEnabled, posthog } from '@/lib/posthog';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -323,34 +323,34 @@ function createEntry(
   };
 }
 
-function reportErrorToSentry(
+function reportErrorToPostHog(
   subsystem: string,
   message: string,
   errorOrMeta?: unknown,
   maybeMeta?: Record<string, unknown>,
 ): void {
+  if (!isErrorTrackingEnabled()) {
+    return;
+  }
+
   try {
     if (isErrorLike(errorOrMeta)) {
-      Sentry.captureException(errorOrMeta, {
-        level: 'error',
-        tags: { subsystem },
-        contexts: {
-          logger: { subsystem, message, ...(maybeMeta ?? {}) },
-        },
+      posthog.captureException(errorOrMeta, {
+        subsystem,
+        message,
+        ...(maybeMeta ?? {}),
       });
       return;
     }
 
     const extra = isPlainObject(errorOrMeta) ? errorOrMeta : {};
-    Sentry.captureMessage(message, {
-      level: 'error',
-      tags: { subsystem },
-      contexts: {
-        logger: { subsystem, ...extra, ...(maybeMeta ?? {}) },
-      },
+    posthog.captureException(new Error(message), {
+      subsystem,
+      ...extra,
+      ...(maybeMeta ?? {}),
     });
   } catch {
-    // Swallow Sentry failures. Logging must not break app code.
+    // Swallow PostHog failures. Logging must not break app code.
   }
 }
 
@@ -383,7 +383,7 @@ export class Logger {
     emitEntry(
       createEntry('error', this.subsystem, message, errorOrMeta, maybeMeta),
     );
-    reportErrorToSentry(this.subsystem, message, errorOrMeta, maybeMeta);
+    reportErrorToPostHog(this.subsystem, message, errorOrMeta, maybeMeta);
   }
 }
 

@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { trackEvent } from '@/lib/analytics';
 import { Logger } from '@/lib/logger';
 import { summarizeNoteBytes } from '@/lib/note/state-summary';
 import type { ReindexItem } from '@/lib/note-index';
@@ -1666,6 +1667,22 @@ export class CachedRepository
   }
 
   private updateRuntimeStatus(patch: Partial<RepositoryRuntimeStatus>): void {
+    // Single shared choke point for recording sync errors. Fire sync_failed
+    // only when a real error is newly recorded (non-null and not the same
+    // object already on record), so the multiple callers that route their
+    // errors through here don't double-fire.
+    if (patch.lastError && patch.lastError !== this.runtimeStatus.lastError) {
+      const error = patch.lastError;
+      const errorType =
+        error instanceof RemoteNoteCacheMergeError ||
+        error instanceof BatchHeadConflictError
+          ? 'conflict'
+          : 'other';
+      trackEvent('sync_failed', {
+        error_type: errorType,
+        error_message: error.message.slice(0, 200),
+      });
+    }
     this.runtimeStatus = { ...this.runtimeStatus, ...patch };
     const snapshot = this.getRuntimeStatus();
     for (const listener of this.statusListeners) {

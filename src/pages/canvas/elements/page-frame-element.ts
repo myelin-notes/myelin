@@ -10,6 +10,7 @@ import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { trackEvent } from '@/lib/analytics';
 import { exportPdf as exportPdfToRust } from '@/lib/pdf-export/client';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { ChromeMenuItem } from '../chrome-menu';
@@ -354,6 +355,7 @@ export class PageFrameElement extends DrawableElement {
     screenX?: number,
     screenY?: number,
   ): HTMLElement | null {
+    const wasEditing = this._editing;
     this._editing = true;
     this.pmEditor?.setEditable(true);
 
@@ -438,6 +440,10 @@ export class PageFrameElement extends DrawableElement {
         this.pmEditor?.ensureFocused();
       }
     });
+
+    if (!wasEditing) {
+      trackEvent('page_frame_edit_started', { page_layout: this._pageLayout });
+    }
 
     return this.frameDiv;
   }

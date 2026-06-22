@@ -6,6 +6,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { trackEvent } from '@/lib/analytics';
 import {
   localeLabels,
   type SupportedLocale,
@@ -25,6 +26,7 @@ export function LanguageSection() {
 
   const handleLanguage = (code: string) => {
     setLocale(code as SupportedLocale);
+    trackEvent('language_changed', { language_code: code });
   };
 
   const selectedLang =
