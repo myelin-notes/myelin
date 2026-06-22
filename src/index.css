@@ -1,5 +1,6 @@
-@import "tailwindcss";
+@import "tailwindcss" source(".");
 @import "tw-animate-css";
+@import "@myelin/ui/theme.css";
 @import "katex/dist/katex.min.css";
 
 /* Split by feature for readability; import order preserves the original
