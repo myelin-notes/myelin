@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod code_runner;
 mod handwriting;
 mod iroh_transport;
 mod mcp_server;
@@ -69,6 +70,7 @@ pub fn run() {
         .manage(note_index::IndexEngineState::new())
         .manage(handwriting::HandwritingState::new())
         .manage(transcription::TranscriptionState::new())
+        .manage(code_runner::CodeRunnerState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
             iroh_transport::iroh_join,
@@ -90,6 +92,8 @@ pub fn run() {
             transcription::start_audio_transcription,
             transcription::push_audio_transcription_samples,
             transcription::finish_audio_transcription,
+            code_runner::run_code,
+            code_runner::cancel_run,
         ]);
 
     #[cfg(debug_assertions)]
