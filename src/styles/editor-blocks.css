@@ -45,6 +45,93 @@
   background: Highlight;
 }
 
+.pm-editor .ProseMirror .pm-code-block__run-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-top: 0.5px solid var(--border-ghost);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pm-editor .ProseMirror .pm-code-block__run-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-md, 6px);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pm-editor .ProseMirror .pm-code-block__run-btn:hover {
+  color: var(--text-primary);
+}
+
+.pm-editor .ProseMirror .pm-code-block__run-status.is-error {
+  color: var(--text-error, #e5484d);
+}
+
+/* Output overlay is portaled to <body>, so it sits outside the .pm-editor
+   scope and tracks the block in screen space. */
+.pm-code-block__output {
+  position: fixed;
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  max-height: 320px;
+  border: 0.5px solid var(--border-ghost);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.pm-code-block__output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--border-ghost);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pm-code-block__output-close {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pm-code-block__output-close:hover {
+  color: var(--text-primary);
+}
+
+.pm-code-block__output-body {
+  overflow: auto;
+  padding: 8px 10px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+
+.pm-code-block__output-line.is-stderr {
+  color: var(--text-error, #e5484d);
+}
+
 /* The * descendant variant overrides the markdown highlighter's CodeMark /
    CodeInfo token colors — CodeMirror nests highlight spans inside the
    delimiter mark span, and inherited color loses to the inner span's own. */
