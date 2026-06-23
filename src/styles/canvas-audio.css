@@ -97,7 +97,7 @@
 }
 
 .canvas-audio-time {
-  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-family: var(--font-sans, 'Hanken Grotesk', sans-serif);
   font-size: calc(10px * var(--canvas-audio-scale));
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -171,7 +171,7 @@
     0 calc(8px * var(--canvas-audio-scale))
       calc(24px * var(--canvas-audio-scale))
       calc(-8px * var(--canvas-audio-scale)) rgba(28, 39, 56, 0.18);
-  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-family: var(--font-sans, 'Hanken Grotesk', sans-serif);
   font-size: calc(11px * var(--canvas-audio-scale));
   line-height: 1.5;
   color: var(--text-primary);

@@ -554,7 +554,7 @@ export class GraphCanvasController {
   private drawNodes(): void {
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.font = `${12 / this.viewport.zoom}px Inter, sans-serif`;
+    this.ctx.font = `${12 / this.viewport.zoom}px 'Hanken Grotesk', sans-serif`;
     const totalNodes = this.layout.nodes.length;
     for (const node of this.layout.nodes) {
       const progress = node.selectionProgress;

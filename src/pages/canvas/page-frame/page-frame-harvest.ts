@@ -321,7 +321,7 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
       x,
       baselineY: y,
       text: `${order}.`,
-      font: 'inter',
+      font: 'hanken',
       weight: 400,
       italic: false,
       sizePt: pxToPt(em),

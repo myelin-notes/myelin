@@ -1,33 +1,66 @@
 @font-face {
-  font-family: "Inter";
+  font-family: "Hanken Grotesk";
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("../../src-tauri/fonts/Inter.ttf") format("truetype");
+  src: url("../../src-tauri/fonts/HankenGrotesk.ttf") format("truetype");
 }
 
 @font-face {
-  font-family: "Inter";
+  font-family: "Hanken Grotesk";
   font-style: italic;
   font-weight: 100 900;
   font-display: swap;
-  src: url("../../src-tauri/fonts/Inter-Italic.ttf") format("truetype");
+  src: url("../../src-tauri/fonts/HankenGrotesk-Italic.ttf") format("truetype");
 }
 
+/* Nyght Serif has no variable font — ship static weights. */
 @font-face {
-  font-family: "Newsreader";
+  font-family: "Nyght Serif";
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 400;
   font-display: swap;
-  src: url("../../src-tauri/fonts/Newsreader.ttf") format("truetype");
+  src: url("../../src-tauri/fonts/NyghtSerif-Regular.ttf") format("truetype");
 }
 
 @font-face {
-  font-family: "Newsreader";
+  font-family: "Nyght Serif";
   font-style: italic;
-  font-weight: 200 800;
+  font-weight: 400;
   font-display: swap;
-  src: url("../../src-tauri/fonts/Newsreader-Italic.ttf") format("truetype");
+  src: url("../../src-tauri/fonts/NyghtSerif-RegularItalic.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Nyght Serif";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../../src-tauri/fonts/NyghtSerif-Medium.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Nyght Serif";
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../../src-tauri/fonts/NyghtSerif-MediumItalic.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Nyght Serif";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../src-tauri/fonts/NyghtSerif-Bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Nyght Serif";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../src-tauri/fonts/NyghtSerif-BoldItalic.ttf") format("truetype");
 }
 
 @theme inline {
@@ -128,8 +161,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: "Newsreader", "Georgia", serif;
-  --font-sans: "Inter", Arial, sans-serif;
+  --font-heading: "Nyght Serif", "Georgia", serif;
+  --font-sans: "Hanken Grotesk", Arial, sans-serif;
   --color-icons: #65558F;
   --color-low-contrast: #DFDFDF;
   --color-sidebar-ring: var(--sidebar-ring);

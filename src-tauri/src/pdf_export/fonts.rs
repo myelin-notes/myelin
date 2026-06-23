@@ -1,10 +1,11 @@
-//! Bundled variable fonts + a cache of krilla `Font` instances.
+//! Bundled fonts + a cache of krilla `Font` instances.
 //!
-//! The webview loads Inter (body) and Newsreader (headings) as variable fonts from
-//! Google Fonts; we embed the same variable TTFs and select `wght`/`opsz` per run so
-//! glyph advances match the harvested on-screen positions. `Font` is expensive to
-//! create but cheap to clone, so we cache instances keyed by rounded weight + optical
-//! size.
+//! The webview loads Hanken Grotesk (body) as a variable font and Nyght Serif
+//! (headings) as static weights; we embed the same TTFs. Hanken varies via the
+//! `wght` axis per run so glyph advances match the harvested on-screen positions.
+//! Nyght has no variable axis, so we pick the nearest static face (Regular/Bold).
+//! `Font` is expensive to create but cheap to clone, so we cache instances keyed by
+//! face + rounded weight + optical size.
 
 use std::collections::HashMap;
 
@@ -13,14 +14,16 @@ use krilla::Data;
 
 use super::contract::FontKey;
 
-const INTER: &[u8] = include_bytes!("../../fonts/Inter.ttf");
-const INTER_ITALIC: &[u8] = include_bytes!("../../fonts/Inter-Italic.ttf");
-const NEWSREADER: &[u8] = include_bytes!("../../fonts/Newsreader.ttf");
-const NEWSREADER_ITALIC: &[u8] = include_bytes!("../../fonts/Newsreader-Italic.ttf");
+const HANKEN: &[u8] = include_bytes!("../../fonts/HankenGrotesk.ttf");
+const HANKEN_ITALIC: &[u8] = include_bytes!("../../fonts/HankenGrotesk-Italic.ttf");
+const NYGHT: &[u8] = include_bytes!("../../fonts/NyghtSerif-Regular.ttf");
+const NYGHT_ITALIC: &[u8] = include_bytes!("../../fonts/NyghtSerif-RegularItalic.ttf");
+const NYGHT_BOLD: &[u8] = include_bytes!("../../fonts/NyghtSerif-Bold.ttf");
+const NYGHT_BOLD_ITALIC: &[u8] = include_bytes!("../../fonts/NyghtSerif-BoldItalic.ttf");
 const MONO: &[u8] = include_bytes!("../../fonts/JetBrainsMono.ttf");
 
-type FaceKey = (u8, bool);
-type InstanceKey = (u8, bool, i32, i32);
+type FaceKey = (u8, bool, bool);
+type InstanceKey = (u8, bool, bool, i32, i32);
 
 pub struct FontRegistry {
     data: HashMap<FaceKey, Data>,
@@ -39,15 +42,17 @@ impl FontRegistry {
         let k = key as u8;
         // Mono has no italic face; fall back to upright.
         let italic = italic && !matches!(key, FontKey::Mono);
-        let ik: InstanceKey = (k, italic, weight.round() as i32, opsz.round() as i32);
+        // Nyght Serif ships static weights only — switch to the bold face past 600.
+        let bold = matches!(key, FontKey::Nyght) && weight >= 600.0;
+        let ik: InstanceKey = (k, italic, bold, weight.round() as i32, opsz.round() as i32);
         if let Some(font) = self.cache.get(&ik) {
             return Some(font.clone());
         }
 
         let data = self
             .data
-            .entry((k, italic))
-            .or_insert_with(|| face_bytes(key, italic).to_vec().into())
+            .entry((k, italic, bold))
+            .or_insert_with(|| face_bytes(key, italic, bold).to_vec().into())
             .clone();
 
         let coords = [(Tag::new(b"wght"), weight), (Tag::new(b"opsz"), opsz)];
@@ -57,12 +62,14 @@ impl FontRegistry {
     }
 }
 
-fn face_bytes(key: FontKey, italic: bool) -> &'static [u8] {
-    match (key, italic) {
-        (FontKey::Inter, false) => INTER,
-        (FontKey::Inter, true) => INTER_ITALIC,
-        (FontKey::Newsreader, false) => NEWSREADER,
-        (FontKey::Newsreader, true) => NEWSREADER_ITALIC,
-        (FontKey::Mono, _) => MONO,
+fn face_bytes(key: FontKey, italic: bool, bold: bool) -> &'static [u8] {
+    match (key, italic, bold) {
+        (FontKey::Hanken, false, _) => HANKEN,
+        (FontKey::Hanken, true, _) => HANKEN_ITALIC,
+        (FontKey::Nyght, false, false) => NYGHT,
+        (FontKey::Nyght, true, false) => NYGHT_ITALIC,
+        (FontKey::Nyght, false, true) => NYGHT_BOLD,
+        (FontKey::Nyght, true, true) => NYGHT_BOLD_ITALIC,
+        (FontKey::Mono, _, _) => MONO,
     }
 }

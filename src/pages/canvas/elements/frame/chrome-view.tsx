@@ -156,7 +156,7 @@ export const FrameChromeView = forwardRef<
               paddingLeft: `${CHROME_SIDE_PADDING}px`,
               paddingRight: `${CHROME_SIDE_PADDING}px`,
               gap: '14px',
-              fontFamily: 'Inter, Arial, sans-serif',
+              fontFamily: 'Hanken Grotesk, Arial, sans-serif',
               // width and transform set imperatively via syncHeaderGeometry
               transformOrigin: '0 0',
             }}
@@ -201,7 +201,7 @@ export const FrameChromeView = forwardRef<
                   className="w-full min-w-0 border-0 border-text-primary border-b-2 bg-transparent p-0 pb-0.5 font-medium text-[14px] text-text-primary leading-[1.2] outline-none"
                   style={{
                     borderRadius: 0,
-                    fontFamily: 'Inter, Arial, sans-serif',
+                    fontFamily: 'Hanken Grotesk, Arial, sans-serif',
                     letterSpacing: '-0.005em',
                     pointerEvents: 'auto',
                   }}
@@ -211,7 +211,7 @@ export const FrameChromeView = forwardRef<
                   <span
                     className="truncate font-medium text-[14px] text-text-primary leading-[1.2]"
                     style={{
-                      fontFamily: 'Inter, Arial, sans-serif',
+                      fontFamily: 'Hanken Grotesk, Arial, sans-serif',
                       letterSpacing: '-0.005em',
                     }}
                   >

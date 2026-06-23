@@ -1,7 +1,7 @@
 /**
  * Map a computed font style to the bundled font the Rust renderer embeds.
- * The webview loads Inter (sans/body) and Newsreader (serif/headings); code uses a
- * system monospace which we approximate with the bundled JetBrains Mono.
+ * The webview loads Hanken Grotesk (sans/body) and Nyght Serif (serif/headings); code
+ * uses a system monospace which we approximate with the bundled JetBrains Mono.
  */
 
 import type { FontKey } from './contract';
@@ -25,10 +25,10 @@ export function familyToKey(fontFamily: string): FontKey {
   if (/mono|consolas|menlo|cascadia|sfmono|courier/.test(f)) {
     return 'mono';
   }
-  if (/newsreader|georgia|serif/.test(f) && !/sans-serif/.test(f)) {
-    return 'newsreader';
+  if (/nyght|georgia|serif/.test(f) && !/sans-serif/.test(f)) {
+    return 'nyght';
   }
-  return 'inter';
+  return 'hanken';
 }
 
 function parseWeight(fontWeight: string): number {

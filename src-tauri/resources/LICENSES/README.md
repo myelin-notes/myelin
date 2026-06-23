@@ -21,6 +21,6 @@ third-party model and font assets redistributed with Myelin.
 
 | Bundled asset | License file | Upstream license source |
 | --- | --- | --- |
-| `Inter.ttf`, `Inter-Italic.ttf` | `Inter-OFL-1.1.txt` | https://raw.githubusercontent.com/rsms/inter/master/LICENSE.txt |
+| `HankenGrotesk.ttf`, `HankenGrotesk-Italic.ttf` | `HankenGrotesk-OFL-1.1.txt` | https://raw.githubusercontent.com/marcologous/hanken-grotesk/master/OFL.txt |
 | `JetBrainsMono.ttf` | `JetBrainsMono-OFL-1.1.txt` | https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/OFL.txt |
-| `Newsreader.ttf`, `Newsreader-Italic.ttf` | `Newsreader-OFL-1.1.txt` | https://raw.githubusercontent.com/productiontype/Newsreader/master/OFL.txt |
+| `NyghtSerif-*.ttf` | `NyghtSerif-OFL-1.1.txt` | https://github.com/Kobuzan/nyght-serif/blob/main/LICENSE.txt |
