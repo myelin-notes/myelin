@@ -122,14 +122,19 @@
 }
 
 .pm-code-block__output-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding: 8px 10px;
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 12px;
   line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.pm-code-block__output-line {
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--text-primary);
 }
 
 .pm-code-block__output-line.is-stderr {
