@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@astrojs/react": "^5.0.6",
+    "@astrojs/sitemap": "^3.7.3",
     "@myelin/ui": "*",
     "@tailwindcss/vite": "^4.3.0",
     "astro": "^6.4.2",

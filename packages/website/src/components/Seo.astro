@@ -1,0 +1,42 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  /** Page-specific OG image path, relative to site root. */
+  image?: string;
+  /** Structured data object(s) injected as JSON-LD. */
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+}
+
+// TODO: replace placeholder with a real 1200×630 share image, then update this default.
+const { title, description, image = '/todo-placeholder-og.png', jsonLd } = Astro.props;
+
+// Astro.site comes from the `site` config; canonical strips query/hash noise.
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const imageUrl = new URL(image, Astro.site).href;
+
+const structuredData = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+---
+
+<link rel="canonical" href={canonical} />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Myelin" />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={imageUrl} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={imageUrl} />
+
+{
+  structuredData.map((data) => (
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify(data)}
+    />
+  ))
+}
