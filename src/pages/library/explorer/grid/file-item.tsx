@@ -17,6 +17,7 @@ import { TagManageDialog } from '../../tag-manage-dialog';
 import { ItemContextMenu } from '../item-context-menu';
 import { RenameReferencesDialog } from '../rename-references-dialog';
 import { SearchHighlight } from '../search-highlight';
+import { TagList } from '../tag-list';
 import { useExplorerItem } from '../use-explorer-item';
 import {
   explorerGridBodyClass,
@@ -143,20 +144,12 @@ export function GridFileItem({
                     className={explorerGridSnippetClass}
                   />
                 )}
-                {file.tags.length > 0 && (
-                  <div className={explorerGridTagsClass}>
-                    {file.tags.slice(0, 2).map((tag) => (
-                      <span key={tag} className={explorerGridTagClass}>
-                        #{tag}
-                      </span>
-                    ))}
-                    {file.tags.length > 2 && (
-                      <span className={explorerGridTagOverflowClass}>
-                        +{file.tags.length - 2}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <TagList
+                  tags={file.tags}
+                  className={explorerGridTagsClass}
+                  tagClassName={explorerGridTagClass}
+                  overflowClassName={explorerGridTagOverflowClass}
+                />
               </>
             )}
           </div>

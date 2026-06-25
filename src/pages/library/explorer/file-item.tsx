@@ -17,6 +17,7 @@ import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
 import { RenameReferencesDialog } from './rename-references-dialog';
 import { SearchHighlight } from './search-highlight';
+import { TagList } from './tag-list';
 import { useExplorerItem } from './use-explorer-item';
 
 interface FileItemProps {
@@ -103,23 +104,12 @@ export function FileItem({
                 <span className="truncate font-normal text-sm text-text-secondary transition-colors duration-200 group-hover:text-text-primary">
                   <SearchHighlight text={file.name} terms={matchedTerms} />
                 </span>
-                {file.tags.length > 0 && (
-                  <div className="flex shrink-0 items-center gap-1">
-                    {file.tags.slice(0, 2).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                    {file.tags.length > 2 && (
-                      <span className="text-[9px] text-text-muted">
-                        +{file.tags.length - 2}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <TagList
+                  tags={file.tags}
+                  className="flex shrink-0 items-center gap-1"
+                  tagClassName="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
+                  overflowClassName="text-[9px] text-text-muted"
+                />
               </div>
               {snippet && (
                 <SearchHighlight

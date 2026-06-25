@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { formatExplorerItemAccessibleName } from '../../accessibility-labels';
 import { TagManageDialog } from '../../tag-manage-dialog';
 import { ItemContextMenu } from '../item-context-menu';
+import { TagList } from '../tag-list';
 import { useDropTarget } from '../use-drop-target';
 import { useExplorerItem } from '../use-explorer-item';
 import {
@@ -115,20 +116,12 @@ export function GridFolderItem({
                 >
                   {name}
                 </span>
-                {tags.length > 0 && (
-                  <div className={explorerGridTagsClass}>
-                    {tags.slice(0, 2).map((tag) => (
-                      <span key={tag} className={explorerGridTagClass}>
-                        #{tag}
-                      </span>
-                    ))}
-                    {tags.length > 2 && (
-                      <span className={explorerGridTagOverflowClass}>
-                        +{tags.length - 2}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <TagList
+                  tags={tags}
+                  className={explorerGridTagsClass}
+                  tagClassName={explorerGridTagClass}
+                  overflowClassName={explorerGridTagOverflowClass}
+                />
               </>
             )}
           </div>
