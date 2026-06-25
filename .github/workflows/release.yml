@@ -184,7 +184,13 @@ jobs:
 
       - name: Assemble manifest
         run: |
-          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          # tauri.conf.json's version is the path-reference form ("../package.json"),
+          # so read the resolved semver from package.json directly.
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::resolved VERSION is not a semver: '$VERSION'"
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           node scripts/build-updater-manifest.mjs \
             --dir incoming \
