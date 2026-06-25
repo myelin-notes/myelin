@@ -8,7 +8,7 @@
 //     --dir <artifacts-dir> --version <x.y.z> --base-url <url-prefix> --out <path>
 //
 // `--base-url` is the public prefix the bundles will be served from, e.g.
-//   https://pub-b609df54ffbc4104a99c47d9ac342457.r2.dev/prerelease/0.2.0
+//   https://updates.trymyelin.app/prerelease/0.2.0
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 

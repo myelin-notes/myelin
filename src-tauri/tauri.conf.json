@@ -35,7 +35,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4NUUwOTk0NzhCOEY3RjMKUldUejk3aDRsQWxleUNib3BueFREUVBsTkMvekJoeGxsNDlhR0k1RElNd0Z2bTdTeE5zWmQ0a0oK",
       "endpoints": [
-        "https://pub-b609df54ffbc4104a99c47d9ac342457.r2.dev/stable/latest.json"
+        "https://updates.trymyelin.app/stable/latest.json"
       ]
     }
   },

@@ -31,7 +31,7 @@ env:
   SOURCE_DATE_EPOCH: "1704067200"
   # Must match the updater endpoint host in src-tauri/tauri.conf.json.
   R2_BUCKET: myelin-updates
-  UPDATER_DOMAIN: https://pub-b609df54ffbc4104a99c47d9ac342457.r2.dev
+  UPDATER_DOMAIN: https://updates.trymyelin.app
 
 jobs:
   test:
