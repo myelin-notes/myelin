@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import type { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { PM_UPDATE_EVENT } from '@/lib/events';
+import { useMessages } from '@/lib/i18n';
 import {
   type NoteLinkSearchSource,
   type PageFrameNameCache,
@@ -72,6 +73,12 @@ export function usePageFrameAutocomplete({
   const [activeKind, setActiveKind] =
     useState<PageFrameAutocompleteKind | null>(null);
 
+  // Read inside the (memoized) source closure so language changes are picked up
+  // without recreating the controller.
+  const strings = useMessages();
+  const slashLabelsRef = useRef(strings.canvas.slashInsert);
+  slashLabelsRef.current = strings.canvas.slashInsert;
+
   const frameNameCache = useMemo<PageFrameNameCache>(() => new Map(), []);
 
   const controller = useMemo(
@@ -79,7 +86,11 @@ export function usePageFrameAutocomplete({
       new PageFrameAutocompleteController({
         source: ({ query, limit = 8, signal }) => {
           if (activeSourceRef.current === 'slash') {
-            return searchSlashInsertAutocompleteItems(query, limit);
+            return searchSlashInsertAutocompleteItems(
+              query,
+              limit,
+              slashLabelsRef.current,
+            );
           }
 
           return searchNoteLinkAutocompleteItems(

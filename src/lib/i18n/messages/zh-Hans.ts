@@ -533,6 +533,68 @@ const zhHans: typeof en = {
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },
+    slashInsert: {
+      heading1: {
+        title: '一级标题',
+        subtitle: '将此块转换为顶级标题',
+      },
+      heading2: {
+        title: '二级标题',
+        subtitle: '将此块转换为章节标题',
+      },
+      heading3: {
+        title: '三级标题',
+        subtitle: '将此块转换为小标题',
+      },
+      quote: {
+        title: '引用',
+        subtitle: '将此块转换为引用块',
+      },
+      bulletList: {
+        title: '项目符号列表',
+        subtitle: '将此块转换为项目符号列表项',
+      },
+      numberedList: {
+        title: '编号列表',
+        subtitle: '将此块转换为编号列表项',
+      },
+      todo: {
+        title: '待办事项',
+        subtitle: '将此块转换为可勾选的待办事项',
+      },
+      paragraph: {
+        title: '段落',
+        subtitle: '将此块重置为纯正文文本',
+      },
+      table: {
+        title: '表格',
+        subtitle: '插入包含表头和正文行的表格',
+      },
+      bold: {
+        title: '粗体',
+        subtitle: '插入 **粗体** Markdown',
+      },
+      italic: {
+        title: '斜体',
+        subtitle: '插入 *斜体* Markdown',
+      },
+      link: {
+        title: '链接',
+        subtitle: '插入 [标签](url) Markdown',
+      },
+      noteLink: {
+        title: '笔记链接',
+        subtitle: '插入指向其他笔记的 [[笔记]] 链接',
+      },
+      inlineCode: {
+        title: '行内代码',
+        subtitle: '插入 `代码` Markdown',
+      },
+      embed: {
+        title: '嵌入',
+        subtitle: '插入 ![alt](url) — 图片、视频、YouTube、链接卡片',
+      },
+    },
     backlinks: {
       title: '反向链接',
       linkedMentions: '已链接提及',

@@ -550,6 +550,68 @@ const en = {
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },
+    slashInsert: {
+      heading1: {
+        title: 'Heading 1',
+        subtitle: 'Turn this block into a top-level heading',
+      },
+      heading2: {
+        title: 'Heading 2',
+        subtitle: 'Turn this block into a section heading',
+      },
+      heading3: {
+        title: 'Heading 3',
+        subtitle: 'Turn this block into a small heading',
+      },
+      quote: {
+        title: 'Quote',
+        subtitle: 'Turn this block into a blockquote',
+      },
+      bulletList: {
+        title: 'Bullet list',
+        subtitle: 'Turn this block into a bulleted list item',
+      },
+      numberedList: {
+        title: 'Numbered list',
+        subtitle: 'Turn this block into a numbered list item',
+      },
+      todo: {
+        title: 'To-do',
+        subtitle: 'Turn this block into a checkable to-do item',
+      },
+      paragraph: {
+        title: 'Paragraph',
+        subtitle: 'Reset this block back to plain body text',
+      },
+      table: {
+        title: 'Table',
+        subtitle: 'Insert a table with header and body rows',
+      },
+      bold: {
+        title: 'Bold',
+        subtitle: 'Insert **bold** markdown',
+      },
+      italic: {
+        title: 'Italic',
+        subtitle: 'Insert *italic* markdown',
+      },
+      link: {
+        title: 'Link',
+        subtitle: 'Insert [label](url) markdown',
+      },
+      noteLink: {
+        title: 'Note link',
+        subtitle: 'Insert [[note]] link to another note',
+      },
+      inlineCode: {
+        title: 'Inline code',
+        subtitle: 'Insert `code` markdown',
+      },
+      embed: {
+        title: 'Embed',
+        subtitle: 'Insert ![alt](url) — images, videos, YouTube, link cards',
+      },
+    },
     backlinks: {
       title: 'Backlinks',
       linkedMentions: 'Linked mentions',

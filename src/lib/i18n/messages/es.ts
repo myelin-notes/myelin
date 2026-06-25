@@ -555,6 +555,69 @@ const es: typeof en = {
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
     },
+    slashInsert: {
+      heading1: {
+        title: 'Encabezado 1',
+        subtitle: 'Convierte este bloque en un encabezado de nivel superior',
+      },
+      heading2: {
+        title: 'Encabezado 2',
+        subtitle: 'Convierte este bloque en un encabezado de sección',
+      },
+      heading3: {
+        title: 'Encabezado 3',
+        subtitle: 'Convierte este bloque en un encabezado pequeño',
+      },
+      quote: {
+        title: 'Cita',
+        subtitle: 'Convierte este bloque en una cita',
+      },
+      bulletList: {
+        title: 'Lista con viñetas',
+        subtitle: 'Convierte este bloque en un elemento de lista con viñetas',
+      },
+      numberedList: {
+        title: 'Lista numerada',
+        subtitle: 'Convierte este bloque en un elemento de lista numerada',
+      },
+      todo: {
+        title: 'Tarea',
+        subtitle: 'Convierte este bloque en una tarea con casilla',
+      },
+      paragraph: {
+        title: 'Párrafo',
+        subtitle: 'Restablece este bloque a texto normal',
+      },
+      table: {
+        title: 'Tabla',
+        subtitle: 'Inserta una tabla con filas de encabezado y cuerpo',
+      },
+      bold: {
+        title: 'Negrita',
+        subtitle: 'Inserta marcado **negrita**',
+      },
+      italic: {
+        title: 'Cursiva',
+        subtitle: 'Inserta marcado *cursiva*',
+      },
+      link: {
+        title: 'Enlace',
+        subtitle: 'Inserta marcado [etiqueta](url)',
+      },
+      noteLink: {
+        title: 'Enlace a nota',
+        subtitle: 'Inserta un enlace [[nota]] a otra nota',
+      },
+      inlineCode: {
+        title: 'Código en línea',
+        subtitle: 'Inserta marcado `código`',
+      },
+      embed: {
+        title: 'Insertar contenido',
+        subtitle:
+          'Inserta ![alt](url): imágenes, vídeos, YouTube, tarjetas de enlace',
+      },
+    },
     backlinks: {
       title: 'Backlinks',
       linkedMentions: 'Menciones enlazadas',
