@@ -12,6 +12,7 @@ const invokeMock = vi.hoisted(() => vi.fn());
 const listeners = vi.hoisted(() => new Map<string, Set<EventCallback>>());
 const loggerDebug = vi.hoisted(() => vi.fn());
 const loggerWarn = vi.hoisted(() => vi.fn());
+const loggerError = vi.hoisted(() => vi.fn());
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
@@ -33,7 +34,7 @@ vi.mock('@/lib/logger', () => ({
     debug = loggerDebug;
     info = vi.fn();
     warn = loggerWarn;
-    error = vi.fn();
+    error = loggerError;
   },
 }));
 
@@ -145,6 +146,7 @@ describe('audio transcription service', () => {
     invokeMock.mockReset();
     loggerDebug.mockReset();
     loggerWarn.mockReset();
+    loggerError.mockReset();
     listeners.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -205,7 +207,7 @@ describe('audio transcription service', () => {
 
     expect(session).toBeNull();
     expect(listenerCount()).toBe(0);
-    expect(loggerWarn).toHaveBeenCalled();
+    expect(loggerError).toHaveBeenCalled();
   });
 
   it('finishes the backend session and removes listeners when capture fails', async () => {
@@ -237,7 +239,7 @@ describe('audio transcription service', () => {
       expect(audioContext?.close).toHaveBeenCalled();
       expect(listenerCount()).toBe(0);
     });
-    expect(loggerWarn).toHaveBeenCalled();
+    expect(loggerError).toHaveBeenCalled();
 
     emitSamples();
     await Promise.resolve();
@@ -274,6 +276,7 @@ describe('audio transcription service', () => {
     });
     expect(loggerDebug).toHaveBeenCalled();
     expect(loggerWarn).not.toHaveBeenCalled();
+    expect(loggerError).not.toHaveBeenCalled();
 
     emitSamples();
     await Promise.resolve();
@@ -295,7 +298,7 @@ describe('audio transcription service', () => {
     await vi.waitFor(() => {
       expect(audioContext?.close).toHaveBeenCalled();
     });
-    expect(loggerWarn).toHaveBeenCalled();
+    expect(loggerError).toHaveBeenCalled();
 
     emitSamples();
     await Promise.resolve();
