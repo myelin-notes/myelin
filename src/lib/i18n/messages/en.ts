@@ -236,8 +236,6 @@ const en = {
   },
   settings: {
     title: 'Preferences',
-    description:
-      'Customize your creative sanctuary. These settings adjust the visual atmosphere and functional depth of your infinite canvas.',
     canvasStyle: {
       title: 'Canvas Style',
       eyebrow: 'Surface Layer',

@@ -64,9 +64,6 @@ export function SettingsPage() {
               >
                 {strings.settings.title}
               </h1>
-              <p className="mt-3 text-text-muted leading-relaxed">
-                {strings.settings.description}
-              </p>
             </header>
 
             <div className="space-y-12 md:space-y-16">

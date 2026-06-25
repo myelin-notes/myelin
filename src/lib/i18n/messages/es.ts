@@ -239,8 +239,6 @@ const es: typeof en = {
   },
   settings: {
     title: 'Preferencias',
-    description:
-      'Personaliza tu santuario creativo. Estos ajustes modifican la atmósfera visual y la profundidad funcional de tu lienzo infinito.',
     canvasStyle: {
       title: 'Estilo del lienzo',
       eyebrow: 'Aspecto visual',

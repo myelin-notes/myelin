@@ -16,7 +16,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { trackEvent } from '@/lib/analytics';
-import { useMessages } from '@/lib/i18n';
+import { type Messages, useMessages } from '@/lib/i18n';
 import {
   isMac,
   isWindows,
@@ -39,6 +39,22 @@ import {
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
 import { WindowControls } from './window-controls';
+
+// Built-in tabs store a title captured at creation time, so they don't follow
+// language changes. Derive their title from the current messages instead and
+// fall back to the stored title for content tabs (canvas/image file names).
+function tabTitle(tab: Tab, strings: Messages): string {
+  switch (tab.target.type) {
+    case 'library':
+      return strings.tabBar.library;
+    case 'graph':
+      return strings.graph.title;
+    case 'settings':
+      return strings.tabBar.settings;
+    default:
+      return tab.title;
+  }
+}
 
 function tabIcon(target: TabTarget) {
   switch (target.type) {
@@ -242,7 +258,9 @@ const TabItem = memo(function TabItem({
   onDragStateChange: (tabId: TabId | null) => void;
 }) {
   const controller = useTabController();
+  const strings = useMessages();
   const tabRef = useRef<HTMLDivElement>(null);
+  const title = tabTitle(tab, strings);
 
   const handleClick = useCallback(() => {
     controller.activateTab(tab.id, paneId);
@@ -359,12 +377,12 @@ const TabItem = memo(function TabItem({
         >
           {icon}
           <span className="min-w-0 flex-1 truncate font-medium text-[11px]">
-            {tab.title}
+            {title}
           </span>
           <button
             type="button"
             onClick={handleClose}
-            aria-label={`Close ${tab.title}`}
+            aria-label={`Close ${title}`}
             className={cn(
               'flex size-4 shrink-0 items-center justify-center rounded transition-colors duration-150',
               isActive
