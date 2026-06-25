@@ -18,7 +18,9 @@ import {
   forwardNestedContentUpdate,
   forwardNestedSelectionUpdate,
 } from '../nested-editor/pm-sync';
+import { collectRunSource, parseBlockLanguage } from './concat';
 import type { CodeBlockEditor, CodeBlockEditorBoundaryInput } from './editor';
+import { CodeBlockRunView } from './run-view';
 import {
   type CodeBlockExternalSelection,
   type CodeBlockExternalSelectionDetail,
@@ -55,6 +57,7 @@ export class CodeBlockNodeView implements NodeView {
   public readonly dom: HTMLDivElement;
 
   private readonly editorEl: HTMLDivElement;
+  private readonly runView: CodeBlockRunView;
   private editor: CodeBlockEditor | null = null;
   private layoutObserver: MutationObserver | null = null;
   private destroyed = false;
@@ -131,6 +134,14 @@ export class CodeBlockNodeView implements NodeView {
     this.editorEl.className = 'pm-code-block__editor';
     this.dom.appendChild(this.editorEl);
 
+    this.runView = new CodeBlockRunView({
+      view: this.view,
+      blockDom: this.dom,
+      collectSource: () => collectRunSource(this.view.state.doc, this.getPos()),
+    });
+    this.dom.appendChild(this.runView.button);
+    this.runView.setLanguage(parseBlockLanguage(this.node.textContent));
+
     // The .pm-page-capped max-height tracks data-page-layout, which the frame
     // can flip after this view mounts (e.g. switching to continuous in
     // settings) — re-measure the outer height when it does.
@@ -152,6 +163,7 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     this.node = node;
+    this.runView.setLanguage(parseBlockLanguage(node.textContent));
 
     if (!this.editor) {
       return true;
@@ -193,6 +205,7 @@ export class CodeBlockNodeView implements NodeView {
 
   destroy(): void {
     this.destroyed = true;
+    this.runView.dispose();
     this.layoutObserver?.disconnect();
     this.layoutObserver = null;
     this.dom.removeEventListener(

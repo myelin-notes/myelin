@@ -89,6 +89,18 @@ export function getPageFramePmScreenRectForPos(
 }
 
 /**
+ * Screen-pixel rect for a node view's DOM element, resolved against the
+ * editor's frame/content DOM so it stays correct under the canvas's zoom and
+ * scale. Used to anchor floating UI (e.g. code run output) to a block.
+ */
+export function getPageFramePmScreenRectForElement(
+  view: EditorView,
+  element: HTMLElement,
+): PageFramePmScreenRect | null {
+  return mapViewRectToScreen(view, element.getBoundingClientRect());
+}
+
+/**
  * Screen-pixel rect for the caret while it lives inside a nested CodeMirror
  * editor (code block, math source panel). Those node views have no
  * contentDOM, so `coordsAtPos` for inner positions degrades to the block's

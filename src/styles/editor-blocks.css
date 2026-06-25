@@ -30,6 +30,7 @@
 .pm-editor .ProseMirror .pm-code-block {
   /* Keep the outer wrapper in normal flow so pagination sees the same block
      coordinates as neighboring paragraphs. */
+  position: relative;
   margin: 1.15em 0;
   overflow: hidden;
   overflow: clip;
@@ -43,6 +44,94 @@
 
 .pm-editor .ProseMirror .pm-code-block__external-selection {
   background: Highlight;
+}
+
+.pm-editor .ProseMirror .pm-code-block__run-btn {
+  /* Float over the block's top-right corner so the run affordance never adds
+     to the block's measured height. */
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-md, 6px);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pm-editor .ProseMirror .pm-code-block__run-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Output overlay is portaled to <body>, so it sits outside the .pm-editor
+   scope and tracks the block in screen space. */
+.pm-code-block__output {
+  position: fixed;
+  z-index: 80;
+  /* The per-frame editor runs on a transform/zoom compositing layer; force the
+     overlay onto its own layer too, or the editor's glyphs paint over it in the
+     overlap region (WebKit overlap-compositing quirk). */
+  transform: translateZ(0);
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  max-height: 320px;
+  border: 0.5px solid var(--border-ghost);
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.pm-code-block__output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 0.5px solid var(--border-ghost);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pm-code-block__output-close {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pm-code-block__output-close:hover {
+  color: var(--text-primary);
+}
+
+.pm-code-block__output-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.pm-code-block__output-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pm-code-block__output-line.is-stderr {
+  color: var(--text-error, #e5484d);
 }
 
 /* The * descendant variant overrides the markdown highlighter's CodeMark /

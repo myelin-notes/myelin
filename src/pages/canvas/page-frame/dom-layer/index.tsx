@@ -27,6 +27,7 @@ import type {
   PageFrameAutocompleteItem,
 } from '../pm/autocomplete';
 import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
+import { CodeRunOverlayLayer } from '../pm/code-block/run-overlay';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
@@ -740,6 +741,7 @@ export function PageFrameDomLayer({
         loadPreview={loadNoteLinkPreview}
         suppressed={autocompleteKind !== null}
       />
+      <CodeRunOverlayLayer />
     </>
   );
 }

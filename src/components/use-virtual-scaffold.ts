@@ -23,10 +23,11 @@ interface VirtualScaffold {
 export function useVirtualScaffold(
   itemCount: number,
   getItemKey: (index: number) => string,
+  estimateHeight: (index: number) => number,
   onWidthChange?: (width: number) => void,
 ): VirtualScaffold {
   const { containerRef, setContainerEl } = useListContainer(onWidthChange);
-  const measured = useMeasuredHeights();
+  const measured = useMeasuredHeights(estimateHeight);
   const { prune } = measured;
 
   const liveKeys = useMemo(() => {
