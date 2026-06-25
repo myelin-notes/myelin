@@ -304,6 +304,10 @@ const zhHans: typeof en = {
           signOut: '退出登录',
         },
         deviceCode: '在浏览器中输入此代码',
+        notices: {
+          credentialReset: (provider: string) =>
+            `您的 ${provider} 登录已过期并已重置，请重新连接。`,
+        },
       },
       authStatus: {
         checking: '检查中',

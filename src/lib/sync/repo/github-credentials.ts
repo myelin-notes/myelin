@@ -1,4 +1,5 @@
 import { appDataDir, join } from '@tauri-apps/api/path';
+import { remove } from '@tauri-apps/plugin-fs';
 import { fetch } from '@tauri-apps/plugin-http';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import {
@@ -7,7 +8,10 @@ import {
   type Store as StrongholdStore,
 } from '@tauri-apps/plugin-stronghold';
 import { GITHUB_CLIENT_ID } from '@/lib/env';
+import { Logger } from '@/lib/logger';
 import { UserPrefs } from '@/lib/user-prefs';
+
+const logger = new Logger('GitHubCredentials');
 
 const SECURE_STORAGE_UNAVAILABLE_ERROR =
   'Encrypted credential storage is unavailable on this device.';
@@ -53,12 +57,56 @@ function getGitHubVaultPassword(): string {
   return generated;
 }
 
+function isVaultKeyError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('BadFileKey') || message.includes('decode/decrypt');
+}
+
+// Set when a stale, undecryptable vault is discarded so the UI can surface a
+// one-time "sign-in expired, please reconnect" notice. Read-and-cleared via
+// consumeGitHubVaultDiscarded().
+let githubVaultDiscarded = false;
+
+export function consumeGitHubVaultDiscarded(): boolean {
+  const discarded = githubVaultDiscarded;
+  githubVaultDiscarded = false;
+  return discarded;
+}
+
+async function loadGitHubStronghold(
+  vaultPath: string,
+  password: string,
+): Promise<Stronghold> {
+  try {
+    return await Stronghold.load(vaultPath, password);
+  } catch (error) {
+    if (!isVaultKeyError(error)) {
+      throw error;
+    }
+
+    // The vault file exists but can't be decrypted with the current password
+    // (e.g. the stored vault password was reset/regenerated). Any token inside
+    // is unrecoverable, so discard the file and start fresh — the user simply
+    // re-authenticates. Logged as a warning so it isn't reported as an
+    // exception for an expected, self-healing condition.
+    logger.warn('Discarding unreadable GitHub credential vault', error);
+    githubVaultDiscarded = true;
+    await remove(vaultPath).catch((removeError) => {
+      logger.warn('Failed to remove unreadable GitHub vault', removeError);
+    });
+    return Stronghold.load(vaultPath, password);
+  }
+}
+
 async function createGitHubStrongholdStore(): Promise<{
   stronghold: Stronghold;
   store: StrongholdStore;
 }> {
   const vaultPath = await join(await appDataDir(), GITHUB_STRONGHOLD_FILENAME);
-  const stronghold = await Stronghold.load(vaultPath, getGitHubVaultPassword());
+  const stronghold = await loadGitHubStronghold(
+    vaultPath,
+    getGitHubVaultPassword(),
+  );
 
   let client: StrongholdClient;
   try {

@@ -317,6 +317,10 @@ const es: typeof en = {
           signOut: 'Cerrar sesión',
         },
         deviceCode: 'Introduce este código en tu navegador',
+        notices: {
+          credentialReset: (provider: string) =>
+            `Tu sesión de ${provider} expiró y se restableció. Vuelve a conectar.`,
+        },
       },
       authStatus: {
         checking: 'Comprobando',

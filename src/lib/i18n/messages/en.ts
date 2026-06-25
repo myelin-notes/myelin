@@ -313,6 +313,10 @@ const en = {
           signOut: 'Sign out',
         },
         deviceCode: 'Enter this code in your browser',
+        notices: {
+          credentialReset: (provider: string) =>
+            `Your ${provider} sign-in expired and was reset. Please reconnect.`,
+        },
       },
       authStatus: {
         checking: 'Checking',
