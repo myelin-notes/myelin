@@ -1,5 +1,6 @@
 import type { EditorView } from 'prosemirror-view';
 import type { UnlistenFn } from '@tauri-apps/api/event';
+import { trackEvent } from '@/lib/analytics';
 import {
   cancelRun,
   onRunFinished,
@@ -21,50 +22,46 @@ interface CodeBlockRunViewOptions {
   collectSource: () => RunSource | null;
 }
 
-type RunStatus = 'idle' | 'running' | 'ok' | 'error';
-
 /**
  * Owns a code block's run affordance: a Run/Stop button overlaid in the block's
- * top-right corner, plus a status label. The chip is absolutely positioned, so
- * it never changes the block's measured size. Output is pushed to
- * {@link codeRunStore} and rendered by the React overlay layer.
+ * top-right corner. The button is absolutely positioned, so it never changes
+ * the block's measured size. Output (including a non-zero exit code) is pushed
+ * to {@link codeRunStore} and rendered by the React overlay layer.
  */
 export class CodeBlockRunView {
   /** Appended into the node view's DOM as a top-right absolute overlay. */
-  public readonly chip: HTMLDivElement;
+  public readonly button: HTMLButtonElement;
 
-  private readonly runButton: HTMLButtonElement;
   /** Stable identity for this block's overlay entry in the store. */
   private readonly id = crypto.randomUUID();
 
   private language: RunnableLanguage | null = null;
   private executionId: string | null = null;
-  private status: RunStatus = 'idle';
+  private running = false;
+  /** Run context captured at start, reported when the run finishes. */
+  private runLanguage: RunnableLanguage | null = null;
+  private runStartedAt = 0;
+  private runCancelled = false;
 
   private unlistenOutput: UnlistenFn | null = null;
   private unlistenFinished: UnlistenFn | null = null;
 
   constructor(private readonly options: CodeBlockRunViewOptions) {
-    this.chip = document.createElement('div');
-    this.chip.className = 'pm-code-block__run-bar';
-    this.chip.style.display = 'none';
-
-    this.runButton = document.createElement('button');
-    this.runButton.type = 'button';
-    this.runButton.className = 'pm-code-block__run-btn';
-    this.runButton.addEventListener('click', () => this.toggleRun());
-
-    this.chip.append(this.runButton);
-    this.syncChip();
+    this.button = document.createElement('button');
+    this.button.type = 'button';
+    this.button.className = 'pm-code-block__run-btn';
+    this.button.style.display = 'none';
+    this.button.addEventListener('click', () => this.toggleRun());
+    this.syncButton();
   }
 
-  /** Show the chip only for languages with a local runner. */
+  /** Show the button only for languages with a local runner. */
   setLanguage(language: RunnableLanguage | null): void {
     if (language === this.language) {
       return;
     }
     this.language = language;
-    this.chip.style.display = language ? '' : 'none';
+    this.button.style.display = language ? '' : 'none';
   }
 
   dispose(): void {
@@ -76,8 +73,9 @@ export class CodeBlockRunView {
   }
 
   private toggleRun(): void {
-    if (this.status === 'running') {
+    if (this.running) {
       if (this.executionId) {
+        this.runCancelled = true;
         void cancelRun(this.executionId).catch((err) =>
           logger.error('cancel_run failed', err),
         );
@@ -95,7 +93,10 @@ export class CodeBlockRunView {
 
     const executionId = crypto.randomUUID();
     this.executionId = executionId;
-    this.setStatus('running');
+    this.runLanguage = payload.language;
+    this.runStartedAt = Date.now();
+    this.runCancelled = false;
+    this.setRunning(true);
     codeRunStore.start(this.id, this.options.view, this.options.blockDom);
 
     // Subscribe before invoking so a fast-exiting process can't emit before a
@@ -124,34 +125,38 @@ export class CodeBlockRunView {
   private onFinished(exitCode: number | null, error: string | null): void {
     this.clearListeners();
     this.executionId = null;
+    this.setRunning(false);
 
     if (error) {
       codeRunStore.appendLine(this.id, { text: error, stream: 'stderr' });
-      codeRunStore.setStatus(this.id, 'error');
-      this.setStatus('error');
-    } else if (exitCode === 0) {
-      codeRunStore.setStatus(this.id, 'ok');
-      this.setStatus('ok');
-    } else {
+    } else if (exitCode !== 0) {
       codeRunStore.appendLine(this.id, {
         text: `Process exited with code ${exitCode}`,
         stream: 'stderr',
       });
-      codeRunStore.setStatus(this.id, 'error');
-      this.setStatus('error');
     }
+
+    const outcome = this.runCancelled
+      ? 'cancelled'
+      : error || exitCode !== 0
+        ? 'error'
+        : 'success';
+    trackEvent('code_run_finished', {
+      language: this.runLanguage,
+      outcome,
+      exit_code: exitCode,
+      duration_ms: Date.now() - this.runStartedAt,
+    });
   }
 
-  private setStatus(status: RunStatus): void {
-    this.status = status;
-    this.syncChip();
+  private setRunning(running: boolean): void {
+    this.running = running;
+    this.syncButton();
   }
 
-  private syncChip(): void {
-    const running = this.status === 'running';
-    this.runButton.textContent = running ? '■' : '▶';
-    this.runButton.setAttribute('aria-label', running ? 'Stop' : 'Run');
-    this.runButton.classList.toggle('is-running', running);
+  private syncButton(): void {
+    this.button.textContent = this.running ? '■' : '▶';
+    this.button.setAttribute('aria-label', this.running ? 'Stop' : 'Run');
   }
 
   private clearListeners(): void {

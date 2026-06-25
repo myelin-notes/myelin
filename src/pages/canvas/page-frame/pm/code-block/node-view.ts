@@ -139,7 +139,7 @@ export class CodeBlockNodeView implements NodeView {
       blockDom: this.dom,
       collectSource: () => collectRunSource(this.view.state.doc, this.getPos()),
     });
-    this.dom.appendChild(this.runView.chip);
+    this.dom.appendChild(this.runView.button);
     this.runView.setLanguage(parseBlockLanguage(this.node.textContent));
 
     // The .pm-page-capped max-height tracks data-page-layout, which the frame

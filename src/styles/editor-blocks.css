@@ -46,21 +46,13 @@
   background: Highlight;
 }
 
-.pm-editor .ProseMirror .pm-code-block__run-bar {
+.pm-editor .ProseMirror .pm-code-block__run-btn {
   /* Float over the block's top-right corner so the run affordance never adds
      to the block's measured height. */
   position: absolute;
   top: 6px;
   right: 6px;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.pm-editor .ProseMirror .pm-code-block__run-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
