@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { trackEvent } from '@/lib/analytics';
+import { useMessages } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import type { ExportFormat, ExportTarget } from './export-controller';
 
@@ -26,6 +27,7 @@ const FORMAT_LABELS: Record<ExportFormat, string> = {
 };
 
 export function ExportDialog({ target, onClose }: ExportDialogProps) {
+  const strings = useMessages();
   const [format, setFormat] = useState<ExportFormat>('pdf');
   const [includeAnnotations, setIncludeAnnotations] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -54,11 +56,11 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
         return;
       }
       if (result.warnings && result.warnings.length > 0) {
-        toast.warning('Exported with warnings', {
+        toast.warning(strings.canvas.export.exportedWithWarnings, {
           description: result.warnings.join(' '),
         });
       } else {
-        toast.success('Export complete');
+        toast.success(strings.canvas.export.complete);
       }
       trackEvent('export_completed', {
         format,
@@ -91,7 +93,7 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
         overlayClassName="z-[110]"
       >
         <DialogHeader>
-          <DialogTitle>Export</DialogTitle>
+          <DialogTitle>{strings.canvas.export.title}</DialogTitle>
           {target?.title && (
             <DialogDescription>{target.title}</DialogDescription>
           )}
@@ -101,7 +103,7 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
           {showFormatPicker && (
             <div className="flex flex-col gap-2">
               <span className="font-medium text-[0.7rem] text-muted-foreground uppercase tracking-wider">
-                Format
+                {strings.canvas.export.format}
               </span>
               <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
                 {target?.formats.map((f) => (
@@ -131,9 +133,11 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
                 htmlFor="export-annotations"
                 className="flex cursor-pointer flex-col gap-0.5"
               >
-                <span className="font-medium text-sm">Include annotations</span>
+                <span className="font-medium text-sm">
+                  {strings.canvas.export.includeAnnotations}
+                </span>
                 <span className="text-muted-foreground text-xs">
-                  Drawings and notes on the page
+                  {strings.canvas.export.annotationsHint}
                 </span>
               </label>
               <Switch
@@ -162,7 +166,7 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
             disabled={busy}
             onClick={onClose}
           >
-            Cancel
+            {strings.common.cancel}
           </Button>
           <Button
             type="button"
@@ -170,7 +174,11 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
             onClick={() => void handleExport()}
           >
             <LoaderIcon className={cn('animate-spin', !busy && 'hidden')} />
-            {busy ? 'Exporting…' : error !== null ? 'Try again' : 'Export'}
+            {busy
+              ? strings.canvas.export.exporting
+              : error !== null
+                ? strings.canvas.export.tryAgain
+                : strings.canvas.export.title}
           </Button>
         </DialogFooter>
       </DialogContent>

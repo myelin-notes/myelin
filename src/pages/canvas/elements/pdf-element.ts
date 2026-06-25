@@ -6,6 +6,7 @@ import {
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
+import { getMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { bytesToBase64, exportPdf } from '@/lib/pdf-export/client';
 import { CanvasPool } from '../canvas-pool';
@@ -320,24 +321,25 @@ export class PdfElement extends DrawableElement {
       return [];
     }
 
+    const strings = getMessages().canvas.frame;
     return [
       {
         id: 'layout-vertical',
-        label: 'Pages',
+        label: strings.pages,
         icon: RowsIcon,
         checked: this._pageLayout === 'vertical',
         onSelect: () => this.setPageLayout('vertical'),
       },
       {
         id: 'layout-horizontal',
-        label: 'Columns',
+        label: strings.columns,
         icon: ColumnsIcon,
         checked: this._pageLayout === 'horizontal',
         onSelect: () => this.setPageLayout('horizontal'),
       },
       {
         id: 'export',
-        label: 'Export',
+        label: strings.export,
         icon: DownloadIcon,
         onSelect: () => openExportDialog(this.buildExportTarget()),
       },
@@ -1563,7 +1565,7 @@ export class PdfElement extends DrawableElement {
 
   private createDom(host: HTMLElement): void {
     const chrome = new FrameChrome({
-      kindLabel: 'PDF',
+      kindLabel: getMessages().canvas.frame.pdfKind,
       getMenuItems: () => this.getMenuItems(),
     });
     chrome.setFileName(this._fileName || null);

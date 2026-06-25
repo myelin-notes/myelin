@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { PM_UPDATE_EVENT } from '@/lib/events';
+import { getMessages } from '@/lib/i18n';
 import { getDevicePixelRatio } from '@/lib/utils';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
@@ -218,7 +219,7 @@ function createFrameRefs(
   container: HTMLDivElement,
 ): FrameRefs {
   const chrome = new FrameChrome({
-    kindLabel: 'NOTE',
+    kindLabel: getMessages().canvas.frame.noteKind,
     getMenuItems: () => frame.getMenuItems(),
     onTitleCommit: (title) => {
       frame.setDisplayName(title);
