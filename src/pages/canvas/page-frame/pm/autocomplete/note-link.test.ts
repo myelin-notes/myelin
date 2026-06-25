@@ -40,6 +40,14 @@ describe('findActiveNoteLinkAutocomplete', () => {
     });
   });
 
+  it('does not activate for a bare "[[" with no query', () => {
+    const markdown = 'See [[';
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+
+    expect(findActiveNoteLinkAutocomplete(state)).toBeNull();
+  });
+
   it('detects closed note-link titles while caret stays inside title', () => {
     const markdown = 'See [[Alpha Note]]';
     const openFrom = 1 + 'See '.length;
