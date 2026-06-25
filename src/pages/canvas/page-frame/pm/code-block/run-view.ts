@@ -24,17 +24,16 @@ interface CodeBlockRunViewOptions {
 type RunStatus = 'idle' | 'running' | 'ok' | 'error';
 
 /**
- * Owns a code block's run affordance: an in-flow status chip (Run/Stop button +
- * status) that lives inside the block. Output is pushed to {@link codeRunStore}
- * and rendered by the React overlay layer — it never enters the document flow,
- * so it can't perturb pagination.
+ * Owns a code block's run affordance: a Run/Stop button overlaid in the block's
+ * top-right corner, plus a status label. The chip is absolutely positioned, so
+ * it never changes the block's measured size. Output is pushed to
+ * {@link codeRunStore} and rendered by the React overlay layer.
  */
 export class CodeBlockRunView {
-  /** Appended into the node view's DOM; height folds into the block measure. */
+  /** Appended into the node view's DOM as a top-right absolute overlay. */
   public readonly chip: HTMLDivElement;
 
   private readonly runButton: HTMLButtonElement;
-  private readonly statusEl: HTMLSpanElement;
   /** Stable identity for this block's overlay entry in the store. */
   private readonly id = crypto.randomUUID();
 
@@ -55,10 +54,7 @@ export class CodeBlockRunView {
     this.runButton.className = 'pm-code-block__run-btn';
     this.runButton.addEventListener('click', () => this.toggleRun());
 
-    this.statusEl = document.createElement('span');
-    this.statusEl.className = 'pm-code-block__run-status';
-
-    this.chip.append(this.runButton, this.statusEl);
+    this.chip.append(this.runButton);
     this.syncChip();
   }
 
@@ -69,11 +65,6 @@ export class CodeBlockRunView {
     }
     this.language = language;
     this.chip.style.display = language ? '' : 'none';
-  }
-
-  /** Height the chip contributes to the block, for the node view's measure. */
-  chipHeight(): number {
-    return this.language ? this.chip.offsetHeight : 0;
   }
 
   dispose(): void {
@@ -140,38 +131,27 @@ export class CodeBlockRunView {
       this.setStatus('error');
     } else if (exitCode === 0) {
       codeRunStore.setStatus(this.id, 'ok');
-      this.setStatus('ok', exitCode);
+      this.setStatus('ok');
     } else {
+      codeRunStore.appendLine(this.id, {
+        text: `Process exited with code ${exitCode}`,
+        stream: 'stderr',
+      });
       codeRunStore.setStatus(this.id, 'error');
-      this.setStatus('error', exitCode);
+      this.setStatus('error');
     }
   }
 
-  private setStatus(status: RunStatus, exitCode?: number | null): void {
+  private setStatus(status: RunStatus): void {
     this.status = status;
-    this.syncChip(exitCode);
+    this.syncChip();
   }
 
-  private syncChip(exitCode?: number | null): void {
+  private syncChip(): void {
     const running = this.status === 'running';
     this.runButton.textContent = running ? '■' : '▶';
     this.runButton.setAttribute('aria-label', running ? 'Stop' : 'Run');
     this.runButton.classList.toggle('is-running', running);
-
-    if (running) {
-      this.statusEl.textContent = 'Running…';
-    } else if (this.status === 'ok') {
-      this.statusEl.textContent = 'Done';
-    } else if (this.status === 'error') {
-      this.statusEl.textContent =
-        exitCode == null ? 'Error' : `Exit ${exitCode}`;
-    } else {
-      this.statusEl.textContent = '';
-    }
-    this.statusEl.classList.toggle(
-      'is-error',
-      this.status === 'error' && !running,
-    );
   }
 
   private clearListeners(): void {

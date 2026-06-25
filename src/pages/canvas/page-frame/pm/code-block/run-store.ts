@@ -5,15 +5,12 @@ export interface CodeRunLine {
   stream: 'stdout' | 'stderr';
 }
 
-export type CodeRunStatus = 'running' | 'ok' | 'error';
-
 export interface CodeRunEntry {
   /** Stable per code-block node view; one overlay per block. */
   id: string;
   view: EditorView;
   blockDom: HTMLElement;
   lines: CodeRunLine[];
-  status: CodeRunStatus;
   visible: boolean;
 }
 
@@ -59,7 +56,6 @@ class CodeRunStore {
       view,
       blockDom,
       lines: [],
-      status: 'running',
       visible: true,
     });
     this.emit();
@@ -86,15 +82,6 @@ class CodeRunStore {
       entry.lines.push(line);
     }
     this.scheduleEmit();
-  }
-
-  setStatus(id: string, status: CodeRunStatus): void {
-    const entry = this.entries.get(id);
-    if (!entry) {
-      return;
-    }
-    entry.status = status;
-    this.emit();
   }
 
   setVisible(id: string, visible: boolean): void {

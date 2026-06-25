@@ -471,6 +471,6 @@ export class CodeBlockNodeView implements NodeView {
     }
 
     const layout = this.editor.syncLayout();
-    this.dom.style.height = `${layout.outerHeightPx + this.runView.chipHeight()}px`;
+    this.dom.style.height = `${layout.outerHeightPx}px`;
   }
 }
