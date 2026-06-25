@@ -538,6 +538,14 @@ const en = {
         },
       },
     },
+    about: {
+      title: 'About',
+      eyebrow: 'Application',
+      version: {
+        label: 'Version',
+        description: 'The version of Myelin currently installed.',
+      },
+    },
   },
   canvas: {
     kind: 'Canvas',

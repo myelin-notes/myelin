@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
 import { KeybindsSection } from './keybinds-section';
+import { AboutSection } from './sections/about-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { DataSection } from './sections/data-section';
 import { EditingSection } from './sections/editing-section';
@@ -75,6 +76,7 @@ export function SettingsPage() {
               <PrivacySection />
               <McpSection />
               <KeybindsSection />
+              <AboutSection />
             </div>
           </div>
         </motion.div>

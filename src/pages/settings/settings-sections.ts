@@ -4,6 +4,7 @@ import {
   Brush,
   Cloud,
   HardDriveDownload,
+  Info,
   Keyboard,
   Languages,
   PenLine,
@@ -18,7 +19,8 @@ export type SettingsSectionId =
   | 'data'
   | 'privacy'
   | 'mcp'
-  | 'keybinds';
+  | 'keybinds'
+  | 'about';
 
 export interface SettingsSectionMeta {
   id: SettingsSectionId;
@@ -30,7 +32,8 @@ export interface SettingsSectionMeta {
     | 'dataExport'
     | 'privacy'
     | 'mcp'
-    | 'keybinds';
+    | 'keybinds'
+    | 'about';
   icon: ComponentType<{ className?: string }>;
 }
 
@@ -43,4 +46,5 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: 'privacy', titleKey: 'privacy', icon: ShieldCheck },
   { id: 'mcp', titleKey: 'mcp', icon: Bot },
   { id: 'keybinds', titleKey: 'keybinds', icon: Keyboard },
+  { id: 'about', titleKey: 'about', icon: Info },
 ] as const;

@@ -521,6 +521,14 @@ const zhHans: typeof en = {
         },
       },
     },
+    about: {
+      title: '关于',
+      eyebrow: '应用程序',
+      version: {
+        label: '版本',
+        description: '当前安装的 Myelin 版本。',
+      },
+    },
   },
   canvas: {
     kind: '画布',

@@ -543,6 +543,14 @@ const es: typeof en = {
         },
       },
     },
+    about: {
+      title: 'Acerca de',
+      eyebrow: 'Aplicación',
+      version: {
+        label: 'Versión',
+        description: 'La versión de Myelin instalada actualmente.',
+      },
+    },
   },
   canvas: {
     kind: 'Lienzo',
