@@ -8,9 +8,9 @@ import {
   useState,
 } from 'react';
 import {
+  Trash2 as DeleteIcon,
   ArrowDown as MoveBackwardIcon,
   ArrowUp as MoveForwardIcon,
-  Trash2 as DeleteIcon,
 } from 'lucide-react';
 import {
   Tooltip,
