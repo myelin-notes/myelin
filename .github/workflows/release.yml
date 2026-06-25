@@ -231,14 +231,23 @@ jobs:
           cat latest.json
 
       - name: Prune old prerelease versions
-        run: node scripts/prune-prerelease.mjs
+        run: node scripts/prune-channel.mjs prerelease
 
       - name: Upload bundles + manifest to R2
         run: |
-          for f in incoming/*; do
-            npx --yes wrangler@4 r2 object put \
-              "$R2_BUCKET/prerelease/$VERSION/$(basename "$f")" --file "$f" --remote
-          done
+          # Upload only the bundles latest.json references (each platform's file
+          # plus its .sig). tauri's targets:"all" + createUpdaterArtifacts emits
+          # extra signed bundles that collide on one platform key -- e.g. the
+          # Windows NSIS *-setup.exe and WiX *.msi both map to windows-x86_64, so
+          # the manifest keeps only one. Uploading incoming/* wholesale would push
+          # the dropped one too, and prune-channel.mjs (which deletes by
+          # manifest) could never reclaim it. Driving the upload from the manifest
+          # keeps R2's object set identical to what prune later removes.
+          node -e "const m=require('./latest.json'); for (const p of Object.values(m.platforms)) { const f = p.url.split('/').pop(); console.log(f); console.log(f + '.sig'); }" \
+            | while IFS= read -r f; do
+                npx --yes wrangler@4 r2 object put \
+                  "$R2_BUCKET/prerelease/$VERSION/$f" --file "incoming/$f" --remote
+              done
           # Versioned copy lets promotion later fetch this exact version's manifest.
           npx --yes wrangler@4 r2 object put \
             "$R2_BUCKET/prerelease/$VERSION/latest.json" --file latest.json --remote

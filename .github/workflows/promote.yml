@@ -31,5 +31,8 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      - name: Prune old stable versions
+        run: node scripts/prune-channel.mjs stable
+
       - name: Promote prerelease -> stable
         run: node scripts/promote-release.mjs

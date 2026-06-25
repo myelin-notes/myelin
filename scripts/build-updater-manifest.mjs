@@ -49,8 +49,24 @@ function platformKey(filename) {
   return `${os}-${arch}`;
 }
 
+// Windows builds both an NSIS installer and a WiX .msi; with
+// createUpdaterArtifacts both are signed and collide on the same windows-<arch>
+// key. Prefer NSIS deterministically instead of letting readdir order decide,
+// so the updater serves a consistent installer type across releases.
+function rank(filename) {
+  const name = filename.toLowerCase();
+  if (name.endsWith('-setup.exe') || name.endsWith('.nsis.zip')) {
+    return 2;
+  }
+  if (name.endsWith('.msi')) {
+    return 1;
+  }
+  return 0;
+}
+
 const baseUrl = args['base-url'].replace(/\/$/, '');
 const platforms = {};
+const chosenRank = {};
 
 for (const file of readdirSync(args.dir)) {
   if (!file.endsWith('.sig')) {
@@ -62,6 +78,10 @@ for (const file of readdirSync(args.dir)) {
     console.warn(`Skipping unrecognized artifact: ${bundle}`);
     continue;
   }
+  if (key in platforms && chosenRank[key] >= rank(bundle)) {
+    continue;
+  }
+  chosenRank[key] = rank(bundle);
   platforms[key] = {
     signature: readFileSync(path.join(args.dir, file), 'utf8').trim(),
     url: `${baseUrl}/${bundle}`,
