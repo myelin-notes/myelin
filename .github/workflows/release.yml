@@ -129,13 +129,37 @@ jobs:
 
       - name: Stage updater artifacts
         shell: bash
+        env:
+          MATRIX_ARGS: ${{ matrix.args }}
         run: |
           mkdir -p updater-out
+          # macOS updater tarballs are named "<product>.app.tar.gz" identically
+          # for both arches, so they collide once download-artifact merges them
+          # into one dir. Tag the arch into the name to keep them distinct (the
+          # manifest builder reads arch back off /aarch64|arm64/ in the name).
+          arch=""
+          case "$MATRIX_ARGS" in
+            *aarch64*) arch="aarch64" ;;
+            *x86_64*) arch="x86_64" ;;
+          esac
           # Copy every signed updater bundle alongside its .sig. Globbing by
           # .sig keeps us platform-agnostic: each .sig names its own bundle.
           while IFS= read -r sig; do
-            cp "$sig" updater-out/
-            cp "${sig%.sig}" updater-out/
+            bundle="${sig%.sig}"
+            base="$(basename "$bundle")"
+            if [[ "$base" == *.app.tar.gz ]]; then
+              # The arch-less macOS name collides across targets; we MUST tag it.
+              # Bail loudly rather than silently re-introducing the collision
+              # (e.g. a future matrix entry that builds the host arch without
+              # --target would leave $arch empty here).
+              if [[ -z "$arch" ]]; then
+                echo "::error::macOS updater bundle '$base' but no arch from MATRIX_ARGS='$MATRIX_ARGS'; cannot disambiguate." >&2
+                exit 1
+              fi
+              base="${base%.app.tar.gz}-$arch.app.tar.gz"
+            fi
+            cp "$bundle" "updater-out/$base"
+            cp "$sig" "updater-out/$base.sig"
           done < <(find src-tauri/target -type f -name '*.sig')
 
       - name: Upload updater artifacts
