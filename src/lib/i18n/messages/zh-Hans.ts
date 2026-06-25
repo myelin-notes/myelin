@@ -547,6 +547,7 @@ const zhHans: typeof en = {
       label: '选区层级',
       moveHigher: '前移一层',
       moveLower: '后移一层',
+      delete: '删除',
       crop: '裁剪',
       applyCrop: '应用裁剪',
     },

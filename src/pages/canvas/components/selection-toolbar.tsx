@@ -10,6 +10,7 @@ import {
 import {
   ArrowDown as MoveBackwardIcon,
   ArrowUp as MoveForwardIcon,
+  Trash2 as DeleteIcon,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -186,6 +187,22 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     drawableCanvasRef.current?.reorderSelection('lower');
   }, [drawableCanvasRef]);
 
+  const deleteSelection = useCallback(() => {
+    drawableCanvasRef.current?.deleteSelected();
+  }, [drawableCanvasRef]);
+
+  const deleteItems = useMemo<SelectionToolbarItem[]>(
+    () => [
+      {
+        id: 'delete',
+        label: strings.canvas.selectionToolbar.delete,
+        icon: DeleteIcon,
+        onClick: deleteSelection,
+      },
+    ],
+    [strings.canvas.selectionToolbar.delete, deleteSelection],
+  );
+
   const reorderItems = useMemo<SelectionToolbarItem[]>(
     () => [
       {
@@ -230,6 +247,8 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
           <Divider />
         )}
         <ToolbarItemGroup items={reorderItems} divided />
+        <Divider />
+        <ToolbarItemGroup items={deleteItems} />
       </div>
     </TooltipProvider>
   );

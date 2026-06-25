@@ -565,6 +565,7 @@ const en = {
       label: 'Selection order',
       moveHigher: 'Move forward',
       moveLower: 'Move backward',
+      delete: 'Delete',
       crop: 'Crop',
       applyCrop: 'Apply crop',
     },

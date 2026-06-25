@@ -206,6 +206,18 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
     },
   },
   {
+    id: 'slash-note-link',
+    title: 'Note link',
+    subtitle: 'Insert [[note]] link to another note',
+    detail: '[[]]',
+    keywords: ['note', 'link', 'wiki', 'reference', 'backlink', '[[]]'],
+    slashAction: {
+      kind: 'inline',
+      open: '[[',
+      close: ']]',
+    },
+  },
+  {
     id: 'slash-inline-code',
     title: 'Inline code',
     subtitle: 'Insert `code` markdown',
