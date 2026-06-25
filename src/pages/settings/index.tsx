@@ -53,11 +53,11 @@ export function SettingsPage() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
-          className="flex gap-12"
+          className="mx-auto flex w-fit gap-12"
         >
           <SettingsRail activeId={activeId} onJump={handleJump} />
 
-          <div className="min-w-0 max-w-3xl flex-1">
+          <div className="min-w-0 w-[48rem] max-w-full">
             <header className="mb-10 md:mb-14">
               <h1
                 className="font-extralight font-heading text-text-primary tracking-tight"
