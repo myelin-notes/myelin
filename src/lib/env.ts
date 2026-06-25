@@ -28,7 +28,7 @@ export const GITHUB_CLIENT_ID = (
 
 export const LIVE_DISCOVERY_URL = (
   import.meta.env.VITE_LIVE_DISCOVERY_URL ??
-  'https://myelin-live-discovery.w1nter-ish3re.workers.dev'
+  'https://live.trymyelin.app'
 )
   .trim()
   .replace(/\/+$/, '');
