@@ -123,6 +123,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Source maps for posthog-js exception symbolication. yarn build (run
+          # by tauri-action) injects chunk IDs and uploads the maps via
+          # scripts/posthog-sourcemaps.mjs. The key is only set on release
+          # events, so workflow_dispatch test builds skip the upload.
+          POSTHOG_CLI_API_KEY: ${{ github.event_name == 'release' && secrets.POSTHOG_CLI_API_KEY || '' }}
+          POSTHOG_CLI_PROJECT_ID: ${{ secrets.POSTHOG_CLI_PROJECT_ID }}
+          POSTHOG_CLI_HOST: https://us.posthog.com
         with:
           releaseId: ${{ github.event.release.id }}
           args: ${{ matrix.args }}
