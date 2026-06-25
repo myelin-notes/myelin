@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod code_runner;
+mod error_report;
 mod handwriting;
 mod iroh_transport;
 mod mcp_server;

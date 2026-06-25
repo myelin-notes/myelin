@@ -5,6 +5,7 @@ import { I18nProvider } from '@/lib/i18n';
 import App from './App';
 import { trackEvent } from './lib/analytics';
 import { initErrorTracking } from './lib/posthog';
+import { initRustErrorReporting } from './lib/rust-errors';
 import { RepositoryProvider } from './lib/sync';
 import { initAutoUpdate } from './lib/updater';
 import './index.css';
@@ -15,6 +16,7 @@ import './index.css';
 // covers throws during the synchronous startup calls below.
 try {
   initErrorTracking();
+  initRustErrorReporting();
   trackEvent('app_opened');
 
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

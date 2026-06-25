@@ -130,7 +130,12 @@ pub(crate) fn schedule(
                 );
             }
             Ok(false) => {}
-            Err(e) => eprintln!("handwriting: recognition failed for {node_id}: {e}"),
+            Err(e) => crate::error_report::report_error(
+                &app,
+                "handwriting",
+                &format!("recognition failed for {node_id}"),
+                e,
+            ),
         }
     });
 }

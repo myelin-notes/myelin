@@ -20,8 +20,11 @@ import {
   transcribeAudioBuffer,
 } from '@/lib/audio-transcription/service';
 import { useMessages } from '@/lib/i18n';
+import { Logger } from '@/lib/logger';
 import { getDevicePixelRatio } from '@/lib/utils';
 import { decodeAudio, drawWaveform } from './waveform';
+
+const logger = new Logger('AudioTranscription');
 
 const MAX_WAVEFORM_BACKING_DIMENSION = 4096;
 
@@ -581,7 +584,10 @@ export function AudioPlayerView({
             : strings.noSpeechDetected,
         );
       }
-    } catch {
+    } catch (error) {
+      logger.error('On-demand audio transcription failed', error, {
+        elementId,
+      });
       // The button stays visible as the retry affordance.
       if (!disposedRef.current) {
         flashNotice(strings.transcriptionFailed);
