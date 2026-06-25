@@ -109,6 +109,25 @@ function CodeRunOverlay({ entry }: { entry: CodeRunEntry }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Dismiss on pointer-down outside the block and the panel — i.e. when the
+  // block is deselected — mirroring the slash insert panel. Re-running the
+  // block shows it again via codeRunStore.start.
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (
+        rootRef.current?.contains(target) ||
+        entry.blockDom.contains(target)
+      ) {
+        return;
+      }
+      codeRunStore.setVisible(entry.id, false);
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () =>
+      document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [entry.id, entry.blockDom]);
+
   // Follow the tail as new lines arrive, unless the user scrolled up.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when line count grows
   useEffect(() => {
