@@ -19,6 +19,12 @@ const FINISHED_EVENT: &str = "code-run-finished";
 /// How often the run loop checks for process exit while also watching for a
 /// cancel signal. Keeps exit latency imperceptible without busy-spinning.
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
+/// Output lines are coalesced into batches before crossing the IPC boundary.
+/// One Tauri event per line floods the webview's main thread and tanks UI frame
+/// rate when a program prints rapidly, so we flush a batch once it reaches
+/// `MAX_BATCH_LINES` or `FLUSH_INTERVAL` elapses since its first line.
+const FLUSH_INTERVAL: Duration = Duration::from_millis(33);
+const MAX_BATCH_LINES: usize = 512;
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -32,7 +38,7 @@ enum OutputStream {
 struct OutputPayload {
     execution_id: String,
     stream: OutputStream,
-    chunk: String,
+    lines: Vec<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -161,11 +167,11 @@ async fn run_to_completion(
             return Err(format!("No compiler found — install one of: {names}."));
         };
         if !output.stderr.is_empty() {
-            emit_chunk(
+            emit_lines(
                 app,
                 execution_id,
                 OutputStream::Stderr,
-                &String::from_utf8_lossy(&output.stderr),
+                vec![String::from_utf8_lossy(&output.stderr).into_owned()],
             );
         }
         if !output.status.success() {
@@ -261,26 +267,55 @@ fn spawn_reader<R: AsyncRead + Unpin + Send + 'static>(
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let mut lines = BufReader::new(reader).lines();
-        while let Ok(Some(line)) = lines.next_line().await {
-            let _ = app.emit(
-                OUTPUT_EVENT,
-                OutputPayload {
-                    execution_id: execution_id.clone(),
-                    stream,
-                    chunk: line,
+        let mut batch: Vec<String> = Vec::new();
+        // Deadline for the current batch, anchored to its first line so a slow
+        // trickle still flushes on time instead of a per-line timer reset
+        // deferring it indefinitely.
+        let mut deadline: Option<tokio::time::Instant> = None;
+
+        loop {
+            let timer = async {
+                match deadline {
+                    Some(at) => tokio::time::sleep_until(at).await,
+                    None => std::future::pending::<()>().await,
+                }
+            };
+
+            tokio::select! {
+                next = lines.next_line() => match next {
+                    Ok(Some(line)) => {
+                        if batch.is_empty() {
+                            deadline = Some(tokio::time::Instant::now() + FLUSH_INTERVAL);
+                        }
+                        batch.push(line);
+                        if batch.len() >= MAX_BATCH_LINES {
+                            emit_lines(&app, &execution_id, stream, std::mem::take(&mut batch));
+                            deadline = None;
+                        }
+                    }
+                    // EOF or a read error: stop reading; the final flush is below.
+                    _ => break,
                 },
-            );
+                _ = timer => {
+                    emit_lines(&app, &execution_id, stream, std::mem::take(&mut batch));
+                    deadline = None;
+                }
+            }
+        }
+
+        if !batch.is_empty() {
+            emit_lines(&app, &execution_id, stream, batch);
         }
     })
 }
 
-fn emit_chunk(app: &AppHandle, execution_id: &str, stream: OutputStream, text: &str) {
+fn emit_lines(app: &AppHandle, execution_id: &str, stream: OutputStream, lines: Vec<String>) {
     let _ = app.emit(
         OUTPUT_EVENT,
         OutputPayload {
             execution_id: execution_id.to_string(),
             stream,
-            chunk: text.to_string(),
+            lines,
         },
     );
 }

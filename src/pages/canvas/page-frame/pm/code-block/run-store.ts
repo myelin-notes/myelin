@@ -18,10 +18,18 @@ export interface CodeRunEntry {
 }
 
 /**
+ * Line appends are coalesced to at most one notify per this interval. The
+ * overlay re-render is O(line count) (the virtualizer rebuilds its offsets), so
+ * pacing updates well below the display refresh rate keeps a flood of output
+ * from saturating the main thread — ~15 Hz still reads as continuous streaming.
+ */
+const OUTPUT_FLUSH_MS = 64;
+
+/**
  * Bridges the vanilla code-block node views to the React output overlay layer.
  * Node views push run state here; {@link CodeRunOverlayLayer} renders it. Line
- * appends are coalesced to one notify per frame so a flood of output doesn't
- * trigger a render per line.
+ * appends are coalesced (see {@link OUTPUT_FLUSH_MS}) so a flood of output
+ * doesn't trigger a render per line.
  */
 class CodeRunStore {
   private readonly entries = new Map<string, CodeRunEntry>();
@@ -68,6 +76,18 @@ class CodeRunStore {
     this.scheduleEmit();
   }
 
+  /** Append a coalesced batch of lines with a single notify. */
+  appendLines(id: string, lines: CodeRunLine[]): void {
+    const entry = this.entries.get(id);
+    if (!entry || lines.length === 0) {
+      return;
+    }
+    for (const line of lines) {
+      entry.lines.push(line);
+    }
+    this.scheduleEmit();
+  }
+
   setStatus(id: string, status: CodeRunStatus): void {
     const entry = this.entries.get(id);
     if (!entry) {
@@ -105,12 +125,12 @@ class CodeRunStore {
       return;
     }
     this.flushScheduled = true;
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       this.flushScheduled = false;
       for (const listener of this.listeners) {
         listener();
       }
-    });
+    }, OUTPUT_FLUSH_MS);
   }
 }
 

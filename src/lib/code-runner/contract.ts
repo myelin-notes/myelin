@@ -49,7 +49,8 @@ export function canonicalizeLanguage(token: string): RunnableLanguage | null {
 export interface RunOutputEvent {
   executionId: string;
   stream: 'stdout' | 'stderr';
-  chunk: string;
+  /** A coalesced batch of output lines (the backend batches to spare IPC). */
+  lines: string[];
 }
 
 export interface RunFinishedEvent {

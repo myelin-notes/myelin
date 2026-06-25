@@ -20,6 +20,12 @@ const ESTIMATED_LINE_HEIGHT = 18;
 /** Treat the body as "at the bottom" within this many px (tail-follow). */
 const STICK_THRESHOLD = 4;
 
+// Stable identities: the virtualizer keys its memoized layout off these, so
+// passing fresh closures each render would force an O(line count) rebuild on
+// every scroll frame.
+const getLineRowKey = (index: number) => String(index);
+const estimateLineHeight = () => ESTIMATED_LINE_HEIGHT;
+
 /**
  * Renders the floating output overlay for every active code run. Anchored to
  * each block in screen space and tracked through canvas pan/zoom via a rAF
@@ -146,8 +152,8 @@ function CodeRunOverlay({ entry }: { entry: CodeRunEntry }) {
         <VirtualList
           scrollRef={bodyRef}
           count={entry.lines.length}
-          estimateHeight={() => ESTIMATED_LINE_HEIGHT}
-          getRowKey={(index) => String(index)}
+          estimateHeight={estimateLineHeight}
+          getRowKey={getLineRowKey}
           gap={0}
           renderRow={(index) => {
             const line = entry.lines[index];

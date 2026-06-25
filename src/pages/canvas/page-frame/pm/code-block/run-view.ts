@@ -110,10 +110,10 @@ export class CodeBlockRunView {
     // Subscribe before invoking so a fast-exiting process can't emit before a
     // listener exists.
     this.unlistenOutput = await onRunOutput(executionId, (event) => {
-      codeRunStore.appendLine(this.id, {
-        text: event.chunk,
-        stream: event.stream,
-      });
+      codeRunStore.appendLines(
+        this.id,
+        event.lines.map((text) => ({ text, stream: event.stream })),
+      );
     });
     this.unlistenFinished = await onRunFinished(executionId, (event) => {
       this.onFinished(event.exitCode, event.error);

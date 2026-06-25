@@ -71,6 +71,7 @@ export function VirtualGrid({
   const { containerRef, setContainerEl, measured } = useVirtualScaffold(
     itemCount,
     getItemKey,
+    () => estimateItemHeight,
     onWidthChange,
   );
 
@@ -107,6 +108,10 @@ export function VirtualGrid({
     count: rowCount,
     rowHeight,
     heightsVersion: measured.version,
+    consumeDirtyFrom: measured.consumeDirtyFrom,
+    // A column-count change re-groups which items share a row, so every row's
+    // height may change without any measurement firing — force a full rebuild.
+    layoutKey: columns,
     gap: rowGap,
     overscan,
     pinnedIndex: pinnedRow,
@@ -134,7 +139,7 @@ export function VirtualGrid({
           cells.push(
             <div
               key={key}
-              ref={measured.measure(key)}
+              ref={measured.measure(key, virtualRow.index)}
               className="absolute"
               style={{
                 top: virtualRow.start,
