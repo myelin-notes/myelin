@@ -1,6 +1,7 @@
 import {
   type RefObject,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -124,13 +125,23 @@ export function useVirtualizer({
   // Subscribe once to scroll and viewport resize. The frame is a stable
   // ancestor, so we read the latest recompute via a ref instead of
   // re-subscribing whenever the layout changes.
+  //
+  // This must be a passive effect, not a layout effect: when the scroll frame
+  // is an ancestor that mounts in the same commit as this list (e.g. the list's
+  // own parent), React attaches refs child-first, so `scrollRef.current` is
+  // still null during layout effects and the subscription would silently never
+  // attach. Passive effects run after the whole commit, by which point every
+  // ref is set.
   const recomputeRef = useRef(recomputeRange);
   recomputeRef.current = recomputeRange;
-  useLayoutEffect(() => {
+  useEffect(() => {
     const frame = scrollRef.current;
     if (!frame) {
       return;
     }
+    // Sync now in case the frame only became available after the pre-paint
+    // recompute below ran with a null ref.
+    recomputeRef.current();
     let raf = 0;
     const onScroll = () => {
       if (raf) {
@@ -180,12 +191,17 @@ export function useVirtualizer({
   );
 
   const virtualRows = useMemo(() => {
+    // `range` is updated in an effect after render, so it can briefly lag a
+    // shrunk `count` (e.g. a re-run that clears the list). Clamp to `count` so
+    // we never emit an index past the current rows.
     const rows: VirtualRow[] = [];
-    for (let i = range.start; i < range.end; i++) {
+    const start = Math.min(range.start, count);
+    const end = Math.min(range.end, count);
+    for (let i = start; i < end; i++) {
       rows.push({ index: i, start: offsets[i] ?? 0 });
     }
     return rows;
-  }, [range, offsets]);
+  }, [range, offsets, count]);
 
   return { totalHeight, virtualRows, scrollToIndex };
 }
