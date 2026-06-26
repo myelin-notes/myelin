@@ -1,22 +1,27 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { orderTagsHierarchically } from '@/lib/sync/repo/tag-hierarchy';
+import { addRegistryTags, getRegistryTags } from '@/lib/sync/tag-registry';
 import { cn } from '@/lib/utils';
 import { formatSemanticTagAccessibleName } from './accessibility-labels';
+import { TagRegistryDialog } from './tag-registry-dialog';
 
 const logger = new Logger('SemanticTags');
 
 interface SemanticTagsProps {
   activeTags: Set<string>;
   onActiveTagsChanged: (tags: Set<string>) => void;
+  /** Refresh the file/folder panels after tags are created or deleted. */
+  onTagsChanged: () => void;
 }
 
 export const SemanticTags = memo(function SemanticTags({
   activeTags,
   onActiveTagsChanged,
+  onTagsChanged,
 }: SemanticTagsProps) {
   const strings = useMessages();
   const locale = useLocale();
@@ -28,18 +33,42 @@ export const SemanticTags = memo(function SemanticTags({
     totalTags: 0,
   });
   const [loaded, setLoaded] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [manageOpen, setManageOpen] = useState(false);
 
+  const reload = useCallback(() => setRefreshKey((key) => key + 1), []);
+
+  // Refresh this panel's tag list and the file/folder panels, which may have
+  // had a tag detached by a permanent delete.
+  const handleRegistryChanged = useCallback(() => {
+    reload();
+    onTagsChanged();
+  }, [reload, onTagsChanged]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is a trigger that re-runs the fetch after registry edits; it isn't read in the body
   useEffect(() => {
     let cancelled = false;
 
     setLoaded(false);
-    Promise.all([repository.listTags(true), repository.getStats()])
-      .then(([allTags, nextStats]) => {
+    Promise.all([repository.listTags(), repository.getStats()])
+      .then(([attachedTags, nextStats]) => {
         if (cancelled) {
           return;
         }
 
-        setTags(allTags);
+        // Seed any tags already on nodes into the registry so it stays the
+        // single source of truth, then read the full list back from it and
+        // annotate each with its file count (0 when unattached).
+        addRegistryTags(attachedTags.map((entry) => entry.tag));
+        const counts = new Map(
+          attachedTags.map((entry) => [entry.tag, entry.count]),
+        );
+        setTags(
+          getRegistryTags().map((tag) => ({
+            tag,
+            count: counts.get(tag) ?? 0,
+          })),
+        );
         setStats(nextStats);
         setLoaded(true);
       })
@@ -54,14 +83,13 @@ export const SemanticTags = memo(function SemanticTags({
     return () => {
       cancelled = true;
     };
-  }, [repository]);
+  }, [repository, refreshKey]);
 
   useEffect(() => {
     if (!(loaded && activeTags.size > 0)) {
       return;
     }
 
-    // `tags` holds the synthesized (includeAncestors) list, so exact membership is intentionally correct for hierarchical filters.
     const existing = new Set(tags.map((entry) => entry.tag));
     const pruned = new Set([...activeTags].filter((tag) => existing.has(tag)));
     if (pruned.size !== activeTags.size) {
@@ -107,7 +135,7 @@ export const SemanticTags = memo(function SemanticTags({
       {/* Tag Cloud */}
       <div className="flex min-h-[36px] flex-wrap gap-2">
         {tags.length === 0 && (
-          <p className="text-text-muted text-xs italic">
+          <p className="w-full text-text-muted text-xs italic">
             {strings.library.semanticTags.empty}
           </p>
         )}
@@ -145,7 +173,20 @@ export const SemanticTags = memo(function SemanticTags({
             </button>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setManageOpen(true)}
+          className="h-6 cursor-pointer self-end rounded-xl border border-text-muted/40 border-dashed bg-transparent px-3 font-medium text-text-muted text-xs transition-colors hover:border-text-muted/60 hover:text-text-secondary"
+        >
+          {strings.library.semanticTags.manageTag}
+        </button>
       </div>
+
+      <TagRegistryDialog
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        onChanged={handleRegistryChanged}
+      />
 
       {/* Insights */}
       <div className="flex flex-col gap-3 rounded-lg bg-page p-4 ring-1 ring-border-subtle/70">

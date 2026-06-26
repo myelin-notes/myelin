@@ -23,6 +23,12 @@ import {
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
@@ -169,6 +175,14 @@ export function LibraryPage() {
     refreshLibraryData();
     explorerRef.current?.reload();
   }, [refreshLibraryData]);
+
+  // Refresh the file/folder panels after a tag is created or permanently
+  // deleted from the Semantic Tags panel. Avoids bumping semanticTagsVersion so
+  // the open manage-tags dialog isn't remounted (and closed) mid-session.
+  const refreshAfterTagChange = useCallback(() => {
+    void loadRecentFiles();
+    explorerRef.current?.reload();
+  }, [loadRecentFiles]);
 
   const handleRefreshRepository = useCallback(() => {
     if (!repositoryRefreshAvailable || repositoryStatus.initializing) {
@@ -606,21 +620,31 @@ export function LibraryPage() {
                     <X className="size-3.5" />
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={toggleSearchMode}
-                  aria-label={strings.library.semanticSearchLabel}
-                  title={strings.library.semanticSearchLabel}
-                  aria-pressed={searchMode === 'semantic'}
-                  className={cn(
-                    'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150',
-                    searchMode === 'semantic'
-                      ? 'bg-tag-active text-text-on-dark'
-                      : 'text-text-muted hover:bg-surface hover:text-text-primary',
-                  )}
-                >
-                  <BrainCircuit className="size-3.5" />
-                </button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          onClick={toggleSearchMode}
+                          aria-label={strings.library.semanticSearchLabel}
+                          aria-pressed={searchMode === 'semantic'}
+                          className={cn(
+                            'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150',
+                            searchMode === 'semantic'
+                              ? 'bg-tag-active text-text-on-dark'
+                              : 'text-text-muted hover:bg-surface hover:text-text-primary',
+                          )}
+                        >
+                          <BrainCircuit className="size-3.5" />
+                        </button>
+                      }
+                    />
+                    <TooltipContent side="top">
+                      {strings.library.semanticSearchLabel}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
 
               <div className="flex items-center justify-between">
@@ -792,6 +816,7 @@ export function LibraryPage() {
                 key={semanticTagsVersion}
                 activeTags={activeTags}
                 onActiveTagsChanged={setActiveTags}
+                onTagsChanged={refreshAfterTagChange}
               />
             </div>
           </section>

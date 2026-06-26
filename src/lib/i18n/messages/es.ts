@@ -172,6 +172,7 @@ const es: typeof en = {
       empty:
         'Aún no hay etiquetas. Haz clic derecho en un archivo y elige "Administrar etiquetas" para empezar.',
       insights: 'Análisis del estudio',
+      manageTag: '+ gestionar etiqueta',
       stats: {
         totalFiles: 'Total de archivos',
         folders: 'Carpetas',
@@ -208,6 +209,21 @@ const es: typeof en = {
       available: 'Disponibles',
       createNew: 'Crear nueva etiqueta',
       placeholder: 'Nombre de la etiqueta...',
+    },
+    tagRegistryDialog: {
+      title: 'Administrar etiquetas',
+      description:
+        'Crea etiquetas para reutilizarlas o elimínalas de todas partes.',
+      tags: 'Etiquetas',
+      empty: 'Aún no hay etiquetas',
+      createNew: 'Crear nueva etiqueta',
+      placeholder: 'Nombre de la etiqueta...',
+      confirmTitle: '¿Eliminar etiqueta?',
+      confirmDescription: (tag: string, count: number) =>
+        count > 0
+          ? `#${tag} se eliminará permanentemente de ${count} archivo${count === 1 ? '' : 's'}/carpeta${count === 1 ? '' : 's'} y se borrará de todas partes.`
+          : `#${tag} se eliminará permanentemente.`,
+      confirmDelete: 'Eliminar',
     },
   },
   graph: {

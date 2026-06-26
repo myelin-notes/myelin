@@ -55,6 +55,7 @@ const PREFS = {
   githubVaultPassword: pref<string>('github-vault-password', ''),
   peerId: pref<string>('peer-id', ''),
   explorerViewMode: pref<'tree' | 'grid'>('explorer-view-mode', 'tree'),
+  tagRegistry: pref<string[]>('tag-registry', []),
 };
 
 export type UserPrefsKey = keyof typeof PREFS;
