@@ -11,7 +11,6 @@ import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { normalizeTagInput } from '@/lib/sync/repo/tag-hierarchy';
-import { addRegistryTags, getRegistryTags } from '@/lib/sync/tag-registry';
 import { cn } from '@/lib/utils';
 
 const logger = new Logger('TagManageDialog');
@@ -43,13 +42,11 @@ export function TagManageDialog({
     if (!open) {
       return;
     }
-    Promise.all([repository.listTags(), repository.getNode(nodeId)])
-      .then(([tags, node]) => {
-        // Seed attached tags into the registry, then read the full list back
-        // from it so Available shows every tag that exists, including ones not
+    Promise.all([repository.getNode(nodeId), repository.getRegistryTags()])
+      .then(([node, registryTags]) => {
+        // Available shows every tag in the registry, including ones not
         // attached to anything yet.
-        addRegistryTags(tags.map((entry) => entry.tag));
-        setAllTags(getRegistryTags());
+        setAllTags(registryTags);
         setNodeTags(node ? [...node.tags] : []);
       })
       .catch((error) => {
@@ -69,7 +66,7 @@ export function TagManageDialog({
       setNodeTags((prev) => prev.filter((t) => t !== tag));
     } else {
       await repository.addTag(nodeId, tag);
-      addRegistryTags([tag]);
+      await repository.addRegistryTags([tag]);
       setNodeTags((prev) => [...prev, tag]);
       if (!allTags.includes(tag)) {
         setAllTags((prev) => [...prev, tag]);
@@ -85,7 +82,7 @@ export function TagManageDialog({
       return;
     }
     await repository.addTag(nodeId, normalized);
-    addRegistryTags([normalized]);
+    await repository.addRegistryTags([normalized]);
     setNodeTags((prev) =>
       prev.includes(normalized) ? prev : [...prev, normalized],
     );

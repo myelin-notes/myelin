@@ -66,6 +66,7 @@ import {
   enqueueCustomColorsSync,
   enqueueDeleteManifestNode,
   enqueuePushNote,
+  enqueueTagRegistrySync,
   enqueueUpsertManifestNode,
   type PendingOp,
 } from './outbox';
@@ -613,6 +614,28 @@ export class CachedRepository
     );
   }
 
+  async getRegistryTags(): Promise<string[]> {
+    return this.cache.getRegistryTags();
+  }
+
+  async addRegistryTags(tags: string[]): Promise<string[]> {
+    return this.writeLocalAndQueue(
+      () => this.cache.addRegistryTags(tags),
+      (ops) => {
+        enqueueTagRegistrySync(ops);
+      },
+    );
+  }
+
+  async removeRegistryTag(tag: string): Promise<string[]> {
+    return this.writeLocalAndQueue(
+      () => this.cache.removeRegistryTag(tag),
+      (ops) => {
+        enqueueTagRegistrySync(ops);
+      },
+    );
+  }
+
   // Tri-state return contract, relied on by enqueuePushNote/checkRawConflicts/
   // applyRawFilePush:
   //   undefined -> not a raw file (canvas/non-file); skip conflict check entirely
@@ -961,6 +984,11 @@ export class CachedRepository
           plan.manifestChanged = true;
           plan.messages.push('Sync custom colors');
           break;
+        case 'sync-tag-registry':
+          plan.manifest.tagRegistry = [...cacheSnapshot.manifest.tagRegistry];
+          plan.manifestChanged = true;
+          plan.messages.push('Sync tag registry');
+          break;
         case 'push-note': {
           const node = cacheSnapshot.manifest.nodes[op.nodeId];
           if (!node || node.type !== 'file') {
@@ -1143,6 +1171,9 @@ export class CachedRepository
       case 'sync-custom-colors':
         await this.applyCustomColorsSync();
         return;
+      case 'sync-tag-registry':
+        await this.applyTagRegistrySync();
+        return;
     }
   }
 
@@ -1156,6 +1187,20 @@ export class CachedRepository
       'Sync custom colors',
       (remoteManifest) => {
         remoteManifest.customColors = [...cacheColors];
+      },
+    );
+  }
+
+  private async applyTagRegistrySync(): Promise<void> {
+    // Cache is the source of truth — overwriting remote is what lets deletes
+    // propagate (a merge-only strategy could never remove).
+    const cacheTags = await this.withLocalStateLock(() =>
+      this.cache.getRegistryTags(),
+    );
+    await this.remote.applyManifestMutation(
+      'Sync tag registry',
+      (remoteManifest) => {
+        remoteManifest.tagRegistry = [...cacheTags];
       },
     );
   }

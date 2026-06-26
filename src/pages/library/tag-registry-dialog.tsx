@@ -22,11 +22,6 @@ import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { normalizeTagInput } from '@/lib/sync/repo/tag-hierarchy';
 import type { VFSNode } from '@/lib/sync/repo/types';
-import {
-  addRegistryTags,
-  getRegistryTags,
-  removeRegistryTag,
-} from '@/lib/sync/tag-registry';
 
 const logger = new Logger('TagRegistryDialog');
 
@@ -58,10 +53,16 @@ export function TagRegistryDialog({
 
   // The registry is the single source of truth for which tags exist.
   useEffect(() => {
-    if (open) {
-      setTags(getRegistryTags());
+    if (!open) {
+      return;
     }
-  }, [open]);
+    repository
+      .getRegistryTags()
+      .then(setTags)
+      .catch((error) => {
+        logger.error('Failed to load registry tags', error);
+      });
+  }, [open, repository]);
 
   useEffect(() => {
     if (isAdding) {
@@ -69,17 +70,20 @@ export function TagRegistryDialog({
     }
   }, [isAdding]);
 
-  const handleCreateTag = () => {
+  const handleCreateTag = async () => {
     const normalized = normalizeTagInput(newTag);
     if (!normalized) {
       setIsAdding(false);
       return;
     }
-    addRegistryTags([normalized]);
-    setTags(getRegistryTags());
-    setNewTag('');
-    setIsAdding(false);
-    onChanged();
+    try {
+      setTags(await repository.addRegistryTags([normalized]));
+      setNewTag('');
+      setIsAdding(false);
+      onChanged();
+    } catch (error) {
+      logger.error('Failed to create tag', error, { tag: normalized });
+    }
   };
 
   // Look up the affected nodes up front so the confirmation can show how many
@@ -102,8 +106,7 @@ export function TagRegistryDialog({
       for (const node of nodes) {
         await repository.removeTag(node.id, tag);
       }
-      removeRegistryTag(tag);
-      setTags(getRegistryTags());
+      setTags(await repository.removeRegistryTag(tag));
       onChanged();
     } catch (error) {
       logger.error('Failed to delete tag', error, { tag });

@@ -87,6 +87,7 @@ describe('Repository business logic parity', () => {
       await repository.removeTag(rawFileId, 'beta');
       await repository.addTag(rawFileId, 'uni/math');
       await repository.addCustomColor('#ABCDEF');
+      await repository.addRegistryTags(['alpha', 'orphan']);
 
       const [rootFolders, rootFiles] = await repository.listDirectory(null);
       const [, docsFiles] = await repository.listDirectory(folderId);
@@ -129,6 +130,10 @@ describe('Repository business logic parity', () => {
         (await repository.getNodesByAnyTag(['uni'])).length,
       );
       expect(await repository.getCustomColors()).toEqual(['#abcdef']);
+      expect((await repository.getRegistryTags()).sort()).toEqual([
+        'alpha',
+        'orphan',
+      ]);
       expect(
         Array.from((await repository.readFileBytes(rawFileId)) ?? []),
       ).toEqual([4, 5]);
@@ -166,11 +171,13 @@ describe('Repository business logic parity', () => {
       });
 
       await repository.removeCustomColor('#abcdef');
+      await repository.removeRegistryTag('orphan');
       await repository.deleteNode(folderId);
 
       expect(await repository.getNode(folderId)).toBeNull();
       expect(await repository.getNode(rawFileId)).toBeNull();
       expect(await repository.getCustomColors()).toEqual([]);
+      expect(await repository.getRegistryTags()).toEqual(['alpha']);
     });
   }
 });

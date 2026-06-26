@@ -4,7 +4,6 @@ import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { orderTagsHierarchically } from '@/lib/sync/repo/tag-hierarchy';
-import { addRegistryTags, getRegistryTags } from '@/lib/sync/tag-registry';
 import { cn } from '@/lib/utils';
 import { formatSemanticTagAccessibleName } from './accessibility-labels';
 import { TagRegistryDialog } from './tag-registry-dialog';
@@ -50,21 +49,23 @@ export const SemanticTags = memo(function SemanticTags({
     let cancelled = false;
 
     setLoaded(false);
-    Promise.all([repository.listTags(), repository.getStats()])
-      .then(([attachedTags, nextStats]) => {
+    Promise.all([
+      repository.listTags(),
+      repository.getStats(),
+      repository.getRegistryTags(),
+    ])
+      .then(([attachedTags, nextStats, registryTags]) => {
         if (cancelled) {
           return;
         }
 
-        // Seed any tags already on nodes into the registry so it stays the
-        // single source of truth, then read the full list back from it and
-        // annotate each with its file count (0 when unattached).
-        addRegistryTags(attachedTags.map((entry) => entry.tag));
+        // The registry is the source of truth for which tags exist; annotate
+        // each with its file count from the repository (0 when unattached).
         const counts = new Map(
           attachedTags.map((entry) => [entry.tag, entry.count]),
         );
         setTags(
-          getRegistryTags().map((tag) => ({
+          registryTags.map((tag) => ({
             tag,
             count: counts.get(tag) ?? 0,
           })),

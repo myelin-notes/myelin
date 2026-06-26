@@ -29,7 +29,8 @@ export type PendingOp =
       replaceFile?: true;
       queueRevision: string;
     }
-  | { kind: 'sync-custom-colors'; queueRevision: string };
+  | { kind: 'sync-custom-colors'; queueRevision: string }
+  | { kind: 'sync-tag-registry'; queueRevision: string };
 
 export interface DeletedSubtree {
   nodeIds: string[];
@@ -295,6 +296,15 @@ export function enqueueCustomColorsSync(ops: PendingOp[]): void {
     touchPendingOp(existing);
   } else {
     ops.push(withQueueRevision({ kind: 'sync-custom-colors' }));
+  }
+}
+
+export function enqueueTagRegistrySync(ops: PendingOp[]): void {
+  const existing = ops.find((op) => op.kind === 'sync-tag-registry');
+  if (existing) {
+    touchPendingOp(existing);
+  } else {
+    ops.push(withQueueRevision({ kind: 'sync-tag-registry' }));
   }
 }
 
