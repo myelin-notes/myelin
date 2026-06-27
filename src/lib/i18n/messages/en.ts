@@ -169,6 +169,7 @@ const en = {
       empty:
         'No tags yet. Right-click a file and choose "Manage Tags" to start.',
       insights: 'Studio Insights',
+      manageTag: '+ manage tag',
       stats: {
         totalFiles: 'Total Files',
         folders: 'Folders',
@@ -205,6 +206,20 @@ const en = {
       available: 'Available',
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
+    },
+    tagRegistryDialog: {
+      title: 'Manage Tags',
+      description: 'Create tags to reuse, or delete them everywhere.',
+      tags: 'Tags',
+      empty: 'No tags yet',
+      createNew: 'Create new tag',
+      placeholder: 'Tag name...',
+      confirmTitle: 'Delete tag?',
+      confirmDescription: (tag: string, count: number) =>
+        count > 0
+          ? `#${tag} will be permanently removed from ${count} file${count === 1 ? '' : 's'}/folder${count === 1 ? '' : 's'} and deleted everywhere.`
+          : `#${tag} will be deleted permanently.`,
+      confirmDelete: 'Delete',
     },
   },
   graph: {

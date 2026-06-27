@@ -27,6 +27,7 @@ export interface VFSManifest {
   nodes: Record<string, VFSNode>;
   linksBySource: Record<VFSNodeId, StoredNoteLink[]>;
   customColors: string[];
+  tagRegistry: string[];
 }
 
 export interface RepositorySnapshot {
@@ -70,6 +71,7 @@ export function createEmptyManifest(): VFSManifest {
     nodes: {},
     linksBySource: {},
     customColors: [],
+    tagRegistry: [],
   };
 }
 

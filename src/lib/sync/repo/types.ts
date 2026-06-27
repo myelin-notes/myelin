@@ -197,6 +197,10 @@ export interface Repository {
   addCustomColor(color: string): Promise<string[]>;
   removeCustomColor(color: string): Promise<string[]>;
 
+  getRegistryTags(): Promise<string[]>;
+  addRegistryTags(tags: string[]): Promise<string[]>;
+  removeRegistryTag(tag: string): Promise<string[]>;
+
   openSession(nodeId: VFSNodeId): Promise<NoteSession>;
 }
 
