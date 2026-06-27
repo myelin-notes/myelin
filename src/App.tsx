@@ -7,7 +7,7 @@ import { TabStateProvider } from '@/lib/tabs/context';
 import { CanvasCommandProvider } from '@/pages/canvas/command-context';
 
 function App() {
-  useTheme('light');
+  useTheme();
 
   return (
     <TabStateProvider>

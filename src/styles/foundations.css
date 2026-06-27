@@ -325,11 +325,82 @@
   --shadow-key: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
-/* Dark mode — supply colors here to enable */
+/* Dark mode — deep slate surfaces, light text, mint accent preserved */
 .dark {
-  /* --bg-page: ...; */
-  /* --text-primary: ...; */
-  /* etc. */
+  --background: #0e1216;
+  --foreground: #e4e7e9;
+  --card: #1e242c;
+  --card-foreground: #e4e7e9;
+  --popover: #1c2127;
+  --popover-foreground: #e4e7e9;
+  --primary: #e3e8ef;
+  --primary-foreground: #11161d;
+  --secondary: #232830;
+  --secondary-foreground: #e4e7e9;
+  --muted: #232830;
+  --muted-foreground: #8b95a3;
+  --accent: #6ffbbe;
+  --accent-foreground: #00301f;
+  --destructive: #f87171;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: #232830;
+  --ring: #5a6b85;
+
+  /* Theme colors — dark mode. Surfaces form an elevation ladder (page is
+     darkest, cards sit above it); hover targets are a clear step lighter so
+     hover feedback reads on dark. */
+  --bg-page: #0e1216;
+  --bg-surface: #191e25;
+  --bg-sidebar: #121620;
+  --bg-card: #1e242c;
+  --bg-card-active: #262d37;
+  --bg-tag: #25344a;
+  --bg-tag-active: #44597a;
+  --bg-input: #191e25;
+  --bg-accent-green: #6ffbbe;
+  --bg-toolbar: rgba(23, 27, 32, 0.8);
+
+  --text-primary: #e4e7e9;
+  --text-secondary: #b8bdc2;
+  --text-muted: #8b95a3;
+  --text-on-dark: #ffffff;
+  --text-green: #6ffbbe;
+  --text-tag: #9fb0c4;
+  --text-brand: #cdd6dd;
+
+  --accent-dark: #2a3a50;
+  --accent-navy: #34465e;
+  --text-link: #6ea8fe;
+  --text-success: #6ee7a8;
+  --bg-success-soft: #14271d;
+  --text-error: #f1a3a3;
+  --bg-error-soft: #2c1818;
+
+  --bg-hover-tint: rgba(255, 255, 255, 0.07);
+  --bg-secondary-container: #232c38;
+  /* Light, so the gradient primary button (from-primary → primary-container)
+     stays a coherent light CTA with dark text in dark mode. */
+  --bg-primary-container: #c8d2e0;
+
+  --graph-edge: #5a6573;
+  --graph-edge-outgoing: #34d399;
+  --bg-accent-amber: #fbbf24;
+  --bg-accent-amber-strong: #f59e0b;
+
+  --gradient-thumb-placeholder: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0) 48%
+    ),
+    radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-divider: rgba(255, 255, 255, 0.12);
+  --border-ghost: rgba(255, 255, 255, 0.05);
+
+  --bg-key: rgba(255, 255, 255, 0.06);
+  --border-key: rgba(255, 255, 255, 0.12);
+  --shadow-key: 0 1px 0 rgba(0, 0, 0, 0.4);
 }
 
 @layer base {

@@ -232,6 +232,15 @@ const zhHans: typeof en = {
   settings: {
     title: '偏好设置',
     description: '定制你的创作圣地，这些设置可调整无限画布的视觉氛围与功能深度',
+    theme: {
+      title: '主题',
+      eyebrow: '外观',
+      options: {
+        light: '浅色',
+        dark: '深色',
+        system: '跟随系统',
+      },
+    },
     canvasStyle: {
       title: '画布样式',
       eyebrow: '视觉外观',

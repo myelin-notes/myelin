@@ -256,7 +256,7 @@ function ColorPickerDialog({
         <button
           type="button"
           onClick={() => onConfirm(hex)}
-          className="h-7 cursor-pointer rounded-lg border-none bg-gradient-to-b from-accent-dark to-primary-container px-3 font-medium text-[12px] text-text-on-dark shadow-sm transition-transform duration-100 hover:scale-[1.02] active:scale-[0.98]"
+          className="h-7 cursor-pointer rounded-lg border-none bg-gradient-to-b from-accent-dark to-accent-navy px-3 font-medium text-[12px] text-text-on-dark shadow-sm transition-transform duration-100 hover:scale-[1.02] active:scale-[0.98]"
         >
           Add color
         </button>

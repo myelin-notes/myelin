@@ -1,17 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useUserPref } from '@/lib/use-user-pref';
+import type { UserPrefValue } from '@/lib/user-prefs';
 
-type ThemeMode = 'light' | 'dark';
+export type ThemeMode = UserPrefValue<'theme'>;
 
-export function useTheme(initial: ThemeMode = 'light') {
-  const [mode, setMode] = useState<ThemeMode>(initial);
+function prefersDark(): boolean {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function resolveDark(mode: ThemeMode): boolean {
+  return mode === 'system' ? prefersDark() : mode === 'dark';
+}
+
+/**
+ * Applies the persisted theme preference to <html>. Mount once near the root.
+ * In 'system' mode it also tracks the OS colour-scheme so the app follows
+ * light/dark changes live.
+ */
+export function useTheme() {
+  const mode = useUserPref('theme');
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', mode === 'dark');
+    const apply = () => {
+      document.documentElement.classList.toggle('dark', resolveDark(mode));
+    };
+    apply();
+
+    if (mode !== 'system') {
+      return;
+    }
+
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    mql.addEventListener('change', apply);
+    return () => mql.removeEventListener('change', apply);
   }, [mode]);
-
-  const toggle = () => {
-    setMode((m) => (m === 'light' ? 'dark' : 'light'));
-  };
-
-  return { mode, setMode, toggle };
 }

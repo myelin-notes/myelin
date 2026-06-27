@@ -199,7 +199,7 @@ export function InsertPopover({
                   : 'cursor-pointer hover:bg-hover-tint'
               }`}
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface/70 text-text-primary transition-colors group-hover:bg-white">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface/70 text-text-primary transition-colors group-hover:bg-card-active">
                 <Icon className="size-4" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col">
