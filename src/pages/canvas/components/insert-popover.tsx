@@ -167,7 +167,7 @@ export function InsertPopover({
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: -8, scale: 0.98 }}
       transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
-      className="ml-2 w-[260px] overflow-hidden rounded-2xl bg-white/85 shadow-ambient backdrop-blur-[24px]"
+      className="ml-2 w-[260px] overflow-hidden rounded-2xl bg-popover/85 shadow-ambient backdrop-blur-[24px]"
       role="menu"
       onKeyDown={onPanelKeyDown}
     >
@@ -216,7 +216,7 @@ export function InsertPopover({
                 </span>
               ) : (
                 item.hotkey && (
-                  <kbd className="flex min-w-[20px] items-center justify-center rounded-[5px] border border-border-divider bg-white px-1 py-[1px] font-sans font-semibold text-[10px] text-text-secondary">
+                  <kbd className="flex min-w-[20px] items-center justify-center rounded-[5px] border border-border-divider bg-card px-1 py-[1px] font-sans font-semibold text-[10px] text-text-secondary">
                     {item.hotkey}
                   </kbd>
                 )

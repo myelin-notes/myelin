@@ -3,7 +3,7 @@ input[type="range"].tool-slider {
   -webkit-appearance: none;
   appearance: none;
   height: 3px;
-  background: rgba(195, 199, 202, 0.4);
+  background: var(--track);
   border-radius: 2px;
   outline: none;
   cursor: pointer;
@@ -36,6 +36,6 @@ input[type="range"].tool-slider::-moz-range-thumb {
 
 input[type="range"].tool-slider::-moz-range-track {
   height: 3px;
-  background: rgba(195, 199, 202, 0.4);
+  background: var(--track);
   border-radius: 2px;
 }

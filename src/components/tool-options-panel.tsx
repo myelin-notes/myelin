@@ -91,7 +91,7 @@ function FontPicker({
               }}
               className={`w-full cursor-pointer border-none px-3 py-2 text-left text-xs transition-colors ${
                 value === font.family
-                  ? 'bg-accent-dark text-white'
+                  ? 'bg-accent-dark text-text-on-dark'
                   : 'bg-transparent text-text-primary hover:bg-hover-tint'
               }`}
               style={{ fontFamily: `"${font.family}", ${font.category}` }}
@@ -99,7 +99,9 @@ function FontPicker({
               {font.family}
               <span
                 className={`ml-2 text-[10px] ${
-                  value === font.family ? 'text-white/50' : 'text-text-muted'
+                  value === font.family
+                    ? 'text-text-on-dark/50'
+                    : 'text-text-muted'
                 }`}
               >
                 {font.category}
@@ -126,7 +128,7 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-white/85 px-3.5 py-3 shadow-ambient backdrop-blur-[24px]">
+    <div className="flex flex-col gap-3 rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-[24px]">
       {options.map((option) => {
         if (option.type === 'color') {
           return (
@@ -203,7 +205,7 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
                       onClick={() => option.set(choice.value)}
                       className={`flex cursor-pointer items-center gap-1.5 rounded-md border-none px-2 py-1 font-medium text-xs transition-all duration-150 ${
                         active
-                          ? 'bg-white text-text-primary shadow-sm'
+                          ? 'bg-card text-text-primary shadow-sm'
                           : 'bg-transparent text-text-muted hover:text-text-secondary'
                       }`}
                     >

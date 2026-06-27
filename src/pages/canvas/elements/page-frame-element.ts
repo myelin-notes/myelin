@@ -13,6 +13,7 @@ import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { trackEvent } from '@/lib/analytics';
 import { exportPdf as exportPdfToRust } from '@/lib/pdf-export/client';
 import { UserPrefs } from '@/lib/user-prefs';
+import { getCanvasPalette } from '../canvas-theme';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
 import {
@@ -643,7 +644,7 @@ export class PageFrameElement extends DrawableElement {
     ctx: CanvasRenderingContext2D,
     _deltaTime: number,
   ): void {
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = getCanvasPalette().surface;
     ctx.beginPath();
     ctx.roundRect(0, 0, this._pageWidth, this._pageHeight, PAGE_CORNER_RADIUS);
     ctx.fill();

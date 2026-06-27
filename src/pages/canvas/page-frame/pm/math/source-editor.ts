@@ -38,7 +38,7 @@ interface MathSourceEditorOwnerRef {
 const mathSourceEditorTheme = EditorView.theme({
   '&': {
     backgroundColor: 'transparent',
-    color: '#1F2328',
+    color: 'var(--text-primary)',
     maxHeight: '300px',
   },
   '.cm-scroller': {
@@ -49,10 +49,10 @@ const mathSourceEditorTheme = EditorView.theme({
   },
   '.cm-content': {
     padding: '2px 4px',
-    caretColor: '#1F2328',
+    caretColor: 'var(--text-primary)',
   },
   '::selection': {
-    backgroundColor: '#0969DA26',
+    backgroundColor: 'var(--editor-selection)',
   },
   '&.cm-focused': {
     outline: 'none',

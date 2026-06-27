@@ -36,7 +36,7 @@ export function ToolShelf({
   }, []);
 
   return (
-    <div className="fade-in slide-in-from-left-2 w-56 animate-in overflow-hidden rounded-xl bg-white/85 shadow-ambient backdrop-blur-[24px] duration-200">
+    <div className="fade-in slide-in-from-left-2 w-56 animate-in overflow-hidden rounded-xl bg-popover/85 shadow-ambient backdrop-blur-[24px] duration-200">
       <div className="flex items-center justify-between px-4 py-3">
         <span className="font-bold text-[10px] text-text-primary uppercase tracking-[0.1em]">
           {strings.canvas.toolShelf.title}
@@ -88,7 +88,7 @@ export function ToolShelf({
                 }`}
               >
                 <div
-                  className={`h-2.5 w-2.5 rounded-full bg-white transition-transform ${
+                  className={`h-2.5 w-2.5 rounded-full bg-text-on-dark transition-transform ${
                     enabled ? 'translate-x-3' : 'translate-x-0'
                   }`}
                 />

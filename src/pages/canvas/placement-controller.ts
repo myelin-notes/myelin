@@ -1,3 +1,4 @@
+import { getCanvasPalette } from './canvas-theme';
 import type { PlacementGhost, Vector2 } from './drawable-canvas';
 
 /**
@@ -62,12 +63,13 @@ export class PlacementController {
     const x = worldPos.x + b.x;
     const y = worldPos.y + b.y;
 
-    ctx.fillStyle = 'rgba(208, 225, 251, 0.18)';
+    const palette = getCanvasPalette();
+    ctx.fillStyle = palette.selectionFill;
     ctx.beginPath();
     ctx.roundRect(x, y, b.width, b.height, 6);
     ctx.fill();
 
-    ctx.strokeStyle = '#2f3e46';
+    ctx.strokeStyle = palette.selectionStroke;
     ctx.lineWidth = 1;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();

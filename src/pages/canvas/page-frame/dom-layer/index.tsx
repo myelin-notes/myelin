@@ -81,9 +81,9 @@ const PAGE_CHROME_STYLE: Record<string, string> = {
   position: 'absolute',
   left: '0px',
   height: `${PAGE_HEIGHT}px`,
-  background: '#ffffff',
+  background: 'var(--bg-card)',
   borderRadius: `${PAGE_CORNER_RADIUS}px`,
-  boxShadow: '0 4px 24px rgba(25, 28, 30, 0.08)',
+  boxShadow: '0 4px 24px rgb(var(--shadow-rgb) / 0.08)',
   border: '1px solid var(--border-ghost)',
   pointerEvents: 'none',
 };

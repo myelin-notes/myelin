@@ -9,7 +9,7 @@
   /* Selection + hit-testing happen on the canvas; the overlay never takes
      pointer input. */
   pointer-events: none;
-  color: #1a1a1a;
+  color: var(--text-primary);
 }
 
 /* While editing, tint the preview like the page frame's math block
@@ -19,7 +19,7 @@
    which anchors to this box's layout rect. */
 .canvas-latex-block[data-editing="true"] {
   border-radius: var(--radius-lg);
-  background: rgba(230, 234, 240, 0.55);
+  background: var(--bg-code);
 }
 
 /* KaTeX display mode wraps content in .katex-display with a 1em block margin
@@ -53,11 +53,11 @@
 
 .canvas-latex-source {
   padding: 0.5em 0.65em;
-  border: 1px solid rgba(195, 199, 202, 0.32);
+  border: 1px solid var(--border-divider);
   border-radius: var(--radius-xl);
   background: var(--bg-surface);
   box-shadow:
-    0 0 32px 0 rgba(25, 28, 30, 0.06),
-    0 18px 40px -24px rgba(28, 39, 56, 0.18);
+    0 0 32px 0 rgb(var(--shadow-rgb) / 0.06),
+    0 18px 40px -24px rgb(var(--shadow-rgb-elevated) / 0.18);
   font-size: 14px;
 }

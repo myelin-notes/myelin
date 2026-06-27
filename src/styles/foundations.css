@@ -241,12 +241,24 @@
   --color-graph-edge: var(--graph-edge);
   --color-graph-edge-outgoing: var(--graph-edge-outgoing);
 
-  --shadow-ambient: 0 0 32px 0 rgba(25, 28, 30, 0.06);
-  --shadow-elevated: 0 18px 40px -24px rgba(28, 39, 56, 0.18);
+  /* Theme-aware elevation — values resolve from --sh-* (see :root / .dark) */
+  --shadow-ambient: var(--sh-ambient);
+  --shadow-elevated: var(--sh-elevated);
 
   --color-bg-key: var(--bg-key);
   --color-border-key: var(--border-key);
   --shadow-key: var(--shadow-key);
+
+  --color-overlay: var(--overlay);
+  --color-overlay-strong: var(--overlay-strong);
+  --color-code: var(--bg-code);
+  --color-inline-code: var(--bg-inline-code);
+  --color-warning-soft: var(--bg-warning-soft);
+  --color-warning: var(--text-warning);
+  --color-border-strong: var(--border-strong);
+  --color-accent-dark-hover: var(--accent-dark-hover);
+  --color-recording: var(--bg-recording);
+  --color-recording-hover: var(--bg-recording-hover);
 }
 
 :root {
@@ -323,6 +335,59 @@
   --bg-key: rgba(0, 0, 0, 0.04);
   --border-key: rgba(0, 0, 0, 0.08);
   --shadow-key: 0 1px 0 rgba(0, 0, 0, 0.04);
+
+  /* Dialog / popover scrims */
+  --overlay: rgba(25, 28, 30, 0.1);
+  --overlay-strong: rgba(25, 28, 30, 0.16);
+
+  /* Elevation shadows — consumed by --shadow-ambient / --shadow-elevated */
+  --sh-ambient: 0 0 32px 0 rgba(25, 28, 30, 0.06);
+  --sh-elevated: 0 18px 40px -24px rgba(28, 39, 56, 0.18);
+
+  /* Accent-dark interaction states */
+  --accent-dark-hover: #2d3f54;
+  --accent-dark-active: #111d2a;
+  --accent-muted: #5f6f85;
+
+  /* Recording / live-capture surfaces */
+  --bg-recording: #e03e3e;
+  --bg-recording-hover: #c73333;
+
+  /* Warning (amber) */
+  --bg-warning-soft: rgba(245, 158, 11, 0.1);
+  --text-warning: #b45309;
+
+  /* Editor code surfaces */
+  --bg-code: rgba(242, 244, 246, 0.92);
+  --bg-inline-code: rgba(28, 39, 56, 0.08);
+
+  /* Stronger hairline + accent rule (blockquote / callout) */
+  --border-strong: rgba(195, 199, 202, 0.5);
+  --rule-accent: rgba(47, 62, 70, 0.28);
+
+  /* Range / slider track */
+  --track: rgba(195, 199, 202, 0.4);
+
+  /* Canvas chrome — read at runtime via getComputedStyle (see canvas-theme.ts) */
+  --canvas-grid: rgba(164, 168, 172, 0.35);
+  --selection-stroke: #2f3e46;
+  --selection-fill: rgba(208, 225, 251, 0.15);
+  --waveform-track: #d0d5db;
+
+  /* CodeMirror text selection tint */
+  --editor-selection: #0969da26;
+
+  /* Code syntax highlight — GitHub light */
+  --syntax-comment: #6e7781;
+  --syntax-keyword: #cf222e;
+  --syntax-string: #0a3069;
+  --syntax-constant: #0550ae;
+  --syntax-type: #953800;
+  --syntax-function: #8250df;
+  --syntax-tag: #116329;
+
+  /* Brand accent dot */
+  --brand-dot: #1abd84;
 }
 
 /* Dark mode — deep slate surfaces, light text, mint accent preserved */
@@ -401,6 +466,59 @@
   --bg-key: rgba(255, 255, 255, 0.06);
   --border-key: rgba(255, 255, 255, 0.12);
   --shadow-key: 0 1px 0 rgba(0, 0, 0, 0.4);
+
+  /* Dialog / popover scrims — deeper on dark so the panel reads above the page */
+  --overlay: rgba(0, 0, 0, 0.5);
+  --overlay-strong: rgba(0, 0, 0, 0.6);
+
+  /* Elevation shadows — pure-black + stronger so they register on dark surfaces */
+  --sh-ambient: 0 0 32px 0 rgba(0, 0, 0, 0.4);
+  --sh-elevated: 0 18px 40px -24px rgba(0, 0, 0, 0.5);
+
+  /* Accent-dark interaction states — step lighter than the base navy */
+  --accent-dark-hover: #34465e;
+  --accent-dark-active: #1f2c3e;
+  --accent-muted: #4a5870;
+
+  /* Recording / live-capture surfaces */
+  --bg-recording: #f05252;
+  --bg-recording-hover: #e04444;
+
+  /* Warning (amber) */
+  --bg-warning-soft: rgba(245, 158, 11, 0.15);
+  --text-warning: #fbbf24;
+
+  /* Editor code surfaces */
+  --bg-code: rgba(35, 40, 48, 0.7);
+  --bg-inline-code: rgba(255, 255, 255, 0.1);
+
+  /* Stronger hairline + accent rule (blockquote / callout) */
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --rule-accent: rgba(159, 176, 196, 0.3);
+
+  /* Range / slider track */
+  --track: rgba(255, 255, 255, 0.12);
+
+  /* Canvas chrome — read at runtime via getComputedStyle (see canvas-theme.ts) */
+  --canvas-grid: rgba(255, 255, 255, 0.08);
+  --selection-stroke: #9fb0c4;
+  --selection-fill: rgba(120, 160, 220, 0.2);
+  --waveform-track: #3a424d;
+
+  /* CodeMirror text selection tint */
+  --editor-selection: rgba(110, 168, 254, 0.25);
+
+  /* Code syntax highlight — GitHub dark */
+  --syntax-comment: #8b949e;
+  --syntax-keyword: #ff7b72;
+  --syntax-string: #a5d6ff;
+  --syntax-constant: #79c0ff;
+  --syntax-type: #ffa657;
+  --syntax-function: #d2a8ff;
+  --syntax-tag: #7ee787;
+
+  /* Brand accent dot */
+  --brand-dot: #1abd84;
 }
 
 @layer base {

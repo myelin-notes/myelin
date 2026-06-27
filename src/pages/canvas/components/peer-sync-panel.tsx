@@ -84,7 +84,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
   const repositorySyncLabel = getRepositorySyncLabel(strings, repositoryStatus);
 
   return (
-    <div className="absolute bottom-6 left-6 z-[100] flex max-h-[calc(100dvh-4rem)] w-72 flex-col gap-2 overflow-y-auto rounded-xl bg-white/90 p-3 shadow-ambient backdrop-blur-[24px]">
+    <div className="absolute bottom-6 left-6 z-[100] flex max-h-[calc(100dvh-4rem)] w-72 flex-col gap-2 overflow-y-auto rounded-xl bg-popover/90 p-3 shadow-ambient backdrop-blur-[24px]">
       <div className="flex items-center gap-1.5">
         <Radio className="size-3.5 text-text-muted" />
         <span className="font-medium text-text-secondary text-xs">
@@ -102,7 +102,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-[10px]">
-            <div className="rounded-md bg-white/80 px-2 py-1.5">
+            <div className="rounded-md bg-card/80 px-2 py-1.5">
               <div className="text-text-muted">
                 {strings.canvas.peerSync.localPeer}
               </div>
@@ -114,7 +114,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
               </div>
             </div>
 
-            <div className="rounded-md bg-white/80 px-2 py-1.5">
+            <div className="rounded-md bg-card/80 px-2 py-1.5">
               <div className="text-text-muted">
                 {strings.canvas.peerSync.writer}
               </div>
@@ -129,7 +129,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
             </div>
           </div>
 
-          <div className="rounded-md bg-white/80 px-2 py-1.5 text-[10px]">
+          <div className="rounded-md bg-card/80 px-2 py-1.5 text-[10px]">
             <div className="flex items-center justify-between">
               <span className="text-text-muted">
                 {strings.canvas.peerSync.repository}
@@ -159,14 +159,14 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
             </div>
 
             {peerCount === 0 ? (
-              <div className="rounded-md bg-white/80 px-2 py-1.5 text-[10px] text-text-muted">
+              <div className="rounded-md bg-card/80 px-2 py-1.5 text-[10px] text-text-muted">
                 {strings.canvas.peerSync.noRemotePeers}
               </div>
             ) : (
               peerSnapshot.connectedPeers.map((peer) => (
                 <div
                   key={peer.peerId}
-                  className="flex items-center justify-between rounded-md bg-white/80 px-2 py-1.5 text-[10px]"
+                  className="flex items-center justify-between rounded-md bg-card/80 px-2 py-1.5 text-[10px]"
                 >
                   <span className="font-mono text-text-secondary">
                     {formatPeerId(peer.peerId)}

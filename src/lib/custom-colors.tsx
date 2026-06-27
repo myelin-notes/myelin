@@ -216,7 +216,7 @@ function ColorPickerDialog({
           style={{
             backgroundColor: hex,
             boxShadow:
-              'inset 0 0 0 1px rgba(25,28,30,0.08), 0 0 0 2px rgba(255,255,255,0.6)',
+              'inset 0 0 0 1px var(--border-ghost), 0 0 0 2px var(--bg-card)',
           }}
         />
       </div>
@@ -237,7 +237,7 @@ function ColorPickerDialog({
           onChange={(e) => onHexInputChange(e.target.value)}
           spellCheck={false}
           autoComplete="off"
-          className="h-6 flex-1 rounded-md border-none bg-surface px-2 font-medium text-[12px] text-text-primary outline-none transition-colors focus:bg-white"
+          className="h-6 flex-1 rounded-md border-none bg-surface px-2 font-medium text-[12px] text-text-primary outline-none transition-colors focus:bg-card"
           style={{
             boxShadow: 'inset 0 0 0 0.5px var(--border-ghost)',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',

@@ -137,7 +137,7 @@ export const FrameChromeView = forwardRef<
         style={{
           borderRadius: 'inherit',
           boxShadow:
-            '0 0 0 1px rgba(28, 39, 56, 0.10), 0 1px 2px rgba(25, 28, 30, 0.06), 0 10px 20px -8px rgba(25, 28, 30, 0.10), 0 36px 72px -24px rgba(25, 28, 30, 0.22)',
+            '0 0 0 1px rgb(var(--shadow-rgb-elevated) / 0.10), 0 1px 2px rgb(var(--shadow-rgb) / 0.06), 0 10px 20px -8px rgb(var(--shadow-rgb) / 0.10), 0 36px 72px -24px rgb(var(--shadow-rgb) / 0.22)',
           pointerEvents: 'none',
         }}
       >

@@ -75,7 +75,7 @@ function ControlButton({
       className={cn(
         'flex w-[46px] cursor-pointer items-center justify-center text-text-muted transition-colors duration-150',
         danger
-          ? 'hover:bg-red-600 hover:text-white'
+          ? 'hover:bg-destructive hover:text-text-on-dark'
           : 'hover:bg-hover-tint hover:text-text-primary',
       )}
     >

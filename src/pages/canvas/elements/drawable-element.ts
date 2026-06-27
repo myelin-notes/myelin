@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import type { Messages } from '@/lib/i18n/messages';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
+import { getCanvasPalette } from '../canvas-theme';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
@@ -19,7 +20,6 @@ export interface SelectionToolbarItem {
   onClick: () => void;
 }
 
-const SELECTION_STROKE = '#2f3e46';
 const HANDLE_SIZE = 6;
 const SELECTION_PADDING = 4;
 const SELECTION_RADIUS = 4;
@@ -272,18 +272,20 @@ export abstract class DrawableElement {
     const h = box.height + pad * 2;
     const r = SELECTION_RADIUS * eased;
 
+    const palette = getCanvasPalette();
+
     ctx.globalAlpha = eased;
 
     // Selection fill — skipped while editing to keep the editing surface clean.
     if (!isEditing) {
-      ctx.fillStyle = `rgba(208, 225, 251, 0.12)`;
+      ctx.fillStyle = palette.selectionFill;
       ctx.beginPath();
       ctx.roundRect(x, y, w, h, r);
       ctx.fill();
     }
 
     // Selection border
-    ctx.strokeStyle = SELECTION_STROKE;
+    ctx.strokeStyle = palette.selectionStroke;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([]);
     ctx.beginPath();
@@ -304,12 +306,12 @@ export abstract class DrawableElement {
       const cx = x + w * spec.fx - half;
       const cy = y + h * spec.fy - half;
 
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = palette.surface;
       ctx.beginPath();
       ctx.roundRect(cx, cy, size, size, radius);
       ctx.fill();
 
-      ctx.strokeStyle = SELECTION_STROKE;
+      ctx.strokeStyle = palette.selectionStroke;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.roundRect(cx, cy, size, size, radius);

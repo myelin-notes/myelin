@@ -96,7 +96,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               aria-label={strings.canvas.toolbar.insert}
               className={`cursor-pointer rounded-lg p-2.5 transition-colors ${
                 insertOpen
-                  ? 'bg-accent-dark text-white'
+                  ? 'bg-accent-dark text-text-on-dark'
                   : 'bg-transparent text-text-secondary hover:bg-hover-tint'
               }`}
               onClick={onToggleInsert}
@@ -124,7 +124,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                   aria-label={tool.label}
                   className={`group relative cursor-pointer rounded-lg p-2.5 transition-colors ${
                     isActive
-                      ? 'bg-accent-dark text-white'
+                      ? 'bg-accent-dark text-text-on-dark'
                       : 'bg-transparent text-text-secondary hover:bg-hover-tint'
                   }`}
                   onClick={() => {
@@ -140,7 +140,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                     <span
                       className={`absolute bottom-1 left-1/2 h-[2px] w-3 -translate-x-1/2 rounded-full transition-opacity ${
                         isActive
-                          ? 'bg-white/60'
+                          ? 'bg-text-on-dark/60'
                           : 'bg-current opacity-0 group-hover:opacity-20'
                       }`}
                     />
@@ -175,7 +175,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               aria-label={strings.canvas.toolbar.customizeWheel}
               className={`cursor-pointer rounded-lg p-2.5 transition-colors ${
                 shelfOpen
-                  ? 'bg-accent-dark text-white'
+                  ? 'bg-accent-dark text-text-on-dark'
                   : 'bg-transparent text-text-secondary hover:bg-hover-tint'
               }`}
               onClick={onToggleShelf}

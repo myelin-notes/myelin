@@ -26,7 +26,7 @@ export function CommandPaletteDialog({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[200] flex items-start justify-center bg-[rgba(25,28,30,0.16)] px-4 pt-[12vh] backdrop-blur-[6px]"
+          className="fixed inset-0 z-[200] flex items-start justify-center bg-overlay-strong px-4 pt-[12vh] backdrop-blur-[6px]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -41,7 +41,7 @@ export function CommandPaletteDialog({
             role="dialog"
             aria-modal="true"
             aria-label={strings.commandPalette.title}
-            className="w-full max-w-2xl overflow-hidden rounded-[1.35rem] bg-white/90 shadow-[0_24px_80px_rgba(25,28,30,0.16)] ring-1 ring-white/80 backdrop-blur-[28px]"
+            className="w-full max-w-2xl overflow-hidden rounded-[1.35rem] bg-popover/90 shadow-[0_24px_80px_rgb(var(--shadow-rgb)/0.16)] ring-1 ring-border-subtle backdrop-blur-[28px]"
             initial={{ y: -12, scale: 0.98 }}
             animate={{ y: 0, scale: 1 }}
             exit={{ y: -8, scale: 0.98 }}

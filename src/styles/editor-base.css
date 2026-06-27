@@ -83,7 +83,7 @@
 }
 
 .pm-editor .ProseMirror blockquote {
-  --pm-blockquote-rule-color: rgba(195, 199, 202, 0.5);
+  --pm-blockquote-rule-color: var(--border-strong);
   --pm-blockquote-rule-width: 2px;
   margin: 1.15em 0;
   padding-left: calc(1rem + var(--pm-blockquote-rule-width));
@@ -107,7 +107,7 @@
     var(--bg-surface) 78%,
     transparent
   );
-  --pm-blockquote-rule-color: rgba(47, 62, 70, 0.28);
+  --pm-blockquote-rule-color: var(--rule-accent);
   padding-block: 0.85rem;
   padding-right: 1rem;
   border-radius: var(--radius-lg);

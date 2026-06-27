@@ -31,11 +31,15 @@ export function codeBlockLanguage(): LanguageSupport {
   });
 }
 
-/** GitHub-light token palette, mirrored from the previous Monaco theme. */
+/**
+ * Token palette sourced from CSS theme tokens (--syntax-*), so it tracks
+ * light/dark automatically — CodeMirror accepts `var(...)` color strings and
+ * the highlight style needs no reconfiguration on theme change.
+ */
 const codeBlockHighlightStyle = HighlightStyle.define([
   {
     tag: [t.comment, t.lineComment, t.blockComment, t.docComment],
-    color: '#6e7781',
+    color: 'var(--syntax-comment)',
     fontStyle: 'italic',
   },
   {
@@ -47,21 +51,24 @@ const codeBlockHighlightStyle = HighlightStyle.define([
       t.definitionKeyword,
       t.moduleKeyword,
     ],
-    color: '#cf222e',
+    color: 'var(--syntax-keyword)',
   },
-  { tag: [t.string, t.special(t.string), t.docString], color: '#0a3069' },
-  { tag: [t.escape, t.character], color: '#0550ae' },
+  {
+    tag: [t.string, t.special(t.string), t.docString],
+    color: 'var(--syntax-string)',
+  },
+  { tag: [t.escape, t.character], color: 'var(--syntax-constant)' },
   {
     tag: [t.number, t.integer, t.float, t.bool, t.atom, t.null],
-    color: '#0550ae',
+    color: 'var(--syntax-constant)',
   },
   {
     tag: [t.constant(t.variableName), t.standard(t.variableName)],
-    color: '#0550ae',
+    color: 'var(--syntax-constant)',
   },
   {
     tag: [t.typeName, t.className, t.namespace, t.typeOperator],
-    color: '#953800',
+    color: 'var(--syntax-type)',
   },
   {
     tag: [
@@ -71,13 +78,13 @@ const codeBlockHighlightStyle = HighlightStyle.define([
       t.macroName,
       t.labelName,
     ],
-    color: '#8250df',
+    color: 'var(--syntax-function)',
   },
-  { tag: [t.tagName], color: '#116329' },
-  { tag: [t.attributeName], color: '#0550ae' },
-  { tag: [t.attributeValue], color: '#0a3069' },
-  { tag: [t.meta, t.processingInstruction], color: '#cf222e' },
-  { tag: [t.regexp], color: '#116329' },
+  { tag: [t.tagName], color: 'var(--syntax-tag)' },
+  { tag: [t.attributeName], color: 'var(--syntax-constant)' },
+  { tag: [t.attributeValue], color: 'var(--syntax-string)' },
+  { tag: [t.meta, t.processingInstruction], color: 'var(--syntax-keyword)' },
+  { tag: [t.regexp], color: 'var(--syntax-tag)' },
   { tag: [t.heading], fontWeight: 'bold' },
   { tag: [t.strong], fontWeight: 'bold' },
   { tag: [t.emphasis], fontStyle: 'italic' },
@@ -86,12 +93,12 @@ const codeBlockHighlightStyle = HighlightStyle.define([
 
 export { codeBlockHighlightStyle };
 
-/** Editor chrome: transparent surface, GitHub-light gutter and selection. */
+/** Editor chrome: transparent surface, themed gutter and selection. */
 export const codeBlockEditorTheme = EditorView.theme({
   // The editor grows to fit its content; the shared .pm-page-capped CSS rule
   // caps it at the page-frame content height and it scrolls past that.
   '&': {
-    color: '#1F2328',
+    color: 'var(--text-primary)',
     backgroundColor: 'transparent',
     fontSize: '14px',
   },
@@ -103,11 +110,11 @@ export const codeBlockEditorTheme = EditorView.theme({
   },
   '.cm-content': {
     padding: '14px 0',
-    caretColor: '#1F2328',
+    caretColor: 'var(--text-primary)',
   },
   '.cm-gutters': {
     backgroundColor: 'transparent',
-    color: '#8c959f',
+    color: 'var(--text-muted)',
     border: 'none',
   },
   // No minWidth: `ch` resolves inconsistently under page-frame scaling, and
@@ -119,7 +126,7 @@ export const codeBlockEditorTheme = EditorView.theme({
   },
   // Native selection/caret (no drawSelection() extension installed).
   '::selection': {
-    backgroundColor: '#0969DA26',
+    backgroundColor: 'var(--editor-selection)',
   },
   '&.cm-focused': {
     outline: 'none',

@@ -16,8 +16,8 @@
   position: relative;
   min-width: var(--default-cell-min-width, 120px);
   padding: 0.78rem 1rem;
-  border-right: 1px solid rgba(195, 199, 202, 0.22);
-  border-bottom: 1px solid rgba(195, 199, 202, 0.22);
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
   vertical-align: top;
   background: var(--bg-card);
 }
@@ -27,12 +27,12 @@
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--text-secondary);
-  border-bottom-color: rgba(195, 199, 202, 0.32);
+  border-bottom-color: var(--border-divider);
 }
 
 .pm-editor .ProseMirror .pm-table-node__table tr > th:first-child,
 .pm-editor .ProseMirror .pm-table-node__table tr > td:first-child {
-  border-left: 1px solid rgba(195, 199, 202, 0.22);
+  border-left: 1px solid var(--border-subtle);
 }
 
 .pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > th,
@@ -51,7 +51,7 @@
   > tr[data-page-break="table-row"]
   + tr
   > td {
-  border-top: 1px solid rgba(195, 199, 202, 0.22);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .pm-editor .ProseMirror .pm-table-node__table tbody > tr:first-child > th:first-child,
@@ -107,8 +107,8 @@
   --pm-table-cell-break-border-width: 100%;
   --pm-table-cell-break-gap-start: 0px;
   --pm-table-cell-break-gap-end: 0px;
-  --pm-table-cell-break-border: rgba(195, 199, 202, 0.22);
-  --pm-table-cell-break-dot-color: rgba(164, 168, 172, 0.35);
+  --pm-table-cell-break-border: var(--border-subtle);
+  --pm-table-cell-break-dot-color: var(--canvas-grid);
   position: relative;
   z-index: 2;
 }
@@ -129,12 +129,12 @@
   background:
     linear-gradient(
       to bottom,
-      #fff 0,
-      #fff var(--pm-table-cell-break-gap-start),
+      var(--bg-card) 0,
+      var(--bg-card) var(--pm-table-cell-break-gap-start),
       transparent var(--pm-table-cell-break-gap-start),
       transparent var(--pm-table-cell-break-gap-end),
-      #fff var(--pm-table-cell-break-gap-end),
-      #fff 100%
+      var(--bg-card) var(--pm-table-cell-break-gap-end),
+      var(--bg-card) 100%
     ),
     radial-gradient(
         circle,
@@ -166,7 +166,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(28, 39, 56, 0.08);
+  background: var(--bg-hover-tint);
   pointer-events: none;
 }
 
@@ -201,7 +201,7 @@
   position: absolute;
   width: 22px;
   height: 22px;
-  border: 1px solid rgba(149, 157, 165, 0.28);
+  border: 1px solid var(--border);
   padding: 0;
   border-radius: 999px;
   background: var(--bg-card);
@@ -211,7 +211,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 18px rgba(25, 28, 30, 0.12);
+  box-shadow: 0 8px 18px rgb(var(--shadow-rgb) / 0.12);
   pointer-events: auto;
   cursor: pointer;
   opacity: 0;
@@ -223,7 +223,7 @@
 }
 
 .pm-editor .ProseMirror .pm-table-node__handle--delete {
-  color: #b42318;
+  color: var(--text-error);
 }
 
 .pm-editor
@@ -257,5 +257,5 @@
 }
 
 .pm-editor .ProseMirror .pm-table-node__handle:hover {
-  box-shadow: 0 12px 22px rgba(25, 28, 30, 0.18);
+  box-shadow: 0 12px 22px rgb(var(--shadow-rgb) / 0.18);
 }

@@ -128,7 +128,7 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.14, ease: [0.25, 0.1, 0.25, 1] }}
-            className="absolute top-full left-0 z-[110] mt-2 flex max-h-[60vh] w-[22rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-xl bg-white/95 shadow-ambient backdrop-blur-[24px]"
+            className="absolute top-full left-0 z-[110] mt-2 flex max-h-[60vh] w-[22rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-xl bg-popover/95 shadow-ambient backdrop-blur-[24px]"
           >
             <div className="flex items-center gap-2 px-3 pt-3 pb-2">
               <h2 className="m-0 flex-1 font-semibold text-[13px] text-text-primary">

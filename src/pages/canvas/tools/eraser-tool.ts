@@ -1,5 +1,6 @@
 import { Eraser as EraserIcon } from 'lucide-react';
 import type { MessageGetter } from '@/lib/i18n';
+import { getCanvasPalette, withCanvasAlpha } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { ElementType } from '../elements/element-type';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
@@ -38,12 +39,13 @@ export class EraserTool implements ITool {
   }
 
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
-    ctx.fillStyle = 'rgba(208, 225, 251, 0.15)';
+    const palette = getCanvasPalette();
+    ctx.fillStyle = palette.selectionFill;
     ctx.beginPath();
     ctx.arc(position.x, position.y, this.radius, 0, 2 * Math.PI);
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(47, 62, 70, 0.5)';
+    ctx.strokeStyle = withCanvasAlpha(palette.selectionStroke, 0.5);
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(position.x, position.y, this.radius, 0, 2 * Math.PI);

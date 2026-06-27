@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import type { MessageGetter } from '@/lib/i18n';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
+import { getCanvasPalette } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type {
   DrawableElement,
@@ -66,18 +67,19 @@ export class SelectTool implements ITool {
   }
 
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
+    const palette = getCanvasPalette();
     if (this.mode === SelectMode.Marquee) {
       const x = Math.min(this.startPoint.x, position.x);
       const y = Math.min(this.startPoint.y, position.y);
       const w = Math.abs(position.x - this.startPoint.x);
       const h = Math.abs(position.y - this.startPoint.y);
 
-      ctx.fillStyle = 'rgba(208, 225, 251, 0.15)';
+      ctx.fillStyle = palette.selectionFill;
       ctx.beginPath();
       ctx.roundRect(x, y, w, h, 3);
       ctx.fill();
 
-      ctx.strokeStyle = '#2f3e46';
+      ctx.strokeStyle = palette.selectionStroke;
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 4]);
       ctx.lineDashOffset = 0;
@@ -94,10 +96,10 @@ export class SelectTool implements ITool {
       ctx.lineTo(position.x, position.y);
       ctx.closePath();
 
-      ctx.fillStyle = 'rgba(208, 225, 251, 0.15)';
+      ctx.fillStyle = palette.selectionFill;
       ctx.fill();
 
-      ctx.strokeStyle = '#2f3e46';
+      ctx.strokeStyle = palette.selectionStroke;
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 4]);
       ctx.stroke();
