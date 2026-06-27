@@ -1,3 +1,7 @@
+// Polyfill structuredClone before anything else loads; older WKWebView builds
+// lack it and would crash the app during module evaluation.
+import '@/lib/structured-clone-polyfill';
+
 import { reportFatalError } from '@/lib/fatal-error';
 
 // Install global failure handlers BEFORE the app module graph loads, then pull
