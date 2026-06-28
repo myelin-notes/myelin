@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
+import type { SupportedLocale } from '@/lib/i18n/messages';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
-import { orderTagsHierarchically } from '@/lib/sync/repo/tag-hierarchy';
+import {
+  buildTagTree,
+  expandTagWithAncestors,
+  indexTagTree,
+  type TagTreeNode,
+  toggleTagSelection,
+} from '@/lib/sync/repo/tag-hierarchy';
 import { cn } from '@/lib/utils';
 import { formatSemanticTagAccessibleName } from '../accessibility-labels';
 import { TagRegistryDialog } from '../tag-registry-dialog';
@@ -36,6 +43,9 @@ export function TagListPanel({
   const [loaded, setLoaded] = useState(false);
   const [localRefresh, setLocalRefresh] = useState(0);
   const [manageOpen, setManageOpen] = useState(false);
+  // Tags whose subtree the user has collapsed. Empty means everything is
+  // expanded, which is the default for the fully-loaded tag tree.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
 
   const reload = useCallback(() => setLocalRefresh((key) => key + 1), []);
 
@@ -51,7 +61,9 @@ export function TagListPanel({
     }
     let cancelled = false;
     setLoaded(false);
-    Promise.all([repository.listTags(), repository.getRegistryTags()])
+    // Hierarchical counts so a parent reflects every item under its subtree,
+    // which is exactly what selecting it filters by.
+    Promise.all([repository.listTags(true), repository.getRegistryTags()])
       .then(([attachedTags, registryTags]) => {
         if (cancelled) {
           return;
@@ -59,8 +71,16 @@ export function TagListPanel({
         const counts = new Map(
           attachedTags.map((entry) => [entry.tag, entry.count]),
         );
+        // Show every registry tag plus the ancestors needed to nest it, so a
+        // registered "a/b" still appears under a parent "a" node.
+        const displayed = new Set<string>();
+        for (const tag of registryTags) {
+          for (const ancestor of expandTagWithAncestors(tag)) {
+            displayed.add(ancestor);
+          }
+        }
         setTags(
-          registryTags.map((tag) => ({ tag, count: counts.get(tag) ?? 0 })),
+          [...displayed].map((tag) => ({ tag, count: counts.get(tag) ?? 0 })),
         );
         setLoaded(true);
       })
@@ -86,17 +106,27 @@ export function TagListPanel({
     }
   }, [activeTags, loaded, onActiveTagsChanged, tags]);
 
-  const orderedTags = useMemo(() => orderTagsHierarchically(tags), [tags]);
+  const tree = useMemo(() => buildTagTree(tags), [tags]);
+  const byTag = useMemo(() => indexTagTree(tree), [tree]);
 
-  const toggleTag = (tag: string) => {
-    const next = new Set(activeTags);
-    if (next.has(tag)) {
-      next.delete(tag);
-    } else {
-      next.add(tag);
-    }
-    onActiveTagsChanged(next);
-  };
+  const toggleTag = useCallback(
+    (tag: string) => {
+      onActiveTagsChanged(toggleTagSelection(activeTags, tag, byTag));
+    },
+    [activeTags, byTag, onActiveTagsChanged],
+  );
+
+  const toggleCollapse = useCallback((tag: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) {
+        next.delete(tag);
+      } else {
+        next.add(tag);
+      }
+      return next;
+    });
+  }, []);
 
   return (
     <div className="flex h-full flex-col">
@@ -121,52 +151,19 @@ export function TagListPanel({
             {strings.library.semanticTags.empty}
           </p>
         )}
-        {orderedTags.map(({ tag, count }) => {
-          const isActive = activeTags.has(tag);
-          const formattedCount = formatNumber(count, locale);
-          return (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => toggleTag(tag)}
-              aria-pressed={isActive}
-              aria-label={formatSemanticTagAccessibleName(
-                tag,
-                count,
-                formattedCount,
-              )}
-              className={cn(
-                'flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150',
-                isActive
-                  ? 'bg-accent/15 font-medium text-text-primary'
-                  : 'text-text-secondary hover:bg-hover-tint',
-              )}
-            >
-              <span
-                className={cn(
-                  'flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
-                  isActive
-                    ? 'border-accent-dark bg-accent-dark text-text-on-dark'
-                    : 'border-border-subtle text-transparent',
-                )}
-              >
-                <Check className="size-3" />
-              </span>
-              <span className="min-w-0 flex-1 truncate">
-                <span className="opacity-50">#</span>
-                {tag}
-              </span>
-              <span
-                className={cn(
-                  'shrink-0 text-xs tabular-nums',
-                  isActive ? 'text-text-secondary' : 'text-text-muted',
-                )}
-              >
-                {formattedCount}
-              </span>
-            </button>
-          );
-        })}
+        {tree.map((node) => (
+          <TagTreeNodeView
+            key={node.tag}
+            node={node}
+            depth={0}
+            ancestorSelected={false}
+            activeTags={activeTags}
+            collapsed={collapsed}
+            onToggleTag={toggleTag}
+            onToggleCollapse={toggleCollapse}
+            locale={locale}
+          />
+        ))}
       </div>
 
       <div className="border-border-subtle/60 border-t px-3 py-2">
@@ -185,5 +182,121 @@ export function TagListPanel({
         onChanged={handleRegistryChanged}
       />
     </div>
+  );
+}
+
+interface TagTreeNodeViewProps {
+  node: TagTreeNode;
+  depth: number;
+  /** Whether a selected ancestor already covers this node (so it reads checked). */
+  ancestorSelected: boolean;
+  activeTags: Set<string>;
+  collapsed: Set<string>;
+  onToggleTag: (tag: string) => void;
+  onToggleCollapse: (tag: string) => void;
+  locale: SupportedLocale;
+}
+
+function TagTreeNodeView({
+  node,
+  depth,
+  ancestorSelected,
+  activeTags,
+  collapsed,
+  onToggleTag,
+  onToggleCollapse,
+  locale,
+}: TagTreeNodeViewProps) {
+  const isChecked = ancestorSelected || activeTags.has(node.tag);
+  const hasChildren = node.children.length > 0;
+  const isExpanded = !collapsed.has(node.tag);
+  const formattedCount = formatNumber(node.count, locale);
+  const indentStyle = { paddingLeft: `${depth * 14 + 4}px` };
+
+  return (
+    <>
+      <div
+        className={cn(
+          'group flex w-full items-center gap-1 rounded-lg pr-2 transition-colors duration-150',
+          isChecked ? 'bg-accent/15' : 'hover:bg-hover-tint',
+        )}
+        style={indentStyle}
+      >
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleCollapse(node.tag);
+            }}
+            aria-label={node.label}
+            aria-expanded={isExpanded}
+            className="flex size-4 shrink-0 items-center justify-center rounded text-text-muted transition-colors hover:text-text-secondary"
+          >
+            <ChevronRight
+              className={cn(
+                'size-3 transition-transform duration-150',
+                isExpanded && 'rotate-90',
+              )}
+            />
+          </button>
+        ) : (
+          <span className="size-4 shrink-0" />
+        )}
+        <button
+          type="button"
+          onClick={() => onToggleTag(node.tag)}
+          aria-pressed={isChecked}
+          aria-label={formatSemanticTagAccessibleName(
+            node.tag,
+            node.count,
+            formattedCount,
+          )}
+          className={cn(
+            'flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 text-left text-sm transition-colors duration-150',
+            isChecked ? 'font-medium text-text-primary' : 'text-text-secondary',
+          )}
+        >
+          <span
+            className={cn(
+              'flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
+              isChecked
+                ? 'border-accent-dark bg-accent-dark text-text-on-dark'
+                : 'border-border-subtle text-transparent',
+            )}
+          >
+            <Check className="size-3" />
+          </span>
+          <span className="min-w-0 flex-1 truncate">
+            <span className="opacity-50">#</span>
+            {node.label}
+          </span>
+          <span
+            className={cn(
+              'shrink-0 text-xs tabular-nums',
+              isChecked ? 'text-text-secondary' : 'text-text-muted',
+            )}
+          >
+            {formattedCount}
+          </span>
+        </button>
+      </div>
+
+      {hasChildren &&
+        isExpanded &&
+        node.children.map((child) => (
+          <TagTreeNodeView
+            key={child.tag}
+            node={child}
+            depth={depth + 1}
+            ancestorSelected={isChecked}
+            activeTags={activeTags}
+            collapsed={collapsed}
+            onToggleTag={onToggleTag}
+            onToggleCollapse={onToggleCollapse}
+            locale={locale}
+          />
+        ))}
+    </>
   );
 }

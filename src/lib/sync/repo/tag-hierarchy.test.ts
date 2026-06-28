@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildTagTree,
   expandTagWithAncestors,
+  indexTagTree,
   nodeMatchesAnyTag,
   normalizeTagInput,
   orderTagsHierarchically,
   tagMatchesQuery,
+  toggleTagSelection,
 } from './tag-hierarchy';
 
 describe('tagMatchesQuery', () => {
@@ -130,5 +133,107 @@ describe('orderTagsHierarchically', () => {
         { tag: 'solo', count: 2 },
       ]),
     ).toEqual(['orphan/child', 'solo']);
+  });
+});
+
+describe('buildTagTree', () => {
+  it('nests descendants under their parent and labels by trailing segment', () => {
+    const tree = buildTagTree([
+      { tag: 'uni', count: 10 },
+      { tag: 'uni/math', count: 6 },
+      { tag: 'uni/math/calc', count: 4 },
+    ]);
+    expect(tree).toEqual([
+      {
+        tag: 'uni',
+        label: 'uni',
+        count: 10,
+        children: [
+          {
+            tag: 'uni/math',
+            label: 'math',
+            count: 6,
+            children: [
+              { tag: 'uni/math/calc', label: 'calc', count: 4, children: [] },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('orders roots and siblings by count with an alphabetical tie-break', () => {
+    const tree = buildTagTree([
+      { tag: 'a', count: 5 },
+      { tag: 'b', count: 9 },
+      { tag: 'a/low', count: 1 },
+      { tag: 'a/high', count: 4 },
+    ]);
+    expect(tree.map((node) => node.tag)).toEqual(['b', 'a']);
+    expect(tree[1].children.map((node) => node.tag)).toEqual([
+      'a/high',
+      'a/low',
+    ]);
+  });
+
+  it('treats a tag whose parent is absent as a root', () => {
+    const tree = buildTagTree([{ tag: 'orphan/child', count: 7 }]);
+    expect(tree).toEqual([
+      { tag: 'orphan/child', label: 'child', count: 7, children: [] },
+    ]);
+  });
+});
+
+describe('toggleTagSelection', () => {
+  const tags = [
+    { tag: 'a', count: 0 },
+    { tag: 'a/b', count: 0 },
+    { tag: 'a/c', count: 0 },
+    { tag: 'a/b/d', count: 0 },
+    { tag: 'x', count: 0 },
+  ];
+  const byTag = indexTagTree(buildTagTree(tags));
+  const toggle = (active: string[], tag: string) =>
+    [...toggleTagSelection(new Set(active), tag, byTag)].sort();
+
+  it('selects a leaf and leaves siblings untouched', () => {
+    expect(toggle([], 'a/c')).toEqual(['a/c']);
+  });
+
+  it('selecting a parent stays compact and drops redundant descendants', () => {
+    expect(toggle(['a/b', 'a/c'], 'a')).toEqual(['a']);
+  });
+
+  it('deselecting a directly-selected tag just removes it', () => {
+    expect(toggle(['a', 'x'], 'a')).toEqual(['x']);
+  });
+
+  it('deselecting a child pushes the parent coverage down to siblings', () => {
+    // "a" covers the whole subtree; unchecking "a/b" must keep "a/c" selected
+    // (and not re-add the deselected branch).
+    expect(toggle(['a'], 'a/b')).toEqual(['a/c']);
+  });
+
+  it('pushes coverage down through multiple levels', () => {
+    // Unchecking the deep "a/b/d" keeps the "a/c" branch and the "a/b" level
+    // minus the removed leaf.
+    expect(toggle(['a'], 'a/b/d')).toEqual(['a/c']);
+  });
+
+  it('selecting a partially-selected parent fills the whole subtree', () => {
+    expect(toggle(['a/c'], 'a')).toEqual(['a']);
+  });
+});
+
+describe('indexTagTree', () => {
+  it('indexes every node by its full tag', () => {
+    const index = indexTagTree(
+      buildTagTree([
+        { tag: 'a', count: 1 },
+        { tag: 'a/b', count: 2 },
+      ]),
+    );
+    expect([...index.keys()].sort()).toEqual(['a', 'a/b']);
+    expect(index.get('a/b')?.label).toBe('b');
   });
 });
