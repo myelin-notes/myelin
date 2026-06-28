@@ -108,14 +108,6 @@ export const TabBar = memo(function TabBar({
     controller.openTab({ type: 'library' }, strings.tabBar.library, pane.id);
   }, [controller, pane.id, strings.tabBar.library]);
 
-  const handleGraph = useCallback(() => {
-    controller.openTab({ type: 'graph' }, strings.graph.title, pane.id);
-  }, [controller, pane.id, strings.graph.title]);
-
-  const handleSettings = useCallback(() => {
-    controller.openTab({ type: 'settings' }, strings.tabBar.settings, pane.id);
-  }, [controller, pane.id, strings.tabBar.settings]);
-
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
       if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) {
@@ -205,38 +197,8 @@ export const TabBar = memo(function TabBar({
 
       <div className="flex-1 self-stretch" {...dragRegion} />
 
-      <div
-        className={cn(
-          'flex shrink-0 items-center gap-1 px-2',
-          // Frameless Windows centers the gear over the full bar height so it
-          // lines up with the full-height window controls; elsewhere it sits on
-          // the tab baseline.
-          isWindows ? 'self-stretch' : 'pb-1',
-        )}
-        {...dragRegion}
-      >
-        <button
-          type="button"
-          onClick={handleGraph}
-          aria-label={strings.graph.title}
-          title={strings.graph.title}
-          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <Network className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={handleSettings}
-          aria-label={strings.tabBar.settings}
-          title={strings.tabBar.settings}
-          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <Settings className="size-3.5" />
-        </button>
-      </div>
-
       {/* Frameless Windows has no native title bar, so the top-right pane's
-          bar carries the window controls (sits right of the utility buttons). */}
+          bar carries the window controls. */}
       {isWindows && isTopRight && <WindowControls />}
     </div>
   );

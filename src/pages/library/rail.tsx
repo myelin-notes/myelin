@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Clock, Files, Tag } from 'lucide-react';
+import { Clock, Files, Settings, Tag } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
+import { useTabController } from '@/lib/tabs/context';
 import { cn } from '@/lib/utils';
 import type { LibraryLens } from './types';
 
@@ -17,6 +18,7 @@ interface LibraryRailProps {
 
 export function LibraryRail({ lens, onLensChange }: LibraryRailProps) {
   const strings = useMessages();
+  const controller = useTabController();
 
   const lenses: { id: LibraryLens; icon: LucideIcon; label: string }[] = [
     { id: 'files', icon: Files, label: strings.library.lens.files },
@@ -39,6 +41,16 @@ export function LibraryRail({ lens, onLensChange }: LibraryRailProps) {
             onClick={() => onLensChange(id)}
           />
         ))}
+
+        <RailButton
+          className="mt-auto"
+          icon={Settings}
+          label={strings.tabBar.settings}
+          active={false}
+          onClick={() =>
+            controller.openTab({ type: 'settings' }, strings.tabBar.settings)
+          }
+        />
       </nav>
     </TooltipProvider>
   );
@@ -49,11 +61,13 @@ function RailButton({
   label,
   active,
   onClick,
+  className,
 }: {
   icon: LucideIcon;
   label: string;
   active: boolean;
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <Tooltip>
@@ -64,6 +78,7 @@ function RailButton({
         className={cn(
           'group relative flex w-full cursor-pointer items-center justify-center rounded-md py-2.5 transition-colors',
           !active && 'hover:bg-card-active/30',
+          className,
         )}
       >
         <span
