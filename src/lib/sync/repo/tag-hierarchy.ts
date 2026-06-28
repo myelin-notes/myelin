@@ -22,48 +22,6 @@ export function expandTagWithAncestors(tag: string): string[] {
   return result;
 }
 
-/**
- * Reorder a count-sorted tag list so each parent is immediately followed by its
- * descendant subtree. Sibling groups (and roots) keep count-descending order
- * with an alphabetical tie-break. A list with no "/" tags is returned in the
- * same order it came in, so flat repositories are unaffected. Tags whose parent
- * is missing from the list are treated as roots rather than dropped.
- */
-export function orderTagsHierarchically<
-  T extends { tag: string; count: number },
->(tags: readonly T[]): T[] {
-  const byTag = new Map(tags.map((entry) => [entry.tag, entry]));
-  const children = new Map<string, T[]>();
-  for (const entry of tags) {
-    const slash = entry.tag.lastIndexOf('/');
-    const parent = slash === -1 ? '' : entry.tag.slice(0, slash);
-    const key = parent !== '' && byTag.has(parent) ? parent : '';
-    const group = children.get(key);
-    if (group) {
-      group.push(entry);
-    } else {
-      children.set(key, [entry]);
-    }
-  }
-
-  const result: T[] = [];
-  const visit = (path: string) => {
-    const group = children.get(path);
-    if (!group) {
-      return;
-    }
-    group.sort((a, b) =>
-      b.count !== a.count ? b.count - a.count : a.tag.localeCompare(b.tag),
-    );
-    for (const entry of group) {
-      result.push(entry);
-      visit(entry.tag);
-    }
-  };
-  visit('');
-  return result;
-}
-
 export interface TagTreeNode {
   /** Full tag path, e.g. "uni/math". */
   tag: string;
@@ -77,8 +35,7 @@ export interface TagTreeNode {
  * Turn a flat tag list into a hierarchy keyed by the "/" separator. A tag whose
  * parent is absent from the list becomes a root rather than being dropped, so
  * callers that want intermediate parents must include them in the input. Roots
- * and sibling groups are count-descending with an alphabetical tie-break, the
- * same order {@link orderTagsHierarchically} produces.
+ * and sibling groups are count-descending with an alphabetical tie-break.
  */
 export function buildTagTree(
   tags: readonly { tag: string; count: number }[],
