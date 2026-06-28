@@ -94,6 +94,10 @@ const en = {
     scopeRecent: 'recent',
     folderTreeEmpty: 'No folders yet',
     graphEmpty: 'No linked notes in this selection.',
+    searchResults: 'Results',
+    searchEmpty: 'No matching notes',
+    recentEmpty: 'No recent notes',
+    taggedFiles: 'Tagged notes',
     sortLabel: (label: string) => `Sort: ${label}`,
     sortModes: {
       'name-asc': 'Name (A-Z)',

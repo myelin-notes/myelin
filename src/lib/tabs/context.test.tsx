@@ -43,9 +43,8 @@ describe('TabStateProvider', () => {
     expect(replaceState).toHaveBeenCalledWith({}, '', '/');
     expect(state.layout.type).toBe('pane');
     if (state.layout.type === 'pane') {
-      expect(state.layout.tabs).toMatchObject([
-        { target: { type: 'library' }, title: 'Library' },
-      ]);
+      // The default editor opens empty; tabs are created by opening files.
+      expect(state.layout.tabs).toEqual([]);
     }
   });
 });

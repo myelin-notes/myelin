@@ -97,6 +97,10 @@ const es: typeof en = {
     scopeRecent: 'recientes',
     folderTreeEmpty: 'Aún no hay carpetas',
     graphEmpty: 'No hay notas enlazadas en esta selección.',
+    searchResults: 'Resultados',
+    searchEmpty: 'No hay notas coincidentes',
+    recentEmpty: 'No hay notas recientes',
+    taggedFiles: 'Notas etiquetadas',
     sortLabel: (label: string) => `Ordenar: ${label}`,
     sortModes: {
       'name-asc': 'Nombre (A-Z)',

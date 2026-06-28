@@ -1,13 +1,5 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import {
-  BookOpen,
-  Columns2,
-  Network,
-  Plus,
-  Rows2,
-  Settings,
-  X,
-} from 'lucide-react';
+import { Columns2, Network, Rows2, Settings, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ContextMenu,
@@ -17,12 +9,7 @@ import {
 } from '@/components/ui/context-menu';
 import { trackEvent } from '@/lib/analytics';
 import { type Messages, useMessages } from '@/lib/i18n';
-import {
-  isMac,
-  isWindows,
-  TAB_BAR_HEIGHT_CLASS,
-  TRAFFIC_LIGHT_INSET_CLASS,
-} from '@/lib/platform';
+import { isWindows, TAB_BAR_HEIGHT_CLASS } from '@/lib/platform';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
@@ -45,8 +32,6 @@ import { WindowControls } from './window-controls';
 // fall back to the stored title for content tabs (canvas/image file names).
 function tabTitle(tab: Tab, strings: Messages): string {
   switch (tab.target.type) {
-    case 'library':
-      return strings.tabBar.library;
     case 'graph':
       return strings.graph.title;
     case 'settings':
@@ -58,8 +43,6 @@ function tabTitle(tab: Tab, strings: Messages): string {
 
 function tabIcon(target: TabTarget) {
   switch (target.type) {
-    case 'library':
-      return <BookOpen className="size-3 shrink-0" />;
     case 'graph':
       return <Network className="size-3 shrink-0" />;
     case 'settings':
@@ -87,7 +70,6 @@ function DropIndicator() {
 interface TabBarProps {
   pane: PaneNode;
   isFocused: boolean;
-  isTopLeft: boolean;
   isTopRight: boolean;
   windowDraggable: boolean;
 }
@@ -95,18 +77,12 @@ interface TabBarProps {
 export const TabBar = memo(function TabBar({
   pane,
   isFocused,
-  isTopLeft,
   isTopRight,
   windowDraggable,
 }: TabBarProps) {
-  const strings = useMessages();
   const controller = useTabController();
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
-
-  const handleNewTab = useCallback(() => {
-    controller.openTab({ type: 'library' }, strings.tabBar.library, pane.id);
-  }, [controller, pane.id, strings.tabBar.library]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -158,7 +134,6 @@ export const TabBar = memo(function TabBar({
         'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
         TAB_BAR_HEIGHT_CLASS,
         !isFocused && 'opacity-75',
-        isMac && isTopLeft && TRAFFIC_LIGHT_INSET_CLASS,
       )}
     >
       <div
@@ -183,17 +158,6 @@ export const TabBar = memo(function TabBar({
           {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
         </AnimatePresence>
       </div>
-
-      {/* Kept outside the scroll strip so it stays beside the tabs and never
-          scrolls off when they overflow. */}
-      <button
-        type="button"
-        onClick={handleNewTab}
-        aria-label="New tab"
-        className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-      >
-        <Plus className="size-3.5" />
-      </button>
 
       <div className="flex-1 self-stretch" {...dragRegion} />
 

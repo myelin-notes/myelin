@@ -23,14 +23,6 @@ function createSplitId(): string {
   return crypto.randomUUID();
 }
 
-function createLibraryTab(): Tab {
-  return {
-    id: createTabId(),
-    target: { type: 'library' },
-    title: 'Library',
-  };
-}
-
 function createPaneWithTabs(tabs: Tab[]): PaneNode {
   return {
     type: 'pane',
@@ -40,8 +32,15 @@ function createPaneWithTabs(tabs: Tab[]): PaneNode {
   };
 }
 
-function createLibraryPane(): PaneNode {
-  return createPaneWithTabs([createLibraryTab()]);
+// A pane with no tabs renders the empty-editor placeholder. The persistent
+// sidebar means an empty editor is a valid resting state, not a window we close.
+function createEmptyPane(): PaneNode {
+  return {
+    type: 'pane',
+    id: createPaneId(),
+    tabs: [],
+    activeTabId: '',
+  };
 }
 
 function targetsEqual(a: TabTarget, b: TabTarget): boolean {
@@ -50,7 +49,6 @@ function targetsEqual(a: TabTarget, b: TabTarget): boolean {
   }
 
   switch (a.type) {
-    case 'library':
     case 'graph':
     case 'settings':
       return true;
@@ -94,12 +92,7 @@ function normalizeSizes(sizes: number[], count: number): number[] {
 
 function normalizePane(pane: PaneNode): PaneNode {
   if (pane.tabs.length === 0) {
-    const tab = createLibraryTab();
-    return {
-      ...pane,
-      tabs: [tab],
-      activeTabId: tab.id,
-    };
+    return pane.activeTabId === '' ? pane : { ...pane, activeTabId: '' };
   }
 
   if (pane.tabs.some((tab) => tab.id === pane.activeTabId)) {
@@ -119,7 +112,7 @@ function normalizeLayout(node: LayoutNode): LayoutNode {
 
   const children = node.children.map(normalizeLayout);
   if (children.length === 0) {
-    return createLibraryPane();
+    return createEmptyPane();
   }
   if (children.length === 1) {
     return children[0]!;
@@ -327,7 +320,7 @@ function findTabByTargetInLayout(
 }
 
 export function createDefaultWindowState(): WindowState {
-  const pane = createLibraryPane();
+  const pane = createEmptyPane();
   return {
     layout: pane,
     focusedPaneId: pane.id,
@@ -460,7 +453,22 @@ export class TabStateController {
 
     const tabs = pane.tabs.filter((tab) => tab.id !== tabId);
     if (tabs.length === 0) {
-      this.closePane(paneId);
+      // Closing the last tab of the sole pane leaves an empty editor (the
+      // sidebar stays); closing the last tab of a split pane collapses it.
+      const isRootPane =
+        state.layout.type === 'pane' && state.layout.id === paneId;
+      if (isRootPane) {
+        this.commit({
+          ...state,
+          layout: replacePane(state.layout, {
+            ...pane,
+            tabs: [],
+            activeTabId: '',
+          }),
+        });
+      } else {
+        this.closePane(paneId);
+      }
       return;
     }
 
@@ -602,7 +610,7 @@ export class TabStateController {
       return paneId;
     }
 
-    const newPane = createLibraryPane();
+    const newPane = createEmptyPane();
     const split: SplitNode = {
       type: 'split',
       id: createSplitId(),

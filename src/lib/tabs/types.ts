@@ -4,7 +4,6 @@ export type TabId = string;
 export type PaneId = string;
 
 export type TabTarget =
-  | { type: 'library' }
   | { type: 'graph' }
   | { type: 'settings' }
   | {

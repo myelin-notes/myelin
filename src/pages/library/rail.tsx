@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Clock, Files, Settings, Tag } from 'lucide-react';
+import { Clock, Files, Network, Settings, Tag } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
+import { TAB_BAR_HEIGHT_CLASS } from '@/lib/platform';
 import { useTabController } from '@/lib/tabs/context';
 import { cn } from '@/lib/utils';
 import type { LibraryLens } from './types';
@@ -30,27 +31,45 @@ export function LibraryRail({ lens, onLensChange }: LibraryRailProps) {
     <TooltipProvider>
       <nav
         aria-label={strings.library.title}
-        className="flex w-12 shrink-0 flex-col items-center gap-0.5 border-border-subtle/60 border-r bg-surface/40 px-1.5 py-4"
+        className="flex w-12 shrink-0 flex-col items-center border-border-subtle/60 border-r bg-surface/40 px-1.5 pb-4"
       >
-        {lenses.map(({ id, icon, label }) => (
-          <RailButton
-            key={id}
-            icon={icon}
-            label={label}
-            active={lens === id}
-            onClick={() => onLensChange(id)}
-          />
-        ))}
-
-        <RailButton
-          className="mt-auto"
-          icon={Settings}
-          label={strings.tabBar.settings}
-          active={false}
-          onClick={() =>
-            controller.openTab({ type: 'settings' }, strings.tabBar.settings)
-          }
+        {/* Drag strip that also clears the macOS traffic lights overlaid on the
+            window's top-left corner, which the rail now occupies. */}
+        <div
+          data-tauri-drag-region
+          className={cn('w-full shrink-0', TAB_BAR_HEIGHT_CLASS)}
         />
+
+        <div className="flex flex-col items-center gap-0.5 pt-1">
+          {lenses.map(({ id, icon, label }) => (
+            <RailButton
+              key={id}
+              icon={icon}
+              label={label}
+              active={lens === id}
+              onClick={() => onLensChange(id)}
+            />
+          ))}
+        </div>
+
+        <div className="mt-auto flex flex-col items-center gap-0.5">
+          <RailButton
+            icon={Network}
+            label={strings.graph.title}
+            active={false}
+            onClick={() =>
+              controller.openTab({ type: 'graph' }, strings.graph.title)
+            }
+          />
+          <RailButton
+            icon={Settings}
+            label={strings.tabBar.settings}
+            active={false}
+            onClick={() =>
+              controller.openTab({ type: 'settings' }, strings.tabBar.settings)
+            }
+          />
+        </div>
       </nav>
     </TooltipProvider>
   );

@@ -21,6 +21,7 @@ import type {
   SplitDirection,
 } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
+import { EmptyEditor } from './empty-editor';
 import { PaneContent } from './pane';
 import { TabBar } from './tab-bar';
 
@@ -303,14 +304,14 @@ function PaneView({
         <TabBar
           pane={node}
           isFocused={isFocused}
-          isTopLeft={isTopLeft}
           isTopRight={isTopRight}
-          // The top-left pane sits at the window's top-left, so its bar carries
-          // the window drag handle (titleBarStyle: Overlay has no native one).
+          // The editor's top-left pane carries the window drag handle
+          // (titleBarStyle: Overlay has no native one); the sidebar owns the
+          // traffic-light corner.
           windowDraggable={isTopLeft}
         />
         <div className="min-h-0 flex-1">
-          {activeTab && <PaneContent tab={activeTab} />}
+          {activeTab ? <PaneContent tab={activeTab} /> : <EmptyEditor />}
         </div>
       </PaneDropTarget>
     </PaneIdProvider>

@@ -95,6 +95,10 @@ const zhHans: typeof en = {
     scopeRecent: '最近',
     folderTreeEmpty: '暂无文件夹',
     graphEmpty: '此选择中没有关联的笔记。',
+    searchResults: '结果',
+    searchEmpty: '没有匹配的笔记',
+    recentEmpty: '没有最近的笔记',
+    taggedFiles: '已标记的笔记',
     sortLabel: (label: string) => `排序：${label}`,
     sortModes: {
       'name-asc': '名称（A-Z）',

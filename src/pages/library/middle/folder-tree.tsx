@@ -413,7 +413,12 @@ interface FileNodeProps {
   onChanged: () => void;
 }
 
-function FileNode({ file, depth, autoRename, onChanged }: FileNodeProps) {
+export function FileNode({
+  file,
+  depth,
+  autoRename,
+  onChanged,
+}: FileNodeProps) {
   const repository = useRepository();
   const tabController = useTabController();
   const [tagDialogOpen, setTagDialogOpen] = useState(false);

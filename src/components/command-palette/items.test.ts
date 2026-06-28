@@ -20,7 +20,6 @@ function commandIdsForPage(currentPage: CommandPalettePage): string[] {
     openGraph: () => {},
     openPalette: () => {},
     refreshRepository: async () => {},
-    toggleLibraryView: () => {},
     triggerKeybindingAction: () => {},
     triggerCanvasMarkdownImport: () => {},
     triggerLibraryMarkdownImport: () => {},
@@ -30,9 +29,6 @@ function commandIdsForPage(currentPage: CommandPalettePage): string[] {
 describe('commandPalettePageFromTabTarget', () => {
   it('maps tab targets to command palette pages', () => {
     expect(commandPalettePageFromTabTarget(null)).toBe('library');
-    expect(commandPalettePageFromTabTarget({ type: 'library' })).toBe(
-      'library',
-    );
     expect(
       commandPalettePageFromTabTarget({ type: 'canvas', id: 'note-1' }),
     ).toBe('canvas');
@@ -61,11 +57,9 @@ describe('createCommandPaletteItems', () => {
 
   it('shows library commands only on the library page', () => {
     expect(commandIdsForPage('library')).toContain('import-markdown-library');
-    expect(commandIdsForPage('library')).toContain('switch-library-view');
     expect(commandIdsForPage('canvas')).not.toContain(
       'import-markdown-library',
     );
-    expect(commandIdsForPage('canvas')).not.toContain('switch-library-view');
   });
 
   it('shows repository refresh only for refreshable library repositories', () => {
@@ -80,7 +74,6 @@ describe('createCommandPaletteItems', () => {
       openGraph: () => {},
       openPalette: () => {},
       refreshRepository: async () => {},
-      toggleLibraryView: () => {},
       triggerKeybindingAction: () => {},
       triggerCanvasMarkdownImport: () => {},
       triggerLibraryMarkdownImport: () => {},
@@ -114,7 +107,6 @@ describe('createCommandPaletteItems', () => {
       openGraph: () => {},
       openPalette: () => {},
       refreshRepository: async () => {},
-      toggleLibraryView: () => {},
       triggerKeybindingAction: (action) => triggered.push(action),
       triggerCanvasMarkdownImport: () => {},
       triggerLibraryMarkdownImport: () => {},
@@ -149,7 +141,6 @@ describe('createCommandPaletteItems', () => {
       openGraph: () => opened.push('graph'),
       openPalette: () => {},
       refreshRepository: async () => {},
-      toggleLibraryView: () => {},
       triggerKeybindingAction: () => {},
       triggerCanvasMarkdownImport: () => {},
       triggerLibraryMarkdownImport: () => {},
