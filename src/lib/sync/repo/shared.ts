@@ -75,7 +75,14 @@ export function createEmptyManifest(): VFSManifest {
   };
 }
 
-export function migrate(_manifest: VFSManifest): void {}
+export function migrate(manifest: VFSManifest): void {
+  // Backfill fields added after the original schema so manifests written by
+  // older builds stay loadable instead of throwing when these are later spread
+  // or iterated (e.g. `[...manifest.tagRegistry]`).
+  manifest.customColors ??= [];
+  manifest.linksBySource ??= {};
+  manifest.tagRegistry ??= [];
+}
 
 export function createNodeId(): string {
   return crypto.randomUUID();

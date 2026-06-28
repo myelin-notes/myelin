@@ -411,6 +411,23 @@ describe('LocalRepository', () => {
     expect(snapshot.revision).toBeNull();
   });
 
+  it('backfills fields missing from manifests written by older builds', async () => {
+    const storage = getRepositoryTestStorage();
+    const manifestPath = `repositories/legacy-test/${MANIFEST_PATH}`;
+    // A manifest from before customColors/linksBySource/tagRegistry existed.
+    await storage.writeTextFile(
+      manifestPath,
+      JSON.stringify({ version: 1, children: [], nodes: {} }),
+    );
+
+    const repository = new LocalRepository('repositories/legacy-test');
+    await repository.initialize();
+
+    // Would throw "tagRegistry is not iterable" without migration backfill.
+    await expect(repository.getRegistryTags()).resolves.toEqual([]);
+    await expect(repository.listTags()).resolves.toEqual([]);
+  });
+
   it('reloads the manifest from disk after refresh', async () => {
     const repository = new LocalRepository('repositories/refresh-test');
     await repository.initialize();
