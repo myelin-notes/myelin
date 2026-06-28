@@ -73,6 +73,30 @@ const es: typeof en = {
     searchPlaceholder: 'Buscar en el estudio...',
     semanticSearchLabel: 'Búsqueda semántica',
     explorer: 'Navegador',
+    lens: {
+      files: 'Archivos',
+      recent: 'Recientes',
+      graph: 'Grafo',
+      tags: 'Etiquetas',
+    },
+    searchModes: {
+      lexical: 'Palabra clave',
+      semantic: 'Semántica',
+    },
+    recentBuckets: {
+      today: 'Hoy',
+      week: 'Esta semana',
+      month: 'Este mes',
+      earlier: 'Anterior',
+    },
+    allFiles: 'Todos los archivos',
+    fileCount: (count: number) =>
+      `${count} ${count === 1 ? 'archivo' : 'archivos'}`,
+    scopeIn: (name: string) => `en ${name}`,
+    scopeTagged: 'con etiqueta',
+    scopeRecent: 'recientes',
+    folderTreeEmpty: 'Aún no hay carpetas',
+    graphEmpty: 'No hay notas enlazadas en esta selección.',
     sortLabel: (label: string) => `Ordenar: ${label}`,
     sortModes: {
       'name-asc': 'Nombre (A-Z)',

@@ -6,57 +6,19 @@ import {
   useRef,
   useState,
 } from 'react';
-import {
-  ArrowDownAZ,
-  ArrowDownZA,
-  BrainCircuit,
-  CalendarPlus,
-  ChevronRight,
-  Clock,
-  LayoutGrid,
-  List,
-  LoaderCircle,
-  RefreshCw,
-  Search,
-  X,
-} from 'lucide-react';
-import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
-import { useLocale, useMessages } from '@/lib/i18n';
-import { formatRelativeTime } from '@/lib/i18n/format';
+import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { openNote } from '@/lib/note/navigation';
-import {
-  type FileType,
-  useRepository,
-  useRepositoryStatus,
-  type VFSFileNode,
-  type VFSFolderNode,
-} from '@/lib/sync';
+import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
-import { useTabController } from '@/lib/tabs/context';
-import { UserPrefs } from '@/lib/user-prefs';
-import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from './create-new-dropdown';
-import {
-  ExplorerTree,
-  type ExplorerTreeHandle,
-  type SearchMode,
-  type SortMode,
-  type ViewMode,
-} from './explorer/explorer-tree';
+import { GraphPane } from './graph-pane';
 import { ImportDialog, type ImportSource } from './import/dialog';
 import {
   importStorageFile,
@@ -81,118 +43,152 @@ import {
   PDF_FILE_ACCEPT,
 } from './import/pdf';
 import { createWorkspaceJsonImportSource } from './import/workspace-json-source';
-import { RecentCard } from './recent-card';
-import { SemanticTags } from './semantic-tags';
+import { FolderTree, type FolderTreeHandle } from './middle/folder-tree';
+import { RecentList } from './middle/recent-list';
+import { TagListPanel } from './middle/tag-list-panel';
+import { LibraryRail } from './rail';
+import type { LibraryLens, RecentBucket, SearchMode } from './types';
+import { useFilePaneFiles } from './use-file-pane-files';
+import { useRepositorySetupState } from './use-repository-setup-state';
 
 const logger = new Logger('LibraryPage');
 const LIBRARY_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
-const SORT_MODES: SortMode[] = ['name-asc', 'name-desc', 'modified', 'created'];
 
 function errorDescription(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+interface SelectedFolder {
+  id: string | null;
+  name: string;
+}
+
+type PendingCreate =
+  | { kind: 'folder' }
+  | { kind: 'file'; title: string; type: FileType };
+
 export function LibraryPage() {
   const strings = useMessages();
-  const locale = useLocale();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
-  const tabController = useTabController();
-  const explorerRef = useRef<ExplorerTreeHandle>(null);
-  const scrollRef = useRef<HTMLElement | null>(null);
+  const setupState = useRepositorySetupState();
+
+  const folderTreeRef = useRef<FolderTreeHandle>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const goodnotesZipInputRef = useRef<HTMLInputElement>(null);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
-  const dragTimerRef = useRef<number | null>(null);
-  const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(
-    null,
-  );
-  const [semanticTagsVersion, setSemanticTagsVersion] = useState(0);
-  const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
+
+  const [lens, setLens] = useState<LibraryLens>('files');
+  const [selectedFolder, setSelectedFolder] = useState<SelectedFolder>({
+    id: null,
+    name: strings.library.allFiles,
+  });
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
-  const filterTagsArr = useMemo(() => [...activeTags], [activeTags]);
+  const filterTags = useMemo(() => [...activeTags], [activeTags]);
+  const [recentBucket, setRecentBucket] = useState<RecentBucket | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState<SearchMode>('lexical');
-  const [sortMode, setSortMode] = useState<SortMode>('name-asc');
+
+  const [middleRefresh, setMiddleRefresh] = useState(0);
+  const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
+    null,
+  );
+
   const [isImportingFiles, setIsImportingFiles] = useState(false);
   const [importSource, setImportSource] = useState<ImportSource | null>(null);
   const [importType, setImportType] = useState<
     'obsidian_vault' | 'workspace_json'
   >('obsidian_vault');
+
   const isRefreshingRepository = useManualRepositoryRefreshPending();
-  const recentFilesRequestRef = useRef(0);
-  const cycleSortMode = () => {
-    setSortMode(
-      (prev) => SORT_MODES[(SORT_MODES.indexOf(prev) + 1) % SORT_MODES.length],
-    );
-  };
-  const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    UserPrefs.get('explorerViewMode'),
-  );
   const repositoryRefreshAvailable = useManualRepositoryRefreshAvailable(
     repositoryStatus.config,
     repositoryStatus.initializing,
   );
-  const activityLabel = isImportingFiles
-    ? strings.library.importFiles.loading
-    : isRefreshingRepository
-      ? strings.library.refreshRepository.loading
-      : repositoryStatus.initializing &&
-          repositoryStatus.config.kind !== 'local'
-        ? strings.library.repositoryLoading
-        : null;
-  useEffect(() => UserPrefs.subscribe('explorerViewMode', setViewMode), []);
-  const toggleViewMode = () => {
-    UserPrefs.set('explorerViewMode', viewMode === 'tree' ? 'grid' : 'tree');
-  };
-  const toggleSearchMode = () => {
-    setSearchMode((mode) => (mode === 'semantic' ? 'lexical' : 'semantic'));
-  };
 
-  const loadRecentFiles = useCallback(async () => {
-    const requestId = recentFilesRequestRef.current + 1;
-    recentFilesRequestRef.current = requestId;
+  // The selected file set defines the scope of the right-hand graph.
+  const filePane = useFilePaneFiles({
+    lens,
+    selectedFolderId: selectedFolder.id,
+    filterTags,
+    recentBucket,
+    searchQuery,
+    searchMode,
+    sortMode: 'name-asc',
+    setupState,
+  });
+  const fileIds = useMemo(
+    () => filePane.files.map((file) => file.id),
+    [filePane.files],
+  );
 
-    try {
-      const files = await repository.getRecentFiles(3);
-      if (requestId === recentFilesRequestRef.current) {
-        setRecentFiles(files);
-      }
-    } catch (error) {
-      if (requestId === recentFilesRequestRef.current) {
-        logger.error('Failed to load recent files', error);
-      }
+  const handleDataChanged = useCallback(async () => {
+    setMiddleRefresh((value) => value + 1);
+    await filePane.reload();
+  }, [filePane]);
+
+  useEffect(() => {
+    if (repositoryStatus.lastRemoteSyncAt !== null) {
+      setMiddleRefresh((value) => value + 1);
     }
-  }, [repository]);
+  }, [repositoryStatus.lastRemoteSyncAt]);
 
-  const refreshLibraryData = useCallback(() => {
-    setSemanticTagsVersion((version) => version + 1);
-    void loadRecentFiles();
-  }, [loadRecentFiles]);
+  // Run a queued create once the Files lens (and its tree) is mounted.
+  useEffect(() => {
+    if (lens !== 'files' || !pendingCreate) {
+      return;
+    }
+    const pending = pendingCreate;
+    setPendingCreate(null);
+    const handle = folderTreeRef.current;
+    if (!handle) {
+      return;
+    }
+    if (pending.kind === 'folder') {
+      void handle.startNewFolder();
+    } else {
+      void handle
+        .startNewFile(pending.title, pending.type)
+        .then(() => trackEvent('note_created', { file_type: pending.type }))
+        .catch((error) => {
+          logger.error('Failed to create file', error);
+          toast.error(strings.commandPalette.errors.createNote, {
+            description: errorDescription(error),
+          });
+        });
+    }
+  }, [lens, pendingCreate, strings.commandPalette.errors.createNote]);
 
-  const triggerRefresh = useCallback(() => {
-    refreshLibraryData();
-    explorerRef.current?.reload();
-  }, [refreshLibraryData]);
+  const handleSelectFolder = useCallback(
+    (id: string | null, name: string) => {
+      setSelectedFolder({
+        id,
+        name: id === null ? strings.library.allFiles : name,
+      });
+    },
+    [strings.library.allFiles],
+  );
 
-  // Refresh the file/folder panels after a tag is created or permanently
-  // deleted from the Semantic Tags panel. Avoids bumping semanticTagsVersion so
-  // the open manage-tags dialog isn't remounted (and closed) mid-session.
-  const refreshAfterTagChange = useCallback(() => {
-    void loadRecentFiles();
-    explorerRef.current?.reload();
-  }, [loadRecentFiles]);
+  const selectFolderById = useCallback(
+    async (id: string | null) => {
+      if (id === null) {
+        setSelectedFolder({ id: null, name: strings.library.allFiles });
+        return;
+      }
+      const node = await repository.getNode(id);
+      setSelectedFolder({ id, name: node?.name ?? strings.library.allFiles });
+    },
+    [repository, strings.library.allFiles],
+  );
 
   const handleRefreshRepository = useCallback(() => {
     if (!repositoryRefreshAvailable || repositoryStatus.initializing) {
       return;
     }
-
     enqueueManualRepositoryRefresh(async () => {
       try {
         await repository.refresh();
-        triggerRefresh();
+        await handleDataChanged();
       } catch (error) {
         toast.error(strings.library.refreshRepository.failed, {
           description: errorDescription(error),
@@ -204,8 +200,19 @@ export function LibraryPage() {
     repositoryRefreshAvailable,
     repositoryStatus.initializing,
     strings.library.refreshRepository.failed,
-    triggerRefresh,
+    handleDataChanged,
   ]);
+
+  const handleNewFolder = useCallback(() => {
+    setLens('files');
+    setPendingCreate({ kind: 'folder' });
+  }, []);
+
+  const handleNewFile = useCallback((title: string, type: FileType) => {
+    setLens('files');
+    setSearchQuery('');
+    setPendingCreate({ kind: 'file', title, type });
+  }, []);
 
   const handleImportStorageFiles = async (files: File[]) => {
     const supportedFiles = files.filter(
@@ -221,44 +228,42 @@ export function LibraryPage() {
     }
 
     setIsImportingFiles(true);
-
     try {
       for (const file of supportedFiles) {
         if (isMarkdownFile(file)) {
           await importMarkdownFile({
             file,
             repository,
-            parentId: currentFolderId,
+            parentId: selectedFolder.id,
             fallbackTitle: strings.library.createNew.untitledCanvas,
           });
         } else if (isPdfFile(file)) {
           await importPdfFile({
             file,
             repository,
-            parentId: currentFolderId,
+            parentId: selectedFolder.id,
             fallbackTitle: strings.library.createNew.untitledCanvas,
           });
         } else {
           await importStorageFile({
             file,
             repository,
-            parentId: currentFolderId,
+            parentId: selectedFolder.id,
           });
         }
       }
-      triggerRefresh();
+      await handleDataChanged();
       trackEvent('import_completed', {
         import_type: 'storage',
         file_count: supportedFiles.length,
         partial_failure: supportedFiles.length !== files.length,
       });
-
       if (supportedFiles.length !== files.length) {
         toast.error(strings.library.importFiles.someUnsupported);
       }
     } catch (error) {
       toast.error(strings.library.importFiles.failed, {
-        description: error instanceof Error ? error.message : String(error),
+        description: errorDescription(error),
       });
     } finally {
       setIsImportingFiles(false);
@@ -276,16 +281,16 @@ export function LibraryPage() {
     }
 
     setIsImportingFiles(true);
-
     try {
       const result = await importGoodnotesZip({
         file,
         repository,
-        parentId: currentFolderId,
+        parentId: selectedFolder.id,
         fallbackTitle: strings.library.createNew.untitledCanvas,
       });
-      setCurrentFolderId(result.focusFolderId);
-      triggerRefresh();
+      setLens('files');
+      await selectFolderById(result.focusFolderId);
+      await handleDataChanged();
       trackEvent('import_completed', {
         import_type: 'goodnotes_zip',
         file_count: result.pdfsImported,
@@ -298,7 +303,7 @@ export function LibraryPage() {
       }
     } catch (error) {
       toast.error(strings.library.importGoodnotesZip.failed, {
-        description: error instanceof Error ? error.message : String(error),
+        description: errorDescription(error),
       });
     } finally {
       setIsImportingFiles(false);
@@ -329,7 +334,6 @@ export function LibraryPage() {
     if (isImportingFiles || importSource !== null) {
       return;
     }
-
     const selected = await openDialog({
       directory: true,
       multiple: false,
@@ -338,23 +342,21 @@ export function LibraryPage() {
     if (!selected || Array.isArray(selected)) {
       return;
     }
-
     setImportType('obsidian_vault');
     setImportSource(
       createObsidianVaultImportSource({
         vaultPath: selected,
         repository,
-        parentId: currentFolderId,
+        parentId: selectedFolder.id,
         strings,
       }),
     );
-  }, [isImportingFiles, importSource, repository, currentFolderId, strings]);
+  }, [isImportingFiles, importSource, repository, selectedFolder.id, strings]);
 
   const handleImportWorkspaceJson = useCallback(async () => {
     if (isImportingFiles || importSource !== null) {
       return;
     }
-
     const selected = await openDialog({
       directory: true,
       multiple: false,
@@ -363,49 +365,25 @@ export function LibraryPage() {
     if (!selected || Array.isArray(selected)) {
       return;
     }
-
     setImportType('workspace_json');
     setImportSource(
       createWorkspaceJsonImportSource({
         dirPath: selected,
         repository,
-        parentId: currentFolderId,
+        parentId: selectedFolder.id,
         strings,
       }),
     );
-  }, [isImportingFiles, importSource, repository, currentFolderId, strings]);
+  }, [isImportingFiles, importSource, repository, selectedFolder.id, strings]);
 
   const handleImportDialogDone = useCallback(
     (rootFolderId: string) => {
-      setCurrentFolderId(rootFolderId);
-      triggerRefresh();
+      setLens('files');
+      void selectFolderById(rootFolderId);
+      void handleDataChanged();
       trackEvent('import_completed', { import_type: importType });
     },
-    [triggerRefresh, importType],
-  );
-
-  const handleNewFolder = useCallback(() => {
-    void explorerRef.current?.startNewFolder();
-  }, []);
-
-  const handleNewFile = useCallback(
-    (title: string, type: FileType) => {
-      void explorerRef.current
-        ?.startNewFile(title, type)
-        .then(() => {
-          trackEvent('note_created', { file_type: type });
-        })
-        .catch((error) => {
-          logger.error('Failed to create explorer file', error, {
-            currentFolderId,
-            fileType: type,
-          });
-          toast.error(strings.commandPalette.errors.createNote, {
-            description: errorDescription(error),
-          });
-        });
-    },
-    [currentFolderId, strings.commandPalette.errors.createNote],
+    [selectFolderById, handleDataChanged, importType],
   );
 
   const handleImportFiles = useCallback(() => {
@@ -416,412 +394,93 @@ export function LibraryPage() {
     goodnotesZipInputRef.current?.click();
   }, []);
 
-  useEffect(() => {
-    void loadRecentFiles();
-  }, [loadRecentFiles]);
-
-  useEffect(() => {
-    if (repositoryStatus.lastRemoteSyncAt !== null) {
-      refreshLibraryData();
-    }
-  }, [refreshLibraryData, repositoryStatus.lastRemoteSyncAt]);
-
-  // Update breadcrumbs when folder changes
-  useEffect(() => {
-    if (currentFolderId === null) {
-      setBreadcrumbs([]);
-      return;
-    }
-    let cancelled = false;
-    repository
-      .getFolderChain(currentFolderId)
-      .then((nextBreadcrumbs) => {
-        if (!cancelled) {
-          setBreadcrumbs(nextBreadcrumbs);
-        }
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-
-        logger.error('Failed to load breadcrumbs', error, { currentFolderId });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentFolderId, repository]);
-
-  const clearDragTimer = () => {
-    if (dragTimerRef.current) {
-      window.clearTimeout(dragTimerRef.current);
-      dragTimerRef.current = null;
-    }
-  };
-
-  const handleBreadcrumbDrop = async (
-    e: React.DragEvent,
-    targetFolderId: string | null,
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    clearDragTimer();
-    setBreadcrumbDragIdx(null);
-
-    const raw = e.dataTransfer.getData('application/myelin-item');
-    if (!raw) {
-      return;
-    }
-
-    const { nodeId } = JSON.parse(raw) as { nodeId: string };
-
-    try {
-      await repository.moveNode(nodeId, targetFolderId);
-      setCurrentFolderId(targetFolderId);
-      triggerRefresh();
-    } catch (err) {
-      logger.error('Failed to move item from breadcrumb', err, {
-        nodeId,
-        targetFolderId,
-      });
-    }
-  };
-
-  const makeBreadcrumbDragHandlers = (
-    targetFolderId: string | null,
-    idx: number,
-  ) => ({
-    onDragOver: (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes('application/myelin-item')) {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
-    },
-    onDragEnter: (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes('application/myelin-item')) {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      setBreadcrumbDragIdx(idx);
-      clearDragTimer();
-      dragTimerRef.current = window.setTimeout(() => {
-        setCurrentFolderId(targetFolderId);
-        setBreadcrumbDragIdx(null);
-      }, 800);
-    },
-    onDragLeave: (e: React.DragEvent) => {
-      e.stopPropagation();
-      setBreadcrumbDragIdx((prev) => (prev === idx ? null : prev));
-      clearDragTimer();
-    },
-    onDrop: (e: React.DragEvent) => handleBreadcrumbDrop(e, targetFolderId),
-  });
+  const activityLabel = isImportingFiles
+    ? strings.library.importFiles.loading
+    : isRefreshingRepository
+      ? strings.library.refreshRepository.loading
+      : repositoryStatus.initializing &&
+          repositoryStatus.config.kind !== 'local'
+        ? strings.library.repositoryLoading
+        : null;
 
   return (
     <div className="relative flex h-full w-full bg-page">
-      <a href="#library-main" data-skip-link className="skip-link">
-        {strings.library.title}
-      </a>
+      <LibraryRail lens={lens} onLensChange={setLens} />
 
-      <main
-        ref={scrollRef}
-        id="library-main"
-        className="flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <h1
-            className="font-extralight font-heading text-text-primary leading-[1.05]"
-            style={{ fontSize: 'var(--fluid-display)' }}
-          >
-            {strings.library.title}
-          </h1>
+      <aside className="flex w-64 shrink-0 flex-col border-border-subtle/60 border-r bg-surface/20">
+        <div className="flex items-center justify-end border-border-subtle/60 border-b px-3 py-2">
+          <CreateNewDropdown
+            onNewFolder={handleNewFolder}
+            onNewFile={handleNewFile}
+            onImportFiles={handleImportFiles}
+            onImportGoodnotesZip={handleImportGoodnotesZip}
+            onImportObsidianVault={handleImportObsidianVault}
+            onImportWorkspaceJson={handleImportWorkspaceJson}
+            importDisabled={isImportingFiles || importSource !== null}
+          />
+          <input
+            ref={importInputRef}
+            type="file"
+            multiple
+            accept={LIBRARY_IMPORT_ACCEPT}
+            className="hidden"
+            onChange={handleStorageInputChange}
+          />
+          <input
+            ref={goodnotesZipInputRef}
+            type="file"
+            accept={GOODNOTES_ZIP_FILE_ACCEPT}
+            className="hidden"
+            onChange={handleGoodnotesZipInputChange}
+          />
+        </div>
 
-          {recentFiles.length === 0 && (
-            <p className="mt-3 max-w-lg font-normal text-sm text-text-muted leading-relaxed">
-              {strings.library.emptyState}
-            </p>
-          )}
+        {lens === 'files' && (
+          <FolderTree
+            ref={folderTreeRef}
+            selectedFolderId={selectedFolder.id}
+            onSelect={handleSelectFolder}
+            onChanged={() => void handleDataChanged()}
+            setupState={setupState}
+            refreshKey={middleRefresh}
+          />
+        )}
+        {lens === 'recent' && (
+          <RecentList
+            selectedBucket={recentBucket}
+            onSelect={setRecentBucket}
+            setupState={setupState}
+            version={middleRefresh}
+          />
+        )}
+        {lens === 'tags' && (
+          <TagListPanel
+            activeTags={activeTags}
+            onActiveTagsChanged={setActiveTags}
+            onTagsChanged={() => void handleDataChanged()}
+            setupState={setupState}
+            refreshKey={middleRefresh}
+          />
+        )}
+      </aside>
 
-          {/* Recently Opened */}
-          {recentFiles.length > 0 && (
-            <section className="mt-6">
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="font-heading font-normal text-2xl text-text-primary leading-8">
-                  {strings.library.recentlyOpened}
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {recentFiles.map((file, i) => (
-                  <motion.div
-                    key={file.id}
-                    className="min-w-0"
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.4,
-                      delay: i * 0.08,
-                      ease: [0.25, 0.1, 0.25, 1],
-                    }}
-                  >
-                    <RecentCard
-                      nodeId={file.id}
-                      category={
-                        strings.library.fileTypes[
-                          file.fileType as keyof typeof strings.library.fileTypes
-                        ] ?? file.fileType
-                      }
-                      time={formatRelativeTime(file.modifiedAt, locale, {
-                        style: 'short',
-                      })}
-                      title={file.name}
-                      tags={file.tags}
-                      featured={i === 0}
-                      onClick={() =>
-                        openNote(tabController, file, file.name, 'recent_files')
-                      }
-                    />
-                  </motion.div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Explorer + Tags */}
-          <section className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-12">
-            <div className="flex flex-col gap-8 lg:col-span-8">
-              <div className="group flex items-center gap-1 rounded-2xl bg-card/75 px-3 py-2 ring-1 ring-border-subtle/70 transition-all duration-200 focus-within:bg-card focus-within:shadow-ambient focus-within:ring-accent-dark/15 hover:bg-card">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-xl text-text-muted transition-colors duration-200 group-focus-within:text-accent-dark">
-                  <Search className="size-3.5" />
-                </span>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={strings.library.searchPlaceholder}
-                  aria-label={strings.library.searchPlaceholder}
-                  className="w-full min-w-0 bg-transparent py-2 font-normal text-[15px] text-text-primary outline-none placeholder:text-text-muted"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    aria-label={strings.common.clear}
-                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text-primary"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <button
-                          type="button"
-                          onClick={toggleSearchMode}
-                          aria-label={strings.library.semanticSearchLabel}
-                          aria-pressed={searchMode === 'semantic'}
-                          className={cn(
-                            'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150',
-                            searchMode === 'semantic'
-                              ? 'bg-tag-active text-text-on-dark'
-                              : 'text-text-muted hover:bg-surface hover:text-text-primary',
-                          )}
-                        >
-                          <BrainCircuit className="size-3.5" />
-                        </button>
-                      }
-                    />
-                    <TooltipContent side="top">
-                      {strings.library.semanticSearchLabel}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-heading font-normal text-2xl leading-8">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentFolderId(null)}
-                      className={cn(
-                        '-mx-2 cursor-pointer rounded-lg px-2 py-0.5 transition-colors',
-                        breadcrumbDragIdx === -1
-                          ? 'bg-accent/15 text-accent-foreground'
-                          : 'text-text-primary hover:bg-hover-tint hover:text-text-secondary',
-                      )}
-                      {...makeBreadcrumbDragHandlers(null, -1)}
-                    >
-                      {strings.library.explorer}
-                    </button>
-                  </h3>
-                  {breadcrumbs.length > 0 && (
-                    <div className="flex items-center gap-1 text-sm text-text-muted">
-                      <ChevronRight className="size-3.5 shrink-0" />
-                      {breadcrumbs.map((crumb, i) => {
-                        const isLast = i === breadcrumbs.length - 1;
-                        const isDragTarget = breadcrumbDragIdx === i;
-                        return (
-                          <span
-                            key={crumb.id}
-                            className="flex items-center gap-1"
-                          >
-                            {i > 0 && (
-                              <ChevronRight className="size-3 shrink-0 text-text-muted" />
-                            )}
-                            <button
-                              onClick={() => setCurrentFolderId(crumb.id)}
-                              className={`rounded px-1 transition-colors ${
-                                isDragTarget
-                                  ? 'bg-accent/15 text-accent-foreground ring-1 ring-accent/40'
-                                  : isLast
-                                    ? 'font-medium text-text-secondary'
-                                    : 'cursor-pointer text-text-muted hover:text-text-secondary'
-                              }`}
-                              {...makeBreadcrumbDragHandlers(crumb.id, i)}
-                            >
-                              {crumb.name}
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                <div className="flex min-w-0 items-center gap-1.5">
-                  {activityLabel && (
-                    <div
-                      role="status"
-                      className="mr-1 flex min-w-0 items-center gap-2 rounded-lg bg-surface px-2.5 py-1 text-text-muted text-xs"
-                    >
-                      <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
-                      <span className="truncate">{activityLabel}</span>
-                    </div>
-                  )}
-                  {repositoryRefreshAvailable && (
-                    <button
-                      type="button"
-                      onClick={handleRefreshRepository}
-                      disabled={
-                        repositoryStatus.initializing || isRefreshingRepository
-                      }
-                      aria-label={strings.library.refreshRepository.label}
-                      title={strings.library.refreshRepository.label}
-                      className={cn(
-                        'flex size-8 items-center justify-center rounded-lg text-text-secondary transition-colors duration-150',
-                        repositoryStatus.initializing || isRefreshingRepository
-                          ? 'cursor-default opacity-60'
-                          : 'cursor-pointer hover:bg-hover-tint hover:text-text-primary',
-                      )}
-                    >
-                      <RefreshCw
-                        className={cn(
-                          'size-4',
-                          isRefreshingRepository && 'animate-spin',
-                        )}
-                      />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={cycleSortMode}
-                    aria-label={strings.library.sortLabel(
-                      strings.library.sortModes[sortMode],
-                    )}
-                    title={strings.library.sortLabel(
-                      strings.library.sortModes[sortMode],
-                    )}
-                    className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-                  >
-                    {sortMode === 'name-asc' && (
-                      <ArrowDownAZ className="size-4" />
-                    )}
-                    {sortMode === 'name-desc' && (
-                      <ArrowDownZA className="size-4" />
-                    )}
-                    {sortMode === 'modified' && <Clock className="size-4" />}
-                    {sortMode === 'created' && (
-                      <CalendarPlus className="size-4" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleViewMode}
-                    aria-label={strings.library.viewModeLabel(
-                      strings.library.viewModes[viewMode],
-                    )}
-                    title={strings.library.viewModeLabel(
-                      strings.library.viewModes[viewMode],
-                    )}
-                    className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-                  >
-                    {viewMode === 'tree' ? (
-                      <List className="size-4" />
-                    ) : (
-                      <LayoutGrid className="size-4" />
-                    )}
-                  </button>
-                  <CreateNewDropdown
-                    onNewFolder={handleNewFolder}
-                    onNewFile={handleNewFile}
-                    onImportFiles={handleImportFiles}
-                    onImportGoodnotesZip={handleImportGoodnotesZip}
-                    onImportObsidianVault={handleImportObsidianVault}
-                    onImportWorkspaceJson={handleImportWorkspaceJson}
-                    importDisabled={isImportingFiles || importSource !== null}
-                  />
-                  <input
-                    ref={importInputRef}
-                    type="file"
-                    multiple
-                    accept={LIBRARY_IMPORT_ACCEPT}
-                    className="hidden"
-                    onChange={handleStorageInputChange}
-                  />
-                  <input
-                    ref={goodnotesZipInputRef}
-                    type="file"
-                    accept={GOODNOTES_ZIP_FILE_ACCEPT}
-                    className="hidden"
-                    onChange={handleGoodnotesZipInputChange}
-                  />
-                </div>
-              </div>
-
-              <ExplorerTree
-                ref={explorerRef}
-                scrollRef={scrollRef}
-                currentFolderId={currentFolderId}
-                onNavigate={setCurrentFolderId}
-                onChanged={refreshLibraryData}
-                sortMode={sortMode}
-                viewMode={viewMode}
-                searchQuery={searchQuery}
-                searchMode={searchMode}
-                filterTags={filterTagsArr}
-              />
-            </div>
-
-            <div className="lg:col-span-4">
-              <SemanticTags
-                key={semanticTagsVersion}
-                activeTags={activeTags}
-                onActiveTagsChanged={setActiveTags}
-                onTagsChanged={refreshAfterTagChange}
-              />
-            </div>
-          </section>
-        </motion.div>
-      </main>
+      <GraphPane
+        fileIds={fileIds}
+        filesLoading={filePane.loading}
+        setupState={setupState}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        searchMode={searchMode}
+        onSearchModeChange={setSearchMode}
+        refreshKey={middleRefresh}
+        activityLabel={activityLabel}
+        refreshAvailable={repositoryRefreshAvailable}
+        refreshing={isRefreshingRepository}
+        refreshDisabled={
+          repositoryStatus.initializing || isRefreshingRepository
+        }
+        onRefresh={handleRefreshRepository}
+      />
 
       {importSource !== null && (
         <ImportDialog
