@@ -1,5 +1,5 @@
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
-import { getCanvasPalette } from '../../canvas-theme';
+import type { CanvasPalette } from '../../canvas-theme';
 
 /**
  * Approximate visual metrics for the thumbnail. These don't need to match the
@@ -47,19 +47,20 @@ interface Cursor {
 /**
  * Render an approximate visual of a ProseMirror document into a 2D context.
  *
- * Pure: reads the doc model and emits draw calls into `ctx`. No DOM access.
- * The caller is responsible for translating `ctx` so (0, 0) is the top-left of
- * the content area and for drawing any page background first.
+ * Pure: reads the doc model and emits draw calls into `ctx`. No DOM access —
+ * theme colors come from the `palette` the caller passes in. The caller is also
+ * responsible for translating `ctx` so (0, 0) is the top-left of the content
+ * area and for drawing any page background first.
  */
 export function renderPageFrameThumbnail(
   doc: ProseMirrorNode,
   ctx: CanvasRenderingContext2D,
   opts: RenderPageFrameThumbnailOptions,
+  palette: CanvasPalette,
 ): void {
   const { width, maxHeight } = opts;
   const cursor: Cursor = { y: 0 };
 
-  const palette = getCanvasPalette();
   TEXT_COLOR = palette.textPrimary;
   MUTED_COLOR = palette.textMuted;
   SHADE_COLOR = palette.muted;

@@ -646,7 +646,8 @@ export class PageFrameElement extends DrawableElement {
     ctx: CanvasRenderingContext2D,
     _deltaTime: number,
   ): void {
-    ctx.fillStyle = getCanvasPalette().surface;
+    const palette = getCanvasPalette();
+    ctx.fillStyle = palette.surface;
     ctx.beginPath();
     ctx.roundRect(0, 0, this._pageWidth, this._pageHeight, PAGE_CORNER_RADIUS);
     ctx.fill();
@@ -661,10 +662,15 @@ export class PageFrameElement extends DrawableElement {
     ctx.rect(0, 0, this._pageWidth, this._pageHeight);
     ctx.clip();
     ctx.translate(PAGE_PADDING, PAGE_PADDING);
-    renderPageFrameThumbnail(doc, ctx, {
-      width: this._pageWidth - PAGE_PADDING * 2,
-      maxHeight: this._pageHeight - PAGE_PADDING * 2,
-    });
+    renderPageFrameThumbnail(
+      doc,
+      ctx,
+      {
+        width: this._pageWidth - PAGE_PADDING * 2,
+        maxHeight: this._pageHeight - PAGE_PADDING * 2,
+      },
+      palette,
+    );
     ctx.restore();
   }
 }

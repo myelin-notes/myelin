@@ -1,7 +1,22 @@
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { describe, expect, it } from 'vitest';
+import type { CanvasPalette } from '../../canvas-theme';
 import { schema } from '../pm/schema';
 import { renderPageFrameThumbnail } from './render';
+
+const PALETTE: CanvasPalette = {
+  grid: '#000',
+  selectionStroke: '#000',
+  selectionFill: '#000',
+  surface: '#fff',
+  border: '#cbd2d9',
+  accentDark: '#1c2738',
+  waveformTrack: '#d0d5db',
+  recording: '#e03e3e',
+  textPrimary: '#1f2933',
+  textMuted: '#7b8794',
+  muted: '#f0f2f5',
+};
 
 interface FillTextCall {
   text: string;
@@ -76,7 +91,7 @@ describe('renderPageFrameThumbnail', () => {
     ]);
     const { ctx, fillTexts } = createStubContext();
 
-    renderPageFrameThumbnail(doc, ctx, OPTS);
+    renderPageFrameThumbnail(doc, ctx, OPTS, PALETTE);
 
     const texts = fillTexts.map((c) => c.text);
     expect(texts).toContain('Title');
@@ -99,7 +114,7 @@ describe('renderPageFrameThumbnail', () => {
     const doc = makeDoc([paragraph(words)]);
     const { ctx, fillTexts } = createStubContext();
 
-    renderPageFrameThumbnail(doc, ctx, OPTS);
+    renderPageFrameThumbnail(doc, ctx, OPTS, PALETTE);
 
     expect(fillTexts.length).toBeGreaterThan(1);
     const ys = fillTexts.map((c) => c.y);
@@ -112,7 +127,7 @@ describe('renderPageFrameThumbnail', () => {
     const doc = makeDoc([paragraph('')]);
     const { ctx, fillTexts } = createStubContext();
 
-    expect(() => renderPageFrameThumbnail(doc, ctx, OPTS)).not.toThrow();
+    expect(() => renderPageFrameThumbnail(doc, ctx, OPTS, PALETTE)).not.toThrow();
     expect(fillTexts).toHaveLength(0);
   });
 
@@ -123,7 +138,7 @@ describe('renderPageFrameThumbnail', () => {
     const doc = makeDoc(blocks);
     const { ctx, fillTexts } = createStubContext();
 
-    renderPageFrameThumbnail(doc, ctx, { width: 500, maxHeight: 400 });
+    renderPageFrameThumbnail(doc, ctx, { width: 500, maxHeight: 400 }, PALETTE);
 
     // Bounded: far fewer paragraphs drawn than the 2000 in the doc, and the
     // last drawn line sits near (not far past) maxHeight.
