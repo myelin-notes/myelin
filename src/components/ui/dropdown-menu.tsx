@@ -215,7 +215,7 @@ function DropdownMenuRadioItem({
         data-slot="dropdown-menu-radio-item-indicator"
       >
         <MenuPrimitive.RadioItemIndicator>
-          <CheckIcon className="size-3.5 text-accent-navy" />
+          <CheckIcon className="size-3.5 text-text-brand" />
         </MenuPrimitive.RadioItemIndicator>
       </span>
       {children}

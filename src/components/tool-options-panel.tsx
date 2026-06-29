@@ -71,7 +71,7 @@ function FontPicker({
             preloadAllFonts(fonts);
           }
         }}
-        className="flex min-w-[120px] cursor-pointer items-center gap-2 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-primary text-xs transition-colors hover:bg-hover-tint"
+        className="flex min-w-[120px] cursor-pointer items-center gap-2 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-primary text-xs transition-colors hover:bg-card-active"
         style={{ fontFamily: `"${value}", sans-serif` }}
       >
         <span className="flex-1 truncate text-left">{value}</span>

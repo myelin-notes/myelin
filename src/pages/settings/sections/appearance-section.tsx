@@ -78,7 +78,7 @@ function CanvasPreview({
         className={cn(
           'mt-3 block text-center text-[10px] uppercase tracking-widest transition-colors',
           selected
-            ? 'font-semibold text-accent-navy'
+            ? 'font-semibold text-text-brand'
             : 'text-text-muted group-hover:text-text-primary',
         )}
       >
@@ -121,20 +121,20 @@ export function AppearanceSection() {
                   'inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all duration-200',
                   selected
                     ? 'bg-card shadow-ambient ring-2 ring-accent-navy/20'
-                    : 'bg-input ring-1 ring-border-subtle/70 hover:bg-card hover:shadow-ambient',
+                    : 'bg-input ring-1 ring-border-subtle/70 hover:bg-card-active hover:shadow-ambient',
                 )}
               >
                 <Icon
                   className={cn(
                     'size-4 transition-colors',
-                    selected ? 'text-accent-navy' : 'text-text-muted',
+                    selected ? 'text-text-brand' : 'text-text-muted',
                   )}
                 />
                 <span
                   className={cn(
                     'text-xs transition-colors',
                     selected
-                      ? 'font-semibold text-accent-navy'
+                      ? 'font-semibold text-text-brand'
                       : 'text-text-muted',
                   )}
                 >

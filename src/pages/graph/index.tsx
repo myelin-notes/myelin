@@ -432,7 +432,7 @@ function GraphInspector({
           <button
             type="button"
             onClick={onOpen}
-            className="flex h-9 items-center justify-center gap-2 rounded-xl bg-accent-dark px-3 text-sm text-text-on-dark transition-colors hover:bg-accent-dark/90"
+            className="flex h-9 items-center justify-center gap-2 rounded-xl bg-accent-dark px-3 text-sm text-text-on-dark transition-colors hover:bg-accent-dark-hover"
           >
             <ExternalLink className="size-3.5" />
             {strings.graph.openNote}
@@ -494,7 +494,7 @@ function GraphEdgeList({
                 key={edge.id}
                 type="button"
                 onClick={() => onSelect(nodeId)}
-                className="rounded-lg bg-card px-3 py-2 text-left text-sm text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary"
+                className="rounded-lg bg-card px-3 py-2 text-left text-sm text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary"
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="min-w-0 truncate">{label}</span>

@@ -44,7 +44,7 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-md bg-accent-dark px-2.5 py-1 text-text-on-dark outline-none transition-colors hover:bg-accent-dark/90">
+      <DropdownMenuTrigger className="flex cursor-pointer items-center gap-1.5 rounded-md bg-accent-dark px-2.5 py-1 text-text-on-dark outline-none transition-colors hover:bg-accent-dark-hover">
         <Plus className="size-3" />
         <span className="font-medium text-xs">
           {strings.library.createNew.button}
