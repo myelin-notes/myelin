@@ -88,7 +88,6 @@ export function usePageFrameAutocomplete({
           if (activeSourceRef.current === 'slash') {
             return searchSlashInsertAutocompleteItems(
               query,
-              limit,
               slashLabelsRef.current,
             );
           }

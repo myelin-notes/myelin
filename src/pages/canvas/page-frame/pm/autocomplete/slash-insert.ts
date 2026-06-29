@@ -312,15 +312,12 @@ function buildSlashInsertItem(
 
 export function searchSlashInsertAutocompleteItems(
   query: string,
-  limit: number,
   labels: SlashInsertLabels,
 ): readonly SlashInsertAutocompleteItem[] {
   const normalizedQuery = query.trim().toLowerCase();
   return SLASH_INSERT_DEFINITIONS.map((definition) =>
     buildSlashInsertItem(definition, labels),
-  )
-    .filter((item) => matchesSlashQuery(item, normalizedQuery))
-    .slice(0, limit);
+  ).filter((item) => matchesSlashQuery(item, normalizedQuery));
 }
 
 export function findActiveSlashInsertAutocomplete(

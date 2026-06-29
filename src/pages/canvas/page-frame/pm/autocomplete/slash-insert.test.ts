@@ -24,7 +24,7 @@ function createState(markdown: string, head: number) {
 }
 
 function findItem(id: string): PageFrameAutocompleteItem {
-  const item = searchSlashInsertAutocompleteItems('', 20, labels).find(
+  const item = searchSlashInsertAutocompleteItems('', labels).find(
     (entry) => entry.id === id,
   );
   if (!item) {
@@ -64,18 +64,25 @@ describe('findActiveSlashInsertAutocomplete', () => {
 
 describe('searchSlashInsertAutocompleteItems', () => {
   it('matches aliases like h2, links, and inline code', () => {
-    expect(searchSlashInsertAutocompleteItems('h2', 5, labels)[0]?.id).toBe(
+    expect(searchSlashInsertAutocompleteItems('h2', labels)[0]?.id).toBe(
       'slash-heading-2',
     );
-    expect(
-      searchSlashInsertAutocompleteItems('hyperlink', 5, labels)[0]?.id,
-    ).toBe('slash-link');
-    expect(searchSlashInsertAutocompleteItems('table', 5, labels)[0]?.id).toBe(
+    expect(searchSlashInsertAutocompleteItems('hyperlink', labels)[0]?.id).toBe(
+      'slash-link',
+    );
+    expect(searchSlashInsertAutocompleteItems('table', labels)[0]?.id).toBe(
       'slash-table',
     );
-    expect(searchSlashInsertAutocompleteItems('code', 5, labels)[0]?.id).toBe(
+    expect(searchSlashInsertAutocompleteItems('code', labels)[0]?.id).toBe(
       'slash-inline-code',
     );
+  });
+
+  it('returns every item for an empty query without truncating', () => {
+    const ids = searchSlashInsertAutocompleteItems('', labels).map(
+      (item) => item.id,
+    );
+    expect(ids).toContain('slash-note-link');
   });
 });
 
