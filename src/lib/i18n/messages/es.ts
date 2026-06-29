@@ -214,7 +214,6 @@ const es: typeof en = {
     title: 'Grafo',
     explicitLinks: 'Enlaces explícitos',
     searchPlaceholder: 'Buscar en el grafo...',
-    fit: 'Ajustar',
     recenter: 'Recentrar',
     zoomIn: 'Acercar',
     zoomOut: 'Alejar',

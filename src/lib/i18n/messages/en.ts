@@ -211,7 +211,6 @@ const en = {
     title: 'Graph',
     explicitLinks: 'Explicit links',
     searchPlaceholder: 'Search graph...',
-    fit: 'Fit',
     recenter: 'Recenter',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',

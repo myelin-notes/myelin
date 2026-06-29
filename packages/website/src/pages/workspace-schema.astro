@@ -197,7 +197,15 @@ const exampleTree = `My Workspace/
           <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">size</code>
           and a flat
           <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">points</code>
-          array, while an image carries its natural dimensions and pixel data.
+          array of
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">[x, y, pressure]</code>
+          triplets — read three numbers at a time, so
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">[0, 0, 0.5, 10, 12, 0.7]</code>
+          is two points. The
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">hasPressure</code>
+          flag says whether those pressure values came from a real stylus or were
+          synthesized; the triplet stride is the same either way. An image carries
+          its natural dimensions and pixel data.
           Most drawable elements also carry position
           (<code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">offsetX</code>,
           <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">offsetY</code>)

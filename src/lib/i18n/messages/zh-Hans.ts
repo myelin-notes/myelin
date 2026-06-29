@@ -206,7 +206,6 @@ const zhHans: typeof en = {
     title: '图谱',
     explicitLinks: '显式链接',
     searchPlaceholder: '搜索图谱...',
-    fit: '适应',
     recenter: '重新居中',
     zoomIn: '放大',
     zoomOut: '缩小',

@@ -42,8 +42,11 @@ impl FontRegistry {
         let k = key as u8;
         // Mono has no italic face; fall back to upright.
         let italic = italic && !matches!(key, FontKey::Mono);
-        // Nyght Serif ships static weights only — switch to the bold face past 600.
-        let bold = matches!(key, FontKey::Nyght) && weight >= 600.0;
+        // Nyght Serif ships static weights only (Regular/Bold here). The webview
+        // snaps any weight above 500 up to its 700 face, so match that cutoff —
+        // otherwise headings (weight 560) would render Bold on screen but Regular
+        // in the PDF.
+        let bold = matches!(key, FontKey::Nyght) && weight > 500.0;
         let ik: InstanceKey = (k, italic, bold, weight.round() as i32, opsz.round() as i32);
         if let Some(font) = self.cache.get(&ik) {
             return Some(font.clone());
