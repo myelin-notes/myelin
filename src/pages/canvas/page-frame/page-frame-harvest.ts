@@ -127,6 +127,9 @@ function buildOffscreenClone(source: PageFramePdfSource): {
     : source.pageWidth;
 
   const container = document.createElement('div');
+  // Force the light palette so the clone harvests light-mode colors regardless of
+  // the live theme — PDFs always render on a white page (see foundations.css).
+  container.className = 'pdf-export-light';
   Object.assign(container.style, {
     position: 'fixed',
     left: '-100000px',

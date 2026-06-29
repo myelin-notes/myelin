@@ -261,7 +261,11 @@
   --color-recording-hover: var(--bg-recording-hover);
 }
 
-:root {
+/* `.pdf-export-light` mirrors the light palette so the offscreen PDF export
+   clone resolves light-mode colors even while the app runs in dark mode
+   (see page-frame-harvest.ts). */
+:root,
+.pdf-export-light {
   --background: #f7f9fb;
   --foreground: #191c1e;
   --card: #ffffff;
