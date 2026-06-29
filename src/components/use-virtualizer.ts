@@ -1,6 +1,7 @@
 import {
   type RefObject,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -24,6 +25,13 @@ interface UseVirtualizerOptions {
   rowHeight: (index: number) => number;
   /** Bumped whenever a `rowHeight` result changes; retriggers layout. */
   heightsVersion: number;
+  /** Returns the lowest row index whose height changed since the last call (or
+   *  Infinity). Lets offsets rebuild from that index instead of from scratch. */
+  consumeDirtyFrom: () => number;
+  /** Optional token identifying how `rowHeight` maps indices to heights. When it
+   *  changes, every row may have re-interpreted (e.g. a grid's column count
+   *  changing which items share a row), forcing a full offsets rebuild. */
+  layoutKey?: unknown;
   /** Vertical gap between rows, in pixels. */
   gap: number;
   /** Rows to render beyond the viewport on each side. */
@@ -72,6 +80,8 @@ export function useVirtualizer({
   count,
   rowHeight,
   heightsVersion,
+  consumeDirtyFrom,
+  layoutKey,
   gap,
   overscan = 4,
   pinnedIndex = null,
@@ -79,21 +89,48 @@ export function useVirtualizer({
   const rowHeightRef = useRef(rowHeight);
   rowHeightRef.current = rowHeight;
   const offsetsRef = useRef<number[]>([]);
+  const builtCountRef = useRef(0);
+  const builtGapRef = useRef(gap);
+  const builtLayoutKeyRef = useRef(layoutKey);
   const [range, setRange] = useState({ start: 0, end: 0 });
 
-  // Recompute offsets whenever the row count or a measurement changes.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: heightsVersion intentionally retriggers this after heights change
+  // Offsets are a prefix sum of row heights. Rebuilding the whole array on every
+  // append or measurement is O(count) per frame, which tanks streaming/scroll
+  // for long lists, so we rebuild only from the lowest index that changed:
+  // appended rows (>= the previously built count) and any row the measurement
+  // cache reports dirty. The array is mutated in place — `heightsVersion` is the
+  // signal that its values changed (see the range/virtualRows deps below).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: heightsVersion retriggers this after heights change; consumeDirtyFrom is read, not depended on
   const { offsets, totalHeight } = useMemo(() => {
-    const next: number[] = new Array(count);
-    let y = 0;
-    for (let i = 0; i < count; i++) {
-      next[i] = y;
+    const arr = offsetsRef.current;
+    let dirtyFrom = Math.min(consumeDirtyFrom(), builtCountRef.current);
+    if (
+      gap !== builtGapRef.current ||
+      layoutKey !== builtLayoutKeyRef.current
+    ) {
+      dirtyFrom = 0;
+    }
+    dirtyFrom = Math.max(0, Math.min(dirtyFrom, count));
+
+    arr.length = count;
+    let y =
+      dirtyFrom > 0
+        ? arr[dirtyFrom - 1] + rowHeightRef.current(dirtyFrom - 1) + gap
+        : 0;
+    for (let i = dirtyFrom; i < count; i++) {
+      arr[i] = y;
       y += rowHeightRef.current(i) + gap;
     }
-    offsetsRef.current = next;
-    return { offsets: next, totalHeight: count > 0 ? y - gap : 0 };
-  }, [count, gap, heightsVersion]);
 
+    builtCountRef.current = count;
+    builtGapRef.current = gap;
+    builtLayoutKeyRef.current = layoutKey;
+    return { offsets: arr, totalHeight: count > 0 ? y - gap : 0 };
+  }, [count, gap, layoutKey, heightsVersion]);
+
+  // `offsets` is mutated in place, so its identity is stable; `heightsVersion`
+  // signals its values moved and the range may need recomputing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: heightsVersion stands in for offsets' mutated contents
   const recomputeRange = useCallback(() => {
     const frame = scrollRef.current;
     const container = containerRef.current;
@@ -119,18 +156,36 @@ export function useVirtualizer({
     setRange((prev) =>
       prev.start === start && prev.end === end ? prev : { start, end },
     );
-  }, [scrollRef, containerRef, count, offsets, overscan, pinnedIndex]);
+  }, [
+    scrollRef,
+    containerRef,
+    count,
+    offsets,
+    heightsVersion,
+    overscan,
+    pinnedIndex,
+  ]);
 
   // Subscribe once to scroll and viewport resize. The frame is a stable
   // ancestor, so we read the latest recompute via a ref instead of
   // re-subscribing whenever the layout changes.
+  //
+  // This must be a passive effect, not a layout effect: when the scroll frame
+  // is an ancestor that mounts in the same commit as this list (e.g. the list's
+  // own parent), React attaches refs child-first, so `scrollRef.current` is
+  // still null during layout effects and the subscription would silently never
+  // attach. Passive effects run after the whole commit, by which point every
+  // ref is set.
   const recomputeRef = useRef(recomputeRange);
   recomputeRef.current = recomputeRange;
-  useLayoutEffect(() => {
+  useEffect(() => {
     const frame = scrollRef.current;
     if (!frame) {
       return;
     }
+    // Sync now in case the frame only became available after the pre-paint
+    // recompute below ran with a null ref.
+    recomputeRef.current();
     let raf = 0;
     const onScroll = () => {
       if (raf) {
@@ -179,13 +234,21 @@ export function useVirtualizer({
     [scrollRef, containerRef],
   );
 
+  // `offsets` is mutated in place, so its identity is stable; `heightsVersion`
+  // stands in for its mutated contents (so does `count`-driven rebuilds).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: heightsVersion signals offsets' values changed
   const virtualRows = useMemo(() => {
+    // `range` is updated in an effect after render, so it can briefly lag a
+    // shrunk `count` (e.g. a re-run that clears the list). Clamp to `count` so
+    // we never emit an index past the current rows.
     const rows: VirtualRow[] = [];
-    for (let i = range.start; i < range.end; i++) {
+    const start = Math.min(range.start, count);
+    const end = Math.min(range.end, count);
+    for (let i = start; i < end; i++) {
       rows.push({ index: i, start: offsets[i] ?? 0 });
     }
     return rows;
-  }, [range, offsets]);
+  }, [range, offsets, count, heightsVersion]);
 
   return { totalHeight, virtualRows, scrollToIndex };
 }

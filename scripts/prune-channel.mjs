@@ -1,15 +1,16 @@
 #!/usr/bin/env node
-// Run BEFORE uploading a new prerelease to make room under R2's 10GB cap: prune
-// the channel to the newest KEEP-1 existing versions so the incoming upload
-// brings the total to KEEP. Pruning first keeps the on-disk peak at KEEP sets
-// instead of momentarily holding KEEP+1. Mirrors the stable-channel pruning in
-// promote-release.mjs.
+// Prune an updater channel (prerelease|stable) to the newest KEEP versions.
+// Run BEFORE uploading a new version to make room under R2's 10GB cap: pruning
+// first keeps the on-disk peak at KEEP sets instead of momentarily holding
+// KEEP+1.
 //
-// Maintains prerelease/versions.json as the ordered index (oldest -> newest);
+// Maintains <channel>/versions.json as the ordered index (oldest -> newest);
 // VERSION is appended here so the upload that follows fills it in. For each
-// pruned version it deletes the bundles, their .sig sidecars, and the versioned
-// latest.json.
+// pruned version it deletes the bundles, their .sig sidecars (best-effort -
+// prerelease ships them, stable embeds the signature in latest.json), and the
+// versioned latest.json.
 //
+// Usage: node scripts/prune-channel.mjs <prerelease|stable>
 // Env: R2_BUCKET, VERSION, plus CLOUDFLARE_* for wrangler auth.
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -17,10 +18,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const { R2_BUCKET: BUCKET, VERSION } = process.env;
+const CHANNEL = process.argv[2];
 const KEEP = 2;
 
 if (!BUCKET || !VERSION) {
   console.error('R2_BUCKET and VERSION are required');
+  process.exit(1);
+}
+if (CHANNEL !== 'prerelease' && CHANNEL !== 'stable') {
+  console.error('Usage: prune-channel.mjs <prerelease|stable>');
   process.exit(1);
 }
 
@@ -49,31 +55,30 @@ function tryGetJson(key) {
 
 const fileOf = (url) => url.split('/').pop();
 
-let versions = tryGetJson('prerelease/versions.json') ?? [];
+let versions = tryGetJson(`${CHANNEL}/versions.json`) ?? [];
 versions = versions.filter((v) => v !== VERSION);
 // Leave room for VERSION, which the subsequent upload step fills in.
 while (versions.length > KEEP - 1) {
   const old = versions.shift();
-  const oldManifest = tryGetJson(`prerelease/${old}/latest.json`);
+  const oldManifest = tryGetJson(`${CHANNEL}/${old}/latest.json`);
   if (oldManifest) {
     for (const p of Object.values(oldManifest.platforms)) {
       const file = fileOf(p.url);
-      // Prerelease uploads the bundle and its detached .sig sidecar.
       try {
-        del(`prerelease/${old}/${file}`);
+        del(`${CHANNEL}/${old}/${file}`);
       } catch {}
       try {
-        del(`prerelease/${old}/${file}.sig`);
+        del(`${CHANNEL}/${old}/${file}.sig`);
       } catch {}
     }
     try {
-      del(`prerelease/${old}/latest.json`);
+      del(`${CHANNEL}/${old}/latest.json`);
     } catch {}
   }
 }
 versions.push(VERSION);
 const versionsPath = path.join(tmp, 'versions.json');
 writeFileSync(versionsPath, `${JSON.stringify(versions, null, 2)}\n`);
-put('prerelease/versions.json', versionsPath);
+put(`${CHANNEL}/versions.json`, versionsPath);
 
-console.log(`Pruned prerelease. Keeping: ${versions.join(', ')}`);
+console.log(`Pruned ${CHANNEL}. Keeping: ${versions.join(', ')}`);

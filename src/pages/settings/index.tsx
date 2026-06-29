@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
 import { KeybindsSection } from './keybinds-section';
+import { AboutSection } from './sections/about-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { DataSection } from './sections/data-section';
 import { EditingSection } from './sections/editing-section';
@@ -52,7 +53,7 @@ export function SettingsPage() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
-          className="flex gap-12"
+          className="mx-auto flex w-full max-w-[63rem] gap-12"
         >
           <SettingsRail activeId={activeId} onJump={handleJump} />
 
@@ -64,9 +65,6 @@ export function SettingsPage() {
               >
                 {strings.settings.title}
               </h1>
-              <p className="mt-3 text-text-muted leading-relaxed">
-                {strings.settings.description}
-              </p>
             </header>
 
             <div className="space-y-12 md:space-y-16">
@@ -78,6 +76,7 @@ export function SettingsPage() {
               <PrivacySection />
               <McpSection />
               <KeybindsSection />
+              <AboutSection />
             </div>
           </div>
         </motion.div>

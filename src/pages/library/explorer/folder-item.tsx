@@ -4,6 +4,7 @@ import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { ItemContextMenu } from './item-context-menu';
+import { TagList } from './tag-list';
 import { useDropTarget } from './use-drop-target';
 import { useExplorerItem } from './use-explorer-item';
 
@@ -86,23 +87,12 @@ export function FolderItem({
               <span className="truncate font-medium text-sm text-text-primary">
                 {name}
               </span>
-              {tags.length > 0 && (
-                <div className="flex shrink-0 items-center gap-1">
-                  {tags.slice(0, 2).map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                  {tags.length > 2 && (
-                    <span className="text-[9px] text-text-muted">
-                      +{tags.length - 2}
-                    </span>
-                  )}
-                </div>
-              )}
+              <TagList
+                tags={tags}
+                className="flex shrink-0 items-center gap-1"
+                tagClassName="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
+                overflowClassName="text-[9px] text-text-muted"
+              />
             </div>
           )}
         </ContextMenuTrigger>

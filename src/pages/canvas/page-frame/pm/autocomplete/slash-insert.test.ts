@@ -1,5 +1,6 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
+import en from '@/lib/i18n/messages/en';
 import { parseMarkdownToDoc } from '../../markdown/parser';
 import { schema } from '../schema';
 import type { PageFrameAutocompleteItem } from './index';
@@ -8,6 +9,8 @@ import {
   findActiveSlashInsertAutocomplete,
   searchSlashInsertAutocompleteItems,
 } from './slash-insert';
+
+const labels = en.canvas.slashInsert;
 
 function createState(markdown: string, head: number) {
   const state = EditorState.create({
@@ -21,7 +24,7 @@ function createState(markdown: string, head: number) {
 }
 
 function findItem(id: string): PageFrameAutocompleteItem {
-  const item = searchSlashInsertAutocompleteItems('', 20).find(
+  const item = searchSlashInsertAutocompleteItems('', 20, labels).find(
     (entry) => entry.id === id,
   );
   if (!item) {
@@ -61,16 +64,16 @@ describe('findActiveSlashInsertAutocomplete', () => {
 
 describe('searchSlashInsertAutocompleteItems', () => {
   it('matches aliases like h2, links, and inline code', () => {
-    expect(searchSlashInsertAutocompleteItems('h2', 5)[0]?.id).toBe(
+    expect(searchSlashInsertAutocompleteItems('h2', 5, labels)[0]?.id).toBe(
       'slash-heading-2',
     );
-    expect(searchSlashInsertAutocompleteItems('hyperlink', 5)[0]?.id).toBe(
-      'slash-link',
-    );
-    expect(searchSlashInsertAutocompleteItems('table', 5)[0]?.id).toBe(
+    expect(
+      searchSlashInsertAutocompleteItems('hyperlink', 5, labels)[0]?.id,
+    ).toBe('slash-link');
+    expect(searchSlashInsertAutocompleteItems('table', 5, labels)[0]?.id).toBe(
       'slash-table',
     );
-    expect(searchSlashInsertAutocompleteItems('code', 5)[0]?.id).toBe(
+    expect(searchSlashInsertAutocompleteItems('code', 5, labels)[0]?.id).toBe(
       'slash-inline-code',
     );
   });

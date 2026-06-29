@@ -164,6 +164,13 @@ export function findActiveNoteLinkAutocomplete(
       return null;
     }
 
+    // A bare "[[" with nothing typed has nothing to autocomplete. Don't activate
+    // the request: each note-link search rebuilds the full-vault lexical index,
+    // so we avoid opening the popup and searching until there is a query.
+    if (query.trim().length === 0) {
+      return null;
+    }
+
     return {
       query,
       range: {

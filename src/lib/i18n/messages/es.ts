@@ -172,6 +172,7 @@ const es: typeof en = {
       empty:
         'Aún no hay etiquetas. Haz clic derecho en un archivo y elige "Administrar etiquetas" para empezar.',
       insights: 'Análisis del estudio',
+      manageTag: '+ gestionar etiqueta',
       stats: {
         totalFiles: 'Total de archivos',
         folders: 'Carpetas',
@@ -209,6 +210,21 @@ const es: typeof en = {
       createNew: 'Crear nueva etiqueta',
       placeholder: 'Nombre de la etiqueta...',
     },
+    tagRegistryDialog: {
+      title: 'Administrar etiquetas',
+      description:
+        'Crea etiquetas para reutilizarlas o elimínalas de todas partes.',
+      tags: 'Etiquetas',
+      empty: 'Aún no hay etiquetas',
+      createNew: 'Crear nueva etiqueta',
+      placeholder: 'Nombre de la etiqueta...',
+      confirmTitle: '¿Eliminar etiqueta?',
+      confirmDescription: (tag: string, count: number) =>
+        count > 0
+          ? `#${tag} se eliminará permanentemente de ${count} archivo${count === 1 ? '' : 's'}/carpeta${count === 1 ? '' : 's'} y se borrará de todas partes.`
+          : `#${tag} se eliminará permanentemente.`,
+      confirmDelete: 'Eliminar',
+    },
   },
   graph: {
     title: 'Grafo',
@@ -242,8 +258,6 @@ const es: typeof en = {
   },
   settings: {
     title: 'Preferencias',
-    description:
-      'Personaliza tu santuario creativo. Estos ajustes modifican la atmósfera visual y la profundidad funcional de tu lienzo infinito.',
     theme: {
       title: 'Tema',
       eyebrow: 'Apariencia',
@@ -331,6 +345,10 @@ const es: typeof en = {
           signOut: 'Cerrar sesión',
         },
         deviceCode: 'Introduce este código en tu navegador',
+        notices: {
+          credentialReset: (provider: string) =>
+            `Tu sesión de ${provider} expiró y se restableció. Vuelve a conectar.`,
+        },
       },
       authStatus: {
         checking: 'Comprobando',
@@ -557,9 +575,40 @@ const es: typeof en = {
         },
       },
     },
+    about: {
+      title: 'Acerca de',
+      eyebrow: 'Aplicación',
+      version: {
+        label: 'Versión',
+        description: 'La versión de Myelin instalada actualmente.',
+      },
+    },
   },
   canvas: {
     kind: 'Lienzo',
+    frame: {
+      noteKind: 'Nota',
+      pdfKind: 'PDF',
+      displayNameLabel: 'Nombre del marco de página',
+      menu: 'Menú',
+      openMenu: 'Abrir menú del marco',
+      rename: 'Cambiar nombre',
+      pages: 'Páginas',
+      continuous: 'Continuo',
+      columns: 'Columnas',
+      export: 'Exportar',
+    },
+    export: {
+      title: 'Exportar',
+      exportCanvasPdf: 'Exportar lienzo como PDF',
+      format: 'Formato',
+      includeAnnotations: 'Incluir anotaciones',
+      annotationsHint: 'Dibujos y notas en la página',
+      exporting: 'Exportando…',
+      tryAgain: 'Reintentar',
+      exportedWithWarnings: 'Exportado con advertencias',
+      complete: 'Exportación completa',
+    },
     search: {
       placeholder: 'Buscar en el lienzo',
       noResults: 'Sin resultados',
@@ -568,6 +617,69 @@ const es: typeof en = {
     },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
+    },
+    slashInsert: {
+      heading1: {
+        title: 'Encabezado 1',
+        subtitle: 'Convierte este bloque en un encabezado de nivel superior',
+      },
+      heading2: {
+        title: 'Encabezado 2',
+        subtitle: 'Convierte este bloque en un encabezado de sección',
+      },
+      heading3: {
+        title: 'Encabezado 3',
+        subtitle: 'Convierte este bloque en un encabezado pequeño',
+      },
+      quote: {
+        title: 'Cita',
+        subtitle: 'Convierte este bloque en una cita',
+      },
+      bulletList: {
+        title: 'Lista con viñetas',
+        subtitle: 'Convierte este bloque en un elemento de lista con viñetas',
+      },
+      numberedList: {
+        title: 'Lista numerada',
+        subtitle: 'Convierte este bloque en un elemento de lista numerada',
+      },
+      todo: {
+        title: 'Tarea',
+        subtitle: 'Convierte este bloque en una tarea con casilla',
+      },
+      paragraph: {
+        title: 'Párrafo',
+        subtitle: 'Restablece este bloque a texto normal',
+      },
+      table: {
+        title: 'Tabla',
+        subtitle: 'Inserta una tabla con filas de encabezado y cuerpo',
+      },
+      bold: {
+        title: 'Negrita',
+        subtitle: 'Inserta marcado **negrita**',
+      },
+      italic: {
+        title: 'Cursiva',
+        subtitle: 'Inserta marcado *cursiva*',
+      },
+      link: {
+        title: 'Enlace',
+        subtitle: 'Inserta marcado [etiqueta](url)',
+      },
+      noteLink: {
+        title: 'Enlace a nota',
+        subtitle: 'Inserta un enlace [[nota]] a otra nota',
+      },
+      inlineCode: {
+        title: 'Código en línea',
+        subtitle: 'Inserta marcado `código`',
+      },
+      embed: {
+        title: 'Insertar contenido',
+        subtitle:
+          'Inserta ![alt](url): imágenes, vídeos, YouTube, tarjetas de enlace',
+      },
     },
     backlinks: {
       title: 'Backlinks',
@@ -582,6 +694,7 @@ const es: typeof en = {
       label: 'Orden de selección',
       moveHigher: 'Mover hacia delante',
       moveLower: 'Mover hacia atrás',
+      delete: 'Eliminar',
       crop: 'Recortar',
       applyCrop: 'Aplicar recorte',
     },

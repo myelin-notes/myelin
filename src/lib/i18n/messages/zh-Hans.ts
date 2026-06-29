@@ -165,6 +165,7 @@ const zhHans: typeof en = {
       title: '语义标签',
       empty: '还没有标签，右键点击文件并选择“管理标签”即可开始',
       insights: '工作室洞察',
+      manageTag: '+ 管理标签',
       stats: {
         totalFiles: '文件总数',
         folders: '文件夹',
@@ -201,6 +202,20 @@ const zhHans: typeof en = {
       createNew: '创建新标签',
       placeholder: '标签名称...',
     },
+    tagRegistryDialog: {
+      title: '管理标签',
+      description: '创建可复用的标签，或在所有位置删除它们。',
+      tags: '标签',
+      empty: '还没有标签',
+      createNew: '创建新标签',
+      placeholder: '标签名称...',
+      confirmTitle: '删除标签？',
+      confirmDescription: (tag: string, count: number) =>
+        count > 0
+          ? `#${tag} 将从 ${count} 个文件/文件夹中永久移除，并在所有位置删除。`
+          : `#${tag} 将被永久删除。`,
+      confirmDelete: '删除',
+    },
   },
   graph: {
     title: '图谱',
@@ -234,7 +249,6 @@ const zhHans: typeof en = {
   },
   settings: {
     title: '偏好设置',
-    description: '定制你的创作圣地，这些设置可调整无限画布的视觉氛围与功能深度',
     theme: {
       title: '主题',
       eyebrow: '外观',
@@ -317,6 +331,10 @@ const zhHans: typeof en = {
           signOut: '退出登录',
         },
         deviceCode: '在浏览器中输入此代码',
+        notices: {
+          credentialReset: (provider: string) =>
+            `您的 ${provider} 登录已过期并已重置，请重新连接。`,
+        },
       },
       authStatus: {
         checking: '检查中',
@@ -534,9 +552,40 @@ const zhHans: typeof en = {
         },
       },
     },
+    about: {
+      title: '关于',
+      eyebrow: '应用程序',
+      version: {
+        label: '版本',
+        description: '当前安装的 Myelin 版本。',
+      },
+    },
   },
   canvas: {
     kind: '画布',
+    frame: {
+      noteKind: '笔记',
+      pdfKind: 'PDF',
+      displayNameLabel: '页面框架显示名称',
+      menu: '菜单',
+      openMenu: '打开框架菜单',
+      rename: '重命名',
+      pages: '页面',
+      continuous: '连续',
+      columns: '分栏',
+      export: '导出',
+    },
+    export: {
+      title: '导出',
+      exportCanvasPdf: '将画布导出为 PDF',
+      format: '格式',
+      includeAnnotations: '包含批注',
+      annotationsHint: '页面上的绘图和笔记',
+      exporting: '正在导出…',
+      tryAgain: '重试',
+      exportedWithWarnings: '导出完成但有警告',
+      complete: '导出完成',
+    },
     search: {
       placeholder: '在画布中查找',
       noResults: '无结果',
@@ -545,6 +594,68 @@ const zhHans: typeof en = {
     },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
+    },
+    slashInsert: {
+      heading1: {
+        title: '一级标题',
+        subtitle: '将此块转换为顶级标题',
+      },
+      heading2: {
+        title: '二级标题',
+        subtitle: '将此块转换为章节标题',
+      },
+      heading3: {
+        title: '三级标题',
+        subtitle: '将此块转换为小标题',
+      },
+      quote: {
+        title: '引用',
+        subtitle: '将此块转换为引用块',
+      },
+      bulletList: {
+        title: '项目符号列表',
+        subtitle: '将此块转换为项目符号列表项',
+      },
+      numberedList: {
+        title: '编号列表',
+        subtitle: '将此块转换为编号列表项',
+      },
+      todo: {
+        title: '待办事项',
+        subtitle: '将此块转换为可勾选的待办事项',
+      },
+      paragraph: {
+        title: '段落',
+        subtitle: '将此块重置为纯正文文本',
+      },
+      table: {
+        title: '表格',
+        subtitle: '插入包含表头和正文行的表格',
+      },
+      bold: {
+        title: '粗体',
+        subtitle: '插入 **粗体** Markdown',
+      },
+      italic: {
+        title: '斜体',
+        subtitle: '插入 *斜体* Markdown',
+      },
+      link: {
+        title: '链接',
+        subtitle: '插入 [标签](url) Markdown',
+      },
+      noteLink: {
+        title: '笔记链接',
+        subtitle: '插入指向其他笔记的 [[笔记]] 链接',
+      },
+      inlineCode: {
+        title: '行内代码',
+        subtitle: '插入 `代码` Markdown',
+      },
+      embed: {
+        title: '嵌入',
+        subtitle: '插入 ![alt](url) — 图片、视频、YouTube、链接卡片',
+      },
     },
     backlinks: {
       title: '反向链接',
@@ -559,6 +670,7 @@ const zhHans: typeof en = {
       label: '选区层级',
       moveHigher: '前移一层',
       moveLower: '后移一层',
+      delete: '删除',
       crop: '裁剪',
       applyCrop: '应用裁剪',
     },

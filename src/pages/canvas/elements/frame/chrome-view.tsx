@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { Menu as MenuIcon } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { getMessages } from '@/lib/i18n';
 import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
@@ -53,6 +54,7 @@ export const FrameChromeView = forwardRef<
   },
   ref,
 ) {
+  const strings = getMessages().canvas.frame;
   const surfaceRef = useRef<HTMLDivElement>(null);
   const headerClipRef = useRef<HTMLDivElement>(null);
   const headerInnerRef = useRef<HTMLDivElement>(null);
@@ -175,7 +177,7 @@ export const FrameChromeView = forwardRef<
                 <input
                   ref={inputRef}
                   type="text"
-                  aria-label="Page frame display name"
+                  aria-label={strings.displayNameLabel}
                   data-page-frame-preserve-focus
                   value={draftTitle}
                   onChange={(event) => setDraftTitle(event.currentTarget.value)}
@@ -234,8 +236,8 @@ export const FrameChromeView = forwardRef<
       {createPortal(
         <button
           type="button"
-          title="Menu"
-          aria-label="Open frame menu"
+          title={strings.menu}
+          aria-label={strings.openMenu}
           onPointerDown={(event) => {
             event.preventDefault();
             event.stopPropagation();

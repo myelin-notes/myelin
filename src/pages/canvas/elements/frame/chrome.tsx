@@ -9,6 +9,7 @@ import { createRef } from 'react';
 import { Pencil as PencilIcon } from 'lucide-react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
+import { getMessages } from '@/lib/i18n';
 import { type ChromeMenuItem, openChromeMenu } from '../../chrome-menu';
 import {
   CHROME_BOTTOM_PADDING,
@@ -223,7 +224,7 @@ export class FrameChrome {
     return [
       {
         id: 'rename-frame',
-        label: 'Rename',
+        label: getMessages().canvas.frame.rename,
         icon: PencilIcon,
         onSelect: () => this.startTitleRename(),
       },

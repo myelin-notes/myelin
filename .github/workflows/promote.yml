@@ -13,7 +13,7 @@ concurrency:
 
 env:
   R2_BUCKET: myelin-updates
-  UPDATER_DOMAIN: https://pub-b609df54ffbc4104a99c47d9ac342457.r2.dev
+  UPDATER_DOMAIN: https://updates.trymyelin.app
 
 jobs:
   promote:
@@ -30,6 +30,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+
+      - name: Prune old stable versions
+        run: node scripts/prune-channel.mjs stable
 
       - name: Promote prerelease -> stable
         run: node scripts/promote-release.mjs

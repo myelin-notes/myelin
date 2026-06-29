@@ -90,7 +90,7 @@ async function openSession(
       sessionId: session.sessionId,
     }).catch(() => {});
     await session.close();
-    logger.warn('Audio transcription unavailable', error, { elementId });
+    logger.error('Audio transcription unavailable', error, { elementId });
     return null;
   }
 }
@@ -138,7 +138,7 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
           return;
         }
         if (event.payload.error) {
-          logger.warn('Live audio transcription stopped', {
+          logger.error('Live audio transcription stopped', {
             elementId: this.elementId,
             error: event.payload.error,
           });
@@ -175,7 +175,7 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
       });
     } catch (error) {
       await this.close();
-      logger.warn('Failed to finish live audio transcription', error, {
+      logger.error('Failed to finish live audio transcription', error, {
         elementId: this.elementId,
       });
     }
@@ -263,7 +263,7 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
       }
       this.stopped = true;
       await this.stopCapture();
-      logger.warn('Failed to stream audio samples for transcription', error, {
+      logger.error('Failed to stream audio samples for transcription', error, {
         elementId: this.elementId,
       });
     }

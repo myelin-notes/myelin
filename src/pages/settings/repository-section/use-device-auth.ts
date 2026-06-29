@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
@@ -22,6 +23,9 @@ export interface DeviceAuthApi<TBegin extends DeviceAuthBeginPayload> {
   ) => Promise<DeviceAuthWaitResult>;
   cancel: (credentialId: string) => Promise<void>;
   clear: (credentialId: string) => Promise<void>;
+  // Returns true once if the stored credential was discarded since the last
+  // check (e.g. an unreadable vault was reset), so the UI can prompt re-auth.
+  consumeDiscarded?: () => boolean;
 }
 
 export interface DeviceAuthState {
@@ -68,6 +72,13 @@ export function useDeviceAuth<TBegin extends DeviceAuthBeginPayload>(
       if (has) {
         setAuthError(null);
       }
+      if (apiRef.current.consumeDiscarded?.()) {
+        toast.warning(
+          strings.settings.repository.auth.notices.credentialReset(
+            providerName,
+          ),
+        );
+      }
     } catch (error) {
       loggerRef.current.error('Failed to read device auth state', error, {
         credentialId,
@@ -81,7 +92,12 @@ export function useDeviceAuth<TBegin extends DeviceAuthBeginPayload>(
     } finally {
       setCheckingToken(false);
     }
-  }, [credentialId, strings.settings.repository.auth.errors.readState]);
+  }, [
+    credentialId,
+    providerName,
+    strings.settings.repository.auth.errors.readState,
+    strings.settings.repository.auth.notices.credentialReset,
+  ]);
 
   useEffect(() => {
     void checkToken();

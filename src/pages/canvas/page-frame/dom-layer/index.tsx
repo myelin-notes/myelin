@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { PM_UPDATE_EVENT } from '@/lib/events';
+import { getMessages } from '@/lib/i18n';
 import { getDevicePixelRatio } from '@/lib/utils';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
@@ -27,6 +28,7 @@ import type {
   PageFrameAutocompleteItem,
 } from '../pm/autocomplete';
 import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
+import { CodeRunOverlayLayer } from '../pm/code-block/run-overlay';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
@@ -217,7 +219,7 @@ function createFrameRefs(
   container: HTMLDivElement,
 ): FrameRefs {
   const chrome = new FrameChrome({
-    kindLabel: 'NOTE',
+    kindLabel: getMessages().canvas.frame.noteKind,
     getMenuItems: () => frame.getMenuItems(),
     onTitleCommit: (title) => {
       frame.setDisplayName(title);
@@ -740,6 +742,7 @@ export function PageFrameDomLayer({
         loadPreview={loadNoteLinkPreview}
         suppressed={autocompleteKind !== null}
       />
+      <CodeRunOverlayLayer />
     </>
   );
 }

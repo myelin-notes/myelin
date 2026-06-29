@@ -437,14 +437,16 @@ function CanvasViewInner({
                   variant="ghost"
                   size="icon-xs"
                   onClick={onExportCanvasPdf}
-                  aria-label="Export canvas as PDF"
+                  aria-label={strings.canvas.export.exportCanvasPdf}
                   disabled={!engine.ready}
                 />
               }
             >
               <Download className="size-3.5" />
             </TooltipTrigger>
-            <TooltipContent>Export canvas as PDF</TooltipContent>
+            <TooltipContent>
+              {strings.canvas.export.exportCanvasPdf}
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -476,6 +478,7 @@ function CanvasViewInner({
     engine.ready,
     liveDiscoveryPauseError,
     strings.canvas.peerSync.livePaused,
+    strings.canvas.export.exportCanvasPdf,
     strings.versionHistory.title,
     strings.settings.keybinds.actions,
   ]);

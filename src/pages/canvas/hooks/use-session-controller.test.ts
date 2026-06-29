@@ -6,6 +6,7 @@ import type {
   VFSNodeId,
 } from '@/lib/sync';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import { CanvasSessionController } from './use-session-controller';
 
 const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
   () => ({
@@ -82,9 +83,6 @@ afterEach(() => {
 
 describe('CanvasSessionController', () => {
   it('opens the latest note without waiting for a stale open to finish', async () => {
-    const { CanvasSessionController } = await import(
-      './use-session-controller'
-    );
     const noteAOpen = createDeferred<MockNoteSession>();
     const noteBOpen = createDeferred<MockNoteSession>();
     const noteASession = createSession('note-a');
@@ -149,9 +147,6 @@ describe('CanvasSessionController', () => {
   });
 
   it('passes the note link resolver into DrawableCanvas', async () => {
-    const { CanvasSessionController } = await import(
-      './use-session-controller'
-    );
     const repository = {
       kind: 'local',
       openSession: vi.fn().mockResolvedValue(createSession('note-1')),
@@ -194,9 +189,6 @@ describe('CanvasSessionController', () => {
   });
 
   it('does not attach a late session after dispose', async () => {
-    const { CanvasSessionController } = await import(
-      './use-session-controller'
-    );
     const pendingOpen = createDeferred<MockNoteSession>();
     const noteSession = createSession('note-1');
     const repository = {

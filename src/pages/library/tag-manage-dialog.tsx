@@ -42,9 +42,11 @@ export function TagManageDialog({
     if (!open) {
       return;
     }
-    Promise.all([repository.listTags(), repository.getNode(nodeId)])
-      .then(([tags, node]) => {
-        setAllTags(tags.map((entry) => entry.tag));
+    Promise.all([repository.getNode(nodeId), repository.getRegistryTags()])
+      .then(([node, registryTags]) => {
+        // Available shows every tag in the registry, including ones not
+        // attached to anything yet.
+        setAllTags(registryTags);
         setNodeTags(node ? [...node.tags] : []);
       })
       .catch((error) => {
@@ -64,6 +66,7 @@ export function TagManageDialog({
       setNodeTags((prev) => prev.filter((t) => t !== tag));
     } else {
       await repository.addTag(nodeId, tag);
+      await repository.addRegistryTags([tag]);
       setNodeTags((prev) => [...prev, tag]);
       if (!allTags.includes(tag)) {
         setAllTags((prev) => [...prev, tag]);
@@ -79,6 +82,7 @@ export function TagManageDialog({
       return;
     }
     await repository.addTag(nodeId, normalized);
+    await repository.addRegistryTags([normalized]);
     setNodeTags((prev) =>
       prev.includes(normalized) ? prev : [...prev, normalized],
     );

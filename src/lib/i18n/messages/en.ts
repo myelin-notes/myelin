@@ -169,6 +169,7 @@ const en = {
       empty:
         'No tags yet. Right-click a file and choose "Manage Tags" to start.',
       insights: 'Studio Insights',
+      manageTag: '+ manage tag',
       stats: {
         totalFiles: 'Total Files',
         folders: 'Folders',
@@ -206,6 +207,20 @@ const en = {
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
     },
+    tagRegistryDialog: {
+      title: 'Manage Tags',
+      description: 'Create tags to reuse, or delete them everywhere.',
+      tags: 'Tags',
+      empty: 'No tags yet',
+      createNew: 'Create new tag',
+      placeholder: 'Tag name...',
+      confirmTitle: 'Delete tag?',
+      confirmDescription: (tag: string, count: number) =>
+        count > 0
+          ? `#${tag} will be permanently removed from ${count} file${count === 1 ? '' : 's'}/folder${count === 1 ? '' : 's'} and deleted everywhere.`
+          : `#${tag} will be deleted permanently.`,
+      confirmDelete: 'Delete',
+    },
   },
   graph: {
     title: 'Graph',
@@ -239,8 +254,6 @@ const en = {
   },
   settings: {
     title: 'Preferences',
-    description:
-      'Customize your creative sanctuary. These settings adjust the visual atmosphere and functional depth of your infinite canvas.',
     theme: {
       title: 'Theme',
       eyebrow: 'Appearance',
@@ -327,6 +340,10 @@ const en = {
           signOut: 'Sign out',
         },
         deviceCode: 'Enter this code in your browser',
+        notices: {
+          credentialReset: (provider: string) =>
+            `Your ${provider} sign-in expired and was reset. Please reconnect.`,
+        },
       },
       authStatus: {
         checking: 'Checking',
@@ -552,9 +569,40 @@ const en = {
         },
       },
     },
+    about: {
+      title: 'About',
+      eyebrow: 'Application',
+      version: {
+        label: 'Version',
+        description: 'The version of Myelin currently installed.',
+      },
+    },
   },
   canvas: {
     kind: 'Canvas',
+    frame: {
+      noteKind: 'Note',
+      pdfKind: 'PDF',
+      displayNameLabel: 'Page frame display name',
+      menu: 'Menu',
+      openMenu: 'Open frame menu',
+      rename: 'Rename',
+      pages: 'Pages',
+      continuous: 'Continuous',
+      columns: 'Columns',
+      export: 'Export',
+    },
+    export: {
+      title: 'Export',
+      exportCanvasPdf: 'Export canvas as PDF',
+      format: 'Format',
+      includeAnnotations: 'Include annotations',
+      annotationsHint: 'Drawings and notes on the page',
+      exporting: 'Exporting…',
+      tryAgain: 'Try again',
+      exportedWithWarnings: 'Exported with warnings',
+      complete: 'Export complete',
+    },
     search: {
       placeholder: 'Find in canvas',
       noResults: 'No results',
@@ -563,6 +611,68 @@ const en = {
     },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
+    },
+    slashInsert: {
+      heading1: {
+        title: 'Heading 1',
+        subtitle: 'Turn this block into a top-level heading',
+      },
+      heading2: {
+        title: 'Heading 2',
+        subtitle: 'Turn this block into a section heading',
+      },
+      heading3: {
+        title: 'Heading 3',
+        subtitle: 'Turn this block into a small heading',
+      },
+      quote: {
+        title: 'Quote',
+        subtitle: 'Turn this block into a blockquote',
+      },
+      bulletList: {
+        title: 'Bullet list',
+        subtitle: 'Turn this block into a bulleted list item',
+      },
+      numberedList: {
+        title: 'Numbered list',
+        subtitle: 'Turn this block into a numbered list item',
+      },
+      todo: {
+        title: 'To-do',
+        subtitle: 'Turn this block into a checkable to-do item',
+      },
+      paragraph: {
+        title: 'Paragraph',
+        subtitle: 'Reset this block back to plain body text',
+      },
+      table: {
+        title: 'Table',
+        subtitle: 'Insert a table with header and body rows',
+      },
+      bold: {
+        title: 'Bold',
+        subtitle: 'Insert **bold** markdown',
+      },
+      italic: {
+        title: 'Italic',
+        subtitle: 'Insert *italic* markdown',
+      },
+      link: {
+        title: 'Link',
+        subtitle: 'Insert [label](url) markdown',
+      },
+      noteLink: {
+        title: 'Note link',
+        subtitle: 'Insert [[note]] link to another note',
+      },
+      inlineCode: {
+        title: 'Inline code',
+        subtitle: 'Insert `code` markdown',
+      },
+      embed: {
+        title: 'Embed',
+        subtitle: 'Insert ![alt](url) — images, videos, YouTube, link cards',
+      },
     },
     backlinks: {
       title: 'Backlinks',
@@ -577,6 +687,7 @@ const en = {
       label: 'Selection order',
       moveHigher: 'Move forward',
       moveLower: 'Move backward',
+      delete: 'Delete',
       crop: 'Crop',
       applyCrop: 'Apply crop',
     },

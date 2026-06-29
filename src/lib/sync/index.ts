@@ -50,6 +50,7 @@ export {
   beginGitHubDeviceAuth,
   cancelGitHubDeviceAuth,
   clearGitHubToken,
+  consumeGitHubVaultDiscarded,
   hasGitHubToken,
   isGitHubDeviceAuthAvailable,
   isGitHubSecureStorageAvailable,

@@ -11,6 +11,7 @@ import type * as Y from 'yjs';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { trackEvent } from '@/lib/analytics';
+import { getMessages } from '@/lib/i18n';
 import { exportPdf as exportPdfToRust } from '@/lib/pdf-export/client';
 import { UserPrefs } from '@/lib/user-prefs';
 import { getCanvasPalette } from '../canvas-theme';
@@ -464,31 +465,32 @@ export class PageFrameElement extends DrawableElement {
   }
 
   public getMenuItems(): ChromeMenuItem[] {
+    const strings = getMessages().canvas.frame;
     return [
       {
         id: 'layout-vertical',
-        label: 'Pages',
+        label: strings.pages,
         icon: RowsIcon,
         checked: this._pageLayout === 'vertical',
         onSelect: () => this.setPageLayout('vertical'),
       },
       {
         id: 'layout-continuous',
-        label: 'Continuous',
+        label: strings.continuous,
         icon: ContinuousIcon,
         checked: this._pageLayout === 'continuous',
         onSelect: () => this.setPageLayout('continuous'),
       },
       {
         id: 'layout-horizontal',
-        label: 'Columns',
+        label: strings.columns,
         icon: ColumnsIcon,
         checked: this._pageLayout === 'horizontal',
         onSelect: () => this.setPageLayout('horizontal'),
       },
       {
         id: 'export',
-        label: 'Export',
+        label: strings.export,
         icon: DownloadIcon,
         onSelect: () => openExportDialog(this.buildExportTarget()),
       },

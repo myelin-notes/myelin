@@ -3,10 +3,15 @@ import { useCallback, useRef, useState } from 'react';
 export interface MeasuredHeights {
   /** Latest measured height for a key, or undefined if not yet measured. */
   getHeight: (key: string) => number | undefined;
-  /** Stable ref callback that measures and caches the element's height. */
-  measure: (key: string) => (el: HTMLElement | null) => void;
+  /** Stable ref callback that measures and caches the element's height. The
+   *  row `index` lets the cache report which positions changed. */
+  measure: (key: string, index: number) => (el: HTMLElement | null) => void;
   /** Bumped whenever a cached height changes; use as a memo dependency. */
   version: number;
+  /** Lowest row index whose height changed since the last call, then resets to
+   *  Infinity. Lets a consumer rebuild derived layout from that index down
+   *  instead of from scratch. */
+  consumeDirtyFrom: () => number;
   /** Drops cached heights and callbacks for keys no longer present. */
   prune: (liveKeys: Set<string>) => void;
 }
@@ -19,13 +24,25 @@ export interface MeasuredHeights {
  *
  * Height changes are coalesced into one `version` bump per microtask so a batch
  * of mounting rows triggers a single re-render.
+ *
+ * `estimateHeight` (optional) is the height the layout assumes for a row before
+ * it is measured. When a first measurement comes back equal to that estimate,
+ * recording it changes nothing on screen, so we skip the version bump — this is
+ * what keeps scrolling through uniform-height content (code output) from
+ * rebuilding offsets for every newly-mounted row.
  */
-export function useMeasuredHeights(): MeasuredHeights {
+export function useMeasuredHeights(
+  estimateHeight?: (index: number) => number,
+): MeasuredHeights {
   const heightsRef = useRef(new Map<string, number>());
   const [version, setVersion] = useState(0);
 
+  const estimateRef = useRef(estimateHeight);
+  estimateRef.current = estimateHeight;
   const observerRef = useRef<ResizeObserver | null>(null);
   const elementKeyRef = useRef(new Map<Element, string>());
+  const keyIndexRef = useRef(new Map<string, number>());
+  const dirtyFromRef = useRef(Number.POSITIVE_INFINITY);
   const flushScheduledRef = useRef(false);
   const callbackCacheRef = useRef(
     new Map<string, (el: HTMLElement | null) => void>(),
@@ -33,10 +50,23 @@ export function useMeasuredHeights(): MeasuredHeights {
 
   const record = useCallback((key: string, el: HTMLElement) => {
     const height = Math.round(el.getBoundingClientRect().height);
-    if (height <= 0 || heightsRef.current.get(key) === height) {
+    const prev = heightsRef.current.get(key);
+    if (height <= 0 || prev === height) {
       return;
     }
+    const index = keyIndexRef.current.get(key);
+    // The layout assumed `prev`, or the row's estimate before any measurement.
+    // If the exact height matches, store it for future reads but don't
+    // invalidate layout — nothing moved.
+    const assumed =
+      prev ?? (index !== undefined ? estimateRef.current?.(index) : undefined);
     heightsRef.current.set(key, height);
+    if (assumed !== undefined && height === assumed) {
+      return;
+    }
+    if (index !== undefined && index < dirtyFromRef.current) {
+      dirtyFromRef.current = index;
+    }
     if (!flushScheduledRef.current) {
       flushScheduledRef.current = true;
       queueMicrotask(() => {
@@ -62,7 +92,10 @@ export function useMeasuredHeights(): MeasuredHeights {
 
   // One stable callback per key so elements aren't re-observed every render.
   const measure = useCallback(
-    (key: string) => {
+    (key: string, index: number) => {
+      // Track each key's current row index so `record` can report the lowest
+      // changed position. Updated every render since a key can move (grids).
+      keyIndexRef.current.set(key, index);
       const cache = callbackCacheRef.current;
       let cb = cache.get(key);
       if (!cb) {
@@ -91,11 +124,18 @@ export function useMeasuredHeights(): MeasuredHeights {
     [],
   );
 
+  const consumeDirtyFrom = useCallback(() => {
+    const from = dirtyFromRef.current;
+    dirtyFromRef.current = Number.POSITIVE_INFINITY;
+    return from;
+  }, []);
+
   const prune = useCallback((liveKeys: Set<string>) => {
     if (heightsRef.current.size > liveKeys.size) {
       for (const key of heightsRef.current.keys()) {
         if (!liveKeys.has(key)) {
           heightsRef.current.delete(key);
+          keyIndexRef.current.delete(key);
         }
       }
     }
@@ -108,5 +148,5 @@ export function useMeasuredHeights(): MeasuredHeights {
     }
   }, []);
 
-  return { getHeight, measure, version, prune };
+  return { getHeight, measure, version, consumeDirtyFrom, prune };
 }

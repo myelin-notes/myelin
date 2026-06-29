@@ -4,6 +4,7 @@ import {
   TextSelection,
   type Transaction,
 } from 'prosemirror-state';
+import type { Messages } from '@/lib/i18n';
 import { MARKDOWN_ATOM_CHAR } from '../markdown/types';
 import {
   createTableNode,
@@ -53,11 +54,22 @@ export interface ActiveSlashInsertAutocomplete
   replaceRange: PageFrameAutocompleteRange;
 }
 
-const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
+export type SlashInsertLabels = Messages['canvas']['slashInsert'];
+
+// Title and subtitle live in the message catalogs (keyed by labelKey) so the
+// menu follows the active language; everything here is language-independent.
+interface SlashInsertItemDefinition {
+  id: string;
+  labelKey: keyof SlashInsertLabels;
+  detail: string;
+  keywords: readonly string[];
+  slashAction: SlashInsertAction;
+}
+
+const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
   {
     id: 'slash-heading-1',
-    title: 'Heading 1',
-    subtitle: 'Turn this block into a top-level heading',
+    labelKey: 'heading1',
     detail: '#',
     keywords: ['heading', 'h1', 'title', '#'],
     slashAction: {
@@ -68,8 +80,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-heading-2',
-    title: 'Heading 2',
-    subtitle: 'Turn this block into a section heading',
+    labelKey: 'heading2',
     detail: '##',
     keywords: ['heading', 'h2', 'section', '##'],
     slashAction: {
@@ -80,8 +91,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-heading-3',
-    title: 'Heading 3',
-    subtitle: 'Turn this block into a small heading',
+    labelKey: 'heading3',
     detail: '###',
     keywords: ['heading', 'h3', 'subheading', '###'],
     slashAction: {
@@ -92,8 +102,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-quote',
-    title: 'Quote',
-    subtitle: 'Turn this block into a blockquote',
+    labelKey: 'quote',
     detail: '>',
     keywords: ['quote', 'blockquote', '>'],
     slashAction: {
@@ -103,8 +112,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-bullet-list',
-    title: 'Bullet list',
-    subtitle: 'Turn this block into a bulleted list item',
+    labelKey: 'bulletList',
     detail: '-',
     keywords: ['bullet', 'list', 'unordered', '-', '*'],
     slashAction: {
@@ -115,8 +123,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-numbered-list',
-    title: 'Numbered list',
-    subtitle: 'Turn this block into a numbered list item',
+    labelKey: 'numberedList',
     detail: '1.',
     keywords: ['numbered', 'ordered', 'list', '1.'],
     slashAction: {
@@ -127,8 +134,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-checklist',
-    title: 'To-do',
-    subtitle: 'Turn this block into a checkable to-do item',
+    labelKey: 'todo',
     detail: '[ ]',
     keywords: [
       'todo',
@@ -148,8 +154,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-paragraph',
-    title: 'Paragraph',
-    subtitle: 'Reset this block back to plain body text',
+    labelKey: 'paragraph',
     detail: 'P',
     keywords: ['paragraph', 'text', 'body', 'plain'],
     slashAction: {
@@ -159,8 +164,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-table',
-    title: 'Table',
-    subtitle: 'Insert a table with header and body rows',
+    labelKey: 'table',
     detail: '2x2',
     keywords: ['table', 'grid', 'rows', 'columns'],
     slashAction: {
@@ -171,8 +175,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-bold',
-    title: 'Bold',
-    subtitle: 'Insert **bold** markdown',
+    labelKey: 'bold',
     detail: '**',
     keywords: ['bold', 'strong', '**'],
     slashAction: {
@@ -183,8 +186,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-italic',
-    title: 'Italic',
-    subtitle: 'Insert *italic* markdown',
+    labelKey: 'italic',
     detail: '*',
     keywords: ['italic', 'emphasis', 'em', '*'],
     slashAction: {
@@ -195,8 +197,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-link',
-    title: 'Link',
-    subtitle: 'Insert [label](url) markdown',
+    labelKey: 'link',
     detail: '[]()',
     keywords: ['link', 'url', 'hyperlink', '[]()'],
     slashAction: {
@@ -206,9 +207,19 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
     },
   },
   {
+    id: 'slash-note-link',
+    labelKey: 'noteLink',
+    detail: '[[]]',
+    keywords: ['note', 'link', 'wiki', 'reference', 'backlink', '[[]]'],
+    slashAction: {
+      kind: 'inline',
+      open: '[[',
+      close: ']]',
+    },
+  },
+  {
     id: 'slash-inline-code',
-    title: 'Inline code',
-    subtitle: 'Insert `code` markdown',
+    labelKey: 'inlineCode',
     detail: '`',
     keywords: ['code', 'inline', '`'],
     slashAction: {
@@ -219,8 +230,7 @@ const SLASH_INSERT_ITEMS: readonly SlashInsertAutocompleteItem[] = [
   },
   {
     id: 'slash-embed',
-    title: 'Embed',
-    subtitle: 'Insert ![alt](url) — images, videos, YouTube, link cards',
+    labelKey: 'embed',
     detail: '![]',
     keywords: [
       'embed',
@@ -285,14 +295,32 @@ function matchesSlashQuery(
   return searchable.includes(normalizedQuery);
 }
 
+function buildSlashInsertItem(
+  definition: SlashInsertItemDefinition,
+  labels: SlashInsertLabels,
+): SlashInsertAutocompleteItem {
+  const label = labels[definition.labelKey];
+  return {
+    id: definition.id,
+    title: label.title,
+    subtitle: label.subtitle,
+    detail: definition.detail,
+    keywords: definition.keywords,
+    slashAction: definition.slashAction,
+  };
+}
+
 export function searchSlashInsertAutocompleteItems(
   query: string,
   limit: number,
+  labels: SlashInsertLabels,
 ): readonly SlashInsertAutocompleteItem[] {
   const normalizedQuery = query.trim().toLowerCase();
-  return SLASH_INSERT_ITEMS.filter((item) =>
-    matchesSlashQuery(item, normalizedQuery),
-  ).slice(0, limit);
+  return SLASH_INSERT_DEFINITIONS.map((definition) =>
+    buildSlashInsertItem(definition, labels),
+  )
+    .filter((item) => matchesSlashQuery(item, normalizedQuery))
+    .slice(0, limit);
 }
 
 export function findActiveSlashInsertAutocomplete(

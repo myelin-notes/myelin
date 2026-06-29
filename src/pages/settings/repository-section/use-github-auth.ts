@@ -2,6 +2,7 @@ import {
   beginGitHubDeviceAuth,
   cancelGitHubDeviceAuth,
   clearGitHubToken,
+  consumeGitHubVaultDiscarded,
   hasGitHubToken,
   isGitHubDeviceAuthAvailable,
   openGitHubDeviceAuth,
@@ -21,5 +22,6 @@ export function useGitHubAuth(credentialId: string): GitHubAuthState {
       waitForGitHubDeviceAuth(id, { signal: options.signal }),
     cancel: cancelGitHubDeviceAuth,
     clear: clearGitHubToken,
+    consumeDiscarded: consumeGitHubVaultDiscarded,
   });
 }

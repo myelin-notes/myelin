@@ -62,6 +62,7 @@ export function VirtualList({
   const { containerRef, setContainerEl, measured } = useVirtualScaffold(
     count,
     getRowKey,
+    estimateHeight,
     onWidthChange,
   );
 
@@ -77,6 +78,7 @@ export function VirtualList({
     count,
     rowHeight,
     heightsVersion: measured.version,
+    consumeDirtyFrom: measured.consumeDirtyFrom,
     gap,
     overscan,
     pinnedIndex,
@@ -98,7 +100,7 @@ export function VirtualList({
         return (
           <div
             key={key}
-            ref={measured.measure(key)}
+            ref={measured.measure(key, virtualRow.index)}
             className="absolute inset-x-0"
             style={{ top: virtualRow.start }}
           >

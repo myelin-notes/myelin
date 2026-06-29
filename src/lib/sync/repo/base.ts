@@ -51,6 +51,7 @@ import {
   VERSION_HISTORY_MAX_PER_FILE,
   type VFSManifest,
 } from './shared';
+import { normalizeTagInput } from './tag-hierarchy';
 import type {
   CreateFileOptions,
   FileType,
@@ -586,6 +587,32 @@ export abstract class BaseRepository
         (c) => c !== normalized,
       );
       return [...manifest.customColors];
+    });
+  }
+
+  async getRegistryTags(): Promise<string[]> {
+    const { manifest } = await this.loadManifestImpl();
+    return [...manifest.tagRegistry];
+  }
+
+  async addRegistryTags(tags: string[]): Promise<string[]> {
+    const normalized = tags
+      .map(normalizeTagInput)
+      .filter((tag) => tag.length > 0);
+    return this.mutateManifest('Add registry tags', (manifest) => {
+      const next = new Set(manifest.tagRegistry);
+      for (const tag of normalized) {
+        next.add(tag);
+      }
+      manifest.tagRegistry = [...next];
+      return [...manifest.tagRegistry];
+    });
+  }
+
+  async removeRegistryTag(tag: string): Promise<string[]> {
+    return this.mutateManifest('Remove registry tag', (manifest) => {
+      manifest.tagRegistry = manifest.tagRegistry.filter((t) => t !== tag);
+      return [...manifest.tagRegistry];
     });
   }
 

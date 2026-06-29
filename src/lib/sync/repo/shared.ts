@@ -27,6 +27,7 @@ export interface VFSManifest {
   nodes: Record<string, VFSNode>;
   linksBySource: Record<VFSNodeId, StoredNoteLink[]>;
   customColors: string[];
+  tagRegistry: string[];
 }
 
 export interface RepositorySnapshot {
@@ -70,6 +71,7 @@ export function createEmptyManifest(): VFSManifest {
     nodes: {},
     linksBySource: {},
     customColors: [],
+    tagRegistry: [],
   };
 }
 
@@ -728,7 +730,9 @@ export function deleteNodeFromManifest(
         collect(childId);
       }
     } else {
-      files.push(structuredClone(current));
+      // The node is removed from the manifest below and never mutated after,
+      // so callers can safely take the live reference without a defensive copy.
+      files.push(current);
       // Version-history snapshots live under the hidden root, not under the
       // file itself, so deleting the file would orphan them. Drop them too.
       if (!isFileVersionNode(current)) {
