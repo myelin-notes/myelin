@@ -656,6 +656,22 @@ const zhHans: typeof en = {
         title: '嵌入',
         subtitle: '插入 ![alt](url) — 图片、视频、YouTube、链接卡片',
       },
+      today: {
+        title: '今天',
+        subtitle: '插入今天的日期',
+      },
+      tomorrow: {
+        title: '明天',
+        subtitle: '插入明天的日期',
+      },
+      yesterday: {
+        title: '昨天',
+        subtitle: '插入昨天的日期',
+      },
+      now: {
+        title: '现在',
+        subtitle: '插入当前日期和时间',
+      },
     },
     backlinks: {
       title: '反向链接',

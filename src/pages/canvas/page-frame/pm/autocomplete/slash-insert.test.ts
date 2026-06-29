@@ -183,6 +183,41 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
     expect(selectedState.selection.to).toBe(2);
   });
 
+  it("inserts today's date formatted in the active locale", () => {
+    const markdown = '/today';
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+    const activeRequest = findActiveSlashInsertAutocomplete(state);
+
+    expect(activeRequest).not.toBeNull();
+
+    const tr = buildSelectSlashInsertAutocompleteTransaction(
+      state,
+      schema,
+      activeRequest!,
+      findItem('slash-date-today'),
+    );
+
+    expect(tr).not.toBeNull();
+
+    const expected = new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'long',
+    }).format(new Date());
+    const selectedState = state.apply(tr!);
+
+    expect(selectedState.doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: expected }],
+        },
+      ],
+    });
+    expect(selectedState.selection.from).toBe(1 + expected.length);
+    expect(selectedState.selection.to).toBe(1 + expected.length);
+  });
+
   it('replaces the current block with a table and places the caret in the first cell', () => {
     const markdown = '/table';
     const head = 1 + markdown.length;

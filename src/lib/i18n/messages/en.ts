@@ -673,6 +673,22 @@ const en = {
         title: 'Embed',
         subtitle: 'Insert ![alt](url) — images, videos, YouTube, link cards',
       },
+      today: {
+        title: 'Today',
+        subtitle: "Insert today's date",
+      },
+      tomorrow: {
+        title: 'Tomorrow',
+        subtitle: "Insert tomorrow's date",
+      },
+      yesterday: {
+        title: 'Yesterday',
+        subtitle: "Insert yesterday's date",
+      },
+      now: {
+        title: 'Now',
+        subtitle: 'Insert the current date and time',
+      },
     },
     backlinks: {
       title: 'Backlinks',

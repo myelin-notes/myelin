@@ -42,6 +42,11 @@ type SlashInsertAction =
       kind: 'table';
       rows: number;
       columns: number;
+    }
+  | {
+      kind: 'date';
+      offsetDays: number;
+      includeTime: boolean;
     };
 
 export interface SlashInsertAutocompleteItem extends PageFrameAutocompleteItem {
@@ -61,9 +66,22 @@ export type SlashInsertLabels = Messages['canvas']['slashInsert'];
 interface SlashInsertItemDefinition {
   id: string;
   labelKey: keyof SlashInsertLabels;
-  detail: string;
+  detail?: string;
   keywords: readonly string[];
   slashAction: SlashInsertAction;
+}
+
+// Formats a date action in the user's locale. Used both for the inserted text
+// and for the live preview shown in the menu's detail chip.
+export function formatSlashDate(
+  action: Extract<SlashInsertAction, { kind: 'date' }>,
+): string {
+  const date = new Date();
+  date.setDate(date.getDate() + action.offsetDays);
+  const options: Intl.DateTimeFormatOptions = action.includeTime
+    ? { dateStyle: 'long', timeStyle: 'short' }
+    : { dateStyle: 'long' };
+  return new Intl.DateTimeFormat(undefined, options).format(date);
 }
 
 const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
@@ -249,6 +267,30 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
       close: ']()',
     },
   },
+  {
+    id: 'slash-date-today',
+    labelKey: 'today',
+    keywords: ['date', 'today', 'now', 'current'],
+    slashAction: { kind: 'date', offsetDays: 0, includeTime: false },
+  },
+  {
+    id: 'slash-date-tomorrow',
+    labelKey: 'tomorrow',
+    keywords: ['date', 'tomorrow', 'next'],
+    slashAction: { kind: 'date', offsetDays: 1, includeTime: false },
+  },
+  {
+    id: 'slash-date-yesterday',
+    labelKey: 'yesterday',
+    keywords: ['date', 'yesterday', 'previous', 'last'],
+    slashAction: { kind: 'date', offsetDays: -1, includeTime: false },
+  },
+  {
+    id: 'slash-date-now',
+    labelKey: 'now',
+    keywords: ['date', 'time', 'now', 'timestamp', 'current'],
+    slashAction: { kind: 'date', offsetDays: 0, includeTime: true },
+  },
 ];
 
 function buildTextOffsetMap(
@@ -304,7 +346,10 @@ function buildSlashInsertItem(
     id: definition.id,
     title: label.title,
     subtitle: label.subtitle,
-    detail: definition.detail,
+    detail:
+      definition.slashAction.kind === 'date'
+        ? formatSlashDate(definition.slashAction)
+        : definition.detail,
     keywords: definition.keywords,
     slashAction: definition.slashAction,
   };
@@ -403,6 +448,14 @@ export function buildSelectSlashInsertAutocompleteTransaction(
     tr.setSelection(
       TextSelection.create(tr.doc, from + slashAction.open.length),
     );
+    return tr;
+  }
+
+  if (slashAction.kind === 'date') {
+    const text = formatSlashDate(slashAction);
+    const { from, to } = activeRequest.replaceRange;
+    const tr = state.tr.insertText(text, from, to);
+    tr.setSelection(TextSelection.create(tr.doc, from + text.length));
     return tr;
   }
 

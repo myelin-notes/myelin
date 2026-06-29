@@ -680,6 +680,22 @@ const es: typeof en = {
         subtitle:
           'Inserta ![alt](url): imágenes, vídeos, YouTube, tarjetas de enlace',
       },
+      today: {
+        title: 'Hoy',
+        subtitle: 'Inserta la fecha de hoy',
+      },
+      tomorrow: {
+        title: 'Mañana',
+        subtitle: 'Inserta la fecha de mañana',
+      },
+      yesterday: {
+        title: 'Ayer',
+        subtitle: 'Inserta la fecha de ayer',
+      },
+      now: {
+        title: 'Ahora',
+        subtitle: 'Inserta la fecha y hora actuales',
+      },
     },
     backlinks: {
       title: 'Backlinks',
