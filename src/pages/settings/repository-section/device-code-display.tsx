@@ -29,7 +29,7 @@ export function DeviceCodeDisplay({ userCode }: { userCode: string }) {
           <p className="text-[10px] text-text-muted uppercase tracking-widest">
             {strings.settings.repository.auth.deviceCode}
           </p>
-          <p className="mt-1.5 font-mono font-semibold text-2xl text-accent-navy tracking-[0.25em]">
+          <p className="mt-1.5 font-mono font-semibold text-2xl text-text-brand tracking-[0.25em]">
             {userCode}
           </p>
         </div>

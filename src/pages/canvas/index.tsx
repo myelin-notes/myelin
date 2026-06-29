@@ -515,7 +515,7 @@ function CanvasViewInner({
     [inserts.closeEmbed, inserts.embedOpen, inserts.submitEmbed],
   );
   const wheelCenterIcon = useMemo(
-    () => <XIcon className="size-4 text-white" />,
+    () => <XIcon className="size-4 text-text-on-dark" />,
     [],
   );
 

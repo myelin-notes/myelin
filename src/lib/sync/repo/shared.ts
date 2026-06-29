@@ -652,6 +652,7 @@ export function getNoteGraph(manifest: VFSManifest): RepositoryNoteGraph {
     .map((node) => ({
       id: node.id,
       name: node.name,
+      tags: node.tags,
     }));
 
   const canvasNodeIds = new Set(nodes.map((node) => node.id));

@@ -48,11 +48,37 @@ const faqs = [
     a: 'On your own disk. You can export your whole workspace to a complete file that preserves everything, any time.',
   },
 ];
+
+const softwareJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Myelin',
+  applicationCategory: 'ProductivityApplication',
+  operatingSystem: 'macOS, Windows, Linux, iPadOS, Android',
+  description:
+    'A native, local-first canvas where handwriting, type, PDFs, images, and audio live in one note, kept on your own machine.',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+  },
+};
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map(({ q, a }) => ({
+    '@type': 'Question',
+    name: q,
+    acceptedAnswer: { '@type': 'Answer', text: a },
+  })),
+};
 ---
 
 <Base
   title="Myelin — handwriting, type, and PDFs in one note"
   description="Myelin is a native, local-first canvas where handwriting, type, PDFs, images, and audio live in one note, kept on your own machine. Free while it is in early access."
+  jsonLd={[softwareJsonLd, faqJsonLd]}
 >
   <!-- Hero -->
   <section class="mx-auto max-w-6xl px-6 lg:px-10">

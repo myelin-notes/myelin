@@ -1,3 +1,5 @@
+import { getCanvasPalette } from '../../canvas-theme';
+
 const WAVEFORM_BARS = 80;
 
 export interface DecodedAudio {
@@ -52,12 +54,14 @@ export function drawWaveform(
   const gap = (width - bars * barW) / (bars - 1);
   const cx = width * progress;
   const minBarH = 3;
+  const palette = getCanvasPalette();
 
   for (let i = 0; i < bars; i++) {
     const x = i * (barW + gap);
     const barH = Math.max(minBarH, waveform[i] * height * 0.85);
     const y = (height - barH) / 2;
-    ctx2d.fillStyle = x + barW < cx ? '#1c2738' : '#d0d5db';
+    ctx2d.fillStyle =
+      x + barW < cx ? palette.accentDark : palette.waveformTrack;
     ctx2d.beginPath();
     ctx2d.roundRect(x, y, barW, barH, 1);
     ctx2d.fill();

@@ -1,10 +1,12 @@
 //! Bundled variable fonts + a cache of krilla `Font` instances.
 //!
-//! The webview loads Inter (body) and Newsreader (headings) as variable fonts from
-//! Google Fonts; we embed the same variable TTFs and select `wght`/`opsz` per run so
-//! glyph advances match the harvested on-screen positions. `Font` is expensive to
-//! create but cheap to clone, so we cache instances keyed by rounded weight + optical
-//! size.
+//! The webview loads a sans body font and a serif heading font as variable fonts; we
+//! embed the same variable TTFs and select `wght`/`opsz` per run so glyph advances
+//! match the harvested on-screen positions. `Font` is expensive to create but cheap to
+//! clone, so we cache instances keyed by rounded weight + optical size.
+//!
+//! `FontKey` names the use case (sans/serif/mono); the concrete TTF a use case maps to
+//! lives only in `face_bytes`, so swapping fonts touches just the consts below.
 
 use std::collections::HashMap;
 
@@ -13,8 +15,8 @@ use krilla::Data;
 
 use super::contract::FontKey;
 
-const INTER: &[u8] = include_bytes!("../../fonts/Inter.ttf");
-const INTER_ITALIC: &[u8] = include_bytes!("../../fonts/Inter-Italic.ttf");
+const HANKEN: &[u8] = include_bytes!("../../fonts/HankenGrotesk.ttf");
+const HANKEN_ITALIC: &[u8] = include_bytes!("../../fonts/HankenGrotesk-Italic.ttf");
 const NEWSREADER: &[u8] = include_bytes!("../../fonts/Newsreader.ttf");
 const NEWSREADER_ITALIC: &[u8] = include_bytes!("../../fonts/Newsreader-Italic.ttf");
 const MONO: &[u8] = include_bytes!("../../fonts/JetBrainsMono.ttf");
@@ -59,10 +61,10 @@ impl FontRegistry {
 
 fn face_bytes(key: FontKey, italic: bool) -> &'static [u8] {
     match (key, italic) {
-        (FontKey::Inter, false) => INTER,
-        (FontKey::Inter, true) => INTER_ITALIC,
-        (FontKey::Newsreader, false) => NEWSREADER,
-        (FontKey::Newsreader, true) => NEWSREADER_ITALIC,
+        (FontKey::Sans, false) => HANKEN,
+        (FontKey::Sans, true) => HANKEN_ITALIC,
+        (FontKey::Serif, false) => NEWSREADER,
+        (FontKey::Serif, true) => NEWSREADER_ITALIC,
         (FontKey::Mono, _) => MONO,
     }
 }

@@ -23,14 +23,14 @@ export function KindCard({
         'group relative flex w-full cursor-pointer items-center gap-4 px-4 py-3.5 text-left transition-colors',
         selected
           ? 'bg-transparent'
-          : 'bg-transparent hover:bg-hover-tint focus-visible:bg-hover-tint',
+          : 'bg-transparent hover:bg-input focus-visible:bg-input',
       )}
     >
       {selected && (
         <motion.span
           layoutId="repo-kind-rail"
           aria-hidden="true"
-          className="absolute inset-y-2 left-0 w-[2px] rounded-r-full bg-accent-navy"
+          className="absolute inset-y-2 left-0 w-[2px] rounded-r-full bg-text-brand"
           transition={{ type: 'spring', stiffness: 420, damping: 36 }}
         />
       )}
@@ -38,7 +38,7 @@ export function KindCard({
         className={cn(
           'flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors',
           selected
-            ? 'bg-accent-navy/12 text-accent-navy'
+            ? 'bg-text-brand/12 text-text-brand'
             : 'bg-hover-tint text-text-secondary group-hover:text-text-primary',
         )}
       >
@@ -48,7 +48,7 @@ export function KindCard({
         <span
           className={cn(
             'block font-heading text-[15px] leading-tight transition-colors',
-            selected ? 'text-accent-navy' : 'text-text-primary',
+            selected ? 'text-text-brand' : 'text-text-primary',
           )}
         >
           {label}
@@ -61,14 +61,14 @@ export function KindCard({
         aria-hidden="true"
         className={cn(
           'relative flex size-[18px] shrink-0 items-center justify-center rounded-full border transition-colors',
-          selected ? 'border-accent-navy' : 'border-border-divider',
+          selected ? 'border-text-brand' : 'border-border-divider',
         )}
       >
         <motion.span
           initial={false}
           animate={{ scale: selected ? 1 : 0, opacity: selected ? 1 : 0 }}
           transition={{ type: 'spring', stiffness: 480, damping: 32 }}
-          className="size-[8px] rounded-full bg-accent-navy"
+          className="size-[8px] rounded-full bg-text-brand"
         />
       </span>
     </button>

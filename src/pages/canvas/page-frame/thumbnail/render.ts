@@ -1,14 +1,17 @@
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import { getCanvasPalette } from '../../canvas-theme';
 
 /**
  * Approximate visual metrics for the thumbnail. These don't need to match the
  * live editor exactly — the result is shown at <=600px, so coarse line heights
  * and greedy word-wrap read fine.
  */
-const TEXT_COLOR = '#1f2933';
-const MUTED_COLOR = '#7b8794';
-const SHADE_COLOR = '#f0f2f5';
-const RULE_COLOR = '#cbd2d9';
+// Theme-aware chrome colors, refreshed from the canvas palette at render entry
+// so the thumbnail tracks light/dark. Fallbacks are the original light values.
+let TEXT_COLOR = '#1f2933';
+let MUTED_COLOR = '#7b8794';
+let SHADE_COLOR = '#f0f2f5';
+let RULE_COLOR = '#cbd2d9';
 const BODY_FONT = 'sans-serif';
 const MONO_FONT = 'monospace';
 
@@ -55,6 +58,12 @@ export function renderPageFrameThumbnail(
 ): void {
   const { width, maxHeight } = opts;
   const cursor: Cursor = { y: 0 };
+
+  const palette = getCanvasPalette();
+  TEXT_COLOR = palette.textPrimary;
+  MUTED_COLOR = palette.textMuted;
+  SHADE_COLOR = palette.muted;
+  RULE_COLOR = palette.border;
 
   ctx.textBaseline = 'top';
 

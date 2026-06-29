@@ -27,8 +27,8 @@ export function ColorSwatch({
       style={{
         backgroundColor: color,
         boxShadow: active
-          ? '0 0 0 2px rgba(255,255,255,0.9), 0 0 0 3.5px rgba(25,28,30,0.25)'
-          : 'inset 0 0 0 1px rgba(25,28,30,0.06)',
+          ? '0 0 0 2px var(--bg-card), 0 0 0 3.5px rgb(var(--shadow-rgb) / 0.25)'
+          : 'inset 0 0 0 1px var(--border-ghost)',
         transform: active ? 'scale(1.15)' : undefined,
       }}
     />

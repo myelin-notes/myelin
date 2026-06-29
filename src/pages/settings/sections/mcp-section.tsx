@@ -73,7 +73,7 @@ export function McpSection() {
           label={strings.settings.mcp.enabled.label}
           description={strings.settings.mcp.enabled.description}
         />
-        <label className="flex w-full items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 ring-1 ring-border-subtle/70">
+        <label className="flex w-full items-center justify-between gap-4 rounded-xl bg-input/40 px-4 py-3 ring-1 ring-border-subtle/70">
           <span className="min-w-0">
             <span className="block font-medium text-sm text-text-primary">
               {strings.settings.mcp.port.label}
@@ -90,7 +90,7 @@ export function McpSection() {
             onChange={(event) => setPortDraft(event.currentTarget.value)}
             onBlur={commitPort}
             onKeyDown={handlePortKeyDown}
-            className="h-9 w-24 rounded-lg bg-card px-3 text-right text-sm text-text-primary outline-none ring-1 ring-border-subtle/70 transition-shadow focus:ring-2 focus:ring-accent-navy/20"
+            className="h-9 w-24 rounded-lg bg-card px-3 text-right text-sm text-text-primary outline-none ring-1 ring-border-subtle/70 transition-shadow [appearance:textfield] focus:ring-2 focus:ring-accent-navy/20 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </label>
         <ToggleRow
@@ -99,7 +99,7 @@ export function McpSection() {
           label={strings.settings.mcp.directWrites.label}
           description={strings.settings.mcp.directWrites.description}
         />
-        <div className="rounded-xl bg-input px-4 py-3 ring-1 ring-border-subtle/70">
+        <div className="rounded-xl bg-input/40 px-4 py-3 ring-1 ring-border-subtle/70">
           <div className="flex items-start justify-between gap-4">
             <span className="min-w-0">
               <span className="block font-medium text-sm text-text-primary">

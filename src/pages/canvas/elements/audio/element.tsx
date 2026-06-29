@@ -2,6 +2,7 @@ import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import type * as Y from 'yjs';
 import { I18nProvider } from '@/lib/i18n';
+import { getCanvasPalette } from '../../canvas-theme';
 import type { CanvasViewport } from '../../canvas-viewport';
 import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
@@ -204,13 +205,14 @@ export class AudioElement extends DrawableElement {
   protected draw2D(): void {}
 
   public override drawThumbnail(ctx: CanvasRenderingContext2D): void {
+    const palette = getCanvasPalette();
     ctx.save();
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = palette.surface;
     ctx.beginPath();
     ctx.roundRect(0, 0, AUDIO_NATURAL_WIDTH, AUDIO_NATURAL_HEIGHT, 10);
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(195, 199, 202, 0.6)';
+    ctx.strokeStyle = palette.border;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(0, 0, AUDIO_NATURAL_WIDTH, AUDIO_NATURAL_HEIGHT, 10);
@@ -224,7 +226,7 @@ export class AudioElement extends DrawableElement {
       ctx.restore();
     }
 
-    ctx.fillStyle = '#1c2738';
+    ctx.fillStyle = palette.accentDark;
     ctx.beginPath();
     ctx.arc(28, AUDIO_NATURAL_HEIGHT / 2, 16, 0, Math.PI * 2);
     ctx.fill();

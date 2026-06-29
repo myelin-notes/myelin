@@ -238,12 +238,12 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
       onDrop={handlePanelDrop}
     >
       <div
-        className={`relative w-[min(296px,calc(100vw-5rem))] overflow-hidden rounded-2xl bg-white/85 shadow-ambient backdrop-blur-[24px] transition-colors duration-200 ${
+        className={`relative w-[min(296px,calc(100vw-5rem))] overflow-hidden rounded-2xl bg-popover/85 shadow-ambient backdrop-blur-[24px] transition-colors duration-200 ${
           isDragOver ? 'ring-2 ring-accent-dark/40' : ''
         }`}
       >
         {isDragOver && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-accent-green/30 via-white/40 to-accent-green/20 backdrop-blur-[2px]">
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-br from-accent-green/30 via-surface/40 to-accent-green/20 backdrop-blur-[2px]">
             <div className="flex flex-col items-center gap-2 text-text-primary">
               <ImagePlusIcon className="size-6" />
               <span className="font-heading text-base italic">
@@ -326,7 +326,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                 </div>
                 <button
                   onClick={handleUrlEmbed}
-                  className="mt-2 w-full cursor-pointer rounded-xl border-none bg-accent-dark px-3 py-2 font-medium text-[13px] text-white tracking-[0.005em] transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
+                  className="mt-2 w-full cursor-pointer rounded-xl border-none bg-accent-dark px-3 py-2 font-medium text-[13px] text-text-on-dark tracking-[0.005em] transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
                 >
                   {urlState.mime === 'application/pdf'
                     ? strings.canvas.embedComposer.embedPdf
@@ -361,7 +361,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
                       }
                     }}
                     placeholder={strings.canvas.embedComposer.urlPlaceholder}
-                    className="w-full rounded-xl border border-border-divider bg-card py-2 pr-[68px] pl-8 font-normal text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-accent-dark/50 focus:bg-white"
+                    className="w-full rounded-xl border border-border-divider bg-card py-2 pr-[68px] pl-8 font-normal text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-accent-dark/50 focus:bg-card"
                   />
                   <button
                     onClick={handleUrlSubmit}
@@ -416,8 +416,8 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
             onClick={handleBrowse}
             className="group relative flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-border-divider border-dashed bg-surface/40 px-4 py-5 transition-colors duration-150 hover:border-accent-dark/40 hover:bg-surface/70"
           >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(111,251,190,0.12),transparent_70%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-            <div className="relative flex size-9 items-center justify-center rounded-full bg-white/80 shadow-[0_1px_3px_rgba(25,28,30,0.05)] transition-transform duration-200 group-hover:scale-110">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,color-mix(in_srgb,var(--accent-green)_12%,transparent),transparent_70%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            <div className="relative flex size-9 items-center justify-center rounded-full bg-card/80 shadow-[0_1px_3px_rgb(var(--shadow-rgb)/0.05)] transition-transform duration-200 group-hover:scale-110">
               <ImagePlusIcon className="size-4 text-text-primary" />
             </div>
             <div className="relative flex flex-col items-center gap-0.5">
@@ -440,7 +440,7 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
           className="flex items-center justify-between border-border-ghost border-t border-dashed px-4 py-2.5"
         >
           <div className="flex items-center gap-1.5 text-[10.5px] text-text-muted">
-            <kbd className="flex min-w-[20px] items-center justify-center rounded-[5px] border border-border-divider bg-white px-1 py-[1px] font-sans font-semibold text-[9.5px] text-text-secondary">
+            <kbd className="flex min-w-[20px] items-center justify-center rounded-[5px] border border-border-divider bg-card px-1 py-[1px] font-sans font-semibold text-[9.5px] text-text-secondary">
               ⌘V
             </kbd>
             <span>{strings.canvas.embedComposer.pasteFromClipboard}</span>

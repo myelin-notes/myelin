@@ -13,8 +13,8 @@ import type { NoteGraph } from './types';
 
 const graph: NoteGraph = {
   nodes: [
-    { id: 'a', name: 'Alpha', incomingEdges: [], outgoingEdges: [] },
-    { id: 'b', name: 'Beta', incomingEdges: [], outgoingEdges: [] },
+    { id: 'a', name: 'Alpha', tags: [], incomingEdges: [], outgoingEdges: [] },
+    { id: 'b', name: 'Beta', tags: [], incomingEdges: [], outgoingEdges: [] },
   ],
   edges: [
     {
@@ -35,6 +35,7 @@ function graphWithNodeCount(totalNodes: number): NoteGraph {
   const nodes = Array.from({ length: totalNodes }, (_, index) => ({
     id: `node-${index}`,
     name: `Node ${index}`,
+    tags: [],
     incomingEdges: [],
     outgoingEdges: [],
   }));

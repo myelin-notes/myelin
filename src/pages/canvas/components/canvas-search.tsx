@@ -72,7 +72,7 @@ export function CanvasSearch({
           ref={panelRef}
           role="dialog"
           aria-label={strings.canvas.search.placeholder}
-          className="fixed top-4 right-4 z-[200] flex items-center gap-1 rounded-xl bg-white/90 py-1.5 pr-1.5 pl-2 shadow-[0_12px_40px_rgba(25,28,30,0.16)] ring-1 ring-white/80 backdrop-blur-[28px]"
+          className="fixed top-4 right-4 z-[200] flex items-center gap-1 rounded-xl bg-popover/90 py-1.5 pr-1.5 pl-2 shadow-[0_12px_40px_rgb(var(--shadow-rgb)/0.16)] ring-1 ring-border-subtle backdrop-blur-[28px]"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

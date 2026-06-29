@@ -1597,7 +1597,7 @@ export class PdfElement extends DrawableElement {
       top: '0px',
       transformOrigin: '0 0',
       overflow: 'hidden',
-      background: '#ffffff',
+      background: 'var(--bg-card)',
       border: '1px solid var(--border-ghost)',
       boxSizing: 'border-box',
       pointerEvents: 'none',
@@ -1611,7 +1611,7 @@ export class PdfElement extends DrawableElement {
       display: 'block',
       width: '100%',
       height: '100%',
-      background: '#ffffff',
+      background: 'var(--bg-card)',
       pointerEvents: 'none',
     } as Partial<CSSStyleDeclaration>);
 

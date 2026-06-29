@@ -1,0 +1,316 @@
+---
+import Base from '../layouts/Base.astro';
+
+const elementTypes = [
+  { value: 0, name: 'STROKE', desc: 'A pen or highlighter stroke' },
+  { value: 1, name: 'TEXT', desc: 'A free-floating text box' },
+  { value: 2, name: 'IMAGE', desc: 'An embedded image' },
+  { value: 3, name: 'PAGE_FRAME', desc: 'A rich-text page (its text lives in content)' },
+  { value: 4, name: 'PDF', desc: 'An embedded PDF' },
+  { value: 5, name: 'SHAPE', desc: 'A vector shape' },
+  { value: 6, name: 'LATEX', desc: 'A rendered LaTeX expression' },
+  { value: 7, name: 'AUDIO', desc: 'An embedded audio clip' },
+];
+
+const noteFields = [
+  { name: 'version', type: 'number', desc: 'Schema version stamped on every note. Currently 1. Import rejects a file whose version it does not recognize.' },
+  { name: 'name', type: 'string', desc: 'The note’s display name.' },
+  { name: 'fileType', type: 'string', desc: 'The note’s file type. Canvas notes are "mcanvas".' },
+  { name: 'tags', type: 'string[]', desc: 'Tags applied to the note.' },
+  { name: 'createdAt', type: 'number', desc: 'Creation time, milliseconds since the Unix epoch.' },
+  { name: 'modifiedAt', type: 'number', desc: 'Last-modified time, milliseconds since the Unix epoch.' },
+  { name: 'elements', type: 'object[]', desc: 'Every element on the canvas, in document order. See below.' },
+];
+
+const exampleNote = `{
+  "version": 1,
+  "name": "Sample",
+  "fileType": "mcanvas",
+  "tags": ["a", "b"],
+  "createdAt": 1750636800000,
+  "modifiedAt": 1750636900000,
+  "elements": [
+    {
+      "type": 3,
+      "uuid": "page-frame-1",
+      "offsetX": 0,
+      "offsetY": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "displayName": "Page",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "heading",
+            "attrs": { "level": 1 },
+            "content": [{ "type": "text", "text": "Title" }]
+          },
+          {
+            "type": "paragraph",
+            "content": [
+              { "type": "text", "text": "Hello " },
+              {
+                "type": "text",
+                "marks": [{ "type": "strong" }],
+                "text": "world"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": 0,
+      "uuid": "stroke-1",
+      "offsetX": 5,
+      "offsetY": 6,
+      "scaleX": 1,
+      "scaleY": 1,
+      "color": "#ff0000",
+      "size": 4,
+      "hasPressure": false,
+      "points": [0, 0, 0.5, 10, 12, 0.7]
+    },
+    {
+      "type": 2,
+      "uuid": "image-1",
+      "offsetX": 20,
+      "offsetY": 30,
+      "scaleX": 1,
+      "scaleY": 1,
+      "naturalWidth": 2,
+      "naturalHeight": 3,
+      "imageData": { "__bytes__": "AAECyP7/" }
+    }
+  ]
+}`;
+
+const exampleTree = `My Workspace/
+├─ Research/
+│  ├─ Reading notes.json
+│  └─ diagram.png
+├─ Inbox/
+│  └─ Scratch.json
+└─ Welcome.json`;
+---
+
+<Base
+  title="Workspace export schema — Myelin"
+  description="The JSON schema Myelin uses when you export a workspace: the on-disk layout, the note format, and how canvas elements and binary data are encoded."
+>
+  <section class="mx-auto max-w-3xl px-6 lg:px-10">
+    <div class="pt-16 pb-12 lg:pt-24">
+      <p class="kicker text-text-muted">Reference</p>
+      <h1
+        class="mt-6 font-heading text-[clamp(2.4rem,5vw,3.75rem)] leading-[1.02] font-medium tracking-[-0.02em] text-text-primary"
+      >
+        Workspace export schema
+      </h1>
+      <p class="mt-7 text-lg leading-relaxed text-text-secondary">
+        When you export a workspace, Myelin writes a plain folder of files you
+        own and can read. Canvas notes become JSON, and any standalone media is
+        copied alongside them. This page documents that JSON so you can read,
+        diff, or generate it yourself.
+      </p>
+    </div>
+
+    <div class="space-y-16 pb-24">
+      <!-- On-disk layout -->
+      <section>
+        <h2 class="font-heading text-2xl font-medium text-text-primary">
+          On-disk layout
+        </h2>
+        <p class="mt-4 leading-relaxed text-text-secondary">
+          An export is a single root folder that mirrors your workspace
+          hierarchy. Each canvas note is written as a <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">.json</code>
+          file; standalone media (images, PDFs, audio) is copied as-is into the
+          same folders.
+        </p>
+        <pre
+          class="mt-6 overflow-x-auto rounded-2xl bg-surface p-5 font-mono text-sm leading-relaxed text-text-primary"
+        >{exampleTree}</pre>
+      </section>
+
+      <!-- Note file -->
+      <section>
+        <h2 class="font-heading text-2xl font-medium text-text-primary">
+          The note file
+        </h2>
+        <p class="mt-4 leading-relaxed text-text-secondary">
+          Every canvas note is one JSON object with these top-level fields.
+        </p>
+        <div class="mt-6 overflow-hidden rounded-2xl border border-border-ghost">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="bg-surface">
+                <th class="px-5 py-3 font-medium text-text-primary">Field</th>
+                <th class="px-5 py-3 font-medium text-text-primary">Type</th>
+                <th class="px-5 py-3 font-medium text-text-primary">Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                noteFields.map((field) => (
+                  <tr class="border-t border-border-ghost align-top">
+                    <td class="px-5 py-3 font-mono text-text-primary">
+                      {field.name}
+                    </td>
+                    <td class="px-5 py-3 font-mono text-text-muted">
+                      {field.type}
+                    </td>
+                    <td class="px-5 py-3 leading-relaxed text-text-secondary">
+                      {field.desc}
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Elements -->
+      <section>
+        <h2 class="font-heading text-2xl font-medium text-text-primary">
+          Elements
+        </h2>
+        <p class="mt-4 leading-relaxed text-text-secondary">
+          Each entry in <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">elements</code>
+          is a flat object describing one thing on the canvas. Two fields
+          identify every element:
+        </p>
+        <ul class="mt-4 space-y-2 leading-relaxed text-text-secondary">
+          <li>
+            <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">type</code>
+            — a number from the element-type table below.
+          </li>
+          <li>
+            <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">uuid</code>
+            — a string that uniquely identifies the element within the note.
+          </li>
+        </ul>
+        <p class="mt-4 leading-relaxed text-text-secondary">
+          Every other field is an element property. The set of properties
+          depends on the element type — a stroke carries
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">color</code>,
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">size</code>
+          and a flat
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">points</code>
+          array of
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">[x, y, pressure]</code>
+          triplets — read three numbers at a time, so
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">[0, 0, 0.5, 10, 12, 0.7]</code>
+          is two points. The
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">hasPressure</code>
+          flag says whether those pressure values came from a real stylus or were
+          synthesized; the triplet stride is the same either way. An image carries
+          its natural dimensions and pixel data.
+          Most drawable elements also carry position
+          (<code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">offsetX</code>,
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">offsetY</code>)
+          and scale
+          (<code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">scaleX</code>,
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">scaleY</code>).
+          Properties not in the list below are preserved verbatim on import.
+        </p>
+
+        <h3 class="mt-10 font-heading text-lg font-medium text-text-primary">
+          Element types
+        </h3>
+        <div class="mt-4 overflow-hidden rounded-2xl border border-border-ghost">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="bg-surface">
+                <th class="px-5 py-3 font-medium text-text-primary">type</th>
+                <th class="px-5 py-3 font-medium text-text-primary">Name</th>
+                <th class="px-5 py-3 font-medium text-text-primary">Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                elementTypes.map((el) => (
+                  <tr class="border-t border-border-ghost align-top">
+                    <td class="px-5 py-3 font-mono text-text-primary">
+                      {el.value}
+                    </td>
+                    <td class="px-5 py-3 font-mono text-text-muted">
+                      {el.name}
+                    </td>
+                    <td class="px-5 py-3 leading-relaxed text-text-secondary">
+                      {el.desc}
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="mt-10 font-heading text-lg font-medium text-text-primary">
+          Page-frame text
+        </h3>
+        <p class="mt-4 leading-relaxed text-text-secondary">
+          A page frame (<code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">type: 3</code>)
+          holds its rich text in a reserved
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">content</code>
+          field, separate from its other properties. The value is a
+          <a
+            href="https://prosemirror.net/docs/ref/#model.Node.toJSON"
+            class="text-accent-navy underline underline-offset-2"
+            target="_blank"
+            rel="noopener">ProseMirror document</a
+          > serialized to JSON — a tree of
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">doc</code>,
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">heading</code>,
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">paragraph</code>,
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">text</code>
+          nodes and marks. Only page frames use this field.
+        </p>
+
+        <h3 class="mt-10 font-heading text-lg font-medium text-text-primary">
+          Binary data
+        </h3>
+        <p class="mt-4 leading-relaxed text-text-secondary">
+          Binary properties — such as an image’s pixel bytes — are wrapped
+          in an object with a single
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">__bytes__</code>
+          key whose value is the base64-encoded content. The wrapper lets the
+          importer tell binaries apart from ordinary strings without knowing
+          which fields are binary.
+        </p>
+        <pre
+          class="mt-6 overflow-x-auto rounded-2xl bg-surface p-5 font-mono text-sm leading-relaxed text-text-primary"
+>{`"imageData": { "__bytes__": "AAECyP7/" }`}</pre>
+      </section>
+
+      <!-- Example -->
+      <section>
+        <h2 class="font-heading text-2xl font-medium text-text-primary">
+          A complete note
+        </h2>
+        <p class="mt-4 leading-relaxed text-text-secondary">
+          A note with one page frame, one stroke, and one image:
+        </p>
+        <pre
+          class="mt-6 overflow-x-auto rounded-2xl bg-surface p-5 font-mono text-[13px] leading-relaxed text-text-primary"
+        >{exampleNote}</pre>
+      </section>
+
+      <!-- Versioning -->
+      <section>
+        <h2 class="font-heading text-2xl font-medium text-text-primary">
+          Versioning
+        </h2>
+        <p class="mt-4 leading-relaxed text-text-secondary">
+          The current schema version is <strong class="text-text-primary">1</strong>.
+          Every exported note carries it in the
+          <code class="rounded bg-surface px-1.5 py-0.5 font-mono text-sm">version</code>
+          field, and import refuses a file whose version it does not recognize.
+          Timestamps live inside the JSON; reimporting a note creates a new file
+          rather than restoring its original creation date.
+        </p>
+      </section>
+    </div>
+  </section>
+</Base>

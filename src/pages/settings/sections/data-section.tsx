@@ -1,12 +1,18 @@
 import { useCallback, useState } from 'react';
-import { FolderOutput } from 'lucide-react';
+import {
+  ArrowUpRight,
+  FileJson,
+  FolderOutput,
+  Loader2,
+  type LucideIcon,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
+import { cn } from '@/lib/utils';
 import { exportObsidianVault } from '@/pages/library/export/obsidian-vault';
 import { exportWorkspaceJson } from '@/pages/library/export/workspace-json';
 
@@ -19,7 +25,8 @@ function errorDescription(error: unknown): string {
 export function DataSection() {
   const strings = useMessages();
   const repository = useRepository();
-  const [isExporting, setIsExporting] = useState(false);
+  const [exporting, setExporting] = useState<'obsidian' | 'json' | null>(null);
+  const isExporting = exporting !== null;
   const dataStrings = strings.settings.dataExport;
 
   const handleExportObsidianVault = useCallback(async () => {
@@ -32,7 +39,7 @@ export function DataSection() {
       return;
     }
 
-    setIsExporting(true);
+    setExporting('obsidian');
     const toastId = toast.loading(dataStrings.export.loading);
     try {
       const result = await exportObsidianVault({
@@ -61,7 +68,7 @@ export function DataSection() {
         description: errorDescription(error),
       });
     } finally {
-      setIsExporting(false);
+      setExporting(null);
     }
   }, [isExporting, repository, dataStrings]);
 
@@ -75,7 +82,7 @@ export function DataSection() {
       return;
     }
 
-    setIsExporting(true);
+    setExporting('json');
     const toastId = toast.loading(dataStrings.exportJson.loading);
     try {
       const result = await exportWorkspaceJson({
@@ -107,7 +114,7 @@ export function DataSection() {
         description: errorDescription(error),
       });
     } finally {
-      setIsExporting(false);
+      setExporting(null);
     }
   }, [isExporting, repository, dataStrings]);
 
@@ -120,41 +127,80 @@ export function DataSection() {
         </span>
       </div>
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 ring-1 ring-border-subtle/70">
-          <span className="min-w-0">
-            <span className="block font-medium text-sm text-text-primary">
-              {dataStrings.export.label}
-            </span>
-            <span className="mt-1 block text-text-muted text-xs leading-relaxed">
-              {dataStrings.export.description}
-            </span>
-          </span>
-          <Button
-            onClick={() => void handleExportObsidianVault()}
-            disabled={isExporting}
-          >
-            <FolderOutput className="size-3.5" />
-            {dataStrings.export.button}
-          </Button>
-        </div>
-        <div className="flex items-center justify-between gap-4 rounded-xl bg-input px-4 py-3 ring-1 ring-border-subtle/70">
-          <span className="min-w-0">
-            <span className="block font-medium text-sm text-text-primary">
-              {dataStrings.exportJson.label}
-            </span>
-            <span className="mt-1 block text-text-muted text-xs leading-relaxed">
-              {dataStrings.exportJson.description}
-            </span>
-          </span>
-          <Button
-            onClick={() => void handleExportWorkspaceJson()}
-            disabled={isExporting}
-          >
-            <FolderOutput className="size-3.5" />
-            {dataStrings.exportJson.button}
-          </Button>
-        </div>
+        <ExportCard
+          icon={FolderOutput}
+          label={dataStrings.export.label}
+          description={dataStrings.export.description}
+          action={dataStrings.export.button}
+          onClick={() => void handleExportObsidianVault()}
+          loading={exporting === 'obsidian'}
+          disabled={isExporting}
+        />
+        <ExportCard
+          icon={FileJson}
+          label={dataStrings.exportJson.label}
+          description={dataStrings.exportJson.description}
+          action={dataStrings.exportJson.button}
+          onClick={() => void handleExportWorkspaceJson()}
+          loading={exporting === 'json'}
+          disabled={isExporting}
+        />
       </div>
     </section>
+  );
+}
+
+function ExportCard({
+  icon: Icon,
+  label,
+  description,
+  action,
+  onClick,
+  loading,
+  disabled,
+}: {
+  icon: LucideIcon;
+  label: string;
+  description: string;
+  action: string;
+  onClick: () => void;
+  loading: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-busy={loading}
+      className="group flex w-full items-center gap-4 rounded-xl bg-input/40 px-4 py-3.5 text-left ring-1 ring-border-subtle/70 transition-colors duration-200 hover:bg-input disabled:pointer-events-none disabled:opacity-60"
+    >
+      <span
+        className={cn(
+          'flex size-10 shrink-0 items-center justify-center rounded-lg bg-hover-tint text-text-secondary transition-colors duration-200',
+          !disabled && 'group-hover:text-text-primary',
+        )}
+      >
+        <Icon className="size-[18px]" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium text-sm text-text-primary">
+          {label}
+        </span>
+        <span className="mt-0.5 block text-text-muted text-xs leading-relaxed">
+          {description}
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5 font-medium text-text-muted text-xs uppercase tracking-[0.08em] transition-colors duration-200 group-hover:text-text-brand">
+        {loading ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <>
+            {action}
+            <ArrowUpRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </>
+        )}
+      </span>
+    </button>
   );
 }

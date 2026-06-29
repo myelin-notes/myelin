@@ -207,9 +207,9 @@ describe('LocalRepository', () => {
 
     expect(await repository.getNoteGraph()).toEqual({
       nodes: [
-        { id: sourceId, name: 'Source' },
-        { id: targetId, name: 'Target' },
-        { id: otherId, name: 'Other' },
+        { id: sourceId, name: 'Source', tags: [] },
+        { id: targetId, name: 'Target', tags: [] },
+        { id: otherId, name: 'Other', tags: [] },
       ],
       links: [
         {
@@ -277,7 +277,7 @@ describe('LocalRepository', () => {
     ];
 
     expect(getNoteGraph(manifest)).toEqual({
-      nodes: [{ id: userId, name: 'User Note' }],
+      nodes: [{ id: userId, name: 'User Note', tags: [] }],
       links: [
         {
           sourceId: userId,

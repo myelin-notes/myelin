@@ -226,7 +226,10 @@ const en = {
     title: 'Graph',
     explicitLinks: 'Explicit links',
     searchPlaceholder: 'Search graph...',
-    fit: 'Fit',
+    recenter: 'Recenter',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    tags: 'Tags',
     openNote: 'Open note',
     emptySelection: 'Select a note to inspect its links.',
     noCanvasNotes: 'No canvas notes yet.',
@@ -251,6 +254,15 @@ const en = {
   },
   settings: {
     title: 'Preferences',
+    theme: {
+      title: 'Theme',
+      eyebrow: 'Appearance',
+      options: {
+        light: 'Light',
+        dark: 'Dark',
+        system: 'System',
+      },
+    },
     canvasStyle: {
       title: 'Canvas Style',
       eyebrow: 'Surface Layer',

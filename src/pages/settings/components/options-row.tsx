@@ -21,7 +21,7 @@ export function OptionsRow<T extends string>({
   options: ReadonlyArray<OptionsRowOption<T>>;
 }) {
   return (
-    <div className="flex w-full flex-col gap-3 rounded-xl bg-input px-4 py-3 ring-1 ring-border-subtle/70 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex w-full flex-col gap-3 rounded-xl bg-input/40 px-4 py-3 ring-1 ring-border-subtle/70 sm:flex-row sm:items-center sm:justify-between">
       <span className="min-w-0">
         <span className="block font-medium text-sm text-text-primary">
           {label}

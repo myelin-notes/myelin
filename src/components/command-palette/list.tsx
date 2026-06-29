@@ -127,7 +127,7 @@ export function CommandPaletteList({
                 </div>
               </div>
               {item.shortcut && (
-                <kbd className="rounded-md border border-border-divider bg-white px-1.5 py-0.5 font-semibold text-[10px] text-text-secondary">
+                <kbd className="rounded-md border border-border-divider bg-card px-1.5 py-0.5 font-semibold text-[10px] text-text-secondary">
                   {item.shortcut}
                 </kbd>
               )}

@@ -26,6 +26,7 @@ const PREFS = {
     'tool-options',
     {},
   ),
+  theme: pref<'light' | 'dark' | 'system'>('theme', 'system'),
   canvasBackground: pref<'grid' | 'dots' | 'blank'>(
     'canvas-background',
     'dots',

@@ -208,8 +208,8 @@ export function ImportDialog({
             )}
 
             {phase.data.conflict && (
-              <div className="rounded-lg bg-amber-500/10 p-3">
-                <div className="mb-2.5 flex items-center gap-2 font-medium text-amber-700 text-sm">
+              <div className="rounded-lg bg-warning-soft p-3">
+                <div className="mb-2.5 flex items-center gap-2 font-medium text-sm text-warning">
                   <AlertTriangle className="size-4 shrink-0" />
                   {strings.library.importDialog.conflict.label}
                 </div>

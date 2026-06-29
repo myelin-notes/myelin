@@ -1,7 +1,7 @@
 /**
- * Map a computed font style to the bundled font the Rust renderer embeds.
- * The webview loads Inter (sans/body) and Newsreader (serif/headings); code uses a
- * system monospace which we approximate with the bundled JetBrains Mono.
+ * Map a computed font style to a use-case key (`sans`/`serif`/`mono`) the Rust renderer
+ * resolves to a bundled font. Keying by use case rather than font name means swapping
+ * the actual fonts doesn't ripple through this contract.
  */
 
 import type { FontKey } from './contract';
@@ -26,9 +26,9 @@ export function familyToKey(fontFamily: string): FontKey {
     return 'mono';
   }
   if (/newsreader|georgia|serif/.test(f) && !/sans-serif/.test(f)) {
-    return 'newsreader';
+    return 'serif';
   }
-  return 'inter';
+  return 'sans';
 }
 
 function parseWeight(fontWeight: string): number {

@@ -47,7 +47,7 @@ export function RecentCard({
           : undefined
       }
       className={cn(
-        'group relative flex aspect-[16/10] min-h-[180px] w-full cursor-pointer flex-col overflow-hidden rounded-xl text-left ring-1 ring-border-subtle/70 transition-all duration-300 hover:scale-[1.01] hover:shadow-ambient sm:aspect-auto sm:h-[204px]',
+        'group relative flex aspect-[16/10] min-h-[180px] w-full cursor-pointer flex-col overflow-hidden rounded-xl text-left ring-1 ring-border-subtle/70 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-ambient sm:aspect-auto sm:h-[204px]',
         featured ? 'bg-card-active hover:bg-card' : 'bg-surface hover:bg-card',
       )}
     >
@@ -103,7 +103,7 @@ export function RecentCard({
       </span>
 
       <div className="relative flex flex-1 flex-col px-5 pt-4 pb-5 sm:px-6 sm:pb-6">
-        <h4 className="font-heading font-normal text-text-primary text-xl leading-7 transition-colors duration-200 group-hover:text-accent-dark">
+        <h4 className="font-heading font-normal text-text-primary text-xl leading-7 transition-colors duration-200 group-hover:text-text-brand dark:group-hover:text-text-on-dark">
           {title}
         </h4>
 

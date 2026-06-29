@@ -139,7 +139,7 @@ export const FrameChromeView = forwardRef<
         style={{
           borderRadius: 'inherit',
           boxShadow:
-            '0 0 0 1px rgba(28, 39, 56, 0.10), 0 1px 2px rgba(25, 28, 30, 0.06), 0 10px 20px -8px rgba(25, 28, 30, 0.10), 0 36px 72px -24px rgba(25, 28, 30, 0.22)',
+            '0 0 0 1px rgb(var(--shadow-rgb-elevated) / 0.10), 0 1px 2px rgb(var(--shadow-rgb) / 0.06), 0 10px 20px -8px rgb(var(--shadow-rgb) / 0.10), 0 36px 72px -24px rgb(var(--shadow-rgb) / 0.22)',
           pointerEvents: 'none',
         }}
       >
@@ -158,7 +158,7 @@ export const FrameChromeView = forwardRef<
               paddingLeft: `${CHROME_SIDE_PADDING}px`,
               paddingRight: `${CHROME_SIDE_PADDING}px`,
               gap: '14px',
-              fontFamily: 'Inter, Arial, sans-serif',
+              fontFamily: 'Hanken Grotesk, Arial, sans-serif',
               // width and transform set imperatively via syncHeaderGeometry
               transformOrigin: '0 0',
             }}
@@ -203,7 +203,7 @@ export const FrameChromeView = forwardRef<
                   className="w-full min-w-0 border-0 border-text-primary border-b-2 bg-transparent p-0 pb-0.5 font-medium text-[14px] text-text-primary leading-[1.2] outline-none"
                   style={{
                     borderRadius: 0,
-                    fontFamily: 'Inter, Arial, sans-serif',
+                    fontFamily: 'Hanken Grotesk, Arial, sans-serif',
                     letterSpacing: '-0.005em',
                     pointerEvents: 'auto',
                   }}
@@ -213,7 +213,7 @@ export const FrameChromeView = forwardRef<
                   <span
                     className="truncate font-medium text-[14px] text-text-primary leading-[1.2]"
                     style={{
-                      fontFamily: 'Inter, Arial, sans-serif',
+                      fontFamily: 'Hanken Grotesk, Arial, sans-serif',
                       letterSpacing: '-0.005em',
                     }}
                   >

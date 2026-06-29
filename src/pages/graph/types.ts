@@ -11,6 +11,7 @@ export interface NoteGraphEdge {
 export interface NoteGraphNode {
   id: VFSNodeId;
   name: string;
+  tags: string[];
   incomingEdges: NoteGraphEdge[];
   outgoingEdges: NoteGraphEdge[];
 }

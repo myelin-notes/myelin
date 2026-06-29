@@ -107,6 +107,7 @@ export interface NoteBacklink extends StoredNoteLink {
 export interface RepositoryNoteGraphNode {
   id: VFSNodeId;
   name: string;
+  tags: string[];
 }
 
 export interface RepositoryNoteGraphLink extends StoredNoteLink {

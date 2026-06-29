@@ -235,7 +235,7 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
       <div
         ref={toolbarRef}
         data-selection-toolbar="true"
-        className={`pointer-events-auto absolute top-0 left-0 z-[110] flex items-center gap-1 rounded-xl bg-white/85 px-1.5 py-1.5 text-text-secondary shadow-ambient ring-1 ring-border-ghost/70 backdrop-blur-[24px] transition-opacity duration-150 ${
+        className={`pointer-events-auto absolute top-0 left-0 z-[110] flex items-center gap-1 rounded-xl bg-popover/85 px-1.5 py-1.5 text-text-secondary shadow-ambient ring-1 ring-border-ghost/70 backdrop-blur-[24px] transition-opacity duration-150 ${
           state.visible ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         role="toolbar"
@@ -284,7 +284,7 @@ function ToolbarButton({ item }: { item: SelectionToolbarItem }) {
   const baseClass =
     'flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors focus-visible:outline-none data-disabled:cursor-default data-disabled:opacity-35';
   const activeClass = active
-    ? 'bg-accent-dark text-white hover:bg-accent-dark hover:text-white focus-visible:bg-accent-dark focus-visible:text-white'
+    ? 'bg-accent-dark text-text-on-dark hover:bg-accent-dark hover:text-text-on-dark focus-visible:bg-accent-dark focus-visible:text-text-on-dark'
     : 'bg-transparent text-inherit hover:bg-hover-tint hover:text-text-primary focus-visible:bg-hover-tint focus-visible:text-text-primary data-disabled:hover:bg-transparent data-disabled:hover:text-inherit';
   return (
     <Tooltip>

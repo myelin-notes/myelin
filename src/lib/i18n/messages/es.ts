@@ -230,7 +230,10 @@ const es: typeof en = {
     title: 'Grafo',
     explicitLinks: 'Enlaces explícitos',
     searchPlaceholder: 'Buscar en el grafo...',
-    fit: 'Ajustar',
+    recenter: 'Recentrar',
+    zoomIn: 'Acercar',
+    zoomOut: 'Alejar',
+    tags: 'Etiquetas',
     openNote: 'Abrir nota',
     emptySelection: 'Selecciona una nota para inspeccionar sus enlaces.',
     noCanvasNotes: 'Aún no hay notas de lienzo.',
@@ -255,6 +258,15 @@ const es: typeof en = {
   },
   settings: {
     title: 'Preferencias',
+    theme: {
+      title: 'Tema',
+      eyebrow: 'Apariencia',
+      options: {
+        light: 'Claro',
+        dark: 'Oscuro',
+        system: 'Sistema',
+      },
+    },
     canvasStyle: {
       title: 'Estilo del lienzo',
       eyebrow: 'Aspecto visual',

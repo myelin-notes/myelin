@@ -24,7 +24,7 @@ export function Logo({ size = 28, className, ...props }: LogoProps) {
           fill="currentColor"
         />
       </g>
-      <circle cx="25.4" cy="21.6" r="1.4" fill="#1abd84" />
+      <circle cx="25.4" cy="21.6" r="1.4" fill="var(--brand-dot)" />
     </svg>
   );
 }

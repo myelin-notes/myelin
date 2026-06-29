@@ -7,7 +7,7 @@
  * Keep field names in sync with the Rust serde structs (camelCase).
  */
 
-export type FontKey = 'inter' | 'newsreader' | 'mono';
+export type FontKey = 'sans' | 'serif' | 'mono';
 
 export type Rgb = [number, number, number];
 

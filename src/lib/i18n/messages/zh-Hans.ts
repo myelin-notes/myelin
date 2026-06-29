@@ -221,7 +221,10 @@ const zhHans: typeof en = {
     title: '图谱',
     explicitLinks: '显式链接',
     searchPlaceholder: '搜索图谱...',
-    fit: '适应',
+    recenter: '重新居中',
+    zoomIn: '放大',
+    zoomOut: '缩小',
+    tags: '标签',
     openNote: '打开笔记',
     emptySelection: '选择一条笔记以查看它的链接。',
     noCanvasNotes: '还没有画布笔记。',
@@ -246,6 +249,15 @@ const zhHans: typeof en = {
   },
   settings: {
     title: '偏好设置',
+    theme: {
+      title: '主题',
+      eyebrow: '外观',
+      options: {
+        light: '浅色',
+        dark: '深色',
+        system: '跟随系统',
+      },
+    },
     canvasStyle: {
       title: '画布样式',
       eyebrow: '视觉外观',

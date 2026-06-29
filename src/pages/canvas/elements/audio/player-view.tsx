@@ -22,6 +22,7 @@ import {
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { getDevicePixelRatio } from '@/lib/utils';
+import { getCanvasPalette, withCanvasAlpha } from '../../canvas-theme';
 import { decodeAudio, drawWaveform } from './waveform';
 
 const logger = new Logger('AudioTranscription');
@@ -119,6 +120,7 @@ function drawRecordingWaveformFrame(
   const bars = 40;
   const barW = 2;
   const gap = (metrics.cssWidth - bars * barW) / (bars - 1);
+  const recording = getCanvasPalette().recording;
   for (let i = 0; i < bars; i++) {
     const x = i * (barW + gap);
     const freq = 1.5 + (i % 5) * 0.3;
@@ -127,7 +129,7 @@ function drawRecordingWaveformFrame(
     const v = 0.5 + amp * Math.sin(t * freq + phase);
     const barH = Math.max(3, v * metrics.cssHeight * 0.85);
     const y = (metrics.cssHeight - barH) / 2;
-    ctx.fillStyle = `rgba(224, 62, 62, ${0.5 + 0.5 * v})`;
+    ctx.fillStyle = withCanvasAlpha(recording, 0.5 + 0.5 * v);
     ctx.beginPath();
     ctx.roundRect(x, y, barW, barH, 1);
     ctx.fill();

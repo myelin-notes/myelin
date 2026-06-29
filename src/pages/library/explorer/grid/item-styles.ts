@@ -11,7 +11,7 @@ export const explorerGridBodyClass =
   'flex min-w-0 flex-1 flex-col gap-2 px-4 pt-3 pb-4 sm:px-5 sm:pb-5';
 
 export const explorerGridTitleClass =
-  'line-clamp-2 text-[15px] leading-5 text-text-primary transition-colors duration-200 group-hover:text-accent-dark';
+  'line-clamp-2 text-[15px] leading-5 text-text-primary transition-colors duration-200 group-hover:text-text-brand dark:group-hover:text-text-on-dark';
 
 export const explorerGridSnippetClass =
   'line-clamp-2 text-[11px] text-text-muted leading-snug';

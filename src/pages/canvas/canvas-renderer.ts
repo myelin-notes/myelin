@@ -1,4 +1,5 @@
 import { UserPrefs } from '@/lib/user-prefs';
+import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
 import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
 import type { Vector2 } from './geometry';
@@ -22,7 +23,9 @@ export class CanvasRenderer {
   private overlayCtx: CanvasRenderingContext2D | null = null;
   private overlayCanvas: HTMLCanvasElement | null = null;
   private bgPattern: CanvasPattern | null = null;
+  private bgStyle: CanvasBackground;
   private unsubBgPref: (() => void) | null = null;
+  private unsubTheme: (() => void) | null = null;
 
   public constructor(
     foregroundCtx: CanvasRenderingContext2D,
@@ -31,9 +34,14 @@ export class CanvasRenderer {
     this.ctx = foregroundCtx;
     this.canvas = foregroundCanvas;
     this.resizeCanvas(window.innerWidth, window.innerHeight);
-    this.buildBgPattern(UserPrefs.get('canvasBackground'));
+    this.bgStyle = UserPrefs.get('canvasBackground');
+    this.buildBgPattern(this.bgStyle);
     this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
       this.buildBgPattern(bg);
+    });
+    // Theme toggle changes the grid color, but the pattern is cached — rebuild.
+    this.unsubTheme = onCanvasThemeChange(() => {
+      this.buildBgPattern(this.bgStyle);
     });
   }
 
@@ -50,6 +58,7 @@ export class CanvasRenderer {
   }
 
   public buildBgPattern(style: CanvasBackground): void {
+    this.bgStyle = style;
     if (style === 'blank') {
       this.bgPattern = null;
       return;
@@ -58,7 +67,7 @@ export class CanvasRenderer {
     const spacing = 24;
     const tile = new OffscreenCanvas(spacing, spacing);
     const pctx = tile.getContext('2d')!;
-    const color = 'rgba(164, 168, 172, 0.35)';
+    const color = getCanvasPalette().grid;
 
     if (style === 'dots') {
       pctx.fillStyle = color;
@@ -176,6 +185,8 @@ export class CanvasRenderer {
   public destroy(): void {
     this.unsubBgPref?.();
     this.unsubBgPref = null;
+    this.unsubTheme?.();
+    this.unsubTheme = null;
   }
 
   private resizeCanvas(width: number, height: number): void {
