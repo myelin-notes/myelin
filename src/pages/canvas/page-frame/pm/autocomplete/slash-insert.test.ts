@@ -50,11 +50,33 @@ describe('findActiveSlashInsertAutocomplete', () => {
         to: head,
       },
       anchorPosition: head,
+      allowBlockActions: true,
     });
   });
 
-  it('does not trigger when the slash is not the first character', () => {
-    const markdown = 'Alpha /head';
+  it('detects an inline slash after a space', () => {
+    const markdown = 'Alpha /to';
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+
+    const active = findActiveSlashInsertAutocomplete(state);
+    expect(active).not.toBeNull();
+    expect(active?.query).toBe('to');
+    expect(active?.allowBlockActions).toBe(false);
+  });
+
+  it('allows block actions when the slash is at the start of the block', () => {
+    const markdown = '/head';
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+
+    expect(findActiveSlashInsertAutocomplete(state)?.allowBlockActions).toBe(
+      true,
+    );
+  });
+
+  it('does not trigger when the slash is mid-word with no preceding space', () => {
+    const markdown = 'and/or';
     const head = 1 + markdown.length;
     const state = createState(markdown, head);
 
@@ -83,6 +105,26 @@ describe('searchSlashInsertAutocompleteItems', () => {
       (item) => item.id,
     );
     expect(ids).toContain('slash-note-link');
+  });
+
+  it('excludes block and table items when block actions are disallowed', () => {
+    const ids = searchSlashInsertAutocompleteItems('', labels, false).map(
+      (item) => item.id,
+    );
+    expect(ids).not.toContain('slash-heading-1');
+    expect(ids).not.toContain('slash-bullet-list');
+    expect(ids).not.toContain('slash-table');
+    expect(ids).not.toContain('slash-paragraph');
+    expect(ids).toContain('slash-link');
+    expect(ids).toContain('slash-date-today');
+  });
+
+  it('keeps block and table items when block actions are allowed', () => {
+    const ids = searchSlashInsertAutocompleteItems('', labels, true).map(
+      (item) => item.id,
+    );
+    expect(ids).toContain('slash-heading-1');
+    expect(ids).toContain('slash-table');
   });
 });
 

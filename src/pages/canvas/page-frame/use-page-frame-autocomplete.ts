@@ -78,6 +78,7 @@ export function usePageFrameAutocomplete({
   const strings = useMessages();
   const slashLabelsRef = useRef(strings.canvas.slashInsert);
   slashLabelsRef.current = strings.canvas.slashInsert;
+  const slashAllowBlockActionsRef = useRef(true);
 
   const frameNameCache = useMemo<PageFrameNameCache>(() => new Map(), []);
 
@@ -89,6 +90,7 @@ export function usePageFrameAutocomplete({
             return searchSlashInsertAutocompleteItems(
               query,
               slashLabelsRef.current,
+              slashAllowBlockActionsRef.current,
             );
           }
 
@@ -189,6 +191,10 @@ export function usePageFrameAutocomplete({
 
     activeSourceRef.current = activeRequest.kind;
     setActiveKind(activeRequest.kind);
+    if (activeRequest.kind === 'slash') {
+      slashAllowBlockActionsRef.current =
+        activeRequest.request.allowBlockActions;
+    }
     controller.show(activeRequest.request);
   });
 

@@ -57,6 +57,7 @@ export interface SlashInsertAutocompleteItem extends PageFrameAutocompleteItem {
 export interface ActiveSlashInsertAutocomplete
   extends PageFrameAutocompleteRequest {
   replaceRange: PageFrameAutocompleteRange;
+  allowBlockActions: boolean;
 }
 
 export type SlashInsertLabels = Messages['canvas']['slashInsert'];
@@ -358,11 +359,20 @@ function buildSlashInsertItem(
 export function searchSlashInsertAutocompleteItems(
   query: string,
   labels: SlashInsertLabels,
+  allowBlockActions = true,
 ): readonly SlashInsertAutocompleteItem[] {
   const normalizedQuery = query.trim().toLowerCase();
   return SLASH_INSERT_DEFINITIONS.map((definition) =>
     buildSlashInsertItem(definition, labels),
-  ).filter((item) => matchesSlashQuery(item, normalizedQuery));
+  ).filter((item) => {
+    if (
+      !allowBlockActions &&
+      (item.slashAction.kind === 'block' || item.slashAction.kind === 'table')
+    ) {
+      return false;
+    }
+    return matchesSlashQuery(item, normalizedQuery);
+  });
 }
 
 export function findActiveSlashInsertAutocomplete(
@@ -381,45 +391,38 @@ export function findActiveSlashInsertAutocomplete(
     return null;
   }
 
-  if (!text.startsWith('/')) {
+  // A slash token triggers either at block start or immediately after
+  // whitespace, with no whitespace between the slash and the cursor.
+  const before = text.slice(0, cursorOffset);
+  const match = before.match(/(?:^|\s)\/(\S*)$/);
+  if (!match) {
     return null;
   }
 
-  const commandText = text.trimEnd();
-  if (commandText.length === 0 || commandText === '/') {
-    return {
-      query: '',
-      range: {
-        from: posAt[1],
-        to: posAt[1],
-      },
-      replaceRange: {
-        from: posAt[0],
-        to: posAt[text.length],
-      },
-      anchorPosition: state.selection.head,
-    };
-  }
-
-  if (!commandText.startsWith('/')) {
-    return null;
-  }
-
-  if (cursorOffset < 1) {
-    return null;
-  }
+  const query = match[1];
+  const slashOffset = match[0].startsWith('/')
+    ? match.index!
+    : match.index! + 1;
+  const queryStartOffset = slashOffset + 1;
+  const atBlockStart = slashOffset === 0;
 
   return {
-    query: commandText.slice(1),
+    query,
     range: {
-      from: posAt[1],
-      to: posAt[commandText.length],
+      from: posAt[queryStartOffset],
+      to: posAt[cursorOffset],
     },
-    replaceRange: {
-      from: posAt[0],
-      to: posAt[text.length],
-    },
+    replaceRange: atBlockStart
+      ? {
+          from: posAt[0],
+          to: posAt[text.length],
+        }
+      : {
+          from: posAt[slashOffset],
+          to: posAt[cursorOffset],
+        },
     anchorPosition: state.selection.head,
+    allowBlockActions: atBlockStart,
   };
 }
 
