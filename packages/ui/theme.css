@@ -22,53 +22,20 @@
   src: url("./fonts/HankenGrotesk-Italic.ttf") format("truetype");
 }
 
-/* Nyght Serif has no variable font — ship static weights. */
 @font-face {
-  font-family: "Nyght Serif";
+  font-family: "Newsreader";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 200 800;
   font-display: swap;
-  src: url("./fonts/NyghtSerif-Regular.ttf") format("truetype");
+  src: url("./fonts/Newsreader.ttf") format("truetype");
 }
 
 @font-face {
-  font-family: "Nyght Serif";
+  font-family: "Newsreader";
   font-style: italic;
-  font-weight: 400;
+  font-weight: 200 800;
   font-display: swap;
-  src: url("./fonts/NyghtSerif-RegularItalic.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Nyght Serif";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("./fonts/NyghtSerif-Medium.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Nyght Serif";
-  font-style: italic;
-  font-weight: 500;
-  font-display: swap;
-  src: url("./fonts/NyghtSerif-MediumItalic.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Nyght Serif";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("./fonts/NyghtSerif-Bold.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Nyght Serif";
-  font-style: italic;
-  font-weight: 700;
-  font-display: swap;
-  src: url("./fonts/NyghtSerif-BoldItalic.ttf") format("truetype");
+  src: url("./fonts/Newsreader-Italic.ttf") format("truetype");
 }
 
 @theme inline {
@@ -169,7 +136,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: "Nyght Serif", "Georgia", serif;
+  --font-heading: "Newsreader", "Georgia", serif;
   --font-sans: "Hanken Grotesk", Arial, sans-serif;
   --color-icons: #65558F;
   --color-low-contrast: #DFDFDF;

@@ -23,4 +23,4 @@ third-party model and font assets redistributed with Myelin.
 | --- | --- | --- |
 | `HankenGrotesk.ttf`, `HankenGrotesk-Italic.ttf` | `HankenGrotesk-OFL-1.1.txt` | https://raw.githubusercontent.com/marcologous/hanken-grotesk/master/OFL.txt |
 | `JetBrainsMono.ttf` | `JetBrainsMono-OFL-1.1.txt` | https://raw.githubusercontent.com/JetBrains/JetBrainsMono/master/OFL.txt |
-| `NyghtSerif-*.ttf` | `NyghtSerif-OFL-1.1.txt` | https://github.com/Kobuzan/nyght-serif/blob/main/LICENSE.txt |
+| `Newsreader.ttf`, `Newsreader-Italic.ttf` | `Newsreader-OFL-1.1.txt` | https://raw.githubusercontent.com/productiontype/Newsreader/master/OFL.txt |
