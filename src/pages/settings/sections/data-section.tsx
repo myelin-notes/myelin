@@ -173,7 +173,7 @@ function ExportCard({
       onClick={onClick}
       disabled={disabled}
       aria-busy={loading}
-      className="group flex w-full items-center gap-4 rounded-xl bg-input px-4 py-3.5 text-left ring-1 ring-border-subtle/70 transition-all duration-200 hover:bg-card-active hover:shadow-ambient hover:ring-text-muted/30 disabled:pointer-events-none disabled:opacity-60"
+      className="group flex w-full items-center gap-4 rounded-xl bg-input/40 px-4 py-3.5 text-left ring-1 ring-border-subtle/70 transition-all duration-200 hover:bg-input hover:shadow-ambient hover:ring-text-muted/30 disabled:pointer-events-none disabled:opacity-60"
     >
       <span
         className={cn(

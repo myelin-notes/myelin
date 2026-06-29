@@ -140,7 +140,7 @@ export function RepositorySection() {
         </span>
       </div>
 
-      <div className="divide-y divide-border-divider/60 overflow-hidden rounded-xl bg-input ring-1 ring-border-subtle/70">
+      <div className="divide-y divide-border-divider/60 overflow-hidden rounded-xl bg-input/40 ring-1 ring-border-subtle/70">
         <KindCard
           selected={config.kind === 'local'}
           onSelect={() => handleKindChange('local')}
@@ -167,7 +167,7 @@ export function RepositorySection() {
           <div className="mt-5 space-y-4">
             {!remoteAuth.tokenPresent ? (
               <>
-                <div className="flex flex-col gap-3 rounded-xl bg-input px-5 py-4 ring-1 ring-border-subtle/70 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-xl bg-input/40 px-5 py-4 ring-1 ring-border-subtle/70 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <RemoteAuthIcon className="size-5 shrink-0 text-text-secondary" />
                     <div className="min-w-0">
@@ -223,7 +223,7 @@ export function RepositorySection() {
               </>
             ) : (
               <>
-                <div className="flex flex-col gap-3 rounded-xl bg-input px-5 py-4 ring-1 ring-border-subtle/70 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-xl bg-input/40 px-5 py-4 ring-1 ring-border-subtle/70 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <RemoteAuthIcon className="size-5 shrink-0 text-text-secondary" />
                     <div className="min-w-0">
@@ -265,7 +265,7 @@ export function RepositorySection() {
                       <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
                         {strings.settings.repository.sync.remoteRepository}
                       </p>
-                      <div className="flex flex-wrap items-center gap-0.5 rounded-xl bg-input p-1 ring-1 ring-border-subtle/70 sm:flex-nowrap">
+                      <div className="flex flex-wrap items-center gap-0.5 rounded-xl bg-input/40 p-1 ring-1 ring-border-subtle/70 sm:flex-nowrap">
                         <OwnerField
                           disabled={!githubAuth.tokenPresent}
                           loading={selectors.ownersLoading}
@@ -308,7 +308,7 @@ export function RepositorySection() {
                   </>
                 )}
 
-                <div className="rounded-xl bg-input px-5 py-4 ring-1 ring-border-subtle/70">
+                <div className="rounded-xl bg-input/40 px-5 py-4 ring-1 ring-border-subtle/70">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="font-medium text-sm text-text-primary">

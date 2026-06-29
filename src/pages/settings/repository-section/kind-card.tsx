@@ -23,7 +23,7 @@ export function KindCard({
         'group relative flex w-full cursor-pointer items-center gap-4 px-4 py-3.5 text-left transition-colors',
         selected
           ? 'bg-transparent'
-          : 'bg-transparent hover:bg-card-active focus-visible:bg-card-active',
+          : 'bg-transparent hover:bg-input focus-visible:bg-input',
       )}
     >
       {selected && (

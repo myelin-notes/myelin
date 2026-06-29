@@ -311,6 +311,8 @@
   --bg-error-soft: #f7e6e4;
 
   --bg-hover-tint: rgba(25, 28, 30, 0.05);
+  --scrollbar-thumb: rgba(25, 28, 30, 0.22);
+  --scrollbar-thumb-hover: rgba(25, 28, 30, 0.38);
   --bg-secondary-container: #dce4ed;
   --bg-primary-container: #2a3a50;
 
@@ -446,6 +448,8 @@
   --bg-error-soft: #2c1818;
 
   --bg-hover-tint: rgba(255, 255, 255, 0.07);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.32);
   --bg-secondary-container: #232c38;
   /* Light, so the gradient primary button (from-primary → primary-container)
      stays a coherent light CTA with dark text in dark mode. */
@@ -550,6 +554,29 @@
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* Themed scrollbars — slim translucent thumb that reads on any surface in
+     both themes (dark overlay on light, light overlay on dark). Opt out with
+     the `no-scrollbar` utility. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   /* Honor reduced-motion preference — scope to off so page loads still feel alive by default */
