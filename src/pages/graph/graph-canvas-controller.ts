@@ -17,9 +17,6 @@ const EDGE_FLOW_SPEED = 42;
 const EDGE_ARROW_SPACING = 46;
 const EDGE_ARROW_SIZE = 5;
 
-const NODE_FILL_ALPHA = 0.95;
-const NODE_STROKE_ALPHA = 0.2;
-const NODE_STROKE_SELECTED_ALPHA = 0.42;
 const LABEL_HALO_ALPHA = 0.9;
 const DIM_ALPHA = 0.14;
 const DIM_DURATION = 0.22;
@@ -31,8 +28,6 @@ export interface GraphPalette {
   background: string;
   nodeFillBase: Rgba;
   nodeFillSelected: Rgba;
-  nodeStrokeBase: Rgba;
-  nodeStrokeSelected: Rgba;
   labelBase: Rgba;
   labelSelected: Rgba;
   labelHalo: string;
@@ -82,8 +77,9 @@ export function resolveGraphPalette(element: HTMLElement): GraphPalette {
     parseThemeColor(styles.getPropertyValue(name), fallback);
 
   const page = read('--bg-page', [247, 249, 251]);
-  const card = read('--bg-card', [255, 255, 255]);
-  const accentDark = read('--accent-dark', [28, 39, 56]);
+  const node = read('--graph-node', [108, 119, 135]);
+  const nodeActive = read('--graph-node-active', [27, 31, 38]);
+  const textPrimary = read('--text-primary', [25, 28, 30]);
   const textSecondary = read('--text-secondary', [67, 71, 74]);
   const edge = read('--graph-edge', [141, 154, 167]);
   const edgeOutgoing = read('--graph-edge-outgoing', [42, 157, 111]);
@@ -91,12 +87,10 @@ export function resolveGraphPalette(element: HTMLElement): GraphPalette {
 
   return {
     background: rgbaString(page, 1),
-    nodeFillBase: withAlpha(card, NODE_FILL_ALPHA),
-    nodeFillSelected: withAlpha(accentDark, 1),
-    nodeStrokeBase: withAlpha(edge, NODE_STROKE_ALPHA),
-    nodeStrokeSelected: withAlpha(accentDark, NODE_STROKE_SELECTED_ALPHA),
+    nodeFillBase: withAlpha(node, 1),
+    nodeFillSelected: withAlpha(nodeActive, 1),
     labelBase: withAlpha(textSecondary, 1),
-    labelSelected: withAlpha(accentDark, 1),
+    labelSelected: withAlpha(textPrimary, 1),
     labelHalo: rgbaString(page, LABEL_HALO_ALPHA),
     edge,
     edgeOutgoing,
@@ -188,14 +182,14 @@ export function graphNodeRadius(totalNodes: number): number {
 
 export function graphEdgeAlpha(totalNodes: number): number {
   if (totalNodes <= 100) {
-    return 0.68;
+    return 0.42;
   }
   if (totalNodes >= 1000) {
-    return 0.3;
+    return 0.16;
   }
 
   const density = (totalNodes - 100) / 900;
-  return 0.68 - density * 0.38;
+  return 0.42 - density * 0.26;
 }
 
 export function shouldDrawGraphNodeLabel({
@@ -553,8 +547,8 @@ export class GraphCanvasController {
 
   private drawNodes(): void {
     this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.font = `${12 / this.viewport.zoom}px 'Hanken Grotesk', sans-serif`;
+    this.ctx.textBaseline = 'top';
+    this.ctx.font = `${13 / this.viewport.zoom}px 'Nyght Serif', Georgia, serif`;
     const totalNodes = this.layout.nodes.length;
     for (const node of this.layout.nodes) {
       const progress = node.selectionProgress;
@@ -571,13 +565,6 @@ export class GraphCanvasController {
       this.ctx.beginPath();
       this.ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
       this.ctx.fill();
-      this.ctx.strokeStyle = lerpRgba(
-        this.palette.nodeStrokeBase,
-        this.palette.nodeStrokeSelected,
-        colorT,
-      );
-      this.ctx.lineWidth = lerp(0.8, 1.4, colorT) / this.viewport.zoom;
-      this.ctx.stroke();
       if (
         shouldDrawGraphNodeLabel({
           selected: progress > 0.01,
@@ -596,8 +583,7 @@ export class GraphCanvasController {
     radius: number,
     colorT: number,
   ): void {
-    const raisedY = node.y - radius - 10 / this.viewport.zoom;
-    const y = lerp(node.y, raisedY, colorT);
+    const y = node.y + radius + 9 / this.viewport.zoom;
     this.ctx.lineWidth = 3 / this.viewport.zoom;
     this.ctx.strokeStyle = this.palette.labelHalo;
     this.ctx.strokeText(node.label, node.x, y);

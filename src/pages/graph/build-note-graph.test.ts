@@ -4,9 +4,9 @@ import { buildNoteGraph } from './build-note-graph';
 
 const source: RepositoryNoteGraph = {
   nodes: [
-    { id: 'a', name: 'Alpha' },
-    { id: 'b', name: 'Beta' },
-    { id: 'c', name: 'Gamma' },
+    { id: 'a', name: 'Alpha', tags: [] },
+    { id: 'b', name: 'Beta', tags: [] },
+    { id: 'c', name: 'Gamma', tags: [] },
   ],
   links: [
     {

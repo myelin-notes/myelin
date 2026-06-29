@@ -314,10 +314,14 @@
   --bg-secondary-container: #dce4ed;
   --bg-primary-container: #2a3a50;
 
-  /* Note graph — neutral connective line plus a green accent for a selected
-     node's outgoing links; incoming links reuse --accent-dark. */
+  /* Note graph — faint connective line plus a green accent for a selected
+     node's outgoing links; incoming links reuse --accent-dark. Nodes are flat
+     solid discs: a muted slate by default, swapping to a high-contrast fill
+     when active so the focused node reads as near-black against --bg-page. */
   --graph-edge: #8d9aa7;
   --graph-edge-outgoing: #2a9d6f;
+  --graph-node: #6c7787;
+  --graph-node-active: #1b1f26;
   --bg-accent-amber: #fbbf24;
   --bg-accent-amber-strong: #f59e0b;
 
@@ -449,6 +453,8 @@
 
   --graph-edge: #5a6573;
   --graph-edge-outgoing: #34d399;
+  --graph-node: #828d9d;
+  --graph-node-active: #e6e9ec;
   --bg-accent-amber: #fbbf24;
   --bg-accent-amber-strong: #f59e0b;
 

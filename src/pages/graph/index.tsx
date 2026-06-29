@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, Maximize2, Search } from 'lucide-react';
+import { ExternalLink, Focus, Search, ZoomIn, ZoomOut } from 'lucide-react';
 import type { Messages } from '@/lib/i18n';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
@@ -213,7 +213,7 @@ export function GraphPage() {
 
   return (
     <div className="grid h-full w-full grid-cols-1 grid-rows-[minmax(0,1fr)_13rem] overflow-hidden bg-page lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[minmax(0,1fr)]">
-      <section className="relative min-h-0 min-w-0">
+      <section className="relative min-h-0 min-w-0 bg-page">
         <div className="pointer-events-none absolute top-6 left-8 z-10">
           <h1 className="font-heading font-normal text-4xl text-text-primary leading-none">
             {strings.graph.title}
@@ -232,14 +232,6 @@ export function GraphPage() {
               className="w-40 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
             />
           </label>
-          <button
-            type="button"
-            onClick={() => controllerRef.current?.fit()}
-            className="flex h-9 items-center gap-2 rounded-xl bg-card/85 px-3 text-sm text-text-secondary shadow-ambient backdrop-blur-[24px] transition-colors hover:bg-card hover:text-text-primary"
-          >
-            <Maximize2 className="size-3.5" />
-            {strings.graph.fit}
-          </button>
         </div>
 
         {matches.length > 0 && (
@@ -327,6 +319,15 @@ export function GraphPage() {
         <div className="absolute bottom-6 left-8 rounded-xl bg-card/85 px-3 py-2 text-text-muted text-xs shadow-ambient backdrop-blur-[24px]">
           {statusMessage}
         </div>
+
+        <GraphToolbar
+          strings={strings}
+          onZoomIn={() => controllerRef.current?.viewport.zoomByFactor(1.2)}
+          onZoomOut={() =>
+            controllerRef.current?.viewport.zoomByFactor(1 / 1.2)
+          }
+          onRecenter={() => controllerRef.current?.fit()}
+        />
       </section>
 
       <GraphInspector
@@ -335,6 +336,51 @@ export function GraphPage() {
         onOpen={() => openSelectedNode(selectedNode)}
         onSelect={selectNode}
       />
+    </div>
+  );
+}
+
+const TOOLBAR_ICON_BUTTON =
+  'flex size-9 items-center justify-center rounded-xl text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary';
+
+function GraphToolbar({
+  strings,
+  onZoomIn,
+  onZoomOut,
+  onRecenter,
+}: {
+  strings: Messages;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onRecenter: () => void;
+}) {
+  return (
+    <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-2xl bg-card/85 p-1.5 shadow-elevated backdrop-blur-[24px]">
+      <button
+        type="button"
+        onClick={onZoomOut}
+        aria-label={strings.graph.zoomOut}
+        className={TOOLBAR_ICON_BUTTON}
+      >
+        <ZoomOut className="size-4" />
+      </button>
+      <button
+        type="button"
+        onClick={onZoomIn}
+        aria-label={strings.graph.zoomIn}
+        className={TOOLBAR_ICON_BUTTON}
+      >
+        <ZoomIn className="size-4" />
+      </button>
+      <span className="mx-1 h-5 w-px bg-[var(--border-divider)]" />
+      <button
+        type="button"
+        onClick={onRecenter}
+        className="flex h-9 items-center gap-2 rounded-xl px-3 font-medium text-sm text-text-secondary uppercase tracking-[0.06em] transition-colors hover:bg-hover-tint hover:text-text-primary"
+      >
+        <Focus className="size-4" />
+        {strings.graph.recenter}
+      </button>
     </div>
   );
 }
@@ -370,6 +416,18 @@ function GraphInspector({
                 node.outgoingEdges.length,
               )}
             </p>
+            {node.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {node.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-md bg-tag px-2 py-0.5 font-medium text-[11px] text-text-tag uppercase tracking-[0.06em]"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <button
             type="button"

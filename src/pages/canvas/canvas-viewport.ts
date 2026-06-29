@@ -374,6 +374,15 @@ export class CanvasViewport {
     this.animateViewToFitRect(new DOMRect(0, 0, 0, 0), {});
   }
 
+  /**
+   * Multiply the current zoom by `factor`, anchored on the viewport center.
+   * Used by on-screen zoom controls (e.g. the graph toolbar buttons).
+   */
+  public zoomByFactor(factor: number): void {
+    this.cancelAnimation();
+    this.zoomAroundViewportCenter(this._zoom * factor);
+  }
+
   /** Stop any in-flight view animation. */
   public cancelAnimation(): void {
     this._viewAnim?.stop();

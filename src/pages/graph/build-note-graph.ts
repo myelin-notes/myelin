@@ -9,6 +9,7 @@ export function buildNoteGraph(source: RepositoryNoteGraph): NoteGraph {
   const nodes: NoteGraphNode[] = source.nodes.map((node) => ({
     id: node.id,
     name: node.name,
+    tags: node.tags,
     incomingEdges: [],
     outgoingEdges: [],
   }));
