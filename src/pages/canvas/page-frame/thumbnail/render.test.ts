@@ -127,7 +127,9 @@ describe('renderPageFrameThumbnail', () => {
     const doc = makeDoc([paragraph('')]);
     const { ctx, fillTexts } = createStubContext();
 
-    expect(() => renderPageFrameThumbnail(doc, ctx, OPTS, PALETTE)).not.toThrow();
+    expect(() =>
+      renderPageFrameThumbnail(doc, ctx, OPTS, PALETTE),
+    ).not.toThrow();
     expect(fillTexts).toHaveLength(0);
   });
 
