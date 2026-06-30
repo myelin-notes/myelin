@@ -180,7 +180,9 @@ const zhHans: typeof en = {
       title: '语义标签',
       empty: '还没有标签，右键点击文件并选择“管理标签”即可开始',
       insights: '工作室洞察',
-      manageTag: '+ 管理标签',
+      addTag: '新建标签',
+      placeholder: '标签名称…',
+      deleteTag: (tag: string) => `删除 #${tag}`,
       stats: {
         totalFiles: '文件总数',
         folders: '文件夹',
@@ -216,20 +218,6 @@ const zhHans: typeof en = {
       available: '可用',
       createNew: '创建新标签',
       placeholder: '标签名称...',
-    },
-    tagRegistryDialog: {
-      title: '管理标签',
-      description: '创建可复用的标签，或在所有位置删除它们。',
-      tags: '标签',
-      empty: '还没有标签',
-      createNew: '创建新标签',
-      placeholder: '标签名称...',
-      confirmTitle: '删除标签？',
-      confirmDescription: (tag: string, count: number) =>
-        count > 0
-          ? `#${tag} 将从 ${count} 个文件/文件夹中永久移除，并在所有位置删除。`
-          : `#${tag} 将被永久删除。`,
-      confirmDelete: '删除',
     },
   },
   graph: {
