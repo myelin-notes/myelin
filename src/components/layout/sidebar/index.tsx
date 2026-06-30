@@ -27,6 +27,7 @@ import { useTabController } from '@/lib/tabs/context';
 import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from '@/pages/library/create-new-dropdown';
 import { ImportDialog } from '@/pages/library/import/dialog';
+import { useSidebar } from './context';
 import { SidebarTags } from './sidebar-tags';
 import {
   type SearchMode,
@@ -49,6 +50,7 @@ export function Sidebar() {
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const tabController = useTabController();
+  const { width } = useSidebar();
   const treeRef = useRef<SidebarTreeHandle>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -176,7 +178,10 @@ export function Sidebar() {
         : strings.sidebar.synced;
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col bg-surface">
+    <aside
+      style={{ width }}
+      className="flex h-full shrink-0 flex-col bg-surface"
+    >
       <header
         data-tauri-drag-region
         className={cn(

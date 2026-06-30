@@ -5,11 +5,19 @@ import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { orderTagsHierarchically } from '@/lib/sync/repo/tag-hierarchy';
+import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { formatSemanticTagAccessibleName } from '@/pages/library/accessibility-labels';
 import { TagRegistryDialog } from '@/pages/library/tag-registry-dialog';
+import { useResizeHandle } from './use-resize-handle';
 
 const logger = new Logger('SidebarTags');
+const TAGS_MIN_HEIGHT = 80;
+const TAGS_MAX_HEIGHT = 400;
+
+function clampTagsHeight(height: number): number {
+  return Math.min(Math.max(height, TAGS_MIN_HEIGHT), TAGS_MAX_HEIGHT);
+}
 
 interface SidebarTagsProps {
   activeTags: Set<string>;
@@ -34,6 +42,23 @@ export const SidebarTags = memo(function SidebarTags({
   const [open, setOpen] = useState(false);
   const [internalRefresh, setInternalRefresh] = useState(0);
   const [manageOpen, setManageOpen] = useState(false);
+  const [height, setHeightState] = useState(() =>
+    clampTagsHeight(UserPrefs.get('sidebarTagsHeight')),
+  );
+
+  const setHeight = useCallback((next: number) => {
+    const clamped = clampTagsHeight(next);
+    setHeightState(clamped);
+    UserPrefs.set('sidebarTagsHeight', clamped);
+  }, []);
+
+  // Dragging up grows the panel, so the y-axis is inverted.
+  const resizeHandleProps = useResizeHandle({
+    axis: 'y',
+    value: height,
+    onChange: setHeight,
+    invert: true,
+  });
 
   const handleRegistryChanged = useCallback(() => {
     setInternalRefresh((key) => key + 1);
@@ -92,8 +117,26 @@ export const SidebarTags = memo(function SidebarTags({
   };
 
   return (
-    <div className="border-border-subtle border-t">
-      <div className="flex items-center">
+    <div className="flex flex-col">
+      {open ? (
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize tags"
+          aria-valuenow={height}
+          aria-valuemin={TAGS_MIN_HEIGHT}
+          aria-valuemax={TAGS_MAX_HEIGHT}
+          tabIndex={0}
+          {...resizeHandleProps}
+          className="h-1.5 shrink-0 cursor-row-resize border-border-subtle border-t outline-none transition-colors hover:border-accent-dark/30 focus-visible:border-accent-dark/40"
+        />
+      ) : null}
+      <div
+        className={cn(
+          'flex items-center',
+          !open && 'border-border-subtle border-t',
+        )}
+      >
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
@@ -117,7 +160,10 @@ export const SidebarTags = memo(function SidebarTags({
       </div>
 
       {open && (
-        <div className="flex flex-wrap gap-1.5 px-2 pt-0.5 pb-3">
+        <div
+          style={{ height }}
+          className="flex flex-wrap content-start gap-1.5 overflow-y-auto px-2 pt-0.5 pb-3"
+        >
           {tags.length === 0 ? (
             <p className="text-text-muted text-xs italic">
               {strings.library.semanticTags.empty}
