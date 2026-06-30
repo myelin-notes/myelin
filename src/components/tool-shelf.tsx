@@ -76,7 +76,7 @@ export function ToolShelf({
             >
               <div className="flex items-center gap-3">
                 <Icon
-                  className={`size-4 ${enabled ? 'text-accent-dark' : 'text-text-muted'}`}
+                  className={`size-4 ${enabled ? 'text-text-primary' : 'text-text-muted'}`}
                 />
                 <span className="font-medium text-text-primary text-xs">
                   {tool.label}
