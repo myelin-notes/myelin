@@ -94,11 +94,25 @@ export function Sidebar() {
     loadStats();
   }, [loadStats]);
 
+  // Refresh tag counts and the file total when a remote sync lands or any local
+  // repository mutation occurs (create/rename/delete/move/tag), including
+  // changes made outside the sidebar such as the tab bar's new-tab button.
+  // `dataVersion` is the only refresh signal for local repos, where
+  // `lastRemoteSyncAt` stays null. Skip the initial render — `loadStats` above
+  // and the tags list already load on mount.
+  const didMountMetaRefresh = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
-    if (repositoryStatus.lastRemoteSyncAt !== null) {
-      refreshMeta();
+    if (!didMountMetaRefresh.current) {
+      didMountMetaRefresh.current = true;
+      return;
     }
-  }, [refreshMeta, repositoryStatus.lastRemoteSyncAt]);
+    refreshMeta();
+  }, [
+    refreshMeta,
+    repositoryStatus.lastRemoteSyncAt,
+    repositoryStatus.dataVersion,
+  ]);
 
   const openGraph = useCallback(() => {
     tabController.openTab({ type: 'graph' }, strings.graph.title);

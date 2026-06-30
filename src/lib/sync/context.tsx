@@ -30,6 +30,8 @@ export interface RepositoryStatus {
   pendingRemoteWrites: number;
   lastRemoteSyncAt: number | null;
   lastError: Error | null;
+  /** Bumped on every local repository mutation so views can refresh in sync. */
+  dataVersion: number;
 }
 
 interface RepositoryContextValue {
@@ -48,6 +50,7 @@ function createRepositoryStatus(config: RepositoryConfig): RepositoryStatus {
     pendingRemoteWrites: 0,
     lastRemoteSyncAt: null,
     lastError: null,
+    dataVersion: 0,
   };
 }
 
@@ -61,6 +64,7 @@ function mergeRuntimeStatus(
     pendingRemoteWrites: runtimeStatus.pendingRemoteWrites,
     lastRemoteSyncAt: runtimeStatus.lastRemoteSyncAt,
     lastError: runtimeStatus.lastError,
+    dataVersion: runtimeStatus.dataVersion,
   };
 }
 

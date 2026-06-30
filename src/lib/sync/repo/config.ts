@@ -47,6 +47,14 @@ export interface RepositoryRuntimeStatus {
   pendingRemoteWrites: number;
   lastRemoteSyncAt: number | null;
   lastError: Error | null;
+  /**
+   * Incremented on every local repository mutation (file/folder created,
+   * renamed, moved, deleted, retagged, or written) — including mutations made
+   * outside the current view, such as the tab bar creating a file for a new
+   * tab. Lets the sidebar tree and recents refresh in sync. Unlike
+   * `lastRemoteSyncAt`, this advances for local repositories too.
+   */
+  dataVersion: number;
 }
 
 export interface RepositoryStatusSource {

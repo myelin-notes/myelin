@@ -103,6 +103,7 @@ export abstract class BaseRepository
     pendingRemoteWrites: 0,
     lastRemoteSyncAt: null,
     lastError: null,
+    dataVersion: 0,
   };
   private readonly statusListeners = new Set<
     (status: RepositoryRuntimeStatus) => void
@@ -773,6 +774,9 @@ export abstract class BaseRepository
 
       try {
         await this.saveManifestImpl(manifest, revision, action);
+        this.updateRuntimeStatus({
+          dataVersion: this.runtimeStatus.dataVersion + 1,
+        });
         return result;
       } catch (error) {
         if (attempt < maxRetries - 1 && this.isConflictError(error)) {

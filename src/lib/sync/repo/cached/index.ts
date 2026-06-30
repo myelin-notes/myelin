@@ -152,6 +152,7 @@ export class CachedRepository
     pendingRemoteWrites: 0,
     lastRemoteSyncAt: null,
     lastError: null,
+    dataVersion: 0,
   };
   private readonly statusListeners = new Set<
     (status: RepositoryRuntimeStatus) => void
@@ -377,6 +378,9 @@ export class CachedRepository
       const result = await writeLocal();
       await this.outbox.mutate((ops) => {
         queueRemoteWrite(ops, result);
+      });
+      this.updateRuntimeStatus({
+        dataVersion: this.runtimeStatus.dataVersion + 1,
       });
       return result;
     });

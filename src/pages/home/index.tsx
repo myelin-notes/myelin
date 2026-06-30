@@ -41,15 +41,18 @@ export function HomePage() {
     }
   }, [repository]);
 
+  // Load recents on mount, and reload when a remote sync lands or any local
+  // repository mutation occurs (e.g. creating a file for a new tab).
+  // `dataVersion` is the only refresh signal for local repos, where
+  // `lastRemoteSyncAt` stays null.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
     void loadRecentFiles();
-  }, [loadRecentFiles]);
-
-  useEffect(() => {
-    if (repositoryStatus.lastRemoteSyncAt !== null) {
-      void loadRecentFiles();
-    }
-  }, [loadRecentFiles, repositoryStatus.lastRemoteSyncAt]);
+  }, [
+    loadRecentFiles,
+    repositoryStatus.lastRemoteSyncAt,
+    repositoryStatus.dataVersion,
+  ]);
 
   return (
     <div className="relative flex h-full w-full bg-page">
