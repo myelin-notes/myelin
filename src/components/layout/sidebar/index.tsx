@@ -16,7 +16,7 @@ import { trackEvent } from '@/lib/analytics';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
-import { isMac, TRAFFIC_LIGHT_INSET_CLASS } from '@/lib/platform';
+import { isMac, isWindows, TRAFFIC_LIGHT_INSET_CLASS } from '@/lib/platform';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
@@ -180,7 +180,11 @@ export function Sidebar() {
       <header
         data-tauri-drag-region
         className={cn(
-          'flex h-11 shrink-0 items-center justify-end gap-0.5 px-2',
+          'flex h-11 shrink-0 items-center gap-0.5 px-2',
+          // macOS right-aligns the buttons since the traffic lights hold the
+          // left; Windows has no lights, so center them instead of stranding
+          // them in the corner.
+          isWindows ? 'justify-center' : 'justify-end',
           isMac && TRAFFIC_LIGHT_INSET_CLASS,
         )}
       >
