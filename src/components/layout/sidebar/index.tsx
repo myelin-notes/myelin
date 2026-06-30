@@ -8,6 +8,7 @@ import {
   Network,
   RefreshCw,
   Search,
+  Settings,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -101,6 +102,10 @@ export function Sidebar() {
     tabController.openTab({ type: 'graph' }, strings.graph.title);
   }, [strings.graph.title, tabController]);
 
+  const openSettings = useCallback(() => {
+    tabController.openTab({ type: 'settings' }, strings.tabBar.settings);
+  }, [strings.tabBar.settings, tabController]);
+
   const cycleSortMode = useCallback(() => {
     setSortMode(
       (prev) => SORT_MODES[(SORT_MODES.indexOf(prev) + 1) % SORT_MODES.length],
@@ -187,6 +192,15 @@ export function Sidebar() {
           className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
           <Network className="size-4" />
+        </button>
+        <button
+          type="button"
+          onClick={openSettings}
+          aria-label={strings.tabBar.settings}
+          title={strings.tabBar.settings}
+          className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        >
+          <Settings className="size-4" />
         </button>
       </header>
 

@@ -139,10 +139,6 @@ export const TabBar = memo(function TabBar({
     strings.library.createNew.untitledCanvas,
   ]);
 
-  const handleSettings = useCallback(() => {
-    controller.openTab({ type: 'settings' }, strings.tabBar.settings, pane.id);
-  }, [controller, pane.id, strings.tabBar.settings]);
-
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
       if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) {
@@ -255,15 +251,6 @@ export const TabBar = memo(function TabBar({
           className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
           <PanelLeft className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={handleSettings}
-          aria-label={strings.tabBar.settings}
-          title={strings.tabBar.settings}
-          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <Settings className="size-3.5" />
         </button>
       </div>
 
