@@ -19,6 +19,7 @@ import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
 import type { Vector2 } from './geometry';
+import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
 import { PlacementController } from './placement-controller';
 import { EraserTool } from './tools/eraser-tool';
@@ -162,6 +163,7 @@ export class DrawableCanvas {
   private _toolCursor: string = 'default';
   private toolSelected: ITool;
   private readonly resolveNoteLink?: ResolveNoteLink;
+  private readonly resolveMedia?: ResolveMediaSrc;
   private onPageFrameRenamed?: (
     uuid: string,
     newName: string,
@@ -206,6 +208,7 @@ export class DrawableCanvas {
     ydoc: YDocManager,
     tools?: ITool[],
     resolveNoteLink?: ResolveNoteLink,
+    resolveMedia?: ResolveMediaSrc,
     private readonly _localPeerId = '',
   ) {
     const ctx = canvas.getContext('2d', { alpha: true });
@@ -224,6 +227,7 @@ export class DrawableCanvas {
     this.toolSelected = this.tools[0];
     this._ydoc = ydoc;
     this.resolveNoteLink = resolveNoteLink;
+    this.resolveMedia = resolveMedia;
 
     this.initEventListeners(canvas);
     this.initStates();
@@ -365,6 +369,7 @@ export class DrawableCanvas {
     };
     if (element instanceof PageFrameElement) {
       element.setNoteLinkResolver(this.resolveNoteLink);
+      element.setMediaResolver(this.resolveMedia);
       element.setOnDisplayNameRenamed((uuid, newName, oldName) => {
         this.onPageFrameRenamed?.(uuid, newName, oldName);
       });

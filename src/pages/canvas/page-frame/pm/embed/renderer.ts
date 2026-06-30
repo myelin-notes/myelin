@@ -263,10 +263,27 @@ export interface EmbedHost {
   destroy: () => void;
 }
 
+export interface ResolvedMedia {
+  url: string;
+  kind: 'image' | 'video';
+  revoke: () => void;
+}
+
+/**
+ * Resolve a `/`-rooted library path to a renderable object URL, or `null` if
+ * it doesn't point at an existing image/video.
+ */
+export type ResolveMediaSrc = (path: string) => Promise<ResolvedMedia | null>;
+
+function isLibraryPath(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//');
+}
+
 export function renderEmbedHost(
   url: string,
   alt: string | null,
   hint: EmbedHint,
+  resolveMedia?: ResolveMediaSrc,
 ): EmbedHost {
   const host = document.createElement('div');
   host.className = 'pm-embed-host pm-page-capped';
@@ -280,6 +297,40 @@ export function renderEmbedHost(
 
   if (!url) {
     return { dom: host, destroy: () => undefined };
+  }
+
+  if (resolveMedia && isLibraryPath(url)) {
+    swap(buildSkeleton(url));
+    let revoke: (() => void) | null = null;
+    resolveMedia(url)
+      .then((media) => {
+        if (cancelled) {
+          media?.revoke();
+          return;
+        }
+        if (!media) {
+          // Leave the skeleton showing the raw path so a broken/missing
+          // reference is visible rather than silently empty.
+          return;
+        }
+        revoke = media.revoke;
+        swap(
+          media.kind === 'video'
+            ? buildVideo(media.url)
+            : buildImage(media.url, alt),
+        );
+      })
+      .catch(() => {
+        // Leave the skeleton on failure.
+      });
+
+    return {
+      dom: host,
+      destroy: () => {
+        cancelled = true;
+        revoke?.();
+      },
+    };
   }
 
   const syncKind = resolveSyncKind(url, hint);

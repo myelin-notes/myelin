@@ -18,6 +18,7 @@ import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-ref
 import { UserPrefs } from '@/lib/user-prefs';
 import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
+import { createMediaPathResolver } from '@/pages/canvas/page-frame/media-path/resolution';
 import {
   type PageFrameNameCache,
   resolveNoteLinkRefByTitle,
@@ -169,6 +170,7 @@ export class CanvasSessionController {
         this.canvasToolsRef.current,
         async (title) =>
           resolveNoteLinkRefByTitle(this.repository, title, frameNameCache),
+        createMediaPathResolver(this.repository),
         session.localPeerId,
       );
       drawableCanvas.setOnPageFrameRenamed((uuid, newName) => {

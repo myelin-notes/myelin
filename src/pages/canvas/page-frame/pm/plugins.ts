@@ -4,6 +4,7 @@ import { Plugin as ProseMirrorPlugin } from 'prosemirror-state';
 import { tableEditing } from 'prosemirror-tables';
 import { ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
 import type * as Y from 'yjs';
+import type { ResolveMediaSrc } from './embed/renderer';
 import { buildKeymap, calloutCaretAnchorCleanupPlugin } from './keymap';
 import { embedPreviewPlugin } from './markdown/embeds';
 import {
@@ -80,6 +81,7 @@ export function buildPlugins(
   yXmlFragment: Y.XmlFragment,
   onLayout?: (pageCount: number, contentHeight: number | null) => void,
   resolveNoteLink?: ResolveNoteLink,
+  resolveMedia?: ResolveMediaSrc,
 ): Plugin[] {
   const plugins: Plugin[] = [
     ySyncPlugin(yXmlFragment),
@@ -90,7 +92,7 @@ export function buildPlugins(
     mathBlockInputRules(schema),
     mathBlockNormalizationPlugin(schema),
     noteLinkMarkdownPlugin(schema, resolveNoteLink),
-    embedPreviewPlugin(),
+    embedPreviewPlugin(resolveMedia),
     linkMarkdownPlugin(schema),
     markdownPastePlugin(),
     markdownPreviewPlugin(),

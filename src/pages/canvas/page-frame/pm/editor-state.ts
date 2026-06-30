@@ -5,6 +5,7 @@ import {
   CODE_BLOCK_CLEAR_SELECTION_EVENT,
   PM_UPDATE_EVENT,
 } from '@/lib/events';
+import type { ResolveMediaSrc } from './embed/renderer';
 import type { ResolveNoteLink } from './markdown/note-links';
 import { buildNodeViews } from './node-views';
 import { buildPlugins } from './plugins';
@@ -26,6 +27,7 @@ export class PageFrameEditorState {
   constructor(
     private readonly _yXmlFragment: Y.XmlFragment,
     private readonly _resolveNoteLink?: ResolveNoteLink,
+    private readonly _resolveMedia?: ResolveMediaSrc,
   ) {}
 
   get view(): EditorView | null {
@@ -66,6 +68,7 @@ export class PageFrameEditorState {
         this._yXmlFragment,
         onLayout,
         this._resolveNoteLink,
+        this._resolveMedia,
       ),
     });
 

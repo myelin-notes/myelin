@@ -6,7 +6,13 @@ import {
   useRef,
   useState,
 } from 'react';
-import { FileText, LoaderCircle } from 'lucide-react';
+import {
+  FileImage,
+  FileText,
+  FileVideo,
+  Folder,
+  LoaderCircle,
+} from 'lucide-react';
 import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
@@ -29,6 +35,7 @@ interface PageFrameAutocompletePopupProps {
   loadingLabel?: string;
   emptyLabel?: string;
   errorLabel?: string;
+  showItemIcons?: boolean;
   enablePreview?: boolean;
   loadPreview?: (
     target: NoteLinkPreviewTarget,
@@ -70,6 +77,19 @@ export function getAutocompleteScrollTop(
     return itemBottom - container.clientHeight;
   }
   return viewTop;
+}
+
+function AutocompleteItemIcon({ item }: { item: PageFrameAutocompleteItem }) {
+  switch (item.iconKind) {
+    case 'folder':
+      return <Folder className="size-4" />;
+    case 'image':
+      return <FileImage className="size-4" />;
+    case 'video':
+      return <FileVideo className="size-4" />;
+    default:
+      return <FileText className="size-4" />;
+  }
 }
 
 function createClosedState(): PageFrameAutocompleteState {
@@ -114,6 +134,7 @@ export function PageFrameAutocompletePopup({
   loadingLabel = 'Searching...',
   emptyLabel = 'No matches.',
   errorLabel = 'Could not load suggestions.',
+  showItemIcons = true,
   enablePreview = false,
   loadPreview,
 }: PageFrameAutocompletePopupProps) {
@@ -372,9 +393,11 @@ export function PageFrameAutocompletePopup({
                   : 'text-text-secondary hover:bg-hover-tint',
               )}
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface/80 text-text-secondary">
-                <FileText className="size-4" />
-              </div>
+              {showItemIcons && (
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface/80 text-text-secondary">
+                  <AutocompleteItemIcon item={item} />
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-sm text-text-primary">
                   {item.title}

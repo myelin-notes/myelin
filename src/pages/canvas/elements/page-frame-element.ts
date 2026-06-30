@@ -29,6 +29,7 @@ import {
   type PageFramePdfSource,
 } from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
+import type { ResolveMediaSrc } from '../page-frame/pm/embed/renderer';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
 import { schema } from '../page-frame/pm/schema';
 import { renderPageFrameThumbnail } from '../page-frame/thumbnail/render';
@@ -87,6 +88,7 @@ export class PageFrameElement extends DrawableElement {
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
     null;
   private _noteLinkResolver?: NoteLinkResolver;
+  private _mediaResolver?: ResolveMediaSrc;
   private _onDisplayNameRenamed?: (
     uuid: string,
     newName: string,
@@ -124,6 +126,10 @@ export class PageFrameElement extends DrawableElement {
 
   public setNoteLinkResolver(resolveNoteLink?: NoteLinkResolver): void {
     this._noteLinkResolver = resolveNoteLink;
+  }
+
+  public setMediaResolver(resolveMedia?: ResolveMediaSrc): void {
+    this._mediaResolver = resolveMedia;
   }
 
   public setOnDisplayNameRenamed(
@@ -187,6 +193,7 @@ export class PageFrameElement extends DrawableElement {
     this.pmEditor = new PageFrameEditorState(
       yXmlFragment,
       this._noteLinkResolver,
+      this._mediaResolver,
     );
   }
 
