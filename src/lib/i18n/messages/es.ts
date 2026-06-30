@@ -14,7 +14,22 @@ const es: typeof en = {
   },
   tabBar: {
     library: 'Biblioteca',
+    home: 'Inicio',
     settings: 'Ajustes',
+  },
+  sidebar: {
+    searchPlaceholder: 'Busca en tu biblioteca...',
+    searchModeText: 'Texto',
+    searchModeSemantic: 'Semántica',
+    explorer: 'Explorador',
+    tags: 'Etiquetas',
+    synced: 'Sincronizado',
+    syncing: 'Sincronizando',
+    offline: 'Sin conexión',
+    fileCount: (count: string) => `${count} archivos`,
+    collapse: 'Contraer barra lateral',
+    expand: 'Expandir barra lateral',
+    graph: 'Abrir grafo',
   },
   commandPalette: {
     title: 'Paleta de comandos',

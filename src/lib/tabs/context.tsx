@@ -37,12 +37,15 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
     };
     const initTab = readInitTab();
     if (initTab) {
+      // Tabs torn off into their own window close that window when emptied.
       return new TabStateController(
         createWindowStateWithTab(initTab),
         closeWindow,
       );
     }
-    return new TabStateController(undefined, closeWindow);
+    // The main window never closes from emptying its tabs; it falls back to an
+    // empty home pane (recents + welcome).
+    return new TabStateController(undefined);
   }, []);
 
   useTabCloseShortcut(controller);

@@ -19,7 +19,6 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
-import { UserPrefs } from '@/lib/user-prefs';
 import { useCanvasCommandContext } from '@/pages/canvas/command-context';
 import {
   importMarkdownFile,
@@ -159,15 +158,6 @@ export function useCommandPalette(): {
     tabController.openTab({ type: 'graph' }, strings.graph.title);
   }, [closePalette, strings.graph.title, tabController]);
 
-  const toggleLibraryView = useCallback(() => {
-    closePalette();
-    const current = UserPrefs.get('explorerViewMode');
-    UserPrefs.set('explorerViewMode', current === 'tree' ? 'grid' : 'tree');
-    if (focusedTab?.target.type !== 'library') {
-      tabController.openTab({ type: 'library' }, 'Library');
-    }
-  }, [closePalette, focusedTab?.target.type, tabController]);
-
   const triggerLibraryMarkdownImport = useCallback(async () => {
     closePalette();
     const file = await pickMarkdownFile();
@@ -288,7 +278,6 @@ export function useCommandPalette(): {
         openGraph,
         openPalette,
         refreshRepository,
-        toggleLibraryView,
         triggerKeybindingAction,
         triggerCanvasMarkdownImport,
         triggerLibraryMarkdownImport,
@@ -304,7 +293,6 @@ export function useCommandPalette(): {
       openPalette,
       refreshRepository,
       strings,
-      toggleLibraryView,
       triggerCanvasMarkdownImport,
       triggerKeybindingAction,
       triggerLibraryMarkdownImport,

@@ -1,14 +1,16 @@
 import { memo, useCallback, useRef, useState } from 'react';
 import {
-  BookOpen,
   Columns2,
   Network,
+  PanelLeft,
   Plus,
   Rows2,
   Settings,
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { toast } from 'sonner';
+import { useSidebar } from '@/components/layout/sidebar/context';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -17,12 +19,14 @@ import {
 } from '@/components/ui/context-menu';
 import { trackEvent } from '@/lib/analytics';
 import { type Messages, useMessages } from '@/lib/i18n';
+import { Logger } from '@/lib/logger';
 import {
   isMac,
   isWindows,
   TAB_BAR_HEIGHT_CLASS,
   TRAFFIC_LIGHT_INSET_CLASS,
 } from '@/lib/platform';
+import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
@@ -40,13 +44,17 @@ import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
 import { WindowControls } from './window-controls';
 
+const logger = new Logger('TabBar');
+
+function errorDescription(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // Built-in tabs store a title captured at creation time, so they don't follow
 // language changes. Derive their title from the current messages instead and
 // fall back to the stored title for content tabs (canvas/image file names).
 function tabTitle(tab: Tab, strings: Messages): string {
   switch (tab.target.type) {
-    case 'library':
-      return strings.tabBar.library;
     case 'graph':
       return strings.graph.title;
     case 'settings':
@@ -58,8 +66,6 @@ function tabTitle(tab: Tab, strings: Messages): string {
 
 function tabIcon(target: TabTarget) {
   switch (target.type) {
-    case 'library':
-      return <BookOpen className="size-3 shrink-0" />;
     case 'graph':
       return <Network className="size-3 shrink-0" />;
     case 'settings':
@@ -101,16 +107,37 @@ export const TabBar = memo(function TabBar({
 }: TabBarProps) {
   const strings = useMessages();
   const controller = useTabController();
+  const repository = useRepository();
+  const { collapsed, toggle: toggleSidebar } = useSidebar();
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
+  // The "+" button creates a fresh canvas note in the library root and opens it
+  // in this pane. Closing every tab returns the pane to the home view.
   const handleNewTab = useCallback(() => {
-    controller.openTab({ type: 'library' }, strings.tabBar.library, pane.id);
-  }, [controller, pane.id, strings.tabBar.library]);
-
-  const handleGraph = useCallback(() => {
-    controller.openTab({ type: 'graph' }, strings.graph.title, pane.id);
-  }, [controller, pane.id, strings.graph.title]);
+    void (async () => {
+      try {
+        const name = await repository.getUniqueFileName(
+          strings.library.createNew.untitledCanvas,
+          null,
+        );
+        const id = await repository.createFile(name, 'mcanvas', null);
+        controller.openTab({ type: 'canvas', id }, name, pane.id);
+        trackEvent('note_created', { file_type: 'mcanvas' });
+      } catch (error) {
+        logger.error('Failed to create note from tab bar', error);
+        toast.error(strings.commandPalette.errors.createNote, {
+          description: errorDescription(error),
+        });
+      }
+    })();
+  }, [
+    controller,
+    pane.id,
+    repository,
+    strings.commandPalette.errors.createNote,
+    strings.library.createNew.untitledCanvas,
+  ]);
 
   const handleSettings = useCallback(() => {
     controller.openTab({ type: 'settings' }, strings.tabBar.settings, pane.id);
@@ -166,7 +193,9 @@ export const TabBar = memo(function TabBar({
         'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
         TAB_BAR_HEIGHT_CLASS,
         !isFocused && 'opacity-75',
-        isMac && isTopLeft && TRAFFIC_LIGHT_INSET_CLASS,
+        // The sidebar normally clears the macOS traffic lights; only inset the
+        // tab bar when the sidebar is collapsed and this is the top-left bar.
+        isMac && isTopLeft && collapsed && TRAFFIC_LIGHT_INSET_CLASS,
       )}
     >
       <div
@@ -217,12 +246,15 @@ export const TabBar = memo(function TabBar({
       >
         <button
           type="button"
-          onClick={handleGraph}
-          aria-label={strings.graph.title}
-          title={strings.graph.title}
+          onClick={toggleSidebar}
+          aria-label={
+            collapsed ? strings.sidebar.expand : strings.sidebar.collapse
+          }
+          title={collapsed ? strings.sidebar.expand : strings.sidebar.collapse}
+          aria-pressed={!collapsed}
           className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
-          <Network className="size-3.5" />
+          <PanelLeft className="size-3.5" />
         </button>
         <button
           type="button"

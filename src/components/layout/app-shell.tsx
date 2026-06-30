@@ -1,5 +1,6 @@
 import { PaneIdProvider, useWindowState } from '@/lib/tabs/context';
 import type { PaneNode } from '@/lib/tabs/types';
+import { HomePage } from '@/pages/home';
 import { PaneContent } from './pane';
 import { PaneDropTarget, PaneLayout } from './pane-layout';
 import { TabBar } from './tab-bar';
@@ -10,7 +11,7 @@ export function AppShell() {
 
   if (hasSplits) {
     return (
-      <div className="flex h-screen w-screen flex-col overflow-hidden">
+      <div className="flex h-full w-full flex-col overflow-hidden">
         <div className="min-h-0 flex-1">
           <PaneLayout />
         </div>
@@ -25,14 +26,14 @@ export function AppShell() {
     : null;
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       {pane && (
         <TabBar pane={pane} isFocused isTopLeft isTopRight windowDraggable />
       )}
-      {activeTab && pane && (
+      {pane && (
         <PaneIdProvider paneId={pane.id}>
           <PaneDropTarget paneId={pane.id} className="min-h-0 flex-1">
-            <PaneContent tab={activeTab} />
+            {activeTab ? <PaneContent tab={activeTab} /> : <HomePage />}
           </PaneDropTarget>
         </PaneIdProvider>
       )}

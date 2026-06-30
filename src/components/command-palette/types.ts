@@ -5,7 +5,7 @@ export type CommandPaletteMode = 'commands' | 'notes';
 export type CommandPalettePage =
   | 'canvas'
   | 'graph'
-  | 'library'
+  | 'home'
   | 'settings'
   | 'unknown';
 

@@ -14,7 +14,22 @@ const zhHans: typeof en = {
   },
   tabBar: {
     library: '资料库',
+    home: '主页',
     settings: '设置',
+  },
+  sidebar: {
+    searchPlaceholder: '搜索你的资料库…',
+    searchModeText: '文本',
+    searchModeSemantic: '语义',
+    explorer: '资源管理器',
+    tags: '标签',
+    synced: '已同步',
+    syncing: '同步中',
+    offline: '离线',
+    fileCount: (count: string) => `${count} 个文件`,
+    collapse: '收起侧边栏',
+    expand: '展开侧边栏',
+    graph: '打开关系图',
   },
   commandPalette: {
     title: '命令面板',

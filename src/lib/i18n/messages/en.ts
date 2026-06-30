@@ -12,7 +12,22 @@ const en = {
   },
   tabBar: {
     library: 'Library',
+    home: 'Home',
     settings: 'Settings',
+  },
+  sidebar: {
+    searchPlaceholder: 'Search your library...',
+    searchModeText: 'Text',
+    searchModeSemantic: 'Semantic',
+    explorer: 'Explorer',
+    tags: 'Tags',
+    synced: 'Synced',
+    syncing: 'Syncing',
+    offline: 'Offline',
+    fileCount: (count: string) => `${count} files`,
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+    graph: 'Open graph',
   },
   commandPalette: {
     title: 'Command Palette',

@@ -21,6 +21,7 @@ import type {
   SplitDirection,
 } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
+import { HomePage } from '@/pages/home';
 import { PaneContent } from './pane';
 import { TabBar } from './tab-bar';
 
@@ -310,7 +311,7 @@ function PaneView({
           windowDraggable={isTopLeft}
         />
         <div className="min-h-0 flex-1">
-          {activeTab && <PaneContent tab={activeTab} />}
+          {activeTab ? <PaneContent tab={activeTab} /> : <HomePage />}
         </div>
       </PaneDropTarget>
     </PaneIdProvider>
