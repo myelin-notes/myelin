@@ -178,7 +178,8 @@ const zhHans: typeof en = {
     },
     semanticTags: {
       title: '语义标签',
-      empty: '还没有标签，右键点击文件并选择“管理标签”即可开始',
+      empty: '还没有标签',
+      emptyHint: '创建一个来筛选你的库。',
       insights: '工作室洞察',
       addTag: '新建标签',
       placeholder: '标签名称…',

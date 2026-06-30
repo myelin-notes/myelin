@@ -154,6 +154,40 @@ export const SidebarTags = memo(function SidebarTags({
     onActiveTagsChanged(next);
   };
 
+  const createControl = isAdding ? (
+    <div className="flex items-center gap-1 rounded-lg bg-card px-2 py-1 ring-1 ring-border-subtle/70">
+      <span className="text-[11px] text-text-muted">#</span>
+      <input
+        ref={inputRef}
+        value={newTag}
+        onChange={(e) => setNewTag(e.target.value)}
+        onBlur={createTag}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            createTag();
+          }
+          if (e.key === 'Escape') {
+            setNewTag('');
+            setIsAdding(false);
+          }
+        }}
+        placeholder={strings.library.semanticTags.placeholder}
+        className="w-20 bg-transparent font-medium text-[11px] text-text-primary outline-none placeholder:text-text-muted"
+      />
+    </div>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setIsAdding(true)}
+      aria-label={strings.library.semanticTags.addTag}
+      title={strings.library.semanticTags.addTag}
+      className="flex cursor-pointer items-center gap-1 rounded-lg border border-text-muted/40 border-dashed bg-transparent px-2 py-1 font-medium text-[11px] text-text-muted transition-colors hover:border-text-muted/60 hover:text-text-secondary"
+    >
+      <Plus className="size-3" />
+      {strings.library.semanticTags.addTag}
+    </button>
+  );
+
   return (
     <div className="flex flex-col">
       {open ? (
@@ -200,12 +234,26 @@ export const SidebarTags = memo(function SidebarTags({
       {open && (
         <div
           style={{ height }}
-          className="flex flex-wrap content-start gap-1.5 overflow-y-auto px-2 pt-0.5 pb-3"
+          className={cn(
+            'overflow-y-auto px-2 pt-0.5 pb-3',
+            tags.length === 0 ? 'flex' : 'flex flex-wrap content-start gap-1.5',
+          )}
         >
           {tags.length === 0 ? (
-            <p className="text-text-muted text-xs italic">
-              {strings.library.semanticTags.empty}
-            </p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-4 text-center">
+              <div className="flex size-9 items-center justify-center rounded-full bg-card text-text-muted ring-1 ring-border-subtle/70">
+                <Hash className="size-4" />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <p className="font-medium text-text-secondary text-xs">
+                  {strings.library.semanticTags.empty}
+                </p>
+                <p className="text-[11px] text-text-muted">
+                  {strings.library.semanticTags.emptyHint}
+                </p>
+              </div>
+              {createControl}
+            </div>
           ) : (
             orderedTags.map(({ tag, count }) => {
               const isActive = activeTags.has(tag);
@@ -259,39 +307,7 @@ export const SidebarTags = memo(function SidebarTags({
               );
             })
           )}
-          {isAdding ? (
-            <div className="flex items-center gap-1 rounded-lg bg-card px-2 py-1 ring-1 ring-border-subtle/70">
-              <span className="text-[11px] text-text-muted">#</span>
-              <input
-                ref={inputRef}
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onBlur={createTag}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    createTag();
-                  }
-                  if (e.key === 'Escape') {
-                    setNewTag('');
-                    setIsAdding(false);
-                  }
-                }}
-                placeholder={strings.library.semanticTags.placeholder}
-                className="w-20 bg-transparent font-medium text-[11px] text-text-primary outline-none placeholder:text-text-muted"
-              />
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsAdding(true)}
-              aria-label={strings.library.semanticTags.addTag}
-              title={strings.library.semanticTags.addTag}
-              className="flex cursor-pointer items-center gap-1 rounded-lg border border-text-muted/40 border-dashed bg-transparent px-2 py-1 font-medium text-[11px] text-text-muted transition-colors hover:border-text-muted/60 hover:text-text-secondary"
-            >
-              <Plus className="size-3" />
-              {strings.library.semanticTags.addTag}
-            </button>
-          )}
+          {tags.length > 0 && createControl}
         </div>
       )}
     </div>

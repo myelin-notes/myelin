@@ -181,8 +181,8 @@ const en = {
     },
     semanticTags: {
       title: 'Semantic Tags',
-      empty:
-        'No tags yet. Right-click a file and choose "Manage Tags" to start.',
+      empty: 'No tags yet',
+      emptyHint: 'Create one to filter your library.',
       insights: 'Studio Insights',
       addTag: 'New tag',
       placeholder: 'Tag name...',

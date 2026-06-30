@@ -184,8 +184,8 @@ const es: typeof en = {
     },
     semanticTags: {
       title: 'Etiquetas semánticas',
-      empty:
-        'Aún no hay etiquetas. Haz clic derecho en un archivo y elige "Administrar etiquetas" para empezar.',
+      empty: 'Aún no hay etiquetas',
+      emptyHint: 'Crea una para filtrar tu biblioteca.',
       insights: 'Análisis del estudio',
       addTag: 'Nueva etiqueta',
       placeholder: 'Nombre de etiqueta...',
