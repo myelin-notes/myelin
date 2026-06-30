@@ -188,6 +188,7 @@ const es: typeof en = {
       emptyHint: 'Crea una para filtrar tu biblioteca.',
       insights: 'Análisis del estudio',
       addTag: 'Nueva etiqueta',
+      addChild: (tag: string) => `Añadir etiqueta dentro de #${tag}`,
       placeholder: 'Nombre de etiqueta...',
       deleteTag: (tag: string) => `Eliminar #${tag}`,
       stats: {

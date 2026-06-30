@@ -182,6 +182,7 @@ const zhHans: typeof en = {
       emptyHint: '创建一个来筛选你的库。',
       insights: '工作室洞察',
       addTag: '新建标签',
+      addChild: (tag: string) => `在 #${tag} 下添加标签`,
       placeholder: '标签名称…',
       deleteTag: (tag: string) => `删除 #${tag}`,
       stats: {

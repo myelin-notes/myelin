@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ChevronRight, Hash, Plus, X } from 'lucide-react';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatNumber } from '@/lib/i18n/format';
@@ -7,6 +15,7 @@ import { useRepository } from '@/lib/sync';
 import {
   normalizeTagInput,
   orderTagsHierarchically,
+  tagMatchesQuery,
 } from '@/lib/sync/repo/tag-hierarchy';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
@@ -43,7 +52,9 @@ export const SidebarTags = memo(function SidebarTags({
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
   const [internalRefresh, setInternalRefresh] = useState(0);
-  const [isAdding, setIsAdding] = useState(false);
+  // null = not adding; '' = adding a root tag; otherwise the parent tag a new
+  // child is being created under.
+  const [addParent, setAddParent] = useState<string | null>(null);
   const [newTag, setNewTag] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const [height, setHeightState] = useState(() =>
@@ -70,15 +81,24 @@ export const SidebarTags = memo(function SidebarTags({
   }, [onTagsChanged]);
 
   useEffect(() => {
-    if (isAdding) {
+    if (addParent !== null) {
       inputRef.current?.focus();
     }
-  }, [isAdding]);
+  }, [addParent]);
 
-  const createTag = async () => {
-    const normalized = normalizeTagInput(newTag);
+  const startAdd = (parent: string) => {
+    setOpen(true);
     setNewTag('');
-    setIsAdding(false);
+    setAddParent(parent);
+  };
+
+  const submitAdd = async () => {
+    const parent = addParent ?? '';
+    const normalized = normalizeTagInput(
+      parent ? `${parent}/${newTag}` : newTag,
+    );
+    setNewTag('');
+    setAddParent(null);
     if (!normalized) {
       return;
     }
@@ -92,11 +112,22 @@ export const SidebarTags = memo(function SidebarTags({
 
   const deleteTag = async (tag: string) => {
     try {
+      // Deleting a tag removes its whole subtree, so dropping `A` also drops
+      // `A/B` instead of leaving the child stranded.
       const nodes = await repository.getNodesByAnyTag([tag]);
       for (const node of nodes) {
-        await repository.removeTag(node.id, tag);
+        for (const nodeTag of node.tags) {
+          if (tagMatchesQuery(nodeTag, tag)) {
+            await repository.removeTag(node.id, nodeTag);
+          }
+        }
       }
-      await repository.removeRegistryTag(tag);
+      const registry = await repository.getRegistryTags();
+      for (const registryTag of registry) {
+        if (tagMatchesQuery(registryTag, tag)) {
+          await repository.removeRegistryTag(registryTag);
+        }
+      }
       handleRegistryChanged();
     } catch (error) {
       logger.error('Failed to delete tag', error, { tag });
@@ -162,39 +193,41 @@ export const SidebarTags = memo(function SidebarTags({
     onActiveTagsChanged(next);
   };
 
-  const createControl = isAdding ? (
-    <div className="flex items-center gap-1 rounded-lg bg-card px-2 py-1 ring-1 ring-border-subtle/70">
-      <span className="text-[11px] text-text-muted">#</span>
-      <input
-        ref={inputRef}
-        value={newTag}
-        onChange={(e) => setNewTag(e.target.value)}
-        onBlur={createTag}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            createTag();
-          }
-          if (e.key === 'Escape') {
-            setNewTag('');
-            setIsAdding(false);
-          }
-        }}
-        placeholder={strings.library.semanticTags.placeholder}
-        className="w-20 bg-transparent font-medium text-[11px] text-text-primary outline-none placeholder:text-text-muted"
-      />
-    </div>
-  ) : (
-    <button
-      type="button"
-      onClick={() => setIsAdding(true)}
-      aria-label={strings.library.semanticTags.addTag}
-      title={strings.library.semanticTags.addTag}
-      className="flex cursor-pointer items-center gap-1 rounded-lg border border-text-muted/40 border-dashed bg-transparent px-2 py-1 font-medium text-[11px] text-text-muted transition-colors hover:border-text-muted/60 hover:text-text-secondary"
-    >
-      <Plus className="size-3" />
-      {strings.library.semanticTags.addTag}
-    </button>
-  );
+  // Inline editor row used both for a new root tag and a new child under a
+  // parent; the parent segment is shown as a static prefix.
+  const addRow = (depth: number, parent: string | null) => {
+    const parentLeaf = parent
+      ? parent.slice(parent.lastIndexOf('/') + 1)
+      : null;
+    return (
+      <div
+        className="flex items-center gap-1 rounded-md pr-1"
+        style={{ paddingLeft: depth * 14 + 8 }}
+      >
+        <span className="shrink-0 font-medium text-[11px] text-text-muted">
+          <span className="opacity-50">#</span>
+          {parentLeaf ? `${parentLeaf}/` : ''}
+        </span>
+        <input
+          ref={inputRef}
+          value={newTag}
+          onChange={(e) => setNewTag(e.target.value)}
+          onBlur={submitAdd}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              submitAdd();
+            }
+            if (e.key === 'Escape') {
+              setNewTag('');
+              setAddParent(null);
+            }
+          }}
+          placeholder={strings.library.semanticTags.placeholder}
+          className="min-w-0 flex-1 border-accent-dark/40 border-b bg-transparent py-1 font-medium text-[11px] text-text-primary outline-none placeholder:text-text-muted"
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col">
@@ -234,9 +267,18 @@ export const SidebarTags = memo(function SidebarTags({
             {strings.sidebar.tags}
           </span>
         </button>
-        <span className="px-2 text-text-muted text-xs tabular-nums">
+        <span className="px-1 text-text-muted text-xs tabular-nums">
           {formatNumber(tags.length, locale)}
         </span>
+        <button
+          type="button"
+          onClick={() => startAdd('')}
+          aria-label={strings.library.semanticTags.addTag}
+          title={strings.library.semanticTags.addTag}
+          className="mr-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        >
+          <Plus className="size-3.5" />
+        </button>
       </div>
 
       {open && (
@@ -248,75 +290,102 @@ export const SidebarTags = memo(function SidebarTags({
           )}
         >
           {tags.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2.5 px-4 text-center">
-              <div className="flex size-9 items-center justify-center rounded-full bg-card text-text-muted ring-1 ring-border-subtle/70">
-                <Hash className="size-4" />
+            addParent !== null ? (
+              addRow(0, null)
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2.5 px-4 text-center">
+                <div className="flex size-9 items-center justify-center rounded-full bg-card text-text-muted ring-1 ring-border-subtle/70">
+                  <Hash className="size-4" />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <p className="font-medium text-text-secondary text-xs">
+                    {strings.library.semanticTags.empty}
+                  </p>
+                  <p className="text-[11px] text-text-muted">
+                    {strings.library.semanticTags.emptyHint}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => startAdd('')}
+                  className="flex cursor-pointer items-center gap-1 rounded-lg border border-text-muted/40 border-dashed bg-transparent px-2 py-1 font-medium text-[11px] text-text-muted transition-colors hover:border-text-muted/60 hover:text-text-secondary"
+                >
+                  <Plus className="size-3" />
+                  {strings.library.semanticTags.addTag}
+                </button>
               </div>
-              <div className="flex flex-col gap-0.5">
-                <p className="font-medium text-text-secondary text-xs">
-                  {strings.library.semanticTags.empty}
-                </p>
-                <p className="text-[11px] text-text-muted">
-                  {strings.library.semanticTags.emptyHint}
-                </p>
-              </div>
-              {createControl}
-            </div>
+            )
           ) : (
             <>
+              {addParent === '' && addRow(0, null)}
               {orderedTags.map(({ tag, count, depth, label }) => {
                 const isActive = activeTags.has(tag);
                 const formattedCount = formatNumber(count, locale);
                 return (
-                  <div
-                    key={tag}
-                    className={cn(
-                      'group/tag flex items-center gap-1 rounded-md pr-1 transition-colors',
-                      isActive
-                        ? 'bg-tag-active text-text-on-dark'
-                        : 'text-text-secondary hover:bg-hover-tint',
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleTag(tag)}
-                      aria-label={formatSemanticTagAccessibleName(
-                        tag,
-                        count,
-                        formattedCount,
-                      )}
-                      aria-pressed={isActive}
-                      style={{ paddingLeft: depth * 14 + 8 }}
-                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1 text-left font-medium text-[11px]"
-                    >
-                      <span className="shrink-0 opacity-50">#</span>
-                      <span className="truncate">{label}</span>
-                    </button>
-                    <span
+                  <Fragment key={tag}>
+                    <div
                       className={cn(
-                        'shrink-0 text-[9px] tabular-nums',
-                        isActive ? 'text-text-on-dark/60' : 'text-text-muted',
-                      )}
-                    >
-                      {formattedCount}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => deleteTag(tag)}
-                      aria-label={strings.library.semanticTags.deleteTag(tag)}
-                      className={cn(
-                        'flex shrink-0 cursor-pointer items-center rounded p-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
+                        'group/tag flex items-center gap-1 rounded-md pr-1 transition-colors',
                         isActive
-                          ? 'text-text-on-dark/70 hover:text-text-on-dark'
-                          : 'text-text-muted hover:text-destructive',
+                          ? 'bg-tag-active text-text-on-dark'
+                          : 'text-text-secondary hover:bg-hover-tint',
                       )}
                     >
-                      <X className="size-3" />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        aria-label={formatSemanticTagAccessibleName(
+                          tag,
+                          count,
+                          formattedCount,
+                        )}
+                        aria-pressed={isActive}
+                        style={{ paddingLeft: depth * 14 + 8 }}
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1 text-left font-medium text-[11px]"
+                      >
+                        <span className="shrink-0 opacity-50">#</span>
+                        <span className="truncate">{label}</span>
+                      </button>
+                      <span
+                        className={cn(
+                          'shrink-0 text-[9px] tabular-nums',
+                          isActive ? 'text-text-on-dark/60' : 'text-text-muted',
+                        )}
+                      >
+                        {formattedCount}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => startAdd(tag)}
+                        aria-label={strings.library.semanticTags.addChild(tag)}
+                        title={strings.library.semanticTags.addChild(tag)}
+                        className={cn(
+                          'flex shrink-0 cursor-pointer items-center rounded p-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
+                          isActive
+                            ? 'text-text-on-dark/70 hover:text-text-on-dark'
+                            : 'text-text-muted hover:text-text-primary',
+                        )}
+                      >
+                        <Plus className="size-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteTag(tag)}
+                        aria-label={strings.library.semanticTags.deleteTag(tag)}
+                        className={cn(
+                          'flex shrink-0 cursor-pointer items-center rounded p-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
+                          isActive
+                            ? 'text-text-on-dark/70 hover:text-text-on-dark'
+                            : 'text-text-muted hover:text-destructive',
+                        )}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                    {addParent === tag && addRow(depth + 1, tag)}
+                  </Fragment>
                 );
               })}
-              <div className="flex px-1 pt-1.5">{createControl}</div>
             </>
           )}
         </div>

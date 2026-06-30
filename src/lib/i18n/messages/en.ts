@@ -185,6 +185,7 @@ const en = {
       emptyHint: 'Create one to filter your library.',
       insights: 'Studio Insights',
       addTag: 'New tag',
+      addChild: (tag: string) => `Add tag under #${tag}`,
       placeholder: 'Tag name...',
       deleteTag: (tag: string) => `Delete #${tag}`,
       stats: {
