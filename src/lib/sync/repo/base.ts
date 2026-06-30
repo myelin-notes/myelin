@@ -51,7 +51,7 @@ import {
   VERSION_HISTORY_MAX_PER_FILE,
   type VFSManifest,
 } from './shared';
-import { normalizeTagInput } from './tag-hierarchy';
+import { expandTagWithAncestors, normalizeTagInput } from './tag-hierarchy';
 import type {
   CreateFileOptions,
   FileType,
@@ -596,9 +596,12 @@ export abstract class BaseRepository
   }
 
   async addRegistryTags(tags: string[]): Promise<string[]> {
+    // Registering `a/b` also registers its ancestor `a`, so parent tags exist
+    // as usable filters even before anything is attached to them.
     const normalized = tags
       .map(normalizeTagInput)
-      .filter((tag) => tag.length > 0);
+      .filter((tag) => tag.length > 0)
+      .flatMap(expandTagWithAncestors);
     return this.mutateManifest('Add registry tags', (manifest) => {
       const next = new Set(manifest.tagRegistry);
       for (const tag of normalized) {

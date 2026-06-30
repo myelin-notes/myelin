@@ -107,16 +107,24 @@ export const SidebarTags = memo(function SidebarTags({
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
-    Promise.all([repository.listTags(), repository.getRegistryTags()])
-      .then(([attachedTags, registryTags]) => {
+    // Ask for ancestor-inclusive counts so a parent like `uni` surfaces (and
+    // counts the whole subtree) even when only `uni/math` is attached.
+    Promise.all([repository.listTags(true), repository.getRegistryTags()])
+      .then(([hierarchicalTags, registryTags]) => {
         if (cancelled) {
           return;
         }
         const counts = new Map(
-          attachedTags.map((entry) => [entry.tag, entry.count]),
+          hierarchicalTags.map((entry) => [entry.tag, entry.count]),
         );
+        // Show every attached tag (including synthesized ancestors) plus
+        // registry tags that exist without being attached to anything yet.
+        const allTags = new Set<string>([
+          ...hierarchicalTags.map((entry) => entry.tag),
+          ...registryTags,
+        ]);
         setTags(
-          registryTags.map((tag) => ({ tag, count: counts.get(tag) ?? 0 })),
+          [...allTags].map((tag) => ({ tag, count: counts.get(tag) ?? 0 })),
         );
         setLoaded(true);
       })
@@ -235,12 +243,12 @@ export const SidebarTags = memo(function SidebarTags({
         <div
           style={{ height }}
           className={cn(
-            'overflow-y-auto px-2 pt-0.5 pb-3',
-            tags.length === 0 ? 'flex' : 'flex flex-wrap content-start gap-1.5',
+            'flex flex-col overflow-y-auto px-1.5 pt-0.5 pb-2',
+            tags.length === 0 && 'justify-center',
           )}
         >
           {tags.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-4 text-center">
+            <div className="flex flex-col items-center justify-center gap-2.5 px-4 text-center">
               <div className="flex size-9 items-center justify-center rounded-full bg-card text-text-muted ring-1 ring-border-subtle/70">
                 <Hash className="size-4" />
               </div>
@@ -255,59 +263,62 @@ export const SidebarTags = memo(function SidebarTags({
               {createControl}
             </div>
           ) : (
-            orderedTags.map(({ tag, count }) => {
-              const isActive = activeTags.has(tag);
-              const formattedCount = formatNumber(count, locale);
-              return (
-                <div
-                  key={tag}
-                  className={cn(
-                    'group/tag flex items-center rounded-lg font-medium text-[11px] transition-colors',
-                    isActive
-                      ? 'bg-tag-active text-text-on-dark'
-                      : 'bg-card text-text-secondary ring-1 ring-border-subtle/70 hover:bg-card-active',
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    aria-label={formatSemanticTagAccessibleName(
-                      tag,
-                      count,
-                      formattedCount,
+            <>
+              {orderedTags.map(({ tag, count, depth, label }) => {
+                const isActive = activeTags.has(tag);
+                const formattedCount = formatNumber(count, locale);
+                return (
+                  <div
+                    key={tag}
+                    className={cn(
+                      'group/tag flex items-center gap-1 rounded-md pr-1 transition-colors',
+                      isActive
+                        ? 'bg-tag-active text-text-on-dark'
+                        : 'text-text-secondary hover:bg-hover-tint',
                     )}
-                    aria-pressed={isActive}
-                    className="cursor-pointer rounded-l-lg py-1 pr-1 pl-2"
                   >
-                    <span className="opacity-50">#</span>
-                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      aria-label={formatSemanticTagAccessibleName(
+                        tag,
+                        count,
+                        formattedCount,
+                      )}
+                      aria-pressed={isActive}
+                      style={{ paddingLeft: depth * 14 + 8 }}
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1 text-left font-medium text-[11px]"
+                    >
+                      <span className="shrink-0 opacity-50">#</span>
+                      <span className="truncate">{label}</span>
+                    </button>
                     <span
                       className={cn(
-                        'ml-1 text-[9px]',
+                        'shrink-0 text-[9px] tabular-nums',
                         isActive ? 'text-text-on-dark/60' : 'text-text-muted',
                       )}
                     >
                       {formattedCount}
                     </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteTag(tag)}
-                    aria-label={strings.library.semanticTags.deleteTag(tag)}
-                    className={cn(
-                      'flex shrink-0 cursor-pointer items-center self-stretch rounded-r-lg pr-1.5 pl-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
-                      isActive
-                        ? 'text-text-on-dark/70 hover:text-text-on-dark'
-                        : 'text-text-muted hover:text-destructive',
-                    )}
-                  >
-                    <X className="size-3" />
-                  </button>
-                </div>
-              );
-            })
+                    <button
+                      type="button"
+                      onClick={() => deleteTag(tag)}
+                      aria-label={strings.library.semanticTags.deleteTag(tag)}
+                      className={cn(
+                        'flex shrink-0 cursor-pointer items-center rounded p-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
+                        isActive
+                          ? 'text-text-on-dark/70 hover:text-text-on-dark'
+                          : 'text-text-muted hover:text-destructive',
+                      )}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                );
+              })}
+              <div className="flex px-1 pt-1.5">{createControl}</div>
+            </>
           )}
-          {tags.length > 0 && createControl}
         </div>
       )}
     </div>
