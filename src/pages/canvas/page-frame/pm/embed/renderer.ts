@@ -251,9 +251,18 @@ function buildSkeleton(url: string): HTMLElement {
   return wrap;
 }
 
-function renderResolved(meta: EmbedMeta, url: string): HTMLElement {
+function renderResolved(
+  meta: EmbedMeta,
+  url: string,
+  alt: string | null,
+): HTMLElement {
   if (meta.kind === 'oembed') {
     return buildOEmbed(meta, url);
+  }
+  if (meta.kind === 'media') {
+    return meta.mediaKind === 'video'
+      ? buildVideo(meta.url)
+      : buildImage(meta.url, alt);
   }
   return buildLinkCard(meta, url);
 }
@@ -263,11 +272,147 @@ export interface EmbedHost {
   destroy: () => void;
 }
 
+export interface ResolvedMedia {
+  url: string;
+  kind: 'image' | 'video';
+  revoke: () => void;
+}
+
+/**
+ * Resolve a `/`-rooted library path to a renderable object URL, or `null` if
+ * it doesn't point at an existing image/video.
+ */
+export type ResolveMediaSrc = (path: string) => Promise<ResolvedMedia | null>;
+
+function isLibraryPath(url: string): boolean {
+  return url.startsWith('/') && !url.startsWith('//');
+}
+
+// Load embeds slightly before they scroll into view, and keep them loaded for
+// a short band after they leave, to avoid thrashing at the viewport edge.
+const LIBRARY_MEDIA_ROOT_MARGIN = '300px';
+
+/**
+ * Render a `/`-rooted library image/video, reading its bytes only while the
+ * embed is near the viewport and releasing the object URL once it scrolls away.
+ * Page frames are created eagerly for the whole canvas, so resolving every
+ * embed up-front would hold every referenced file in memory as a Blob for the
+ * frame's lifetime; gating on visibility keeps only on-screen media resident.
+ */
+function renderLibraryMedia(
+  url: string,
+  alt: string | null,
+  resolveMedia: ResolveMediaSrc,
+): EmbedHost {
+  const host = document.createElement('div');
+  host.className = 'pm-embed-host pm-page-capped';
+  host.contentEditable = 'false';
+  host.appendChild(buildSkeleton(url));
+
+  const swap = (next: HTMLElement): void => {
+    clear(host);
+    host.appendChild(next);
+  };
+
+  // 'idle' allows media that resolved while off-screen to be re-read when it
+  // returns to view; 'missing' is terminal so a broken reference is not
+  // re-fetched on every intersection.
+  let state: 'idle' | 'loading' | 'loaded' | 'missing' = 'idle';
+  let revoke: (() => void) | null = null;
+  let visible = false;
+  let destroyed = false;
+
+  const load = (): void => {
+    if (destroyed || state !== 'idle') {
+      return;
+    }
+    state = 'loading';
+    resolveMedia(url)
+      .then((media) => {
+        if (!media) {
+          // Leave the skeleton showing the raw path so a broken/missing
+          // reference is visible rather than silently empty.
+          state = 'missing';
+          return;
+        }
+        if (destroyed || !visible) {
+          // Destroyed or scrolled away before the bytes arrived: drop them now
+          // and let it reload if it comes back into view.
+          media.revoke();
+          state = 'idle';
+          return;
+        }
+        revoke = media.revoke;
+        state = 'loaded';
+        swap(
+          media.kind === 'video'
+            ? buildVideo(media.url)
+            : buildImage(media.url, alt),
+        );
+      })
+      .catch(() => {
+        // Leave the skeleton on failure; allow a retry on the next view.
+        state = 'idle';
+      });
+  };
+
+  const unload = (): void => {
+    if (state !== 'loaded') {
+      return;
+    }
+    revoke?.();
+    revoke = null;
+    state = 'idle';
+    swap(buildSkeleton(url));
+  };
+
+  // Without IntersectionObserver (e.g. a non-DOM test env) resolve eagerly so
+  // behaviour is unchanged.
+  if (typeof IntersectionObserver === 'undefined') {
+    visible = true;
+    load();
+    return {
+      dom: host,
+      destroy: () => {
+        destroyed = true;
+        revoke?.();
+      },
+    };
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      visible = entries[entries.length - 1]?.isIntersecting ?? false;
+      if (visible) {
+        load();
+      } else {
+        unload();
+      }
+    },
+    { rootMargin: LIBRARY_MEDIA_ROOT_MARGIN },
+  );
+  observer.observe(host);
+
+  return {
+    dom: host,
+    destroy: () => {
+      destroyed = true;
+      observer.disconnect();
+      revoke?.();
+    },
+  };
+}
+
 export function renderEmbedHost(
   url: string,
   alt: string | null,
   hint: EmbedHint,
+  resolveMedia?: ResolveMediaSrc,
 ): EmbedHost {
+  if (url && resolveMedia && isLibraryPath(url)) {
+    return renderLibraryMedia(url, alt, resolveMedia);
+  }
+
   const host = document.createElement('div');
   host.className = 'pm-embed-host pm-page-capped';
   host.contentEditable = 'false';
@@ -298,7 +443,7 @@ export function renderEmbedHost(
       if (cancelled) {
         return;
       }
-      swap(renderResolved(meta, url));
+      swap(renderResolved(meta, url, alt));
     })
     .catch(() => {
       if (cancelled) {

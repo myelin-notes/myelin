@@ -733,6 +733,7 @@ export function PageFrameDomLayer({
           controller={autocompleteController}
           view={activeView}
           onSelectItem={onAutocompleteSelect}
+          showItemIcons={autocompleteKind !== 'slash'}
           enablePreview={autocompleteKind === 'note-link'}
           loadPreview={loadNoteLinkPreview}
         />

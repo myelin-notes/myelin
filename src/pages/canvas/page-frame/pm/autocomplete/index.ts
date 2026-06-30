@@ -4,6 +4,8 @@ import {
   type PageFramePmScreenRect,
 } from '../screen-rect';
 
+export type PageFrameAutocompleteIconKind = 'folder' | 'image' | 'video';
+
 export interface PageFrameAutocompleteItem {
   id: string;
   title: string;
@@ -11,6 +13,8 @@ export interface PageFrameAutocompleteItem {
   detail?: string;
   insertText?: string;
   pageFrameId?: string | null;
+  /** Picks the list icon; falls back to a generic document icon when unset. */
+  iconKind?: PageFrameAutocompleteIconKind;
 }
 
 export interface PageFrameAutocompleteRange {

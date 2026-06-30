@@ -4,6 +4,10 @@ import type { EditorView } from 'prosemirror-view';
 import { PM_UPDATE_EVENT } from '@/lib/events';
 import { useMessages } from '@/lib/i18n';
 import {
+  type MediaPathSearchSource,
+  searchMediaPathAutocompleteItems,
+} from './media-path/resolution';
+import {
   type NoteLinkSearchSource,
   type PageFrameNameCache,
   searchNoteLinkAutocompleteItems,
@@ -12,6 +16,11 @@ import {
   PageFrameAutocompleteController,
   type PageFrameAutocompleteItem,
 } from './pm/autocomplete';
+import {
+  type ActiveMediaPathAutocomplete,
+  buildSelectMediaPathAutocompleteTransaction,
+  findActiveMediaPathAutocomplete,
+} from './pm/autocomplete/media-path';
 import {
   type ActiveNoteLinkAutocomplete,
   buildSelectNoteLinkAutocompleteTransaction,
@@ -27,11 +36,11 @@ import {
 import { schema } from './pm/schema';
 
 interface UsePageFrameAutocompleteArgs {
-  repository: NoteLinkSearchSource;
+  repository: NoteLinkSearchSource & MediaPathSearchSource;
   view: EditorView | null;
 }
 
-export type PageFrameAutocompleteKind = 'note-link' | 'slash';
+export type PageFrameAutocompleteKind = 'note-link' | 'slash' | 'media-path';
 
 type ActiveAutocompleteRequest =
   | {
@@ -41,6 +50,10 @@ type ActiveAutocompleteRequest =
   | {
       kind: 'note-link';
       request: ActiveNoteLinkAutocomplete;
+    }
+  | {
+      kind: 'media-path';
+      request: ActiveMediaPathAutocomplete;
     };
 
 function findActiveAutocompleteRequest(
@@ -51,6 +64,14 @@ function findActiveAutocompleteRequest(
     return {
       kind: 'slash',
       request: slashRequest,
+    };
+  }
+
+  const mediaPathRequest = findActiveMediaPathAutocomplete(state);
+  if (mediaPathRequest) {
+    return {
+      kind: 'media-path',
+      request: mediaPathRequest,
     };
   }
 
@@ -91,6 +112,15 @@ export function usePageFrameAutocomplete({
               query,
               slashLabelsRef.current,
               slashAllowBlockActionsRef.current,
+            );
+          }
+
+          if (activeSourceRef.current === 'media-path') {
+            return searchMediaPathAutocompleteItems(
+              repository,
+              query,
+              limit,
+              signal,
             );
           }
 
@@ -138,12 +168,19 @@ export function usePageFrameAutocomplete({
               activeRequest.request,
               item,
             )
-          : buildSelectNoteLinkAutocompleteTransaction(
-              view.state,
-              schema,
-              activeRequest.request,
-              item,
-            );
+          : activeRequest.kind === 'media-path'
+            ? buildSelectMediaPathAutocompleteTransaction(
+                view.state,
+                schema,
+                activeRequest.request,
+                item,
+              )
+            : buildSelectNoteLinkAutocompleteTransaction(
+                view.state,
+                schema,
+                activeRequest.request,
+                item,
+              );
 
       if (!tr) {
         return;

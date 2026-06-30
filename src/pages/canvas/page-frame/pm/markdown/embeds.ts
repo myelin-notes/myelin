@@ -1,7 +1,7 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
-import { renderEmbedHost } from '../embed/renderer';
+import { type ResolveMediaSrc, renderEmbedHost } from '../embed/renderer';
 import {
   collectAffectedTextblocks,
   getChangedRangesForTransaction,
@@ -9,7 +9,9 @@ import {
 import { buildTextOffsetMap } from './text-offset-map';
 import { MARKDOWN_ATOM_CHAR } from './types';
 
-const IMAGE_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g;
+// The URL runs up to the closing paren (spaces allowed, e.g. library paths
+// like `/My Pics/cat.png`); it's trimmed when collected.
+const IMAGE_RE = /!\[([^\]]*)\]\(([^)\n]+)\)/g;
 
 interface EmbedHit {
   url: string;
@@ -27,7 +29,7 @@ function findEmbedHitsForBlock(node: PMNode): EmbedHit[] {
   for (const match of text.matchAll(IMAGE_RE)) {
     const full = match[0];
     const alt = match[1] ?? '';
-    const url = match[2] ?? '';
+    const url = (match[2] ?? '').trim();
     if (url.length === 0) {
       continue;
     }
@@ -45,7 +47,11 @@ function embedKey(hit: EmbedHit): string {
 
 const embedHostDestroyers = new WeakMap<Node, () => void>();
 
-function buildBlockDecorations(node: PMNode, pos: number): Decoration[] {
+function buildBlockDecorations(
+  node: PMNode,
+  pos: number,
+  resolveMedia?: ResolveMediaSrc,
+): Decoration[] {
   const hits = findEmbedHitsForBlock(node);
   if (hits.length === 0) {
     return [];
@@ -55,7 +61,12 @@ function buildBlockDecorations(node: PMNode, pos: number): Decoration[] {
     Decoration.widget(
       widgetPos,
       () => {
-        const { dom, destroy } = renderEmbedHost(hit.url, hit.alt, null);
+        const { dom, destroy } = renderEmbedHost(
+          hit.url,
+          hit.alt,
+          null,
+          resolveMedia,
+        );
         embedHostDestroyers.set(dom, destroy);
         return dom;
       },
@@ -99,7 +110,10 @@ function sameKeySet(a: string[], b: string[]): boolean {
   return true;
 }
 
-function buildAllDecorations(doc: PMNode): Decoration[] {
+function buildAllDecorations(
+  doc: PMNode,
+  resolveMedia?: ResolveMediaSrc,
+): Decoration[] {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isTextblock) {
@@ -108,7 +122,7 @@ function buildAllDecorations(doc: PMNode): Decoration[] {
     if (node.type.spec.code) {
       return;
     }
-    decorations.push(...buildBlockDecorations(node, pos));
+    decorations.push(...buildBlockDecorations(node, pos, resolveMedia));
     return false;
   });
   return decorations;
@@ -116,12 +130,15 @@ function buildAllDecorations(doc: PMNode): Decoration[] {
 
 const embedPreviewKey = new PluginKey<DecorationSet>('embed-preview');
 
-export function embedPreviewPlugin(): Plugin {
+export function embedPreviewPlugin(resolveMedia?: ResolveMediaSrc): Plugin {
   return new Plugin({
     key: embedPreviewKey,
     state: {
       init(_, state) {
-        return DecorationSet.create(state.doc, buildAllDecorations(state.doc));
+        return DecorationSet.create(
+          state.doc,
+          buildAllDecorations(state.doc, resolveMedia),
+        );
       },
       apply(tr, prev) {
         if (!tr.docChanged) {
@@ -156,7 +173,7 @@ export function embedPreviewPlugin(): Plugin {
             continue;
           }
           toRemove.push(...existing);
-          toAdd.push(...buildBlockDecorations(node, pos));
+          toAdd.push(...buildBlockDecorations(node, pos, resolveMedia));
         }
         const next = toRemove.length > 0 ? mapped.remove(toRemove) : mapped;
         return toAdd.length > 0 ? next.add(tr.doc, toAdd) : next;
