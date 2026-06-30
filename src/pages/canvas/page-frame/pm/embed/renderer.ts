@@ -251,9 +251,18 @@ function buildSkeleton(url: string): HTMLElement {
   return wrap;
 }
 
-function renderResolved(meta: EmbedMeta, url: string): HTMLElement {
+function renderResolved(
+  meta: EmbedMeta,
+  url: string,
+  alt: string | null,
+): HTMLElement {
   if (meta.kind === 'oembed') {
     return buildOEmbed(meta, url);
+  }
+  if (meta.kind === 'media') {
+    return meta.mediaKind === 'video'
+      ? buildVideo(meta.url)
+      : buildImage(meta.url, alt);
   }
   return buildLinkCard(meta, url);
 }
@@ -349,7 +358,7 @@ export function renderEmbedHost(
       if (cancelled) {
         return;
       }
-      swap(renderResolved(meta, url));
+      swap(renderResolved(meta, url, alt));
     })
     .catch(() => {
       if (cancelled) {

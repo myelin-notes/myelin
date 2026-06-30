@@ -22,7 +22,15 @@ export interface LinkMeta {
   siteName: string | null;
 }
 
-export type EmbedMeta = OEmbedMeta | LinkMeta;
+/** A URL that resolves directly to an image/video (by Content-Type), even
+ * though its path has no recognizable file extension. */
+export interface MediaMeta {
+  kind: 'media';
+  mediaKind: 'image' | 'video';
+  url: string;
+}
+
+export type EmbedMeta = OEmbedMeta | LinkMeta | MediaMeta;
 
 const MAX_CACHE_ENTRIES = 200;
 const cache = new Map<string, Promise<EmbedMeta>>();
@@ -64,14 +72,35 @@ async function fetchOEmbed(
   };
 }
 
-async function fetchLink(url: string): Promise<LinkMeta> {
+function mediaKindFromContentType(
+  contentType: string | null,
+): MediaMeta['mediaKind'] | null {
+  const value = contentType?.toLowerCase() ?? '';
+  if (value.startsWith('image/')) {
+    return 'image';
+  }
+  if (value.startsWith('video/')) {
+    return 'video';
+  }
+  return null;
+}
+
+async function fetchLink(url: string): Promise<EmbedMeta> {
   const res = await fetch(url, {
     method: 'GET',
-    headers: { accept: 'text/html,application/xhtml+xml' },
+    headers: { accept: 'text/html,application/xhtml+xml,image/*,video/*' },
   });
   if (!res.ok) {
     throw new Error(`fetch ${res.status}`);
   }
+
+  // A URL that serves an image/video directly (no extension in the path, e.g.
+  // a CDN link) is rendered as media rather than scraped for OG tags.
+  const mediaKind = mediaKindFromContentType(res.headers.get('content-type'));
+  if (mediaKind) {
+    return { kind: 'media', mediaKind, url };
+  }
+
   const html = await res.text();
   const og = parseOg(html);
   return {
