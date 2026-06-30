@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { LayoutGrid, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
+import { Button } from '@/components/ui/button';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
@@ -41,6 +43,19 @@ export function HomePage() {
     }
   }, [repository]);
 
+  const createCanvas = useCallback(async () => {
+    try {
+      const name = await repository.getUniqueFileName(
+        strings.library.createNew.untitledCanvas,
+        null,
+      );
+      const id = await repository.createFile(name, 'mcanvas', null);
+      tabController.openTab({ type: 'canvas', id }, name);
+    } catch (error) {
+      logger.error('Failed to create canvas', error);
+    }
+  }, [repository, strings.library.createNew.untitledCanvas, tabController]);
+
   // Load recents on mount, and reload when a remote sync lands or any local
   // repository mutation occurs (e.g. creating a file for a new tab).
   // `dataVersion` is the only refresh signal for local repos, where
@@ -63,32 +78,58 @@ export function HomePage() {
       <main
         ref={scrollRef}
         id="home-main"
-        className="flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
+        className="flex flex-1 flex-col overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-          className="mx-auto max-w-5xl"
-        >
-          <h1
-            className="font-extralight font-heading text-text-primary leading-[1.05]"
-            style={{ fontSize: 'var(--fluid-display)' }}
+        {recentFiles.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+            className="flex flex-1 flex-col items-center justify-center text-center"
           >
-            {strings.library.title}
-          </h1>
+            <div className="flex size-16 items-center justify-center rounded-2xl bg-surface ring-1 ring-border-subtle/70">
+              <LayoutGrid className="size-7 text-text-muted" />
+            </div>
 
-          {recentFiles.length === 0 ? (
-            <p className="mt-3 max-w-lg font-normal text-sm text-text-muted leading-relaxed">
-              {strings.library.emptyState}
+            <h1
+              className="mt-6 font-extralight font-heading text-text-primary leading-[1.05]"
+              style={{ fontSize: 'var(--fluid-display)' }}
+            >
+              {strings.library.emptyState.title}
+            </h1>
+
+            <p className="mt-3 max-w-sm font-normal text-sm text-text-muted leading-relaxed">
+              {strings.library.emptyState.description}
             </p>
-          ) : (
-            <section className="mt-10">
-              <h3 className="mb-6 font-heading font-normal text-2xl text-text-primary leading-8">
-                {strings.library.recentlyOpened}
-              </h3>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <Button
+              size="lg"
+              className="mt-7"
+              onClick={() => void createCanvas()}
+            >
+              <Plus />
+              {strings.library.emptyState.cta}
+            </Button>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <h1
+              className="font-extralight font-heading text-text-primary leading-[1.05]"
+              style={{ fontSize: 'var(--fluid-display)' }}
+            >
+              {strings.library.title}
+            </h1>
+
+            <section className="mt-12">
+              <h2 className="mb-4 font-medium text-[11px] text-text-muted uppercase tracking-[1.5px]">
+                {strings.library.recentlyOpened}
+              </h2>
+
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(248px,1fr))] gap-4">
                 {recentFiles.map((file, i) => (
                   <motion.div
                     key={file.id}
@@ -113,7 +154,6 @@ export function HomePage() {
                       })}
                       title={file.name}
                       tags={file.tags}
-                      featured={i === 0}
                       onClick={() =>
                         openNote(tabController, file, file.name, 'recent_files')
                       }
@@ -122,8 +162,8 @@ export function HomePage() {
                 ))}
               </div>
             </section>
-          )}
-        </motion.div>
+          </motion.div>
+        )}
       </main>
     </div>
   );

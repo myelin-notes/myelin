@@ -82,7 +82,11 @@ const zhHans: typeof en = {
   },
   library: {
     title: '数字资料库',
-    emptyState: '你的个人知识工作区，创建画布即可开始收集想法、笔记与研究',
+    emptyState: {
+      title: '你的库是空的',
+      description: '创建画布即可开始收集想法、笔记与研究。',
+      cta: '新建画布',
+    },
     recentlyOpened: '最近打开',
     searchPlaceholder: '搜索工作室...',
     semanticSearchLabel: '语义搜索',

@@ -80,8 +80,12 @@ const en = {
   },
   library: {
     title: 'Digital Library',
-    emptyState:
-      'Your personal knowledge workspace. Create a canvas to start collecting ideas, notes, and research.',
+    emptyState: {
+      title: 'Your library is empty',
+      description:
+        'Create a canvas to start collecting ideas, notes, and research.',
+      cta: 'New Canvas',
+    },
     recentlyOpened: 'Recently Opened',
     searchPlaceholder: 'Search studio...',
     semanticSearchLabel: 'Semantic search',

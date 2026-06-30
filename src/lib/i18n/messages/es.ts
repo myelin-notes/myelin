@@ -82,8 +82,12 @@ const es: typeof en = {
   },
   library: {
     title: 'Biblioteca Digital',
-    emptyState:
-      'Tu espacio personal de conocimiento. Crea un lienzo para empezar a recopilar ideas, notas e investigación.',
+    emptyState: {
+      title: 'Tu biblioteca está vacía',
+      description:
+        'Crea un lienzo para empezar a recopilar ideas, notas e investigación.',
+      cta: 'Nuevo lienzo',
+    },
     recentlyOpened: 'Abiertos recientemente',
     searchPlaceholder: 'Buscar en el estudio...',
     semanticSearchLabel: 'Búsqueda semántica',
