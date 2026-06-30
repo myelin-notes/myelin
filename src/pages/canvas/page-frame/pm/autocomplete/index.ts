@@ -301,12 +301,11 @@ export class PageFrameAutocompleteController {
         return;
       }
 
-      const limitedItems = items.slice(0, request.limit);
       this.setState({
         ...this.state,
-        items: limitedItems,
-        activeIndex: limitedItems.length > 0 ? 0 : -1,
-        status: limitedItems.length > 0 ? 'open' : 'empty',
+        items,
+        activeIndex: items.length > 0 ? 0 : -1,
+        status: items.length > 0 ? 'open' : 'empty',
         error: null,
       });
     } catch (error) {
