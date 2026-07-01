@@ -12,13 +12,7 @@ import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
 import { useExplorerItem } from '@/pages/library/explorer/use-explorer-item';
 import { useFileItemContextMenu } from '@/pages/library/explorer/use-file-item-context-menu';
 import { TagManageDialog } from '@/pages/library/tag-manage-dialog';
-
-const ROW_BASE_PADDING = 8;
-const ROW_DEPTH_INDENT = 14;
-
-function rowPadding(depth: number): string {
-  return `${ROW_BASE_PADDING + depth * ROW_DEPTH_INDENT}px`;
-}
+import { TreeIndentGuides, treeRowPadding } from './indent-guides';
 
 const tagListProps = {
   className: 'flex shrink-0 items-center gap-1',
@@ -81,7 +75,7 @@ export function SidebarFolderRow({
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               {...dropTargetProps}
-              style={{ paddingLeft: rowPadding(depth) }}
+              style={{ paddingLeft: treeRowPadding(depth) }}
               aria-expanded={expanded}
               aria-label={
                 renaming
@@ -89,7 +83,7 @@ export function SidebarFolderRow({
                   : formatExplorerItemAccessibleName(node.name, node.tags)
               }
               className={cn(
-                'group flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150',
+                'group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150',
                 dragOver
                   ? 'bg-accent/15 ring-1 ring-accent/40'
                   : 'hover:bg-hover-tint',
@@ -98,6 +92,7 @@ export function SidebarFolderRow({
             />
           }
         >
+          <TreeIndentGuides depth={depth} />
           <ChevronRight
             className={cn(
               'size-3.5 shrink-0 text-text-muted transition-transform duration-150',
@@ -175,19 +170,20 @@ export function SidebarFileRow({
               }}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              style={{ paddingLeft: rowPadding(depth) }}
+              style={{ paddingLeft: treeRowPadding(depth) }}
               aria-label={
                 renaming
                   ? undefined
                   : formatExplorerItemAccessibleName(node.name, node.tags)
               }
               className={cn(
-                'group flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150 hover:bg-hover-tint',
+                'group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150 hover:bg-hover-tint',
                 dragging && 'opacity-40',
               )}
             />
           }
         >
+          <TreeIndentGuides depth={depth} />
           <FileText className="size-3.5 shrink-0 text-text-muted transition-colors duration-150 group-hover:text-text-secondary" />
           {renaming ? (
             <input

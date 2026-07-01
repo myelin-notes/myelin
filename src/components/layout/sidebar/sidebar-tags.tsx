@@ -20,6 +20,7 @@ import {
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { formatSemanticTagAccessibleName } from '@/pages/library/accessibility-labels';
+import { TreeIndentGuides, treeRowPadding } from './indent-guides';
 import { useResizeHandle } from './use-resize-handle';
 
 const logger = new Logger('SidebarTags');
@@ -201,9 +202,10 @@ export const SidebarTags = memo(function SidebarTags({
       : null;
     return (
       <div
-        className="flex items-center gap-1 rounded-md pr-1"
-        style={{ paddingLeft: depth * 14 + 8 }}
+        className="relative flex items-center gap-1 rounded-md pr-1"
+        style={{ paddingLeft: treeRowPadding(depth) }}
       >
+        <TreeIndentGuides depth={depth} />
         <span className="shrink-0 font-medium text-[11px] text-text-muted">
           <span className="opacity-50">#</span>
           {parentLeaf ? `${parentLeaf}/` : ''}
@@ -325,12 +327,13 @@ export const SidebarTags = memo(function SidebarTags({
                   <Fragment key={tag}>
                     <div
                       className={cn(
-                        'group/tag flex items-center gap-1 rounded-md pr-1 transition-colors',
+                        'group/tag relative flex items-center gap-1 rounded-md pr-1 transition-colors',
                         isActive
                           ? 'bg-tag-active text-text-on-dark'
                           : 'text-text-secondary hover:bg-hover-tint',
                       )}
                     >
+                      <TreeIndentGuides depth={depth} />
                       <button
                         type="button"
                         onClick={() => toggleTag(tag)}
@@ -340,7 +343,7 @@ export const SidebarTags = memo(function SidebarTags({
                           formattedCount,
                         )}
                         aria-pressed={isActive}
-                        style={{ paddingLeft: depth * 14 + 8 }}
+                        style={{ paddingLeft: treeRowPadding(depth) }}
                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1 text-left font-medium text-[11px]"
                       >
                         <span className="shrink-0 opacity-50">#</span>
