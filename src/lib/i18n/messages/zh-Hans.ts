@@ -25,13 +25,13 @@ const zhHans: typeof en = {
     tags: '标签',
     collapse: '收起侧边栏',
     expand: '展开侧边栏',
-    graph: '打开关系图',
+    graph: '打开关系图谱',
   },
   commandPalette: {
     title: '命令面板',
-    placeholder: '搜索命令...',
-    searchPlaceholder: '搜索笔记...',
-    loading: '正在加载...',
+    placeholder: '搜索命令…',
+    searchPlaceholder: '搜索笔记…',
+    loading: '正在加载…',
     noCommandResults: '没有匹配的命令',
     noNoteResults: '没有匹配的笔记',
     noteResultDescription: '画布笔记',
@@ -47,12 +47,12 @@ const zhHans: typeof en = {
         description: '跳转到最近或匹配的画布',
       },
       createNote: {
-        label: '创建笔记',
+        label: '新建笔记',
         description: '在资料库根目录创建新画布',
       },
       openGraph: {
-        label: '打开图谱',
-        description: '映射画布笔记之间的显式链接',
+        label: '打开关系图谱',
+        description: '呈现画布笔记之间的显式链接',
       },
       importMarkdown: {
         label: '导入 Markdown',
@@ -64,7 +64,7 @@ const zhHans: typeof en = {
       },
       switchView: {
         label: '切换资料库视图',
-        description: '在列表和网格之间切换资料库',
+        description: '在资料库的列表视图与网格视图之间切换',
       },
       refreshRepository: {
         label: '刷新仓库',
@@ -79,12 +79,12 @@ const zhHans: typeof en = {
   library: {
     title: '数字资料库',
     emptyState: {
-      title: '你的库是空的',
-      description: '创建画布即可开始收集想法、笔记与研究。',
+      title: '你的资料库还是空的',
+      description: '创建画布，开始收集想法、笔记与研究资料。',
       cta: '新建画布',
     },
     recentlyOpened: '最近打开',
-    searchPlaceholder: '搜索工作室...',
+    searchPlaceholder: '搜索工作室…',
     semanticSearchLabel: '语义搜索',
     explorer: '资源管理器',
     sortLabel: (label: string) => `排序：${label}`,
@@ -121,10 +121,10 @@ const zhHans: typeof en = {
       unsupportedFile: '请选择 Markdown、PDF、图片或视频文件',
       someUnsupported: '部分文件不受支持',
       failed: '导入失败',
-      loading: '正在导入文件...',
+      loading: '正在导入文件…',
     },
     importGoodnotesZip: {
-      unsupportedFile: '请选择从 Goodnotes 以 PDF 格式导出的 ZIP',
+      unsupportedFile: '请选择从 Goodnotes 导出为 PDF 的 ZIP 文件',
       nativeFile:
         '暂不支持原生 .goodnotes 文件。请先在 Goodnotes 中将文件夹导出为 PDF，再导入该 ZIP。',
       failed: 'Goodnotes ZIP 导入失败',
@@ -132,30 +132,30 @@ const zhHans: typeof en = {
     },
     importObsidianVault: {
       failed: 'Obsidian 仓库导入失败',
-      loading: '正在导入 Obsidian 仓库...',
+      loading: '正在导入 Obsidian 仓库…',
       skipped: (count: number) => `已跳过 ${count} 个不受支持的文件`,
       succeeded: (notes: number, media: number) =>
         `已导入 ${notes} 个笔记和 ${media} 个媒体文件`,
     },
     importDialog: {
       title: '导入 Obsidian 仓库',
-      scanning: '正在扫描仓库...',
+      scanning: '正在扫描仓库…',
       jsonTitle: '导入工作区 JSON',
-      jsonScanning: '正在扫描文件夹...',
+      jsonScanning: '正在扫描文件夹…',
       jsonNoFiles: '此文件夹中未找到 JSON 笔记或媒体文件',
       notes: (count: number) => `${count} 个笔记`,
       media: (count: number) => `${count} 个媒体文件`,
-      skippedFiles: (count: number) => `${count} 个不受支持的文件将被跳过`,
+      skippedFiles: (count: number) => `将跳过 ${count} 个不受支持的文件`,
       noFiles: '此仓库中未找到受支持的文件',
       conflict: {
         label: '已存在同名文件夹',
-        rename: '保留两者（重命名）',
-        replace: '替换现有',
+        rename: '两者都保留（重命名）',
+        replace: '替换现有文件夹',
       },
       progress: {
         importing: (current: number, total: number) =>
-          `正在导入 ${current}/${total}...`,
-        cancelling: '正在取消...',
+          `正在导入 ${current}/${total}…`,
+        cancelling: '正在取消…',
       },
       summary: {
         title: '导入完成',
@@ -170,16 +170,16 @@ const zhHans: typeof en = {
         done: '完成',
       },
     },
-    repositoryLoading: '正在加载仓库...',
+    repositoryLoading: '正在加载仓库…',
     refreshRepository: {
       label: '刷新仓库',
-      loading: '正在刷新仓库...',
+      loading: '正在刷新仓库…',
       failed: '仓库刷新失败',
     },
     semanticTags: {
       title: '语义标签',
       empty: '还没有标签',
-      emptyHint: '创建一个来筛选你的库。',
+      emptyHint: '创建一个标签以筛选你的资料库。',
       insights: '工作室洞察',
       addTag: '新建标签',
       addChild: (tag: string) => `在 #${tag} 下添加标签`,
@@ -188,13 +188,13 @@ const zhHans: typeof en = {
       stats: {
         totalFiles: '文件总数',
         folders: '文件夹',
-        uniqueTags: '唯一标签',
+        uniqueTags: '标签数',
       },
     },
     explorerTree: {
       repositorySetupRequired: '请先在设置中完成仓库配置，才能查看文件',
       emptySearch: '未找到结果',
-      emptyFilter: '没有项目匹配所选标签',
+      emptyFilter: '没有符合所选标签的项目',
       emptyDefault: '还没有文件',
     },
     itemMenu: {
@@ -208,37 +208,37 @@ const zhHans: typeof en = {
       title: '更新链接提及？',
       description: (mentionCount: number, noteCount: number) =>
         `将改写 ${noteCount} 篇其他笔记中的 ${mentionCount} 处链接提及，使其与新名称一致。`,
-      always: '始终更新且不再询问',
+      always: '始终更新，不再询问',
       yes: '更新',
       no: '跳过',
     },
     tagDialog: {
       title: '管理标签',
       description: (name: string) => `${name} 的标签`,
-      activeTags: '已启用的标签',
+      activeTags: '已添加的标签',
       noTags: '还没有标签',
-      available: '可用',
+      available: '可添加',
       createNew: '创建新标签',
-      placeholder: '标签名称...',
+      placeholder: '标签名称…',
     },
   },
   graph: {
-    title: '图谱',
+    title: '关系图谱',
     explicitLinks: '显式链接',
-    searchPlaceholder: '搜索图谱...',
+    searchPlaceholder: '搜索关系图谱…',
     recenter: '重新居中',
     zoomIn: '放大',
     zoomOut: '缩小',
     tags: '标签',
     openNote: '打开笔记',
-    emptySelection: '选择一条笔记以查看它的链接。',
+    emptySelection: '选择一篇笔记以查看其链接。',
     noCanvasNotes: '还没有画布笔记。',
-    noLinks: '添加显式笔记链接来连接此图谱。',
-    loadFailed: '无法加载图谱。',
+    noLinks: '添加显式笔记链接以连接此关系图谱。',
+    loadFailed: '无法加载关系图谱。',
     outgoing: '传出链接',
     backlinks: '反向链接',
     graphStats: (notes: number, links: number) =>
-      `${notes} 条笔记，${links} 条链接`,
+      `${notes} 篇笔记，${links} 条链接`,
     linkCount: (incoming: number, outgoing: number) =>
       `${outgoing} 条传出，${incoming} 条反向链接`,
   },
@@ -248,7 +248,7 @@ const zhHans: typeof en = {
     empty: '还没有版本',
     loadFailed: '无法加载版本历史',
     restore: '恢复',
-    restoring: '正在恢复...',
+    restoring: '正在恢复…',
     restored: '版本已恢复',
     restoreFailed: '无法恢复版本',
   },
@@ -294,12 +294,12 @@ const zhHans: typeof en = {
       },
       hoverPreview: {
         label: '显示笔记链接的悬停预览',
-        description: '将光标悬停在链接的笔记上时显示缩略图和标题。',
+        description: '将光标悬停在笔记链接上时，显示缩略图和标题。',
       },
       requireModifier: {
-        label: (key: string) => `需要按住 ${key} 才能打开链接`,
+        label: (key: string) => `需要 ${key}+单击 才能打开链接`,
         description: (key: string) =>
-          `关闭时，单击即可打开笔记链接和超链接。开启时，需按住 ${key} 才能打开，普通单击仅用于定位光标。`,
+          `关闭时，单击即可打开笔记链接和超链接；开启后，需按住 ${key} 才能打开，普通单击则用于定位光标。`,
       },
       renameReferences: {
         label: '重命名笔记后始终更新链接',
@@ -323,7 +323,7 @@ const zhHans: typeof en = {
         title: '仓库身份验证',
         descriptions: {
           polling: '在浏览器中输入代码以完成登录',
-          connected: '已完成登录',
+          connected: '登录已完成',
           unavailable: '身份验证不可用',
           signIn: '登录以连接此仓库',
         },
@@ -338,7 +338,7 @@ const zhHans: typeof en = {
         deviceCode: '在浏览器中输入此代码',
         notices: {
           credentialReset: (provider: string) =>
-            `您的 ${provider} 登录已过期并已重置，请重新连接。`,
+            `你的 ${provider} 登录凭据已过期并被重置，请重新连接。`,
         },
       },
       authStatus: {
@@ -366,7 +366,7 @@ const zhHans: typeof en = {
             description: (count: number, online: boolean) =>
               online
                 ? `${count} 项更改正在排队上传`
-                : `${count} 项更改已在本地排队，直到恢复远程同步`,
+                : `${count} 项更改已在本地排队，将在远程同步恢复后上传`,
           },
           issue: {
             label: '异常',
@@ -376,29 +376,29 @@ const zhHans: typeof en = {
           synced: {
             label: '已同步',
             upToDate: '远程仓库已是最新',
-            ready: '仓库已准备好同步',
+            ready: '仓库已就绪，可以同步',
           },
         },
       },
       fields: {
         owner: {
-          select: '选择拥有者',
-          loading: '正在加载账户...',
+          select: '选择所有者',
+          loading: '正在加载账户…',
           error: '无法加载 GitHub 账户',
           you: '你',
           org: '组织',
         },
         repo: {
-          pickOwner: '选择拥有者',
+          pickOwner: '选择所有者',
           select: '选择仓库',
-          loading: '正在加载仓库...',
+          loading: '正在加载仓库…',
           error: '无法加载仓库',
           empty: '没有仓库',
         },
         branch: {
           pickRepo: '选择仓库',
           select: '选择分支',
-          loading: '正在加载分支...',
+          loading: '正在加载分支…',
           error: '无法加载分支',
           empty: '没有分支',
         },
@@ -413,22 +413,22 @@ const zhHans: typeof en = {
           '将整个工作区保存到文件夹中，作为兼容 Obsidian 的仓库。笔记会转换为带 frontmatter 的 Markdown；其他文件会被复制，并保留文件夹结构。',
         button: '导出',
         defaultVaultName: 'Myelin 仓库',
-        loading: '正在导出 Obsidian 仓库...',
+        loading: '正在导出 Obsidian 仓库…',
         progress: (current: number, total: number) =>
-          `正在导出 ${current} / ${total}...`,
+          `正在导出 ${current} / ${total}…`,
         failed: 'Obsidian 仓库导出失败',
         succeeded: (notes: number, media: number) =>
           `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
       },
       exportJson: {
-        label: '导出工作区为 JSON',
+        label: '将工作区导出为 JSON',
         description:
-          '将整个工作区保存到文件夹中，作为 JSON。每个笔记会编码为 JSON 文件，包含其笔迹、文本和嵌入的媒体（二进制以 base64 编码）；其他文件会被复制，并保留文件夹结构。',
+          '将整个工作区保存到文件夹中，格式为 JSON。每个笔记会编码为一个 JSON 文件，包含其笔迹、文本和嵌入的媒体（二进制以 base64 编码）；其他文件会被复制，并保留文件夹结构。',
         button: '导出',
         defaultExportName: 'Myelin JSON 导出',
-        loading: '正在将工作区导出为 JSON...',
+        loading: '正在将工作区导出为 JSON…',
         progress: (current: number, total: number) =>
-          `正在导出 ${current} / ${total}...`,
+          `正在导出 ${current} / ${total}…`,
         failed: 'JSON 导出失败',
         succeeded: (notes: number, media: number) =>
           `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
@@ -438,9 +438,9 @@ const zhHans: typeof en = {
       title: '隐私',
       eyebrow: '使用数据',
       analytics: {
-        label: '共享匿名使用分析',
+        label: '共享匿名使用数据',
         description:
-          '发送匿名的产品使用分析和错误报告，帮助改进 Myelin。关闭后将不会发送任何内容。',
+          '发送匿名的产品使用数据和错误报告，帮助改进 Myelin。关闭后将不会发送任何内容。',
       },
     },
     mcp: {
@@ -449,7 +449,7 @@ const zhHans: typeof en = {
       enabled: {
         label: '启用本地 MCP 服务器',
         description:
-          '将正在运行的 Myelin 应用暴露给 127.0.0.1 上的本地 AI 代理。',
+          '将正在运行的 Myelin 应用开放给 127.0.0.1 上的本地 AI 代理。',
       },
       port: {
         label: '本地端口',
@@ -457,20 +457,20 @@ const zhHans: typeof en = {
       },
       installPrompt: {
         label: '代理安装提示词',
-        description: '复制到你的代理中，将它连接到正在运行的此应用。',
+        description: '复制到你的代理中，即可将其连接到正在运行的此应用。',
         prompt: (endpoint: string) =>
           `为正在运行的 Myelin 桌面应用安装 MCP 服务器。使用 Streamable HTTP，端点为 ${endpoint}。将服务器命名为 myelin。此服务器只在本机可用，因此 Myelin 必须保持打开并启用 MCP。`,
       },
       directWrites: {
         label: '允许直接 MCP 写入',
-        description: '允许代理创建页面框并替换页面框 Markdown。',
+        description: '允许代理创建页面框并替换页面框的 Markdown。',
       },
       startFailed: (port: number) => `无法在端口 ${port} 上启动 MCP 服务器`,
     },
     keybinds: {
       title: '快捷键',
       resetAll: '全部重置',
-      pressKey: '按下一个键...',
+      pressKey: '按下按键…',
       unbound: '未绑定',
       empty: '还没有注册快捷键，打开画布后即可查看',
       categories: {
@@ -528,8 +528,8 @@ const zhHans: typeof en = {
           description: '创建新的文本节点',
         },
         'canvas:insert-frame': {
-          label: '插入页面框架',
-          description: '在画布上放置新的页面框架',
+          label: '插入页面框',
+          description: '在画布上放置新的页面框',
         },
         'canvas:insert-embed': {
           label: '插入媒体',
@@ -571,9 +571,9 @@ const zhHans: typeof en = {
     frame: {
       noteKind: '笔记',
       pdfKind: 'PDF',
-      displayNameLabel: '页面框架显示名称',
+      displayNameLabel: '页面框显示名称',
       menu: '菜单',
-      openMenu: '打开框架菜单',
+      openMenu: '打开页面框菜单',
       rename: '重命名',
       pages: '页面',
       continuous: '连续',
@@ -588,7 +588,7 @@ const zhHans: typeof en = {
       annotationsHint: '页面上的绘图和笔记',
       exporting: '正在导出…',
       tryAgain: '重试',
-      exportedWithWarnings: '导出完成但有警告',
+      exportedWithWarnings: '导出完成，但有警告',
       complete: '导出完成',
     },
     search: {
@@ -680,7 +680,7 @@ const zhHans: typeof en = {
     },
     backlinks: {
       title: '反向链接',
-      linkedMentions: '已链接提及',
+      linkedMentions: '链接提及',
     },
     toolbar: {
       clickForOptions: '点击查看选项',
@@ -699,7 +699,7 @@ const zhHans: typeof en = {
       title: '插入',
       soon: '即将推出',
       frame: {
-        label: '页面框架',
+        label: '页面框',
         description: '可书写的新页面',
       },
       embed: {
@@ -716,7 +716,7 @@ const zhHans: typeof en = {
       },
     },
     audioPlayer: {
-      requestingMic: '正在请求麦克风...',
+      requestingMic: '正在请求麦克风…',
       requestingMicAccess: '正在请求麦克风权限',
       micUnavailable: '麦克风不可用',
       tapToRecord: '点按录音',
@@ -727,14 +727,14 @@ const zhHans: typeof en = {
       playAudio: '播放音频',
       pauseAudio: '暂停音频',
       transcribe: '转录音频',
-      transcribing: '正在转录音频...',
+      transcribing: '正在转录音频…',
       showTranscript: '显示转录文本',
       hideTranscript: '隐藏转录文本',
       noSpeechDetected: '未检测到语音',
       transcriptionFailed: '转录失败',
     },
     toolShelf: {
-      title: '工具盘',
+      title: '工具架',
       empty: '轮盘已停用，右键点击将不会打开',
     },
     tools: {
@@ -746,7 +746,7 @@ const zhHans: typeof en = {
     },
     toolOptions: {
       color: '颜色',
-      stroke: '笔画',
+      stroke: '笔触',
       size: '大小',
       font: '字体',
       fontSize: '字号',
@@ -761,11 +761,11 @@ const zhHans: typeof en = {
     embedComposer: {
       dropToEmbed: '拖放以嵌入',
       title: '添加媒体',
-      subtitle: '粘贴、拖放或选择图片及PDF',
+      subtitle: '粘贴、拖放或选择图片或 PDF',
       readyToEmbed: '准备嵌入',
       embedPdf: '嵌入 PDF',
       embedImage: '嵌入图片',
-      urlPlaceholder: '粘贴 URL',
+      urlPlaceholder: '粘贴链接',
       fetch: '获取',
       browse: '点击浏览',
       dropFiles: '或将文件拖放到这里',
@@ -775,10 +775,8 @@ const zhHans: typeof en = {
         unsupportedUrl: '该链接指向的不是图片或 PDF',
         fetchFailed: '无法获取该链接',
         embedFailed: '无法嵌入该文件',
-        unsupportedType: '',
-        unsupportedDesc: () => {
-          throw new Error('not yet implemented language');
-        },
+        unsupportedType: '不支持的媒体类型',
+        unsupportedDesc: (type: string) => `暂不支持 ${type}`,
       },
     },
     peerSync: {
@@ -786,9 +784,9 @@ const zhHans: typeof en = {
       host: '使用 iroh 托管',
       joinPlaceholder: '输入共享代码',
       join: '加入',
-      waitingForPeer: '等待对等方...',
+      waitingForPeer: '等待对等方…',
       shareCode: '将此代码分享给协作方',
-      connecting: '连接中...',
+      connecting: '连接中…',
       connected: '已连接',
       sync: '同步',
       localPeer: '本地节点',
@@ -801,7 +799,7 @@ const zhHans: typeof en = {
       noRemotePeers: '没有远程节点',
       livePaused: '实时同步已暂停',
       peerModes: {
-        'owner-device': '拥有者设备',
+        'owner-device': '所有者设备',
         'guest-editor': '访客编辑',
         'guest-viewer': '访客查看',
       },
