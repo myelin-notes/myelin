@@ -6,7 +6,10 @@ import NeuralField from '../components/NeuralField.tsx';
 
 const cta = cn(buttonVariants(), 'h-11 rounded-2xl px-6 text-sm');
 
-// Edit these once installers are published. Placeholders for now.
+// Desktop download URLs are resolved on load from stable/latest.json and point
+// at the current stable release on the R2-backed CDN (see the wiring script
+// below); the buttons stay inert until then. macOS is a universal build (Apple
+// Silicon + Intel). iPad/Android are placeholders pending store/TestFlight links.
 const downloads = [
   { name: 'macOS', href: '#' },
   { name: 'Windows', href: '#' },
@@ -474,6 +477,49 @@ const faqJsonLd = {
 
   <script>
     import { trackWebEvent } from '../lib/posthog';
+
+    // Resolve the desktop download buttons to direct CDN installer URLs for the
+    // current stable release. The updater manifest is the single source of truth
+    // for the live version, so nothing is hardcoded here and no rebuild is needed
+    // when a release ships. Windows (-setup.exe) and Linux (.AppImage) installers
+    // are updater artifacts and used verbatim; the macOS .dmg isn't, so it's
+    // derived from the manifest's version folder (uploaded there as
+    // Myelin-macOS.dmg by promote-release.mjs).
+    const MANIFEST = 'https://updates.trymyelin.app/stable/latest.json';
+
+    async function wireDesktopDownloads() {
+      let manifest: {
+        platforms?: Record<string, { url?: string }>;
+      };
+      try {
+        const res = await fetch(MANIFEST, { cache: 'no-store' });
+        if (!res.ok) return;
+        manifest = await res.json();
+      } catch {
+        return;
+      }
+      const platforms = manifest.platforms ?? {};
+      // The macOS .dmg lives beside the darwin updater bundle in the same
+      // version folder, so derive its URL from that bundle's URL.
+      const darwinUrl = platforms['darwin-aarch64']?.url;
+      const versionBase = darwinUrl?.slice(0, darwinUrl.lastIndexOf('/') + 1);
+
+      const hrefFor: Record<string, string | undefined> = {
+        macOS: versionBase ? `${versionBase}Myelin-macOS.dmg` : undefined,
+        Windows: platforms['windows-x86_64']?.url,
+        Linux: platforms['linux-x86_64']?.url,
+      };
+      for (const el of document.querySelectorAll<HTMLElement>(
+        '[data-download-platform]',
+      )) {
+        const href = hrefFor[el.dataset.downloadPlatform ?? ''];
+        if (href) {
+          el.setAttribute('href', href);
+        }
+      }
+    }
+
+    wireDesktopDownloads();
 
     for (const el of document.querySelectorAll<HTMLElement>(
       '[data-download-platform]',

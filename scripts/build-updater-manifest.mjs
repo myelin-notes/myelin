@@ -28,64 +28,44 @@ for (const required of ['dir', 'version', 'base-url', 'out']) {
   }
 }
 
-function platformKey(filename) {
+// Maps a bundle filename to the updater platform keys it serves. We build
+// exactly three targets: Windows x86_64 (-setup.exe), Linux x86_64 (.AppImage),
+// and a universal macOS bundle (.app.tar.gz) that runs on both arches, so it
+// serves both darwin keys the updater client may ask for.
+function platformKeys(filename) {
   const name = filename.toLowerCase();
-  let os;
   if (name.endsWith('.app.tar.gz')) {
-    os = 'darwin';
-  } else if (name.endsWith('.appimage')) {
-    os = 'linux';
-  } else if (
-    name.endsWith('-setup.exe') ||
-    name.endsWith('.nsis.zip') ||
-    name.endsWith('.msi')
-  ) {
-    os = 'windows';
-  } else {
-    return null;
+    return ['darwin-aarch64', 'darwin-x86_64'];
   }
-
-  const arch = /aarch64|arm64/.test(name) ? 'aarch64' : 'x86_64';
-  return `${os}-${arch}`;
-}
-
-// Windows builds both an NSIS installer and a WiX .msi; with
-// createUpdaterArtifacts both are signed and collide on the same windows-<arch>
-// key. Prefer NSIS deterministically instead of letting readdir order decide,
-// so the updater serves a consistent installer type across releases.
-function rank(filename) {
-  const name = filename.toLowerCase();
-  if (name.endsWith('-setup.exe') || name.endsWith('.nsis.zip')) {
-    return 2;
+  if (name.endsWith('.appimage')) {
+    return ['linux-x86_64'];
   }
-  if (name.endsWith('.msi')) {
-    return 1;
+  if (name.endsWith('-setup.exe')) {
+    return ['windows-x86_64'];
   }
-  return 0;
+  return null;
 }
 
 const baseUrl = args['base-url'].replace(/\/$/, '');
 const platforms = {};
-const chosenRank = {};
 
 for (const file of readdirSync(args.dir)) {
   if (!file.endsWith('.sig')) {
     continue;
   }
   const bundle = file.slice(0, -'.sig'.length);
-  const key = platformKey(bundle);
-  if (!key) {
+  const keys = platformKeys(bundle);
+  if (!keys) {
     console.warn(`Skipping unrecognized artifact: ${bundle}`);
     continue;
   }
-  if (key in platforms && chosenRank[key] >= rank(bundle)) {
-    continue;
+  const signature = readFileSync(path.join(args.dir, file), 'utf8').trim();
+  for (const key of keys) {
+    platforms[key] = {
+      signature,
+      url: `${baseUrl}/${bundle}`,
+    };
   }
-  chosenRank[key] = rank(bundle);
-  platforms[key] = {
-    signature: readFileSync(path.join(args.dir, file), 'utf8').trim(),
-    url: `${baseUrl}/${bundle}`,
-  };
 }
 
 if (Object.keys(platforms).length === 0) {

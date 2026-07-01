@@ -8,9 +8,9 @@
 // VERSION is appended here so the upload that follows fills it in. Each pruned
 // version's entire folder (<channel>/<version>/) is deleted by prefix, so every
 // object under it goes -- bundles, .sig sidecars, the versioned latest.json, and
-// any stragglers the manifest never referenced (e.g. the WiX .msi that
-// build-updater-manifest.mjs drops in favour of the NSIS installer). Deleting by
-// prefix needs S3's bulk delete; wrangler's r2 object command is single-key only.
+// any stragglers the manifest never referenced (e.g. the macOS .dmg, which is a
+// human installer rather than an updater artifact). Deleting by prefix needs S3's
+// bulk delete; wrangler's r2 object command is single-key only.
 //
 // Usage: node scripts/prune-channel.mjs <prerelease|stable>
 // Env: R2_BUCKET, VERSION, CLOUDFLARE_* for wrangler (versions.json get/put), and

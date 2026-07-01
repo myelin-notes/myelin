@@ -44,9 +44,13 @@ if (manifest.version !== VERSION) {
   process.exit(1);
 }
 
-// 2. Copy each platform bundle prerelease/<v>/ -> stable/<v>/.
-for (const { url } of Object.values(manifest.platforms)) {
-  const file = fileOf(url);
+// 2. Copy each platform bundle prerelease/<v>/ -> stable/<v>/. Dedupe by
+// filename: the universal macOS bundle is shared by both darwin keys, so it
+// would otherwise be copied twice.
+const bundles = new Set(
+  Object.values(manifest.platforms).map(({ url }) => fileOf(url)),
+);
+for (const file of bundles) {
   const local = path.join(tmp, file);
   get(`prerelease/${VERSION}/${file}`, local);
   put(`stable/${VERSION}/${file}`, local);
@@ -61,5 +65,15 @@ const stablePath = path.join(tmp, 'stable.json');
 writeFileSync(stablePath, `${JSON.stringify(stable, null, 2)}\n`);
 put(`stable/${VERSION}/latest.json`, stablePath);
 put('stable/latest.json', stablePath); // live switch the app polls
+
+// 4. The macOS .dmg is the human-facing installer the website links to. It's
+// not an updater artifact (absent from latest.json), so it isn't copied by the
+// loop above; move it into this version's stable folder under the fixed name the
+// release workflow uploaded. Windows (-setup.exe) and Linux (.AppImage)
+// installers double as updater artifacts, so they're already in stable/<v>/ and
+// are discoverable straight from latest.json.
+const dmgLocal = path.join(tmp, 'Myelin-macOS.dmg');
+get(`prerelease/${VERSION}/Myelin-macOS.dmg`, dmgLocal);
+put(`stable/${VERSION}/Myelin-macOS.dmg`, dmgLocal);
 
 console.log(`Promoted ${VERSION} to stable.`);

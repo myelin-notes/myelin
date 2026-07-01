@@ -68,9 +68,7 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
+            args: --target universal-apple-darwin
           - platform: ubuntu-22.04
             args: ''
           - platform: windows-latest
@@ -136,38 +134,25 @@ jobs:
 
       - name: Stage updater artifacts
         shell: bash
-        env:
-          MATRIX_ARGS: ${{ matrix.args }}
         run: |
           mkdir -p updater-out
-          # macOS updater tarballs are named "<product>.app.tar.gz" identically
-          # for both arches, so they collide once download-artifact merges them
-          # into one dir. Tag the arch into the name to keep them distinct (the
-          # manifest builder reads arch back off /aarch64|arm64/ in the name).
-          arch=""
-          case "$MATRIX_ARGS" in
-            *aarch64*) arch="aarch64" ;;
-            *x86_64*) arch="x86_64" ;;
-          esac
           # Copy every signed updater bundle alongside its .sig. Globbing by
           # .sig keeps us platform-agnostic: each .sig names its own bundle.
+          # macOS is a single universal build, so its "<product>.app.tar.gz" no
+          # longer collides across arches and needs no arch tagging (the manifest
+          # builder maps the universal bundle to both darwin arch keys).
           while IFS= read -r sig; do
             bundle="${sig%.sig}"
             base="$(basename "$bundle")"
-            if [[ "$base" == *.app.tar.gz ]]; then
-              # The arch-less macOS name collides across targets; we MUST tag it.
-              # Bail loudly rather than silently re-introducing the collision
-              # (e.g. a future matrix entry that builds the host arch without
-              # --target would leave $arch empty here).
-              if [[ -z "$arch" ]]; then
-                echo "::error::macOS updater bundle '$base' but no arch from MATRIX_ARGS='$MATRIX_ARGS'; cannot disambiguate." >&2
-                exit 1
-              fi
-              base="${base%.app.tar.gz}-$arch.app.tar.gz"
-            fi
             cp "$bundle" "updater-out/$base"
             cp "$sig" "updater-out/$base.sig"
           done < <(find src-tauri/target -type f -name '*.sig')
+          # Stage the macOS .dmg too: it's the human-facing installer the website
+          # links to, not an updater artifact, so it rides along here to reach the
+          # publish job. Exactly one universal dmg is produced.
+          while IFS= read -r dmg; do
+            cp "$dmg" "updater-out/$(basename "$dmg")"
+          done < <(find src-tauri/target -type f -name '*.dmg')
 
       - name: Upload updater artifacts
         uses: actions/upload-artifact@v4
@@ -239,19 +224,21 @@ jobs:
 
       - name: Upload bundles + manifest to R2
         run: |
-          # Upload only the bundles latest.json references (each platform's file
-          # plus its .sig). tauri's targets:"all" + createUpdaterArtifacts emits
-          # extra signed bundles that collide on one platform key -- e.g. the
-          # Windows NSIS *-setup.exe and WiX *.msi both map to windows-x86_64, so
-          # the manifest keeps only one. Uploading incoming/* wholesale would push
-          # the dropped one too, and prune-channel.mjs (which deletes by
-          # manifest) could never reclaim it. Driving the upload from the manifest
-          # keeps R2's object set identical to what prune later removes.
-          node -e "const m=require('./latest.json'); for (const p of Object.values(m.platforms)) { const f = p.url.split('/').pop(); console.log(f); console.log(f + '.sig'); }" \
-            | while IFS= read -r f; do
-                npx --yes wrangler@4 r2 object put \
-                  "$R2_BUCKET/prerelease/$VERSION/$f" --file "incoming/$f" --remote
-              done
+          # Upload every artifact we built: the updater bundles (.app.tar.gz /
+          # -setup.exe / .AppImage) with their .sig sidecars, plus the macOS .dmg.
+          # The .dmg is the human-facing installer the website links to; it isn't
+          # an updater artifact (absent from latest.json), so it goes up under a
+          # fixed name the website and promote step can find. Everything else keeps
+          # its own name and is discoverable straight from the manifest.
+          for f in incoming/*; do
+            [ -e "$f" ] || continue
+            name="$(basename "$f")"
+            case "$name" in
+              *.dmg) name="Myelin-macOS.dmg" ;;
+            esac
+            npx --yes wrangler@4 r2 object put \
+              "$R2_BUCKET/prerelease/$VERSION/$name" --file "$f" --remote
+          done
           # Versioned copy lets promotion later fetch this exact version's manifest.
           npx --yes wrangler@4 r2 object put \
             "$R2_BUCKET/prerelease/$VERSION/latest.json" --file latest.json --remote
