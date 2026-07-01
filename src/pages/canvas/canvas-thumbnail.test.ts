@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderCanvasThumbnail } from './canvas-thumbnail';
 import type { DrawableElement } from './elements/drawable-element';
 
 class TestDOMRect {
@@ -67,17 +68,12 @@ function asElements(elements: FakeElement[]): readonly DrawableElement[] {
   return elements as unknown as readonly DrawableElement[];
 }
 
-async function importRender() {
-  return (await import('./canvas-thumbnail')).renderCanvasThumbnail;
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('renderCanvasThumbnail', () => {
   it('returns null for empty input', async () => {
-    const renderCanvasThumbnail = await importRender();
     const result = await renderCanvasThumbnail(
       asElements([]),
       new DOMRect(0, 0, 100, 100),
@@ -87,7 +83,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('returns null for zero-size region', async () => {
-    const renderCanvasThumbnail = await importRender();
     const result = await renderCanvasThumbnail(
       asElements([makeElement()]),
       new DOMRect(0, 0, 0, 0),
@@ -97,7 +92,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('culls elements outside the region', async () => {
-    const renderCanvasThumbnail = await importRender();
     const inView = makeElement({ boundingBox: new DOMRect(10, 10, 50, 50) });
     const offscreen = makeElement({
       boundingBox: new DOMRect(1000, 1000, 50, 50),
@@ -115,7 +109,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('keeps elements inside the 16:10-expanded region', async () => {
-    const renderCanvasThumbnail = await importRender();
     // A 100x100 region snaps to (-30, 0, 160, 100); this element only
     // intersects the expanded part.
     const inExpanded = makeElement({
@@ -132,7 +125,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('passes the snapped region to prepareThumbnail', async () => {
-    const renderCanvasThumbnail = await importRender();
     const element = makeElement();
 
     await renderCanvasThumbnail(
@@ -148,7 +140,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('renders a 16:10 canvas regardless of input region aspect', async () => {
-    const renderCanvasThumbnail = await importRender();
     const { getScratchCanvasContext } = await import('@/lib/scratch-canvas');
 
     await renderCanvasThumbnail(
@@ -167,7 +158,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('returns null when no element intersects the region', async () => {
-    const renderCanvasThumbnail = await importRender();
     const offscreen = makeElement({
       boundingBox: new DOMRect(1000, 1000, 50, 50),
     });
@@ -183,7 +173,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('draws elements in order', async () => {
-    const renderCanvasThumbnail = await importRender();
     const order: number[] = [];
     const first = makeElement({
       drawThumbnail: vi.fn(() => order.push(1)),
@@ -202,7 +191,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('skips hidden elements', async () => {
-    const renderCanvasThumbnail = await importRender();
     const visible = makeElement();
     const hidden = makeElement({ hidden: true });
 
@@ -218,7 +206,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('awaits prepareThumbnail before drawing any element', async () => {
-    const renderCanvasThumbnail = await importRender();
     const events: string[] = [];
     const element = makeElement({
       prepareThumbnail: vi.fn(async () => {
@@ -238,7 +225,6 @@ describe('renderCanvasThumbnail', () => {
   });
 
   it('releases the scratch canvas', async () => {
-    const renderCanvasThumbnail = await importRender();
     await renderCanvasThumbnail(
       asElements([makeElement()]),
       new DOMRect(0, 0, 100, 100),
