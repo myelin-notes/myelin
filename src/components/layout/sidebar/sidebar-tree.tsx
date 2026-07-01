@@ -19,6 +19,8 @@ import {
   type VFSNode,
 } from '@/lib/sync';
 import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
+import { cn } from '@/lib/utils';
+import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
 import { SidebarFileRow, SidebarFolderRow } from './tree-rows';
 
 const logger = new Logger('SidebarTree');
@@ -293,6 +295,9 @@ export function SidebarTree({
     onChanged?.();
   }, [loadFlatResults, onChanged]);
 
+  const { dragOver: rootDragOver, dropTargetProps: rootDropProps } =
+    useDropTarget({ targetFolderId: ROOT_KEY, onMoved: notifyNested });
+
   const renderNodes = useCallback(
     (nodes: VFSNode[], depth: number): React.ReactNode[] => {
       return sortNodes(nodes, sortMode).flatMap((node) => {
@@ -369,7 +374,13 @@ export function SidebarTree({
       : strings.library.explorerTree.emptyDefault;
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div
+      className={cn(
+        'flex min-h-full flex-col gap-0.5 rounded-md transition-colors duration-150',
+        !isFlat && rootDragOver && 'bg-accent/10 ring-1 ring-accent/30',
+      )}
+      {...(isFlat ? {} : rootDropProps)}
+    >
       {rows.length === 0 ? (
         <p className="px-2 py-1 text-text-muted text-xs italic">
           {emptyMessage}
