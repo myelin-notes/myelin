@@ -1,6 +1,7 @@
 import { type ChangeEvent, useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { errorDescription } from '@/components/command-palette/utils';
 import { trackEvent } from '@/lib/analytics';
 import type { Messages } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
@@ -30,10 +31,6 @@ import {
 import { createWorkspaceJsonImportSource } from '@/pages/library/import/workspace-json-source';
 
 const SIDEBAR_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
-
-function errorDescription(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export interface ExplorerImports {
   isImporting: boolean;

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
+import { errorDescription } from '@/components/command-palette/utils';
 import { useSidebar } from '@/components/layout/sidebar/context';
 import {
   ContextMenu,
@@ -45,10 +46,6 @@ import { cn } from '@/lib/utils';
 import { WindowControls } from './window-controls';
 
 const logger = new Logger('TabBar');
-
-function errorDescription(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 // Built-in tabs store a title captured at creation time, so they don't follow
 // language changes. Derive their title from the current messages instead and

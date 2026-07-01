@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { errorDescription } from '@/components/command-palette/utils';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
@@ -37,10 +38,6 @@ import { useExplorerImports } from './use-explorer-imports';
 
 const logger = new Logger('Sidebar');
 const SORT_MODES: SortMode[] = ['name-asc', 'name-desc', 'modified', 'created'];
-
-function errorDescription(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export function Sidebar() {
   const strings = useMessages();

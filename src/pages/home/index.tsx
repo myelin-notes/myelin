@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutGrid, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
+import { toast } from 'sonner';
+import { errorDescription } from '@/components/command-palette/utils';
 import { Button } from '@/components/ui/button';
+import { trackEvent } from '@/lib/analytics';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { formatRelativeTime } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
@@ -51,10 +54,19 @@ export function HomePage() {
       );
       const id = await repository.createFile(name, 'mcanvas', null);
       tabController.openTab({ type: 'canvas', id }, name);
+      trackEvent('note_created', { file_type: 'mcanvas' });
     } catch (error) {
       logger.error('Failed to create canvas', error);
+      toast.error(strings.commandPalette.errors.createNote, {
+        description: errorDescription(error),
+      });
     }
-  }, [repository, strings.library.createNew.untitledCanvas, tabController]);
+  }, [
+    repository,
+    strings.commandPalette.errors.createNote,
+    strings.library.createNew.untitledCanvas,
+    tabController,
+  ]);
 
   // Load recents on mount, and reload when a remote sync lands or any local
   // repository mutation occurs (e.g. creating a file for a new tab).
