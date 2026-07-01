@@ -1089,7 +1089,7 @@ export class DrawableCanvas {
     window.addEventListener('pointerup', this._handlePointerUp);
 
     this._handleResize = () => {
-      this.renderer.handleWindowResize(window.innerWidth, window.innerHeight);
+      this.renderer.refreshSize();
     };
     window.addEventListener('resize', this._handleResize);
   }

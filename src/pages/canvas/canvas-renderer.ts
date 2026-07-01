@@ -26,6 +26,7 @@ export class CanvasRenderer {
   private bgStyle: CanvasBackground;
   private unsubBgPref: (() => void) | null = null;
   private unsubTheme: (() => void) | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   public constructor(
     foregroundCtx: CanvasRenderingContext2D,
@@ -33,7 +34,7 @@ export class CanvasRenderer {
   ) {
     this.ctx = foregroundCtx;
     this.canvas = foregroundCanvas;
-    this.resizeCanvas(window.innerWidth, window.innerHeight);
+    this.syncSizeToContainer();
     this.bgStyle = UserPrefs.get('canvasBackground');
     this.buildBgPattern(this.bgStyle);
     this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
@@ -43,18 +44,25 @@ export class CanvasRenderer {
     this.unsubTheme = onCanvasThemeChange(() => {
       this.buildBgPattern(this.bgStyle);
     });
+    // The canvas fills its pane, whose width changes when the sidebar is
+    // toggled/resized or the pane is split — not only on window resize. Track
+    // the element's own laid-out size so the viewport center stays correct.
+    this.resizeObserver = new ResizeObserver(() => {
+      this.syncSizeToContainer();
+    });
+    this.resizeObserver.observe(this.canvas);
   }
 
   public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
     this.bgCanvas = canvas;
     this.bgCtx = canvas.getContext('2d', { alpha: true });
-    this.resizeBgCanvas(window.innerWidth, window.innerHeight);
+    this.resizeBgCanvas(this.canvas.clientWidth, this.canvas.clientHeight);
   }
 
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
     this.overlayCanvas = canvas;
     this.overlayCtx = canvas.getContext('2d', { alpha: true });
-    this.resizeOverlayCanvas(window.innerWidth, window.innerHeight);
+    this.resizeOverlayCanvas(this.canvas.clientWidth, this.canvas.clientHeight);
   }
 
   public buildBgPattern(style: CanvasBackground): void {
@@ -176,10 +184,14 @@ export class CanvasRenderer {
     }
   }
 
-  public handleWindowResize(width: number, height: number): void {
-    this.resizeCanvas(width, height);
-    this.resizeBgCanvas(width, height);
-    this.resizeOverlayCanvas(width, height);
+  /**
+   * Re-measure the container and resize all backing stores. Called on DPR
+   * changes (e.g. moving the window between monitors), which fire a window
+   * resize but may not change the element's CSS box, so the ResizeObserver
+   * alone would miss them.
+   */
+  public refreshSize(): void {
+    this.syncSizeToContainer();
   }
 
   public destroy(): void {
@@ -187,14 +199,31 @@ export class CanvasRenderer {
     this.unsubBgPref = null;
     this.unsubTheme?.();
     this.unsubTheme = null;
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+  }
+
+  /**
+   * Size every backing store to the foreground canvas's laid-out size. The
+   * canvas is stretched to its pane by CSS (`inset-0`), so `clientWidth/Height`
+   * is the visible viewport — the sidebar's width is already excluded. All
+   * three layers share the same container, so one measurement drives them all.
+   */
+  private syncSizeToContainer(): void {
+    const width = this.canvas.clientWidth;
+    const height = this.canvas.clientHeight;
+    if (width === 0 || height === 0) {
+      return;
+    }
+    this.resizeCanvas(width, height);
+    this.resizeBgCanvas(width, height);
+    this.resizeOverlayCanvas(width, height);
   }
 
   private resizeCanvas(width: number, height: number): void {
     const dpr = window.devicePixelRatio || 1;
     this.canvas.width = width * dpr;
     this.canvas.height = height * dpr;
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
   }
 
   private resizeBgCanvas(width: number, height: number): void {
@@ -204,8 +233,6 @@ export class CanvasRenderer {
     const dpr = window.devicePixelRatio || 1;
     this.bgCanvas.width = width * dpr;
     this.bgCanvas.height = height * dpr;
-    this.bgCanvas.style.width = `${width}px`;
-    this.bgCanvas.style.height = `${height}px`;
   }
 
   private resizeOverlayCanvas(width: number, height: number): void {
@@ -215,7 +242,5 @@ export class CanvasRenderer {
     const dpr = window.devicePixelRatio || 1;
     this.overlayCanvas.width = width * dpr;
     this.overlayCanvas.height = height * dpr;
-    this.overlayCanvas.style.width = `${width}px`;
-    this.overlayCanvas.style.height = `${height}px`;
   }
 }
