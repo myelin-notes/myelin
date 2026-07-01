@@ -194,6 +194,25 @@ export const TabBar = memo(function TabBar({
         isMac && isTopLeft && collapsed && TRAFFIC_LIGHT_INSET_CLASS,
       )}
     >
+      {/* The sidebar lives on the window's left edge, so its toggle sits at the
+          top-left — only on the leftmost pane's bar, so split views don't show
+          duplicate toggles. When collapsed on macOS the whole bar insets to
+          clear the traffic lights, leaving the toggle just right of them. */}
+      {isTopLeft && (
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={
+            collapsed ? strings.sidebar.expand : strings.sidebar.collapse
+          }
+          title={collapsed ? strings.sidebar.expand : strings.sidebar.collapse}
+          aria-pressed={!collapsed}
+          className="mb-1 ml-2 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        >
+          <PanelLeft className="size-3.5" />
+        </button>
+      )}
+
       <div
         className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
         style={{ scrollbarWidth: 'none' }}
@@ -229,30 +248,6 @@ export const TabBar = memo(function TabBar({
       </button>
 
       <div className="flex-1 self-stretch" {...dragRegion} />
-
-      <div
-        className={cn(
-          'flex shrink-0 items-center gap-1 px-2',
-          // Frameless Windows centers the gear over the full bar height so it
-          // lines up with the full-height window controls; elsewhere it sits on
-          // the tab baseline.
-          isWindows ? 'self-stretch' : 'pb-1',
-        )}
-        {...dragRegion}
-      >
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          aria-label={
-            collapsed ? strings.sidebar.expand : strings.sidebar.collapse
-          }
-          title={collapsed ? strings.sidebar.expand : strings.sidebar.collapse}
-          aria-pressed={!collapsed}
-          className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <PanelLeft className="size-3.5" />
-        </button>
-      </div>
 
       {/* Frameless Windows has no native title bar, so the top-right pane's
           bar carries the window controls (sits right of the utility buttons). */}
