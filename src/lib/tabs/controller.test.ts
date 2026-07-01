@@ -294,6 +294,39 @@ describe('TabStateController', () => {
     expectValidWindowState(state);
   });
 
+  it('closes tabs for deleted nodes across panes and leaves others alone', () => {
+    const controller = new TabStateController();
+    const rootPaneId = focusedPane(controller).id;
+    openCanvas(controller, 'alpha', 'Alpha', rootPaneId);
+    const betaId = openCanvas(controller, 'beta', 'Beta', rootPaneId);
+    const otherPaneId = controller.splitPane(rootPaneId, 'horizontal');
+    openCanvas(controller, 'gamma', 'Gamma', otherPaneId);
+
+    // Deleting a folder reports every contained file id at once.
+    controller.closeTabsForNodes(['alpha', 'gamma']);
+
+    expect(tabTitles(controller.getPane(rootPaneId)!)).toEqual(['Beta']);
+    expect(controller.getPane(rootPaneId)!.activeTabId).toBe(betaId);
+    // The other pane emptied and collapsed, leaving a single pane.
+    expect(controller.getSnapshot().layout.type).toBe('pane');
+    expectValidWindowState(controller.getSnapshot());
+  });
+
+  it('ignores non-node tab targets and unknown ids when closing deleted nodes', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    controller.openTab({ type: 'graph' }, 'Graph', paneId);
+    openCanvas(controller, 'alpha', 'Alpha', paneId);
+    const before = controller.getSnapshot();
+
+    // 'graph' is not node-backed and 'missing' matches nothing: both no-ops.
+    controller.closeTabsForNodes(['graph', 'missing']);
+
+    expect(controller.getSnapshot()).toBe(before);
+    expect(tabTitles(rootPane(controller))).toEqual(['Graph', 'Alpha']);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
   it('ignores invalid focus, activation, and resize requests', () => {
     const controller = new TabStateController();
     const paneId = focusedPane(controller).id;

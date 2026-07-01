@@ -1,4 +1,5 @@
 import { trackEvent } from '@/lib/analytics';
+import type { VFSNodeId } from '@/lib/sync';
 import type {
   LayoutNode,
   PaneId,
@@ -438,6 +439,38 @@ export class TabStateController {
       is_new_document: true,
     });
     return tab.id;
+  }
+
+  // Close every canvas/image tab whose document was deleted. Graph/settings
+  // tabs are not node-backed and are left alone. Panes emptied by this collapse
+  // the same way a manual close does (home pane or, in a tear-off, the window).
+  closeTabsForNodes(nodeIds: Iterable<VFSNodeId>): void {
+    const ids = new Set(nodeIds);
+    if (ids.size === 0) {
+      return;
+    }
+
+    const matches: { tabId: TabId; paneId: PaneId }[] = [];
+    const collect = (node: LayoutNode): void => {
+      if (node.type === 'pane') {
+        for (const tab of node.tabs) {
+          const { target } = tab;
+          if (
+            (target.type === 'canvas' || target.type === 'image') &&
+            ids.has(target.id)
+          ) {
+            matches.push({ tabId: tab.id, paneId: node.id });
+          }
+        }
+        return;
+      }
+      node.children.forEach(collect);
+    };
+    collect(this.state.layout);
+
+    for (const { tabId, paneId } of matches) {
+      this.closeTab(tabId, paneId);
+    }
   }
 
   closeTab(tabId: TabId, paneId: PaneId): void {

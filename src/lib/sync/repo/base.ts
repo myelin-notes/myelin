@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { NODES_DELETED_EVENT, type NodesDeletedDetail } from '@/lib/events';
 import { handwritingService } from '@/lib/handwriting';
 import { Logger } from '@/lib/logger';
 import { summarizeYDoc } from '@/lib/note/state-summary';
@@ -73,6 +74,16 @@ import type {
 
 const logger = new Logger('BaseRepository');
 const DEFAULT_SEMANTIC_SEARCH_LIMIT = 50;
+
+// Announce deleted files so the tab layer can close tabs bound to them. Guarded
+// for non-DOM contexts (tests, background workers) where `window` is absent.
+function emitNodesDeleted(ids: VFSNodeId[]): void {
+  if (ids.length === 0 || typeof window === 'undefined') {
+    return;
+  }
+  const detail: NodesDeletedDetail = { ids };
+  window.dispatchEvent(new CustomEvent(NODES_DELETED_EVENT, { detail }));
+}
 
 function byteArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
   if (left.byteLength !== right.byteLength) {
@@ -505,6 +516,8 @@ export abstract class BaseRepository
         await handwritingService.removeRecognition(file.id);
       }),
     );
+
+    emitNodesDeleted(deletedFiles.map((file) => file.id));
   }
 
   async moveNode(nodeId: string, newParentId: string | null): Promise<void> {
