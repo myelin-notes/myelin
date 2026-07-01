@@ -67,8 +67,11 @@ export class CanvasViewport {
         // and ctrl+wheel zoom on desktop. Anchor on the cursor so the world
         // point under the pointer stays put.
         if (!this._zoomLocked) {
+          // Exponential (log-based) step: each wheel notch multiplies zoom by
+          // a constant factor, so the change feels equally granular whether
+          // we're zoomed way in or way out. A small exponent keeps it smooth.
           this.zoomAroundPoint(
-            this._zoom + evt.deltaY * -0.005,
+            this._zoom * Math.exp(evt.deltaY * -0.0025),
             this.getScreenPoint(evt),
           );
         }
