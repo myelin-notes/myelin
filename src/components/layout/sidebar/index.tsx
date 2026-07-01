@@ -4,7 +4,6 @@ import {
   ArrowDownZA,
   CalendarPlus,
   Clock,
-  LoaderCircle,
   Network,
   RefreshCw,
   Search,
@@ -13,8 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { trackEvent } from '@/lib/analytics';
-import { useLocale, useMessages } from '@/lib/i18n';
-import { formatNumber } from '@/lib/i18n/format';
+import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { isMac, isWindows, TRAFFIC_LIGHT_INSET_CLASS } from '@/lib/platform';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
@@ -46,7 +44,6 @@ function errorDescription(error: unknown): string {
 
 export function Sidebar() {
   const strings = useMessages();
-  const locale = useLocale();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const tabController = useTabController();
@@ -59,7 +56,6 @@ export function Sidebar() {
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTags = useMemo(() => [...activeTags], [activeTags]);
   const [tagsRefreshKey, setTagsRefreshKey] = useState(0);
-  const [fileCount, setFileCount] = useState<number | null>(null);
 
   const isRefreshing = useManualRepositoryRefreshPending();
   const refreshAvailable = useManualRepositoryRefreshAvailable(
@@ -67,17 +63,9 @@ export function Sidebar() {
     repositoryStatus.initializing,
   );
 
-  const loadStats = useCallback(() => {
-    repository
-      .getStats()
-      .then((stats) => setFileCount(stats.totalFiles))
-      .catch((error) => logger.error('Failed to load stats', error));
-  }, [repository]);
-
   const refreshMeta = useCallback(() => {
     setTagsRefreshKey((key) => key + 1);
-    loadStats();
-  }, [loadStats]);
+  }, []);
 
   const refreshAfterImport = useCallback(() => {
     void treeRef.current?.reload();
@@ -90,16 +78,12 @@ export function Sidebar() {
     strings,
   });
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
-
-  // Refresh tag counts and the file total when a remote sync lands or any local
+  // Refresh tag counts when a remote sync lands or any local
   // repository mutation occurs (create/rename/delete/move/tag), including
   // changes made outside the sidebar such as the tab bar's new-tab button.
   // `dataVersion` is the only refresh signal for local repos, where
-  // `lastRemoteSyncAt` stays null. Skip the initial render — `loadStats` above
-  // and the tags list already load on mount.
+  // `lastRemoteSyncAt` stays null. Skip the initial render — the tags list
+  // already loads on mount.
   const didMountMetaRefresh = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
@@ -176,20 +160,6 @@ export function Sidebar() {
     repositoryStatus.initializing,
     strings.library.refreshRepository.failed,
   ]);
-
-  const syncStatus = repositoryStatus.initializing
-    ? 'syncing'
-    : !repositoryStatus.online
-      ? 'offline'
-      : repositoryStatus.pendingRemoteWrites > 0
-        ? 'syncing'
-        : 'synced';
-  const statusLabel =
-    syncStatus === 'offline'
-      ? strings.sidebar.offline
-      : syncStatus === 'syncing'
-        ? strings.sidebar.syncing
-        : strings.sidebar.synced;
 
   return (
     <aside
@@ -339,28 +309,6 @@ export function Sidebar() {
         onTagsChanged={refreshAfterImport}
         refreshKey={tagsRefreshKey}
       />
-
-      <footer className="flex h-8 shrink-0 items-center gap-2 border-border-subtle border-t px-3 text-text-muted text-xs">
-        {syncStatus === 'syncing' ? (
-          <LoaderCircle className="size-3 shrink-0 animate-spin" />
-        ) : (
-          <span
-            className={cn(
-              'size-2 shrink-0 rounded-full',
-              syncStatus === 'offline' ? 'bg-text-muted' : 'bg-text-success',
-            )}
-          />
-        )}
-        <span className="truncate">
-          {statusLabel}
-          {fileCount !== null && (
-            <>
-              {' · '}
-              {strings.sidebar.fileCount(formatNumber(fileCount, locale))}
-            </>
-          )}
-        </span>
-      </footer>
 
       <input
         ref={imports.storageInputRef}
