@@ -143,7 +143,7 @@ export function HomePage() {
                     }}
                   >
                     <RecentCard
-                      nodeId={file.id}
+                      node={file}
                       category={
                         strings.library.fileTypes[
                           file.fileType as keyof typeof strings.library.fileTypes
@@ -152,11 +152,10 @@ export function HomePage() {
                       time={formatRelativeTime(file.modifiedAt, locale, {
                         style: 'short',
                       })}
-                      title={file.name}
-                      tags={file.tags}
                       onClick={() =>
                         openNote(tabController, file, file.name, 'recent_files')
                       }
+                      onChanged={loadRecentFiles}
                     />
                   </motion.div>
                 ))}

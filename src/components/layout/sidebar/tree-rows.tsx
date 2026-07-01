@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { ChevronRight, FileText, Folder } from 'lucide-react';
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { openNote } from '@/lib/note/navigation';
 import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { cn } from '@/lib/utils';
 import { formatExplorerItemAccessibleName } from '@/pages/library/accessibility-labels';
 import { ItemContextMenu } from '@/pages/library/explorer/item-context-menu';
-import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { TagList } from '@/pages/library/explorer/tag-list';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
 import { useExplorerItem } from '@/pages/library/explorer/use-explorer-item';
+import { useFileItemContextMenu } from '@/pages/library/explorer/use-file-item-context-menu';
 import { TagManageDialog } from '@/pages/library/tag-manage-dialog';
 
 const ROW_BASE_PADDING = 8;
@@ -151,26 +150,15 @@ export function SidebarFileRow({
   onChanged,
 }: FileRowProps) {
   const tabController = useTabController();
-  const [tagDialogOpen, setTagDialogOpen] = useState(false);
-  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const {
     renaming,
     dragging,
-    startRenaming,
-    handleRemove,
     handleDragStart,
     handleDragEnd,
     renameInputProps,
-    renameReferencesPrompt,
-    chooseRenameReferences,
-  } = useExplorerItem({
-    nodeId: node.id,
-    name: node.name,
-    dragKind: 'file',
-    onChanged,
-    initialRenaming: autoRename,
-    renameReferencesOnRename: node.fileType === 'mcanvas',
-  });
+    menu,
+    dialogs,
+  } = useFileItemContextMenu(node, onChanged, { initialRenaming: autoRename });
 
   return (
     <>
@@ -215,32 +203,9 @@ export function SidebarFileRow({
             </div>
           )}
         </ContextMenuTrigger>
-        <ItemContextMenu
-          onRename={startRenaming}
-          onRemove={handleRemove}
-          onManageTags={() => setTagDialogOpen(true)}
-          onVersionHistory={() => setVersionHistoryOpen(true)}
-        />
+        {menu}
       </ContextMenu>
-      <TagManageDialog
-        open={tagDialogOpen}
-        onOpenChange={setTagDialogOpen}
-        nodeId={node.id}
-        nodeName={node.name}
-        onChanged={onChanged}
-      />
-      <VersionHistoryDialog
-        open={versionHistoryOpen}
-        onOpenChange={setVersionHistoryOpen}
-        fileId={node.id}
-        fileName={node.name}
-        fileType={node.fileType}
-        onRestored={onChanged}
-      />
-      <RenameReferencesDialog
-        prompt={renameReferencesPrompt}
-        onChoice={chooseRenameReferences}
-      />
+      {dialogs}
     </>
   );
 }
