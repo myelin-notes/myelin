@@ -81,6 +81,19 @@ describe('LocalRepository', () => {
     expect(readNoteText(snapshot.update)).toBe('hello local repository');
   });
 
+  it('registers ancestor tags when a nested tag is added', async () => {
+    const repository = new LocalRepository('repositories/registry-ancestors');
+    await repository.initialize();
+
+    await repository.addRegistryTags(['uni/math/calc']);
+
+    expect((await repository.getRegistryTags()).sort()).toEqual([
+      'uni',
+      'uni/math',
+      'uni/math/calc',
+    ]);
+  });
+
   it('returns reveal paths inside app data storage', async () => {
     const repository = new LocalRepository('repositories/reveal-test');
     await repository.initialize();

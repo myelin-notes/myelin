@@ -12,7 +12,18 @@ const en = {
   },
   tabBar: {
     library: 'Library',
+    home: 'Home',
     settings: 'Settings',
+  },
+  sidebar: {
+    searchPlaceholder: 'Search your library...',
+    searchModeText: 'Text',
+    searchModeSemantic: 'Semantic',
+    explorer: 'Explorer',
+    tags: 'Tags',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+    graph: 'Open graph',
   },
   commandPalette: {
     title: 'Command Palette',
@@ -65,8 +76,12 @@ const en = {
   },
   library: {
     title: 'Digital Library',
-    emptyState:
-      'Your personal knowledge workspace. Create a canvas to start collecting ideas, notes, and research.',
+    emptyState: {
+      title: 'Your library is empty',
+      description:
+        'Create a canvas to start collecting ideas, notes, and research.',
+      cta: 'New Canvas',
+    },
     recentlyOpened: 'Recently Opened',
     searchPlaceholder: 'Search studio...',
     semanticSearchLabel: 'Semantic search',
@@ -166,10 +181,13 @@ const en = {
     },
     semanticTags: {
       title: 'Semantic Tags',
-      empty:
-        'No tags yet. Right-click a file and choose "Manage Tags" to start.',
+      empty: 'No tags yet',
+      emptyHint: 'Create one to filter your library.',
       insights: 'Studio Insights',
-      manageTag: '+ manage tag',
+      addTag: 'New tag',
+      addChild: (tag: string) => `Add tag under #${tag}`,
+      placeholder: 'Tag name...',
+      deleteTag: (tag: string) => `Delete #${tag}`,
       stats: {
         totalFiles: 'Total Files',
         folders: 'Folders',
@@ -206,20 +224,6 @@ const en = {
       available: 'Available',
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
-    },
-    tagRegistryDialog: {
-      title: 'Manage Tags',
-      description: 'Create tags to reuse, or delete them everywhere.',
-      tags: 'Tags',
-      empty: 'No tags yet',
-      createNew: 'Create new tag',
-      placeholder: 'Tag name...',
-      confirmTitle: 'Delete tag?',
-      confirmDescription: (tag: string, count: number) =>
-        count > 0
-          ? `#${tag} will be permanently removed from ${count} file${count === 1 ? '' : 's'}/folder${count === 1 ? '' : 's'} and deleted everywhere.`
-          : `#${tag} will be deleted permanently.`,
-      confirmDelete: 'Delete',
     },
   },
   graph: {

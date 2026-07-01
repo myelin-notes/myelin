@@ -14,7 +14,18 @@ const es: typeof en = {
   },
   tabBar: {
     library: 'Biblioteca',
+    home: 'Inicio',
     settings: 'Ajustes',
+  },
+  sidebar: {
+    searchPlaceholder: 'Busca en tu biblioteca...',
+    searchModeText: 'Texto',
+    searchModeSemantic: 'Semántica',
+    explorer: 'Explorador',
+    tags: 'Etiquetas',
+    collapse: 'Contraer barra lateral',
+    expand: 'Expandir barra lateral',
+    graph: 'Abrir grafo',
   },
   commandPalette: {
     title: 'Paleta de comandos',
@@ -67,8 +78,12 @@ const es: typeof en = {
   },
   library: {
     title: 'Biblioteca Digital',
-    emptyState:
-      'Tu espacio personal de conocimiento. Crea un lienzo para empezar a recopilar ideas, notas e investigación.',
+    emptyState: {
+      title: 'Tu biblioteca está vacía',
+      description:
+        'Crea un lienzo para empezar a recopilar ideas, notas e investigación.',
+      cta: 'Nuevo lienzo',
+    },
     recentlyOpened: 'Abiertos recientemente',
     searchPlaceholder: 'Buscar en el estudio...',
     semanticSearchLabel: 'Búsqueda semántica',
@@ -169,10 +184,13 @@ const es: typeof en = {
     },
     semanticTags: {
       title: 'Etiquetas semánticas',
-      empty:
-        'Aún no hay etiquetas. Haz clic derecho en un archivo y elige "Administrar etiquetas" para empezar.',
+      empty: 'Aún no hay etiquetas',
+      emptyHint: 'Crea una para filtrar tu biblioteca.',
       insights: 'Análisis del estudio',
-      manageTag: '+ gestionar etiqueta',
+      addTag: 'Nueva etiqueta',
+      addChild: (tag: string) => `Añadir etiqueta dentro de #${tag}`,
+      placeholder: 'Nombre de etiqueta...',
+      deleteTag: (tag: string) => `Eliminar #${tag}`,
       stats: {
         totalFiles: 'Total de archivos',
         folders: 'Carpetas',
@@ -209,21 +227,6 @@ const es: typeof en = {
       available: 'Disponibles',
       createNew: 'Crear nueva etiqueta',
       placeholder: 'Nombre de la etiqueta...',
-    },
-    tagRegistryDialog: {
-      title: 'Administrar etiquetas',
-      description:
-        'Crea etiquetas para reutilizarlas o elimínalas de todas partes.',
-      tags: 'Etiquetas',
-      empty: 'Aún no hay etiquetas',
-      createNew: 'Crear nueva etiqueta',
-      placeholder: 'Nombre de la etiqueta...',
-      confirmTitle: '¿Eliminar etiqueta?',
-      confirmDescription: (tag: string, count: number) =>
-        count > 0
-          ? `#${tag} se eliminará permanentemente de ${count} archivo${count === 1 ? '' : 's'}/carpeta${count === 1 ? '' : 's'} y se borrará de todas partes.`
-          : `#${tag} se eliminará permanentemente.`,
-      confirmDelete: 'Eliminar',
     },
   },
   graph: {

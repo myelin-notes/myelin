@@ -1,4 +1,5 @@
 import { trackEvent } from '@/lib/analytics';
+import type { VFSNodeId } from '@/lib/sync';
 import type {
   LayoutNode,
   PaneId,
@@ -23,14 +24,6 @@ function createSplitId(): string {
   return crypto.randomUUID();
 }
 
-function createLibraryTab(): Tab {
-  return {
-    id: createTabId(),
-    target: { type: 'library' },
-    title: 'Library',
-  };
-}
-
 function createPaneWithTabs(tabs: Tab[]): PaneNode {
   return {
     type: 'pane',
@@ -40,8 +33,15 @@ function createPaneWithTabs(tabs: Tab[]): PaneNode {
   };
 }
 
-function createLibraryPane(): PaneNode {
-  return createPaneWithTabs([createLibraryTab()]);
+// A pane with no tabs renders the home view (recents + welcome) in its body.
+// `activeTabId` is empty since there is no active tab to reference.
+function createEmptyPane(): PaneNode {
+  return {
+    type: 'pane',
+    id: createPaneId(),
+    tabs: [],
+    activeTabId: '',
+  };
 }
 
 function targetsEqual(a: TabTarget, b: TabTarget): boolean {
@@ -50,7 +50,6 @@ function targetsEqual(a: TabTarget, b: TabTarget): boolean {
   }
 
   switch (a.type) {
-    case 'library':
     case 'graph':
     case 'settings':
       return true;
@@ -93,13 +92,9 @@ function normalizeSizes(sizes: number[], count: number): number[] {
 }
 
 function normalizePane(pane: PaneNode): PaneNode {
+  // Empty panes are valid: they render the home view. Keep activeTabId empty.
   if (pane.tabs.length === 0) {
-    const tab = createLibraryTab();
-    return {
-      ...pane,
-      tabs: [tab],
-      activeTabId: tab.id,
-    };
+    return pane.activeTabId === '' ? pane : { ...pane, activeTabId: '' };
   }
 
   if (pane.tabs.some((tab) => tab.id === pane.activeTabId)) {
@@ -119,7 +114,7 @@ function normalizeLayout(node: LayoutNode): LayoutNode {
 
   const children = node.children.map(normalizeLayout);
   if (children.length === 0) {
-    return createLibraryPane();
+    return createEmptyPane();
   }
   if (children.length === 1) {
     return children[0]!;
@@ -327,7 +322,7 @@ function findTabByTargetInLayout(
 }
 
 export function createDefaultWindowState(): WindowState {
-  const pane = createLibraryPane();
+  const pane = createEmptyPane();
   return {
     layout: pane,
     focusedPaneId: pane.id,
@@ -444,6 +439,38 @@ export class TabStateController {
       is_new_document: true,
     });
     return tab.id;
+  }
+
+  // Close every canvas/image tab whose document was deleted. Graph/settings
+  // tabs are not node-backed and are left alone. Panes emptied by this collapse
+  // the same way a manual close does (home pane or, in a tear-off, the window).
+  closeTabsForNodes(nodeIds: Iterable<VFSNodeId>): void {
+    const ids = new Set(nodeIds);
+    if (ids.size === 0) {
+      return;
+    }
+
+    const matches: { tabId: TabId; paneId: PaneId }[] = [];
+    const collect = (node: LayoutNode): void => {
+      if (node.type === 'pane') {
+        for (const tab of node.tabs) {
+          const { target } = tab;
+          if (
+            (target.type === 'canvas' || target.type === 'image') &&
+            ids.has(target.id)
+          ) {
+            matches.push({ tabId: tab.id, paneId: node.id });
+          }
+        }
+        return;
+      }
+      node.children.forEach(collect);
+    };
+    collect(this.state.layout);
+
+    for (const { tabId, paneId } of matches) {
+      this.closeTab(tabId, paneId);
+    }
   }
 
   closeTab(tabId: TabId, paneId: PaneId): void {
@@ -602,7 +629,7 @@ export class TabStateController {
       return paneId;
     }
 
-    const newPane = createLibraryPane();
+    const newPane = createEmptyPane();
     const split: SplitNode = {
       type: 'split',
       id: createSplitId(),

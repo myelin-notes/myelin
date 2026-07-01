@@ -1731,4 +1731,36 @@ describe('CachedRepository', () => {
     ).toBe('local pending edit');
     expect(storage.readText(outboxPath)).toBe('[]');
   });
+
+  it('advances dataVersion on each cached local mutation', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/cached-change-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/cached-change-test/outbox.json',
+    );
+    await repository.initialize();
+
+    const before = repository.getRuntimeStatus().dataVersion;
+
+    const folderId = await repository.createFolder('Folder', null);
+    const fileId = await repository.createFile('Note', 'mcanvas', null);
+    await repository.renameNode(fileId, 'Renamed');
+    await repository.moveNode(fileId, folderId);
+    await repository.deleteNode(fileId);
+
+    // One increment per local mutation above.
+    expect(repository.getRuntimeStatus().dataVersion).toBe(before + 5);
+  });
+
+  it('advances dataVersion on local repository mutations', async () => {
+    const repository = new LocalRepository('repositories/local-change-test');
+    await repository.initialize();
+
+    const before = repository.getRuntimeStatus().dataVersion;
+    await repository.createFile('Note', 'mcanvas', null);
+
+    expect(repository.getRuntimeStatus().dataVersion).toBeGreaterThan(before);
+  });
 });

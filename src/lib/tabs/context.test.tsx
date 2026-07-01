@@ -43,9 +43,7 @@ describe('TabStateProvider', () => {
     expect(replaceState).toHaveBeenCalledWith({}, '', '/');
     expect(state.layout.type).toBe('pane');
     if (state.layout.type === 'pane') {
-      expect(state.layout.tabs).toMatchObject([
-        { target: { type: 'library' }, title: 'Library' },
-      ]);
+      expect(state.layout.tabs).toEqual([]);
     }
   });
 });

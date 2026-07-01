@@ -1,6 +1,7 @@
 import { Toaster } from 'sonner';
 import { CommandPalette } from '@/components/command-palette';
-import { AppShell } from '@/components/layout/app-shell';
+import { RootLayout } from '@/components/layout/root-layout';
+import { SidebarProvider } from '@/components/layout/sidebar/context';
 import { useTheme } from '@/hooks/useTheme';
 import { McpRuntime } from '@/lib/mcp/runtime';
 import { TabStateProvider } from '@/lib/tabs/context';
@@ -12,10 +13,12 @@ function App() {
   return (
     <TabStateProvider>
       <CanvasCommandProvider>
-        <McpRuntime />
-        <Toaster position="bottom-right" />
-        <CommandPalette />
-        <AppShell />
+        <SidebarProvider>
+          <McpRuntime />
+          <Toaster position="bottom-right" />
+          <CommandPalette />
+          <RootLayout />
+        </SidebarProvider>
       </CanvasCommandProvider>
     </TabStateProvider>
   );

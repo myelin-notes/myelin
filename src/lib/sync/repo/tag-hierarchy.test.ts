@@ -131,4 +131,26 @@ describe('orderTagsHierarchically', () => {
       ]),
     ).toEqual(['orphan/child', 'solo']);
   });
+
+  it('annotates depth and a leaf label per nesting level', () => {
+    expect(
+      orderTagsHierarchically([
+        { tag: 'uni', count: 10 },
+        { tag: 'uni/math', count: 6 },
+        { tag: 'uni/math/calc', count: 4 },
+      ]),
+    ).toEqual([
+      { tag: 'uni', count: 10, depth: 0, label: 'uni' },
+      { tag: 'uni/math', count: 6, depth: 1, label: 'math' },
+      { tag: 'uni/math/calc', count: 4, depth: 2, label: 'calc' },
+    ]);
+  });
+
+  it('keeps the full path as the label for a parentless root', () => {
+    expect(
+      orderTagsHierarchically([{ tag: 'orphan/child', count: 7 }]),
+    ).toEqual([
+      { tag: 'orphan/child', count: 7, depth: 0, label: 'orphan/child' },
+    ]);
+  });
 });

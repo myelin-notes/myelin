@@ -22,18 +22,29 @@ export function expandTagWithAncestors(tag: string): string[] {
   return result;
 }
 
+export interface OrderedTag {
+  tag: string;
+  count: number;
+  /** Nesting level: 0 for roots, +1 per present ancestor. */
+  depth: number;
+  /** The tag relative to its present parent — the leaf segment when nested. */
+  label: string;
+}
+
 /**
  * Reorder a count-sorted tag list so each parent is immediately followed by its
- * descendant subtree. Sibling groups (and roots) keep count-descending order
- * with an alphabetical tie-break. A list with no "/" tags is returned in the
- * same order it came in, so flat repositories are unaffected. Tags whose parent
- * is missing from the list are treated as roots rather than dropped.
+ * descendant subtree, annotating every entry with its `depth` and a relative
+ * `label` for indented rendering. Sibling groups (and roots) keep
+ * count-descending order with an alphabetical tie-break. A list with no "/" tags
+ * is returned in the same order it came in, so flat repositories are
+ * unaffected. Tags whose parent is missing from the list are treated as roots
+ * rather than dropped (and keep their full path as the label).
  */
-export function orderTagsHierarchically<
-  T extends { tag: string; count: number },
->(tags: readonly T[]): T[] {
+export function orderTagsHierarchically(
+  tags: readonly { tag: string; count: number }[],
+): OrderedTag[] {
   const byTag = new Map(tags.map((entry) => [entry.tag, entry]));
-  const children = new Map<string, T[]>();
+  const children = new Map<string, { tag: string; count: number }[]>();
   for (const entry of tags) {
     const slash = entry.tag.lastIndexOf('/');
     const parent = slash === -1 ? '' : entry.tag.slice(0, slash);
@@ -46,8 +57,8 @@ export function orderTagsHierarchically<
     }
   }
 
-  const result: T[] = [];
-  const visit = (path: string) => {
+  const result: OrderedTag[] = [];
+  const visit = (path: string, depth: number) => {
     const group = children.get(path);
     if (!group) {
       return;
@@ -56,11 +67,15 @@ export function orderTagsHierarchically<
       b.count !== a.count ? b.count - a.count : a.tag.localeCompare(b.tag),
     );
     for (const entry of group) {
-      result.push(entry);
-      visit(entry.tag);
+      const label =
+        depth === 0
+          ? entry.tag
+          : entry.tag.slice(entry.tag.lastIndexOf('/') + 1);
+      result.push({ tag: entry.tag, count: entry.count, depth, label });
+      visit(entry.tag, depth + 1);
     }
   };
-  visit('');
+  visit('', 0);
   return result;
 }
 

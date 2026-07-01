@@ -14,7 +14,18 @@ const zhHans: typeof en = {
   },
   tabBar: {
     library: '资料库',
+    home: '主页',
     settings: '设置',
+  },
+  sidebar: {
+    searchPlaceholder: '搜索你的资料库…',
+    searchModeText: '文本',
+    searchModeSemantic: '语义',
+    explorer: '资源管理器',
+    tags: '标签',
+    collapse: '收起侧边栏',
+    expand: '展开侧边栏',
+    graph: '打开关系图',
   },
   commandPalette: {
     title: '命令面板',
@@ -67,7 +78,11 @@ const zhHans: typeof en = {
   },
   library: {
     title: '数字资料库',
-    emptyState: '你的个人知识工作区，创建画布即可开始收集想法、笔记与研究',
+    emptyState: {
+      title: '你的库是空的',
+      description: '创建画布即可开始收集想法、笔记与研究。',
+      cta: '新建画布',
+    },
     recentlyOpened: '最近打开',
     searchPlaceholder: '搜索工作室...',
     semanticSearchLabel: '语义搜索',
@@ -163,9 +178,13 @@ const zhHans: typeof en = {
     },
     semanticTags: {
       title: '语义标签',
-      empty: '还没有标签，右键点击文件并选择“管理标签”即可开始',
+      empty: '还没有标签',
+      emptyHint: '创建一个来筛选你的库。',
       insights: '工作室洞察',
-      manageTag: '+ 管理标签',
+      addTag: '新建标签',
+      addChild: (tag: string) => `在 #${tag} 下添加标签`,
+      placeholder: '标签名称…',
+      deleteTag: (tag: string) => `删除 #${tag}`,
       stats: {
         totalFiles: '文件总数',
         folders: '文件夹',
@@ -201,20 +220,6 @@ const zhHans: typeof en = {
       available: '可用',
       createNew: '创建新标签',
       placeholder: '标签名称...',
-    },
-    tagRegistryDialog: {
-      title: '管理标签',
-      description: '创建可复用的标签，或在所有位置删除它们。',
-      tags: '标签',
-      empty: '还没有标签',
-      createNew: '创建新标签',
-      placeholder: '标签名称...',
-      confirmTitle: '删除标签？',
-      confirmDescription: (tag: string, count: number) =>
-        count > 0
-          ? `#${tag} 将从 ${count} 个文件/文件夹中永久移除，并在所有位置删除。`
-          : `#${tag} 将被永久删除。`,
-      confirmDelete: '删除',
     },
   },
   graph: {

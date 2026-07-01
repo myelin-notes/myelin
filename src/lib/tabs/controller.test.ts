@@ -25,8 +25,11 @@ function expectValidWindowState(state: WindowState): void {
   expect(paneIds.has(state.focusedPaneId)).toBe(true);
 
   for (const pane of panes) {
-    expect(pane.tabs.length).toBeGreaterThan(0);
-    expect(pane.tabs.some((tab) => tab.id === pane.activeTabId)).toBe(true);
+    // Panes may be empty (the home view); only non-empty panes must point their
+    // activeTabId at a real tab.
+    if (pane.tabs.length > 0) {
+      expect(pane.tabs.some((tab) => tab.id === pane.activeTabId)).toBe(true);
+    }
 
     for (const tab of pane.tabs) {
       expect(tabIds.has(tab.id)).toBe(false);
@@ -66,11 +69,11 @@ function tabTitles(pane: PaneNode): string[] {
 }
 
 describe('TabStateController', () => {
-  it('starts with a focused library tab', () => {
+  it('starts as a single empty pane (the home view)', () => {
     const controller = new TabStateController();
 
     expectValidWindowState(controller.getSnapshot());
-    expect(tabTitles(focusedPane(controller))).toEqual(['Library']);
+    expect(tabTitles(focusedPane(controller))).toEqual([]);
   });
 
   it('opens tabs after the active tab and reuses matching targets in the pane', () => {
@@ -82,12 +85,7 @@ describe('TabStateController', () => {
     controller.activateTab(alphaId, paneId);
     openCanvas(controller, 'gamma', 'Gamma');
 
-    expect(tabTitles(rootPane(controller))).toEqual([
-      'Library',
-      'Alpha',
-      'Gamma',
-      'Beta',
-    ]);
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha', 'Gamma', 'Beta']);
 
     const reopenedId = controller.openTab(
       {
@@ -103,12 +101,7 @@ describe('TabStateController', () => {
     const pane = rootPane(controller);
     const alpha = pane.tabs.find((tab) => tab.id === alphaId);
     expect(reopenedId).toBe(alphaId);
-    expect(tabTitles(pane)).toEqual([
-      'Library',
-      'Alpha again',
-      'Gamma',
-      'Beta',
-    ]);
+    expect(tabTitles(pane)).toEqual(['Alpha again', 'Gamma', 'Beta']);
     expect(alpha?.target).toMatchObject({
       type: 'canvas',
       id: 'alpha',
@@ -131,7 +124,7 @@ describe('TabStateController', () => {
     );
 
     expect(secondId).toBe(firstId);
-    expect(tabTitles(rootPane(controller))).toEqual(['Library', 'Graph again']);
+    expect(tabTitles(rootPane(controller))).toEqual(['Graph again']);
     expectValidWindowState(controller.getSnapshot());
   });
 
@@ -147,11 +140,8 @@ describe('TabStateController', () => {
     const reopenedId = controller.openTab({ type: 'canvas', id: 'alpha' }, 'A');
 
     expect(reopenedId).toBe(alphaId);
-    expect(tabTitles(controller.getPane(rootPaneId)!)).toEqual([
-      'Library',
-      'A',
-    ]);
-    expect(tabTitles(controller.getPane(otherPaneId)!)).toEqual(['Library']);
+    expect(tabTitles(controller.getPane(rootPaneId)!)).toEqual(['A']);
+    expect(tabTitles(controller.getPane(otherPaneId)!)).toEqual([]);
     expect(controller.getSnapshot().focusedPaneId).toBe(rootPaneId);
     expectValidWindowState(controller.getSnapshot());
   });
@@ -164,22 +154,20 @@ describe('TabStateController', () => {
 
     const dupId = openCanvas(controller, 'alpha', 'Alpha copy', otherPaneId);
 
-    expect(tabTitles(controller.getPane(otherPaneId)!)).toEqual([
-      'Library',
-      'Alpha copy',
-    ]);
+    expect(tabTitles(controller.getPane(otherPaneId)!)).toEqual(['Alpha copy']);
     expect(controller.getPane(otherPaneId)!.activeTabId).toBe(dupId);
     expectValidWindowState(controller.getSnapshot());
   });
 
-  it('replaces the last closed pane with a valid default state', () => {
+  it('falls back to an empty home pane when the last tab is closed', () => {
     const controller = new TabStateController();
     const pane = focusedPane(controller);
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha');
 
-    controller.closeTab(pane.activeTabId, pane.id);
+    controller.closeTab(alphaId, pane.id);
 
     const nextPane = rootPane(controller);
-    expect(tabTitles(nextPane)).toEqual(['Library']);
+    expect(tabTitles(nextPane)).toEqual([]);
     expect(controller.getSnapshot().focusedPaneId).toBe(nextPane.id);
     expectValidWindowState(controller.getSnapshot());
   });
@@ -207,29 +195,19 @@ describe('TabStateController', () => {
     const betaId = openCanvas(controller, 'beta', 'Beta');
     openCanvas(controller, 'gamma', 'Gamma');
 
-    controller.moveTab(betaId, paneId, paneId, 3);
-    expect(tabTitles(rootPane(controller))).toEqual([
-      'Library',
-      'Alpha',
-      'Beta',
-      'Gamma',
-    ]);
+    // Layout is [Alpha, Beta, Gamma] with Beta at index 1.
+    // Dropping at the tab's own slot or the slot just after it is a no-op.
+    controller.moveTab(betaId, paneId, paneId, 1);
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha', 'Beta', 'Gamma']);
 
-    controller.moveTab(betaId, paneId, paneId, 4);
-    expect(tabTitles(rootPane(controller))).toEqual([
-      'Library',
-      'Alpha',
-      'Gamma',
-      'Beta',
-    ]);
+    controller.moveTab(betaId, paneId, paneId, 2);
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha', 'Beta', 'Gamma']);
+
+    controller.moveTab(betaId, paneId, paneId, 3);
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha', 'Gamma', 'Beta']);
 
     controller.moveTab(betaId, paneId, paneId, 0);
-    expect(tabTitles(rootPane(controller))).toEqual([
-      'Beta',
-      'Library',
-      'Alpha',
-      'Gamma',
-    ]);
+    expect(tabTitles(rootPane(controller))).toEqual(['Beta', 'Alpha', 'Gamma']);
     expectValidWindowState(controller.getSnapshot());
   });
 
@@ -238,13 +216,13 @@ describe('TabStateController', () => {
     const rootPaneId = focusedPane(controller).id;
     openCanvas(controller, 'alpha', 'Alpha');
     const sourcePaneId = controller.splitPane(rootPaneId, 'horizontal');
-    const movedTabId = controller.getPane(sourcePaneId)!.activeTabId;
+    const movedTabId = openCanvas(controller, 'beta', 'Beta', sourcePaneId);
 
     controller.moveTab(movedTabId, sourcePaneId, rootPaneId, 1);
 
     const pane = rootPane(controller);
     expect(pane.id).toBe(rootPaneId);
-    expect(tabTitles(pane)).toEqual(['Library', 'Library', 'Alpha']);
+    expect(tabTitles(pane)).toEqual(['Alpha', 'Beta']);
     expect(pane.activeTabId).toBe(movedTabId);
     expect(controller.getSnapshot().focusedPaneId).toBe(rootPaneId);
     expectValidWindowState(controller.getSnapshot());
@@ -264,7 +242,7 @@ describe('TabStateController', () => {
 
     const state = controller.getSnapshot();
     expect(state.layout.type).toBe('split');
-    expect(tabTitles(controller.getPane(paneId)!)).toEqual(['Library', 'Beta']);
+    expect(tabTitles(controller.getPane(paneId)!)).toEqual(['Beta']);
     expect(tabTitles(controller.getPane(newPaneId)!)).toEqual(['Alpha']);
     expect(state.focusedPaneId).toBe(newPaneId);
     expectValidWindowState(state);
@@ -291,7 +269,7 @@ describe('TabStateController', () => {
     expectValidWindowState(state);
   });
 
-  it('splits the only tab out of a pane by leaving a default tab behind', () => {
+  it('splits the only tab out of a pane by leaving an empty pane behind', () => {
     const controller = new TabStateController(
       createWindowStateWithTab({
         id: 'alpha-tab',
@@ -310,10 +288,43 @@ describe('TabStateController', () => {
     const state = controller.getSnapshot();
     expect(state.layout.type).toBe('split');
     expect(returnedPaneId).not.toBe(pane.id);
-    expect(tabTitles(controller.getPane(pane.id)!)).toEqual(['Library']);
+    expect(tabTitles(controller.getPane(pane.id)!)).toEqual([]);
     expect(tabTitles(controller.getPane(returnedPaneId)!)).toEqual(['Alpha']);
     expect(state.focusedPaneId).toBe(returnedPaneId);
     expectValidWindowState(state);
+  });
+
+  it('closes tabs for deleted nodes across panes and leaves others alone', () => {
+    const controller = new TabStateController();
+    const rootPaneId = focusedPane(controller).id;
+    openCanvas(controller, 'alpha', 'Alpha', rootPaneId);
+    const betaId = openCanvas(controller, 'beta', 'Beta', rootPaneId);
+    const otherPaneId = controller.splitPane(rootPaneId, 'horizontal');
+    openCanvas(controller, 'gamma', 'Gamma', otherPaneId);
+
+    // Deleting a folder reports every contained file id at once.
+    controller.closeTabsForNodes(['alpha', 'gamma']);
+
+    expect(tabTitles(controller.getPane(rootPaneId)!)).toEqual(['Beta']);
+    expect(controller.getPane(rootPaneId)!.activeTabId).toBe(betaId);
+    // The other pane emptied and collapsed, leaving a single pane.
+    expect(controller.getSnapshot().layout.type).toBe('pane');
+    expectValidWindowState(controller.getSnapshot());
+  });
+
+  it('ignores non-node tab targets and unknown ids when closing deleted nodes', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    controller.openTab({ type: 'graph' }, 'Graph', paneId);
+    openCanvas(controller, 'alpha', 'Alpha', paneId);
+    const before = controller.getSnapshot();
+
+    // 'graph' is not node-backed and 'missing' matches nothing: both no-ops.
+    controller.closeTabsForNodes(['graph', 'missing']);
+
+    expect(controller.getSnapshot()).toBe(before);
+    expect(tabTitles(rootPane(controller))).toEqual(['Graph', 'Alpha']);
+    expectValidWindowState(controller.getSnapshot());
   });
 
   it('ignores invalid focus, activation, and resize requests', () => {

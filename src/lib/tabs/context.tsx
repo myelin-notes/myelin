@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useKeybindings } from '@/hooks/useKeybindings';
+import { NODES_DELETED_EVENT, type NodesDeletedDetail } from '@/lib/events';
 import { createWindowStateWithTab, TabStateController } from './controller';
 import { listenForTabDrops } from './multi-window';
 import type { PaneId, Tab, WindowState } from './types';
@@ -37,16 +38,20 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
     };
     const initTab = readInitTab();
     if (initTab) {
+      // Tabs torn off into their own window close that window when emptied.
       return new TabStateController(
         createWindowStateWithTab(initTab),
         closeWindow,
       );
     }
-    return new TabStateController(undefined, closeWindow);
+    // The main window never closes from emptying its tabs; it falls back to an
+    // empty home pane (recents + welcome).
+    return new TabStateController(undefined);
   }, []);
 
   useTabCloseShortcut(controller);
   useAdoptDroppedTabs(controller);
+  useCloseDeletedTabs(controller);
 
   return (
     <TabControllerContext.Provider value={controller}>
@@ -75,6 +80,19 @@ function useAdoptDroppedTabs(controller: TabStateController) {
       disposed = true;
       unlisten?.();
     };
+  }, [controller]);
+}
+
+// Close tabs whose document was deleted (from the sidebar, an MCP agent, or a
+// deleted parent folder) so we never leave a live editor bound to a gone node.
+function useCloseDeletedTabs(controller: TabStateController) {
+  useEffect(() => {
+    const handle = (event: Event) => {
+      const { detail } = event as CustomEvent<NodesDeletedDetail>;
+      controller.closeTabsForNodes(detail.ids);
+    };
+    window.addEventListener(NODES_DELETED_EVENT, handle);
+    return () => window.removeEventListener(NODES_DELETED_EVENT, handle);
   }, [controller]);
 }
 

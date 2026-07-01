@@ -1,7 +1,6 @@
 import {
   BookOpen,
   FileText,
-  Grid2X2,
   Keyboard,
   Network,
   Plus,
@@ -32,7 +31,6 @@ export interface CommandPaletteItemContext {
   openGraph: () => void;
   openPalette: (mode: CommandPaletteMode) => void;
   refreshRepository: () => void;
-  toggleLibraryView: () => void;
   triggerKeybindingAction: (action: Action) => void;
   triggerCanvasMarkdownImport: () => void;
   triggerLibraryMarkdownImport: () => void;
@@ -49,7 +47,6 @@ export function createCommandPaletteItems({
   openGraph,
   openPalette,
   refreshRepository,
-  toggleLibraryView,
   triggerKeybindingAction,
   triggerCanvasMarkdownImport,
   triggerLibraryMarkdownImport,
@@ -90,7 +87,7 @@ export function createCommandPaletteItems({
       section: strings.commandPalette.sections.commands,
       icon: FileText,
       disabled: isImportingMarkdown,
-      visibleOn: ['library'],
+      visibleOn: ['home'],
       onSelect: triggerLibraryMarkdownImport,
     },
     {
@@ -105,16 +102,6 @@ export function createCommandPaletteItems({
       visibleOn: ['canvas'],
       onSelect: triggerCanvasMarkdownImport,
     },
-    {
-      id: 'switch-library-view',
-      label: strings.commandPalette.commands.switchView.label,
-      description: strings.commandPalette.commands.switchView.description,
-      keywords: ['grid', 'list', 'tree'],
-      section: strings.commandPalette.sections.commands,
-      icon: Grid2X2,
-      visibleOn: ['library'],
-      onSelect: toggleLibraryView,
-    },
     ...(canRefreshRepository
       ? [
           {
@@ -126,7 +113,7 @@ export function createCommandPaletteItems({
             section: strings.commandPalette.sections.commands,
             icon: RefreshCw,
             disabled: isRefreshingRepository,
-            visibleOn: ['library' as const],
+            visibleOn: ['home' as const],
             onSelect: refreshRepository,
           },
         ]
@@ -149,11 +136,9 @@ export function commandPalettePageFromTabTarget(
   target: TabTarget | null,
 ): CommandPalettePage {
   if (!target) {
-    return 'library';
+    return 'home';
   }
   switch (target.type) {
-    case 'library':
-      return 'library';
     case 'graph':
       return 'graph';
     case 'canvas':
