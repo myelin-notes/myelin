@@ -6,18 +6,32 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { UserPrefs } from '@/lib/user-prefs';
 
 export const SIDEBAR_MIN_WIDTH = 220;
 export const SIDEBAR_MAX_WIDTH = 480;
+
+// Below this viewport width the persistent column can't coexist with usable
+// content, so the sidebar becomes an overlay drawer instead. Runtime/adaptive
+// by design — the same Sidebar reflows, it isn't a separate mobile UI.
+const SIDEBAR_COMPACT_QUERY = '(max-width: 767px)';
 
 function clampWidth(width: number): number {
   return Math.min(Math.max(width, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH);
 }
 
 interface SidebarContextValue {
+  /** Desktop layout: the persistent column is hidden (manual toggle). */
   collapsed: boolean;
+  /** Viewport is narrow, so the sidebar renders as an overlay drawer. */
+  isCompact: boolean;
+  /** Compact layout: the overlay drawer is open. */
+  drawerOpen: boolean;
+  /** Flips visibility for the current mode: drawer when compact, else column. */
   toggle: () => void;
+  /** Closes the compact drawer; no-op in desktop layout. */
+  close: () => void;
   width: number;
   setWidth: (width: number) => void;
 }
@@ -25,12 +39,21 @@ interface SidebarContextValue {
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
+  const isCompact = useMediaQuery(SIDEBAR_COMPACT_QUERY);
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [width, setWidthState] = useState(() =>
     clampWidth(UserPrefs.get('sidebarWidth')),
   );
 
-  const toggle = useCallback(() => setCollapsed((prev) => !prev), []);
+  const toggle = useCallback(() => {
+    if (isCompact) {
+      setDrawerOpen((prev) => !prev);
+    } else {
+      setCollapsed((prev) => !prev);
+    }
+  }, [isCompact]);
+  const close = useCallback(() => setDrawerOpen(false), []);
   const setWidth = useCallback((next: number) => {
     const clamped = clampWidth(next);
     setWidthState(clamped);
@@ -38,8 +61,16 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ collapsed, toggle, width, setWidth }),
-    [collapsed, toggle, width, setWidth],
+    () => ({
+      collapsed,
+      isCompact,
+      drawerOpen,
+      toggle,
+      close,
+      width,
+      setWidth,
+    }),
+    [collapsed, isCompact, drawerOpen, toggle, close, width, setWidth],
   );
 
   return (

@@ -39,7 +39,7 @@ import { useExplorerImports } from './use-explorer-imports';
 const logger = new Logger('Sidebar');
 const SORT_MODES: SortMode[] = ['name-asc', 'name-desc', 'modified', 'created'];
 
-export function Sidebar() {
+export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
@@ -160,8 +160,11 @@ export function Sidebar() {
 
   return (
     <aside
-      style={{ width }}
-      className="flex h-full shrink-0 flex-col bg-surface"
+      style={fill ? undefined : { width }}
+      className={cn(
+        'flex h-full shrink-0 flex-col bg-surface',
+        fill && 'w-full',
+      )}
     >
       <header
         data-tauri-drag-region

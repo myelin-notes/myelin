@@ -105,7 +105,15 @@ export const TabBar = memo(function TabBar({
   const strings = useMessages();
   const controller = useTabController();
   const repository = useRepository();
-  const { collapsed, toggle: toggleSidebar } = useSidebar();
+  const {
+    collapsed,
+    isCompact,
+    drawerOpen,
+    toggle: toggleSidebar,
+  } = useSidebar();
+  // In compact layout the sidebar is an overlay drawer; elsewhere it's the
+  // persistent column. `sidebarShown` unifies both for the toggle's a11y state.
+  const sidebarShown = isCompact ? drawerOpen : !collapsed;
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
@@ -186,9 +194,13 @@ export const TabBar = memo(function TabBar({
         'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
         TAB_BAR_HEIGHT_CLASS,
         !isFocused && 'opacity-75',
-        // The sidebar normally clears the macOS traffic lights; only inset the
-        // tab bar when the sidebar is collapsed and this is the top-left bar.
-        isMac && isTopLeft && collapsed && TRAFFIC_LIGHT_INSET_CLASS,
+        // The sidebar column normally clears the macOS traffic lights; inset
+        // the top-left bar whenever that column isn't present (collapsed, or
+        // reflowed into the compact overlay drawer).
+        isMac &&
+          isTopLeft &&
+          (collapsed || isCompact) &&
+          TRAFFIC_LIGHT_INSET_CLASS,
       )}
     >
       {/* The sidebar lives on the window's left edge, so its toggle sits at the
@@ -200,10 +212,12 @@ export const TabBar = memo(function TabBar({
           type="button"
           onClick={toggleSidebar}
           aria-label={
-            collapsed ? strings.sidebar.expand : strings.sidebar.collapse
+            sidebarShown ? strings.sidebar.collapse : strings.sidebar.expand
           }
-          title={collapsed ? strings.sidebar.expand : strings.sidebar.collapse}
-          aria-pressed={!collapsed}
+          title={
+            sidebarShown ? strings.sidebar.collapse : strings.sidebar.expand
+          }
+          aria-pressed={sidebarShown}
           className="mb-1 ml-2 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
         >
           <PanelLeft className="size-3.5" />
