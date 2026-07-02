@@ -94,6 +94,27 @@ describe('LocalRepository', () => {
     ]);
   });
 
+  it('backfills registry fields when loading a pre-tagRegistry manifest', async () => {
+    const storage = getRepositoryTestStorage();
+    const manifestPath = `repositories/legacy-manifest/${MANIFEST_PATH}`;
+    // A manifest written before `tagRegistry`/`customColors` existed.
+    await storage.writeTextFile(
+      manifestPath,
+      JSON.stringify({
+        version: 1,
+        children: [],
+        nodes: {},
+        linksBySource: {},
+      }),
+    );
+
+    const repository = new LocalRepository('repositories/legacy-manifest');
+    await repository.initialize();
+
+    expect(await repository.getRegistryTags()).toEqual([]);
+    expect(await repository.getCustomColors()).toEqual([]);
+  });
+
   it('returns reveal paths inside app data storage', async () => {
     const repository = new LocalRepository('repositories/reveal-test');
     await repository.initialize();

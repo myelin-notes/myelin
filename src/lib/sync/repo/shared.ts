@@ -75,7 +75,12 @@ export function createEmptyManifest(): VFSManifest {
   };
 }
 
-export function migrate(_manifest: VFSManifest): void {}
+export function migrate(manifest: VFSManifest): void {
+  // Fields added after the initial schema are absent from manifests written by
+  // older builds; default them so read paths don't spread `undefined`.
+  manifest.tagRegistry ??= [];
+  manifest.customColors ??= [];
+}
 
 export function createNodeId(): string {
   return crypto.randomUUID();
