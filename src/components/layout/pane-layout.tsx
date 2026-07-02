@@ -13,7 +13,11 @@ import {
   useTabController,
   useWindowState,
 } from '@/lib/tabs/context';
-import { getTabDragData, TAB_DRAG_MIME } from '@/lib/tabs/drag';
+import {
+  computeTabDropIndex,
+  getTabDragData,
+  TAB_DRAG_MIME,
+} from '@/lib/tabs/drag';
 import type {
   LayoutNode,
   PaneId,
@@ -72,6 +76,18 @@ function isPaneTabBarEvent(e: React.DragEvent): boolean {
     e.target instanceof HTMLElement &&
     e.target.closest('[data-pane-tab-bar]') !== null
   );
+}
+
+// The drag overlay covers the whole pane, tab bar included. Report the pane's
+// tab bar when the cursor is over it so drops there merge into the tab strip
+// instead of being read as an edge split.
+function tabBarAt(container: HTMLElement, clientY: number): HTMLElement | null {
+  const bar = container.querySelector('[data-pane-tab-bar]');
+  if (!(bar instanceof HTMLElement)) {
+    return null;
+  }
+  const rect = bar.getBoundingClientRect();
+  return clientY >= rect.top && clientY <= rect.bottom ? bar : null;
 }
 
 function splitLineStyle(edge: SplitEdge): React.CSSProperties {
@@ -150,6 +166,13 @@ export function PaneDropTarget({
       return;
     }
 
+    // Hovering a tab bar always merges into that pane — the body owns the
+    // split zones, the bar owns the tab strip.
+    if (tabBarAt(container, e.clientY)) {
+      setDragIntent({ edge: 'center' });
+      return;
+    }
+
     setDragIntent(
       dragIntentForPoint(
         container.getBoundingClientRect(),
@@ -174,18 +197,8 @@ export function PaneDropTarget({
   const handleOverlayDrop = useCallback(
     (e: React.DragEvent) => {
       const container = containerRef.current;
-      const intent =
-        dragIntent ??
-        (container
-          ? dragIntentForPoint(
-              container.getBoundingClientRect(),
-              e.clientX,
-              e.clientY,
-            )
-          : ({ edge: 'center' } as DragIntent));
-
       const data = getTabDragData(e.dataTransfer);
-      if (!data) {
+      if (!data || !container) {
         setDragIntent(null);
         return;
       }
@@ -193,6 +206,27 @@ export function PaneDropTarget({
       e.preventDefault();
       e.stopPropagation();
       setDragIntent(null);
+
+      // A drop over the tab bar merges the tab at the hovered position,
+      // matching a plain tab-bar drop.
+      const bar = tabBarAt(container, e.clientY);
+      if (bar) {
+        const index = computeTabDropIndex(
+          bar,
+          bar.querySelectorAll('[data-tab-id]').length,
+          e.clientX,
+        );
+        controller.moveTab(data.tabId, data.sourcePaneId, paneId, index);
+        return;
+      }
+
+      const intent =
+        dragIntent ??
+        dragIntentForPoint(
+          container.getBoundingClientRect(),
+          e.clientX,
+          e.clientY,
+        );
 
       if (intent.edge === 'center') {
         controller.moveTab(data.tabId, data.sourcePaneId, paneId, Infinity);
