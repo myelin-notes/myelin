@@ -282,6 +282,20 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;${{ env.NDK_VERSION }}'
 
+      # The runner image preinstalls its own (newer) NDK under $ANDROID_HOME/ndk,
+      # and cargo-mobile's NDK resolver otherwise picks the highest version it
+      # finds there rather than our pinned one — so the linker/sysroot silently
+      # drift to whatever the image ships. Export the standard NDK env vars (which
+      # the resolver prioritizes over the version scan) so every step below uses
+      # the pinned NDK_VERSION deterministically.
+      - name: Pin NDK
+        run: |
+          NDK_PATH="$ANDROID_HOME/ndk/$NDK_VERSION"
+          test -d "$NDK_PATH" || { echo "::error::pinned NDK not found at $NDK_PATH"; exit 1; }
+          for v in ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK ANDROID_NDK_LATEST_HOME NDK_HOME; do
+            echo "$v=$NDK_PATH" >> "$GITHUB_ENV"
+          done
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -301,8 +315,6 @@ jobs:
           if [ ! -d src-tauri/gen/android ]; then
             yarn tauri android init
           fi
-        env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
 
       - name: Decode Android keystore
         if: env.ANDROID_KEYSTORE_BASE64 != ''
@@ -317,7 +329,14 @@ jobs:
 
       - name: Build Android
         env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+          # whisper-rs-sys runs bindgen against the Android target. bindgen sets
+          # the correct --target per ABI from cargo's TARGET, but without the NDK
+          # sysroot clang falls back to the host /usr/include, can't find libc
+          # headers, and the crate silently uses its bundled 64-bit bindings.rs.
+          # Those hardcode 64-bit struct sizes, so the 32-bit ABIs (armv7, i686)
+          # fail the compile-time size assertions (E0080 overflow). Pointing
+          # bindgen at the sysroot lets it generate correct per-ABI bindings.
+          BINDGEN_EXTRA_CLANG_ARGS: --sysroot=${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
         run: yarn tauri android build --apk --aab
 
       - name: Upload to release
