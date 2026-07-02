@@ -7,9 +7,8 @@ third-party model and font assets redistributed with Myelin.
 
 | Bundled asset | License file | Upstream license source |
 | --- | --- | --- |
-| `scribble-models/ggml-base.bin` | `Whisper-MIT.txt` | https://raw.githubusercontent.com/openai/whisper/main/LICENSE |
-| `scribble-models/ggml-base.bin` | `WhisperCpp-MIT.txt` | https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/LICENSE |
-| `scribble-models/ggml-silero-v6.2.0.bin` | `SileroVAD-MIT.txt` | https://raw.githubusercontent.com/snakers4/silero-vad/master/LICENSE |
+| `scribble-models/ggml-base-q5_1.bin` | `Whisper-MIT.txt` | https://raw.githubusercontent.com/openai/whisper/main/LICENSE |
+| `scribble-models/ggml-base-q5_1.bin` | `WhisperCpp-MIT.txt` | https://raw.githubusercontent.com/ggml-org/whisper.cpp/master/LICENSE |
 
 ## Embedding models
 
