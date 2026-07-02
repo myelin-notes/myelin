@@ -74,7 +74,8 @@ opt-level = 3
 [profile.dev.package.half]
 opt-level = 3
 
-# Fork carrying the Windows MSVC compilation fix (whisper logging hooks). Pinned
-# to a branch so a clean checkout (CI) resolves it without any local patch step.
+# Fork carrying the Windows MSVC compilation fix (whisper logging hooks) plus
+# Opts.abort_signal for cancelling in-flight whisper runs. Pinned to a branch so
+# a clean checkout (CI) resolves it without any local patch step.
 [patch.crates-io]
-scribble = { git = "https://github.com/winterSteve25/scribble", branch = "fix/windows-msvc-compilation" }
+scribble = { git = "https://github.com/winterSteve25/scribble", branch = "feat/abort-signal" }
