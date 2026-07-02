@@ -180,7 +180,7 @@ jobs:
   publish-prerelease:
     name: Publish prerelease to R2
     needs: build
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && !github.event.release.prerelease
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
