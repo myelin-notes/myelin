@@ -70,24 +70,29 @@ jobs:
           - platform: macos-latest
             args: --target universal-apple-darwin
             # GPU comes from the scribble `metal` feature (see src-tauri/Cargo.toml).
-            # No x86 SIMD flags here: the universal bundle also builds an aarch64
-            # slice where -march/-mavx2 is an invalid flag. Apple Silicon uses
-            # NEON (always on) + Metal; Intel Macs fall back to Metal.
+            # No x86 SIMD knobs here: the universal bundle also builds an aarch64
+            # slice where they don't apply. Apple Silicon uses NEON (always on) +
+            # Metal; Intel Macs fall back to Metal.
           - platform: ubuntu-22.04
             args: ''
-            # SOURCE_DATE_EPOCH forces GGML_NATIVE=OFF (portable build), which
-            # also drops AVX2/FMA/F16C. Re-add a universal desktop CPU baseline:
-            # x86-64-v3 == Haswell (2013+) == AVX2+FMA+F16C+BMI2. ggml's kernels
-            # guard on __AVX2__/__FMA__/__F16C__, which these flags define.
-            cmake_c_flags: '-march=x86-64-v3'
-            cmake_cxx_flags: '-march=x86-64-v3'
+            # SOURCE_DATE_EPOCH forces GGML_NATIVE=OFF (portable build), which also
+            # drops AVX2/FMA/F16C. Re-enable a universal desktop CPU baseline via
+            # ggml's own options (whisper-rs-sys forwards GGML_* to CMake). Using
+            # these instead of CMAKE_C_FLAGS keeps ggml's ARCH_FLAGS separate from
+            # the crate's -fPIC in CMAKE_C_FLAGS — overriding that flag drops -fPIC
+            # and breaks the shared-lib link. ggml adds -mavx2/-mfma/-mf16c itself.
+            ggml_avx2: 'ON'
+            ggml_fma: 'ON'
+            ggml_f16c: 'ON'
           - platform: windows-latest
             args: ''
-            # MSVC equivalent: /arch:AVX2 defines __AVX2__, and ggml-cpu-impl.h
-            # then implies __FMA__/__F16C__ on MSVC. /utf-8 is re-added because
-            # overriding CMAKE_CXX_FLAGS drops the crate's own /utf-8.
-            cmake_c_flags: '/arch:AVX2'
-            cmake_cxx_flags: '/arch:AVX2 /utf-8'
+            # Same portable AVX2 baseline via ggml options. On MSVC, GGML_AVX2=ON
+            # emits /arch:AVX2 and implies FMA/F16C (ggml-cpu-impl.h); the extra
+            # FMA/F16C flags are harmless no-ops there. Going through GGML_* also
+            # avoids overriding CMAKE_CXX_FLAGS and dropping the crate's /utf-8.
+            ggml_avx2: 'ON'
+            ggml_fma: 'ON'
+            ggml_f16c: 'ON'
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -138,10 +143,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           # Per-platform CPU SIMD baseline for whisper.cpp/ggml (see matrix).
-          # whisper-rs-sys forwards CMAKE_*-prefixed env vars to CMake. Empty on
-          # macOS, where the universal build deliberately sets no extra flags.
-          CMAKE_C_FLAGS: ${{ matrix.cmake_c_flags }}
-          CMAKE_CXX_FLAGS: ${{ matrix.cmake_cxx_flags }}
+          # whisper-rs-sys forwards GGML_*-prefixed env vars to CMake. Empty on
+          # macOS (evaluates to "" → treated as OFF), where the universal build
+          # deliberately sets no x86 SIMD options.
+          GGML_AVX2: ${{ matrix.ggml_avx2 }}
+          GGML_FMA: ${{ matrix.ggml_fma }}
+          GGML_F16C: ${{ matrix.ggml_f16c }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
