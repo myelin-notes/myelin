@@ -255,6 +255,7 @@ fn run_transcription_session(
         language: None,
         output_type: OutputType::Json,
         incremental_min_window_seconds: 1,
+        emit_single_segments: false,
         abort_signal: Some(cancelled.clone()),
     };
 
