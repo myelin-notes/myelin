@@ -41,6 +41,16 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       image={image}
       jsonLd={[organization, ...pageJsonLd]}
     />
+    <!-- Canvas-flight gate: set before first paint so flight-mode CSS applies
+         without a flash. Desktop only, and never when reduced motion is on. -->
+    <script is:inline>
+      if (
+        window.matchMedia('(min-width: 1024px)').matches &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) {
+        document.documentElement.classList.add('flight-active');
+      }
+    </script>
   </head>
   <script>
     import { initWebAnalytics } from '../lib/posthog';

@@ -1,0 +1,22 @@
+---
+// A labeled slot where a product screenshot will go. There are no real
+// screenshots yet — every visual slot uses this so the shots are trivially
+// findable and swappable later (search for `Placeholder`).
+interface Props {
+  label: string;
+  ratio?: string;
+  class?: string;
+}
+
+const { label, ratio = '16 / 10', class: className = '' } = Astro.props;
+---
+
+<div
+  class:list={[
+    'flex items-center justify-center rounded-2xl border border-dashed border-border-divider bg-card/70 px-6 text-center',
+    className,
+  ]}
+  style={`aspect-ratio: ${ratio}`}
+>
+  <span class="kicker text-text-muted">{label}</span>
+</div>

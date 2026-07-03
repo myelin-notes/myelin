@@ -1,0 +1,65 @@
+---
+// Region 05 visual: two device regions on the canvas, one live edit
+// travelling the direct connection between them. The pulse follows the same
+// path the SVG draws (coordinates in viewBox user units).
+const connector = 'M170 96 C 280 34 400 60 476 212';
+---
+
+<div class="relative mx-auto aspect-[16/9] w-full max-w-[620px]" aria-hidden="true">
+  <svg viewBox="0 0 640 360" class="absolute inset-0 h-full w-full" fill="none">
+    <path
+      data-fx="sync-path"
+      class="ink-stroke text-accent-navy"
+      opacity="0.45"
+      d={connector}
+    ></path>
+    <circle
+      data-fx="sync-pulse"
+      class="sync-pulse"
+      r="6"
+      fill="var(--bg-accent-green)"
+      style={`offset-path: path('${connector}'); offset-distance: 55%`}
+    ></circle>
+  </svg>
+
+  <span
+    data-fx="sync-label"
+    class="kicker absolute top-[8%] left-1/2 -translate-x-1/2 text-text-muted"
+  >
+    same note
+  </span>
+
+  <div data-fx="sync-card" class="absolute top-[22%] left-0 w-[228px]">
+    <div class="rounded-xl bg-card p-5 shadow-elevated">
+      <div class="flex items-center justify-between gap-3">
+        <p class="kicker text-text-muted">Laptop</p>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-bg-success-soft px-2.5 py-1 text-[10px] font-medium text-text-green"
+        >
+          <span class="size-1.5 rounded-full bg-accent-green"></span>
+          live
+        </span>
+      </div>
+      <p class="mt-2 font-heading text-lg text-text-primary">
+        editing the paragraph
+      </p>
+    </div>
+  </div>
+
+  <div data-fx="sync-card" class="absolute right-0 bottom-[6%] w-[228px]">
+    <div class="rounded-xl bg-card p-5 shadow-elevated">
+      <div class="flex items-center justify-between gap-3">
+        <p class="kicker text-text-muted">Desktop</p>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-bg-success-soft px-2.5 py-1 text-[10px] font-medium text-text-green"
+        >
+          <span class="size-1.5 rounded-full bg-accent-green"></span>
+          live
+        </span>
+      </div>
+      <p class="mt-2 font-heading text-lg text-text-primary">
+        sketching the diagram
+      </p>
+    </div>
+  </div>
+</div>

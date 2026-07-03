@@ -1,0 +1,19 @@
+---
+// Wraps content in the selection chrome of a placed canvas element in
+// Myelin: a faint blue outline with square corner handles.
+interface Props {
+  class?: string;
+}
+
+const { class: className = '' } = Astro.props;
+---
+
+<div class:list={['relative', className]}>
+  <slot />
+  <div class="placed-outline" data-fx="outline" aria-hidden="true">
+    <span class="placed-handle" data-corner="tl"></span>
+    <span class="placed-handle" data-corner="tr"></span>
+    <span class="placed-handle" data-corner="bl"></span>
+    <span class="placed-handle" data-corner="br"></span>
+  </div>
+</div>

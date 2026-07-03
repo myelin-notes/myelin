@@ -76,3 +76,190 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Canvas flight — desktop-only scroll-driven camera over one large canvas.
+ *
+ * `.flight-active` is set on <html> before first paint (inline script in
+ * Base.astro) when the viewport is >= lg and prefers-reduced-motion is off.
+ * Without it, every rule below is inert and the page flows as a normal
+ * linear document — that linear document is the source of truth for SEO,
+ * no-JS, mobile, and reduced motion. The flight layer only repositions the
+ * same DOM; it never owns content.
+ * ------------------------------------------------------------------------- */
+
+.flight-active .flight-stage {
+  position: relative;
+  height: var(--stage-h, 1250vh);
+}
+
+.flight-active .flight-viewport {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.flight-active .flight-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+  transform-origin: 0 0;
+  /* First-paint camera: centered on the hero target (550, 330) before the
+     flight module loads, so there is no jump and no CLS. */
+  transform: translate(calc(50vw - 550px), calc(50vh - 330px));
+}
+
+/* Each region is a normal flowing section in linear mode; in flight mode it
+   is placed at its canvas coordinates (--rx/--ry, unitless px) with a fixed
+   design width (--rw). */
+.flight-active .flight-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  width: calc(var(--rw, 1000) * 1px);
+  max-width: none;
+  transform: translate(calc(var(--rx, 0) * 1px), calc(var(--ry, 0) * 1px));
+}
+
+/* The infinite-canvas dot grid, camera-locked by the flight module via a
+   transform (mod grid-cell translate + zoom scale). Desktop flight only. */
+.flight-dots,
+.flight-vignette,
+.flight-hud {
+  display: none;
+}
+
+.flight-active .flight-dots {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 170vw;
+  height: 170vh;
+  pointer-events: none;
+  will-change: transform;
+  transform-origin: 0 0;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent-dark) 11%, transparent) 1.2px,
+    transparent 1.2px
+  );
+  background-size: 28px 28px;
+}
+
+/* Soft edge mask so the canvas reads as a surface, not a wallpaper */
+.flight-active .flight-vignette {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 120% at 50% 45%,
+    transparent 62%,
+    color-mix(in srgb, var(--bg-page) 55%, transparent) 100%
+  );
+}
+
+/* Quiet chrome: canvas coordinate / zoom readout, bottom-left */
+.flight-active .flight-hud {
+  display: block;
+  position: fixed;
+  left: 1.5rem;
+  bottom: 1.25rem;
+  z-index: 40;
+  pointer-events: none;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+ * Canvas primitives shared by both modes
+ * ------------------------------------------------------------------------ */
+
+/* Hand-drawn ink accents — real strokes, drawn on by the flight module */
+.ink-stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Transient scene elements: hidden at rest, revealed only by the flight
+   timelines. Everything else is authored in its final state so the linear
+   page (and reduced motion) shows the finished note. */
+.fx-transient {
+  opacity: 0;
+}
+
+/* A "placed element" — how a selected element reads in Myelin: a faint blue
+   selection outline with square corner handles. */
+.placed-outline {
+  position: absolute;
+  inset: -7px;
+  pointer-events: none;
+  border: 1.5px solid color-mix(in srgb, var(--text-link) 55%, transparent);
+  border-radius: 10px;
+}
+
+.placed-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: var(--card);
+  border: 1.5px solid color-mix(in srgb, var(--text-link) 75%, transparent);
+  border-radius: 2px;
+}
+
+.placed-handle[data-corner='tl'] {
+  top: -5px;
+  left: -5px;
+}
+.placed-handle[data-corner='tr'] {
+  top: -5px;
+  right: -5px;
+}
+.placed-handle[data-corner='bl'] {
+  bottom: -5px;
+  left: -5px;
+}
+.placed-handle[data-corner='br'] {
+  bottom: -5px;
+  right: -5px;
+}
+
+/* Sync scene: a change travelling between two devices along an SVG path.
+   Hidden entirely where offset-path is unsupported (it would sit at the
+   viewBox origin). At rest it holds mid-path; the flight adds the travel. */
+@keyframes sync-travel {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
+.sync-pulse {
+  display: none;
+}
+
+@supports (offset-path: path('M 0 0 L 1 1')) {
+  .sync-pulse {
+    display: block;
+  }
+
+  .flight-active .sync-pulse {
+    animation: sync-travel 3.6s ease-in-out infinite;
+  }
+}

@@ -1,0 +1,66 @@
+---
+// The opening performance: a rough pen stroke draws itself, snaps into a
+// clean ellipse, and a rich-text frame lands beside it. Authored in its
+// final state; the flight module rewinds and plays it during the hero dwell.
+import PlacedCard from '../PlacedCard.astro';
+---
+
+<div class="relative mx-auto w-full max-w-md" aria-hidden="true">
+  <svg viewBox="0 0 440 470" class="block w-full" fill="none">
+    <!-- ghost strokes left behind on the canvas -->
+    <path
+      class="ink-stroke text-text-muted"
+      opacity="0.16"
+      d="M20 84 C 52 62 92 64 116 84 C 128 94 124 108 108 110"
+    ></path>
+    <path
+      class="ink-stroke text-text-muted"
+      opacity="0.12"
+      d="M366 420 C 388 400 412 402 428 414"
+    ></path>
+    <!-- rough ellipse: draws on, then snaps into the clean one -->
+    <path
+      data-fx="hero-rough"
+      class="ink-stroke fx-transient text-accent-navy"
+      stroke-width="3"
+      d="M66 322 C 58 282 104 250 156 246 C 214 242 258 272 256 314 C 254 356 204 386 148 382 C 96 378 60 354 64 318 C 66 306 74 300 84 300"
+    ></path>
+    <ellipse
+      data-fx="hero-clean"
+      class="ink-stroke text-accent-navy"
+      stroke-width="3"
+      cx="160" cy="314" rx="98" ry="68"
+    ></ellipse>
+    <!-- arrow from the frame down to the shape -->
+    <path
+      data-fx="hero-arrow"
+      class="ink-stroke text-accent-navy"
+      opacity="0.75"
+      d="M330 176 C 316 218 282 250 244 268"
+    ></path>
+    <path
+      data-fx="hero-arrow"
+      class="ink-stroke text-accent-navy"
+      opacity="0.75"
+      d="M258 246 L 244 268 L 270 273"
+    ></path>
+  </svg>
+
+  <div data-fx="hero-frame" class="absolute top-0 right-0 w-[248px]">
+    <PlacedCard>
+      <div class="rounded-xl bg-card p-5 shadow-elevated">
+        <p class="font-heading text-lg text-text-primary">Reading notes</p>
+        <div class="mt-3 space-y-2">
+          <div class="h-1.5 w-4/5 rounded-full bg-sidebar-bg"></div>
+          <div class="h-1.5 w-3/5 rounded-full bg-sidebar-bg"></div>
+          <div class="h-1.5 w-2/3 rounded-full bg-sidebar-bg"></div>
+        </div>
+        <p
+          class="mt-4 inline-block rounded-md bg-surface px-2 py-1 font-mono text-xs text-text-secondary"
+        >
+          e<sup>iπ</sup> + 1 = 0
+        </p>
+      </div>
+    </PlacedCard>
+  </div>
+</div>

@@ -1,0 +1,112 @@
+---
+// Region 02 marquee: three PDF pages fan out, hand annotations land on the
+// front page, and a recording card fills its waveform while the transcript
+// types itself. All live DOM/SVG — no screenshots involved.
+
+// Deterministic waveform bar heights (pseudo-random, stable across builds)
+const bars = Array.from({ length: 34 }, (_, i) => 8 + ((i * 37 + 11) % 22));
+---
+
+<div class="relative" aria-hidden="true">
+  <!-- fanned pages -->
+  <div class="relative mx-auto h-[290px] w-full max-w-[440px]">
+    <div
+      data-fx="pdf-page"
+      class="absolute top-4 left-[2%] h-[252px] w-[196px] rounded-lg border border-border-subtle bg-card p-4 shadow-elevated"
+      style="transform: rotate(-7deg)"
+    >
+      <div class="space-y-2.5">
+        {Array.from({ length: 9 }).map((_, i) => (
+          <div
+            class="h-1.5 rounded-full bg-sidebar-bg"
+            style={`width: ${[92, 100, 84, 96, 72, 100, 88, 94, 58][i]}%`}
+          ></div>
+        ))}
+      </div>
+    </div>
+    <div
+      data-fx="pdf-page"
+      class="absolute top-6 right-[2%] h-[252px] w-[196px] rounded-lg border border-border-subtle bg-card p-4 shadow-elevated"
+      style="transform: rotate(6deg)"
+    >
+      <div class="space-y-2.5">
+        {Array.from({ length: 9 }).map((_, i) => (
+          <div
+            class="h-1.5 rounded-full bg-sidebar-bg"
+            style={`width: ${[88, 96, 100, 70, 94, 86, 100, 62, 90][i]}%`}
+          ></div>
+        ))}
+      </div>
+    </div>
+    <div
+      data-fx="pdf-page"
+      class="absolute top-0 left-1/2 h-[268px] w-[212px] -translate-x-1/2 rounded-lg border border-border-subtle bg-card p-4 shadow-elevated"
+    >
+      <div class="h-2 w-3/5 rounded-full bg-primary/60"></div>
+      <div class="mt-3 space-y-2.5">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div
+            class="h-1.5 rounded-full bg-sidebar-bg"
+            style={`width: ${[100, 92, 96, 84, 100, 90, 76, 94][i]}%`}
+          ></div>
+        ))}
+      </div>
+      <!-- hand annotations on the front page -->
+      <svg viewBox="0 0 212 268" class="absolute inset-0 h-full w-full" fill="none">
+        <path
+          data-fx="pdf-ink"
+          class="ink-stroke text-accent-amber-strong"
+          stroke-width="3"
+          d="M18 92 C 60 84 150 84 192 92 C 198 104 196 118 190 126 C 140 134 60 132 20 126 C 14 114 14 100 18 92"
+        ></path>
+        <path
+          data-fx="pdf-ink"
+          class="ink-stroke text-accent-navy"
+          d="M26 196 C 66 202 128 202 184 196"
+        ></path>
+        <path
+          data-fx="pdf-ink"
+          class="ink-stroke text-accent-navy"
+          d="M150 236 C 166 224 184 226 194 238 C 198 244 194 250 186 250"
+        ></path>
+      </svg>
+    </div>
+  </div>
+
+  <!-- recording + on-device transcript -->
+  <div
+    data-fx="pdf-audio"
+    class="relative z-10 mx-auto mt-5 w-full max-w-[440px] rounded-xl bg-card p-5 shadow-elevated"
+  >
+    <div class="flex items-center gap-2.5">
+      <span class="size-2 rounded-full bg-destructive"></span>
+      <span class="kicker text-text-muted">Recording</span>
+      <span class="ml-auto text-xs text-text-muted tabular-nums">03:26</span>
+    </div>
+    <svg
+      data-fx="pdf-wave"
+      viewBox="0 0 408 40"
+      class="mt-3 h-10 w-full"
+      fill="none"
+      aria-hidden="true"
+    >
+      {bars.map((h, i) => (
+        <rect
+          x={i * 12 + 2}
+          y={20 - h / 2}
+          width="5"
+          height={h}
+          rx="2.5"
+          fill="var(--accent-navy)"
+          opacity="0.55"
+        ></rect>
+      ))}
+    </svg>
+    <p class="kicker mt-4 text-text-muted">Transcript — on-device</p>
+    <div class="mt-2 space-y-1.5 text-sm leading-relaxed text-text-secondary">
+      <p data-fx="pdf-line">…so the step size controls how fast we descend,</p>
+      <p data-fx="pdf-line">and if it is too large the loss oscillates</p>
+      <p data-fx="pdf-line">instead of settling into the minimum.</p>
+    </div>
+  </div>
+</div>

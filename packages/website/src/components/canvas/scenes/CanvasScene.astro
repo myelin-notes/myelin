@@ -1,0 +1,54 @@
+---
+// Region 01 visual: the product-shot placeholder as a placed canvas element,
+// with a shape-snap vignette and a mini rich-text frame around it.
+import PlacedCard from '../PlacedCard.astro';
+import Placeholder from '../Placeholder.astro';
+---
+
+<div class="relative" aria-hidden="true">
+  <div data-fx="ws-card">
+    <PlacedCard>
+      <Placeholder
+        label="Screenshot — pen, shapes, and rich text on one page"
+        ratio="16 / 10"
+      />
+    </PlacedCard>
+  </div>
+
+  <!-- rough rectangle snapping into a clean one -->
+  <svg
+    viewBox="0 0 200 150"
+    class="absolute -top-8 right-2 w-[150px] lg:-right-10 lg:w-[180px]"
+    fill="none"
+  >
+    <path
+      data-fx="ws-rough"
+      class="ink-stroke fx-transient text-accent-navy"
+      d="M30 40 C 72 32 128 34 164 42 C 172 66 170 96 164 116 C 118 126 66 122 36 114 C 26 88 26 62 30 40"
+    ></path>
+    <rect
+      data-fx="ws-clean"
+      class="ink-stroke text-accent-navy"
+      x="28" y="34" width="140" height="86" rx="10"
+    ></rect>
+  </svg>
+
+  <!-- mini rich-text frame overlapping the shot -->
+  <div
+    data-fx="ws-frame"
+    class="absolute -bottom-9 left-2 w-[230px] rounded-xl bg-card p-5 shadow-elevated lg:-left-9"
+  >
+    <div class="h-2 w-2/3 rounded-full bg-primary/70"></div>
+    <div class="mt-3 space-y-2">
+      <div class="h-1.5 w-full rounded-full bg-sidebar-bg"></div>
+      <div class="h-1.5 w-5/6 rounded-full bg-sidebar-bg"></div>
+    </div>
+    <p
+      class="mt-4 inline-block rounded-md bg-surface px-2 py-1 font-mono text-[11px] text-text-secondary"
+    >
+      ∫ f(x) dx = F(b) − F(a)
+    </p>
+  </div>
+  <!-- reserve room for the overlapping frame in linear flow -->
+  <div class="h-12"></div>
+</div>

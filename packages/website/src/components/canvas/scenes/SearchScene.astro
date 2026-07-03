@@ -1,0 +1,78 @@
+---
+// Region 03 visual: the library screenshot placeholder with a live search
+// card resolving in front of it — including a handwritten word getting
+// recognized into text.
+import Placeholder from '../Placeholder.astro';
+---
+
+<div class="relative" aria-hidden="true">
+  <Placeholder
+    label="Screenshot — library with search and semantic tags"
+    ratio="16 / 10"
+    class="ml-auto w-full lg:w-[86%]"
+  />
+
+  <div
+    data-fx="search-card"
+    class="relative z-10 mt-4 w-full rounded-xl bg-card p-5 shadow-elevated lg:-mt-24 lg:w-[340px]"
+  >
+    <div class="flex items-center gap-2.5 border-b border-border-divider pb-3">
+      <svg viewBox="0 0 24 24" class="size-4 text-text-muted" fill="none">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"></circle>
+        <path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+      </svg>
+      <span data-fx="search-q" class="text-sm font-medium text-text-primary">
+        entropy
+      </span>
+      <span class="kicker ml-auto text-text-muted">semantic</span>
+    </div>
+
+    <ul class="mt-4 space-y-4">
+      <li data-fx="search-row">
+        <p class="text-sm font-medium text-text-primary">
+          Thermodynamics — lecture 4
+        </p>
+        <p class="mt-1 text-xs leading-relaxed text-text-muted">
+          …reversible processes keep total
+          <mark class="rounded bg-accent/40 px-0.5 text-text-primary">entropy</mark>
+          constant…
+        </p>
+        <div class="mt-2 flex gap-1.5">
+          <span
+            data-fx="search-chip"
+            class="rounded-full bg-tag px-2 py-0.5 text-[10px] font-medium text-text-tag"
+          >
+            physics
+          </span>
+          <span
+            data-fx="search-chip"
+            class="rounded-full bg-tag px-2 py-0.5 text-[10px] font-medium text-text-tag"
+          >
+            statistical mechanics
+          </span>
+        </div>
+      </li>
+      <li data-fx="search-row">
+        <p class="text-sm font-medium text-text-primary">
+          Information theory scribbles
+        </p>
+        <div class="mt-2 flex items-center gap-3">
+          <svg viewBox="0 0 120 30" class="h-6 w-[96px] text-text-secondary" fill="none">
+            <path
+              data-fx="search-hand"
+              class="ink-stroke"
+              stroke-width="2"
+              d="M6 22 C 10 12 14 10 16 16 C 18 22 22 22 26 14 C 28 10 32 12 32 18 C 32 24 38 22 42 16 C 46 10 50 14 50 20 C 50 24 56 22 60 16 C 64 10 68 14 70 20 C 72 24 78 20 82 14 C 86 10 92 12 94 18 C 96 24 104 20 112 12"
+            ></path>
+          </svg>
+          <span
+            data-fx="search-hand-chip"
+            class="rounded-full bg-bg-success-soft px-2 py-0.5 text-[10px] font-medium text-text-success"
+          >
+            found in handwriting
+          </span>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>
