@@ -52,6 +52,13 @@ tauri-plugin-process = "2"
 # Match the webkit2gtk version pinned by wry.
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Build whisper.cpp with the Metal backend so transcription runs on the GPU
+# (Apple Silicon and Intel Macs), falling back to CPU when no Metal device is
+# present. whisper-rs defaults use_gpu=true once any GPU backend is compiled in,
+# so scribble's default WhisperContextParameters pick this up with no code change.
+scribble = { version = "0.5.4", features = ["metal"] }
+
 [profile.dev.package.scrypt]
 opt-level = 3
 
@@ -78,4 +85,4 @@ opt-level = 3
 # Opts.abort_signal for cancelling in-flight whisper runs. Pinned to a branch so
 # a clean checkout (CI) resolves it without any local patch step.
 [patch.crates-io]
-scribble = { git = "https://github.com/winterSteve25/scribble", branch = "feat/abort-signal" }
+scribble = { git = "https://github.com/winterSteve25/scribble", branch = "feat/abort-signal-upstream" }
