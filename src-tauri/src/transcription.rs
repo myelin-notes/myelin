@@ -3,7 +3,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use scribble::{
     Backend, BackendStream, Opts, OutputType, Scribble, Segment, SegmentEncoder, WhisperBackend,
@@ -245,7 +245,6 @@ fn run_transcription_session(
     rx: mpsc::Receiver<TranscriptionMessage>,
     cancelled: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    log_whisper_system_info(&app);
     let scribble = get_or_init_scribble(&engine, paths)?;
     let opts = Opts {
         model_key: None,
@@ -264,21 +263,12 @@ fn run_transcription_session(
         abort_signal: Some(cancelled.clone()),
     };
 
-    // TEMPORARY diagnostic: clone the handle so we can log timing after `app` is
-    // moved into the writer below.
-    let timing_app = app.clone();
     let mut writer = TranscriptionEventWriter::new(app, session_id);
     let mut stream = scribble
         .backend()
         .create_stream(&opts, &mut writer)
         .map_err(|e| format!("create scribble stream: {e}"))?;
     let mut resampler = PcmResampler::new();
-
-    // TEMPORARY diagnostic: how long whisper actually runs vs how much audio it
-    // sees, so we can separate inference cost from surrounding overhead.
-    let session_start = Instant::now();
-    let mut whisper_time = Duration::ZERO;
-    let mut audio_samples: usize = 0;
 
     // An explicit Finish, a cancel, a timeout, and a disconnect all end the
     // session. A whisper run aborted by the cancel flag surfaces as an error;
@@ -293,11 +283,7 @@ fn run_transcription_session(
         }
         let samples_16k = resampler.push(&samples, sample_rate);
         if !samples_16k.is_empty() {
-            audio_samples += samples_16k.len();
-            let started = Instant::now();
-            let result = stream.on_samples(&samples_16k);
-            whisper_time += started.elapsed();
-            if let Err(e) = result {
+            if let Err(e) = stream.on_samples(&samples_16k) {
                 if cancelled.load(Ordering::Relaxed) {
                     return Ok(());
                 }
@@ -314,78 +300,16 @@ fn run_transcription_session(
 
     // Always flush: this is what emits the final in-progress segment. Whisper
     // handles short tails itself (input under 100ms yields zero segments).
-    let started = Instant::now();
-    let finish_result = stream.finish();
-    whisper_time += started.elapsed();
-    if let Err(e) = finish_result {
+    if let Err(e) = stream.finish() {
         if cancelled.load(Ordering::Relaxed) {
             return Ok(());
         }
         return Err(format!("finish transcription stream: {e}"));
     }
     drop(stream);
-    let close_result = writer
+    writer
         .close()
-        .map_err(|e| format!("close transcription encoder: {e}"));
-    log_transcription_timing(&timing_app, whisper_time, audio_samples, session_start.elapsed());
-    close_result
-}
-
-/// TEMPORARY diagnostic: dump the CPU features whisper.cpp was actually compiled
-/// with (AVX2/FMA/F16C) plus the logical CPU count, once per process. Written to
-/// `whisper-sysinfo.txt` in the app data dir and to stderr so a production build
-/// can be checked for SIMD without a debugger. Remove once the perf issue is closed.
-fn log_whisper_system_info(app: &AppHandle) {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        let cpus = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(0);
-        let line = format!(
-            "whisper system_info: {} | logical_cpus={cpus}",
-            whisper_rs::print_system_info()
-        );
-        eprintln!("{line}");
-        if let Ok(dir) = app.path().app_local_data_dir() {
-            let _ = std::fs::write(dir.join("whisper-sysinfo.txt"), &line);
-        }
-    });
-}
-
-/// TEMPORARY diagnostic: report whisper's actual compute time against the audio
-/// duration (realtime factor) and the total session wall-clock, so we can tell
-/// whether a slow session is inference-bound or dominated by model load / idle
-/// waits. Appended to `whisper-timing.txt` in the app data dir and echoed to
-/// stderr. Remove once the perf issue is closed.
-fn log_transcription_timing(
-    app: &AppHandle,
-    whisper_time: Duration,
-    audio_samples: usize,
-    session_wall: Duration,
-) {
-    let audio_secs = audio_samples as f64 / TARGET_SAMPLE_RATE as f64;
-    let whisper_secs = whisper_time.as_secs_f64();
-    let rtf = if audio_secs > 0.0 {
-        whisper_secs / audio_secs
-    } else {
-        0.0
-    };
-    let line = format!(
-        "whisper timing: audio={audio_secs:.1}s whisper_compute={whisper_secs:.1}s \
-         realtime_factor={rtf:.2}x session_wall={:.1}s",
-        session_wall.as_secs_f64()
-    );
-    eprintln!("{line}");
-    if let Ok(dir) = app.path().app_local_data_dir() {
-        use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(dir.join("whisper-timing.txt"))
-        {
-            let _ = writeln!(f, "{line}");
-        }
-    }
+        .map_err(|e| format!("close transcription encoder: {e}"))
 }
 
 fn get_or_init_scribble(
