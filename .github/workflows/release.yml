@@ -85,7 +85,11 @@ jobs:
             ggml_fma: 'ON'
             ggml_f16c: 'ON'
           - platform: windows-latest
-            args: ''
+            # --features gpu-vulkan builds whisper.cpp's Vulkan backend so
+            # transcription runs on the GPU (any vendor), falling back to CPU when
+            # no device is present. Requires the Vulkan SDK, installed below.
+            # Folding it into args also busts the Rust cache for this build.
+            args: '--features gpu-vulkan'
             # Same portable AVX2 baseline via ggml options. On MSVC, GGML_AVX2=ON
             # emits /arch:AVX2 and implies FMA/F16C (ggml-cpu-impl.h); the extra
             # FMA/F16C flags are harmless no-ops there. Going through GGML_* also
@@ -142,6 +146,22 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+
+      # whisper-rs-sys links vulkan-1 and compiles GGML's Vulkan shaders (glslc)
+      # at build time when the vulkan feature is on, and panics without VULKAN_SDK.
+      # Install the latest LunarG SDK and export VULKAN_SDK + its Bin (glslc) dir.
+      - name: Install Vulkan SDK (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $installer = "$env:RUNNER_TEMP\vulkan_sdk.exe"
+          curl.exe -L --fail --retry 3 -o $installer "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe"
+          Start-Process -FilePath $installer -ArgumentList '--accept-licenses','--default-answer','--confirm-command','install' -Wait
+          $sdk = (Get-ChildItem 'C:\VulkanSDK' -Directory | Sort-Object Name -Descending | Select-Object -First 1).FullName
+          if (-not $sdk) { throw "Vulkan SDK install dir not found under C:\VulkanSDK" }
+          "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Write-Host "Installed Vulkan SDK at $sdk"
 
       # The repo permanently carries version 0.0.0 (dev marker); releases get
       # their real version from the tag. workflow_dispatch test builds keep

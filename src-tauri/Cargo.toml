@@ -47,6 +47,14 @@ candle-nn = "0.10"
 candle-transformers = "0.10"
 tokenizers = { version = "0.23", default-features = false, features = ["fancy-regex"] }
 
+[features]
+# Opt-in GPU acceleration via whisper.cpp's Vulkan backend. Kept off by default
+# so ordinary local builds stay CPU-only and don't require the Vulkan SDK
+# (whisper-rs-sys panics at build time without VULKAN_SDK when vulkan is on).
+# CI enables this only for the Windows release build, where it installs the SDK.
+# At runtime ggml auto-selects the GPU and falls back to CPU when none is present.
+gpu-vulkan = ["scribble/vulkan"]
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
