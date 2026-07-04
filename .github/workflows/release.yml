@@ -122,11 +122,11 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
-          # whisper-rs-sys does NOT declare rerun-if-env-changed for GGML_*/CMAKE_*,
-          # so changing the SIMD flags below never invalidates its build fingerprint
-          # and a cached AVX2-off whisper.cpp would be restored unchanged. Fold the
-          # flag values into the cache key so any change forces a clean rebuild.
-          key: ${{ matrix.platform }}-${{ matrix.args }}-ggml-${{ matrix.ggml_avx2 }}${{ matrix.ggml_fma }}${{ matrix.ggml_f16c }}
+          # NOTE: whisper-rs-sys does not declare rerun-if-env-changed for the GGML_*
+          # SIMD flags, so changing them does NOT invalidate this cache. On the rare
+          # occasion you change those flags, manually clear the Actions cache (or bump
+          # this key), or a stale whisper.cpp will be restored.
+          key: ${{ matrix.platform }}-${{ matrix.args }}
 
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
