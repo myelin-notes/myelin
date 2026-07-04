@@ -143,6 +143,16 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      # The repo permanently carries version 0.0.0 (dev marker); releases get
+      # their real version from the tag. workflow_dispatch test builds keep
+      # 0.0.0 so they're identifiable as non-releases.
+      - name: Set version from release tag
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: node scripts/set-version.mjs "${TAG#v}"
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -238,10 +248,12 @@ jobs:
           merge-multiple: true
 
       - name: Assemble manifest
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          # tauri.conf.json's version is the path-reference form ("../package.json"),
-          # so read the resolved semver from package.json directly.
-          VERSION=$(node -p "require('./package.json').version")
+          # The repo's own version is pinned to 0.0.0; the release tag is the
+          # source of truth (same derivation the build jobs stamped in).
+          VERSION="${TAG#v}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
             echo "::error::resolved VERSION is not a semver: '$VERSION'"
             exit 1
@@ -345,6 +357,19 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      # Releases get their version from the tag. Unlike desktop, dispatch test
+      # builds can't keep the repo's 0.0.0 dev version: `tauri android build`
+      # rejects the derived versionCode 0, so they stamp 0.0.1 instead.
+      - name: Set version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            node scripts/set-version.mjs "${TAG#v}"
+          else
+            node scripts/set-version.mjs 0.0.1
+          fi
+
       - name: Init Android project
         run: |
           if [ ! -d src-tauri/gen/android ]; then
@@ -432,6 +457,17 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+
+      # Same tag-derived version as the other jobs, minus any prerelease
+      # suffix: Apple's version format is numeric-only and the Tauri CLI
+      # panics on prerelease semvers in iOS builds (tauri#12470).
+      - name: Set version from release tag
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG#v}"
+          node scripts/set-version.mjs "${VERSION%%-*}"
 
       - name: Init iOS project
         run: |

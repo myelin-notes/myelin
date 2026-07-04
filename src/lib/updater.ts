@@ -1,3 +1,4 @@
+import { getVersion } from '@tauri-apps/api/app';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
@@ -9,6 +10,13 @@ import { check } from '@tauri-apps/plugin-updater';
  */
 export async function initAutoUpdate(): Promise<void> {
   try {
+    // The repo's version is pinned to 0.0.0; real versions are stamped in by
+    // CI from the release tag. Anything still at 0.0.0 is a dev/local build,
+    // and every published release would register as an "update" for it.
+    if ((await getVersion()) === '0.0.0') {
+      return;
+    }
+
     const update = await check();
     if (!update) {
       return;
