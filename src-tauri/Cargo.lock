@@ -6982,7 +6982,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 [[package]]
 name = "scribble"
 version = "0.5.4"
-source = "git+https://github.com/winterSteve25/scribble?branch=feat%2Fabort-signal-upstream#001afcfb617d7bee8f92f5931acf03d680148648"
+source = "git+https://github.com/winterSteve25/scribble?branch=feat%2Fabort-signal-upstream#51779a532dfc14d69891f0f145bdafa7f90f25f8"
 dependencies = [
  "anyhow",
  "audioadapter 4.0.0",
