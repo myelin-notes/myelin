@@ -154,6 +154,12 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
+          # ggml-vulkan builds a nested vulkan-shaders-gen sub-project under
+          # cargo's target dir; the combined path exceeds Windows' 260-char
+          # MAX_PATH and MSBuild's FileTracker can't create its .tlog files
+          # (FTK1011). Enable long-path support before the build runs.
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
+          git config --system core.longpaths true
           $installer = "$env:RUNNER_TEMP\vulkan_sdk.exe"
           curl.exe -L --fail --retry 3 -o $installer "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe"
           Start-Process -FilePath $installer -ArgumentList '--accept-licenses','--default-answer','--confirm-command','install' -Wait
