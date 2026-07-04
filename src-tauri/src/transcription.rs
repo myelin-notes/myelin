@@ -255,7 +255,11 @@ fn run_transcription_session(
         enable_voice_activity_detection: false,
         language: None,
         output_type: OutputType::Json,
-        incremental_min_window_seconds: 1,
+        // whisper_full re-runs a full 30s encoder pass on the growing window each
+        // time it fires, so a smaller window means more redundant encodes per
+        // utterance. 5s (was 1s) roughly cuts those re-encodes from ~6 to ~4 at
+        // the cost of ~5s more latency before the first live segment appears.
+        incremental_min_window_seconds: 5,
         emit_single_segments: false,
         abort_signal: Some(cancelled.clone()),
     };
