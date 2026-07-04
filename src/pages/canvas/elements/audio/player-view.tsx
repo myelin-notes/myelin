@@ -409,7 +409,7 @@ export function AudioPlayerView({
         recordingStream.getTracks().forEach((t) => {
           t.stop();
         });
-        void transcriptionSession?.finish();
+        void transcriptionSession?.cancel();
         return;
       }
       recordChunksRef.current = [];
@@ -474,6 +474,9 @@ export function AudioPlayerView({
     recordChunksRef.current = [];
 
     if (chunks.length === 0) {
+      if (transcriptionSessionRef.current === transcription) {
+        transcriptionSessionRef.current = null;
+      }
       return;
     }
 
@@ -494,6 +497,9 @@ export function AudioPlayerView({
       // and return to "tap to record". Longer recordings that fail to decode
       // are kept with the wall-clock duration.
       if (dur < 1) {
+        if (transcriptionSessionRef.current === transcription) {
+          transcriptionSessionRef.current = null;
+        }
         return;
       }
     }
