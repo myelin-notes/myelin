@@ -433,18 +433,24 @@ jobs:
       # The Rust cache above restores the target dir, which includes whisper-rs-sys's
       # CMake build dir (out/build/CMakeCache.txt). On a restore-key (partial) cache
       # hit -- e.g. whenever Cargo.lock changed -- cargo re-runs whisper-rs-sys's build
-      # script, and the `cmake` crate re-configures that *restored* build dir. CMake
-      # finds CMAKE_C_COMPILER differs from the cached value, prints "you have changed
-      # variables that require your cache to be deleted", wipes the cache and
-      # re-configures -- and the wipe drops the crate's command-line
+      # script and the `cmake` crate RE-configures that restored build dir. Because
+      # whisper.cpp pins cmake_minimum_required(3.5) (CMP0126 = OLD), re-configuring an
+      # existing Android build tree makes CMake declare CMAKE_C_COMPILER "changed",
+      # print "you have changed variables that require your cache to be deleted", wipe
+      # the cache and re-configure -- and the wipe drops the crate's command-line
       # -DWHISPER_BUILD_EXAMPLES=OFF / -DWHISPER_BUILD_TESTS=OFF. whisper.cpp then falls
       # back to its WHISPER_STANDALONE=ON default and runs add_subdirectory(examples)/
-      # (tests) on dirs the packaged crate doesn't ship, failing the build with
+      # (tests) on dirs the packaged crate doesn't ship, failing with
       # "add_subdirectory given source \"examples\" which is not an existing directory".
-      # A clean whisper-rs-sys build (as on a cold cache) configures fine, so force it
-      # to rebuild from scratch; the rest of the workspace stays cached.
-      - name: Clean cached whisper-rs-sys build (avoid stale CMake cache reset)
-        run: cd src-tauri && cargo clean -p whisper-rs-sys
+      # (Confirmed locally: a fresh configure works; re-configuring the same dir resets.)
+      # The last green run had a cold cache; every failure since has been a warm one.
+      # cargo clean -p doesn't remove the per-target build-script dirs, so purge the
+      # whisper-rs-sys build + fingerprint dirs directly to force a clean reconfigure.
+      # The rest of the workspace stays cached.
+      - name: Purge cached whisper-rs-sys build (avoid stale CMake cache reset)
+        run: |
+          find src-tauri/target -type d -name 'whisper-rs-sys-*' -prune -exec rm -rf {} + 2>/dev/null || true
+          echo "Purged whisper-rs-sys build + fingerprint dirs"
 
       - name: Build Android
         env:
