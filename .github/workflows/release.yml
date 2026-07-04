@@ -150,16 +150,16 @@ jobs:
       # whisper-rs-sys links vulkan-1 and compiles GGML's Vulkan shaders (glslc)
       # at build time when the vulkan feature is on, and panics without VULKAN_SDK.
       # Install the latest LunarG SDK and export VULKAN_SDK + its Bin (glslc) dir.
-      - name: Install Vulkan SDK (Windows)
+      # Also switch the CMake build to Ninja: ggml-vulkan's nested shader-gen
+      # sub-build overflows Windows' 260-char MAX_PATH under MSBuild's FileTracker
+      # (FTK1011, which ignores LongPathsEnabled). Ninja doesn't create those deep
+      # .tlog files, so the build stays under the limit.
+      - name: Install Vulkan SDK + Ninja (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          # ggml-vulkan builds a nested vulkan-shaders-gen sub-project under
-          # cargo's target dir; the combined path exceeds Windows' 260-char
-          # MAX_PATH and MSBuild's FileTracker can't create its .tlog files
-          # (FTK1011). Enable long-path support before the build runs.
-          reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
-          git config --system core.longpaths true
+          choco install ninja -y --no-progress
+          "CMAKE_GENERATOR=Ninja" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $installer = "$env:RUNNER_TEMP\vulkan_sdk.exe"
           curl.exe -L --fail --retry 3 -o $installer "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe"
           Start-Process -FilePath $installer -ArgumentList '--accept-licenses','--default-answer','--confirm-command','install' -Wait
@@ -168,6 +168,12 @@ jobs:
           "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           Write-Host "Installed Vulkan SDK at $sdk"
+
+      # Ninja needs cl/link on PATH (unlike the VS generator, which finds the
+      # toolchain itself). Activate the MSVC dev environment for the build step.
+      - name: Set up MSVC environment (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
 
       # The repo permanently carries version 0.0.0 (dev marker); releases get
       # their real version from the tag. workflow_dispatch test builds keep
