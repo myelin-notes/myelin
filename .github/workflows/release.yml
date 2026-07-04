@@ -160,6 +160,17 @@ jobs:
         run: |
           choco install ninja -y --no-progress
           "CMAKE_GENERATOR=Ninja" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # The npm `rc` package installs a node_modules/.bin/rc shim that yarn puts
+          # on PATH ahead of the Windows SDK's resource compiler. Under Ninja, CMake's
+          # vs_link_exe resolves `rc` from PATH, grabs the shim, and linking fails.
+          # Remove the shim and pin the real rc.exe (also prepend its dir to PATH so
+          # the vulkan-shaders-gen sub-build finds it too).
+          Remove-Item -Force "node_modules\.bin\rc","node_modules\.bin\rc.cmd","node_modules\.bin\rc.ps1","node_modules\.bin\rc.bat" -ErrorAction SilentlyContinue
+          $rc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\rc.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+          if ($rc) {
+            "CMAKE_RC_COMPILER=$($rc.FullName -replace '\\','/')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            (Split-Path $rc.FullName) | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          }
           $installer = "$env:RUNNER_TEMP\vulkan_sdk.exe"
           curl.exe -L --fail --retry 3 -o $installer "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe"
           Start-Process -FilePath $installer -ArgumentList '--accept-licenses','--default-answer','--confirm-command','install' -Wait
