@@ -430,25 +430,21 @@ jobs:
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
           EOF
 
-      # whisper-rs-sys builds bundled whisper.cpp through the `cmake` crate, which
-      # passes -DCMAKE_C_COMPILER=<ndk clang> but not -DCMAKE_ANDROID_NDK. CMake
-      # (3.31 on ubuntu-latest) then derives the NDK from the compiler path and
-      # rewrites CMAKE_C_COMPILER, tripping its "compiler changed -> delete cache and
-      # re-configure" path. That wipe drops the command-line -DWHISPER_BUILD_EXAMPLES=OFF
-      # / -DWHISPER_BUILD_TESTS=OFF cache entries, so whisper.cpp reverts to its
-      # WHISPER_STANDALONE=ON default and runs add_subdirectory(examples)/(tests) on
-      # dirs the packaged crate doesn't ship, failing configure. Handing CMake the NDK
-      # up front (whisper-rs-sys forwards CMAKE_*-prefixed env vars to cmake as -D)
-      # avoids the compiler rewrite, so no cache wipe happens and the OFF flags stick.
-      # Must be the same NDK cargo-mobile2 selects for the compiler (the newest
-      # installed one) or CMake re-derives and resets again.
-      - name: Point CMake at the Android NDK
-        run: |
-          NDK_USED="$(ls -d "$ANDROID_HOME"/ndk/*/ | sort -V | tail -n1)"
-          NDK_USED="${NDK_USED%/}"
-          test -d "$NDK_USED" || { echo "::error::no NDK found under $ANDROID_HOME/ndk"; exit 1; }
-          echo "CMAKE_ANDROID_NDK=$NDK_USED" >> "$GITHUB_ENV"
-          echo "CMAKE_ANDROID_NDK=$NDK_USED"
+      # The Rust cache above restores the target dir, which includes whisper-rs-sys's
+      # CMake build dir (out/build/CMakeCache.txt). On a restore-key (partial) cache
+      # hit -- e.g. whenever Cargo.lock changed -- cargo re-runs whisper-rs-sys's build
+      # script, and the `cmake` crate re-configures that *restored* build dir. CMake
+      # finds CMAKE_C_COMPILER differs from the cached value, prints "you have changed
+      # variables that require your cache to be deleted", wipes the cache and
+      # re-configures -- and the wipe drops the crate's command-line
+      # -DWHISPER_BUILD_EXAMPLES=OFF / -DWHISPER_BUILD_TESTS=OFF. whisper.cpp then falls
+      # back to its WHISPER_STANDALONE=ON default and runs add_subdirectory(examples)/
+      # (tests) on dirs the packaged crate doesn't ship, failing the build with
+      # "add_subdirectory given source \"examples\" which is not an existing directory".
+      # A clean whisper-rs-sys build (as on a cold cache) configures fine, so force it
+      # to rebuild from scratch; the rest of the workspace stays cached.
+      - name: Clean cached whisper-rs-sys build (avoid stale CMake cache reset)
+        run: cd src-tauri && cargo clean -p whisper-rs-sys
 
       - name: Build Android
         env:
