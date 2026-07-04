@@ -39,6 +39,9 @@ krilla = { version = "0.8.1", features = ["pdf"] }
 base64 = "0.22.1"
 yrs = "0.26.0"
 scribble = "0.5.4"
+# Direct dep only to call print_system_info() for a one-time SIMD diagnostic
+# (see transcription.rs). Same version scribble resolves, so no extra build.
+whisper-rs = "0.16"
 candle-core = "0.10"
 candle-nn = "0.10"
 candle-transformers = "0.10"

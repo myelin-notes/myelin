@@ -4475,6 +4475,7 @@ dependencies = [
  "tokenizers 0.23.1",
  "tokio",
  "webkit2gtk",
+ "whisper-rs",
  "yrs",
 ]
 
