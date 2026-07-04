@@ -93,4 +93,4 @@ opt-level = 3
 # Opts.abort_signal for cancelling in-flight whisper runs. Pinned to a branch so
 # a clean checkout (CI) resolves it without any local patch step.
 [patch.crates-io]
-scribble = { git = "https://github.com/winterSteve25/scribble", branch = "feat/abort-signal-upstream" }
+scribble = { git = "https://github.com/myelin-notes/scribble", branch = "feat/abort-signal-upstream" }
