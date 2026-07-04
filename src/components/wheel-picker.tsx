@@ -132,8 +132,16 @@ export const WheelPicker = memo(function WheelPicker({
       const cx = Math.min(Math.max(event.clientX, outer), vw - outer);
       const cy = Math.min(Math.max(event.clientY, outer), vh - outer);
       if (groupRef.current) {
-        groupRef.current.style.left = `${cx}px`;
-        groupRef.current.style.top = `${cy}px`;
+        // groupRef is absolutely positioned within a container that may be
+        // offset from the viewport (e.g. by the persistent sidebar). Convert
+        // the viewport-space pointer position into the container's local
+        // coordinate space so the wheel renders under the cursor. Pointer
+        // hit-testing (centerRef) stays in viewport space to match evt.clientX.
+        const origin = groupRef.current.offsetParent?.getBoundingClientRect();
+        const originX = origin?.left ?? 0;
+        const originY = origin?.top ?? 0;
+        groupRef.current.style.left = `${cx - originX}px`;
+        groupRef.current.style.top = `${cy - originY}px`;
       }
       setVisible(true);
       centerRef.current = [cx, cy];
