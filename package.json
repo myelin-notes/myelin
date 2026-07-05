@@ -2,6 +2,7 @@
   "name": "myelin",
   "private": true,
   "version": "0.0.0",
+  "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
   "workspaces": [
     "packages/ui",
