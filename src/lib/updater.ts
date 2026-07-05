@@ -23,7 +23,7 @@ export async function initAutoUpdate(): Promise<void> {
     }
 
     const wantsUpdate = await ask(
-      `Myelin ${update.version} is available. Download and install it now?`,
+      `Myelin Notes ${update.version} is available. Download and install it now?`,
       { title: 'Update available', kind: 'info' },
     );
     if (!wantsUpdate) {

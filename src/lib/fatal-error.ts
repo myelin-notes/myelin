@@ -98,7 +98,7 @@ function renderFatalError(error: unknown): void {
   );
 
   const heading = document.createElement('h1');
-  heading.textContent = 'Myelin failed to start';
+  heading.textContent = 'Myelin Notes failed to start';
   heading.setAttribute('style', 'font-size:18px;margin:0 0 12px;');
 
   const msg = document.createElement('p');

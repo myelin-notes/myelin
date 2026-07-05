@@ -3,7 +3,7 @@
   "app": {
     "windows": [
       {
-        "title": "Myelin",
+        "title": "Myelin Notes",
         "width": 1100,
         "height": 700,
         "dragDropEnabled": false,

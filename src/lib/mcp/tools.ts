@@ -919,7 +919,7 @@ export class McpToolService {
   private assertWritesAllowed(): void {
     if (!this.allowDirectWrites()) {
       throw new Error(
-        'Direct MCP writes are disabled. Enable direct MCP writes in Myelin settings to use this tool.',
+        'Direct MCP writes are disabled. Enable direct MCP writes in Myelin Notes settings to use this tool.',
       );
     }
   }

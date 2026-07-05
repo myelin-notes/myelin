@@ -12,7 +12,7 @@ function Wordmark({ className }: WordmarkProps) {
         className,
       )}
     >
-      Myelin
+      Myelin Notes
     </span>
   );
 }

@@ -13,7 +13,7 @@ interface Props {
 
 const {
   title,
-  description = 'Myelin is a native, local-first canvas where handwriting, type, PDFs, images, and audio live in one note, kept on your own machine. Free while it is in early access.',
+  description = 'Myelin Notes is a native, local-first canvas where handwriting, type, PDFs, images, and audio live in one note, kept on your own machine. Free while it is in early access.',
   image,
   jsonLd,
 } = Astro.props;
@@ -21,7 +21,7 @@ const {
 const organization = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
-  name: 'Myelin',
+  name: 'Myelin Notes',
   url: Astro.site?.href,
 };
 const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];

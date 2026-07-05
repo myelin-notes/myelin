@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Record audio notes in Myelin.</string>
+  <string>Record audio notes in Myelin Notes.</string>
 </dict>
 </plist>

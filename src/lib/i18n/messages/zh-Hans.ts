@@ -303,7 +303,7 @@ const zhHans: typeof en = {
       },
       renameReferences: {
         label: '重命名笔记后始终更新链接',
-        description: '关闭时，笔记重命名后 Myelin 会先询问是否更改链接提及。',
+        description: '关闭时，笔记重命名后 Myelin Notes 会先询问是否更改链接提及。',
       },
     },
     repository: {
@@ -412,7 +412,7 @@ const zhHans: typeof en = {
         description:
           '将整个工作区保存到文件夹中，作为兼容 Obsidian 的仓库。笔记会转换为带 frontmatter 的 Markdown；其他文件会被复制，并保留文件夹结构。',
         button: '导出',
-        defaultVaultName: 'Myelin 仓库',
+        defaultVaultName: 'Myelin Notes 仓库',
         loading: '正在导出 Obsidian 仓库…',
         progress: (current: number, total: number) =>
           `正在导出 ${current} / ${total}…`,
@@ -425,7 +425,7 @@ const zhHans: typeof en = {
         description:
           '将整个工作区保存到文件夹中，格式为 JSON。每个笔记会编码为一个 JSON 文件，包含其笔迹、文本和嵌入的媒体（二进制以 base64 编码）；其他文件会被复制，并保留文件夹结构。',
         button: '导出',
-        defaultExportName: 'Myelin JSON 导出',
+        defaultExportName: 'Myelin Notes JSON 导出',
         loading: '正在将工作区导出为 JSON…',
         progress: (current: number, total: number) =>
           `正在导出 ${current} / ${total}…`,
@@ -440,7 +440,7 @@ const zhHans: typeof en = {
       analytics: {
         label: '共享匿名使用数据',
         description:
-          '发送匿名的产品使用数据和错误报告，帮助改进 Myelin。关闭后将不会发送任何内容。',
+          '发送匿名的产品使用数据和错误报告，帮助改进 Myelin Notes。关闭后将不会发送任何内容。',
       },
     },
     mcp: {
@@ -449,7 +449,7 @@ const zhHans: typeof en = {
       enabled: {
         label: '启用本地 MCP 服务器',
         description:
-          '将正在运行的 Myelin 应用开放给 127.0.0.1 上的本地 AI 代理。',
+          '将正在运行的 Myelin Notes 应用开放给 127.0.0.1 上的本地 AI 代理。',
       },
       port: {
         label: '本地端口',
@@ -459,7 +459,7 @@ const zhHans: typeof en = {
         label: '代理安装提示词',
         description: '复制到你的代理中，即可将其连接到正在运行的此应用。',
         prompt: (endpoint: string) =>
-          `为正在运行的 Myelin 桌面应用安装 MCP 服务器。使用 Streamable HTTP，端点为 ${endpoint}。将服务器命名为 myelin。此服务器只在本机可用，因此 Myelin 必须保持打开并启用 MCP。`,
+          `为正在运行的 Myelin Notes 桌面应用安装 MCP 服务器。使用 Streamable HTTP，端点为 ${endpoint}。将服务器命名为 myelin。此服务器只在本机可用，因此 Myelin Notes 必须保持打开并启用 MCP。`,
       },
       directWrites: {
         label: '允许直接 MCP 写入',
@@ -562,7 +562,7 @@ const zhHans: typeof en = {
       eyebrow: '应用程序',
       version: {
         label: '版本',
-        description: '当前安装的 Myelin 版本。',
+        description: '当前安装的 Myelin Notes 版本。',
       },
     },
   },

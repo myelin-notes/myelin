@@ -311,7 +311,7 @@ const en = {
       renameReferences: {
         label: 'Always update links after renaming notes',
         description:
-          'When off, Myelin asks before changing linked mentions after a note is renamed.',
+          'When off, Myelin Notes asks before changing linked mentions after a note is renamed.',
       },
     },
     repository: {
@@ -423,7 +423,7 @@ const en = {
         description:
           'Save your whole workspace to a folder as an Obsidian-compatible vault. Notes become Markdown with frontmatter; other files are copied and the folder structure is preserved.',
         button: 'Export',
-        defaultVaultName: 'Myelin Vault',
+        defaultVaultName: 'Myelin Notes Vault',
         loading: 'Exporting Obsidian vault...',
         progress: (current: number, total: number) =>
           `Exporting ${current} of ${total}...`,
@@ -436,7 +436,7 @@ const en = {
         description:
           'Save your whole workspace to a folder as JSON. Each note becomes a JSON file encoding its strokes, text, and embedded media (binaries as base64); other files are copied and the folder structure is preserved.',
         button: 'Export',
-        defaultExportName: 'Myelin JSON Export',
+        defaultExportName: 'Myelin Notes JSON Export',
         loading: 'Exporting workspace as JSON...',
         progress: (current: number, total: number) =>
           `Exporting ${current} of ${total}...`,
@@ -451,7 +451,7 @@ const en = {
       analytics: {
         label: 'Share anonymous usage analytics',
         description:
-          'Send anonymous product analytics and error reports to help improve Myelin. When off, nothing is sent.',
+          'Send anonymous product analytics and error reports to help improve Myelin Notes. When off, nothing is sent.',
       },
     },
     mcp: {
@@ -460,7 +460,7 @@ const en = {
       enabled: {
         label: 'Enable local MCP server',
         description:
-          'Expose this running Myelin app to local AI agents on 127.0.0.1.',
+          'Expose this running Myelin Notes app to local AI agents on 127.0.0.1.',
       },
       port: {
         label: 'Local port',
@@ -472,7 +472,7 @@ const en = {
         description:
           'Copy this into your agent to connect it to this running app.',
         prompt: (endpoint: string) =>
-          `Install the Myelin MCP server for this running desktop app. Use Streamable HTTP with the endpoint ${endpoint}. Name the server myelin. This server is local to this computer, so Myelin must stay open with MCP enabled.`,
+          `Install the Myelin Notes MCP server for this running desktop app. Use Streamable HTTP with the endpoint ${endpoint}. Name the server myelin. This server is local to this computer, so Myelin Notes must stay open with MCP enabled.`,
       },
       directWrites: {
         label: 'Allow direct MCP writes',
@@ -578,7 +578,7 @@ const en = {
       eyebrow: 'Application',
       version: {
         label: 'Version',
-        description: 'The version of Myelin currently installed.',
+        description: 'The version of Myelin Notes currently installed.',
       },
     },
   },

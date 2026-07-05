@@ -1,7 +1,7 @@
 # Third-party licenses
 
 This directory is bundled with the application and contains license texts for
-third-party model and font assets redistributed with Myelin.
+third-party model and font assets redistributed with Myelin Notes.
 
 ## Transcription models
 

@@ -314,7 +314,7 @@ const es: typeof en = {
       renameReferences: {
         label: 'Actualizar siempre los enlaces al renombrar notas',
         description:
-          'Cuando está desactivado, Myelin pregunta antes de cambiar menciones enlazadas después de renombrar una nota.',
+          'Cuando está desactivado, Myelin Notes pregunta antes de cambiar menciones enlazadas después de renombrar una nota.',
       },
     },
     repository: {
@@ -428,7 +428,7 @@ const es: typeof en = {
         description:
           'Guarda todo tu espacio de trabajo en una carpeta como una bóveda compatible con Obsidian. Las notas se convierten en Markdown con frontmatter; los demás archivos se copian y se conserva la estructura de carpetas.',
         button: 'Exportar',
-        defaultVaultName: 'Bóveda de Myelin',
+        defaultVaultName: 'Bóveda de Myelin Notes',
         loading: 'Exportando bóveda de Obsidian...',
         progress: (current: number, total: number) =>
           `Exportando ${current} de ${total}...`,
@@ -441,7 +441,7 @@ const es: typeof en = {
         description:
           'Guarda todo tu espacio de trabajo en una carpeta como JSON. Cada nota se convierte en un archivo JSON que codifica sus trazos, texto y multimedia incrustada (binarios en base64); los demás archivos se copian y se conserva la estructura de carpetas.',
         button: 'Exportar',
-        defaultExportName: 'Exportación JSON de Myelin',
+        defaultExportName: 'Exportación JSON de Myelin Notes',
         loading: 'Exportando espacio de trabajo como JSON...',
         progress: (current: number, total: number) =>
           `Exportando ${current} de ${total}...`,
@@ -456,7 +456,7 @@ const es: typeof en = {
       analytics: {
         label: 'Compartir análisis de uso anónimos',
         description:
-          'Envía análisis de producto e informes de errores anónimos para ayudar a mejorar Myelin. Cuando está desactivado, no se envía nada.',
+          'Envía análisis de producto e informes de errores anónimos para ayudar a mejorar Myelin Notes. Cuando está desactivado, no se envía nada.',
       },
     },
     mcp: {
@@ -465,7 +465,7 @@ const es: typeof en = {
       enabled: {
         label: 'Habilitar servidor MCP local',
         description:
-          'Expone esta app de Myelin en ejecución a agentes de IA locales en 127.0.0.1.',
+          'Expone esta app de Myelin Notes en ejecución a agentes de IA locales en 127.0.0.1.',
       },
       port: {
         label: 'Puerto local',
@@ -477,7 +477,7 @@ const es: typeof en = {
         description:
           'Cópialo en tu agente para conectarlo a esta app en ejecución.',
         prompt: (endpoint: string) =>
-          `Instala el servidor MCP de Myelin para esta app de escritorio en ejecución. Usa Streamable HTTP con el endpoint ${endpoint}. Nombra el servidor myelin. Este servidor es local en este equipo, así que Myelin debe permanecer abierto con MCP habilitado.`,
+          `Instala el servidor MCP de Myelin Notes para esta app de escritorio en ejecución. Usa Streamable HTTP con el endpoint ${endpoint}. Nombra el servidor myelin. Este servidor es local en este equipo, así que Myelin Notes debe permanecer abierto con MCP habilitado.`,
       },
       directWrites: {
         label: 'Permitir escrituras MCP directas',
@@ -583,7 +583,7 @@ const es: typeof en = {
       eyebrow: 'Aplicación',
       version: {
         label: 'Versión',
-        description: 'La versión de Myelin instalada actualmente.',
+        description: 'La versión de Myelin Notes instalada actualmente.',
       },
     },
   },
