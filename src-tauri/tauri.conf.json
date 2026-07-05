@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "myelin",
+  "productName": "Myelin Notes",
   "version": "../package.json",
   "identifier": "com.github.wintersteve25.myelin",
   "build": {

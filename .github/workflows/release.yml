@@ -157,7 +157,13 @@ jobs:
           # builder maps the universal bundle to both darwin arch keys).
           while IFS= read -r sig; do
             bundle="${sig%.sig}"
-            base="$(basename "$bundle")"
+            # Strip spaces from the staged name: productName ("Myelin Notes")
+            # bakes a space into the bundle filename, which would land in the
+            # manifest URL, the R2 object key, and promote-release.mjs's
+            # filename round-trip. Removing it keeps all three space-free and
+            # consistent. Suffix matching (-setup.exe/.appimage/.app.tar.gz) is
+            # unaffected, and the .sig sidecar is renamed to match.
+            base="$(basename "$bundle" | tr -d ' ')"
             cp "$bundle" "updater-out/$base"
             cp "$sig" "updater-out/$base.sig"
           done < <(find src-tauri/target -type f -name '*.sig')
