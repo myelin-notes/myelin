@@ -7,6 +7,11 @@ name: iOS Build
 # Without them it builds unsigned — install via a re-signing sideloader
 # (e.g. Sideloadly) with an Apple ID.
 on:
+  # Temporary: run on every push to the debug branch. workflow_dispatch only
+  # becomes available once this file lands on the default branch — drop the
+  # push trigger when it does.
+  push:
+    branches: [debug-ios-build]
   workflow_dispatch:
     inputs:
       ref:
