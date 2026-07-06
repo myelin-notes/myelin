@@ -89,21 +89,25 @@ jobs:
       # (its "Build Rust Code" Xcode phase connects back to the CLI's options
       # server, so raw xcodebuild panics with a missing
       # "<identifier>-server-addr" file), but without a development team the
-      # CLI's final `xcodebuild -exportArchive` step cannot sign and fails.
-      # XCODE_XCCONFIG_FILE is honored by every xcodebuild the CLI spawns, so
-      # code signing is disabled through it: the build and archive steps then
-      # produce an unsigned .xcarchive, the export failure is tolerated, and
-      # the unsigned .app is zipped into an IPA by hand for a re-signing
-      # sideloader (e.g. Sideloadly).
+      # signing steps fail. Env vars can't carry Xcode settings through: the
+      # CLI spawns xcodebuild with a whitelisted env (TAURI*/WRY*/CARGO_*/
+      # RUST_*/TMPDIR/PATH — see tauri-cli mobile/mod.rs env_vars()), which
+      # strips XCODE_XCCONFIG_FILE. So signing is disabled by patching the
+      # pbxproj in the CI workspace: the build and archive steps then produce
+      # an unsigned .xcarchive, the failure of the final (signing) export
+      # step is tolerated, and the unsigned .app is zipped into an IPA by
+      # hand for a re-signing sideloader (e.g. Sideloadly).
       - name: Build iOS (unsigned)
         if: env.APPLE_CERTIFICATE == ''
         run: |
-          cat > "$RUNNER_TEMP/nosign.xcconfig" <<'EOF'
-          CODE_SIGNING_ALLOWED = NO
-          CODE_SIGNING_REQUIRED = NO
-          CODE_SIGN_IDENTITY =
-          EOF
-          export XCODE_XCCONFIG_FILE="$RUNNER_TEMP/nosign.xcconfig"
+          PBXPROJ=src-tauri/gen/apple/myelin.xcodeproj/project.pbxproj
+          perl -0pi -e 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;/g' "$PBXPROJ"
+          PATCHED=$(grep -c 'CODE_SIGNING_ALLOWED = NO;' "$PBXPROJ")
+          if [ "$PATCHED" -eq 0 ]; then
+            echo "::error::failed to patch code signing settings in $PBXPROJ"
+            exit 1
+          fi
+          echo "Disabled code signing in $PATCHED pbxproj build configuration(s)"
           yarn tauri ios build --export-method debugging \
             && echo "unsigned export unexpectedly succeeded" \
             || echo "tauri ios build failed as expected at the unsigned export step"
