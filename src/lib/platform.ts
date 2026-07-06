@@ -33,6 +33,14 @@ export const isWindows = /Win/.test(ua);
 export const isApplePlatform = /Mac|iPhone|iPad/.test(ua);
 
 /**
+ * Running on a mobile OS (iOS / iPadOS / Android) rather than a desktop. Used
+ * to hide desktop-only chrome such as the MCP, data-export, and keybinding
+ * settings sections. A touchscreen Windows/Linux laptop is not mobile.
+ */
+export const isMobile =
+  (isApplePlatform && isTouchDevice) || /Android/.test(ua);
+
+/**
  * Tab-bar height class. On macOS the bar is shorter so the OS traffic-light
  * buttons (fixed ~16px below the window top) land vertically centered in it.
  * Shared across every tab bar so the geometry can't drift apart.

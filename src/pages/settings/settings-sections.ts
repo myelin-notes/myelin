@@ -10,6 +10,7 @@ import {
   PenLine,
   ShieldCheck,
 } from 'lucide-react';
+import { isMobile } from '@/lib/platform';
 
 export type SettingsSectionId =
   | 'appearance'
@@ -35,16 +36,31 @@ export interface SettingsSectionMeta {
     | 'keybinds'
     | 'about';
   icon: ComponentType<{ className?: string }>;
+  /** Hidden on mobile — the feature is desktop-only (see {@link isMobile}). */
+  desktopOnly?: boolean;
 }
 
-export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
+const ALL_SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: 'appearance', titleKey: 'canvasStyle', icon: Brush },
   { id: 'language', titleKey: 'language', icon: Languages },
   { id: 'editing', titleKey: 'pageFrameEditing', icon: PenLine },
   { id: 'sync', titleKey: 'repository', icon: Cloud },
-  { id: 'data', titleKey: 'dataExport', icon: HardDriveDownload },
+  {
+    id: 'data',
+    titleKey: 'dataExport',
+    icon: HardDriveDownload,
+    desktopOnly: true,
+  },
   { id: 'privacy', titleKey: 'privacy', icon: ShieldCheck },
-  { id: 'mcp', titleKey: 'mcp', icon: Bot },
-  { id: 'keybinds', titleKey: 'keybinds', icon: Keyboard },
+  { id: 'mcp', titleKey: 'mcp', icon: Bot, desktopOnly: true },
+  { id: 'keybinds', titleKey: 'keybinds', icon: Keyboard, desktopOnly: true },
   { id: 'about', titleKey: 'about', icon: Info },
 ] as const;
+
+/**
+ * Sections to show on the current platform. Desktop-only sections (MCP, data
+ * export, keybindings) are dropped on mobile. Drives both the settings rail and
+ * the rendered section list so they can't drift apart.
+ */
+export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] =
+  ALL_SETTINGS_SECTIONS.filter((section) => !(isMobile && section.desktopOnly));

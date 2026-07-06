@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
+import { isMobile } from '@/lib/platform';
 import { KeybindsSection } from './keybinds-section';
 import { AboutSection } from './sections/about-section';
 import { AppearanceSection } from './sections/appearance-section';
@@ -72,10 +73,10 @@ export function SettingsPage() {
               <LanguageSection />
               <EditingSection />
               <SyncSection />
-              <DataSection />
+              {!isMobile && <DataSection />}
               <PrivacySection />
-              <McpSection />
-              <KeybindsSection />
+              {!isMobile && <McpSection />}
+              {!isMobile && <KeybindsSection />}
               <AboutSection />
             </div>
           </div>
