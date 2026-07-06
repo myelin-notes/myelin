@@ -103,8 +103,7 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name || github.event.inputs.ref }}
           # Fetch LFS-tracked binaries (scribble/embedding models). Without this,
-          # checkout leaves pointer files in place and the bundled ggml-base.bin
-          # is a ~130-byte text stub whisper.cpp can't load at runtime.
+          # checkout leaves pointer files in place
           lfs: true
 
       - name: Setup Node

@@ -13,7 +13,7 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{path::BaseDirectory, AppHandle, Emitter, Manager, State};
 
 const MODEL_DIR: &str = "scribble-models";
-const DEFAULT_MODEL_FILE: &str = "ggml-base.bin";
+const DEFAULT_MODEL_FILE: &str = "ggml-base-q5_1.bin";
 const VAD_STUB_FILE: &str = "scribble-vad-stub.bin";
 const SEGMENT_EVENT: &str = "audio-transcription-segment";
 const FINISHED_EVENT: &str = "audio-transcription-finished";
