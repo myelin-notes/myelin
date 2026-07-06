@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
@@ -22,13 +23,20 @@ const TARGET_SAMPLE_RATE: u32 = 16_000;
 const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 type SampleSender = mpsc::SyncSender<TranscriptionMessage>;
-type Sessions = Arc<Mutex<HashMap<String, SampleSender>>>;
+type Sessions = Arc<Mutex<HashMap<String, SessionHandle>>>;
 type SharedScribble = Arc<Scribble<WhisperBackend>>;
 type ScribbleEngine = Arc<Mutex<Option<SharedScribble>>>;
 
 enum TranscriptionMessage {
     Samples { samples: Vec<f32>, sample_rate: u32 },
     Finish,
+}
+
+struct SessionHandle {
+    tx: SampleSender,
+    /// Shared with the worker (checked between chunks) and with whisper via
+    /// scribble's abort callback (checked mid-inference).
+    cancelled: Arc<AtomicBool>,
 }
 
 pub struct TranscriptionState {
@@ -76,17 +84,31 @@ pub fn start_audio_transcription(
 ) -> Result<(), String> {
     let paths = resolve_model_paths(&app)?;
     let (tx, rx) = mpsc::sync_channel::<TranscriptionMessage>(64);
+    let cancelled = Arc::new(AtomicBool::new(false));
 
     {
         let mut sessions = state.sessions.lock().expect("sessions mutex poisoned");
-        sessions.insert(session_id.clone(), tx);
+        sessions.insert(
+            session_id.clone(),
+            SessionHandle {
+                tx,
+                cancelled: cancelled.clone(),
+            },
+        );
     }
 
     let sessions = state.sessions.clone();
     let engine = state.engine.clone();
     std::thread::spawn(move || {
         let result = catch_unwind(AssertUnwindSafe(|| {
-            run_transcription_session(app.clone(), engine.clone(), paths, session_id.clone(), rx)
+            run_transcription_session(
+                app.clone(),
+                engine.clone(),
+                paths,
+                session_id.clone(),
+                rx,
+                cancelled,
+            )
         }))
         .unwrap_or_else(|panic| {
             // The panic may have corrupted the cached engine and poisoned its
@@ -148,7 +170,7 @@ pub fn push_audio_transcription_samples(
 
     let tx = {
         let sessions = state.sessions.lock().expect("sessions mutex poisoned");
-        sessions.get(&session_id).cloned()
+        sessions.get(&session_id).map(|handle| handle.tx.clone())
     };
     let Some(tx) = tx else {
         return Ok(false);
@@ -174,13 +196,34 @@ pub fn finish_audio_transcription(
 ) -> Result<(), String> {
     let tx = {
         let sessions = state.sessions.lock().expect("sessions mutex poisoned");
-        sessions.get(&session_id).cloned()
+        sessions.get(&session_id).map(|handle| handle.tx.clone())
     };
     if let Some(tx) = tx {
-        if tx.try_send(TranscriptionMessage::Finish).is_err() {
-            let mut sessions = state.sessions.lock().expect("sessions mutex poisoned");
-            sessions.remove(&session_id);
-        }
+        // Blocking send: the channel can be full while whisper churns through a
+        // backlog, and dropping Finish here would orphan the session. The worker
+        // keeps draining, so a slot frees up; a disconnected channel (worker
+        // already gone) is benign. Keeping the session in the map until the
+        // worker exits also lets a later cancel still abort the flush.
+        let _ = tx.send(TranscriptionMessage::Finish);
+    }
+    Ok(())
+}
+
+/// Abandon a session and abort its in-flight whisper run. The worker skips the
+/// final flush, so no further segments are emitted; FINISHED still fires.
+#[tauri::command(async)]
+pub fn cancel_audio_transcription(
+    state: State<'_, TranscriptionState>,
+    session_id: String,
+) -> Result<(), String> {
+    let handle = {
+        let mut sessions = state.sessions.lock().expect("sessions mutex poisoned");
+        sessions.remove(&session_id)
+    };
+    if let Some(handle) = handle {
+        // Set the flag while `handle` still owns the sender: the worker observes
+        // the cancel no later than the disconnect that dropping the sender causes.
+        handle.cancelled.store(true, Ordering::Relaxed);
     }
     Ok(())
 }
@@ -200,6 +243,7 @@ fn run_transcription_session(
     paths: ModelPaths,
     session_id: String,
     rx: mpsc::Receiver<TranscriptionMessage>,
+    cancelled: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let scribble = get_or_init_scribble(&engine, paths)?;
     let opts = Opts {
@@ -210,7 +254,13 @@ fn run_transcription_session(
         enable_voice_activity_detection: false,
         language: None,
         output_type: OutputType::Json,
-        incremental_min_window_seconds: 1,
+        // whisper_full re-runs a full 30s encoder pass on the growing window each
+        // time it fires, so a smaller window means more redundant encodes per
+        // utterance. 5s (was 1s) roughly cuts those re-encodes from ~6 to ~4 at
+        // the cost of ~5s more latency before the first live segment appears.
+        incremental_min_window_seconds: 5,
+        emit_single_segments: false,
+        abort_signal: Some(cancelled.clone()),
     };
 
     let mut writer = TranscriptionEventWriter::new(app, session_id);
@@ -220,25 +270,42 @@ fn run_transcription_session(
         .map_err(|e| format!("create scribble stream: {e}"))?;
     let mut resampler = PcmResampler::new();
 
-    // An explicit Finish, a timeout, and a disconnect all end the session.
+    // An explicit Finish, a cancel, a timeout, and a disconnect all end the
+    // session. A whisper run aborted by the cancel flag surfaces as an error;
+    // report it as a clean cancel, not a failure.
     while let Ok(TranscriptionMessage::Samples {
         samples,
         sample_rate,
     }) = rx.recv_timeout(SESSION_IDLE_TIMEOUT)
     {
+        if cancelled.load(Ordering::Relaxed) {
+            return Ok(());
+        }
         let samples_16k = resampler.push(&samples, sample_rate);
         if !samples_16k.is_empty() {
-            stream
-                .on_samples(&samples_16k)
-                .map_err(|e| format!("transcribe samples: {e}"))?;
+            if let Err(e) = stream.on_samples(&samples_16k) {
+                if cancelled.load(Ordering::Relaxed) {
+                    return Ok(());
+                }
+                return Err(format!("transcribe samples: {e}"));
+            }
         }
+    }
+
+    // Cancelled sessions skip the flush: the frontend already closed, so the
+    // final segments would only burn CPU on an abandoned transcript.
+    if cancelled.load(Ordering::Relaxed) {
+        return Ok(());
     }
 
     // Always flush: this is what emits the final in-progress segment. Whisper
     // handles short tails itself (input under 100ms yields zero segments).
-    stream
-        .finish()
-        .map_err(|e| format!("finish transcription stream: {e}"))?;
+    if let Err(e) = stream.finish() {
+        if cancelled.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        return Err(format!("finish transcription stream: {e}"));
+    }
     drop(stream);
     writer
         .close()

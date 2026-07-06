@@ -483,8 +483,7 @@ const faqJsonLd = {
     // for the live version, so nothing is hardcoded here and no rebuild is needed
     // when a release ships. Windows (-setup.exe) and Linux (.AppImage) installers
     // are updater artifacts and used verbatim; the macOS .dmg isn't, so it's
-    // derived from the manifest's version folder (uploaded there as
-    // Myelin-macOS.dmg by promote-release.mjs).
+    // derived from the manifest's version folder.
     const MANIFEST = 'https://updates.trymyelin.app/stable/latest.json';
 
     async function wireDesktopDownloads() {

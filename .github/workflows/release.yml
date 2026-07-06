@@ -69,10 +69,34 @@ jobs:
         include:
           - platform: macos-latest
             args: --target universal-apple-darwin
+            # GPU comes from the scribble `metal` feature (see src-tauri/Cargo.toml).
+            # No x86 SIMD knobs here: the universal bundle also builds an aarch64
+            # slice where they don't apply. Apple Silicon uses NEON (always on) +
+            # Metal; Intel Macs fall back to Metal.
           - platform: ubuntu-22.04
             args: ''
+            # SOURCE_DATE_EPOCH forces GGML_NATIVE=OFF (portable build), which also
+            # drops AVX2/FMA/F16C. Re-enable a universal desktop CPU baseline via
+            # ggml's own options (whisper-rs-sys forwards GGML_* to CMake). Using
+            # these instead of CMAKE_C_FLAGS keeps ggml's ARCH_FLAGS separate from
+            # the crate's -fPIC in CMAKE_C_FLAGS — overriding that flag drops -fPIC
+            # and breaks the shared-lib link. ggml adds -mavx2/-mfma/-mf16c itself.
+            ggml_avx2: 'ON'
+            ggml_fma: 'ON'
+            ggml_f16c: 'ON'
           - platform: windows-latest
-            args: ''
+            # --features gpu-vulkan builds whisper.cpp's Vulkan backend so
+            # transcription runs on the GPU (any vendor), falling back to CPU when
+            # no device is present. Requires the Vulkan SDK, installed below.
+            # Folding it into args also busts the Rust cache for this build.
+            args: '--features gpu-vulkan'
+            # Same portable AVX2 baseline via ggml options. On MSVC, GGML_AVX2=ON
+            # emits /arch:AVX2 and implies FMA/F16C (ggml-cpu-impl.h); the extra
+            # FMA/F16C flags are harmless no-ops there. Going through GGML_* also
+            # avoids overriding CMAKE_CXX_FLAGS and dropping the crate's /utf-8.
+            ggml_avx2: 'ON'
+            ggml_fma: 'ON'
+            ggml_f16c: 'ON'
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -98,6 +122,10 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
+          # NOTE: whisper-rs-sys does not declare rerun-if-env-changed for the GGML_*
+          # SIMD flags, so changing them does NOT invalidate this cache. On the rare
+          # occasion you change those flags, manually clear the Actions cache (or bump
+          # this key), or a stale whisper.cpp will be restored.
           key: ${{ matrix.platform }}-${{ matrix.args }}
 
       - name: Install Linux system dependencies
@@ -119,6 +147,45 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      # whisper-rs-sys links vulkan-1 and compiles GGML's Vulkan shaders (glslc)
+      # at build time when the vulkan feature is on, and panics without VULKAN_SDK.
+      # Install the latest LunarG SDK and export VULKAN_SDK + its Bin (glslc) dir.
+      # Also switch the CMake build to Ninja: ggml-vulkan's nested shader-gen
+      # sub-build overflows Windows' 260-char MAX_PATH under MSBuild's FileTracker
+      # (FTK1011, which ignores LongPathsEnabled). Ninja doesn't create those deep
+      # .tlog files, so the build stays under the limit.
+      - name: Install Vulkan SDK + Ninja (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          choco install ninja -y --no-progress
+          "CMAKE_GENERATOR=Ninja" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # The npm `rc` package installs a node_modules/.bin/rc shim that yarn puts
+          # on PATH ahead of the Windows SDK's resource compiler. Under Ninja, CMake's
+          # vs_link_exe resolves `rc` from PATH, grabs the shim, and linking fails.
+          # Remove the shim and pin the real rc.exe (also prepend its dir to PATH so
+          # the vulkan-shaders-gen sub-build finds it too).
+          Remove-Item -Force "node_modules\.bin\rc","node_modules\.bin\rc.cmd","node_modules\.bin\rc.ps1","node_modules\.bin\rc.bat" -ErrorAction SilentlyContinue
+          $rc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\rc.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+          if ($rc) {
+            "CMAKE_RC_COMPILER=$($rc.FullName -replace '\\','/')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            (Split-Path $rc.FullName) | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          }
+          $installer = "$env:RUNNER_TEMP\vulkan_sdk.exe"
+          curl.exe -L --fail --retry 3 -o $installer "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe"
+          Start-Process -FilePath $installer -ArgumentList '--accept-licenses','--default-answer','--confirm-command','install' -Wait
+          $sdk = (Get-ChildItem 'C:\VulkanSDK' -Directory | Sort-Object Name -Descending | Select-Object -First 1).FullName
+          if (-not $sdk) { throw "Vulkan SDK install dir not found under C:\VulkanSDK" }
+          "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Write-Host "Installed Vulkan SDK at $sdk"
+
+      # Ninja needs cl/link on PATH (unlike the VS generator, which finds the
+      # toolchain itself). Activate the MSVC dev environment for the build step.
+      - name: Set up MSVC environment (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+
       # The repo permanently carries version 0.0.0 (dev marker); releases get
       # their real version from the tag. workflow_dispatch test builds keep
       # 0.0.0 so they're identifiable as non-releases.
@@ -132,6 +199,13 @@ jobs:
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
+          # Per-platform CPU SIMD baseline for whisper.cpp/ggml (see matrix).
+          # whisper-rs-sys forwards GGML_*-prefixed env vars to CMake. Empty on
+          # macOS (evaluates to "" → treated as OFF), where the universal build
+          # deliberately sets no x86 SIMD options.
+          GGML_AVX2: ${{ matrix.ggml_avx2 }}
+          GGML_FMA: ${{ matrix.ggml_fma }}
+          GGML_F16C: ${{ matrix.ggml_f16c }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -193,8 +267,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  publish-prerelease:
-    name: Publish prerelease to R2
+  publish-stable:
+    name: Publish stable to R2
     needs: build
     if: github.event_name == 'release' && !github.event.release.prerelease
     runs-on: ubuntu-latest
@@ -237,36 +311,40 @@ jobs:
           node scripts/build-updater-manifest.mjs \
             --dir incoming \
             --version "$VERSION" \
-            --base-url "$UPDATER_DOMAIN/prerelease/$VERSION" \
+            --base-url "$UPDATER_DOMAIN/stable/$VERSION" \
             --out latest.json
           cat latest.json
 
-      - name: Prune old prerelease versions
-        run: node scripts/prune-channel.mjs prerelease
+      - name: Prune old stable versions
+        run: node scripts/prune-channel.mjs stable
 
       - name: Upload bundles + manifest to R2
         run: |
-          # Upload every artifact we built: the updater bundles (.app.tar.gz /
-          # -setup.exe / .AppImage) with their .sig sidecars, plus the macOS .dmg.
-          # The .dmg is the human-facing installer the website links to; it isn't
-          # an updater artifact (absent from latest.json), so it goes up under a
-          # fixed name the website and promote step can find. Everything else keeps
+          # Upload the updater bundles (.app.tar.gz / -setup.exe / .AppImage) plus
+          # the macOS .dmg. The .dmg is the human-facing installer the website
+          # links to; it isn't an updater artifact (absent from latest.json), so it
+          # goes up under a fixed name the website can find. Everything else keeps
           # its own name and is discoverable straight from the manifest.
+          #
+          # Skip the .sig sidecars: their contents are already inlined into
+          # latest.json's signature field, so the app never fetches them. Leaving
+          # them out keeps R2 under its storage cap.
           for f in incoming/*; do
             [ -e "$f" ] || continue
             name="$(basename "$f")"
             case "$name" in
+              *.sig) continue ;;
               *.dmg) name="Myelin-macOS.dmg" ;;
             esac
             npx --yes wrangler@4 r2 object put \
-              "$R2_BUCKET/prerelease/$VERSION/$name" --file "$f" --remote
+              "$R2_BUCKET/stable/$VERSION/$name" --file "$f" --remote
           done
-          # Versioned copy lets promotion later fetch this exact version's manifest.
+          # Versioned copy pins this exact version's manifest.
           npx --yes wrangler@4 r2 object put \
-            "$R2_BUCKET/prerelease/$VERSION/latest.json" --file latest.json --remote
+            "$R2_BUCKET/stable/$VERSION/latest.json" --file latest.json --remote
           # The channel-root manifest is the live switch the app polls. Upload last.
           npx --yes wrangler@4 r2 object put \
-            "$R2_BUCKET/prerelease/latest.json" --file latest.json --remote
+            "$R2_BUCKET/stable/latest.json" --file latest.json --remote
 
   android:
     name: Build (android)
@@ -357,6 +435,28 @@ jobs:
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
           EOF
+
+      # The Rust cache above restores the target dir, which includes whisper-rs-sys's
+      # CMake build dir (out/build/CMakeCache.txt). On a restore-key (partial) cache
+      # hit -- e.g. whenever Cargo.lock changed -- cargo re-runs whisper-rs-sys's build
+      # script and the `cmake` crate RE-configures that restored build dir. Because
+      # whisper.cpp pins cmake_minimum_required(3.5) (CMP0126 = OLD), re-configuring an
+      # existing Android build tree makes CMake declare CMAKE_C_COMPILER "changed",
+      # print "you have changed variables that require your cache to be deleted", wipe
+      # the cache and re-configure -- and the wipe drops the crate's command-line
+      # -DWHISPER_BUILD_EXAMPLES=OFF / -DWHISPER_BUILD_TESTS=OFF. whisper.cpp then falls
+      # back to its WHISPER_STANDALONE=ON default and runs add_subdirectory(examples)/
+      # (tests) on dirs the packaged crate doesn't ship, failing with
+      # "add_subdirectory given source \"examples\" which is not an existing directory".
+      # (Confirmed locally: a fresh configure works; re-configuring the same dir resets.)
+      # The last green run had a cold cache; every failure since has been a warm one.
+      # cargo clean -p doesn't remove the per-target build-script dirs, so purge the
+      # whisper-rs-sys build + fingerprint dirs directly to force a clean reconfigure.
+      # The rest of the workspace stays cached.
+      - name: Purge cached whisper-rs-sys build (avoid stale CMake cache reset)
+        run: |
+          find src-tauri/target -type d -name 'whisper-rs-sys-*' -prune -exec rm -rf {} + 2>/dev/null || true
+          echo "Purged whisper-rs-sys build + fingerprint dirs"
 
       - name: Build Android
         env:

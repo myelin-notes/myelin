@@ -17,7 +17,7 @@ import { trackEvent } from '@/lib/analytics';
 import {
   type AudioTranscriptionSession,
   startAudioTranscription,
-  transcribeAudioBuffer,
+  startBufferTranscription,
 } from '@/lib/audio-transcription/service';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
@@ -275,7 +275,9 @@ export function AudioPlayerView({
           t.stop();
         });
       }
-      void transcriptionSessionRef.current?.finish();
+      // Cancel rather than finish: the element is gone, so abort any
+      // in-flight whisper run instead of letting it grind to completion.
+      void transcriptionSessionRef.current?.cancel();
       transcriptionSessionRef.current = null;
     },
     [],
@@ -407,7 +409,7 @@ export function AudioPlayerView({
         recordingStream.getTracks().forEach((t) => {
           t.stop();
         });
-        void transcriptionSession?.finish();
+        void transcriptionSession?.cancel();
         return;
       }
       recordChunksRef.current = [];
@@ -426,9 +428,12 @@ export function AudioPlayerView({
         recordingStream.getTracks().forEach((t) => {
           t.stop();
         });
-        const transcription = transcriptionSessionRef.current;
-        transcriptionSessionRef.current = null;
-        void finalizeRecording(recorder.mimeType, transcription);
+        // The ref stays set while whisper finishes so deleting the element
+        // mid-transcription can still cancel the backend session.
+        void finalizeRecording(
+          recorder.mimeType,
+          transcriptionSessionRef.current,
+        );
       };
 
       recorder.start(100);
@@ -441,7 +446,7 @@ export function AudioPlayerView({
     } catch {
       clearInterval(recordTickRef.current);
       mediaRecorderRef.current = null;
-      void transcriptionSessionRef.current?.finish();
+      void transcriptionSessionRef.current?.cancel();
       transcriptionSessionRef.current = null;
       stream?.getTracks().forEach((t) => {
         t.stop();
@@ -469,6 +474,9 @@ export function AudioPlayerView({
     recordChunksRef.current = [];
 
     if (chunks.length === 0) {
+      if (transcriptionSessionRef.current === transcription) {
+        transcriptionSessionRef.current = null;
+      }
       return;
     }
 
@@ -489,6 +497,9 @@ export function AudioPlayerView({
       // and return to "tap to record". Longer recordings that fail to decode
       // are kept with the wall-clock duration.
       if (dur < 1) {
+        if (transcriptionSessionRef.current === transcription) {
+          transcriptionSessionRef.current = null;
+        }
         return;
       }
     }
@@ -506,6 +517,9 @@ export function AudioPlayerView({
     }
     setIsTranscribing(true);
     const transcript = await transcriptPromise.catch(() => '');
+    if (transcriptionSessionRef.current === transcription) {
+      transcriptionSessionRef.current = null;
+    }
     if (disposedRef.current) {
       return;
     }
@@ -571,7 +585,23 @@ export function AudioPlayerView({
     setNotice(null);
     try {
       const { buffer } = await decodeAudio(audioBytes);
-      const text = await transcribeAudioBuffer(elementId, buffer);
+      const session = await startBufferTranscription(elementId, buffer);
+      if (!session) {
+        // Backend unavailable (e.g. bundled model missing).
+        if (!disposedRef.current) {
+          flashNotice(strings.transcriptionFailed);
+        }
+        return;
+      }
+      if (disposedRef.current) {
+        void session.cancel();
+        return;
+      }
+      transcriptionSessionRef.current = session;
+      const text = await session.finish();
+      if (transcriptionSessionRef.current === session) {
+        transcriptionSessionRef.current = null;
+      }
       if (disposedRef.current) {
         return;
       }
@@ -579,12 +609,8 @@ export function AudioPlayerView({
         onTranscribed(text);
         setShowTranscript(true);
       } else {
-        // null = backend unavailable; '' = whisper ran and heard nothing.
-        flashNotice(
-          text === null
-            ? strings.transcriptionFailed
-            : strings.noSpeechDetected,
-        );
+        // Whisper ran and heard nothing.
+        flashNotice(strings.noSpeechDetected);
       }
     } catch (error) {
       logger.error('On-demand audio transcription failed', error, {

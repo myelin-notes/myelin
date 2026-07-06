@@ -93,6 +93,7 @@ pub fn run() {
             transcription::start_audio_transcription,
             transcription::push_audio_transcription_samples,
             transcription::finish_audio_transcription,
+            transcription::cancel_audio_transcription,
             code_runner::run_code,
             code_runner::cancel_run,
         ]);
