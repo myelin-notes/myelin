@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
 import { I18nProvider } from '@/lib/i18n';
 import App from './App';
@@ -17,6 +18,7 @@ import './index.css';
 try {
   initErrorTracking();
   initRustErrorReporting();
+  disableNativePinchZoom();
   trackEvent('app_opened');
 
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
