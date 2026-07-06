@@ -1,5 +1,4 @@
 ---
-import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import Seo from '../components/Seo.astro';
@@ -46,13 +45,11 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     import { initWebAnalytics } from '../lib/posthog';
     initWebAnalytics();
   </script>
-  <body class="grain bg-page">
-    <div class="relative z-10">
-      <Nav />
-      <main>
-        <slot />
-      </main>
-      <Footer />
-    </div>
+  <body>
+    <Nav />
+    <main>
+      <slot />
+    </main>
+    <Footer />
   </body>
 </html>
