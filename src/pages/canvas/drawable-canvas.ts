@@ -5,6 +5,7 @@ import {
   describeElementType,
   summarizeDrawableElements,
 } from '@/lib/note/state-summary';
+import { CollisionHelper } from '../../lib/utils/collision-helper';
 import { StateMachine } from '../../lib/utils/state-machine';
 import { CanvasRenderer } from './canvas-renderer';
 import { CanvasViewport } from './canvas-viewport';
@@ -155,6 +156,12 @@ export class DrawableCanvas {
 
   private spaceDown: boolean = false;
   private screenPosition: Vector2 = { x: 0, y: 0 };
+
+  // Touch double-tap → element edit. A single finger pans (Moving state), which
+  // never runs the select tool, so its double-click edit path can't fire on
+  // touch; we detect the double-tap here instead.
+  private _lastTouchTapTime: number = 0;
+  private _lastTouchTapPos: Vector2 = { x: 0, y: 0 };
 
   /** Owns the element collections and keeps them mutating as a unit. */
   private readonly _store = new ElementStore(() => this.notifyChange());
@@ -745,6 +752,32 @@ export class DrawableCanvas {
     });
   }
 
+  /**
+   * Hit-test the topmost editable element under a world point and enter its
+   * edit mode, selecting it exclusively. Shared by the select tool's
+   * double-click path and the touch double-tap path. Returns whether an
+   * editable element was found.
+   */
+  public enterEditAtPoint(point: Vector2, event?: Event): boolean {
+    for (let i = this.elements.length - 1; i >= 0; i--) {
+      const element = this.elements[i];
+      if (!CollisionHelper.inBox(point, element.boundingBox)) {
+        continue;
+      }
+      if (element.editable) {
+        for (const other of this.elements) {
+          if (other !== element) {
+            other.unselect();
+          }
+        }
+        element.select();
+        this.enterElementEdit(element, event);
+        return true;
+      }
+    }
+    return false;
+  }
+
   public destroy(): void {
     if (this._editingElement) {
       this.exitElementEdit();
@@ -1058,10 +1091,25 @@ export class DrawableCanvas {
       }
 
       switch (evt.pointerType) {
-        case 'touch':
+        case 'touch': {
+          // Double-tap enters element edit (matches the mouse/pen double-click);
+          // otherwise a single finger pans the canvas.
+          const point = this.viewport.getPoint(evt);
+          const now = Date.now();
+          const dx = point.x - this._lastTouchTapPos.x;
+          const dy = point.y - this._lastTouchTapPos.y;
+          const isDoubleTap =
+            now - this._lastTouchTapTime < 400 && dx * dx + dy * dy < 25;
+          if (isDoubleTap && this.enterEditAtPoint(point, evt)) {
+            this._lastTouchTapTime = 0;
+            break;
+          }
+          this._lastTouchTapTime = now;
+          this._lastTouchTapPos = point;
           this.state.change(InteractState.Moving, evt);
           this.state.update(evt);
           break;
+        }
         // @ts-expect-error
         // biome-ignore lint/suspicious/noFallthroughSwitchClause: intentional fallthrough to default
         case 'mouse':

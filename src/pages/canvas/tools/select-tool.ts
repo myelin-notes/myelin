@@ -138,24 +138,9 @@ export class SelectTool implements ITool {
     const isDoubleClick =
       now - this.lastClickTime < 400 && dx * dx + dy * dy < 25;
 
-    if (isDoubleClick) {
-      for (let i = canvas.elements.length - 1; i >= 0; i--) {
-        const e = canvas.elements[i];
-        if (!CollisionHelper.inBox(point, e.boundingBox)) {
-          continue;
-        }
-        if (e.editable) {
-          for (const el of canvas.elements) {
-            if (el !== e) {
-              el.unselect();
-            }
-          }
-          e.select();
-          canvas.enterElementEdit(e, event);
-          this.lastClickTime = 0;
-          return;
-        }
-      }
+    if (isDoubleClick && canvas.enterEditAtPoint(point, event)) {
+      this.lastClickTime = 0;
+      return;
     }
 
     // 3. Hit-test elements (topmost first), cycle on repeated clicks

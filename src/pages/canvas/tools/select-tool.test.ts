@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CollisionHelper } from '@/lib/utils/collision-helper';
 import { catalogs } from '@/lib/i18n/messages';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { ElementType } from '../elements/element-type';
@@ -55,9 +56,29 @@ function makeImageElement() {
 
 function makeCanvas(elements: ImageElement[], point: Vector2) {
   const enterElementEdit = vi.fn();
+  // Mirrors DrawableCanvas.enterEditAtPoint: hit-test the topmost editable
+  // element under the point, select it exclusively, and enter its edit mode.
+  const enterEditAtPoint = vi.fn((p: Vector2, event?: Event) => {
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const element = elements[i];
+      if (!CollisionHelper.inBox(p, element.boundingBox) || !element.editable) {
+        continue;
+      }
+      for (const other of elements) {
+        if (other !== element) {
+          other.unselect();
+        }
+      }
+      element.select();
+      enterElementEdit(element, event);
+      return true;
+    }
+    return false;
+  });
   const canvas = {
     elements,
     enterElementEdit,
+    enterEditAtPoint,
     viewport: {
       getPoint: vi.fn(() => point),
     },
