@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
-import type { Repository, VFSNode } from '@/lib/sync';
+import type { Repository, VFSNode } from '@/lib/sync/core';
 import { ElementType } from '../../elements/element-type';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,

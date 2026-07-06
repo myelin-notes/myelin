@@ -5,7 +5,7 @@ import {
   type Repository,
   type VFSFileNode,
   type VFSNodeId,
-} from '@/lib/sync';
+} from '@/lib/sync/core';
 import type { PageFrameAutocompleteItem } from '../pm/autocomplete';
 import type { ResolveMediaSrc } from '../pm/embed/renderer';
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
 import {
@@ -8,10 +8,6 @@ import {
   PAGE_WIDTH,
 } from './page-frame-constants';
 import { PageFrameElement } from './page-frame-element';
-
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  save: vi.fn(),
-}));
 
 describe('PageFrameElement display name', () => {
   it('serializes the default display name when none is provided', () => {

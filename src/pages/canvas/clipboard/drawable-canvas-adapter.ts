@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import type * as Y from 'yjs';
-import type { VFSNodeId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync/core';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { ElementType } from '../elements/element-type';
 import { PageFrameElement } from '../elements/page-frame-element';

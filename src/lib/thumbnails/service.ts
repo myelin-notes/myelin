@@ -1,6 +1,6 @@
 import { Logger } from '@/lib/logger';
 import type { VFSNodeId } from '@/lib/sync';
-import * as cache from './cache';
+import { getPlatform } from '@/platform';
 
 export interface ThumbnailProducer {
   render(
@@ -19,6 +19,11 @@ export interface ThumbnailRegenerationOptions {
 
 const MAX_SIZE = 600;
 const SCHEDULED_DEBOUNCE_MS = 30_000;
+const THUMBNAILS_DIR = 'Thumbnails';
+
+function cachePath(nodeId: VFSNodeId): string {
+  return `${THUMBNAILS_DIR}/${nodeId}.png`;
+}
 
 const logger = new Logger('ThumbnailService');
 type ThumbnailTimer = ReturnType<typeof globalThis.setTimeout>;
@@ -92,7 +97,7 @@ export async function regenerateThumbnailNow(nodeId: VFSNodeId): Promise<void> {
 export async function getThumbnailUrl(
   nodeId: VFSNodeId,
 ): Promise<string | null> {
-  const url = await cache.readUrl(nodeId);
+  const url = await getPlatform().artifactCache.getUrl(cachePath(nodeId));
   if (url === null) {
     return null;
   }
@@ -123,11 +128,11 @@ export function subscribeThumbnail(
 }
 
 export async function clearAllThumbnails(): Promise<void> {
-  await cache.clearAll();
+  await getPlatform().artifactCache.remove(THUMBNAILS_DIR);
 }
 
 export async function removeThumbnail(nodeId: VFSNodeId): Promise<void> {
-  await cache.removeEntry(nodeId);
+  await getPlatform().artifactCache.remove(cachePath(nodeId));
   bumpVersion(nodeId);
   notify(nodeId);
 }
@@ -157,7 +162,7 @@ async function runGenerate(
       if (blob === null) {
         return;
       }
-      await cache.writeBlob(nodeId, blob);
+      await getPlatform().artifactCache.write(cachePath(nodeId), blob);
       bumpVersion(nodeId);
       notify(nodeId);
     } catch (err) {

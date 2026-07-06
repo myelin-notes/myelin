@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import type { VFSNodeId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync/core';
 import { ElementType } from '../elements/element-type';
 import { CanvasClipboardController } from './controller';
 import {

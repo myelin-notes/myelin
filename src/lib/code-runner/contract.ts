@@ -46,6 +46,12 @@ export function canonicalizeLanguage(token: string): RunnableLanguage | null {
   return LANGUAGE_ALIASES[token.trim().toLowerCase()] ?? null;
 }
 
+export interface RunCodeRequest {
+  executionId: string;
+  language: RunnableLanguage;
+  source: string;
+}
+
 export interface RunOutputEvent {
   executionId: string;
   stream: 'stdout' | 'stderr';

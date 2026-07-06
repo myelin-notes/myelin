@@ -19,6 +19,12 @@ export interface Transport {
   destroy(): Promise<void>;
 }
 
+/** A transport that can also host or join a discovery session. */
+export interface LiveDiscoveryTransport extends Transport {
+  host(): Promise<string>;
+  join(ticket: string): Promise<void>;
+}
+
 export const noopTransport: Transport = {
   connected: false,
   async send() {},

@@ -1,4 +1,4 @@
-import { ImageFileTypes, VideoFileTypes } from '@/lib/sync/repo/types';
+import { ImageFileTypes, VideoFileTypes } from '@/lib/sync/core';
 
 const IMAGE_EXT_RE = new RegExp(
   `\\.(${ImageFileTypes.join('|')})(\\?|#|$)`,

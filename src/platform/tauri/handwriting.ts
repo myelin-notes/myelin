@@ -1,30 +1,61 @@
 import { invoke } from '@tauri-apps/api/core';
+import { BaseDirectory, exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
-import type { ReindexItem } from '@/lib/note-index';
-import type { VFSNodeId } from '@/lib/sync';
-import { type RecognizedPage, readRecognizedPage } from './cache';
+import type { VFSNodeId } from '@/lib/sync/types';
+import type {
+  HandwritingCapability,
+  RecognizedPage,
+  ReindexItem,
+} from '../types';
 
 const logger = new Logger('HandwritingService');
+
+const HANDWRITING_DIR = 'Handwriting';
+const SUFFIX = '.json';
+
+function relPath(repoId: string, nodeId: VFSNodeId): string {
+  return `${HANDWRITING_DIR}/${repoId}/${nodeId}${SUFFIX}`;
+}
+
+/**
+ * The recognized handwriting for a node, or null if it has none yet. The
+ * on-disk artifact is written by the Rust handwriting engine; the field shape
+ * is a cross-language contract (see `src-tauri/src/handwriting/store.rs`).
+ */
+async function readRecognizedPage(
+  repoId: string,
+  nodeId: VFSNodeId,
+): Promise<RecognizedPage | null> {
+  const rel = relPath(repoId, nodeId);
+  if (!(await exists(rel, { baseDir: BaseDirectory.AppCache }))) {
+    return null;
+  }
+  try {
+    const json = await readTextFile(rel, { baseDir: BaseDirectory.AppCache });
+    return JSON.parse(json) as RecognizedPage;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Thin client over the Rust handwriting engine: triggers recognition from the
  * same save path that triggers reindex, so handwriting is re-recognized
  * whenever a note's strokes change. The heavy work (stroke clustering, the
  * per-line cache, recognition, artifact I/O) all lives in Rust on its own
- * worker. A single {@link handwritingService} instance is shared app-wide.
+ * worker.
  *
  * The client schedules recognition, exposes reads of the recognized artifact
  * (search pulls a page on demand via {@link readPage}) and cleans up; it holds
  * no in-memory corpus.
  */
-export class HandwritingService {
+export class TauriHandwritingService implements HandwritingCapability {
   /**
    * The repository recognition currently targets. Artifacts are namespaced per
    * repo on disk. Null between a {@link reset} and the next {@link init}.
    */
   private repoId: string | null = null;
 
-  /** Point the service at a repository. Pair with {@link reset} on teardown. */
   init(repoId: string): void {
     this.repoId = repoId;
   }
@@ -33,7 +64,6 @@ export class HandwritingService {
     this.repoId = null;
   }
 
-  /** Queue a single note for (debounced) handwriting recognition. */
   requestRecognize(nodeId: VFSNodeId, path: string, fileType: string): void {
     const repoId = this.repoId;
     if (!repoId) {
@@ -49,7 +79,6 @@ export class HandwritingService {
     });
   }
 
-  /** Hand the engine a batch of candidates (startup backfill). */
   startBackfill(items: ReindexItem[]): void {
     const repoId = this.repoId;
     if (!repoId || items.length === 0) {
@@ -62,7 +91,6 @@ export class HandwritingService {
     );
   }
 
-  /** Read a node's recognized handwriting from the on-disk artifact. */
   async readPage(nodeId: VFSNodeId): Promise<RecognizedPage | null> {
     const repoId = this.repoId;
     if (!repoId) {
@@ -83,5 +111,3 @@ export class HandwritingService {
     }
   }
 }
-
-export const handwritingService = new HandwritingService();

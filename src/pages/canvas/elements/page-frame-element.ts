@@ -8,12 +8,10 @@ import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { Selection } from 'prosemirror-state';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import { save } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { trackEvent } from '@/lib/analytics';
 import { getMessages } from '@/lib/i18n';
-import { exportPdf as exportPdfToRust } from '@/lib/pdf-export/client';
 import { UserPrefs } from '@/lib/user-prefs';
+import { getPlatform } from '@/platform';
 import { getCanvasPalette } from '../canvas-theme';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
@@ -505,9 +503,10 @@ export class PageFrameElement extends DrawableElement {
   }
 
   private buildExportTarget(): ExportTarget {
+    // PDF export is a platform capability; markdown only needs saveFile.
     return {
       title: this._displayName || DEFAULT_PAGE_FRAME_DISPLAY_NAME,
-      formats: ['pdf', 'markdown'],
+      formats: getPlatform().pdfExport ? ['pdf', 'markdown'] : ['markdown'],
       supportsAnnotations: true,
       run: (options) => this.runExport(options),
     };
@@ -545,42 +544,41 @@ export class PageFrameElement extends DrawableElement {
     // batches that yield to the event loop, so the save dialog animation
     // and menu close both paint smoothly while the doc is processed.
     const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
-    const path = await save({
-      defaultPath: `${this.getSafeExportName()}.md`,
-      filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+    const result = await getPlatform().saveFile({
+      suggestedName: `${this.getSafeExportName()}.md`,
+      filter: { name: 'Markdown', extensions: ['md', 'markdown'] },
+      data: mdPromise,
     });
-    if (!path) {
-      return { cancelled: true };
-    }
-    const md = await mdPromise;
-    await writeTextFile(path, md);
-    return {};
+    return result.cancelled ? { cancelled: true } : {};
   }
 
   private async runPdfExport(
     includeAnnotations: boolean,
   ): Promise<ExportResult> {
-    const contentDiv = this.contentDiv;
-    if (!contentDiv) {
-      return {};
-    }
-    const path = await save({
-      defaultPath: `${this.getSafeExportName()}.pdf`,
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    });
-    if (!path) {
+    const pdfExport = getPlatform().pdfExport;
+    if (!pdfExport || !this.contentDiv) {
       return { cancelled: true };
     }
-    const overlays = includeAnnotations
-      ? (this._exportElementsProvider?.() ?? [])
-      : [];
-    const source = this.getPdfExportSource(overlays);
-    if (!source) {
-      return {};
+    let warnings: string[] = [];
+    const outcome = await pdfExport.export({
+      suggestedName: `${this.getSafeExportName()}.pdf`,
+      buildRequest: async () => {
+        const overlays = includeAnnotations
+          ? (this._exportElementsProvider?.() ?? [])
+          : [];
+        const source = this.getPdfExportSource(overlays);
+        if (!source) {
+          return null;
+        }
+        await prepareExportOverlays(overlays);
+        const harvest = await harvestPageFramePdf(source);
+        warnings = harvest.warnings;
+        return harvest.request;
+      },
+    });
+    if (outcome.cancelled) {
+      return { cancelled: true };
     }
-    await prepareExportOverlays(overlays);
-    const { request, warnings } = await harvestPageFramePdf(source);
-    await exportPdfToRust(request, path);
     return { warnings };
   }
 

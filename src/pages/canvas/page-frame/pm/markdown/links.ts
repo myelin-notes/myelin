@@ -5,8 +5,8 @@ import {
   Plugin,
   TextSelection,
 } from 'prosemirror-state';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { UserPrefs } from '@/lib/user-prefs';
+import { getPlatform } from '@/platform';
 import {
   collectAffectedTextblocks,
   getChangedRangesForTransactions,
@@ -374,7 +374,7 @@ function handleModifiedLinkInteraction(event: MouseEvent): boolean {
   }
 
   event.preventDefault();
-  void openUrl(openableHref);
+  void getPlatform().openExternal(openableHref);
   return true;
 }
 

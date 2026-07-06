@@ -1,14 +1,8 @@
 import type { EditorView } from 'prosemirror-view';
-import type { UnlistenFn } from '@tauri-apps/api/event';
 import { trackEvent } from '@/lib/analytics';
-import {
-  cancelRun,
-  onRunFinished,
-  onRunOutput,
-  runCode,
-} from '@/lib/code-runner/client';
 import type { RunnableLanguage } from '@/lib/code-runner/contract';
 import { Logger } from '@/lib/logger';
+import { getPlatform, type Unsubscribe } from '@/platform';
 import type { RunSource } from './concat';
 import { codeRunStore } from './run-store';
 
@@ -43,8 +37,8 @@ export class CodeBlockRunView {
   private runStartedAt = 0;
   private runCancelled = false;
 
-  private unlistenOutput: UnlistenFn | null = null;
-  private unlistenFinished: UnlistenFn | null = null;
+  private unlistenOutput: Unsubscribe | null = null;
+  private unlistenFinished: Unsubscribe | null = null;
 
   constructor(private readonly options: CodeBlockRunViewOptions) {
     this.button = document.createElement('button');
@@ -55,18 +49,24 @@ export class CodeBlockRunView {
     this.syncButton();
   }
 
-  /** Show the button only for languages with a local runner. */
+  /**
+   * Show the button only for languages with a local runner, and only when
+   * this platform can run code at all.
+   */
   setLanguage(language: RunnableLanguage | null): void {
     if (language === this.language) {
       return;
     }
     this.language = language;
-    this.button.style.display = language ? '' : 'none';
+    this.button.style.display =
+      language && getPlatform().codeRunner ? '' : 'none';
   }
 
   dispose(): void {
     if (this.executionId) {
-      void cancelRun(this.executionId).catch(() => {});
+      void getPlatform()
+        .codeRunner?.cancelRun(this.executionId)
+        .catch(() => {});
     }
     this.clearListeners();
     codeRunStore.remove(this.id);
@@ -76,9 +76,9 @@ export class CodeBlockRunView {
     if (this.running) {
       if (this.executionId) {
         this.runCancelled = true;
-        void cancelRun(this.executionId).catch((err) =>
-          logger.error('cancel_run failed', err),
-        );
+        void getPlatform()
+          .codeRunner?.cancelRun(this.executionId)
+          .catch((err) => logger.error('cancel_run failed', err));
       }
       return;
     }
@@ -86,6 +86,10 @@ export class CodeBlockRunView {
   }
 
   private async run(): Promise<void> {
+    const codeRunner = getPlatform().codeRunner;
+    if (!codeRunner) {
+      return;
+    }
     const payload = this.options.collectSource();
     if (!payload) {
       return;
@@ -101,18 +105,21 @@ export class CodeBlockRunView {
 
     // Subscribe before invoking so a fast-exiting process can't emit before a
     // listener exists.
-    this.unlistenOutput = await onRunOutput(executionId, (event) => {
+    this.unlistenOutput = await codeRunner.onRunOutput(executionId, (event) => {
       codeRunStore.appendLines(
         this.id,
         event.lines.map((text) => ({ text, stream: event.stream })),
       );
     });
-    this.unlistenFinished = await onRunFinished(executionId, (event) => {
-      this.onFinished(event.exitCode, event.error);
-    });
+    this.unlistenFinished = await codeRunner.onRunFinished(
+      executionId,
+      (event) => {
+        this.onFinished(event.exitCode, event.error);
+      },
+    );
 
     try {
-      await runCode({
+      await codeRunner.runCode({
         executionId,
         language: payload.language,
         source: payload.source,

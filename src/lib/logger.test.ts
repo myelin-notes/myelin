@@ -1,22 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  getRepositoryTestStorage,
-  resetRepositoryTestDoubles,
-} from '@/test/repository-test-utils';
-import {
-  flushLogs,
-  getLogFilePath,
-  Logger,
-  resetLoggingForTests,
-} from './logger';
+import { setPlatform } from '@/platform';
+import { createFakePlatform } from '@/test/fake-platform';
+import { flushLogs, Logger, resetLoggingForTests } from './logger';
 
 describe('Logger', () => {
+  let written: string[];
+
   beforeEach(() => {
-    resetRepositoryTestDoubles();
+    written = [];
+    setPlatform(
+      createFakePlatform({
+        writeLogs: async (lines) => {
+          written.push(...lines);
+        },
+      }),
+    );
     resetLoggingForTests({
       mode: 'development',
       persistDebug: false,
-      maxFileBytes: 8192,
     });
     vi.restoreAllMocks();
   });
@@ -30,9 +31,8 @@ describe('Logger', () => {
 
     await flushLogs();
 
-    const raw = getRepositoryTestStorage().readText(getLogFilePath());
-    expect(raw).toBeTruthy();
-    const entry = JSON.parse(raw!.trim()) as {
+    expect(written).toHaveLength(1);
+    const entry = JSON.parse(written[0]) as {
       level: string;
       subsystem: string;
       message: string;
@@ -57,8 +57,8 @@ describe('Logger', () => {
 
     await flushLogs();
 
-    const raw = getRepositoryTestStorage().readText(getLogFilePath());
-    const entry = JSON.parse(raw!.trim()) as {
+    expect(written).toHaveLength(1);
+    const entry = JSON.parse(written[0]) as {
       error?: { name: string; message: string; stack?: string };
       metadata?: Record<string, unknown>;
     };
@@ -71,7 +71,7 @@ describe('Logger', () => {
     });
   });
 
-  it('serializes concurrent writes through a single file sink', async () => {
+  it('serializes concurrent writes through a single sink', async () => {
     const logger = new Logger('Concurrent');
     for (let i = 0; i < 5; i++) {
       logger.info(`message-${i}`);
@@ -79,13 +79,9 @@ describe('Logger', () => {
 
     await flushLogs();
 
-    const raw = getRepositoryTestStorage().readText(getLogFilePath()) ?? '';
-    const lines = raw
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as { message: string });
-
+    const lines = written.map(
+      (line) => JSON.parse(line) as { message: string },
+    );
     expect(lines).toHaveLength(5);
     expect(lines.map((line) => line.message)).toEqual([
       'message-0',
@@ -94,24 +90,6 @@ describe('Logger', () => {
       'message-3',
       'message-4',
     ]);
-  });
-
-  it('trims the log file to the configured size cap', async () => {
-    resetLoggingForTests({
-      mode: 'development',
-      persistDebug: false,
-      maxFileBytes: 180,
-    });
-    const logger = new Logger('Trim');
-    logger.info('first entry that should be rotated out');
-    logger.info('second entry that should survive');
-    logger.info('third entry that should survive');
-
-    await flushLogs();
-
-    const raw = getRepositoryTestStorage().readText(getLogFilePath()) ?? '';
-    expect(new TextEncoder().encode(raw).byteLength).toBeLessThanOrEqual(180);
-    expect(raw).not.toContain('first entry that should be rotated out');
   });
 
   it('applies console policy by environment', async () => {
@@ -123,7 +101,6 @@ describe('Logger', () => {
     resetLoggingForTests({
       mode: 'production',
       persistDebug: false,
-      maxFileBytes: 8192,
     });
 
     const logger = new Logger('Policy');

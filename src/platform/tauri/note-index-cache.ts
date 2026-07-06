@@ -4,7 +4,8 @@ import {
   readDir,
   readTextFile,
 } from '@tauri-apps/plugin-fs';
-import type { VFSNodeId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync/types';
+import type { NoteEmbedding } from '../types';
 
 const INDEX_DIR = 'NoteIndex';
 const SUFFIX = '.json';
@@ -20,15 +21,9 @@ export interface NoteIndexRecord {
   sourceHash: string;
   schemaVersion: number;
   text: string;
-  embedding?: NoteIndexEmbedding | null;
+  embedding?: NoteEmbedding | null;
   providers: NoteIndexProviderEntry[];
   updatedAt: number;
-}
-
-export interface NoteIndexEmbedding {
-  model: string;
-  dim: number;
-  vector: number[];
 }
 
 export interface NoteIndexProviderEntry {
@@ -42,15 +37,6 @@ function repoDir(repoId: string): string {
 
 function relPath(repoId: string, nodeId: VFSNodeId): string {
   return `${repoDir(repoId)}/${nodeId}${SUFFIX}`;
-}
-
-/** Combined searchable text for a node, or null if it has no index yet. */
-export async function readNodeText(
-  repoId: string,
-  nodeId: VFSNodeId,
-): Promise<string | null> {
-  const record = await readNodeRecord(repoId, nodeId);
-  return record && record.text.length > 0 ? record.text : null;
 }
 
 export async function readNodeRecord(

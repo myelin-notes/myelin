@@ -5,7 +5,7 @@ import type {
   VFSFolderNode,
   VFSNode,
   YjsSyncSnapshot,
-} from '@/lib/sync';
+} from '@/lib/sync/core';
 import { ElementType } from '../../elements/element-type';
 import { PAGE_HEIGHT, PAGE_WIDTH } from '../../elements/page-frame-constants';
 import { YDocManager } from '../../ydoc-manager';

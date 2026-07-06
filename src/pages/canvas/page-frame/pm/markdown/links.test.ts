@@ -1,7 +1,8 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { setPlatform } from '@/platform';
+import { createFakePlatform } from '@/test/fake-platform';
 import { parseMarkdownToDoc } from '../../markdown/parser';
 import { schema } from '../schema';
 import {
@@ -10,12 +11,11 @@ import {
   linkMarkdownPlugin,
 } from './links';
 
-vi.mock('@tauri-apps/plugin-opener', () => ({
-  openUrl: vi.fn(),
-}));
+const openExternal = vi.fn(async () => {});
 
 beforeEach(() => {
-  vi.mocked(openUrl).mockClear();
+  openExternal.mockClear();
+  setPlatform(createFakePlatform({ openExternal }));
 });
 
 function createEditorState(doc = schema.nodes.doc.createAndFill()!) {
@@ -131,7 +131,7 @@ describe('linkMarkdownPlugin', () => {
 
     expect(handleClick?.call(plugin, {} as EditorView, 1, event)).toBe(true);
     expect(preventDefault).toHaveBeenCalled();
-    expect(openUrl).toHaveBeenCalledWith('https://example.com');
+    expect(openExternal).toHaveBeenCalledWith('https://example.com');
   });
 
   it('normalizes bare domains before opening them on cmd-click', () => {
@@ -155,7 +155,7 @@ describe('linkMarkdownPlugin', () => {
 
     expect(handleClick?.call(plugin, {} as EditorView, 1, event)).toBe(true);
     expect(preventDefault).toHaveBeenCalled();
-    expect(openUrl).toHaveBeenCalledWith('https://example.com/docs');
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/docs');
   });
 
   it('normalizes localhost links to http before opening them on ctrl-click', () => {
@@ -179,7 +179,7 @@ describe('linkMarkdownPlugin', () => {
 
     expect(handleClick?.call(plugin, {} as EditorView, 1, event)).toBe(true);
     expect(preventDefault).toHaveBeenCalled();
-    expect(openUrl).toHaveBeenCalledWith('http://localhost:3000/path');
+    expect(openExternal).toHaveBeenCalledWith('http://localhost:3000/path');
   });
 });
 

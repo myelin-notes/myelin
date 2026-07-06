@@ -1,22 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Logger } from '@/lib/logger';
-import type { VFSNodeId } from '@/lib/sync';
-import * as cache from './cache';
+import type { VFSNodeId } from '@/lib/sync/types';
+import type { NoteEmbedding, NoteIndexCapability, ReindexItem } from '../types';
+import * as cache from './note-index-cache';
 
 const logger = new Logger('NoteIndexService');
-
-/**
- * One reindex request, as passed to the Rust engine. The frontend owns the
- * node list (the manifest), so it supplies the on-disk path and file type.
- */
-export interface ReindexItem {
-  nodeId: VFSNodeId;
-  path: string;
-  fileType: string;
-}
-
-export type NoteEmbedding = cache.NoteIndexEmbedding;
 
 function yieldToIdle(): Promise<void> {
   return new Promise((resolve) => {
@@ -40,9 +29,9 @@ function yieldToIdle(): Promise<void> {
  * Thin client over the Rust note-index engine: triggers reindexing, listens for
  * completion events, and holds the in-memory search corpus the search layer
  * reads. The heavy work (provider selection, extraction, queueing, staleness)
- * all lives in Rust. A single {@link noteIndexService} instance is shared app-wide.
+ * all lives in Rust.
  */
-export class NoteIndexService {
+export class TauriNoteIndexService implements NoteIndexCapability {
   /** node id -> extracted text. The synchronous corpus the search layer reads. */
   private readonly contentByNode = new Map<VFSNodeId, string>();
   private readonly embeddingByNode = new Map<VFSNodeId, NoteEmbedding>();
@@ -84,7 +73,6 @@ export class NoteIndexService {
     this.embeddingByNode.clear();
   }
 
-  /** The synchronous index corpus, keyed by node id, for the search layer. */
   getContent(): ReadonlyMap<VFSNodeId, string> {
     return this.contentByNode;
   }
@@ -97,7 +85,6 @@ export class NoteIndexService {
     return invoke<NoteEmbedding>('embed_search_query', { query });
   }
 
-  /** Queue a single note for (debounced) reindexing in the Rust engine. */
   requestReindex(nodeId: VFSNodeId, path: string, fileType: string): void {
     const repoId = this.repoId;
     if (!repoId) {
@@ -110,7 +97,6 @@ export class NoteIndexService {
     );
   }
 
-  /** Hand the engine a batch of stale/missing candidates (startup backfill). */
   startBackfill(items: ReindexItem[]): void {
     const repoId = this.repoId;
     if (!repoId || items.length === 0) {
@@ -197,5 +183,3 @@ export class NoteIndexService {
     }
   }
 }
-
-export const noteIndexService = new NoteIndexService();

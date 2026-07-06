@@ -6,11 +6,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { listen } from '@tauri-apps/api/event';
 import { useKeybindings } from '@/hooks/useKeybindings';
-import { handwritingService } from '@/lib/handwriting';
 import type { ActionBinding } from '@/lib/keybinds';
 import type { VFSNodeId } from '@/lib/sync';
+import { getPlatform } from '@/platform';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { PageFrameElement } from '../elements/page-frame-element';
 import {
@@ -202,9 +201,15 @@ export function useCanvasSearch(
 
   // Read this node's recognized handwriting from disk and re-collect sources
   // with it merged in. Re-collecting also refreshes the live text/frame/
-  // transcript sources, which is fine — collection is cheap.
+  // transcript sources, which is fine — collection is cheap. Without the
+  // handwriting capability there is no artifact — search simply has no
+  // handwriting layer.
   const refreshHandwritingSources = useCallback(() => {
-    void handwritingService.readPage(nodeId).then((page) => {
+    const handwriting = getPlatform().handwriting;
+    if (!handwriting) {
+      return;
+    }
+    void handwriting.readPage(nodeId).then((page) => {
       const current = drawableCanvasRef.current;
       if (current) {
         setSources(collectCanvasSearchSources(current, page));
@@ -231,13 +236,13 @@ export function useCanvasSearch(
   // without reopening. New handwriting matches append after the element
   // matches, so the current position stays put.
   useEffect(() => {
-    if (!open) {
+    if (!open || !getPlatform().handwriting) {
       return;
     }
-    const unlisten = listen<{ nodeId: VFSNodeId }>(
+    const unlisten = getPlatform().subscribeEvent<{ nodeId: VFSNodeId }>(
       'handwriting-updated',
-      (event) => {
-        if (event.payload.nodeId === nodeId) {
+      (payload) => {
+        if (payload.nodeId === nodeId) {
           refreshHandwritingSources();
         }
       },

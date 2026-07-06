@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
-import type { NoteEmbedding } from '@/lib/note-index';
 import { type SearchField, type SearchHit, searchItems } from '@/lib/search';
+import type { NoteEmbedding } from '@/platform';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import {
   type FileType,

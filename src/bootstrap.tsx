@@ -2,6 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
 import { I18nProvider } from '@/lib/i18n';
+import { flushLogs } from '@/lib/logger';
+import { setPlatform } from '@/platform';
+import { tauriPlatform } from '@/platform/tauri';
 import App from './App';
 import { trackEvent } from './lib/analytics';
 import { initErrorTracking } from './lib/posthog';
@@ -15,6 +18,9 @@ import './index.css';
 // is reported, rather than silently blanking the window. The try/catch here
 // covers throws during the synchronous startup calls below.
 try {
+  setPlatform(tauriPlatform);
+  // Drain log lines queued while modules were importing (pre-platform).
+  void flushLogs();
   initErrorTracking();
   initRustErrorReporting();
   trackEvent('app_opened');

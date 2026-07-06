@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
-vi.mock('@tauri-apps/plugin-http', () => ({ fetch: fetchMock }));
-
+import { setPlatform } from '@/platform';
+import { createFakePlatform } from '@/test/fake-platform';
 import { fetchEmbed } from './fetcher';
+
+const fetchMock = vi.fn();
 
 function response(opts: {
   ok?: boolean;
@@ -35,6 +35,7 @@ function uniqueUrl(): string {
 describe('fetchEmbed content-type detection', () => {
   beforeEach(() => {
     fetchMock.mockReset();
+    setPlatform(createFakePlatform({ fetch: fetchMock }));
   });
 
   it('treats an image content-type as a media embed', async () => {

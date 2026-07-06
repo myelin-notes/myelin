@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NoteIndexService } from './service';
+import { TauriNoteIndexService } from './note-index';
 
 const invoke = vi.fn();
 let listenHandler:
@@ -22,7 +22,7 @@ vi.mock('@tauri-apps/api/event', () => ({
   },
 }));
 
-vi.mock('./cache', () => ({
+vi.mock('./note-index-cache', () => ({
   readNodeRecord: (...args: unknown[]) => readNodeRecord(...args),
   listIndexedNodeIds: (...args: unknown[]) => listIndexedNodeIds(...args),
 }));
@@ -62,7 +62,7 @@ function record(
 
 describe('NoteIndexService', () => {
   it('requestReindex invokes the engine with the active repo and camelCase args', async () => {
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     await service.init('repo-a');
     service.requestReindex('n1', '/files/n1.mcanvas', 'mcanvas');
     expect(invoke).toHaveBeenCalledWith('reindex_note', {
@@ -74,7 +74,7 @@ describe('NoteIndexService', () => {
   });
 
   it('skips reindex/backfill/remove while no repo is active', async () => {
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     service.requestReindex('n1', '/files/n1.mcanvas', 'mcanvas');
     service.startBackfill([
       { nodeId: 'n1', path: '/files/n1.mcanvas', fileType: 'mcanvas' },
@@ -85,7 +85,7 @@ describe('NoteIndexService', () => {
 
   it('updates the corpus on an index-updated event for the active repo', async () => {
     readNodeRecord.mockResolvedValue(record('hello indexed world', [0.1, 0.2]));
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     await service.init('repo-a');
     expect(listenHandler).toBeTruthy();
 
@@ -98,7 +98,7 @@ describe('NoteIndexService', () => {
 
   it('ignores index-updated events for a different repo', async () => {
     readNodeRecord.mockResolvedValue(record('stale repo text'));
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     await service.init('repo-a');
 
     listenHandler?.({ payload: { nodeId: 'n1', repoId: 'repo-b' } });
@@ -112,7 +112,7 @@ describe('NoteIndexService', () => {
     readNodeRecord.mockImplementation(async (_repoId: string, id: string) =>
       id === 'n1' ? record('first note', [1]) : record('second note'),
     );
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     await service.init('repo-a');
 
     expect(listIndexedNodeIds).toHaveBeenCalledWith('repo-a');
@@ -124,7 +124,7 @@ describe('NoteIndexService', () => {
   it('hydrates embeddings regardless of model id (staleness enforced downstream)', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1']);
     readNodeRecord.mockResolvedValue(record('other model text', [1], 'other'));
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     await service.init('repo-a');
 
     expect(service.getContent().get('n1')).toBe('other model text');
@@ -135,7 +135,7 @@ describe('NoteIndexService', () => {
   it('reset clears the corpus and detaches from the active repo', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1']);
     readNodeRecord.mockResolvedValue(record('old repo text', [1]));
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     await service.init('repo-a');
     expect(service.getContent().get('n1')).toBe('old repo text');
 
@@ -151,7 +151,7 @@ describe('NoteIndexService', () => {
   it('removeIndex clears the corpus entry and invokes remove_index', async () => {
     listIndexedNodeIds.mockResolvedValue(['n1']);
     readNodeRecord.mockResolvedValue(record('doomed text', [1]));
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     await service.init('repo-a');
     expect(service.getContent().get('n1')).toBe('doomed text');
 
@@ -166,7 +166,7 @@ describe('NoteIndexService', () => {
   });
 
   it('startBackfill forwards items with the active repo and skips empty batches', async () => {
-    const service = new NoteIndexService();
+    const service = new TauriNoteIndexService();
     await service.init('repo-a');
     const items = [
       { nodeId: 'n1', path: '/files/n1.mcanvas', fileType: 'mcanvas' },

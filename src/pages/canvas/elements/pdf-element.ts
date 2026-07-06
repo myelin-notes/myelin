@@ -5,10 +5,10 @@ import {
 } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type * as Y from 'yjs';
-import { save } from '@tauri-apps/plugin-dialog';
 import { getMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { bytesToBase64, exportPdf } from '@/lib/pdf-export/client';
+import { bytesToBase64 } from '@/lib/pdf-export/contract';
+import { getPlatform } from '@/platform';
 import { CanvasPool } from '../canvas-pool';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
@@ -337,12 +337,18 @@ export class PdfElement extends DrawableElement {
         checked: this._pageLayout === 'horizontal',
         onSelect: () => this.setPageLayout('horizontal'),
       },
-      {
-        id: 'export',
-        label: strings.export,
-        icon: DownloadIcon,
-        onSelect: () => openExportDialog(this.buildExportTarget()),
-      },
+      // PDF is this element's only export format, so the entry itself is
+      // gated on the capability.
+      ...(getPlatform().pdfExport
+        ? [
+            {
+              id: 'export',
+              label: strings.export,
+              icon: DownloadIcon,
+              onSelect: () => openExportDialog(this.buildExportTarget()),
+            },
+          ]
+        : []),
     ];
   }
 
@@ -496,25 +502,27 @@ export class PdfElement extends DrawableElement {
   private async runExport({
     includeAnnotations,
   }: ExportOptions): Promise<ExportResult> {
+    const pdfExport = getPlatform().pdfExport;
+    if (!pdfExport) {
+      return { cancelled: true };
+    }
     const source = this.getPdfExportSource();
     if (!source) {
       return {};
     }
-    const path = await save({
-      defaultPath: this.getDefaultExportFileName(),
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    const outcome = await pdfExport.export({
+      suggestedName: this.getDefaultExportFileName(),
+      buildRequest: async () => {
+        const overlays = includeAnnotations
+          ? (this._exportElementsProvider?.() ?? [])
+          : [];
+        await prepareExportOverlays(overlays);
+        const request = buildPdfElementRequest(source, overlays);
+        request.originalPdfB64 = bytesToBase64(source.pdfBytes);
+        return request;
+      },
     });
-    if (!path) {
-      return { cancelled: true };
-    }
-    const overlays = includeAnnotations
-      ? (this._exportElementsProvider?.() ?? [])
-      : [];
-    await prepareExportOverlays(overlays);
-    const request = buildPdfElementRequest(source, overlays);
-    request.originalPdfB64 = bytesToBase64(source.pdfBytes);
-    await exportPdf(request, path);
-    return {};
+    return outcome.cancelled ? { cancelled: true } : {};
   }
 
   public getPdfExportSource(): PdfElementExportSource | null {

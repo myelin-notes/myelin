@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import { trackEvent } from '@/lib/analytics';
 import { Logger } from '@/lib/logger';
 import { summarizeNoteBytes } from '@/lib/note/state-summary';
-import type { ReindexItem } from '@/lib/note-index';
+import type { ReindexItem } from '@/platform';
 import { NoteSession } from '../../session';
 import type {
   YjsSyncPushOptions,

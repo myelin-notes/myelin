@@ -11,7 +11,7 @@ import type {
   VFSNode,
   VFSNodeId,
   YjsSyncTarget,
-} from '@/lib/sync';
+} from '@/lib/sync/core';
 import { ElementType } from '../../elements/element-type';
 import { normalizePageFrameDisplayName } from '../../elements/page-frame-constants';
 import { YDocManager } from '../../ydoc-manager';

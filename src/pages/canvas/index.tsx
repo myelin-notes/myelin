@@ -37,6 +37,7 @@ import { regenerateThumbnailNow } from '@/lib/thumbnails';
 import { UserPrefs } from '@/lib/user-prefs';
 import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
+import { getPlatform } from '@/platform';
 import { buildCanvasPdfExportTarget } from './canvas-pdf-export';
 import type { ChromeMenuItem } from './chrome-menu';
 import { setChromeMenuOpener } from './chrome-menu';
@@ -429,25 +430,27 @@ function CanvasViewInner({
             </TooltipTrigger>
             <TooltipContent>{redoLabel}</TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={onExportCanvasPdf}
-                  aria-label={strings.canvas.export.exportCanvasPdf}
-                  disabled={!engine.ready}
-                />
-              }
-            >
-              <Download className="size-3.5" />
-            </TooltipTrigger>
-            <TooltipContent>
-              {strings.canvas.export.exportCanvasPdf}
-            </TooltipContent>
-          </Tooltip>
+          {getPlatform().pdfExport && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={onExportCanvasPdf}
+                    aria-label={strings.canvas.export.exportCanvasPdf}
+                    disabled={!engine.ready}
+                  />
+                }
+              >
+                <Download className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>
+                {strings.canvas.export.exportCanvasPdf}
+              </TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger
               render={

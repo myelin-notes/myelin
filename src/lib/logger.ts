@@ -1,12 +1,6 @@
-import {
-  BaseDirectory,
-  exists,
-  mkdir,
-  readTextFile,
-  writeTextFile,
-} from '@tauri-apps/plugin-fs';
 import { IS_DEV, PERSIST_DEBUG_LOGS } from '@/lib/env';
 import { isErrorTrackingEnabled, posthog } from '@/lib/posthog';
+import { getPlatform, isPlatformSet } from '@/platform';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -28,12 +22,8 @@ interface LogEntry {
 interface LoggerRuntimeOptions {
   mode: 'development' | 'production';
   persistDebug: boolean;
-  maxFileBytes: number;
 }
 
-const LOGS_DIR = 'logs';
-const LOG_FILE = `${LOGS_DIR}/app.log`;
-const DEFAULT_MAX_FILE_BYTES = 512 * 1024;
 const REDACTED = '[REDACTED]';
 const SENSITIVE_KEY_PATTERN =
   /(token|password|secret|authorization|credential|cookie|vault|api[-_]?key)/i;
@@ -42,14 +32,12 @@ function getDefaultRuntimeOptions(): LoggerRuntimeOptions {
   return {
     mode: IS_DEV ? 'development' : 'production',
     persistDebug: IS_DEV && PERSIST_DEBUG_LOGS,
-    maxFileBytes: DEFAULT_MAX_FILE_BYTES,
   };
 }
 
 let runtimeOptions: LoggerRuntimeOptions = getDefaultRuntimeOptions();
 let queue: string[] = [];
 let flushPromise: Promise<void> | null = null;
-let logDirectoryReady = false;
 let internalError = false;
 
 function consoleEnabled(level: LogLevel): boolean {
@@ -200,61 +188,19 @@ function emitConsole(entry: LogEntry): void {
   method(...args);
 }
 
-async function ensureLogDirectory(): Promise<void> {
-  if (logDirectoryReady) {
-    return;
-  }
-
-  if (!(await exists(LOGS_DIR, { baseDir: BaseDirectory.AppData }))) {
-    await mkdir(LOGS_DIR, {
-      baseDir: BaseDirectory.AppData,
-      recursive: true,
-    });
-  }
-
-  logDirectoryReady = true;
-}
-
-function trimLogText(text: string, maxBytes: number): string {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  const bytes = encoder.encode(text);
-  if (bytes.byteLength <= maxBytes) {
-    return text;
-  }
-
-  const tailBytes = bytes.slice(bytes.byteLength - maxBytes);
-  let trimmed = decoder.decode(tailBytes);
-  const firstNewline = trimmed.indexOf('\n');
-  if (firstNewline !== -1) {
-    trimmed = trimmed.slice(firstNewline + 1);
-  }
-  return trimmed;
-}
-
-async function writeBatch(batch: string[]): Promise<void> {
-  await ensureLogDirectory();
-  const existing = (await exists(LOG_FILE, { baseDir: BaseDirectory.AppData }))
-    ? await readTextFile(LOG_FILE, { baseDir: BaseDirectory.AppData })
-    : '';
-  const next = trimLogText(
-    `${existing}${batch.join('\n')}\n`,
-    runtimeOptions.maxFileBytes,
-  );
-  await writeTextFile(LOG_FILE, next, { baseDir: BaseDirectory.AppData });
-}
-
 function scheduleFlush(): void {
   if (flushPromise) {
     return;
   }
 
   flushPromise = (async () => {
-    while (queue.length > 0) {
+    // Entries logged while modules are still importing (before bootstrap
+    // installs the platform) stay queued; the next log call re-flushes them.
+    while (queue.length > 0 && isPlatformSet()) {
       const batch = queue;
       queue = [];
       try {
-        await writeBatch(batch);
+        await getPlatform().writeLogs(batch);
       } catch (error) {
         if (!internalError) {
           internalError = true;
@@ -268,7 +214,7 @@ function scheduleFlush(): void {
     }
   })().finally(() => {
     flushPromise = null;
-    if (queue.length > 0) {
+    if (queue.length > 0 && isPlatformSet()) {
       scheduleFlush();
     }
   });
@@ -388,13 +334,14 @@ export class Logger {
 }
 
 export async function flushLogs(): Promise<void> {
+  // Entries queued before the platform was installed have no flush scheduled
+  // yet; kick one off so a post-bootstrap flush drains them.
+  if (queue.length > 0) {
+    scheduleFlush();
+  }
   while (flushPromise) {
     await flushPromise;
   }
-}
-
-export function getLogFilePath(): string {
-  return LOG_FILE;
 }
 
 export function resetLoggingForTests(options?: Partial<LoggerRuntimeOptions>) {
@@ -404,6 +351,5 @@ export function resetLoggingForTests(options?: Partial<LoggerRuntimeOptions>) {
   };
   queue = [];
   flushPromise = null;
-  logDirectoryReady = false;
   internalError = false;
 }

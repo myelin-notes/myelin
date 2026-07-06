@@ -1,6 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Logger } from '@/lib/logger';
+import type {
+  AudioTranscriptionSession,
+  TranscriptionCapability,
+} from '../types';
 
 const logger = new Logger('AudioTranscription');
 
@@ -30,40 +34,26 @@ interface AudioTranscriptionFinishedPayload {
   error: string | null;
 }
 
-interface StartAudioTranscriptionOptions {
-  elementId: string;
-  stream: MediaStream;
-}
-
-export interface AudioTranscriptionSession {
-  /** Resolves with the full transcript once the backend flushes its final segments. */
-  finish(): Promise<string>;
-}
-
 interface PcmCapture {
   stop(): Promise<void>;
 }
 
-export async function startAudioTranscription({
-  elementId,
-  stream,
-}: StartAudioTranscriptionOptions): Promise<AudioTranscriptionSession | null> {
-  return openSession(elementId, stream);
-}
+export const transcription: TranscriptionCapability = {
+  async startSession({ elementId, stream }) {
+    return openSession(elementId, stream);
+  },
 
-/** Transcribe an already-decoded audio file (the media import path). */
-export async function transcribeAudioBuffer(
-  elementId: string,
-  buffer: AudioBuffer,
-): Promise<string | null> {
-  const session = await openSession(elementId);
-  if (!session) {
-    return null;
-  }
+  /** Transcribe an already-decoded audio file (the media import path). */
+  async transcribeBuffer(elementId, buffer) {
+    const session = await openSession(elementId);
+    if (!session) {
+      return null;
+    }
 
-  session.transcribeSamples(mixToMono(buffer), buffer.sampleRate);
-  return session.finish();
-}
+    session.transcribeSamples(mixToMono(buffer), buffer.sampleRate);
+    return session.finish();
+  },
+};
 
 /** Start a backend session, fully unwinding it (and returning null) on failure. */
 async function openSession(

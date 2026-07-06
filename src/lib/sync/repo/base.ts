@@ -1,10 +1,9 @@
 import * as Y from 'yjs';
 import { NODES_DELETED_EVENT, type NodesDeletedDetail } from '@/lib/events';
-import { handwritingService } from '@/lib/handwriting';
 import { Logger } from '@/lib/logger';
 import { summarizeYDoc } from '@/lib/note/state-summary';
-import { noteIndexService, type ReindexItem } from '@/lib/note-index';
 import { removeThumbnail } from '@/lib/thumbnails';
+import { getPlatform, type ReindexItem } from '@/platform';
 import { NoteSession } from '../session';
 import type {
   YjsSyncPushOptions,
@@ -180,10 +179,13 @@ export abstract class BaseRepository
     });
 
     if (candidateFileType !== null) {
-      const path = await this.getStoredAbsolutePath(nodeId);
-      if (path) {
-        noteIndexService.requestReindex(nodeId, path, candidateFileType);
-        handwritingService.requestRecognize(nodeId, path, candidateFileType);
+      const { noteIndex, handwriting } = getPlatform();
+      if (noteIndex || handwriting) {
+        const path = await this.getStoredAbsolutePath(nodeId);
+        if (path) {
+          noteIndex?.requestReindex(nodeId, path, candidateFileType);
+          handwriting?.requestRecognize(nodeId, path, candidateFileType);
+        }
       }
     }
   }
@@ -273,21 +275,23 @@ export abstract class BaseRepository
     options: SearchNodesOptions = {},
   ): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifestImpl();
-    if (options.mode === 'semantic' && query.trim()) {
-      const queryEmbedding = await noteIndexService.embedSearchQuery(query);
+    const noteIndex = getPlatform().noteIndex;
+    // Semantic search needs the index capability; fall back to name search.
+    if (options.mode === 'semantic' && query.trim() && noteIndex) {
+      const queryEmbedding = await noteIndex.embedSearchQuery(query);
       const limit = options.limit ?? DEFAULT_SEMANTIC_SEARCH_LIMIT;
       return searchNodeResultsSemantically(
         manifest,
         query,
         queryEmbedding,
-        noteIndexService.getContent(),
-        noteIndexService.getEmbeddings(),
+        noteIndex.getContent(),
+        noteIndex.getEmbeddings(),
       ).slice(0, limit);
     }
     return searchNodeResults(
       manifest,
       query,
-      noteIndexService.getContent(),
+      noteIndex?.getContent() ?? new Map(),
     ).slice(0, options.limit);
   }
 
@@ -512,8 +516,8 @@ export abstract class BaseRepository
       deletedFiles.map(async (file) => {
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
-        await noteIndexService.removeIndex(file.id);
-        await handwritingService.removeRecognition(file.id);
+        await getPlatform().noteIndex?.removeIndex(file.id);
+        await getPlatform().handwriting?.removeRecognition(file.id);
       }),
     );
 

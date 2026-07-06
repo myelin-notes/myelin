@@ -1,4 +1,4 @@
-import type { ReindexItem } from '@/lib/note-index';
+import type { ReindexItem } from '@/platform';
 import type { NoteSession } from '../session';
 import type { VFSNodeId } from '../types';
 

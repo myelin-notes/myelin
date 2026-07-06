@@ -1,22 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VFSNodeId } from '@/lib/sync';
-import * as cache from './cache';
+import { setPlatform } from '@/platform';
+import { createFakePlatform } from '@/test/fake-platform';
 import {
   regenerateThumbnailNow,
   registerThumbnailProducer,
   requestThumbnailRegeneration,
 } from './service';
 
-vi.mock('./cache', () => ({
-  readUrl: vi.fn(async () => null),
-  removeEntry: vi.fn(async () => undefined),
-  writeBlob: vi.fn(async () => undefined),
-}));
+const writeArtifact = vi.fn(async () => {});
 
 describe('thumbnail service', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.mocked(cache.writeBlob).mockClear();
+    writeArtifact.mockClear();
+    setPlatform(
+      createFakePlatform({
+        artifactCache: {
+          getUrl: async () => null,
+          write: writeArtifact,
+          remove: async () => {},
+        },
+      }),
+    );
   });
 
   afterEach(() => {
@@ -36,12 +42,12 @@ describe('thumbnail service', () => {
     await vi.advanceTimersByTimeAsync(1);
 
     expect(render).toHaveBeenCalledWith(600, { reason: 'scheduled' });
-    expect(cache.writeBlob).toHaveBeenCalledTimes(1);
+    expect(writeArtifact).toHaveBeenCalledTimes(1);
 
     await regenerateThumbnailNow(nodeId);
 
     expect(render).toHaveBeenLastCalledWith(600, { reason: 'immediate' });
-    expect(cache.writeBlob).toHaveBeenCalledTimes(2);
+    expect(writeArtifact).toHaveBeenCalledTimes(2);
 
     unregister();
   });
@@ -76,7 +82,7 @@ describe('thumbnail service', () => {
     await vi.advanceTimersByTimeAsync(30_000);
 
     expect(render).toHaveBeenCalledTimes(1);
-    expect(cache.writeBlob).toHaveBeenCalledTimes(1);
+    expect(writeArtifact).toHaveBeenCalledTimes(1);
   });
 
   it('flushes a pending unregister regeneration after an inflight render', async () => {
@@ -108,7 +114,7 @@ describe('thumbnail service', () => {
     await vi.waitFor(() => {
       expect(render).toHaveBeenCalledTimes(2);
     });
-    expect(cache.writeBlob).toHaveBeenCalledTimes(2);
+    expect(writeArtifact).toHaveBeenCalledTimes(2);
   });
 
   it('does not remove a newer producer after an old unregister flush finishes', async () => {

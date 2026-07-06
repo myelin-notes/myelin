@@ -1,7 +1,7 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import type { VFSNodeId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync/core';
 import { ElementType } from '../../elements/element-type';
 import {
   normalizePageFrameDisplayName,

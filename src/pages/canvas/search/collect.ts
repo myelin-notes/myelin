@@ -1,5 +1,5 @@
 import type { Node as PMNode } from 'prosemirror-model';
-import type { RecognizedPage } from '@/lib/handwriting';
+import type { RecognizedPage } from '@/platform';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { AudioElement } from '../elements/audio/element';
 import { PageFrameElement } from '../elements/page-frame-element';

@@ -1,4 +1,6 @@
 import { beforeEach, vi } from 'vitest';
+import { setPlatform } from '@/platform';
+import { createFakePlatform } from './fake-platform';
 
 // The `node` test environment has no DOMRect. Provide a minimal stand-in so
 // canvas elements that compute geometry (localBoundingBox / boundingBox) can be
@@ -66,6 +68,9 @@ Object.defineProperty(globalThis, 'localStorage', {
 
 beforeEach(() => {
   memoryLocalStorage.clear();
+  // A fresh fake platform per test; tests exercising a platform seam install
+  // their own via setPlatform(createFakePlatform({ ... })).
+  setPlatform(createFakePlatform());
 });
 
 vi.mock('@/lib/thumbnails', () => ({
@@ -76,19 +81,6 @@ vi.mock('@/lib/thumbnails', () => ({
   removeThumbnail: async () => {},
   requestThumbnailRegeneration: () => {},
   subscribeThumbnail: () => () => {},
-}));
-
-vi.mock('@/lib/note-index', () => ({
-  noteIndexService: {
-    init: async () => {},
-    reset: () => {},
-    getContent: () => new Map<string, string>(),
-    getEmbeddings: () => new Map<string, unknown>(),
-    embedSearchQuery: async () => ({ model: 'test', dim: 0, vector: [] }),
-    requestReindex: () => {},
-    startBackfill: () => {},
-    removeIndex: async () => {},
-  },
 }));
 
 vi.mock('@/lib/sync/repo/github-credentials', () => ({

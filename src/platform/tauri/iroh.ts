@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Logger } from '@/lib/logger';
-import type { VFSNodeId } from '../types';
-import type { Transport, TransportEvents } from './transport';
+import type { Transport, TransportEvents } from '@/lib/sync/live/transport';
+import type { VFSNodeId } from '@/lib/sync/types';
 
 type EventName = keyof TransportEvents;
 

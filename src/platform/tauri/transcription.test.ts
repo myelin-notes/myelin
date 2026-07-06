@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { startAudioTranscription, transcribeAudioBuffer } from './service';
+import { transcription } from './transcription';
 
 type EventCallback = (event: { payload: unknown }) => void;
 type FakeProcessor = {
@@ -123,7 +123,7 @@ describe('audio transcription service', () => {
   }
 
   async function start() {
-    return startAudioTranscription({
+    return transcription.startSession({
       elementId: 'audio-1',
       stream: {} as MediaStream,
     });
@@ -363,7 +363,7 @@ describe('audio transcription service', () => {
       getChannelData: () => data,
     } as unknown as AudioBuffer;
 
-    const transcriptPromise = transcribeAudioBuffer('audio-1', buffer);
+    const transcriptPromise = transcription.transcribeBuffer('audio-1', buffer);
 
     await vi.waitFor(() => {
       expect(invokesOf('push_audio_transcription_samples')).toHaveLength(2);

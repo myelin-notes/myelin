@@ -14,14 +14,10 @@ import {
   Square as SquareIcon,
 } from 'lucide-react';
 import { trackEvent } from '@/lib/analytics';
-import {
-  type AudioTranscriptionSession,
-  startAudioTranscription,
-  transcribeAudioBuffer,
-} from '@/lib/audio-transcription/service';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { getDevicePixelRatio } from '@/lib/utils';
+import { type AudioTranscriptionSession, getPlatform } from '@/platform';
 import { getCanvasPalette, withCanvasAlpha } from '../../canvas-theme';
 import { decodeAudio, drawWaveform } from './waveform';
 
@@ -238,6 +234,13 @@ export function AudioPlayerView({
   const disposedRef = useRef(false);
   const isRecording = recordingState === 'recording';
   const isRequestingRecording = recordingState === 'requesting';
+  const canTranscribe = getPlatform().transcription !== undefined;
+  // The captions button is the transcribe affordance for creators without a
+  // transcript; hide it when this platform can't transcribe. Existing
+  // transcripts (and the non-creator waiting state) stay visible regardless.
+  const showCaptionsButton = Boolean(
+    audioBytes && (transcript || !isCreator || canTranscribe),
+  );
   const interaction = getAudioPlayerInteractionState({
     audioBytes,
     transcript,
@@ -399,10 +402,11 @@ export function AudioPlayerView({
         stream,
         mime ? { mimeType: mime } : undefined,
       );
-      const transcriptionSession = await startAudioTranscription({
-        elementId,
-        stream: recordingStream,
-      });
+      const transcriptionSession =
+        (await getPlatform().transcription?.startSession({
+          elementId,
+          stream: recordingStream,
+        })) ?? null;
       if (disposedRef.current) {
         recordingStream.getTracks().forEach((t) => {
           t.stop();
@@ -564,14 +568,15 @@ export function AudioPlayerView({
   // Recordings are transcribed live; this is the on-demand path for imported
   // audio (and the retry path for recordings whose transcription failed).
   async function handleTranscribe() {
-    if (!audioBytes || isTranscribing || !isCreator) {
+    const transcription = getPlatform().transcription;
+    if (!audioBytes || isTranscribing || !isCreator || !transcription) {
       return;
     }
     setIsTranscribing(true);
     setNotice(null);
     try {
       const { buffer } = await decodeAudio(audioBytes);
-      const text = await transcribeAudioBuffer(elementId, buffer);
+      const text = await transcription.transcribeBuffer(elementId, buffer);
       if (disposedRef.current) {
         return;
       }
@@ -690,7 +695,7 @@ export function AudioPlayerView({
         />
         <span className="canvas-audio-time">{timeLabel}</span>
       </div>
-      {audioBytes && (
+      {showCaptionsButton && (
         <button
           type="button"
           className="canvas-audio-transcribe"

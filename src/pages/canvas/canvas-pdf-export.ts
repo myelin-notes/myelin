@@ -1,12 +1,12 @@
-import { save } from '@tauri-apps/plugin-dialog';
-import { bytesToBase64, exportPdf } from '@/lib/pdf-export/client';
-import type {
-  ExportPage,
-  PageItem,
-  PdfExportRequest,
+import {
+  bytesToBase64,
+  type ExportPage,
+  type PageItem,
+  type PdfExportRequest,
 } from '@/lib/pdf-export/contract';
 import { POINTS_PER_PX, pxToPt } from '@/lib/pdf-export/coords';
 import type { PdfHarvestContext } from '@/lib/pdf-export/harvest';
+import { getPlatform } from '@/platform';
 import type { DrawableCanvas } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
 import { PAGE_GAP } from './elements/page-frame-constants';
@@ -46,21 +46,27 @@ export async function runCanvasPdfExport(
   canvas: DrawableCanvas,
   title: string,
 ): Promise<ExportResult> {
+  const pdfExport = getPlatform().pdfExport;
+  if (!pdfExport) {
+    return { cancelled: true };
+  }
   const visible = canvas.elements.filter((element) => !element.hidden);
   if (!getCanvasPdfExportBounds(visible)) {
     throw new Error('Canvas has no visible content to export.');
   }
 
-  const path = await save({
-    defaultPath: `${getSafeExportName(title)}.pdf`,
-    filters: [{ name: 'PDF', extensions: ['pdf'] }],
+  let warnings: string[] = [];
+  const outcome = await pdfExport.export({
+    suggestedName: `${getSafeExportName(title)}.pdf`,
+    buildRequest: async () => {
+      const harvest = await harvestCanvasPdf(visible);
+      warnings = harvest.warnings;
+      return harvest.request;
+    },
   });
-  if (!path) {
+  if (outcome.cancelled) {
     return { cancelled: true };
   }
-
-  const { request, warnings } = await harvestCanvasPdf(visible);
-  await exportPdf(request, path);
   return { warnings };
 }
 

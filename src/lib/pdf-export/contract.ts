@@ -95,3 +95,16 @@ export interface PdfExportRequest {
   /** Base64 original PDF bytes (pdfElement only). */
   originalPdfB64?: string;
 }
+
+/**
+ * Base64-encode bytes in chunks (avoids stack overflow on large buffers).
+ * Used to fill the `*B64` fields of a {@link PdfExportRequest}.
+ */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}

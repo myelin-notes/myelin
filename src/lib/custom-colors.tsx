@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { HexColorPicker } from 'react-colorful';
 import { createPortal } from 'react-dom';
 import { Logger } from './logger';
-import { useRepository } from './sync';
+import { useRepository } from './sync/repo-context';
 
 interface CustomColorsContextValue {
   colors: string[];

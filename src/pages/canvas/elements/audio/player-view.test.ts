@@ -1,12 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   getAudioPlayerInteractionState,
   getWaveformCanvasMetrics,
 } from './player-view';
-
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(),
-}));
 
 describe('getWaveformCanvasMetrics', () => {
   it('uses the device pixel ratio for ordinary waveform sizes', () => {

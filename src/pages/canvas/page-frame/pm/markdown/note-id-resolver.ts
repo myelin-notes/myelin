@@ -6,7 +6,7 @@
 import type { Node as PMNode, Schema } from 'prosemirror-model';
 import type { EditorState, PluginView, Transaction } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
-import type { VFSNodeId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync/core';
 
 export interface NoteLinkRef {
   noteId: VFSNodeId | null;

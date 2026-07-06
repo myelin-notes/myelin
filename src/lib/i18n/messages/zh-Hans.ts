@@ -303,7 +303,8 @@ const zhHans: typeof en = {
       },
       renameReferences: {
         label: '重命名笔记后始终更新链接',
-        description: '关闭时，笔记重命名后 Myelin Notes 会先询问是否更改链接提及。',
+        description:
+          '关闭时，笔记重命名后 Myelin Notes 会先询问是否更改链接提及。',
       },
     },
     repository: {

@@ -1,4 +1,4 @@
-import type { Repository, VFSNodeId, YjsSyncTarget } from '@/lib/sync';
+import type { Repository, VFSNodeId, YjsSyncTarget } from '@/lib/sync/core';
 import { extractCanvasPreviewText } from '../preview-text';
 import { isCanvasNote, resolveNoteLinkIdByTitle } from './resolution';
 

@@ -1,4 +1,4 @@
-import { fetch } from '@tauri-apps/plugin-http';
+import { getPlatform } from '@/platform';
 import { matchProvider } from './oembed-providers';
 import { parseOg } from './og-parse';
 
@@ -54,7 +54,7 @@ async function fetchOEmbed(
   providerName: string,
   endpoint: string,
 ): Promise<OEmbedMeta> {
-  const res = await fetch(endpoint, { method: 'GET' });
+  const res = await getPlatform().fetch(endpoint, { method: 'GET' });
   if (!res.ok) {
     throw new Error(`oEmbed ${res.status}`);
   }
@@ -86,7 +86,7 @@ function mediaKindFromContentType(
 }
 
 async function fetchLink(url: string): Promise<EmbedMeta> {
-  const res = await fetch(url, {
+  const res = await getPlatform().fetch(url, {
     method: 'GET',
     headers: { accept: 'text/html,application/xhtml+xml,image/*,video/*' },
   });

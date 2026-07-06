@@ -1,5 +1,5 @@
 import type * as Y from 'yjs';
-import type { VFSNodeId } from '@/lib/sync';
+import type { VFSNodeId } from '@/lib/sync/core';
 import type { ElementType } from '../elements/element-type';
 
 export interface CanvasPoint {

@@ -1,17 +1,13 @@
 import {
-  createContext,
   type PropsWithChildren,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react';
-import { handwritingService } from '@/lib/handwriting';
 import { Logger } from '@/lib/logger';
-import { noteIndexService } from '@/lib/note-index';
+import { getPlatform } from '@/platform';
 import {
-  type ActiveRepository,
   getRepositoryStorageKey,
   type RepositoryConfig,
   type RepositoryRuntimeStatus,
@@ -21,25 +17,13 @@ import {
   getRepositoryConfig,
   subscribeRepositoryConfig,
 } from './repo/repository-settings';
+import {
+  RepositoryContext,
+  type RepositoryContextValue,
+  type RepositoryStatus,
+} from './repo-context';
 import { RepositoryShutdownGate } from './shutdown-gate';
 
-export interface RepositoryStatus {
-  config: RepositoryConfig;
-  initializing: boolean;
-  online: boolean;
-  pendingRemoteWrites: number;
-  lastRemoteSyncAt: number | null;
-  lastError: Error | null;
-  /** Bumped on every local repository mutation so views can refresh in sync. */
-  dataVersion: number;
-}
-
-interface RepositoryContextValue {
-  repository: ActiveRepository;
-  status: RepositoryStatus;
-}
-
-const RepositoryContext = createContext<RepositoryContextValue | null>(null);
 const logger = new Logger('RepositoryProvider');
 
 function createRepositoryStatus(config: RepositoryConfig): RepositoryStatus {
@@ -156,24 +140,30 @@ export function RepositoryProvider({
 
         // Hydrate the search corpus and backfill any unindexed notes in the
         // background. The index cache is namespaced per repository; Rust skips
-        // notes whose content hash is unchanged.
-        handwritingService.init(getRepositoryStorageKey(resolvedConfig));
-        void noteIndexService
-          .init(getRepositoryStorageKey(resolvedConfig))
-          .then(() => repository.listIndexBackfillItems())
-          .then((items) => {
-            // A repo switch may have run cleanup (reset + next init) while this
-            // chain was resolving; bail so we don't backfill the previous repo's
-            // items under the now-current repo.
-            if (disposed) {
-              return;
-            }
-            noteIndexService.startBackfill(items);
-            handwritingService.startBackfill(items);
-          })
-          .catch((error) => {
-            logger.error('Failed to start note-index backfill', error);
-          });
+        // notes whose content hash is unchanged. Both engines are optional
+        // platform capabilities; absence means no indexing on this client.
+        const { noteIndex, handwriting } = getPlatform();
+        handwriting?.init(getRepositoryStorageKey(resolvedConfig));
+        if (noteIndex || handwriting) {
+          void (
+            noteIndex?.init(getRepositoryStorageKey(resolvedConfig)) ??
+            Promise.resolve()
+          )
+            .then(() => repository.listIndexBackfillItems())
+            .then((items) => {
+              // A repo switch may have run cleanup (reset + next init) while
+              // this chain was resolving; bail so we don't backfill the
+              // previous repo's items under the now-current repo.
+              if (disposed) {
+                return;
+              }
+              noteIndex?.startBackfill(items);
+              handwriting?.startBackfill(items);
+            })
+            .catch((error) => {
+              logger.error('Failed to start note-index backfill', error);
+            });
+        }
       })
       .catch((error) => {
         if (disposed) {
@@ -191,8 +181,8 @@ export function RepositoryProvider({
       disposed = true;
       unsubscribeStatus();
       // Drop the previous repo's search corpus so it can't leak into the next.
-      noteIndexService.reset();
-      handwritingService.reset();
+      getPlatform().noteIndex?.reset();
+      getPlatform().handwriting?.reset();
       void repository.dispose().catch((error) => {
         logger.error('Failed to dispose repository', error);
       });
@@ -205,24 +195,4 @@ export function RepositoryProvider({
       {children}
     </RepositoryContext.Provider>
   );
-}
-
-export function useRepository(): ActiveRepository {
-  const context = useContext(RepositoryContext);
-  if (!context) {
-    throw new Error('useRepository must be used within a RepositoryProvider.');
-  }
-
-  return context.repository;
-}
-
-export function useRepositoryStatus(): RepositoryStatus {
-  const context = useContext(RepositoryContext);
-  if (!context) {
-    throw new Error(
-      'useRepositoryStatus must be used within a RepositoryProvider.',
-    );
-  }
-
-  return context.status;
 }
