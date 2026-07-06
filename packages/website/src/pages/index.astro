@@ -1,52 +1,33 @@
 ---
 import Base from '../layouts/Base.astro';
-import Shot from '../components/Shot.astro';
+import CanvasIsland from '../canvas/CanvasIsland';
+import {
+  downloadPlatforms,
+  faqs,
+  regions,
+  siteDescription,
+  siteTitle,
+} from '../content/site';
 
-// Desktop download URLs are resolved on load from stable/latest.json and point
-// at the current stable release on the R2-backed CDN (see the wiring script
-// below); the buttons stay inert until then. macOS is a universal build (Apple
-// Silicon + Intel). iPad/Android are placeholders pending store/TestFlight links.
-const downloads = [
-  { name: 'macOS', href: '#' },
-  { name: 'Windows', href: '#' },
-  { name: 'Linux', href: '#' },
-  { name: 'iPad', href: '#' },
-  { name: 'Android', href: '#' },
-];
-
-// Edit this once a feedback channel is live.
-const feedbackHref = '#';
-
-const localFirst = [
-  'Local-first storage that works offline',
-  'Version history with restore',
-  'Export to Markdown, PDF, an Obsidian vault, or a complete workspace file that preserves everything',
-];
-
-const sync = [
-  'Sync through your own GitHub repository',
-  'Live editing across your own computers over a direct connection',
-  'No Myelin Notes account required — sign in with GitHub only when you want to sync',
-];
-
-const faqs = [
-  {
-    q: 'Do I need an account?',
-    a: 'No Myelin Notes account. The app runs locally; you sign in with GitHub only if you want to sync across your own computers.',
+// Placeholder product screenshots shown in the static notebook cards.
+const regionShots: Record<string, { src: string; alt: string }> = {
+  welcome: {
+    src: '/canvas/shot-note.png',
+    alt: 'A Myelin note mixing typed text, a formula, a diagram, and handwritten margin notes',
   },
-  {
-    q: 'Does it work offline?',
-    a: 'Fully. Everything runs on your machine — there is no server call to open, edit, or search a note. Only optional GitHub sync touches the network.',
+  pdf: {
+    src: '/canvas/shot-pdf.png',
+    alt: 'A PDF page annotated by hand inside a Myelin note',
   },
-  {
-    q: 'Is it really free?',
-    a: 'Free while Myelin Notes is in early access. The whole editor, with no tiers and no trial to expire.',
+  connections: {
+    src: '/canvas/shot-graph.png',
+    alt: 'The Myelin graph view showing notes connected as a network',
   },
-  {
-    q: 'Where do my notes live?',
-    a: 'On your own disk. You can export your whole workspace to a complete file that preserves everything, any time.',
+  'local-first': {
+    src: '/canvas/shot-library.png',
+    alt: 'The Myelin library: a grid of note cards with tags and folders',
   },
-];
+};
 
 const softwareJsonLd = {
   '@context': 'https://schema.org',
@@ -54,8 +35,7 @@ const softwareJsonLd = {
   name: 'Myelin Notes',
   applicationCategory: 'ProductivityApplication',
   operatingSystem: 'macOS, Windows, Linux, iPadOS, Android',
-  description:
-    'A native, local-first canvas where handwriting, type, PDFs, images, and audio live in one note, kept on your own machine.',
+  description: siteDescription,
   offers: {
     '@type': 'Offer',
     price: '0',
@@ -72,252 +52,106 @@ const faqJsonLd = {
     acceptedAnswer: { '@type': 'Answer', text: a },
   })),
 };
+
+// Scroll length of the camera tour: one generous viewport-height segment per
+// region keeps the pacing calm.
+const trackHeight = `${regions.length * 130}vh`;
 ---
 
-<Base
-  title="Myelin Notes — handwriting, type, and PDFs in one note"
-  description="Myelin Notes is a native, local-first canvas where handwriting, type, PDFs, images, and audio live in one note, kept on your own machine. Free while it is in early access."
-  jsonLd={[softwareJsonLd, faqJsonLd]}
->
-  <!-- Hero -->
-  <section>
-    <p>A native knowledge workspace · free during early access</p>
-    <h1>Handwriting, type, and PDFs in <em>one note</em></h1>
-    <p>
-      Myelin Notes is a native, local-first canvas where you write with the pen,
-      type in rich text, annotate PDFs, and drop in images and audio — all
-      in the same document, all kept on your own machine. Most tools make
-      you pick one lane. This is the workspace that is both.
-    </p>
-    <a href="#download">Download Myelin Notes</a>
-    <a href="#workspace">See what it does</a>
-  </section>
+<Base title={siteTitle} description={siteDescription} jsonLd={[softwareJsonLd, faqJsonLd]}>
+  <!-- Scrollbar for the canvas camera; only shown once the notebook is live. -->
+  <div class="canvas-track" style={`height: ${trackHeight}`} aria-hidden="true">
+  </div>
 
-  <!-- Manifesto -->
-  <section>
-    <p>The idea</p>
-    <blockquote>One canvas instead of five apps</blockquote>
-    <p>
-      Most tools make you pick a lane: a handwriting app for the pen, a
-      document editor for prose, a separate reader for the PDF, another window
-      for the recording. Myelin Notes puts them on one infinite canvas. Sketch a
-      diagram with the pen, type the paragraph next to it, paste in a
-      screenshot, embed the PDF and mark it up, and record the voice note that
-      explains it — in a single document. The workspace stays quiet and out of
-      the way while you think.
-    </p>
-  </section>
+  <!-- The live notebook. Loads only on desktop pointers (see CanvasIsland). -->
+  <CanvasIsland client:only="react" />
 
-  <!-- Canvas -->
-  <section id="workspace">
-    <p>01 / The canvas</p>
-    <h2>Write by hand or by keyboard, on the same page</h2>
-    <p>
-      Draw with a pressure-sensitive pen and let rough strokes snap into
-      clean lines, rectangles, ellipses, and triangles when you pause.
-      Highlight, erase, and pick colors from a radial wheel. Drop in
-      editable text boxes, or open a rich-text frame with headings, lists,
-      tables, code blocks, and LaTeX math.
-    </p>
-    <ul>
+  <!--
+    The full message as real, crawlable HTML. This is the page for crawlers,
+    JS-off visitors, and phones; the canvas island hides it when it takes over.
+  -->
+  <div class="static-fallback">
+    <div class="notebook-page">
       {
-        [
-          'Pressure-sensitive pen with shape recognition for lines, rectangles, ellipses, and triangles',
-          'Highlighter, eraser, and a radial color wheel',
-          'Rich-text frames with headings, lists, tables, code blocks, and LaTeX math',
-          'Select, move, rotate, resize, and reorder any element, with full undo and redo',
-        ].map((item) => <li>{item}</li>)
-      }
-    </ul>
-    <Shot src="/shots/ink.png" alt="Handwritten annotations and a code block in a note in Myelin Notes" />
-  </section>
-
-  <!-- PDFs and audio -->
-  <section>
-    <Shot src="/shots/pdf.png" alt="A multi-page PDF annotated by hand inside a note" />
-    <p>02 / PDFs and audio</p>
-    <h2>Bring in PDFs and recordings, and work on them in place</h2>
-    <p>
-      Embed a multi-page PDF, reorder its pages, insert blank pages, and
-      draw annotations directly on top. Record audio straight into a note
-      with a live waveform, and Whisper transcribes it on-device as you
-      speak, with nothing sent to the cloud. The transcript becomes part of
-      the note, and part of what you can search.
-    </p>
-    <ul>
-      {
-        [
-          'Embed and annotate multi-page PDFs, and reorder, delete, or insert pages',
-          'Import from GoodNotes exports and Obsidian vaults',
-          'Record audio with live, on-device Whisper transcription',
-          'Embed images with drag-to-resize and crop',
-        ].map((item) => <li>{item}</li>)
-      }
-    </ul>
-  </section>
-
-  <!-- Search -->
-  <section id="search">
-    <p>03 / Search</p>
-    <h2>Find anything you have written, including by hand</h2>
-    <p>
-      Search your whole library by keyword, or switch to semantic search to
-      find notes by idea rather than exact wording. The embedding model runs
-      locally on your device, so semantic search makes no network calls of
-      its own. Inside a note, a find bar matches text, page frames, audio
-      transcripts, and recognized handwriting.
-    </p>
-    <ul>
-      {
-        [
-          'Keyword and on-device semantic search across your library',
-          'In-note find across text, page frames, and audio transcripts',
-          'Handwriting recognition and search on macOS, via Apple Vision',
-        ].map((item) => <li>{item}</li>)
-      }
-    </ul>
-    <Shot src="/shots/library.png" alt="The Myelin Notes library with note cards, folders, semantic tags, and search" />
-  </section>
-
-  <!-- Local-first -->
-  <section id="local">
-    <p>04 / Local-first</p>
-    <h2>Your notes live on your machine</h2>
-    <p>
-      Myelin Notes keeps your library on your own disk and works fully offline.
-      Your notes never leave your control. Version history keeps snapshots
-      you can look back on and restore, and you can export your whole
-      workspace to a complete file that preserves everything — any time, no
-      questions asked.
-    </p>
-    <ul>
-      {localFirst.map((item) => <li>{item}</li>)}
-    </ul>
-  </section>
-
-  <!-- Sync -->
-  <section id="sync">
-    <p>05 / Sync</p>
-    <h2>Across your own computers, when you want it</h2>
-    <p>
-      Sync is optional, and it is yours. Sync a note through a GitHub
-      repository you own, or edit it live on two machines at once: changes
-      connect directly between your devices, coordinated by a small
-      discovery service that helps them find each other but never stores
-      your notes.
-    </p>
-    <ul>
-      {sync.map((item) => <li>{item}</li>)}
-    </ul>
-  </section>
-
-  <!-- FAQ -->
-  <section id="faq">
-    <p>06 / Questions</p>
-    <h2>Good to know before you start</h2>
-    <dl>
-      {
-        faqs.map((faq) => (
-          <div>
-            <dt>{faq.q}</dt>
-            <dd>{faq.a}</dd>
-          </div>
+        regions.map((region, index) => (
+          <section class="notebook-card" id={region.id}>
+            <p class="eyebrow">{region.article.eyebrow}</p>
+            {index === 0 ? (
+              <h1>{region.article.heading}</h1>
+            ) : (
+              <h2>{region.article.heading}</h2>
+            )}
+            {region.article.body.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+            {region.article.bullets && (
+              <ul>
+                {region.article.bullets.map((bullet) => (
+                  <li>{bullet}</li>
+                ))}
+              </ul>
+            )}
+            {regionShots[region.id] && (
+              <img
+                class="notebook-shot"
+                src={regionShots[region.id].src}
+                alt={regionShots[region.id].alt}
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+            {(region.id === 'welcome' || region.id === 'download') && (
+              <>
+                <div class="download-row">
+                  {downloadPlatforms.map((platform) =>
+                    platform.available ? (
+                      <a href="#download" data-download-platform={platform.name}>
+                        {platform.name}
+                      </a>
+                    ) : (
+                      <a class="unavailable" aria-disabled="true">
+                        {platform.name} soon
+                      </a>
+                    ),
+                  )}
+                </div>
+                <p class="hand-note">no account, free in early access</p>
+              </>
+            )}
+            {region.id === 'local-first' && (
+              <p>
+                The workspace export is documented, open JSON.{' '}
+                <a href="/workspace-schema">Read the file format</a>.
+              </p>
+            )}
+          </section>
         ))
       }
-    </dl>
-  </section>
 
-  <!-- Promise -->
-  <section>
-    <p>A promise</p>
-    <h2>We will never take your notes away</h2>
-    <p>
-      Your notes stay on your disk and stay open to you, full stop. We will
-      never put your own notes behind a paywall, and we will never lock you
-      out — not if you stop paying, not if you stop using Myelin Notes. Whatever
-      happens, you can export your entire workspace to a complete file that
-      preserves everything and walk away with all of it.
-    </p>
-  </section>
+      <section class="notebook-card notebook-faq" id="faq">
+        <p class="eyebrow">good to know</p>
+        <h2>Questions, answered</h2>
+        <dl>
+          {
+            faqs.map((faq) => (
+              <div>
+                <dt>{faq.q}</dt>
+                <dd>{faq.a}</dd>
+              </div>
+            ))
+          }
+        </dl>
+      </section>
 
-  <!-- Early access / download -->
-  <section id="download">
-    <p>Early access · download</p>
-    <h2>Free while Myelin Notes is in early access</h2>
-    <p>
-      Myelin Notes is in early access and free to use right now. The whole editor is
-      in your hands: the canvas, pen and handwriting tools, PDFs and audio,
-      import and export, local-first storage, GitHub sync, and live editing
-      across your own computers. No account is needed to start — sign in with
-      GitHub only when you want to sync.
-    </p>
-    {
-      downloads.map((platform) => (
-        <a href={platform.href} data-download-platform={platform.name}>
-          {platform.name}
-        </a>
-      ))
-    }
-    <p>
-      Found a bug or have a request?{' '}
-      <a href={feedbackHref}>Tell us</a>.
-    </p>
-  </section>
+      <p class="hand-note ink-underline">we will never take your notes away.</p>
+    </div>
+  </div>
 
   <script>
-    import { trackWebEvent } from '../lib/posthog';
+    import { wireDownloadLinks } from '../lib/downloads';
 
-    // Resolve the desktop download buttons to direct CDN installer URLs for the
-    // current stable release. The updater manifest is the single source of truth
-    // for the live version, so nothing is hardcoded here and no rebuild is needed
-    // when a release ships. Windows (-setup.exe) and Linux (.AppImage) installers
-    // are updater artifacts and used verbatim; the macOS .dmg isn't, so it's
-    // derived from the manifest's version folder (uploaded there as
-    // Myelin-macOS.dmg by promote-release.mjs).
-    const MANIFEST = 'https://updates.trymyelin.app/stable/latest.json';
-
-    async function wireDesktopDownloads() {
-      let manifest: {
-        platforms?: Record<string, { url?: string }>;
-      };
-      try {
-        const res = await fetch(MANIFEST, { cache: 'no-store' });
-        if (!res.ok) return;
-        manifest = await res.json();
-      } catch {
-        return;
-      }
-      const platforms = manifest.platforms ?? {};
-      // The macOS .dmg lives beside the darwin updater bundle in the same
-      // version folder, so derive its URL from that bundle's URL.
-      const darwinUrl = platforms['darwin-aarch64']?.url;
-      const versionBase = darwinUrl?.slice(0, darwinUrl.lastIndexOf('/') + 1);
-
-      const hrefFor: Record<string, string | undefined> = {
-        macOS: versionBase ? `${versionBase}Myelin-macOS.dmg` : undefined,
-        Windows: platforms['windows-x86_64']?.url,
-        Linux: platforms['linux-x86_64']?.url,
-      };
-      for (const el of document.querySelectorAll<HTMLElement>(
-        '[data-download-platform]',
-      )) {
-        const href = hrefFor[el.dataset.downloadPlatform ?? ''];
-        if (href) {
-          el.setAttribute('href', href);
-        }
-      }
-    }
-
-    wireDesktopDownloads();
-
-    for (const el of document.querySelectorAll<HTMLElement>(
-      '[data-download-platform]',
-    )) {
-      el.addEventListener('click', () => {
-        trackWebEvent('download_clicked', {
-          platform: el.dataset.downloadPlatform,
-        });
-      });
-    }
+    // Static download links resolve for everyone; the canvas island wires its
+    // own buttons the same way when it mounts.
+    wireDownloadLinks(document);
   </script>
 </Base>

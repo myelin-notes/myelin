@@ -10,9 +10,18 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@astrojs/react": "^5.0.7",
     "@astrojs/sitemap": "^3.7.3",
+    "@myelin/ui": "*",
+    "@tailwindcss/vite": "^4.2.2",
     "astro": "^6.4.2",
-    "posthog-js": "^1.392.0"
+    "posthog-js": "^1.392.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.3",
+    "yjs": "^13.6.30"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",

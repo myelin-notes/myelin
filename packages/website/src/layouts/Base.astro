@@ -1,7 +1,8 @@
 ---
-import Nav from '../components/Nav.astro';
-import Footer from '../components/Footer.astro';
 import Seo from '../components/Seo.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import SiteTopbar from '../components/SiteTopbar.astro';
+import '../styles/global.css';
 
 interface Props {
   title: string;
@@ -40,16 +41,16 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       image={image}
       jsonLd={[organization, ...pageJsonLd]}
     />
+    <script>
+      import { initWebAnalytics } from '../lib/posthog';
+      initWebAnalytics();
+    </script>
   </head>
-  <script>
-    import { initWebAnalytics } from '../lib/posthog';
-    initWebAnalytics();
-  </script>
   <body>
-    <Nav />
+    <SiteTopbar />
     <main>
       <slot />
     </main>
-    <Footer />
+    <SiteFooter />
   </body>
 </html>
