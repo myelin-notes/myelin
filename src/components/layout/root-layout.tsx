@@ -17,7 +17,7 @@ export function RootLayout() {
   const showColumn = !isCompact && !collapsed;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       {showColumn && <Sidebar />}
       {showColumn && <SidebarResizeHandle />}
       <div className="flex min-w-0 flex-1 flex-col">

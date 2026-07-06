@@ -54,7 +54,7 @@ export function SidebarDrawer() {
             onClick={close}
           />
           <motion.div
-            className="fixed inset-y-0 left-0 z-50 w-[min(320px,85vw)] shadow-xl"
+            className="fixed inset-y-0 left-0 z-50 w-[min(320px,85vw)] bg-surface pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-xl"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
