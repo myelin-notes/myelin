@@ -6,16 +6,16 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import {
+  clearSearchHighlight,
+  setSearchHighlight,
+} from '@myelin/editor/page-frame/pm/search-highlight';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import type { ActionBinding } from '@/lib/keybinds';
 import type { VFSNodeId } from '@/lib/sync';
 import { getPlatform } from '@/platform';
-import type { DrawableCanvas } from '../drawable-canvas';
-import { PageFrameElement } from '../elements/page-frame-element';
-import {
-  clearSearchHighlight,
-  setSearchHighlight,
-} from '../page-frame/pm/search-highlight';
 import {
   buildCanvasMatches,
   type CanvasMatch,

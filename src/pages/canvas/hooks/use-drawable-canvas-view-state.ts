@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import type { DrawableElement } from '@/pages/canvas/elements/drawable-element';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
 
 interface DrawableCanvasViewState {
   zoomLevel: number;

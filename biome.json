@@ -194,6 +194,30 @@
       }
     },
     {
+      "includes": ["packages/editor/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@tauri-apps/**"],
+                    "message": "The editor package is host-agnostic. Tauri implementations live app-side in src/platform/tauri/; go through the Platform seam."
+                  },
+                  {
+                    "group": ["@/**"],
+                    "message": "The editor package must not import app code. Move the dependency into the package or inject it through a seam."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": [
         "src/platform/tauri/**",
         "src/lib/updater.ts",

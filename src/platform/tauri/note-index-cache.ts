@@ -1,3 +1,4 @@
+import type { NoteEmbedding } from '@myelin/editor/platform/types';
 import {
   BaseDirectory,
   exists,
@@ -5,7 +6,6 @@ import {
   readTextFile,
 } from '@tauri-apps/plugin-fs';
 import type { VFSNodeId } from '@/lib/sync/types';
-import type { NoteEmbedding } from '../types';
 
 const INDEX_DIR = 'NoteIndex';
 const SUFFIX = '.json';

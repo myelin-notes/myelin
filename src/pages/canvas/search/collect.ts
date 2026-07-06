@@ -1,10 +1,10 @@
 import type { Node as PMNode } from 'prosemirror-model';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { AudioElement } from '@myelin/editor/elements/audio/element';
+import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import { TextElement } from '@myelin/editor/elements/text/element';
+import { findTextMatches } from '@myelin/editor/page-frame/pm/search-highlight';
 import type { RecognizedPage } from '@/platform';
-import type { DrawableCanvas } from '../drawable-canvas';
-import { AudioElement } from '../elements/audio/element';
-import { PageFrameElement } from '../elements/page-frame-element';
-import { TextElement } from '../elements/text/element';
-import { findTextMatches } from '../page-frame/pm/search-highlight';
 
 export type CanvasSearchKind =
   | 'text'

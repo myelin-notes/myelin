@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
+import { formatNumber } from '@myelin/editor/i18n/format';
 import { TimeAgo } from '@/components/time-ago';
 import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
 import { type Messages, useLocale, useMessages } from '@/lib/i18n';
-import { formatNumber } from '@/lib/i18n/format';
 import {
   getRepositoryConfig,
   type RepositoryConfig,

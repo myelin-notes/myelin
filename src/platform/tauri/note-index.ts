@@ -1,8 +1,12 @@
+import type {
+  NoteEmbedding,
+  NoteIndexCapability,
+  ReindexItem,
+} from '@myelin/editor/platform/types';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Logger } from '@/lib/logger';
 import type { VFSNodeId } from '@/lib/sync/types';
-import type { NoteEmbedding, NoteIndexCapability, ReindexItem } from '../types';
 import * as cache from './note-index-cache';
 
 const logger = new Logger('NoteIndexService');

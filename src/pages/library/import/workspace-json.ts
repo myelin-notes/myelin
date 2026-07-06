@@ -1,5 +1,8 @@
 import { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
+import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import { join } from '@tauri-apps/api/path';
 import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
@@ -9,9 +12,6 @@ import {
   type Repository,
   type VFSNodeId,
 } from '@/lib/sync';
-import { ElementType } from '@/pages/canvas/elements/element-type';
-import { schema } from '@/pages/canvas/page-frame/pm/schema';
-import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
   BYTES_MARKER,
   base64DecodeBytes,

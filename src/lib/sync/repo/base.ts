@@ -1,7 +1,7 @@
 import * as Y from 'yjs';
+import { summarizeYDoc } from '@myelin/editor/note/state-summary';
 import { NODES_DELETED_EVENT, type NodesDeletedDetail } from '@/lib/events';
 import { Logger } from '@/lib/logger';
-import { summarizeYDoc } from '@/lib/note/state-summary';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { getPlatform, type ReindexItem } from '@/platform';
 import { NoteSession } from '../session';

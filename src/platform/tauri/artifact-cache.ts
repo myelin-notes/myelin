@@ -1,3 +1,4 @@
+import type { ArtifactCache } from '@myelin/editor/platform/types';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { appCacheDir, join } from '@tauri-apps/api/path';
 import {
@@ -7,7 +8,6 @@ import {
   open,
   remove as removeFile,
 } from '@tauri-apps/plugin-fs';
-import type { ArtifactCache } from '../types';
 
 async function ensureParentDir(path: string): Promise<void> {
   const parent = path.split('/').slice(0, -1).join('/');

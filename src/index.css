@@ -1,6 +1,8 @@
 @import "tailwindcss" source(".");
 @import "tw-animate-css";
 @import "@myelin/ui/theme.css";
+/* The editor package is source-consumed; scan it for Tailwind classes. */
+@source "../packages/editor/src/**/*.{ts,tsx}";
 @import "katex/dist/katex.min.css";
 
 /* Split by feature for readability; import order preserves the original

@@ -1,10 +1,10 @@
-import { invoke } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { Logger } from '@/lib/logger';
 import type {
   AudioTranscriptionSession,
   TranscriptionCapability,
-} from '../types';
+} from '@myelin/editor/platform/types';
+import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { Logger } from '@/lib/logger';
 
 const logger = new Logger('AudioTranscription');
 

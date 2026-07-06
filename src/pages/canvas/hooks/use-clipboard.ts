@@ -1,8 +1,8 @@
 import { type RefObject, useEffect, useEffectEvent, useMemo } from 'react';
+import { CanvasClipboardController } from '@myelin/editor/clipboard/controller';
+import { DrawableCanvasClipboardAdapter } from '@myelin/editor/clipboard/drawable-canvas-adapter';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { VFSNodeId } from '@/lib/sync';
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import { CanvasClipboardController } from '../clipboard/controller';
-import { DrawableCanvasClipboardAdapter } from '../clipboard/drawable-canvas-adapter';
 import type { EmbedFilesFn } from './use-embed-files';
 
 interface UseCanvasClipboardArgs {

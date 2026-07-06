@@ -2,10 +2,10 @@ import {
   prosemirrorToYXmlFragment,
   yXmlFragmentToProseMirrorRootNode,
 } from 'y-prosemirror';
-import { ElementType } from '@/pages/canvas/elements/element-type';
-import { renamePageFrameLinkReferencesDoc } from '@/pages/canvas/page-frame/pm/markdown/note-links';
-import { schema } from '@/pages/canvas/page-frame/pm/schema';
-import type { YDocManager } from '@/pages/canvas/ydoc-manager';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { renamePageFrameLinkReferencesDoc } from '@myelin/editor/page-frame/pm/markdown/note-links';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
+import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import {
   type DocRewriteRepository,
   rewriteDocReferencesInSources,

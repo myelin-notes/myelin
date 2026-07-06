@@ -1,9 +1,9 @@
+import type { Platform } from '@myelin/editor/platform/types';
 import { listen } from '@tauri-apps/api/event';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import type { Platform } from '../types';
 import { artifactCache } from './artifact-cache';
 import { codeRunner } from './code-runner';
 import { TauriHandwritingService } from './handwriting';

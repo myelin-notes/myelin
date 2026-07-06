@@ -1,11 +1,11 @@
 import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type {
   ActiveRepository,
   NoteSessionStatus,
   VFSNodeId,
 } from '@/lib/sync';
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { CanvasSessionController } from './use-session-controller';
 
 const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
@@ -24,15 +24,15 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
   }),
 );
 
-vi.mock('@/pages/canvas/drawable-canvas', () => ({
+vi.mock('@myelin/editor/drawable-canvas', () => ({
   DrawableCanvas: drawableCanvasCtor,
 }));
 
-vi.mock('@/pages/canvas/elements/page-frame-element', () => ({
+vi.mock('@myelin/editor/elements/page-frame-element', () => ({
   PageFrameElement: class PageFrameElement {},
 }));
 
-vi.mock('@/pages/canvas/page-frame/note-link/resolution', () => ({
+vi.mock('@myelin/editor/page-frame/note-link/resolution', () => ({
   resolveNoteLinkRefByTitle: resolveNoteLinkRefByTitleMock,
 }));
 

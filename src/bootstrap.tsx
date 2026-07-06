@@ -1,5 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { setAnalyticsSink } from '@myelin/editor/analytics';
+import { setLogErrorReporter } from '@myelin/editor/logger';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
 import { I18nProvider } from '@/lib/i18n';
 import { flushLogs } from '@/lib/logger';
@@ -7,7 +9,11 @@ import { setPlatform } from '@/platform';
 import { tauriPlatform } from '@/platform/tauri';
 import App from './App';
 import { trackEvent } from './lib/analytics';
-import { initErrorTracking } from './lib/posthog';
+import {
+  initErrorTracking,
+  isErrorTrackingEnabled,
+  posthog,
+} from './lib/posthog';
 import { initRustErrorReporting } from './lib/rust-errors';
 import { RepositoryProvider } from './lib/sync';
 import { initAutoUpdate } from './lib/updater';
@@ -22,6 +28,15 @@ try {
   // Drain log lines queued while modules were importing (pre-platform).
   void flushLogs();
   initErrorTracking();
+  // Editor-package seams: product events and error-level log reports flow to
+  // PostHog through these host-installed hooks.
+  setAnalyticsSink(trackEvent);
+  setLogErrorReporter((error, context) => {
+    if (!isErrorTrackingEnabled()) {
+      return;
+    }
+    posthog.captureException(error, context);
+  });
   initRustErrorReporting();
   trackEvent('app_opened');
 

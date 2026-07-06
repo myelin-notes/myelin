@@ -1,3 +1,4 @@
+import { summarizeNoteBytes } from '@myelin/editor/note/state-summary';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
@@ -11,7 +12,6 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
-import { summarizeNoteBytes } from '@/lib/note/state-summary';
 import { BaseRepository } from './base';
 import {
   computeRevision,

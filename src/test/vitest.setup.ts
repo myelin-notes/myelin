@@ -1,6 +1,6 @@
 import { beforeEach, vi } from 'vitest';
+import { createFakePlatform } from '@myelin/editor/test/fake-platform';
 import { setPlatform } from '@/platform';
-import { createFakePlatform } from './fake-platform';
 
 // The `node` test environment has no DOMRect. Provide a minimal stand-in so
 // canvas elements that compute geometry (localBoundingBox / boundingBox) can be
@@ -73,7 +73,7 @@ beforeEach(() => {
   setPlatform(createFakePlatform());
 });
 
-vi.mock('@/lib/thumbnails', () => ({
+vi.mock('@myelin/editor/thumbnails', () => ({
   clearAllThumbnails: async () => {},
   getThumbnailUrl: async () => null,
   regenerateThumbnailNow: async () => {},

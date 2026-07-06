@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ElementType } from '@/pages/canvas/elements/element-type';
-import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/import';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { serializeNoteElements } from '@/pages/library/export/workspace-json';
 import {
   NOTE_JSON_VERSION,

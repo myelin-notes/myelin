@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { formatNumber } from '@myelin/editor/i18n/format';
 import { useLocale, useMessages } from '@/lib/i18n';
-import { formatNumber } from '@/lib/i18n/format';
 import { Logger } from '@/lib/logger';
 import {
   type NoteBacklink,

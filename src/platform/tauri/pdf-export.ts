@@ -1,6 +1,6 @@
+import type { PdfExportCapability } from '@myelin/editor/platform/types';
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
-import type { PdfExportCapability } from '../types';
 
 /**
  * Destination picking plus the Rust `export_pdf` command. Fire-and-forget on

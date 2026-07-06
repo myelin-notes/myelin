@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
+import { useCanvasCommandContext } from '@myelin/editor/command-context';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
@@ -19,7 +20,6 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
-import { useCanvasCommandContext } from '@/pages/canvas/command-context';
 import {
   importMarkdownFile,
   isMarkdownFile,

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Radio } from 'lucide-react';
+import { formatNumber } from '@myelin/editor/i18n/format';
 import { TimeAgo } from '@/components/time-ago';
 import { type Messages, useLocale, useMessages } from '@/lib/i18n';
-import { formatNumber } from '@/lib/i18n/format';
 import {
   type NoteSession,
   type NoteSessionStatus,

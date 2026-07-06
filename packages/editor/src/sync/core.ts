@@ -1,0 +1,40 @@
+/**
+ * Pure sync types and helpers the editor depends on: the VFS/Repository
+ * contract, Yjs sync types, the live transport interface, and file-type
+ * helpers. No host or app dependencies.
+ */
+
+export { noopTransport, type Transport } from './live/transport';
+export {
+  getFileTypeForName,
+  getMimeTypeForFileType,
+  isImageFileType,
+  isVideoFileType,
+} from './repo/file-types';
+export type {
+  FileType,
+  FileVersion,
+  NodeSearchResult,
+  NoteBacklink,
+  Repository,
+  RepositoryCapabilities,
+  RepositoryNoteGraph,
+  RepositoryNoteGraphLink,
+  RepositoryNoteGraphNode,
+  RepositoryStats,
+  RepositoryTag,
+  SearchNodesOptions,
+  StoredNoteLink,
+  VFSFileNode,
+  VFSFolderNode,
+  VFSNode,
+} from './repo/types';
+export { FileTypes, ImageFileTypes, VideoFileTypes } from './repo/types';
+export type {
+  NoteSessionStatus,
+  VFSNodeId,
+  YjsSyncPushOptions,
+  YjsSyncPushResult,
+  YjsSyncSnapshot,
+  YjsSyncTarget,
+} from './types';

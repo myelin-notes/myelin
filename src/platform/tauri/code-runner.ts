@@ -1,10 +1,10 @@
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import type {
   RunFinishedEvent,
   RunOutputEvent,
-} from '@/lib/code-runner/contract';
-import type { CodeRunnerCapability } from '../types';
+} from '@myelin/editor/code-runner/contract';
+import type { CodeRunnerCapability } from '@myelin/editor/platform/types';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 const OUTPUT_EVENT = 'code-run-output';
 const FINISHED_EVENT = 'code-run-finished';

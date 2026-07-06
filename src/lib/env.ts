@@ -1,7 +1,9 @@
 // Central registry of runtime environment variables.
 //
 // All `import.meta.env.*` reads in the app should live here so we have a
-// single place to audit which env vars the app depends on.
+// single place to audit which env vars the app depends on. The editor
+// package reads its own flags in `packages/editor/src/env.ts` — keep any
+// shared flag semantics in sync with that file.
 //
 // Build-time env vars consumed by vite.config.ts (Node context, `process.env`)
 // are documented here for discoverability but must be read there directly:
