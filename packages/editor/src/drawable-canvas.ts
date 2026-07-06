@@ -21,6 +21,7 @@ import {
 import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
 import { PlacementController } from './placement-controller';
+import type { LivePeersSnapshot } from './sync/live/peers';
 import { EraserTool } from './tools/eraser-tool';
 import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
@@ -203,6 +204,9 @@ export class DrawableCanvas {
    */
   private _changeListeners = new Set<() => void>();
 
+  /** Latest live-session membership; null until the app feeds a snapshot. */
+  private _livePeers: LivePeersSnapshot | null = null;
+
   public constructor(
     canvas: HTMLCanvasElement,
     ydoc: YDocManager,
@@ -249,6 +253,22 @@ export class DrawableCanvas {
 
   public get localPeerId(): string {
     return this._localPeerId;
+  }
+
+  /**
+   * Latest live-session membership from the app's sync layer. Forwarded to
+   * elements that coordinate work across peers (audio transcription claims).
+   */
+  public setLivePeers(snapshot: LivePeersSnapshot | null): void {
+    if (this._livePeers === snapshot) {
+      return;
+    }
+    this._livePeers = snapshot;
+    for (const element of this.elements) {
+      if (element instanceof AudioElement) {
+        element.setLivePeers(snapshot);
+      }
+    }
   }
 
   /**
@@ -380,6 +400,7 @@ export class DrawableCanvas {
     }
     if (element instanceof AudioElement) {
       element.setLocalPeerId(this._localPeerId);
+      element.setLivePeers(this._livePeers);
     }
   }
 

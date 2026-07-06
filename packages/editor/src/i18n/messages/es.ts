@@ -750,6 +750,9 @@ const es: typeof en = {
       pauseAudio: 'Pausar audio',
       transcribe: 'Transcribir audio',
       transcribing: 'Transcribiendo audio...',
+      transcribingOn: (peer: string) => `Transcribiendo en ${peer}...`,
+      transcriptionUnavailable:
+        'La transcripción requiere un dispositivo compatible',
       showTranscript: 'Mostrar transcripción',
       hideTranscript: 'Ocultar transcripción',
       noSpeechDetected: 'No se detectó voz',

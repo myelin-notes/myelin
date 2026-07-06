@@ -169,6 +169,10 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
         if (type === ElementType.AUDIO) {
           // A paste creates a new element, so the paster owns any empty recording slot.
           nextMap.set('creatorPeerId', canvas.localPeerId);
+          // The source's transcription job (if any) writes only to the
+          // original element; an inherited claim would leave the copy showing
+          // "transcribing" that never completes.
+          nextMap.set('transcribingPeerId', '');
         }
         const background = isBackgroundElement(type);
         const element = canvas.insertElementMap(nextMap, {

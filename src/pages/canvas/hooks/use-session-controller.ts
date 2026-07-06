@@ -75,6 +75,7 @@ interface ActiveCanvasSession {
   noteSession: NoteSession;
   drawableCanvas: DrawableCanvas;
   unsubscribeStatus: () => void;
+  unsubscribePeers: () => void;
 }
 
 export class CanvasSessionController {
@@ -275,6 +276,7 @@ export class CanvasSessionController {
       }
 
       activeSession.unsubscribeStatus();
+      activeSession.unsubscribePeers();
       activeSession.drawableCanvas.destroy();
 
       try {
@@ -327,10 +329,20 @@ export class CanvasSessionController {
     this.lifecycleError = null;
     let unsubscribeStatus = () => {};
 
+    // Feed live-session membership (peer modes + capabilities) to the canvas
+    // so audio elements can coordinate transcription claims.
+    const unsubscribePeers = noteSession.subscribePeerSnapshot((snapshot) => {
+      drawableCanvas.setLivePeers({
+        localMode: snapshot.localMode,
+        peers: snapshot.connectedPeers,
+      });
+    });
+
     this.activeSession = {
       noteSession,
       drawableCanvas,
       unsubscribeStatus: () => unsubscribeStatus(),
+      unsubscribePeers,
     };
     this.drawableCanvasRef.current = drawableCanvas;
 

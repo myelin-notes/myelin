@@ -729,6 +729,8 @@ const zhHans: typeof en = {
       pauseAudio: '暂停音频',
       transcribe: '转录音频',
       transcribing: '正在转录音频…',
+      transcribingOn: (peer: string) => `正在 ${peer} 上转录…`,
+      transcriptionUnavailable: '转录需要支持转录的设备',
       showTranscript: '显示转录文本',
       hideTranscript: '隐藏转录文本',
       noSpeechDetected: '未检测到语音',

@@ -1,4 +1,6 @@
 import { summarizeYDocManager } from '@myelin/editor/note/state-summary';
+import { getPlatform } from '@myelin/editor/platform';
+import { TRANSCRIPTION_CAPABILITY } from '@myelin/editor/sync/live/peers';
 import {
   FRAGMENT_SWEEP_ORIGIN,
   PEER_ORIGIN,
@@ -518,6 +520,7 @@ export class NoteSession {
         peerId: this.localPeer.peerId,
         kind,
         mode: this.localPeer.mode,
+        capabilities: getLocalPeerCapabilities(),
       },
       transport,
     );
@@ -544,6 +547,11 @@ export class NoteSession {
       listener(this.status);
     }
   }
+}
+
+/** Capability advertisement for presence messages, derived from the platform. */
+function getLocalPeerCapabilities(): string[] {
+  return getPlatform().transcription ? [TRANSCRIPTION_CAPABILITY] : [];
 }
 
 function isRemoteSyncOrigin(origin: unknown): origin is SyncOrigin {

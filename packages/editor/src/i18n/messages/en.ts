@@ -744,6 +744,9 @@ const en = {
       pauseAudio: 'Pause audio',
       transcribe: 'Transcribe audio',
       transcribing: 'Transcribing audio...',
+      transcribingOn: (peer: string) => `Transcribing on ${peer}...`,
+      transcriptionUnavailable:
+        'Transcription requires a device that supports it',
       showTranscript: 'Show transcript',
       hideTranscript: 'Hide transcript',
       noSpeechDetected: 'No speech detected',

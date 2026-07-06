@@ -4,6 +4,7 @@ import type * as Y from 'yjs';
 import { getCanvasPalette } from '../../canvas-theme';
 import type { CanvasViewport } from '../../canvas-viewport';
 import { I18nProvider } from '../../i18n';
+import type { LivePeer, LivePeersSnapshot } from '../../sync/live/peers';
 import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
@@ -13,6 +14,9 @@ import { decodeAudio, drawWaveform } from './waveform';
 
 export const AUDIO_NATURAL_WIDTH = 280;
 export const AUDIO_NATURAL_HEIGHT = 64;
+
+/** Stable fallback so renders without a live session don't churn props. */
+const NO_REMOTE_PEERS: readonly LivePeer[] = [];
 
 /** e.g. 'audio/webm;codecs=opus' → 'recording.webm', 'audio/mp4' → 'recording.m4a' */
 function recordingFileName(mimeType: string): string {
@@ -29,6 +33,8 @@ export class AudioElement extends DrawableElement {
   private _transcript: string = '';
   private _creatorPeerId: string;
   private _localPeerId: string;
+  private _transcribingPeerId: string = '';
+  private _livePeers: LivePeersSnapshot | null = null;
 
   // Decoded lazily after audio data arrives; rendered into the view as a
   // prop and used by drawThumbnail.
@@ -60,6 +66,14 @@ export class AudioElement extends DrawableElement {
     this.setTranscript(transcript);
   };
 
+  private readonly _onTranscriptionClaimed = () => {
+    this.claimTranscription();
+  };
+
+  private readonly _onTranscriptionClaimReleased = () => {
+    this.releaseTranscriptionClaim();
+  };
+
   constructor(uuid: string, localPeerId = '', creatorPeerId = localPeerId) {
     super(uuid, ElementType.AUDIO);
     this._localPeerId = localPeerId;
@@ -73,6 +87,7 @@ export class AudioElement extends DrawableElement {
       mimeType: this._mimeType,
       transcript: this._transcript,
       creatorPeerId: this._creatorPeerId,
+      transcribingPeerId: this._transcribingPeerId,
     };
     if (this._audioData) {
       props.audioData = new Uint8Array(this._audioData);
@@ -102,6 +117,10 @@ export class AudioElement extends DrawableElement {
         this._creatorPeerId = typeof v === 'string' ? v : '';
         this.render();
       },
+      transcribingPeerId: (v) => {
+        this._transcribingPeerId = typeof v === 'string' ? v : '';
+        this.render();
+      },
       audioData: (v) => {
         this._audioData = v instanceof Uint8Array ? new Uint8Array(v) : null;
         this.scheduleWaveformDecode();
@@ -122,12 +141,61 @@ export class AudioElement extends DrawableElement {
   public get transcript(): string {
     return this._transcript;
   }
+  public get transcribingPeerId(): string {
+    return this._transcribingPeerId;
+  }
 
   public setLocalPeerId(peerId: string): void {
     if (this._localPeerId === peerId) {
       return;
     }
     this._localPeerId = peerId;
+    this.render();
+  }
+
+  /** Latest live-session membership, fed in by the canvas from the app's sync layer. */
+  public setLivePeers(snapshot: LivePeersSnapshot | null): void {
+    if (this._livePeers === snapshot) {
+      return;
+    }
+    this._livePeers = snapshot;
+    this.render();
+  }
+
+  /**
+   * Write the transcription claim: this peer is transcribing (or about to).
+   * Written the moment transcription starts on both the live-recording and
+   * on-demand paths, so other capable peers don't self-elect meanwhile.
+   */
+  public claimTranscription(): void {
+    if (!this._localPeerId) {
+      return;
+    }
+    this._transcribingPeerId = this._localPeerId;
+    // Like the transcript itself, claim writes arrive outside any user edit
+    // and must not enter the undo stack.
+    this.syncToYMap(
+      { transcribingPeerId: this._localPeerId },
+      ASYNC_RESULT_ORIGIN,
+    );
+    this.render();
+  }
+
+  /**
+   * Clear our own claim after a job ends without a transcript (failure or no
+   * speech), so present-but-idle doesn't read as "still transcribing" to
+   * remote peers. Successful jobs skip this: a claim is inert once
+   * `transcript` is set.
+   */
+  public releaseTranscriptionClaim(): void {
+    if (
+      this._transcribingPeerId.length === 0 ||
+      this._transcribingPeerId !== this._localPeerId
+    ) {
+      return;
+    }
+    this._transcribingPeerId = '';
+    this.syncToYMap({ transcribingPeerId: '' }, ASYNC_RESULT_ORIGIN);
     this.render();
   }
 
@@ -300,8 +368,14 @@ export class AudioElement extends DrawableElement {
             waveform={this._waveform}
             transcript={this._transcript}
             isCreator={this.isCreatedByLocalPeer}
+            transcribingPeerId={this._transcribingPeerId}
+            localPeerId={this._localPeerId}
+            localMode={this._livePeers?.localMode ?? 'owner-device'}
+            remotePeers={this._livePeers?.peers ?? NO_REMOTE_PEERS}
             onRecorded={this._onRecorded}
             onTranscribed={this._onTranscribed}
+            onTranscriptionClaimed={this._onTranscriptionClaimed}
+            onTranscriptionClaimReleased={this._onTranscriptionClaimReleased}
           />
         </I18nProvider>,
       );

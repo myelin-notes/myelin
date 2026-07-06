@@ -17,6 +17,7 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
         setOverlayCanvas: vi.fn(),
         setDomOverlayHost: vi.fn(),
         setOnPageFrameRenamed: vi.fn(),
+        setLivePeers: vi.fn(),
         destroy: vi.fn(),
       };
     }),
@@ -45,6 +46,7 @@ interface MockNoteSession {
   subscribeStatus: (
     listener: (status: NoteSessionStatus) => void,
   ) => () => void;
+  subscribePeerSnapshot: (listener: (snapshot: unknown) => void) => () => void;
   close: () => Promise<void>;
   save: () => Promise<void>;
 }
@@ -71,6 +73,7 @@ function createSession(id: VFSNodeId): MockNoteSession {
       });
       return vi.fn();
     }),
+    subscribePeerSnapshot: vi.fn(() => vi.fn()),
     close: vi.fn().mockResolvedValue(undefined),
     save: vi.fn().mockResolvedValue(undefined),
   };

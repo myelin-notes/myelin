@@ -18,12 +18,37 @@ import { getCanvasPalette, withCanvasAlpha } from '../../canvas-theme';
 import { useMessages } from '../../i18n';
 import { Logger } from '../../logger';
 import { type AudioTranscriptionSession, getPlatform } from '../../platform';
+import type { LivePeer, PeerMode } from '../../sync/live/peers';
 import { getDevicePixelRatio } from '../../utils';
+import {
+  canTranscribeHere,
+  getTranscriptionSlotState,
+  shouldAutoTranscribe,
+  shouldClaimOnRecordingStart,
+  type TranscriptionCoordinationInput,
+  type TranscriptionSlotState,
+} from './transcription-claims';
 import { decodeAudio, drawWaveform } from './waveform';
 
 const logger = new Logger('AudioTranscription');
 
 const MAX_WAVEFORM_BACKING_DIMENSION = 4096;
+
+/**
+ * Grace period before self-electing to pick up an orphaned transcription.
+ * A joining client learns of present peers via heartbeats (5s cadence), so
+ * acting sooner could steal a claim we simply haven't heard about yet.
+ */
+const AUTO_PICKUP_DELAY_MS = 8_000;
+
+// TODO: presence carries no device display name yet — add `deviceName` to the
+// peer hello/heartbeat so this can show "Caden's MacBook" instead of a UUID.
+function formatPeerId(peerId: string): string {
+  if (peerId.length <= 12) {
+    return peerId;
+  }
+  return `${peerId.slice(0, 8)}...${peerId.slice(-4)}`;
+}
 
 type RecordingState = 'idle' | 'requesting' | 'recording' | 'error';
 
@@ -158,7 +183,13 @@ interface AudioPlayerViewProps {
   mimeType: string;
   waveform: Float32Array | null;
   transcript: string;
+  /** Gates the recording slot only — transcription is capability/claim-gated. */
   isCreator: boolean;
+  /** The element's transcription claim; '' when never claimed. */
+  transcribingPeerId: string;
+  localPeerId: string;
+  localMode: PeerMode;
+  remotePeers: readonly LivePeer[];
   onRecorded: (
     data: Uint8Array,
     duration: number,
@@ -166,13 +197,15 @@ interface AudioPlayerViewProps {
     waveform: Float32Array | null,
   ) => void;
   onTranscribed: (transcript: string) => void;
+  onTranscriptionClaimed: () => void;
+  onTranscriptionClaimReleased: () => void;
 }
 
 interface AudioPlayerInteractionOptions {
   audioBytes: Uint8Array | null;
   transcript: string;
   isCreator: boolean;
-  isTranscribing: boolean;
+  slot: TranscriptionSlotState;
 }
 
 export interface AudioPlayerInteractionState {
@@ -186,17 +219,19 @@ export function getAudioPlayerInteractionState({
   audioBytes,
   transcript,
   isCreator,
-  isTranscribing,
+  slot,
 }: AudioPlayerInteractionOptions): AudioPlayerInteractionState {
   const hasAudio = Boolean(audioBytes);
   const isWaitingForRemoteAudio = !hasAudio && !isCreator;
-  const shouldWaitForRemoteTranscript = hasAudio && !transcript && !isCreator;
-  const isCaptionsLoading = isTranscribing || shouldWaitForRemoteTranscript;
+  const isCaptionsLoading =
+    slot.kind === 'transcribing-here' || slot.kind === 'transcribing-remote';
   return {
     isWaitingForRemoteAudio,
     isCaptionsLoading,
     primaryButtonDisabled: isWaitingForRemoteAudio,
-    captionsButtonDisabled: isCaptionsLoading,
+    // Enabled to toggle an existing transcript or to start a job here;
+    // disabled while a job runs (here or remotely) and when unavailable.
+    captionsButtonDisabled: !transcript && slot.kind !== 'can-transcribe',
   };
 }
 
@@ -208,8 +243,14 @@ export function AudioPlayerView({
   waveform,
   transcript,
   isCreator,
+  transcribingPeerId,
+  localPeerId,
+  localMode,
+  remotePeers,
   onRecorded,
   onTranscribed,
+  onTranscriptionClaimed,
+  onTranscriptionClaimReleased,
 }: AudioPlayerViewProps) {
   const strings = useMessages().canvas.audioPlayer;
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
@@ -232,20 +273,29 @@ export function AudioPlayerView({
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
   const displaySizeRef = useRef<WaveformDisplaySize | null>(null);
   const disposedRef = useRef(false);
+  // One auto-pickup attempt per audio blob per window — a failed run must
+  // degrade to the manual Transcribe affordance, not retry in a loop.
+  const autoPickupAttemptedRef = useRef(false);
   const isRecording = recordingState === 'recording';
   const isRequestingRecording = recordingState === 'requesting';
   const canTranscribe = getPlatform().transcription !== undefined;
-  // The captions button is the transcribe affordance for creators without a
-  // transcript; hide it when this platform can't transcribe. Existing
-  // transcripts (and the non-creator waiting state) stay visible regardless.
-  const showCaptionsButton = Boolean(
-    audioBytes && (transcript || !isCreator || canTranscribe),
-  );
+  const claimInput: TranscriptionCoordinationInput = {
+    hasAudio: Boolean(audioBytes),
+    transcript,
+    claimPeerId: transcribingPeerId,
+    localPeerId,
+    localMode,
+    localCapable: canTranscribe,
+    isTranscribingLocally: isTranscribing,
+    remotePeers,
+  };
+  const slot = getTranscriptionSlotState(claimInput);
+  const showCaptionsButton = Boolean(audioBytes);
   const interaction = getAudioPlayerInteractionState({
     audioBytes,
     transcript,
     isCreator,
-    isTranscribing,
+    slot,
   });
   const redrawAfterResize = useEffectEvent(() => {
     const canvas = waveformCanvasRef.current;
@@ -297,12 +347,33 @@ export function AudioPlayerView({
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
       }
+      autoPickupAttemptedRef.current = false;
       setIsPlaying(false);
       setCurrentTime(0);
       setRecordingState('idle');
       setShowTranscript(false);
     };
   }, [audioBytes]);
+
+  const attemptAutoPickup = useEffectEvent(() => {
+    if (autoPickupAttemptedRef.current || !shouldAutoTranscribe(claimInput)) {
+      return;
+    }
+    autoPickupAttemptedRef.current = true;
+    void handleTranscribe();
+  });
+
+  // Orphaned-claim pickup: a claim exists (transcription was started at some
+  // point) but its peer is gone. Wait out the membership grace period, then
+  // re-check eligibility and self-elect if we still win the election.
+  const autoPickupEligible = shouldAutoTranscribe(claimInput);
+  useEffect(() => {
+    if (!autoPickupEligible) {
+      return;
+    }
+    const timer = window.setTimeout(attemptAutoPickup, AUTO_PICKUP_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [autoPickupEligible]);
 
   // Animate recording visualization on the waveform canvas.
   useEffect(() => {
@@ -414,6 +485,17 @@ export function AudioPlayerView({
         void transcriptionSession?.finish();
         return;
       }
+      // Claim now, not when the transcript lands: audioData syncs with an
+      // empty transcript well before whisper finishes, and without a claim
+      // every capable peer would self-elect in that window.
+      if (
+        shouldClaimOnRecordingStart({
+          transcriptionSessionStarted: transcriptionSession !== null,
+          localMode,
+        })
+      ) {
+        onTranscriptionClaimed();
+      }
       recordChunksRef.current = [];
       mediaRecorderRef.current = recorder;
       transcriptionSessionRef.current = transcriptionSession;
@@ -447,6 +529,9 @@ export function AudioPlayerView({
       mediaRecorderRef.current = null;
       void transcriptionSessionRef.current?.finish();
       transcriptionSessionRef.current = null;
+      // The claim may already be written for a session that will never
+      // deliver; release it (a no-op unless the claim is ours).
+      onTranscriptionClaimReleased();
       stream?.getTracks().forEach((t) => {
         t.stop();
       });
@@ -473,6 +558,9 @@ export function AudioPlayerView({
     recordChunksRef.current = [];
 
     if (chunks.length === 0) {
+      if (transcription) {
+        onTranscriptionClaimReleased();
+      }
       return;
     }
 
@@ -493,6 +581,9 @@ export function AudioPlayerView({
       // and return to "tap to record". Longer recordings that fail to decode
       // are kept with the wall-clock duration.
       if (dur < 1) {
+        if (transcription) {
+          onTranscriptionClaimReleased();
+        }
         return;
       }
     }
@@ -522,6 +613,9 @@ export function AudioPlayerView({
     if (transcript) {
       onTranscribed(transcript);
     } else {
+      // The claim must not outlive the job: present-but-idle would read as
+      // "still transcribing" to remote peers forever.
+      onTranscriptionClaimReleased();
       flashNotice(strings.noSpeechDetected);
     }
   }
@@ -566,14 +660,17 @@ export function AudioPlayerView({
   }
 
   // Recordings are transcribed live; this is the on-demand path for imported
-  // audio (and the retry path for recordings whose transcription failed).
+  // audio, the retry path for failed recordings, and the orphaned-claim
+  // pickup path. Any capable owner-device peer may run it — creator-ness
+  // gates recording only.
   async function handleTranscribe() {
     const transcription = getPlatform().transcription;
-    if (!audioBytes || isTranscribing || !isCreator || !transcription) {
+    if (!audioBytes || !transcription || !canTranscribeHere(claimInput)) {
       return;
     }
     setIsTranscribing(true);
     setNotice(null);
+    onTranscriptionClaimed();
     try {
       const { buffer } = await decodeAudio(audioBytes);
       const text = await transcription.transcribeBuffer(elementId, buffer);
@@ -584,6 +681,7 @@ export function AudioPlayerView({
         onTranscribed(text);
         setShowTranscript(true);
       } else {
+        onTranscriptionClaimReleased();
         // null = backend unavailable; '' = whisper ran and heard nothing.
         flashNotice(
           text === null
@@ -597,6 +695,7 @@ export function AudioPlayerView({
       });
       // The button stays visible as the retry affordance.
       if (!disposedRef.current) {
+        onTranscriptionClaimReleased();
         flashNotice(strings.transcriptionFailed);
       }
     } finally {
@@ -609,7 +708,7 @@ export function AudioPlayerView({
   function handleCaptionsClick() {
     if (transcript) {
       setShowTranscript((open) => !open);
-    } else if (isCreator) {
+    } else if (slot.kind === 'can-transcribe') {
       void handleTranscribe();
     }
   }
@@ -656,9 +755,13 @@ export function AudioPlayerView({
     ? showTranscript
       ? strings.hideTranscript
       : strings.showTranscript
-    : interaction.isCaptionsLoading
-      ? strings.transcribing
-      : strings.transcribe;
+    : slot.kind === 'transcribing-remote'
+      ? strings.transcribingOn(formatPeerId(slot.peerId))
+      : slot.kind === 'transcribing-here'
+        ? strings.transcribing
+        : slot.kind === 'unavailable'
+          ? strings.transcriptionUnavailable
+          : strings.transcribe;
 
   const buttonLabel = isRequestingRecording
     ? strings.requestingMicAccess

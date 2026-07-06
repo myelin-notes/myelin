@@ -29,23 +29,47 @@ describe('getAudioPlayerInteractionState', () => {
       audioBytes: null,
       transcript: '',
       isCreator: false,
-      isTranscribing: false,
+      slot: { kind: 'none' },
     });
 
     expect(state.primaryButtonDisabled).toBe(true);
     expect(state.isWaitingForRemoteAudio).toBe(true);
   });
 
-  it('shows captions as loading for non-creators until transcript exists', () => {
+  it('shows captions as loading while a valid remote claim is transcribing', () => {
     const state = getAudioPlayerInteractionState({
       audioBytes: new Uint8Array([1]),
       transcript: '',
       isCreator: false,
-      isTranscribing: false,
+      slot: { kind: 'transcribing-remote', peerId: 'peer-b' },
     });
 
     expect(state.captionsButtonDisabled).toBe(true);
     expect(state.isCaptionsLoading).toBe(true);
+  });
+
+  it('disables captions when no capable client can transcribe here', () => {
+    const state = getAudioPlayerInteractionState({
+      audioBytes: new Uint8Array([1]),
+      transcript: '',
+      isCreator: false,
+      slot: { kind: 'unavailable' },
+    });
+
+    expect(state.captionsButtonDisabled).toBe(true);
+    expect(state.isCaptionsLoading).toBe(false);
+  });
+
+  it('enables the transcribe affordance for a capable eligible client', () => {
+    const state = getAudioPlayerInteractionState({
+      audioBytes: new Uint8Array([1]),
+      transcript: '',
+      isCreator: false,
+      slot: { kind: 'can-transcribe' },
+    });
+
+    expect(state.captionsButtonDisabled).toBe(false);
+    expect(state.isCaptionsLoading).toBe(false);
   });
 
   it('allows captions once the transcript has synced', () => {
@@ -53,7 +77,7 @@ describe('getAudioPlayerInteractionState', () => {
       audioBytes: new Uint8Array([1]),
       transcript: 'hello',
       isCreator: false,
-      isTranscribing: false,
+      slot: { kind: 'none' },
     });
 
     expect(state.captionsButtonDisabled).toBe(false);
