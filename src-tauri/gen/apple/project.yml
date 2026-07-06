@@ -66,7 +66,9 @@ targets:
         # Swift objects in libapp.a (tauri plugins, swift-rs) target iOS 14 and
         # need the Swift back-compat shims. Cargo's link directives don't carry
         # into the Xcode link of libapp.a, so they're declared here.
-        OTHER_LDFLAGS: $(inherited) -framework Accelerate -lswiftCompatibility56 -lswiftCompatibilityConcurrency
+        # -L uses DT_TOOLCHAIN_DIR: since Xcode 26, TOOLCHAIN_DIR resolves to
+        # the Metal toolchain cryptex, which lacks the Swift compat libs.
+        OTHER_LDFLAGS: $(inherited) -framework Accelerate -L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) -lswiftCompatibility56 -lswiftCompatibilityConcurrency
         ARCHS: [arm64]
         VALID_ARCHS: arm64 
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)

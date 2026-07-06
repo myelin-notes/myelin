@@ -341,6 +341,7 @@
 				OTHER_LDFLAGS = (
 					"-framework",
 					Accelerate,
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
 					"-lswiftCompatibility56",
 					"-lswiftCompatibilityConcurrency",
 				);
@@ -378,6 +379,7 @@
 				OTHER_LDFLAGS = (
 					"-framework",
 					Accelerate,
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
 					"-lswiftCompatibility56",
 					"-lswiftCompatibilityConcurrency",
 				);
