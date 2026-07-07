@@ -163,6 +163,11 @@ export class DrawableCanvas {
   private _lastTouchTapTime: number = 0;
   private _lastTouchTapPos: Vector2 = { x: 0, y: 0 };
 
+  // Active touch pointers by id. A two-finger touch is a viewport pinch/pan
+  // gesture (handled by CanvasViewport's touch listeners), so single-finger
+  // pointer panning must yield while 2+ fingers are down.
+  private readonly _activeTouchPointers = new Set<number>();
+
   /** Owns the element collections and keeps them mutating as a unit. */
   private readonly _store = new ElementStore(() => this.notifyChange());
   private _ydoc: YDocManager;
@@ -795,6 +800,7 @@ export class DrawableCanvas {
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
     window.removeEventListener('pointerup', this._handlePointerUp);
+    window.removeEventListener('pointercancel', this._handlePointerUp);
     window.removeEventListener('resize', this._handleResize);
   }
 
@@ -1092,6 +1098,13 @@ export class DrawableCanvas {
 
       switch (evt.pointerType) {
         case 'touch': {
+          this._activeTouchPointers.add(evt.pointerId);
+          // Second finger down → the viewport owns the pinch/pan gesture; stop
+          // any single-finger pan in progress and ignore this pointer.
+          if (this._activeTouchPointers.size >= 2) {
+            this.state.change(InteractState.Idle, evt);
+            break;
+          }
           // Double-tap enters element edit (matches the mouse/pen double-click);
           // otherwise a single finger pans the canvas.
           const point = this.viewport.getPoint(evt);
@@ -1132,9 +1145,14 @@ export class DrawableCanvas {
     canvas.addEventListener('pointerdown', this._handlePointerDown);
 
     this._handlePointerUp = (evt) => {
+      this._activeTouchPointers.delete(evt.pointerId);
       this.state.change(InteractState.Idle, evt);
     };
     window.addEventListener('pointerup', this._handlePointerUp);
+    // iOS fires pointercancel (not pointerup) for touches it absorbs into a
+    // system gesture; without this the active-touch set would leak and block
+    // future single-finger panning.
+    window.addEventListener('pointercancel', this._handlePointerUp);
 
     this._handleResize = () => {
       this.renderer.refreshSize();
