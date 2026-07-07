@@ -1,1 +1,1 @@
-export * from '@myelin/editor/os';
+export * from '@myelin/shared/os';

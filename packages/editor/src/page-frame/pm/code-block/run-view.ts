@@ -1,6 +1,6 @@
 import type { EditorView } from 'prosemirror-view';
+import { trackEvent } from '@myelin/shared/analytics';
 import { Logger } from '@myelin/shared/logger';
-import { trackEvent } from '../../../analytics';
 import type { RunnableLanguage } from '../../../code-runner/contract';
 import { getPlatform, type Unsubscribe } from '../../../platform';
 import type { RunSource } from './concat';

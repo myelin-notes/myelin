@@ -13,8 +13,8 @@ import {
   Play as PlayIcon,
   Square as SquareIcon,
 } from 'lucide-react';
+import { trackEvent } from '@myelin/shared/analytics';
 import { Logger } from '@myelin/shared/logger';
-import { trackEvent } from '../../analytics';
 import { getCanvasPalette, withCanvasAlpha } from '../../canvas-theme';
 import { useMessages } from '../../i18n';
 import { type AudioTranscriptionSession, getPlatform } from '../../platform';

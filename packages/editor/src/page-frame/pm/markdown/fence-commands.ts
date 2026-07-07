@@ -7,7 +7,7 @@ import {
   Plugin as StatePlugin,
   TextSelection,
 } from 'prosemirror-state';
-import { trackEvent } from '../../../analytics';
+import { trackEvent } from '@myelin/shared/analytics';
 import {
   findFenceLineAtOffset,
   isClosingFenceLine,

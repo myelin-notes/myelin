@@ -1,4 +1,4 @@
-import { isApplePlatform } from '../os';
+import { isApplePlatform } from '@myelin/shared/os';
 import { UserPrefs } from '../user-prefs';
 
 // biome-ignore lint/suspicious/noEmptyInterface: intentionally empty, extended via declaration merging

@@ -8,7 +8,7 @@ import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { Selection } from 'prosemirror-state';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import { trackEvent } from '../analytics';
+import { trackEvent } from '@myelin/shared/analytics';
 import { getCanvasPalette } from '../canvas-theme';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';

@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { setAnalyticsSink } from '@myelin/editor/analytics';
+import { setAnalyticsSink } from '@myelin/shared/analytics';
 import { setLogErrorReporter, setLogSink } from '@myelin/shared/logger';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
 import { I18nProvider } from '@/lib/i18n';

@@ -31,8 +31,8 @@ import {
 import { goToNextCell } from 'prosemirror-tables';
 import type { EditorView } from 'prosemirror-view';
 import { redo, undo } from 'y-prosemirror';
+import { isApplePlatform } from '@myelin/shared/os';
 import { type Action, comboToPMKey, registry } from '../../keybinds';
-import { isApplePlatform } from '../../os';
 import { parseCalloutMarker } from '../callouts';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { expandMarkdownLinkCommand } from './markdown/links';
