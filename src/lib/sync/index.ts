@@ -1,3 +1,9 @@
+export * from '@myelin/editor/sync/live/transport';
+export * from '@myelin/editor/sync/repo/file-types';
+// `Repository` from the editor contract is shadowed below with the app's
+// extension (adds `openSession`), so importers here keep the full contract.
+export * from '@myelin/editor/sync/repo/types';
+export * from '@myelin/editor/sync/types';
 export {
   fetchGitHubBranches,
   fetchGitHubOrgs,
@@ -10,7 +16,6 @@ export {
   type GitHubUser,
 } from '../utils/github-api';
 export { RepositoryProvider } from './context';
-export * from './core';
 export { CloudflareLiveDiscoveryClient } from './live/cloudflare-discovery';
 export {
   createLiveDiscoveryRecordInput,
@@ -66,6 +71,7 @@ export {
   setRepositoryConfig,
   subscribeRepositoryConfig,
 } from './repo/repository-settings';
+export type { Repository } from './repo/types';
 export type { RepositoryStatus } from './repo-context';
 export { useRepository, useRepositoryStatus } from './repo-context';
 export { NoteSession } from './session';

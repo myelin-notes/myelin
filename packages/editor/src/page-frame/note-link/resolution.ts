@@ -12,8 +12,8 @@ import type {
   VFSFileNode,
   VFSNode,
   VFSNodeId,
-  YjsSyncTarget,
-} from '../../sync/core';
+} from '../../sync/repo/types';
+import type { YjsSyncTarget } from '../../sync/types';
 import { YDocManager } from '../../ydoc-manager';
 import type { PageFrameAutocompleteItem } from '../pm/autocomplete';
 

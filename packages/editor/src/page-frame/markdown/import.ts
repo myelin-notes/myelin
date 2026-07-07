@@ -7,7 +7,7 @@ import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
 } from '../../elements/page-frame-constants';
-import type { VFSNodeId } from '../../sync/core';
+import type { VFSNodeId } from '../../sync/types';
 import type { YDocManager } from '../../ydoc-manager';
 import {
   type NoteLinkRefResolveSource,

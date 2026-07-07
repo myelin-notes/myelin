@@ -4,7 +4,7 @@ import type {
   VFSFileNode,
   VFSFolderNode,
   VFSNodeId,
-} from '../../sync/core';
+} from '../../sync/repo/types';
 import {
   type MediaPathResolveSource,
   resolveLibraryMediaNode,

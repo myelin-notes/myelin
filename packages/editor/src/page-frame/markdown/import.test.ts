@@ -6,7 +6,7 @@ import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
 } from '../../elements/page-frame-constants';
-import type { Repository, VFSNode } from '../../sync/core';
+import type { Repository, VFSNode } from '../../sync/repo/types';
 import { YDocManager } from '../../ydoc-manager';
 import { schema } from '../pm/schema';
 import {

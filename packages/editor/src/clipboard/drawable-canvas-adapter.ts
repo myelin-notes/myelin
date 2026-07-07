@@ -3,7 +3,7 @@ import type * as Y from 'yjs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { ElementType } from '../elements/element-type';
 import { PageFrameElement } from '../elements/page-frame-element';
-import type { VFSNodeId } from '../sync/core';
+import type { VFSNodeId } from '../sync/types';
 import {
   cloneYMap,
   copyXmlFragmentInto,

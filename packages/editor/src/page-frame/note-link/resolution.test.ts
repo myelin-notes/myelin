@@ -6,8 +6,8 @@ import type {
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
-  YjsSyncSnapshot,
-} from '../../sync/core';
+} from '../../sync/repo/types';
+import type { YjsSyncSnapshot } from '../../sync/types';
 import { YDocManager } from '../../ydoc-manager';
 import {
   resolveNoteLinkIdByTitle,

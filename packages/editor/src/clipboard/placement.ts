@@ -1,4 +1,4 @@
-import type { VFSNodeId } from '../sync/core';
+import type { VFSNodeId } from '../sync/types';
 import type {
   CanvasClipboardSnapshot,
   CanvasPasteContext,

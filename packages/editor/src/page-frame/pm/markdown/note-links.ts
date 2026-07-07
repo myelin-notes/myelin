@@ -6,7 +6,7 @@ import {
   joinNoteLinkTitle,
   splitNoteLinkTargetFrame,
 } from '../../../note/link-syntax';
-import type { VFSNodeId } from '../../../sync/core';
+import type { VFSNodeId } from '../../../sync/types';
 import { UserPrefs } from '../../../user-prefs';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import {

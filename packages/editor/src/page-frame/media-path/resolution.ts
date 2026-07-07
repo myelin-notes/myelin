@@ -2,10 +2,8 @@ import {
   getMimeTypeForFileType,
   isImageFileType,
   isVideoFileType,
-  type Repository,
-  type VFSFileNode,
-  type VFSNodeId,
-} from '../../sync/core';
+} from '../../sync/repo/file-types';
+import type { Repository, VFSFileNode, VFSNodeId } from '../../sync/repo/types';
 import type { PageFrameAutocompleteItem } from '../pm/autocomplete';
 import type { ResolveMediaSrc } from '../pm/embed/renderer';
 

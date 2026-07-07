@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { VFSNodeId } from '../../sync/core';
+import type { VFSNodeId } from '../../sync/types';
 import { useThumbnailUrl } from '../../use-thumbnail-url';
 import { cn } from '../../utils';
 

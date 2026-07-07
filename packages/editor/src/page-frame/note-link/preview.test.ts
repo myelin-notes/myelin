@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { VFSFileNode, VFSFolderNode } from '../../sync/core';
+import type { VFSFileNode, VFSFolderNode } from '../../sync/repo/types';
 import type { YjsSyncSnapshot } from '../../sync/types';
 import { YDocManager } from '../../ydoc-manager';
 import { addMarkdownPageFrameToYDoc } from '../markdown/import';
