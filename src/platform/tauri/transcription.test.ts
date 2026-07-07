@@ -322,7 +322,7 @@ describe('audio transcription service', () => {
     expect(invokesOf('push_audio_transcription_samples')).toHaveLength(0);
   });
 
-  it('settles finish() within a bounded timeout when FINISHED never arrives', async () => {
+  it('keeps finish() pending until FINISHED arrives, however late', async () => {
     vi.useFakeTimers();
     try {
       stubAudioContext();
@@ -330,7 +330,7 @@ describe('audio transcription service', () => {
 
       const session = await start();
       const sessionId = startedSessionId();
-      emitSegment(sessionId, ' partial transcript ');
+      emitSegment(sessionId, ' slow transcript ');
 
       let settled = false;
       const finishPromise = session!.finish().then((transcript) => {
@@ -338,18 +338,38 @@ describe('audio transcription service', () => {
         return transcript;
       });
 
-      // Let the finish invoke resolve, but never emit FINISHED.
-      await vi.advanceTimersByTimeAsync(0);
+      // Let the finish invoke resolve, but delay FINISHED far beyond the old
+      // 5s fallback: a slow whisper run is not a failure.
+      await vi.advanceTimersByTimeAsync(60_000);
       expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
       expect(settled).toBe(false);
 
-      // Advancing past the fallback timeout must settle finish().
-      await vi.advanceTimersByTimeAsync(10_000);
-      expect(settled).toBe(true);
-      expect(await finishPromise).toBe('partial transcript');
+      emitFinished(sessionId);
+      expect(await finishPromise).toBe('slow transcript');
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('cancel() aborts the backend session and settles a pending finish()', async () => {
+    stubAudioContext();
+    mockInvokeDefaults();
+
+    const session = await start();
+    const sessionId = startedSessionId();
+    const finishPromise = session!.finish();
+    await vi.waitFor(() => {
+      expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
+    });
+
+    await session!.cancel();
+
+    expect(invokesOf('cancel_audio_transcription')).toEqual([
+      ['cancel_audio_transcription', { sessionId }],
+    ]);
+    await finishPromise;
+    expect(audioContext?.close).toHaveBeenCalled();
+    expect(listenerCount()).toBe(0);
   });
 
   it('transcribes a decoded audio buffer in chunks', async () => {
@@ -363,7 +383,9 @@ describe('audio transcription service', () => {
       getChannelData: () => data,
     } as unknown as AudioBuffer;
 
-    const transcriptPromise = transcription.transcribeBuffer('audio-1', buffer);
+    const session = await transcription.startBufferSession('audio-1', buffer);
+    expect(session).not.toBeNull();
+    const transcriptPromise = session!.finish();
 
     await vi.waitFor(() => {
       expect(invokesOf('push_audio_transcription_samples')).toHaveLength(2);

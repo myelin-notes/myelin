@@ -53,8 +53,17 @@ export interface ArtifactCache {
 }
 
 export interface AudioTranscriptionSession {
-  /** Resolves with the full transcript once the backend flushes its final segments. */
+  /**
+   * Resolves with the full transcript once the backend flushes its final
+   * segments — however long whisper takes. Settles early only when the session
+   * is cancelled or the backend reports the session finished.
+   */
   finish(): Promise<string>;
+  /**
+   * Abandon the session: stop capture, abort any in-flight whisper run on the
+   * backend, and discard the transcript. Settles a pending finish().
+   */
+  cancel(): Promise<void>;
 }
 
 export interface TranscriptionCapability {
@@ -67,13 +76,15 @@ export interface TranscriptionCapability {
     stream: MediaStream;
   }): Promise<AudioTranscriptionSession | null>;
   /**
-   * Transcribe an already-decoded audio file (the import / retry path).
-   * Resolves null when the backend is unavailable, '' when no speech was heard.
+   * Start transcribing an already-decoded audio file (the import / retry
+   * path). Resolves null when the backend is unavailable. The caller awaits
+   * `finish()` for the transcript and can `cancel()` while it is pending
+   * (e.g. when the element is deleted mid-transcription).
    */
-  transcribeBuffer(
+  startBufferSession(
     elementId: string,
     buffer: AudioBuffer,
-  ): Promise<string | null>;
+  ): Promise<AudioTranscriptionSession | null>;
 }
 
 /** One reindex/recognition request, as passed to the host engine. */

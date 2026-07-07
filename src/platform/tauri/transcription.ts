@@ -14,13 +14,6 @@ const FINISHED_EVENT = 'audio-transcription-finished';
 /** Decoded file samples are pushed in chunks to bound per-invoke payload size. */
 const IMPORT_CHUNK_SAMPLES = 65_536;
 
-/**
- * After the finish invoke resolves we wait this long for the backend's FINISHED
- * event before settling finish() ourselves — a crashed worker or dropped IPC
- * channel can swallow FINISHED, and callers must never hang on it.
- */
-const FINISH_FALLBACK_TIMEOUT_MS = 5_000;
-
 interface AudioTranscriptionSegmentPayload {
   sessionId: string;
   text: string;
@@ -43,15 +36,19 @@ export const transcription: TranscriptionCapability = {
     return openSession(elementId, stream);
   },
 
-  /** Transcribe an already-decoded audio file (the media import path). */
-  async transcribeBuffer(elementId, buffer) {
+  /**
+   * Start transcribing an already-decoded audio file (the media import path).
+   * The caller awaits `finish()` for the transcript and can `cancel()` while
+   * it is pending (e.g. when the element is deleted mid-transcription).
+   */
+  async startBufferSession(elementId, buffer) {
     const session = await openSession(elementId);
     if (!session) {
       return null;
     }
 
     session.transcribeSamples(mixToMono(buffer), buffer.sampleRate);
-    return session.finish();
+    return session;
   },
 };
 
@@ -170,30 +167,24 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
       });
     }
 
-    // The backend emits FINISHED after flushing its final segments; the
-    // FINISHED handler calls close(), which resolves this promise. If FINISHED
-    // never arrives (crashed worker, dropped IPC channel), fall back to
-    // close() after a bounded wait so finish() always settles.
-    await this.waitForClose();
+    // The backend emits FINISHED after flushing its final segments — however
+    // long whisper takes; the FINISHED handler calls close(), which resolves
+    // this promise. There is deliberately no timeout here: a slow machine is
+    // not a failure, and the worker always emits FINISHED (even on panic).
+    // cancel() also resolves it for callers that abandon the session.
+    await this.closedPromise;
     return this.segments
       .map((segment) => segment.trim())
       .filter(Boolean)
       .join(' ');
   }
 
-  private async waitForClose(): Promise<void> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<void>((resolve) => {
-      timer = setTimeout(() => {
-        void this.close();
-        resolve();
-      }, FINISH_FALLBACK_TIMEOUT_MS);
-    });
-    try {
-      await Promise.race([this.closedPromise, timeout]);
-    } finally {
-      clearTimeout(timer);
-    }
+  public async cancel(): Promise<void> {
+    this.stopped = true;
+    void invoke('cancel_audio_transcription', {
+      sessionId: this.sessionId,
+    }).catch(() => {});
+    await this.close();
   }
 
   /**
