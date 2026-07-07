@@ -1,9 +1,27 @@
-import {
-  type FileType,
-  FileTypes,
-  ImageFileTypes,
-  VideoFileTypes,
-} from './types';
+export const ImageFileTypes = [
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'avif',
+  'svg',
+  'bmp',
+] as const;
+export const VideoFileTypes = [
+  'mp4',
+  'mov',
+  'm4v',
+  'webm',
+  'avi',
+  'mkv',
+] as const;
+export const FileTypes = [
+  'mcanvas',
+  ...ImageFileTypes,
+  ...VideoFileTypes,
+] as const;
+export type FileType = (typeof FileTypes)[number];
 
 const FILE_TYPE_SET = new Set<string>(FileTypes);
 const IMAGE_FILE_TYPE_SET = new Set<string>(ImageFileTypes);

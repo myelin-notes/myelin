@@ -6,13 +6,16 @@
 
 export { noopTransport, type Transport } from './live/transport';
 export {
+  type FileType,
+  FileTypes,
   getFileTypeForName,
   getMimeTypeForFileType,
+  ImageFileTypes,
   isImageFileType,
   isVideoFileType,
+  VideoFileTypes,
 } from './repo/file-types';
 export type {
-  FileType,
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
@@ -29,7 +32,6 @@ export type {
   VFSFolderNode,
   VFSNode,
 } from './repo/types';
-export { FileTypes, ImageFileTypes, VideoFileTypes } from './repo/types';
 export type {
   NoteSessionStatus,
   VFSNodeId,

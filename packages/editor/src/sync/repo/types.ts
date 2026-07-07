@@ -1,32 +1,9 @@
 import type { ReindexItem } from '../../platform';
 import type { VFSNodeId } from '../types';
+import type { FileType } from './file-types';
 
 export type { VFSNodeId } from '../types';
-
-export const ImageFileTypes = [
-  'jpg',
-  'jpeg',
-  'png',
-  'gif',
-  'webp',
-  'avif',
-  'svg',
-  'bmp',
-] as const;
-export const VideoFileTypes = [
-  'mp4',
-  'mov',
-  'm4v',
-  'webm',
-  'avi',
-  'mkv',
-] as const;
-export const FileTypes = [
-  'mcanvas',
-  ...ImageFileTypes,
-  ...VideoFileTypes,
-] as const;
-export type FileType = (typeof FileTypes)[number];
+export type { FileType } from './file-types';
 
 export interface VFSFileNode {
   id: VFSNodeId;
