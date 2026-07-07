@@ -19,8 +19,6 @@ export interface PeerControlMessage {
   peerId: string;
   kind: PeerMessageKind;
   mode: PeerMode;
-  /** Capability names the peer advertises; empty for older clients. */
-  capabilities: string[];
 }
 
 export type SyncMessage = YjsUpdateMessage | PeerControlMessage;
@@ -64,19 +62,11 @@ function decodePeerMessage(bytes: Uint8Array): PeerControlMessage | null {
       return null;
     }
 
-    // Absent on messages from older clients — treat as "no capabilities".
-    const capabilities = Array.isArray(raw.capabilities)
-      ? raw.capabilities.filter(
-          (value): value is string => typeof value === 'string',
-        )
-      : [];
-
     return {
       type: 'peer',
       peerId,
       kind,
       mode,
-      capabilities,
     };
   } catch {
     return null;
@@ -95,7 +85,6 @@ export function encodeMessage(message: SyncMessage): Uint8Array {
         peerId: message.peerId,
         kind: message.kind,
         mode: message.mode,
-        capabilities: message.capabilities,
       }),
     ),
   );

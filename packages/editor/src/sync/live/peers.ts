@@ -7,14 +7,9 @@
 
 export type PeerMode = 'owner-device' | 'guest-editor' | 'guest-viewer';
 
-/** Capability name advertised in presence messages by transcription-capable clients. */
-export const TRANSCRIPTION_CAPABILITY = 'transcription';
-
 export interface LivePeer {
   peerId: string;
   mode: PeerMode;
-  /** Capability names the peer advertised; empty for older clients. */
-  capabilities: readonly string[];
 }
 
 /** What the local client knows about the live session it is part of. */

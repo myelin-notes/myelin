@@ -34,13 +34,6 @@ const logger = new Logger('AudioTranscription');
 
 const MAX_WAVEFORM_BACKING_DIMENSION = 4096;
 
-/**
- * Grace period before self-electing to pick up an orphaned transcription.
- * A joining client learns of present peers via heartbeats (5s cadence), so
- * acting sooner could steal a claim we simply haven't heard about yet.
- */
-const AUTO_PICKUP_DELAY_MS = 8_000;
-
 // TODO: presence carries no device display name yet — add `deviceName` to the
 // peer hello/heartbeat so this can show "Caden's MacBook" instead of a UUID.
 function formatPeerId(peerId: string): string {
@@ -363,16 +356,14 @@ export function AudioPlayerView({
     void handleTranscribe();
   });
 
-  // Orphaned-claim pickup: a claim exists (transcription was started at some
-  // point) but its peer is gone. Wait out the membership grace period, then
-  // re-check eligibility and self-elect if we still win the election.
+  // Own-orphaned-claim pickup: this window started a job (e.g. before a
+  // reload) that never delivered a transcript. Remote peers see our claim as
+  // active while we're present, so no one else will ever act — resume it.
   const autoPickupEligible = shouldAutoTranscribe(claimInput);
   useEffect(() => {
-    if (!autoPickupEligible) {
-      return;
+    if (autoPickupEligible) {
+      attemptAutoPickup();
     }
-    const timer = window.setTimeout(attemptAutoPickup, AUTO_PICKUP_DELAY_MS);
-    return () => window.clearTimeout(timer);
   }, [autoPickupEligible]);
 
   // Animate recording visualization on the waveform canvas.
@@ -487,7 +478,8 @@ export function AudioPlayerView({
       }
       // Claim now, not when the transcript lands: audioData syncs with an
       // empty transcript well before whisper finishes, and without a claim
-      // every capable peer would self-elect in that window.
+      // every capable peer would offer the manual Transcribe affordance in
+      // that window and invite duplicate runs.
       if (
         shouldClaimOnRecordingStart({
           transcriptionSessionStarted: transcriptionSession !== null,

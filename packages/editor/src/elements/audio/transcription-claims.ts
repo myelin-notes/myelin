@@ -9,14 +9,15 @@
  * set. There are no wall-clock leases; races resolve via Yjs LWW (worst case
  * a duplicate Whisper run, which converges).
  *
- * Auto-pickup applies only where transcription was wanted but orphaned: the
- * claim field is non-empty (someone started a job) yet no longer valid.
- * Imported audio that was never transcribed has no claim and is never
- * auto-transcribed — the manual Transcribe affordance covers it.
+ * Auto-pickup applies only to our own orphaned claim (e.g. this window
+ * reloaded mid-job): remote peers see the claim as active while we're
+ * present, so no one else will ever act — resume it ourselves. Orphaned
+ * claims from other peers are never auto-resumed, and imported audio that
+ * was never transcribed has no claim — in both cases the manual Transcribe
+ * affordance covers it.
  */
 
 import type { LivePeer, PeerMode } from '../../sync/live/peers';
-import { TRANSCRIPTION_CAPABILITY } from '../../sync/live/peers';
 
 export interface TranscriptionCoordinationInput {
   hasAudio: boolean;
@@ -58,41 +59,13 @@ export function isClaimActive(input: TranscriptionCoordinationInput): boolean {
 }
 
 /**
- * Mirrors the `currentWriter` election: the lowest peerId among present
- * owner-device peers, restricted to those advertising the transcription
- * capability. Guests never elect.
- */
-export function getTranscriptionElectionWinner(
-  input: TranscriptionCoordinationInput,
-): string | null {
-  const eligiblePeerIds: string[] = [];
-
-  if (input.localCapable && input.localMode === 'owner-device') {
-    eligiblePeerIds.push(input.localPeerId);
-  }
-
-  for (const peer of input.remotePeers) {
-    if (
-      peer.mode === 'owner-device' &&
-      peer.capabilities.includes(TRANSCRIPTION_CAPABILITY)
-    ) {
-      eligiblePeerIds.push(peer.peerId);
-    }
-  }
-
-  if (eligiblePeerIds.length === 0) {
-    return null;
-  }
-
-  eligiblePeerIds.sort((a, b) => a.localeCompare(b));
-  return eligiblePeerIds[0];
-}
-
-/**
- * Whether this client should self-elect and transcribe an orphaned job: audio
- * present, no transcript, a claim exists but is no longer valid, and we win
- * the election among present capable owner-device peers. A missing claim
- * means transcription was never started (an import) — never auto-picked-up.
+ * Whether this client should resume its own orphaned job: audio present, no
+ * transcript, and our own claim with no job running in this window (e.g. this
+ * window reloaded mid-job). Remote peers see our claim as active while we're
+ * present, so no one else will ever act — resume it ourselves. Claims held by
+ * other peers are never auto-picked-up, and a missing claim means
+ * transcription was never started (an import) — the manual Transcribe
+ * affordance covers both.
  */
 export function shouldAutoTranscribe(
   input: TranscriptionCoordinationInput,
@@ -100,19 +73,10 @@ export function shouldAutoTranscribe(
   if (!input.hasAudio || input.transcript || input.isTranscribingLocally) {
     return false;
   }
-  if (!input.claimPeerId || isClaimActive(input)) {
+  if (!input.claimPeerId || input.claimPeerId !== input.localPeerId) {
     return false;
   }
-  if (!input.localCapable || input.localMode !== 'owner-device') {
-    return false;
-  }
-  // Our own orphaned claim (e.g. this window reloaded mid-job): remote peers
-  // see the claim as active while we're present, so no one else will ever
-  // act — resume it ourselves regardless of the election.
-  if (input.claimPeerId === input.localPeerId) {
-    return true;
-  }
-  return getTranscriptionElectionWinner(input) === input.localPeerId;
+  return input.localCapable && input.localMode === 'owner-device';
 }
 
 /**
@@ -135,9 +99,10 @@ export function canTranscribeHere(
 /**
  * Recording path: the claim is written the moment live transcription starts.
  * The recording's audioData lands with an empty transcript minutes before the
- * transcript does — without an upfront claim every capable peer would
- * self-elect in that window. Guests never claim; an incapable recorder has no
- * transcription session and therefore never claims either.
+ * transcript does — without an upfront claim every capable peer would offer
+ * the manual Transcribe affordance in that window and invite duplicate runs.
+ * Guests never claim; an incapable recorder has no transcription session and
+ * therefore never claims either.
  */
 export function shouldClaimOnRecordingStart(options: {
   transcriptionSessionStarted: boolean;

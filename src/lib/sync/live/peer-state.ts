@@ -3,7 +3,6 @@ import type { PeerMode, SyncMessage } from './protocol';
 export interface ConnectedPeer {
   peerId: string;
   mode: PeerMode;
-  capabilities: string[];
   lastSeenAt: number;
 }
 
@@ -13,14 +12,9 @@ export interface PeerSnapshot {
   connectedPeers: Array<{
     peerId: string;
     mode: PeerMode;
-    capabilities: string[];
   }>;
   currentWriter: string | null;
   isWriter: boolean;
-}
-
-function sameCapabilities(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 function sortPeerIds(a: { peerId: string }, b: { peerId: string }): number {
@@ -53,17 +47,13 @@ export class PeerState {
       this.connectedPeers.set(message.peerId, {
         peerId: message.peerId,
         mode: message.mode,
-        capabilities: message.capabilities,
         lastSeenAt: now,
       });
       return true;
     }
 
-    const changed =
-      existing.mode !== message.mode ||
-      !sameCapabilities(existing.capabilities, message.capabilities);
+    const changed = existing.mode !== message.mode;
     existing.mode = message.mode;
-    existing.capabilities = message.capabilities;
     existing.lastSeenAt = now;
     return changed;
   }
@@ -101,7 +91,6 @@ export class PeerState {
       .map((peer) => ({
         peerId: peer.peerId,
         mode: peer.mode,
-        capabilities: peer.capabilities,
       }))
       .sort(sortPeerIds);
 

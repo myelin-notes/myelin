@@ -329,8 +329,8 @@ export class CanvasSessionController {
     this.lifecycleError = null;
     let unsubscribeStatus = () => {};
 
-    // Feed live-session membership (peer modes + capabilities) to the canvas
-    // so audio elements can coordinate transcription claims.
+    // Feed live-session membership (peer modes) to the canvas so audio
+    // elements can coordinate transcription claims.
     const unsubscribePeers = noteSession.subscribePeerSnapshot((snapshot) => {
       drawableCanvas.setLivePeers({
         localMode: snapshot.localMode,

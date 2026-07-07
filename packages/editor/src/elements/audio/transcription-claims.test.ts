@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { LivePeer, PeerMode } from '../../sync/live/peers';
 import {
   canTranscribeHere,
-  getTranscriptionElectionWinner,
   getTranscriptionSlotState,
   isClaimActive,
   shouldAutoTranscribe,
@@ -10,14 +9,10 @@ import {
   type TranscriptionCoordinationInput,
 } from './transcription-claims';
 
-function peer(
-  peerId: string,
-  options: { mode?: PeerMode; capabilities?: string[] } = {},
-): LivePeer {
+function peer(peerId: string, options: { mode?: PeerMode } = {}): LivePeer {
   return {
     peerId,
     mode: options.mode ?? 'owner-device',
-    capabilities: options.capabilities ?? ['transcription'],
   };
 }
 
@@ -36,43 +31,6 @@ function input(
     ...overrides,
   };
 }
-
-describe('getTranscriptionElectionWinner', () => {
-  it('picks the lowest peer id among capable owner-device peers', () => {
-    const winner = getTranscriptionElectionWinner(
-      input({ remotePeers: [peer('peer-c'), peer('peer-a')] }),
-    );
-
-    expect(winner).toBe('peer-a');
-  });
-
-  it('skips remote peers without the transcription capability', () => {
-    const winner = getTranscriptionElectionWinner(
-      input({ remotePeers: [peer('peer-a', { capabilities: [] })] }),
-    );
-
-    expect(winner).toBe('peer-b');
-  });
-
-  it('skips guest peers even when capable', () => {
-    const winner = getTranscriptionElectionWinner(
-      input({ remotePeers: [peer('peer-a', { mode: 'guest-editor' })] }),
-    );
-
-    expect(winner).toBe('peer-b');
-  });
-
-  it('returns null when no capable owner-device peer is present', () => {
-    const winner = getTranscriptionElectionWinner(
-      input({
-        localCapable: false,
-        remotePeers: [peer('peer-a', { capabilities: [] })],
-      }),
-    );
-
-    expect(winner).toBeNull();
-  });
-});
 
 describe('isClaimActive', () => {
   it('holds while the claiming peer is present in the session', () => {
@@ -110,18 +68,30 @@ describe('isClaimActive', () => {
 });
 
 describe('shouldAutoTranscribe', () => {
-  it('picks up an orphaned claim when we win the election', () => {
-    expect(shouldAutoTranscribe(input({ claimPeerId: 'peer-gone' }))).toBe(
-      true,
-    );
+  it('picks up our own orphaned claim from a previous run', () => {
+    expect(shouldAutoTranscribe(input({ claimPeerId: 'peer-b' }))).toBe(true);
+  });
+
+  it('resumes our own orphaned claim regardless of other present peers', () => {
+    expect(
+      shouldAutoTranscribe(
+        input({ claimPeerId: 'peer-b', remotePeers: [peer('peer-a')] }),
+      ),
+    ).toBe(true);
   });
 
   it('never auto-transcribes unclaimed audio (imports)', () => {
     expect(shouldAutoTranscribe(input())).toBe(false);
   });
 
-  it('respects a valid claim even when we hold the lower peer id', () => {
-    // peer-b < peer-c: without the claim, the local peer would win.
+  it("never picks up another peer's orphaned claim, but leaves the manual affordance", () => {
+    const orphaned = input({ claimPeerId: 'peer-gone' });
+
+    expect(shouldAutoTranscribe(orphaned)).toBe(false);
+    expect(canTranscribeHere(orphaned)).toBe(true);
+  });
+
+  it("respects another peer's valid claim", () => {
     expect(
       shouldAutoTranscribe(
         input({ claimPeerId: 'peer-c', remotePeers: [peer('peer-c')] }),
@@ -129,34 +99,26 @@ describe('shouldAutoTranscribe', () => {
     ).toBe(false);
   });
 
-  it('defers to a lower-id capable peer for an orphaned claim', () => {
+  it('does nothing while our own job is still running in this window', () => {
     expect(
       shouldAutoTranscribe(
-        input({ claimPeerId: 'peer-gone', remotePeers: [peer('peer-a')] }),
+        input({ claimPeerId: 'peer-b', isTranscribingLocally: true }),
       ),
     ).toBe(false);
   });
 
-  it('wins the election when present capable peers all have higher ids', () => {
+  it('never resumes on an incapable client', () => {
     expect(
       shouldAutoTranscribe(
-        input({ claimPeerId: 'peer-gone', remotePeers: [peer('peer-c')] }),
-      ),
-    ).toBe(true);
-  });
-
-  it('never elects an incapable client', () => {
-    expect(
-      shouldAutoTranscribe(
-        input({ claimPeerId: 'peer-gone', localCapable: false }),
+        input({ claimPeerId: 'peer-b', localCapable: false }),
       ),
     ).toBe(false);
   });
 
-  it('never elects a guest client', () => {
+  it('never resumes as a guest client', () => {
     expect(
       shouldAutoTranscribe(
-        input({ claimPeerId: 'peer-gone', localMode: 'guest-editor' }),
+        input({ claimPeerId: 'peer-b', localMode: 'guest-editor' }),
       ),
     ).toBe(false);
   });
@@ -164,23 +126,9 @@ describe('shouldAutoTranscribe', () => {
   it('does nothing once the transcript is set', () => {
     expect(
       shouldAutoTranscribe(
-        input({ claimPeerId: 'peer-gone', transcript: 'done' }),
+        input({ claimPeerId: 'peer-b', transcript: 'done' }),
       ),
     ).toBe(false);
-  });
-
-  it('picks up our own orphaned claim from a previous run', () => {
-    expect(shouldAutoTranscribe(input({ claimPeerId: 'peer-b' }))).toBe(true);
-  });
-
-  it('resumes our own orphaned claim even when a lower-id capable peer is present', () => {
-    // Remote peers see our claim as active while we are present, so nobody
-    // else will ever act — the election must not block our own resume.
-    expect(
-      shouldAutoTranscribe(
-        input({ claimPeerId: 'peer-b', remotePeers: [peer('peer-a')] }),
-      ),
-    ).toBe(true);
   });
 });
 

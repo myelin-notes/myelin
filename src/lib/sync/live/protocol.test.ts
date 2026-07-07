@@ -9,82 +9,24 @@ function encodePeerJson(payload: Record<string, unknown>): Uint8Array {
   return bytes;
 }
 
-describe('peer presence capability advertisement', () => {
-  it('round-trips capabilities through encode/decode', () => {
+describe('peer presence messages', () => {
+  it('round-trips a peer control message through encode/decode', () => {
     const message: SyncMessage = {
       type: 'peer',
       peerId: 'peer-a',
       kind: 'hello',
       mode: 'owner-device',
-      capabilities: ['transcription'],
     };
 
     expect(decodeMessage(encodeMessage(message))).toEqual(message);
   });
 
-  it('round-trips an empty capability list', () => {
-    const message: SyncMessage = {
-      type: 'peer',
-      peerId: 'peer-a',
-      kind: 'heartbeat',
-      mode: 'owner-device',
-      capabilities: [],
-    };
-
-    expect(decodeMessage(encodeMessage(message))).toEqual(message);
-  });
-
-  it('treats messages from older clients without capabilities as empty', () => {
+  it('ignores unknown fields', () => {
     const decoded = decodeMessage(
       encodePeerJson({
         peerId: 'peer-a',
         kind: 'hello',
         mode: 'owner-device',
-      }),
-    );
-
-    expect(decoded).toEqual({
-      type: 'peer',
-      peerId: 'peer-a',
-      kind: 'hello',
-      mode: 'owner-device',
-      capabilities: [],
-    });
-  });
-
-  it('drops malformed capability values', () => {
-    const nonArray = decodeMessage(
-      encodePeerJson({
-        peerId: 'peer-a',
-        kind: 'hello',
-        mode: 'owner-device',
-        capabilities: 'transcription',
-      }),
-    );
-    const mixed = decodeMessage(
-      encodePeerJson({
-        peerId: 'peer-a',
-        kind: 'hello',
-        mode: 'owner-device',
-        capabilities: ['transcription', 7, null],
-      }),
-    );
-
-    expect(
-      nonArray && nonArray.type === 'peer' && nonArray.capabilities,
-    ).toEqual([]);
-    expect(mixed && mixed.type === 'peer' && mixed.capabilities).toEqual([
-      'transcription',
-    ]);
-  });
-
-  it('still ignores unknown fields', () => {
-    const decoded = decodeMessage(
-      encodePeerJson({
-        peerId: 'peer-a',
-        kind: 'hello',
-        mode: 'owner-device',
-        capabilities: ['transcription'],
         futureField: { nested: true },
       }),
     );
@@ -94,7 +36,12 @@ describe('peer presence capability advertisement', () => {
       peerId: 'peer-a',
       kind: 'hello',
       mode: 'owner-device',
-      capabilities: ['transcription'],
     });
+  });
+
+  it('rejects messages missing required fields', () => {
+    expect(
+      decodeMessage(encodePeerJson({ peerId: 'peer-a', kind: 'hello' })),
+    ).toBeNull();
   });
 });
