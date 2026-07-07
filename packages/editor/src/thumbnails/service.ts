@@ -1,4 +1,4 @@
-import { Logger } from '../logger';
+import { Logger } from '@myelin/shared/logger';
 import { getPlatform } from '../platform';
 import type { VFSNodeId } from '../sync/types';
 

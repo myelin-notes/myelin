@@ -1,7 +1,7 @@
 import type { EditorView } from 'prosemirror-view';
+import { Logger } from '@myelin/shared/logger';
 import { trackEvent } from '../../../analytics';
 import type { RunnableLanguage } from '../../../code-runner/contract';
-import { Logger } from '../../../logger';
 import { getPlatform, type Unsubscribe } from '../../../platform';
 import type { RunSource } from './concat';
 import { codeRunStore } from './run-store';

@@ -8,7 +8,6 @@ import { artifactCache } from './artifact-cache';
 import { codeRunner } from './code-runner';
 import { TauriHandwritingService } from './handwriting';
 import { IrohTransport } from './iroh';
-import { writeLogs } from './log-sink';
 import { TauriNoteIndexService } from './note-index';
 import { pdfExport } from './pdf-export';
 import { transcription } from './transcription';
@@ -40,10 +39,6 @@ export const tauriPlatform: Platform = {
   },
 
   artifactCache,
-
-  writeLogs(lines) {
-    return writeLogs(lines);
-  },
 
   subscribeEvent<T>(event: string, handler: (payload: T) => void) {
     return listen<T>(event, (e) => handler(e.payload));

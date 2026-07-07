@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type * as Y from 'yjs';
+import { Logger } from '@myelin/shared/logger';
 import { CanvasPool } from '../canvas-pool';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { ChromeMenuItem } from '../chrome-menu';
@@ -15,7 +16,6 @@ import {
   openExportDialog,
 } from '../export/export-controller';
 import { getMessages } from '../i18n';
-import { Logger } from '../logger';
 import {
   buildPdfElementRequest,
   type PdfElementExportPage,

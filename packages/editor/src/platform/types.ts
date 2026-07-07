@@ -174,8 +174,6 @@ export interface Platform {
   openExternal(url: string): Promise<void>;
   fetch(input: string | URL | Request, init?: RequestInit): Promise<Response>;
   artifactCache: ArtifactCache;
-  /** Persist serialized log lines — the logger's sink. */
-  writeLogs(lines: string[]): Promise<void>;
   /** Subscribe to a host-emitted event by name. */
   subscribeEvent<T>(
     event: string,

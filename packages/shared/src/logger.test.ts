@@ -1,20 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushLogs, Logger, resetLoggingForTests } from './logger';
-import { setPlatform } from './platform';
-import { createFakePlatform } from './test/fake-platform';
+import { flushLogs, Logger, resetLoggingForTests, setLogSink } from './logger';
 
 describe('Logger', () => {
   let written: string[];
 
   beforeEach(() => {
     written = [];
-    setPlatform(
-      createFakePlatform({
-        writeLogs: async (lines) => {
-          written.push(...lines);
-        },
-      }),
-    );
+    setLogSink(async (lines) => {
+      written.push(...lines);
+    });
     resetLoggingForTests({
       mode: 'development',
       persistDebug: false,

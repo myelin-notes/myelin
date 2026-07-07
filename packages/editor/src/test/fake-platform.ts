@@ -25,7 +25,6 @@ export function createFakePlatform(
       write: async () => {},
       remove: async () => {},
     },
-    writeLogs: async () => {},
     subscribeEvent: async () => () => {},
     noteIndex: createFakeNoteIndex(),
     handwriting: createFakeHandwriting(),

@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { Logger } from '@myelin/shared/logger';
 import { CanvasRenderer } from './canvas-renderer';
 import { CanvasViewport } from './canvas-viewport';
 import { ElementStore } from './element-store';
@@ -13,7 +14,6 @@ import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
 import type { Vector2 } from './geometry';
 import { catalogs, type MessageGetter } from './i18n/messages';
-import { Logger } from './logger';
 import {
   describeElementType,
   summarizeDrawableElements,

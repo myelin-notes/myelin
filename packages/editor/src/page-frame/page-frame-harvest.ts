@@ -7,8 +7,8 @@
  */
 
 import { toPng } from 'html-to-image';
+import { Logger } from '@myelin/shared/logger';
 import { PAGE_GAP } from '../elements/page-frame-constants';
-import { Logger } from '../logger';
 import {
   type PdfExportOverlayElement,
   rectsIntersect,

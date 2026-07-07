@@ -13,7 +13,7 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { HexColorPicker } from 'react-colorful';
 import { createPortal } from 'react-dom';
-import { Logger } from './logger';
+import { Logger } from '@myelin/shared/logger';
 import { useRepository } from './sync/repo-context';
 
 interface CustomColorsContextValue {

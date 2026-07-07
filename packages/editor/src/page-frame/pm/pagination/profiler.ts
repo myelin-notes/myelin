@@ -1,5 +1,6 @@
-import { IS_DEV, PAGINATION_PROFILING } from '../../../env';
-import { Logger } from '../../../logger';
+import { IS_DEV } from '@myelin/shared/env';
+import { Logger } from '@myelin/shared/logger';
+import { PAGINATION_PROFILING } from '../../../env';
 
 const logger = new Logger('PaginationProfiler');
 const SAMPLE_LIMIT = 60;

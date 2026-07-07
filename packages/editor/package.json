@@ -31,6 +31,7 @@
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.0",
     "@lezer/highlight": "^1.2.3",
+    "@myelin/shared": "*",
     "@myelin/ui": "*",
     "html-to-image": "^1.11.13",
     "katex": "^0.17.0",

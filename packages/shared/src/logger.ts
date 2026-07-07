@@ -1,5 +1,4 @@
 import { IS_DEV, PERSIST_DEBUG_LOGS } from './env';
-import { getPlatform, isPlatformSet } from './platform';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -187,6 +186,23 @@ function emitConsole(entry: LogEntry): void {
   method(...args);
 }
 
+/**
+ * Host-installed sink that persists serialized log lines (the desktop app
+ * appends to the log file). Installed once at bootstrap; entries queue until
+ * then.
+ */
+export type LogSink = (lines: string[]) => Promise<void>;
+
+let logSink: LogSink | null = null;
+
+/** Install the host's log sink. Called once at bootstrap. */
+export function setLogSink(sink: LogSink | null): void {
+  logSink = sink;
+  if (sink && queue.length > 0) {
+    scheduleFlush();
+  }
+}
+
 function scheduleFlush(): void {
   if (flushPromise) {
     return;
@@ -194,12 +210,12 @@ function scheduleFlush(): void {
 
   flushPromise = (async () => {
     // Entries logged while modules are still importing (before bootstrap
-    // installs the platform) stay queued; the next log call re-flushes them.
-    while (queue.length > 0 && isPlatformSet()) {
+    // installs the sink) stay queued; the next log call re-flushes them.
+    while (queue.length > 0 && logSink !== null) {
       const batch = queue;
       queue = [];
       try {
-        await getPlatform().writeLogs(batch);
+        await logSink(batch);
       } catch (error) {
         if (!internalError) {
           internalError = true;
@@ -213,7 +229,7 @@ function scheduleFlush(): void {
     }
   })().finally(() => {
     flushPromise = null;
-    if (queue.length > 0 && isPlatformSet()) {
+    if (queue.length > 0 && logSink !== null) {
       scheduleFlush();
     }
   });
@@ -350,7 +366,7 @@ export class Logger {
 }
 
 export async function flushLogs(): Promise<void> {
-  // Entries queued before the platform was installed have no flush scheduled
+  // Entries queued before the sink was installed have no flush scheduled
   // yet; kick one off so a post-bootstrap flush drains them.
   if (queue.length > 0) {
     scheduleFlush();

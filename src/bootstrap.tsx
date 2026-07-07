@@ -1,12 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { setAnalyticsSink } from '@myelin/editor/analytics';
-import { setLogErrorReporter } from '@myelin/editor/logger';
+import { setLogErrorReporter, setLogSink } from '@myelin/shared/logger';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
 import { I18nProvider } from '@/lib/i18n';
 import { flushLogs } from '@/lib/logger';
 import { setPlatform } from '@/platform';
 import { tauriPlatform } from '@/platform/tauri';
+import { writeLogs } from '@/platform/tauri/log-sink';
 import App from './App';
 import { trackEvent } from './lib/analytics';
 import {
@@ -25,7 +26,8 @@ import './index.css';
 // covers throws during the synchronous startup calls below.
 try {
   setPlatform(tauriPlatform);
-  // Drain log lines queued while modules were importing (pre-platform).
+  setLogSink(writeLogs);
+  // Drain log lines queued while modules were importing (pre-sink).
   void flushLogs();
   initErrorTracking();
   // Editor-package seams: product events and error-level log reports flow to

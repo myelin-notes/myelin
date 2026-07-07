@@ -1,1 +1,1 @@
-export * from '@myelin/editor/logger';
+export * from '@myelin/shared/logger';
