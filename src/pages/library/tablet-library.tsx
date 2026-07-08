@@ -52,6 +52,7 @@ import {
   type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
+import { useDropTarget } from './explorer/use-drop-target';
 import { ImportDialog } from './import/dialog';
 import { RecentCard } from './recent-card';
 
@@ -84,10 +85,6 @@ export function TabletLibrary() {
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<VFSFolderNode[]>([]);
-  const [breadcrumbDragIdx, setBreadcrumbDragIdx] = useState<number | null>(
-    null,
-  );
-  const dragTimerRef = useRef<number | null>(null);
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTags = useMemo(() => [...activeTags], [activeTags]);
   const [tagsRefreshKey, setTagsRefreshKey] = useState(0);
@@ -204,9 +201,11 @@ export function TabletLibrary() {
     setSearchMode((mode) => (mode === 'semantic' ? 'lexical' : 'semantic'));
   }, []);
 
+  // ExplorerTree.startNewFolder/startNewFile fire their onChanged (bound to
+  // refreshMeta) internally after the write, so there's no need to refresh again.
   const handleNewFolder = useCallback(() => {
-    void explorerRef.current?.startNewFolder().then(refreshMeta);
-  }, [refreshMeta]);
+    void explorerRef.current?.startNewFolder();
+  }, []);
 
   const handleNewFile = useCallback(
     (title: string, type: FileType) => {
@@ -214,7 +213,6 @@ export function TabletLibrary() {
         ?.startNewFile(title, type)
         .then(() => {
           trackEvent('note_created', { file_type: type });
-          refreshMeta();
         })
         .catch((error) => {
           logger.error('Failed to create file', error, { fileType: type });
@@ -223,13 +221,10 @@ export function TabletLibrary() {
           });
         });
     },
-    [refreshMeta, strings.commandPalette.errors.createNote],
+    [strings.commandPalette.errors.createNote],
   );
 
   const handleRefreshRepository = useCallback(() => {
-    if (!refreshAvailable || repositoryStatus.initializing) {
-      return;
-    }
     enqueueManualRepositoryRefresh(async () => {
       try {
         await repository.refresh();
@@ -241,78 +236,10 @@ export function TabletLibrary() {
       }
     });
   }, [
-    refreshAvailable,
     refreshLibraryData,
     repository,
-    repositoryStatus.initializing,
     strings.library.refreshRepository.failed,
   ]);
-
-  const clearDragTimer = () => {
-    if (dragTimerRef.current) {
-      window.clearTimeout(dragTimerRef.current);
-      dragTimerRef.current = null;
-    }
-  };
-
-  const handleBreadcrumbDrop = async (
-    e: React.DragEvent,
-    targetFolderId: string | null,
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    clearDragTimer();
-    setBreadcrumbDragIdx(null);
-
-    const raw = e.dataTransfer.getData('application/myelin-item');
-    if (!raw) {
-      return;
-    }
-    const { nodeId } = JSON.parse(raw) as { nodeId: string };
-    try {
-      await repository.moveNode(nodeId, targetFolderId);
-      setCurrentFolderId(targetFolderId);
-      refreshLibraryData();
-    } catch (err) {
-      logger.error('Failed to move item from breadcrumb', err, {
-        nodeId,
-        targetFolderId,
-      });
-    }
-  };
-
-  const makeBreadcrumbDragHandlers = (
-    targetFolderId: string | null,
-    idx: number,
-  ) => ({
-    onDragOver: (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes('application/myelin-item')) {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
-    },
-    onDragEnter: (e: React.DragEvent) => {
-      if (!e.dataTransfer.types.includes('application/myelin-item')) {
-        return;
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      setBreadcrumbDragIdx(idx);
-      clearDragTimer();
-      dragTimerRef.current = window.setTimeout(() => {
-        setCurrentFolderId(targetFolderId);
-        setBreadcrumbDragIdx(null);
-      }, 800);
-    },
-    onDragLeave: (e: React.DragEvent) => {
-      e.stopPropagation();
-      setBreadcrumbDragIdx((prev) => (prev === idx ? null : prev));
-      clearDragTimer();
-    },
-    onDrop: (e: React.DragEvent) => handleBreadcrumbDrop(e, targetFolderId),
-  });
 
   return (
     <div className="relative flex h-full w-full bg-page">
@@ -414,52 +341,41 @@ export function TabletLibrary() {
               <div className="flex items-center justify-between">
                 <div className="flex min-w-0 items-center gap-2">
                   <h3 className="font-heading font-normal text-2xl leading-8">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentFolderId(null)}
-                      className={cn(
-                        '-mx-2 cursor-pointer rounded-lg px-2 py-0.5 transition-colors',
-                        breadcrumbDragIdx === -1
-                          ? 'bg-accent/15 text-accent-foreground'
-                          : 'text-text-primary hover:bg-hover-tint hover:text-text-secondary',
-                      )}
-                      {...makeBreadcrumbDragHandlers(null, -1)}
-                    >
-                      {strings.library.explorer}
-                    </button>
+                    <BreadcrumbCrumb
+                      variant="root"
+                      targetFolderId={null}
+                      label={strings.library.explorer}
+                      onNavigate={() => setCurrentFolderId(null)}
+                      onMoved={() => {
+                        setCurrentFolderId(null);
+                        refreshLibraryData();
+                      }}
+                    />
                   </h3>
                   {breadcrumbs.length > 0 && (
                     <div className="flex min-w-0 items-center gap-1 text-sm text-text-muted">
                       <ChevronRight className="size-3.5 shrink-0" />
-                      {breadcrumbs.map((crumb, i) => {
-                        const isLast = i === breadcrumbs.length - 1;
-                        const isDragTarget = breadcrumbDragIdx === i;
-                        return (
-                          <span
-                            key={crumb.id}
-                            className="flex min-w-0 items-center gap-1"
-                          >
-                            {i > 0 && (
-                              <ChevronRight className="size-3 shrink-0 text-text-muted" />
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setCurrentFolderId(crumb.id)}
-                              className={cn(
-                                'truncate rounded px-1 transition-colors',
-                                isDragTarget
-                                  ? 'bg-accent/15 text-accent-foreground ring-1 ring-accent/40'
-                                  : isLast
-                                    ? 'font-medium text-text-secondary'
-                                    : 'cursor-pointer text-text-muted hover:text-text-secondary',
-                              )}
-                              {...makeBreadcrumbDragHandlers(crumb.id, i)}
-                            >
-                              {crumb.name}
-                            </button>
-                          </span>
-                        );
-                      })}
+                      {breadcrumbs.map((crumb, i) => (
+                        <span
+                          key={crumb.id}
+                          className="flex min-w-0 items-center gap-1"
+                        >
+                          {i > 0 && (
+                            <ChevronRight className="size-3 shrink-0 text-text-muted" />
+                          )}
+                          <BreadcrumbCrumb
+                            variant="crumb"
+                            targetFolderId={crumb.id}
+                            label={crumb.name}
+                            isLast={i === breadcrumbs.length - 1}
+                            onNavigate={() => setCurrentFolderId(crumb.id)}
+                            onMoved={() => {
+                              setCurrentFolderId(crumb.id);
+                              refreshLibraryData();
+                            }}
+                          />
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -549,7 +465,7 @@ export function TabletLibrary() {
             </div>
 
             <div className="flex flex-col gap-8 lg:col-span-4">
-              <div className="overflow-hidden rounded-2xl bg-card/50 ring-1 ring-border-subtle/70">
+              <div className="flex max-h-96 flex-col overflow-hidden rounded-2xl bg-card/50 ring-1 ring-border-subtle/70">
                 <SidebarTags
                   variant="panel"
                   activeTags={activeTags}
@@ -597,7 +513,7 @@ export function TabletLibrary() {
                               'recent_files',
                             )
                           }
-                          onChanged={loadRecentFiles}
+                          onChanged={refreshLibraryData}
                         />
                       </motion.div>
                     ))}
@@ -632,5 +548,63 @@ export function TabletLibrary() {
         />
       )}
     </div>
+  );
+}
+
+interface BreadcrumbCrumbProps {
+  targetFolderId: string | null;
+  label: string;
+  /** 'root' is the h3-sized "Explorer" crumb; 'crumb' is an ancestor folder. */
+  variant: 'root' | 'crumb';
+  isLast?: boolean;
+  onNavigate: () => void;
+  /** Called after a dragged item is dropped and moved into this crumb. */
+  onMoved: () => void;
+}
+
+/**
+ * A single breadcrumb that doubles as a drop target: dragging a file/folder onto
+ * it moves the item into that folder. Wraps the shared {@link useDropTarget} so
+ * the breadcrumb reuses the same drag/drop plumbing as the explorer rows.
+ */
+function BreadcrumbCrumb({
+  targetFolderId,
+  label,
+  variant,
+  isLast = false,
+  onNavigate,
+  onMoved,
+}: BreadcrumbCrumbProps) {
+  const { dragOver, dropTargetProps } = useDropTarget({
+    targetFolderId,
+    onMoved,
+  });
+
+  const className =
+    variant === 'root'
+      ? cn(
+          '-mx-2 cursor-pointer rounded-lg px-2 py-0.5 transition-colors',
+          dragOver
+            ? 'bg-accent/15 text-accent-foreground'
+            : 'text-text-primary hover:bg-hover-tint hover:text-text-secondary',
+        )
+      : cn(
+          'truncate rounded px-1 transition-colors',
+          dragOver
+            ? 'bg-accent/15 text-accent-foreground ring-1 ring-accent/40'
+            : isLast
+              ? 'font-medium text-text-secondary'
+              : 'cursor-pointer text-text-muted hover:text-text-secondary',
+        );
+
+  return (
+    <button
+      type="button"
+      onClick={onNavigate}
+      {...dropTargetProps}
+      className={className}
+    >
+      {label}
+    </button>
   );
 }
