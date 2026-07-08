@@ -1,12 +1,15 @@
 import { PaneIdProvider, useWindowState } from '@/lib/tabs/context';
 import type { PaneNode } from '@/lib/tabs/types';
 import { HomePage } from '@/pages/home';
+import { TabletLibrary } from '@/pages/library/tablet-library';
 import { PaneContent } from './pane';
 import { PaneDropTarget, PaneLayout } from './pane-layout';
+import { useSidebar } from './sidebar/context';
 import { TabBar } from './tab-bar';
 
 export function AppShell() {
   const windowState = useWindowState();
+  const { tabletLayout } = useSidebar();
   const hasSplits = windowState.layout.type === 'split';
 
   if (hasSplits) {
@@ -33,7 +36,13 @@ export function AppShell() {
       {pane && (
         <PaneIdProvider paneId={pane.id}>
           <PaneDropTarget paneId={pane.id} className="min-h-0 flex-1">
-            {activeTab ? <PaneContent tab={activeTab} /> : <HomePage />}
+            {activeTab ? (
+              <PaneContent tab={activeTab} />
+            ) : tabletLayout ? (
+              <TabletLibrary />
+            ) : (
+              <HomePage />
+            )}
           </PaneDropTarget>
         </PaneIdProvider>
       )}

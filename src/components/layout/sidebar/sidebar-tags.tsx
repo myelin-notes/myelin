@@ -38,6 +38,13 @@ interface SidebarTagsProps {
   onTagsChanged: () => void;
   /** Bumped externally to force a tag-list reload. */
   refreshKey: number;
+  /**
+   * 'collapsible' (default): the desktop sidebar's bottom panel with a collapse
+   * toggle and a drag-to-resize handle. 'panel': always-open, fills its
+   * container height with no toggle or resize handle — used as the tablet
+   * library's left tags column.
+   */
+  variant?: 'collapsible' | 'panel';
 }
 
 export const SidebarTags = memo(function SidebarTags({
@@ -45,13 +52,18 @@ export const SidebarTags = memo(function SidebarTags({
   onActiveTagsChanged,
   onTagsChanged,
   refreshKey,
+  variant = 'collapsible',
 }: SidebarTagsProps) {
+  const isPanel = variant === 'panel';
   const strings = useMessages();
   const locale = useLocale();
   const repository = useRepository();
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
+  // Panel mode is permanently expanded; the collapse toggle only exists in the
+  // desktop sidebar's bottom-panel variant.
+  const effectiveOpen = isPanel || open;
   const [internalRefresh, setInternalRefresh] = useState(0);
   // null = not adding; '' = adding a root tag; otherwise the parent tag a new
   // child is being created under.
@@ -232,8 +244,8 @@ export const SidebarTags = memo(function SidebarTags({
   };
 
   return (
-    <div className="flex flex-col">
-      {open ? (
+    <div className={cn('flex flex-col', isPanel && 'min-h-0 flex-1')}>
+      {effectiveOpen && !isPanel ? (
         <div
           role="separator"
           aria-orientation="horizontal"
@@ -249,26 +261,35 @@ export const SidebarTags = memo(function SidebarTags({
       <div
         className={cn(
           'flex items-center',
-          !open && 'border-border-subtle border-t',
+          !effectiveOpen && !isPanel && 'border-border-subtle border-t',
         )}
       >
-        <button
-          type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-2.5 text-text-secondary transition-colors duration-150 hover:bg-hover-tint"
-        >
-          <ChevronRight
-            className={cn(
-              'size-3.5 shrink-0 text-text-muted transition-transform duration-150',
-              open && 'rotate-90',
-            )}
-          />
-          <Hash className="size-3.5 shrink-0 text-text-muted" />
-          <span className="font-bold text-[11px] uppercase tracking-[0.08em]">
-            {strings.sidebar.tags}
-          </span>
-        </button>
+        {isPanel ? (
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-2.5 text-text-secondary">
+            <Hash className="size-3.5 shrink-0 text-text-muted" />
+            <span className="font-bold text-[11px] uppercase tracking-[0.08em]">
+              {strings.sidebar.tags}
+            </span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen((prev) => !prev)}
+            aria-expanded={open}
+            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-2.5 text-text-secondary transition-colors duration-150 hover:bg-hover-tint"
+          >
+            <ChevronRight
+              className={cn(
+                'size-3.5 shrink-0 text-text-muted transition-transform duration-150',
+                open && 'rotate-90',
+              )}
+            />
+            <Hash className="size-3.5 shrink-0 text-text-muted" />
+            <span className="font-bold text-[11px] uppercase tracking-[0.08em]">
+              {strings.sidebar.tags}
+            </span>
+          </button>
+        )}
         <span className="px-1 text-text-muted text-xs tabular-nums">
           {formatNumber(tags.length, locale)}
         </span>
@@ -283,11 +304,12 @@ export const SidebarTags = memo(function SidebarTags({
         </button>
       </div>
 
-      {open && (
+      {effectiveOpen && (
         <div
-          style={{ height }}
+          style={isPanel ? undefined : { height }}
           className={cn(
             'flex flex-col overflow-y-auto px-1.5 pt-0.5 pb-2',
+            isPanel && 'min-h-0 flex-1',
             tags.length === 0 && 'justify-center',
           )}
         >

@@ -38,6 +38,11 @@ jobs:
     env:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+      # Ships the tablet full-page library layout instead of the desktop
+      # sidebar. Read by vite.config.ts during `tauri ios build`'s frontend
+      # build and baked into the bundle at build time (a compile-time `define`,
+      # not a runtime read). See src/lib/env.ts (IS_TABLET_BUILD).
+      VITE_TABLET_LAYOUT: "true"
     steps:
       - uses: actions/checkout@v4
         with:

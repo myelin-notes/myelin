@@ -1,6 +1,7 @@
 import { memo, useCallback, useRef, useState } from 'react';
 import {
   Columns2,
+  LayoutGrid,
   Network,
   PanelLeft,
   Plus,
@@ -108,12 +109,20 @@ export const TabBar = memo(function TabBar({
   const {
     collapsed,
     isCompact,
+    tabletLayout,
     drawerOpen,
     toggle: toggleSidebar,
   } = useSidebar();
   // In compact layout the sidebar is an overlay drawer; elsewhere it's the
   // persistent column. `sidebarShown` unifies both for the toggle's a11y state.
   const sidebarShown = isCompact ? drawerOpen : !collapsed;
+  // Tablet layout has no sidebar; the top-left button returns to the full-page
+  // library home instead of toggling one. It's "active" while the pane is
+  // already showing home (no active tab).
+  const showingHome = pane.activeTabId === '';
+  const showLibrary = useCallback(() => {
+    controller.showHome(pane.id);
+  }, [controller, pane.id]);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
@@ -206,23 +215,36 @@ export const TabBar = memo(function TabBar({
       {/* The sidebar lives on the window's left edge, so its toggle sits at the
           top-left — only on the leftmost pane's bar, so split views don't show
           duplicate toggles. When collapsed on macOS the whole bar insets to
-          clear the traffic lights, leaving the toggle just right of them. */}
-      {isTopLeft && (
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          aria-label={
-            sidebarShown ? strings.sidebar.collapse : strings.sidebar.expand
-          }
-          title={
-            sidebarShown ? strings.sidebar.collapse : strings.sidebar.expand
-          }
-          aria-pressed={sidebarShown}
-          className="mb-1 ml-2 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <PanelLeft className="size-3.5" />
-        </button>
-      )}
+          clear the traffic lights, leaving the toggle just right of them. On
+          tablet there's no sidebar, so this button returns to the library. */}
+      {isTopLeft &&
+        (tabletLayout ? (
+          <button
+            type="button"
+            onClick={showLibrary}
+            aria-label={strings.library.title}
+            title={strings.library.title}
+            aria-pressed={showingHome}
+            className="mb-1 ml-2 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary aria-pressed:text-text-primary"
+          >
+            <LayoutGrid className="size-3.5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={
+              sidebarShown ? strings.sidebar.collapse : strings.sidebar.expand
+            }
+            title={
+              sidebarShown ? strings.sidebar.collapse : strings.sidebar.expand
+            }
+            aria-pressed={sidebarShown}
+            className="mb-1 ml-2 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+          >
+            <PanelLeft className="size-3.5" />
+          </button>
+        ))}
 
       <div
         className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"

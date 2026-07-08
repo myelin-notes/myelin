@@ -22,6 +22,13 @@
 export const IS_DEV = import.meta.env.DEV;
 export const MODE = import.meta.env.MODE;
 
+// Baked in at build time by vite.config.ts through a `define` global (not an
+// import.meta.env read): true for iOS app builds, or when VITE_TABLET_LAYOUT
+// is set for local preview. Selects the tablet full-page library layout over
+// the desktop sidebar. The final runtime decision also gates on viewport size
+// so a narrow iPhone still uses the compact drawer — see SidebarProvider.
+export const IS_TABLET_BUILD = __TABLET_BUILD__;
+
 export const GITHUB_CLIENT_ID = (
   import.meta.env.VITE_GITHUB_CLIENT_ID ?? 'Ov23lio3GBRJhHIcx6ow'
 ).trim();

@@ -31,6 +31,14 @@ export default defineConfig(async ({ mode }) => {
   const port = readTauriDevPort(env);
   const hmrPort = port < 65535 ? port + 1 : port;
 
+  // Tauri sets TAURI_ENV_PLATFORM when it invokes this build; on iOS we ship the
+  // tablet full-page library layout instead of the desktop sidebar. Baked in as
+  // a `define` global so the choice is fixed at build time. VITE_TABLET_LAYOUT
+  // lets a desktop dev preview the layout without an iOS build.
+  const isTabletBuild =
+    process.env.TAURI_ENV_PLATFORM === 'ios' ||
+    env.VITE_TABLET_LAYOUT === 'true';
+
   return {
     plugins: [
       {
@@ -66,6 +74,10 @@ export default defineConfig(async ({ mode }) => {
     },
     build: {
       sourcemap: true,
+    },
+
+    define: {
+      __TABLET_BUILD__: JSON.stringify(isTabletBuild),
     },
 
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

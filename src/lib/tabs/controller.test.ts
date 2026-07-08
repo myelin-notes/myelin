@@ -25,9 +25,10 @@ function expectValidWindowState(state: WindowState): void {
   expect(paneIds.has(state.focusedPaneId)).toBe(true);
 
   for (const pane of panes) {
-    // Panes may be empty (the home view); only non-empty panes must point their
-    // activeTabId at a real tab.
-    if (pane.tabs.length > 0) {
+    // Panes may show the home view either by being empty or by an empty
+    // activeTabId while tabs stay open; otherwise activeTabId must point at a
+    // real tab.
+    if (pane.tabs.length > 0 && pane.activeTabId !== '') {
       expect(pane.tabs.some((tab) => tab.id === pane.activeTabId)).toBe(true);
     }
 
@@ -185,6 +186,41 @@ describe('TabStateController', () => {
 
     controller.closeTab(gammaId, paneId);
     expect(rootPane(controller).activeTabId).toBe(alphaId);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
+  it('shows the home view without closing open tabs', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha', paneId);
+    openCanvas(controller, 'beta', 'Beta', paneId);
+
+    controller.showHome(paneId);
+
+    const pane = rootPane(controller);
+    // Home is active (empty activeTabId survives re-normalization) and the tabs
+    // are untouched.
+    expect(pane.activeTabId).toBe('');
+    expect(tabTitles(pane)).toEqual(['Alpha', 'Beta']);
+    expectValidWindowState(controller.getSnapshot());
+
+    // Selecting a tab leaves the home view again.
+    controller.activateTab(alphaId, paneId);
+    expect(rootPane(controller).activeTabId).toBe(alphaId);
+  });
+
+  it('stays on the home view when a background tab is closed', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha', paneId);
+    openCanvas(controller, 'beta', 'Beta', paneId);
+
+    controller.showHome(paneId);
+    controller.closeTab(alphaId, paneId);
+
+    const pane = rootPane(controller);
+    expect(pane.activeTabId).toBe('');
+    expect(tabTitles(pane)).toEqual(['Beta']);
     expectValidWindowState(controller.getSnapshot());
   });
 
