@@ -3,6 +3,9 @@
 @import "@myelin/ui/theme.css";
 /* The editor package is source-consumed; scan it for Tailwind classes. */
 @source "../packages/editor/src/**/*.{ts,tsx}";
+/* Shared package emits class-name constants (e.g. the tab-bar height and
+   traffic-light inset); scan it too or those classes go ungenerated. */
+@source "../packages/shared/src/**/*.{ts,tsx}";
 @import "katex/dist/katex.min.css";
 
 /* Split by feature for readability; import order preserves the original
