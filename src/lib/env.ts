@@ -35,14 +35,6 @@ export const LIVE_DISCOVERY_URL = (
   .trim()
   .replace(/\/+$/, '');
 
-export const PERSIST_DEBUG_LOGS =
-  String(import.meta.env.VITE_PERSIST_DEBUG_LOGS ?? '').toLowerCase() ===
-  'true';
-
-export const PAGINATION_PROFILING =
-  String(import.meta.env.VITE_PAGINATION_PROFILING ?? '').toLowerCase() ===
-  'true';
-
 export const POSTHOG_KEY = (
   import.meta.env.VITE_POSTHOG_KEY ??
   'phc_skVas2x5YjFtHDNKeaTrDXvb4V4homydUXaG5hNwBdiL'

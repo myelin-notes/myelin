@@ -556,8 +556,11 @@ export class PageFrameElement extends DrawableElement {
     includeAnnotations: boolean,
   ): Promise<ExportResult> {
     const pdfExport = getPlatform().pdfExport;
-    if (!pdfExport || !this.contentDiv) {
+    if (!pdfExport) {
       return { cancelled: true };
+    }
+    if (!this.contentDiv) {
+      return {};
     }
     let warnings: string[] = [];
     const outcome = await pdfExport.export({
