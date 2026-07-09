@@ -25,6 +25,7 @@ import {
   getTranscriptionSlotState,
   shouldAutoTranscribe,
   shouldClaimOnRecordingStart,
+  shouldStartAutoPickup,
   type TranscriptionCoordinationInput,
   type TranscriptionSlotState,
 } from './transcription-claims';
@@ -269,12 +270,6 @@ export function AudioPlayerView({
   // One auto-pickup attempt per audio blob per window — a failed run must
   // degrade to the manual Transcribe affordance, not retry in a loop.
   const autoPickupAttemptedRef = useRef(false);
-  // True while finalizeRecording is running the live-recording transcript for
-  // the current blob. Synchronous (unlike the isTranscribing state, which
-  // hasn't committed yet when onRecorded's flushSync re-render runs), so the
-  // auto-pickup effect can tell "my own live job is in flight" apart from "my
-  // orphaned claim from a reload" and not launch a duplicate whisper run.
-  const liveRecordingTranscribeRef = useRef(false);
   const isRecording = recordingState === 'recording';
   const isRequestingRecording = recordingState === 'requesting';
   const canTranscribe = getPlatform().transcription !== undefined;
@@ -349,7 +344,6 @@ export function AudioPlayerView({
         objectUrlRef.current = null;
       }
       autoPickupAttemptedRef.current = false;
-      liveRecordingTranscribeRef.current = false;
       setIsPlaying(false);
       setCurrentTime(0);
       setRecordingState('idle');
@@ -358,10 +352,15 @@ export function AudioPlayerView({
   }, [audioBytes]);
 
   const attemptAutoPickup = useEffectEvent(() => {
+    // transcriptionSessionRef is the synchronous "a job is already running in
+    // this window" signal — it stays accurate through onRecorded's flushSync
+    // re-render, where the isTranscribingLocally state has not yet committed.
     if (
-      autoPickupAttemptedRef.current ||
-      liveRecordingTranscribeRef.current ||
-      !shouldAutoTranscribe(claimInput)
+      !shouldStartAutoPickup({
+        eligible: shouldAutoTranscribe(claimInput),
+        sessionInFlight: transcriptionSessionRef.current !== null,
+        alreadyAttempted: autoPickupAttemptedRef.current,
+      })
     ) {
       return;
     }
@@ -607,14 +606,9 @@ export function AudioPlayerView({
     }
     // Publish the recording right away — waveform and playback must not wait
     // on whisper. The transcript follows when ready, spinner in the captions
-    // slot meanwhile.
-    // Mark the live job in flight BEFORE onRecorded publishes the blob: that
-    // call flushSync-re-renders the view with hasAudio=true while
-    // isTranscribing is still false, and the auto-pickup effect must not read
-    // that intermediate render as an orphaned claim and start a second run.
-    if (transcription) {
-      liveRecordingTranscribeRef.current = true;
-    }
+    // slot meanwhile. transcriptionSessionRef is still set here (until the
+    // transcript resolves below), so the auto-pickup effect this render fires
+    // sees the live job in flight and won't start a duplicate run.
     onRecorded(bytes, dur, recordedMimeType, recordedWaveform);
 
     if (!transcription) {
@@ -622,7 +616,6 @@ export function AudioPlayerView({
     }
     setIsTranscribing(true);
     const transcript = await transcriptPromise.catch(() => '');
-    liveRecordingTranscribeRef.current = false;
     if (transcriptionSessionRef.current === transcription) {
       transcriptionSessionRef.current = null;
     }

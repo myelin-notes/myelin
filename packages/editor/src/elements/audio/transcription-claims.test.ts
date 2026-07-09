@@ -6,6 +6,7 @@ import {
   isClaimActive,
   shouldAutoTranscribe,
   shouldClaimOnRecordingStart,
+  shouldStartAutoPickup,
   type TranscriptionCoordinationInput,
 } from './transcription-claims';
 
@@ -128,6 +129,54 @@ describe('shouldAutoTranscribe', () => {
       shouldAutoTranscribe(
         input({ claimPeerId: 'peer-b', transcript: 'done' }),
       ),
+    ).toBe(false);
+  });
+});
+
+describe('shouldStartAutoPickup', () => {
+  it('resumes an eligible orphaned claim when no job is in flight', () => {
+    expect(
+      shouldStartAutoPickup({
+        eligible: true,
+        sessionInFlight: false,
+        alreadyAttempted: false,
+      }),
+    ).toBe(true);
+  });
+
+  // Regression: a live recording just finished. onRecorded publishes the audio
+  // via a flushSync re-render that commits with the audio present but
+  // isTranscribingLocally not yet set, so shouldAutoTranscribe returns true
+  // (eligible) on that torn render — but the live session is still in flight.
+  // Without the sessionInFlight guard this fired a duplicate Whisper run on
+  // every recording.
+  it('does not start a duplicate run while a session is already in flight', () => {
+    expect(
+      shouldStartAutoPickup({
+        eligible: true,
+        sessionInFlight: true,
+        alreadyAttempted: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not retry after an attempt was already made for this blob', () => {
+    expect(
+      shouldStartAutoPickup({
+        eligible: true,
+        sessionInFlight: false,
+        alreadyAttempted: true,
+      }),
+    ).toBe(false);
+  });
+
+  it('does nothing when the claim is not eligible for pickup', () => {
+    expect(
+      shouldStartAutoPickup({
+        eligible: false,
+        sessionInFlight: false,
+        alreadyAttempted: false,
+      }),
     ).toBe(false);
   });
 });

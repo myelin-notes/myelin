@@ -80,6 +80,26 @@ export function shouldAutoTranscribe(
 }
 
 /**
+ * Guard for the auto-pickup effect. `shouldAutoTranscribe` alone is not
+ * enough: the recording flow publishes audio via a synchronous flushSync
+ * re-render that commits with the audio present but the `isTranscribingLocally`
+ * signal (React state) not yet set, so that render's `shouldAutoTranscribe`
+ * reads the torn intermediate state as an orphaned claim. `sessionInFlight` —
+ * the transcription-session ref, which is synchronous and already accurate at
+ * that instant — suppresses the duplicate run, and `alreadyAttempted` keeps a
+ * failed pickup from looping.
+ */
+export function shouldStartAutoPickup(options: {
+  eligible: boolean;
+  sessionInFlight: boolean;
+  alreadyAttempted: boolean;
+}): boolean {
+  return (
+    options.eligible && !options.sessionInFlight && !options.alreadyAttempted
+  );
+}
+
+/**
  * Whether the manual Transcribe affordance is actionable here: capable
  * owner-device client, untranscribed audio, and no valid claim held by
  * another peer. Replaces the old creator-only gate.
