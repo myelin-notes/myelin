@@ -4,6 +4,7 @@ import {
   MousePointer2 as PointerIcon,
 } from 'lucide-react';
 import type { MessageGetter } from '@/lib/i18n';
+import { isApplePlatform } from '@/lib/platform';
 import { CollisionHelper } from '../../../lib/utils/collision-helper';
 import { getCanvasPalette } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
@@ -111,6 +112,11 @@ export class SelectTool implements ITool {
     const point = canvas.viewport.getPoint(event);
     this.startPoint = point;
 
+    // Modifier+click toggles a single element in/out of the selection without
+    // clearing the rest. Cmd on macOS / Ctrl on Windows, matching the app-wide
+    // shortcut convention (and avoiding the macOS Ctrl+click right-click gesture).
+    const additive = isApplePlatform ? event.metaKey : event.ctrlKey;
+
     // 1. Check handles on selected elements first
     for (let i = canvas.elements.length - 1; i >= 0; i--) {
       const e = canvas.elements[i];
@@ -138,7 +144,7 @@ export class SelectTool implements ITool {
     const isDoubleClick =
       now - this.lastClickTime < 400 && dx * dx + dy * dy < 25;
 
-    if (isDoubleClick) {
+    if (isDoubleClick && !additive) {
       for (let i = canvas.elements.length - 1; i >= 0; i--) {
         const e = canvas.elements[i];
         if (!CollisionHelper.inBox(point, e.boundingBox)) {
@@ -165,6 +171,22 @@ export class SelectTool implements ITool {
       if (CollisionHelper.inBox(point, e.boundingBox)) {
         hits.push(e);
       }
+    }
+
+    if (hits.length > 0 && additive) {
+      // Toggle the topmost hit in/out of the selection (no cycle-through).
+      const pick = hits[0];
+      if (pick.isSelected) {
+        pick.unselect();
+      } else {
+        pick.select();
+        this.mode = SelectMode.Moving;
+        this.lastPoint = point;
+        this.totalDelta = { x: 0, y: 0 };
+        this.movingElements = canvas.elements.filter((e) => e.isSelected);
+      }
+      this.lastCycledElement = null;
+      return;
     }
 
     if (hits.length > 0) {
@@ -225,6 +247,11 @@ export class SelectTool implements ITool {
       ) {
         this.clickToEditCandidate = pick;
       }
+      return;
+    }
+
+    // Modifier+click on empty space preserves the current selection.
+    if (additive) {
       return;
     }
 
