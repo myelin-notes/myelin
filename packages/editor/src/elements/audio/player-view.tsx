@@ -691,10 +691,7 @@ export function AudioPlayerView({
     onTranscriptionClaimed();
     try {
       const { buffer } = await decodeAudio(audioBytes);
-      const session = await transcription.startBufferSession(
-        elementId,
-        buffer,
-      );
+      const session = await transcription.startBufferSession(elementId, buffer);
       if (!session) {
         // Backend unavailable (e.g. bundled model missing).
         if (!disposedRef.current) {
