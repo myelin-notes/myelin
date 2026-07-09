@@ -1,9 +1,9 @@
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import { ImageElement } from '@/pages/canvas/elements/image-element';
-import { LatexElement } from '@/pages/canvas/elements/latex/element';
-import { ShapeElement } from '@/pages/canvas/elements/shape-element';
-import { StrokeElement } from '@/pages/canvas/elements/stroke-element';
-import { TextElement } from '@/pages/canvas/elements/text/element';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { ImageElement } from '@myelin/editor/elements/image-element';
+import { LatexElement } from '@myelin/editor/elements/latex/element';
+import { ShapeElement } from '@myelin/editor/elements/shape-element';
+import { StrokeElement } from '@myelin/editor/elements/stroke-element';
+import { TextElement } from '@myelin/editor/elements/text/element';
 import { type CanvasItem, type CanvasRegion, FONT, INK } from '../content/site';
 import { gestureToPoints } from './ink';
 

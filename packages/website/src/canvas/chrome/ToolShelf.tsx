@@ -1,5 +1,5 @@
 import { Redo2, Undo2 } from 'lucide-react';
-import type { ITool } from '@/pages/canvas/tools/tool';
+import type { ITool } from '@myelin/editor/tools/tool';
 
 interface ToolShelfProps {
   tools: ITool[];

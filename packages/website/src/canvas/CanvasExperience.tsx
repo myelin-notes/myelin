@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { startDrawableCanvasAnimationLoop } from '@/pages/canvas/hooks/use-drawable-canvas-view-state';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { regions } from '../content/site';
 import { ScrollCamera } from './camera';
 import { CommandPalette, type PaletteCommand } from './chrome/CommandPalette';

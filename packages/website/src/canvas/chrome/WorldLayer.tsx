@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { wireDownloadLinks } from '../../lib/downloads';
 import type { DomAnchor } from '../seed';
 

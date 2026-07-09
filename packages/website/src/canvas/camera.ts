@@ -1,4 +1,4 @@
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 
 interface Frame {
   x: number;
