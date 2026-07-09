@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { startDrawableCanvasAnimationLoop } from './use-drawable-canvas-view-state';
+import { startDrawableCanvasAnimationLoop } from './render-loop';
 
 describe('startDrawableCanvasAnimationLoop', () => {
   it('does not reschedule after stop is called during an in-flight frame', () => {

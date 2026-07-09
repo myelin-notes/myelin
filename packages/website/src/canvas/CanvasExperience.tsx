@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
-import { startDrawableCanvasAnimationLoop } from '@/pages/canvas/hooks/use-drawable-canvas-view-state';
+import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { regions } from '../content/site';
 import { ScrollCamera } from './camera';
