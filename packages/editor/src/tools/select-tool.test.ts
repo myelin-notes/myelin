@@ -31,12 +31,12 @@ class TestDOMRect {
   }
 }
 
-function makeImageElement() {
+function makeImageElement(uuid = 'image-uuid', offsetX = 0, offsetY = 0) {
   vi.stubGlobal('DOMRect', TestDOMRect);
   const ydoc = new YDocManager();
-  const yMap = ydoc.createElementMap(ElementType.IMAGE, 'image-uuid', {
-    offsetX: 0,
-    offsetY: 0,
+  const yMap = ydoc.createElementMap(ElementType.IMAGE, uuid, {
+    offsetX,
+    offsetY,
     scaleX: 1,
     scaleY: 1,
     naturalWidth: 100,
@@ -46,7 +46,7 @@ function makeImageElement() {
     cropW: 100,
     cropH: 80,
   });
-  const image = new ImageElement('image-uuid');
+  const image = new ImageElement(uuid);
   image.bindToYMap(yMap);
   (image as unknown as { _bitmap: ImageBitmap | null })._bitmap =
     {} as ImageBitmap;
@@ -112,6 +112,51 @@ describe('SelectTool', () => {
 
     expect(enterCropMode).not.toHaveBeenCalled();
     expect(enterElementEdit).not.toHaveBeenCalled();
+  });
+
+  it('modifier+click adds an element to the selection without clearing others', () => {
+    const { image: a } = makeImageElement('a', 0, 0);
+    const { image: b } = makeImageElement('b', 200, 0);
+    a.select();
+    const { canvas } = makeCanvas([a, b], { x: 210, y: 10 });
+    const tool = new SelectTool(() => catalogs.en);
+    // Set both modifiers so the test is agnostic to the platform the tool reads.
+    const event = { ctrlKey: true, metaKey: true } as unknown as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.finish(canvas, event);
+
+    expect(a.isSelected).toBe(true);
+    expect(b.isSelected).toBe(true);
+  });
+
+  it('modifier+click removes an already-selected element from the selection', () => {
+    const { image: a } = makeImageElement('a', 0, 0);
+    const { image: b } = makeImageElement('b', 200, 0);
+    a.select();
+    b.select();
+    const { canvas } = makeCanvas([a, b], { x: 210, y: 10 });
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { ctrlKey: true, metaKey: true } as unknown as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.finish(canvas, event);
+
+    expect(a.isSelected).toBe(true);
+    expect(b.isSelected).toBe(false);
+  });
+
+  it('modifier+click on empty space preserves the current selection', () => {
+    const { image: a } = makeImageElement('a', 0, 0);
+    a.select();
+    const { canvas } = makeCanvas([a], { x: 500, y: 500 });
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { ctrlKey: true, metaKey: true } as unknown as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.finish(canvas, event);
+
+    expect(a.isSelected).toBe(true);
   });
 
   it('does not write element position when clicking to select without moving', () => {
