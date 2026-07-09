@@ -1,3 +1,9 @@
+export * from '@myelin/editor/sync/live/transport';
+export * from '@myelin/editor/sync/repo/file-types';
+// `Repository` from the editor contract is shadowed below with the app's
+// extension (adds `openSession`), so importers here keep the full contract.
+export * from '@myelin/editor/sync/repo/types';
+export * from '@myelin/editor/sync/types';
 export {
   fetchGitHubBranches,
   fetchGitHubOrgs,
@@ -9,12 +15,7 @@ export {
   type GitHubRepo,
   type GitHubUser,
 } from '../utils/github-api';
-export type { RepositoryStatus } from './context';
-export {
-  RepositoryProvider,
-  useRepository,
-  useRepositoryStatus,
-} from './context';
+export { RepositoryProvider } from './context';
 export { CloudflareLiveDiscoveryClient } from './live/cloudflare-discovery';
 export {
   createLiveDiscoveryRecordInput,
@@ -36,7 +37,6 @@ export type {
   SyncMessage,
   YjsUpdateMessage,
 } from './live/protocol';
-export { noopTransport, type Transport } from './live/transport';
 export {
   type ActiveRepository,
   DEFAULT_REPOSITORY_CONFIG,
@@ -71,37 +71,7 @@ export {
   setRepositoryConfig,
   subscribeRepositoryConfig,
 } from './repo/repository-settings';
-export {
-  getFileTypeForName,
-  getMimeTypeForFileType,
-  isImageFileType,
-  isVideoFileType,
-} from './repo/shared';
-export type {
-  FileType,
-  FileVersion,
-  NodeSearchResult,
-  NoteBacklink,
-  Repository,
-  RepositoryCapabilities,
-  RepositoryNoteGraph,
-  RepositoryNoteGraphLink,
-  RepositoryNoteGraphNode,
-  RepositoryStats,
-  RepositoryTag,
-  SearchNodesOptions,
-  StoredNoteLink,
-  VFSFileNode,
-  VFSFolderNode,
-  VFSNode,
-} from './repo/types';
-export { FileTypes, ImageFileTypes, VideoFileTypes } from './repo/types';
+export type { Repository } from './repo/types';
+export type { RepositoryStatus } from './repo-context';
+export { useRepository, useRepositoryStatus } from './repo-context';
 export { NoteSession } from './session';
-export type {
-  NoteSessionStatus,
-  VFSNodeId,
-  YjsSyncPushOptions,
-  YjsSyncPushResult,
-  YjsSyncSnapshot,
-  YjsSyncTarget,
-} from './types';

@@ -1,10 +1,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
+import { ColorSwatch } from '@myelin/editor/components/color-swatch';
+import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
+import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { useCustomColors } from '@/lib/custom-colors';
-import type { FontEntry, ToolOption } from '@/pages/canvas/tools/tool';
-import { AddColorSwatch } from './add-color-swatch';
-import { ColorSwatch } from './color-swatch';
-import { CustomColorSwatch } from './custom-color-swatch';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];

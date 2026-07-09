@@ -1,9 +1,9 @@
 import { memo } from 'react';
 import { Crosshair, ImageDown, Lock, Unlock } from 'lucide-react';
 import { motion } from 'motion/react';
+import { formatNumber } from '@myelin/editor/i18n/format';
 import { IS_DEV } from '@/lib/env';
 import { useLocale, useMessages } from '@/lib/i18n';
-import { formatNumber } from '@/lib/i18n/format';
 
 interface StatusBarProps {
   zoomLevel: number;

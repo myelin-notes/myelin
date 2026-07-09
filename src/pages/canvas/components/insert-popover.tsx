@@ -7,8 +7,8 @@ import {
   Sigma as SigmaIcon,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { getInsertHotkey } from '@myelin/editor/tools/tool-keybinds';
 import { useMessages } from '@/lib/i18n';
-import { getInsertHotkey } from '@/pages/canvas/tools/tool-keybinds';
 
 interface InsertPopoverProps {
   onInsertFrame: () => void;

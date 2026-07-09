@@ -1,24 +1,21 @@
 import * as Y from 'yjs';
-import type { NoteEmbedding } from '@/lib/note-index';
 import { type SearchField, type SearchHit, searchItems } from '@/lib/search';
+import type { NoteEmbedding } from '@/platform';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
-import {
-  type FileType,
-  FileTypes,
-  type FileVersion,
-  ImageFileTypes,
-  type NodeSearchResult,
-  type NoteBacklink,
-  type RepositoryNoteGraph,
-  type RepositoryStats,
-  type RepositoryTag,
-  type StoredNoteLink,
-  type VFSFileNode,
-  type VFSFolderNode,
-  type VFSNode,
-  type VFSNodeId,
-  type VFSSystemMetadata,
-  VideoFileTypes,
+import type {
+  FileType,
+  FileVersion,
+  NodeSearchResult,
+  NoteBacklink,
+  RepositoryNoteGraph,
+  RepositoryStats,
+  RepositoryTag,
+  StoredNoteLink,
+  VFSFileNode,
+  VFSFolderNode,
+  VFSNode,
+  VFSNodeId,
+  VFSSystemMetadata,
 } from './types';
 
 export interface VFSManifest {
@@ -42,28 +39,6 @@ export const FILE_EXT = '.myelin';
 export const VERSION_HISTORY_INTERVAL_MS = 10 * 60 * 1000;
 export const VERSION_HISTORY_MAX_PER_FILE = 32;
 export const VERSION_HISTORY_ROOT_NAME = '.myelin-version-history';
-const FILE_TYPE_SET = new Set<string>(FileTypes);
-const IMAGE_FILE_TYPE_SET = new Set<string>(ImageFileTypes);
-const VIDEO_FILE_TYPE_SET = new Set<string>(VideoFileTypes);
-
-const MIME_TYPE_BY_FILE_TYPE: Record<FileType, string> = {
-  mcanvas: 'application/octet-stream',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  avif: 'image/avif',
-  svg: 'image/svg+xml',
-  bmp: 'image/bmp',
-  mp4: 'video/mp4',
-  mov: 'video/quicktime',
-  m4v: 'video/x-m4v',
-  webm: 'video/webm',
-  avi: 'video/x-msvideo',
-  mkv: 'video/x-matroska',
-};
-
 export function createEmptyManifest(): VFSManifest {
   return {
     version: CURRENT_MANIFEST_VERSION,
@@ -797,30 +772,6 @@ export function normalizeCustomColor(color: string): string | null {
     return null;
   }
   return `#${match[1].toLowerCase()}`;
-}
-
-export function isSupportedFileType(value: string): value is FileType {
-  return FILE_TYPE_SET.has(value);
-}
-
-export function isImageFileType(fileType: FileType): boolean {
-  return IMAGE_FILE_TYPE_SET.has(fileType);
-}
-
-export function isVideoFileType(fileType: FileType): boolean {
-  return VIDEO_FILE_TYPE_SET.has(fileType);
-}
-
-export function getFileTypeForName(name: string): FileType | null {
-  const extension = name.split('.').pop()?.toLowerCase();
-  if (!extension || !isSupportedFileType(extension)) {
-    return null;
-  }
-  return extension;
-}
-
-export function getMimeTypeForFileType(fileType: FileType): string {
-  return MIME_TYPE_BY_FILE_TYPE[fileType];
 }
 
 export function getStoredFileName(

@@ -1,4 +1,4 @@
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { Repository, VFSNodeId } from './types';
 
 export type DocRewriteRepository = Pick<

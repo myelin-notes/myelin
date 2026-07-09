@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { KEYBINDS_RESET_EVENT } from '@/lib/events';
-import { useMessages } from '@/lib/i18n';
-import { type Action, type KeyCombo, registry } from '@/lib/keybinds';
 import {
   getActionCategory,
   getActionCopy,
   getActionIcon,
-} from '@/lib/keybinds/messages';
+} from '@myelin/editor/keybinds/messages';
+import { KEYBINDS_RESET_EVENT } from '@/lib/events';
+import { useMessages } from '@/lib/i18n';
+import { type Action, type KeyCombo, registry } from '@/lib/keybinds';
 import { isApplePlatform } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 

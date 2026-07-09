@@ -171,5 +171,83 @@
   "files": {
     "includes": ["**/*.ts", "**/*.tsx", "**/*.jsx", "**/*.mjs", "**/*.cjs"],
     "ignoreUnknown": false
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@tauri-apps/**"],
+                    "message": "Tauri APIs are host-only. Go through the platform seam (@/platform); Tauri implementations live in src/platform/tauri/."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/editor/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@tauri-apps/**"],
+                    "message": "The editor package is host-agnostic. Tauri implementations live app-side in src/platform/tauri/; go through the Platform seam."
+                  },
+                  {
+                    "group": ["@/**"],
+                    "message": "The editor package must not import app code. Move the dependency into the package or inject it through a seam."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/platform/tauri/**",
+        "src/lib/updater.ts",
+        "src/lib/fatal-error.ts",
+        "src/lib/rust-errors.ts",
+        "src/lib/mcp/runtime.tsx",
+        "src/lib/tabs/context.tsx",
+        "src/lib/tabs/multi-window.ts",
+        "src/lib/sync/shutdown-gate.tsx",
+        "src/lib/sync/repo/github-credentials.ts",
+        "src/lib/sync/repo/local.ts",
+        "src/lib/sync/repo/github.ts",
+        "src/lib/sync/repo/cached/outbox.ts",
+        "src/lib/sync/repo/cached/outbox.test.ts",
+        "src/lib/sync/live/cloudflare-discovery.ts",
+        "src/lib/utils/github-api.ts",
+        "src/components/layout/window-controls.tsx",
+        "src/components/layout/sidebar/use-explorer-imports.ts",
+        "src/pages/library/import/**",
+        "src/pages/library/export/**",
+        "src/pages/settings/sections/**",
+        "src/test/vitest.setup.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    }
+  ]
 }
