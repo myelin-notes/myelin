@@ -13,8 +13,14 @@ interface CameraState {
   cy: number;
 }
 
-/** Fraction of each scroll segment spent resting on a region. */
-const DWELL = 0.22;
+/**
+ * Fraction of each scroll segment pinned on a region before the camera starts
+ * gliding to the next. Kept small: a larger dwell reads as "my scroll is being
+ * ignored" because the camera stays put while the page keeps scrolling.
+ * smoothstep already eases the camera to a near-stop at each region, so this
+ * only adds a brief extra beat rather than the settle itself.
+ */
+const DWELL = 0.06;
 const SMOOTHING = 7;
 /** Progress movement that re-engages the camera after manual pan/zoom. */
 const REENGAGE_DELTA = 0.04;
