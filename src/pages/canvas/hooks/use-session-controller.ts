@@ -7,6 +7,17 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import { createMediaPathResolver } from '@myelin/editor/page-frame/media-path/resolution';
+import {
+  type PageFrameNameCache,
+  resolveNoteLinkRefByTitle,
+} from '@myelin/editor/page-frame/note-link/resolution';
+import { buildRenamePageFrameLinkReferencesTransaction } from '@myelin/editor/page-frame/pm/markdown/note-links';
+import { schema as pageFrameSchema } from '@myelin/editor/page-frame/pm/schema';
+import type { ITool } from '@myelin/editor/tools/tool';
+import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@/lib/logger';
 import type { NoteBacklink, NoteSession, VFSNodeId } from '@/lib/sync';
 import {
@@ -16,17 +27,6 @@ import {
 } from '@/lib/sync';
 import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-references';
 import { UserPrefs } from '@/lib/user-prefs';
-import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import { PageFrameElement } from '@/pages/canvas/elements/page-frame-element';
-import { createMediaPathResolver } from '@/pages/canvas/page-frame/media-path/resolution';
-import {
-  type PageFrameNameCache,
-  resolveNoteLinkRefByTitle,
-} from '@/pages/canvas/page-frame/note-link/resolution';
-import { buildRenamePageFrameLinkReferencesTransaction } from '@/pages/canvas/page-frame/pm/markdown/note-links';
-import { schema as pageFrameSchema } from '@/pages/canvas/page-frame/pm/schema';
-import type { ITool } from '@/pages/canvas/tools/tool';
-import type { YDocManager } from '@/pages/canvas/ydoc-manager';
 import type {
   RenameReferencesChoice,
   RenameReferencesPrompt,
@@ -75,6 +75,7 @@ interface ActiveCanvasSession {
   noteSession: NoteSession;
   drawableCanvas: DrawableCanvas;
   unsubscribeStatus: () => void;
+  unsubscribePeers: () => void;
 }
 
 export class CanvasSessionController {
@@ -275,6 +276,7 @@ export class CanvasSessionController {
       }
 
       activeSession.unsubscribeStatus();
+      activeSession.unsubscribePeers();
       activeSession.drawableCanvas.destroy();
 
       try {
@@ -327,10 +329,20 @@ export class CanvasSessionController {
     this.lifecycleError = null;
     let unsubscribeStatus = () => {};
 
+    // Feed live-session membership (peer modes) to the canvas so audio
+    // elements can coordinate transcription claims.
+    const unsubscribePeers = noteSession.subscribePeerSnapshot((snapshot) => {
+      drawableCanvas.setLivePeers({
+        localMode: snapshot.localMode,
+        peers: snapshot.connectedPeers,
+      });
+    });
+
     this.activeSession = {
       noteSession,
       drawableCanvas,
       unsubscribeStatus: () => unsubscribeStatus(),
+      unsubscribePeers,
     };
     this.drawableCanvasRef.current = drawableCanvas;
 

@@ -52,10 +52,10 @@ export class PeerState {
       return true;
     }
 
-    const modeChanged = existing.mode !== message.mode;
+    const changed = existing.mode !== message.mode;
     existing.mode = message.mode;
     existing.lastSeenAt = now;
-    return modeChanged;
+    return changed;
   }
 
   public removePeer(peerId: string): boolean {

@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { NoteSession, Repository } from '@/lib/sync';
-import { ElementType } from '@/pages/canvas/elements/element-type';
+import { ElementType } from '@myelin/editor/elements/element-type';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
-} from '@/pages/canvas/elements/page-frame-constants';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+} from '@myelin/editor/elements/page-frame-constants';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
+import type { NoteSession, Repository } from '@/lib/sync';
 import { importPdfFile, isNativeGoodnotesFile, isPdfFile } from './pdf';
 
-vi.mock('@/pages/canvas/pdf-renderer', () => ({
+vi.mock('@myelin/editor/pdf-renderer', () => ({
   createDefaultPdfPageOrder: (pageCount: number) =>
     Array.from({ length: pageCount }, (_, originalIndex) => ({
       kind: 'pdf',

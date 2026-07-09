@@ -1,5 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Plus as PlusIcon } from 'lucide-react';
+import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import {
+  type ITool,
+  setToolOption,
+  setToolOptionValue,
+  type ToolOption,
+} from '@myelin/editor/tools/tool';
 import { loadGoogleFont } from '@/components/tool-options-panel';
 import {
   loadWheelToolIndices,
@@ -9,13 +16,6 @@ import type { WheelItem } from '@/components/wheel-picker';
 import { useCustomColors } from '@/lib/custom-colors';
 import { type Messages, useMessages } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
-import { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import {
-  type ITool,
-  setToolOption,
-  setToolOptionValue,
-  type ToolOption,
-} from '@/pages/canvas/tools/tool';
 
 function makeSizeChildren(
   tool: ITool,

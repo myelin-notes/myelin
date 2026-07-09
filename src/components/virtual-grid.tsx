@@ -8,8 +8,8 @@ import {
 import {
   mergeContainerProps,
   useVirtualScaffold,
-} from './use-virtual-scaffold';
-import { useVirtualizer } from './use-virtualizer';
+} from '@myelin/editor/components/use-virtual-scaffold';
+import { useVirtualizer } from '@myelin/editor/components/use-virtualizer';
 
 interface VirtualGridProps {
   /** Scroll container the grid lives inside (commonly an ancestor). */

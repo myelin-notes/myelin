@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import { noteIndexService } from '@/lib/note-index';
+import { getPlatform } from '@/platform';
 import {
   createCanvasNoteState,
   getRepositoryTestStorage,
@@ -68,7 +68,11 @@ describe('repository file version history', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 
-    const reindexSpy = vi.spyOn(noteIndexService, 'requestReindex');
+    const noteIndex = getPlatform().noteIndex;
+    if (!noteIndex) {
+      throw new Error('fake platform is expected to provide noteIndex');
+    }
+    const reindexSpy = vi.spyOn(noteIndex, 'requestReindex');
 
     const repository = new LocalRepository('repositories/version-index-test');
     await repository.initialize();

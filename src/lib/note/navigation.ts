@@ -1,8 +1,8 @@
+import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { trackEvent } from '@/lib/analytics';
 import type { FileType, Repository, VFSNodeId } from '@/lib/sync';
 import type { TabStateController } from '@/lib/tabs/controller';
 import type { TabTarget } from '@/lib/tabs/types';
-import { parseNoteLinkTarget } from './link-target';
 
 export type NoteOpenSource =
   | 'explorer'
