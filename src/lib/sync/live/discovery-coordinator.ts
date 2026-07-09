@@ -6,7 +6,9 @@ import {
   type LiveDiscoveryClient,
   type LiveDiscoveryRecord,
 } from './discovery';
-import type { Transport } from './transport';
+import type { LiveDiscoveryTransport, Transport } from './transport';
+
+export type { LiveDiscoveryTransport } from './transport';
 
 const INITIAL_POLL_INTERVAL_MS = 2_000;
 const MAX_POLL_INTERVAL_MS = 60_000;
@@ -14,11 +16,6 @@ const JOIN_RETRY_MS = 30_000;
 const REFRESH_TTL_FRACTION = 0.9;
 
 type Timer = ReturnType<typeof setTimeout>;
-
-export interface LiveDiscoveryTransport extends Transport {
-  host(): Promise<string>;
-  join(ticket: string): Promise<void>;
-}
 
 export interface LiveDiscoverySession {
   readonly id: VFSNodeId;

@@ -1,11 +1,11 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import * as Y from 'yjs';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { invoke } from '@tauri-apps/api/core';
 import { Logger } from '@/lib/logger';
 import type { ReadableRepository, VFSFileNode } from '@/lib/sync';
-import { ElementType } from '@/pages/canvas/elements/element-type';
-import { schema } from '@/pages/canvas/page-frame/pm/schema';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import {
   BYTES_MARKER,
   base64EncodeBytes,

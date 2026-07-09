@@ -3,14 +3,14 @@ import {
   prosemirrorToYXmlFragment,
   yXmlFragmentToProseMirrorRootNode,
 } from 'y-prosemirror';
-import { ElementType } from '@/pages/canvas/elements/element-type';
+import { ElementType } from '@myelin/editor/elements/element-type';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
-} from '@/pages/canvas/elements/page-frame-constants';
-import { serializeDocToMarkdown } from '@/pages/canvas/page-frame/markdown/serializer';
-import { schema } from '@/pages/canvas/page-frame/pm/schema';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+} from '@myelin/editor/elements/page-frame-constants';
+import { serializeDocToMarkdown } from '@myelin/editor/page-frame/markdown/serializer';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { renamePageFrameReferences } from './rename-page-frame-references';
 import type { NoteBacklink, VFSFileNode, VFSNodeId } from './types';
 

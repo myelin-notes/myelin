@@ -16,7 +16,7 @@ import {
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import { runShutdownTasks } from '@/lib/shutdown-tasks';
-import { useRepository } from './context';
+import { useRepository } from './repo-context';
 
 const logger = new Logger('RepositoryShutdownGate');
 const FORCE_QUIT_DELAY_MS = 10_000;

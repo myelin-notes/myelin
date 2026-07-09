@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
 import { useLocale, useMessages } from '@/lib/i18n';
-import { formatRelativeTime } from '@/lib/i18n/format';
+import { formatRelativeTime } from '@myelin/editor/i18n/format';
 import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note/navigation';
 import {

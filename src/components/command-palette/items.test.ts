@@ -1,6 +1,6 @@
 import { Undo2 } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
-import en from '@/lib/i18n/messages/en';
+import en from '@myelin/editor/i18n/messages/en';
 import { registry } from '@/lib/keybinds';
 import {
   commandPalettePageFromTabTarget,

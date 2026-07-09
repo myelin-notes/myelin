@@ -1,7 +1,10 @@
 // Central registry of runtime environment variables.
 //
 // All `import.meta.env.*` reads in the app should live here so we have a
-// single place to audit which env vars the app depends on.
+// single place to audit which env vars the app depends on. The editor and
+// shared packages read their own flags in `packages/editor/src/env.ts` and
+// `packages/shared/src/env.ts` — keep any shared flag semantics in sync with
+// those files.
 //
 // Build-time env vars consumed by vite.config.ts (Node context, `process.env`)
 // are documented here for discoverability but must be read there directly:
@@ -38,14 +41,6 @@ export const LIVE_DISCOVERY_URL = (
 )
   .trim()
   .replace(/\/+$/, '');
-
-export const PERSIST_DEBUG_LOGS =
-  String(import.meta.env.VITE_PERSIST_DEBUG_LOGS ?? '').toLowerCase() ===
-  'true';
-
-export const PAGINATION_PROFILING =
-  String(import.meta.env.VITE_PAGINATION_PROFILING ?? '').toLowerCase() ===
-  'true';
 
 export const POSTHOG_KEY = (
   import.meta.env.VITE_POSTHOG_KEY ??

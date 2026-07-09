@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
+import { renderCanvasThumbnail } from '@myelin/editor/canvas-thumbnail';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { VFSNodeId } from '@/lib/sync';
 import {
   registerThumbnailProducer,
   requestThumbnailRegeneration,
 } from '@/lib/thumbnails';
-import { renderCanvasThumbnail } from '../canvas-thumbnail';
-import type { DrawableCanvas } from '../drawable-canvas';
 
 interface UseCanvasThumbnailProducerArgs {
   id: VFSNodeId | undefined;

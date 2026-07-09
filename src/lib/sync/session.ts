@@ -1,12 +1,12 @@
-import { Logger } from '@/lib/logger';
-import { summarizeYDocManager } from '@/lib/note/state-summary';
+import { summarizeYDocManager } from '@myelin/editor/note/state-summary';
 import {
   FRAGMENT_SWEEP_ORIGIN,
   PEER_ORIGIN,
   REPOSITORY_SYNC_ORIGIN,
   type SyncOrigin,
   YDocManager,
-} from '@/pages/canvas/ydoc-manager';
+} from '@myelin/editor/ydoc-manager';
+import { Logger } from '@/lib/logger';
 import { getOrCreatePeerId } from './identity';
 import { type PeerSnapshot, PeerState } from './live/peer-state';
 import {

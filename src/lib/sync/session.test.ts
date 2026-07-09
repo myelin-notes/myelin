@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import { ElementType } from '@/pages/canvas/elements/element-type';
+import { ElementType } from '@myelin/editor/elements/element-type';
 import {
   REPOSITORY_SYNC_ORIGIN,
   YDocManager,
-} from '@/pages/canvas/ydoc-manager';
+} from '@myelin/editor/ydoc-manager';
 import { NoteSession } from './session';
 import type {
   VFSNodeId,

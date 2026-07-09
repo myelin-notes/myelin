@@ -1,10 +1,12 @@
+import type { PeerMode } from '@myelin/editor/sync/live/peers';
+
 const YJS_UPDATE_TAG = 0x01;
 const PEER_TAG = 0x02;
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-export type PeerMode = 'owner-device' | 'guest-editor' | 'guest-viewer';
+export type { PeerMode };
 export type PeerMessageKind = 'hello' | 'heartbeat' | 'left';
 
 export interface YjsUpdateMessage {

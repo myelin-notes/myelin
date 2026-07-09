@@ -12,6 +12,9 @@ import {
   ArrowDown as MoveBackwardIcon,
   ArrowUp as MoveForwardIcon,
 } from 'lucide-react';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
+import type { Messages } from '@myelin/editor/i18n/messages';
 import {
   Tooltip,
   TooltipContent,
@@ -19,9 +22,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
-import type { Messages } from '@/lib/i18n/messages';
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import type { SelectionToolbarItem } from '@/pages/canvas/elements/drawable-element';
 
 interface SelectionToolbarProps {
   drawableCanvasRef: RefObject<DrawableCanvas | null>;

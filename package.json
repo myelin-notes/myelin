@@ -5,6 +5,8 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
   "workspaces": [
+    "packages/editor",
+    "packages/shared",
     "packages/ui",
     "packages/website"
   ],
@@ -12,7 +14,7 @@
     "dev": "vite",
     "build": "tsc && vite build && node scripts/posthog-sourcemaps.mjs",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/editor && tsc --noEmit -p packages/shared",
     "preview": "vite preview",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -40,6 +42,8 @@
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.0",
     "@lezer/highlight": "^1.2.3",
+    "@myelin/editor": "*",
+    "@myelin/shared": "*",
     "@myelin/ui": "*",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.6.0",

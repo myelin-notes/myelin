@@ -1,8 +1,8 @@
 import { gzipSync } from 'node:zlib';
 import * as Y from 'yjs';
+import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { VFSNodeId } from '@/lib/sync';
-import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/import';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
 
 function normalizePath(path: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/\/+/g, '/');

@@ -16,6 +16,25 @@ import {
 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
+import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
+import { setChromeMenuOpener } from '@myelin/editor/chrome-menu';
+import { useCanvasCommandContext } from '@myelin/editor/command-context';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import {
+  type ExportTarget,
+  setExportDialogOpener,
+} from '@myelin/editor/export/export-controller';
+import { markdownImportHandler } from '@myelin/editor/media/markdown';
+import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
+import {
+  getNoteLinkPreview,
+  type NoteLinkPreviewTarget,
+} from '@myelin/editor/page-frame/note-link/preview';
+import type { NoteLinkOpenRequestDetail } from '@myelin/editor/page-frame/pm/markdown/note-links';
+import { usePageFrameAutocomplete } from '@myelin/editor/page-frame/use-page-frame-autocomplete';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -35,42 +54,24 @@ import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
 import { regenerateThumbnailNow } from '@/lib/thumbnails';
 import { UserPrefs } from '@/lib/user-prefs';
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
-import { buildCanvasPdfExportTarget } from './canvas-pdf-export';
-import type { ChromeMenuItem } from './chrome-menu';
-import { setChromeMenuOpener } from './chrome-menu';
-import { useCanvasCommandContext } from './command-context';
+import { getPlatform } from '@/platform';
 import { BacklinksChip } from './components/backlinks-chip';
 import { CanvasSearch } from './components/canvas-search';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
+import { ExportDialog } from './components/export-dialog';
 import { InsertPopover } from './components/insert-popover';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
 import { TitleBar } from './components/title-bar';
-import { ElementType } from './elements/element-type';
-import { PageFrameElement } from './elements/page-frame-element';
-import {
-  type ExportTarget,
-  setExportDialogOpener,
-} from './export/export-controller';
-import { ExportDialog } from './export/export-dialog';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
 import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { useToolState } from './hooks/use-tool-state';
-import { markdownImportHandler } from './media/markdown';
-import { PageFrameDomLayer } from './page-frame/dom-layer';
-import {
-  getNoteLinkPreview,
-  type NoteLinkPreviewTarget,
-} from './page-frame/note-link/preview';
-import type { NoteLinkOpenRequestDetail } from './page-frame/pm/markdown/note-links';
-import { usePageFrameAutocomplete } from './page-frame/use-page-frame-autocomplete';
 import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
@@ -429,25 +430,27 @@ function CanvasViewInner({
             </TooltipTrigger>
             <TooltipContent>{redoLabel}</TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={onExportCanvasPdf}
-                  aria-label={strings.canvas.export.exportCanvasPdf}
-                  disabled={!engine.ready}
-                />
-              }
-            >
-              <Download className="size-3.5" />
-            </TooltipTrigger>
-            <TooltipContent>
-              {strings.canvas.export.exportCanvasPdf}
-            </TooltipContent>
-          </Tooltip>
+          {getPlatform().pdfExport && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={onExportCanvasPdf}
+                    aria-label={strings.canvas.export.exportCanvasPdf}
+                    disabled={!engine.ready}
+                  />
+                }
+              >
+                <Download className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>
+                {strings.canvas.export.exportCanvasPdf}
+              </TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger
               render={

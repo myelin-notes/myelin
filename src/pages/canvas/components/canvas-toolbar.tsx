@@ -4,6 +4,8 @@ import {
   SlidersHorizontal as SlidersIcon,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
+import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
 import {
@@ -13,8 +15,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
-import type { ITool, ToolOption } from '@/pages/canvas/tools/tool';
-import { getToolHotkey } from '@/pages/canvas/tools/tool-keybinds';
 
 interface CanvasToolbarProps {
   tools: ITool[];

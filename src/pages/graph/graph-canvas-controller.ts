@@ -1,5 +1,5 @@
-import { CanvasViewport } from '@/pages/canvas/canvas-viewport';
-import type { Vector2 } from '@/pages/canvas/geometry';
+import { CanvasViewport } from '@myelin/editor/canvas-viewport';
+import type { Vector2 } from '@myelin/editor/geometry';
 import type { NoteGraph, NoteGraphEdge, NoteGraphNode } from './types';
 
 const SMALL_GRAPH_NODE_RADIUS = 16;

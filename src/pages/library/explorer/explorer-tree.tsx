@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react';
 import { VirtualGrid } from '@/components/virtual-grid';
-import { VirtualList } from '@/components/virtual-list';
+import { VirtualList } from '@myelin/editor/components/virtual-list';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import {

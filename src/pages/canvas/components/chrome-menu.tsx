@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { Check as CheckIcon } from 'lucide-react';
 import { motion } from 'motion/react';
-import type { ChromeMenuItem } from '../chrome-menu';
+import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
 
 interface ChromeMenuProps {
   anchor: DOMRect;

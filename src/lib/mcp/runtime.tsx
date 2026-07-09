@@ -5,9 +5,9 @@ import { listen } from '@tauri-apps/api/event';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { noteIndexService } from '@/lib/note-index';
 import { useRepository } from '@/lib/sync';
 import { useUserPref } from '@/lib/use-user-pref';
+import { getPlatform } from '@/platform';
 import { MCP_TOOL_DEFINITIONS, McpToolService } from './tools';
 import type { McpBridgeToolCallPayload } from './types';
 
@@ -59,7 +59,7 @@ export function McpRuntime() {
   const handleToolCall = useEffectEvent((payload: McpBridgeToolCallPayload) => {
     const service = new McpToolService({
       repository,
-      indexedTextByNode: noteIndexService.getContent(),
+      indexedTextByNode: getPlatform().noteIndex?.getContent() ?? new Map(),
       allowDirectWrites: () => allowDirectWrites,
     });
     trackEvent('mcp_tool_called', { tool_name: payload.toolName });

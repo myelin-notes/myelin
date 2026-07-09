@@ -9,7 +9,7 @@ import {
   useRepositoryStatus,
 } from '@/lib/sync';
 import { LivePeerDiscoveryCoordinator } from '@/lib/sync/live/discovery-coordinator';
-import { IrohTransport } from '@/lib/sync/live/iroh';
+import { getPlatform } from '@/platform';
 
 const logger = new Logger('useLivePeerDiscovery');
 
@@ -21,7 +21,9 @@ export function useLivePeerDiscovery(
 
   useEffect(() => {
     setPauseError(null);
-    if (!noteSession || !LIVE_DISCOVERY_URL) {
+    // No live transport capability means this client can't join live sync.
+    const createLiveTransport = getPlatform().createLiveTransport;
+    if (!noteSession || !LIVE_DISCOVERY_URL || !createLiveTransport) {
       return;
     }
 
@@ -71,7 +73,7 @@ export function useLivePeerDiscovery(
           baseUrl: LIVE_DISCOVERY_URL,
           roomId,
         }),
-        createTransport: (noteId) => new IrohTransport(noteId),
+        createTransport: (noteId) => createLiveTransport(noteId),
         onPauseChange: setLiveDiscoveryPause,
       });
 

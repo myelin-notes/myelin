@@ -1,10 +1,10 @@
 import { type RefObject, useCallback } from 'react';
 import { toast } from 'sonner';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { getMediaImportHandler } from '@myelin/editor/media';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
-import type { DrawableCanvas } from '@/pages/canvas/drawable-canvas';
-import { getMediaImportHandler } from '../media';
 
 export type EmbedFilesFn = (
   files: FileList | File[],
