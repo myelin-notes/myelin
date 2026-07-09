@@ -1,3 +1,9 @@
+import { ElementType } from '@myelin/editor/elements/element-type';
+import {
+  addMarkdownPageFrameToYDoc,
+  DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
+  writeMarkdownToPageFrameFragment,
+} from '@myelin/editor/page-frame/markdown/import';
 import type {
   NodeSearchResult,
   NoteBacklink,
@@ -15,12 +21,6 @@ import {
   type RenameNoteReferencesResult,
   renameNoteReferences,
 } from '@/lib/sync/repo/rename-note-references';
-import { ElementType } from '@/pages/canvas/elements/element-type';
-import {
-  addMarkdownPageFrameToYDoc,
-  DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
-  writeMarkdownToPageFrameFragment,
-} from '@/pages/canvas/page-frame/markdown/import';
 import {
   buildMcpNoteReadModel,
   findElementMap,

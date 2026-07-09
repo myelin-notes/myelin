@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ElementType } from '@myelin/editor/elements/element-type';
 import { LocalRepository } from '@/lib/sync/repo/local';
-import { ElementType } from '@/pages/canvas/elements/element-type';
 import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { importGoodnotesZip, isZipFile } from './goodnotes';
 
-vi.mock('@/pages/canvas/pdf-renderer', () => ({
+vi.mock('@myelin/editor/pdf-renderer', () => ({
   createDefaultPdfPageOrder: (pageCount: number) =>
     Array.from({ length: pageCount }, (_, originalIndex) => ({
       kind: 'pdf',

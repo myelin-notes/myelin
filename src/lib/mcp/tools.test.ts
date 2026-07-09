@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { LocalRepository } from '@/lib/sync/repo/local';
-import { ElementType } from '@/pages/canvas/elements/element-type';
-import { addMarkdownPageFrameToYDoc } from '@/pages/canvas/page-frame/markdown/import';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
 import { McpToolService } from './tools';
 
 let repositoryCounter = 0;

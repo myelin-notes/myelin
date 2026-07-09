@@ -1,16 +1,16 @@
-import { Logger } from '@/lib/logger';
-import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
-import { ElementType } from '@/pages/canvas/elements/element-type';
+import { ElementType } from '@myelin/editor/elements/element-type';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
-} from '@/pages/canvas/elements/page-frame-constants';
+} from '@myelin/editor/elements/page-frame-constants';
 import {
   createDefaultPdfPageOrder,
   getPdfPageSizes,
   type PdfPageSize,
-} from '@/pages/canvas/pdf-renderer';
-import type { YDocManager } from '@/pages/canvas/ydoc-manager';
+} from '@myelin/editor/pdf-renderer';
+import type { YDocManager } from '@myelin/editor/ydoc-manager';
+import { Logger } from '@/lib/logger';
+import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
 
 const logger = new Logger('PdfImport');
 export const PDF_FILE_ACCEPT = 'application/pdf,.pdf';

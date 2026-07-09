@@ -1,9 +1,9 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import { ElementType } from '@/pages/canvas/elements/element-type';
-import { schema } from '@/pages/canvas/page-frame/pm/schema';
-import { YDocManager } from '@/pages/canvas/ydoc-manager';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { StoredNoteLink, VFSNodeId } from './types';
 
 const MAX_SNIPPET_LENGTH = 180;

@@ -1,25 +1,25 @@
 import { type RefObject, useCallback, useRef, useState } from 'react';
-import { trackEvent } from '@/lib/analytics';
-import { UserPrefs } from '@/lib/user-prefs';
-import { CollisionHelper } from '@/lib/utils/collision-helper';
-import type { DrawableCanvas, Vector2 } from '@/pages/canvas/drawable-canvas';
+import type { DrawableCanvas, Vector2 } from '@myelin/editor/drawable-canvas';
 import {
   AUDIO_NATURAL_HEIGHT,
   AUDIO_NATURAL_WIDTH,
   AudioElement,
-} from '@/pages/canvas/elements/audio/element';
+} from '@myelin/editor/elements/audio/element';
 import {
   CHROME_BOTTOM_PADDING,
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
-} from '@/pages/canvas/elements/frame/chrome';
-import { LatexElement } from '@/pages/canvas/elements/latex/element';
+} from '@myelin/editor/elements/frame/chrome';
+import { LatexElement } from '@myelin/editor/elements/latex/element';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
   PageFrameElement,
-} from '@/pages/canvas/elements/page-frame-element';
-import type { ITool } from '@/pages/canvas/tools/tool';
+} from '@myelin/editor/elements/page-frame-element';
+import type { ITool } from '@myelin/editor/tools/tool';
+import { CollisionHelper } from '@myelin/editor/utils/collision-helper';
+import { trackEvent } from '@/lib/analytics';
+import { UserPrefs } from '@/lib/user-prefs';
 
 export interface ContextInsertAnchor {
   screenX: number;

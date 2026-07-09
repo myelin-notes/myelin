@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { LocalRepository } from '@/lib/sync/repo/local';
 import type { FileType, VFSNodeId } from '@/lib/sync/repo/types';
-import { ElementType } from '@/pages/canvas/elements/element-type';
-import { schema } from '@/pages/canvas/page-frame/pm/schema';
 import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
