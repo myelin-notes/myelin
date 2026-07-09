@@ -1,14 +1,13 @@
 /**
  * All marketing copy and canvas layout for the landing experience.
  *
- * This file is the single place to edit website copy. It feeds two renderers:
- *  - `src/pages/index.astro` renders every region's `article` block as static,
- *    crawlable HTML (the JS-off and mobile experience).
- *  - `src/canvas/seed.ts` places every region's `items` onto the live Myelin
- *    canvas (the desktop experience).
+ * `src/canvas/seed.ts` places every region's `items` onto the live Myelin
+ * canvas (the desktop experience). There is no static/mobile renderer right
+ * now; when one is built it should be authored on its own, not derived from
+ * these regions.
  *
  * Items are authored in each region's LOCAL coordinates (0,0 = the region's
- * top-left). `REGION_MOVES` translates each region onto a non-overlapping path
+ * top-left). Each region's `origin` translates it onto a non-overlapping path
  * across the canvas, so you can lay out a region without worrying about where
  * it sits in the wider tour. Coordinates are world units (px at zoom 1).
  */
@@ -92,26 +91,26 @@ export type CanvasItem =
       width: number;
     };
 
-export interface RegionArticle {
-  eyebrow: string;
-  heading: string;
-  body: string[];
-  bullets?: string[];
-}
-
 export interface CanvasRegion {
   id: string;
   /** Command palette, progress rail, and app-tab label. */
   label: string;
+  /**
+   * Where this region's local (0,0) origin lands on the canvas world. Origins
+   * form a gentle serpentine with generous gaps so no region's content bleeds
+   * into a neighbor's framed view. `frame` and `items` are authored in local
+   * coordinates; the exported `regions` shifts them by this origin.
+   */
+  origin: [number, number];
   frame: { x: number; y: number; width: number; height: number };
   items: CanvasItem[];
-  article: RegionArticle;
 }
 
 const authoredRegions: CanvasRegion[] = [
   {
     id: 'welcome',
     label: 'Welcome',
+    origin: [0, 0],
     frame: { x: 0, y: 0, width: 1560, height: 980 },
     items: [
       {
@@ -173,18 +172,11 @@ const authoredRegions: CanvasRegion[] = [
       },
       { kind: 'dom', slot: 'scroll-hint', x: 700, y: 900, width: 220 },
     ],
-    article: {
-      eyebrow: 'A native knowledge workspace',
-      heading: 'Handwriting, type, and PDFs in one note',
-      body: [
-        'Myelin Notes is a native, local-first canvas where you write with the pen, type in rich text, annotate PDFs, and drop in images and audio, all in the same document, all kept on your own machine. Most tools make you pick one lane. This is the workspace that is both.',
-        'On a desktop browser this page opens the real canvas engine so you can scroll through a working notebook, draw ink, and type into it. On this device you get the readable version, and the download is one tap away.',
-      ],
-    },
   },
   {
     id: 'ink-and-type',
     label: 'Ink and type',
+    origin: [1950, 120],
     frame: { x: 0, y: 0, width: 1440, height: 940 },
     items: [
       {
@@ -292,23 +284,11 @@ const authoredRegions: CanvasRegion[] = [
         size: 4,
       },
     ],
-    article: {
-      eyebrow: 'The canvas',
-      heading: 'Write by hand or by keyboard, on the same page',
-      body: [
-        'Draw with a pressure-sensitive pen and let rough strokes snap into clean lines, rectangles, ellipses, and triangles when you pause. Highlight, erase, and pick colors from a radial wheel. Drop in editable text boxes, or open a rich-text frame with headings, lists, tables, code blocks, and LaTeX math.',
-      ],
-      bullets: [
-        'Pressure-sensitive pen with shape recognition for lines, rectangles, ellipses, and triangles',
-        'Highlighter, eraser, and a radial color wheel',
-        'Rich-text frames with headings, lists, tables, code blocks, and LaTeX math',
-        'Select, move, rotate, resize, and reorder any element, with full undo and redo',
-      ],
-    },
   },
   {
     id: 'math',
     label: 'Math',
+    origin: [2250, 1450],
     frame: { x: 0, y: 0, width: 1180, height: 820 },
     items: [
       {
@@ -392,17 +372,11 @@ const authoredRegions: CanvasRegion[] = [
         size: 3,
       },
     ],
-    article: {
-      eyebrow: 'Math',
-      heading: 'Math renders where you wrote it',
-      body: [
-        'Write LaTeX inline in a rich-text frame or drop a block straight onto the canvas. KaTeX renders it in place, next to the handwritten derivation it belongs to.',
-      ],
-    },
   },
   {
     id: 'pdf',
     label: 'PDFs',
+    origin: [250, 1650],
     frame: { x: 0, y: 0, width: 1360, height: 980 },
     items: [
       {
@@ -450,23 +424,11 @@ const authoredRegions: CanvasRegion[] = [
         width: 380,
       },
     ],
-    article: {
-      eyebrow: 'PDFs and audio',
-      heading: 'Bring in PDFs and recordings, and work on them in place',
-      body: [
-        'Embed a multi-page PDF, reorder its pages, insert blank pages, and draw annotations directly on top. Record audio straight into a note with a live waveform, and Whisper transcribes it on-device as you speak, with nothing sent to the cloud. The transcript becomes part of the note, and part of what you can search.',
-      ],
-      bullets: [
-        'Embed and annotate multi-page PDFs, and reorder, delete, or insert pages',
-        'Import from GoodNotes exports and Obsidian vaults',
-        'Record audio with live, on-device Whisper transcription',
-        'Embed images with drag-to-resize and crop',
-      ],
-    },
   },
   {
     id: 'connections',
     label: 'Connections',
+    origin: [250, 3000],
     frame: { x: 0, y: 0, width: 1520, height: 960 },
     items: [
       {
@@ -530,23 +492,11 @@ const authoredRegions: CanvasRegion[] = [
         size: 4,
       },
     ],
-    article: {
-      eyebrow: 'Connections and search',
-      heading: 'Notes that know each other',
-      body: [
-        'Link notes with double brackets and follow them both ways. The graph view shows the shape of what you know.',
-        'Search your whole library by keyword, or switch to semantic search to find notes by idea rather than exact wording. The embedding model runs locally on your device. Inside a note, a find bar matches text, page frames, audio transcripts, and recognized handwriting.',
-      ],
-      bullets: [
-        'Bidirectional links and a graph view of your workspace',
-        'Keyword and on-device semantic search across your library',
-        'Handwriting recognition and search on macOS, via Apple Vision',
-      ],
-    },
   },
   {
     id: 'local-first',
     label: 'Local-first',
+    origin: [2150, 3050],
     frame: { x: 0, y: 0, width: 1440, height: 900 },
     items: [
       {
@@ -604,25 +554,11 @@ const authoredRegions: CanvasRegion[] = [
       },
       { kind: 'dom', slot: 'schema-link', x: 64, y: 720, width: 260 },
     ],
-    article: {
-      eyebrow: 'Local-first',
-      heading: 'Your notes live on your machine',
-      body: [
-        'Myelin Notes keeps your library on your own disk and works fully offline. Your notes never leave your control. Version history keeps snapshots you can look back on and restore, and you can export your whole workspace to a complete file that preserves everything, any time, no questions asked.',
-        'Sync is optional, and it is yours. Sync a note through a GitHub repository you own, or edit it live on two machines at once: changes connect directly between your devices, coordinated by a small discovery service that helps them find each other but never stores your notes.',
-        'We will never put your own notes behind a paywall, and we will never lock you out. Whatever happens, you can export everything and walk away with all of it.',
-      ],
-      bullets: [
-        'Local-first storage that works offline',
-        'Version history with restore',
-        'Export to Markdown, PDF, an Obsidian vault, or a complete workspace file',
-        'Optional sync through your own GitHub repository, or live between your computers',
-      ],
-    },
   },
   {
     id: 'download',
     label: 'Download',
+    origin: [3950, 3000],
     frame: { x: 0, y: 0, width: 1240, height: 860 },
     items: [
       {
@@ -662,31 +598,8 @@ const authoredRegions: CanvasRegion[] = [
         size: 4,
       },
     ],
-    article: {
-      eyebrow: 'Early access',
-      heading: 'Free while Myelin Notes is in early access',
-      body: [
-        'Myelin Notes is in early access and free to use right now. The whole editor is in your hands: the canvas, pen and handwriting tools, PDFs and audio, import and export, local-first storage, GitHub sync, and live editing across your own computers. No account is needed to start. Sign in with GitHub only when you want to sync.',
-      ],
-    },
   },
 ];
-
-/**
- * Where each region's local (0,0) origin lands on the canvas. The path is a
- * gentle serpentine with generous gaps so no region's content bleeds into a
- * neighbor's framed view. To move a region on the tour, change its origin here;
- * to re-author its contents, edit the local item coordinates above.
- */
-const REGION_MOVES: Record<string, [number, number]> = {
-  welcome: [0, 0],
-  'ink-and-type': [1950, 120],
-  math: [2250, 1450],
-  pdf: [250, 1650],
-  connections: [250, 3000],
-  'local-first': [2150, 3050],
-  download: [3950, 3000],
-};
 
 function shiftItem(item: CanvasItem, dx: number, dy: number): CanvasItem {
   if (
@@ -703,8 +616,12 @@ function shiftItem(item: CanvasItem, dx: number, dy: number): CanvasItem {
   return { ...item, x: item.x + dx, y: item.y + dy };
 }
 
+/**
+ * Shift each authored region from its local (0,0) frame onto its `origin` in
+ * the canvas world, so the tour reads as one non-overlapping notebook.
+ */
 export const regions: CanvasRegion[] = authoredRegions.map((region) => {
-  const [dx, dy] = REGION_MOVES[region.id] ?? [0, 0];
+  const [dx, dy] = region.origin;
   return {
     ...region,
     frame: {
@@ -715,34 +632,6 @@ export const regions: CanvasRegion[] = authoredRegions.map((region) => {
     items: region.items.map((item) => shiftItem(item, dx, dy)),
   };
 });
-
-/** Desktop platforms resolve from the updater manifest at load time. */
-export const downloadPlatforms = [
-  { name: 'macOS', available: true },
-  { name: 'Windows', available: true },
-  { name: 'Linux', available: true },
-  { name: 'iPad', available: false },
-  { name: 'Android', available: false },
-] as const;
-
-export const faqs = [
-  {
-    q: 'Do I need an account?',
-    a: 'No Myelin Notes account. The app runs locally; you sign in with GitHub only if you want to sync across your own computers.',
-  },
-  {
-    q: 'Does it work offline?',
-    a: 'Fully. Everything runs on your machine, and there is no server call to open, edit, or search a note. Only optional GitHub sync touches the network.',
-  },
-  {
-    q: 'Is it really free?',
-    a: 'Free while Myelin Notes is in early access. The whole editor, with no tiers and no trial to expire.',
-  },
-  {
-    q: 'Where do my notes live?',
-    a: 'On your own disk. You can export your whole workspace to a complete file that preserves everything, any time.',
-  },
-] as const;
 
 export const siteTitle =
   'Myelin Notes: handwriting, type, and PDFs in one note';

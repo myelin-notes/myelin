@@ -1,33 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import CanvasIsland from '../canvas/CanvasIsland';
-import {
-  downloadPlatforms,
-  faqs,
-  regions,
-  siteDescription,
-  siteTitle,
-} from '../content/site';
-
-// Placeholder product screenshots shown in the static notebook cards.
-const regionShots: Record<string, { src: string; alt: string }> = {
-  welcome: {
-    src: '/canvas/shot-note.png',
-    alt: 'A Myelin note mixing typed text, a formula, a diagram, and handwritten margin notes',
-  },
-  pdf: {
-    src: '/canvas/shot-pdf.png',
-    alt: 'A PDF page annotated by hand inside a Myelin note',
-  },
-  connections: {
-    src: '/canvas/shot-graph.png',
-    alt: 'The Myelin graph view showing notes connected as a network',
-  },
-  'local-first': {
-    src: '/canvas/shot-library.png',
-    alt: 'The Myelin library: a grid of note cards with tags and folders',
-  },
-};
+import { regions, siteDescription, siteTitle } from '../content/site';
 
 const softwareJsonLd = {
   '@context': 'https://schema.org',
@@ -43,115 +17,20 @@ const softwareJsonLd = {
   },
 };
 
-const faqJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: faqs.map(({ q, a }) => ({
-    '@type': 'Question',
-    name: q,
-    acceptedAnswer: { '@type': 'Answer', text: a },
-  })),
-};
-
 // Scroll length of the camera tour: one generous viewport-height segment per
 // region keeps the pacing calm.
 const trackHeight = `${regions.length * 130}vh`;
 ---
 
-<Base title={siteTitle} description={siteDescription} jsonLd={[softwareJsonLd, faqJsonLd]}>
+<Base title={siteTitle} description={siteDescription} jsonLd={[softwareJsonLd]}>
   <!-- Scrollbar for the canvas camera; only shown once the notebook is live. -->
   <div class="canvas-track" style={`height: ${trackHeight}`} aria-hidden="true">
   </div>
 
-  <!-- The live notebook. Loads only on desktop pointers (see CanvasIsland). -->
-  <CanvasIsland client:only="react" />
-
   <!--
-    The full message as real, crawlable HTML. This is the page for crawlers,
-    JS-off visitors, and phones; the canvas island hides it when it takes over.
+    The live notebook. Loads only on desktop pointers (see CanvasIsland). There
+    is no static/mobile fallback right now; a standalone version will be built
+    separately.
   -->
-  <div class="static-fallback">
-    <div class="notebook-page">
-      {
-        regions.map((region, index) => (
-          <section class="notebook-card" id={region.id}>
-            <p class="eyebrow">{region.article.eyebrow}</p>
-            {index === 0 ? (
-              <h1>{region.article.heading}</h1>
-            ) : (
-              <h2>{region.article.heading}</h2>
-            )}
-            {region.article.body.map((paragraph) => (
-              <p>{paragraph}</p>
-            ))}
-            {region.article.bullets && (
-              <ul>
-                {region.article.bullets.map((bullet) => (
-                  <li>{bullet}</li>
-                ))}
-              </ul>
-            )}
-            {regionShots[region.id] && (
-              <img
-                class="notebook-shot"
-                src={regionShots[region.id].src}
-                alt={regionShots[region.id].alt}
-                loading="lazy"
-                decoding="async"
-              />
-            )}
-            {(region.id === 'welcome' || region.id === 'download') && (
-              <>
-                <div class="download-row">
-                  {downloadPlatforms.map((platform) =>
-                    platform.available ? (
-                      <a href="#download" data-download-platform={platform.name}>
-                        {platform.name}
-                      </a>
-                    ) : (
-                      <a class="unavailable" aria-disabled="true">
-                        {platform.name} soon
-                      </a>
-                    ),
-                  )}
-                </div>
-                <p class="hand-note">no account, free in early access</p>
-              </>
-            )}
-            {region.id === 'local-first' && (
-              <p>
-                The workspace export is documented, open JSON.{' '}
-                <a href="/workspace-schema">Read the file format</a>.
-              </p>
-            )}
-          </section>
-        ))
-      }
-
-      <section class="notebook-card notebook-faq" id="faq">
-        <p class="eyebrow">good to know</p>
-        <h2>Questions, answered</h2>
-        <dl>
-          {
-            faqs.map((faq) => (
-              <div>
-                <dt>{faq.q}</dt>
-                <dd>{faq.a}</dd>
-              </div>
-            ))
-          }
-        </dl>
-      </section>
-
-      <p class="hand-note ink-underline">we will never take your notes away.</p>
-    </div>
-  </div>
-
-  <script>
-    import { wireDownloadLinks } from '../lib/downloads';
-
-    // Static download links resolve for everyone; the canvas island wires its
-    // own buttons the same way when it mounts.
-    wireDownloadLinks(document);
-  </script>
+  <CanvasIsland client:only="react" />
 </Base>

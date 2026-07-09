@@ -56,148 +56,22 @@ html {
     var(--bg-page);
 }
 
-/* The scroll track exists only to give the canvas camera a scrollbar; the
-   static article is the document for crawlers, JS-off visitors, and small
-   screens. The island flips `data-canvas` once the notebook is live. */
+/* The scroll track exists only to give the canvas camera a scrollbar. The
+   island flips `data-canvas` once the notebook is live. */
 .canvas-track {
   display: none;
 }
 html[data-canvas='on'] .canvas-track {
   display: block;
 }
-html[data-canvas='on'] .static-fallback {
-  display: none;
-}
 
-/* ---------- Static notebook article (mobile, JS-off, crawlers) ---------- */
-
-.static-fallback {
-  background-color: var(--bg-page);
-  background-image: radial-gradient(var(--canvas-grid) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-.notebook-page {
-  margin: 0 auto;
-  max-width: 44rem;
-  padding: 4.5rem 1.25rem 3rem;
-}
-
-.notebook-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 0.75rem;
-  box-shadow: 0 18px 40px -24px rgba(28, 39, 56, 0.18);
-  padding: 2rem 1.75rem;
-  margin-bottom: 2.25rem;
-}
-
-.notebook-card .eyebrow {
-  font-family: var(--font-hand);
-  font-size: 1.35rem;
-  color: var(--text-muted);
-  margin: 0 0 0.4rem;
-}
-
-.notebook-card h1,
-.notebook-card h2 {
-  font-family: var(--font-heading);
-  font-weight: 500;
-  line-height: 1.15;
-  margin: 0 0 1rem;
-  text-wrap: balance;
-}
-
-.notebook-card h1 {
-  font-size: clamp(2.1rem, 6vw, 3rem);
-}
-
-.notebook-card h2 {
-  font-size: clamp(1.5rem, 4.5vw, 2rem);
-}
-
-.notebook-card p {
-  color: var(--text-secondary);
-  line-height: 1.65;
-  margin: 0 0 0.9rem;
-}
-
-.notebook-card ul {
-  margin: 0.75rem 0 0;
-  padding-left: 1.2rem;
-  color: var(--text-secondary);
-  line-height: 1.65;
-}
-
-.notebook-card li {
-  margin-bottom: 0.35rem;
-}
-
-.notebook-card li::marker {
-  color: var(--text-muted);
-}
-
-.notebook-shot {
-  display: block;
-  width: 100%;
-  height: auto;
-  margin: 1.5rem 0 0.5rem;
-  /* The screenshots carry their own baked shadow + rounded window, so no card
-     framing is needed; a hair of negative margin lets the shadow breathe. */
-  margin-left: -0.5rem;
-  max-width: calc(100% + 1rem);
-}
-
+/* Handwritten annotation, used on the canvas chrome and secondary pages. */
 .hand-note {
   font-family: var(--font-hand);
   font-size: 1.45rem;
   color: var(--accent-navy);
   transform: rotate(-1deg);
   display: inline-block;
-}
-
-.ink-underline {
-  text-decoration-line: underline;
-  text-decoration-color: #e03e3e;
-  text-decoration-thickness: 3px;
-  text-decoration-skip-ink: none;
-  text-underline-offset: 6px;
-}
-
-.download-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 1.1rem 0 0.6rem;
-}
-
-.download-row a {
-  background: var(--accent-dark);
-  border-radius: 0.5rem;
-  color: var(--text-on-dark);
-  display: inline-block;
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0.6rem 1.1rem;
-  text-decoration: none;
-}
-
-.download-row a.unavailable {
-  background: var(--bg-surface);
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.notebook-faq dt {
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-top: 1rem;
-}
-
-.notebook-faq dd {
-  margin: 0.3rem 0 0;
-  color: var(--text-secondary);
-  line-height: 1.6;
 }
 
 /* ---------- Document-styled secondary pages ---------- */
