@@ -26,8 +26,6 @@ export interface NoteLinkRouteTarget {
   pageFrameId?: string | null;
 }
 
-export type NoteLinkRepository = Pick<Repository, 'createFile' | 'getNode'>;
-
 function noteTargetToTabTarget(target: NoteRouteTarget): TabTarget {
   if (target.fileType === 'mcanvas') {
     return {
@@ -58,7 +56,7 @@ export function openNote(
 
 export async function openNoteLink(
   controller: TabStateController,
-  repository: NoteLinkRepository,
+  repository: Repository,
   currentNoteId: VFSNodeId,
   target: NoteLinkRouteTarget,
 ): Promise<void> {
@@ -69,7 +67,7 @@ export async function openNoteLink(
     const currentNode = await repository.getNode(currentNoteId);
     const parentId = currentNode?.type === 'file' ? currentNode.parentId : null;
     noteId = await createBlankCanvasFile(
-      repository.createFile,
+      repository,
       noteTitle,
       parentId,
       parsedTarget?.pageFrameName,

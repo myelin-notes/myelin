@@ -138,11 +138,7 @@ export function useCommandPalette(): {
         strings.library.createNew.untitledCanvas,
         null,
       );
-      const id = await createBlankCanvasFile(
-        repository.createFile,
-        name,
-        null,
-      );
+      const id = await createBlankCanvasFile(repository, name, null);
       tabController.openTab({ type: 'canvas', id }, name);
     } catch (error) {
       logger.error('Failed to create note from command palette', error);

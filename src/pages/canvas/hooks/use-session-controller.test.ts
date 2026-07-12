@@ -1,6 +1,9 @@
 import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type {
   ActiveRepository,
   NoteSessionStatus,
@@ -8,12 +11,21 @@ import type {
 } from '@/lib/sync';
 import { CanvasSessionController } from './use-session-controller';
 
-const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
-  () => ({
+const {
+  drawableCanvasCtor,
+  drawableCanvasState,
+  resolveNoteLinkRefByTitleMock,
+} = vi.hoisted(() => {
+  const state = {
+    elements: [] as unknown[],
+    screenToWorld: vi.fn(),
+  };
+  return {
+    drawableCanvasState: state,
     drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
       return {
-        elements: [],
-        viewport: { screenToWorld: vi.fn() },
+        elements: state.elements,
+        viewport: { screenToWorld: state.screenToWorld },
         addElement: vi.fn(),
         setBackgroundCanvas: vi.fn(),
         setOverlayCanvas: vi.fn(),
@@ -24,8 +36,8 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
       };
     }),
     resolveNoteLinkRefByTitleMock: vi.fn(),
-  }),
-);
+  };
+});
 
 vi.mock('@myelin/editor/drawable-canvas', () => ({
   DrawableCanvas: drawableCanvasCtor,
@@ -80,6 +92,8 @@ function createSession(id: VFSNodeId): MockNoteSession {
 afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
+  drawableCanvasState.elements = [];
+  drawableCanvasState.screenToWorld.mockReset();
 });
 
 describe('CanvasSessionController', () => {
@@ -108,6 +122,93 @@ describe('CanvasSessionController', () => {
 
     const canvas = drawableCanvasCtor.mock.results[0]?.value;
     expect(canvas.addElement).not.toHaveBeenCalled();
+    expect(session.save).not.toHaveBeenCalled();
+
+    await controller.dispose();
+  });
+
+  it('centers and saves an initial page frame without stored offsets', async () => {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(
+      ElementType.PAGE_FRAME,
+      'initial-frame',
+      {},
+    );
+    const frame = new PageFrameElement('initial-frame');
+    frame.bindToYMap(yMap);
+    drawableCanvasState.elements = [frame];
+    drawableCanvasState.screenToWorld.mockReturnValue({ x: 500, y: 300 });
+    vi.stubGlobal('window', { devicePixelRatio: 2 });
+
+    const session = createSession('note-1');
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn().mockResolvedValue(session),
+      getNode: vi.fn().mockResolvedValue({
+        type: 'file',
+        name: 'New Canvas',
+      }),
+      searchNodes: vi.fn(),
+    };
+    const controller = new CanvasSessionController(
+      repository as unknown as ControllerRepository,
+      { current: { width: 2000, height: 1200 } as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: [] },
+    );
+
+    await controller.open('note-1');
+
+    expect(drawableCanvasState.screenToWorld).toHaveBeenCalledWith({
+      x: 500,
+      y: 300,
+    });
+    expect(yMap.get('offsetX')).toBe(500 - frame.totalWidth / 2);
+    expect(yMap.get('offsetY')).toBe(300 - frame.totalHeight / 2);
+    expect(session.save).toHaveBeenCalledTimes(1);
+
+    await controller.dispose();
+  });
+
+  it('does not reposition a page frame with stored offsets', async () => {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(
+      ElementType.PAGE_FRAME,
+      'positioned-frame',
+      { offsetX: 12, offsetY: 34 },
+    );
+    const frame = new PageFrameElement('positioned-frame');
+    frame.bindToYMap(yMap);
+    drawableCanvasState.elements = [frame];
+
+    const session = createSession('note-1');
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn().mockResolvedValue(session),
+      getNode: vi.fn().mockResolvedValue({
+        type: 'file',
+        name: 'Existing Canvas',
+      }),
+      searchNodes: vi.fn(),
+    };
+    const controller = new CanvasSessionController(
+      repository as unknown as ControllerRepository,
+      { current: { width: 2000, height: 1200 } as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: [] },
+    );
+
+    await controller.open('note-1');
+
+    expect(drawableCanvasState.screenToWorld).not.toHaveBeenCalled();
+    expect(yMap.get('offsetX')).toBe(12);
+    expect(yMap.get('offsetY')).toBe(34);
     expect(session.save).not.toHaveBeenCalled();
 
     await controller.dispose();

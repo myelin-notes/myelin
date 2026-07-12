@@ -177,6 +177,26 @@ export class CanvasSessionController {
         drawableCanvas.setDomOverlayHost(this.domOverlayRef.current);
       }
 
+      const unpositionedFrame = drawableCanvas.elements.find(
+        (element): element is PageFrameElement =>
+          element instanceof PageFrameElement &&
+          element.yMap?.has('offsetX') === false &&
+          element.yMap.has('offsetY') === false,
+      );
+      if (unpositionedFrame) {
+        const dpr = window.devicePixelRatio || 1;
+        const centerWorld = drawableCanvas.viewport.screenToWorld({
+          x: canvas.width / dpr / 2,
+          y: canvas.height / dpr / 2,
+        });
+        unpositionedFrame.setOffset(
+          centerWorld.x - unpositionedFrame.totalWidth / 2,
+          centerWorld.y - unpositionedFrame.totalHeight / 2,
+        );
+        unpositionedFrame.updateBounds();
+        await session.save();
+      }
+
       if (this.shouldAbortOpen(token)) {
         await this.cleanupAbandonedSession(session, drawableCanvas);
         return;

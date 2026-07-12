@@ -13,9 +13,10 @@ describe('createBlankCanvasFile', () => {
     const createFile = vi.fn<Repository['createFile']>(
       async () => 'note-1' as VFSNodeId,
     );
+    const repository = { createFile } as unknown as Repository;
 
     const id = await createBlankCanvasFile(
-      createFile,
+      repository,
       'Untitled Canvas',
       'folder-1',
     );
@@ -36,8 +37,6 @@ describe('createBlankCanvasFile', () => {
     expect(ydoc.elements.length).toBe(1);
     expect(Object.fromEntries(ydoc.elements.get(0).entries())).toMatchObject({
       type: ElementType.PAGE_FRAME,
-      offsetX: 160,
-      offsetY: 80,
       scaleX: 1,
       scaleY: 1,
       zOrder: 0,
@@ -46,19 +45,17 @@ describe('createBlankCanvasFile', () => {
       pageHeight: PAGE_HEIGHT,
       pageLayout: 'vertical',
     });
+    expect(ydoc.elements.get(0).has('offsetX')).toBe(false);
+    expect(ydoc.elements.get(0).has('offsetY')).toBe(false);
   });
 
   it('uses an initial page-frame name when one is provided', async () => {
     const createFile = vi.fn<Repository['createFile']>(
       async () => 'note-1' as VFSNodeId,
     );
+    const repository = { createFile } as unknown as Repository;
 
-    await createBlankCanvasFile(
-      createFile,
-      'Alpha Note',
-      null,
-      'Details',
-    );
+    await createBlankCanvasFile(repository, 'Alpha Note', null, 'Details');
 
     const bytes = createFile.mock.calls[0]?.[3];
     if (!(bytes instanceof Uint8Array)) {

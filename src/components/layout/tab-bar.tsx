@@ -127,11 +127,7 @@ export const TabBar = memo(function TabBar({
           strings.library.createNew.untitledCanvas,
           null,
         );
-        const id = await createBlankCanvasFile(
-          repository.createFile,
-          name,
-          null,
-        );
+        const id = await createBlankCanvasFile(repository, name, null);
         controller.openTab({ type: 'canvas', id }, name, pane.id);
         trackEvent('note_created', { file_type: 'mcanvas' });
       } catch (error) {
