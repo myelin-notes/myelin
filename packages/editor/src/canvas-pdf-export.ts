@@ -20,7 +20,7 @@ import {
   type PdfExportRequest,
 } from './pdf-export/contract';
 import { POINTS_PER_PX, pxToPt } from './pdf-export/coords';
-import type { PdfHarvestContext } from './pdf-export/harvest';
+import { createFontTable, type PdfHarvestContext } from './pdf-export/harvest';
 import { getPlatform } from './platform';
 
 const WHITE: [number, number, number] = [255, 255, 255];
@@ -83,13 +83,14 @@ export async function harvestCanvasPdf(
 
   const imagesB64: string[] = [];
   const pdfsB64: string[] = [];
+  const fontsB64: string[] = [];
   const page: ExportPage = {
     widthPt: pxToPt(bounds.width),
     heightPt: pxToPt(bounds.height),
     items: [],
   };
   const warnings: string[] = [];
-  const ctx = createCanvasHarvestContext(page, imagesB64, bounds);
+  const ctx = createCanvasHarvestContext(page, imagesB64, fontsB64, bounds);
 
   for (const element of visible) {
     if (element instanceof PageFrameElement) {
@@ -99,7 +100,14 @@ export async function harvestCanvasPdf(
         continue;
       }
       const result = await harvestPageFramePdf(source);
-      appendPageFrameHarvest(page, imagesB64, result.request, source, bounds);
+      appendPageFrameHarvest(
+        page,
+        imagesB64,
+        fontsB64,
+        result.request,
+        source,
+        bounds,
+      );
       warnings.push(...result.warnings);
       continue;
     }
@@ -120,7 +128,7 @@ export async function harvestCanvasPdf(
   }
 
   return {
-    request: { kind: 'canvas', pages: [page], imagesB64, pdfsB64 },
+    request: { kind: 'canvas', pages: [page], imagesB64, pdfsB64, fontsB64 },
     warnings,
   };
 }
@@ -217,6 +225,7 @@ function getPageFrameContentBounds(source: PageFramePdfSource): DOMRect {
 function createCanvasHarvestContext(
   page: ExportPage,
   imagesB64: string[],
+  fontsB64: string[],
   bounds: DOMRect,
 ): PdfHarvestContext {
   return {
@@ -227,18 +236,22 @@ function createCanvasHarvestContext(
     }),
     push: (item) => page.items.push(item),
     addImageBase64: (b64) => imagesB64.push(b64) - 1,
+    addFontBase64: createFontTable(fontsB64),
   };
 }
 
 function appendPageFrameHarvest(
   target: ExportPage,
   imagesB64: string[],
+  fontsB64: string[],
   request: PdfExportRequest,
   source: PageFramePdfSource,
   canvasBounds: DOMRect,
 ): void {
   const imageRefOffset = imagesB64.length;
   imagesB64.push(...(request.imagesB64 ?? []));
+  const fontRefOffset = fontsB64.length;
+  fontsB64.push(...(request.fontsB64 ?? []));
 
   const scaleX = getPositiveScale(source.scale?.x ?? 1);
   const scaleY = getPositiveScale(source.scale?.y ?? 1);
@@ -266,7 +279,14 @@ function appendPageFrameHarvest(
 
     for (const item of harvestedPage.items) {
       target.items.push(
-        transformPageItem(item, origin, scaleX, scaleY, imageRefOffset),
+        transformPageItem(
+          item,
+          origin,
+          scaleX,
+          scaleY,
+          imageRefOffset,
+          fontRefOffset,
+        ),
       );
     }
   }
@@ -313,6 +333,7 @@ function transformPageItem(
   scaleX: number,
   scaleY: number,
   imageRefOffset: number,
+  fontRefOffset: number,
 ): PageItem {
   switch (item.t) {
     case 'text':
@@ -321,6 +342,10 @@ function transformPageItem(
         x: origin.x + item.x * scaleX,
         baselineY: origin.y + item.baselineY * scaleY,
         sizePt: item.sizePt * scaleY,
+        font:
+          typeof item.font === 'object'
+            ? { custom: item.font.custom + fontRefOffset }
+            : item.font,
       };
     case 'rect':
       return {

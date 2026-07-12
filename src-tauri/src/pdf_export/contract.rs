@@ -12,6 +12,9 @@ pub enum FontKey {
     Sans,
     Serif,
     Mono,
+    /// Embedded custom face: index into `PdfExportRequest::fonts_b64`.
+    /// Externally tagged on the wire: `{"custom": 0}`.
+    Custom(usize),
 }
 
 #[derive(Debug, Deserialize)]
@@ -118,6 +121,9 @@ pub struct PdfExportRequest {
     /// Base64-encoded PNG blobs referenced by `PageItem::Image.image_ref`.
     #[serde(default)]
     pub images_b64: Vec<String>,
+    /// Base64-encoded TTF/OTF blobs referenced by `FontKey::Custom`.
+    #[serde(default)]
+    pub fonts_b64: Vec<String>,
     /// Base64-encoded PDF blobs referenced by `PageItem::PdfPage.pdf_ref`.
     #[serde(default)]
     pub pdfs_b64: Vec<String>,

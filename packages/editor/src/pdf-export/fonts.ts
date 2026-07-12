@@ -22,10 +22,13 @@ export function resolveFont(style: CSSStyleDeclaration): ResolvedFont {
 
 export function familyToKey(fontFamily: string): FontKey {
   const f = fontFamily.toLowerCase();
-  if (/mono|consolas|menlo|cascadia|sfmono|courier/.test(f)) {
+  if (/mono|consolas|menlo|cascadia|sfmono|courier|fira code/.test(f)) {
     return 'mono';
   }
-  if (/newsreader|georgia|serif/.test(f) && !/sans-serif/.test(f)) {
+  if (
+    /newsreader|georgia|serif|playfair|merriweather|lora/.test(f) &&
+    !/sans-serif/.test(f)
+  ) {
     return 'serif';
   }
   return 'sans';

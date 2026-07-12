@@ -6,7 +6,9 @@ import {
 } from '@chenglou/pretext';
 import type { CanvasViewport } from '../../canvas-viewport';
 import type { DrawableCanvas } from '../../drawable-canvas';
+import { ensureDisplayFont, fetchFontTtfBase64 } from '../../google-fonts';
 import { parseCssColor } from '../../pdf-export/color';
+import type { FontKey } from '../../pdf-export/contract';
 import { familyToKey } from '../../pdf-export/fonts';
 import type { PdfHarvestContext } from '../../pdf-export/harvest';
 import { DrawableElement } from '../drawable-element';
@@ -48,6 +50,10 @@ export class TextElement extends DrawableElement {
   private _cachedLineHeight: number = 0;
 
   private _textarea: HTMLTextAreaElement | null = null;
+
+  // TTF bytes for the display font, staged by prepareForPdf so the synchronous
+  // drawToPdf pass can embed the real face; null falls back to familyToKey.
+  private _pdfFontB64: string | null = null;
 
   public constructor(
     uuid: string,
@@ -150,6 +156,9 @@ export class TextElement extends DrawableElement {
     textarea.style.height = `${this.box.height * sy}px`;
     textarea.style.fontSize = `${this._style.fontSize}px`;
     textarea.style.lineHeight = `${this._style.fontSize * 1.3}px`;
+    // Deduped internally; covers documents opened with existing text boxes,
+    // which the tool UI's font loading never sees.
+    ensureDisplayFont(this._style.fontFamily);
     textarea.style.fontFamily = this._style.fontFamily;
     textarea.style.color = this._style.color;
     textarea.dataset.editing = this._editing ? 'true' : 'false';
@@ -274,6 +283,12 @@ export class TextElement extends DrawableElement {
     }
   }
 
+  public override prepareForPdf(): Promise<void> {
+    return fetchFontTtfBase64(this._style.fontFamily).then((b64) => {
+      this._pdfFontB64 = b64;
+    });
+  }
+
   public override drawToPdf(ctx: PdfHarvestContext): void {
     if (!this._text || this._cachedLines.length === 0) {
       return;
@@ -281,7 +296,9 @@ export class TextElement extends DrawableElement {
     // Text renders at native font size regardless of element scale; in world
     // space the block therefore starts at `offset` with line height `lh`.
     const { rgb, opacity } = parseCssColor(this._style.color);
-    const font = familyToKey(this._style.fontFamily);
+    const font: FontKey = this._pdfFontB64
+      ? { custom: ctx.addFontBase64(this._pdfFontB64) }
+      : familyToKey(this._style.fontFamily);
     const fontSize = this._style.fontSize;
     const lh = this._cachedLineHeight;
     const ascent = fontSize * 0.8;

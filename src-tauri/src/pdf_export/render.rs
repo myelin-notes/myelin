@@ -25,7 +25,7 @@ const PX_PER_PT: f32 = 96.0 / 72.0;
 pub fn render(req: PdfExportRequest) -> Result<Vec<u8>, String> {
     let images = decode_images(&req.images_b64)?;
     let pdfs = decode_pdfs(&req.pdfs_b64)?;
-    let mut fonts = FontRegistry::new();
+    let mut fonts = FontRegistry::new(decode_fonts(&req.fonts_b64)?);
     let mut document = Document::new();
 
     match req.kind {
@@ -271,6 +271,13 @@ fn decode_images(images_b64: &[String]) -> Result<Vec<Image>, String> {
             let bytes = b64_decode(b)?;
             Image::from_png(bytes.into(), false).map_err(|e| format!("failed to decode PNG: {e}"))
         })
+        .collect()
+}
+
+fn decode_fonts(fonts_b64: &[String]) -> Result<Vec<krilla::Data>, String> {
+    fonts_b64
+        .iter()
+        .map(|b| Ok(b64_decode(b)?.into()))
         .collect()
 }
 
