@@ -4,16 +4,13 @@ import {
   layoutWithLines,
   prepareWithSegments,
 } from '@chenglou/pretext';
+import type { CanvasViewport } from '../../canvas-viewport';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import { parseCssColor } from '../../pdf-export/color';
 import { familyToKey } from '../../pdf-export/fonts';
 import type { PdfHarvestContext } from '../../pdf-export/harvest';
 import { DrawableElement } from '../drawable-element';
 import { ElementType } from '../element-type';
-import {
-  createTextEditOverlay,
-  type TextEditOverlayHandle,
-} from './edit-overlay';
 
 export interface TextStyle {
   color: string;
@@ -30,6 +27,14 @@ const DEFAULT_STYLE: TextStyle = {
 const DEFAULT_BOX_WIDTH = 200;
 const DEFAULT_BOX_HEIGHT = 80;
 
+/**
+ * A free-floating text box on the canvas. The text is a DOM overlay at all
+ * times — display and editing share one persistent textarea (like
+ * LatexElement's preview), so entering edit mode only toggles focus and
+ * editability instead of swapping render paths. draw2D is a no-op; the
+ * pretext layout in `_cachedLines` remains the source for PDF export,
+ * thumbnails, and the bounding box.
+ */
 export class TextElement extends DrawableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
   private _text: string = '';
@@ -37,11 +42,12 @@ export class TextElement extends DrawableElement {
   private _boxWidth: number = DEFAULT_BOX_WIDTH;
   private _boxHeight: number = DEFAULT_BOX_HEIGHT;
   private _editing: boolean = false;
-  private _editOverlay: TextEditOverlayHandle | null = null;
   private _oldText: string = '';
   private _canvas: DrawableCanvas | null = null;
   private _cachedLines: LayoutLine[] = [];
   private _cachedLineHeight: number = 0;
+
+  private _textarea: HTMLTextAreaElement | null = null;
 
   public constructor(
     uuid: string,
@@ -114,54 +120,99 @@ export class TextElement extends DrawableElement {
     return true;
   }
 
+  public override get lowersCanvasWhileEditing(): boolean {
+    return true;
+  }
+
+  public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
+    const textarea = this._textarea ?? this.createDom(host);
+
+    // Remote/undo edits land here; skip while editing so the user's
+    // in-progress typing isn't clobbered.
+    if (!this._editing && textarea.value !== this._text) {
+      textarea.value = this._text;
+    }
+
+    const sx = Math.abs(this._scale.x) || 1;
+    const sy = Math.abs(this._scale.y) || 1;
+    const screen = viewport.worldToScreen({
+      x: this.offset.x,
+      y: this.offset.y,
+    });
+
+    // Text renders at native font size while the element's scale widens the
+    // wrap box (matching the old canvas draw, which counter-scaled glyphs),
+    // so only the viewport zoom goes into the transform.
+    textarea.style.left = `${screen.x}px`;
+    textarea.style.top = `${screen.y}px`;
+    textarea.style.transform = `scale(${viewport.zoom})`;
+    textarea.style.width = `${this._boxWidth * sx}px`;
+    textarea.style.height = `${this.box.height * sy}px`;
+    textarea.style.fontSize = `${this._style.fontSize}px`;
+    textarea.style.lineHeight = `${this._style.fontSize * 1.3}px`;
+    textarea.style.fontFamily = this._style.fontFamily;
+    textarea.style.color = this._style.color;
+    textarea.dataset.editing = this._editing ? 'true' : 'false';
+  }
+
+  private createDom(host: HTMLElement): HTMLTextAreaElement {
+    const textarea = document.createElement('textarea');
+    textarea.className = 'canvas-text-block';
+    textarea.dataset.elementUuid = this.uuid;
+    textarea.value = this._text;
+    textarea.readOnly = true;
+    // Not tab-reachable while idle; edit mode focuses it programmatically.
+    textarea.tabIndex = -1;
+    textarea.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        this._canvas?.exitElementEdit();
+      }
+    });
+    host.appendChild(textarea);
+    this._textarea = textarea;
+    return textarea;
+  }
+
+  public override disposeDOM(): void {
+    this._textarea?.remove();
+    this._textarea = null;
+  }
+
   public override enterEditMode(canvas: DrawableCanvas): HTMLElement | null {
     this._editing = true;
     this._oldText = this._text;
     this._canvas = canvas;
 
-    const zoom = canvas.viewport.zoom;
-    const box = this.boundingBox;
-    const screenPos = canvas.viewport.worldToScreen({
-      x: box.x,
-      y: box.y,
-    });
-
-    const overlay = createTextEditOverlay({
-      initialText: this._text,
-      rect: {
-        left: screenPos.x,
-        top: screenPos.y,
-        width: box.width * zoom,
-        height: box.height * zoom,
-      },
-      textStyle: this._style,
-      zoom,
-      onSubmit: () => {
-        canvas.exitElementEdit();
-      },
-    });
-
-    overlay.focus();
-
-    this._editOverlay = overlay;
-    return overlay.root;
+    // The canvas syncs DOM right before this call, so the textarea exists;
+    // that sync ran with _editing still false, so flip pointer events here.
+    const textarea = this._textarea;
+    if (!textarea) {
+      return null;
+    }
+    textarea.dataset.editing = 'true';
+    textarea.readOnly = false;
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    return textarea;
   }
 
   public override exitEditMode(): void {
     this._editing = false;
 
-    const overlay = this._editOverlay;
+    const textarea = this._textarea;
     const canvas = this._canvas;
-    this._editOverlay = null;
     this._canvas = null;
 
-    if (!overlay || !canvas) {
+    if (!textarea || !canvas) {
       return;
     }
 
-    const newText = overlay.getValue();
-    overlay.dispose();
+    textarea.readOnly = true;
+    textarea.dataset.editing = 'false';
+    textarea.blur();
 
+    const newText = textarea.value;
     if (!newText.trim()) {
       canvas.removeElement(this);
       return;
@@ -194,22 +245,22 @@ export class TextElement extends DrawableElement {
       fontSize: this._style.fontSize,
       fontFamily: this._style.fontFamily,
     });
-
-    const overlay = this._editOverlay;
-    if (overlay && this._canvas) {
-      const zoom = this._canvas.viewport.zoom;
-      overlay.setTextStyle(this._style, zoom);
-    }
   }
 
-  protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
-    if (!this._text || this._editing) {
+  // The DOM overlay paints the text; nothing to draw on the 2D canvas.
+  protected draw2D(): void {}
+
+  public override drawThumbnail(
+    ctx: CanvasRenderingContext2D,
+    _deltaTime: number,
+  ): void {
+    if (!this._text) {
       return;
     }
     const sx = this._scale.x;
     const sy = this._scale.y;
 
-    // Counter the parent's scale so text renders at native font size
+    // Counter the caller's scale so text renders at native font size
     ctx.scale(1 / sx, 1 / sy);
 
     const fontSize = this._style.fontSize;
@@ -227,8 +278,8 @@ export class TextElement extends DrawableElement {
     if (!this._text || this._cachedLines.length === 0) {
       return;
     }
-    // draw2D counter-scales the element so text renders at native font size; in
-    // world space the block therefore starts at `offset` with line height `lh`.
+    // Text renders at native font size regardless of element scale; in world
+    // space the block therefore starts at `offset` with line height `lh`.
     const { rgb, opacity } = parseCssColor(this._style.color);
     const font = familyToKey(this._style.fontFamily);
     const fontSize = this._style.fontSize;

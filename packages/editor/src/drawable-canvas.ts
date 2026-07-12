@@ -692,6 +692,13 @@ export class DrawableCanvas {
       type: describeElementType(element.type),
       ...summarizeDrawableElements(this.elements),
     });
+    // DOM-backed elements can enter edit mode before their first render frame
+    // (click-to-create runs synchronously); sync now so enterEditMode has an
+    // up-to-date node to focus.
+    if (this._domOverlayHost) {
+      element.syncDOM(this.viewport, this._domOverlayHost);
+    }
+
     const pe = event instanceof PointerEvent ? event : undefined;
     const editDomRoot = element.enterEditMode(this, pe?.clientX, pe?.clientY);
     this._editDomRoot = editDomRoot;
