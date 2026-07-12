@@ -133,7 +133,13 @@ export function buildPdfElementRequest(
     pageMap.push(page.kind === 'pdf' ? page.originalIndex : 'blank');
   }
 
-  return { kind: 'pdfElement', pages: exportPages, pageMap, imagesB64, fontsB64 };
+  return {
+    kind: 'pdfElement',
+    pages: exportPages,
+    pageMap,
+    imagesB64,
+    fontsB64,
+  };
 }
 
 export function rectsIntersect(a: DOMRect, b: DOMRect): boolean {

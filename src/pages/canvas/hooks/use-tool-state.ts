@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Plus as PlusIcon } from 'lucide-react';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import {
   type ITool,
   setToolOption,
   setToolOptionValue,
   type ToolOption,
 } from '@myelin/editor/tools/tool';
-import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import {
   loadWheelToolIndices,
   saveWheelToolIndices,

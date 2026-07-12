@@ -26,10 +26,7 @@ import {
   pxToPt,
 } from '../pdf-export/coords';
 import { resolveFont } from '../pdf-export/fonts';
-import {
-  createFontTable,
-  type PdfHarvestContext,
-} from '../pdf-export/harvest';
+import { createFontTable, type PdfHarvestContext } from '../pdf-export/harvest';
 
 const logger = new Logger('PageFramePdfExport');
 
