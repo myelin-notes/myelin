@@ -733,6 +733,22 @@ export class DrawableCanvas {
     // Click outside editing DOM exits edit mode. Canvas-interactive edit modes
     // handle canvas clicks through the active tool so resize handles still work.
     const handlePointerDown = (e: PointerEvent) => {
+      // A pointerdown on a resize handle of a DOM-edited element (e.g. a text
+      // box) exits edit mode AND begins the resize in the same gesture, rather
+      // than only dropping out of edit mode and forcing a second click on the
+      // handle. Canvas-interactive edit modes already route handle clicks
+      // through the tool; this covers modes where a DOM editor root has taken
+      // over canvas pointer events.
+      if (
+        editDomRoot &&
+        !editDomRoot.contains(e.target as Node) &&
+        element.isSelected &&
+        element.hitHandle(this.viewport.getPoint(e), this.viewport.zoom)
+      ) {
+        this.exitElementEdit();
+        this.state.change(InteractState.UsingTool, e);
+        return;
+      }
       if (!editDomRoot) {
         if (e.target === this.canvas) {
           return;
@@ -750,9 +766,30 @@ export class DrawableCanvas {
     };
     document.addEventListener('pointerdown', handlePointerDown);
 
+    // While a DOM editor covers the canvas, the tool's hover() no longer runs
+    // (the canvas has pointer-events: none), so the resize cursor over a handle
+    // is lost. Mirror it here. `cursor` is inherited, so setting it on the
+    // canvas host makes the background canvas under the handle show it, while
+    // the textarea keeps its own text cursor inside the box.
+    const cursorHost = this.canvas.parentElement;
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!editDomRoot || !cursorHost) {
+        return;
+      }
+      const handle = element.isSelected
+        ? element.hitHandle(this.viewport.getPoint(e), this.viewport.zoom)
+        : null;
+      cursorHost.style.cursor = handle ? handle.cursor : '';
+    };
+    document.addEventListener('pointermove', handlePointerMove);
+
     this._cleanupEditListeners = () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointermove', handlePointerMove);
+      if (cursorHost) {
+        cursorHost.style.cursor = '';
+      }
     };
   }
 
