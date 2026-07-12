@@ -16,6 +16,8 @@ export async function createBlankCanvasFile(
 ): Promise<VFSNodeId> {
   const ydoc = new YDocManager();
   ydoc.createElementMap(ElementType.PAGE_FRAME, crypto.randomUUID(), {
+    offsetX: 425,
+    offsetY: 110,
     scaleX: 1,
     scaleY: 1,
     zOrder: 0,

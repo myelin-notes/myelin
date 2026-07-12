@@ -37,6 +37,8 @@ describe('createBlankCanvasFile', () => {
     expect(ydoc.elements.length).toBe(1);
     expect(Object.fromEntries(ydoc.elements.get(0).entries())).toMatchObject({
       type: ElementType.PAGE_FRAME,
+      offsetX: 0,
+      offsetY: 0,
       scaleX: 1,
       scaleY: 1,
       zOrder: 0,
@@ -45,8 +47,6 @@ describe('createBlankCanvasFile', () => {
       pageHeight: PAGE_HEIGHT,
       pageLayout: 'vertical',
     });
-    expect(ydoc.elements.get(0).has('offsetX')).toBe(false);
-    expect(ydoc.elements.get(0).has('offsetY')).toBe(false);
   });
 
   it('uses an initial page-frame name when one is provided', async () => {
