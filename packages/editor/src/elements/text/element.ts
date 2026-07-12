@@ -227,6 +227,9 @@ export class TextElement extends DrawableElement {
 
     textarea.readOnly = true;
     textarea.dataset.editing = 'false';
+    // Collapse the selection; a blurred textarea otherwise keeps painting its
+    // (greyed-out) highlight over the text.
+    textarea.setSelectionRange(0, 0);
     textarea.blur();
 
     const newText = textarea.value;
