@@ -143,6 +143,9 @@ export class TextTool implements ITool {
     });
     el.select();
     canvas.enterElementEdit(el);
+    // Placing a box is a one-shot action; hand control back to the select tool
+    // so the user isn't stuck creating more boxes after this one.
+    canvas.switchToTool('select');
   }
 
   interrupt(_canvas: DrawableCanvas): void {

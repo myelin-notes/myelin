@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { AllSelection } from 'prosemirror-state';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ElementType } from '@myelin/editor/elements/element-type';
@@ -75,6 +75,17 @@ export function useCanvasEngine({
     canvasTools,
   });
   const canvasViewState = useDrawableCanvasViewState(drawableCanvasRef.current);
+
+  // Keep the toolbar selection in sync when a tool hands control back to
+  // another (e.g. the text tool reverting to select after placing a box).
+  const drawableCanvas = drawableCanvasRef.current;
+  useEffect(() => {
+    if (!drawableCanvas) {
+      return;
+    }
+    drawableCanvas.setOnToolSwitched(setSelectedToolIndex);
+    return () => drawableCanvas.setOnToolSwitched(() => {});
+  }, [drawableCanvas, setSelectedToolIndex]);
   const saving = useCanvasSessionSaving({
     noteId: id,
     noteSession: sessionController.noteSession,
@@ -90,12 +101,9 @@ export function useCanvasEngine({
     () =>
       canvasTools.map((tool, index) => ({
         action: TOOL_ACTIONS[tool.id],
-        onDown: () => {
-          drawableCanvasRef.current?.switchTool(index);
-          setSelectedToolIndex(index);
-        },
+        onDown: () => drawableCanvasRef.current?.switchTool(index),
       })),
-    [canvasTools, drawableCanvasRef, setSelectedToolIndex],
+    [canvasTools, drawableCanvasRef],
   );
 
   const keyBindings = useMemo<ActionBinding[]>(

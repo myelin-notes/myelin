@@ -27,9 +27,9 @@ import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
-import type { ITool } from './tools/tool';
-import { StateMachine } from './utils/state-machine';
+import type { ITool, ToolId } from './tools/tool';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
+import { StateMachine } from './utils/state-machine';
 
 export type { Vector2 } from './geometry';
 
@@ -172,6 +172,7 @@ export class DrawableCanvas {
   ) => void;
 
   private onElementEdit?: (element: DrawableElement | null) => void;
+  private onToolSwitched?: (index: number) => void;
 
   // Event handlers (stored for cleanup in destroy())
   private _handlePointerDown!: (evt: PointerEvent) => void;
@@ -573,6 +574,10 @@ export class DrawableCanvas {
 
   public setOnElementEdit(callback: (element: DrawableElement | null) => void) {
     this.onElementEdit = callback;
+  }
+
+  public setOnToolSwitched(callback: (index: number) => void) {
+    this.onToolSwitched = callback;
   }
 
   public setOnPlacementEnd(callback: (() => void) | undefined) {
@@ -1235,6 +1240,18 @@ export class DrawableCanvas {
     this.toolSelected = this.tools[to];
     this._toolCursor = 'default';
     this.updateCursor();
+    // Single sync point: every tool switch notifies React so the toolbar
+    // selection follows, whether triggered by the UI, a keybind, or a tool
+    // handing control back (e.g. the text tool reverting to select).
+    this.onToolSwitched?.(to);
+  }
+
+  /** Switch to a tool by id, for tools that hand control back by name. */
+  public switchToTool(id: ToolId) {
+    const index = this.tools.findIndex((t) => t.id === id);
+    if (index >= 0) {
+      this.switchTool(index);
+    }
   }
 
   public setSpaceDown(value: boolean) {
