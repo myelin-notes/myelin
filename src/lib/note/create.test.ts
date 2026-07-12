@@ -15,7 +15,7 @@ describe('createBlankCanvasFile', () => {
     );
 
     const id = await createBlankCanvasFile(
-      { createFile } as Pick<Repository, 'createFile'>,
+      createFile,
       'Untitled Canvas',
       'folder-1',
     );
@@ -54,7 +54,7 @@ describe('createBlankCanvasFile', () => {
     );
 
     await createBlankCanvasFile(
-      { createFile } as Pick<Repository, 'createFile'>,
+      createFile,
       'Alpha Note',
       null,
       'Details',

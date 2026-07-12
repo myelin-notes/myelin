@@ -53,7 +53,11 @@ export function HomePage() {
         strings.library.createNew.untitledCanvas,
         null,
       );
-      const id = await createBlankCanvasFile(repository, name, null);
+      const id = await createBlankCanvasFile(
+        repository.createFile,
+        name,
+        null,
+      );
       tabController.openTab({ type: 'canvas', id }, name);
       trackEvent('note_created', { file_type: 'mcanvas' });
     } catch (error) {

@@ -8,10 +8,8 @@ import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { Repository, VFSNodeId } from '@/lib/sync';
 import { UserPrefs } from '@/lib/user-prefs';
 
-type BlankCanvasRepository = Pick<Repository, 'createFile'>;
-
 export async function createBlankCanvasFile(
-  repository: BlankCanvasRepository,
+  createFile: Repository['createFile'],
   name: string,
   parentId: VFSNodeId | null,
   initialPageFrameName?: string | null,
@@ -28,5 +26,5 @@ export async function createBlankCanvasFile(
     pageHeight: PAGE_HEIGHT,
     pageLayout: UserPrefs.get('defaultPageLayout'),
   });
-  return repository.createFile(name, 'mcanvas', parentId, ydoc.encodeState());
+  return createFile(name, 'mcanvas', parentId, ydoc.encodeState());
 }

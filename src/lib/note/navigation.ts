@@ -69,7 +69,7 @@ export async function openNoteLink(
     const currentNode = await repository.getNode(currentNoteId);
     const parentId = currentNode?.type === 'file' ? currentNode.parentId : null;
     noteId = await createBlankCanvasFile(
-      repository,
+      repository.createFile,
       noteTitle,
       parentId,
       parsedTarget?.pageFrameName,

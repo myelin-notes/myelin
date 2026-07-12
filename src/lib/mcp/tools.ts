@@ -945,7 +945,7 @@ export class McpToolService {
       createdId =
         markdown === undefined
           ? await createBlankCanvasFile(
-              this.options.repository,
+              this.options.repository.createFile,
               title,
               parentId,
             )

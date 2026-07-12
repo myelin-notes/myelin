@@ -274,7 +274,7 @@ export function SidebarTree({
       const name = await repository.getUniqueFileName(title, ROOT_KEY);
       const id =
         type === 'mcanvas'
-          ? await createBlankCanvasFile(repository, name, ROOT_KEY)
+          ? await createBlankCanvasFile(repository.createFile, name, ROOT_KEY)
           : await repository.createFile(name, type, ROOT_KEY);
       setRenamingId(id);
       await loadFolder(ROOT_KEY);
