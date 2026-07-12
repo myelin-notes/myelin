@@ -48,6 +48,21 @@ function normalize(family: string): string {
 }
 
 /**
+ * Filesystem-safe cache key for a family. `fontFamily` is read from the shared
+ * Y.Map without validation, so a malformed document could carry `/`, `\`, `..`,
+ * `:` etc.; collapsing everything outside `[a-z0-9]` to a single `-` keeps the
+ * key inside the `fonts/` keyspace and valid on Windows. Google family names
+ * are ASCII alphanumerics and spaces, so real families stay distinct.
+ */
+function fontCacheKey(family: string): string {
+  return (
+    normalize(family)
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'font'
+  );
+}
+
+/**
  * TTF bytes for a family at regular weight, or `null` when the fetch fails.
  * Failures aren't cached, so a later call retries (e.g. back online).
  */
@@ -120,7 +135,7 @@ export function fetchFontTtfBase64(family: string): Promise<string | null> {
 
 async function loadTtf(family: string): Promise<Uint8Array | null> {
   const platform = getPlatform();
-  const cachePath = `fonts/${normalize(family).replace(/\s+/g, '-')}-400.ttf`;
+  const cachePath = `fonts/${fontCacheKey(family)}-400.ttf`;
 
   const cachedUrl = await platform.artifactCache.getUrl(cachePath);
   if (cachedUrl) {
