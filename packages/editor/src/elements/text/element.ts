@@ -172,6 +172,14 @@ export class TextElement extends DrawableElement {
     textarea.readOnly = true;
     // Not tab-reachable while idle; edit mode focuses it programmatically.
     textarea.tabIndex = -1;
+    // Grow the box to fit as the user types. Without this the fixed-height
+    // textarea would scroll its content (overflow: hidden) instead of the box
+    // extending downwards. recomputeBox() runs off _text, so update it first.
+    textarea.addEventListener('input', () => {
+      this._text = textarea.value;
+      this.updateBounds();
+      this.onTransformChanged?.();
+    });
     textarea.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
