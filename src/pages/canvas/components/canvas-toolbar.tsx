@@ -196,8 +196,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-              className="absolute top-0 left-full ml-2"
-              style={{ paddingTop: optionsPanelOffset }}
+              className="absolute left-full ml-2"
+              style={{ top: optionsPanelOffset }}
             >
               <ToolOptionsPanel options={activeOptions} />
             </motion.div>
