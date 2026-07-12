@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Plus as PlusIcon } from 'lucide-react';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import {
   type ITool,
   setToolOption,
   setToolOptionValue,
   type ToolOption,
 } from '@myelin/editor/tools/tool';
-import { loadGoogleFont } from '@/components/tool-options-panel';
 import {
   loadWheelToolIndices,
   saveWheelToolIndices,
@@ -81,7 +81,6 @@ function toolToWheelItem(
   getCanvas: () => DrawableCanvas | null,
   tool: ITool,
   toolIndex: number,
-  setSelectedToolIndex: (i: number) => void,
   applyRef: {
     current: (tool: ITool, option: ToolOption, value: unknown) => void;
   },
@@ -124,10 +123,7 @@ function toolToWheelItem(
   return {
     label: tool.label,
     icon: tool.icon,
-    command: () => {
-      getCanvas()?.switchTool(toolIndex);
-      setSelectedToolIndex(toolIndex);
-    },
+    command: () => getCanvas()?.switchTool(toolIndex),
     children,
   };
 }
@@ -153,7 +149,7 @@ export function useToolState(
             continue;
           }
           if (key === 'fontFamily' && typeof value === 'string') {
-            loadGoogleFont(value);
+            ensureDisplayFont(value);
           }
         }
       }
@@ -190,7 +186,6 @@ export function useToolState(
           () => drawableCanvasRef.current,
           tool,
           index,
-          setSelectedToolIndex,
           applyOptionRef,
           strings,
           customColors,
@@ -239,7 +234,6 @@ export function useToolState(
   const selectTool = useCallback(
     (index: number) => {
       drawableCanvasRef.current?.switchTool(index);
-      setSelectedToolIndex(index);
       setShelfOpen(false);
       const toolHasOptions =
         (canvasTools[index]?.getOptions?.()?.length ?? 0) > 0;

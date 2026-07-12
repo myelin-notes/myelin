@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
+import { createBlankCanvasFile } from '@/lib/note/create';
 import { openNote } from '@/lib/note/navigation';
 import {
   useRepository,
@@ -52,7 +53,7 @@ export function HomePage() {
         strings.library.createNew.untitledCanvas,
         null,
       );
-      const id = await repository.createFile(name, 'mcanvas', null);
+      const id = await createBlankCanvasFile(repository, name, null);
       tabController.openTab({ type: 'canvas', id }, name);
       trackEvent('note_created', { file_type: 'mcanvas' });
     } catch (error) {

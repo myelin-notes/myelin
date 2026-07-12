@@ -27,18 +27,34 @@ type InstanceKey = (u8, bool, i32, i32);
 pub struct FontRegistry {
     data: HashMap<FaceKey, Data>,
     cache: HashMap<InstanceKey, Font>,
+    /// Request-supplied faces referenced by `FontKey::Custom`.
+    custom_data: Vec<Data>,
+    custom_cache: HashMap<usize, Font>,
 }
 
 impl FontRegistry {
-    pub fn new() -> Self {
+    pub fn new(custom_data: Vec<Data>) -> Self {
         Self {
             data: HashMap::new(),
             cache: HashMap::new(),
+            custom_data,
+            custom_cache: HashMap::new(),
         }
     }
 
     pub fn get(&mut self, key: FontKey, italic: bool, weight: f32, opsz: f32) -> Option<Font> {
-        let k = key as u8;
+        if let FontKey::Custom(index) = key {
+            // Custom faces are static instances (weight/style baked in when the
+            // frontend fetched them), so the variation axes don't apply.
+            if let Some(font) = self.custom_cache.get(&index) {
+                return Some(font.clone());
+            }
+            let font = Font::new(self.custom_data.get(index)?.clone(), 0)?;
+            self.custom_cache.insert(index, font.clone());
+            return Some(font);
+        }
+
+        let k = face_index(key);
         // Mono has no italic face; fall back to upright.
         let italic = italic && !matches!(key, FontKey::Mono);
         let ik: InstanceKey = (k, italic, weight.round() as i32, opsz.round() as i32);
@@ -59,6 +75,15 @@ impl FontRegistry {
     }
 }
 
+fn face_index(key: FontKey) -> u8 {
+    match key {
+        FontKey::Sans => 0,
+        FontKey::Serif => 1,
+        FontKey::Mono => 2,
+        FontKey::Custom(_) => unreachable!("custom fonts bypass the bundled-face cache"),
+    }
+}
+
 fn face_bytes(key: FontKey, italic: bool) -> &'static [u8] {
     match (key, italic) {
         (FontKey::Sans, false) => HANKEN,
@@ -66,5 +91,6 @@ fn face_bytes(key: FontKey, italic: bool) -> &'static [u8] {
         (FontKey::Serif, false) => NEWSREADER,
         (FontKey::Serif, true) => NEWSREADER_ITALIC,
         (FontKey::Mono, _) => MONO,
+        (FontKey::Custom(_), _) => unreachable!("custom fonts bypass the bundled-face cache"),
     }
 }

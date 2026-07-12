@@ -194,6 +194,7 @@ function makePdfCtx(): { ctx: PdfHarvestContext; items: PageItem[] } {
     ptPerWorldY: 2,
     push: (item) => items.push(item),
     addImageBase64: vi.fn(() => 0),
+    addFontBase64: vi.fn(() => 0),
   };
   return { ctx, items };
 }

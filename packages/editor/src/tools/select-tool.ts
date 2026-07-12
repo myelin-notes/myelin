@@ -3,6 +3,7 @@ import {
   Lasso as LassoIcon,
   MousePointer2 as PointerIcon,
 } from 'lucide-react';
+import { isApplePlatform } from '@myelin/shared/os';
 import { getCanvasPalette } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type {
@@ -13,8 +14,6 @@ import { ElementType } from '../elements/element-type';
 import type { MessageGetter } from '../i18n';
 import { CollisionHelper } from '../utils/collision-helper';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
-
-const HANDLE_HIT_RADIUS = 10;
 
 enum SelectMode {
   None,
@@ -111,13 +110,18 @@ export class SelectTool implements ITool {
     const point = canvas.viewport.getPoint(event);
     this.startPoint = point;
 
+    // Modifier+click toggles a single element in/out of the selection without
+    // clearing the rest. Cmd on macOS / Ctrl on Windows, matching the app-wide
+    // shortcut convention (and avoiding the macOS Ctrl+click right-click gesture).
+    const additive = isApplePlatform ? event.metaKey : event.ctrlKey;
+
     // 1. Check handles on selected elements first
     for (let i = canvas.elements.length - 1; i >= 0; i--) {
       const e = canvas.elements[i];
       if (!e.isSelected) {
         continue;
       }
-      const handle = this.hitHandle(e, point, canvas.viewport.zoom);
+      const handle = e.hitHandle(point, canvas.viewport.zoom);
       if (handle) {
         this.mode = SelectMode.Scaling;
         this.scalingElement = e;
@@ -138,7 +142,7 @@ export class SelectTool implements ITool {
     const isDoubleClick =
       now - this.lastClickTime < 400 && dx * dx + dy * dy < 25;
 
-    if (isDoubleClick && canvas.enterEditAtPoint(point, event)) {
+    if (isDoubleClick && !additive && canvas.enterEditAtPoint(point, event)) {
       this.lastClickTime = 0;
       return;
     }
@@ -150,6 +154,22 @@ export class SelectTool implements ITool {
       if (CollisionHelper.inBox(point, e.boundingBox)) {
         hits.push(e);
       }
+    }
+
+    if (hits.length > 0 && additive) {
+      // Toggle the topmost hit in/out of the selection (no cycle-through).
+      const pick = hits[0];
+      if (pick.isSelected) {
+        pick.unselect();
+      } else {
+        pick.select();
+        this.mode = SelectMode.Moving;
+        this.lastPoint = point;
+        this.totalDelta = { x: 0, y: 0 };
+        this.movingElements = canvas.elements.filter((e) => e.isSelected);
+      }
+      this.lastCycledElement = null;
+      return;
     }
 
     if (hits.length > 0) {
@@ -210,6 +230,11 @@ export class SelectTool implements ITool {
       ) {
         this.clickToEditCandidate = pick;
       }
+      return;
+    }
+
+    // Modifier+click on empty space preserves the current selection.
+    if (additive) {
       return;
     }
 
@@ -391,7 +416,7 @@ export class SelectTool implements ITool {
       if (!e.isSelected) {
         continue;
       }
-      const handle = this.hitHandle(e, position, canvas.viewport.zoom);
+      const handle = e.hitHandle(position, canvas.viewport.zoom);
       if (handle) {
         canvas.setCursor(handle.cursor);
         return;
@@ -437,23 +462,6 @@ export class SelectTool implements ITool {
     }
     pick.select();
     this.lastCycledElement = pick;
-  }
-
-  private hitHandle(
-    element: DrawableElement,
-    point: Vector2,
-    zoom: number,
-  ): ResizeHandle | null {
-    const handles = element.getHandles();
-    const hitRadius = HANDLE_HIT_RADIUS / zoom;
-    for (const h of handles) {
-      const dx = point.x - h.position.x;
-      const dy = point.y - h.position.y;
-      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
-        return h;
-      }
-    }
-    return null;
   }
 
   public getOptions(): ToolOption[] {

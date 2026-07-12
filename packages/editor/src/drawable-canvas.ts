@@ -27,7 +27,7 @@ import { HighlighterTool } from './tools/highlighter-tool';
 import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
-import type { ITool } from './tools/tool';
+import type { ITool, ToolId } from './tools/tool';
 import { CollisionHelper } from './utils/collision-helper';
 import { StateMachine } from './utils/state-machine';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
@@ -184,6 +184,7 @@ export class DrawableCanvas {
   ) => void;
 
   private onElementEdit?: (element: DrawableElement | null) => void;
+  private onToolSwitched?: (index: number) => void;
 
   // Event handlers (stored for cleanup in destroy())
   private _handlePointerDown!: (evt: PointerEvent) => void;
@@ -587,6 +588,10 @@ export class DrawableCanvas {
     this.onElementEdit = callback;
   }
 
+  public setOnToolSwitched(callback: (index: number) => void) {
+    this.onToolSwitched = callback;
+  }
+
   public setOnPlacementEnd(callback: (() => void) | undefined) {
     this._placement.setOnPlacementEnd(callback);
   }
@@ -699,6 +704,13 @@ export class DrawableCanvas {
       type: describeElementType(element.type),
       ...summarizeDrawableElements(this.elements),
     });
+    // DOM-backed elements can enter edit mode before their first render frame
+    // (click-to-create runs synchronously); sync now so enterEditMode has an
+    // up-to-date node to focus.
+    if (this._domOverlayHost) {
+      element.syncDOM(this.viewport, this._domOverlayHost);
+    }
+
     const pe = event instanceof PointerEvent ? event : undefined;
     const editDomRoot = element.enterEditMode(this, pe?.clientX, pe?.clientY);
     this._editDomRoot = editDomRoot;
@@ -733,6 +745,22 @@ export class DrawableCanvas {
     // Click outside editing DOM exits edit mode. Canvas-interactive edit modes
     // handle canvas clicks through the active tool so resize handles still work.
     const handlePointerDown = (e: PointerEvent) => {
+      // A pointerdown on a resize handle of a DOM-edited element (e.g. a text
+      // box) exits edit mode AND begins the resize in the same gesture, rather
+      // than only dropping out of edit mode and forcing a second click on the
+      // handle. Canvas-interactive edit modes already route handle clicks
+      // through the tool; this covers modes where a DOM editor root has taken
+      // over canvas pointer events.
+      if (
+        editDomRoot &&
+        !editDomRoot.contains(e.target as Node) &&
+        element.isSelected &&
+        element.hitHandle(this.viewport.getPoint(e), this.viewport.zoom)
+      ) {
+        this.exitElementEdit();
+        this.state.change(InteractState.UsingTool, e);
+        return;
+      }
       if (!editDomRoot) {
         if (e.target === this.canvas) {
           return;
@@ -750,9 +778,30 @@ export class DrawableCanvas {
     };
     document.addEventListener('pointerdown', handlePointerDown);
 
+    // While a DOM editor covers the canvas, the tool's hover() no longer runs
+    // (the canvas has pointer-events: none), so the resize cursor over a handle
+    // is lost. Mirror it here. `cursor` is inherited, so setting it on the
+    // canvas host makes the background canvas under the handle show it, while
+    // the textarea keeps its own text cursor inside the box.
+    const cursorHost = this.canvas.parentElement;
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!editDomRoot || !cursorHost) {
+        return;
+      }
+      const handle = element.isSelected
+        ? element.hitHandle(this.viewport.getPoint(e), this.viewport.zoom)
+        : null;
+      cursorHost.style.cursor = handle ? handle.cursor : '';
+    };
+    document.addEventListener('pointermove', handlePointerMove);
+
     this._cleanupEditListeners = () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointermove', handlePointerMove);
+      if (cursorHost) {
+        cursorHost.style.cursor = '';
+      }
     };
   }
 
@@ -1301,6 +1350,18 @@ export class DrawableCanvas {
     this.toolSelected = this.tools[to];
     this._toolCursor = 'default';
     this.updateCursor();
+    // Single sync point: every tool switch notifies React so the toolbar
+    // selection follows, whether triggered by the UI, a keybind, or a tool
+    // handing control back (e.g. the text tool reverting to select).
+    this.onToolSwitched?.(to);
+  }
+
+  /** Switch to a tool by id, for tools that hand control back by name. */
+  public switchToTool(id: ToolId) {
+    const index = this.tools.findIndex((t) => t.id === id);
+    if (index >= 0) {
+      this.switchTool(index);
+    }
   }
 
   public setSpaceDown(value: boolean) {

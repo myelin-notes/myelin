@@ -169,7 +169,6 @@ function CanvasViewInner({
 
   const engine = useCanvasEngine({
     id,
-    initialPageFrameName: targetPageFrameName,
     thumbnailRootRef,
     canvasRef,
     bgCanvasRef,

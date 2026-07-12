@@ -26,7 +26,7 @@ import {
   pxToPt,
 } from '../pdf-export/coords';
 import { resolveFont } from '../pdf-export/fonts';
-import type { PdfHarvestContext } from '../pdf-export/harvest';
+import { createFontTable, type PdfHarvestContext } from '../pdf-export/harvest';
 
 const logger = new Logger('PageFramePdfExport');
 
@@ -54,6 +54,8 @@ const TABLE_BORDER_GRAY: [number, number, number] = [210, 214, 218];
 interface Harvester {
   pages: ExportPage[];
   imagesB64: string[];
+  fontsB64: string[];
+  addFontBase64: (b64: string) => number;
   geom: PageGeometry;
   originX: number;
   originY: number;
@@ -80,9 +82,12 @@ export async function harvestPageFramePdf(
       items: [],
     }));
 
+    const fontsB64: string[] = [];
     const h: Harvester = {
       pages,
       imagesB64: [],
+      fontsB64,
+      addFontBase64: createFontTable(fontsB64),
       geom: {
         pageWidth: source.pageWidth,
         pageHeight: source.pageHeight,
@@ -107,7 +112,12 @@ export async function harvestPageFramePdf(
     }
 
     return {
-      request: { kind: 'pageframe', pages, imagesB64: h.imagesB64 },
+      request: {
+        kind: 'pageframe',
+        pages,
+        imagesB64: h.imagesB64,
+        fontsB64: h.fontsB64,
+      },
       warnings,
     };
   } finally {
@@ -531,6 +541,7 @@ function harvestOverlays(h: Harvester, source: PageFramePdfSource): void {
       }),
       push: (item) => h.pages[p].items.push(item),
       addImageBase64: (b64) => h.imagesB64.push(b64) - 1,
+      addFontBase64: h.addFontBase64,
     };
 
     for (const element of overlays) {

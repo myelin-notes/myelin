@@ -7,7 +7,12 @@
  * Keep field names in sync with the Rust serde structs (camelCase).
  */
 
-export type FontKey = 'sans' | 'serif' | 'mono';
+/**
+ * Bundled use-case font (`sans`/`serif`/`mono`) or an embedded custom face —
+ * `custom` indexes into {@link PdfExportRequest.fontsB64}. Matches the serde
+ * encoding of the Rust `FontKey` enum (externally tagged).
+ */
+export type FontKey = 'sans' | 'serif' | 'mono' | { custom: number };
 
 export type Rgb = [number, number, number];
 
@@ -90,6 +95,8 @@ export interface PdfExportRequest {
   pageMap?: PageRef[];
   /** Base64 PNG blobs referenced by image items. */
   imagesB64?: string[];
+  /** Base64 TTF/OTF blobs referenced by text items' `{ custom }` font refs. */
+  fontsB64?: string[];
   /** Base64 PDF blobs referenced by pdfPage items. */
   pdfsB64?: string[];
   /** Base64 original PDF bytes (pdfElement only). */

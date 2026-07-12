@@ -25,6 +25,11 @@ const SELECTION_PADDING = 4;
 const SELECTION_RADIUS = 4;
 const SELECTION_ANIM_SPEED = 8;
 
+// Screen-space radius (px) for grabbing a resize handle, divided by zoom to get
+// a world-space tolerance. Shared by every consumer of `hitHandle` so the grab
+// target stays identical wherever a resize can start.
+const HANDLE_HIT_RADIUS = 10;
+
 export const MIN_SCALE = 0.05;
 
 export enum ResizeHandles {
@@ -477,6 +482,19 @@ export abstract class DrawableElement {
       });
     }
     return result;
+  }
+
+  /** The resize handle under `point` (world space), or null if none. */
+  public hitHandle(point: Vector2, zoom: number): ResizeHandle | null {
+    const hitRadius = HANDLE_HIT_RADIUS / zoom;
+    for (const h of this.getHandles()) {
+      const dx = point.x - h.position.x;
+      const dy = point.y - h.position.y;
+      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+        return h;
+      }
+    }
+    return null;
   }
 
   /**
