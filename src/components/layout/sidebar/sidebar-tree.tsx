@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
+import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   type FileType,
   isRepositoryConfigStructurallyComplete,
@@ -271,7 +272,10 @@ export function SidebarTree({
   const startNewFile = useCallback(
     async (title: string, type: FileType) => {
       const name = await repository.getUniqueFileName(title, ROOT_KEY);
-      const id = await repository.createFile(name, type, ROOT_KEY);
+      const id =
+        type === 'mcanvas'
+          ? await createBlankCanvasFile(repository, name, ROOT_KEY)
+          : await repository.createFile(name, type, ROOT_KEY);
       setRenamingId(id);
       await loadFolder(ROOT_KEY);
       requestAnimationFrame(() => setRenamingId(null));

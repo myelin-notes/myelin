@@ -73,22 +73,31 @@ beforeEach(() => {
 });
 
 describe('renderCanvasThumbnail', () => {
-  it('returns null for empty input', async () => {
+  it('returns a blank thumbnail for empty input', async () => {
+    const { getScratchCanvasContext } = await import('./scratch-canvas');
+
     const result = await renderCanvasThumbnail(
       asElements([]),
       new DOMRect(0, 0, 100, 100),
       600,
     );
-    expect(result).toBeNull();
+
+    expect(result).toBeInstanceOf(Blob);
+    expect(getScratchCanvasContext).toHaveBeenCalledWith(160, 100);
+    expect(toBlob).toHaveBeenCalledWith({ type: 'image/png' });
   });
 
-  it('returns null for zero-size region', async () => {
+  it('returns a blob for zero-size region', async () => {
+    const { getScratchCanvasContext } = await import('./scratch-canvas');
+
     const result = await renderCanvasThumbnail(
       asElements([makeElement()]),
       new DOMRect(0, 0, 0, 0),
       600,
     );
-    expect(result).toBeNull();
+
+    expect(result).toBeInstanceOf(Blob);
+    expect(getScratchCanvasContext).toHaveBeenCalledWith(1, 1);
   });
 
   it('culls elements outside the region', async () => {
@@ -157,7 +166,7 @@ describe('renderCanvasThumbnail', () => {
     expect(getScratchCanvasContext).toHaveBeenLastCalledWith(320, 200);
   });
 
-  it('returns null when no element intersects the region', async () => {
+  it('returns a blank thumbnail when no element intersects the region', async () => {
     const offscreen = makeElement({
       boundingBox: new DOMRect(1000, 1000, 50, 50),
     });
@@ -168,8 +177,9 @@ describe('renderCanvasThumbnail', () => {
       600,
     );
 
-    expect(result).toBeNull();
+    expect(result).toBeInstanceOf(Blob);
     expect(offscreen.drawThumbnail).not.toHaveBeenCalled();
+    expect(toBlob).toHaveBeenCalledWith({ type: 'image/png' });
   });
 
   it('draws elements in order', async () => {

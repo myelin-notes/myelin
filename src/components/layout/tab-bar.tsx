@@ -21,6 +21,7 @@ import {
 import { trackEvent } from '@/lib/analytics';
 import { type Messages, useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
+import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   isMac,
   isWindows,
@@ -126,7 +127,7 @@ export const TabBar = memo(function TabBar({
           strings.library.createNew.untitledCanvas,
           null,
         );
-        const id = await repository.createFile(name, 'mcanvas', null);
+        const id = await createBlankCanvasFile(repository, name, null);
         controller.openTab({ type: 'canvas', id }, name, pane.id);
         trackEvent('note_created', { file_type: 'mcanvas' });
       } catch (error) {

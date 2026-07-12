@@ -28,8 +28,8 @@ import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
 import type { ITool, ToolId } from './tools/tool';
-import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 import { StateMachine } from './utils/state-machine';
+import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type { Vector2 } from './geometry';
 

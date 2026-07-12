@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { TabStateController } from '@/lib/tabs/controller';
 import { openNote, openNoteLink } from './navigation';
 
@@ -118,11 +119,18 @@ describe('note navigation', () => {
     });
 
     expect(repository.getNode).toHaveBeenCalledWith('current-note');
-    expect(repository.createFile).toHaveBeenCalledWith(
-      'Alpha Note',
-      'mcanvas',
-      'folder-1',
-    );
+    expect(repository.createFile).toHaveBeenCalledTimes(1);
+    const [name, fileType, parentId, bytes] =
+      repository.createFile.mock.calls[0];
+    expect({ name, fileType, parentId }).toEqual({
+      name: 'Alpha Note',
+      fileType: 'mcanvas',
+      parentId: 'folder-1',
+    });
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    const ydoc = YDocManager.fromUpdate(bytes);
+    expect(ydoc.elements.length).toBe(1);
+    expect(ydoc.elements.get(0).get('displayName')).toBe('Research Notes');
 
     const state = controller.getSnapshot();
     const pane = state.layout.type === 'pane' ? state.layout : null;

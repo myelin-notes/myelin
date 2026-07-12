@@ -3,6 +3,7 @@ import { trackEvent } from '@/lib/analytics';
 import type { FileType, Repository, VFSNodeId } from '@/lib/sync';
 import type { TabStateController } from '@/lib/tabs/controller';
 import type { TabTarget } from '@/lib/tabs/types';
+import { createBlankCanvasFile } from './create';
 
 export type NoteOpenSource =
   | 'explorer'
@@ -67,7 +68,12 @@ export async function openNoteLink(
   if (!noteId) {
     const currentNode = await repository.getNode(currentNoteId);
     const parentId = currentNode?.type === 'file' ? currentNode.parentId : null;
-    noteId = await repository.createFile(noteTitle, 'mcanvas', parentId);
+    noteId = await createBlankCanvasFile(
+      repository,
+      noteTitle,
+      parentId,
+      parsedTarget?.pageFrameName,
+    );
   }
 
   openNote(

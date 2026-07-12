@@ -12,7 +12,9 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
   () => ({
     drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
       return {
-        elements: [{ id: 'existing-element' }],
+        elements: [],
+        viewport: { screenToWorld: vi.fn() },
+        addElement: vi.fn(),
         setBackgroundCanvas: vi.fn(),
         setOverlayCanvas: vi.fn(),
         setDomOverlayHost: vi.fn(),
@@ -27,10 +29,6 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
 
 vi.mock('@myelin/editor/drawable-canvas', () => ({
   DrawableCanvas: drawableCanvasCtor,
-}));
-
-vi.mock('@myelin/editor/elements/page-frame-element', () => ({
-  PageFrameElement: class PageFrameElement {},
 }));
 
 vi.mock('@myelin/editor/page-frame/note-link/resolution', () => ({
@@ -85,6 +83,36 @@ afterEach(() => {
 });
 
 describe('CanvasSessionController', () => {
+  it('does not add elements when opening an empty canvas', async () => {
+    const session = createSession('note-1');
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn().mockResolvedValue(session),
+      getNode: vi.fn().mockResolvedValue({
+        type: 'file',
+        name: 'Empty Canvas',
+      }),
+      searchNodes: vi.fn(),
+    };
+    const controller = new CanvasSessionController(
+      repository as unknown as ControllerRepository,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: [] },
+    );
+
+    await controller.open('note-1');
+
+    const canvas = drawableCanvasCtor.mock.results[0]?.value;
+    expect(canvas.addElement).not.toHaveBeenCalled();
+    expect(session.save).not.toHaveBeenCalled();
+
+    await controller.dispose();
+  });
+
   it('opens the latest note without waiting for a stale open to finish', async () => {
     const noteAOpen = createDeferred<MockNoteSession>();
     const noteBOpen = createDeferred<MockNoteSession>();

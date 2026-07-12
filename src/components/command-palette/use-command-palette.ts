@@ -13,6 +13,7 @@ import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { type Action, type ActionBinding, keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
+import { createBlankCanvasFile } from '@/lib/note/create';
 import { useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
@@ -137,7 +138,7 @@ export function useCommandPalette(): {
         strings.library.createNew.untitledCanvas,
         null,
       );
-      const id = await repository.createFile(name, 'mcanvas', null);
+      const id = await createBlankCanvasFile(repository, name, null);
       tabController.openTab({ type: 'canvas', id }, name);
     } catch (error) {
       logger.error('Failed to create note from command palette', error);
