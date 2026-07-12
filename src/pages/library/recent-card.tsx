@@ -10,7 +10,9 @@ interface RecentCardProps {
   node: VFSFileNode;
   category: string;
   time: string;
-  onClick?: () => void;
+  /** Emphasizes the card (used for the first, most-recent item). */
+  featured?: boolean;
+  onClick: () => void;
   onChanged: () => void;
 }
 
@@ -18,6 +20,7 @@ export function RecentCard({
   node,
   category,
   time,
+  featured,
   onClick,
   onChanged,
 }: RecentCardProps) {
@@ -47,7 +50,7 @@ export function RecentCard({
               type="button"
               onClick={() => {
                 if (!renaming) {
-                  onClick?.();
+                  onClick();
                 }
               }}
               aria-label={
@@ -55,10 +58,30 @@ export function RecentCard({
                   ? undefined
                   : formatExplorerItemAccessibleName(node.name, node.tags)
               }
-              className="group relative flex aspect-[16/11] min-h-[188px] w-full cursor-pointer flex-col overflow-hidden rounded-xl bg-surface text-left ring-1 ring-border-subtle/70 transition-all duration-300 hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient sm:aspect-auto sm:h-[208px]"
+              className={cn(
+                'group relative flex aspect-[16/11] min-h-[188px] w-full cursor-pointer flex-col overflow-hidden rounded-xl text-left ring-1 ring-border-subtle/70 transition-all duration-300 hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient sm:aspect-auto sm:h-[208px]',
+                featured ? 'bg-card-active' : 'bg-surface',
+              )}
             />
           }
         >
+          {featured && (
+            <div className="pointer-events-none absolute top-0 right-0 z-10">
+              <svg
+                width="44"
+                height="44"
+                viewBox="0 0 44 44"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M0 0H44V44L22 33L0 22V0Z"
+                  className="fill-accent-green opacity-60"
+                />
+              </svg>
+            </div>
+          )}
+
           {/* Thumbnail region */}
           <div
             className="relative h-[52%] w-full shrink-0 overflow-hidden bg-surface/80"

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
 import { setLogErrorReporter, setLogSink } from '@myelin/shared/logger';
+import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
 import { I18nProvider } from '@/lib/i18n';
 import { flushLogs } from '@/lib/logger';
@@ -40,6 +41,7 @@ try {
     posthog.captureException(error, context);
   });
   initRustErrorReporting();
+  disableNativePinchZoom();
   trackEvent('app_opened');
 
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

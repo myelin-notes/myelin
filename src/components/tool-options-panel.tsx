@@ -114,7 +114,7 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-[24px]">
+    <div className="flex flex-col gap-3 rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md">
       {options.map((option) => {
         if (option.type === 'color') {
           return (

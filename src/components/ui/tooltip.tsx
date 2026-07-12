@@ -1,4 +1,5 @@
 import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/utils';
 
 function TooltipProvider({
@@ -14,8 +15,19 @@ function TooltipProvider({
   );
 }
 
-function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
+function Tooltip({ disabled, ...props }: TooltipPrimitive.Root.Props) {
+  // Base UI treats a stylus (pointerType 'pen') as mouse-like, so the first pen
+  // tap on a trigger opens the tooltip and swallows the click. Only enable
+  // tooltips where a real hover-capable pointer exists, so pen/touch taps click
+  // on the first try.
+  const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
+  return (
+    <TooltipPrimitive.Root
+      data-slot="tooltip"
+      disabled={disabled || !canHover}
+      {...props}
+    />
+  );
 }
 
 function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {

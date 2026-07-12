@@ -13,10 +13,11 @@ type EditModePanAxis = 'vertical' | 'horizontal';
  * calls `panBy()` here — deciding whether a pointerdown is a pan vs a tool
  * gesture is a scene-level concern, not a camera one.
  *
- * `editMode` is a hint set by DrawableCanvas when an element is being
- * inline-edited: it restricts wheel/trackpad pan to vertical by default,
- * and enables two-finger touch pan + pinch zoom (single-finger touch is
- * left alone so the contentEditable can place the cursor / select text).
+ * Two-finger touch pan + pinch zoom is always active. `editMode` is a hint
+ * set by DrawableCanvas when an element is being inline-edited: it restricts
+ * wheel/trackpad and two-finger pan to the edited element's page axis
+ * (single-finger touch is left alone so the contentEditable can place the
+ * cursor / select text).
  */
 export class CanvasViewport {
   private readonly canvas: HTMLCanvasElement;
@@ -40,9 +41,9 @@ export class CanvasViewport {
   private _contentBoundsProvider: (() => DOMRect | null) | null = null;
 
   /**
-   * When true, plain wheel/touch pan is restricted to the edit-mode axis,
-   * and two-finger touch gestures (pan + pinch zoom) are active. Toggled by
-   * DrawableCanvas on element edit enter/exit.
+   * When true, plain wheel/touch pan is restricted to the edit-mode axis.
+   * Two-finger pinch zoom is unaffected. Toggled by DrawableCanvas on element
+   * edit enter/exit.
    */
   public editMode: boolean = false;
   public editModePanAxis: EditModePanAxis = 'vertical';
@@ -94,13 +95,11 @@ export class CanvasViewport {
       return Math.hypot(dx, dy);
     };
 
-    // Two-finger touch in edit mode: pan + pinch zoom.
-    // Single-finger touch is left to the contentEditable for cursor
-    // placement / selection.
+    // Two-finger touch: pan + pinch zoom. Works on the free canvas and in
+    // edit mode alike. Single-finger touch is left alone — DrawableCanvas's
+    // pointer state machine pans the free canvas with one finger, and in edit
+    // mode the contentEditable uses it for cursor placement / selection.
     this._handleTouchStart = (evt) => {
-      if (!this.editMode) {
-        return;
-      }
       if (evt.touches.length >= 2) {
         const t0 = evt.touches[0];
         const t1 = evt.touches[1];
@@ -117,9 +116,6 @@ export class CanvasViewport {
     };
 
     this._handleTouchMove = (evt) => {
-      if (!this.editMode) {
-        return;
-      }
       if (
         evt.touches.length < 2 ||
         this._touchPanLast == null ||
@@ -138,24 +134,27 @@ export class CanvasViewport {
       };
       const dist = touchDistance(t0, t1);
 
-      // Pan only along the edited element's page axis.
+      // On the free canvas, two-finger drag pans both axes; in edit mode,
+      // lock pan to the edited element's page axis (consistent with wheel).
       const dx = avg.x - this._touchPanLast.x;
       const dy = avg.y - this._touchPanLast.y;
-      if (this.editModePanAxis === 'horizontal') {
+      if (!this.editMode || this.editModePanAxis === 'horizontal') {
         this._offset.x += dx / this._zoom;
-      } else {
+      }
+      if (!this.editMode || this.editModePanAxis === 'vertical') {
         this._offset.y += dy / this._zoom;
       }
       this._touchPanLast = avg;
 
-      // Pinch zoom around viewport center (consistent with wheel).
-      // zoomAroundViewportCenter -> zoomAroundPoint already fires
+      // Pinch zoom anchored on the midpoint between the fingers, so the world
+      // point under the pinch stays put. zoomAroundPoint already fires
       // notifyViewChange (which picks up the pan offset above), so only notify
       // here when no pinch zoom ran.
       let zoomed = false;
       if (!this._zoomLocked && this._touchPinchLastDist > 0 && dist > 0) {
-        this.zoomAroundViewportCenter(
+        this.zoomAroundPoint(
           this._zoom * (dist / this._touchPinchLastDist),
+          this.getScreenPoint({ clientX: avg.x, clientY: avg.y }),
         );
         zoomed = true;
       }

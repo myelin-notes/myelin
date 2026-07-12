@@ -17,6 +17,7 @@ export interface ResizeHandleProps {
   onPointerMove: (e: React.PointerEvent<HTMLElement>) => void;
   onPointerUp: (e: React.PointerEvent<HTMLElement>) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => void;
+  style: React.CSSProperties;
 }
 
 /**
@@ -82,5 +83,14 @@ export function useResizeHandle({
     [axis, keyboardStep, onChange, value],
   );
 
-  return { onPointerDown, onPointerMove, onPointerUp, onKeyDown };
+  // Without this, touch devices claim the drag as a scroll/pan gesture and fire
+  // pointercancel, so the handle never moves on iPad. Covers the descendant grab
+  // zone too, since ancestor touch-action applies to touches on children.
+  return {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onKeyDown,
+    style: { touchAction: 'none' },
+  };
 }

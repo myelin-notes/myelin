@@ -28,6 +28,7 @@ import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
 import type { ITool, ToolId } from './tools/tool';
+import { CollisionHelper } from './utils/collision-helper';
 import { StateMachine } from './utils/state-machine';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
@@ -156,6 +157,17 @@ export class DrawableCanvas {
 
   private spaceDown: boolean = false;
   private screenPosition: Vector2 = { x: 0, y: 0 };
+
+  // Touch double-tap → element edit. A single finger pans (Moving state), which
+  // never runs the select tool, so its double-click edit path can't fire on
+  // touch; we detect the double-tap here instead.
+  private _lastTouchTapTime: number = 0;
+  private _lastTouchTapPos: Vector2 = { x: 0, y: 0 };
+
+  // Active touch pointers by id. A two-finger touch is a viewport pinch/pan
+  // gesture (handled by CanvasViewport's touch listeners), so single-finger
+  // pointer panning must yield while 2+ fingers are down.
+  private readonly _activeTouchPointers = new Set<number>();
 
   /** Owns the element collections and keeps them mutating as a unit. */
   private readonly _store = new ElementStore(() => this.notifyChange());
@@ -815,6 +827,32 @@ export class DrawableCanvas {
     });
   }
 
+  /**
+   * Hit-test the topmost editable element under a world point and enter its
+   * edit mode, selecting it exclusively. Shared by the select tool's
+   * double-click path and the touch double-tap path. Returns whether an
+   * editable element was found.
+   */
+  public enterEditAtPoint(point: Vector2, event?: Event): boolean {
+    for (let i = this.elements.length - 1; i >= 0; i--) {
+      const element = this.elements[i];
+      if (!CollisionHelper.inBox(point, element.boundingBox)) {
+        continue;
+      }
+      if (element.editable) {
+        for (const other of this.elements) {
+          if (other !== element) {
+            other.unselect();
+          }
+        }
+        element.select();
+        this.enterElementEdit(element, event);
+        return true;
+      }
+    }
+    return false;
+  }
+
   public destroy(): void {
     if (this._editingElement) {
       this.exitElementEdit();
@@ -832,6 +870,7 @@ export class DrawableCanvas {
     this.canvas.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
     window.removeEventListener('pointerup', this._handlePointerUp);
+    window.removeEventListener('pointercancel', this._handlePointerUp);
     window.removeEventListener('resize', this._handleResize);
   }
 
@@ -1128,10 +1167,32 @@ export class DrawableCanvas {
       }
 
       switch (evt.pointerType) {
-        case 'touch':
+        case 'touch': {
+          this._activeTouchPointers.add(evt.pointerId);
+          // Second finger down → the viewport owns the pinch/pan gesture; stop
+          // any single-finger pan in progress and ignore this pointer.
+          if (this._activeTouchPointers.size >= 2) {
+            this.state.change(InteractState.Idle, evt);
+            break;
+          }
+          // Double-tap enters element edit (matches the mouse/pen double-click);
+          // otherwise a single finger pans the canvas.
+          const point = this.viewport.getPoint(evt);
+          const now = Date.now();
+          const dx = point.x - this._lastTouchTapPos.x;
+          const dy = point.y - this._lastTouchTapPos.y;
+          const isDoubleTap =
+            now - this._lastTouchTapTime < 400 && dx * dx + dy * dy < 25;
+          if (isDoubleTap && this.enterEditAtPoint(point, evt)) {
+            this._lastTouchTapTime = 0;
+            break;
+          }
+          this._lastTouchTapTime = now;
+          this._lastTouchTapPos = point;
           this.state.change(InteractState.Moving, evt);
           this.state.update(evt);
           break;
+        }
         // @ts-expect-error
         // biome-ignore lint/suspicious/noFallthroughSwitchClause: intentional fallthrough to default
         case 'mouse':
@@ -1154,9 +1215,14 @@ export class DrawableCanvas {
     canvas.addEventListener('pointerdown', this._handlePointerDown);
 
     this._handlePointerUp = (evt) => {
+      this._activeTouchPointers.delete(evt.pointerId);
       this.state.change(InteractState.Idle, evt);
     };
     window.addEventListener('pointerup', this._handlePointerUp);
+    // iOS fires pointercancel (not pointerup) for touches it absorbs into a
+    // system gesture; without this the active-touch set would leak and block
+    // future single-finger panning.
+    window.addEventListener('pointercancel', this._handlePointerUp);
 
     this._handleResize = () => {
       this.renderer.refreshSize();
