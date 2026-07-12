@@ -376,7 +376,16 @@ export class TextElement extends DrawableElement {
         lineHeight,
       ).lines;
 
-      const textHeight = this._cachedLines.length * lineHeight;
+      // The textarea is the real renderer (display and editing share it), so
+      // when it's mounted measure its content height directly — the box then
+      // matches the displayed wrapping exactly, including trailing blank lines
+      // from Shift+Enter that pretext's normal-whitespace layout collapses.
+      // pretext's line count is the fallback for headless paths (PDF export,
+      // thumbnails, before the first render frame) where no laid-out textarea
+      // exists. Both are visual (native-font) pixel heights.
+      const domHeight = this._textarea?.scrollHeight ?? 0;
+      const textHeight =
+        domHeight > 0 ? domHeight : this._cachedLines.length * lineHeight;
 
       if (sx === 1 && sy === 1) {
         // Unscaled: grow box to fit text permanently
