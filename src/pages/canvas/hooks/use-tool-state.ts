@@ -7,7 +7,7 @@ import {
   setToolOptionValue,
   type ToolOption,
 } from '@myelin/editor/tools/tool';
-import { loadGoogleFont } from '@/components/tool-options-panel';
+import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import {
   loadWheelToolIndices,
   saveWheelToolIndices,
@@ -149,7 +149,7 @@ export function useToolState(
             continue;
           }
           if (key === 'fontFamily' && typeof value === 'string') {
-            loadGoogleFont(value);
+            ensureDisplayFont(value);
           }
         }
       }

@@ -15,8 +15,6 @@ import type { MessageGetter } from '../i18n';
 import { CollisionHelper } from '../utils/collision-helper';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
-const HANDLE_HIT_RADIUS = 10;
-
 enum SelectMode {
   None,
   Moving,
@@ -123,7 +121,7 @@ export class SelectTool implements ITool {
       if (!e.isSelected) {
         continue;
       }
-      const handle = this.hitHandle(e, point, canvas.viewport.zoom);
+      const handle = e.hitHandle(point, canvas.viewport.zoom);
       if (handle) {
         this.mode = SelectMode.Scaling;
         this.scalingElement = e;
@@ -433,7 +431,7 @@ export class SelectTool implements ITool {
       if (!e.isSelected) {
         continue;
       }
-      const handle = this.hitHandle(e, position, canvas.viewport.zoom);
+      const handle = e.hitHandle(position, canvas.viewport.zoom);
       if (handle) {
         canvas.setCursor(handle.cursor);
         return;
@@ -479,23 +477,6 @@ export class SelectTool implements ITool {
     }
     pick.select();
     this.lastCycledElement = pick;
-  }
-
-  private hitHandle(
-    element: DrawableElement,
-    point: Vector2,
-    zoom: number,
-  ): ResizeHandle | null {
-    const handles = element.getHandles();
-    const hitRadius = HANDLE_HIT_RADIUS / zoom;
-    for (const h of handles) {
-      const dx = point.x - h.position.x;
-      const dy = point.y - h.position.y;
-      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
-        return h;
-      }
-    }
-    return null;
   }
 
   public getOptions(): ToolOption[] {

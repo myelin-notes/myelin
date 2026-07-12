@@ -1,0 +1,29 @@
+/* Free-floating canvas text box. A single persistent textarea in the canvas
+   DOM overlay is both the display and the editor — edit mode only toggles
+   focus/editability, never the render path. Position, size, and font styles
+   are set inline per frame by TextElement.syncDOM. */
+
+.canvas-text-block {
+  position: absolute;
+  transform-origin: 0 0;
+  display: block;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  caret-color: var(--accent-dark);
+  /* Selection + hit-testing happen on the canvas; the box only takes pointer
+     input while being edited. */
+  pointer-events: none;
+}
+
+.canvas-text-block[data-editing="true"] {
+  pointer-events: auto;
+}
