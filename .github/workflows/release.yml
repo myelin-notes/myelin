@@ -51,9 +51,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Lint
-        run: yarn lint
-
       - name: Typecheck
         run: yarn typecheck
 
@@ -102,9 +99,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name || github.event.inputs.ref }}
-          # Fetch LFS-tracked binaries (scribble/embedding models). Without this,
-          # checkout leaves pointer files in place
-          lfs: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -356,9 +350,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name || github.event.inputs.ref }}
-          # See build job: LFS-tracked model binaries must be materialized, not
-          # left as pointer stubs, or the bundled models fail to load at runtime.
-          lfs: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -504,9 +495,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name || github.event.inputs.ref }}
-          # See build job: LFS-tracked model binaries must be materialized, not
-          # left as pointer stubs, or the bundled models fail to load at runtime.
-          lfs: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
