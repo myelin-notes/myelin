@@ -4,6 +4,7 @@ import {
   DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
   writeMarkdownToPageFrameFragment,
 } from '@myelin/editor/page-frame/markdown/import';
+import { createBlankCanvasFile } from '@/lib/note/create';
 import type {
   NodeSearchResult,
   NoteBacklink,
@@ -941,11 +942,18 @@ export class McpToolService {
     let session: NoteSession | null = null;
 
     try {
-      createdId = await this.options.repository.createFile(
-        title,
-        'mcanvas',
-        parentId,
-      );
+      createdId =
+        markdown === undefined
+          ? await createBlankCanvasFile(
+              this.options.repository,
+              title,
+              parentId,
+            )
+          : await this.options.repository.createFile(
+              title,
+              'mcanvas',
+              parentId,
+            );
       if (markdown !== undefined) {
         session = await this.options.repository.openSession(createdId);
         await addMarkdownPageFrameToYDoc(session.ydoc, markdown, {

@@ -14,25 +14,18 @@ const THUMBNAIL_ASPECT = 16 / 10;
  * rect to capture (the viewport's visible area), so the thumbnail is a snapshot
  * of what the user currently sees. The region is expanded to 16:10 to match
  * the display containers; elements outside the expanded region are culled.
- * Returns `null` when there's nothing to draw.
+ * When there's nothing to draw, returns a blank image of the capture region.
  */
 export async function renderCanvasThumbnail(
   elements: readonly DrawableElement[],
   region: DOMRect,
   maxSize: number,
-): Promise<Blob | null> {
-  if (elements.length === 0 || region.width <= 0 || region.height <= 0) {
-    return null;
-  }
-
+): Promise<Blob> {
   const capture = snapToThumbnailAspect(region);
 
   const visible = elements.filter(
     (el) => !el.hidden && intersects(el.boundingBox, capture),
   );
-  if (visible.length === 0) {
-    return null;
-  }
 
   const scale = Math.min(1, maxSize / Math.max(capture.width, capture.height));
   const width = Math.max(1, Math.round(capture.width * scale));
