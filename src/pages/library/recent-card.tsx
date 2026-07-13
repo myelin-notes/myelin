@@ -59,7 +59,7 @@ export function RecentCard({
                   : formatExplorerItemAccessibleName(node.name, node.tags)
               }
               className={cn(
-                'group relative flex aspect-[16/11] min-h-[188px] w-full cursor-pointer flex-col overflow-hidden rounded-xl text-left ring-1 ring-border-subtle/70 transition-all duration-300 hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient sm:aspect-auto sm:h-[208px]',
+                'group relative flex h-full min-h-[188px] w-full cursor-pointer flex-col overflow-hidden rounded-xl text-left ring-1 ring-border-subtle/70 transition-all duration-300 hover:-translate-y-0.5 hover:bg-card hover:shadow-ambient sm:min-h-[208px]',
                 featured ? 'bg-card-active' : 'bg-surface',
               )}
             />
@@ -84,7 +84,7 @@ export function RecentCard({
 
           {/* Thumbnail region */}
           <div
-            className="relative h-[52%] w-full shrink-0 overflow-hidden bg-surface/80"
+            className="relative h-[108px] w-full shrink-0 overflow-hidden bg-surface/80"
             style={{
               maskImage: fadeMask,
               WebkitMaskImage: fadeMask,
