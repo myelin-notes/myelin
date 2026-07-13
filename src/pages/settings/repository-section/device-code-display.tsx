@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
-import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { useResettableTimeout } from '@/hooks/use-resettable-timeout';
 import { useMessages } from '@/lib/i18n';
@@ -17,13 +16,7 @@ export function DeviceCodeDisplay({ userCode }: { userCode: string }) {
   };
 
   return (
-    <motion.div
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: 'auto', opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.15, ease: 'easeInOut' }}
-      className="overflow-hidden"
-    >
+    <div className="fade-in-0 animate-in duration-150">
       <div className="flex items-center justify-between rounded-xl bg-card px-5 py-4 shadow-ambient ring-1 ring-border-subtle/70">
         <div>
           <p className="text-[10px] text-text-muted uppercase tracking-widest">
@@ -47,6 +40,6 @@ export function DeviceCodeDisplay({ userCode }: { userCode: string }) {
           {copied ? strings.common.copied : strings.common.copy}
         </Button>
       </div>
-    </motion.div>
+    </div>
   );
 }

@@ -97,6 +97,14 @@ function normalizePane(pane: PaneNode): PaneNode {
     return pane.activeTabId === '' ? pane : { ...pane, activeTabId: '' };
   }
 
+  // An empty activeTabId is the intentional home view (see showHome). Preserve
+  // it even while tabs are open, so a pane can show home without closing them —
+  // otherwise this would snap back to the first tab and the home button (and
+  // closing a background tab while on home) would appear to do nothing.
+  if (pane.activeTabId === '') {
+    return pane;
+  }
+
   if (pane.tabs.some((tab) => tab.id === pane.activeTabId)) {
     return pane;
   }
@@ -519,6 +527,22 @@ export class TabStateController {
         ...pane,
         activeTabId: tabId,
       }),
+      focusedPaneId: paneId,
+    });
+  }
+
+  // Deactivate the pane's current tab so it falls back to the empty-pane home
+  // view (activeTabId === ''), without closing any tabs. Used by the tablet
+  // layout's library button to reveal the full-page explorer.
+  showHome(paneId: PaneId): void {
+    const state = this.state;
+    const pane = findPane(state.layout, paneId);
+    if (!pane || pane.activeTabId === '') {
+      return;
+    }
+
+    this.commit({
+      layout: replacePane(state.layout, { ...pane, activeTabId: '' }),
       focusedPaneId: paneId,
     });
   }

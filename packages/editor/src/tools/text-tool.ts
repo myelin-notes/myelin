@@ -141,6 +141,11 @@ export class TextTool implements ITool {
       te.setOffset(worldPos.x, worldPos.y);
       return te;
     });
+    // Placing a box is a one-shot action; hand control back to the select tool
+    // so the user isn't stuck creating more boxes after this one. Switch first:
+    // switchToTool unselects every element, so selecting + entering edit must
+    // come after or the new box's selection outline is cleared immediately.
+    canvas.switchToTool('select');
     el.select();
     canvas.enterElementEdit(el);
   }

@@ -1,7 +1,11 @@
-import { type AnimationPlaybackControls, animate } from 'motion';
 import type { Vector2 } from './geometry';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
+
+/** Handle to an in-flight RAF view transition. */
+interface ViewAnimation {
+  stop: () => void;
+}
 
 /**
  * Camera state for the canvas: pan offset, zoom level, the wheel + touch
@@ -13,18 +17,19 @@ type EditModePanAxis = 'vertical' | 'horizontal';
  * calls `panBy()` here — deciding whether a pointerdown is a pan vs a tool
  * gesture is a scene-level concern, not a camera one.
  *
- * `editMode` is a hint set by DrawableCanvas when an element is being
- * inline-edited: it restricts wheel/trackpad pan to vertical by default,
- * and enables two-finger touch pan + pinch zoom (single-finger touch is
- * left alone so the contentEditable can place the cursor / select text).
+ * Two-finger touch pan + pinch zoom is always active. `editMode` is a hint
+ * set by DrawableCanvas when an element is being inline-edited: it restricts
+ * wheel/trackpad and two-finger pan to the edited element's page axis
+ * (single-finger touch is left alone so the contentEditable can place the
+ * cursor / select text).
  */
 export class CanvasViewport {
   private readonly canvas: HTMLCanvasElement;
   private _offset: Vector2 = { x: 0, y: 0 };
   private _zoom: number = 1;
 
-  // Active pan/zoom transition (driven by motion's animate())
-  private _viewAnim: AnimationPlaybackControls | null = null;
+  // Active pan/zoom transition (driven by requestAnimationFrame)
+  private _viewAnim: ViewAnimation | null = null;
 
   // Wheel + touch are attached to the canvas's parent (not the canvas) so
   // they still fire during edit mode, when the canvas has pointer-events: none.
@@ -40,9 +45,9 @@ export class CanvasViewport {
   private _contentBoundsProvider: (() => DOMRect | null) | null = null;
 
   /**
-   * When true, plain wheel/touch pan is restricted to the edit-mode axis,
-   * and two-finger touch gestures (pan + pinch zoom) are active. Toggled by
-   * DrawableCanvas on element edit enter/exit.
+   * When true, plain wheel/touch pan is restricted to the edit-mode axis.
+   * Two-finger pinch zoom is unaffected. Toggled by DrawableCanvas on element
+   * edit enter/exit.
    */
   public editMode: boolean = false;
   public editModePanAxis: EditModePanAxis = 'vertical';
@@ -94,13 +99,11 @@ export class CanvasViewport {
       return Math.hypot(dx, dy);
     };
 
-    // Two-finger touch in edit mode: pan + pinch zoom.
-    // Single-finger touch is left to the contentEditable for cursor
-    // placement / selection.
+    // Two-finger touch: pan + pinch zoom. Works on the free canvas and in
+    // edit mode alike. Single-finger touch is left alone — DrawableCanvas's
+    // pointer state machine pans the free canvas with one finger, and in edit
+    // mode the contentEditable uses it for cursor placement / selection.
     this._handleTouchStart = (evt) => {
-      if (!this.editMode) {
-        return;
-      }
       if (evt.touches.length >= 2) {
         const t0 = evt.touches[0];
         const t1 = evt.touches[1];
@@ -117,9 +120,6 @@ export class CanvasViewport {
     };
 
     this._handleTouchMove = (evt) => {
-      if (!this.editMode) {
-        return;
-      }
       if (
         evt.touches.length < 2 ||
         this._touchPanLast == null ||
@@ -138,24 +138,27 @@ export class CanvasViewport {
       };
       const dist = touchDistance(t0, t1);
 
-      // Pan only along the edited element's page axis.
+      // On the free canvas, two-finger drag pans both axes; in edit mode,
+      // lock pan to the edited element's page axis (consistent with wheel).
       const dx = avg.x - this._touchPanLast.x;
       const dy = avg.y - this._touchPanLast.y;
-      if (this.editModePanAxis === 'horizontal') {
+      if (!this.editMode || this.editModePanAxis === 'horizontal') {
         this._offset.x += dx / this._zoom;
-      } else {
+      }
+      if (!this.editMode || this.editModePanAxis === 'vertical') {
         this._offset.y += dy / this._zoom;
       }
       this._touchPanLast = avg;
 
-      // Pinch zoom around viewport center (consistent with wheel).
-      // zoomAroundViewportCenter -> zoomAroundPoint already fires
+      // Pinch zoom anchored on the midpoint between the fingers, so the world
+      // point under the pinch stays put. zoomAroundPoint already fires
       // notifyViewChange (which picks up the pan offset above), so only notify
       // here when no pinch zoom ran.
       let zoomed = false;
       if (!this._zoomLocked && this._touchPinchLastDist > 0 && dist > 0) {
-        this.zoomAroundViewportCenter(
+        this.zoomAroundPoint(
           this._zoom * (dist / this._touchPinchLastDist),
+          this.getScreenPoint({ clientX: avg.x, clientY: avg.y }),
         );
         zoomed = true;
       }
@@ -345,27 +348,33 @@ export class CanvasViewport {
     const startZoom = this._zoom;
 
     this.cancelAnimation();
-    this._viewAnim = animate(0, 1, {
-      duration: 0.7,
-      ease: [0.22, 1, 0.36, 1], // ease-out quint
-      onUpdate: (t) => {
-        const z = startZoom + (targetZoom - startZoom) * t;
-        const sx =
-          startScreenFocus.x + (targetScreenFocus.x - startScreenFocus.x) * t;
-        const sy =
-          startScreenFocus.y + (targetScreenFocus.y - startScreenFocus.y) * t;
-        this._zoom = z;
-        this._offset = {
-          x: sx / z - worldFocus.x,
-          y: sy / z - worldFocus.y,
-        };
-        this._onZoomChange?.(this._zoom);
-        this.notifyViewChange();
-      },
-      onComplete: () => {
+
+    const durationMs = 700;
+    const start = performance.now();
+    let rafId = 0;
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = 1 - (1 - t) ** 5; // ease-out quint
+      const z = startZoom + (targetZoom - startZoom) * eased;
+      const sx =
+        startScreenFocus.x + (targetScreenFocus.x - startScreenFocus.x) * eased;
+      const sy =
+        startScreenFocus.y + (targetScreenFocus.y - startScreenFocus.y) * eased;
+      this._zoom = z;
+      this._offset = {
+        x: sx / z - worldFocus.x,
+        y: sy / z - worldFocus.y,
+      };
+      this._onZoomChange?.(this._zoom);
+      this.notifyViewChange();
+      if (t < 1) {
+        rafId = requestAnimationFrame(step);
+      } else {
         this._viewAnim = null;
-      },
-    });
+      }
+    };
+    rafId = requestAnimationFrame(step);
+    this._viewAnim = { stop: () => cancelAnimationFrame(rafId) };
   }
 
   /**

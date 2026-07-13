@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link2, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import { formatNumber } from '@myelin/editor/i18n/format';
+import { usePresence } from '@myelin/ui';
 import { useLocale, useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import {
@@ -94,6 +94,7 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
 
   const rows = useMemo(() => sortBacklinks(backlinks), [backlinks]);
   const count = backlinks.length;
+  const presence = usePresence(open);
 
   if (!noteId || count === 0) {
     return null;
@@ -118,50 +119,45 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
         <span className="font-medium tabular-nums">{countLabel}</span>
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="backlinks-popover"
-            role="dialog"
-            aria-label={strings.canvas.backlinks.title}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.14, ease: [0.25, 0.1, 0.25, 1] }}
-            className="absolute top-full left-0 z-[110] mt-2 flex max-h-[60vh] w-[22rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-xl bg-popover/95 shadow-ambient backdrop-blur-[24px]"
-          >
-            <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-              <h2 className="m-0 flex-1 font-semibold text-[13px] text-text-primary">
-                {strings.canvas.backlinks.linkedMentions}
-              </h2>
-              <span className="rounded-md bg-surface px-1.5 py-0.5 font-medium text-[11px] text-text-secondary tabular-nums">
-                {countLabel}
-              </span>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label={strings.common.close}
-                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary"
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
+      {presence.mounted && (
+        <div
+          {...presence.state}
+          onAnimationEnd={presence.onAnimationEnd}
+          role="dialog"
+          aria-label={strings.canvas.backlinks.title}
+          className="data-closed:slide-out-to-top-1 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:fade-in-0 absolute top-full left-0 z-[110] mt-2 flex max-h-[60vh] w-[22rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-xl bg-popover/95 shadow-ambient backdrop-blur-[24px] duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
+        >
+          <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+            <h2 className="m-0 flex-1 font-semibold text-[13px] text-text-primary">
+              {strings.canvas.backlinks.linkedMentions}
+            </h2>
+            <span className="rounded-md bg-surface px-1.5 py-0.5 font-medium text-[11px] text-text-secondary tabular-nums">
+              {countLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label={strings.common.close}
+              className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
 
-            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
-              {rows.map((row, index) => (
-                <BacklinkRow
-                  key={`${row.sourceId}\0${row.snippet}\0${index}`}
-                  row={row}
-                  onOpenSource={(sourceId) => {
-                    setOpen(false);
-                    onOpenSource(sourceId);
-                  }}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
+            {rows.map((row, index) => (
+              <BacklinkRow
+                key={`${row.sourceId}\0${row.snippet}\0${index}`}
+                row={row}
+                onOpenSource={(sourceId) => {
+                  setOpen(false);
+                  onOpenSource(sourceId);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

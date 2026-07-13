@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
+import type { Repository } from '@/lib/sync';
 import { TabStateController } from '@/lib/tabs/controller';
 import { openNote, openNoteLink } from './navigation';
+
+function asRepository<T>(repository: T): T & Repository {
+  return repository as T & Repository;
+}
 
 describe('note navigation', () => {
   it('opens a canvas note as a tab', () => {
@@ -24,10 +30,10 @@ describe('note navigation', () => {
 
   it('opens resolved note links without creating a note', async () => {
     const controller = new TabStateController();
-    const repository = {
+    const repository = asRepository({
       getNode: vi.fn(),
       createFile: vi.fn(),
-    };
+    });
 
     await openNoteLink(controller, repository, 'current-note', {
       title: 'Alpha Note',
@@ -47,10 +53,10 @@ describe('note navigation', () => {
 
   it('opens resolved note links with page-frame targets', async () => {
     const controller = new TabStateController();
-    const repository = {
+    const repository = asRepository({
       getNode: vi.fn(),
       createFile: vi.fn(),
-    };
+    });
 
     await openNoteLink(controller, repository, 'current-note', {
       title: 'Alpha Note#Research Notes',
@@ -73,10 +79,10 @@ describe('note navigation', () => {
 
   it('preserves resolved page-frame ids when opening note links', async () => {
     const controller = new TabStateController();
-    const repository = {
+    const repository = asRepository({
       getNode: vi.fn(),
       createFile: vi.fn(),
-    };
+    });
 
     await openNoteLink(controller, repository, 'current-note', {
       title: 'Alpha Note#Research Notes',
@@ -98,7 +104,7 @@ describe('note navigation', () => {
 
   it('creates unresolved note links before opening', async () => {
     const controller = new TabStateController();
-    const repository = {
+    const repository = asRepository({
       getNode: vi.fn().mockResolvedValue({
         id: 'current-note',
         name: 'Current Note',
@@ -110,7 +116,7 @@ describe('note navigation', () => {
         modifiedAt: 0,
       }),
       createFile: vi.fn().mockResolvedValue('created-note'),
-    };
+    });
 
     await openNoteLink(controller, repository, 'current-note', {
       title: 'Alpha Note#Research Notes',
@@ -118,11 +124,18 @@ describe('note navigation', () => {
     });
 
     expect(repository.getNode).toHaveBeenCalledWith('current-note');
-    expect(repository.createFile).toHaveBeenCalledWith(
-      'Alpha Note',
-      'mcanvas',
-      'folder-1',
-    );
+    expect(repository.createFile).toHaveBeenCalledTimes(1);
+    const [name, fileType, parentId, bytes] =
+      repository.createFile.mock.calls[0];
+    expect({ name, fileType, parentId }).toEqual({
+      name: 'Alpha Note',
+      fileType: 'mcanvas',
+      parentId: 'folder-1',
+    });
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    const ydoc = YDocManager.fromUpdate(bytes);
+    expect(ydoc.elements.length).toBe(1);
+    expect(ydoc.elements.get(0).get('displayName')).toBe('Research Notes');
 
     const state = controller.getSnapshot();
     const pane = state.layout.type === 'pane' ? state.layout : null;

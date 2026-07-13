@@ -107,20 +107,13 @@ export class CanvasSessionController {
 
   getSnapshot = (): CanvasSessionSnapshot => this.snapshot;
 
-  async open(
-    noteId: VFSNodeId,
-    options?: { initialPageFrameName?: string | null },
-  ): Promise<void> {
+  async open(noteId: VFSNodeId): Promise<void> {
     const token = ++this.lifecycleToken;
     await this.teardownActiveSession();
     if (token !== this.lifecycleToken) {
       return;
     }
-    await this.openSession(
-      noteId,
-      token,
-      options?.initialPageFrameName ?? null,
-    );
+    await this.openSession(noteId, token);
   }
 
   async dispose(): Promise<void> {
@@ -132,11 +125,7 @@ export class CanvasSessionController {
     this.onPageFrameRenamed = listener;
   }
 
-  private async openSession(
-    noteId: VFSNodeId,
-    token: number,
-    initialPageFrameName: string | null,
-  ): Promise<void> {
+  private async openSession(noteId: VFSNodeId, token: number): Promise<void> {
     const canvas = this.canvasRef.current;
     if (!canvas) {
       this.setLifecycleError(new Error('Canvas is not mounted.'));
@@ -186,28 +175,6 @@ export class CanvasSessionController {
       }
       if (this.domOverlayRef.current) {
         drawableCanvas.setDomOverlayHost(this.domOverlayRef.current);
-      }
-
-      if (drawableCanvas.elements.length === 0 && node?.type === 'file') {
-        const dpr = window.devicePixelRatio || 1;
-        const centerWorld = drawableCanvas.viewport.screenToWorld({
-          x: canvas.width / dpr / 2,
-          y: canvas.height / dpr / 2,
-        });
-        const frame = drawableCanvas.addElement(
-          (uuid) =>
-            new PageFrameElement(
-              uuid,
-              initialPageFrameName ?? undefined,
-              UserPrefs.get('defaultPageLayout'),
-            ),
-        );
-        frame.setOffset(
-          centerWorld.x - frame.totalWidth / 2,
-          centerWorld.y - frame.totalHeight / 2,
-        );
-        frame.updateBounds();
-        await session.save();
       }
 
       if (this.shouldAbortOpen(token)) {
@@ -388,7 +355,6 @@ export class CanvasSessionController {
 
 interface UseCanvasSessionControllerArgs {
   id: VFSNodeId | undefined;
-  initialPageFrameName?: string | null;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   bgCanvasRef: RefObject<HTMLCanvasElement | null>;
   overlayCanvasRef: RefObject<HTMLCanvasElement | null>;
@@ -399,7 +365,6 @@ interface UseCanvasSessionControllerArgs {
 
 export function useCanvasSessionController({
   id,
-  initialPageFrameName,
   canvasRef,
   bgCanvasRef,
   overlayCanvasRef,
@@ -439,18 +404,13 @@ export function useCanvasSessionController({
     controller.getSnapshot,
   );
 
-  const initialPageFrameNameRef = useRef(initialPageFrameName);
-  initialPageFrameNameRef.current = initialPageFrameName;
-
   useEffect(() => {
     if (!id) {
       void controller.dispose();
       return;
     }
 
-    void controller.open(id, {
-      initialPageFrameName: initialPageFrameNameRef.current,
-    });
+    void controller.open(id);
 
     return () => {
       void controller.dispose();

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard, RotateCcw } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import {
   getActionCategory,
   getActionCopy,
@@ -41,7 +40,7 @@ function KeyCapture({
   onCancel: () => void;
 }) {
   const strings = useMessages();
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     ref.current?.focus();
@@ -79,19 +78,15 @@ function KeyCapture({
   );
 
   return (
-    <motion.div
+    <button
+      type="button"
       ref={ref}
-      tabIndex={0}
       onKeyDown={handleKeyDown}
       onBlur={onCancel}
-      initial={{ scale: 0.95, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.95, opacity: 0 }}
-      transition={{ duration: 0.1 }}
-      className="flex h-8 min-w-20 items-center justify-center rounded-lg bg-accent-navy px-4 font-semibold text-[10px] text-text-on-dark uppercase tracking-widest outline-none"
+      className="fade-in-0 zoom-in-95 flex h-8 min-w-20 animate-in items-center justify-center rounded-lg bg-accent-navy px-4 font-semibold text-[10px] text-text-on-dark uppercase tracking-widest outline-none duration-100"
     >
       {strings.settings.keybinds.pressKey}
-    </motion.div>
+    </button>
   );
 }
 
@@ -136,44 +131,36 @@ function KeybindRow({
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {capturing ? (
-          <KeyCapture
-            key="capture"
-            onCapture={handleCapture}
-            onCancel={() => setCapturing(false)}
-          />
-        ) : (
-          <motion.button
-            key="display"
-            type="button"
-            onClick={() => setCapturing(true)}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.1 }}
-            className="flex shrink-0 cursor-pointer flex-wrap items-center justify-end gap-1"
-          >
-            {currentCombo ? (
-              keyParts(currentCombo).map((part, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    'flex h-7 items-center justify-center rounded-md border-border-key border-b-2 bg-bg-key font-bold text-text-secondary text-xs shadow-key',
-                    part.length === 1 ? 'w-9' : 'px-4',
-                  )}
-                >
-                  {part}
-                </span>
-              ))
-            ) : (
-              <span className="text-text-muted text-xs">
-                {strings.settings.keybinds.unbound}
+      {capturing ? (
+        <KeyCapture
+          onCapture={handleCapture}
+          onCancel={() => setCapturing(false)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCapturing(true)}
+          className="fade-in-0 flex shrink-0 animate-in cursor-pointer flex-wrap items-center justify-end gap-1 duration-100"
+        >
+          {currentCombo ? (
+            keyParts(currentCombo).map((part, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'flex h-7 items-center justify-center rounded-md border-border-key border-b-2 bg-bg-key font-bold text-text-secondary text-xs shadow-key',
+                  part.length === 1 ? 'w-9' : 'px-4',
+                )}
+              >
+                {part}
               </span>
-            )}
-          </motion.button>
-        )}
-      </AnimatePresence>
+            ))
+          ) : (
+            <span className="text-text-muted text-xs">
+              {strings.settings.keybinds.unbound}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 }

@@ -181,6 +181,14 @@ export class CanvasRenderer {
       for (const element of elements) {
         element.syncDOM(viewport, domOverlayHost);
       }
+      // DOM overlay nodes share one layer, so among themselves they stack by
+      // DOM order, not the element z-order. syncDOM only appends a node when it
+      // first creates it, so a reorder (send backward/forward) never moves the
+      // existing nodes. Reconcile the overlay's child order to `elements` so
+      // overlapping DOM elements paint by z-order. Nodes move only when out of
+      // position, so steady-state frames touch nothing and an already-correct
+      // node (e.g. the focused editing textarea) is never re-inserted.
+      reorderDomOverlay(domOverlayHost, elements);
     }
   }
 
@@ -242,5 +250,42 @@ export class CanvasRenderer {
     const dpr = window.devicePixelRatio || 1;
     this.overlayCanvas.width = width * dpr;
     this.overlayCanvas.height = height * dpr;
+  }
+}
+
+/**
+ * Order the DOM overlay's children to match the element z-order. Each DOM-backed
+ * element tags its overlay node with `data-element-uuid`; walking `elements` in
+ * order and inserting only out-of-position nodes yields the desired stacking
+ * with the minimum number of DOM moves (none once orders agree).
+ */
+function reorderDomOverlay(
+  host: HTMLElement,
+  elements: DrawableElement[],
+): void {
+  const nodes = new Map<string, Element>();
+  for (const child of host.children) {
+    const uuid = (child as HTMLElement).dataset.elementUuid;
+    if (uuid) {
+      nodes.set(uuid, child);
+    }
+  }
+  if (nodes.size < 2) {
+    return;
+  }
+
+  let prev: Element | null = null;
+  for (const element of elements) {
+    const node = nodes.get(element.uuid);
+    if (!node) {
+      continue;
+    }
+    const expected: Element | null = prev
+      ? prev.nextElementSibling
+      : host.firstElementChild;
+    if (node !== expected) {
+      host.insertBefore(node, expected);
+    }
+    prev = node;
   }
 }

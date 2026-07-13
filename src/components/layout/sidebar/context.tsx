@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { IS_TABLET_BUILD } from '@/lib/env';
 import { UserPrefs } from '@/lib/user-prefs';
 
 export const SIDEBAR_MIN_WIDTH = 220;
@@ -26,6 +27,12 @@ interface SidebarContextValue {
   collapsed: boolean;
   /** Viewport is narrow, so the sidebar renders as an overlay drawer. */
   isCompact: boolean;
+  /**
+   * Tablet build on a roomy (iPad-sized) viewport: replace the sidebar entirely
+   * with a full-page library home. False on narrow screens even in a tablet
+   * build, so a phone-sized viewport still falls back to the compact drawer.
+   */
+  tabletLayout: boolean;
   /** Compact layout: the overlay drawer is open. */
   drawerOpen: boolean;
   /** Flips visibility for the current mode: drawer when compact, else column. */
@@ -40,6 +47,7 @@ const SidebarContext = createContext<SidebarContextValue | null>(null);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const isCompact = useMediaQuery(SIDEBAR_COMPACT_QUERY);
+  const tabletLayout = IS_TABLET_BUILD && !isCompact;
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [width, setWidthState] = useState(() =>
@@ -64,13 +72,23 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     () => ({
       collapsed,
       isCompact,
+      tabletLayout,
       drawerOpen,
       toggle,
       close,
       width,
       setWidth,
     }),
-    [collapsed, isCompact, drawerOpen, toggle, close, width, setWidth],
+    [
+      collapsed,
+      isCompact,
+      tabletLayout,
+      drawerOpen,
+      toggle,
+      close,
+      width,
+      setWidth,
+    ],
   );
 
   return (

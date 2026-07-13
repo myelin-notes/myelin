@@ -6,7 +6,6 @@ import {
   useState,
 } from 'react';
 import { Check as CheckIcon } from 'lucide-react';
-import { motion } from 'motion/react';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
 
 interface ChromeMenuProps {
@@ -98,13 +97,9 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
   };
 
   return (
-    <motion.div
+    <div
       ref={menuRef}
-      initial={{ opacity: 0, y: -4, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -2, scale: 0.98 }}
-      transition={{ duration: 0.14, ease: [0.25, 0.1, 0.25, 1] }}
-      className="pointer-events-auto fixed z-[100] min-w-[200px] origin-top-right overflow-hidden rounded-xl bg-popover/90 p-1.5 shadow-ambient outline-none backdrop-blur-2xl"
+      className="fade-in-0 slide-in-from-top-1 zoom-in-95 pointer-events-auto fixed z-[100] min-w-[200px] origin-top-right animate-in overflow-hidden rounded-xl bg-popover/90 p-1.5 shadow-ambient outline-none backdrop-blur-2xl duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
       style={{ top: pos.top, left: pos.left, minWidth: MENU_MIN_WIDTH }}
       role="menu"
       onKeyDown={onMenuKeyDown}
@@ -164,7 +159,7 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
           </button>
         );
       })}
-    </motion.div>
+    </div>
   );
 }
 

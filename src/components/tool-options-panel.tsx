@@ -3,6 +3,7 @@ import { ChevronDown as ChevronDownIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
+import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { useCustomColors } from '@/lib/custom-colors';
 
@@ -10,24 +11,9 @@ interface ToolOptionsPanelProps {
   options: ToolOption[];
 }
 
-/* ── Font loading ───────────────────────────────────────── */
-
-const loadedFonts = new Set<string>();
-
-export function loadGoogleFont(family: string) {
-  if (loadedFonts.has(family)) {
-    return;
-  }
-  loadedFonts.add(family);
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;700&display=swap`;
-  document.head.appendChild(link);
-}
-
 function preloadAllFonts(fonts: FontEntry[]) {
   for (const f of fonts) {
-    loadGoogleFont(f.family);
+    ensureDisplayFont(f.family);
   }
 }
 
@@ -128,7 +114,7 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-[24px]">
+    <div className="flex flex-col gap-3 rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md">
       {options.map((option) => {
         if (option.type === 'color') {
           return (
@@ -229,7 +215,7 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
                 value={option.value}
                 fonts={option.fonts}
                 onChange={(family) => {
-                  loadGoogleFont(family);
+                  ensureDisplayFont(family);
                   option.set(family);
                 }}
               />

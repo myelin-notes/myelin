@@ -3,9 +3,9 @@ import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
 import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
+import { usePresence } from '@myelin/ui';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
 import {
@@ -54,6 +54,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   embedComposer,
 }: CanvasToolbarProps) {
   const strings = useMessages();
+  const optionsPresence = usePresence(
+    optionsVisible && hasOptions && !shelfOpen,
+  );
   const toolbarRef = useRef<HTMLDivElement>(null);
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
@@ -74,12 +77,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 
   return (
     <TooltipProvider>
-      <motion.div
+      <div
         ref={toolbarRef}
-        initial={{ opacity: 0, x: -12 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-        className="absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2"
+        className="fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
         role="toolbar"
         aria-label="Canvas tools"
       >
@@ -188,21 +188,16 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           </Tooltip>
         </div>
 
-        <AnimatePresence>
-          {optionsVisible && hasOptions && !shelfOpen && (
-            <motion.div
-              key={selectedToolIndex}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-              className="absolute top-0 left-full ml-2"
-              style={{ paddingTop: optionsPanelOffset }}
-            >
-              <ToolOptionsPanel options={activeOptions} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {optionsPresence.mounted && (
+          <div
+            {...optionsPresence.state}
+            onAnimationEnd={optionsPresence.onAnimationEnd}
+            className="data-closed:slide-out-to-left-2 data-closed:fade-out-0 data-open:slide-in-from-left-2 data-open:fade-in-0 absolute left-full ml-2 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
+            style={{ top: optionsPanelOffset }}
+          >
+            <ToolOptionsPanel options={activeOptions} />
+          </div>
+        )}
 
         {shelfOpen && (
           <div
@@ -228,18 +223,15 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           </div>
         )}
 
-        <AnimatePresence>
-          {insertOpen && !shelfOpen && (
-            <div
-              key="insert-popover"
-              className="absolute top-0 left-full"
-              style={{ paddingTop: insertPanelOffset }}
-            >
-              {insertPopover}
-            </div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        {insertOpen && !shelfOpen && (
+          <div
+            className="absolute top-0 left-full"
+            style={{ paddingTop: insertPanelOffset }}
+          >
+            {insertPopover}
+          </div>
+        )}
+      </div>
     </TooltipProvider>
   );
 });

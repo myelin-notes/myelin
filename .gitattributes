@@ -1,3 +1,0 @@
-src-tauri/resources/scribble-models/*.bin filter=lfs diff=lfs merge=lfs -text
-src-tauri/resources/embedding-models/**/*.onnx filter=lfs diff=lfs merge=lfs -text
-src-tauri/resources/embedding-models/**/*.safetensors filter=lfs diff=lfs merge=lfs -text

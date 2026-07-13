@@ -6,7 +6,7 @@ import type {
   PageRef,
   PdfExportRequest,
 } from './pdf-export/contract';
-import type { PdfHarvestContext } from './pdf-export/harvest';
+import { createFontTable, type PdfHarvestContext } from './pdf-export/harvest';
 import type { PdfPageSize } from './pdf-renderer';
 
 export interface PdfElementExportSource {
@@ -102,6 +102,8 @@ export function buildPdfElementRequest(
   const candidates = getPdfOverlayCandidates(target, elements);
 
   const imagesB64: string[] = [];
+  const fontsB64: string[] = [];
+  const addFontBase64 = createFontTable(fontsB64);
   const exportPages: ExportPage[] = [];
   const pageMap: PageRef[] = [];
 
@@ -118,6 +120,7 @@ export function buildPdfElementRequest(
         imagesB64.push(b64);
         return imagesB64.length - 1;
       },
+      addFontBase64,
     };
 
     for (const element of candidates) {
@@ -130,7 +133,13 @@ export function buildPdfElementRequest(
     pageMap.push(page.kind === 'pdf' ? page.originalIndex : 'blank');
   }
 
-  return { kind: 'pdfElement', pages: exportPages, pageMap, imagesB64 };
+  return {
+    kind: 'pdfElement',
+    pages: exportPages,
+    pageMap,
+    imagesB64,
+    fontsB64,
+  };
 }
 
 export function rectsIntersect(a: DOMRect, b: DOMRect): boolean {

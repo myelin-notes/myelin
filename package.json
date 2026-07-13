@@ -23,7 +23,8 @@
     "tauri:mac-deep-links:check": "node scripts/tauri-deep-links.mjs check",
     "tauri:mac-deep-links:clear": "node scripts/tauri-deep-links.mjs clear",
     "website:dev": "yarn workspace @myelin/website dev",
-    "website:build": "yarn workspace @myelin/website build"
+    "website:build": "yarn workspace @myelin/website build",
+    "prepare": "husky"
   },
   "resolutions": {
     "react": "19.2.6",
@@ -61,7 +62,6 @@
     "katex": "^0.17.0",
     "lucide-react": "^0.577.0",
     "minisearch": "^7.2.0",
-    "motion": "^12.38.0",
     "pdfjs-dist": "^5.7.284",
     "perfect-freehand": "^1.2.3",
     "posthog-js": "^1.392.0",
@@ -95,6 +95,7 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "babel-plugin-react-compiler": "^1.0.0",
+    "husky": "^9.1.7",
     "react-devtools": "^7.0.1",
     "react-devtools-core": "^7.0.1",
     "tailwindcss": "^4.2.2",

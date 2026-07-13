@@ -1,4 +1,5 @@
 import {
+  type AnimationEventHandler,
   createContext,
   memo,
   type PropsWithChildren,
@@ -10,10 +11,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
 import { HexColorPicker } from 'react-colorful';
 import { createPortal } from 'react-dom';
 import { Logger } from '@myelin/shared/logger';
+import { type Presence, usePresence } from '@myelin/ui';
 import { useRepository } from './sync/repo-context';
 
 interface CustomColorsContextValue {
@@ -121,17 +122,18 @@ const CustomColorPickerPortal = memo(function CustomColorPickerPortal({
   onConfirm,
   onCancel,
 }: CustomColorPickerPortalProps) {
+  const presence = usePresence(pickerOpen);
+  if (!presence.mounted) {
+    return null;
+  }
   return createPortal(
-    <AnimatePresence>
-      {pickerOpen && (
-        <ColorPickerDialog
-          key="custom-color-picker"
-          initialColor={INITIAL_PICKER_COLOR}
-          onConfirm={onConfirm}
-          onCancel={onCancel}
-        />
-      )}
-    </AnimatePresence>,
+    <ColorPickerDialog
+      presenceState={presence.state}
+      onAnimationEnd={presence.onAnimationEnd}
+      initialColor={INITIAL_PICKER_COLOR}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />,
     document.body,
   );
 });
@@ -140,12 +142,16 @@ interface ColorPickerDialogProps {
   initialColor: string;
   onConfirm: (hex: string) => void;
   onCancel: () => void;
+  presenceState: Presence['state'];
+  onAnimationEnd: AnimationEventHandler;
 }
 
 function ColorPickerDialog({
   initialColor,
   onConfirm,
   onCancel,
+  presenceState,
+  onAnimationEnd,
 }: ColorPickerDialogProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [hex, setHex] = useState<string>(initialColor);
@@ -196,13 +202,11 @@ function ColorPickerDialog({
   }, []);
 
   return (
-    <motion.div
+    <div
+      {...presenceState}
+      onAnimationEnd={onAnimationEnd}
       ref={ref}
-      initial={{ opacity: 0, y: -4, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -2, scale: 0.98 }}
-      transition={{ duration: 0.14, ease: [0.25, 0.1, 0.25, 1] }}
-      className="pointer-events-auto fixed top-1/2 left-1/2 z-[200] w-[240px] origin-center -translate-x-1/2 -translate-y-1/2 rounded-xl bg-popover/90 p-3 shadow-ambient backdrop-blur-2xl"
+      className="data-closed:slide-out-to-top-1 data-closed:zoom-out-95 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:zoom-in-95 data-open:fade-in-0 pointer-events-auto fixed top-1/2 left-1/2 z-[200] w-[240px] origin-center -translate-x-1/2 -translate-y-1/2 rounded-xl bg-popover/90 p-3 shadow-ambient backdrop-blur-2xl duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
       style={{ border: '0.5px solid var(--border-ghost)' }}
       role="dialog"
       aria-label="Custom color"
@@ -261,7 +265,7 @@ function ColorPickerDialog({
           Add color
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 }
 

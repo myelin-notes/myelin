@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
 import { formatNumber } from '@myelin/editor/i18n/format';
 import { TimeAgo } from '@/components/time-ago';
 import { Button } from '@/components/ui/button';
@@ -209,11 +208,9 @@ export function RepositorySection() {
                   </div>
                 </div>
 
-                <AnimatePresence>
-                  {remoteAuth.userCode && (
-                    <DeviceCodeDisplay userCode={remoteAuth.userCode} />
-                  )}
-                </AnimatePresence>
+                {remoteAuth.userCode && (
+                  <DeviceCodeDisplay userCode={remoteAuth.userCode} />
+                )}
 
                 {remoteAuth.authError && (
                   <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
