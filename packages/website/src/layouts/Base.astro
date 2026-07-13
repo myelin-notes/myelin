@@ -1,7 +1,5 @@
 ---
 import Seo from '../components/Seo.astro';
-import SiteFooter from '../components/SiteFooter.astro';
-import SiteTopbar from '../components/SiteTopbar.astro';
 import '../styles/global.css';
 
 interface Props {
@@ -47,10 +45,6 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     </script>
   </head>
   <body>
-    <SiteTopbar />
-    <main>
-      <slot />
-    </main>
-    <SiteFooter />
+    <slot />
   </body>
 </html>

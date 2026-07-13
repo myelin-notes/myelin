@@ -1,7 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import CanvasIsland from '../canvas/CanvasIsland';
-import { regions, siteDescription, siteTitle } from '../content/site';
+import { siteDescription, siteTitle } from '../content/site';
 
 const softwareJsonLd = {
   '@context': 'https://schema.org',
@@ -16,21 +15,6 @@ const softwareJsonLd = {
     priceCurrency: 'USD',
   },
 };
-
-// Scroll length of the camera tour: one generous viewport-height segment per
-// region keeps the pacing calm.
-const trackHeight = `${regions.length * 130}vh`;
 ---
 
-<Base title={siteTitle} description={siteDescription} jsonLd={[softwareJsonLd]}>
-  <!-- Scrollbar for the canvas camera; only shown once the notebook is live. -->
-  <div class="canvas-track" style={`height: ${trackHeight}`} aria-hidden="true">
-  </div>
-
-  <!--
-    The live notebook. Loads only on desktop pointers (see CanvasIsland). There
-    is no static/mobile fallback right now; a standalone version will be built
-    separately.
-  -->
-  <CanvasIsland client:only="react" />
-</Base>
+<Base title={siteTitle} description={siteDescription} jsonLd={[softwareJsonLd]} />
