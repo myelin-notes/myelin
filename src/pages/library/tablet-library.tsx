@@ -14,8 +14,8 @@ import {
   Settings,
   X,
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { toast } from 'sonner';
+import { formatRelativeTime } from '@myelin/editor/i18n/format';
 import { errorDescription } from '@/components/command-palette/utils';
 import { SidebarTags } from '@/components/layout/sidebar/sidebar-tags';
 import { useExplorerImports } from '@/components/layout/sidebar/use-explorer-imports';
@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
 import { useLocale, useMessages } from '@/lib/i18n';
-import { formatRelativeTime } from '@myelin/editor/i18n/format';
 import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note/navigation';
 import {
@@ -252,11 +251,7 @@ export function TabletLibrary() {
         id="library-main"
         className="flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
+        <div className="fade-in-0 slide-in-from-bottom-2 animate-in duration-[150ms] ease-out">
           <div className="flex items-center justify-between gap-3">
             <h1
               className="font-extralight font-heading text-text-primary leading-[1.05]"
@@ -483,16 +478,10 @@ export function TabletLibrary() {
 
                   <div className="grid grid-cols-1 gap-4">
                     {recentFiles.map((file, i) => (
-                      <motion.div
+                      <div
                         key={file.id}
-                        className="min-w-0"
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{
-                          duration: 0.4,
-                          delay: i * 0.08,
-                          ease: [0.25, 0.1, 0.25, 1],
-                        }}
+                        className="fade-in-0 slide-in-from-bottom-3 min-w-0 animate-in fill-mode-backwards duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                        style={{ animationDelay: `${i * 80}ms` }}
                       >
                         <RecentCard
                           node={file}
@@ -515,14 +504,14 @@ export function TabletLibrary() {
                           }
                           onChanged={refreshLibraryData}
                         />
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
                 </section>
               )}
             </div>
           </section>
-        </motion.div>
+        </div>
       </main>
 
       <input

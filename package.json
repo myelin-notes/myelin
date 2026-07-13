@@ -62,7 +62,6 @@
     "katex": "^0.17.0",
     "lucide-react": "^0.577.0",
     "minisearch": "^7.2.0",
-    "motion": "^12.38.0",
     "pdfjs-dist": "^5.7.284",
     "perfect-freehand": "^1.2.3",
     "posthog-js": "^1.392.0",

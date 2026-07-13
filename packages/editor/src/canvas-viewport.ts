@@ -1,7 +1,11 @@
-import { type AnimationPlaybackControls, animate } from 'motion';
 import type { Vector2 } from './geometry';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
+
+/** Handle to an in-flight RAF view transition. */
+interface ViewAnimation {
+  stop: () => void;
+}
 
 /**
  * Camera state for the canvas: pan offset, zoom level, the wheel + touch
@@ -24,8 +28,8 @@ export class CanvasViewport {
   private _offset: Vector2 = { x: 0, y: 0 };
   private _zoom: number = 1;
 
-  // Active pan/zoom transition (driven by motion's animate())
-  private _viewAnim: AnimationPlaybackControls | null = null;
+  // Active pan/zoom transition (driven by requestAnimationFrame)
+  private _viewAnim: ViewAnimation | null = null;
 
   // Wheel + touch are attached to the canvas's parent (not the canvas) so
   // they still fire during edit mode, when the canvas has pointer-events: none.
@@ -344,27 +348,33 @@ export class CanvasViewport {
     const startZoom = this._zoom;
 
     this.cancelAnimation();
-    this._viewAnim = animate(0, 1, {
-      duration: 0.7,
-      ease: [0.22, 1, 0.36, 1], // ease-out quint
-      onUpdate: (t) => {
-        const z = startZoom + (targetZoom - startZoom) * t;
-        const sx =
-          startScreenFocus.x + (targetScreenFocus.x - startScreenFocus.x) * t;
-        const sy =
-          startScreenFocus.y + (targetScreenFocus.y - startScreenFocus.y) * t;
-        this._zoom = z;
-        this._offset = {
-          x: sx / z - worldFocus.x,
-          y: sy / z - worldFocus.y,
-        };
-        this._onZoomChange?.(this._zoom);
-        this.notifyViewChange();
-      },
-      onComplete: () => {
+
+    const durationMs = 700;
+    const start = performance.now();
+    let rafId = 0;
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = 1 - (1 - t) ** 5; // ease-out quint
+      const z = startZoom + (targetZoom - startZoom) * eased;
+      const sx =
+        startScreenFocus.x + (targetScreenFocus.x - startScreenFocus.x) * eased;
+      const sy =
+        startScreenFocus.y + (targetScreenFocus.y - startScreenFocus.y) * eased;
+      this._zoom = z;
+      this._offset = {
+        x: sx / z - worldFocus.x,
+        y: sy / z - worldFocus.y,
+      };
+      this._onZoomChange?.(this._zoom);
+      this.notifyViewChange();
+      if (t < 1) {
+        rafId = requestAnimationFrame(step);
+      } else {
         this._viewAnim = null;
-      },
-    });
+      }
+    };
+    rafId = requestAnimationFrame(step);
+    this._viewAnim = { stop: () => cancelAnimationFrame(rafId) };
   }
 
   /**

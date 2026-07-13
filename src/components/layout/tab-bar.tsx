@@ -9,7 +9,6 @@ import {
   Settings,
   X,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
 import { errorDescription } from '@/components/command-palette/utils';
 import { useSidebar } from '@/components/layout/sidebar/context';
@@ -76,16 +75,9 @@ function tabIcon(target: TabTarget) {
 
 function DropIndicator() {
   return (
-    <motion.div
-      layout
-      initial={{ width: 0, opacity: 0 }}
-      animate={{ width: 12, opacity: 1 }}
-      exit={{ width: 0, opacity: 0 }}
-      transition={{ duration: 0.15, ease: 'easeOut' }}
-      className="mb-1 flex shrink-0 items-center justify-center overflow-hidden"
-    >
+    <div className="fade-in-0 mb-1 flex w-3 shrink-0 animate-in items-center justify-center overflow-hidden duration-150">
       <div className="h-5 w-0.5 rounded-full bg-accent-dark" />
-    </motion.div>
+    </div>
   );
 }
 
@@ -254,20 +246,18 @@ export const TabBar = memo(function TabBar({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <AnimatePresence initial={false}>
-          {pane.tabs.map((tab, i) => (
-            <TabItem
-              key={tab.id}
-              tab={tab}
-              isActive={tab.id === pane.activeTabId}
-              isDragging={tab.id === dragTabId}
-              paneId={pane.id}
-              showDropIndicator={dropIndex === i}
-              onDragStateChange={setDragTabId}
-            />
-          ))}
-          {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
-        </AnimatePresence>
+        {pane.tabs.map((tab, i) => (
+          <TabItem
+            key={tab.id}
+            tab={tab}
+            isActive={tab.id === pane.activeTabId}
+            isDragging={tab.id === dragTabId}
+            paneId={pane.id}
+            showDropIndicator={dropIndex === i}
+            onDragStateChange={setDragTabId}
+          />
+        ))}
+        {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
       </div>
 
       {/* Kept outside the scroll strip so it stays beside the tabs and never
@@ -395,9 +385,7 @@ const TabItem = memo(function TabItem({
 
   return (
     <>
-      <AnimatePresence initial={false}>
-        {showDropIndicator && <DropIndicator key="drop" />}
-      </AnimatePresence>
+      {showDropIndicator && <DropIndicator key="drop" />}
       <ContextMenu>
         <ContextMenuTrigger
           render={

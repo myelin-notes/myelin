@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutGrid, Plus } from 'lucide-react';
-import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { formatRelativeTime } from '@myelin/editor/i18n/format';
 import { errorDescription } from '@/components/command-palette/utils';
@@ -94,12 +93,7 @@ export function HomePage() {
         className="flex flex-1 flex-col overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
         {recentFiles.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-            className="flex flex-1 flex-col items-center justify-center text-center"
-          >
+          <div className="fade-in-0 slide-in-from-bottom-2 flex flex-1 animate-in flex-col items-center justify-center text-center duration-[250ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]">
             <div className="flex size-16 items-center justify-center rounded-2xl bg-surface ring-1 ring-border-subtle/70">
               <LayoutGrid className="size-7 text-text-muted" />
             </div>
@@ -123,13 +117,9 @@ export function HomePage() {
               <Plus />
               {strings.library.emptyState.cta}
             </Button>
-          </motion.div>
+          </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-          >
+          <div className="fade-in-0 slide-in-from-bottom-2 animate-in duration-[150ms] ease-out">
             <h1
               className="font-extralight font-heading text-text-primary leading-[1.05]"
               style={{ fontSize: 'var(--fluid-display)' }}
@@ -144,16 +134,10 @@ export function HomePage() {
 
               <div className="grid grid-cols-[repeat(auto-fill,minmax(248px,1fr))] gap-4">
                 {recentFiles.map((file, i) => (
-                  <motion.div
+                  <div
                     key={file.id}
-                    className="min-w-0"
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.4,
-                      delay: i * 0.06,
-                      ease: [0.25, 0.1, 0.25, 1],
-                    }}
+                    className="fade-in-0 slide-in-from-bottom-3 min-w-0 animate-in fill-mode-backwards duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    style={{ animationDelay: `${i * 60}ms` }}
                   >
                     <RecentCard
                       node={file}
@@ -170,11 +154,11 @@ export function HomePage() {
                       }
                       onChanged={loadRecentFiles}
                     />
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             </section>
-          </motion.div>
+          </div>
         )}
       </main>
     </div>

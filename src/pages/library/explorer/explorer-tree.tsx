@@ -8,8 +8,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { VirtualGrid } from '@/components/virtual-grid';
 import { VirtualList } from '@myelin/editor/components/virtual-list';
+import { VirtualGrid } from '@/components/virtual-grid';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
 import {

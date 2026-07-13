@@ -14,7 +14,6 @@ import {
   WifiOff,
   X as XIcon,
 } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
@@ -35,6 +34,7 @@ import {
 } from '@myelin/editor/page-frame/note-link/preview';
 import type { NoteLinkOpenRequestDetail } from '@myelin/editor/page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from '@myelin/editor/page-frame/use-page-frame-autocomplete';
+import { usePresence } from '@myelin/ui';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -502,20 +502,15 @@ function CanvasViewInner({
       inserts.onInsertAudio,
     ],
   );
-  const embedComposer = useMemo(
-    () => (
-      <AnimatePresence>
-        {inserts.embedOpen && (
-          <EmbedComposer
-            key="embed-composer"
-            onEmbedFiles={inserts.submitEmbed}
-            onClose={inserts.closeEmbed}
-          />
-        )}
-      </AnimatePresence>
-    ),
-    [inserts.closeEmbed, inserts.embedOpen, inserts.submitEmbed],
-  );
+  const embedPresence = usePresence(inserts.embedOpen);
+  const embedComposer = embedPresence.mounted ? (
+    <EmbedComposer
+      presenceState={embedPresence.state}
+      onAnimationEnd={embedPresence.onAnimationEnd}
+      onEmbedFiles={inserts.submitEmbed}
+      onClose={inserts.closeEmbed}
+    />
+  ) : null;
   const wheelCenterIcon = useMemo(
     () => <XIcon className="size-4 text-text-on-dark" />,
     [],
@@ -620,26 +615,23 @@ function CanvasViewInner({
         embedComposer={embedComposer}
       />
 
-      <AnimatePresence>
-        {inserts.contextInsert && (
-          <div
-            key="context-insert"
-            className="pointer-events-auto absolute z-20"
-            style={{
-              left: inserts.contextInsert.screenX,
-              top: inserts.contextInsert.screenY,
-            }}
-          >
-            <InsertPopover
-              onInsertFrame={inserts.onContextInsertFrame}
-              onInsertEmbed={inserts.onContextInsertEmbed}
-              onInsertLatex={inserts.onContextInsertLatex}
-              onInsertAudio={inserts.onContextInsertAudio}
-              onClose={inserts.closeContextInsert}
-            />
-          </div>
-        )}
-      </AnimatePresence>
+      {inserts.contextInsert && (
+        <div
+          className="pointer-events-auto absolute z-20"
+          style={{
+            left: inserts.contextInsert.screenX,
+            top: inserts.contextInsert.screenY,
+          }}
+        >
+          <InsertPopover
+            onInsertFrame={inserts.onContextInsertFrame}
+            onInsertEmbed={inserts.onContextInsertEmbed}
+            onInsertLatex={inserts.onContextInsertLatex}
+            onInsertAudio={inserts.onContextInsertAudio}
+            onClose={inserts.closeContextInsert}
+          />
+        </div>
+      )}
 
       <div
         style={{ zIndex: 100 }}
@@ -650,16 +642,13 @@ function CanvasViewInner({
         </WheelPicker>
       </div>
 
-      <AnimatePresence>
-        {chromeMenu && (
-          <ChromeMenu
-            key="chrome-menu"
-            anchor={chromeMenu.anchor}
-            items={chromeMenu.items}
-            onClose={() => setChromeMenu(null)}
-          />
-        )}
-      </AnimatePresence>
+      {chromeMenu && (
+        <ChromeMenu
+          anchor={chromeMenu.anchor}
+          items={chromeMenu.items}
+          onClose={() => setChromeMenu(null)}
+        />
+      )}
 
       <CanvasSearch controller={canvasSearch} />
 

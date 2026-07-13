@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import {
   PaneIdProvider,
@@ -263,25 +262,17 @@ export function PaneDropTarget({
           onDrop={handleOverlayDrop}
         />
       )}
-      <AnimatePresence>
-        {splitIntent && (
-          <SplitPreview key={splitIntent.edge} intent={splitIntent} />
-        )}
-        {showCenter && <CenterPreview key="center" />}
-      </AnimatePresence>
+      {splitIntent && (
+        <SplitPreview key={splitIntent.edge} intent={splitIntent} />
+      )}
+      {showCenter && <CenterPreview key="center" />}
     </div>
   );
 }
 
 function SplitPreview({ intent }: { intent: SplitIntent }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.1, ease: 'easeOut' }}
-      className="pointer-events-none absolute inset-0 z-50"
-    >
+    <div className="fade-in-0 pointer-events-none absolute inset-0 z-50 animate-in duration-100 ease-out">
       {/* Directional wash */}
       <div
         className={cn(
@@ -295,19 +286,13 @@ function SplitPreview({ intent }: { intent: SplitIntent }) {
         className="rounded-full bg-accent-dark/40"
         style={splitLineStyle(intent.edge)}
       />
-    </motion.div>
+    </div>
   );
 }
 
 function CenterPreview() {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.1, ease: 'easeOut' }}
-      className="pointer-events-none absolute inset-0 z-50 rounded-md border-2 border-accent-dark/15"
-    />
+    <div className="fade-in-0 pointer-events-none absolute inset-0 z-50 animate-in rounded-md border-2 border-accent-dark/15 duration-100 ease-out" />
   );
 }
 

@@ -1,4 +1,3 @@
-import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
 export function KindCard({
@@ -27,11 +26,9 @@ export function KindCard({
       )}
     >
       {selected && (
-        <motion.span
-          layoutId="repo-kind-rail"
+        <span
           aria-hidden="true"
-          className="absolute inset-y-2 left-0 w-[2px] rounded-r-full bg-text-brand"
-          transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+          className="fade-in-0 absolute inset-y-2 left-0 w-[2px] animate-in rounded-r-full bg-text-brand duration-150"
         />
       )}
       <span
@@ -64,11 +61,11 @@ export function KindCard({
           selected ? 'border-text-brand' : 'border-border-divider',
         )}
       >
-        <motion.span
-          initial={false}
-          animate={{ scale: selected ? 1 : 0, opacity: selected ? 1 : 0 }}
-          transition={{ type: 'spring', stiffness: 480, damping: 32 }}
-          className="size-[8px] rounded-full bg-text-brand"
+        <span
+          className={cn(
+            'size-[8px] rounded-full bg-text-brand transition duration-200 ease-out',
+            selected ? 'scale-100 opacity-100' : 'scale-0 opacity-0',
+          )}
         />
       </span>
     </button>

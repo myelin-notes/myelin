@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef } from 'react';
-import { motion } from 'motion/react';
 import { useMessages } from '@/lib/i18n';
 import { isMobile } from '@/lib/platform';
 import { KeybindsSection } from './keybinds-section';
@@ -50,12 +49,7 @@ export function SettingsPage() {
         id="settings-main"
         className="flex-1 overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-          className="mx-auto flex w-full max-w-[63rem] gap-12"
-        >
+        <div className="fade-in-0 slide-in-from-bottom-2 mx-auto flex w-full max-w-[63rem] animate-in gap-12 duration-[150ms] ease-out">
           <SettingsRail activeId={activeId} onJump={handleJump} />
 
           <div className="min-w-0 max-w-3xl flex-1">
@@ -80,7 +74,7 @@ export function SettingsPage() {
               <AboutSection />
             </div>
           </div>
-        </motion.div>
+        </div>
       </main>
     </div>
   );

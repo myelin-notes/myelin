@@ -6,7 +6,6 @@ import {
   Mic as MicIcon,
   Sigma as SigmaIcon,
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { getInsertHotkey } from '@myelin/editor/tools/tool-keybinds';
 import { useMessages } from '@/lib/i18n';
 
@@ -161,13 +160,9 @@ export function InsertPopover({
   };
 
   return (
-    <motion.div
+    <div
       ref={panelRef}
-      initial={{ opacity: 0, x: -8, scale: 0.98 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: -8, scale: 0.98 }}
-      transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
-      className="ml-2 w-[260px] overflow-hidden rounded-2xl bg-popover/85 shadow-ambient backdrop-blur-[24px]"
+      className="fade-in-0 slide-in-from-left-2 zoom-in-95 ml-2 w-[260px] animate-in overflow-hidden rounded-2xl bg-popover/85 shadow-ambient backdrop-blur-[24px] duration-[220ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
       role="menu"
       onKeyDown={onPanelKeyDown}
     >
@@ -225,6 +220,6 @@ export function InsertPopover({
           );
         })}
       </div>
-    </motion.div>
+    </div>
   );
 }

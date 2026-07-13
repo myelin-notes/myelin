@@ -6,12 +6,15 @@ import {
   Loader2 as LoaderIcon,
   X as XIcon,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import type { Presence } from '@myelin/ui';
 import { useMessages } from '@/lib/i18n';
 
 interface EmbedComposerProps {
   onEmbedFiles: (files: File[]) => void;
   onClose: () => void;
+  /** Presence wiring from the parent, so the panel animates in and out. */
+  presenceState: Presence['state'];
+  onAnimationEnd: React.AnimationEventHandler;
 }
 
 type UrlState =
@@ -37,7 +40,12 @@ function isSupportedFile(file: File): boolean {
   return /\.(md|markdown|mdx)$/i.test(file.name);
 }
 
-export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
+export function EmbedComposer({
+  onEmbedFiles,
+  onClose,
+  presenceState,
+  onAnimationEnd,
+}: EmbedComposerProps) {
   const strings = useMessages();
   const [urlInput, setUrlInput] = useState('');
   const [urlState, setUrlState] = useState<UrlState>({ kind: 'idle' });
@@ -206,20 +214,18 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
 
   const urlIsValid = URL_PATTERN.test(urlInput.trim());
 
-  const childVariants = {
-    initial: { opacity: 0, y: 6 },
-    animate: { opacity: 1, y: 0 },
-  };
-  const transition = { duration: 0.28, ease: [0.25, 0.1, 0.25, 1] as const };
+  // Staggered fade-in for the panel's rows. `fill-mode-backwards` holds each
+  // row at its hidden `from` keyframe through its delay (tw-animate-css's
+  // animate-in defaults to fill-mode: none, which would flash it visible first).
+  const rowEnter =
+    'animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-backwards duration-[280ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]';
 
   return (
-    <motion.div
+    <div
+      {...presenceState}
+      onAnimationEnd={onAnimationEnd}
       ref={panelRef}
-      initial={{ opacity: 0, x: -8, scale: 0.98 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: -8, scale: 0.98 }}
-      transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
-      className="ml-2"
+      className="data-closed:slide-out-to-left-2 data-closed:zoom-out-95 data-closed:fade-out-0 data-open:slide-in-from-left-2 data-open:zoom-in-95 data-open:fade-in-0 ml-2 duration-[220ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
       onDragEnter={(e) => {
         if (e.dataTransfer?.types.includes('Files')) {
           e.preventDefault();
@@ -254,12 +260,8 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
         )}
 
         {/* Header */}
-        <motion.div
-          variants={childVariants}
-          initial="initial"
-          animate="animate"
-          transition={{ ...transition, delay: 0.02 }}
-          className="flex items-start justify-between gap-3 px-4 pt-4 pb-2"
+        <div
+          className={`flex items-start justify-between gap-3 px-4 pt-4 pb-2 ${rowEnter} delay-[20ms]`}
         >
           <div className="flex flex-col">
             <span className="font-heading text-[20px] text-text-primary leading-tight tracking-[-0.01em]">
@@ -276,142 +278,107 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
           >
             <XIcon className="size-3.5" />
           </button>
-        </motion.div>
+        </div>
 
         {/* URL input */}
-        <motion.div
-          variants={childVariants}
-          initial="initial"
-          animate="animate"
-          transition={{ ...transition, delay: 0.06 }}
-          className="px-4 pb-3"
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {urlState.kind === 'ready' ? (
-              <motion.div
-                key="preview"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={transition}
-                className="overflow-hidden"
-              >
-                <div className="flex items-center gap-2.5 rounded-xl border border-border-divider bg-card p-2 pr-3">
-                  <div className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface">
-                    {urlState.mime === 'application/pdf' ? (
-                      <FileTextIcon className="size-5 text-text-secondary" />
-                    ) : (
-                      <img
-                        src={urlState.previewSrc}
-                        alt=""
-                        className="size-full object-cover"
-                      />
-                    )}
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium text-text-primary text-xs">
-                      {strings.canvas.embedComposer.readyToEmbed}
-                    </span>
-                    <span className="truncate text-[10px] text-text-muted">
-                      {new URL(urlState.url).hostname}
-                    </span>
-                  </div>
-                  <button
-                    onClick={resetUrl}
-                    className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint"
-                    aria-label={strings.common.clear}
-                  >
-                    <XIcon className="size-3" />
-                  </button>
+        <div className={`px-4 pb-3 ${rowEnter} delay-[60ms]`}>
+          {urlState.kind === 'ready' ? (
+            <div className="fade-in-0 animate-in duration-200">
+              <div className="flex items-center gap-2.5 rounded-xl border border-border-divider bg-card p-2 pr-3">
+                <div className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface">
+                  {urlState.mime === 'application/pdf' ? (
+                    <FileTextIcon className="size-5 text-text-secondary" />
+                  ) : (
+                    <img
+                      src={urlState.previewSrc}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  )}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-medium text-text-primary text-xs">
+                    {strings.canvas.embedComposer.readyToEmbed}
+                  </span>
+                  <span className="truncate text-[10px] text-text-muted">
+                    {new URL(urlState.url).hostname}
+                  </span>
                 </div>
                 <button
-                  onClick={handleUrlEmbed}
-                  className="mt-2 w-full cursor-pointer rounded-xl border-none bg-accent-dark px-3 py-2 font-medium text-[13px] text-text-on-dark tracking-[0.005em] transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
+                  onClick={resetUrl}
+                  className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint"
+                  aria-label={strings.common.clear}
                 >
-                  {urlState.mime === 'application/pdf'
-                    ? strings.canvas.embedComposer.embedPdf
-                    : strings.canvas.embedComposer.embedImage}
+                  <XIcon className="size-3" />
                 </button>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="input"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={transition}
+              </div>
+              <button
+                onClick={handleUrlEmbed}
+                className="mt-2 w-full cursor-pointer rounded-xl border-none bg-accent-dark px-3 py-2 font-medium text-[13px] text-text-on-dark tracking-[0.005em] transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
               >
-                <div className="relative flex items-center">
-                  <LinkIcon className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-text-muted" />
-                  <input
-                    type="url"
-                    inputMode="url"
-                    spellCheck={false}
-                    value={urlInput}
-                    onChange={(e) => {
-                      setUrlInput(e.target.value);
-                      if (urlState.kind === 'error') {
-                        setUrlState({ kind: 'idle' });
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && urlIsValid) {
-                        e.preventDefault();
-                        handleUrlSubmit();
-                      }
-                    }}
-                    placeholder={strings.canvas.embedComposer.urlPlaceholder}
-                    className="w-full rounded-xl border border-border-divider bg-card py-2 pr-[68px] pl-8 font-normal text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-accent-dark/50 focus:bg-card"
-                  />
-                  <button
-                    onClick={handleUrlSubmit}
-                    disabled={!urlIsValid || urlState.kind === 'loading'}
-                    className="absolute top-1/2 right-1.5 flex -translate-y-1/2 cursor-pointer items-center gap-1 rounded-lg border-none bg-transparent px-2 py-1 font-medium text-[11px] text-text-muted uppercase tracking-[0.08em] transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-40 disabled:hover:text-text-muted"
-                  >
-                    {urlState.kind === 'loading' ? (
-                      <LoaderIcon className="size-3 animate-spin" />
-                    ) : (
-                      strings.canvas.embedComposer.fetch
-                    )}
-                  </button>
+                {urlState.mime === 'application/pdf'
+                  ? strings.canvas.embedComposer.embedPdf
+                  : strings.canvas.embedComposer.embedImage}
+              </button>
+            </div>
+          ) : (
+            <div className="fade-in-0 animate-in duration-200">
+              <div className="relative flex items-center">
+                <LinkIcon className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-text-muted" />
+                <input
+                  type="url"
+                  inputMode="url"
+                  spellCheck={false}
+                  value={urlInput}
+                  onChange={(e) => {
+                    setUrlInput(e.target.value);
+                    if (urlState.kind === 'error') {
+                      setUrlState({ kind: 'idle' });
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && urlIsValid) {
+                      e.preventDefault();
+                      handleUrlSubmit();
+                    }
+                  }}
+                  placeholder={strings.canvas.embedComposer.urlPlaceholder}
+                  className="w-full rounded-xl border border-border-divider bg-card py-2 pr-[68px] pl-8 font-normal text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-accent-dark/50 focus:bg-card"
+                />
+                <button
+                  onClick={handleUrlSubmit}
+                  disabled={!urlIsValid || urlState.kind === 'loading'}
+                  className="absolute top-1/2 right-1.5 flex -translate-y-1/2 cursor-pointer items-center gap-1 rounded-lg border-none bg-transparent px-2 py-1 font-medium text-[11px] text-text-muted uppercase tracking-[0.08em] transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-40 disabled:hover:text-text-muted"
+                >
+                  {urlState.kind === 'loading' ? (
+                    <LoaderIcon className="size-3 animate-spin" />
+                  ) : (
+                    strings.canvas.embedComposer.fetch
+                  )}
+                </button>
+              </div>
+              {urlState.kind === 'error' && (
+                <div className="fade-in-0 slide-in-from-top-1 mt-1.5 animate-in px-1 text-[11px] text-destructive duration-200">
+                  {urlState.message}
                 </div>
-                {urlState.kind === 'error' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-1.5 px-1 text-[11px] text-destructive"
-                  >
-                    {urlState.message}
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Separator */}
-        <motion.div
-          variants={childVariants}
-          initial="initial"
-          animate="animate"
-          transition={{ ...transition, delay: 0.08 }}
-          className="flex items-center gap-2.5 px-4 pb-3"
+        <div
+          className={`flex items-center gap-2.5 px-4 pb-3 ${rowEnter} delay-[80ms]`}
         >
           <div className="h-px flex-1 bg-border-divider" />
           <span className="font-medium text-[10px] text-text-muted uppercase tracking-[0.18em]">
             {strings.common.or}
           </span>
           <div className="h-px flex-1 bg-border-divider" />
-        </motion.div>
+        </div>
 
         {/* Drop zone */}
-        <motion.div
-          variants={childVariants}
-          initial="initial"
-          animate="animate"
-          transition={{ ...transition, delay: 0.1 }}
-          className="px-4 pb-3"
-        >
+        <div className={`px-4 pb-3 ${rowEnter} delay-[100ms]`}>
           <button
             onClick={handleBrowse}
             className="group relative flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-border-divider border-dashed bg-surface/40 px-4 py-5 transition-colors duration-150 hover:border-accent-dark/40 hover:bg-surface/70"
@@ -429,15 +396,11 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
               </span>
             </div>
           </button>
-        </motion.div>
+        </div>
 
         {/* Footer — shortcut chips */}
-        <motion.div
-          variants={childVariants}
-          initial="initial"
-          animate="animate"
-          transition={{ ...transition, delay: 0.12 }}
-          className="flex items-center justify-between border-border-ghost border-t border-dashed px-4 py-2.5"
+        <div
+          className={`flex items-center justify-between border-border-ghost border-t border-dashed px-4 py-2.5 ${rowEnter} delay-[120ms]`}
         >
           <div className="flex items-center gap-1.5 text-[10.5px] text-text-muted">
             <kbd className="flex min-w-[20px] items-center justify-center rounded-[5px] border border-border-divider bg-card px-1 py-[1px] font-sans font-semibold text-[9.5px] text-text-secondary">
@@ -445,21 +408,15 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
             </kbd>
             <span>{strings.canvas.embedComposer.pasteFromClipboard}</span>
           </div>
-          <AnimatePresence>
-            {pulseKey > 0 && (
-              <motion.span
-                key={pulseKey}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.22 }}
-                className="font-medium text-[10px] text-text-green italic"
-              >
-                {strings.canvas.embedComposer.embedded}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </motion.div>
+          {pulseKey > 0 && (
+            <span
+              key={pulseKey}
+              className="fade-in-0 zoom-in-95 animate-in font-medium text-[10px] text-text-green italic duration-[220ms]"
+            >
+              {strings.canvas.embedComposer.embedded}
+            </span>
+          )}
+        </div>
       </div>
 
       <input
@@ -470,6 +427,6 @@ export function EmbedComposer({ onEmbedFiles, onClose }: EmbedComposerProps) {
         className="hidden"
         onChange={handleFileInput}
       />
-    </motion.div>
+    </div>
   );
 }
