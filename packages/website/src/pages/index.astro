@@ -1,4 +1,5 @@
 ---
+import CanvasIsland from '../canvas/CanvasIsland';
 import Base from '../layouts/Base.astro';
 import { siteDescription, siteTitle } from '../content/site';
 
@@ -17,4 +18,8 @@ const softwareJsonLd = {
 };
 ---
 
-<Base title={siteTitle} description={siteDescription} jsonLd={[softwareJsonLd]} />
+<Base title={siteTitle} description={siteDescription} jsonLd={[softwareJsonLd]}>
+  <!-- The live editor: the real Myelin canvas engine, full screen, with the
+       app's tool rail. Client-only so React Fast Refresh works in dev. -->
+  <CanvasIsland client:only="react" />
+</Base>

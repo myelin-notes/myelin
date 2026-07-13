@@ -1,4 +1,33 @@
+@import 'tailwindcss';
+/* Enter/exit animation utilities (animate-in/out, fade, slide). usePresence
+   gates unmount on the closing animation firing `animationend`, so without
+   these the tool-options panel and other popovers never disappear. */
+@import 'tw-animate-css';
 @import '@myelin/ui/theme.css';
+
+/* Tailwind scans the toolbar components brought over from the app for the
+   utility classes they use. */
+@source './components/**/*.{ts,tsx}';
+@source './canvas/**/*.{ts,tsx}';
+
+:root {
+  /* Canvas chrome tokens the engine reads off the document root (values from
+     the app's foundations.css light palette). */
+  --canvas-grid: rgba(164, 168, 172, 0.35);
+  --selection-stroke: #2f3e46;
+  --selection-fill: rgba(208, 225, 251, 0.15);
+  --border-strong: rgba(195, 199, 202, 0.5);
+  --waveform-track: #d0d5db;
+  --bg-recording: #e03e3e;
+  --bg-code: rgba(242, 244, 246, 0.92);
+  --shadow-rgb: 25 28 30;
+  --shadow-rgb-elevated: 28 39 56;
+}
+
+html,
+body {
+  height: 100%;
+}
 
 html {
   background: var(--bg-page);
