@@ -15,7 +15,11 @@ import { errorDescription } from '@/components/command-palette/utils';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { isMac, TRAFFIC_LIGHT_INSET_CLASS } from '@/lib/platform';
+import {
+  isMac,
+  TAB_BAR_HEIGHT_CLASS,
+  TRAFFIC_LIGHT_INSET_CLASS,
+} from '@/lib/platform';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
@@ -169,7 +173,10 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
       <header
         data-tauri-drag-region
         className={cn(
-          'flex h-11 shrink-0 items-center gap-0.5 px-2',
+          // Match the pane tab-bar height so the graph/settings buttons line up
+          // vertically with the tabs and the macOS traffic lights.
+          'flex shrink-0 items-center gap-0.5 px-2',
+          TAB_BAR_HEIGHT_CLASS,
           // Only macOS right-aligns the buttons, since the traffic lights hold
           // the top-left. Every other platform (Windows, iPad, Linux) has no
           // lights there, so center them instead of stranding them in a corner.
