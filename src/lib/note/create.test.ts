@@ -37,8 +37,8 @@ describe('createBlankCanvasFile', () => {
     expect(ydoc.elements.length).toBe(1);
     expect(Object.fromEntries(ydoc.elements.get(0).entries())).toMatchObject({
       type: ElementType.PAGE_FRAME,
-      offsetX: 0,
-      offsetY: 0,
+      offsetX: 425,
+      offsetY: 110,
       scaleX: 1,
       scaleY: 1,
       zOrder: 0,
