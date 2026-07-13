@@ -4,6 +4,10 @@
    these the tool-options panel and other popovers never disappear. */
 @import 'tw-animate-css';
 @import '@myelin/ui/theme.css';
+/* Styles for DOM the editor renders (canvas text box, tool-option slider, and
+   the page-frame/latex/audio/embed styles for when the site grows into them).
+   Owned by @myelin/editor so the site never reaches into app source. */
+@import '@myelin/editor/styles.css';
 
 /* Tailwind scans the toolbar components brought over from the app for the
    utility classes they use. */
@@ -22,6 +26,8 @@
   --bg-code: rgba(242, 244, 246, 0.92);
   --shadow-rgb: 25 28 30;
   --shadow-rgb-elevated: 28 39 56;
+  /* Tool-option slider track (from foundations.css light palette). */
+  --track: rgba(195, 199, 202, 0.4);
 }
 
 html,
