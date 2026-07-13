@@ -69,18 +69,25 @@ function CanvasEditorInner() {
 
   return (
     <div className="fixed inset-0 touch-none overflow-hidden bg-page">
-      <canvas ref={bgRef} className={layerClass} style={{ zIndex: 0 }} />
-      <div
-        ref={domHostRef}
-        className={`${layerClass} pointer-events-none`}
-        style={{ zIndex: 5 }}
-      />
-      <canvas ref={fgRef} className={layerClass} style={{ zIndex: 10 }} />
-      <canvas
-        ref={overlayRef}
-        className={`${layerClass} pointer-events-none`}
-        style={{ zIndex: 12 }}
-      />
+      {/* Canvas layers live in their own stage. The viewport attaches its
+          wheel listener to the foreground canvas's parent and preventDefaults
+          scrolling, so the toolbar must be a sibling of this stage (not a
+          descendant) or its scrollable menus (e.g. the font picker) can't
+          scroll. */}
+      <div className="absolute inset-0">
+        <canvas ref={bgRef} className={layerClass} style={{ zIndex: 0 }} />
+        <div
+          ref={domHostRef}
+          className={`${layerClass} pointer-events-none`}
+          style={{ zIndex: 5 }}
+        />
+        <canvas ref={fgRef} className={layerClass} style={{ zIndex: 10 }} />
+        <canvas
+          ref={overlayRef}
+          className={`${layerClass} pointer-events-none`}
+          style={{ zIndex: 12 }}
+        />
+      </div>
 
       {ready && (
         <CanvasToolbar
