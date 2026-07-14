@@ -1,4 +1,10 @@
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Trash2 as DeleteIcon } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import {
