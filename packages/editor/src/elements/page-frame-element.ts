@@ -366,6 +366,18 @@ export class PageFrameElement extends DrawableElement {
     this._editing = true;
     this.pmEditor?.setEditable(true);
 
+    // The math source editor is loaded on demand (see MathBlockNodeView), so
+    // whichever formula is clicked first pays for the fetch — and since the
+    // block only reveals its source panel once CodeMirror is attached, that
+    // click reads as a no-op until the module lands. Start it here instead:
+    // becoming editable is the earliest point the source panel can be opened
+    // at all, and it precedes the click by long enough that openEditor takes
+    // its synchronous path. Failures are ignored — the click path loads it
+    // again and reports there.
+    void import('../page-frame/pm/math/source-editor')
+      .then((module) => module.getSharedMathSourceEditor())
+      .catch(() => {});
+
     if (UserPrefs.get('pageFrameEditFitWholePage')) {
       const sx = Math.abs(this._scale.x);
       const sy = Math.abs(this._scale.y);
