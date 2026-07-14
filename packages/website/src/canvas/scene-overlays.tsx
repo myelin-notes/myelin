@@ -58,29 +58,37 @@ function WorldButton({
     fontSize: size,
     lineHeight: 1.2,
     padding: `${size * 0.65}px ${size * 1.3}px`,
-    borderRadius: size * 0.55,
+    // Matches the app button's radius-to-text ratio (rounded-xl on text-sm).
+    borderRadius: size * 0.8,
     ...(x != null && y != null
       ? { position: 'absolute', left: x, top: y }
       : {}),
     ...(variant === 'primary'
       ? {
-          background: '#191c1e',
-          color: '#ffffff',
-          boxShadow:
-            '0 2px 6px rgba(25, 28, 30, 0.22), 0 12px 28px -12px rgba(25, 28, 30, 0.45)',
+          background:
+            'linear-gradient(to bottom, var(--primary), var(--bg-primary-container))',
+          color: 'var(--primary-foreground)',
         }
       : {
-          background: '#ffffff',
-          color: '#191c1e',
-          border: '1.5px solid rgba(25, 28, 30, 0.22)',
-          boxShadow: '0 1px 3px rgba(25, 28, 30, 0.08)',
+          // --card, not --background: these sit straight on the page, and
+          // --background *is* the page colour, so it would not read at all.
+          background: 'var(--card)',
+          color: 'var(--foreground)',
+          // Scaled stand-in for the app's `ring-1 ring-border-ghost`; a real
+          // ring would not scale with the canvas.
+          boxShadow: `0 0 0 ${size * 0.06}px var(--border-subtle)`,
         }),
   };
-  const className =
-    'pointer-events-auto inline-block cursor-pointer whitespace-nowrap no-underline transition-transform duration-200 hover:-translate-y-[2px] active:translate-y-0';
+  const className = [
+    'pointer-events-auto inline-block cursor-pointer whitespace-nowrap no-underline',
+    'transition-colors active:translate-y-px',
+    variant === 'primary'
+      ? 'hover:brightness-110 active:brightness-95'
+      : 'hover:bg-hover-tint',
+  ].join(' ');
   const inner = (
     <span className="flex flex-col items-start">
-      <span className="font-semibold">{children}</span>
+      <span className="font-medium">{children}</span>
       {sub && (
         <span style={{ fontSize: size * 0.65, opacity: 0.7 }}>{sub}</span>
       )}

@@ -43,3 +43,48 @@ html {
   color: var(--text-primary);
   font-family: var(--font-sans);
 }
+
+/* Site chrome. Sits above the canvas layers (z 0-12) but below the tool rail
+   (z 100) and the command palette, so nothing the visitor opens is covered. */
+.site-topbar {
+  align-items: center;
+  backdrop-filter: blur(12px);
+  background: var(--bg-toolbar);
+  border-bottom: 1px solid var(--border-divider);
+  display: flex;
+  gap: 0.75rem;
+  height: 3rem;
+  left: 0;
+  padding: 0 1rem;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 40;
+}
+
+.site-topbar .wordmark {
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  text-decoration: none;
+}
+
+.site-topbar .badge {
+  background: var(--bg-tag);
+  border-radius: 999px;
+  color: var(--text-tag);
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.15rem 0.55rem;
+}
+
+.site-topbar .topbar-download {
+  background: var(--accent-dark);
+  border-radius: 0.4rem;
+  color: var(--text-on-dark);
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-left: auto;
+  padding: 0.4rem 0.8rem;
+  text-decoration: none;
+}

@@ -10,6 +10,10 @@ import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { CanvasToolbar } from '@/components/canvas-toolbar';
+import {
+  CommandPalette,
+  type PaletteCommand,
+} from '@/components/command-palette';
 import { SceneRail, ScrollHint } from '@/components/scene-rail';
 import { SelectionToolbar } from '@/components/selection-toolbar';
 import { useFakeScroll } from '@/hooks/use-fake-scroll';
@@ -85,6 +89,7 @@ function CanvasEditorInner() {
   const [editingElement, setEditingElement] = useState<DrawableElement | null>(
     null,
   );
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const { canvasTools, setSelectedToolIndex, hideOptions } = toolState;
 
@@ -173,6 +178,51 @@ function CanvasEditorInner() {
     },
   });
 
+  // Cmd/Ctrl+P toggles the palette. The fake scroll ignores modified keys, so
+  // this can't collide with scene stepping. preventDefault is load-bearing
+  // here: it suppresses the browser's Print dialog.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // The topbar is static Astro markup outside this island, so its Download
+  // link is wired here: the canvas is the whole page, so there is no anchor to
+  // follow, only a scene to fly to.
+  useEffect(() => {
+    const link = document.querySelector('[data-download-platform-jump]');
+    if (!link) {
+      return;
+    }
+    const handleClick = (event: Event) => {
+      event.preventDefault();
+      goTo(SCENES.length - 1);
+    };
+    link.addEventListener('click', handleClick);
+    return () => link.removeEventListener('click', handleClick);
+  }, [goTo]);
+
+  const paletteCommands: PaletteCommand[] = [
+    {
+      id: 'download',
+      group: 'Get it' as const,
+      label: 'Download Myelin Notes',
+      run: () => goTo(SCENES.length - 1),
+    },
+    ...SCENES.map((scene, i) => ({
+      id: `scene-${scene.id}`,
+      group: 'Go to' as const,
+      label: scene.label,
+      run: () => goTo(i),
+    })),
+  ];
+
   // Keep the active scene framed across window resizes.
   const refitScene = useEffectEvent(() => {
     drawableCanvasRef.current?.viewport.animateViewToFitRect(
@@ -257,6 +307,12 @@ function CanvasEditorInner() {
 
       <SceneRail scenes={SCENES} index={index} onSelect={goTo} />
       <ScrollHint visible={index === 0} />
+
+      <CommandPalette
+        open={paletteOpen}
+        commands={paletteCommands}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   );
 }
