@@ -228,65 +228,10 @@
   --color-recording-hover: var(--bg-recording-hover);
 }
 
-/* `.pdf-export-light` mirrors the light palette so the offscreen PDF export
-   clone resolves light-mode colors even while the app runs in dark mode
-   (see page-frame-harvest.ts). */
-:root,
-.pdf-export-light {
-  --background: #f7f9fb;
-  --foreground: #191c1e;
-  --card: #ffffff;
-  --card-foreground: #191c1e;
-  --popover: #ffffff;
-  --popover-foreground: #191c1e;
-  --primary: #1c2738;
-  --primary-foreground: #ffffff;
-  --secondary: #f2f4f6;
-  --secondary-foreground: #191c1e;
-  --muted: #f2f4f6;
-  --muted-foreground: #64748b;
-  --accent: #6ffbbe;
-  --accent-foreground: #005236;
-  --destructive: #ef4444;
-  --border: rgba(195, 199, 202, 0.2);
-  --input: #f2f4f6;
-  --ring: #1c2738;
-  --radius: 0.5rem;
-
-  /* Theme colors — light mode */
-  --bg-page: #f7f9fb;
-  --bg-surface: #f2f4f6;
-  --bg-sidebar: #e0e3e5;
-  --bg-card: #ffffff;
-  --bg-card-active: #ffffff;
-  --bg-tag: #d0e1fb;
-  --bg-tag-active: #1c2738;
-  --bg-input: #f2f4f6;
-  --bg-accent-green: #6ffbbe;
-  --bg-toolbar: rgba(255, 255, 255, 0.8);
-
-  --text-primary: #191c1e;
-  --text-secondary: #43474a;
-  --text-muted: #5b6677;
-  --text-on-dark: #ffffff;
-  --text-green: #005236;
-  --text-tag: #54647a;
-  --text-brand: #2f3e46;
-
-  --accent-dark: #1c2738;
-  --accent-navy: #2f3e46;
-  --text-link: #2563eb;
-  --text-success: #1f5b3f;
-  --bg-success-soft: #e3f3e8;
-  --text-error: #8a2a2a;
-  --bg-error-soft: #f7e6e4;
-
-  --bg-hover-tint: rgba(25, 28, 30, 0.05);
-  --scrollbar-thumb: rgba(25, 28, 30, 0.22);
-  --scrollbar-thumb-hover: rgba(25, 28, 30, 0.38);
-  --bg-secondary-container: #dce4ed;
-  --bg-primary-container: #2a3a50;
-
+/* App-only tokens. The base palette lives in @myelin/ui/theme.css and the
+   editor's own tokens in @myelin/editor/styles.css; both are imported by
+   index.css ahead of this file. */
+:root {
   /* Note graph — faint connective line plus a green accent for a selected
      node's outgoing links; incoming links reuse --accent-dark. Nodes are flat
      solid discs: a muted slate by default, swapping to a high-contrast fill
@@ -295,23 +240,9 @@
   --graph-edge-outgoing: #2a9d6f;
   --graph-node: #6c7787;
   --graph-node-active: #1b1f26;
-  --bg-accent-amber: #fbbf24;
-  --bg-accent-amber-strong: #f59e0b;
 
-  --gradient-thumb-placeholder: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.42),
-      rgba(255, 255, 255, 0) 48%
-    ),
-    radial-gradient(circle, rgba(28, 39, 56, 0.12) 1px, transparent 1px);
-
-  --border-subtle: rgba(195, 199, 202, 0.2);
-  --border-divider: rgba(195, 199, 202, 0.3);
-  --border-ghost: rgba(195, 199, 202, 0.15);
-
-  --bg-key: rgba(0, 0, 0, 0.04);
-  --border-key: rgba(0, 0, 0, 0.08);
-  --shadow-key: 0 1px 0 rgba(0, 0, 0, 0.04);
+  --scrollbar-thumb: rgba(25, 28, 30, 0.22);
+  --scrollbar-thumb-hover: rgba(25, 28, 30, 0.38);
 
   /* Dialog / popover scrims */
   --overlay: rgba(25, 28, 30, 0.1);
@@ -321,47 +252,9 @@
   --sh-ambient: 0 0 32px 0 rgba(25, 28, 30, 0.06);
   --sh-elevated: 0 18px 40px -24px rgba(28, 39, 56, 0.18);
 
-  /* Accent-dark interaction states */
-  --accent-dark-hover: #2d3f54;
-  --accent-dark-active: #111d2a;
-  --accent-muted: #5f6f85;
-
-  /* Recording / live-capture surfaces */
-  --bg-recording: #e03e3e;
-  --bg-recording-hover: #c73333;
-
   /* Warning (amber) */
   --bg-warning-soft: rgba(245, 158, 11, 0.1);
   --text-warning: #b45309;
-
-  /* Editor code surfaces */
-  --bg-code: rgba(242, 244, 246, 0.92);
-  --bg-inline-code: rgba(28, 39, 56, 0.08);
-
-  /* Stronger hairline + accent rule (blockquote / callout) */
-  --border-strong: rgba(195, 199, 202, 0.5);
-  --rule-accent: rgba(47, 62, 70, 0.28);
-
-  /* Range / slider track */
-  --track: rgba(195, 199, 202, 0.4);
-
-  /* Canvas chrome — read at runtime via getComputedStyle (see canvas-theme.ts) */
-  --canvas-grid: rgba(164, 168, 172, 0.35);
-  --selection-stroke: #2f3e46;
-  --selection-fill: rgba(208, 225, 251, 0.15);
-  --waveform-track: #d0d5db;
-
-  /* CodeMirror text selection tint */
-  --editor-selection: #0969da26;
-
-  /* Code syntax highlight — GitHub light */
-  --syntax-comment: #6e7781;
-  --syntax-keyword: #cf222e;
-  --syntax-string: #0a3069;
-  --syntax-constant: #0550ae;
-  --syntax-type: #953800;
-  --syntax-function: #8250df;
-  --syntax-tag: #116329;
 
   /* Brand accent dot */
   --brand-dot: #1abd84;
@@ -369,84 +262,13 @@
 
 /* Dark mode — deep slate surfaces, light text, mint accent preserved */
 .dark {
-  --background: #0e1216;
-  --foreground: #e4e7e9;
-  --card: #1e242c;
-  --card-foreground: #e4e7e9;
-  --popover: #1c2127;
-  --popover-foreground: #e4e7e9;
-  --primary: #e3e8ef;
-  --primary-foreground: #11161d;
-  --secondary: #232830;
-  --secondary-foreground: #e4e7e9;
-  --muted: #232830;
-  --muted-foreground: #8b95a3;
-  --accent: #6ffbbe;
-  --accent-foreground: #00301f;
-  --destructive: #f87171;
-  --border: rgba(255, 255, 255, 0.1);
-  --input: #232830;
-  --ring: #5a6b85;
-
-  /* Theme colors — dark mode. Surfaces form an elevation ladder (page is
-     darkest, cards sit above it); hover targets are a clear step lighter so
-     hover feedback reads on dark. */
-  --bg-page: #0e1216;
-  --bg-surface: #191e25;
-  --bg-sidebar: #121620;
-  --bg-card: #1e242c;
-  --bg-card-active: #262d37;
-  --bg-tag: #25344a;
-  --bg-tag-active: #44597a;
-  --bg-input: #191e25;
-  --bg-accent-green: #6ffbbe;
-  --bg-toolbar: rgba(23, 27, 32, 0.8);
-
-  --text-primary: #e4e7e9;
-  --text-secondary: #b8bdc2;
-  --text-muted: #8b95a3;
-  --text-on-dark: #ffffff;
-  --text-green: #6ffbbe;
-  --text-tag: #9fb0c4;
-  --text-brand: #cdd6dd;
-
-  --accent-dark: #2a3a50;
-  --accent-navy: #34465e;
-  --text-link: #6ea8fe;
-  --text-success: #6ee7a8;
-  --bg-success-soft: #14271d;
-  --text-error: #f1a3a3;
-  --bg-error-soft: #2c1818;
-
-  --bg-hover-tint: rgba(255, 255, 255, 0.07);
-  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.32);
-  --bg-secondary-container: #232c38;
-  /* Light, so the gradient primary button (from-primary → primary-container)
-     stays a coherent light CTA with dark text in dark mode. */
-  --bg-primary-container: #c8d2e0;
-
   --graph-edge: #5a6573;
   --graph-edge-outgoing: #34d399;
   --graph-node: #828d9d;
   --graph-node-active: #e6e9ec;
-  --bg-accent-amber: #fbbf24;
-  --bg-accent-amber-strong: #f59e0b;
 
-  --gradient-thumb-placeholder: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.08),
-      rgba(255, 255, 255, 0) 48%
-    ),
-    radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-divider: rgba(255, 255, 255, 0.12);
-  --border-ghost: rgba(255, 255, 255, 0.05);
-
-  --bg-key: rgba(255, 255, 255, 0.06);
-  --border-key: rgba(255, 255, 255, 0.12);
-  --shadow-key: 0 1px 0 rgba(0, 0, 0, 0.4);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.32);
 
   /* Dialog / popover scrims — deeper on dark so the panel reads above the page */
   --overlay: rgba(0, 0, 0, 0.5);
@@ -456,47 +278,9 @@
   --sh-ambient: 0 0 32px 0 rgba(0, 0, 0, 0.4);
   --sh-elevated: 0 18px 40px -24px rgba(0, 0, 0, 0.5);
 
-  /* Accent-dark interaction states — step lighter than the base navy */
-  --accent-dark-hover: #34465e;
-  --accent-dark-active: #1f2c3e;
-  --accent-muted: #4a5870;
-
-  /* Recording / live-capture surfaces */
-  --bg-recording: #f05252;
-  --bg-recording-hover: #e04444;
-
   /* Warning (amber) */
   --bg-warning-soft: rgba(245, 158, 11, 0.15);
   --text-warning: #fbbf24;
-
-  /* Editor code surfaces */
-  --bg-code: rgba(35, 40, 48, 0.7);
-  --bg-inline-code: rgba(255, 255, 255, 0.1);
-
-  /* Stronger hairline + accent rule (blockquote / callout) */
-  --border-strong: rgba(255, 255, 255, 0.15);
-  --rule-accent: rgba(159, 176, 196, 0.3);
-
-  /* Range / slider track */
-  --track: rgba(255, 255, 255, 0.12);
-
-  /* Canvas chrome — read at runtime via getComputedStyle (see canvas-theme.ts) */
-  --canvas-grid: rgba(255, 255, 255, 0.08);
-  --selection-stroke: #9fb0c4;
-  --selection-fill: rgba(120, 160, 220, 0.2);
-  --waveform-track: #3a424d;
-
-  /* CodeMirror text selection tint */
-  --editor-selection: rgba(110, 168, 254, 0.25);
-
-  /* Code syntax highlight — GitHub dark */
-  --syntax-comment: #8b949e;
-  --syntax-keyword: #ff7b72;
-  --syntax-string: #a5d6ff;
-  --syntax-constant: #79c0ff;
-  --syntax-type: #ffa657;
-  --syntax-function: #d2a8ff;
-  --syntax-tag: #7ee787;
 
   /* Brand accent dot */
   --brand-dot: #1abd84;

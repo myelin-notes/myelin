@@ -5,6 +5,9 @@
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
+  /* Entering edit mode focuses the contenteditable root; the page frame draws
+     its own edit chrome, so suppress the UA focus ring. */
+  outline: none;
 }
 
 /* The doubled .ProseMirror outranks later block rules with equal specificity
