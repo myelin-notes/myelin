@@ -35,18 +35,15 @@ export const copy = {
     tryIt: 'this whole page is the real canvas.\ntry drawing on it!',
   },
 
-  problem: {
-    heading: 'Stop choosing between\nthree half-notes.',
-    body: 'Handwriting apps, typed outliners, and PDF readers each hold a piece of your thinking. Real notes mix all three. Myelin is the canvas where they finally coexist.',
-    boxes: ['Handwriting app', 'Typed outliner', 'PDF reader'],
-    convergence: 'one canvas',
-  },
-
   ink: {
     heading: 'An infinite canvas that\nkeeps up with your pen.',
     body: 'Pressure-sensitive ink, a highlighter, an eraser, text, and images share one surface. Draw a rough rectangle and hold still: shape recognition swaps it for a clean one.',
     annotation: 'draw a shape + hold',
     recognized: 'recognized!',
+    pdfHeading: 'PDFs are first-class citizens.',
+    pdfBody:
+      'Drop a PDF onto the canvas, read it, and write directly on it in the same ink. When you are done, export the annotated PDF back out.',
+    pdfAnnotation: 'ink goes right on the page',
   },
 
   pages: {
@@ -81,12 +78,6 @@ for step in range(3):
     print(round(v, 1))
 \`\`\`
 `,
-  },
-
-  pdf: {
-    heading: 'PDFs are first-class citizens.',
-    body: 'Drop a PDF onto the canvas, read it, and write directly on it in ink. When you are done, export the annotated PDF back out.',
-    annotation: 'ink goes right on the page',
   },
 
   audioSearch: {
@@ -127,16 +118,6 @@ for step in range(3):
     },
   },
 
-  collab: {
-    heading: 'Live collaboration,\nno server in the middle.',
-    body: 'Share a note and edit together in real time, peer to peer. Ink, text, and annotations sync live between machines while everything still lives locally, with owner, editor, and viewer roles.',
-    kicker:
-      'Real-time collaboration is usually the excuse for putting your notes in someone’s cloud. Myelin does it without one.',
-    cursorYou: 'you',
-    cursorPeer: 'ada',
-    sharedNote: 'same note,\ntwo machines,\nzero servers',
-  },
-
   linked: {
     heading: 'Your notes, connected.',
     body: '[[Note links]], backlinks, and hover preview cards keep related ideas one hop away. The command palette jumps you anywhere, and per-file version history restores any earlier state of a note.',
@@ -158,15 +139,27 @@ for step in range(3):
       'Source available on GitHub under FSL-1.1, converting to Apache 2.0 after two years.',
     ],
     cta: 'View the source on GitHub',
+    lockInHeading: 'No lock-in.\nBring your own AI.',
+    importBody:
+      'Import from Obsidian and GoodNotes today; a Notion importer is on the roadmap. Export to PDF, images, or full workspace JSON. Your data leaves as easily as it arrives.',
+    mcpBody:
+      'A built-in MCP server lets Claude, or any MCP client, read and create notes locally. No cloud AI is ever forced on you.',
+    importLabel: 'obsidian · goodnotes → in',
+    exportLabel: 'pdf · images · json → out',
   },
 
   sync: {
-    heading: 'Sync your way.',
+    heading: 'Sync and collaborate,\nno server in the middle.',
+    kicker:
+      'Real-time collaboration is usually the excuse for putting your notes in someone’s cloud. Myelin does it without one.',
+    cursorYou: 'you',
+    cursorPeer: 'ada',
+    sharedNote: 'same note,\ntwo machines,\nzero servers',
     tiers: [
       {
         badge: 'Today',
         title: 'Live collaboration',
-        body: 'Invite someone into a note and edit together in real time, peer to peer over iroh. No account, no server in the middle: the connection is between your machines.',
+        body: 'Invite someone into a note and edit together in real time, peer to peer over iroh. Ink, text, and annotations sync live, with owner, editor, and viewer roles.',
       },
       {
         badge: 'Today',
@@ -179,16 +172,6 @@ for step in range(3):
         body: 'Optional end-to-end encrypted cloud sync for always-on, multi-device sync. Founding Supporters get a lifetime discount when it launches.',
       },
     ],
-  },
-
-  lockIn: {
-    heading: 'No lock-in.\nBring your own AI.',
-    importBody:
-      'Import from Obsidian and GoodNotes today; a Notion importer is on the roadmap. Export to PDF, images, or full workspace JSON. Your data leaves as easily as it arrives.',
-    mcpBody:
-      'A built-in MCP server lets Claude, or any MCP client, read and create notes locally. No cloud AI is ever forced on you.',
-    importLabel: 'obsidian · goodnotes → in',
-    exportLabel: 'pdf · images · json → out',
   },
 
   supporter: {
@@ -205,29 +188,6 @@ for step in range(3):
     ctaSecondary: 'Support on Ko-fi',
   },
 
-  roadmap: {
-    heading: 'Built in the open.',
-    body: 'No promised dates, just a public trajectory. Follow along or open an issue.',
-    columns: [
-      {
-        title: 'Soon · v0.6 to v0.7',
-        items:
-          'Citations and bibliographies\nZotero integration\nMermaid diagrams\nCanvas connectors\nTemplates and outlines\nSaved searches\nAccessibility pass',
-      },
-      {
-        title: 'Later · v0.8 to v0.9',
-        items:
-          'iPad and mobile apps\nPerformance at scale:\nlarge canvases, big PDFs',
-      },
-      {
-        title: 'v1.0',
-        items:
-          'Shared notebooks\nTeam collaboration\nOptional E2E-encrypted\ncloud sync',
-      },
-    ],
-    cta: 'Follow the roadmap on GitHub',
-  },
-
   download: {
     heading: 'Take your notes home.',
     body: 'Native builds with auto-updates built in. English, Spanish, and Simplified Chinese today.',
@@ -236,7 +196,7 @@ for step in range(3):
       { key: 'windows', label: 'Download for Windows', sub: 'Windows 10+' },
       { key: 'linux', label: 'Download for Linux', sub: 'AppImage' },
     ],
-    ipadBadge: 'iPad app coming (roadmap v0.8)',
+    ipadBadge: 'iPad app coming (v0.8)',
     faqTitle: 'FAQ',
     faqMarkdown: `# FAQ
 

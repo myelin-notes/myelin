@@ -1,7 +1,7 @@
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { copy, siteLinks } from '@/content/site';
-import { COLLAB_CURSORS, SCENE_PAD, sceneById } from './scenes';
+import { COLLAB_CURSORS, INK_PDF_MOCK, SCENE_PAD, sceneById } from './scenes';
 import {
   AudioCardMock,
   LiveCursor,
@@ -120,26 +120,26 @@ function WorldButton({
  * the background grid canvas and the foreground element canvas.
  */
 export function SceneUnderlay({ canvas }: { canvas: DrawableCanvas }) {
-  const pdf = sceneById('pdf').rect;
+  const ink = sceneById('ink').rect;
   const audio = sceneById('audio-search').rect;
-  const collab = sceneById('collab').rect;
+  const sync = sceneById('sync').rect;
 
   return (
     <WorldLayer canvas={canvas} zIndex={1}>
-      <PdfPageMock x={pdf.x + 930} y={pdf.y + 120} />
+      <PdfPageMock x={ink.x + INK_PDF_MOCK.dx} y={ink.y + INK_PDF_MOCK.dy} />
       <AudioCardMock x={audio.x + SCENE_PAD} y={audio.y + 470} />
       <SearchPaletteMock x={audio.x + 970} y={audio.y + 470} />
       <LiveCursor
-        x={collab.x + COLLAB_CURSORS.you.dx}
-        y={collab.y + COLLAB_CURSORS.you.dy}
+        x={sync.x + COLLAB_CURSORS.you.dx}
+        y={sync.y + COLLAB_CURSORS.you.dy}
         color="#3b82f6"
-        name={copy.collab.cursorYou}
+        name={copy.sync.cursorYou}
       />
       <LiveCursor
-        x={collab.x + COLLAB_CURSORS.peer.dx}
-        y={collab.y + COLLAB_CURSORS.peer.dy}
+        x={sync.x + COLLAB_CURSORS.peer.dx}
+        y={sync.y + COLLAB_CURSORS.peer.dy}
         color="#ec4899"
-        name={copy.collab.cursorPeer}
+        name={copy.sync.cursorPeer}
       />
     </WorldLayer>
   );
@@ -161,7 +161,6 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
   const hero = sceneById('hero').rect;
   const localFirst = sceneById('local-first').rect;
   const supporter = sceneById('supporter').rect;
-  const roadmap = sceneById('roadmap').rect;
   const download = sceneById('download').rect;
 
   return (
@@ -183,10 +182,10 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
         </WorldButton>
       </div>
 
-      {/* Local-first: source link. */}
+      {/* Local-first: source link, under the last bullet. */}
       <WorldButton
         x={localFirst.x + SCENE_PAD}
-        y={localFirst.y + SCENE_PAD + 810}
+        y={localFirst.y + SCENE_PAD + 850}
         href={siteLinks.github}
         variant="outline"
       >
@@ -209,16 +208,6 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
           {copy.supporter.ctaSecondary}
         </WorldButton>
       </div>
-
-      {/* Roadmap link. */}
-      <WorldButton
-        x={roadmap.x + SCENE_PAD}
-        y={roadmap.y + SCENE_PAD + 800}
-        href={siteLinks.roadmap}
-        variant="outline"
-      >
-        {copy.roadmap.cta}
-      </WorldButton>
 
       {/* Download buttons, one per platform, detected OS first. */}
       <div

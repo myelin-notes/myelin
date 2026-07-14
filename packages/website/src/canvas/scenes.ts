@@ -30,18 +30,13 @@ const Y_LOW = 1050;
 
 const SIZES: Array<{ id: string; label: string; w: number; h: number }> = [
   { id: 'hero', label: 'Myelin', w: 2000, h: 1000 },
-  { id: 'problem', label: 'Why', w: 1750, h: 800 },
-  { id: 'ink', label: 'Ink', w: 1850, h: 950 },
+  { id: 'ink', label: 'Ink & PDFs', w: 2570, h: 1270 },
   { id: 'pages', label: 'Pages', w: 1900, h: 1350 },
-  { id: 'pdf', label: 'PDFs', w: 1850, h: 1100 },
   { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000 },
-  { id: 'collab', label: 'Live collab', w: 1850, h: 900 },
   { id: 'linked', label: 'Linked notes', w: 1750, h: 800 },
-  { id: 'local-first', label: 'Local-first', w: 1750, h: 1100 },
-  { id: 'sync', label: 'Sync', w: 1950, h: 750 },
-  { id: 'lock-in', label: 'No lock-in', w: 1750, h: 900 },
+  { id: 'local-first', label: 'Local-first', w: 2200, h: 1150 },
+  { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150 },
   { id: 'supporter', label: 'Support', w: 1800, h: 1150 },
-  { id: 'roadmap', label: 'Roadmap', w: 1950, h: 1100 },
   { id: 'download', label: 'Download', w: 2100, h: 1400 },
 ];
 
@@ -347,39 +342,8 @@ function buildHero(canvas: DrawableCanvas, r: WorldRect): void {
   addStroke(canvas, sketchStar(r.x + 1380, r.y + 650, 85), ORANGE, 6);
 }
 
-function buildProblem(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
-  const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.problem.heading, 62, 820);
-  addText(canvas, x, y + 240, copy.problem.body, {
-    size: 26,
-    color: MUTED,
-    width: 760,
-  });
-
-  // Three app boxes funneling into one circled canvas. Each arrow lands on
-  // the ellipse's left rim at its own height so the heads never overlap.
-  const bx = r.x + 1000;
-  const ex = bx + 640;
-  const ey = y + 260;
-  const targets: Pt[] = [
-    [ex - 128, ey - 62],
-    [ex - 168, ey],
-    [ex - 128, ey + 62],
-  ];
-  copy.problem.boxes.forEach((label, i) => {
-    const by = y + i * 190;
-    addShape(canvas, 'rect', bx, by, [0, 0, 330, 110], MUTED, 3);
-    addText(canvas, bx + 34, by + 38, label, {
-      size: 24,
-      color: INK,
-      width: 280,
-    });
-    drawArrow(canvas, [bx + 366, by + 55], targets[i], MUTED, 4);
-  });
-  addStroke(canvas, sketchEllipse(ex, ey, 150, 92, 1.7), ORANGE, 7);
-  hand(canvas, ex - 92, ey - 30, copy.problem.convergence, INK, 44, 200);
-}
+/** Where the PDF mock's top-left corner sits (DOM underlay, world-layer.tsx). */
+export const INK_PDF_MOCK = { dx: 1700, dy: 320 } as const;
 
 function buildInk(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
@@ -416,23 +380,46 @@ function buildInk(canvas: DrawableCanvas, r: WorldRect): void {
     7,
   );
 
-  // Shape recognition, shown twice: rough sketch -> arrow -> clean shape.
-  const sx = r.x + 1000;
+  // Middle column: shape recognition, shown twice, rough sketch -> clean shape.
+  const sx = r.x + 960;
   addStroke(
     canvas,
-    sketchEllipse(sx + 130, y + 160, 130, 92, 0.4, 0.09),
+    sketchEllipse(sx + 130, y + 200, 130, 92, 0.4, 0.09),
     INK,
     6,
   );
-  drawArrow(canvas, [sx + 300, y + 160], [sx + 420, y + 160], MUTED, 5);
-  addShape(canvas, 'ellipse', sx + 450, y + 75, [0, 0, 270, 170], INK, 6);
-  hand(canvas, sx + 20, y + 290, copy.ink.annotation, BLUE, 34, 320);
+  drawArrow(canvas, [sx + 300, y + 200], [sx + 420, y + 200], MUTED, 5);
+  addShape(canvas, 'ellipse', sx + 450, y + 115, [0, 0, 270, 170], INK, 6);
+  hand(canvas, sx + 20, y + 330, copy.ink.annotation, BLUE, 34, 320);
 
-  addStroke(canvas, sketchRect(sx + 20, y + 450, 250, 150, 6), INK, 6);
-  drawArrow(canvas, [sx + 310, y + 525], [sx + 420, y + 525], MUTED, 5);
-  addShape(canvas, 'rect', sx + 450, y + 450, [0, 0, 270, 150], INK, 6);
-  hand(canvas, sx + 470, y + 640, copy.ink.recognized, GREEN, 34, 220);
-  drawCheck(canvas, sx + 640, y + 650, 1.2);
+  addStroke(canvas, sketchRect(sx + 20, y + 560, 250, 150, 6), INK, 6);
+  drawArrow(canvas, [sx + 310, y + 635], [sx + 420, y + 635], MUTED, 5);
+  addShape(canvas, 'rect', sx + 450, y + 560, [0, 0, 270, 150], INK, 6);
+  hand(canvas, sx + 470, y + 750, copy.ink.recognized, GREEN, 34, 220);
+  drawCheck(canvas, sx + 640, y + 760, 1.2);
+
+  // Right column: the same ink, on a PDF. Caption sits above the mock page
+  // (DOM underlay at INK_PDF_MOCK, see scene-overlays.tsx); the annotation
+  // offsets below track the mock's skeleton bars, so the circle rings the
+  // equation and the highlight and underline ride their own sentences.
+  const px = r.x + INK_PDF_MOCK.dx;
+  const py = r.y + INK_PDF_MOCK.dy;
+  title(canvas, px, y, copy.ink.pdfHeading, 46, 700);
+  addText(canvas, px, y + 80, copy.ink.pdfBody, {
+    size: 24,
+    color: MUTED,
+    width: 700,
+  });
+  addStroke(canvas, sketchEllipse(px + 390, py + 314, 200, 62, 2.2), PINK, 6);
+  addStroke(
+    canvas,
+    wobblyLine([px + 66, py + 482], [px + 560, py + 478], 4, 0.9),
+    HIGHLIGHT,
+    40,
+  );
+  drawUnderline(canvas, px + 64, py + 634, 380, BLUE, 5);
+  hand(canvas, px + 470, py + 690, copy.ink.pdfAnnotation, BLUE, 34, 320);
+  drawArrow(canvas, [px + 520, py + 672], [px + 430, py + 508], BLUE, 4);
 }
 
 async function buildPages(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
@@ -456,34 +443,6 @@ async function buildPages(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   );
 }
 
-function buildPdf(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
-  const y = r.y + SCENE_PAD;
-  title(canvas, x, y + 80, copy.pdf.heading, 62, 760);
-  addText(canvas, x, y + 260, copy.pdf.body, {
-    size: 26,
-    color: MUTED,
-    width: 700,
-  });
-
-  // Ink annotations over the mock PDF page (DOM underlay renders the page at
-  // these same coordinates, see scene-overlays.tsx). Offsets track the page's
-  // skeleton bars: the circle rings the equation, the highlight and underline
-  // ride their own sentences.
-  const px = r.x + 930;
-  const py = r.y + 120;
-  addStroke(canvas, sketchEllipse(px + 390, py + 314, 200, 62, 2.2), PINK, 6);
-  addStroke(
-    canvas,
-    wobblyLine([px + 66, py + 482], [px + 560, py + 478], 4, 0.9),
-    HIGHLIGHT,
-    40,
-  );
-  drawUnderline(canvas, px + 64, py + 634, 380, BLUE, 5);
-  hand(canvas, px + 470, py + 690, copy.pdf.annotation, BLUE, 34, 320);
-  drawArrow(canvas, [px + 520, py + 672], [px + 430, py + 508], BLUE, 4);
-}
-
 function buildAudioSearch(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
@@ -500,58 +459,6 @@ function buildAudioSearch(canvas: DrawableCanvas, r: WorldRect): void {
   });
   // Mock app cards for both features live in the DOM underlay below these
   // captions (see scene-overlays.tsx).
-}
-
-/** Anchor for the collab scene's DOM cursors (see scene-overlays.tsx). */
-export const COLLAB_CURSORS = {
-  you: { dx: 1270, dy: 380 },
-  peer: { dx: 1600, dy: 440 },
-} as const;
-
-function buildCollab(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
-  const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.collab.heading, 62, 860);
-  addText(canvas, x, y + 250, copy.collab.body, {
-    size: 25,
-    color: MUTED,
-    width: 780,
-  });
-  addText(canvas, x, y + 520, copy.collab.kicker, {
-    size: 27,
-    width: 760,
-  });
-  drawUnderline(canvas, x, y + 640, 480, ORANGE, 6);
-
-  // Two live cursors (DOM, Figma-style) converging on a shared scrap of the
-  // canvas; light ink trails mark where each one came from.
-  const cx = r.x + 1120;
-  const cy = r.y + 260;
-  hand(canvas, cx + 200, cy + 215, copy.collab.sharedNote, INK, 40, 260);
-  addStroke(canvas, sketchEllipse(cx + 320, cy + 290, 260, 170, 1.1), MUTED, 4);
-
-  addStroke(
-    canvas,
-    wobblyLine(
-      [cx - 40, cy - 60],
-      [r.x + COLLAB_CURSORS.you.dx, r.y + COLLAB_CURSORS.you.dy],
-      12,
-      0.5,
-    ),
-    BLUE,
-    5,
-  );
-  addStroke(
-    canvas,
-    wobblyLine(
-      [cx + 700, cy - 40],
-      [r.x + COLLAB_CURSORS.peer.dx, r.y + COLLAB_CURSORS.peer.dy],
-      10,
-      1.9,
-    ),
-    PINK,
-    5,
-  );
 }
 
 function buildLinked(canvas: DrawableCanvas, r: WorldRect): void {
@@ -607,12 +514,12 @@ function buildLinked(canvas: DrawableCanvas, r: WorldRect): void {
 function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.localFirst.heading, 62, 1000);
+  title(canvas, x, y, copy.localFirst.heading, 62, 820);
   drawUnderline(canvas, x, y + 110, 700, ORANGE, 8);
 
-  // "the cloud", circled and crossed out, next to the heading.
-  const ccx = x + 1230;
-  const ccy = y + 40;
+  // "the cloud", circled and crossed out, beside the heading.
+  const ccx = x + 990;
+  const ccy = y + 60;
   hand(canvas, ccx - 62, ccy - 26, 'the cloud', MUTED, 36, 180);
   addStroke(canvas, sketchEllipse(ccx, ccy, 120, 52, 0.5), MUTED, 4);
   addStroke(
@@ -629,24 +536,85 @@ function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
   );
 
   copy.localFirst.bullets.forEach((bullet, i) => {
-    const by = y + 200 + i * 118;
+    const by = y + 240 + i * 130;
     drawCheck(canvas, x + 6, by + 8, 0.9);
     addText(canvas, x + 64, by, bullet, {
       size: 24,
       color: i === 4 ? INK : MUTED,
-      width: 1280,
+      width: 1150,
     });
   });
   // The GitHub source button (DOM overlay) sits below the last bullet.
+
+  // Right column: no lock-in. Data in, data out, and your own AI.
+  const dx = r.x + 1400;
+  title(canvas, dx, y, copy.localFirst.lockInHeading, 46, 620);
+  addText(canvas, dx, y + 150, copy.localFirst.importBody, {
+    size: 24,
+    color: MUTED,
+    width: 700,
+  });
+  hand(canvas, dx, y + 360, copy.localFirst.importLabel, GREEN, 38, 520);
+  drawUnderline(canvas, dx + 4, y + 425, 400, GREEN, 4);
+  hand(canvas, dx, y + 490, copy.localFirst.exportLabel, ORANGE, 38, 520);
+  drawUnderline(canvas, dx + 4, y + 555, 380, ORANGE, 4);
+  addText(canvas, dx, y + 610, copy.localFirst.mcpBody, {
+    size: 24,
+    color: MUTED,
+    width: 700,
+  });
+  addStroke(canvas, sketchEllipse(dx + 300, y + 840, 230, 105, 2.6), BLUE, 5);
+  hand(canvas, dx + 165, y + 785, 'MCP: your\nAI, your rules', BLUE, 38, 300);
 }
+
+/** Anchor for the sync scene's DOM cursors (see scene-overlays.tsx). */
+export const COLLAB_CURSORS = {
+  you: { dx: 1280, dy: 230 },
+  peer: { dx: 1670, dy: 240 },
+} as const;
 
 function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.sync.heading, 62, 700);
+  title(canvas, x, y, copy.sync.heading, 62, 800);
+  addText(canvas, x, y + 200, copy.sync.kicker, {
+    size: 26,
+    width: 780,
+  });
+  drawUnderline(canvas, x, y + 310, 480, ORANGE, 6);
+
+  // Two live cursors (DOM, Figma-style) converging on a shared scrap of the
+  // canvas; light ink trails mark where each one came from.
+  const cx = r.x + 1150;
+  const cy = r.y + 160;
+  hand(canvas, cx + 200, cy + 215, copy.sync.sharedNote, INK, 40, 260);
+  addStroke(canvas, sketchEllipse(cx + 320, cy + 290, 260, 170, 1.1), MUTED, 4);
+  addStroke(
+    canvas,
+    wobblyLine(
+      [cx - 40, cy - 60],
+      [r.x + COLLAB_CURSORS.you.dx, r.y + COLLAB_CURSORS.you.dy],
+      12,
+      0.5,
+    ),
+    BLUE,
+    5,
+  );
+  addStroke(
+    canvas,
+    wobblyLine(
+      [cx + 700, cy - 40],
+      [r.x + COLLAB_CURSORS.peer.dx, r.y + COLLAB_CURSORS.peer.dy],
+      10,
+      1.9,
+    ),
+    PINK,
+    5,
+  );
+
   copy.sync.tiers.forEach((tier, i) => {
     const tx = x + i * 610;
-    const ty = y + 180;
+    const ty = y + 620;
     addShape(canvas, 'rect', tx, ty, [0, 0, 540, 350], MUTED, 3);
     hand(
       canvas,
@@ -668,31 +636,6 @@ function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
       width: 460,
     });
   });
-}
-
-function buildLockIn(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
-  const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.lockIn.heading, 62, 800);
-  addText(canvas, x, y + 250, copy.lockIn.importBody, {
-    size: 25,
-    color: MUTED,
-    width: 740,
-  });
-  addText(canvas, x, y + 500, copy.lockIn.mcpBody, {
-    size: 25,
-    color: MUTED,
-    width: 740,
-  });
-
-  // Right column: two handwritten in/out lines, then the circled MCP note.
-  const dx = r.x + 1030;
-  hand(canvas, dx, y + 100, copy.lockIn.importLabel, GREEN, 38, 520);
-  drawUnderline(canvas, dx + 4, y + 165, 400, GREEN, 4);
-  hand(canvas, dx, y + 240, copy.lockIn.exportLabel, ORANGE, 38, 520);
-  drawUnderline(canvas, dx + 4, y + 305, 380, ORANGE, 4);
-  addStroke(canvas, sketchEllipse(dx + 300, y + 560, 230, 105, 2.6), BLUE, 5);
-  hand(canvas, dx + 165, y + 505, 'MCP: your\nAI, your rules', BLUE, 38, 300);
 }
 
 function buildSupporter(canvas: DrawableCanvas, r: WorldRect): void {
@@ -717,36 +660,6 @@ function buildSupporter(canvas: DrawableCanvas, r: WorldRect): void {
   // Sponsor buttons (DOM overlay) render to the right of the benefits list.
   addStroke(canvas, sketchEllipse(r.x + 1400, y + 510, 240, 140, 0.2), PINK, 6);
   hand(canvas, r.x + 1290, y + 450, 'keep it\nindependent', PINK, 44, 260);
-}
-
-function buildRoadmap(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
-  const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.roadmap.heading, 62, 700);
-  addText(canvas, x, y + 120, copy.roadmap.body, {
-    size: 24,
-    color: MUTED,
-    width: 800,
-  });
-  copy.roadmap.columns.forEach((column, i) => {
-    const cx = x + i * 620;
-    const cy = y + 280;
-    hand(canvas, cx, cy, column.title, i === 2 ? ORANGE : INK, 40, 480);
-    addText(canvas, cx, cy + 90, column.items, {
-      size: 23,
-      color: MUTED,
-      width: 520,
-    });
-    if (i > 0) {
-      addStroke(
-        canvas,
-        wobblyLine([cx - 60, cy - 10], [cx - 66, cy + 400], 5, i * 1.1),
-        'rgba(89, 100, 107, 0.4)',
-        3,
-      );
-    }
-  });
-  // Roadmap link button (DOM overlay) sits under the columns.
 }
 
 async function buildDownload(
@@ -791,17 +704,12 @@ export async function populateScenes(canvas: DrawableCanvas): Promise<void> {
   ensureDisplayFont(HAND_FONT);
   const rect = (id: string) => sceneById(id).rect;
   buildHero(canvas, rect('hero'));
-  buildProblem(canvas, rect('problem'));
   buildInk(canvas, rect('ink'));
-  buildPdf(canvas, rect('pdf'));
   buildAudioSearch(canvas, rect('audio-search'));
-  buildCollab(canvas, rect('collab'));
   buildLinked(canvas, rect('linked'));
   buildLocalFirst(canvas, rect('local-first'));
   buildSync(canvas, rect('sync'));
-  buildLockIn(canvas, rect('lock-in'));
   buildSupporter(canvas, rect('supporter'));
-  buildRoadmap(canvas, rect('roadmap'));
   await buildPages(canvas, rect('pages'));
   await buildDownload(canvas, rect('download'));
 }

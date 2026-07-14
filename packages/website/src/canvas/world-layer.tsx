@@ -288,7 +288,7 @@ export function SearchPaletteMock({ x, y }: WorldPos) {
   );
 }
 
-/** Figma-style live cursor with a name tag, for the collab scene. */
+/** Figma-style live cursor with a name tag, for the sync scene. */
 export function LiveCursor({
   x,
   y,
