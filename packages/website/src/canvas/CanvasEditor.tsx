@@ -4,6 +4,7 @@ import { I18nProvider } from '@myelin/editor/i18n';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { CanvasToolbar } from '@/components/canvas-toolbar';
+import { SelectionToolbar } from '@/components/selection-toolbar';
 import { useToolState } from '@/hooks/use-tool-state';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 
@@ -88,6 +89,8 @@ function CanvasEditorInner() {
           style={{ zIndex: 12 }}
         />
       </div>
+
+      {ready && <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />}
 
       {ready && (
         <CanvasToolbar
