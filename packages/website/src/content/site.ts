@@ -86,7 +86,6 @@ for step in range(3):
   pdf: {
     heading: 'PDFs are first-class citizens.',
     body: 'Drop a PDF onto the canvas, read it, and write directly on it in ink. When you are done, export the annotated PDF back out.',
-    placeholder: 'Screenshot: a PDF page on the canvas with ink annotations',
     annotation: 'ink goes right on the page',
   },
 
@@ -96,8 +95,36 @@ for step in range(3):
       'Record lectures or meetings on the canvas. On-device Whisper transcription makes every recording searchable.',
     searchBody:
       'Full-text and semantic search run entirely on your machine with bundled MiniLM embeddings. Handwriting is OCR’d and searchable. Audio transcripts are searchable too.',
-    audioPlaceholder: 'Screenshot: audio recording card with live transcript',
-    searchPlaceholder: 'Screenshot: search palette matching a handwritten word',
+    // Content of the mock app cards standing in for real screenshots
+    // (see world-layer.tsx).
+    audioMock: {
+      title: 'Lecture 12 · Action potentials',
+      duration: '48:12',
+      transcriptLabel: 'Transcript · on-device',
+      transcript:
+        '…the myelin sheath insulates the axon, so the signal jumps from node to node instead of crawling…',
+      match: 'myelin sheath',
+    },
+    searchMock: {
+      query: 'node of ranvier',
+      results: [
+        {
+          kind: 'page' as const,
+          title: 'Lecture 12 · Action potentials',
+          snippet: '…the signal jumps between nodes of Ranvier…',
+        },
+        {
+          kind: 'ink' as const,
+          title: 'Whiteboard · myelination sketch',
+          snippet: 'Handwriting match, OCR on-device',
+        },
+        {
+          kind: 'audio' as const,
+          title: 'Recording · Lecture 12',
+          snippet: 'Transcript match at 31:42',
+        },
+      ],
+    },
   },
 
   collab: {

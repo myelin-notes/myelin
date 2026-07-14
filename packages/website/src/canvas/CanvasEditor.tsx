@@ -203,8 +203,8 @@ function CanvasEditorInner() {
       <div className="absolute inset-0">
         <canvas ref={bgRef} className={layerClass} style={{ zIndex: 0 }} />
 
-        {/* Screenshot placeholders render under the ink so annotations draw
-            on top of them. */}
+        {/* Mock app surfaces render under the ink so annotations draw on top
+            of them. */}
         {canvas && <SceneUnderlay canvas={canvas} />}
 
         {/* Page-frame chrome + ProseMirror editors (z 5, self-positioned). */}

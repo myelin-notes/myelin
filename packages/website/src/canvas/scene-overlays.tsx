@@ -1,8 +1,14 @@
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { copy, siteLinks } from '@/content/site';
-import { SCENE_PAD, sceneById } from './scenes';
-import { Placeholder, WorldLayer } from './world-layer';
+import { COLLAB_CURSORS, SCENE_PAD, sceneById } from './scenes';
+import {
+  AudioCardMock,
+  LiveCursor,
+  PdfPageMock,
+  SearchPaletteMock,
+  WorldLayer,
+} from './world-layer';
 
 type OS = 'mac' | 'windows' | 'linux';
 
@@ -57,13 +63,21 @@ function WorldButton({
       ? { position: 'absolute', left: x, top: y }
       : {}),
     ...(variant === 'primary'
-      ? { background: '#1a1a1a', color: '#ffffff' }
+      ? {
+          background: '#191c1e',
+          color: '#ffffff',
+          boxShadow:
+            '0 2px 6px rgba(25, 28, 30, 0.22), 0 12px 28px -12px rgba(25, 28, 30, 0.45)',
+        }
       : {
-          background: 'rgba(255, 255, 255, 0.75)',
-          color: '#1a1a1a',
-          border: '2px solid rgba(26, 26, 26, 0.7)',
+          background: '#ffffff',
+          color: '#191c1e',
+          border: '1.5px solid rgba(25, 28, 30, 0.22)',
+          boxShadow: '0 1px 3px rgba(25, 28, 30, 0.08)',
         }),
   };
+  const className =
+    'pointer-events-auto inline-block cursor-pointer whitespace-nowrap no-underline transition-transform duration-200 hover:-translate-y-[2px] active:translate-y-0';
   const inner = (
     <span className="flex flex-col items-start">
       <span className="font-semibold">{children}</span>
@@ -75,7 +89,7 @@ function WorldButton({
   if (href) {
     return (
       <a
-        className="pointer-events-auto inline-block cursor-pointer whitespace-nowrap no-underline transition-transform hover:scale-[1.03]"
+        className={className}
         style={style}
         href={href}
         target="_blank"
@@ -86,48 +100,38 @@ function WorldButton({
     );
   }
   return (
-    <button
-      type="button"
-      className="pointer-events-auto inline-block cursor-pointer whitespace-nowrap transition-transform hover:scale-[1.03]"
-      style={style}
-      onClick={onClick}
-    >
+    <button type="button" className={className} style={style} onClick={onClick}>
       {inner}
     </button>
   );
 }
 
 /**
- * Non-interactive world-space DOM that must render UNDER the ink: screenshot
- * placeholders that visitors' strokes (and ours) draw on top of. Sits between
+ * Non-interactive world-space DOM that must render UNDER the ink: mock app
+ * surfaces that visitors' strokes (and ours) draw on top of. Sits between
  * the background grid canvas and the foreground element canvas.
  */
 export function SceneUnderlay({ canvas }: { canvas: DrawableCanvas }) {
   const pdf = sceneById('pdf').rect;
   const audio = sceneById('audio-search').rect;
+  const collab = sceneById('collab').rect;
 
   return (
     <WorldLayer canvas={canvas} zIndex={1}>
-      <Placeholder
-        x={pdf.x + 930}
-        y={pdf.y + 120}
-        width={780}
-        height={860}
-        label={copy.pdf.placeholder}
+      <PdfPageMock x={pdf.x + 930} y={pdf.y + 120} />
+      <AudioCardMock x={audio.x + SCENE_PAD} y={audio.y + 470} />
+      <SearchPaletteMock x={audio.x + 970} y={audio.y + 470} />
+      <LiveCursor
+        x={collab.x + COLLAB_CURSORS.you.dx}
+        y={collab.y + COLLAB_CURSORS.you.dy}
+        color="#3b82f6"
+        name={copy.collab.cursorYou}
       />
-      <Placeholder
-        x={audio.x + SCENE_PAD}
-        y={audio.y + 470}
-        width={700}
-        height={420}
-        label={copy.audioSearch.audioPlaceholder}
-      />
-      <Placeholder
-        x={audio.x + 970}
-        y={audio.y + 470}
-        width={760}
-        height={420}
-        label={copy.audioSearch.searchPlaceholder}
+      <LiveCursor
+        x={collab.x + COLLAB_CURSORS.peer.dx}
+        y={collab.y + COLLAB_CURSORS.peer.dy}
+        color="#ec4899"
+        name={copy.collab.cursorPeer}
       />
     </WorldLayer>
   );
@@ -174,7 +178,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
       {/* Local-first: source link. */}
       <WorldButton
         x={localFirst.x + SCENE_PAD}
-        y={localFirst.y + SCENE_PAD + 950}
+        y={localFirst.y + SCENE_PAD + 810}
         href={siteLinks.github}
         variant="outline"
       >
@@ -201,7 +205,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
       {/* Roadmap link. */}
       <WorldButton
         x={roadmap.x + SCENE_PAD}
-        y={roadmap.y + SCENE_PAD + 940}
+        y={roadmap.y + SCENE_PAD + 800}
         href={siteLinks.roadmap}
         variant="outline"
       >
@@ -249,7 +253,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
         className="absolute flex flex-wrap items-center"
         style={{
           left: download.x + SCENE_PAD,
-          top: download.y + SCENE_PAD + 1130,
+          top: download.y + SCENE_PAD + 1080,
           gap: 34,
           fontSize: 22,
         }}
