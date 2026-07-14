@@ -13,6 +13,10 @@
    utility classes they use. */
 @source './components/**/*.{ts,tsx}';
 @source './canvas/**/*.{ts,tsx}';
+/* The editor renders its own React UI on the site (page-frame chrome header,
+   floating toolbar, autocomplete, code-run overlay), so its sources must be
+   scanned too or that chrome shows up unstyled. */
+@source '../../../editor/src/**/*.{ts,tsx}';
 
 :root {
   /* Canvas chrome tokens the engine reads off the document root (values from
