@@ -1,30 +1,14 @@
-import {
-  createContext,
-  type PropsWithChildren,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-} from 'react';
+import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
+import { CustomColorsContext } from '@myelin/editor/custom-colors';
 
 /**
- * Repository-free stand-in for the app's custom-colors context. The app version
- * (`@myelin/editor/custom-colors`) persists colors to the workspace repository
- * via `useRepository`, which the marketing site has no provider for. Here we
- * keep custom colors in localStorage so the toolbar's swatches keep working
- * without pulling in the app's sync layer.
+ * Repository-free stand-in for the app's custom-colors provider. The app
+ * version (`@myelin/editor/custom-colors`) persists colors to the workspace
+ * repository via `useRepository`, which the marketing site has no provider
+ * for. Here we keep custom colors in localStorage and feed the editor's own
+ * context, so the editor's toolbars (e.g. the page-frame floating toolbar)
+ * and the site's tool-options panel share the same swatches.
  */
-interface CustomColorsContextValue {
-  colors: string[];
-  addColor: (color: string) => Promise<void>;
-  removeColor: (color: string) => Promise<void>;
-  promptAddColor: () => void;
-  pickerOpen: boolean;
-}
-
-const CustomColorsContext = createContext<CustomColorsContextValue | null>(
-  null,
-);
 
 const STORAGE_KEY = 'myelin-web-custom-colors';
 const HEX_PATTERN = /^#?([0-9a-fA-F]{6})$/;
@@ -100,12 +84,4 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
   );
 }
 
-export function useCustomColors(): CustomColorsContextValue {
-  const context = useContext(CustomColorsContext);
-  if (!context) {
-    throw new Error(
-      'useCustomColors must be used within a CustomColorsProvider.',
-    );
-  }
-  return context;
-}
+export { useCustomColors } from '@myelin/editor/custom-colors';
