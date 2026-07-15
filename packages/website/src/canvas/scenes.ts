@@ -31,7 +31,7 @@ const Y_LOW = 1050;
 const SIZES: Array<{ id: string; label: string; w: number; h: number }> = [
   { id: 'hero', label: 'Myelin', w: 2000, h: 1000 },
   { id: 'ink', label: 'Ink & PDFs', w: 2570, h: 1270 },
-  { id: 'pages', label: 'Pages', w: 1900, h: 1350 },
+  { id: 'pages', label: 'Pages', w: 1900, h: 1140 },
   { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000 },
   { id: 'linked', label: 'Linked notes', w: 1750, h: 800 },
   { id: 'local-first', label: 'Local-first', w: 2200, h: 1150 },
@@ -425,19 +425,24 @@ function buildInk(canvas: DrawableCanvas, r: WorldRect): void {
 async function buildPages(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y + 60, copy.pages.heading, 62, 800);
-  addText(canvas, x, y + 310, copy.pages.body, {
+  // Left column is centered against the page frame to its right, which runs
+  // from r.y + 175 to roughly r.y + 1105 (continuous layout, height measured
+  // from the markdown below). The scene rect carries more padding above that
+  // content than below it, which biases the whole scene down once the camera
+  // centers the rect, clearing the fixed top bar.
+  title(canvas, x, y + 230, copy.pages.heading, 62, 800);
+  addText(canvas, x, y + 480, copy.pages.body, {
     size: 26,
     color: MUTED,
     width: 720,
   });
-  hand(canvas, x + 60, y + 640, copy.pages.annotation, BLUE, 36, 420);
-  drawArrow(canvas, [x + 500, y + 680], [x + 880, y + 620], BLUE, 5);
+  hand(canvas, x + 60, y + 810, copy.pages.annotation, BLUE, 36, 420);
+  drawArrow(canvas, [x + 500, y + 850], [x + 880, y + 790], BLUE, 5);
 
   await addPage(
     canvas,
     r.x + 1030,
-    r.y + 60,
+    r.y + 175,
     copy.pages.pageTitle,
     copy.pages.pageMarkdown,
   );
