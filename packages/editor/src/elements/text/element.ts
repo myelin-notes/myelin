@@ -133,18 +133,13 @@ export class TextElement extends DrawableElement {
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
     const textarea = this._textarea ?? this.createDom(host);
 
-    // Remote/undo edits land here; skip while editing so the user's
-    // in-progress typing isn't clobbered.
-    if (!this._editing && textarea.value !== this._text) {
-      textarea.value = this._text;
-    }
-
-    const sx = Math.abs(this._scale.x) || 1;
     const sy = Math.abs(this._scale.y) || 1;
     const screen = viewport.worldToScreen({
       x: this.offset.x,
       y: this.offset.y,
     });
+
+    this.applyContentStyle(textarea);
 
     // Text renders at native font size while the element's scale widens the
     // wrap box (matching the old canvas draw, which counter-scaled glyphs),
@@ -152,16 +147,52 @@ export class TextElement extends DrawableElement {
     textarea.style.left = `${screen.x}px`;
     textarea.style.top = `${screen.y}px`;
     textarea.style.transform = `scale(${viewport.zoom})`;
-    textarea.style.width = `${this._boxWidth * sx}px`;
     textarea.style.height = `${this.box.height * sy}px`;
+    textarea.style.color = this._style.color;
+    textarea.dataset.editing = this._editing ? 'true' : 'false';
+  }
+
+  /**
+   * The text plus everything that decides how it wraps. syncDOM pushes these
+   * each frame; the measure pass applies them first so a recomputeBox that runs
+   * before the next frame (font or scale change) measures the new wrapping
+   * rather than the last frame's.
+   */
+  private applyContentStyle(textarea: HTMLTextAreaElement): void {
+    // Remote/undo edits land here; skip while editing so the user's
+    // in-progress typing isn't clobbered.
+    if (!this._editing && textarea.value !== this._text) {
+      textarea.value = this._text;
+    }
+
+    const sx = Math.abs(this._scale.x) || 1;
+    textarea.style.width = `${this._boxWidth * sx}px`;
     textarea.style.fontSize = `${this._style.fontSize}px`;
     textarea.style.lineHeight = `${this._style.fontSize * 1.3}px`;
     // Deduped internally; covers documents opened with existing text boxes,
     // which the tool UI's font loading never sees.
     ensureDisplayFont(this._style.fontFamily);
     textarea.style.fontFamily = this._style.fontFamily;
-    textarea.style.color = this._style.color;
-    textarea.dataset.editing = this._editing ? 'true' : 'false';
+  }
+
+  /**
+   * Height of the textarea's content in native-font pixels, or 0 when it isn't
+   * mounted. Measured at height 0: scrollHeight never reports less than the
+   * element's own height, and syncDOM sizes the textarea from the box, so
+   * measuring as-is would echo the box height straight back and pin the box to
+   * its tallest-ever size.
+   */
+  private measureDomTextHeight(): number {
+    const textarea = this._textarea;
+    if (!textarea) {
+      return 0;
+    }
+    this.applyContentStyle(textarea);
+    const height = textarea.style.height;
+    textarea.style.height = '0px';
+    const contentHeight = textarea.scrollHeight;
+    textarea.style.height = height;
+    return contentHeight;
   }
 
   private createDom(host: HTMLElement): HTMLTextAreaElement {
@@ -383,7 +414,7 @@ export class TextElement extends DrawableElement {
       // pretext's line count is the fallback for headless paths (PDF export,
       // thumbnails, before the first render frame) where no laid-out textarea
       // exists. Both are visual (native-font) pixel heights.
-      const domHeight = this._textarea?.scrollHeight ?? 0;
+      const domHeight = this.measureDomTextHeight();
       const textHeight =
         domHeight > 0 ? domHeight : this._cachedLines.length * lineHeight;
 
