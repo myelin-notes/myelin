@@ -24,6 +24,7 @@ import {
   mathBlockNormalizationPlugin,
 } from './math/block-commands';
 import { mathPreviewPlugin } from './math/plugin';
+import { mermaidPreviewPlugin } from './mermaid/plugin';
 import { paginationPlugin } from './pagination/plugin';
 import { schema } from './schema';
 import { searchHighlightPlugin } from './search-highlight';
@@ -97,6 +98,7 @@ export function buildPlugins(
     markdownPastePlugin(),
     markdownPreviewPlugin(),
     mathPreviewPlugin(),
+    mermaidPreviewPlugin(),
     checkListPlugin(schema),
     calloutCaretAnchorCleanupPlugin(),
     buildKeymap(schema),

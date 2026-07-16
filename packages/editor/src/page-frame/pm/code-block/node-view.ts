@@ -9,6 +9,7 @@ import {
 } from '../../../events';
 import { PM_EDITOR_CLASS } from '../constants';
 import { isOpeningFenceLine } from '../markdown/parse-fences';
+import { isMermaidBlock } from '../mermaid/detect';
 import type {
   NestedEditorDirection,
   NestedEditorEscapeUnit,
@@ -159,6 +160,11 @@ export class CodeBlockNodeView implements NodeView {
 
   update(node: PMNode): boolean {
     if (node.type !== this.node.type) {
+      return false;
+    }
+    if (isMermaidBlock(node.textContent)) {
+      // Language changed to mermaid — rebuild through the node-view factory
+      // as a diagram (MermaidBlockNodeView).
       return false;
     }
 
