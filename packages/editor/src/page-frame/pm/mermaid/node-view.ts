@@ -134,6 +134,18 @@ export class MermaidBlockNodeView implements NodeView {
       void this.renderPreview();
     });
     void this.renderPreview();
+
+    // When a plain code block's language becomes `mermaid`, ProseMirror
+    // rebuilds it into this view while the old block's nested CodeMirror still
+    // held focus — so the PM view itself isn't focused and ProseMirror skips
+    // the setSelection() that would open the source editor. Open it eagerly
+    // when the selection already sits inside this block (the just-edited
+    // block, or a mermaid block under the cursor on load) so the raw-source
+    // editor shows and focuses, mirroring the editor a plain code block
+    // creates in its own constructor.
+    if (this.isSelectionInside()) {
+      this.openEditor();
+    }
   }
 
   update(node: PMNode): boolean {
@@ -251,6 +263,14 @@ export class MermaidBlockNodeView implements NodeView {
         this.initializing = false;
         console.error('Failed to load mermaid source editor', error);
       });
+  }
+
+  /** Whether the current ProseMirror selection is contained in this block. */
+  private isSelectionInside(): boolean {
+    const start = this.getPos() + 1;
+    const end = start + this.node.content.size;
+    const { from, to } = this.view.state.selection;
+    return from >= start && to <= end;
   }
 
   /**
