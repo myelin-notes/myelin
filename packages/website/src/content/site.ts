@@ -37,7 +37,6 @@ export const copy = {
 
   ink: {
     heading: 'An infinite canvas that\nkeeps up with your pen.',
-    body: 'Pressure-sensitive ink, a highlighter, an eraser, text, and images share one surface. Draw a rough rectangle and hold still: shape recognition swaps it for a clean one.',
     annotation: 'draw a shape + hold',
     recognized: 'recognized!',
     pdfHeading: 'PDFs are first-class citizens.',

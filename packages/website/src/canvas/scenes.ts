@@ -349,19 +349,14 @@ function buildInk(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
   title(canvas, x, y, copy.ink.heading, 62, 860);
-  addText(canvas, x, y + 250, copy.ink.body, {
-    size: 26,
-    color: MUTED,
-    width: 780,
-  });
   // A line worth highlighting, with a real highlighter swipe over it.
-  addText(canvas, x, y + 520, 'Highlight anything, anywhere.', {
+  addText(canvas, x, y + 280, 'Highlight anything, anywhere.', {
     size: 30,
     width: 520,
   });
   addStroke(
     canvas,
-    wobblyLine([x - 10, y + 540], [x + 450, y + 536], 4, 0.4),
+    wobblyLine([x - 10, y + 300], [x + 450, y + 296], 4, 0.4),
     HIGHLIGHT,
     44,
   );
@@ -369,13 +364,13 @@ function buildInk(canvas: DrawableCanvas, r: WorldRect): void {
   // Colorful pen squiggles.
   addStroke(
     canvas,
-    wobblyLine([x, y + 680], [x + 300, y + 720], 26, 0.2),
+    wobblyLine([x, y + 440], [x + 300, y + 480], 26, 0.2),
     BLUE,
     7,
   );
   addStroke(
     canvas,
-    wobblyLine([x + 90, y + 750], [x + 420, y + 700], 20, 2.6),
+    wobblyLine([x + 90, y + 510], [x + 420, y + 460], 20, 2.6),
     PINK,
     7,
   );
