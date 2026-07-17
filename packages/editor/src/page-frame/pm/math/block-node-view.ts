@@ -1,6 +1,5 @@
 import { exitCode, joinBackward } from 'prosemirror-commands';
 import type { Node as PMNode } from 'prosemirror-model';
-import { TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import { redo, undo } from 'y-prosemirror';
 import type {
@@ -12,6 +11,10 @@ import {
   forwardNestedContentUpdate,
   forwardNestedSelectionUpdate,
 } from '../nested-editor/pm-sync';
+import {
+  makePreviewMouseDownHandler,
+  makePreviewWheelHandler,
+} from '../nested-editor/preview-events';
 import { positionBlockSourcePanels } from '../nested-editor/source-panel';
 import { exitMathBlock } from './block-commands';
 import { parseMathMarkdown, stripMathDelimiters } from './parse-math-block';
@@ -57,42 +60,8 @@ export class MathBlockNodeView implements NodeView {
     },
   };
 
-  // Without this the canvas pan handler swallows wheel events, so a
-  // page-capped preview can never scroll. Mirrors MathSourceEditor's wheel
-  // handling: only consume the event while the block is being edited, and
-  // never for ctrl-wheel (pinch zoom).
-  private readonly handleWheel = (event: WheelEvent): void => {
-    if (
-      event.ctrlKey ||
-      !this.dom.classList.contains('pm-math-block--editing')
-    ) {
-      return;
-    }
-    const overflowing =
-      this.preview.scrollHeight > this.preview.clientHeight + 1 ||
-      this.preview.scrollWidth > this.preview.clientWidth + 1;
-    if (overflowing) {
-      event.stopPropagation();
-    }
-  };
-
-  // Clicking the rendered formula opens the source editor with the cursor at
-  // the end of the LaTeX. ProseMirror may skip NodeView.setSelection while
-  // the view itself isn't focused, so open the editor directly as well.
-  private readonly handlePreviewMouseDown = (event: MouseEvent): void => {
-    if (event.button !== 0 || !this.view.editable) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    const end = this.getPos() + this.node.nodeSize - 1;
-    this.view.dispatch(
-      this.view.state.tr.setSelection(
-        TextSelection.create(this.view.state.doc, end),
-      ),
-    );
-    this.openEditor();
-  };
+  private readonly handleWheel: (event: WheelEvent) => void;
+  private readonly handlePreviewMouseDown: (event: MouseEvent) => void;
 
   constructor(
     node: PMNode,
@@ -107,6 +76,17 @@ export class MathBlockNodeView implements NodeView {
     this.preview = document.createElement('div');
     this.preview.className = 'pm-math-block-preview pm-page-capped';
     this.preview.contentEditable = 'false';
+    this.handleWheel = makePreviewWheelHandler(
+      this.dom,
+      this.preview,
+      'pm-math-block--editing',
+    );
+    this.handlePreviewMouseDown = makePreviewMouseDownHandler(
+      this.view,
+      this.getPos,
+      () => this.node,
+      () => this.openEditor(),
+    );
     this.preview.addEventListener('wheel', this.handleWheel);
     this.preview.addEventListener('mousedown', this.handlePreviewMouseDown);
 

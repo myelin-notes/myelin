@@ -8,8 +8,11 @@ import {
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
 } from '../../../events';
 import { PM_EDITOR_CLASS } from '../constants';
-import { isOpeningFenceLine } from '../markdown/parse-fences';
 import { isMermaidBlock } from '../mermaid/detect';
+import {
+  insertTextAfterBlock,
+  shouldMoveInputOutsideBlock,
+} from '../nested-editor/boundary-input';
 import type {
   NestedEditorDirection,
   NestedEditorEscapeUnit,
@@ -19,7 +22,12 @@ import {
   forwardNestedContentUpdate,
   forwardNestedSelectionUpdate,
 } from '../nested-editor/pm-sync';
-import { collectRunSource, parseBlockLanguage } from './concat';
+import {
+  collectRunSource,
+  type FenceSource,
+  parseBlockLanguage,
+  parseFenceSource,
+} from './concat';
 import type { CodeBlockEditor, CodeBlockEditorBoundaryInput } from './editor';
 import { CodeBlockRunView } from './run-view';
 import {
@@ -27,32 +35,6 @@ import {
   type CodeBlockExternalSelectionDetail,
   getCodeBlockExternalSelection,
 } from './selection-sync';
-
-interface FenceSource {
-  closingFenceLine: number | null;
-  delimiterLines: readonly number[];
-}
-
-function parseFenceSource(text: string): FenceSource {
-  const lines = text.split('\n');
-  const closingFenceLine = lines.length;
-
-  if (
-    !isOpeningFenceLine(lines[0]) ||
-    closingFenceLine <= 1 ||
-    lines[closingFenceLine - 1] !== '```'
-  ) {
-    return {
-      closingFenceLine: null,
-      delimiterLines: [],
-    };
-  }
-
-  return {
-    closingFenceLine,
-    delimiterLines: [1, closingFenceLine],
-  };
-}
 
 export class CodeBlockNodeView implements NodeView {
   public readonly dom: HTMLDivElement;
@@ -325,13 +307,25 @@ export class CodeBlockNodeView implements NodeView {
   }
 
   private handleBoundaryKeyDown(event: CodeBlockEditorBoundaryInput): void {
-    if (!this.shouldMoveInputOutsideCodeBlock(event)) {
+    if (
+      !this.editor ||
+      !shouldMoveInputOutsideBlock(
+        this.editor,
+        parseFenceSource(this.node.textContent).closingFenceLine,
+        event,
+      )
+    ) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    this.insertAfterCodeBlock(event.key === 'Enter' ? '' : event.key);
+    insertTextAfterBlock(
+      this.view,
+      this.getPos,
+      this.node,
+      event.key === 'Enter' ? '' : event.key,
+    );
   }
 
   private maybeEscape(
@@ -344,71 +338,6 @@ export class CodeBlockNodeView implements NodeView {
 
     escapeNestedEditor(this.view, this.getPos(), this.node.nodeSize, dir);
     return true;
-  }
-
-  private shouldMoveInputOutsideCodeBlock(
-    event: CodeBlockEditorBoundaryInput,
-  ): boolean {
-    if (!this.editor) {
-      return false;
-    }
-
-    const selection = this.editor.getSelection();
-    if (!selection.empty) {
-      return false;
-    }
-
-    const source = parseFenceSource(this.node.textContent);
-    if (source.closingFenceLine == null) {
-      return false;
-    }
-
-    const position = this.editor.getCursorPosition();
-    const lineMaxColumn = this.editor.getLineMaxColumn(source.closingFenceLine);
-    if (lineMaxColumn == null) {
-      return false;
-    }
-    if (
-      position.lineNumber !== source.closingFenceLine ||
-      position.column !== lineMaxColumn
-    ) {
-      return false;
-    }
-
-    if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) {
-      return false;
-    }
-
-    if (event.key === 'Enter') {
-      return true;
-    }
-
-    return event.key.length === 1;
-  }
-
-  private insertAfterCodeBlock(text: string): void {
-    const insertPos = this.getPos() + this.node.nodeSize;
-    const paragraphType = this.view.state.schema.nodes.paragraph;
-    let tr = this.view.state.tr;
-    const nextNode = tr.doc.resolve(insertPos).nodeAfter;
-
-    if (nextNode?.type !== paragraphType) {
-      const paragraph = paragraphType.createAndFill();
-      if (!paragraph) {
-        return;
-      }
-      tr = tr.insert(insertPos, paragraph);
-    }
-
-    let selectionPos = insertPos + 1;
-    if (text.length > 0) {
-      tr = tr.insertText(text, selectionPos, selectionPos);
-      selectionPos += text.length;
-    }
-
-    tr = tr.setSelection(TextSelection.create(tr.doc, selectionPos));
-    this.view.dispatch(tr.scrollIntoView());
-    this.view.focus();
   }
 
   private exitCodeBlock(): void {

@@ -1,17 +1,16 @@
 import { exitCode } from 'prosemirror-commands';
 import type { Node as PMNode } from 'prosemirror-model';
-import { TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import { redo, undo } from 'y-prosemirror';
-import { stripFences } from '../code-block/concat';
+import { parseFenceSource, stripFences } from '../code-block/concat';
 import type {
   CodeBlockEditor,
   CodeBlockEditorBoundaryInput,
 } from '../code-block/editor';
 import {
-  isClosingFenceLine,
-  isOpeningFenceLine,
-} from '../markdown/parse-fences';
+  insertTextAfterBlock,
+  shouldMoveInputOutsideBlock,
+} from '../nested-editor/boundary-input';
 import type {
   NestedEditorDirection,
   NestedEditorEscapeUnit,
@@ -21,6 +20,10 @@ import {
   forwardNestedContentUpdate,
   forwardNestedSelectionUpdate,
 } from '../nested-editor/pm-sync';
+import {
+  makePreviewMouseDownHandler,
+  makePreviewWheelHandler,
+} from '../nested-editor/preview-events';
 import { positionBlockSourcePanels } from '../nested-editor/source-panel';
 import { isMermaidBlock } from './detect';
 import { onMermaidThemeChange, renderMermaidSvg } from './render';
@@ -29,20 +32,6 @@ const RENDER_DEBOUNCE_MS = 250;
 
 export const MERMAID_SOURCE_PANEL_SELECTOR =
   '.pm-mermaid-block--editing .pm-mermaid-block-source';
-
-/** Line numbers of the ``` fence lines, for the source editor's dimming. */
-function fenceDelimiterLines(text: string): readonly number[] {
-  const lines = text.split('\n');
-  const closingLine = lines.length;
-  if (
-    !isOpeningFenceLine(lines[0] ?? '') ||
-    closingLine <= 1 ||
-    !isClosingFenceLine(lines[closingLine - 1])
-  ) {
-    return [];
-  }
-  return [1, closingLine];
-}
 
 /**
  * Renders a ```mermaid code block as a diagram preview plus a floating
@@ -72,42 +61,8 @@ export class MermaidBlockNodeView implements NodeView {
   private renderSeq = 0;
   private hasDiagram = false;
   private readonly stopThemeListener: () => void;
-
-  // Without this the canvas pan handler swallows wheel events, so a
-  // page-capped preview can never scroll. Only consume the event while the
-  // block is being edited, and never for ctrl-wheel (pinch zoom).
-  private readonly handleWheel = (event: WheelEvent): void => {
-    if (
-      event.ctrlKey ||
-      !this.dom.classList.contains('pm-mermaid-block--editing')
-    ) {
-      return;
-    }
-    const overflowing =
-      this.preview.scrollHeight > this.preview.clientHeight + 1 ||
-      this.preview.scrollWidth > this.preview.clientWidth + 1;
-    if (overflowing) {
-      event.stopPropagation();
-    }
-  };
-
-  // Clicking the rendered diagram opens the source editor with the cursor at
-  // the end of the source. ProseMirror may skip NodeView.setSelection while
-  // the view itself isn't focused, so open the editor directly as well.
-  private readonly handlePreviewMouseDown = (event: MouseEvent): void => {
-    if (event.button !== 0 || !this.view.editable) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    const end = this.getPos() + this.node.nodeSize - 1;
-    this.view.dispatch(
-      this.view.state.tr.setSelection(
-        TextSelection.create(this.view.state.doc, end),
-      ),
-    );
-    this.openEditor();
-  };
+  private readonly handleWheel: (event: WheelEvent) => void;
+  private readonly handlePreviewMouseDown: (event: MouseEvent) => void;
 
   constructor(
     node: PMNode,
@@ -122,6 +77,17 @@ export class MermaidBlockNodeView implements NodeView {
     this.preview = document.createElement('div');
     this.preview.className = 'pm-mermaid-block-preview pm-page-capped';
     this.preview.contentEditable = 'false';
+    this.handleWheel = makePreviewWheelHandler(
+      this.dom,
+      this.preview,
+      'pm-mermaid-block--editing',
+    );
+    this.handlePreviewMouseDown = makePreviewMouseDownHandler(
+      this.view,
+      this.getPos,
+      () => this.node,
+      () => this.openEditor(),
+    );
     this.preview.addEventListener('wheel', this.handleWheel);
     this.preview.addEventListener('mousedown', this.handlePreviewMouseDown);
 
@@ -170,7 +136,9 @@ export class MermaidBlockNodeView implements NodeView {
             this.updating = false;
           }
         }
-        this.editor.setDelimiterLines(fenceDelimiterLines(node.textContent));
+        this.editor.setDelimiterLines(
+          parseFenceSource(node.textContent).delimiterLines,
+        );
       }
     }
     return true;
@@ -252,7 +220,7 @@ export class MermaidBlockNodeView implements NodeView {
           initialValue: this.node.textContent,
         });
         this.editor.setDelimiterLines(
-          fenceDelimiterLines(this.node.textContent),
+          parseFenceSource(this.node.textContent).delimiterLines,
         );
         this.syncSelectionFromView();
       })
@@ -332,75 +300,25 @@ export class MermaidBlockNodeView implements NodeView {
   }
 
   private handleBoundaryInput(event: CodeBlockEditorBoundaryInput): void {
-    if (!this.shouldMoveInputOutside(event)) {
+    if (
+      !this.editor ||
+      !shouldMoveInputOutsideBlock(
+        this.editor,
+        parseFenceSource(this.node.textContent).closingFenceLine,
+        event,
+      )
+    ) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    this.insertAfterBlock(event.key === 'Enter' ? '' : event.key);
-  }
-
-  /**
-   * Typing at the very end of the closing fence line continues outside the
-   * block, mirroring CodeBlockNodeView.shouldMoveInputOutsideCodeBlock.
-   */
-  private shouldMoveInputOutside(event: CodeBlockEditorBoundaryInput): boolean {
-    if (!this.editor?.getSelection().empty) {
-      return false;
-    }
-
-    const closingLine = fenceDelimiterLines(this.node.textContent)[1];
-    if (closingLine === undefined) {
-      return false;
-    }
-
-    const position = this.editor.getCursorPosition();
-    const lineMaxColumn = this.editor.getLineMaxColumn(closingLine);
-    if (lineMaxColumn == null) {
-      return false;
-    }
-    if (
-      position.lineNumber !== closingLine ||
-      position.column !== lineMaxColumn
-    ) {
-      return false;
-    }
-
-    if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) {
-      return false;
-    }
-
-    if (event.key === 'Enter') {
-      return true;
-    }
-
-    return event.key.length === 1;
-  }
-
-  private insertAfterBlock(text: string): void {
-    const insertPos = this.getPos() + this.node.nodeSize;
-    const paragraphType = this.view.state.schema.nodes.paragraph;
-    let tr = this.view.state.tr;
-    const nextNode = tr.doc.resolve(insertPos).nodeAfter;
-
-    if (nextNode?.type !== paragraphType) {
-      const paragraph = paragraphType.createAndFill();
-      if (!paragraph) {
-        return;
-      }
-      tr = tr.insert(insertPos, paragraph);
-    }
-
-    let selectionPos = insertPos + 1;
-    if (text.length > 0) {
-      tr = tr.insertText(text, selectionPos, selectionPos);
-      selectionPos += text.length;
-    }
-
-    tr = tr.setSelection(TextSelection.create(tr.doc, selectionPos));
-    this.view.dispatch(tr.scrollIntoView());
-    this.view.focus();
+    insertTextAfterBlock(
+      this.view,
+      this.getPos,
+      this.node,
+      event.key === 'Enter' ? '' : event.key,
+    );
   }
 
   private scheduleRender(): void {

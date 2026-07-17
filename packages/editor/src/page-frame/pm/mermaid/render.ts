@@ -1,11 +1,12 @@
 import type { Mermaid } from 'mermaid';
+import { onCanvasThemeChange } from '../../../canvas-theme';
 
 let mermaidPromise: Promise<Mermaid> | null = null;
 let configuredDark: boolean | null = null;
 let renderId = 0;
 
 const themeListeners = new Set<() => void>();
-let themeObserver: MutationObserver | null = null;
+let themeSubscribed = false;
 let observedDark = false;
 
 function isDarkTheme(): boolean {
@@ -59,11 +60,17 @@ export async function renderMermaidSvg(source: string): Promise<string> {
 /**
  * Notifies when the app's light/dark theme flips so mounted previews can
  * re-render with matching colors. Returns an unsubscribe function.
+ *
+ * Piggybacks on the canvas theme observer (onCanvasThemeChange) rather than
+ * owning a MutationObserver. That observer fires on any <html> class mutation,
+ * so a shared handler filters down to actual dark/light flips before notifying
+ * all mermaid listeners — the flip check runs once, not per subscriber.
  */
 export function onMermaidThemeChange(listener: () => void): () => void {
-  if (!themeObserver) {
+  if (!themeSubscribed) {
+    themeSubscribed = true;
     observedDark = isDarkTheme();
-    themeObserver = new MutationObserver(() => {
+    onCanvasThemeChange(() => {
       const dark = isDarkTheme();
       if (dark === observedDark) {
         return;
@@ -72,10 +79,6 @@ export function onMermaidThemeChange(listener: () => void): () => void {
       for (const notify of themeListeners) {
         notify();
       }
-    });
-    themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
     });
   }
 
