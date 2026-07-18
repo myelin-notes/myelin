@@ -33,6 +33,15 @@
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* The scenes frame content around 0.55x zoom, where the app's dot-grid
+   (1.5px dots at 35% alpha) resamples to invisible sub-pixel smudges. The
+   engine reads this token when it builds the pattern (canvas-theme.ts), so
+   boosting it here restores the app's dotted-canvas look at site zoom
+   levels without touching the engine. */
+:root {
+  --canvas-grid: rgba(140, 145, 151, 0.7);
+}
+
 html,
 body {
   height: 100%;
