@@ -232,6 +232,9 @@ export class CanvasRenderer {
     const dpr = window.devicePixelRatio || 1;
     this.canvas.width = width * dpr;
     this.canvas.height = height * dpr;
+    // Assigning width/height resets context state; re-apply smoothing quality
+    // so downscaled images (screenshots, photos) don't alias when zoomed out.
+    this.ctx.imageSmoothingQuality = 'high';
   }
 
   private resizeBgCanvas(width: number, height: number): void {

@@ -32,7 +32,6 @@ export const copy = {
       'Free while in early access · No account required · Your notes are never paywalled',
     ctaPrimary: 'Download',
     ctaSecondary: 'See it in action',
-    tryIt: 'this whole page is the real canvas.\ntry drawing on it!',
   },
 
   ink: {
@@ -119,12 +118,6 @@ for step in range(3):
   linked: {
     heading: 'Your notes, connected.',
     body: '[[Note links]], backlinks, and hover preview cards keep related ideas one hop away. The command palette jumps you anywhere, and per-file version history restores any earlier state of a note.',
-    notes: [
-      '[[action potentials]]',
-      '[[myelin sheath]]',
-      '[[node of ranvier]]',
-    ],
-    annotation: 'backlinks both ways',
   },
 
   localFirst: {

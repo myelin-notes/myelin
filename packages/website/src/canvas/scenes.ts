@@ -1,4 +1,5 @@
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { ImageElement } from '@myelin/editor/elements/image-element';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import { ShapeElement } from '@myelin/editor/elements/shape-element';
 import { StrokeElement } from '@myelin/editor/elements/stroke-element';
@@ -300,25 +301,25 @@ async function addPage(
   return pf;
 }
 
-/**
- * Hand-drawn five-point star, the hero's sample doodle. Edges are sampled
- * densely (via wobblyLine) so the renderer's smoothing keeps the points sharp.
- */
-function sketchStar(cx: number, cy: number, radius: number): Pt[] {
-  const verts: Pt[] = [];
-  for (let i = 0; i <= 10; i++) {
-    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
-    const rr = i % 2 === 0 ? radius : radius * 0.42;
-    verts.push([cx + Math.cos(angle) * rr, cy + Math.sin(angle) * rr]);
-  }
-  const pts: Pt[] = [];
-  for (let i = 0; i < verts.length - 1; i++) {
-    pts.push(...wobblyLine(verts[i], verts[i + 1], 1.5, i * 0.9));
-  }
-  return pts;
+async function addImage(
+  canvas: DrawableCanvas,
+  x: number,
+  y: number,
+  url: string,
+  width: number,
+): Promise<ImageElement> {
+  const res = await fetch(url);
+  const data = await res.arrayBuffer();
+  const img = canvas.addElement((uuid) => new ImageElement(uuid));
+  await img.setImageData(data);
+  const scale = width / img.naturalWidth;
+  img.setScale(scale, scale);
+  img.setOffset(x, y);
+  img.updateBounds();
+  return img;
 }
 
-function buildHero(canvas: DrawableCanvas, r: WorldRect): void {
+async function buildHero(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
   title(canvas, x, y + 30, copy.hero.headline, 88, 1120);
@@ -335,11 +336,16 @@ function buildHero(canvas: DrawableCanvas, r: WorldRect): void {
     width: 900,
   });
 
-  // Right-hand doodle corner inviting visitors to draw: the note, an arrow
-  // into open space, and one sample star doodle beside it.
-  hand(canvas, r.x + 1430, r.y + 250, copy.hero.tryIt, BLUE, 36, 460);
-  drawArrow(canvas, [r.x + 1490, r.y + 410], [r.x + 1560, r.y + 580], BLUE, 5);
-  addStroke(canvas, sketchStar(r.x + 1380, r.y + 650, 85), ORANGE, 6);
+  // Right-hand screenshot of the app's library view, centered vertically.
+  const imgW = 880;
+  const imgH = imgW * (2120 / 3248);
+  await addImage(
+    canvas,
+    r.x + 1030,
+    r.y + (r.height - imgH) / 2,
+    '/library.png',
+    imgW,
+  );
 }
 
 /** Where the PDF mock's top-left corner sits (DOM underlay, world-layer.tsx). */
@@ -429,7 +435,10 @@ function buildAudioSearch(canvas: DrawableCanvas, r: WorldRect): void {
   // captions (see scene-overlays.tsx).
 }
 
-function buildLinked(canvas: DrawableCanvas, r: WorldRect): void {
+async function buildLinked(
+  canvas: DrawableCanvas,
+  r: WorldRect,
+): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
   title(canvas, x, y, copy.linked.heading, 62, 760);
@@ -439,44 +448,16 @@ function buildLinked(canvas: DrawableCanvas, r: WorldRect): void {
     width: 740,
   });
 
-  // Three circled note links; each ellipse hugs its own label.
-  const nx = r.x + 1000;
-  const centers: Pt[] = [
-    [nx + 160, y + 90],
-    [nx + 560, y + 290],
-    [nx + 220, y + 500],
-  ];
-  const radii: number[] = [];
-  copy.linked.notes.forEach((note, i) => {
-    const [ncx, ncy] = centers[i];
-    const textWidth = note.length * 12.2;
-    const rx = textWidth / 2 + 42;
-    radii.push(rx);
-    addText(canvas, ncx - textWidth / 2, ncy - 18, note, {
-      size: 26,
-      color: BLUE,
-      width: textWidth + 30,
-    });
-    addStroke(canvas, sketchEllipse(ncx, ncy, rx, 48, i * 1.3), MUTED, 3);
-  });
-  // Rim-to-rim arrows between consecutive notes.
-  for (let i = 0; i < 2; i++) {
-    const [ax, ay] = centers[i];
-    const [tx, ty] = centers[i + 1];
-    const dx = tx - ax;
-    const dy = ty - ay;
-    const len = Math.hypot(dx, dy);
-    const ux = dx / len;
-    const uy = dy / len;
-    drawArrow(
-      canvas,
-      [ax + ux * (radii[i] + 14), ay + uy * 62],
-      [tx - ux * (radii[i + 1] + 18), ty - uy * 72],
-      MUTED,
-      4,
-    );
-  }
-  hand(canvas, nx + 480, y + 480, copy.linked.annotation, BLUE, 32, 300);
+  // Right-hand screenshot of the app's graph view, centered vertically.
+  const imgW = 800;
+  const imgH = imgW * (2120 / 3248);
+  await addImage(
+    canvas,
+    r.x + 860,
+    r.y + (r.height - imgH) / 2,
+    '/graph.png',
+    imgW,
+  );
 }
 
 function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
@@ -671,13 +652,13 @@ async function buildDownload(
 export async function populateScenes(canvas: DrawableCanvas): Promise<void> {
   ensureDisplayFont(HAND_FONT);
   const rect = (id: string) => sceneById(id).rect;
-  buildHero(canvas, rect('hero'));
   buildInk(canvas, rect('ink'));
   buildAudioSearch(canvas, rect('audio-search'));
-  buildLinked(canvas, rect('linked'));
   buildLocalFirst(canvas, rect('local-first'));
   buildSync(canvas, rect('sync'));
   buildSupporter(canvas, rect('supporter'));
+  await buildHero(canvas, rect('hero'));
+  await buildLinked(canvas, rect('linked'));
   await buildPages(canvas, rect('pages'));
   await buildDownload(canvas, rect('download'));
 }
