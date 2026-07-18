@@ -19,6 +19,37 @@ export function parseBlockLanguage(blockText: string): RunnableLanguage | null {
   return canonicalizeLanguage(token);
 }
 
+export interface FenceSource {
+  closingFenceLine: number | null;
+  delimiterLines: readonly number[];
+}
+
+/**
+ * Locates a fenced block's delimiter lines: the 1-based line numbers to dim
+ * (opening + closing) and the closing fence line, or nulls when the text
+ * isn't a complete `opening…closing` fenced block.
+ */
+export function parseFenceSource(text: string): FenceSource {
+  const lines = text.split('\n');
+  const closingFenceLine = lines.length;
+
+  if (
+    !isOpeningFenceLine(lines[0]) ||
+    closingFenceLine <= 1 ||
+    !isClosingFenceLine(lines[closingFenceLine - 1])
+  ) {
+    return {
+      closingFenceLine: null,
+      delimiterLines: [],
+    };
+  }
+
+  return {
+    closingFenceLine,
+    delimiterLines: [1, closingFenceLine],
+  };
+}
+
 /** Drops the opening and closing fence lines, returning just the code body. */
 export function stripFences(blockText: string): string {
   const lines = blockText.split('\n');
