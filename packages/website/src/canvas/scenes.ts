@@ -26,29 +26,41 @@ export interface SceneDef {
 export const SCENE_PAD = 90;
 
 const SCENE_GAP = 700;
-const Y_HIGH = 80;
-const Y_LOW = 1050;
 
-const SIZES: Array<{ id: string; label: string; w: number; h: number }> = [
-  { id: 'hero', label: 'Myelin', w: 2000, h: 1000 },
-  { id: 'ink', label: 'PDFs', w: 2250, h: 1180 },
-  { id: 'pages', label: 'Pages', w: 1900, h: 1140 },
-  { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000 },
-  { id: 'linked', label: 'Linked notes', w: 1750, h: 800 },
-  { id: 'local-first', label: 'Local-first', w: 2200, h: 1150 },
-  { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150 },
-  { id: 'supporter', label: 'Support', w: 1800, h: 1150 },
-  { id: 'download', label: 'Download', w: 2100, h: 1400 },
+// Each scene's world-space top (`y`). Because the auto-`x` loop always places
+// the next scene's left edge past the previous scene's right edge (via
+// SCENE_GAP), no two scenes can overlap regardless of height, so `y` is free to
+// vary as widely as we like. The values below span a deliberately tall band and
+// wander in irregular steps, with short runs in the same direction (drift down,
+// then down again; jump up, then further up) instead of a strict up/down/up/down
+// alternation. That forces the camera into steep, diagonal pans between scenes
+// so the site reads as a 2D space you move through, not a flat horizontal strip.
+const SIZES: Array<{
+  id: string;
+  label: string;
+  w: number;
+  h: number;
+  y: number;
+}> = [
+  { id: 'hero', label: 'Myelin', w: 2000, h: 1000, y: 600 },
+  { id: 'ink', label: 'PDFs', w: 2250, h: 1180, y: 1500 },
+  { id: 'pages', label: 'Pages', w: 1900, h: 1140, y: 1350 },
+  { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000, y: 180 },
+  { id: 'linked', label: 'Linked notes', w: 1750, h: 800, y: -150 },
+  { id: 'local-first', label: 'Local-first', w: 2200, h: 1150, y: 900 },
+  { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150, y: 1850 },
+  { id: 'supporter', label: 'Support', w: 1800, h: 1150, y: 550 },
+  { id: 'download', label: 'Download', w: 2100, h: 1400, y: 1400 },
 ];
 
-/** Scenes laid out on a left-to-right zigzag so camera moves feel spatial. */
+/** Scenes laid out left-to-right with a varied vertical rhythm (see SIZES). */
 export const SCENES: SceneDef[] = (() => {
   let x = 0;
-  return SIZES.map((s, i) => {
+  return SIZES.map((s) => {
     const def: SceneDef = {
       id: s.id,
       label: s.label,
-      rect: { x, y: i % 2 === 0 ? Y_HIGH : Y_LOW, width: s.w, height: s.h },
+      rect: { x, y: s.y, width: s.w, height: s.h },
     };
     x += s.w + SCENE_GAP;
     return def;
