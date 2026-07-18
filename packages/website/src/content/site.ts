@@ -36,12 +36,11 @@ export const copy = {
   },
 
   ink: {
-    heading: 'An infinite canvas that\nkeeps up with your pen.',
-    annotation: 'draw a shape + hold',
+    annotation: 'draw a shape + hold. try it!',
     recognized: 'recognized!',
-    pdfHeading: 'PDFs are first-class citizens.',
+    pdfHeading: 'Write directly\non your PDFs.',
     pdfBody:
-      'Drop a PDF onto the canvas, read it, and write directly on it in the same ink. When you are done, export the annotated PDF back out.',
+      'Drop a PDF onto the canvas and mark it up in the same ink as everything else: circle an equation, highlight a line, scribble in the margins. When you are done, export the annotated PDF back out.',
     pdfAnnotation: 'ink goes right on the page',
   },
 

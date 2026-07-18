@@ -30,7 +30,7 @@ const Y_LOW = 1050;
 
 const SIZES: Array<{ id: string; label: string; w: number; h: number }> = [
   { id: 'hero', label: 'Myelin', w: 2000, h: 1000 },
-  { id: 'ink', label: 'Ink & PDFs', w: 2570, h: 1270 },
+  { id: 'ink', label: 'PDFs', w: 2250, h: 1180 },
   { id: 'pages', label: 'Pages', w: 1900, h: 1140 },
   { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000 },
   { id: 'linked', label: 'Linked notes', w: 1750, h: 800 },
@@ -343,68 +343,36 @@ function buildHero(canvas: DrawableCanvas, r: WorldRect): void {
 }
 
 /** Where the PDF mock's top-left corner sits (DOM underlay, world-layer.tsx). */
-export const INK_PDF_MOCK = { dx: 1700, dy: 320 } as const;
+export const INK_PDF_MOCK = { dx: 1380, dy: 160 } as const;
 
 function buildInk(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.ink.heading, 62, 860);
-  // A line worth highlighting, with a real highlighter swipe over it.
-  addText(canvas, x, y + 280, 'Highlight anything, anywhere.', {
-    size: 30,
-    width: 520,
+  // Left half: the PDF story, with the shape-recognition demo as a playful
+  // aside underneath.
+  title(canvas, x, y + 150, copy.ink.pdfHeading, 72, 1000);
+  drawUnderline(canvas, x + 4, y + 365, 520, ORANGE, 8);
+  addText(canvas, x, y + 430, copy.ink.pdfBody, {
+    size: 26,
+    color: MUTED,
+    width: 840,
   });
-  addStroke(
-    canvas,
-    wobblyLine([x - 10, y + 300], [x + 450, y + 296], 4, 0.4),
-    HIGHLIGHT,
-    44,
-  );
 
-  // Colorful pen squiggles.
-  addStroke(
-    canvas,
-    wobblyLine([x, y + 440], [x + 300, y + 480], 26, 0.2),
-    BLUE,
-    7,
-  );
-  addStroke(
-    canvas,
-    wobblyLine([x + 90, y + 510], [x + 420, y + 460], 20, 2.6),
-    PINK,
-    7,
-  );
+  // Shape recognition, rough sketch -> clean shape.
+  const sx = x + 60;
+  addStroke(canvas, sketchRect(sx, y + 680, 240, 150, 6), INK, 6);
+  drawArrow(canvas, [sx + 280, y + 755], [sx + 400, y + 755], MUTED, 5);
+  addShape(canvas, 'rect', sx + 430, y + 680, [0, 0, 260, 150], INK, 6);
+  hand(canvas, sx, y + 880, copy.ink.annotation, BLUE, 36, 440);
+  hand(canvas, sx + 460, y + 880, copy.ink.recognized, GREEN, 36, 220);
+  drawCheck(canvas, sx + 630, y + 890, 1.2);
 
-  // Middle column: shape recognition, shown twice, rough sketch -> clean shape.
-  const sx = r.x + 960;
-  addStroke(
-    canvas,
-    sketchEllipse(sx + 130, y + 200, 130, 92, 0.4, 0.09),
-    INK,
-    6,
-  );
-  drawArrow(canvas, [sx + 300, y + 200], [sx + 420, y + 200], MUTED, 5);
-  addShape(canvas, 'ellipse', sx + 450, y + 115, [0, 0, 270, 170], INK, 6);
-  hand(canvas, sx + 20, y + 330, copy.ink.annotation, BLUE, 34, 320);
-
-  addStroke(canvas, sketchRect(sx + 20, y + 560, 250, 150, 6), INK, 6);
-  drawArrow(canvas, [sx + 310, y + 635], [sx + 420, y + 635], MUTED, 5);
-  addShape(canvas, 'rect', sx + 450, y + 560, [0, 0, 270, 150], INK, 6);
-  hand(canvas, sx + 470, y + 750, copy.ink.recognized, GREEN, 34, 220);
-  drawCheck(canvas, sx + 640, y + 760, 1.2);
-
-  // Right column: the same ink, on a PDF. Caption sits above the mock page
-  // (DOM underlay at INK_PDF_MOCK, see scene-overlays.tsx); the annotation
-  // offsets below track the mock's skeleton bars, so the circle rings the
-  // equation and the highlight and underline ride their own sentences.
+  // Right half: the mock PDF page (DOM underlay at INK_PDF_MOCK, see
+  // scene-overlays.tsx), centered vertically. The annotation offsets below
+  // track the mock's skeleton bars, so the circle rings the equation and the
+  // highlight and underline ride their own sentences.
   const px = r.x + INK_PDF_MOCK.dx;
   const py = r.y + INK_PDF_MOCK.dy;
-  title(canvas, px, y, copy.ink.pdfHeading, 46, 700);
-  addText(canvas, px, y + 80, copy.ink.pdfBody, {
-    size: 24,
-    color: MUTED,
-    width: 700,
-  });
   addStroke(canvas, sketchEllipse(px + 390, py + 314, 200, 62, 2.2), PINK, 6);
   addStroke(
     canvas,
