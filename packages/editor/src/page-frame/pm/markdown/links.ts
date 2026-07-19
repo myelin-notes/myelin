@@ -5,6 +5,7 @@ import {
   Plugin,
   TextSelection,
 } from 'prosemirror-state';
+import { Mapping } from 'prosemirror-transform';
 import { getPlatform } from '../../../platform';
 import { UserPrefs } from '../../../user-prefs';
 import {
@@ -378,6 +379,28 @@ function handleModifiedLinkInteraction(event: MouseEvent): boolean {
   return true;
 }
 
+/**
+ * Add the non-code textblock enclosing `pos` to `targets`. Used to re-check the
+ * blocks around the selection endpoints when the caret moves.
+ */
+function addEnclosingLinkTextblock(
+  doc: PMNode,
+  pos: number,
+  targets: Map<number, PMNode>,
+): void {
+  const clamped = Math.max(0, Math.min(pos, doc.content.size));
+  const $pos = doc.resolve(clamped);
+  for (let depth = $pos.depth; depth > 0; depth--) {
+    const node = $pos.node(depth);
+    if (node.isTextblock) {
+      if (!node.type.spec.code) {
+        targets.set($pos.before(depth), node);
+      }
+      return;
+    }
+  }
+}
+
 export function linkMarkdownPlugin(schema: Schema): Plugin {
   return new Plugin({
     props: {
@@ -385,42 +408,54 @@ export function linkMarkdownPlugin(schema: Schema): Plugin {
         return handleModifiedLinkInteraction(event);
       },
     },
-    appendTransaction(transactions, _oldState, newState) {
+    appendTransaction(transactions, oldState, newState) {
+      // Only textblocks that could have changed need re-normalizing: blocks
+      // touched by the edit, plus the blocks around the old and new selection
+      // endpoints (a raw [label](href) collapses once the caret leaves it).
+      // Scoping this way avoids rescanning the whole document on every cursor
+      // move, which is what previously ran here on selection-only transactions.
+      const dirty = new Map<number, PMNode>();
+
       const changedRanges = getChangedRangesForTransactions(
         transactions,
         newState.doc.content.size,
       );
-      if (changedRanges.length === 0) {
-        return null;
-      }
-
-      const changedTargets = collectAffectedTextblocks(
+      for (const { pos, node } of collectAffectedTextblocks(
         newState.doc,
         changedRanges,
         (node) => !node.type.spec.code,
-      );
-      if (changedTargets.length === 0) {
+      )) {
+        dirty.set(pos, node);
+      }
+
+      if (!oldState.selection.eq(newState.selection)) {
+        const mapping = new Mapping();
+        for (const transaction of transactions) {
+          mapping.appendMapping(transaction.mapping);
+        }
+        addEnclosingLinkTextblock(
+          newState.doc,
+          mapping.map(oldState.selection.from),
+          dirty,
+        );
+        addEnclosingLinkTextblock(
+          newState.doc,
+          mapping.map(oldState.selection.to),
+          dirty,
+        );
+        addEnclosingLinkTextblock(newState.doc, newState.selection.from, dirty);
+        addEnclosingLinkTextblock(newState.doc, newState.selection.to, dirty);
+      }
+
+      if (dirty.size === 0) {
         return null;
       }
 
+      const changedTargets = [...dirty.entries()].map(([pos, node]) => ({
+        pos,
+        node,
+      }));
       return buildNormalizedLinkTransaction(newState, schema, changedTargets);
-    },
-    view(_view) {
-      return {
-        update(nextView, previousState) {
-          if (
-            nextView.state.doc === previousState.doc &&
-            nextView.state.selection.eq(previousState.selection)
-          ) {
-            return;
-          }
-
-          const tr = buildNormalizedLinkTransaction(nextView.state, schema);
-          if (tr) {
-            nextView.dispatch(tr);
-          }
-        },
-      };
     },
   });
 }
