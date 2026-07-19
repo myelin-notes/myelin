@@ -2,6 +2,7 @@ import * as Y from 'yjs';
 import { summarizeYDoc } from '@myelin/editor/note/state-summary';
 import { NODES_DELETED_EVENT, type NodesDeletedDetail } from '@/lib/events';
 import { Logger } from '@/lib/logger';
+import type { SearchIndex } from '@/lib/search';
 import { removeThumbnail } from '@/lib/thumbnails';
 import { getPlatform, type ReindexItem } from '@/platform';
 import { NoteSession } from '../session';
@@ -24,6 +25,7 @@ import {
   createFileNode,
   createFolderNode,
   createNodeId,
+  createNodeSearchIndex,
   deleteNodeFromManifest,
   ensureVersionHistoryRoot,
   getBacklinks,
@@ -74,6 +76,7 @@ import type {
 
 const logger = new Logger('BaseRepository');
 const DEFAULT_SEMANTIC_SEARCH_LIMIT = 50;
+const EMPTY_CONTENT: ReadonlyMap<VFSNodeId, string> = new Map();
 
 // Announce deleted files so the tab layer can close tabs bound to them. Guarded
 // for non-DOM contexts (tests, background workers) where `window` is absent.
@@ -119,6 +122,21 @@ export abstract class BaseRepository
   private readonly statusListeners = new Set<
     (status: RepositoryRuntimeStatus) => void
   >();
+
+  /**
+   * Cached lexical search index, reused across search-as-you-type queries so a
+   * keystroke burst doesn't rebuild a MiniSearch index over the whole corpus
+   * each time. Keyed on the manifest reference (a wholesale replace/reload swaps
+   * the object), the mutation counter (in-place edits bump dataVersion), and the
+   * note-index content revision, so it rebuilds exactly when the searchable
+   * corpus changes and never serves stale results.
+   */
+  private nodeSearchCache: {
+    manifest: VFSManifest;
+    dataVersion: number;
+    contentRevision: number;
+    index: SearchIndex<VFSNode>;
+  } | null = null;
 
   protected abstract loadManifestImpl(): Promise<{
     manifest: VFSManifest;
@@ -289,11 +307,44 @@ export abstract class BaseRepository
         noteIndex.getEmbeddings(),
       ).slice(0, limit);
     }
-    return searchNodeResults(
+    const content = noteIndex?.getContent() ?? EMPTY_CONTENT;
+    const index = this.getNodeSearchIndex(
       manifest,
-      query,
-      noteIndex?.getContent() ?? new Map(),
-    ).slice(0, options.limit);
+      content,
+      noteIndex ? noteIndex.contentRevision() : 0,
+    );
+    return searchNodeResults(manifest, query, content, index).slice(
+      0,
+      options.limit,
+    );
+  }
+
+  /**
+   * The lexical search index for `manifest`, rebuilt only when the searchable
+   * corpus (manifest nodes or indexed content) has changed since it was cached.
+   */
+  private getNodeSearchIndex(
+    manifest: VFSManifest,
+    content: ReadonlyMap<VFSNodeId, string>,
+    contentRevision: number,
+  ): SearchIndex<VFSNode> {
+    const cache = this.nodeSearchCache;
+    if (
+      cache &&
+      cache.manifest === manifest &&
+      cache.dataVersion === this.runtimeStatus.dataVersion &&
+      cache.contentRevision === contentRevision
+    ) {
+      return cache.index;
+    }
+    const index = createNodeSearchIndex(manifest, content);
+    this.nodeSearchCache = {
+      manifest,
+      dataVersion: this.runtimeStatus.dataVersion,
+      contentRevision,
+      index,
+    };
+    return index;
   }
 
   async getNodesByName(name: string): Promise<VFSNode[]> {

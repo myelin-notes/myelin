@@ -39,6 +39,8 @@ export class TauriNoteIndexService implements NoteIndexCapability {
   /** node id -> extracted text. The synchronous corpus the search layer reads. */
   private readonly contentByNode = new Map<VFSNodeId, string>();
   private readonly embeddingByNode = new Map<VFSNodeId, NoteEmbedding>();
+  /** Bumped whenever {@link contentByNode} changes; see {@link contentRevision}. */
+  private _contentRevision = 0;
   private unlisten: UnlistenFn | null = null;
   /**
    * The repository the corpus currently reflects. Index artifacts are namespaced
@@ -75,10 +77,15 @@ export class TauriNoteIndexService implements NoteIndexCapability {
     this.repoId = null;
     this.contentByNode.clear();
     this.embeddingByNode.clear();
+    this._contentRevision++;
   }
 
   getContent(): ReadonlyMap<VFSNodeId, string> {
     return this.contentByNode;
+  }
+
+  contentRevision(): number {
+    return this._contentRevision;
   }
 
   getEmbeddings(): ReadonlyMap<VFSNodeId, NoteEmbedding> {
@@ -118,6 +125,7 @@ export class TauriNoteIndexService implements NoteIndexCapability {
     }
     this.contentByNode.delete(nodeId);
     this.embeddingByNode.delete(nodeId);
+    this._contentRevision++;
     try {
       await invoke('remove_index', { repoId, nodeId });
     } catch (err) {
@@ -166,6 +174,7 @@ export class TauriNoteIndexService implements NoteIndexCapability {
     } else {
       this.contentByNode.delete(nodeId);
     }
+    this._contentRevision++;
 
     // Keep any well-formed embedding regardless of model id; search correctness
     // is enforced downstream by matching the query embedding's model against

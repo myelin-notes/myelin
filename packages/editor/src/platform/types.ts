@@ -106,6 +106,12 @@ export interface NoteIndexCapability {
   reset(): void;
   /** The synchronous index corpus, keyed by node id, for the search layer. */
   getContent(): ReadonlyMap<VFSNodeId, string>;
+  /**
+   * Monotonically increasing counter bumped whenever {@link getContent}'s
+   * corpus changes. The search layer keys its cached index on this so it can
+   * reuse the index across queries and rebuild only when the content changes.
+   */
+  contentRevision(): number;
   getEmbeddings(): ReadonlyMap<VFSNodeId, NoteEmbedding>;
   embedSearchQuery(query: string): Promise<NoteEmbedding>;
   /** Queue a single note for (debounced) reindexing. */
