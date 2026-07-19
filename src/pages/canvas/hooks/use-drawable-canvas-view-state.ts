@@ -82,10 +82,15 @@ export function useDrawableCanvasViewState(
     });
 
     canvas.viewport.setOnZoomChange((zoom) => {
-      setViewState((current) => ({
-        ...current,
-        zoomLevel: Math.round(zoom * 100),
-      }));
+      // Fires on every frame of the zoom animation and every wheel/pinch tick;
+      // the rounded percentage is unchanged across most consecutive frames, so
+      // reuse the current state reference to skip redundant re-renders.
+      setViewState((current) => {
+        const zoomLevel = Math.round(zoom * 100);
+        return zoomLevel === current.zoomLevel
+          ? current
+          : { ...current, zoomLevel };
+      });
     });
     canvas.setOnElementEdit((editingElement) => {
       setViewState((current) => ({
