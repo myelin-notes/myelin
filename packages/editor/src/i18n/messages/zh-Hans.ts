@@ -106,12 +106,29 @@ const zhHans: typeof en = {
       button: '新建',
       folder: '新建文件夹',
       canvas: '新建画布',
-      importFiles: '导入文件',
-      importGoodnotesZip: '导入 Goodnotes ZIP',
-      importObsidianVault: '导入 Obsidian 仓库',
-      importWorkspaceJson: '导入工作区 JSON',
+      import: '导入',
       untitledCanvas: '未命名画布',
       unnamedFolder: '未命名文件夹',
+    },
+    importPicker: {
+      title: '导入',
+      description: '选择要导入到库中的内容。',
+      files: {
+        label: '文件',
+        description: '来自电脑的 Markdown、PDF、图片和视频。',
+      },
+      goodnotesZip: {
+        label: 'Goodnotes ZIP',
+        description: '以 PDF 形式导出的 Goodnotes 文件夹。',
+      },
+      obsidianVault: {
+        label: 'Obsidian 仓库',
+        description: '仓库文件夹，包含其笔记和附件。',
+      },
+      workspaceJson: {
+        label: '工作区 JSON',
+        description: '从 Myelin 导出的归档文件。',
+      },
     },
     importMarkdown: {
       unsupportedFile: '请选择 Markdown 文件（.md、.markdown 或 .mdx）',
