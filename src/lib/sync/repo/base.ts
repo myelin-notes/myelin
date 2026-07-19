@@ -177,8 +177,6 @@ export abstract class BaseRepository
     return 1;
   }
 
-  protected async onFileCreated(_nodeId: VFSNodeId): Promise<void> {}
-
   protected async onFileSaved(
     nodeId: VFSNodeId,
     links?: readonly StoredNoteLink[],
@@ -458,7 +456,6 @@ export abstract class BaseRepository
       addChild(manifest, parentId, newId);
       return newId;
     });
-    await this.onFileCreated(id);
     if (bytes !== undefined) {
       await this.writeFileBytes(id, bytes);
     }
