@@ -1,5 +1,5 @@
 import { summarizeNoteBytes } from '@myelin/editor/note/state-summary';
-import { appDataDir, join } from '@tauri-apps/api/path';
+import { join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
   exists,
@@ -12,6 +12,7 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
+import { ensureDirOnce, getAppDataDir } from '@/platform/tauri/fs-cache';
 import { BaseRepository } from './base';
 import {
   computeRevision,
@@ -70,7 +71,7 @@ export class LocalRepository extends BaseRepository {
       return null;
     }
     return join(
-      await appDataDir(),
+      await getAppDataDir(),
       ...(this.storageRoot ? [this.storageRoot] : []),
       FILES_DIR,
       getStoredFileName(node),
@@ -284,23 +285,11 @@ export class LocalRepository extends BaseRepository {
 
   private async ensureDirs(): Promise<void> {
     const rootPath = await this.resolveStoragePath();
-    if (
-      rootPath &&
-      !(await exists(rootPath, { baseDir: BaseDirectory.AppData }))
-    ) {
-      await mkdir(rootPath, {
-        baseDir: BaseDirectory.AppData,
-        recursive: true,
-      });
+    if (rootPath) {
+      await ensureDirOnce(rootPath);
     }
 
-    const filesDirPath = await this.resolveStoragePath(FILES_DIR);
-    if (!(await exists(filesDirPath, { baseDir: BaseDirectory.AppData }))) {
-      await mkdir(filesDirPath, {
-        baseDir: BaseDirectory.AppData,
-        recursive: true,
-      });
-    }
+    await ensureDirOnce(await this.resolveStoragePath(FILES_DIR));
   }
 
   private async writeManifestToDisk(manifest: VFSManifest): Promise<void> {

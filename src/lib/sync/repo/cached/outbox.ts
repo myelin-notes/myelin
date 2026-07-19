@@ -1,12 +1,12 @@
 import {
   BaseDirectory,
   exists,
-  mkdir,
   readTextFile,
   rename,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
+import { ensureDirOnce } from '@/platform/tauri/fs-cache';
 import { createNodeId } from '../shared';
 import type { VFSNodeId } from '../types';
 
@@ -434,12 +434,7 @@ export class CachedRepositoryOutbox {
       return;
     }
 
-    if (!(await exists(parentPath, { baseDir: BaseDirectory.AppData }))) {
-      await mkdir(parentPath, {
-        baseDir: BaseDirectory.AppData,
-        recursive: true,
-      });
-    }
+    await ensureDirOnce(parentPath);
   }
 
   private async write(): Promise<void> {
