@@ -81,7 +81,7 @@ export class LocalRepository extends BaseRepository {
   async replaceSnapshot(snapshot: RepositorySnapshot): Promise<void> {
     await this.ensureDirs();
 
-    const filesDirPath = await this.resolveStoragePath(FILES_DIR);
+    const filesDirPath = this.resolveStoragePath(FILES_DIR);
     if (await exists(filesDirPath, { baseDir: BaseDirectory.AppData })) {
       await remove(filesDirPath, {
         baseDir: BaseDirectory.AppData,
@@ -95,7 +95,7 @@ export class LocalRepository extends BaseRepository {
         continue;
       }
 
-      const filePath = await this.resolveStoragePath(
+      const filePath = this.resolveStoragePath(
         FILES_DIR,
         getStoredFileName(node),
       );
@@ -132,7 +132,7 @@ export class LocalRepository extends BaseRepository {
     }
 
     await this.ensureDirs();
-    const filePath = await this.resolveStoragePath(
+    const filePath = this.resolveStoragePath(
       FILES_DIR,
       getStoredFileName(node),
     );
@@ -154,7 +154,7 @@ export class LocalRepository extends BaseRepository {
 
     await this.ensureDirs();
 
-    const manifestPath = await this.resolveStoragePath(MANIFEST_PATH);
+    const manifestPath = this.resolveStoragePath(MANIFEST_PATH);
 
     if (await exists(manifestPath, { baseDir: BaseDirectory.AppData })) {
       const text = await readTextFile(manifestPath, {
@@ -192,7 +192,7 @@ export class LocalRepository extends BaseRepository {
       return { bytes: null, revision: null };
     }
 
-    const filePath = await this.resolveStoragePath(
+    const filePath = this.resolveStoragePath(
       FILES_DIR,
       getStoredFileName(node),
     );
@@ -229,7 +229,7 @@ export class LocalRepository extends BaseRepository {
     const nodeType = node?.type;
     if (node && node.type === 'file') {
       await this.ensureDirs();
-      const filePath = await this.resolveStoragePath(
+      const filePath = this.resolveStoragePath(
         FILES_DIR,
         getStoredFileName(node),
       );
@@ -267,7 +267,7 @@ export class LocalRepository extends BaseRepository {
       return;
     }
 
-    const filePath = await this.resolveStoragePath(
+    const filePath = this.resolveStoragePath(
       FILES_DIR,
       getStoredFileName(
         node?.type === 'file' ? node : { id: nodeId, fileType: fileType! },
@@ -284,17 +284,17 @@ export class LocalRepository extends BaseRepository {
   }
 
   private async ensureDirs(): Promise<void> {
-    const rootPath = await this.resolveStoragePath();
+    const rootPath = this.resolveStoragePath();
     if (rootPath) {
       await ensureDirOnce(rootPath);
     }
 
-    await ensureDirOnce(await this.resolveStoragePath(FILES_DIR));
+    await ensureDirOnce(this.resolveStoragePath(FILES_DIR));
   }
 
   private async writeManifestToDisk(manifest: VFSManifest): Promise<void> {
     await writeTextFile(
-      await this.resolveStoragePath(MANIFEST_PATH),
+      this.resolveStoragePath(MANIFEST_PATH),
       JSON.stringify(manifest, null, 2),
       {
         baseDir: BaseDirectory.AppData,
@@ -302,20 +302,16 @@ export class LocalRepository extends BaseRepository {
     );
   }
 
-  private async resolveStoragePath(...segments: string[]): Promise<string> {
-    const filteredSegments = [
-      ...(this.storageRoot ? [this.storageRoot] : []),
-      ...segments,
-    ].filter(Boolean);
-
-    if (filteredSegments.length === 0) {
-      return '';
-    }
-
-    if (filteredSegments.length === 1) {
-      return filteredSegments[0];
-    }
-
-    return join(...filteredSegments);
+  /**
+   * Paths here are relative to `BaseDirectory.AppData` and built from app
+   * constants plus UUID filenames, so none of `join`'s extra behaviour (`..`
+   * normalization, verbatim-prefix stripping) is reachable. Concatenating
+   * avoids an IPC round trip per file operation, which dominates workspace
+   * load. `/` is accepted by the fs plugin on every platform.
+   */
+  private resolveStoragePath(...segments: string[]): string {
+    return [...(this.storageRoot ? [this.storageRoot] : []), ...segments]
+      .filter(Boolean)
+      .join('/');
   }
 }
