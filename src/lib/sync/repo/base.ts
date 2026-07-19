@@ -138,6 +138,9 @@ export abstract class BaseRepository
     index: SearchIndex<VFSNode>;
   } | null = null;
 
+  private manifestBatchDepth = 0;
+  private manifestBatchPending = false;
+
   protected abstract loadManifestImpl(): Promise<{
     manifest: VFSManifest;
     revision: string | null;
@@ -241,6 +244,23 @@ export abstract class BaseRepository
       manifest: snapshotManifest,
       notes: Object.fromEntries(noteEntries),
     };
+  }
+
+  /**
+   * Requires `loadManifestImpl` to hand back a live in-memory manifest, since
+   * the deferred mutations live there until the flush.
+   */
+  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
+    this.manifestBatchDepth += 1;
+    try {
+      return await fn();
+    } finally {
+      this.manifestBatchDepth -= 1;
+      if (this.manifestBatchDepth === 0 && this.manifestBatchPending) {
+        this.manifestBatchPending = false;
+        await this.mutateManifest('Batch update', () => {});
+      }
+    }
   }
 
   async applyManifestMutation<T>(
@@ -841,6 +861,14 @@ export abstract class BaseRepository
     action: string,
     mutator: (manifest: VFSManifest) => T,
   ): Promise<T> {
+    if (this.manifestBatchDepth > 0) {
+      // Batched: mutate the in-memory manifest now, persist once on flush.
+      const { manifest } = await this.loadManifestImpl();
+      const result = mutator(manifest);
+      this.manifestBatchPending = true;
+      return result;
+    }
+
     const maxRetries = this.manifestMaxRetries();
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const { manifest, revision } = await this.loadManifestImpl();
