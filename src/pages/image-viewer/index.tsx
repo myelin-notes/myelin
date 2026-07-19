@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  AlertCircle,
-  ChevronLeft,
-  FileImage,
-  LoaderCircle,
-} from 'lucide-react';
+import { AlertCircle, LoaderCircle } from 'lucide-react';
 import {
   getMimeTypeForFileType,
   isImageFileType,
@@ -12,7 +7,6 @@ import {
   type VFSFileNode,
   type VFSNodeId,
 } from '@/lib/sync';
-import { usePaneId, useTabController } from '@/lib/tabs/context';
 
 type ImageViewerState =
   | { status: 'loading' }
@@ -28,8 +22,6 @@ interface ImageViewerPageProps {
 }
 
 export function ImageViewerPage({ id }: ImageViewerPageProps) {
-  const tabController = useTabController();
-  const paneId = usePaneId();
   const repository = useRepository();
   const [state, setState] = useState<ImageViewerState>({ status: 'loading' });
   const [imageFailed, setImageFailed] = useState(false);
@@ -83,44 +75,9 @@ export function ImageViewerPage({ id }: ImageViewerPageProps) {
     };
   }, [id, repository]);
 
-  const goBack = () => {
-    const pane = tabController.getPane(paneId);
-    if (!pane) {
-      return;
-    }
-    const tab = pane.tabs.find(
-      (t) => t.target.type === 'image' && t.target.id === id,
-    );
-    if (tab) {
-      tabController.closeTab(tab.id, paneId);
-    }
-  };
-
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-page">
-      <header className="absolute top-6 right-6 left-6 z-10 flex max-w-[calc(100vw-3rem)] items-center gap-3 rounded-xl bg-card/95 px-4 py-3 shadow-ambient ring-1 ring-border-subtle/70">
-        <button
-          type="button"
-          onClick={goBack}
-          aria-label="Back to library"
-          className="group shrink-0 cursor-pointer border-none bg-transparent p-0"
-        >
-          <ChevronLeft className="size-5 text-text-secondary transition-all duration-200 group-hover:-translate-x-0.5 group-hover:text-text-primary" />
-        </button>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <FileImage className="size-4 shrink-0 text-text-muted" />
-          <h1 className="m-0 truncate font-medium text-sm text-text-primary">
-            {state.status === 'ready' ? state.file.name : 'Image'}
-          </h1>
-        </div>
-        {state.status === 'ready' && (
-          <span className="shrink-0 font-semibold text-[10px] text-text-muted uppercase">
-            {state.file.fileType}
-          </span>
-        )}
-      </header>
-
-      <main className="flex min-h-0 flex-1 items-center justify-center px-6 pt-24 pb-8">
+      <main className="flex min-h-0 flex-1 items-center justify-center px-6 py-8">
         {state.status === 'loading' && (
           <div className="flex items-center gap-2 text-sm text-text-muted">
             <LoaderCircle className="size-4 animate-spin" />
