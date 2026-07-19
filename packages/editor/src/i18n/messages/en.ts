@@ -142,8 +142,9 @@ const en = {
       title: 'Import Obsidian Vault',
       scanning: 'Scanning vault...',
       jsonTitle: 'Import Workspace JSON',
-      jsonScanning: 'Scanning folder...',
-      jsonNoFiles: 'No JSON notes or media found in this folder',
+      jsonScanning: 'Reading archive...',
+      jsonNoFiles: 'No JSON notes or media found in this archive',
+      jsonZipFilter: 'Myelin JSON export',
       notes: (count: number) => `${count} note${count === 1 ? '' : 's'}`,
       media: (count: number) => `${count} media file${count === 1 ? '' : 's'}`,
       skippedFiles: (count: number) =>
@@ -434,7 +435,7 @@ const en = {
       exportJson: {
         label: 'Export Workspace as JSON',
         description:
-          'Save your whole workspace to a folder as JSON. Each note becomes a JSON file encoding its strokes, text, and embedded media (binaries as base64); other files are copied and the folder structure is preserved.',
+          'Save your whole workspace to a ZIP file as JSON. Each note becomes a JSON file encoding its strokes, text, and embedded media (binaries as base64); other files are copied and the folder structure is preserved.',
         button: 'Export',
         defaultExportName: 'Myelin Notes JSON Export',
         loading: 'Exporting workspace as JSON...',

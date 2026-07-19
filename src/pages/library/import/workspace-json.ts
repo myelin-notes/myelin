@@ -1,11 +1,11 @@
+import { strFromU8, type Unzipped, unzip } from 'fflate';
 import { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
-import { join } from '@tauri-apps/api/path';
-import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
+import { readFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import {
   type FileType,
@@ -24,12 +24,14 @@ import type { ImportProgress } from './dialog';
 import {
   createImportedFolders,
   getImportParentId,
+  getParentPath,
   getPathBasename,
 } from './import-tree';
 
 const logger = new Logger('WorkspaceJsonImport');
 
 const JSON_EXTENSION_RE = /\.json$/i;
+const ZIP_EXTENSION_RE = /\.zip$/i;
 
 export interface ImportWorkspaceJsonResult {
   rootFolderId: VFSNodeId;
@@ -41,37 +43,40 @@ export interface ImportWorkspaceJsonResult {
 export interface ImportWorkspaceJsonOptions {
   repository: Repository;
   parentId: VFSNodeId | null;
-  /** Absolute path to the exported workspace folder the user picked. */
-  dirPath: string;
-  /** Name for the created root folder; defaults to the picked folder's name. */
+  /** Absolute path to the exported workspace zip the user picked. */
+  zipPath: string;
+  /** Name for the created root folder; defaults to the archive's own name. */
   rootName?: string;
-  /** Pre-scanned result to avoid re-walking the directory. */
+  /** Pre-scanned archive; re-read from disk when omitted. */
   scanned?: ScannedWorkspace;
   onProgress?: (progress: ImportProgress) => void;
 }
 
-interface ScannedNote {
-  absolutePath: string;
-  folderPath: string;
-}
-
-interface ScannedMedia {
-  absolutePath: string;
+/** An archive entry, already decompressed into memory. */
+interface ScannedFile {
+  /** '/'-separated path inside the archive, below its root folder. */
+  path: string;
   folderPath: string;
   name: string;
+  bytes: Uint8Array;
+}
+
+interface ScannedMedia extends ScannedFile {
   fileType: FileType;
 }
 
 export interface ScannedWorkspace {
+  /** Name of the archive's root folder, used for the imported folder. */
+  rootName: string;
   /** Relative folder paths, including empty folders, '/'-separated. */
   folderPaths: Set<string>;
-  notes: ScannedNote[];
+  notes: ScannedFile[];
   media: ScannedMedia[];
   skippedFiles: number;
 }
 
 export function getPathName(path: string): string {
-  return getPathBasename(path, 'Workspace');
+  return getPathBasename(path, 'Workspace').replace(ZIP_EXTENSION_RE, '');
 }
 
 /** Convert a base64-marked binary back to bytes; otherwise recurse structurally. */
@@ -189,65 +194,55 @@ export function rebuildNote(
   }
 }
 
-async function scanDirectory(
-  absolutePath: string,
-  relativeSegments: string[],
-  scanned: ScannedWorkspace,
-): Promise<void> {
-  const entries = await readDir(absolutePath);
-
-  for (const entry of entries) {
-    if (entry.name.startsWith('.') || entry.isSymlink) {
-      if (entry.isSymlink) {
-        scanned.skippedFiles += 1;
+function unzipArchive(bytes: Uint8Array): Promise<Unzipped> {
+  return new Promise((resolve, reject) => {
+    unzip(bytes, (error, archive) => {
+      if (error) {
+        reject(error);
+        return;
       }
-      continue;
-    }
-
-    const childPath = await join(absolutePath, entry.name);
-    const childSegments = [...relativeSegments, entry.name];
-
-    if (entry.isDirectory) {
-      scanned.folderPaths.add(childSegments.join('/'));
-      await scanDirectory(childPath, childSegments, scanned);
-      continue;
-    }
-
-    if (!entry.isFile) {
-      scanned.skippedFiles += 1;
-      continue;
-    }
-
-    const folderPath = relativeSegments.join('/');
-    if (JSON_EXTENSION_RE.test(entry.name)) {
-      scanned.notes.push({ absolutePath: childPath, folderPath });
-      continue;
-    }
-
-    const fileType = getFileTypeForName(entry.name);
-    if (fileType && fileType !== 'mcanvas') {
-      scanned.media.push({
-        absolutePath: childPath,
-        folderPath,
-        name: entry.name,
-        fileType,
-      });
-      continue;
-    }
-
-    scanned.skippedFiles += 1;
-  }
+      resolve(archive);
+    });
+  });
 }
 
-function parseNote(raw: string, absolutePath: string): NoteJson {
+/** Normalize a raw zip path, or null for entries the import always ignores. */
+function normalizeZipPath(path: string): string | null {
+  const segments = path.replace(/\\/g, '/').split('/').filter(Boolean);
+  if (
+    segments.length === 0 ||
+    segments[0] === '__MACOSX' ||
+    segments.some((segment) => segment.startsWith('.'))
+  ) {
+    return null;
+  }
+  return segments.join('/');
+}
+
+/**
+ * Our exports nest everything under one folder named after the archive, so drop
+ * that prefix and adopt its name for the imported root folder. An archive
+ * without a single common root is taken as-is, named after the zip file.
+ */
+function resolveArchiveRoot(
+  paths: readonly string[],
+  fallbackName: string,
+): { rootName: string; prefix: string } {
+  const tops = new Set(paths.map((path) => path.split('/')[0]));
+  const [top] = [...tops];
+  if (tops.size === 1 && paths.some((path) => path.includes('/'))) {
+    return { rootName: top, prefix: `${top}/` };
+  }
+  return { rootName: fallbackName, prefix: '' };
+}
+
+function parseNote(raw: string, path: string): NoteJson {
   const note = JSON.parse(raw) as NoteJson;
   if (note.version !== NOTE_JSON_VERSION) {
-    throw new Error(
-      `Unsupported note version ${note.version} in ${absolutePath}`,
-    );
+    throw new Error(`Unsupported note version ${note.version} in ${path}`);
   }
   if (!Array.isArray(note.elements)) {
-    throw new Error(`Malformed note (no elements) in ${absolutePath}`);
+    throw new Error(`Malformed note (no elements) in ${path}`);
   }
   return note;
 }
@@ -333,30 +328,95 @@ function createImportNoteLinkResolver(
 }
 
 export async function scanWorkspaceJson(
-  dirPath: string,
+  zipPath: string,
 ): Promise<ScannedWorkspace> {
+  const archive = await unzipArchive(await readFile(zipPath));
+  return scanArchive(archive, getPathName(zipPath));
+}
+
+/**
+ * Turn a decompressed archive into the import plan: which folders to create and
+ * which entries are notes, media, or unsupported.
+ */
+export function scanArchive(
+  archive: Unzipped,
+  fallbackName: string,
+): ScannedWorkspace {
+  // Zip entries carry no ordering or directory guarantees, so normalize first,
+  // then decide what the archive's root folder is from the whole path set.
+  const entries: { path: string; bytes: Uint8Array; isFolder: boolean }[] = [];
+  for (const [rawPath, bytes] of Object.entries(archive)) {
+    const path = normalizeZipPath(rawPath);
+    if (path) {
+      entries.push({ path, bytes, isFolder: rawPath.endsWith('/') });
+    }
+  }
+
+  const { rootName, prefix } = resolveArchiveRoot(
+    entries.map((entry) => entry.path),
+    fallbackName,
+  );
+
   const scanned: ScannedWorkspace = {
+    rootName,
     folderPaths: new Set(),
     notes: [],
     media: [],
     skippedFiles: 0,
   };
-  await scanDirectory(dirPath, [], scanned);
+
+  for (const entry of entries) {
+    if (!entry.path.startsWith(prefix)) {
+      continue;
+    }
+    const path = entry.path.slice(prefix.length);
+    if (!path) {
+      continue;
+    }
+
+    if (entry.isFolder) {
+      scanned.folderPaths.add(path);
+      continue;
+    }
+
+    const name = path.split('/').pop() ?? path;
+    const file: ScannedFile = {
+      path,
+      folderPath: getParentPath(path),
+      name,
+      bytes: entry.bytes,
+    };
+
+    if (JSON_EXTENSION_RE.test(name)) {
+      scanned.notes.push(file);
+      continue;
+    }
+
+    const fileType = getFileTypeForName(name);
+    if (fileType && fileType !== 'mcanvas') {
+      scanned.media.push({ ...file, fileType });
+      continue;
+    }
+
+    scanned.skippedFiles += 1;
+  }
+
   return scanned;
 }
 
 export async function importWorkspaceJson({
   repository,
   parentId,
-  dirPath,
-  rootName = getPathName(dirPath),
+  zipPath,
+  rootName,
   scanned: preScanned,
   onProgress,
 }: ImportWorkspaceJsonOptions): Promise<ImportWorkspaceJsonResult> {
-  const scanned = preScanned ?? (await scanWorkspaceJson(dirPath));
+  const scanned = preScanned ?? (await scanWorkspaceJson(zipPath));
+  const importName = rootName ?? scanned.rootName;
 
   if (scanned.notes.length === 0 && scanned.media.length === 0) {
-    throw new Error('No JSON notes or media found in the selected folder.');
+    throw new Error('No JSON notes or media found in the selected ZIP.');
   }
 
   let rootFolderId: VFSNodeId | null = null;
@@ -370,7 +430,7 @@ export async function importWorkspaceJson({
   // Fatal setup (creating the destination folders) aborts and rolls back.
   // Per-file failures below are isolated so one bad file can't discard the rest.
   try {
-    rootFolderId = await repository.createFolder(rootName, parentId);
+    rootFolderId = await repository.createFolder(importName, parentId);
     folderIds = await createImportedFolders(
       repository,
       rootFolderId,
@@ -378,7 +438,7 @@ export async function importWorkspaceJson({
     );
   } catch (error) {
     logger.error('Failed to import workspace JSON', error, {
-      dirPath,
+      zipPath,
       rootFolderId,
     });
     if (rootFolderId) {
@@ -395,17 +455,9 @@ export async function importWorkspaceJson({
   // remapped to the new nodes (links may point forward), then rebuild content.
   const prepared: PreparedNote[] = [];
   for (const file of scanned.notes) {
-    const fallbackName =
-      file.absolutePath
-        .replace(/\\/g, '/')
-        .split('/')
-        .pop()
-        ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
+    const fallbackName = file.name.replace(JSON_EXTENSION_RE, '') || 'Untitled';
     try {
-      const note = parseNote(
-        await readTextFile(file.absolutePath),
-        file.absolutePath,
-      );
+      const note = parseNote(strFromU8(file.bytes), file.path);
       prepared.push(
         await createImportedNote({
           note,
@@ -421,7 +473,7 @@ export async function importWorkspaceJson({
       failedFiles += 1;
       onProgress?.({ current: ++current, total, fileName: fallbackName });
       logger.warn('Skipping note that failed to import', {
-        path: file.absolutePath,
+        path: file.path,
         error,
       });
     }
@@ -453,13 +505,13 @@ export async function importWorkspaceJson({
         file.name,
         file.fileType,
         getImportParentId(rootFolderId, folderIds, file.folderPath),
-        await readFile(file.absolutePath),
+        file.bytes,
       );
       mediaImported += 1;
     } catch (error) {
       failedFiles += 1;
       logger.warn('Skipping media that failed to import', {
-        path: file.absolutePath,
+        path: file.path,
         error,
       });
     }

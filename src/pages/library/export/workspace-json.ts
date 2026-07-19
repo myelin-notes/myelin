@@ -24,16 +24,16 @@ import {
 const logger = new Logger('WorkspaceJsonExport');
 
 export interface ExportWorkspaceJsonResult {
-  vaultPath: string;
+  zipPath: string;
   notesExported: number;
   filesCopied: number;
 }
 
 export interface ExportWorkspaceJsonOptions {
   repository: ReadableRepository;
-  /** Absolute directory the user picked; the export is created as a subfolder. */
+  /** Absolute directory the user picked; the zip is created inside it. */
   destDir: string;
-  /** Name of the root folder created under {@link destDir}. */
+  /** Name of the zip created under {@link destDir}, and of its root folder. */
   exportName: string;
   onProgress?: (progress: ExportProgress) => void;
 }
@@ -137,8 +137,8 @@ async function buildFileEntry(
     };
   }
 
-  // Standalone media is mirrored on disk, so the Rust side copies the stored
-  // bytes directly from this path (matching the Obsidian vault export).
+  // Standalone media is mirrored on disk, so the Rust side streams the stored
+  // bytes from this path straight into the archive rather than through JSON.
   const sourcePath = await repository.getStoredAbsolutePath(file.node.id);
   if (!sourcePath) {
     logger.warn('Skipping file with no stored path', {
@@ -179,9 +179,9 @@ export async function exportWorkspaceJson({
     }
   }
 
-  // Reuses the Obsidian vault writer: it creates the folders, writes `text`
-  // files and copies `copyFrom` media into the user-picked destination.
-  const vaultPath = await invoke<string>('export_obsidian_vault', {
+  // Shares the Obsidian export's plan shape, but Rust packs it into a single
+  // zip: `text` files are written as entries and `copyFrom` media streamed in.
+  const zipPath = await invoke<string>('export_workspace_zip', {
     request: {
       destDir,
       vaultName: sanitizeName(exportName) || 'Workspace',
@@ -190,5 +190,5 @@ export async function exportWorkspaceJson({
     },
   });
 
-  return { vaultPath, notesExported, filesCopied };
+  return { zipPath, notesExported, filesCopied };
 }

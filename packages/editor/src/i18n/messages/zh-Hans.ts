@@ -141,8 +141,9 @@ const zhHans: typeof en = {
       title: '导入 Obsidian 仓库',
       scanning: '正在扫描仓库…',
       jsonTitle: '导入工作区 JSON',
-      jsonScanning: '正在扫描文件夹…',
-      jsonNoFiles: '此文件夹中未找到 JSON 笔记或媒体文件',
+      jsonScanning: '正在读取压缩包…',
+      jsonNoFiles: '此压缩包中未找到 JSON 笔记或媒体文件',
+      jsonZipFilter: 'Myelin JSON 导出',
       notes: (count: number) => `${count} 个笔记`,
       media: (count: number) => `${count} 个媒体文件`,
       skippedFiles: (count: number) => `将跳过 ${count} 个不受支持的文件`,
@@ -424,7 +425,7 @@ const zhHans: typeof en = {
       exportJson: {
         label: '将工作区导出为 JSON',
         description:
-          '将整个工作区保存到文件夹中，格式为 JSON。每个笔记会编码为一个 JSON 文件，包含其笔迹、文本和嵌入的媒体（二进制以 base64 编码）；其他文件会被复制，并保留文件夹结构。',
+          '将整个工作区保存为 JSON 格式的 ZIP 压缩包。每个笔记会编码为一个 JSON 文件，包含其笔迹、文本和嵌入的媒体（二进制以 base64 编码）；其他文件会被复制，并保留文件夹结构。',
         button: '导出',
         defaultExportName: 'Myelin Notes JSON 导出',
         loading: '正在将工作区导出为 JSON…',

@@ -237,9 +237,13 @@ export function useExplorerImports({
       return;
     }
     const selected = await openDialog({
-      directory: true,
       multiple: false,
-      recursive: true,
+      filters: [
+        {
+          name: strings.library.importDialog.jsonZipFilter,
+          extensions: ['zip'],
+        },
+      ],
     });
     if (!selected || Array.isArray(selected)) {
       return;
@@ -247,7 +251,7 @@ export function useExplorerImports({
     setImportType('workspace_json');
     setImportSource(
       createWorkspaceJsonImportSource({
-        dirPath: selected,
+        zipPath: selected,
         repository,
         parentId,
         strings,

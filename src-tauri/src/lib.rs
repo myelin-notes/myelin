@@ -79,6 +79,7 @@ pub fn run() {
             iroh_transport::iroh_leave,
             pdf_export::export_pdf,
             workspace_export::export_obsidian_vault,
+            workspace_export::zip_archive::export_workspace_zip,
             mcp_server::mcp_start,
             mcp_server::mcp_stop,
             mcp_server::mcp_status,
