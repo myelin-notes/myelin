@@ -217,6 +217,17 @@ export class DrawableCanvas {
    */
   private _changeListeners = new Set<() => void>();
 
+  /**
+   * Cached union of element world-space bounding boxes for `getContentBounds`,
+   * which the viewport queries on every pan/zoom frame to clamp the offset. The
+   * union only changes when elements are added/removed/reordered or an element's
+   * geometry changes, never when the viewport merely pans/zooms, so it is
+   * recomputed lazily and invalidated at every mutation funnel. `_valid` is
+   * separate because `null` is itself a valid cached result (empty document).
+   */
+  private _contentBoundsCache: DOMRect | null = null;
+  private _contentBoundsValid = false;
+
   /** Latest live-session membership; null until the app feeds a snapshot. */
   private _livePeers: LivePeersSnapshot | null = null;
 
@@ -316,6 +327,7 @@ export class DrawableCanvas {
   }
 
   private notifyChange(): void {
+    this._contentBoundsValid = false;
     for (const listener of this._changeListeners) {
       listener();
     }
@@ -396,6 +408,9 @@ export class DrawableCanvas {
       this.notifyChange();
     };
     element.onTransformChanged = () => {
+      // Any element geometry change invalidates the cached content bounds, even
+      // for unselected elements (notifyChange only fires for selected ones).
+      this._contentBoundsValid = false;
       if (element.isSelected) {
         this.notifyChange();
       }
@@ -435,6 +450,11 @@ export class DrawableCanvas {
     if (transaction.origin === LOCAL_ORIGIN) {
       return;
     }
+
+    // Remote field syncs update element geometry without going through
+    // notifyChange or onTransformChanged, so invalidate the content-bounds cache
+    // here to keep pan clamping correct after a peer moves an element.
+    this._contentBoundsValid = false;
 
     let changedElementOrder = false;
     const insertedMaps = new Set<Y.Map<unknown>>();
@@ -892,7 +912,11 @@ export class DrawableCanvas {
    * treats that as "no clamp" so fresh documents stay fully pannable.
    */
   public getContentBounds(): DOMRect | null {
-    return unionBoundingBoxes(this.elements);
+    if (!this._contentBoundsValid) {
+      this._contentBoundsCache = unionBoundingBoxes(this.elements);
+      this._contentBoundsValid = true;
+    }
+    return this._contentBoundsCache;
   }
 
   /**

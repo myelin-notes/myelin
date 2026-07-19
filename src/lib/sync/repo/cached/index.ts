@@ -332,6 +332,10 @@ export class CachedRepository
     return this.cache.searchNodes(query, options);
   }
 
+  async getNodesByName(name: string): Promise<VFSNode[]> {
+    return this.cache.getNodesByName(name);
+  }
+
   async listIndexBackfillItems(): Promise<ReindexItem[]> {
     return this.cache.listIndexBackfillItems();
   }

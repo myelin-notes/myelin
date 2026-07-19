@@ -1,5 +1,10 @@
 import * as Y from 'yjs';
-import { type SearchField, type SearchHit, searchItems } from '@/lib/search';
+import {
+  createSearchIndex,
+  type SearchField,
+  type SearchHit,
+  type SearchIndex,
+} from '@/lib/search';
 import type { NoteEmbedding } from '@/platform';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import type {
@@ -309,16 +314,21 @@ function nodeSearchFields(
   ];
 }
 
-function searchNodeHits(
+/**
+ * Build a reusable lexical search index over the manifest's non-system nodes.
+ * Callers that search repeatedly (search-as-you-type) should build this once and
+ * reuse it rather than rebuilding the MiniSearch index — which tokenizes every
+ * node's name, tags, and full indexed content — on every query.
+ */
+export function createNodeSearchIndex(
   manifest: VFSManifest,
-  query: string,
   indexContent?: ReadonlyMap<VFSNodeId, string>,
-): SearchHit<VFSNode>[] {
-  return searchItems(
-    Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
-    query,
-    { getId: (node) => node.id, fields: nodeSearchFields(indexContent) },
-  );
+): SearchIndex<VFSNode> {
+  return createSearchIndex({
+    items: Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
+    getId: (node) => node.id,
+    fields: nodeSearchFields(indexContent),
+  });
 }
 
 /**
@@ -367,8 +377,10 @@ export function searchNodeResults(
   manifest: VFSManifest,
   query: string,
   indexContent?: ReadonlyMap<VFSNodeId, string>,
+  index?: SearchIndex<VFSNode>,
 ): NodeSearchResult[] {
-  return searchNodeHits(manifest, query, indexContent).map((hit) => ({
+  const searchIndex = index ?? createNodeSearchIndex(manifest, indexContent);
+  return searchIndex.search(query).map((hit) => ({
     node: hit.item,
     score: hit.score,
     contentSnippet: buildContentSnippet(indexContent?.get(hit.item.id), hit),
@@ -453,6 +465,15 @@ function buildSemanticSnippet(content: string): string | null {
     return snippet;
   }
   return `${snippet.slice(0, SNIPPET_RADIUS * 2).trimEnd()}...`;
+}
+
+export function getNodesByExactName(
+  manifest: VFSManifest,
+  name: string,
+): VFSNode[] {
+  return Object.values(manifest.nodes).filter(
+    (node) => !isSystemNode(node) && node.name === name,
+  );
 }
 
 export function getNodesByAnyTag(

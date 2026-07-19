@@ -1,4 +1,4 @@
-import { searchItems } from '@/lib/search';
+import { createSearchIndex, type SearchIndex } from '@/lib/search';
 import type { CommandPaletteEntry } from './types';
 
 interface ScrollViewport {
@@ -18,11 +18,16 @@ export interface PointerPosition {
   clientY: number;
 }
 
-export function filterCommandPaletteEntries<T extends CommandPaletteEntry>(
+/**
+ * Build a reusable search index over command entries. Callers that filter the
+ * same entries across many queries (e.g. per keystroke) should build this once
+ * and reuse it rather than rebuilding the MiniSearch index on every query.
+ */
+export function createCommandPaletteSearchIndex<T extends CommandPaletteEntry>(
   entries: T[],
-  query: string,
-): T[] {
-  return searchItems(entries, query, {
+): SearchIndex<T> {
+  return createSearchIndex({
+    items: entries,
     getId: (entry) => entry.id,
     fields: [
       { name: 'label', weight: 4, getValue: (entry) => entry.label },
@@ -37,7 +42,16 @@ export function filterCommandPaletteEntries<T extends CommandPaletteEntry>(
         getValue: (entry) => entry.description,
       },
     ],
-  }).map((hit) => hit.item);
+  });
+}
+
+export function filterCommandPaletteEntries<T extends CommandPaletteEntry>(
+  entries: T[],
+  query: string,
+): T[] {
+  return createCommandPaletteSearchIndex(entries)
+    .search(query)
+    .map((hit) => hit.item);
 }
 
 export function errorDescription(error: unknown): string {

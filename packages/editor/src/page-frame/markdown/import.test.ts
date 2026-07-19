@@ -64,41 +64,33 @@ describe('markdown canvas import', () => {
   it('resolves note links by title and keeps missing note ids null', async () => {
     const ydoc = new YDocManager();
     const repository = {
-      searchNodes: async (query: string) => {
-        const nodes: VFSNode[] =
-          query === 'Alpha Note'
-            ? [
-                {
-                  id: 'note-1',
-                  name: 'Alpha Note',
-                  type: 'file',
-                  fileType: 'mcanvas',
-                  parentId: null,
-                  tags: [],
-                  createdAt: 0,
-                  modifiedAt: 0,
-                },
-                {
-                  id: 'note-2',
-                  name: 'Alpha Note',
-                  type: 'file',
-                  fileType: 'mcanvas',
-                  parentId: null,
-                  tags: [],
-                  createdAt: 0,
-                  modifiedAt: 0,
-                },
-              ]
-            : [];
-        return nodes.map((node) => ({
-          node,
-          score: 1,
-          contentSnippet: null,
-          matchedTerms: [],
-        }));
-      },
+      getNodesByName: async (name: string): Promise<VFSNode[]> =>
+        name === 'Alpha Note'
+          ? [
+              {
+                id: 'note-1',
+                name: 'Alpha Note',
+                type: 'file',
+                fileType: 'mcanvas',
+                parentId: null,
+                tags: [],
+                createdAt: 0,
+                modifiedAt: 0,
+              },
+              {
+                id: 'note-2',
+                name: 'Alpha Note',
+                type: 'file',
+                fileType: 'mcanvas',
+                parentId: null,
+                tags: [],
+                createdAt: 0,
+                modifiedAt: 0,
+              },
+            ]
+          : [],
       getFolderChain: async () => [],
-    } satisfies Pick<Repository, 'searchNodes' | 'getFolderChain'>;
+    } satisfies Pick<Repository, 'getNodesByName' | 'getFolderChain'>;
 
     const uuid = await addMarkdownPageFrameToYDoc(
       ydoc,

@@ -79,6 +79,11 @@ export class LatexElement extends DrawableElement {
 
   private _root: HTMLDivElement | null = null;
   private _renderedLatex: string | null = null;
+  // The rendered preview's natural size only changes when the formula changes or
+  // when web fonts finish loading, not every frame. Measure (a forced reflow)
+  // only when this is set rather than polling offsetWidth/Height on every redraw.
+  private _naturalDirty = true;
+  private _fontRemeasureToken = 0;
 
   private _editOverlay: LatexEditOverlayHandle | null = null;
   private _canvas: DrawableCanvas | null = null;
@@ -249,6 +254,10 @@ export class LatexElement extends DrawableElement {
     if (this._renderedLatex !== this._latex) {
       this.renderPreview(root);
       this._renderedLatex = this._latex;
+      this._naturalDirty = true;
+      // KaTeX web fonts may still be loading; the layout size settles once they
+      // do, so schedule a single remeasure when fonts are ready.
+      this.scheduleFontRemeasure();
     }
 
     const zoom = viewport.zoom;
@@ -261,7 +270,10 @@ export class LatexElement extends DrawableElement {
     root.style.transform = `scale(${this._scale.x * zoom}, ${this._scale.y * zoom})`;
     root.dataset.editing = this._editing ? 'true' : 'false';
 
-    this.syncNaturalSize(root);
+    if (this._naturalDirty) {
+      this.syncNaturalSize(root);
+      this._naturalDirty = false;
+    }
 
     if (this._editing && this._editOverlay) {
       this._editOverlay.reposition(this.screenEditRect(viewport));
@@ -277,6 +289,24 @@ export class LatexElement extends DrawableElement {
    * every zoom; `offsetWidth/Height` ignore the element's scale transform, so
    * they report the unscaled natural size directly.
    */
+  /**
+   * Request one remeasure once web fonts settle. The token guards against a
+   * stale `fonts.ready` resolving after the formula changed again or the DOM was
+   * disposed, which would otherwise force an unnecessary reflow.
+   */
+  private scheduleFontRemeasure(): void {
+    const fonts = document.fonts;
+    if (!fonts?.ready) {
+      return;
+    }
+    const token = ++this._fontRemeasureToken;
+    void fonts.ready.then(() => {
+      if (token === this._fontRemeasureToken) {
+        this._naturalDirty = true;
+      }
+    });
+  }
+
   private syncNaturalSize(root: HTMLDivElement): void {
     if (!this._latex.trim()) {
       root.style.width = `${EMPTY_WIDTH}px`;
@@ -303,6 +333,10 @@ export class LatexElement extends DrawableElement {
     this._root = null;
     this._renderedLatex = null;
     this._raster = null;
+    // Force a fresh measure when the DOM is recreated, and cancel any pending
+    // font-ready remeasure aimed at the disposed root.
+    this._naturalDirty = true;
+    this._fontRemeasureToken += 1;
   }
 
   private createDom(host: HTMLElement): HTMLDivElement {

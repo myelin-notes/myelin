@@ -129,6 +129,12 @@ export interface Repository {
     query: string,
     options?: SearchNodesOptions,
   ): Promise<NodeSearchResult[]>;
+  /**
+   * Nodes whose name exactly equals `name`, excluding system nodes. Note-link
+   * resolution needs an exact-title match, not a fuzzy search, so it must not
+   * pay to rebuild a MiniSearch index on every document change.
+   */
+  getNodesByName(name: string): Promise<VFSNode[]>;
   /** Candidate notes for the content-index startup backfill. */
   listIndexBackfillItems(): Promise<ReindexItem[]>;
   getNodesByAnyTag(

@@ -19,7 +19,7 @@ import type { PageFrameAutocompleteItem } from '../pm/autocomplete';
 
 export type NoteLinkResolveSource = Pick<
   Repository,
-  'searchNodes' | 'getFolderChain'
+  'getNodesByName' | 'getFolderChain'
 >;
 export type NoteLinkSearchSource = Pick<
   Repository,
@@ -110,7 +110,7 @@ function normalizePathQuery(value: string): string {
 }
 
 async function getNoteLinkPath(
-  repository: NoteLinkSearchSource,
+  repository: Pick<Repository, 'getFolderChain'>,
   note: VFSFileNode,
 ): Promise<{ folderPath: string; linkPath: string }> {
   const folders = await repository.getFolderChain(note.parentId);
@@ -150,7 +150,6 @@ function getPageFrameMetas(update: Uint8Array | null): PageFrameMeta[] {
   return metas;
 }
 
-// todo: probably can avoid searching
 export async function resolveNoteLinkIdByTitle(
   repository: NoteLinkResolveSource,
   target: string,
@@ -160,27 +159,23 @@ export async function resolveNoteLinkIdByTitle(
     return null;
   }
 
-  const matches = await repository.searchNodes(parsedTarget.noteName);
-  const notes = matches.map((result) => result.node).filter(isCanvasNote);
+  // An exact-title lookup, not a fuzzy search: rebuilding a MiniSearch index for
+  // every note link on every document change is what made large linked notes lag.
+  const notes = (await repository.getNodesByName(parsedTarget.noteName)).filter(
+    isCanvasNote,
+  );
   if (!parsedTarget.isPath) {
-    const match = notes.find((node) => node.name === parsedTarget.noteName);
-    return match?.id ?? null;
+    return notes[0]?.id ?? null;
   }
 
-  let match: VFSFileNode | undefined;
   for (const note of notes) {
-    if (note.name !== parsedTarget.noteName) {
-      continue;
-    }
-
     const { linkPath } = await getNoteLinkPath(repository, note);
     if (linkPath === parsedTarget.path) {
-      match = note;
-      break;
+      return note.id;
     }
   }
 
-  return match?.id ?? null;
+  return null;
 }
 
 async function loadFrameMetas(

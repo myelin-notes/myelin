@@ -37,6 +37,7 @@ function createFakeNoteIndex(): NoteIndexCapability {
     init: async () => {},
     reset: () => {},
     getContent: () => new Map(),
+    contentRevision: () => 0,
     getEmbeddings: () => new Map(),
     embedSearchQuery: async () => ({ model: 'test', dim: 0, vector: [] }),
     requestReindex: () => {},

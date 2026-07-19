@@ -23,7 +23,10 @@ function syncCodeBlockExternalSelections(view: EditorView): void {
   const { from, to } = view.state.selection;
 
   if (from !== to) {
-    view.state.doc.descendants((node, pos) => {
+    // Only code blocks overlapping the selection can carry an external
+    // selection, so bound the walk to [from, to] instead of scanning the whole
+    // document tree on every range/drag-selection change.
+    view.state.doc.nodesBetween(from, to, (node, pos) => {
       if (node.type.name !== CODE_BLOCK_NODE_NAME) {
         return true;
       }
