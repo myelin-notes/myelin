@@ -1,6 +1,7 @@
 import { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import { ElementType } from '@myelin/editor/elements/element-type';
+import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import { join } from '@tauri-apps/api/path';
@@ -91,6 +92,58 @@ function decodeJsonValue(value: unknown): unknown {
   return value;
 }
 
+/** Resolves a note-link title to the imported note's new id, or null. */
+export type NoteIdResolver = (title: string) => VFSNodeId | null;
+
+/**
+ * Rewrite the `noteId` on every note-link mark in a page-frame's ProseMirror
+ * JSON to the id of the same-named note in *this* import.
+ *
+ * Exported note ids are meaningless in the destination workspace, so the ids
+ * baked into note-link marks would otherwise dangle: the graph drops links
+ * whose target id is unknown, and the editor treats a set id as authoritative
+ * and never re-resolves it. We remap by title against the imported notes. An
+ * unresolved link is cleared to null (target absent) so live title resolution
+ * can reconnect it later; its stale `pageFrameId` is dropped for the same reason.
+ */
+function remapNoteLinkIds(
+  content: unknown,
+  resolveNoteId: NoteIdResolver,
+): void {
+  if (Array.isArray(content)) {
+    for (const child of content) {
+      remapNoteLinkIds(child, resolveNoteId);
+    }
+    return;
+  }
+  if (!content || typeof content !== 'object') {
+    return;
+  }
+
+  const node = content as { marks?: unknown; content?: unknown };
+  if (Array.isArray(node.marks)) {
+    for (const mark of node.marks) {
+      if (!mark || typeof mark !== 'object') {
+        continue;
+      }
+      const { type, attrs } = mark as {
+        type?: unknown;
+        attrs?: Record<string, unknown>;
+      };
+      if (type !== 'noteLink' || !attrs || typeof attrs.title !== 'string') {
+        continue;
+      }
+      const noteId = resolveNoteId(attrs.title);
+      attrs.noteId = noteId;
+      if (noteId === null) {
+        attrs.pageFrameId = null;
+      }
+    }
+  }
+
+  remapNoteLinkIds(node.content, resolveNoteId);
+}
+
 /**
  * Rebuild every element of a note into a freshly opened session's Y.Doc.
  *
@@ -98,8 +151,15 @@ function decodeJsonValue(value: unknown): unknown {
  * page-frame ProseMirror JSON (written to the XmlFragment, not the Y.Map). Every
  * other field is a Y.Map prop and is assumed to be a scalar or a base64-marked
  * binary — nested Yjs types are not reconstructed (none exist on elements today).
+ *
+ * `resolveNoteId`, when provided, remaps note-link ids to the imported notes so
+ * links and the graph resolve within the destination workspace.
  */
-export function rebuildNote(ydoc: YDocManager, note: NoteJson): void {
+export function rebuildNote(
+  ydoc: YDocManager,
+  note: NoteJson,
+  resolveNoteId?: NoteIdResolver,
+): void {
   for (const element of note.elements) {
     const { type, uuid, content, ...rest } = element as {
       type?: unknown;
@@ -117,6 +177,9 @@ export function rebuildNote(ydoc: YDocManager, note: NoteJson): void {
 
     // Page-frame text lives in the XmlFragment keyed by uuid, mirroring export.
     if (type === ElementType.PAGE_FRAME && content) {
+      if (resolveNoteId) {
+        remapNoteLinkIds(content, resolveNoteId);
+      }
       const doc = PMNode.fromJSON(schema, content);
       const fragment = ydoc.getXmlFragment(uuid);
       ydoc.transact(() => {
@@ -189,34 +252,84 @@ function parseNote(raw: string, absolutePath: string): NoteJson {
   return note;
 }
 
-async function importNote({
+interface PreparedNote {
+  note: NoteJson;
+  nodeId: VFSNodeId;
+  /** Name links target this note by, before any uniqueness renaming. */
+  baseName: string;
+  /** '/'-separated source folder path, used to key path-qualified links. */
+  folderPath: string;
+}
+
+async function createImportedNote({
   note,
   repository,
   parentId,
+  folderPath,
   fallbackName,
 }: {
   note: NoteJson;
   repository: Repository;
   parentId: VFSNodeId | null;
+  folderPath: string;
   fallbackName: string;
-}): Promise<void> {
+}): Promise<PreparedNote> {
   const baseName = note.name?.trim() || fallbackName;
   // VFS timestamps can't be set on create, so the original createdAt/modifiedAt
   // survive only inside the JSON, not as the new node's dates.
   const name = await repository.getUniqueFileName(baseName, parentId);
   const nodeId = await repository.createFile(name, 'mcanvas', parentId);
+  return { note, nodeId, baseName, folderPath };
+}
 
-  const session = await repository.openSession(nodeId);
+async function rebuildImportedNote(
+  repository: Repository,
+  prepared: PreparedNote,
+  resolveNoteId: NoteIdResolver,
+): Promise<void> {
+  const session = await repository.openSession(prepared.nodeId);
   try {
-    rebuildNote(session.ydoc, note);
+    rebuildNote(session.ydoc, prepared.note, resolveNoteId);
     await session.save();
   } finally {
     await session.close().catch(() => {});
   }
 
-  if (note.tags?.length > 0) {
-    await repository.setTags(nodeId, note.tags);
+  if (prepared.note.tags?.length > 0) {
+    await repository.setTags(prepared.nodeId, prepared.note.tags);
   }
+}
+
+/**
+ * Resolve a note-link title to one of the just-imported notes. Mirrors the live
+ * resolver ({@link parseNoteLinkTarget}): path-qualified titles match on the
+ * source folder path, bare titles on note name (first import wins on collision).
+ */
+function createImportNoteLinkResolver(
+  prepared: readonly PreparedNote[],
+): NoteIdResolver {
+  const byPath = new Map<string, VFSNodeId>();
+  const byName = new Map<string, VFSNodeId>();
+  for (const { nodeId, baseName, folderPath } of prepared) {
+    const path = folderPath ? `${folderPath}/${baseName}` : baseName;
+    if (!byPath.has(path)) {
+      byPath.set(path, nodeId);
+    }
+    if (!byName.has(baseName)) {
+      byName.set(baseName, nodeId);
+    }
+  }
+
+  return (title) => {
+    const parsed = parseNoteLinkTarget(title);
+    if (!parsed) {
+      return null;
+    }
+    const match = parsed.isPath
+      ? byPath.get(parsed.path)
+      : byName.get(parsed.noteName);
+    return match ?? null;
+  };
 }
 
 export async function scanWorkspaceJson(
@@ -278,6 +391,9 @@ export async function importWorkspaceJson({
     throw error;
   }
 
+  // Notes import in two passes: create every file first so note-link ids can be
+  // remapped to the new nodes (links may point forward), then rebuild content.
+  const prepared: PreparedNote[] = [];
   for (const file of scanned.notes) {
     const fallbackName =
       file.absolutePath
@@ -285,23 +401,46 @@ export async function importWorkspaceJson({
         .split('/')
         .pop()
         ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
-    onProgress?.({ current: ++current, total, fileName: fallbackName });
     try {
       const note = parseNote(
         await readTextFile(file.absolutePath),
         file.absolutePath,
       );
-      await importNote({
-        note,
-        repository,
-        parentId: getImportParentId(rootFolderId, folderIds, file.folderPath),
-        fallbackName,
+      prepared.push(
+        await createImportedNote({
+          note,
+          repository,
+          parentId: getImportParentId(rootFolderId, folderIds, file.folderPath),
+          folderPath: file.folderPath,
+          fallbackName,
+        }),
+      );
+    } catch (error) {
+      // Notes that fail to create never reach pass 2, so advance progress here
+      // to keep the counter reaching `total` (pass 2 reports the rest).
+      failedFiles += 1;
+      onProgress?.({ current: ++current, total, fileName: fallbackName });
+      logger.warn('Skipping note that failed to import', {
+        path: file.absolutePath,
+        error,
       });
+    }
+  }
+
+  const resolveNoteId = createImportNoteLinkResolver(prepared);
+  for (const preparedNote of prepared) {
+    onProgress?.({
+      current: ++current,
+      total,
+      fileName: preparedNote.baseName,
+    });
+    try {
+      await rebuildImportedNote(repository, preparedNote, resolveNoteId);
       notesImported += 1;
     } catch (error) {
       failedFiles += 1;
-      logger.warn('Skipping note that failed to import', {
-        path: file.absolutePath,
+      logger.warn('Skipping note that failed to rebuild', {
+        nodeId: preparedNote.nodeId,
         error,
       });
     }

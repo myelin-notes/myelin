@@ -10,6 +10,34 @@ import {
 import { resolveImportRootName } from './import-tree';
 import { rebuildNote } from './workspace-json';
 
+/** Find the first note-link mark's attrs anywhere in a page frame's PM content. */
+function findNoteLinkAttrs(
+  content: unknown,
+): Record<string, unknown> | undefined {
+  if (Array.isArray(content)) {
+    for (const child of content) {
+      const found = findNoteLinkAttrs(child);
+      if (found) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+  if (!content || typeof content !== 'object') {
+    return undefined;
+  }
+  const node = content as { marks?: unknown[]; content?: unknown };
+  const mark = node.marks?.find(
+    (m) => (m as { type?: unknown }).type === 'noteLink',
+  ) as { attrs?: Record<string, unknown> } | undefined;
+  return mark?.attrs ?? findNoteLinkAttrs(node.content);
+}
+
+function pageFrameContent(elements: Record<string, unknown>[]): unknown {
+  return elements.find((element) => element.type === ElementType.PAGE_FRAME)
+    ?.content;
+}
+
 /** Build a note with a page frame (text), a stroke, and an image (binary). */
 async function buildSampleDoc(): Promise<YDocManager> {
   const ydoc = new YDocManager();
@@ -67,6 +95,69 @@ describe('workspace JSON round-trip', () => {
     // which covers element order, stroke points, page-frame ProseMirror content,
     // and base64-encoded image bytes.
     expect(serializeNoteElements(rebuilt)).toEqual(elements);
+  });
+
+  it('remaps note-link ids to the imported note when rebuilding', async () => {
+    // Author a note whose link resolved to some id in the source workspace.
+    const source = new YDocManager();
+    await addMarkdownPageFrameToYDoc(source, 'See [[Target Note]]', {
+      resolveNoteLinkId: async () => 'old-source-id' as never,
+    });
+    const note: NoteJson = {
+      version: NOTE_JSON_VERSION,
+      name: 'Sample',
+      fileType: 'mcanvas',
+      tags: [],
+      createdAt: 1,
+      modifiedAt: 2,
+      elements: serializeNoteElements(source),
+    };
+    expect(findNoteLinkAttrs(pageFrameContent(note.elements))?.noteId).toBe(
+      'old-source-id',
+    );
+
+    // Import remaps the stale id to the target note's new id in this workspace.
+    const rebuilt = new YDocManager();
+    rebuildNote(
+      rebuilt,
+      JSON.parse(JSON.stringify(note)) as NoteJson,
+      (title) => (title === 'Target Note' ? ('new-target-id' as never) : null),
+    );
+
+    const attrs = findNoteLinkAttrs(
+      pageFrameContent(serializeNoteElements(rebuilt)),
+    );
+    expect(attrs?.noteId).toBe('new-target-id');
+    expect(attrs?.title).toBe('Target Note');
+  });
+
+  it('clears a note-link id and frame when the target is not imported', async () => {
+    const source = new YDocManager();
+    await addMarkdownPageFrameToYDoc(source, 'See [[Missing Note]]', {
+      resolveNoteLinkId: async () => 'old-source-id' as never,
+    });
+    const note: NoteJson = {
+      version: NOTE_JSON_VERSION,
+      name: 'Sample',
+      fileType: 'mcanvas',
+      tags: [],
+      createdAt: 1,
+      modifiedAt: 2,
+      elements: serializeNoteElements(source),
+    };
+
+    const rebuilt = new YDocManager();
+    rebuildNote(
+      rebuilt,
+      JSON.parse(JSON.stringify(note)) as NoteJson,
+      () => null,
+    );
+
+    const attrs = findNoteLinkAttrs(
+      pageFrameContent(serializeNoteElements(rebuilt)),
+    );
+    expect(attrs?.noteId).toBeNull();
+    expect(attrs?.pageFrameId).toBeNull();
   });
 
   it('decodes image bytes back to the original Uint8Array', async () => {
