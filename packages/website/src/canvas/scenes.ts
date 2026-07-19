@@ -128,13 +128,18 @@ function addStroke(
   pts: Pt[],
   color: string,
   size: number,
+  // Constant-width nib instead of perfect-freehand's simulated pressure. The
+  // simulated taper pinches inward at sharp corners (e.g. a check's vertex), so
+  // opt into a uniform width there. Flat 0.5 pressure + real (non-simulated)
+  // pressure yields an even stroke with rounded caps.
+  constantWidth = false,
 ): StrokeElement {
   const flat: number[] = [];
   for (const [x, y] of pts) {
     flat.push(x, y, 0.5);
   }
   const el = canvas.addElement(
-    (uuid) => new StrokeElement(uuid, flat, false, { color, size }),
+    (uuid) => new StrokeElement(uuid, flat, constantWidth, { color, size }),
   );
   el.updateBounds();
   return el;
@@ -236,15 +241,22 @@ function drawArrow(
   const ux = dx / len;
   const uy = dy / len;
   const head = size * 4.5;
+  const spread = 0.5;
   const left: Pt = [
-    to[0] - ux * head - uy * head * 0.55,
-    to[1] - uy * head + ux * head * 0.55,
+    to[0] - ux * head - uy * head * spread,
+    to[1] - uy * head + ux * head * spread,
   ];
   const right: Pt = [
-    to[0] - ux * head + uy * head * 0.55,
-    to[1] - uy * head - ux * head * 0.55,
+    to[0] - ux * head + uy * head * spread,
+    to[1] - uy * head - ux * head * spread,
   ];
-  addStroke(canvas, [left, to, right], color, size);
+  // Two straight barbs drawn from the tip outward as separate constant-width
+  // strokes. Splitting them avoids a sharp single-stroke cusp at the tip (which
+  // pinches under simulated pressure), and constant width keeps them even. The
+  // barbs run a touch lighter than the shaft so the head does not read heavy.
+  const barb = size * 0.8;
+  addStroke(canvas, [to, left], color, barb, true);
+  addStroke(canvas, [to, right], color, barb, true);
 }
 
 function drawCheck(
@@ -253,15 +265,76 @@ function drawCheck(
   y: number,
   scale = 1,
 ): void {
+  // A real handwritten check: the actual pen path (60 samples) traced on the
+  // canvas, normalized into this (x, y)-anchored frame. Because it is a genuine
+  // traced curve rather than a synthetic V, the vertex rounds naturally and
+  // perfect-freehand's simulated pressure never pinches into a fold.
   addStroke(
     canvas,
     [
-      [x, y + 12 * scale],
-      [x + 10 * scale, y + 24 * scale],
-      [x + 30 * scale, y - 2 * scale],
+      [x, y + 14.42 * scale],
+      [x + 0.32 * scale, y + 14.74 * scale],
+      [x + 0.96 * scale, y + 15.38 * scale],
+      [x + 1.28 * scale, y + 15.7 * scale],
+      [x + 1.92 * scale, y + 16.34 * scale],
+      [x + 2.25 * scale, y + 16.66 * scale],
+      [x + 2.89 * scale, y + 17.3 * scale],
+      [x + 3.21 * scale, y + 18.26 * scale],
+      [x + 3.85 * scale, y + 18.58 * scale],
+      [x + 4.17 * scale, y + 19.23 * scale],
+      [x + 5.13 * scale, y + 20.19 * scale],
+      [x + 5.77 * scale, y + 20.51 * scale],
+      [x + 6.09 * scale, y + 21.15 * scale],
+      [x + 6.74 * scale, y + 21.47 * scale],
+      [x + 7.7 * scale, y + 22.11 * scale],
+      [x + 8.02 * scale, y + 22.43 * scale],
+      [x + 8.66 * scale, y + 23.08 * scale],
+      [x + 8.98 * scale, y + 23.4 * scale],
+      [x + 9.62 * scale, y + 23.4 * scale],
+      [x + 9.94 * scale, y + 24.04 * scale],
+      [x + 10.58 * scale, y + 24.36 * scale],
+      [x + 10.91 * scale, y + 24.36 * scale],
+      [x + 10.91 * scale, y + 25 * scale],
+      [x + 11.55 * scale, y + 25 * scale],
+      [x + 11.87 * scale, y + 25 * scale],
+      [x + 12.51 * scale, y + 25 * scale],
+      [x + 12.51 * scale, y + 24.68 * scale],
+      [x + 12.51 * scale, y + 24.04 * scale],
+      [x + 12.83 * scale, y + 24.04 * scale],
+      [x + 12.83 * scale, y + 23.72 * scale],
+      [x + 13.79 * scale, y + 21.79 * scale],
+      [x + 13.79 * scale, y + 20.83 * scale],
+      [x + 14.43 * scale, y + 20.19 * scale],
+      [x + 14.75 * scale, y + 18.26 * scale],
+      [x + 15.4 * scale, y + 17.94 * scale],
+      [x + 15.72 * scale, y + 16.98 * scale],
+      [x + 15.72 * scale, y + 16.34 * scale],
+      [x + 16.68 * scale, y + 14.42 * scale],
+      [x + 17.32 * scale, y + 13.45 * scale],
+      [x + 17.64 * scale, y + 13.13 * scale],
+      [x + 18.28 * scale, y + 12.17 * scale],
+      [x + 18.28 * scale, y + 11.53 * scale],
+      [x + 19.25 * scale, y + 10.25 * scale],
+      [x + 19.57 * scale, y + 9.28 * scale],
+      [x + 20.21 * scale, y + 8.64 * scale],
+      [x + 20.53 * scale, y + 7.68 * scale],
+      [x + 21.49 * scale, y + 6.4 * scale],
+      [x + 25.34 * scale, y + 0.62 * scale],
+      [x + 26.94 * scale, y - 0.98 * scale],
+      [x + 27.91 * scale, y - 1.94 * scale],
+      [x + 28.23 * scale, y - 2.91 * scale],
+      [x + 29.19 * scale, y - 3.23 * scale],
+      [x + 29.83 * scale, y - 3.87 * scale],
+      [x + 30.79 * scale, y - 5.15 * scale],
+      [x + 31.11 * scale, y - 5.79 * scale],
+      [x + 31.75 * scale, y - 6.11 * scale],
+      [x + 32.08 * scale, y - 6.75 * scale],
+      [x + 32.72 * scale, y - 7.08 * scale],
+      [x + 34 * scale, y - 8.68 * scale],
+      [x + 34.64 * scale, y - 9 * scale],
     ],
     GREEN,
-    6 * scale,
+    5 * scale,
   );
 }
 
