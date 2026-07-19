@@ -31,6 +31,7 @@ import {
   getFolderChain,
   getIndexCandidateFileNodes,
   getNodesByAnyTag,
+  getNodesByExactName,
   getNoteGraph,
   getRecentFiles,
   getStats,
@@ -293,6 +294,11 @@ export abstract class BaseRepository
       query,
       noteIndex?.getContent() ?? new Map(),
     ).slice(0, options.limit);
+  }
+
+  async getNodesByName(name: string): Promise<VFSNode[]> {
+    const { manifest } = await this.loadManifestImpl();
+    return getNodesByExactName(manifest, name);
   }
 
   async listIndexBackfillItems(): Promise<ReindexItem[]> {

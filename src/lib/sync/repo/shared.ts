@@ -455,6 +455,15 @@ function buildSemanticSnippet(content: string): string | null {
   return `${snippet.slice(0, SNIPPET_RADIUS * 2).trimEnd()}...`;
 }
 
+export function getNodesByExactName(
+  manifest: VFSManifest,
+  name: string,
+): VFSNode[] {
+  return Object.values(manifest.nodes).filter(
+    (node) => !isSystemNode(node) && node.name === name,
+  );
+}
+
 export function getNodesByAnyTag(
   manifest: VFSManifest,
   tags: string[],
