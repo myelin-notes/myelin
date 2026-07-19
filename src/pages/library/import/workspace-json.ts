@@ -1,10 +1,11 @@
 import { strFromU8, type Unzipped, unzip } from 'fflate';
 import { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
+import * as Y from 'yjs';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
-import type { YDocManager } from '@myelin/editor/ydoc-manager';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { readFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import {
@@ -277,18 +278,27 @@ async function createImportedNote({
   return { note, nodeId, baseName, folderPath };
 }
 
+/**
+ * Build the note document in memory, then write it once.
+ *
+ * The target is a file this run just created, so there is no remote revision to
+ * reconcile and no peer to sync with. Opening a session would read the empty
+ * placeholder back twice (once to load the document, once to merge the push)
+ * before writing the same bytes. This mirrors what `NoteSession.save` does to
+ * the doc -- sweep orphans, then encode -- without the round trips.
+ */
 async function rebuildImportedNote(
   repository: Repository,
   prepared: PreparedNote,
   resolveNoteId: NoteIdResolver,
 ): Promise<void> {
-  const session = await repository.openSession(prepared.nodeId);
-  try {
-    rebuildNote(session.ydoc, prepared.note, resolveNoteId);
-    await session.save();
-  } finally {
-    await session.close().catch(() => {});
-  }
+  const ydoc = new YDocManager();
+  rebuildNote(ydoc, prepared.note, resolveNoteId);
+  ydoc.sweepOrphanPageFrameFragments();
+  await repository.writeFileBytes(
+    prepared.nodeId,
+    Y.encodeStateAsUpdate(ydoc.doc),
+  );
 
   if (prepared.note.tags?.length > 0) {
     await repository.setTags(prepared.nodeId, prepared.note.tags);
