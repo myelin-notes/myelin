@@ -159,7 +159,6 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
   const [os] = useState<OS>(detectOS);
 
   const hero = sceneById('hero').rect;
-  const localFirst = sceneById('local-first').rect;
   const supporter = sceneById('supporter').rect;
   const download = sceneById('download').rect;
 
@@ -181,16 +180,6 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
           {copy.hero.ctaSecondary} ↓
         </WorldButton>
       </div>
-
-      {/* Local-first: source link, under the last bullet. */}
-      <WorldButton
-        x={localFirst.x + SCENE_PAD}
-        y={localFirst.y + SCENE_PAD + 850}
-        href={siteLinks.github}
-        variant="outline"
-      >
-        {copy.localFirst.cta}
-      </WorldButton>
 
       {/* Founding Supporter CTAs. */}
       <div

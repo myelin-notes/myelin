@@ -121,22 +121,20 @@ for step in range(3):
   },
 
   localFirst: {
-    heading: 'Local-first is the whole point.',
+    heading: 'It all lives on your machine.',
+    lede:
+      'No cloud in the middle. Your notes are ordinary files on your own disk, and Myelin works completely offline.',
     bullets: [
-      'Your notes are files on your machine. Fully offline, no account, no server required.',
-      'CRDT-based note format (Yjs), so nothing is ever lost to a sync conflict.',
-      'Telemetry is minimal: crash reports and a few product events, no session recording. You can turn all of it off in settings.',
-      'Credentials like your GitHub token live in an encrypted vault (Stronghold).',
-      'Source available on GitHub under FSL-1.1, converting to Apache 2.0 after two years.',
+      'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
+      'Everything works fully offline, with no account and no server in the middle.',
+      'Search, semantic embeddings, and handwriting OCR all run on your own machine.',
+      'Bring your own AI: models connect through a local MCP server, never a cloud we chose for you.',
+      'Import from Obsidian or GoodNotes, export to PDF, images, or JSON, and read every line of source on GitHub.',
     ],
-    cta: 'View the source on GitHub',
-    lockInHeading: 'No lock-in.\nBring your own AI.',
-    importBody:
-      'Import from Obsidian and GoodNotes today; a Notion importer is on the roadmap. Export to PDF, images, or full workspace JSON. Your data leaves as easily as it arrives.',
-    mcpBody:
-      'A built-in MCP server lets Claude, or any MCP client, read and create notes locally. No cloud AI is ever forced on you.',
-    importLabel: 'obsidian · goodnotes → in',
-    exportLabel: 'pdf · images · json → out',
+    // Labels for the "files on disk" diagram (see buildLocalFirst in scenes.ts).
+    folderLabel: '~/notes/',
+    files: ['physics.myel', 'meeting.myel', 'ideas.myel'],
+    diskCaption: 'plain files. yours.',
   },
 
   sync: {

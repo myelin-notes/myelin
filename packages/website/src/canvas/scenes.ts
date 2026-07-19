@@ -475,57 +475,160 @@ async function buildLinked(
 function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.localFirst.heading, 62, 820);
-  drawUnderline(canvas, x, y + 110, 700, ORANGE, 8);
 
-  // "the cloud", circled and crossed out, beside the heading.
-  const ccx = x + 990;
-  const ccy = y + 60;
-  hand(canvas, ccx - 62, ccy - 26, 'the cloud', MUTED, 36, 180);
-  addStroke(canvas, sketchEllipse(ccx, ccy, 120, 52, 0.5), MUTED, 4);
+  // Left column: one thesis, one proof list. Every bullet ladders to the same
+  // claim -- your notes are yours and stay on your machine.
+  title(canvas, x, y, copy.localFirst.heading, 62, 1000);
+  // Highlighter swipe over "your machine" (the tail of the one-line heading).
   addStroke(
     canvas,
-    wobblyLine([ccx - 110, ccy - 46], [ccx + 116, ccy + 42], 4, 0.7),
-    PINK,
-    6,
+    wobblyLine([x + 388, y + 36], [x + 736, y + 30], 4, 0.8),
+    HIGHLIGHT,
+    46,
   );
-  addStroke(
-    canvas,
-    wobblyLine([ccx + 110, ccy - 46], [ccx - 116, ccy + 42], 4, 1.8),
-    PINK,
-    6,
-  );
+  addText(canvas, x, y + 245, copy.localFirst.lede, {
+    size: 25,
+    color: MUTED,
+    width: 980,
+  });
 
   copy.localFirst.bullets.forEach((bullet, i) => {
-    const by = y + 240 + i * 130;
+    const by = y + 350 + i * 92;
     drawCheck(canvas, x + 6, by + 8, 0.9);
     addText(canvas, x + 64, by, bullet, {
-      size: 24,
-      color: i === 4 ? INK : MUTED,
-      width: 1150,
+      size: 23,
+      color: i === copy.localFirst.bullets.length - 1 ? INK : MUTED,
+      width: 980,
     });
   });
-  // The GitHub source button (DOM overlay) sits below the last bullet.
 
-  // Right column: no lock-in. Data in, data out, and your own AI.
-  const dx = r.x + 1400;
-  title(canvas, dx, y, copy.localFirst.lockInHeading, 46, 620);
-  addText(canvas, dx, y + 150, copy.localFirst.importBody, {
-    size: 24,
-    color: MUTED,
-    width: 700,
+  // Right: the notes as what they actually are on disk. A manila folder at
+  // ~/notes/ holding a few .myel files, drawn in the same ink as the rest of
+  // the canvas so "just plain files" reads literally.
+  const folderX = r.x + 1340;
+  const folderY = r.y + 340;
+  const folderW = 700;
+  const folderH = 520;
+  const tabW = 250;
+  const tabH = 44;
+
+  // Manila-folder silhouette: a tab on the top-left, then the body.
+  addStroke(
+    canvas,
+    [
+      ...wobblyLine([folderX, folderY], [folderX, folderY - tabH], 3, 0.4),
+      ...wobblyLine(
+        [folderX, folderY - tabH],
+        [folderX + tabW - 30, folderY - tabH],
+        3,
+        1.1,
+      ),
+      ...wobblyLine(
+        [folderX + tabW - 30, folderY - tabH],
+        [folderX + tabW, folderY],
+        3,
+        0.6,
+      ),
+      ...wobblyLine([folderX + tabW, folderY], [folderX + folderW, folderY], 3, 0.9),
+      ...wobblyLine(
+        [folderX + folderW, folderY],
+        [folderX + folderW, folderY + folderH],
+        3,
+        1.6,
+      ),
+      ...wobblyLine(
+        [folderX + folderW, folderY + folderH],
+        [folderX, folderY + folderH],
+        3,
+        0.7,
+      ),
+      ...wobblyLine([folderX, folderY + folderH], [folderX, folderY - 4], 3, 2.2),
+    ],
+    INK,
+    6,
+  );
+  hand(canvas, folderX + 34, folderY - tabH + 2, copy.localFirst.folderLabel, INK, 28, 240);
+
+  // One .myel file per note: a page with a folded corner, listed with its name
+  // like a row in a file browser. The topmost file is inked darker.
+  const iconW = 120;
+  const iconH = 120;
+  const iconX = folderX + 70;
+  const fold = 34;
+  copy.localFirst.files.forEach((name, i) => {
+    const iy = folderY + 60 + i * 150;
+    const cardInk = i === 0 ? INK : MUTED;
+    addStroke(
+      canvas,
+      [
+        ...wobblyLine([iconX, iy], [iconX + iconW - fold, iy], 2, 0.5),
+        ...wobblyLine(
+          [iconX + iconW - fold, iy],
+          [iconX + iconW, iy + fold],
+          2,
+          1.3,
+        ),
+        ...wobblyLine(
+          [iconX + iconW, iy + fold],
+          [iconX + iconW, iy + iconH],
+          2,
+          0.8,
+        ),
+        ...wobblyLine([iconX + iconW, iy + iconH], [iconX, iy + iconH], 2, 1.4),
+        ...wobblyLine([iconX, iy + iconH], [iconX, iy - 4], 2, 0.6),
+      ],
+      cardInk,
+      i === 0 ? 5 : 4,
+    );
+    // The folded corner.
+    addStroke(
+      canvas,
+      [
+        ...wobblyLine(
+          [iconX + iconW - fold, iy],
+          [iconX + iconW - fold, iy + fold],
+          2,
+          0.7,
+        ),
+        ...wobblyLine(
+          [iconX + iconW - fold, iy + fold],
+          [iconX + iconW, iy + fold],
+          2,
+          0.9,
+        ),
+      ],
+      MUTED,
+      3,
+    );
+    // A couple of skeleton text lines on the page.
+    addStroke(
+      canvas,
+      wobblyLine([iconX + 22, iy + 64], [iconX + iconW - 22, iy + 64], 2, 0.6),
+      MUTED,
+      3,
+    );
+    addStroke(
+      canvas,
+      wobblyLine([iconX + 22, iy + 90], [iconX + iconW - 42, iy + 90], 2, 1.2),
+      MUTED,
+      3,
+    );
+    addText(canvas, iconX + iconW + 44, iy + iconH / 2 - 22, name, {
+      size: 30,
+      color: cardInk,
+      width: 360,
+    });
   });
-  hand(canvas, dx, y + 360, copy.localFirst.importLabel, GREEN, 38, 520);
-  drawUnderline(canvas, dx + 4, y + 425, 400, GREEN, 4);
-  hand(canvas, dx, y + 490, copy.localFirst.exportLabel, ORANGE, 38, 520);
-  drawUnderline(canvas, dx + 4, y + 555, 380, ORANGE, 4);
-  addText(canvas, dx, y + 610, copy.localFirst.mcpBody, {
-    size: 24,
-    color: MUTED,
-    width: 700,
-  });
-  addStroke(canvas, sketchEllipse(dx + 300, y + 840, 230, 105, 2.6), BLUE, 5);
-  hand(canvas, dx + 165, y + 785, 'MCP: your\nAI, your rules', BLUE, 38, 300);
+
+  hand(
+    canvas,
+    folderX + 40,
+    folderY + folderH + 34,
+    copy.localFirst.diskCaption,
+    MUTED,
+    36,
+    420,
+  );
 }
 
 /** Anchor for the sync scene's DOM cursors (see scene-overlays.tsx). */
