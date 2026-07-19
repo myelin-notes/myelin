@@ -47,7 +47,7 @@ const SIZES: Array<{
   { id: 'pages', label: 'Pages', w: 1900, h: 1140, y: 1350 },
   { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000, y: 180 },
   { id: 'linked', label: 'Linked notes', w: 1750, h: 800, y: -150 },
-  { id: 'local-first', label: 'Local-first', w: 2200, h: 1150, y: 900 },
+  { id: 'local-first', label: 'Local-first', w: 1850, h: 850, y: 900 },
   { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150, y: 1850 },
   { id: 'supporter', label: 'Support', w: 1800, h: 1150, y: 550 },
   { id: 'download', label: 'Download', w: 2100, h: 1400, y: 1400 },
@@ -476,159 +476,38 @@ function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
 
-  // Left column: one thesis, one proof list. Every bullet ladders to the same
-  // claim -- your notes are yours and stay on your machine.
-  title(canvas, x, y, copy.localFirst.heading, 62, 1000);
-  // Highlighter swipe over "your machine" (the tail of the one-line heading).
+  // Left column: the thesis. A two-line headline with the highlighter riding
+  // "your machine.", a short lede on a tight measure, and one hand-drawn
+  // aside pointing across the gutter at the proof panel.
+  title(canvas, x, y + 40, copy.localFirst.heading, 68, 700);
   addStroke(
     canvas,
-    wobblyLine([x + 388, y + 36], [x + 736, y + 30], 4, 0.8),
+    wobblyLine([x + 120, y + 172], [x + 502, y + 166], 4, 0.8),
     HIGHLIGHT,
-    46,
+    50,
   );
-  addText(canvas, x, y + 245, copy.localFirst.lede, {
-    size: 25,
+  addText(canvas, x, y + 300, copy.localFirst.lede, {
+    size: 26,
     color: MUTED,
-    width: 980,
+    width: 620,
   });
+  hand(canvas, x + 50, y + 480, copy.localFirst.annotation, GREEN, 40, 420);
+  drawArrow(canvas, [x + 410, y + 545], [x + 706, y + 450], GREEN, 4);
 
-  copy.localFirst.bullets.forEach((bullet, i) => {
-    const by = y + 350 + i * 92;
-    drawCheck(canvas, x + 6, by + 8, 0.9);
-    addText(canvas, x + 64, by, bullet, {
+  // Right column: the five proof points as a checklist. Fixed row rhythm; the
+  // closing bullet stays inked darker as the emphasis.
+  const bullets = copy.localFirst.bullets;
+  const px = x + 780;
+  const py = y + 10;
+  bullets.forEach((bullet, i) => {
+    const by = py + 62 + i * 118;
+    drawCheck(canvas, px + 50, by + 4, 0.9);
+    addText(canvas, px + 116, by, bullet, {
       size: 23,
-      color: i === copy.localFirst.bullets.length - 1 ? INK : MUTED,
-      width: 980,
+      color: i === bullets.length - 1 ? INK : MUTED,
+      width: 660,
     });
   });
-
-  // Right: the notes as what they actually are on disk. A manila folder at
-  // ~/notes/ holding a few .myel files, drawn in the same ink as the rest of
-  // the canvas so "just plain files" reads literally.
-  const folderX = r.x + 1340;
-  const folderY = r.y + 340;
-  const folderW = 700;
-  const folderH = 520;
-  const tabW = 250;
-  const tabH = 44;
-
-  // Manila-folder silhouette: a tab on the top-left, then the body.
-  addStroke(
-    canvas,
-    [
-      ...wobblyLine([folderX, folderY], [folderX, folderY - tabH], 3, 0.4),
-      ...wobblyLine(
-        [folderX, folderY - tabH],
-        [folderX + tabW - 30, folderY - tabH],
-        3,
-        1.1,
-      ),
-      ...wobblyLine(
-        [folderX + tabW - 30, folderY - tabH],
-        [folderX + tabW, folderY],
-        3,
-        0.6,
-      ),
-      ...wobblyLine([folderX + tabW, folderY], [folderX + folderW, folderY], 3, 0.9),
-      ...wobblyLine(
-        [folderX + folderW, folderY],
-        [folderX + folderW, folderY + folderH],
-        3,
-        1.6,
-      ),
-      ...wobblyLine(
-        [folderX + folderW, folderY + folderH],
-        [folderX, folderY + folderH],
-        3,
-        0.7,
-      ),
-      ...wobblyLine([folderX, folderY + folderH], [folderX, folderY - 4], 3, 2.2),
-    ],
-    INK,
-    6,
-  );
-  hand(canvas, folderX + 34, folderY - tabH + 2, copy.localFirst.folderLabel, INK, 28, 240);
-
-  // One .myel file per note: a page with a folded corner, listed with its name
-  // like a row in a file browser. The topmost file is inked darker.
-  const iconW = 120;
-  const iconH = 120;
-  const iconX = folderX + 70;
-  const fold = 34;
-  copy.localFirst.files.forEach((name, i) => {
-    const iy = folderY + 60 + i * 150;
-    const cardInk = i === 0 ? INK : MUTED;
-    addStroke(
-      canvas,
-      [
-        ...wobblyLine([iconX, iy], [iconX + iconW - fold, iy], 2, 0.5),
-        ...wobblyLine(
-          [iconX + iconW - fold, iy],
-          [iconX + iconW, iy + fold],
-          2,
-          1.3,
-        ),
-        ...wobblyLine(
-          [iconX + iconW, iy + fold],
-          [iconX + iconW, iy + iconH],
-          2,
-          0.8,
-        ),
-        ...wobblyLine([iconX + iconW, iy + iconH], [iconX, iy + iconH], 2, 1.4),
-        ...wobblyLine([iconX, iy + iconH], [iconX, iy - 4], 2, 0.6),
-      ],
-      cardInk,
-      i === 0 ? 5 : 4,
-    );
-    // The folded corner.
-    addStroke(
-      canvas,
-      [
-        ...wobblyLine(
-          [iconX + iconW - fold, iy],
-          [iconX + iconW - fold, iy + fold],
-          2,
-          0.7,
-        ),
-        ...wobblyLine(
-          [iconX + iconW - fold, iy + fold],
-          [iconX + iconW, iy + fold],
-          2,
-          0.9,
-        ),
-      ],
-      MUTED,
-      3,
-    );
-    // A couple of skeleton text lines on the page.
-    addStroke(
-      canvas,
-      wobblyLine([iconX + 22, iy + 64], [iconX + iconW - 22, iy + 64], 2, 0.6),
-      MUTED,
-      3,
-    );
-    addStroke(
-      canvas,
-      wobblyLine([iconX + 22, iy + 90], [iconX + iconW - 42, iy + 90], 2, 1.2),
-      MUTED,
-      3,
-    );
-    addText(canvas, iconX + iconW + 44, iy + iconH / 2 - 22, name, {
-      size: 30,
-      color: cardInk,
-      width: 360,
-    });
-  });
-
-  hand(
-    canvas,
-    folderX + 40,
-    folderY + folderH + 34,
-    copy.localFirst.diskCaption,
-    MUTED,
-    36,
-    420,
-  );
 }
 
 /** Anchor for the sync scene's DOM cursors (see scene-overlays.tsx). */
