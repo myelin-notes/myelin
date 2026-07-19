@@ -6,7 +6,7 @@ import { openNote } from '@/lib/note/navigation';
 import type { Repository, VFSFileNode, VFSNode } from '@/lib/sync';
 import type { TabStateController } from '@/lib/tabs/controller';
 import type { CommandPaletteItem, CommandPaletteModeState } from './types';
-import { filterCommandPaletteEntries } from './utils';
+import { createCommandPaletteSearchIndex } from './utils';
 
 const logger = new Logger('CommandPalette');
 const SEARCH_DEBOUNCE_MS = 150;
@@ -29,15 +29,22 @@ export function useCommandMode({
   query: string;
   strings: Messages;
 }): CommandPaletteModeState {
+  // Build the search index once per command set; searching it on each keystroke
+  // avoids rebuilding the MiniSearch index (tokenizing every entry) per query.
+  const searchIndex = useMemo(
+    () => createCommandPaletteSearchIndex(commandItems),
+    [commandItems],
+  );
+
   return useMemo(
     () => ({
       emptyMessage: strings.commandPalette.noCommandResults,
-      items: filterCommandPaletteEntries(commandItems, query),
+      items: searchIndex.search(query).map((hit) => hit.item),
       loading: false,
       placeholder: strings.commandPalette.placeholder,
     }),
     [
-      commandItems,
+      searchIndex,
       query,
       strings.commandPalette.noCommandResults,
       strings.commandPalette.placeholder,
