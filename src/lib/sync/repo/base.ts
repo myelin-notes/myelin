@@ -98,6 +98,12 @@ type ReplayableMutation = (
   manifest: VFSManifest,
 ) => (() => Promise<void>) | null;
 
+interface BatchedMutation {
+  /** Names the save. A batch of one keeps it; a larger batch is generic. */
+  action: string;
+  replay: ReplayableMutation;
+}
+
 function byteArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
   if (left.byteLength !== right.byteLength) {
     return false;
@@ -149,7 +155,6 @@ export abstract class BaseRepository
   } | null = null;
 
   private manifestBatchDepth = 0;
-  private manifestBatchPending = false;
   /**
    * Manifest held for the duration of an open batch. Repositories that re-fetch
    * and re-parse on every `loadManifestImpl` (GitHub) hand back a different
@@ -168,7 +173,7 @@ export abstract class BaseRepository
    * ids and timestamps outside the mutator so a replay reuses the values the
    * caller already received.
    */
-  private manifestBatchReplay: ReplayableMutation[] = [];
+  private manifestBatchMutations: BatchedMutation[] = [];
   /**
    * Destructive side effects the open batch has authorized but that must not
    * run until its manifest is persisted — discarding a deleted file's bytes
@@ -291,17 +296,21 @@ export abstract class BaseRepository
     } finally {
       this.manifestBatchDepth -= 1;
       if (this.manifestBatchDepth === 0) {
-        const pending = this.manifestBatchPending;
         const load = this.manifestBatchLoad;
-        const replay = this.manifestBatchReplay;
+        const mutations = this.manifestBatchMutations;
         const effects = this.manifestBatchEffects;
-        this.manifestBatchPending = false;
         this.manifestBatchLoad = null;
-        this.manifestBatchReplay = [];
+        this.manifestBatchMutations = [];
         this.manifestBatchEffects = [];
-        if (pending && load) {
+        // No mutations means the batch only read, so there is nothing to save.
+        if (mutations.length > 0 && load) {
           const { manifest, revision } = await load;
-          await this.flushBatchedManifest(manifest, revision, replay, effects);
+          await this.flushBatchedManifest(
+            manifest,
+            revision,
+            mutations,
+            effects,
+          );
         }
       }
     }
@@ -315,7 +324,7 @@ export abstract class BaseRepository
   private async flushBatchedManifest(
     manifest: VFSManifest,
     revision: string | null,
-    replay: ReadonlyArray<ReplayableMutation>,
+    mutations: ReadonlyArray<BatchedMutation>,
     effects: ReadonlyArray<() => Promise<void>>,
   ): Promise<void> {
     let pendingManifest = manifest;
@@ -324,22 +333,20 @@ export abstract class BaseRepository
     // Held until the save lands so a further conflict doesn't run them early.
     let pendingEffects: Array<() => Promise<void>> = [];
     const maxRetries = this.manifestMaxRetries();
+    const action =
+      mutations.length === 1 ? mutations[0].action : 'Batch update';
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        await this.saveManifestImpl(
-          pendingManifest,
-          pendingRevision,
-          'Batch update',
-        );
+        await this.saveManifestImpl(pendingManifest, pendingRevision, action);
       } catch (error) {
         if (attempt >= maxRetries - 1 || !this.isConflictError(error)) {
           throw error;
         }
         const fresh = await this.loadManifestImpl();
         pendingEffects = [];
-        for (const mutation of replay) {
-          const effect = mutation(fresh.manifest);
+        for (const mutation of mutations) {
+          const effect = mutation.replay(fresh.manifest);
           if (effect) {
             pendingEffects.push(effect);
           }
@@ -362,7 +369,7 @@ export abstract class BaseRepository
     }
 
     throw new Error(
-      'Failed to flush batched manifest writes after retrying manifest conflicts.',
+      `Failed to ${action.toLowerCase()} after retrying manifest conflicts.`,
     );
   }
 
@@ -1034,39 +1041,34 @@ export abstract class BaseRepository
     onReplay?: (result: T) => Promise<void>,
   ): Promise<T> {
     if (this.manifestBatchDepth > 0) {
-      // Batched: mutate the held manifest now, persist once on flush.
-      const { manifest } = await this.loadManifest();
-      const result = mutator(manifest);
-      this.manifestBatchReplay.push((target) => {
+      return this.recordManifestMutation(action, mutator, onReplay);
+    }
+    // An unbatched mutation is a batch of one: same load, same conflict replay,
+    // and the flush names its save after `action` rather than the batch message.
+    return this.batchManifestWrites(() =>
+      this.recordManifestMutation(action, mutator, onReplay),
+    );
+  }
+
+  /**
+   * Applies `mutator` to the held manifest now and queues it for replay, so a
+   * conflicting flush can re-apply it to the manifest that won the race.
+   */
+  private async recordManifestMutation<T>(
+    action: string,
+    mutator: (manifest: VFSManifest) => T,
+    onReplay?: (result: T) => Promise<void>,
+  ): Promise<T> {
+    const { manifest } = await this.loadManifest();
+    const result = mutator(manifest);
+    this.manifestBatchMutations.push({
+      action,
+      replay: (target) => {
         const replayed = mutator(target);
         return onReplay ? () => onReplay(replayed) : null;
-      });
-      this.manifestBatchPending = true;
-      return result;
-    }
-
-    const maxRetries = this.manifestMaxRetries();
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const { manifest, revision } = await this.loadManifestImpl();
-      const result = mutator(manifest);
-
-      try {
-        await this.saveManifestImpl(manifest, revision, action);
-        this.updateRuntimeStatus({
-          dataVersion: this.runtimeStatus.dataVersion + 1,
-        });
-        return result;
-      } catch (error) {
-        if (attempt < maxRetries - 1 && this.isConflictError(error)) {
-          continue;
-        }
-        throw error;
-      }
-    }
-
-    throw new Error(
-      `Failed to ${action.toLowerCase()} after retrying manifest conflicts.`,
-    );
+      },
+    });
+    return result;
   }
 
   private async readYjsSyncState(nodeId: VFSNodeId): Promise<{
