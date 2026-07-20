@@ -84,6 +84,10 @@ const logger = new Logger('BaseRepository');
 const DEFAULT_SEMANTIC_SEARCH_LIMIT = 50;
 const EMPTY_CONTENT: ReadonlyMap<VFSNodeId, string> = new Map();
 
+interface ManifestBatch {
+  effects: Array<() => Promise<void>>;
+}
+
 // Announce deleted files so the tab layer can close tabs bound to them. Guarded
 // for non-DOM contexts (tests, background workers) where `window` is absent.
 function emitNodesDeleted(ids: VFSNodeId[]): void {
@@ -147,6 +151,7 @@ export abstract class BaseRepository
   private manifestDoc: Y.Doc | null = null;
   private manifestSnapshot: VFSManifest | null = null;
   private manifestRevision: string | null = null;
+  private manifestBatch: ManifestBatch | null = null;
 
   protected abstract loadManifestImpl(): Promise<{
     update: Uint8Array | null;
@@ -251,6 +256,29 @@ export abstract class BaseRepository
     };
   }
 
+  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.manifestBatch) {
+      return fn();
+    }
+
+    await this.loadManifest();
+    const doc = this.manifestDoc!;
+    const stateVector = Y.encodeStateVector(doc);
+    const batch: ManifestBatch = { effects: [] };
+    this.manifestBatch = batch;
+    try {
+      return await fn();
+    } finally {
+      this.manifestBatch = null;
+      if (!byteArraysEqual(stateVector, Y.encodeStateVector(doc))) {
+        await this.persistManifest('Batch update');
+        for (const effect of batch.effects) {
+          await effect();
+        }
+      }
+    }
+  }
+
   protected resetManifest(): void {
     this.manifestDoc?.destroy();
     this.manifestDoc = null;
@@ -262,6 +290,13 @@ export abstract class BaseRepository
     manifest: VFSManifest;
     revision: string | null;
   }> {
+    if (this.manifestBatch) {
+      return {
+        manifest: this.manifestSnapshot!,
+        revision: this.manifestRevision,
+      };
+    }
+
     const loaded = await this.loadManifestImpl();
     if (!this.manifestDoc) {
       const decoded = decodeManifestDocument(loaded.update);
@@ -648,6 +683,12 @@ export abstract class BaseRepository
     const deletedFiles = await this.mutateManifest('Delete node', (manifest) =>
       deleteNodeFromManifest(manifest, nodeId),
     );
+    if (this.manifestBatch) {
+      this.manifestBatch.effects.push(() =>
+        this.discardDeletedFiles(deletedFiles),
+      );
+      return;
+    }
     await this.discardDeletedFiles(deletedFiles);
   }
 
@@ -935,6 +976,9 @@ export abstract class BaseRepository
     const result = mutator(next);
     writeManifestToDocument(this.manifestDoc!, next);
     this.manifestSnapshot = next;
+    if (this.manifestBatch) {
+      return result;
+    }
     await this.persistManifest(action);
     return result;
   }

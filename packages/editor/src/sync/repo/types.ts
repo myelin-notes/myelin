@@ -179,6 +179,9 @@ export interface Repository {
   addCustomColor(color: string): Promise<string[]>;
   removeCustomColor(color: string): Promise<string[]>;
 
+  /** Applies all manifest mutations in `fn` and saves the Yjs document once. */
+  batchManifestWrites<T>(fn: () => Promise<T>): Promise<T>;
+
   getRegistryTags(): Promise<string[]>;
   addRegistryTags(tags: string[]): Promise<string[]>;
   removeRegistryTag(tag: string): Promise<string[]>;

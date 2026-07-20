@@ -456,7 +456,9 @@ async function importStorageVaultFile({
 export async function importObsidianVault(
   options: ImportObsidianVaultOptions,
 ): Promise<ObsidianVaultImportResult> {
-  return importObsidianVaultImpl(options);
+  return options.repository.batchManifestWrites(() =>
+    importObsidianVaultImpl(options),
+  );
 }
 
 async function importObsidianVaultImpl({

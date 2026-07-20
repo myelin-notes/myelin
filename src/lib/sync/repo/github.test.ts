@@ -157,6 +157,25 @@ describe('GitHubRepository', () => {
     );
   });
 
+  it('persists a batch of manifest mutations once', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    await repository.initialize();
+    const putsBeforeBatch = githubApi.putCallCount;
+    const [folderA, folderB] = await repository.batchManifestWrites(
+      async () => [
+        await repository.createFolder('A', null),
+        await repository.createFolder('B', null),
+      ],
+    );
+
+    const manifest = readManifest();
+    expect(manifest.nodes[folderA]?.name).toBe('A');
+    expect(manifest.nodes[folderB]?.name).toBe('B');
+    expect(githubApi.putCallCount - putsBeforeBatch).toBe(1);
+  });
+
   it('keeps deleted file bytes when a manifest write fails', async () => {
     const repository = createRepository();
     const githubApi = getRepositoryTestGitHubApi();

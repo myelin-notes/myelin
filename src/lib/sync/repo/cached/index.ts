@@ -333,6 +333,10 @@ export class CachedRepository
     });
   }
 
+  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
+    return this.cache.batchManifestWrites(fn);
+  }
+
   async createFolder(name: string, parentId: string | null): Promise<string> {
     return this.writeLocalAndQueue(
       () => this.cache.createFolder(name, parentId),
@@ -692,7 +696,7 @@ export class CachedRepository
   }
 
   private async flushPendingImpl(): Promise<void> {
-    await this.flushPerOpImpl();
+    await this.remote.batchManifestWrites(() => this.flushPerOpImpl());
   }
 
   private async flushPerOpImpl(): Promise<void> {
