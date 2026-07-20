@@ -17,7 +17,6 @@ import {
   type ExportProgress,
   type PlannedFile,
   planFolder,
-  sanitizeName,
   type VaultFileEntry,
 } from './workspace-plan';
 
@@ -31,10 +30,8 @@ export interface ExportWorkspaceJsonResult {
 
 export interface ExportWorkspaceJsonOptions {
   repository: ReadableRepository;
-  /** Absolute directory the user picked; the zip is created inside it. */
-  destDir: string;
-  /** Name of the zip created under {@link destDir}, and of its root folder. */
-  exportName: string;
+  /** Absolute zip path the user picked in the save dialog; also names the root folder. */
+  outPath: string;
   onProgress?: (progress: ExportProgress) => void;
 }
 
@@ -152,8 +149,7 @@ async function buildFileEntry(
 
 export async function exportWorkspaceJson({
   repository,
-  destDir,
-  exportName,
+  outPath,
   onProgress,
 }: ExportWorkspaceJsonOptions): Promise<ExportWorkspaceJsonResult> {
   const plan: ExportPlan = { folders: [], files: [] };
@@ -183,8 +179,7 @@ export async function exportWorkspaceJson({
   // zip: `text` files are written as entries and `copyFrom` media streamed in.
   const zipPath = await invoke<string>('export_workspace_zip', {
     request: {
-      destDir,
-      vaultName: sanitizeName(exportName) || 'Workspace',
+      outPath,
       folders: plan.folders,
       files: entries,
     },

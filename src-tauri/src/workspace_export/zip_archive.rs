@@ -1,21 +1,31 @@
-//! Workspace JSON export: writes the planned export as a single `.zip` in the
-//! user-picked directory instead of a folder tree. Everything is nested under
-//! one top-level folder named after the archive, so extracting the zip yields a
+//! Workspace JSON export: writes the planned export as a single `.zip` at the
+//! path the user picked in a save dialog. Everything is nested under one
+//! top-level folder named after the archive, so extracting the zip yields a
 //! tidy folder rather than loose files, and the importer can recover the name.
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
+use serde::Deserialize;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
-#[cfg(test)]
-use super::VaultFile;
-use super::{safe_segments, VaultExportRequest};
+use super::{safe_segments, VaultFile};
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ZipExportRequest {
+    /// Absolute path of the zip, chosen by the user in the save dialog. The
+    /// dialog already handled naming and any overwrite confirmation.
+    out_path: String,
+    /// Relative directories to create up front (preserves empty folders).
+    folders: Vec<String>,
+    files: Vec<VaultFile>,
+}
 
 #[tauri::command]
-pub async fn export_workspace_zip(request: VaultExportRequest) -> Result<String, String> {
+pub async fn export_workspace_zip(request: ZipExportRequest) -> Result<String, String> {
     // Filesystem work is blocking; keep it off the async runtime.
     tokio::task::spawn_blocking(move || write_zip(request))
         .await
@@ -31,23 +41,21 @@ fn archive_name(vault_name: &str) -> Result<&str, String> {
     }
 }
 
-/// Pick a free `<name>.zip` in `dest_dir`, appending ` (2)`, ` (3)`… on
-/// collision. Returns the path and the stem, which doubles as the archive root.
-fn resolve_zip_path(dest_dir: &str, name: &str) -> (PathBuf, String) {
-    let dest = Path::new(dest_dir);
-    let mut stem = name.to_string();
-    let mut suffix = 2;
-    while dest.join(format!("{stem}.zip")).exists() {
-        stem = format!("{name} ({suffix})");
-        suffix += 1;
-    }
-    (dest.join(format!("{stem}.zip")), stem)
+/// Name the archive root after the file the user picked. A file name is not
+/// guaranteed to be a usable path segment (`:` is legal on macOS and Linux), so
+/// fall back rather than failing an otherwise valid export.
+fn archive_root(zip_path: &Path) -> &str {
+    zip_path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| archive_name(stem).is_ok())
+        .unwrap_or("Export")
 }
 
-fn write_zip(request: VaultExportRequest) -> Result<String, String> {
-    let name = archive_name(&request.vault_name)?;
-    let (zip_path, root) = resolve_zip_path(&request.dest_dir, name);
-    match write_archive(&zip_path, &root, &request) {
+fn write_zip(request: ZipExportRequest) -> Result<String, String> {
+    let zip_path = PathBuf::from(&request.out_path);
+    let root = archive_root(&zip_path);
+    match write_archive(&zip_path, root, &request) {
         Ok(()) => Ok(zip_path.to_string_lossy().into_owned()),
         Err(error) => {
             // Roll back the partial archive so a failed export does not leave a
@@ -69,7 +77,7 @@ fn entry_name(root: &str, rel: &str) -> Result<String, String> {
     Ok(name)
 }
 
-fn write_archive(zip_path: &Path, root: &str, request: &VaultExportRequest) -> Result<(), String> {
+fn write_archive(zip_path: &Path, root: &str, request: &ZipExportRequest) -> Result<(), String> {
     let file = File::create(zip_path)
         .map_err(|e| format!("failed to create {}: {e}", zip_path.display()))?;
     let mut writer = ZipWriter::new(BufWriter::new(file));
@@ -144,9 +152,9 @@ mod tests {
         let media_source = dir.join("source.png");
         std::fs::write(&media_source, [0u8, 1, 2, 255]).expect("media source");
 
-        let request = VaultExportRequest {
-            dest_dir: dir.to_string_lossy().into_owned(),
-            vault_name: "My Export".to_string(),
+        let out_path = dir.join("My Export.zip");
+        let request = ZipExportRequest {
+            out_path: out_path.to_string_lossy().into_owned(),
             folders: vec!["Sub".to_string(), "Empty".to_string()],
             files: vec![
                 VaultFile {
@@ -185,6 +193,17 @@ mod tests {
         assert_eq!(media, [0u8, 1, 2, 255]);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The root folder tracks whatever the user named the file in the save
+    /// dialog, and degrades to a constant when that name is not a safe segment.
+    #[test]
+    fn archive_root_follows_the_picked_file_name() {
+        assert_eq!(
+            archive_root(Path::new("/tmp/Holiday Notes.zip")),
+            "Holiday Notes"
+        );
+        assert_eq!(archive_root(Path::new("/tmp/notes:2026.zip")), "Export");
     }
 
     #[test]
