@@ -149,12 +149,10 @@ function getCleanupNodeIds(
 export async function importGoodnotesZip(
   options: ImportGoodnotesZipOptions,
 ): Promise<GoodnotesZipImportResult> {
-  return options.repository.batchManifestWrites(() =>
-    importGoodnotesZipBatched(options),
-  );
+  return importGoodnotesZipImpl(options);
 }
 
-async function importGoodnotesZipBatched({
+async function importGoodnotesZipImpl({
   file,
   repository,
   parentId,

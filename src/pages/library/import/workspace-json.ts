@@ -436,12 +436,10 @@ export function scanArchive(
 export async function importWorkspaceJson(
   options: ImportWorkspaceJsonOptions,
 ): Promise<ImportWorkspaceJsonResult> {
-  return options.repository.batchManifestWrites(() =>
-    importWorkspaceJsonBatched(options),
-  );
+  return importWorkspaceJsonImpl(options);
 }
 
-async function importWorkspaceJsonBatched({
+async function importWorkspaceJsonImpl({
   repository,
   parentId,
   zipPath,

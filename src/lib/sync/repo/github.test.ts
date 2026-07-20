@@ -8,6 +8,10 @@ import {
 } from '@/test/repository-test-utils';
 import { GitHubRepository } from './github';
 import {
+  decodeManifestDocument,
+  readManifestFromDocument,
+} from './manifest-yjs';
+import {
   createEmptyManifest,
   getNotePath,
   getStoredFilePath,
@@ -23,6 +27,36 @@ function createRepository() {
   });
 }
 
+class ConflictInjectingGitHubRepository extends GitHubRepository {
+  private didInjectConflict = false;
+
+  constructor(private readonly injectConflict: () => Promise<void>) {
+    super({
+      owner: 'myelin',
+      repo: 'notes',
+      branch: 'main',
+      credentialId: 'test-credential',
+    });
+  }
+
+  protected override async saveManifestImpl(
+    update: Uint8Array,
+    revision: string | null,
+    action: string,
+  ): Promise<string | null> {
+    if (!this.didInjectConflict) {
+      this.didInjectConflict = true;
+      await this.injectConflict();
+    }
+    return super.saveManifestImpl(update, revision, action);
+  }
+}
+
+function readManifest() {
+  const bytes = getRepositoryTestGitHubApi().readBytes(MANIFEST_PATH);
+  return readManifestFromDocument(decodeManifestDocument(bytes).doc);
+}
+
 describe('GitHubRepository', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
@@ -30,7 +64,6 @@ describe('GitHubRepository', () => {
 
   it('initializes missing manifest content as an empty repository', async () => {
     const repository = createRepository();
-    const githubApi = getRepositoryTestGitHubApi();
 
     const stats = await repository.getStats();
 
@@ -39,7 +72,7 @@ describe('GitHubRepository', () => {
       totalFolders: 0,
       totalTags: 0,
     });
-    expect(githubApi.readJson(MANIFEST_PATH)).toEqual(createEmptyManifest());
+    expect(readManifest()).toEqual(createEmptyManifest());
   });
 
   it('writes manifest and note contents through the transport', async () => {
@@ -59,9 +92,7 @@ describe('GitHubRepository', () => {
       localStateVector: note.stateVector,
     });
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, { name: string; parentId: string | null }>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest();
 
     expect(manifest).not.toBeNull();
     expect(manifest?.nodes[folderId]?.name).toBe('Docs');
@@ -78,9 +109,7 @@ describe('GitHubRepository', () => {
 
     const fileId = await repository.createFile('Clip.mp4', 'mp4', null, bytes);
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, { name: string; fileType: string; type: string }>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest();
     const storedBytes = githubApi.readBytes(
       getStoredFilePath({ id: fileId, fileType: 'mp4' }),
     );
@@ -104,101 +133,31 @@ describe('GitHubRepository', () => {
     githubApi.failNextPut(MANIFEST_PATH);
 
     const folderId = await repository.createFolder('Retry folder', null);
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, { name: string }>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest();
 
     expect(manifest).not.toBeNull();
     expect(manifest?.nodes[folderId]?.name).toBe('Retry folder');
   });
 
-  it('persists every batched manifest mutation in one write', async () => {
-    const repository = createRepository();
-    const githubApi = getRepositoryTestGitHubApi();
-
-    await repository.initialize();
-    const putsBeforeBatch = githubApi.putCallCount;
-
-    const [folderA, folderB] = await repository.batchManifestWrites(
-      async () => [
-        await repository.createFolder('A', null),
-        await repository.createFolder('B', null),
-      ],
-    );
-
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, { name: string }>;
-    }>(MANIFEST_PATH);
-
-    expect(manifest?.nodes[folderA]?.name).toBe('A');
-    expect(manifest?.nodes[folderB]?.name).toBe('B');
-    expect(githubApi.putCallCount - putsBeforeBatch).toBe(1);
-  });
-
-  it('replays a batch onto the winning manifest after a flush conflict', async () => {
-    const repository = createRepository();
+  it('merges a stale manifest write through Yjs', async () => {
+    const initial = createRepository();
     const other = createRepository();
-    const githubApi = getRepositoryTestGitHubApi();
-
-    await repository.initialize();
-
-    let concurrentId = '';
-    const [folderA, folderB] = await repository.batchManifestWrites(
-      async () => {
-        const a = await repository.createFolder('A', null);
-        // Another client wins the race while this batch is still open, so the
-        // flush writes against a stale sha.
-        concurrentId = await other.createFolder('Concurrent', null);
-        return [a, await repository.createFolder('B', null)];
-      },
-    );
-
-    const manifest = githubApi.readJson<{
-      children: string[];
-      nodes: Record<string, { name: string }>;
-    }>(MANIFEST_PATH);
-
-    expect(manifest?.nodes[folderA]?.name).toBe('A');
-    expect(manifest?.nodes[folderB]?.name).toBe('B');
-    expect(manifest?.nodes[concurrentId]?.name).toBe('Concurrent');
-    expect(manifest?.children).toEqual([concurrentId, folderA, folderB]);
-  });
-
-  it('discards bytes for files a replayed delete sweeps up', async () => {
-    const repository = createRepository();
-    const other = createRepository();
-    const githubApi = getRepositoryTestGitHubApi();
-
-    const folderId = await repository.createFolder('Doomed', null);
-
-    let concurrentFileId = '';
-    await repository.batchManifestWrites(async () => {
-      // Deleted while the folder is still empty as far as this batch knows.
-      await repository.deleteNode(folderId);
-      // Another client adds a file inside it and wins the race, so the flush
-      // conflicts and the replayed delete removes a node this batch never saw.
-      concurrentFileId = await other.createFile(
-        'Inside.mp4',
-        'mp4',
-        folderId,
-        new Uint8Array([4, 5, 6]),
-      );
+    const repository = new ConflictInjectingGitHubRepository(async () => {
+      await other.createFolder('B', null);
     });
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, unknown>;
-    }>(MANIFEST_PATH);
+    await initial.initialize();
+    await repository.initialize();
+    const folderA = await repository.createFolder('A', null);
 
-    expect(manifest?.nodes[folderId]).toBeUndefined();
-    expect(manifest?.nodes[concurrentFileId]).toBeUndefined();
-    expect(
-      githubApi.readBytes(
-        getStoredFilePath({ id: concurrentFileId, fileType: 'mp4' }),
-      ),
-    ).toBeNull();
+    const manifest = readManifest();
+    expect(manifest.nodes[folderA]?.name).toBe('A');
+    expect(Object.values(manifest.nodes).map((node) => node.name)).toContain(
+      'B',
+    );
   });
 
-  it('keeps deleted file bytes when the batched manifest flush fails', async () => {
+  it('keeps deleted file bytes when a manifest write fails', async () => {
     const repository = createRepository();
     const githubApi = getRepositoryTestGitHubApi();
 
@@ -210,30 +169,14 @@ describe('GitHubRepository', () => {
     );
     const storedPath = getStoredFilePath({ id: fileId, fileType: 'mp4' });
 
-    // Not a conflict, so the flush throws instead of retrying and the manifest
+    // Not a conflict, so the save throws instead of retrying and the manifest
     // still lists the file. Its bytes must survive with it.
     githubApi.failNextPut(MANIFEST_PATH, 500);
-    await expect(
-      repository.batchManifestWrites(() => repository.deleteNode(fileId)),
-    ).rejects.toThrow();
+    await expect(repository.deleteNode(fileId)).rejects.toThrow();
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, unknown>;
-    }>(MANIFEST_PATH);
-
-    expect(manifest?.nodes[fileId]).toBeDefined();
+    const manifest = readManifest();
+    expect(manifest.nodes[fileId]).toBeDefined();
     expect(githubApi.readBytes(storedPath)).not.toBeNull();
-  });
-
-  it('reads batched manifest mutations back inside the batch', async () => {
-    const repository = createRepository();
-
-    const [folderId, chain] = await repository.batchManifestWrites(async () => {
-      const id = await repository.createFolder('Batched', null);
-      return [id, await repository.getFolderChain(id)] as const;
-    });
-
-    expect(chain.map((folder) => folder.id)).toEqual([folderId]);
   });
 
   it('exports a snapshot via a single tarball fetch', async () => {

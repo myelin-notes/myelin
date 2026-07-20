@@ -17,6 +17,12 @@ import type {
   RepositoryRuntimeStatus,
   RepositoryStatusSource,
 } from './config';
+import {
+  decodeManifestDocument,
+  encodeManifestDocument,
+  readManifestFromDocument,
+  writeManifestToDocument,
+} from './manifest-yjs';
 import { extractStoredNoteLinks } from './note-link-index';
 import {
   addChild,
@@ -88,22 +94,6 @@ function emitNodesDeleted(ids: VFSNodeId[]): void {
   window.dispatchEvent(new CustomEvent(NODES_DELETED_EVENT, { detail }));
 }
 
-/**
- * A batched mutation re-applied to the manifest that won a conflict race.
- * Returns the side effect its replayed result now owns, if any — a re-applied
- * delete can sweep up nodes added concurrently, whose stored bytes the original
- * application never saw and so never cleaned up.
- */
-type ReplayableMutation = (
-  manifest: VFSManifest,
-) => (() => Promise<void>) | null;
-
-interface BatchedMutation {
-  /** Names the save. A batch of one keeps it; a larger batch is generic. */
-  action: string;
-  replay: ReplayableMutation;
-}
-
 function byteArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
   if (left.byteLength !== right.byteLength) {
     return false;
@@ -154,41 +144,17 @@ export abstract class BaseRepository
     index: SearchIndex<VFSNode>;
   } | null = null;
 
-  private manifestBatchDepth = 0;
-  /**
-   * Manifest held for the duration of an open batch. Repositories that re-fetch
-   * and re-parse on every `loadManifestImpl` (GitHub) hand back a different
-   * object per call, so batched mutations must all land on this one held
-   * manifest and be flushed from it — otherwise each mutation edits a throwaway
-   * object and only the flush's own reload reaches the remote.
-   */
-  private manifestBatchLoad: Promise<{
-    manifest: VFSManifest;
-    revision: string | null;
-  }> | null = null;
-  /**
-   * Every mutation applied during the open batch, in order, so a conflicting
-   * flush can re-apply them onto the manifest that won the race instead of
-   * discarding either side. Mutators must therefore be replay-safe: mint node
-   * ids and timestamps outside the mutator so a replay reuses the values the
-   * caller already received.
-   */
-  private manifestBatchMutations: BatchedMutation[] = [];
-  /**
-   * Destructive side effects the open batch has authorized but that must not
-   * run until its manifest is persisted — discarding a deleted file's bytes
-   * before the flush lands would leave a saved manifest entry pointing at bytes
-   * that are already gone if the flush then fails.
-   */
-  private manifestBatchEffects: Array<() => Promise<void>> = [];
+  private manifestDoc: Y.Doc | null = null;
+  private manifestSnapshot: VFSManifest | null = null;
+  private manifestRevision: string | null = null;
 
   protected abstract loadManifestImpl(): Promise<{
-    manifest: VFSManifest;
+    update: Uint8Array | null;
     revision: string | null;
   }>;
 
   protected abstract saveManifestImpl(
-    manifest: VFSManifest,
+    update: Uint8Array,
     revision: string | null,
     action: string,
   ): Promise<string | null>;
@@ -285,117 +251,77 @@ export abstract class BaseRepository
     };
   }
 
-  /**
-   * Applies every manifest mutation made inside `fn` to a single held manifest
-   * and persists it once, when the outermost batch closes.
-   */
-  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
-    this.manifestBatchDepth += 1;
-    try {
-      return await fn();
-    } finally {
-      this.manifestBatchDepth -= 1;
-      if (this.manifestBatchDepth === 0) {
-        const load = this.manifestBatchLoad;
-        const mutations = this.manifestBatchMutations;
-        const effects = this.manifestBatchEffects;
-        this.manifestBatchLoad = null;
-        this.manifestBatchMutations = [];
-        this.manifestBatchEffects = [];
-        // No mutations means the batch only read, so there is nothing to save.
-        if (mutations.length > 0 && load) {
-          const { manifest, revision } = await load;
-          await this.flushBatchedManifest(
-            manifest,
-            revision,
-            mutations,
-            effects,
-          );
-        }
-      }
-    }
+  protected resetManifest(): void {
+    this.manifestDoc?.destroy();
+    this.manifestDoc = null;
+    this.manifestSnapshot = null;
+    this.manifestRevision = null;
   }
 
-  /**
-   * Persists the batched manifest, retrying conflicts the way a single mutation
-   * does: reload the manifest that won the race and re-apply the whole batch to
-   * it, so neither side's writes are dropped.
-   */
-  private async flushBatchedManifest(
-    manifest: VFSManifest,
-    revision: string | null,
-    mutations: ReadonlyArray<BatchedMutation>,
-    effects: ReadonlyArray<() => Promise<void>>,
-  ): Promise<void> {
-    let pendingManifest = manifest;
-    let pendingRevision = revision;
-    // Effects a replay uncovered (storage a re-applied delete now also owns).
-    // Held until the save lands so a further conflict doesn't run them early.
-    let pendingEffects: Array<() => Promise<void>> = [];
-    const maxRetries = this.manifestMaxRetries();
-    const action =
-      mutations.length === 1 ? mutations[0].action : 'Batch update';
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        await this.saveManifestImpl(pendingManifest, pendingRevision, action);
-      } catch (error) {
-        if (attempt >= maxRetries - 1 || !this.isConflictError(error)) {
-          throw error;
-        }
-        const fresh = await this.loadManifestImpl();
-        pendingEffects = [];
-        for (const mutation of mutations) {
-          const effect = mutation.replay(fresh.manifest);
-          if (effect) {
-            pendingEffects.push(effect);
-          }
-        }
-        pendingManifest = fresh.manifest;
-        pendingRevision = fresh.revision;
-        continue;
-      }
-
-      this.updateRuntimeStatus({
-        dataVersion: this.runtimeStatus.dataVersion + 1,
-      });
-      for (const effect of effects) {
-        await effect();
-      }
-      for (const effect of pendingEffects) {
-        await effect();
-      }
-      return;
-    }
-
-    throw new Error(
-      `Failed to ${action.toLowerCase()} after retrying manifest conflicts.`,
-    );
-  }
-
-  /**
-   * The manifest to read from and mutate. Inside a batch this is the held
-   * manifest, so reads and writes within the batch observe each other's pending
-   * changes; outside a batch it delegates straight to `loadManifestImpl`.
-   */
   protected async loadManifest(): Promise<{
     manifest: VFSManifest;
     revision: string | null;
   }> {
-    if (this.manifestBatchDepth === 0) {
-      return this.loadManifestImpl();
+    const loaded = await this.loadManifestImpl();
+    if (!this.manifestDoc) {
+      const decoded = decodeManifestDocument(loaded.update);
+      this.manifestDoc = decoded.doc;
+      this.manifestSnapshot = readManifestFromDocument(decoded.doc);
+      this.manifestRevision = loaded.revision;
+      if (decoded.needsPersist) {
+        await this.persistManifest('Migrate manifest to Yjs');
+      }
+    } else if (loaded.update) {
+      const remote = decodeManifestDocument(loaded.update);
+      Y.applyUpdate(this.manifestDoc, Y.encodeStateAsUpdate(remote.doc));
+      remote.doc.destroy();
+      this.manifestSnapshot = readManifestFromDocument(this.manifestDoc);
+      this.manifestRevision = loaded.revision;
     }
-    if (!this.manifestBatchLoad) {
-      const load = this.loadManifestImpl();
-      this.manifestBatchLoad = load;
-      // A failed load must not poison the rest of the batch.
-      load.catch(() => {
-        if (this.manifestBatchLoad === load) {
-          this.manifestBatchLoad = null;
+
+    return {
+      manifest: this.manifestSnapshot!,
+      revision: this.manifestRevision,
+    };
+  }
+
+  private async persistManifest(action: string): Promise<void> {
+    const doc = this.manifestDoc;
+    if (!doc) {
+      throw new Error('Cannot save a manifest that has not been loaded.');
+    }
+
+    for (let attempt = 0; attempt < this.manifestMaxRetries(); attempt += 1) {
+      try {
+        this.manifestRevision = await this.saveManifestImpl(
+          encodeManifestDocument(doc),
+          this.manifestRevision,
+          action,
+        );
+        this.manifestSnapshot = readManifestFromDocument(doc);
+        this.updateRuntimeStatus({
+          dataVersion: this.runtimeStatus.dataVersion + 1,
+        });
+        return;
+      } catch (error) {
+        if (
+          attempt >= this.manifestMaxRetries() - 1 ||
+          !this.isConflictError(error)
+        ) {
+          throw error;
         }
-      });
+        const remote = await this.loadManifestImpl();
+        if (remote.update) {
+          const decoded = decodeManifestDocument(remote.update);
+          Y.applyUpdate(doc, Y.encodeStateAsUpdate(decoded.doc));
+          decoded.doc.destroy();
+          this.manifestSnapshot = readManifestFromDocument(doc);
+        }
+        this.manifestRevision = remote.revision;
+      }
     }
-    return this.manifestBatchLoad;
+
+    throw new Error(`Failed to ${action.toLowerCase()}.`);
   }
 
   async applyManifestMutation<T>(
@@ -410,7 +336,7 @@ export abstract class BaseRepository
   }
 
   async initialize(): Promise<void> {
-    await this.loadManifestImpl();
+    await this.loadManifest();
   }
 
   async refresh(): Promise<void> {}
@@ -563,8 +489,6 @@ export abstract class BaseRepository
   }
 
   async createFolder(name: string, parentId: string | null): Promise<string> {
-    // Minted outside the mutator so a conflict retry re-applies the same id
-    // rather than a fresh one the caller never saw.
     const id = createNodeId();
     const now = Date.now();
     return this.mutateManifest('Create folder', (manifest) => {
@@ -721,48 +645,21 @@ export abstract class BaseRepository
   }
 
   async deleteNode(nodeId: string): Promise<void> {
-    const discarded = new Set<VFSNodeId>();
-    const deletedFiles = await this.mutateManifest(
-      'Delete node',
-      (manifest) => deleteNodeFromManifest(manifest, nodeId),
-      // A conflicting flush re-applies this delete to the manifest that won the
-      // race, which can sweep up descendants another client added meanwhile.
-      // Their stored bytes are ours to discard now; nothing else will.
-      (replayed) => this.discardDeletedFiles(replayed, discarded),
+    const deletedFiles = await this.mutateManifest('Delete node', (manifest) =>
+      deleteNodeFromManifest(manifest, nodeId),
     );
-
-    await this.afterManifestWrite(() =>
-      this.discardDeletedFiles(deletedFiles, discarded),
-    );
-  }
-
-  /**
-   * Runs `effect` once the manifest change authorizing it is persisted. Outside
-   * a batch `mutateManifest` has already saved, so it runs now; inside one it
-   * waits for the flush, because the batched manifest isn't durable yet.
-   */
-  private async afterManifestWrite(effect: () => Promise<void>): Promise<void> {
-    if (this.manifestBatchDepth > 0) {
-      this.manifestBatchEffects.push(effect);
-      return;
-    }
-    await effect();
+    await this.discardDeletedFiles(deletedFiles);
   }
 
   private async discardDeletedFiles(
     files: readonly VFSFileNode[],
-    discarded: Set<VFSNodeId>,
   ): Promise<void> {
-    const pending = files.filter((file) => !discarded.has(file.id));
-    if (pending.length === 0) {
+    if (files.length === 0) {
       return;
-    }
-    for (const file of pending) {
-      discarded.add(file.id);
     }
 
     await Promise.all(
-      pending.map(async (file) => {
+      files.map(async (file) => {
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
         await getPlatform().noteIndex?.removeIndex(file.id);
@@ -770,7 +667,7 @@ export abstract class BaseRepository
       }),
     );
 
-    emitNodesDeleted(pending.map((file) => file.id));
+    emitNodesDeleted(files.map((file) => file.id));
   }
 
   async moveNode(nodeId: string, newParentId: string | null): Promise<void> {
@@ -1029,45 +926,16 @@ export abstract class BaseRepository
     };
   }
 
-  /**
-   * `onReplay` runs when a conflicting batch flush re-applies `mutator` to the
-   * reloaded manifest, receiving that replay's result. Pass it when the mutator
-   * result drives side effects outside the manifest, so a replay that touches
-   * more nodes than the original cleans up after itself too.
-   */
   protected async mutateManifest<T>(
     action: string,
     mutator: (manifest: VFSManifest) => T,
-    onReplay?: (result: T) => Promise<void>,
-  ): Promise<T> {
-    if (this.manifestBatchDepth > 0) {
-      return this.recordManifestMutation(action, mutator, onReplay);
-    }
-    // An unbatched mutation is a batch of one: same load, same conflict replay,
-    // and the flush names its save after `action` rather than the batch message.
-    return this.batchManifestWrites(() =>
-      this.recordManifestMutation(action, mutator, onReplay),
-    );
-  }
-
-  /**
-   * Applies `mutator` to the held manifest now and queues it for replay, so a
-   * conflicting flush can re-apply it to the manifest that won the race.
-   */
-  private async recordManifestMutation<T>(
-    action: string,
-    mutator: (manifest: VFSManifest) => T,
-    onReplay?: (result: T) => Promise<void>,
   ): Promise<T> {
     const { manifest } = await this.loadManifest();
-    const result = mutator(manifest);
-    this.manifestBatchMutations.push({
-      action,
-      replay: (target) => {
-        const replayed = mutator(target);
-        return onReplay ? () => onReplay(replayed) : null;
-      },
-    });
+    const next = structuredClone(manifest);
+    const result = mutator(next);
+    writeManifestToDocument(this.manifestDoc!, next);
+    this.manifestSnapshot = next;
+    await this.persistManifest(action);
     return result;
   }
 

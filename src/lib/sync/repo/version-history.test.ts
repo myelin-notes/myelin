@@ -7,7 +7,18 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { LocalRepository } from './local';
+import {
+  decodeManifestDocument,
+  readManifestFromDocument,
+} from './manifest-yjs';
 import { getStoredFileName, type VFSManifest } from './shared';
+
+function readStoredManifest(path: string): VFSManifest {
+  const bytes = new TextEncoder().encode(
+    getRepositoryTestStorage().readText(path) ?? '',
+  );
+  return readManifestFromDocument(decodeManifestDocument(bytes).doc);
+}
 
 describe('repository file version history', () => {
   beforeEach(() => {
@@ -56,11 +67,9 @@ describe('repository file version history', () => {
       fileId,
     ]);
 
-    const manifest = JSON.parse(
-      getRepositoryTestStorage().readText(
-        'repositories/version-hidden-test/manifest.json',
-      ) ?? '{}',
-    ) as VFSManifest;
+    const manifest = readStoredManifest(
+      'repositories/version-hidden-test/manifest.json',
+    );
     expect(Object.keys(manifest.nodes)).toHaveLength(3);
   });
 
@@ -303,11 +312,9 @@ describe('repository file version history', () => {
     const version = await repository.createFileVersionIfDue(sourceId);
     expect(version).not.toBeNull();
 
-    const manifest = JSON.parse(
-      getRepositoryTestStorage().readText(
-        'repositories/version-links-test/manifest.json',
-      ) ?? '{}',
-    ) as VFSManifest;
+    const manifest = readStoredManifest(
+      'repositories/version-links-test/manifest.json',
+    );
     expect(manifest.linksBySource[sourceId]).toBeDefined();
     expect(manifest.linksBySource[version?.id ?? '']).toBeUndefined();
   });
@@ -337,11 +344,9 @@ describe('repository file version history', () => {
     expect(await repository.listFileVersions(fileId)).toHaveLength(0);
     expect(await repository.readFileBytes(version?.id ?? '')).toBeNull();
 
-    const manifest = JSON.parse(
-      getRepositoryTestStorage().readText(
-        'repositories/version-delete-test/manifest.json',
-      ) ?? '{}',
-    ) as VFSManifest;
+    const manifest = readStoredManifest(
+      'repositories/version-delete-test/manifest.json',
+    );
     expect(manifest.nodes[version?.id ?? '']).toBeUndefined();
     expect(
       Object.values(manifest.nodes).some(

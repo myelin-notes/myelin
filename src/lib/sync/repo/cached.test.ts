@@ -11,11 +11,11 @@ import { BaseRepository } from './base';
 import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
 import { LocalRepository } from './local';
+import { createManifestDocument, encodeManifestDocument } from './manifest-yjs';
 import {
   computeRevision,
   createEmptyManifest,
   getStoredFileName,
-  type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities, VFSFileNode, VFSNodeId } from './types';
 
@@ -24,11 +24,10 @@ class MemoryRemoteRepository extends BaseRepository {
   public readonly capabilities: RepositoryCapabilities = {
     polling: false,
     liveSync: false,
-    batchedCommit: false,
   };
 
-  private manifest: VFSManifest = createEmptyManifest();
-  private manifestRevision: string | null = null;
+  private manifestUpdate = encodeManifestDocument(createManifestDocument());
+  private persistedManifestRevision: string | null = null;
   private readonly notes = new Map<VFSNodeId, Uint8Array>();
   private noteRevision = 0;
   private manifestVersion = 0;
@@ -48,23 +47,23 @@ class MemoryRemoteRepository extends BaseRepository {
   }
 
   protected async loadManifestImpl(): Promise<{
-    manifest: VFSManifest;
+    update: Uint8Array;
     revision: string | null;
   }> {
     return {
-      manifest: structuredClone(this.manifest),
-      revision: this.manifestRevision,
+      update: new Uint8Array(this.manifestUpdate),
+      revision: this.persistedManifestRevision,
     };
   }
 
   protected async saveManifestImpl(
-    manifest: VFSManifest,
+    update: Uint8Array,
     _revision: string | null,
     _action: string,
   ): Promise<string> {
-    this.manifest = structuredClone(manifest);
-    this.manifestRevision = `manifest-${++this.manifestVersion}`;
-    return this.manifestRevision;
+    this.manifestUpdate = new Uint8Array(update);
+    this.persistedManifestRevision = `manifest-${++this.manifestVersion}`;
+    return this.persistedManifestRevision;
   }
 
   protected async loadFileBytes(nodeId: VFSNodeId): Promise<{

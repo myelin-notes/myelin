@@ -12,6 +12,12 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { LocalRepository } from './local';
+import {
+  createManifestDocument,
+  decodeManifestDocument,
+  encodeManifestDocument,
+  readManifestFromDocument,
+} from './manifest-yjs';
 import { renameNoteReferences } from './rename-note-references';
 import {
   createEmptyManifest,
@@ -452,12 +458,20 @@ describe('LocalRepository', () => {
     const folderId = await repository.createFolder('Docs', null);
     const storage = getRepositoryTestStorage();
     const manifestPath = `repositories/refresh-test/${MANIFEST_PATH}`;
-    const manifest = JSON.parse(storage.readText(manifestPath) ?? '{}') as {
-      nodes: Record<string, { name: string }>;
-    };
+    const bytes = new TextEncoder().encode(
+      storage.readText(manifestPath) ?? '',
+    );
+    const manifest = readManifestFromDocument(
+      decodeManifestDocument(bytes).doc,
+    );
 
     manifest.nodes[folderId].name = 'Renamed Outside Repository';
-    await storage.writeTextFile(manifestPath, JSON.stringify(manifest));
+    await storage.writeTextFile(
+      manifestPath,
+      new TextDecoder().decode(
+        encodeManifestDocument(createManifestDocument(manifest)),
+      ),
+    );
 
     expect((await repository.getNode(folderId))?.name).toBe('Docs');
 
