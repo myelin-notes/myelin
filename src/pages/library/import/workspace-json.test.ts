@@ -1,4 +1,3 @@
-import { strToU8 } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
@@ -243,21 +242,19 @@ describe('resolveImportRootName', () => {
 });
 
 describe('scanArchive', () => {
-  /** Scan a stand-in archive; keys ending in '/' are directory entries. */
-  const zipScan = (files: Record<string, string>) =>
+  /** Scan a stand-in entry listing; paths ending in '/' are directories. */
+  const zipScan = (paths: readonly string[]) =>
     scanArchive(
-      Object.fromEntries(
-        Object.entries(files).map(([path, text]) => [path, strToU8(text)]),
-      ),
+      paths.map((path) => ({ path, isDir: path.endsWith('/') })),
       'fallback',
     );
 
   it('strips the export wrapper folder and adopts its name', () => {
-    const scanned = zipScan({
-      'My Export/': '',
-      'My Export/Note.json': '{}',
-      'My Export/Sub/Deep.json': '{}',
-    });
+    const scanned = zipScan([
+      'My Export/',
+      'My Export/Note.json',
+      'My Export/Sub/Deep.json',
+    ]);
 
     expect(scanned.rootName).toBe('My Export');
     expect(scanned.notes.map((note) => note.path)).toEqual([
@@ -268,21 +265,17 @@ describe('scanArchive', () => {
   });
 
   it('keeps empty folders so the tree round-trips', () => {
-    const scanned = zipScan({
-      'Export/': '',
-      'Export/Empty/': '',
-      'Export/N.json': '{}',
-    });
+    const scanned = zipScan(['Export/', 'Export/Empty/', 'Export/N.json']);
     expect([...scanned.folderPaths]).toEqual(['Empty']);
   });
 
   it('classifies media and counts unsupported files as skipped', () => {
-    const scanned = zipScan({
-      'Export/': '',
-      'Export/Note.json': '{}',
-      'Export/Pic.png': 'x',
-      'Export/Weird.xyz': 'x',
-    });
+    const scanned = zipScan([
+      'Export/',
+      'Export/Note.json',
+      'Export/Pic.png',
+      'Export/Weird.xyz',
+    ]);
 
     expect(scanned.notes).toHaveLength(1);
     expect(scanned.media.map((file) => file.name)).toEqual(['Pic.png']);
@@ -290,19 +283,19 @@ describe('scanArchive', () => {
   });
 
   it('ignores __MACOSX and dotfile entries', () => {
-    const scanned = zipScan({
-      'Export/': '',
-      'Export/Note.json': '{}',
-      '__MACOSX/Export/._Note.json': 'x',
-      'Export/.DS_Store': 'x',
-    });
+    const scanned = zipScan([
+      'Export/',
+      'Export/Note.json',
+      '__MACOSX/Export/._Note.json',
+      'Export/.DS_Store',
+    ]);
 
     expect(scanned.notes).toHaveLength(1);
     expect(scanned.skippedFiles).toBe(0);
   });
 
   it('falls back to the zip name when there is no single wrapper folder', () => {
-    const scanned = zipScan({ 'A.json': '{}', 'B.json': '{}' });
+    const scanned = zipScan(['A.json', 'B.json']);
     expect(scanned.rootName).toBe('fallback');
     expect(scanned.notes.map((note) => note.path)).toEqual([
       'A.json',

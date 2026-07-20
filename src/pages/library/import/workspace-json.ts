@@ -1,4 +1,3 @@
-import { strFromU8, type Unzipped, unzip } from 'fflate';
 import { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import * as Y from 'yjs';
@@ -6,7 +5,7 @@ import { ElementType } from '@myelin/editor/elements/element-type';
 import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import { readFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { Logger } from '@/lib/logger';
 import {
   type FileType,
@@ -53,13 +52,26 @@ export interface ImportWorkspaceJsonOptions {
   onProgress?: (progress: ImportProgress) => void;
 }
 
-/** An archive entry, already decompressed into memory. */
+/** A raw archive entry, as listed by Rust without decompressing anything. */
+export interface ZipEntry {
+  /** Entry name exactly as stored in the archive. */
+  path: string;
+  isDir: boolean;
+}
+
+/**
+ * An archive entry the import will write. Bytes are deliberately *not* held
+ * here: the scan runs before the preview dialog and its result lives until the
+ * import finishes, so carrying every entry's contents would pin the whole
+ * expanded workspace in memory. Entries are read back one at a time instead.
+ */
 interface ScannedFile {
+  /** Entry name to read bytes back by, exactly as stored in the archive. */
+  entryPath: string;
   /** '/'-separated path inside the archive, below its root folder. */
   path: string;
   folderPath: string;
   name: string;
-  bytes: Uint8Array;
 }
 
 interface ScannedMedia extends ScannedFile {
@@ -195,16 +207,16 @@ export function rebuildNote(
   }
 }
 
-function unzipArchive(bytes: Uint8Array): Promise<Unzipped> {
-  return new Promise((resolve, reject) => {
-    unzip(bytes, (error, archive) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(archive);
-    });
+/** Decompress a single archive entry, leaving the rest of the zip on disk. */
+async function readZipEntry(
+  zipPath: string,
+  entryPath: string,
+): Promise<Uint8Array> {
+  const bytes = await invoke<ArrayBuffer>('read_workspace_zip_entry', {
+    zipPath,
+    entryPath,
   });
+  return new Uint8Array(bytes);
 }
 
 /** Normalize a raw zip path, or null for entries the import always ignores. */
@@ -249,25 +261,30 @@ function parseNote(raw: string, path: string): NoteJson {
 }
 
 interface PreparedNote {
-  note: NoteJson;
+  /** Source entry, re-read in pass 2 to rebuild the note's content. */
+  file: ScannedFile;
   nodeId: VFSNodeId;
   /** Name links target this note by, before any uniqueness renaming. */
   baseName: string;
-  /** '/'-separated source folder path, used to key path-qualified links. */
-  folderPath: string;
+}
+
+/** Read and parse one note entry out of the archive. */
+async function readNote(zipPath: string, file: ScannedFile): Promise<NoteJson> {
+  const bytes = await readZipEntry(zipPath, file.entryPath);
+  return parseNote(new TextDecoder().decode(bytes), file.path);
 }
 
 async function createImportedNote({
   note,
+  file,
   repository,
   parentId,
-  folderPath,
   fallbackName,
 }: {
   note: NoteJson;
+  file: ScannedFile;
   repository: Repository;
   parentId: VFSNodeId | null;
-  folderPath: string;
   fallbackName: string;
 }): Promise<PreparedNote> {
   const baseName = note.name?.trim() || fallbackName;
@@ -275,7 +292,7 @@ async function createImportedNote({
   // survive only inside the JSON, not as the new node's dates.
   const name = await repository.getUniqueFileName(baseName, parentId);
   const nodeId = await repository.createFile(name, 'mcanvas', parentId);
-  return { note, nodeId, baseName, folderPath };
+  return { file, nodeId, baseName };
 }
 
 /**
@@ -289,19 +306,21 @@ async function createImportedNote({
  */
 async function rebuildImportedNote(
   repository: Repository,
+  zipPath: string,
   prepared: PreparedNote,
   resolveNoteId: NoteIdResolver,
 ): Promise<void> {
+  const note = await readNote(zipPath, prepared.file);
   const ydoc = new YDocManager();
-  rebuildNote(ydoc, prepared.note, resolveNoteId);
+  rebuildNote(ydoc, note, resolveNoteId);
   ydoc.sweepOrphanPageFrameFragments();
   await repository.writeFileBytes(
     prepared.nodeId,
     Y.encodeStateAsUpdate(ydoc.doc),
   );
 
-  if (prepared.note.tags?.length > 0) {
-    await repository.setTags(prepared.nodeId, prepared.note.tags);
+  if (note.tags?.length > 0) {
+    await repository.setTags(prepared.nodeId, note.tags);
   }
 }
 
@@ -315,8 +334,8 @@ function createImportNoteLinkResolver(
 ): NoteIdResolver {
   const byPath = new Map<string, VFSNodeId>();
   const byName = new Map<string, VFSNodeId>();
-  for (const { nodeId, baseName, folderPath } of prepared) {
-    const path = folderPath ? `${folderPath}/${baseName}` : baseName;
+  for (const { nodeId, baseName, file } of prepared) {
+    const path = file.folderPath ? `${file.folderPath}/${baseName}` : baseName;
     if (!byPath.has(path)) {
       byPath.set(path, nodeId);
     }
@@ -340,25 +359,25 @@ function createImportNoteLinkResolver(
 export async function scanWorkspaceJson(
   zipPath: string,
 ): Promise<ScannedWorkspace> {
-  const archive = await unzipArchive(await readFile(zipPath));
-  return scanArchive(archive, getPathName(zipPath));
+  const entries = await invoke<ZipEntry[]>('scan_workspace_zip', { zipPath });
+  return scanArchive(entries, getPathName(zipPath));
 }
 
 /**
- * Turn a decompressed archive into the import plan: which folders to create and
- * which entries are notes, media, or unsupported.
+ * Turn an archive's entry listing into the import plan: which folders to create
+ * and which entries are notes, media, or unsupported. Reads no file contents.
  */
 export function scanArchive(
-  archive: Unzipped,
+  archive: readonly ZipEntry[],
   fallbackName: string,
 ): ScannedWorkspace {
   // Zip entries carry no ordering or directory guarantees, so normalize first,
   // then decide what the archive's root folder is from the whole path set.
-  const entries: { path: string; bytes: Uint8Array; isFolder: boolean }[] = [];
-  for (const [rawPath, bytes] of Object.entries(archive)) {
-    const path = normalizeZipPath(rawPath);
+  const entries: { entryPath: string; path: string; isFolder: boolean }[] = [];
+  for (const entry of archive) {
+    const path = normalizeZipPath(entry.path);
     if (path) {
-      entries.push({ path, bytes, isFolder: rawPath.endsWith('/') });
+      entries.push({ entryPath: entry.path, path, isFolder: entry.isDir });
     }
   }
 
@@ -391,10 +410,10 @@ export function scanArchive(
 
     const name = path.split('/').pop() ?? path;
     const file: ScannedFile = {
+      entryPath: entry.entryPath,
       path,
       folderPath: getParentPath(path),
       name,
-      bytes: entry.bytes,
     };
 
     if (JSON_EXTENSION_RE.test(name)) {
@@ -471,17 +490,19 @@ async function importWorkspaceJsonBatched({
 
   // Notes import in two passes: create every file first so note-link ids can be
   // remapped to the new nodes (links may point forward), then rebuild content.
+  // Pass 1 only needs each note's name, so it drops the parsed JSON and pass 2
+  // re-reads the entry -- holding every note would keep the element binaries
+  // baked into their JSON in memory for the whole import.
   const prepared: PreparedNote[] = [];
   for (const file of scanned.notes) {
     const fallbackName = file.name.replace(JSON_EXTENSION_RE, '') || 'Untitled';
     try {
-      const note = parseNote(strFromU8(file.bytes), file.path);
       prepared.push(
         await createImportedNote({
-          note,
+          note: await readNote(zipPath, file),
+          file,
           repository,
           parentId: getImportParentId(rootFolderId, folderIds, file.folderPath),
-          folderPath: file.folderPath,
           fallbackName,
         }),
       );
@@ -505,7 +526,12 @@ async function importWorkspaceJsonBatched({
       fileName: preparedNote.baseName,
     });
     try {
-      await rebuildImportedNote(repository, preparedNote, resolveNoteId);
+      await rebuildImportedNote(
+        repository,
+        zipPath,
+        preparedNote,
+        resolveNoteId,
+      );
       notesImported += 1;
     } catch (error) {
       failedFiles += 1;
@@ -523,7 +549,7 @@ async function importWorkspaceJsonBatched({
         file.name,
         file.fileType,
         getImportParentId(rootFolderId, folderIds, file.folderPath),
-        file.bytes,
+        await readZipEntry(zipPath, file.entryPath),
       );
       mediaImported += 1;
     } catch (error) {

@@ -9,6 +9,7 @@ mod note_index;
 mod pdf_export;
 mod transcription;
 mod workspace_export;
+mod workspace_import;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -80,6 +81,8 @@ pub fn run() {
             pdf_export::export_pdf,
             workspace_export::export_obsidian_vault,
             workspace_export::zip_archive::export_workspace_zip,
+            workspace_import::scan_workspace_zip,
+            workspace_import::read_workspace_zip_entry,
             mcp_server::mcp_start,
             mcp_server::mcp_stop,
             mcp_server::mcp_status,
