@@ -1,4 +1,4 @@
-import type { VFSManifest } from './shared';
+import type { ManifestDocument } from './manifest-document';
 import type { RepositoryCapabilities } from './types';
 
 export interface BatchedCommitFileChange {
@@ -20,7 +20,7 @@ export interface BatchedCommitResult {
 export interface BatchedCommitTarget {
   getBranchHeadOid(): Promise<string>;
   loadManifestForBatch(): Promise<{
-    manifest: VFSManifest;
+    document: ManifestDocument;
     revision: string | null;
   }>;
   commitBatch(input: BatchedCommitInput): Promise<BatchedCommitResult>;

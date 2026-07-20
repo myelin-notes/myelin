@@ -7,13 +7,13 @@ import {
   BatchUnknownError,
 } from './batch';
 import { getGitHubToken } from './github-credentials';
+import { ManifestDocument } from './manifest-document';
 import {
   createEmptyManifest,
   getStoredFilePath,
+  LEGACY_MANIFEST_PATH,
   MANIFEST_PATH,
-  migrate,
   type RepositorySnapshot,
-  type VFSManifest,
 } from './shared';
 import { readGzippedTarballEntries } from './tar';
 import type {
@@ -141,38 +141,40 @@ export class GitHubRepository extends BaseRepository {
   }
 
   protected async loadManifestImpl(): Promise<{
-    manifest: VFSManifest;
+    document: ManifestDocument;
     revision: string | null;
   }> {
     const payload = await this.getContents(MANIFEST_PATH);
     if (!payload.bytes || payload.bytes.byteLength === 0) {
-      const manifest = createEmptyManifest();
+      const legacy = await this.getContents(LEGACY_MANIFEST_PATH);
+      const document = legacy.bytes
+        ? ManifestDocument.fromBytes(legacy.bytes)
+        : ManifestDocument.fromManifest(createEmptyManifest());
       const revision = await this.saveManifestImpl(
-        manifest,
+        document,
         payload.sha,
-        'Initialize empty repository',
+        legacy.bytes ? 'Migrate repository manifest' : 'Initialize repository',
       );
-      return { manifest, revision };
+      return { document, revision };
     }
 
-    const text = new TextDecoder().decode(payload.bytes);
-    const parsed = JSON.parse(text) as VFSManifest;
-    migrate(parsed);
-    return { manifest: parsed, revision: payload.sha };
+    return {
+      document: ManifestDocument.fromBytes(payload.bytes),
+      revision: payload.sha,
+    };
   }
 
   // The abstract signature is string | null (LocalRepository uses null to mean
   // "no revision"), but putContents always resolves to a non-null commit sha or
   // throws, so the GitHub manifest revision is never null in practice.
   protected async saveManifestImpl(
-    manifest: VFSManifest,
+    document: ManifestDocument,
     revision: string | null,
     action: string,
   ): Promise<string | null> {
-    const bytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
     return this.putContents(
       MANIFEST_PATH,
-      bytes,
+      document.encode(),
       revision,
       `${action} manifest`,
     );
@@ -430,7 +432,7 @@ export class GitHubRepository extends BaseRepository {
   }
 
   async loadManifestForBatch(): Promise<{
-    manifest: VFSManifest;
+    document: ManifestDocument;
     revision: string | null;
   }> {
     return this.loadManifestImpl();

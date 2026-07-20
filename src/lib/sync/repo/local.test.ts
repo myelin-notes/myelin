@@ -12,6 +12,7 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { LocalRepository } from './local';
+import { ManifestDocument } from './manifest-document';
 import { renameNoteReferences } from './rename-note-references';
 import {
   createEmptyManifest,
@@ -19,6 +20,7 @@ import {
   getNoteFileName,
   getNoteGraph,
   getStoredFileName,
+  LEGACY_MANIFEST_PATH,
   MANIFEST_PATH,
 } from './shared';
 
@@ -96,7 +98,7 @@ describe('LocalRepository', () => {
 
   it('backfills registry fields when loading a pre-tagRegistry manifest', async () => {
     const storage = getRepositoryTestStorage();
-    const manifestPath = `repositories/legacy-manifest/${MANIFEST_PATH}`;
+    const manifestPath = `repositories/legacy-manifest/${LEGACY_MANIFEST_PATH}`;
     // A manifest written before `tagRegistry`/`customColors` existed.
     await storage.writeTextFile(
       manifestPath,
@@ -452,12 +454,12 @@ describe('LocalRepository', () => {
     const folderId = await repository.createFolder('Docs', null);
     const storage = getRepositoryTestStorage();
     const manifestPath = `repositories/refresh-test/${MANIFEST_PATH}`;
-    const manifest = JSON.parse(storage.readText(manifestPath) ?? '{}') as {
-      nodes: Record<string, { name: string }>;
-    };
-
-    manifest.nodes[folderId].name = 'Renamed Outside Repository';
-    await storage.writeTextFile(manifestPath, JSON.stringify(manifest));
+    const bytes = storage.readBinary(manifestPath);
+    const manifest = ManifestDocument.fromBytes(bytes!);
+    manifest.mutate((value) => {
+      value.nodes[folderId].name = 'Renamed Outside Repository';
+    });
+    await storage.writeFile(manifestPath, manifest.encode());
 
     expect((await repository.getNode(folderId))?.name).toBe('Docs');
 

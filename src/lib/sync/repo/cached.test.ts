@@ -11,11 +11,11 @@ import { BaseRepository } from './base';
 import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
 import { LocalRepository } from './local';
+import { ManifestDocument } from './manifest-document';
 import {
   computeRevision,
   createEmptyManifest,
   getStoredFileName,
-  type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities, VFSFileNode, VFSNodeId } from './types';
 
@@ -27,7 +27,7 @@ class MemoryRemoteRepository extends BaseRepository {
     batchedCommit: false,
   };
 
-  private manifest: VFSManifest = createEmptyManifest();
+  private manifest = ManifestDocument.fromManifest(createEmptyManifest());
   private manifestRevision: string | null = null;
   private readonly notes = new Map<VFSNodeId, Uint8Array>();
   private noteRevision = 0;
@@ -48,21 +48,21 @@ class MemoryRemoteRepository extends BaseRepository {
   }
 
   protected async loadManifestImpl(): Promise<{
-    manifest: VFSManifest;
+    document: ManifestDocument;
     revision: string | null;
   }> {
     return {
-      manifest: structuredClone(this.manifest),
+      document: ManifestDocument.fromBytes(this.manifest.encode()),
       revision: this.manifestRevision,
     };
   }
 
   protected async saveManifestImpl(
-    manifest: VFSManifest,
+    manifest: ManifestDocument,
     _revision: string | null,
     _action: string,
   ): Promise<string> {
-    this.manifest = structuredClone(manifest);
+    this.manifest = ManifestDocument.fromBytes(manifest.encode());
     this.manifestRevision = `manifest-${++this.manifestVersion}`;
     return this.manifestRevision;
   }

@@ -22,6 +22,7 @@ import type {
   RepositoryStatusSource,
 } from '../config';
 import type { LocalRepository } from '../local';
+import type { ManifestDocument } from '../manifest-document';
 import { extractStoredNoteLinks } from '../note-link-index';
 import {
   addChild,
@@ -89,6 +90,7 @@ class RemoteNoteCacheMergeError extends Error {
 }
 
 interface BatchPlan {
+  document: ManifestDocument;
   manifest: VFSManifest;
   manifestChanged: boolean;
   additions: Map<string, Uint8Array>;
@@ -904,7 +906,8 @@ export class CachedRepository
     }
 
     const expectedHeadOid = await remote.getBranchHeadOid();
-    const { manifest: remoteManifest } = await remote.loadManifestForBatch();
+    const { document } = await remote.loadManifestForBatch();
+    const remoteManifest = document.getManifest();
 
     // Snapshot cache + outbox + per-op payloads atomically. A concurrent
     // user write that lands between the outbox read and the cache reads
@@ -960,6 +963,7 @@ export class CachedRepository
     const { ops, cacheSnapshot, canvasOps, rawOps } = snapshot;
 
     const plan: BatchPlan = {
+      document,
       manifest: structuredClone(remoteManifest),
       manifestChanged: false,
       additions: new Map(),
@@ -1077,10 +1081,8 @@ export class CachedRepository
     }
 
     if (plan.manifestChanged) {
-      plan.additions.set(
-        MANIFEST_PATH,
-        new TextEncoder().encode(JSON.stringify(plan.manifest, null, 2)),
-      );
+      plan.document.replaceManifest(plan.manifest);
+      plan.additions.set(MANIFEST_PATH, plan.document.encode());
     }
 
     // A path can appear in both additions and deletions (e.g. delete then

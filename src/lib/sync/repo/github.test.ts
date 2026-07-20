@@ -7,6 +7,7 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { GitHubRepository } from './github';
+import { ManifestDocument } from './manifest-document';
 import {
   createEmptyManifest,
   getNotePath,
@@ -21,6 +22,11 @@ function createRepository() {
     branch: 'main',
     credentialId: 'test-credential',
   });
+}
+
+function readManifest(api: { readBytes(path: string): Uint8Array | null }) {
+  const bytes = api.readBytes(MANIFEST_PATH);
+  return bytes ? ManifestDocument.fromBytes(bytes).getManifest() : null;
 }
 
 describe('GitHubRepository', () => {
@@ -39,7 +45,7 @@ describe('GitHubRepository', () => {
       totalFolders: 0,
       totalTags: 0,
     });
-    expect(githubApi.readJson(MANIFEST_PATH)).toEqual(createEmptyManifest());
+    expect(readManifest(githubApi)).toEqual(createEmptyManifest());
   });
 
   it('writes manifest and note contents through the transport', async () => {
@@ -59,9 +65,7 @@ describe('GitHubRepository', () => {
       localStateVector: note.stateVector,
     });
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, { name: string; parentId: string | null }>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest(githubApi);
 
     expect(manifest).not.toBeNull();
     expect(manifest?.nodes[folderId]?.name).toBe('Docs');
@@ -78,9 +82,7 @@ describe('GitHubRepository', () => {
 
     const fileId = await repository.createFile('Clip.mp4', 'mp4', null, bytes);
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, { name: string; fileType: string; type: string }>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest(githubApi);
     const storedBytes = githubApi.readBytes(
       getStoredFilePath({ id: fileId, fileType: 'mp4' }),
     );
@@ -104,9 +106,7 @@ describe('GitHubRepository', () => {
     githubApi.failNextPut(MANIFEST_PATH);
 
     const folderId = await repository.createFolder('Retry folder', null);
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, { name: string }>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest(githubApi);
 
     expect(manifest).not.toBeNull();
     expect(manifest?.nodes[folderId]?.name).toBe('Retry folder');
@@ -126,16 +126,14 @@ describe('GitHubRepository', () => {
       ],
     );
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, { name: string }>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest(githubApi);
 
     expect(manifest?.nodes[folderA]?.name).toBe('A');
     expect(manifest?.nodes[folderB]?.name).toBe('B');
     expect(githubApi.putCallCount - putsBeforeBatch).toBe(1);
   });
 
-  it('replays a batch onto the winning manifest after a flush conflict', async () => {
+  it('merges a batch with the winning Yjs manifest after a flush conflict', async () => {
     const repository = createRepository();
     const other = createRepository();
     const githubApi = getRepositoryTestGitHubApi();
@@ -153,18 +151,18 @@ describe('GitHubRepository', () => {
       },
     );
 
-    const manifest = githubApi.readJson<{
-      children: string[];
-      nodes: Record<string, { name: string }>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest(githubApi);
 
     expect(manifest?.nodes[folderA]?.name).toBe('A');
     expect(manifest?.nodes[folderB]?.name).toBe('B');
     expect(manifest?.nodes[concurrentId]?.name).toBe('Concurrent');
-    expect(manifest?.children).toEqual([concurrentId, folderA, folderB]);
+    expect(manifest?.children).toHaveLength(3);
+    expect(manifest?.children).toEqual(
+      expect.arrayContaining([concurrentId, folderA, folderB]),
+    );
   });
 
-  it('discards bytes for files a replayed delete sweeps up', async () => {
+  it('preserves a file concurrently added to a deleted folder', async () => {
     const repository = createRepository();
     const other = createRepository();
     const githubApi = getRepositoryTestGitHubApi();
@@ -185,17 +183,16 @@ describe('GitHubRepository', () => {
       );
     });
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, unknown>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest(githubApi);
 
     expect(manifest?.nodes[folderId]).toBeUndefined();
-    expect(manifest?.nodes[concurrentFileId]).toBeUndefined();
+    expect(manifest?.nodes[concurrentFileId]?.parentId).toBeNull();
+    expect(manifest?.children).toContain(concurrentFileId);
     expect(
       githubApi.readBytes(
         getStoredFilePath({ id: concurrentFileId, fileType: 'mp4' }),
       ),
-    ).toBeNull();
+    ).not.toBeNull();
   });
 
   it('keeps deleted file bytes when the batched manifest flush fails', async () => {
@@ -217,9 +214,7 @@ describe('GitHubRepository', () => {
       repository.batchManifestWrites(() => repository.deleteNode(fileId)),
     ).rejects.toThrow();
 
-    const manifest = githubApi.readJson<{
-      nodes: Record<string, unknown>;
-    }>(MANIFEST_PATH);
+    const manifest = readManifest(githubApi);
 
     expect(manifest?.nodes[fileId]).toBeDefined();
     expect(githubApi.readBytes(storedPath)).not.toBeNull();

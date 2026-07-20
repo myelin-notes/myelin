@@ -38,7 +38,8 @@ export interface RepositorySnapshot {
 }
 
 export const CURRENT_MANIFEST_VERSION = 1;
-export const MANIFEST_PATH = 'manifest.json';
+export const MANIFEST_PATH = 'manifest.yjs';
+export const LEGACY_MANIFEST_PATH = 'manifest.json';
 export const FILES_DIR = 'files';
 export const FILE_EXT = '.myelin';
 export const VERSION_HISTORY_INTERVAL_MS = 10 * 60 * 1000;

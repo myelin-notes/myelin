@@ -9,20 +9,19 @@ import {
   readTextFile,
   remove,
   writeFile,
-  writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import { ensureDirOnce, getAppDataDir } from '@/platform/tauri/fs-cache';
 import { BaseRepository } from './base';
+import { ManifestDocument } from './manifest-document';
 import {
   computeRevision,
   createEmptyManifest,
   FILES_DIR,
   getStoredFileName,
+  LEGACY_MANIFEST_PATH,
   MANIFEST_PATH,
-  migrate,
   type RepositorySnapshot,
-  type VFSManifest,
 } from './shared';
 import type { FileType, RepositoryCapabilities, VFSNodeId } from './types';
 
@@ -49,7 +48,7 @@ export class LocalRepository extends BaseRepository {
     batchedCommit: false,
   };
 
-  private manifest: VFSManifest | null = null;
+  private manifest: ManifestDocument | null = null;
 
   constructor(private readonly storageRoot: string = '') {
     super();
@@ -65,7 +64,8 @@ export class LocalRepository extends BaseRepository {
   }
 
   async getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
-    const { manifest } = await this.loadManifestImpl();
+    const { document } = await this.loadManifestImpl();
+    const manifest = document.getManifest();
     const node = manifest.nodes[nodeId];
     if (!node || node.type !== 'file') {
       return null;
@@ -114,7 +114,7 @@ export class LocalRepository extends BaseRepository {
       await file.close();
     }
 
-    const manifest = structuredClone(snapshot.manifest);
+    const manifest = ManifestDocument.fromManifest(snapshot.manifest);
     await this.writeManifestToDisk(manifest);
     this.manifest = manifest;
     logger.debug('Replaced local repository snapshot', {
@@ -125,11 +125,11 @@ export class LocalRepository extends BaseRepository {
   }
 
   protected async loadManifestImpl(): Promise<{
-    manifest: VFSManifest;
+    document: ManifestDocument;
     revision: string | null;
   }> {
     if (this.manifest) {
-      return { manifest: this.manifest, revision: null };
+      return { document: this.manifest, revision: null };
     }
 
     await this.ensureDirs();
@@ -137,28 +137,41 @@ export class LocalRepository extends BaseRepository {
     const manifestPath = this.resolveStoragePath(MANIFEST_PATH);
 
     if (await exists(manifestPath, { baseDir: BaseDirectory.AppData })) {
-      const text = await readTextFile(manifestPath, {
-        baseDir: BaseDirectory.AppData,
-      });
-      const manifest = JSON.parse(text) as VFSManifest;
-      migrate(manifest);
-      this.manifest = manifest;
-      return { manifest: this.manifest, revision: null };
+      const document = ManifestDocument.fromBytes(
+        await readFile(manifestPath, {
+          baseDir: BaseDirectory.AppData,
+        }),
+      );
+      this.manifest = document;
+      return { document, revision: null };
     }
 
-    const manifest = createEmptyManifest();
-    await this.writeManifestToDisk(manifest);
-    this.manifest = manifest;
-    return { manifest, revision: null };
+    const legacyPath = this.resolveStoragePath(LEGACY_MANIFEST_PATH);
+    if (await exists(legacyPath, { baseDir: BaseDirectory.AppData })) {
+      const legacy = await readTextFile(legacyPath, {
+        baseDir: BaseDirectory.AppData,
+      });
+      const document = ManifestDocument.fromBytes(
+        new TextEncoder().encode(legacy),
+      );
+      await this.writeManifestToDisk(document);
+      this.manifest = document;
+      return { document, revision: null };
+    }
+
+    const document = ManifestDocument.fromManifest(createEmptyManifest());
+    await this.writeManifestToDisk(document);
+    this.manifest = document;
+    return { document, revision: null };
   }
 
   protected async saveManifestImpl(
-    manifest: VFSManifest,
+    document: ManifestDocument,
     _revision: string | null,
     _action: string,
   ): Promise<string | null> {
-    await this.writeManifestToDisk(manifest);
-    this.manifest = manifest;
+    await this.writeManifestToDisk(document);
+    this.manifest = document;
     return null;
   }
 
@@ -166,7 +179,8 @@ export class LocalRepository extends BaseRepository {
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
-    const { manifest } = await this.loadManifestImpl();
+    const { document } = await this.loadManifestImpl();
+    const manifest = document.getManifest();
     const node = manifest.nodes[nodeId];
     if (!node || node.type !== 'file') {
       return { bytes: null, revision: null };
@@ -204,7 +218,8 @@ export class LocalRepository extends BaseRepository {
     _revision: string | null,
     _message: string,
   ): Promise<string | null> {
-    const { manifest } = await this.loadManifestImpl();
+    const { document } = await this.loadManifestImpl();
+    const manifest = document.getManifest();
     const node = manifest.nodes[nodeId];
     const nodeType = node?.type;
     if (node && node.type === 'file') {
@@ -241,7 +256,8 @@ export class LocalRepository extends BaseRepository {
     nodeId: VFSNodeId,
     fileType?: FileType,
   ): Promise<void> {
-    const { manifest } = await this.loadManifestImpl();
+    const { document } = await this.loadManifestImpl();
+    const manifest = document.getManifest();
     const node = manifest.nodes[nodeId];
     if ((!node || node.type !== 'file') && !fileType) {
       return;
@@ -272,14 +288,10 @@ export class LocalRepository extends BaseRepository {
     await ensureDirOnce(this.resolveStoragePath(FILES_DIR));
   }
 
-  private async writeManifestToDisk(manifest: VFSManifest): Promise<void> {
-    await writeTextFile(
-      this.resolveStoragePath(MANIFEST_PATH),
-      JSON.stringify(manifest, null, 2),
-      {
-        baseDir: BaseDirectory.AppData,
-      },
-    );
+  private async writeManifestToDisk(document: ManifestDocument): Promise<void> {
+    await writeFile(this.resolveStoragePath(MANIFEST_PATH), document.encode(), {
+      baseDir: BaseDirectory.AppData,
+    });
   }
 
   /**
