@@ -182,6 +182,9 @@ export function getFileVersionNodes(
 export function ensureVersionHistoryRoot(
   manifest: VFSManifest,
   now: number,
+  // Callers that may be re-applied against a reloaded manifest (a conflict
+  // retry) pass the id in, so the retry reuses the id they already handed out.
+  rootId: VFSNodeId = createNodeId(),
 ): VFSNodeId {
   const existing = Object.values(manifest.nodes).find(
     (node) =>
@@ -191,7 +194,6 @@ export function ensureVersionHistoryRoot(
     return existing.id;
   }
 
-  const rootId = createNodeId();
   manifest.nodes[rootId] = createFolderNode(
     rootId,
     VERSION_HISTORY_ROOT_NAME,
