@@ -105,29 +105,12 @@ const en = {
       button: 'New',
       folder: 'New Folder',
       canvas: 'New Canvas',
-      import: 'Import',
+      importFiles: 'Import Files',
+      importGoodnotesZip: 'Import Goodnotes ZIP',
+      importObsidianVault: 'Import Obsidian Vault',
+      importWorkspaceJson: 'Import Workspace JSON',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
-    },
-    importPicker: {
-      title: 'Import',
-      description: 'Choose what you want to bring into your library.',
-      files: {
-        label: 'Files',
-        description: 'Markdown, PDFs, images, and video from your computer.',
-      },
-      goodnotesZip: {
-        label: 'Goodnotes ZIP',
-        description: 'A Goodnotes folder exported as PDFs.',
-      },
-      obsidianVault: {
-        label: 'Obsidian Vault',
-        description: 'A vault folder, with its notes and attachments.',
-      },
-      workspaceJson: {
-        label: 'Workspace JSON',
-        description: 'An archive exported from Myelin.',
-      },
     },
     importMarkdown: {
       unsupportedFile: 'Choose a Markdown file (.md, .markdown, or .mdx).',
@@ -159,9 +142,8 @@ const en = {
       title: 'Import Obsidian Vault',
       scanning: 'Scanning vault...',
       jsonTitle: 'Import Workspace JSON',
-      jsonScanning: 'Reading archive...',
-      jsonNoFiles: 'No JSON notes or media found in this archive',
-      jsonZipFilter: 'Myelin JSON export',
+      jsonScanning: 'Scanning folder...',
+      jsonNoFiles: 'No JSON notes or media found in this folder',
       notes: (count: number) => `${count} note${count === 1 ? '' : 's'}`,
       media: (count: number) => `${count} media file${count === 1 ? '' : 's'}`,
       skippedFiles: (count: number) =>
@@ -452,7 +434,7 @@ const en = {
       exportJson: {
         label: 'Export Workspace as JSON',
         description:
-          'Save your whole workspace to a ZIP file as JSON. Each note becomes a JSON file encoding its strokes, text, and embedded media (binaries as base64); other files are copied and the folder structure is preserved.',
+          'Save your whole workspace to a folder as JSON. Each note becomes a JSON file encoding its strokes, text, and embedded media (binaries as base64); other files are copied and the folder structure is preserved.',
         button: 'Export',
         defaultExportName: 'Myelin Notes JSON Export',
         loading: 'Exporting workspace as JSON...',

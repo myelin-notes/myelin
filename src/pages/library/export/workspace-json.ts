@@ -17,21 +17,24 @@ import {
   type ExportProgress,
   type PlannedFile,
   planFolder,
+  sanitizeName,
   type VaultFileEntry,
 } from './workspace-plan';
 
 const logger = new Logger('WorkspaceJsonExport');
 
 export interface ExportWorkspaceJsonResult {
-  zipPath: string;
+  vaultPath: string;
   notesExported: number;
   filesCopied: number;
 }
 
 export interface ExportWorkspaceJsonOptions {
   repository: ReadableRepository;
-  /** Absolute zip path the user picked in the save dialog; also names the root folder. */
-  outPath: string;
+  /** Absolute directory the user picked; the export is created as a subfolder. */
+  destDir: string;
+  /** Name of the root folder created under {@link destDir}. */
+  exportName: string;
   onProgress?: (progress: ExportProgress) => void;
 }
 
@@ -134,8 +137,8 @@ async function buildFileEntry(
     };
   }
 
-  // Standalone media is mirrored on disk, so the Rust side streams the stored
-  // bytes from this path straight into the archive rather than through JSON.
+  // Standalone media is mirrored on disk, so the Rust side copies the stored
+  // bytes directly from this path (matching the Obsidian vault export).
   const sourcePath = await repository.getStoredAbsolutePath(file.node.id);
   if (!sourcePath) {
     logger.warn('Skipping file with no stored path', {
@@ -149,7 +152,8 @@ async function buildFileEntry(
 
 export async function exportWorkspaceJson({
   repository,
-  outPath,
+  destDir,
+  exportName,
   onProgress,
 }: ExportWorkspaceJsonOptions): Promise<ExportWorkspaceJsonResult> {
   const plan: ExportPlan = { folders: [], files: [] };
@@ -175,15 +179,16 @@ export async function exportWorkspaceJson({
     }
   }
 
-  // Shares the Obsidian export's plan shape, but Rust packs it into a single
-  // zip: `text` files are written as entries and `copyFrom` media streamed in.
-  const zipPath = await invoke<string>('export_workspace_zip', {
+  // Reuses the Obsidian vault writer: it creates the folders, writes `text`
+  // files and copies `copyFrom` media into the user-picked destination.
+  const vaultPath = await invoke<string>('export_obsidian_vault', {
     request: {
-      outPath,
+      destDir,
+      vaultName: sanitizeName(exportName) || 'Workspace',
       folders: plan.folders,
       files: entries,
     },
   });
 
-  return { zipPath, notesExported, filesCopied };
+  return { vaultPath, notesExported, filesCopied };
 }

@@ -453,15 +453,7 @@ async function importStorageVaultFile({
   );
 }
 
-export async function importObsidianVault(
-  options: ImportObsidianVaultOptions,
-): Promise<ObsidianVaultImportResult> {
-  return options.repository.batchManifestWrites(() =>
-    importObsidianVaultBatched(options),
-  );
-}
-
-async function importObsidianVaultBatched({
+export async function importObsidianVault({
   repository,
   parentId,
   vaultPath,

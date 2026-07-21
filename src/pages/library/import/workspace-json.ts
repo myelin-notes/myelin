@@ -1,11 +1,11 @@
 import { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
-import * as Y from 'yjs';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
-import { YDocManager } from '@myelin/editor/ydoc-manager';
-import { invoke } from '@tauri-apps/api/core';
+import type { YDocManager } from '@myelin/editor/ydoc-manager';
+import { join } from '@tauri-apps/api/path';
+import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
 import {
   type FileType,
@@ -24,14 +24,12 @@ import type { ImportProgress } from './dialog';
 import {
   createImportedFolders,
   getImportParentId,
-  getParentPath,
   getPathBasename,
 } from './import-tree';
 
 const logger = new Logger('WorkspaceJsonImport');
 
 const JSON_EXTENSION_RE = /\.json$/i;
-const ZIP_EXTENSION_RE = /\.zip$/i;
 
 export interface ImportWorkspaceJsonResult {
   rootFolderId: VFSNodeId;
@@ -43,53 +41,37 @@ export interface ImportWorkspaceJsonResult {
 export interface ImportWorkspaceJsonOptions {
   repository: Repository;
   parentId: VFSNodeId | null;
-  /** Absolute path to the exported workspace zip the user picked. */
-  zipPath: string;
-  /** Name for the created root folder; defaults to the archive's own name. */
+  /** Absolute path to the exported workspace folder the user picked. */
+  dirPath: string;
+  /** Name for the created root folder; defaults to the picked folder's name. */
   rootName?: string;
-  /** Pre-scanned archive; re-read from disk when omitted. */
+  /** Pre-scanned result to avoid re-walking the directory. */
   scanned?: ScannedWorkspace;
   onProgress?: (progress: ImportProgress) => void;
 }
 
-/** A raw archive entry, as listed by Rust without decompressing anything. */
-export interface ZipEntry {
-  /** Entry name exactly as stored in the archive. */
-  path: string;
-  isDir: boolean;
+interface ScannedNote {
+  absolutePath: string;
+  folderPath: string;
 }
 
-/**
- * An archive entry the import will write. Bytes are deliberately *not* held
- * here: the scan runs before the preview dialog and its result lives until the
- * import finishes, so carrying every entry's contents would pin the whole
- * expanded workspace in memory. Entries are read back one at a time instead.
- */
-interface ScannedFile {
-  /** Entry name to read bytes back by, exactly as stored in the archive. */
-  entryPath: string;
-  /** '/'-separated path inside the archive, below its root folder. */
-  path: string;
+interface ScannedMedia {
+  absolutePath: string;
   folderPath: string;
   name: string;
-}
-
-interface ScannedMedia extends ScannedFile {
   fileType: FileType;
 }
 
 export interface ScannedWorkspace {
-  /** Name of the archive's root folder, used for the imported folder. */
-  rootName: string;
   /** Relative folder paths, including empty folders, '/'-separated. */
   folderPaths: Set<string>;
-  notes: ScannedFile[];
+  notes: ScannedNote[];
   media: ScannedMedia[];
   skippedFiles: number;
 }
 
 export function getPathName(path: string): string {
-  return getPathBasename(path, 'Workspace').replace(ZIP_EXTENSION_RE, '');
+  return getPathBasename(path, 'Workspace');
 }
 
 /** Convert a base64-marked binary back to bytes; otherwise recurse structurally. */
@@ -207,84 +189,89 @@ export function rebuildNote(
   }
 }
 
-/** Decompress a single archive entry, leaving the rest of the zip on disk. */
-async function readZipEntry(
-  zipPath: string,
-  entryPath: string,
-): Promise<Uint8Array> {
-  const bytes = await invoke<ArrayBuffer>('read_workspace_zip_entry', {
-    zipPath,
-    entryPath,
-  });
-  return new Uint8Array(bytes);
-}
+async function scanDirectory(
+  absolutePath: string,
+  relativeSegments: string[],
+  scanned: ScannedWorkspace,
+): Promise<void> {
+  const entries = await readDir(absolutePath);
 
-/** Normalize a raw zip path, or null for entries the import always ignores. */
-function normalizeZipPath(path: string): string | null {
-  const segments = path.replace(/\\/g, '/').split('/').filter(Boolean);
-  if (
-    segments.length === 0 ||
-    segments[0] === '__MACOSX' ||
-    segments.some((segment) => segment.startsWith('.'))
-  ) {
-    return null;
+  for (const entry of entries) {
+    if (entry.name.startsWith('.') || entry.isSymlink) {
+      if (entry.isSymlink) {
+        scanned.skippedFiles += 1;
+      }
+      continue;
+    }
+
+    const childPath = await join(absolutePath, entry.name);
+    const childSegments = [...relativeSegments, entry.name];
+
+    if (entry.isDirectory) {
+      scanned.folderPaths.add(childSegments.join('/'));
+      await scanDirectory(childPath, childSegments, scanned);
+      continue;
+    }
+
+    if (!entry.isFile) {
+      scanned.skippedFiles += 1;
+      continue;
+    }
+
+    const folderPath = relativeSegments.join('/');
+    if (JSON_EXTENSION_RE.test(entry.name)) {
+      scanned.notes.push({ absolutePath: childPath, folderPath });
+      continue;
+    }
+
+    const fileType = getFileTypeForName(entry.name);
+    if (fileType && fileType !== 'mcanvas') {
+      scanned.media.push({
+        absolutePath: childPath,
+        folderPath,
+        name: entry.name,
+        fileType,
+      });
+      continue;
+    }
+
+    scanned.skippedFiles += 1;
   }
-  return segments.join('/');
 }
 
-/**
- * Our exports nest everything under one folder named after the archive, so drop
- * that prefix and adopt its name for the imported root folder. An archive
- * without a single common root is taken as-is, named after the zip file.
- */
-function resolveArchiveRoot(
-  paths: readonly string[],
-  fallbackName: string,
-): { rootName: string; prefix: string } {
-  const tops = new Set(paths.map((path) => path.split('/')[0]));
-  const [top] = [...tops];
-  if (tops.size === 1 && paths.some((path) => path.includes('/'))) {
-    return { rootName: top, prefix: `${top}/` };
-  }
-  return { rootName: fallbackName, prefix: '' };
-}
-
-function parseNote(raw: string, path: string): NoteJson {
+function parseNote(raw: string, absolutePath: string): NoteJson {
   const note = JSON.parse(raw) as NoteJson;
   if (note.version !== NOTE_JSON_VERSION) {
-    throw new Error(`Unsupported note version ${note.version} in ${path}`);
+    throw new Error(
+      `Unsupported note version ${note.version} in ${absolutePath}`,
+    );
   }
   if (!Array.isArray(note.elements)) {
-    throw new Error(`Malformed note (no elements) in ${path}`);
+    throw new Error(`Malformed note (no elements) in ${absolutePath}`);
   }
   return note;
 }
 
 interface PreparedNote {
-  /** Source entry, re-read in pass 2 to rebuild the note's content. */
-  file: ScannedFile;
+  note: NoteJson;
   nodeId: VFSNodeId;
   /** Name links target this note by, before any uniqueness renaming. */
   baseName: string;
-}
-
-/** Read and parse one note entry out of the archive. */
-async function readNote(zipPath: string, file: ScannedFile): Promise<NoteJson> {
-  const bytes = await readZipEntry(zipPath, file.entryPath);
-  return parseNote(new TextDecoder().decode(bytes), file.path);
+  /** '/'-separated source folder path, used to key path-qualified links. */
+  folderPath: string;
 }
 
 async function createImportedNote({
   note,
-  file,
   repository,
   parentId,
+  folderPath,
   fallbackName,
 }: {
   note: NoteJson;
-  file: ScannedFile;
   repository: Repository;
   parentId: VFSNodeId | null;
+  folderPath: string;
   fallbackName: string;
 }): Promise<PreparedNote> {
   const baseName = note.name?.trim() || fallbackName;
@@ -292,35 +279,24 @@ async function createImportedNote({
   // survive only inside the JSON, not as the new node's dates.
   const name = await repository.getUniqueFileName(baseName, parentId);
   const nodeId = await repository.createFile(name, 'mcanvas', parentId);
-  return { file, nodeId, baseName };
+  return { note, nodeId, baseName, folderPath };
 }
 
-/**
- * Build the note document in memory, then write it once.
- *
- * The target is a file this run just created, so there is no remote revision to
- * reconcile and no peer to sync with. Opening a session would read the empty
- * placeholder back twice (once to load the document, once to merge the push)
- * before writing the same bytes. This mirrors what `NoteSession.save` does to
- * the doc -- sweep orphans, then encode -- without the round trips.
- */
 async function rebuildImportedNote(
   repository: Repository,
-  zipPath: string,
   prepared: PreparedNote,
   resolveNoteId: NoteIdResolver,
 ): Promise<void> {
-  const note = await readNote(zipPath, prepared.file);
-  const ydoc = new YDocManager();
-  rebuildNote(ydoc, note, resolveNoteId);
-  ydoc.sweepOrphanPageFrameFragments();
-  await repository.writeFileBytes(
-    prepared.nodeId,
-    Y.encodeStateAsUpdate(ydoc.doc),
-  );
+  const session = await repository.openSession(prepared.nodeId);
+  try {
+    rebuildNote(session.ydoc, prepared.note, resolveNoteId);
+    await session.save();
+  } finally {
+    await session.close().catch(() => {});
+  }
 
-  if (note.tags?.length > 0) {
-    await repository.setTags(prepared.nodeId, note.tags);
+  if (prepared.note.tags?.length > 0) {
+    await repository.setTags(prepared.nodeId, prepared.note.tags);
   }
 }
 
@@ -334,8 +310,8 @@ function createImportNoteLinkResolver(
 ): NoteIdResolver {
   const byPath = new Map<string, VFSNodeId>();
   const byName = new Map<string, VFSNodeId>();
-  for (const { nodeId, baseName, file } of prepared) {
-    const path = file.folderPath ? `${file.folderPath}/${baseName}` : baseName;
+  for (const { nodeId, baseName, folderPath } of prepared) {
+    const path = folderPath ? `${folderPath}/${baseName}` : baseName;
     if (!byPath.has(path)) {
       byPath.set(path, nodeId);
     }
@@ -357,103 +333,30 @@ function createImportNoteLinkResolver(
 }
 
 export async function scanWorkspaceJson(
-  zipPath: string,
+  dirPath: string,
 ): Promise<ScannedWorkspace> {
-  const entries = await invoke<ZipEntry[]>('scan_workspace_zip', { zipPath });
-  return scanArchive(entries, getPathName(zipPath));
-}
-
-/**
- * Turn an archive's entry listing into the import plan: which folders to create
- * and which entries are notes, media, or unsupported. Reads no file contents.
- */
-export function scanArchive(
-  archive: readonly ZipEntry[],
-  fallbackName: string,
-): ScannedWorkspace {
-  // Zip entries carry no ordering or directory guarantees, so normalize first,
-  // then decide what the archive's root folder is from the whole path set.
-  const entries: { entryPath: string; path: string; isFolder: boolean }[] = [];
-  for (const entry of archive) {
-    const path = normalizeZipPath(entry.path);
-    if (path) {
-      entries.push({ entryPath: entry.path, path, isFolder: entry.isDir });
-    }
-  }
-
-  const { rootName, prefix } = resolveArchiveRoot(
-    entries.map((entry) => entry.path),
-    fallbackName,
-  );
-
   const scanned: ScannedWorkspace = {
-    rootName,
     folderPaths: new Set(),
     notes: [],
     media: [],
     skippedFiles: 0,
   };
-
-  for (const entry of entries) {
-    if (!entry.path.startsWith(prefix)) {
-      continue;
-    }
-    const path = entry.path.slice(prefix.length);
-    if (!path) {
-      continue;
-    }
-
-    if (entry.isFolder) {
-      scanned.folderPaths.add(path);
-      continue;
-    }
-
-    const name = path.split('/').pop() ?? path;
-    const file: ScannedFile = {
-      entryPath: entry.entryPath,
-      path,
-      folderPath: getParentPath(path),
-      name,
-    };
-
-    if (JSON_EXTENSION_RE.test(name)) {
-      scanned.notes.push(file);
-      continue;
-    }
-
-    const fileType = getFileTypeForName(name);
-    if (fileType && fileType !== 'mcanvas') {
-      scanned.media.push({ ...file, fileType });
-      continue;
-    }
-
-    scanned.skippedFiles += 1;
-  }
-
+  await scanDirectory(dirPath, [], scanned);
   return scanned;
 }
 
-export async function importWorkspaceJson(
-  options: ImportWorkspaceJsonOptions,
-): Promise<ImportWorkspaceJsonResult> {
-  return options.repository.batchManifestWrites(() =>
-    importWorkspaceJsonBatched(options),
-  );
-}
-
-async function importWorkspaceJsonBatched({
+export async function importWorkspaceJson({
   repository,
   parentId,
-  zipPath,
-  rootName,
+  dirPath,
+  rootName = getPathName(dirPath),
   scanned: preScanned,
   onProgress,
 }: ImportWorkspaceJsonOptions): Promise<ImportWorkspaceJsonResult> {
-  const scanned = preScanned ?? (await scanWorkspaceJson(zipPath));
-  const importName = rootName ?? scanned.rootName;
+  const scanned = preScanned ?? (await scanWorkspaceJson(dirPath));
 
   if (scanned.notes.length === 0 && scanned.media.length === 0) {
-    throw new Error('No JSON notes or media found in the selected ZIP.');
+    throw new Error('No JSON notes or media found in the selected folder.');
   }
 
   let rootFolderId: VFSNodeId | null = null;
@@ -467,7 +370,7 @@ async function importWorkspaceJsonBatched({
   // Fatal setup (creating the destination folders) aborts and rolls back.
   // Per-file failures below are isolated so one bad file can't discard the rest.
   try {
-    rootFolderId = await repository.createFolder(importName, parentId);
+    rootFolderId = await repository.createFolder(rootName, parentId);
     folderIds = await createImportedFolders(
       repository,
       rootFolderId,
@@ -475,7 +378,7 @@ async function importWorkspaceJsonBatched({
     );
   } catch (error) {
     logger.error('Failed to import workspace JSON', error, {
-      zipPath,
+      dirPath,
       rootFolderId,
     });
     if (rootFolderId) {
@@ -490,19 +393,25 @@ async function importWorkspaceJsonBatched({
 
   // Notes import in two passes: create every file first so note-link ids can be
   // remapped to the new nodes (links may point forward), then rebuild content.
-  // Pass 1 only needs each note's name, so it drops the parsed JSON and pass 2
-  // re-reads the entry -- holding every note would keep the element binaries
-  // baked into their JSON in memory for the whole import.
   const prepared: PreparedNote[] = [];
   for (const file of scanned.notes) {
-    const fallbackName = file.name.replace(JSON_EXTENSION_RE, '') || 'Untitled';
+    const fallbackName =
+      file.absolutePath
+        .replace(/\\/g, '/')
+        .split('/')
+        .pop()
+        ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
     try {
+      const note = parseNote(
+        await readTextFile(file.absolutePath),
+        file.absolutePath,
+      );
       prepared.push(
         await createImportedNote({
-          note: await readNote(zipPath, file),
-          file,
+          note,
           repository,
           parentId: getImportParentId(rootFolderId, folderIds, file.folderPath),
+          folderPath: file.folderPath,
           fallbackName,
         }),
       );
@@ -512,7 +421,7 @@ async function importWorkspaceJsonBatched({
       failedFiles += 1;
       onProgress?.({ current: ++current, total, fileName: fallbackName });
       logger.warn('Skipping note that failed to import', {
-        path: file.path,
+        path: file.absolutePath,
         error,
       });
     }
@@ -526,12 +435,7 @@ async function importWorkspaceJsonBatched({
       fileName: preparedNote.baseName,
     });
     try {
-      await rebuildImportedNote(
-        repository,
-        zipPath,
-        preparedNote,
-        resolveNoteId,
-      );
+      await rebuildImportedNote(repository, preparedNote, resolveNoteId);
       notesImported += 1;
     } catch (error) {
       failedFiles += 1;
@@ -549,13 +453,13 @@ async function importWorkspaceJsonBatched({
         file.name,
         file.fileType,
         getImportParentId(rootFolderId, folderIds, file.folderPath),
-        await readZipEntry(zipPath, file.entryPath),
+        await readFile(file.absolutePath),
       );
       mediaImported += 1;
     } catch (error) {
       failedFiles += 1;
       logger.warn('Skipping media that failed to import', {
-        path: file.path,
+        path: file.absolutePath,
         error,
       });
     }

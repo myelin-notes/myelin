@@ -43,7 +43,6 @@ candle-core = "0.10"
 candle-nn = "0.10"
 candle-transformers = "0.10"
 tokenizers = { version = "0.23", default-features = false, features = ["fancy-regex"] }
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [features]
 # Opt-in GPU acceleration via whisper.cpp's Vulkan backend. Kept off by default

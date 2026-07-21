@@ -390,10 +390,6 @@ export class CachedRepository
     });
   }
 
-  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
-    return this.cache.batchManifestWrites(fn);
-  }
-
   async createFolder(name: string, parentId: string | null): Promise<string> {
     return this.writeLocalAndQueue(
       () => this.cache.createFolder(name, parentId),

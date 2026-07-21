@@ -146,15 +146,7 @@ function getCleanupNodeIds(
   return [...topLevelFolderIds, ...rootFileIds];
 }
 
-export async function importGoodnotesZip(
-  options: ImportGoodnotesZipOptions,
-): Promise<GoodnotesZipImportResult> {
-  return options.repository.batchManifestWrites(() =>
-    importGoodnotesZipBatched(options),
-  );
-}
-
-async function importGoodnotesZipBatched({
+export async function importGoodnotesZip({
   file,
   repository,
   parentId,

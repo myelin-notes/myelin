@@ -180,12 +180,6 @@ export interface Repository {
   addCustomColor(color: string): Promise<string[]>;
   removeCustomColor(color: string): Promise<string[]>;
 
-  /**
-   * Runs `fn` with manifest writes coalesced into a single write at the end.
-   * Without this, bulk operations rewrite the whole manifest once per node.
-   */
-  batchManifestWrites<T>(fn: () => Promise<T>): Promise<T>;
-
   getRegistryTags(): Promise<string[]>;
   addRegistryTags(tags: string[]): Promise<string[]>;
   removeRegistryTag(tag: string): Promise<string[]>;

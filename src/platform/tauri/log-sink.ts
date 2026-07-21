@@ -1,14 +1,31 @@
 import {
   BaseDirectory,
   exists,
+  mkdir,
   readTextFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
-import { ensureDirOnce, resetFsCacheForTests } from './fs-cache';
 
 const LOGS_DIR = 'logs';
 const LOG_FILE = `${LOGS_DIR}/app.log`;
 const MAX_FILE_BYTES = 512 * 1024;
+
+let logDirectoryReady = false;
+
+async function ensureLogDirectory(): Promise<void> {
+  if (logDirectoryReady) {
+    return;
+  }
+
+  if (!(await exists(LOGS_DIR, { baseDir: BaseDirectory.AppData }))) {
+    await mkdir(LOGS_DIR, {
+      baseDir: BaseDirectory.AppData,
+      recursive: true,
+    });
+  }
+
+  logDirectoryReady = true;
+}
 
 function trimLogText(text: string, maxBytes: number): string {
   const encoder = new TextEncoder();
@@ -32,7 +49,7 @@ export async function writeLogs(
   lines: string[],
   maxFileBytes: number = MAX_FILE_BYTES,
 ): Promise<void> {
-  await ensureDirOnce(LOGS_DIR);
+  await ensureLogDirectory();
   const existing = (await exists(LOG_FILE, { baseDir: BaseDirectory.AppData }))
     ? await readTextFile(LOG_FILE, { baseDir: BaseDirectory.AppData })
     : '';
@@ -45,5 +62,5 @@ export function getLogFilePath(): string {
 }
 
 export function resetLogSinkForTests(): void {
-  resetFsCacheForTests();
+  logDirectoryReady = false;
 }
