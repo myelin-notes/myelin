@@ -107,12 +107,30 @@ const es: typeof en = {
       button: 'Nuevo',
       folder: 'Nueva carpeta',
       canvas: 'Nuevo lienzo',
-      importFiles: 'Importar archivos',
-      importGoodnotesZip: 'Importar ZIP de Goodnotes',
-      importObsidianVault: 'Importar bóveda de Obsidian',
-      importWorkspaceJson: 'Importar espacio de trabajo JSON',
+      import: 'Importar',
       untitledCanvas: 'Lienzo sin título',
       unnamedFolder: 'Carpeta sin nombre',
+    },
+    importPicker: {
+      title: 'Importar',
+      description: 'Elige qué quieres traer a tu biblioteca.',
+      files: {
+        label: 'Archivos',
+        description: 'Markdown, PDF, imágenes y video desde tu computadora.',
+      },
+      goodnotesZip: {
+        label: 'ZIP de Goodnotes',
+        description: 'Una carpeta de Goodnotes exportada como PDF.',
+      },
+      obsidianVault: {
+        label: 'Bóveda de Obsidian',
+        description:
+          'Una carpeta de bóveda, con sus notas y archivos adjuntos.',
+      },
+      workspaceJson: {
+        label: 'Espacio de trabajo JSON',
+        description: 'Un archivo exportado desde Myelin.',
+      },
     },
     importMarkdown: {
       unsupportedFile: 'Elige un archivo Markdown (.md, .markdown o .mdx).',
@@ -144,8 +162,10 @@ const es: typeof en = {
       title: 'Importar bóveda de Obsidian',
       scanning: 'Escaneando bóveda...',
       jsonTitle: 'Importar espacio de trabajo JSON',
-      jsonScanning: 'Escaneando carpeta...',
-      jsonNoFiles: 'No se encontraron notas JSON ni multimedia en esta carpeta',
+      jsonScanning: 'Leyendo archivo comprimido...',
+      jsonNoFiles:
+        'No se encontraron notas JSON ni multimedia en este archivo comprimido',
+      jsonZipFilter: 'Exportación JSON de Myelin',
       notes: (count: number) => `${count} nota${count === 1 ? '' : 's'}`,
       media: (count: number) =>
         `${count} archivo${count === 1 ? '' : 's'} multimedia`,
@@ -439,7 +459,7 @@ const es: typeof en = {
       exportJson: {
         label: 'Exportar espacio de trabajo como JSON',
         description:
-          'Guarda todo tu espacio de trabajo en una carpeta como JSON. Cada nota se convierte en un archivo JSON que codifica sus trazos, texto y multimedia incrustada (binarios en base64); los demás archivos se copian y se conserva la estructura de carpetas.',
+          'Guarda todo tu espacio de trabajo en un archivo ZIP como JSON. Cada nota se convierte en un archivo JSON que codifica sus trazos, texto y multimedia incrustada (binarios en base64); los demás archivos se copian y se conserva la estructura de carpetas.',
         button: 'Exportar',
         defaultExportName: 'Exportación JSON de Myelin Notes',
         loading: 'Exportando espacio de trabajo como JSON...',

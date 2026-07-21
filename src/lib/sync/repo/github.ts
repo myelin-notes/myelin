@@ -192,7 +192,7 @@ export class GitHubRepository extends BaseRepository {
   }
 
   async exportSnapshot(): Promise<RepositorySnapshot> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     const fileNodes = Object.values(manifest.nodes).filter(
       (node): node is VFSFileNode => node.type === 'file',
     );
@@ -245,7 +245,7 @@ export class GitHubRepository extends BaseRepository {
     nodeId: VFSNodeId,
     fileType?: FileType,
   ): Promise<Pick<VFSFileNode, 'id' | 'fileType'> | null> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     const node = manifest.nodes[nodeId];
     if (node?.type === 'file') {
       return node;

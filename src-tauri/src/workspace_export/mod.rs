@@ -1,8 +1,15 @@
-//! Obsidian vault export: the frontend plans the vault (a folder list plus, per
-//! file, either the markdown body to write or a local source path to copy) and
-//! Rust writes it into the user-picked destination directly with `std::fs`.
-//! This bypasses the fs-plugin scope the same way `pdf_export` does, so the user
-//! can export anywhere they pick without granting broad filesystem write access.
+//! Workspace export: the frontend plans the export (a folder list plus, per
+//! file, either the text body to write or a local source path to copy) and Rust
+//! writes it into the user-picked destination directly with `std::fs`. This
+//! bypasses the fs-plugin scope the same way `pdf_export` does, so the user can
+//! export anywhere they pick without granting broad filesystem write access.
+//!
+//! Two writers share that plan: this module writes an Obsidian vault as a plain
+//! folder tree, and [`zip_archive`] writes the JSON export as a single `.zip`.
+
+// Public so `generate_handler!` can reach the command together with the hidden
+// macro `#[tauri::command]` generates alongside it; a re-export drops the macro.
+pub mod zip_archive;
 
 use std::path::{Path, PathBuf};
 
@@ -37,10 +44,10 @@ pub async fn export_obsidian_vault(request: VaultExportRequest) -> Result<String
         .map_err(|e| format!("export task panicked: {e}"))?
 }
 
-/// Join a '/'-separated relative path onto `root`, rejecting any segment that
-/// would escape the vault (`..`, absolute paths).
-fn safe_join(root: &Path, rel: &str) -> Result<PathBuf, String> {
-    let mut path = root.to_path_buf();
+/// Split a '/'-separated relative path into its meaningful segments, rejecting
+/// any that would escape the export root (`..`, absolute paths).
+fn safe_segments(rel: &str) -> Result<Vec<&str>, String> {
+    let mut segments = Vec::new();
     for segment in rel.split('/') {
         if segment.is_empty() || segment == "." {
             continue;
@@ -48,13 +55,23 @@ fn safe_join(root: &Path, rel: &str) -> Result<PathBuf, String> {
         // The segment must be a single, plain name. Reject `..`, backslashes and
         // colons (Windows drive letters / drive-relative paths), and require the
         // OS to parse it as exactly one Normal component so absolute or
-        // drive-anchored segments cannot reset/escape the vault root.
+        // drive-anchored segments cannot reset/escape the export root.
         let mut components = Path::new(segment).components();
         let is_single_normal = matches!(components.next(), Some(std::path::Component::Normal(_)))
             && components.next().is_none();
         if segment == ".." || segment.contains('\\') || segment.contains(':') || !is_single_normal {
             return Err(format!("unsafe path segment in {rel}"));
         }
+        segments.push(segment);
+    }
+    Ok(segments)
+}
+
+/// Join a '/'-separated relative path onto `root`, rejecting any segment that
+/// would escape the vault (`..`, absolute paths).
+fn safe_join(root: &Path, rel: &str) -> Result<PathBuf, String> {
+    let mut path = root.to_path_buf();
+    for segment in safe_segments(rel)? {
         path.push(segment);
     }
     Ok(path)

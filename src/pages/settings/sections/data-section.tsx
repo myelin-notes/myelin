@@ -7,7 +7,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import {
+  open as openDialog,
+  save as saveDialog,
+} from '@tauri-apps/plugin-dialog';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
@@ -77,8 +80,11 @@ export function DataSection() {
       return;
     }
 
-    const selected = await openDialog({ directory: true, multiple: false });
-    if (!selected || Array.isArray(selected)) {
+    const outPath = await saveDialog({
+      defaultPath: `${dataStrings.exportJson.defaultExportName}.zip`,
+      filters: [{ name: 'Zip', extensions: ['zip'] }],
+    });
+    if (!outPath) {
       return;
     }
 
@@ -87,8 +93,7 @@ export function DataSection() {
     try {
       const result = await exportWorkspaceJson({
         repository,
-        destDir: selected,
-        exportName: dataStrings.exportJson.defaultExportName,
+        outPath,
         onProgress: ({ current, total }) => {
           toast.loading(dataStrings.exportJson.progress(current, total), {
             id: toastId,

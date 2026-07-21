@@ -10,19 +10,21 @@ import {
 } from './workspace-json';
 
 export function createWorkspaceJsonImportSource({
-  dirPath,
+  zipPath,
   repository,
   parentId,
   strings,
 }: {
-  dirPath: string;
+  zipPath: string;
   repository: Repository;
   parentId: string | null;
   strings: Messages;
 }): ImportSource {
   let scanned: ScannedWorkspace | null = null;
   let conflictNodeId: string | null = null;
-  const rootName = getPathName(dirPath);
+  // The archive names its own root folder; the file name is only a fallback,
+  // so this is not final until scan() has read the zip.
+  let rootName = getPathName(zipPath);
   const dialogStrings = strings.library.importDialog;
 
   return {
@@ -31,7 +33,8 @@ export function createWorkspaceJsonImportSource({
     emptyLabel: dialogStrings.jsonNoFiles,
 
     async scan() {
-      scanned = await scanWorkspaceJson(dirPath);
+      scanned = await scanWorkspaceJson(zipPath);
+      rootName = scanned.rootName;
 
       const [folders] = await repository.listDirectory(parentId);
       const conflictFolder = folders.find(
@@ -76,7 +79,7 @@ export function createWorkspaceJsonImportSource({
       const result = await importWorkspaceJson({
         repository,
         parentId,
-        dirPath,
+        zipPath,
         rootName: resolvedName,
         scanned,
         onProgress,

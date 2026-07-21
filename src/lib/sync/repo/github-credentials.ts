@@ -1,4 +1,4 @@
-import { appDataDir, join } from '@tauri-apps/api/path';
+import { join } from '@tauri-apps/api/path';
 import { remove } from '@tauri-apps/plugin-fs';
 import { fetch } from '@tauri-apps/plugin-http';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -10,6 +10,7 @@ import {
 import { GITHUB_CLIENT_ID } from '@/lib/env';
 import { Logger } from '@/lib/logger';
 import { UserPrefs } from '@/lib/user-prefs';
+import { getAppDataDir } from '@/platform/tauri/fs-cache';
 
 const logger = new Logger('GitHubCredentials');
 
@@ -102,7 +103,10 @@ async function createGitHubStrongholdStore(): Promise<{
   stronghold: Stronghold;
   store: StrongholdStore;
 }> {
-  const vaultPath = await join(await appDataDir(), GITHUB_STRONGHOLD_FILENAME);
+  const vaultPath = await join(
+    await getAppDataDir(),
+    GITHUB_STRONGHOLD_FILENAME,
+  );
   const stronghold = await loadGitHubStronghold(
     vaultPath,
     getGitHubVaultPassword(),

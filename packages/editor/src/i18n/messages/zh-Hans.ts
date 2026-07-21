@@ -106,12 +106,29 @@ const zhHans: typeof en = {
       button: '新建',
       folder: '新建文件夹',
       canvas: '新建画布',
-      importFiles: '导入文件',
-      importGoodnotesZip: '导入 Goodnotes ZIP',
-      importObsidianVault: '导入 Obsidian 仓库',
-      importWorkspaceJson: '导入工作区 JSON',
+      import: '导入',
       untitledCanvas: '未命名画布',
       unnamedFolder: '未命名文件夹',
+    },
+    importPicker: {
+      title: '导入',
+      description: '选择要导入到库中的内容。',
+      files: {
+        label: '文件',
+        description: '来自电脑的 Markdown、PDF、图片和视频。',
+      },
+      goodnotesZip: {
+        label: 'Goodnotes ZIP',
+        description: '以 PDF 形式导出的 Goodnotes 文件夹。',
+      },
+      obsidianVault: {
+        label: 'Obsidian 仓库',
+        description: '仓库文件夹，包含其笔记和附件。',
+      },
+      workspaceJson: {
+        label: '工作区 JSON',
+        description: '从 Myelin 导出的归档文件。',
+      },
     },
     importMarkdown: {
       unsupportedFile: '请选择 Markdown 文件（.md、.markdown 或 .mdx）',
@@ -141,8 +158,9 @@ const zhHans: typeof en = {
       title: '导入 Obsidian 仓库',
       scanning: '正在扫描仓库…',
       jsonTitle: '导入工作区 JSON',
-      jsonScanning: '正在扫描文件夹…',
-      jsonNoFiles: '此文件夹中未找到 JSON 笔记或媒体文件',
+      jsonScanning: '正在读取压缩包…',
+      jsonNoFiles: '此压缩包中未找到 JSON 笔记或媒体文件',
+      jsonZipFilter: 'Myelin JSON 导出',
       notes: (count: number) => `${count} 个笔记`,
       media: (count: number) => `${count} 个媒体文件`,
       skippedFiles: (count: number) => `将跳过 ${count} 个不受支持的文件`,
@@ -424,7 +442,7 @@ const zhHans: typeof en = {
       exportJson: {
         label: '将工作区导出为 JSON',
         description:
-          '将整个工作区保存到文件夹中，格式为 JSON。每个笔记会编码为一个 JSON 文件，包含其笔迹、文本和嵌入的媒体（二进制以 base64 编码）；其他文件会被复制，并保留文件夹结构。',
+          '将整个工作区保存为 JSON 格式的 ZIP 压缩包。每个笔记会编码为一个 JSON 文件，包含其笔迹、文本和嵌入的媒体（二进制以 base64 编码）；其他文件会被复制，并保留文件夹结构。',
         button: '导出',
         defaultExportName: 'Myelin Notes JSON 导出',
         loading: '正在将工作区导出为 JSON…',

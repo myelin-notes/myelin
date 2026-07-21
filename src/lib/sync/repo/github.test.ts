@@ -112,6 +112,130 @@ describe('GitHubRepository', () => {
     expect(manifest?.nodes[folderId]?.name).toBe('Retry folder');
   });
 
+  it('persists every batched manifest mutation in one write', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    await repository.initialize();
+    const putsBeforeBatch = githubApi.putCallCount;
+
+    const [folderA, folderB] = await repository.batchManifestWrites(
+      async () => [
+        await repository.createFolder('A', null),
+        await repository.createFolder('B', null),
+      ],
+    );
+
+    const manifest = githubApi.readJson<{
+      nodes: Record<string, { name: string }>;
+    }>(MANIFEST_PATH);
+
+    expect(manifest?.nodes[folderA]?.name).toBe('A');
+    expect(manifest?.nodes[folderB]?.name).toBe('B');
+    expect(githubApi.putCallCount - putsBeforeBatch).toBe(1);
+  });
+
+  it('replays a batch onto the winning manifest after a flush conflict', async () => {
+    const repository = createRepository();
+    const other = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    await repository.initialize();
+
+    let concurrentId = '';
+    const [folderA, folderB] = await repository.batchManifestWrites(
+      async () => {
+        const a = await repository.createFolder('A', null);
+        // Another client wins the race while this batch is still open, so the
+        // flush writes against a stale sha.
+        concurrentId = await other.createFolder('Concurrent', null);
+        return [a, await repository.createFolder('B', null)];
+      },
+    );
+
+    const manifest = githubApi.readJson<{
+      children: string[];
+      nodes: Record<string, { name: string }>;
+    }>(MANIFEST_PATH);
+
+    expect(manifest?.nodes[folderA]?.name).toBe('A');
+    expect(manifest?.nodes[folderB]?.name).toBe('B');
+    expect(manifest?.nodes[concurrentId]?.name).toBe('Concurrent');
+    expect(manifest?.children).toEqual([concurrentId, folderA, folderB]);
+  });
+
+  it('discards bytes for files a replayed delete sweeps up', async () => {
+    const repository = createRepository();
+    const other = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const folderId = await repository.createFolder('Doomed', null);
+
+    let concurrentFileId = '';
+    await repository.batchManifestWrites(async () => {
+      // Deleted while the folder is still empty as far as this batch knows.
+      await repository.deleteNode(folderId);
+      // Another client adds a file inside it and wins the race, so the flush
+      // conflicts and the replayed delete removes a node this batch never saw.
+      concurrentFileId = await other.createFile(
+        'Inside.mp4',
+        'mp4',
+        folderId,
+        new Uint8Array([4, 5, 6]),
+      );
+    });
+
+    const manifest = githubApi.readJson<{
+      nodes: Record<string, unknown>;
+    }>(MANIFEST_PATH);
+
+    expect(manifest?.nodes[folderId]).toBeUndefined();
+    expect(manifest?.nodes[concurrentFileId]).toBeUndefined();
+    expect(
+      githubApi.readBytes(
+        getStoredFilePath({ id: concurrentFileId, fileType: 'mp4' }),
+      ),
+    ).toBeNull();
+  });
+
+  it('keeps deleted file bytes when the batched manifest flush fails', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+
+    const fileId = await repository.createFile(
+      'Doomed.mp4',
+      'mp4',
+      null,
+      new Uint8Array([1, 2, 3]),
+    );
+    const storedPath = getStoredFilePath({ id: fileId, fileType: 'mp4' });
+
+    // Not a conflict, so the flush throws instead of retrying and the manifest
+    // still lists the file. Its bytes must survive with it.
+    githubApi.failNextPut(MANIFEST_PATH, 500);
+    await expect(
+      repository.batchManifestWrites(() => repository.deleteNode(fileId)),
+    ).rejects.toThrow();
+
+    const manifest = githubApi.readJson<{
+      nodes: Record<string, unknown>;
+    }>(MANIFEST_PATH);
+
+    expect(manifest?.nodes[fileId]).toBeDefined();
+    expect(githubApi.readBytes(storedPath)).not.toBeNull();
+  });
+
+  it('reads batched manifest mutations back inside the batch', async () => {
+    const repository = createRepository();
+
+    const [folderId, chain] = await repository.batchManifestWrites(async () => {
+      const id = await repository.createFolder('Batched', null);
+      return [id, await repository.getFolderChain(id)] as const;
+    });
+
+    expect(chain.map((folder) => folder.id)).toEqual([folderId]);
+  });
+
   it('exports a snapshot via a single tarball fetch', async () => {
     const repository = createRepository();
     const githubApi = getRepositoryTestGitHubApi();
