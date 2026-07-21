@@ -105,12 +105,29 @@ const en = {
       button: 'New',
       folder: 'New Folder',
       canvas: 'New Canvas',
-      importFiles: 'Import Files',
-      importGoodnotesZip: 'Import Goodnotes ZIP',
-      importObsidianVault: 'Import Obsidian Vault',
-      importWorkspaceJson: 'Import Workspace JSON',
+      import: 'Import',
       untitledCanvas: 'Untitled Canvas',
       unnamedFolder: 'Unnamed Folder',
+    },
+    importPicker: {
+      title: 'Import',
+      description: 'Choose what you want to bring into your library.',
+      files: {
+        label: 'Files',
+        description: 'Markdown, PDFs, images, and video from your computer.',
+      },
+      goodnotesZip: {
+        label: 'Goodnotes ZIP',
+        description: 'A Goodnotes folder exported as PDFs.',
+      },
+      obsidianVault: {
+        label: 'Obsidian Vault',
+        description: 'A vault folder, with its notes and attachments.',
+      },
+      workspaceJson: {
+        label: 'Workspace JSON',
+        description: 'A folder exported from Myelin.',
+      },
     },
     importMarkdown: {
       unsupportedFile: 'Choose a Markdown file (.md, .markdown, or .mdx).',
