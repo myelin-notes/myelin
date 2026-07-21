@@ -1,10 +1,12 @@
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ImageElement } from '@myelin/editor/elements/image-element';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import { PdfElement } from '@myelin/editor/elements/pdf-element';
 import { ShapeElement } from '@myelin/editor/elements/shape-element';
 import { StrokeElement } from '@myelin/editor/elements/stroke-element';
 import { TextElement } from '@myelin/editor/elements/text/element';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
+import { getPdfPageSizes } from '@myelin/editor/pdf-renderer';
 import { writeMarkdownToPageFrameFragment } from '@myelin/editor/page-frame/markdown/import';
 import { copy } from '@/content/site';
 
@@ -386,6 +388,25 @@ async function addPage(
   return pf;
 }
 
+async function addPdf(
+  canvas: DrawableCanvas,
+  x: number,
+  y: number,
+  url: string,
+  width: number,
+): Promise<PdfElement> {
+  const res = await fetch(url);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const pageSizes = await getPdfPageSizes(bytes);
+  const pdf = canvas.addElement((uuid) => new PdfElement(uuid));
+  pdf.setInitialPdfData(bytes, url.replace(/^\//, ''), pageSizes);
+  const scale = width / pdf.totalWidth;
+  pdf.setScale(scale, scale);
+  pdf.setOffset(x, y);
+  pdf.updateBounds();
+  return pdf;
+}
+
 async function addImage(
   canvas: DrawableCanvas,
   x: number,
@@ -433,10 +454,15 @@ async function buildHero(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   );
 }
 
-/** Where the PDF mock's top-left corner sits (DOM underlay, world-layer.tsx). */
-export const INK_PDF_MOCK = { dx: 1380, dy: 160 } as const;
+/**
+ * The real PDF on the ink scene: a page of Einstein's 1905 energy-content
+ * paper (public domain, `public/einstein-1905.pdf`), rendered by the engine's
+ * own PdfElement rather than faked in DOM. `dx`/`dy` place its top-left corner
+ * within the scene; the chrome header sits just above `dy`.
+ */
+const INK_PDF = { dx: 1420, dy: 160, width: 700 } as const;
 
-function buildInk(canvas: DrawableCanvas, r: WorldRect): void {
+async function buildInk(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
   // Left half: the PDF story, with the shape-recognition demo as a playful
@@ -458,22 +484,25 @@ function buildInk(canvas: DrawableCanvas, r: WorldRect): void {
   hand(canvas, sx + 460, y + 880, copy.ink.recognized, GREEN, 36, 220);
   drawCheck(canvas, sx + 630, y + 890, 1.2);
 
-  // Right half: the mock PDF page (DOM underlay at INK_PDF_MOCK, see
-  // scene-overlays.tsx), centered vertically. The annotation offsets below
-  // track the mock's skeleton bars, so the circle rings the equation and the
-  // highlight and underline ride their own sentences.
-  const px = r.x + INK_PDF_MOCK.dx;
-  const py = r.y + INK_PDF_MOCK.dy;
-  addStroke(canvas, sketchEllipse(px + 390, py + 314, 200, 62, 2.2), PINK, 6);
+  // Right half: the real PDF. The annotation offsets below are measured from
+  // the page's own text, which sits on a 595x842pt A4 page scaled to
+  // INK_PDF.width, so 1pt is INK_PDF.width / 595.276 world units. The circle
+  // rings the display equation, and the highlight and underline ride the
+  // sentences above and below it.
+  const px = r.x + INK_PDF.dx;
+  const py = r.y + INK_PDF.dy;
+  await addPdf(canvas, px, py, '/einstein-1905.pdf', INK_PDF.width);
+
+  addStroke(canvas, sketchEllipse(px + 358, py + 608, 78, 42, 2.2), PINK, 6);
   addStroke(
     canvas,
-    wobblyLine([px + 66, py + 482], [px + 560, py + 478], 4, 0.9),
+    wobblyLine([px + 160, py + 641], [px + 348, py + 638], 3, 0.9),
     HIGHLIGHT,
-    40,
+    18,
   );
-  drawUnderline(canvas, px + 64, py + 634, 380, BLUE, 5);
-  hand(canvas, px + 470, py + 690, copy.ink.pdfAnnotation, BLUE, 34, 320);
-  drawArrow(canvas, [px + 520, py + 672], [px + 430, py + 508], BLUE, 4);
+  drawUnderline(canvas, px + 158, py + 760, 277, BLUE, 4);
+  hand(canvas, px + 180, py + 838, copy.ink.pdfAnnotation, BLUE, 34, 320);
+  drawArrow(canvas, [px + 330, py + 822], [px + 372, py + 776], BLUE, 4);
 }
 
 async function buildPages(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
@@ -719,11 +748,11 @@ async function buildDownload(
 export async function populateScenes(canvas: DrawableCanvas): Promise<void> {
   ensureDisplayFont(HAND_FONT);
   const rect = (id: string) => sceneById(id).rect;
-  buildInk(canvas, rect('ink'));
   buildAudioSearch(canvas, rect('audio-search'));
   buildLocalFirst(canvas, rect('local-first'));
   buildSync(canvas, rect('sync'));
   buildSupporter(canvas, rect('supporter'));
+  await buildInk(canvas, rect('ink'));
   await buildHero(canvas, rect('hero'));
   await buildLinked(canvas, rect('linked'));
   await buildPages(canvas, rect('pages'));

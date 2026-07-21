@@ -1,11 +1,10 @@
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { copy, siteLinks } from '@/content/site';
-import { COLLAB_CURSORS, INK_PDF_MOCK, SCENE_PAD, sceneById } from './scenes';
+import { COLLAB_CURSORS, SCENE_PAD, sceneById } from './scenes';
 import {
   AudioCardMock,
   LiveCursor,
-  PdfPageMock,
   SearchPaletteMock,
   WorldLayer,
 } from './world-layer';
@@ -120,13 +119,11 @@ function WorldButton({
  * the background grid canvas and the foreground element canvas.
  */
 export function SceneUnderlay({ canvas }: { canvas: DrawableCanvas }) {
-  const ink = sceneById('ink').rect;
   const audio = sceneById('audio-search').rect;
   const sync = sceneById('sync').rect;
 
   return (
     <WorldLayer canvas={canvas} zIndex={1}>
-      <PdfPageMock x={ink.x + INK_PDF_MOCK.dx} y={ink.y + INK_PDF_MOCK.dy} />
       <AudioCardMock x={audio.x + SCENE_PAD} y={audio.y + 470} />
       <SearchPaletteMock x={audio.x + 970} y={audio.y + 470} />
       <LiveCursor
