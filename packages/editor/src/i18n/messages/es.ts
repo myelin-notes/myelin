@@ -458,6 +458,11 @@ const es: typeof en = {
         description:
           'Envía análisis de producto e informes de errores anónimos para ayudar a mejorar Myelin Notes. Cuando está desactivado, no se envía nada.',
       },
+      policy: {
+        label: 'Política de privacidad',
+        description:
+          'Qué sale de tu dispositivo, quién lo recibe y cuánto tiempo se conserva. Abre trymyelin.app en tu navegador.',
+      },
     },
     mcp: {
       title: 'Model Context Protocol',

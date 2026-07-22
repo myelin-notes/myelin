@@ -453,6 +453,11 @@ const en = {
         description:
           'Send anonymous product analytics and error reports to help improve Myelin Notes. When off, nothing is sent.',
       },
+      policy: {
+        label: 'Privacy policy',
+        description:
+          'What leaves your device, who receives it, and how long it is kept. Opens trymyelin.app in your browser.',
+      },
     },
     mcp: {
       title: 'Model Context Protocol',

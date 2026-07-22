@@ -231,6 +231,7 @@ Myelin Notes is native on all three, with the same notes, the same canvas, and t
     privacyNote:
       'Telemetry: crash reports and a few product events only, and you can disable all of it in settings.',
     links: [
+      { label: 'Privacy', href: '/privacy' },
       { label: 'GitHub', href: siteLinks.github },
       { label: 'Roadmap', href: siteLinks.roadmap },
       { label: 'Discord', href: siteLinks.discord },
