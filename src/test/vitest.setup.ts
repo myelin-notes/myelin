@@ -1,6 +1,7 @@
 import { beforeEach, vi } from 'vitest';
 import { createFakePlatform } from '@myelin/editor/test/fake-platform';
 import { setPlatform } from '@/platform';
+import { resetFsCacheForTests } from '@/platform/tauri/fs-cache';
 
 // The `node` test environment has no DOMRect. Provide a minimal stand-in so
 // canvas elements that compute geometry (localBoundingBox / boundingBox) can be
@@ -68,6 +69,12 @@ Object.defineProperty(globalThis, 'localStorage', {
 
 beforeEach(() => {
   memoryLocalStorage.clear();
+  // Tests swap in a fresh in-memory filesystem, so cached mkdir promises from a
+  // previous test would wrongly suppress directory creation. This lives here
+  // rather than in resetRepositoryTestDoubles() because repository-test-utils
+  // provides the `@tauri-apps/plugin-fs` mock, and importing fs-cache (which
+  // imports that plugin) from it deadlocks vitest's module resolution.
+  resetFsCacheForTests();
   // A fresh fake platform per test; tests exercising a platform seam install
   // their own via setPlatform(createFakePlatform({ ... })).
   setPlatform(createFakePlatform());
