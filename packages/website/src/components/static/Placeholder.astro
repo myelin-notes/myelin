@@ -1,0 +1,21 @@
+---
+// Stands in for something the canvas renders for real (a PDF, a page frame, an
+// audio card, a search palette). The static page deliberately does not try to
+// imitate them: a labelled frame is honest and costs no bytes, where a fake
+// screenshot would be both heavier and misleading.
+interface Props {
+  label: string;
+  class?: string;
+}
+
+const { label, class: className = 'h-64' } = Astro.props;
+---
+
+<div
+  class:list={[
+    'flex items-center justify-center rounded-2xl border border-dashed border-border-divider bg-surface px-6 text-center text-sm text-text-muted',
+    className,
+  ]}
+>
+  {label}
+</div>

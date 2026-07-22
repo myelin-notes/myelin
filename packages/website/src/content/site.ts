@@ -234,3 +234,17 @@ A stylus works on desktop today through pen input. The iPad app is on the roadma
     download: 'Download Myelin',
   },
 };
+
+/**
+ * `download.faqMarkdown` as question/answer pairs. The canvas renders that
+ * string as a page frame; the static page needs headings and paragraphs, and
+ * the page needs it a third time as FAQ structured data. One source, three
+ * renderings, so they cannot drift.
+ */
+export const faqs = copy.download.faqMarkdown
+  .split('\n## ')
+  .slice(1)
+  .map((block) => {
+    const [question, ...answer] = block.split('\n');
+    return { question: question.trim(), answer: answer.join(' ').trim() };
+  });

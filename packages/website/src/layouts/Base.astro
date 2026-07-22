@@ -41,6 +41,15 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       crossorigin
     />
     <title>{title}</title>
+    <!-- Marks environments the canvas will run in, before the body is parsed,
+         so the static page is hidden without ever painting a frame of it.
+         `is:inline` is required: a processed script is deferred and would run
+         after the first paint, which is the flash this exists to prevent. -->
+    <script is:inline>
+      if (matchMedia('(pointer: fine)').matches && innerWidth >= 1024) {
+        document.documentElement.classList.add('canvas-env');
+      }
+    </script>
     <Seo
       title={title}
       description={description}

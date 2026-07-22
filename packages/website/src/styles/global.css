@@ -54,6 +54,20 @@ body {
   height: 100%;
 }
 
+/* The canvas is a fixed, full-viewport surface, so it pins the page height.
+   The static fallback scrolls instead and needs to grow past the viewport. */
+html:not(.canvas-env),
+html:not(.canvas-env) body {
+  height: auto;
+  min-height: 100%;
+}
+
+/* Set by the gate in Base.astro before first paint: exactly one of the two
+   renderings is ever shown, so there is no swap and nothing flashes. */
+.canvas-env .static-site {
+  display: none;
+}
+
 html {
   background: var(--bg-page);
   color: var(--text-primary);
