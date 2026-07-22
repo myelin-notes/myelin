@@ -49,7 +49,15 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     />
     <script>
       import { initWebAnalytics } from '../lib/posthog';
-      initWebAnalytics();
+
+      // Hold analytics until the main thread is free, so PostHog neither
+      // downloads nor executes while the canvas bundle is still landing. The
+      // timeout is the backstop for a page that never goes idle.
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => void initWebAnalytics(), { timeout: 5000 });
+      } else {
+        setTimeout(() => void initWebAnalytics(), 2000);
+      }
     </script>
   </head>
   <body>
