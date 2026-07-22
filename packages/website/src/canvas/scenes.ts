@@ -723,10 +723,12 @@ async function buildDownload(
     color: MUTED,
     width: 800,
   });
-  // Download buttons + iPad badge + footer links are DOM overlays; the canvas
-  // leaves the band from y+260 to y+700 for them.
-  hand(canvas, x + 640, y + 290, 'auto-updates\nincluded', GREEN, 36, 300);
-  drawArrow(canvas, [x + 620, y + 350], [x + 500, y + 330], GREEN, 4);
+  // Download buttons + mobile note + footer links are DOM overlays; the canvas
+  // leaves the band from y+280 to y+700 for them. The arrow lands just off the
+  // primary button's right edge, which is why that button is laid out at a
+  // fixed world width rather than sized by its text (see scene-overlays.tsx).
+  hand(canvas, x + 680, y + 285, 'auto-updates\nincluded', GREEN, 36, 300);
+  drawArrow(canvas, [x + 665, y + 340], [x + 545, y + 345], GREEN, 4);
 
   await addPage(
     canvas,

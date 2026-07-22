@@ -1,6 +1,6 @@
 import { type CSSProperties, type ReactNode, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
-import { copy, siteLinks } from '@/content/site';
+import { copy, type PlatformKey, siteLinks } from '@/content/site';
 import { COLLAB_CURSORS, SCENE_PAD, sceneById } from './scenes';
 import {
   AudioCardMock,
@@ -9,24 +9,31 @@ import {
   WorldLayer,
 } from './world-layer';
 
-type OS = 'mac' | 'windows' | 'linux';
-
-function detectOS(): OS {
+/**
+ * Best guess at the visitor's platform, so the primary download button offers
+ * the build they can actually run. Order is load-bearing: Android reports
+ * itself as "Linux; Android", and iPadOS 13+ sends a desktop Macintosh user
+ * agent, which touch points are the only reliable tell for.
+ */
+function detectPlatform(): PlatformKey {
   const ua = navigator.userAgent;
-  if (/Mac|iPhone|iPad/i.test(ua)) {
-    return 'mac';
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    return 'ios';
   }
-  if (/Linux/i.test(ua) && !/Android/i.test(ua)) {
+  if (/Android/i.test(ua)) {
+    return 'android';
+  }
+  if (/Mac/i.test(ua)) {
+    return navigator.maxTouchPoints > 1 ? 'ios' : 'mac';
+  }
+  if (/Linux/i.test(ua)) {
     return 'linux';
   }
   return 'windows';
 }
 
-const OS_LABELS: Record<OS, string> = {
-  mac: 'Download for macOS',
-  windows: 'Download for Windows',
-  linux: 'Download for Linux',
-};
+/** Matches the muted body ink the canvas draws in the same scenes. */
+const MUTED = '#59646b';
 
 interface ButtonProps {
   x?: number;
@@ -37,6 +44,12 @@ interface ButtonProps {
   size?: number;
   children: ReactNode;
   sub?: string;
+  /**
+   * Fixed world width, with the label centred inside it. Set this when canvas
+   * ink has to meet the button: text widths depend on the loaded font, so an
+   * arrow can only be aimed at an edge the layout pins down.
+   */
+  width?: number;
 }
 
 /**
@@ -52,6 +65,7 @@ function WorldButton({
   size = 26,
   children,
   sub,
+  width,
 }: ButtonProps) {
   const style: CSSProperties = {
     fontSize: size,
@@ -59,6 +73,7 @@ function WorldButton({
     padding: `${size * 0.65}px ${size * 1.3}px`,
     // Matches the app button's radius-to-text ratio (rounded-xl on text-sm).
     borderRadius: size * 0.8,
+    ...(width != null ? { width } : {}),
     ...(x != null && y != null
       ? { position: 'absolute', left: x, top: y }
       : {}),
@@ -86,7 +101,9 @@ function WorldButton({
       : 'hover:bg-hover-tint',
   ].join(' ');
   const inner = (
-    <span className="flex flex-col items-start">
+    <span
+      className={`flex flex-col ${width == null ? 'items-start' : 'items-center'}`}
+    >
       <span className="font-medium">{children}</span>
       {sub && (
         <span style={{ fontSize: size * 0.65, opacity: 0.7 }}>{sub}</span>
@@ -153,11 +170,16 @@ interface SceneOverlayProps {
  * layout constants in `scenes.ts` (same SCENE_PAD inset).
  */
 export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
-  const [os] = useState<OS>(detectOS);
+  const [platformKey] = useState<PlatformKey>(detectPlatform);
 
   const hero = sceneById('hero').rect;
   const supporter = sceneById('supporter').rect;
   const download = sceneById('download').rect;
+
+  const platforms = copy.download.platforms;
+  // Every PlatformKey has an entry, so the fallback is only for the type.
+  const primary = platforms.find((p) => p.key === platformKey) ?? platforms[0];
+  const others = platforms.filter((p) => p !== primary);
 
   return (
     <WorldLayer canvas={canvas} zIndex={30}>
@@ -171,7 +193,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
         }}
       >
         <WorldButton href={siteLinks.releases} size={30}>
-          {OS_LABELS[os]}
+          {primary.label}
         </WorldButton>
         <WorldButton variant="outline" size={30} onClick={onSeeItInAction}>
           {copy.hero.ctaSecondary} ↓
@@ -195,38 +217,45 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
         </WorldButton>
       </div>
 
-      {/* Download buttons, one per platform, detected OS first. */}
+      {/* Downloads: one big button for the detected OS, the rest as a quiet
+          row underneath. Every platform ships from the same releases page, so
+          five equal-weight buttons only stacked "Download for" five times. */}
       <div
         className="absolute flex flex-col items-start"
         style={{
           left: download.x + SCENE_PAD,
           top: download.y + SCENE_PAD + 280,
-          gap: 22,
         }}
       >
-        {[...copy.download.platforms]
-          .sort((a, b) => (a.key === os ? -1 : b.key === os ? 1 : 0))
-          .map((platform, i) => (
+        <WorldButton
+          href={siteLinks.releases}
+          size={36}
+          width={520}
+          sub={primary.sub}
+        >
+          {primary.label}
+        </WorldButton>
+
+        <span style={{ fontSize: 22, color: MUTED, marginTop: 64 }}>
+          {copy.download.otherPlatforms}
+        </span>
+        <div className="flex" style={{ gap: 20, marginTop: 20 }}>
+          {others.map((platform) => (
             <WorldButton
               key={platform.key}
               href={siteLinks.releases}
-              variant={i === 0 ? 'primary' : 'outline'}
-              size={28}
+              variant="outline"
+              size={26}
               sub={platform.sub}
             >
-              {platform.label}
+              {platform.name}
             </WorldButton>
           ))}
-        <span
-          className="rounded-full"
-          style={{
-            fontSize: 20,
-            padding: '8px 20px',
-            background: 'rgba(249, 115, 22, 0.12)',
-            color: '#c2570b',
-            border: '1px solid rgba(249, 115, 22, 0.4)',
-          }}
-        >
+        </div>
+
+        {/* Kept close to the row it qualifies: it is a caption for the iOS and
+            Android chips, not a standalone claim. */}
+        <span style={{ fontSize: 21, color: MUTED, marginTop: 36 }}>
           {copy.download.mobileBadge}
         </span>
       </div>

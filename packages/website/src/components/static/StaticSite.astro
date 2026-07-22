@@ -243,14 +243,23 @@ const ctaOutline = cn(
         {copy.download.heading}
       </h2>
       <p class="mt-7 max-w-2xl text-text-on-dark/75">{copy.download.body}</p>
-      <div class="mt-12 flex flex-wrap gap-3">
+      {/* One call to action, then the platforms as detail. This page is
+          prerendered, so it cannot know the visitor's OS the way the canvas
+          overlay does, and every build ships from the same releases page. */}
+      <a
+        href={siteLinks.releases}
+        class="mt-12 inline-flex h-12 items-center rounded-2xl bg-white px-7 text-sm font-semibold text-text-primary transition-colors hover:bg-white/85"
+      >
+        {copy.download.cta}
+      </a>
+      <div class="mt-8 flex flex-wrap gap-3">
         {
           copy.download.platforms.map((platform) => (
             <a
               href={siteLinks.releases}
-              class="rounded-xl bg-white/10 px-5 py-2.5 text-sm font-medium text-text-on-dark transition-colors hover:bg-white/20"
+              class="rounded-xl bg-white/10 px-5 py-2.5 text-sm text-text-on-dark transition-colors hover:bg-white/20"
             >
-              {platform.label}
+              <span class="font-medium">{platform.name}</span>
               <span class="ml-2 opacity-60">{platform.sub}</span>
             </a>
           ))

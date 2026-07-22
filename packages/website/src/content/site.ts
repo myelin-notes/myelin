@@ -18,6 +18,19 @@ export const siteLinks = {
   kofi: 'https://ko-fi.com/wintersteve25',
 };
 
+/** Every platform Myelin ships a native build for. */
+export type PlatformKey = 'mac' | 'windows' | 'linux' | 'ios' | 'android';
+
+export interface Platform {
+  key: PlatformKey;
+  /** Bare platform, for lists where repeating "Download for" would grate. */
+  name: string;
+  /** Full call to action, for wherever a platform stands on its own. */
+  label: string;
+  /** Minimum version or artifact kind. */
+  sub: string;
+}
+
 /**
  * All copy for the scrollytelling canvas, one entry per scene. Layout
  * (world coordinates) lives in `src/canvas/scenes.ts`; this file owns only the
@@ -181,17 +194,40 @@ for step in range(3):
   download: {
     heading: 'Take your notes home.',
     body: 'Native builds for Mac, Windows, Linux, iOS, and Android, with auto-updates built in. English, Spanish, and Simplified Chinese today.',
+    cta: 'Download Myelin Notes',
     platforms: [
-      { key: 'mac', label: 'Download for macOS', sub: 'macOS 10.15+' },
-      { key: 'windows', label: 'Download for Windows', sub: 'Windows 10+' },
-      { key: 'linux', label: 'Download for Linux', sub: 'AppImage' },
-      { key: 'ios', label: 'Download for iOS', sub: 'iPhone and iPad' },
+      {
+        key: 'mac',
+        name: 'macOS',
+        label: 'Download for macOS',
+        sub: 'macOS 10.15+',
+      },
+      {
+        key: 'windows',
+        name: 'Windows',
+        label: 'Download for Windows',
+        sub: 'Windows 10+',
+      },
+      {
+        key: 'linux',
+        name: 'Linux',
+        label: 'Download for Linux',
+        sub: 'AppImage',
+      },
+      {
+        key: 'ios',
+        name: 'iOS',
+        label: 'Download for iOS',
+        sub: 'iPhone and iPad',
+      },
       {
         key: 'android',
+        name: 'Android',
         label: 'Download for Android',
         sub: 'Phone and tablet',
       },
-    ],
+    ] satisfies Platform[],
+    otherPlatforms: 'Also available for',
     mobileBadge: 'Same notes on your phone and tablet, not a cut-down viewer',
     faqTitle: 'FAQ',
     faqMarkdown: `# FAQ
