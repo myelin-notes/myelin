@@ -124,26 +124,6 @@ export class LocalRepository extends BaseRepository {
     });
   }
 
-  protected async onFileCreated(nodeId: VFSNodeId): Promise<void> {
-    const { manifest } = await this.loadManifestImpl();
-    const node = manifest.nodes[nodeId];
-    if (!node || node.type !== 'file') {
-      return;
-    }
-
-    await this.ensureDirs();
-    const filePath = await this.resolveStoragePath(
-      FILES_DIR,
-      getStoredFileName(node),
-    );
-    const file = await open(filePath, {
-      write: true,
-      create: true,
-      baseDir: BaseDirectory.AppData,
-    });
-    await file.close();
-  }
-
   protected async loadManifestImpl(): Promise<{
     manifest: VFSManifest;
     revision: string | null;
