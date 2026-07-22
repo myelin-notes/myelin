@@ -460,10 +460,12 @@ async function buildHero(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
  * own PdfElement rather than faked in DOM. `dx`/`dy` place its top-left corner
  * within the scene; the chrome header sits just above `dy`.
  */
-const INK_PDF = { dx: 1420, dy: 160, width: 700 } as const;
+const INK_PDF = { dx: 1270, dy: 130, width: 760 } as const;
 
 async function buildInk(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
-  const x = r.x + SCENE_PAD;
+  // Pull the left column in from the scene edge so it and the PDF sit closer to
+  // the middle rather than hugging opposite sides.
+  const x = r.x + SCENE_PAD + 130;
   const y = r.y + SCENE_PAD;
   // Left half: the PDF story, with the shape-recognition demo as a playful
   // aside underneath.
@@ -485,24 +487,26 @@ async function buildInk(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   drawCheck(canvas, sx + 630, y + 890, 1.2);
 
   // Right half: the real PDF. The annotation offsets below are measured from
-  // the page's own text, which sits on a 595x842pt A4 page scaled to
-  // INK_PDF.width, so 1pt is INK_PDF.width / 595.276 world units. The circle
-  // rings the display equation, and the highlight and underline ride the
-  // sentences above and below it.
+  // the page's own text, which sits on a ~595x842pt A4 page scaled to
+  // INK_PDF.width, so 1pt is INK_PDF.width / 594.96 ~= 1.277 world units. The
+  // circle rings the mass-energy result (Δm = L/c²) low on the page; the
+  // highlight rides the "strikingly simple relation" phrase above it, the
+  // underline sits under "its mass diminishes by L/c²" just below it, and the
+  // margin note points back at the circled equation.
   const px = r.x + INK_PDF.dx;
   const py = r.y + INK_PDF.dy;
   await addPdf(canvas, px, py, '/einstein-1905.pdf', INK_PDF.width);
 
-  addStroke(canvas, sketchEllipse(px + 358, py + 608, 78, 42, 2.2), PINK, 6);
+  addStroke(canvas, sketchEllipse(px + 478, py + 762, 56, 26, 2.2), PINK, 6);
   addStroke(
     canvas,
-    wobblyLine([px + 160, py + 641], [px + 348, py + 638], 3, 0.9),
+    wobblyLine([px + 200, py + 576], [px + 340, py + 572], 3, 0.9),
     HIGHLIGHT,
-    18,
+    19,
   );
-  drawUnderline(canvas, px + 158, py + 760, 277, BLUE, 4);
-  hand(canvas, px + 180, py + 838, copy.ink.pdfAnnotation, BLUE, 34, 320);
-  drawArrow(canvas, [px + 330, py + 822], [px + 372, py + 776], BLUE, 4);
+  drawUnderline(canvas, px + 427, py + 811, 161, BLUE, 4);
+  hand(canvas, px + 548, py + 702, copy.ink.pdfAnnotation, BLUE, 30, 163);
+  drawArrow(canvas, [px + 560, py + 734], [px + 526, py + 749], BLUE, 4);
 }
 
 async function buildPages(canvas: DrawableCanvas, r: WorldRect): Promise<void> {

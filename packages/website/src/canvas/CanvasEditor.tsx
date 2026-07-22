@@ -84,6 +84,9 @@ function CanvasEditorInner() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const domHostRef = useRef<HTMLDivElement>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
+  // Once the visitor scrolls/navigates they own the camera; until then we keep
+  // re-framing the hero as the canvas settles to its real size (see below).
+  const userNavigatedRef = useRef(false);
   const toolState = useToolState(drawableCanvasRef);
   const [canvas, setCanvas] = useState<DrawableCanvas | null>(null);
   const [editingElement, setEditingElement] = useState<DrawableElement | null>(
@@ -131,11 +134,21 @@ function CanvasEditorInner() {
       .catch((error) => {
         console.error('Failed to build landing scenes', error);
       });
-    // First paint: land on the hero without an animation. Deferred a frame so
-    // the renderer has sized the canvas.
-    const introRaf = requestAnimationFrame(() => {
-      jumpToScene(canvas, SCENES[0].rect);
-    });
+    // Land on the hero without an animation. The camera must be framed against
+    // the canvas's real laid-out size, but on first paint that size is not
+    // settled: the element mounts smaller than its final pane and the
+    // renderer's own ResizeObserver grows it a beat later. Framing once against
+    // that stale size leaves the hero off-center, so re-frame on every resize
+    // until the visitor first navigates and takes the camera over. Our observer
+    // is created after the renderer's, so its size sync runs first each tick.
+    userNavigatedRef.current = false;
+    const frameHero = () => {
+      if (!userNavigatedRef.current) {
+        jumpToScene(canvas, SCENES[0].rect);
+      }
+    };
+    const heroFramer = new ResizeObserver(frameHero);
+    heroFramer.observe(fg);
 
     // Text boxes measure their height with fallback metrics until the
     // handwriting font (Caveat) finishes loading; re-measure so nothing stays
@@ -151,7 +164,7 @@ function CanvasEditorInner() {
 
     return () => {
       disposed = true;
-      cancelAnimationFrame(introRaf);
+      heroFramer.disconnect();
       document.fonts.removeEventListener('loadingdone', handleFontsLoaded);
       fg.removeEventListener('pointerdown', handlePointerDown);
       stopLoop();
@@ -171,6 +184,7 @@ function CanvasEditorInner() {
       return !c || c.editingElement !== null;
     },
     onIndexChange: (i) => {
+      userNavigatedRef.current = true;
       drawableCanvasRef.current?.viewport.animateViewToFitRect(
         toDomRect(SCENES[i].rect),
         SCENE_FIT,
