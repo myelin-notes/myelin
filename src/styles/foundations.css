@@ -1,34 +1,7 @@
-@font-face {
-  font-family: "Hanken Grotesk";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("../../src-tauri/fonts/HankenGrotesk.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Hanken Grotesk";
-  font-style: italic;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("../../src-tauri/fonts/HankenGrotesk-Italic.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Newsreader";
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url("../../src-tauri/fonts/Newsreader.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Newsreader";
-  font-style: italic;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url("../../src-tauri/fonts/Newsreader-Italic.ttf") format("truetype");
-}
+/* Body and heading faces are declared once, in @myelin/ui/theme.css (imported
+   above in index.css), as WOFF2. The TTFs under src-tauri/fonts/ are Rust's
+   copy: krilla parses raw sfnt for PDF export and cannot read WOFF2, so the two
+   formats stay split by consumer rather than shared. */
 
 @theme inline {
   @keyframes accordion-down {
