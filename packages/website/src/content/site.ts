@@ -186,7 +186,11 @@ for step in range(3):
       { key: 'windows', label: 'Download for Windows', sub: 'Windows 10+' },
       { key: 'linux', label: 'Download for Linux', sub: 'AppImage' },
       { key: 'ios', label: 'Download for iOS', sub: 'iPhone and iPad' },
-      { key: 'android', label: 'Download for Android', sub: 'Phone and tablet' },
+      {
+        key: 'android',
+        label: 'Download for Android',
+        sub: 'Phone and tablet',
+      },
     ],
     mobileBadge: 'Same notes on your phone and tablet, not a cut-down viewer',
     faqTitle: 'FAQ',
