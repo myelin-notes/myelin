@@ -2,20 +2,23 @@
 // Stands in for something the canvas renders for real (a PDF, a page frame, an
 // audio card, a search palette). The static page deliberately does not try to
 // imitate them: a labelled frame is honest and costs no bytes, where a fake
-// screenshot would be both heavier and misleading.
+// screenshot would be both heavier and misleading. Framed like a Shot, over the
+// app's dotted canvas, so a section reads the same whether its visual is a
+// screenshot or a stand-in.
 interface Props {
   label: string;
   class?: string;
 }
 
-const { label, class: className = 'h-64' } = Astro.props;
+const { label, class: className = 'aspect-[16/10]' } = Astro.props;
 ---
 
 <div
   class:list={[
-    'flex items-center justify-center rounded-2xl border border-dashed border-border-divider bg-surface px-6 text-center text-sm text-text-muted',
+    'placeholder-shot flex flex-col items-center justify-center gap-2.5 rounded-2xl border border-border-ghost bg-card px-6 text-center shadow-elevated',
     className,
   ]}
 >
-  {label}
+  <span class="kicker text-text-muted">Screenshot coming</span>
+  <span class="max-w-xs text-sm text-text-secondary">{label}</span>
 </div>

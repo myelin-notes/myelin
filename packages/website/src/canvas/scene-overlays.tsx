@@ -227,7 +227,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
             border: '1px solid rgba(249, 115, 22, 0.4)',
           }}
         >
-          {copy.download.ipadBadge}
+          {copy.download.mobileBadge}
         </span>
       </div>
 

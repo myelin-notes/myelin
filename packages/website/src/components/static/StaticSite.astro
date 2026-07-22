@@ -3,152 +3,297 @@
 // says, as ordinary scrolling markup. Served to crawlers, no-JS visitors, and
 // touch/narrow viewports. Sections follow the canvas scene order (see
 // `src/canvas/scenes.ts`) so the two tell the same story in the same sequence.
+// The FAQ is the one exception: the canvas renders it inside the download
+// scene, and here it sits just ahead of the download band so the page closes on
+// the CTA rather than on a question.
 //
 // The gate in `Base.astro` hides this before first paint wherever the canvas
 // will run, so desktop never renders a frame of it.
+import { Wordmark, buttonVariants, cn } from '@myelin/ui';
+import CheckList from './CheckList.astro';
 import Placeholder from './Placeholder.astro';
+import Shot from './Shot.astro';
 import { copy, faqs, siteLinks } from '../../content/site';
 
-const section = 'mx-auto max-w-3xl px-6 py-16';
+const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
+const band = 'py-24 lg:py-32';
+const kicker = 'kicker text-text-muted';
 const heading =
-  'font-heading text-3xl leading-tight font-medium tracking-tight whitespace-pre-line sm:text-4xl';
-const body = 'mt-5 text-base leading-relaxed text-text-secondary';
-const button =
-  'inline-flex items-center rounded-xl bg-accent-dark px-5 py-2.5 text-sm font-medium text-text-on-dark';
-const buttonOutline =
-  'inline-flex items-center rounded-xl border border-border-divider px-5 py-2.5 text-sm font-medium text-text-primary';
+  'font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] whitespace-pre-line text-text-primary';
+const lede = 'mt-7 text-text-secondary';
+const cta = cn(buttonVariants(), 'h-11 rounded-2xl px-6 text-sm');
+const ctaOutline = cn(
+  buttonVariants({ variant: 'outline' }),
+  'h-11 rounded-2xl px-6 text-sm',
+);
 ---
 
-<div class="static-site pt-12">
-  <section class:list={[section, 'pt-16 pb-12']}>
-    <h1 class={`${heading} text-4xl sm:text-5xl`}>{copy.hero.headline}</h1>
-    <p class={`${body} text-lg`}>{copy.hero.subheadline}</p>
-    <div class="mt-8 flex flex-wrap gap-3">
-      <a href={siteLinks.releases} class={button}>{copy.hero.ctaPrimary}</a>
-      <a href="#download" class={buttonOutline}>{copy.hero.ctaSecondary}</a>
-    </div>
-    <p class="mt-6 text-sm text-text-muted">{copy.hero.trustLine}</p>
-  </section>
+<div class="static-site relative z-10 pt-12">
+  <!-- Hero -->
+  <section class={wrap}>
+    <div class="pt-16 pb-20 lg:pt-24 lg:pb-24">
+      <p class:list={[kicker, 'rise']}>{copy.hero.eyebrow}</p>
+      <h1
+        class="rise mt-6 max-w-4xl font-heading text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] font-medium tracking-[-0.02em] whitespace-pre-line text-text-primary"
+        style="animation-delay:.06s"
+      >
+        {copy.hero.headline}
+      </h1>
+      <p
+        class="rise mt-7 max-w-xl text-lg leading-relaxed text-text-secondary"
+        style="animation-delay:.14s"
+      >
+        {copy.hero.subheadline}
+      </p>
+      <div
+        class="rise mt-10 flex flex-wrap items-center gap-x-4 gap-y-4"
+        style="animation-delay:.22s"
+      >
+        <a href={siteLinks.releases} class={cta}>{copy.hero.ctaPrimary}</a>
+        <a href="#pdfs" class={ctaOutline}>{copy.hero.ctaSecondary}</a>
+      </div>
+      <p class="rise mt-7 text-sm text-text-muted" style="animation-delay:.28s">
+        {copy.hero.trustLine}
+      </p>
 
-  <section class={section}>
-    <h2 class={heading}>{copy.ink.pdfHeading}</h2>
-    <p class={body}>{copy.ink.pdfBody}</p>
-    <Placeholder label="PDF with ink annotations" class="mt-8 h-72" />
-  </section>
-
-  <section class={section}>
-    <h2 class={heading}>{copy.pages.heading}</h2>
-    <p class={body}>{copy.pages.body}</p>
-    <Placeholder label={copy.pages.pageTitle} class="mt-8 h-72" />
-  </section>
-
-  <section class={section}>
-    <h2 class={heading}>{copy.audioSearch.heading}</h2>
-    <p class={body}>{copy.audioSearch.audioBody}</p>
-    <Placeholder label="Recording with on-device transcript" class="mt-8 h-40" />
-    <p class={body}>{copy.audioSearch.searchBody}</p>
-    <Placeholder label="Search across pages, ink, and audio" class="mt-8 h-40" />
-  </section>
-
-  <section class={section}>
-    <h2 class={heading}>{copy.linked.heading}</h2>
-    <p class={body}>{copy.linked.body}</p>
-  </section>
-
-  <section id="local" class={section}>
-    <h2 class={heading}>{copy.localFirst.heading}</h2>
-    <p class={body}>{copy.localFirst.lede}</p>
-    <ul class="mt-8 space-y-4">
-      {
-        copy.localFirst.bullets.map((bullet) => (
-          <li class="border-l-2 border-border-divider pl-4 text-text-secondary">
-            {bullet}
-          </li>
-        ))
-      }
-    </ul>
-  </section>
-
-  <section id="sync" class={section}>
-    <h2 class={heading}>{copy.sync.heading}</h2>
-    <p class={body}>{copy.sync.kicker}</p>
-    <div class="mt-8 space-y-6">
-      {
-        copy.sync.tiers.map((tier) => (
-          <div class="rounded-2xl border border-border-divider bg-card p-6">
-            <span class="rounded-full bg-tag px-2.5 py-1 text-xs font-medium text-text-tag">
-              {tier.badge}
-            </span>
-            <h3 class="mt-4 font-heading text-xl font-medium">{tier.title}</h3>
-            <p class="mt-2 text-text-secondary">{tier.body}</p>
-          </div>
-        ))
-      }
+      <div class="rise mt-16 lg:mt-20" style="animation-delay:.36s">
+        <Shot
+          src="/library.png"
+          alt="The Myelin Notes library with folders, note cards, tags, and search"
+          eager
+        />
+      </div>
     </div>
   </section>
 
-  <section class={section}>
-    <h2 class={heading}>{copy.supporter.heading}</h2>
-    <p class={body}>{copy.supporter.body}</p>
-    <ul class="mt-6 space-y-2 text-text-secondary">
-      {copy.supporter.benefits.map((benefit) => <li>{benefit}</li>)}
-    </ul>
-    <p class="mt-6 text-sm text-text-muted">{copy.supporter.reassurance}</p>
-    <div class="mt-8 flex flex-wrap gap-3">
-      <a href={siteLinks.sponsors} class={button}>
-        {copy.supporter.ctaPrimary}
-      </a>
-      <a href={siteLinks.kofi} class={buttonOutline}>
-        {copy.supporter.ctaSecondary}
-      </a>
+  <!-- PDFs -->
+  <section id="pdfs" class="bg-surface">
+    <div class:list={[wrap, band]}>
+      <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
+        <div class="lg:col-span-5">
+          <p class={kicker}>01 / PDFs</p>
+          <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
+          <p class={lede}>{copy.ink.pdfBody}</p>
+        </div>
+        <div class="lg:col-span-7 lg:pl-6">
+          <Placeholder label="A PDF embedded on the canvas, annotated in ink" />
+        </div>
+      </div>
     </div>
   </section>
 
-  <section id="download" class={section}>
-    <h2 class={heading}>{copy.download.heading}</h2>
-    <p class={body}>{copy.download.body}</p>
-    <div class="mt-8 flex flex-wrap gap-3">
-      {
-        copy.download.platforms.map((platform) => (
-          <a href={siteLinks.releases} class={button}>
-            {platform.label}
-            <span class="ml-2 opacity-60">{platform.sub}</span>
-          </a>
-        ))
-      }
+  <!-- Page frames -->
+  <section class:list={[wrap, band]}>
+    <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
+      <div class="order-2 lg:order-1 lg:col-span-7 lg:pr-6">
+        <Placeholder
+          label="A page frame with headings, tables, math, and a runnable code block"
+        />
+      </div>
+      <div class="order-1 lg:order-2 lg:col-span-5">
+        <p class={kicker}>02 / Pages</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.pages.heading}</h2>
+        <p class={lede}>{copy.pages.body}</p>
+      </div>
     </div>
-    <p class="mt-6 text-sm text-text-muted">{copy.download.ipadBadge}</p>
   </section>
 
-  <section id="faq" class={section}>
-    <h2 class={heading}>{copy.download.faqTitle}</h2>
-    <dl class="mt-8 space-y-6">
+  <!-- Audio and search -->
+  <section class="bg-surface">
+    <div class:list={[wrap, band]}>
+      <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
+        <div class="lg:col-span-5">
+          <p class={kicker}>03 / Audio &amp; search</p>
+          <h2 class:list={[heading, 'mt-6']}>{copy.audioSearch.heading}</h2>
+          <p class={lede}>{copy.audioSearch.audioBody}</p>
+          <p class={lede}>{copy.audioSearch.searchBody}</p>
+        </div>
+        <div class="grid gap-5 lg:col-span-7 lg:pl-6">
+          <Placeholder
+            label="A recording on the canvas, transcribed on-device"
+            class="aspect-[16/7]"
+          />
+          <Placeholder
+            label="Search across pages, ink, and audio"
+            class="aspect-[16/7]"
+          />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Linked notes -->
+  <section class:list={[wrap, band]}>
+    <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
+      <div class="order-2 lg:order-1 lg:col-span-7 lg:pr-6">
+        <Shot
+          src="/graph.png"
+          alt="The Myelin Notes graph view, showing a note's outgoing links and backlinks"
+        />
+      </div>
+      <div class="order-1 lg:order-2 lg:col-span-5">
+        <p class={kicker}>04 / Linked notes</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.linked.heading}</h2>
+        <p class={lede}>{copy.linked.body}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Local-first -->
+  <section id="local" class="bg-surface">
+    <div class:list={[wrap, band]}>
+      <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
+        <p class:list={[kicker, 'lg:col-span-3']}>05 / Local-first</p>
+        <h2 class:list={[heading, 'lg:col-span-9']}>
+          {copy.localFirst.heading}
+        </h2>
+      </div>
+      <div class="mt-12 grid gap-x-10 gap-y-8 lg:mt-16 lg:grid-cols-12">
+        <p class="text-text-secondary lg:col-span-5 lg:col-start-4">
+          {copy.localFirst.lede}
+        </p>
+        <CheckList items={copy.localFirst.bullets} class="lg:col-span-4" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Sync and collaboration -->
+  <section id="sync" class:list={[wrap, band]}>
+    <div class="grid gap-x-10 gap-y-12 lg:grid-cols-12">
+      <div class="lg:col-span-5">
+        <p class={kicker}>06 / Sync &amp; collab</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
+        <p class={lede}>{copy.sync.kicker}</p>
+      </div>
+      <div class="grid gap-5 lg:col-span-7 lg:pl-6">
+        {
+          copy.sync.tiers.map((tier) => (
+            <div class="rounded-3xl bg-card p-7 shadow-elevated lg:p-8">
+              <span class="rounded-full bg-tag px-2.5 py-1 text-xs font-medium text-text-tag">
+                {tier.badge}
+              </span>
+              <h3 class="mt-4 font-heading text-xl font-medium text-text-primary">
+                {tier.title}
+              </h3>
+              <p class="mt-2.5 text-sm leading-relaxed text-text-secondary">
+                {tier.body}
+              </p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Founding supporters -->
+  <section class="bg-surface">
+    <div class:list={[wrap, band, 'text-center']}>
+      <p class={kicker}>07 / Support</p>
+      <h2
+        class="mx-auto mt-6 max-w-3xl font-heading text-[clamp(2rem,4vw,3.5rem)] leading-[1.08] font-medium tracking-[-0.015em] whitespace-pre-line text-text-primary"
+      >
+        {copy.supporter.heading}
+      </h2>
+      <p
+        class="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-text-secondary"
+      >
+        {copy.supporter.body}
+      </p>
+      <CheckList
+        items={copy.supporter.benefits}
+        class="mx-auto mt-10 w-fit text-left sm:grid-cols-2 sm:gap-x-8"
+      />
+      <p class="mt-8 text-sm text-text-muted">{copy.supporter.reassurance}</p>
+      <div class="mt-10 flex flex-wrap justify-center gap-4">
+        <a href={siteLinks.sponsors} class={cta}>{copy.supporter.ctaPrimary}</a>
+        <a href={siteLinks.kofi} class={ctaOutline}>
+          {copy.supporter.ctaSecondary}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class:list={[wrap, band]}>
+    <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
+      <p class:list={[kicker, 'lg:col-span-3']}>08 / Questions</p>
+      <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
+    </div>
+    <dl class="mt-16 grid gap-x-10 gap-y-12 lg:mt-20 lg:grid-cols-2">
       {
         faqs.map((faq) => (
           <div>
-            <dt class="font-medium text-text-primary">{faq.question}</dt>
-            <dd class="mt-2 text-text-secondary">{faq.answer}</dd>
+            <dt class="text-lg font-semibold text-text-primary">
+              {faq.question}
+            </dt>
+            <dd class="mt-3 max-w-md text-text-secondary">{faq.answer}</dd>
           </div>
         ))
       }
     </dl>
   </section>
 
-  <footer class="border-t border-border-divider">
-    <div class:list={[section, 'py-12']}>
-      <p class="font-heading text-lg">{copy.footer.tagline}</p>
-      <ul class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+  <!-- Download -->
+  <section id="download" class="bg-primary text-text-on-dark">
+    <div class:list={[wrap, 'py-28 lg:py-36']}>
+      <p class="kicker text-text-on-dark/55">09 / Download</p>
+      <h2
+        class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] whitespace-pre-line"
+      >
+        {copy.download.heading}
+      </h2>
+      <p class="mt-7 max-w-2xl text-text-on-dark/75">{copy.download.body}</p>
+      <div class="mt-12 flex flex-wrap gap-3">
         {
-          copy.footer.links.map((link) => (
-            <li>
-              <a href={link.href} class="text-text-secondary underline">
-                {link.label}
-              </a>
-            </li>
+          copy.download.platforms.map((platform) => (
+            <a
+              href={siteLinks.releases}
+              class="rounded-xl bg-white/10 px-5 py-2.5 text-sm font-medium text-text-on-dark transition-colors hover:bg-white/20"
+            >
+              {platform.label}
+              <span class="ml-2 opacity-60">{platform.sub}</span>
+            </a>
           ))
         }
-      </ul>
-      <p class="mt-6 text-sm text-text-muted">{copy.footer.privacyNote}</p>
+      </div>
+      <p class="mt-10 text-sm text-text-on-dark/55">
+        {copy.download.mobileBadge}
+      </p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class={wrap}>
+    <div class="grid gap-10 py-16 lg:grid-cols-12">
+      <div class="lg:col-span-5">
+        <Wordmark className="text-[1.35rem]" />
+        <p class="mt-4 max-w-xs text-sm leading-relaxed text-text-muted">
+          {copy.footer.tagline}
+        </p>
+      </div>
+      <nav class="lg:col-span-7" aria-label="Footer">
+        <ul class="flex flex-wrap gap-x-8 gap-y-3">
+          {
+            copy.footer.links.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  class="text-sm text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </div>
+    <div class="h-px w-full bg-border-ghost"></div>
+    <div
+      class="flex flex-wrap items-center justify-between gap-4 py-10 text-sm text-text-muted"
+    >
+      <p class="max-w-xl">{copy.footer.privacyNote}</p>
+      <p class="kicker">Mac · Windows · Linux · iPhone · iPad · Android</p>
     </div>
   </footer>
 </div>
