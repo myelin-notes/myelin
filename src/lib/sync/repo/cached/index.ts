@@ -321,6 +321,10 @@ export class CachedRepository
     return this.cache.listDirectory(folderId);
   }
 
+  async listChildIds(folderId: string | null): Promise<readonly string[]> {
+    return this.cache.listChildIds(folderId);
+  }
+
   async getFolderChain(folderId: string | null): Promise<VFSFolderNode[]> {
     return this.cache.getFolderChain(folderId);
   }
@@ -1634,8 +1638,9 @@ export class CachedRepository
       return { nodeIds: [nodeId], fileIds: [nodeId] };
     }
 
+    const childIds = await this.cache.listChildIds(nodeId);
     const childEntries = await Promise.all(
-      node.children.map((childId) => this.collectDeletedSubtree(childId)),
+      childIds.map((childId) => this.collectDeletedSubtree(childId)),
     );
 
     return {

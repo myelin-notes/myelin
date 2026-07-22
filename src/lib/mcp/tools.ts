@@ -443,7 +443,7 @@ async function nodeListItem(
     return {
       ...base,
       type: 'folder',
-      childCount: node.children.length,
+      childCount: (await repository.listChildIds(node.id)).length,
     };
   }
   return {

@@ -29,6 +29,7 @@ import {
   deleteNodeFromManifest,
   ensureVersionHistoryRoot,
   getBacklinks,
+  getChildrenIds,
   getFileVersionNodes,
   getFolderChain,
   getIndexCandidateFileNodes,
@@ -280,6 +281,12 @@ export abstract class BaseRepository
   ): Promise<[VFSFolderNode[], VFSFileNode[]]> {
     const { manifest } = await this.loadManifestImpl();
     return listDirectoryNodes(manifest, folderId);
+  }
+
+  /** Child ids including system nodes, which `listDirectory` filters out. */
+  async listChildIds(folderId: string | null): Promise<readonly string[]> {
+    const { manifest } = await this.loadManifestImpl();
+    return getChildrenIds(manifest, folderId);
   }
 
   async getFolderChain(folderId: string | null): Promise<VFSFolderNode[]> {

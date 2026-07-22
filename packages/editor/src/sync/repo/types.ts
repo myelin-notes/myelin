@@ -22,7 +22,6 @@ export interface VFSFolderNode {
   name: string;
   type: 'folder';
   parentId: VFSNodeId | null;
-  children: VFSNodeId[];
   tags: string[];
   createdAt: number;
   modifiedAt: number;
@@ -151,6 +150,8 @@ export interface Repository {
     parentId: VFSNodeId | null,
   ): Promise<string>;
   createFolder(name: string, parentId: VFSNodeId | null): Promise<VFSNodeId>;
+  /** Child ids including system nodes, which `listDirectory` filters out. */
+  listChildIds(folderId: VFSNodeId | null): Promise<readonly VFSNodeId[]>;
   createFile(
     name: string,
     fileType: FileType,

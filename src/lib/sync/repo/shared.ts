@@ -6,6 +6,7 @@ import {
   type SearchIndex,
 } from '@/lib/search';
 import type { NoteEmbedding } from '@/platform';
+import { addChild, dropNode, getChildIds, removeChild } from './child-index';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import type {
   FileType,
@@ -25,7 +26,6 @@ import type {
 
 export interface VFSManifest {
   version: number;
-  children: string[];
   nodes: Record<string, VFSNode>;
   linksBySource: Record<VFSNodeId, StoredNoteLink[]>;
   customColors: string[];
@@ -37,7 +37,9 @@ export interface RepositorySnapshot {
   notes: Record<VFSNodeId, Uint8Array | null>;
 }
 
-export const CURRENT_MANIFEST_VERSION = 1;
+// 2 dropped the `children` arrays: parentage is stored only as `node.parentId`,
+// and the adjacency index is derived at runtime by `./child-index`.
+export const CURRENT_MANIFEST_VERSION = 2;
 export const MANIFEST_PATH = 'manifest.json';
 export const FILES_DIR = 'files';
 export const FILE_EXT = '.myelin';
@@ -47,7 +49,6 @@ export const VERSION_HISTORY_ROOT_NAME = '.myelin-version-history';
 export function createEmptyManifest(): VFSManifest {
   return {
     version: CURRENT_MANIFEST_VERSION,
-    children: [],
     nodes: {},
     linksBySource: {},
     customColors: [],
@@ -60,6 +61,17 @@ export function migrate(manifest: VFSManifest): void {
   // older builds; default them so read paths don't spread `undefined`.
   manifest.tagRegistry ??= [];
   manifest.customColors ??= [];
+
+  if (manifest.version < CURRENT_MANIFEST_VERSION) {
+    // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest
+    // round-trips unknown keys back to disk on every save. `JSON.stringify`
+    // omits undefined-valued keys, so this drops them from the next write.
+    (manifest as VFSManifest & { children?: undefined }).children = undefined;
+    for (const node of Object.values(manifest.nodes)) {
+      (node as VFSNode & { children?: undefined }).children = undefined;
+    }
+    manifest.version = CURRENT_MANIFEST_VERSION;
+  }
 }
 
 export function createNodeId(): string {
@@ -78,7 +90,6 @@ export function createFolderNode(
     name,
     type: 'folder',
     parentId,
-    children: [],
     tags: [],
     createdAt: now,
     modifiedAt: now,
@@ -203,52 +214,16 @@ export function ensureVersionHistoryRoot(
   return rootId;
 }
 
+export { addChild, removeChild } from './child-index';
+
 export function getChildrenIds(
   manifest: VFSManifest,
   folderId: string | null,
-): string[] {
-  if (folderId === null) {
-    return manifest.children;
-  }
-
-  const folder = manifest.nodes[folderId];
-  if (!folder || folder.type !== 'folder') {
+): readonly string[] {
+  if (folderId !== null && manifest.nodes[folderId]?.type !== 'folder') {
     return [];
   }
-
-  return folder.children;
-}
-
-export function addChild(
-  manifest: VFSManifest,
-  parentId: string | null,
-  childId: string,
-): void {
-  if (parentId === null) {
-    manifest.children.push(childId);
-    return;
-  }
-
-  const parent = manifest.nodes[parentId];
-  if (parent && parent.type === 'folder') {
-    parent.children.push(childId);
-  }
-}
-
-export function removeChild(
-  manifest: VFSManifest,
-  parentId: string | null,
-  childId: string,
-): void {
-  if (parentId === null) {
-    manifest.children = manifest.children.filter((id) => id !== childId);
-    return;
-  }
-
-  const parent = manifest.nodes[parentId];
-  if (parent && parent.type === 'folder') {
-    parent.children = parent.children.filter((id) => id !== childId);
-  }
+  return getChildIds(manifest, folderId);
 }
 
 export function listDirectoryNodes(
@@ -727,7 +702,7 @@ export function deleteNodeFromManifest(
     }
 
     if (current.type === 'folder') {
-      for (const childId of current.children) {
+      for (const childId of getChildIds(manifest, currentId)) {
         collect(childId);
       }
     } else {
@@ -746,6 +721,7 @@ export function deleteNodeFromManifest(
 
     delete manifest.linksBySource[currentId];
     delete manifest.nodes[currentId];
+    dropNode(manifest, currentId);
   };
 
   collect(nodeId);

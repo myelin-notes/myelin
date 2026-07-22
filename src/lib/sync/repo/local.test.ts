@@ -300,7 +300,6 @@ describe('LocalRepository', () => {
         byteLength: 10,
       },
     );
-    manifest.children.push(userId, systemId);
     manifest.linksBySource[userId] = [
       {
         targetId: systemId,
@@ -416,7 +415,6 @@ describe('LocalRepository', () => {
     const repository = new LocalRepository('repositories/replace-test');
     const fileId = 'file-empty';
     const manifest = createEmptyManifest();
-    manifest.children.push(fileId);
     manifest.nodes[fileId] = createFileNode(
       fileId,
       'Empty',
