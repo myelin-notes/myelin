@@ -139,6 +139,27 @@ export abstract class BaseRepository
     index: SearchIndex<VFSNode>;
   } | null = null;
 
+  /**
+   * Nesting depth of `batchManifestWrites`. While positive, manifest mutations
+   * accumulate on one held manifest and defer their save to the outermost close.
+   */
+  private manifestBatchDepth = 0;
+  /**
+   * The single manifest every mutation in the open batch reads from and writes
+   * to, loaded once. Reads inside the batch see pending writes because they
+   * share this object; the flush persists it.
+   */
+  private manifestBatchLoad: Promise<{
+    manifest: VFSManifest;
+    revision: string | null;
+  }> | null = null;
+  /**
+   * The batch's mutators, in order, replayed onto the manifest that wins the
+   * race if the flush hits a conflict — so mutators must be replay-safe: ids and
+   * any values the caller kept are minted outside the mutator.
+   */
+  private manifestBatchMutators: Array<(manifest: VFSManifest) => void> = [];
+
   protected abstract loadManifestImpl(): Promise<{
     manifest: VFSManifest;
     revision: string | null;
@@ -223,7 +244,7 @@ export abstract class BaseRepository
   }
 
   async exportSnapshot(): Promise<RepositorySnapshot> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     const snapshotManifest = structuredClone(manifest);
     const fileNodes = Object.values(snapshotManifest.nodes).filter(
       (node): node is VFSFileNode => node.type === 'file',
@@ -240,6 +261,99 @@ export abstract class BaseRepository
       manifest: snapshotManifest,
       notes: Object.fromEntries(noteEntries),
     };
+  }
+
+  /**
+   * Runs `fn` with every manifest mutation it makes applied to one held
+   * manifest and saved once, when the outermost batch closes. Reads inside `fn`
+   * observe the pending writes. Intended for additive bulk work like imports:
+   * the batch has no delete semantics, so callers must not delete nodes inside
+   * it. A throwing `fn` discards the batch — nothing partial is saved.
+   */
+  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
+    this.manifestBatchDepth += 1;
+    let succeeded = false;
+    try {
+      const result = await fn();
+      succeeded = true;
+      return result;
+    } finally {
+      this.manifestBatchDepth -= 1;
+      if (this.manifestBatchDepth === 0) {
+        const load = this.manifestBatchLoad;
+        const mutators = this.manifestBatchMutators;
+        this.manifestBatchLoad = null;
+        this.manifestBatchMutators = [];
+        // Persist only a batch that both succeeded and actually mutated. A read
+        // -only batch has nothing to save; a failed one is dropped so no partial
+        // manifest lands — the caller's own rollback handles bytes already
+        // written.
+        if (succeeded && load && mutators.length > 0) {
+          const { manifest, revision } = await load;
+          await this.flushBatchedManifest(manifest, revision, mutators);
+        }
+      }
+    }
+  }
+
+  /**
+   * Saves the batched manifest, retrying conflicts the way a single mutation
+   * does: reload the manifest that won the race and replay the whole batch onto
+   * it so neither side's writes are lost.
+   */
+  private async flushBatchedManifest(
+    manifest: VFSManifest,
+    revision: string | null,
+    mutators: ReadonlyArray<(manifest: VFSManifest) => void>,
+  ): Promise<void> {
+    let pendingManifest = manifest;
+    let pendingRevision = revision;
+    const maxRetries = this.manifestMaxRetries();
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await this.saveManifestImpl(pendingManifest, pendingRevision, 'Import');
+        this.updateRuntimeStatus({
+          dataVersion: this.runtimeStatus.dataVersion + 1,
+        });
+        return;
+      } catch (error) {
+        if (attempt >= maxRetries - 1 || !this.isConflictError(error)) {
+          throw error;
+        }
+        const fresh = await this.loadManifestImpl();
+        for (const mutator of mutators) {
+          mutator(fresh.manifest);
+        }
+        pendingManifest = fresh.manifest;
+        pendingRevision = fresh.revision;
+      }
+    }
+    throw new Error('Failed to import after retrying manifest conflicts.');
+  }
+
+  /**
+   * The manifest to read from and mutate. Inside a batch this is the one held
+   * manifest, so reads and writes within the batch observe each other's pending
+   * changes; outside a batch it delegates straight to `loadManifestImpl`.
+   */
+  protected async loadManifest(): Promise<{
+    manifest: VFSManifest;
+    revision: string | null;
+  }> {
+    if (this.manifestBatchDepth === 0) {
+      return this.loadManifestImpl();
+    }
+    if (!this.manifestBatchLoad) {
+      const load = this.loadManifestImpl();
+      this.manifestBatchLoad = load;
+      // A failed load must not poison the batch's later reads.
+      load.catch(() => {
+        if (this.manifestBatchLoad === load) {
+          this.manifestBatchLoad = null;
+        }
+      });
+    }
+    return this.manifestBatchLoad;
   }
 
   async applyManifestMutation<T>(
@@ -272,25 +386,25 @@ export abstract class BaseRepository
   }
 
   async getNode(nodeId: string): Promise<VFSNode | null> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return manifest.nodes[nodeId] ?? null;
   }
 
   async listDirectory(
     folderId: string | null,
   ): Promise<[VFSFolderNode[], VFSFileNode[]]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return listDirectoryNodes(manifest, folderId);
   }
 
   /** Child ids including system nodes, which `listDirectory` filters out. */
   async listChildIds(folderId: string | null): Promise<readonly string[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getChildrenIds(manifest, folderId);
   }
 
   async getFolderChain(folderId: string | null): Promise<VFSFolderNode[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getFolderChain(manifest, folderId);
   }
 
@@ -298,7 +412,7 @@ export abstract class BaseRepository
     query: string,
     options: SearchNodesOptions = {},
   ): Promise<NodeSearchResult[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     const noteIndex = getPlatform().noteIndex;
     // Semantic search needs the index capability; fall back to name search.
     if (options.mode === 'semantic' && query.trim() && noteIndex) {
@@ -353,12 +467,12 @@ export abstract class BaseRepository
   }
 
   async getNodesByName(name: string): Promise<VFSNode[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getNodesByExactName(manifest, name);
   }
 
   async listIndexBackfillItems(): Promise<ReindexItem[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     const items: ReindexItem[] = [];
     for (const node of getIndexCandidateFileNodes(manifest)) {
       const path = await this.getStoredAbsolutePath(node.id);
@@ -373,34 +487,34 @@ export abstract class BaseRepository
     tags: string[],
     folderId: VFSNodeId | null = null,
   ): Promise<VFSNode[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getNodesByAnyTag(manifest, tags, folderId);
   }
 
   async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return includeAncestors
       ? listHierarchicalTags(manifest)
       : listTags(manifest);
   }
 
   async getStats(): Promise<RepositoryStats> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getStats(manifest);
   }
 
   async getRecentFiles(limit: number = 3): Promise<VFSFileNode[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getRecentFiles(manifest, limit);
   }
 
   async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getBacklinks(manifest, noteId);
   }
 
   async getNoteGraph(): Promise<RepositoryNoteGraph> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getNoteGraph(manifest);
   }
 
@@ -408,18 +522,20 @@ export abstract class BaseRepository
     baseName: string,
     parentId: string | null,
   ): Promise<string> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getUniqueFileName(manifest, baseName, parentId);
   }
 
   async createFolder(name: string, parentId: string | null): Promise<string> {
-    return this.mutateManifest('Create folder', (manifest) => {
-      const id = createNodeId();
-      const now = Date.now();
+    // Minted outside the mutator so a batched flush that replays this mutation
+    // after a conflict reuses the id the caller already received.
+    const id = createNodeId();
+    const now = Date.now();
+    await this.mutateManifest('Create folder', (manifest) => {
       manifest.nodes[id] = createFolderNode(id, name, parentId, now);
       addChild(manifest, parentId, id);
-      return id;
     });
+    return id;
   }
 
   async createFile(
@@ -429,19 +545,20 @@ export abstract class BaseRepository
     bytes?: Uint8Array,
     options?: CreateFileOptions,
   ): Promise<VFSNodeId> {
-    const id = await this.mutateManifest('Create file', (manifest) => {
-      const newId = createNodeId();
-      const now = Date.now();
-      manifest.nodes[newId] = createFileNode(
-        newId,
+    // Minted outside the mutator so a batched flush that replays this mutation
+    // after a conflict reuses the id the caller already received.
+    const id = createNodeId();
+    const now = Date.now();
+    await this.mutateManifest('Create file', (manifest) => {
+      manifest.nodes[id] = createFileNode(
+        id,
         name,
         fileType,
         parentId,
         now,
         options?.system,
       );
-      addChild(manifest, parentId, newId);
-      return newId;
+      addChild(manifest, parentId, id);
     });
     if (bytes !== undefined) {
       await this.writeFileBytes(id, bytes);
@@ -450,7 +567,7 @@ export abstract class BaseRepository
   }
 
   async listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return getFileVersionNodes(manifest, nodeId).map(toFileVersion);
   }
 
@@ -639,7 +756,7 @@ export abstract class BaseRepository
   }
 
   async getCustomColors(): Promise<string[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return [...manifest.customColors];
   }
 
@@ -670,7 +787,7 @@ export abstract class BaseRepository
   }
 
   async getRegistryTags(): Promise<string[]> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadManifest();
     return [...manifest.tagRegistry];
   }
 
@@ -845,6 +962,15 @@ export abstract class BaseRepository
     action: string,
     mutator: (manifest: VFSManifest) => T,
   ): Promise<T> {
+    if (this.manifestBatchDepth > 0) {
+      // Apply to the held manifest and defer the save to the batch flush. The
+      // mutator is captured so a conflicting flush can replay it.
+      const { manifest } = await this.loadManifest();
+      const result = mutator(manifest);
+      this.manifestBatchMutators.push(mutator);
+      return result;
+    }
+
     const maxRetries = this.manifestMaxRetries();
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const { manifest, revision } = await this.loadManifestImpl();

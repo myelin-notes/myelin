@@ -471,66 +471,71 @@ export async function importObsidianVault({
   const total = scanned.files.length;
 
   try {
-    rootFolderId = await repository.createFolder(vaultName, parentId);
-    const folderIds = await createImportedFolders(
-      repository,
-      rootFolderId,
-      scanned.folderPaths,
-    );
-
-    const markdownFiles = scanned.files.filter(
-      (file): file is Extract<VaultImportFile, { kind: 'markdown' }> =>
-        file.kind === 'markdown',
-    );
-
-    for (const file of markdownFiles) {
-      file.nodeId = await repository.createFile(
-        file.noteName,
-        'mcanvas',
-        getImportParentId(rootFolderId, folderIds, file.folderPath),
+    // Every folder and note this import creates lands on one manifest, saved
+    // once when the batch closes, instead of a manifest write per node.
+    return await repository.batchManifestWrites(async () => {
+      const root = await repository.createFolder(vaultName, parentId);
+      rootFolderId = root;
+      const folderIds = await createImportedFolders(
+        repository,
+        root,
+        scanned.folderPaths,
       );
-    }
 
-    const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
-    for (const file of markdownFiles) {
-      onProgress?.({ current: ++current, total, fileName: file.name });
-      await writeMarkdownFile({ file, repository, resolveNoteLinkId });
-    }
+      const markdownFiles = scanned.files.filter(
+        (file): file is Extract<VaultImportFile, { kind: 'markdown' }> =>
+          file.kind === 'markdown',
+      );
 
-    let mediaImported = 0;
-    for (const file of scanned.files) {
-      if (file.kind === 'markdown') {
-        continue;
+      for (const file of markdownFiles) {
+        file.nodeId = await repository.createFile(
+          file.noteName,
+          'mcanvas',
+          getImportParentId(root, folderIds, file.folderPath),
+        );
       }
 
-      onProgress?.({ current: ++current, total, fileName: file.name });
-      const importParentId = getImportParentId(
-        rootFolderId,
-        folderIds,
-        file.folderPath,
-      );
-      if (file.kind === 'pdf') {
-        await importPdfVaultFile({
-          file,
-          repository,
-          parentId: importParentId,
-        });
-      } else {
-        await importStorageVaultFile({
-          file,
-          repository,
-          parentId: importParentId,
-        });
+      const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
+      for (const file of markdownFiles) {
+        onProgress?.({ current: ++current, total, fileName: file.name });
+        await writeMarkdownFile({ file, repository, resolveNoteLinkId });
       }
-      mediaImported += 1;
-    }
 
-    return {
-      rootFolderId,
-      notesImported: markdownFiles.length,
-      mediaImported,
-      skippedFiles: scanned.skippedFiles,
-    };
+      let mediaImported = 0;
+      for (const file of scanned.files) {
+        if (file.kind === 'markdown') {
+          continue;
+        }
+
+        onProgress?.({ current: ++current, total, fileName: file.name });
+        const importParentId = getImportParentId(
+          root,
+          folderIds,
+          file.folderPath,
+        );
+        if (file.kind === 'pdf') {
+          await importPdfVaultFile({
+            file,
+            repository,
+            parentId: importParentId,
+          });
+        } else {
+          await importStorageVaultFile({
+            file,
+            repository,
+            parentId: importParentId,
+          });
+        }
+        mediaImported += 1;
+      }
+
+      return {
+        rootFolderId: root,
+        notesImported: markdownFiles.length,
+        mediaImported,
+        skippedFiles: scanned.skippedFiles,
+      };
+    });
   } catch (error) {
     logger.error('Failed to import Obsidian vault', error, {
       vaultPath,

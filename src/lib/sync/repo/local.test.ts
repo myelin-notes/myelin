@@ -81,6 +81,59 @@ describe('LocalRepository', () => {
     expect(readNoteText(snapshot.update)).toBe('hello local repository');
   });
 
+  it('collapses an import into a single manifest save while batching', async () => {
+    const repository = new LocalRepository('repositories/batch-writes');
+    await repository.initialize();
+
+    const countSaves = () =>
+      vi.spyOn(
+        repository as unknown as {
+          saveManifestImpl: (...args: unknown[]) => Promise<unknown>;
+        },
+        'saveManifestImpl',
+      );
+
+    // Each note is a create + a content write (which touches the manifest to
+    // record its link graph), so the same five notes unbatched save the
+    // manifest 5 * 2 = 10 times.
+    const write = async (folderId: string) => {
+      for (let i = 0; i < 5; i++) {
+        const id = await repository.createFile(
+          `Note ${i}`,
+          'mcanvas',
+          folderId,
+        );
+        await repository.writeFileBytes(
+          id,
+          createNoteState(`note ${i}`).update,
+        );
+      }
+    };
+
+    const unbatchedFolder = await repository.createFolder('Unbatched', null);
+    const unbatchedSaves = countSaves();
+    await write(unbatchedFolder);
+    expect(unbatchedSaves.mock.calls.length).toBe(10);
+    unbatchedSaves.mockRestore();
+
+    const batchedSaves = countSaves();
+    await repository.batchManifestWrites(async () => {
+      const folderId = await repository.createFolder('Batched', null);
+      await write(folderId);
+    });
+    expect(batchedSaves.mock.calls.length).toBe(1);
+    batchedSaves.mockRestore();
+
+    // The batched nodes and their content survived the single flush.
+    const [batchedFolder] = (await repository.listDirectory(null))[0].filter(
+      (folder) => folder.name === 'Batched',
+    );
+    const [, files] = await repository.listDirectory(batchedFolder.id);
+    expect(files).toHaveLength(5);
+    const reloaded = await repository.loadDocument(files[0].id);
+    expect(readNoteText(reloaded.update)).toContain('note');
+  });
+
   it('registers ancestor tags when a nested tag is added', async () => {
     const repository = new LocalRepository('repositories/registry-ancestors');
     await repository.initialize();

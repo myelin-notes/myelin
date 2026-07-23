@@ -394,6 +394,13 @@ export class CachedRepository
     });
   }
 
+  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
+    // The manifest lives in the local cache; writes below land on it and queue a
+    // remote op each. Batching there collapses the cache's per-node manifest
+    // saves into one; the outbox still queues an op per node as before.
+    return this.cache.batchManifestWrites(fn);
+  }
+
   async createFolder(name: string, parentId: string | null): Promise<string> {
     return this.writeLocalAndQueue(
       () => this.cache.createFolder(name, parentId),
