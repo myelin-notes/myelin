@@ -1,6 +1,11 @@
-import { type CSSProperties, type ReactNode, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { copy, type PlatformKey, siteLinks } from '@/content/site';
+import {
+  type DownloadUrls,
+  detectPlatform,
+  fetchDownloadUrls,
+} from '@/lib/downloads';
 import { COLLAB_CURSORS, SCENE_PAD, sceneById } from './scenes';
 import {
   AudioCardMock,
@@ -8,29 +13,6 @@ import {
   SearchPaletteMock,
   WorldLayer,
 } from './world-layer';
-
-/**
- * Best guess at the visitor's platform, so the primary download button offers
- * the build they can actually run. Order is load-bearing: Android reports
- * itself as "Linux; Android", and iPadOS 13+ sends a desktop Macintosh user
- * agent, which touch points are the only reliable tell for.
- */
-function detectPlatform(): PlatformKey {
-  const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/i.test(ua)) {
-    return 'ios';
-  }
-  if (/Android/i.test(ua)) {
-    return 'android';
-  }
-  if (/Mac/i.test(ua)) {
-    return navigator.maxTouchPoints > 1 ? 'ios' : 'mac';
-  }
-  if (/Linux/i.test(ua)) {
-    return 'linux';
-  }
-  return 'windows';
-}
 
 /** Matches the muted body ink the canvas draws in the same scenes. */
 const MUTED = '#59646b';
@@ -171,6 +153,25 @@ interface SceneOverlayProps {
  */
 export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
   const [platformKey] = useState<PlatformKey>(detectPlatform);
+  // Resolved from the GitHub release, so a button points at the installer
+  // itself rather than the releases page. Empty until it lands, and stays empty
+  // for platforms the release has no build for.
+  const [downloads, setDownloads] = useState<DownloadUrls>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchDownloadUrls().then((urls) => {
+      if (!cancelled) {
+        setDownloads(urls);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const downloadHref = (key: PlatformKey) =>
+    downloads[key] ?? siteLinks.releases;
 
   const hero = sceneById('hero').rect;
   const supporter = sceneById('supporter').rect;
@@ -192,7 +193,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
           gap: 28,
         }}
       >
-        <WorldButton href={siteLinks.releases} size={30}>
+        <WorldButton href={downloadHref(primary.key)} size={30}>
           {primary.label}
         </WorldButton>
         <WorldButton variant="outline" size={30} onClick={onSeeItInAction}>
@@ -218,8 +219,8 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
       </div>
 
       {/* Downloads: one big button for the detected OS, the rest as a quiet
-          row underneath. Every platform ships from the same releases page, so
-          five equal-weight buttons only stacked "Download for" five times. */}
+          row underneath. Five equal-weight buttons only stacked "Download for"
+          five times. */}
       <div
         className="absolute flex flex-col items-start"
         style={{
@@ -228,7 +229,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
         }}
       >
         <WorldButton
-          href={siteLinks.releases}
+          href={downloadHref(primary.key)}
           size={36}
           width={520}
           sub={primary.sub}
@@ -243,7 +244,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
           {others.map((platform) => (
             <WorldButton
               key={platform.key}
-              href={siteLinks.releases}
+              href={downloadHref(platform.key)}
               variant="outline"
               size={26}
               sub={platform.sub}
@@ -285,7 +286,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
         <a
           className="pointer-events-auto font-semibold underline underline-offset-4"
           style={{ color: '#1a1a1a' }}
-          href={siteLinks.releases}
+          href={downloadHref(primary.key)}
           target="_blank"
           rel="noreferrer"
         >

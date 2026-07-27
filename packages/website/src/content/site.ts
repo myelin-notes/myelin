@@ -11,6 +11,10 @@ export const siteDescription =
 export const siteLinks = {
   github: 'https://github.com/myelin-notes/myelin',
   releases: 'https://github.com/myelin-notes/myelin/releases/latest',
+  /** Latest stable release, as JSON: where `src/lib/downloads.ts` finds the
+   *  per-platform installer asset behind every download button. */
+  latestReleaseApi:
+    'https://api.github.com/repos/myelin-notes/myelin/releases/latest',
   roadmap: 'https://github.com/myelin-notes/myelin/issues',
   license: 'https://github.com/myelin-notes/myelin/blob/main/LICENSE.md',
   discord: 'https://github.com/myelin-notes/myelin',

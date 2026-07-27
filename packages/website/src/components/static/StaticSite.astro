@@ -49,7 +49,9 @@ const ctaOutline = cn(
         class="rise mt-10 flex flex-wrap items-center gap-x-4 gap-y-4"
         style="animation-delay:.22s"
       >
-        <a href={siteLinks.releases} class={cta}>{copy.hero.ctaPrimary}</a>
+        <a href={siteLinks.releases} data-download="auto" class={cta}>
+          {copy.hero.ctaPrimary}
+        </a>
         <a href="#pdfs" class={ctaOutline}>{copy.hero.ctaSecondary}</a>
       </div>
       <p class="rise mt-7 text-sm text-text-muted" style="animation-delay:.28s">
@@ -248,10 +250,11 @@ const ctaOutline = cn(
       </h2>
       <p class="mt-7 max-w-2xl text-text-on-dark/75">{copy.download.body}</p>
       {/* One call to action, then the platforms as detail. This page is
-          prerendered, so it cannot know the visitor's OS the way the canvas
-          overlay does, and every build ships from the same releases page. */}
+          prerendered, so the OS-specific href is filled in by the script at the
+          bottom of this file rather than at build time. */}
       <a
         href={siteLinks.releases}
+        data-download="auto"
         class="mt-12 inline-flex h-12 items-center rounded-2xl bg-white px-7 text-sm font-semibold text-text-primary transition-colors hover:bg-white/85"
       >
         {copy.download.cta}
@@ -261,6 +264,7 @@ const ctaOutline = cn(
           copy.download.platforms.map((platform) => (
             <a
               href={siteLinks.releases}
+              data-download={platform.key}
               class="rounded-xl bg-white/10 px-5 py-2.5 text-sm text-text-on-dark transition-colors hover:bg-white/20"
             >
               <span class="font-medium">{platform.name}</span>
@@ -310,3 +314,27 @@ const ctaOutline = cn(
     </div>
   </footer>
 </div>
+
+<script>
+  import { detectPlatform, fetchDownloadUrls } from '../../lib/downloads';
+  import type { PlatformKey } from '../../content/site';
+
+  // Every download link ships pointing at the releases page; upgrade the ones
+  // whose platform has a real installer in the latest release. "auto" means the
+  // link is a bare "Download", so it follows the visitor's OS. Anything left
+  // unresolved (no build for that platform, no JS, GitHub unreachable) keeps
+  // the releases page, which is a working destination on its own.
+  void fetchDownloadUrls().then((urls) => {
+    const detected = detectPlatform();
+    const links =
+      document.querySelectorAll<HTMLAnchorElement>('a[data-download]');
+    for (const link of links) {
+      const attr = link.dataset.download;
+      const key = (attr === 'auto' ? detected : attr) as PlatformKey;
+      const url = urls[key];
+      if (url) {
+        link.href = url;
+      }
+    }
+  });
+</script>
