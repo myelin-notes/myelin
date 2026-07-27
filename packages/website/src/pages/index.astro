@@ -6,10 +6,10 @@ import NeuralField from '../components/NeuralField.tsx';
 
 const cta = cn(buttonVariants(), 'h-11 rounded-2xl px-6 text-sm');
 
-// Desktop download URLs are resolved on load from stable/latest.json and point
-// at the current stable release on the R2-backed CDN (see the wiring script
-// below); the buttons stay inert until then. macOS is a universal build (Apple
-// Silicon + Intel). iPad/Android are placeholders pending store/TestFlight links.
+// Desktop download URLs are resolved on load from the latest GitHub release
+// (see the wiring script below); the buttons stay inert until then. macOS is a
+// universal build (Apple Silicon + Intel). iPad/Android are placeholders
+// pending store/TestFlight links.
 const downloads = [
   { name: 'macOS', href: '#' },
   { name: 'Windows', href: '#' },
@@ -478,36 +478,47 @@ const faqJsonLd = {
   <script>
     import { trackWebEvent } from '../lib/posthog';
 
-    // Resolve the desktop download buttons to direct CDN installer URLs for the
-    // current stable release. The updater manifest is the single source of truth
-    // for the live version, so nothing is hardcoded here and no rebuild is needed
-    // when a release ships. Windows (-setup.exe) and Linux (.AppImage) installers
-    // are updater artifacts and used verbatim; the macOS .dmg isn't, so it's
-    // derived from the manifest's version folder.
-    const MANIFEST = 'https://updates.trymyelin.app/stable/latest.json';
+    // Resolve the desktop download buttons to the current stable release's
+    // installers, which are GitHub release assets. Their names carry the version
+    // ("Myelin.Notes_0.2.3_x64-setup.exe"), so there is no fixed
+    // /releases/latest/download/<name> URL to hardcode and the real names have to
+    // come from the API. Nothing is baked in at build time, so no rebuild is
+    // needed when a release ships. The macOS .dmg is listed alongside the updater
+    // artifacts here, so unlike the updater manifest this covers all three.
+    const LATEST_RELEASE =
+      'https://api.github.com/repos/myelin-notes/myelin/releases/latest';
+
+    /** Filename suffix identifying each button's installer, lowercased. */
+    const INSTALLER_SUFFIX: Record<string, string> = {
+      macOS: '.dmg',
+      Windows: '-setup.exe',
+      Linux: '.appimage',
+    };
 
     async function wireDesktopDownloads() {
-      let manifest: {
-        platforms?: Record<string, { url?: string }>;
+      let release: {
+        assets?: { name: string; browser_download_url: string }[];
       };
       try {
-        const res = await fetch(MANIFEST, { cache: 'no-store' });
+        const res = await fetch(LATEST_RELEASE, {
+          headers: { Accept: 'application/vnd.github+json' },
+          cache: 'no-store',
+        });
         if (!res.ok) return;
-        manifest = await res.json();
+        release = await res.json();
       } catch {
         return;
       }
-      const platforms = manifest.platforms ?? {};
-      // The macOS .dmg lives beside the darwin updater bundle in the same
-      // version folder, so derive its URL from that bundle's URL.
-      const darwinUrl = platforms['darwin-aarch64']?.url;
-      const versionBase = darwinUrl?.slice(0, darwinUrl.lastIndexOf('/') + 1);
 
-      const hrefFor: Record<string, string | undefined> = {
-        macOS: versionBase ? `${versionBase}Myelin-macOS.dmg` : undefined,
-        Windows: platforms['windows-x86_64']?.url,
-        Linux: platforms['linux-x86_64']?.url,
-      };
+      const hrefFor: Record<string, string | undefined> = {};
+      for (const asset of release.assets ?? []) {
+        const name = asset.name.toLowerCase();
+        for (const platform in INSTALLER_SUFFIX) {
+          if (name.endsWith(INSTALLER_SUFFIX[platform])) {
+            hrefFor[platform] = asset.browser_download_url;
+          }
+        }
+      }
       for (const el of document.querySelectorAll<HTMLElement>(
         '[data-download-platform]',
       )) {
