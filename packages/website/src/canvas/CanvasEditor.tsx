@@ -34,30 +34,7 @@ function toDomRect(rect: WorldRect): DOMRect {
 
 /** Place the camera on a scene instantly (no animation), for the first paint. */
 function jumpToScene(canvas: DrawableCanvas, rect: WorldRect): void {
-  const viewport = canvas.viewport;
-  viewport.cancelAnimation();
-  const world = viewport.getWorldRect();
-  const screenW = world.width * viewport.zoom;
-  const screenH = world.height * viewport.zoom;
-  if (screenW < 1 || screenH < 1) {
-    return;
-  }
-  const targetZoom = Math.min(
-    3,
-    Math.max(
-      0.2,
-      Math.min(
-        (SCENE_FIT.widthRatio * screenW) / rect.width,
-        (SCENE_FIT.heightRatio * screenH) / rect.height,
-      ),
-    ),
-  );
-  viewport.zoomByFactor(targetZoom / viewport.zoom);
-  const after = viewport.getWorldRect();
-  viewport.panBy(
-    after.x + after.width / 2 - (rect.x + rect.width / 2),
-    after.y + after.height / 2 - (rect.y + rect.height / 2),
-  );
+  canvas.viewport.setViewToFitRect(toDomRect(rect), SCENE_FIT);
 }
 
 /**
