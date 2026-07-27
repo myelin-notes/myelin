@@ -219,10 +219,14 @@ const ctaOutline = cn(
       <p class:list={[kicker, 'lg:col-span-3']}>08 / Questions</p>
       <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
     </div>
-    <dl class="mt-16 grid gap-x-10 gap-y-12 lg:mt-20 lg:grid-cols-2">
+    {/* Two columns from `sm` up, not `lg`: this page only ever renders below
+        the canvas breakpoint, so an `lg` column split would never fire and the
+        answers would read as one undifferentiated column. The rules keep the
+        entries separated at phone widths, where it is one column regardless. */}
+    <dl class="mt-12 grid gap-x-10 sm:mt-16 sm:grid-cols-2">
       {
         faqs.map((faq) => (
-          <div>
+          <div class="border-t border-border-divider py-7">
             <dt class="text-lg font-semibold text-text-primary">
               {faq.question}
             </dt>
