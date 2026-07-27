@@ -22,7 +22,6 @@ export interface VFSFolderNode {
   name: string;
   type: 'folder';
   parentId: VFSNodeId | null;
-  children: VFSNodeId[];
   tags: string[];
   createdAt: number;
   modifiedAt: number;
@@ -151,6 +150,8 @@ export interface Repository {
     parentId: VFSNodeId | null,
   ): Promise<string>;
   createFolder(name: string, parentId: VFSNodeId | null): Promise<VFSNodeId>;
+  /** Child ids including system nodes, which `listDirectory` filters out. */
+  listChildIds(folderId: VFSNodeId | null): Promise<readonly VFSNodeId[]>;
   createFile(
     name: string,
     fileType: FileType,
@@ -158,6 +159,13 @@ export interface Repository {
     bytes?: Uint8Array,
     options?: CreateFileOptions,
   ): Promise<VFSNodeId>;
+  /**
+   * Runs `fn` with the manifest writes it makes batched onto one manifest and
+   * saved once when `fn` resolves, instead of once per mutation. For additive
+   * bulk work such as imports — no deletes inside. Reads inside `fn` observe the
+   * pending writes.
+   */
+  batchManifestWrites<T>(fn: () => Promise<T>): Promise<T>;
   readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null>;
   writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void>;
   listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]>;

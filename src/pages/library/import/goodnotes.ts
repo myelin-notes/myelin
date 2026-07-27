@@ -162,38 +162,46 @@ export async function importGoodnotesZip({
   let folderIds = new Map<string, VFSNodeId>();
 
   try {
-    const folderPaths = new Set<string>();
-    for (const entry of pdfEntries) {
-      addFolderAncestors(folderPaths, entry.folderPath);
-    }
-
-    folderIds = await createImportedFolders(repository, parentId, folderPaths);
-
-    for (let index = 0; index < pdfEntries.length; index++) {
-      const entry = pdfEntries[index];
-      onProgress?.({
-        current: index + 1,
-        total: pdfEntries.length,
-        fileName: entry.fileName,
-      });
-      const importedId = await importPdfFile({
-        file: new File([entry.bytes], entry.fileName, {
-          type: 'application/pdf',
-        }),
-        repository,
-        parentId: getImportParentId(parentId, folderIds, entry.folderPath),
-        fallbackTitle,
-      });
-      if (!entry.folderPath) {
-        rootFileIds.push(importedId);
+    // Every folder and note this import creates lands on one manifest, saved
+    // once when the batch closes, instead of a manifest write per node.
+    return await repository.batchManifestWrites(async () => {
+      const folderPaths = new Set<string>();
+      for (const entry of pdfEntries) {
+        addFolderAncestors(folderPaths, entry.folderPath);
       }
-    }
 
-    return {
-      focusFolderId: getFocusFolderId(parentId, folderIds),
-      pdfsImported: pdfEntries.length,
-      skippedFiles,
-    };
+      folderIds = await createImportedFolders(
+        repository,
+        parentId,
+        folderPaths,
+      );
+
+      for (let index = 0; index < pdfEntries.length; index++) {
+        const entry = pdfEntries[index];
+        onProgress?.({
+          current: index + 1,
+          total: pdfEntries.length,
+          fileName: entry.fileName,
+        });
+        const importedId = await importPdfFile({
+          file: new File([entry.bytes], entry.fileName, {
+            type: 'application/pdf',
+          }),
+          repository,
+          parentId: getImportParentId(parentId, folderIds, entry.folderPath),
+          fallbackTitle,
+        });
+        if (!entry.folderPath) {
+          rootFileIds.push(importedId);
+        }
+      }
+
+      return {
+        focusFolderId: getFocusFolderId(parentId, folderIds),
+        pdfsImported: pdfEntries.length,
+        skippedFiles,
+      };
+    });
   } catch (error) {
     for (const nodeId of getCleanupNodeIds(folderIds, rootFileIds)) {
       await repository.deleteNode(nodeId).catch(() => {});

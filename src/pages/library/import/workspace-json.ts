@@ -1,9 +1,10 @@
 import { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
+import * as Y from 'yjs';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
-import type { YDocManager } from '@myelin/editor/ydoc-manager';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { join } from '@tauri-apps/api/path';
 import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { Logger } from '@/lib/logger';
@@ -282,18 +283,27 @@ async function createImportedNote({
   return { note, nodeId, baseName, folderPath };
 }
 
+/**
+ * Build the note document in memory, then write it once.
+ *
+ * The target is a file this run just created, so there is no remote revision to
+ * reconcile and no peer to sync with. Opening a session would read the empty
+ * placeholder back twice (once to load the document, once to merge the push)
+ * before writing the same bytes. This mirrors what `NoteSession.save` does to
+ * the doc -- sweep orphans, then encode -- without the round trips.
+ */
 async function rebuildImportedNote(
   repository: Repository,
   prepared: PreparedNote,
   resolveNoteId: NoteIdResolver,
 ): Promise<void> {
-  const session = await repository.openSession(prepared.nodeId);
-  try {
-    rebuildNote(session.ydoc, prepared.note, resolveNoteId);
-    await session.save();
-  } finally {
-    await session.close().catch(() => {});
-  }
+  const ydoc = new YDocManager();
+  rebuildNote(ydoc, prepared.note, resolveNoteId);
+  ydoc.sweepOrphanPageFrameFragments();
+  await repository.writeFileBytes(
+    prepared.nodeId,
+    Y.encodeStateAsUpdate(ydoc.doc),
+  );
 
   if (prepared.note.tags?.length > 0) {
     await repository.setTags(prepared.nodeId, prepared.note.tags);
@@ -360,22 +370,101 @@ export async function importWorkspaceJson({
   }
 
   let rootFolderId: VFSNodeId | null = null;
-  let folderIds: Map<string, VFSNodeId>;
   let current = 0;
   let notesImported = 0;
   let mediaImported = 0;
   let failedFiles = 0;
   const total = scanned.notes.length + scanned.media.length;
 
-  // Fatal setup (creating the destination folders) aborts and rolls back.
-  // Per-file failures below are isolated so one bad file can't discard the rest.
+  // Every folder and note this import creates lands on one manifest, saved once
+  // when the batch closes, instead of a manifest write per node. Fatal setup
+  // (creating the destination folders) aborts and rolls back; per-file failures
+  // are isolated so one bad file can't discard the rest.
   try {
-    rootFolderId = await repository.createFolder(rootName, parentId);
-    folderIds = await createImportedFolders(
-      repository,
-      rootFolderId,
-      scanned.folderPaths,
-    );
+    await repository.batchManifestWrites(async () => {
+      const root = await repository.createFolder(rootName, parentId);
+      rootFolderId = root;
+      const folderIds = await createImportedFolders(
+        repository,
+        root,
+        scanned.folderPaths,
+      );
+
+      // Notes import in two passes: create every file first so note-link ids can
+      // be remapped to the new nodes (links may point forward), then rebuild
+      // content.
+      const prepared: PreparedNote[] = [];
+      for (const file of scanned.notes) {
+        const fallbackName =
+          file.absolutePath
+            .replace(/\\/g, '/')
+            .split('/')
+            .pop()
+            ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
+        try {
+          const note = parseNote(
+            await readTextFile(file.absolutePath),
+            file.absolutePath,
+          );
+          prepared.push(
+            await createImportedNote({
+              note,
+              repository,
+              parentId: getImportParentId(root, folderIds, file.folderPath),
+              folderPath: file.folderPath,
+              fallbackName,
+            }),
+          );
+        } catch (error) {
+          // Notes that fail to create never reach pass 2, so advance progress
+          // here to keep the counter reaching `total` (pass 2 reports the rest).
+          failedFiles += 1;
+          onProgress?.({ current: ++current, total, fileName: fallbackName });
+          logger.warn('Skipping note that failed to import', {
+            path: file.absolutePath,
+            error,
+          });
+        }
+      }
+
+      const resolveNoteId = createImportNoteLinkResolver(prepared);
+      for (const preparedNote of prepared) {
+        onProgress?.({
+          current: ++current,
+          total,
+          fileName: preparedNote.baseName,
+        });
+        try {
+          await rebuildImportedNote(repository, preparedNote, resolveNoteId);
+          notesImported += 1;
+        } catch (error) {
+          failedFiles += 1;
+          logger.warn('Skipping note that failed to rebuild', {
+            nodeId: preparedNote.nodeId,
+            error,
+          });
+        }
+      }
+
+      for (const file of scanned.media) {
+        onProgress?.({ current: ++current, total, fileName: file.name });
+        try {
+          await repository.createFile(
+            file.name,
+            file.fileType,
+            getImportParentId(root, folderIds, file.folderPath),
+            await readFile(file.absolutePath),
+          );
+          mediaImported += 1;
+        } catch (error) {
+          failedFiles += 1;
+          logger.warn('Skipping media that failed to import', {
+            path: file.absolutePath,
+            error,
+          });
+        }
+      }
+    });
   } catch (error) {
     logger.error('Failed to import workspace JSON', error, {
       dirPath,
@@ -391,78 +480,8 @@ export async function importWorkspaceJson({
     throw error;
   }
 
-  // Notes import in two passes: create every file first so note-link ids can be
-  // remapped to the new nodes (links may point forward), then rebuild content.
-  const prepared: PreparedNote[] = [];
-  for (const file of scanned.notes) {
-    const fallbackName =
-      file.absolutePath
-        .replace(/\\/g, '/')
-        .split('/')
-        .pop()
-        ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
-    try {
-      const note = parseNote(
-        await readTextFile(file.absolutePath),
-        file.absolutePath,
-      );
-      prepared.push(
-        await createImportedNote({
-          note,
-          repository,
-          parentId: getImportParentId(rootFolderId, folderIds, file.folderPath),
-          folderPath: file.folderPath,
-          fallbackName,
-        }),
-      );
-    } catch (error) {
-      // Notes that fail to create never reach pass 2, so advance progress here
-      // to keep the counter reaching `total` (pass 2 reports the rest).
-      failedFiles += 1;
-      onProgress?.({ current: ++current, total, fileName: fallbackName });
-      logger.warn('Skipping note that failed to import', {
-        path: file.absolutePath,
-        error,
-      });
-    }
-  }
-
-  const resolveNoteId = createImportNoteLinkResolver(prepared);
-  for (const preparedNote of prepared) {
-    onProgress?.({
-      current: ++current,
-      total,
-      fileName: preparedNote.baseName,
-    });
-    try {
-      await rebuildImportedNote(repository, preparedNote, resolveNoteId);
-      notesImported += 1;
-    } catch (error) {
-      failedFiles += 1;
-      logger.warn('Skipping note that failed to rebuild', {
-        nodeId: preparedNote.nodeId,
-        error,
-      });
-    }
-  }
-
-  for (const file of scanned.media) {
-    onProgress?.({ current: ++current, total, fileName: file.name });
-    try {
-      await repository.createFile(
-        file.name,
-        file.fileType,
-        getImportParentId(rootFolderId, folderIds, file.folderPath),
-        await readFile(file.absolutePath),
-      );
-      mediaImported += 1;
-    } catch (error) {
-      failedFiles += 1;
-      logger.warn('Skipping media that failed to import', {
-        path: file.absolutePath,
-        error,
-      });
-    }
+  if (rootFolderId === null) {
+    throw new Error('Workspace import did not create a root folder.');
   }
 
   return {
