@@ -1,0 +1,24 @@
+/*
+ * Styles for DOM the editor renders: the page-frame ProseMirror editor, canvas
+ * text/LaTeX/audio elements, PDF chrome, embeds, and the tool-option slider.
+ * Consumed by any host of @myelin/editor (the desktop app and the website) via
+ * `@import "@myelin/editor/styles.css"`.
+ *
+ * Tokens only this package reads (canvas chrome, syntax colors, code surfaces)
+ * ship in ./tokens.css. The rest (--text-primary, --accent-dark, --bg-card,
+ * --shadow-rgb, …) are shared with host chrome and come from
+ * @myelin/ui/theme.css, which the host must import.
+ *
+ * Import order matches the app's original single-file cascade; keep it stable.
+ */
+@import "./tokens.css";
+@import "./canvas-controls.css";
+@import "./editor-base.css";
+@import "./editor-tables.css";
+@import "./editor-blocks.css";
+@import "./canvas-latex.css";
+@import "./text.css";
+@import "./canvas-audio.css";
+@import "./editor-inline.css";
+@import "./widgets.css";
+@import "./embeds.css";

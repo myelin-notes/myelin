@@ -12,6 +12,7 @@
     "./custom-colors": "./src/custom-colors.tsx",
     "./elements/audio/element": "./src/elements/audio/element.tsx",
     "./elements/frame/chrome": "./src/elements/frame/chrome.tsx",
+    "./styles.css": "./src/styles/index.css",
     "./i18n": "./src/i18n/index.tsx",
     "./i18n/messages": "./src/i18n/messages/index.ts",
     "./keybinds": "./src/keybinds/index.ts",

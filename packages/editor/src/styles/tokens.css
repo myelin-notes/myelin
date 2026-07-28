@@ -1,0 +1,94 @@
+/*
+ * Tokens for DOM the editor renders. Nothing outside @myelin/editor reads
+ * these, so the package ships them rather than making every host restate the
+ * palette (the app and the website had drifted to different subsets).
+ *
+ * Tokens the editor shares with host chrome (--text-primary, --accent-dark,
+ * --bg-card, --shadow-rgb, …) are NOT here — they live in @myelin/ui/theme.css,
+ * which every host already imports.
+ *
+ * `.theme-light` pins a subtree to the light palette while the host runs dark;
+ * page-frame-harvest.ts puts it on the offscreen PDF export clone. It mirrors
+ * the light block here (and in @myelin/ui/theme.css) for exactly that reason.
+ */
+
+:root,
+.theme-light {
+  /* Canvas chrome — read at runtime via getComputedStyle (see canvas-theme.ts) */
+  --canvas-grid: rgba(164, 168, 172, 0.35);
+  --selection-stroke: #2f3e46;
+  --selection-fill: rgba(208, 225, 251, 0.15);
+  --waveform-track: #d0d5db;
+
+  /* Accent-dark interaction states */
+  --accent-dark-hover: #2d3f54;
+  --accent-dark-active: #111d2a;
+  --accent-muted: #5f6f85;
+
+  /* Recording / live-capture surfaces */
+  --bg-recording: #e03e3e;
+  --bg-recording-hover: #c73333;
+
+  /* Code surfaces */
+  --bg-code: rgba(242, 244, 246, 0.92);
+  --bg-inline-code: rgba(28, 39, 56, 0.08);
+
+  /* Stronger hairline + accent rule (blockquote / callout) */
+  --border-strong: rgba(195, 199, 202, 0.5);
+  --rule-accent: rgba(47, 62, 70, 0.28);
+
+  /* Range / slider track */
+  --track: rgba(195, 199, 202, 0.4);
+
+  /* Elevated-surface shadow tint (page frame, audio card) */
+  --shadow-rgb-elevated: 28 39 56;
+
+  /* CodeMirror text selection tint */
+  --editor-selection: #0969da26;
+
+  /* Code syntax highlight — GitHub light */
+  --syntax-comment: #6e7781;
+  --syntax-keyword: #cf222e;
+  --syntax-string: #0a3069;
+  --syntax-constant: #0550ae;
+  --syntax-type: #953800;
+  --syntax-function: #8250df;
+  --syntax-tag: #116329;
+}
+
+.dark {
+  --canvas-grid: rgba(255, 255, 255, 0.08);
+  --selection-stroke: #9fb0c4;
+  --selection-fill: rgba(120, 160, 220, 0.2);
+  --waveform-track: #3a424d;
+
+  /* Accent-dark interaction states — step lighter than the base navy */
+  --accent-dark-hover: #34465e;
+  --accent-dark-active: #1f2c3e;
+  --accent-muted: #4a5870;
+
+  --bg-recording: #f05252;
+  --bg-recording-hover: #e04444;
+
+  --bg-code: rgba(35, 40, 48, 0.7);
+  --bg-inline-code: rgba(255, 255, 255, 0.1);
+
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --rule-accent: rgba(159, 176, 196, 0.3);
+
+  --track: rgba(255, 255, 255, 0.12);
+
+  /* Pure black on dark, matching --sh-elevated */
+  --shadow-rgb-elevated: 0 0 0;
+
+  --editor-selection: rgba(110, 168, 254, 0.25);
+
+  /* Code syntax highlight — GitHub dark */
+  --syntax-comment: #8b949e;
+  --syntax-keyword: #ff7b72;
+  --syntax-string: #a5d6ff;
+  --syntax-constant: #79c0ff;
+  --syntax-type: #ffa657;
+  --syntax-function: #d2a8ff;
+  --syntax-tag: #7ee787;
+}

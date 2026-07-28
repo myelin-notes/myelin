@@ -17,7 +17,7 @@ import { Logger } from '@myelin/shared/logger';
 import { type Presence, usePresence } from '@myelin/ui';
 import { useRepository } from './sync/repo-context';
 
-interface CustomColorsContextValue {
+export interface CustomColorsContextValue {
   colors: string[];
   addColor: (color: string) => Promise<void>;
   removeColor: (color: string) => Promise<void>;
@@ -30,9 +30,10 @@ interface CustomColorsContextValue {
   pickerOpen: boolean;
 }
 
-const CustomColorsContext = createContext<CustomColorsContextValue | null>(
-  null,
-);
+// Exported so hosts without a repository (e.g. the marketing website) can
+// mount their own provider that the editor's toolbars still read from.
+export const CustomColorsContext =
+  createContext<CustomColorsContextValue | null>(null);
 const logger = new Logger('CustomColors');
 
 const INITIAL_PICKER_COLOR = '#3b82f6';

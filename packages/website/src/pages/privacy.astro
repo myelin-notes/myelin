@@ -1,0 +1,307 @@
+---
+// The privacy policy. Linked from the site footer (both renderings) and from
+// Settings > Privacy in the app, which is what Apple's guideline 5.1.1(i) asks
+// for: a policy reachable from the store listing and from inside the app.
+//
+// Every claim here is checked against the code. When you change what leaves the
+// device, change this page in the same commit:
+//   - website capture .......... src/lib/posthog.ts
+//   - app capture .............. app src/lib/analytics.ts, src/lib/posthog.ts
+//   - redaction ................ packages/shared/src/logger.ts
+//   - update endpoint .......... src-tauri/tauri.conf.json
+//   - live discovery ........... app src/lib/sync/live/
+import Base from '../layouts/Base.astro';
+
+const updated = '22 July 2026';
+
+const wrap = 'mx-auto max-w-3xl px-6 lg:px-10';
+const h2 =
+  'font-heading text-2xl leading-tight font-medium tracking-[-0.01em] text-text-primary';
+const p = 'mt-4 text-text-secondary leading-relaxed';
+const list = 'mt-4 space-y-3 text-text-secondary leading-relaxed';
+const term = 'font-medium text-text-primary';
+const link = 'underline underline-offset-4 hover:text-text-primary';
+---
+
+<Base
+  title="Privacy | Myelin Notes"
+  description="What Myelin Notes collects, what it never collects, who else touches it, and how to turn it off."
+>
+  <div class={`${wrap} pt-12 pb-24`}>
+    <header class="pt-16 pb-12">
+      <p class="kicker text-text-muted">Last updated {updated}</p>
+      <h1
+        class="mt-6 font-heading text-[clamp(2.2rem,4.5vw,3.4rem)] leading-[1.05] font-medium tracking-[-0.02em] text-text-primary"
+      >
+        Privacy
+      </h1>
+      <p class="mt-7 text-lg leading-relaxed text-text-secondary">
+        Myelin Notes is a local-first note-taking app. Your notes live on your
+        device, in storage you control. This page covers the small amount of
+        data that does leave your device, why it leaves, who receives it, and
+        how to stop it.
+      </p>
+      <p class="mt-4 text-text-secondary leading-relaxed">
+        Myelin Notes is an independent project rather than a company. "We" below
+        means the people who maintain it.
+      </p>
+    </header>
+
+    <div class="h-px w-full bg-border-ghost"></div>
+
+    <section class="pt-14">
+      <h2 class={h2}>What we never collect</h2>
+      <ul class={list}>
+        <li>
+          <span class={term}>The content of your notes.</span> Text, ink, PDFs, images,
+          audio, and the names you give them stay on your device. None of it is sent
+          to us in any form.
+        </li>
+        <li>
+          <span class={term}>Accounts or payment details.</span> The app has no sign-in
+          and takes no payment, so there is no name, email address, or card on file
+          to collect.
+        </li>
+        <li>
+          <span class={term}>Advertising data.</span> No ads, no ad networks, no advertising
+          identifiers, and no tracking of you across other apps or websites. We do
+          not sell, rent, or trade data to anyone.
+        </li>
+      </ul>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Your notes</h2>
+      <p class={p}>
+        Notes are files on your device. There is no server of ours that holds
+        them, and no account that they belong to. Two features move note data
+        off your device, and you turn on both yourself.
+      </p>
+      <ul class={list}>
+        <li>
+          <span class={term}>GitHub sync.</span> The app writes your notes to a GitHub
+          repository you choose, using a token you authorize. The token is kept on
+          your device in an encrypted vault; we never receive it. Your notes travel
+          between your device and GitHub without passing through us, and GitHub's
+          handling of what lands there is covered by GitHub's own privacy statement.
+        </li>
+        <li>
+          <span class={term}>Live collaboration.</span> Described under <a
+            href="#live"
+            class={link}>Live collaboration</a
+          > below. Note content moves directly between the devices in the session,
+          encrypted end to end.
+        </li>
+      </ul>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>This website</h2>
+      <p class={p}>
+        trymyelin.app uses PostHog to count page views and to record JavaScript
+        errors, so we can tell whether the site works and which pages people
+        read.
+      </p>
+      <ul class={list}>
+        <li>
+          <span class={term}>No cookies, and no storage on your device.</span> PostHog
+          is configured to keep its state in memory only, so the site writes no cookie,
+          no localStorage entry, and no sessionStorage entry. The identifier attached
+          to your visit lasts as long as the page is open and is gone when you close
+          the tab. There is no consent banner because there is nothing stored to consent
+          to.
+        </li>
+        <li>
+          <span class={term}>What is recorded.</span> The page you opened and when you
+          left it, the page that referred you, your browser, operating system and screen
+          size, and your IP address, from which PostHog derives an approximate location.
+          Autocapture
+          and session recording are both off, so clicks, keystrokes, form input, and
+          screen contents are not recorded.
+        </li>
+        <li>
+          <span class={term}>Where it goes.</span> PostHog processes this on servers
+          in the United States.
+        </li>
+      </ul>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Analytics and error reports in the app</h2>
+      <p class={p}>
+        The app can send two kinds of data, both governed by a single switch in
+        Settings, under Privacy.
+      </p>
+      <ul class={list}>
+        <li>
+          <span class={term}>Product events.</span> A fixed list of named actions:
+          opening the app, creating or opening a note, running a command, finishing
+          an import or export, changing a setting, a sync failing. Each carries only
+          categorical detail, such as the kind of note, the export format, or how many
+          files were involved. Note titles and note content are not attached. The one
+          exception is a failed sync, which also carries the first 200 characters of
+          the error message so the failure can be diagnosed, and that text can mention
+          a file path.
+        </li>
+        <li>
+          <span class={term}>Error reports.</span> The error message, its stack trace,
+          and the part of the app it came from. Before anything is sent, values stored
+          under keys that look like secrets (token, password, secret, authorization,
+          credential, cookie, vault, api key) are replaced with a redaction marker.
+          Messages and stack traces can still mention file paths, so an error report
+          may reveal a folder or file name even though the note itself is never included.
+        </li>
+      </ul>
+      <p class={p}>
+        This switch starts on. Turning it off stops product events and error
+        reports at once, and nothing is sent while it is off.
+      </p>
+      <p class={p}>
+        So that repeated events from one installation can be grouped, the app
+        stores a random installation identifier on your device. It is not linked
+        to your name or email address, and there is no account for it to be
+        linked to.
+      </p>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Update checks</h2>
+      <p class={p}>
+        The app asks GitHub, where our releases are published, whether a newer
+        version exists. That request shows GitHub your IP address along with the
+        platform and version you are running, the same as any software download.
+        It happens whether or not analytics are on, because it is how security
+        fixes reach you.
+      </p>
+    </section>
+
+    <section id="live" class="scroll-mt-20 pt-14">
+      <h2 class={h2}>Live collaboration</h2>
+      <p class={p}>
+        When you edit a GitHub-backed note together with someone else, your
+        device publishes a short-lived record to live.trymyelin.app so the other
+        device can find yours. The record holds a random peer identifier, a
+        connection ticket, and an expiry time. It is filed under a SHA-256 hash
+        of the repository and note identifier rather than their names, so the
+        service is not given the name of your repository or your note.
+      </p>
+      <p class={p}>
+        Note content itself does not go through that service. It moves directly
+        between the devices in the session over an encrypted connection, and
+        when a direct connection cannot be established it is relayed through
+        servers run by the iroh project, which carry the traffic without being
+        able to read it.
+      </p>
+      <p class={p}>
+        Notes that live only on your device never contact this service at all.
+      </p>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Who else handles this data</h2>
+      <ul class={list}>
+        <li>
+          <span class={term}>PostHog</span> receives the analytics and error reports
+          described above, and processes them in the United States.
+        </li>
+        <li>
+          <span class={term}>Cloudflare</span> serves this website, the update endpoint,
+          and the live collaboration discovery service, so it handles the network requests
+          your device makes to them.
+        </li>
+        <li>
+          <span class={term}>GitHub</span> receives your notes, but only if you set
+          up GitHub sync.
+        </li>
+        <li>
+          <span class={term}>The iroh project</span> runs the relay servers that carry
+          live collaboration traffic when a direct connection is not possible. That
+          traffic is encrypted end to end, so the relays pass it along without seeing
+          its contents.
+        </li>
+      </ul>
+      <p class={p}>
+        Each of these providers is bound by its own terms and data processing
+        agreement to protect what it handles for us and to use it only to
+        provide that service. None of them are permitted to use it for their own
+        advertising or to pass it on. We share data with no one else.
+      </p>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>How long it is kept</h2>
+      <ul class={list}>
+        <li>
+          Analytics and error events are retained for 12 months and then
+          deleted.
+        </li>
+        <li>
+          Live collaboration records carry an expiry and are dropped
+          automatically when it passes, within minutes of the session ending.
+        </li>
+        <li>
+          We keep no server-side request logs of our own for the website, the
+          update endpoint, or the discovery service beyond what Cloudflare
+          retains to operate and protect them.
+        </li>
+        <li>
+          There is nothing else to keep, because there is no account and no copy
+          of your notes.
+        </li>
+      </ul>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Your choices</h2>
+      <ul class={list}>
+        <li>
+          <span class={term}>Stop collection.</span> Open Settings, go to Privacy,
+          and turn off the analytics switch. It takes effect immediately and needs
+          no restart. Withdrawing consent this way is always available and never affects
+          how the app works.
+        </li>
+        <li>
+          <span class={term}>Ask what we hold.</span> Email <a
+            href="mailto:privacy@trymyelin.app"
+            class={link}>privacy@trymyelin.app</a
+          > and we will tell you.
+        </li>
+        <li>
+          <span class={term}>Ask us to delete it.</span> Email the same address.
+          Because there is no account, what we hold is not linked to your name or
+          email address and cannot be found from an email address alone, so we will
+          walk you through locating your installation identifier and then delete every
+          event carrying it.
+        </li>
+      </ul>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Children</h2>
+      <p class={p}>
+        Myelin Notes is not directed at children under 13, and we do not
+        knowingly collect data from them. If you believe a child has sent us
+        data, email us and we will remove it.
+      </p>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Changes to this page</h2>
+      <p class={p}>
+        When what we collect changes, this page changes with it, and the date at
+        the top moves. Material changes are called out in the release notes for
+        the version that makes them.
+      </p>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Contact</h2>
+      <p class={p}>
+        Questions about anything here go to <a
+          href="mailto:privacy@trymyelin.app"
+          class={link}>privacy@trymyelin.app</a
+        >.
+      </p>
+    </section>
+  </div>
+</Base>

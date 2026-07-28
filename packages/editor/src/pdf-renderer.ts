@@ -1,5 +1,4 @@
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 
 export interface PdfPageSize {
   w: number;
@@ -46,8 +45,14 @@ function createRenderCancelledError(): Error {
 }
 
 async function getPdfJs() {
-  pdfJsPromise ??= import('pdfjs-dist/legacy/build/pdf.mjs').then((pdfjs) => {
-    pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+  // Load the pdfjs library and its worker URL together, both lazily, so nothing
+  // pdfjs-related (including the `?url` worker asset) sits in the static import
+  // graph until a PDF actually renders.
+  pdfJsPromise ??= Promise.all([
+    import('pdfjs-dist/legacy/build/pdf.mjs'),
+    import('pdfjs-dist/legacy/build/pdf.worker.mjs?url'),
+  ]).then(([pdfjs, worker]) => {
+    pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
     return pdfjs;
   });
   return pdfJsPromise;

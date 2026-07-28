@@ -2,6 +2,12 @@ import type { Vector2 } from './geometry';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
 
+/**
+ * How much of the viewport a framed rect should fill. A bare number is the
+ * width ratio; both ratios given, the tighter one wins.
+ */
+export type ViewFit = number | { widthRatio?: number; heightRatio?: number };
+
 /** Handle to an in-flight RAF view transition. */
 interface ViewAnimation {
   stop: () => void;
@@ -238,6 +244,10 @@ export class CanvasViewport {
     if (!this._viewAnim) {
       this.clampOffsetToContent();
     }
+    this.emitViewChange();
+  }
+
+  private emitViewChange(): void {
     for (const listener of this._viewListeners) {
       listener();
     }
@@ -296,18 +306,19 @@ export class CanvasViewport {
   }
 
   /**
-   * Animate pan & zoom so the given world-space rect is centered in the
-   * viewport and fits the requested screen ratios.
-   *
-   * Lerps the SCREEN-SPACE position of the rect's center (not offset
-   * directly) so the focal point traces a straight line on the screen.
-   * Lerping offset linearly while zoom also changes makes any fixed world
-   * point trace a curved screen-space path, which shows up as a wobble.
+   * Zoom level and world focal point that frame `worldRect` per `fit`, plus
+   * the logical viewport size they were derived from. Shared by the animated
+   * and instant fit paths so both land on exactly the same view.
    */
-  public animateViewToFitRect(
+  private computeFit(
     worldRect: DOMRect,
-    fit: number | { widthRatio?: number; heightRatio?: number } = 0.8,
-  ): void {
+    fit: ViewFit,
+  ): {
+    screenW: number;
+    screenH: number;
+    targetZoom: number;
+    worldFocus: Vector2;
+  } {
     const dpr = window.devicePixelRatio || 1;
     const screenW = this.canvas.width / dpr;
     const screenH = this.canvas.height / dpr;
@@ -329,12 +340,64 @@ export class CanvasViewport {
       targetZoomCandidates.length > 0
         ? Math.min(...targetZoomCandidates)
         : this._zoom;
-    const targetZoom = Math.min(3, Math.max(0.2, unclampedTargetZoom));
 
-    const worldFocus: Vector2 = {
-      x: worldRect.x + worldRect.width / 2,
-      y: worldRect.y + worldRect.height / 2,
+    return {
+      screenW,
+      screenH,
+      targetZoom: Math.min(3, Math.max(0.2, unclampedTargetZoom)),
+      worldFocus: {
+        x: worldRect.x + worldRect.width / 2,
+        y: worldRect.y + worldRect.height / 2,
+      },
     };
+  }
+
+  /**
+   * Instantly frame `worldRect` — the non-animated twin of
+   * `animateViewToFitRect`, for placing the camera before the first paint
+   * where an animation would only be a jump anyway.
+   *
+   * Like the animated path, this deliberately skips `clampOffsetToContent`:
+   * framing a rect is an explicit instruction, and the clamp exists to stop
+   * the *user* drifting into empty space. Honouring it here would also make
+   * the result depend on how much content happens to exist yet, so framing a
+   * rect while a document is still being built would land off-center.
+   *
+   * No-ops until the canvas has a real size; the caller is expected to try
+   * again once it does.
+   */
+  public setViewToFitRect(worldRect: DOMRect, fit: ViewFit = 0.8): void {
+    this.cancelAnimation();
+    const { screenW, screenH, targetZoom, worldFocus } = this.computeFit(
+      worldRect,
+      fit,
+    );
+    if (screenW < 1 || screenH < 1) {
+      return;
+    }
+    this._zoom = targetZoom;
+    this._offset = {
+      x: screenW / 2 / targetZoom - worldFocus.x,
+      y: screenH / 2 / targetZoom - worldFocus.y,
+    };
+    this._onZoomChange?.(this._zoom);
+    this.emitViewChange();
+  }
+
+  /**
+   * Animate pan & zoom so the given world-space rect is centered in the
+   * viewport and fits the requested screen ratios.
+   *
+   * Lerps the SCREEN-SPACE position of the rect's center (not offset
+   * directly) so the focal point traces a straight line on the screen.
+   * Lerping offset linearly while zoom also changes makes any fixed world
+   * point trace a curved screen-space path, which shows up as a wobble.
+   */
+  public animateViewToFitRect(worldRect: DOMRect, fit: ViewFit = 0.8): void {
+    const { screenW, screenH, targetZoom, worldFocus } = this.computeFit(
+      worldRect,
+      fit,
+    );
 
     const startScreenFocus: Vector2 = {
       x: (worldFocus.x + this._offset.x) * this._zoom,

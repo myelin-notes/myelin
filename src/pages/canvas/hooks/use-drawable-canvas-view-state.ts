@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
+import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
 import { IS_DEV } from '@/lib/env';
 
 interface DrawableCanvasViewState {
@@ -14,52 +15,6 @@ const EMPTY_VIEW_STATE: DrawableCanvasViewState = {
   fps: 0,
   editingElement: null,
 };
-
-export function startDrawableCanvasAnimationLoop(
-  drawableCanvas: Pick<DrawableCanvas, 'redraw'>,
-  onFps: (fps: number) => void,
-): () => void {
-  let previousTime = 0;
-  let fpsAccum = 0;
-  let fpsFrames = 0;
-  let frameId = 0;
-  let stopped = false;
-
-  function animate(time: number) {
-    if (stopped) {
-      return;
-    }
-
-    const dt = (time - previousTime) / 1000;
-    previousTime = time;
-    drawableCanvas.redraw(dt);
-    if (stopped) {
-      return;
-    }
-
-    if (dt > 0) {
-      fpsAccum += dt;
-      fpsFrames += 1;
-      if (fpsAccum >= 0.5) {
-        const fps = Math.round(fpsFrames / fpsAccum);
-        fpsAccum = 0;
-        fpsFrames = 0;
-        onFps(fps);
-        if (stopped) {
-          return;
-        }
-      }
-    }
-
-    frameId = requestAnimationFrame(animate);
-  }
-
-  frameId = requestAnimationFrame(animate);
-  return () => {
-    stopped = true;
-    cancelAnimationFrame(frameId);
-  };
-}
 
 export function useDrawableCanvasViewState(
   drawableCanvas: DrawableCanvas | null,

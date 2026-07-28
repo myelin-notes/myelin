@@ -460,6 +460,11 @@ const zhHans: typeof en = {
         description:
           '发送匿名的产品使用数据和错误报告，帮助改进 Myelin Notes。关闭后将不会发送任何内容。',
       },
+      policy: {
+        label: '隐私政策',
+        description:
+          '哪些数据会离开你的设备、由谁接收、保留多久。在浏览器中打开 trymyelin.app。',
+      },
     },
     mcp: {
       title: 'Model Context Protocol',

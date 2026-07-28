@@ -1,7 +1,16 @@
+import { ArrowUpRight } from 'lucide-react';
 import { useMessages } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
+import { getPlatform } from '@/platform';
 import { ToggleRow } from '../components/toggle-row';
+
+/**
+ * The published policy describing what the analytics toggle sends. App Store
+ * guideline 5.1.1(i) requires it to be reachable from inside the app, not just
+ * from the store listing, which is what the row below the toggle is for.
+ */
+const PRIVACY_POLICY_URL = 'https://trymyelin.app/privacy';
 
 export function PrivacySection() {
   const strings = useMessages();
@@ -9,6 +18,10 @@ export function PrivacySection() {
 
   const handleAnalytics = () => {
     UserPrefs.set('analyticsEnabled', !analyticsEnabled);
+  };
+
+  const handlePolicy = () => {
+    void getPlatform().openExternal(PRIVACY_POLICY_URL);
   };
 
   return (
@@ -28,6 +41,21 @@ export function PrivacySection() {
           label={strings.settings.privacy.analytics.label}
           description={strings.settings.privacy.analytics.description}
         />
+        <button
+          type="button"
+          onClick={handlePolicy}
+          className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input/40 px-4 py-3 text-left ring-1 ring-border-subtle/70 transition-colors hover:bg-input"
+        >
+          <span className="min-w-0">
+            <span className="block font-medium text-sm text-text-primary">
+              {strings.settings.privacy.policy.label}
+            </span>
+            <span className="mt-1 block text-text-muted text-xs leading-relaxed">
+              {strings.settings.privacy.policy.description}
+            </span>
+          </span>
+          <ArrowUpRight className="size-4 shrink-0 text-text-muted" />
+        </button>
       </div>
     </section>
   );

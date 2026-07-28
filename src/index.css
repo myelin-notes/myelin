@@ -8,17 +8,10 @@
 @source "../packages/shared/src/**/*.{ts,tsx}";
 @import "katex/dist/katex.min.css";
 
-/* Split by feature for readability; import order preserves the original
-   single-file rule order, so the cascade is unchanged. */
+/* App-owned foundation (fonts, Tailwind theme/variants, token palette) and the
+   explorer interaction fix stay here; everything that styles editor-rendered
+   DOM now lives in @myelin/editor. Import order preserves the original cascade:
+   foundations, then the editor styles, then interaction. */
 @import "./styles/foundations.css";
-@import "./styles/canvas-controls.css";
-@import "./styles/editor-base.css";
-@import "./styles/editor-tables.css";
-@import "./styles/editor-blocks.css";
-@import "./styles/canvas-latex.css";
-@import "./styles/canvas-text.css";
-@import "./styles/canvas-audio.css";
-@import "./styles/editor-inline.css";
-@import "./styles/widgets.css";
-@import "./styles/embeds.css";
+@import "@myelin/editor/styles.css";
 @import "./styles/interaction.css";

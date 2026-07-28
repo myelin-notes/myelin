@@ -887,7 +887,7 @@ export class DrawableCanvas {
     }
     this._store.clear();
     this.viewport.destroy();
-    this.canvas.removeEventListener('pointermove', this._handlePointerMove);
+    window.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
     window.removeEventListener('pointerup', this._handlePointerUp);
     window.removeEventListener('pointercancel', this._handlePointerUp);
@@ -1170,14 +1170,21 @@ export class DrawableCanvas {
   }
 
   private initEventListeners(canvas: HTMLCanvasElement) {
+    // Bound to the window, not the canvas: DOM layered above the canvas
+    // (page-frame chrome, the site's world-anchored links) swallows
+    // pointermove, which froze an in-progress drag at the last point the
+    // canvas heard about until the cursor left that DOM again. Hover still
+    // only fires for the bare canvas.
     this._handlePointerMove = (evt) => {
       this.screenPosition = this.viewport.getScreenPoint(evt);
       this.state.update(evt);
-      const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
-      this.toolSelected.hover?.(this, mouseWorld);
+      if (evt.target === canvas) {
+        const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
+        this.toolSelected.hover?.(this, mouseWorld);
+      }
       this.updateCursor();
     };
-    canvas.addEventListener('pointermove', this._handlePointerMove);
+    window.addEventListener('pointermove', this._handlePointerMove);
 
     this._handlePointerDown = (evt) => {
       // One-shot placement intercepts primary-button clicks regardless of tool.
