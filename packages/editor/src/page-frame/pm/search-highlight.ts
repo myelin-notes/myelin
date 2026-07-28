@@ -10,6 +10,12 @@ interface SearchHighlightState {
   query: string;
   /** Index (in reading order) of the occurrence to mark as current, or null. */
   current: number | null;
+  /**
+   * Cached match ranges for the current (doc, query). Recomputed only when the
+   * doc or query changes, so selection-only and current-only updates (stepping
+   * through occurrences) reuse them instead of rescanning the whole document.
+   */
+  ranges: { from: number; to: number }[];
 }
 
 export const searchHighlightKey = new PluginKey<SearchHighlightState>(
@@ -55,25 +61,36 @@ export function searchHighlightPlugin(): Plugin<SearchHighlightState> {
   return new Plugin<SearchHighlightState>({
     key: searchHighlightKey,
     state: {
-      init: () => ({ query: '', current: null }),
-      apply(tr, value) {
-        const meta = tr.getMeta(searchHighlightKey);
-        return meta ? (meta as SearchHighlightState) : value;
+      init: () => ({ query: '', current: null, ranges: [] }),
+      apply(tr, value, _oldState, newState) {
+        const meta = tr.getMeta(searchHighlightKey) as
+          | { query: string; current: number | null }
+          | undefined;
+        const query = meta ? meta.query : value.query;
+        const current = meta ? meta.current : value.current;
+
+        // Match ranges depend only on the doc and the query. When neither
+        // changed, reuse the cached ranges and only swap the current index.
+        if (!tr.docChanged && query === value.query) {
+          return current === value.current ? value : { ...value, current };
+        }
+
+        return {
+          query,
+          current,
+          ranges: query ? findTextMatches(newState.doc, query) : [],
+        };
       },
     },
     props: {
       decorations(state) {
         const highlight = searchHighlightKey.getState(state);
-        if (!highlight?.query) {
-          return DecorationSet.empty;
-        }
-        const ranges = findTextMatches(state.doc, highlight.query);
-        if (ranges.length === 0) {
+        if (!highlight?.query || highlight.ranges.length === 0) {
           return DecorationSet.empty;
         }
         return DecorationSet.create(
           state.doc,
-          ranges.map((range, index) =>
+          highlight.ranges.map((range, index) =>
             Decoration.inline(range.from, range.to, {
               class: index === highlight.current ? CURRENT_CLASS : MATCH_CLASS,
             }),

@@ -1,6 +1,12 @@
 import * as Y from 'yjs';
-import { type SearchField, type SearchHit, searchItems } from '@/lib/search';
+import {
+  createSearchIndex,
+  type SearchField,
+  type SearchHit,
+  type SearchIndex,
+} from '@/lib/search';
 import type { NoteEmbedding } from '@/platform';
+import { addChild, dropNode, getChildIds, removeChild } from './child-index';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import type {
   FileType,
@@ -20,7 +26,6 @@ import type {
 
 export interface VFSManifest {
   version: number;
-  children: string[];
   nodes: Record<string, VFSNode>;
   linksBySource: Record<VFSNodeId, StoredNoteLink[]>;
   customColors: string[];
@@ -32,7 +37,9 @@ export interface RepositorySnapshot {
   notes: Record<VFSNodeId, Uint8Array | null>;
 }
 
-export const CURRENT_MANIFEST_VERSION = 1;
+// 2 dropped the `children` arrays: parentage is stored only as `node.parentId`,
+// and the adjacency index is derived at runtime by `./child-index`.
+export const CURRENT_MANIFEST_VERSION = 2;
 export const MANIFEST_PATH = 'manifest.json';
 export const FILES_DIR = 'files';
 export const FILE_EXT = '.myelin';
@@ -42,7 +49,6 @@ export const VERSION_HISTORY_ROOT_NAME = '.myelin-version-history';
 export function createEmptyManifest(): VFSManifest {
   return {
     version: CURRENT_MANIFEST_VERSION,
-    children: [],
     nodes: {},
     linksBySource: {},
     customColors: [],
@@ -55,6 +61,17 @@ export function migrate(manifest: VFSManifest): void {
   // older builds; default them so read paths don't spread `undefined`.
   manifest.tagRegistry ??= [];
   manifest.customColors ??= [];
+
+  if (manifest.version < CURRENT_MANIFEST_VERSION) {
+    // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest
+    // round-trips unknown keys back to disk on every save. `JSON.stringify`
+    // omits undefined-valued keys, so this drops them from the next write.
+    (manifest as VFSManifest & { children?: undefined }).children = undefined;
+    for (const node of Object.values(manifest.nodes)) {
+      (node as VFSNode & { children?: undefined }).children = undefined;
+    }
+    manifest.version = CURRENT_MANIFEST_VERSION;
+  }
 }
 
 export function createNodeId(): string {
@@ -73,7 +90,6 @@ export function createFolderNode(
     name,
     type: 'folder',
     parentId,
-    children: [],
     tags: [],
     createdAt: now,
     modifiedAt: now,
@@ -198,52 +214,16 @@ export function ensureVersionHistoryRoot(
   return rootId;
 }
 
+export { addChild, removeChild } from './child-index';
+
 export function getChildrenIds(
   manifest: VFSManifest,
   folderId: string | null,
-): string[] {
-  if (folderId === null) {
-    return manifest.children;
-  }
-
-  const folder = manifest.nodes[folderId];
-  if (!folder || folder.type !== 'folder') {
+): readonly string[] {
+  if (folderId !== null && manifest.nodes[folderId]?.type !== 'folder') {
     return [];
   }
-
-  return folder.children;
-}
-
-export function addChild(
-  manifest: VFSManifest,
-  parentId: string | null,
-  childId: string,
-): void {
-  if (parentId === null) {
-    manifest.children.push(childId);
-    return;
-  }
-
-  const parent = manifest.nodes[parentId];
-  if (parent && parent.type === 'folder') {
-    parent.children.push(childId);
-  }
-}
-
-export function removeChild(
-  manifest: VFSManifest,
-  parentId: string | null,
-  childId: string,
-): void {
-  if (parentId === null) {
-    manifest.children = manifest.children.filter((id) => id !== childId);
-    return;
-  }
-
-  const parent = manifest.nodes[parentId];
-  if (parent && parent.type === 'folder') {
-    parent.children = parent.children.filter((id) => id !== childId);
-  }
+  return getChildIds(manifest, folderId);
 }
 
 export function listDirectoryNodes(
@@ -309,16 +289,21 @@ function nodeSearchFields(
   ];
 }
 
-function searchNodeHits(
+/**
+ * Build a reusable lexical search index over the manifest's non-system nodes.
+ * Callers that search repeatedly (search-as-you-type) should build this once and
+ * reuse it rather than rebuilding the MiniSearch index — which tokenizes every
+ * node's name, tags, and full indexed content — on every query.
+ */
+export function createNodeSearchIndex(
   manifest: VFSManifest,
-  query: string,
   indexContent?: ReadonlyMap<VFSNodeId, string>,
-): SearchHit<VFSNode>[] {
-  return searchItems(
-    Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
-    query,
-    { getId: (node) => node.id, fields: nodeSearchFields(indexContent) },
-  );
+): SearchIndex<VFSNode> {
+  return createSearchIndex({
+    items: Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
+    getId: (node) => node.id,
+    fields: nodeSearchFields(indexContent),
+  });
 }
 
 /**
@@ -367,8 +352,10 @@ export function searchNodeResults(
   manifest: VFSManifest,
   query: string,
   indexContent?: ReadonlyMap<VFSNodeId, string>,
+  index?: SearchIndex<VFSNode>,
 ): NodeSearchResult[] {
-  return searchNodeHits(manifest, query, indexContent).map((hit) => ({
+  const searchIndex = index ?? createNodeSearchIndex(manifest, indexContent);
+  return searchIndex.search(query).map((hit) => ({
     node: hit.item,
     score: hit.score,
     contentSnippet: buildContentSnippet(indexContent?.get(hit.item.id), hit),
@@ -453,6 +440,15 @@ function buildSemanticSnippet(content: string): string | null {
     return snippet;
   }
   return `${snippet.slice(0, SNIPPET_RADIUS * 2).trimEnd()}...`;
+}
+
+export function getNodesByExactName(
+  manifest: VFSManifest,
+  name: string,
+): VFSNode[] {
+  return Object.values(manifest.nodes).filter(
+    (node) => !isSystemNode(node) && node.name === name,
+  );
 }
 
 export function getNodesByAnyTag(
@@ -706,7 +702,7 @@ export function deleteNodeFromManifest(
     }
 
     if (current.type === 'folder') {
-      for (const childId of current.children) {
+      for (const childId of getChildIds(manifest, currentId)) {
         collect(childId);
       }
     } else {
@@ -725,6 +721,7 @@ export function deleteNodeFromManifest(
 
     delete manifest.linksBySource[currentId];
     delete manifest.nodes[currentId];
+    dropNode(manifest, currentId);
   };
 
   collect(nodeId);

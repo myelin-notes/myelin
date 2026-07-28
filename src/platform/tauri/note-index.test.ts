@@ -96,6 +96,29 @@ describe('NoteIndexService', () => {
     expect(service.getEmbeddings().get('n1')?.vector).toEqual([0.1, 0.2]);
   });
 
+  it('bumps contentRevision when the corpus changes but not otherwise', async () => {
+    readNodeRecord.mockResolvedValue(record('hello indexed world', [0.1]));
+    const service = new TauriNoteIndexService();
+    await service.init('repo-a');
+
+    const before = service.contentRevision();
+    listenHandler?.({ payload: { nodeId: 'n1', repoId: 'repo-a' } });
+    await flush();
+    const afterUpdate = service.contentRevision();
+    expect(afterUpdate).toBeGreaterThan(before);
+
+    // A read of the content does not change the revision.
+    service.getContent();
+    expect(service.contentRevision()).toBe(afterUpdate);
+
+    await service.removeIndex('n1');
+    expect(service.contentRevision()).toBeGreaterThan(afterUpdate);
+
+    const afterRemove = service.contentRevision();
+    service.reset();
+    expect(service.contentRevision()).toBeGreaterThan(afterRemove);
+  });
+
   it('ignores index-updated events for a different repo', async () => {
     readNodeRecord.mockResolvedValue(record('stale repo text'));
     const service = new TauriNoteIndexService();

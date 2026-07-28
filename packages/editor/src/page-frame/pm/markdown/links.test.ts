@@ -79,13 +79,14 @@ describe('linkMarkdownPlugin', () => {
       ]),
     ]);
     const baseState = createEditorState(doc);
+    // Moving the caret past the link is a selection-only change; the plugin's
+    // appendTransaction re-checks the blocks around the selection endpoints and
+    // collapses the raw link into a link mark during the same apply().
     const state = baseState.apply(
       baseState.tr.setSelection(TextSelection.create(baseState.doc, 29)),
     );
-    const tr = buildNormalizedLinkTransaction(state, schema);
 
-    expect(tr).not.toBeNull();
-    expect(state.apply(tr!).doc.toJSON()).toEqual({
+    expect(state.doc.toJSON()).toEqual({
       type: 'doc',
       content: [
         {

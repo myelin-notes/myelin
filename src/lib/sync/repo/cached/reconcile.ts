@@ -1,9 +1,8 @@
+import { addChild, removeChild } from '../child-index';
 import type { RepositorySnapshot, VFSManifest } from '../shared';
-import type { VFSNode } from '../types';
 
 export function isSnapshotEmpty(snapshot: RepositorySnapshot): boolean {
   return (
-    snapshot.manifest.children.length === 0 &&
     Object.keys(snapshot.manifest.nodes).length === 0 &&
     Object.keys(snapshot.manifest.linksBySource ?? {}).length === 0 &&
     snapshot.manifest.customColors.length === 0
@@ -14,59 +13,41 @@ export function detachNodeFromAllContainers(
   manifest: VFSManifest,
   nodeId: string,
 ): void {
-  manifest.children = manifest.children.filter((id) => id !== nodeId);
-  for (const current of Object.values(manifest.nodes)) {
-    if (current.type === 'folder') {
-      current.children = current.children.filter((id) => id !== nodeId);
-    }
-  }
+  removeChild(manifest, manifest.nodes[nodeId]?.parentId ?? null, nodeId);
 }
 
-function detachNodeFromOtherContainers(
-  manifest: VFSManifest,
-  nodeId: string,
-  targetParentId: string | null,
-): void {
-  if (targetParentId !== null) {
-    manifest.children = manifest.children.filter((id) => id !== nodeId);
-  }
-
-  for (const current of Object.values(manifest.nodes)) {
-    if (current.type === 'folder' && current.id !== targetParentId) {
-      current.children = current.children.filter((id) => id !== nodeId);
-    }
-  }
-}
-
-function addChildIfMissing(
-  manifest: VFSManifest,
-  parentId: string | null,
-  childId: string,
-): void {
-  const children =
-    parentId === null
-      ? manifest.children
-      : manifest.nodes[parentId]?.type === 'folder'
-        ? manifest.nodes[parentId].children
-        : null;
-
-  if (children && !children.includes(childId)) {
-    children.push(childId);
-  }
-}
-
-function upsertNodePreservingRemoteChildren(
+/**
+ * Copies a node from the cache onto the remote manifest, rooting it when the
+ * cache's parent does not exist remotely.
+ *
+ * Sibling order and membership are no longer carried on the node, so a cache
+ * node holding a stale view of a folder's contents can no longer clobber
+ * children the remote gained concurrently — those children keep their own
+ * `parentId` and stay put.
+ */
+function upsertNodeFromCache(
   remoteManifest: VFSManifest,
-  cacheNode: VFSNode,
+  cacheManifest: VFSManifest,
+  nodeId: string,
 ): void {
-  const nextNode = structuredClone(cacheNode);
-  const remoteNode = remoteManifest.nodes[cacheNode.id];
-  if (nextNode.type === 'folder') {
-    nextNode.children =
-      remoteNode?.type === 'folder' ? remoteNode.children : [];
+  const cacheNode = cacheManifest.nodes[nodeId];
+  if (!cacheNode) {
+    return;
   }
 
-  remoteManifest.nodes[cacheNode.id] = nextNode;
+  const existing = remoteManifest.nodes[nodeId];
+  if (existing) {
+    removeChild(remoteManifest, existing.parentId, nodeId);
+  }
+
+  const nextNode = structuredClone(cacheNode);
+  nextNode.parentId =
+    cacheNode.parentId !== null &&
+    remoteManifest.nodes[cacheNode.parentId]?.type === 'folder'
+      ? cacheNode.parentId
+      : null;
+  remoteManifest.nodes[nodeId] = nextNode;
+  addChild(remoteManifest, nextNode.parentId, nodeId);
 }
 
 function ensureNodePath(
@@ -87,33 +68,7 @@ function ensureNodePath(
     return;
   }
 
-  upsertNodePreservingRemoteChildren(remoteManifest, cacheNode);
-  restoreNodePlacement(remoteManifest, cacheManifest, nodeId);
-}
-
-function restoreNodePlacement(
-  remoteManifest: VFSManifest,
-  cacheManifest: VFSManifest,
-  nodeId: string,
-): void {
-  const cacheNode = cacheManifest.nodes[nodeId];
-  if (!cacheNode) {
-    return;
-  }
-
-  const remoteNode = remoteManifest.nodes[nodeId];
-  if (!remoteNode) {
-    return;
-  }
-
-  const parentId =
-    cacheNode.parentId !== null &&
-    remoteManifest.nodes[cacheNode.parentId]?.type === 'folder'
-      ? cacheNode.parentId
-      : null;
-  remoteNode.parentId = parentId;
-  detachNodeFromOtherContainers(remoteManifest, nodeId, parentId);
-  addChildIfMissing(remoteManifest, parentId, nodeId);
+  upsertNodeFromCache(remoteManifest, cacheManifest, nodeId);
 }
 
 export function applyCachedManifestUpsert(
@@ -129,8 +84,7 @@ export function applyCachedManifestUpsert(
   if (cacheNode.parentId !== null) {
     ensureNodePath(remoteManifest, cacheManifest, cacheNode.parentId);
   }
-  upsertNodePreservingRemoteChildren(remoteManifest, cacheNode);
-  restoreNodePlacement(remoteManifest, cacheManifest, nodeId);
+  upsertNodeFromCache(remoteManifest, cacheManifest, nodeId);
 }
 
 export function getExistingParentId(

@@ -107,12 +107,30 @@ const es: typeof en = {
       button: 'Nuevo',
       folder: 'Nueva carpeta',
       canvas: 'Nuevo lienzo',
-      importFiles: 'Importar archivos',
-      importGoodnotesZip: 'Importar ZIP de Goodnotes',
-      importObsidianVault: 'Importar bóveda de Obsidian',
-      importWorkspaceJson: 'Importar espacio de trabajo JSON',
+      import: 'Importar',
       untitledCanvas: 'Lienzo sin título',
       unnamedFolder: 'Carpeta sin nombre',
+    },
+    importPicker: {
+      title: 'Importar',
+      description: 'Elige qué quieres traer a tu biblioteca.',
+      files: {
+        label: 'Archivos',
+        description: 'Markdown, PDF, imágenes y video desde tu computadora.',
+      },
+      goodnotesZip: {
+        label: 'ZIP de Goodnotes',
+        description: 'Una carpeta de Goodnotes exportada como PDF.',
+      },
+      obsidianVault: {
+        label: 'Bóveda de Obsidian',
+        description:
+          'Una carpeta de bóveda, con sus notas y archivos adjuntos.',
+      },
+      workspaceJson: {
+        label: 'Espacio de trabajo JSON',
+        description: 'Una carpeta exportada desde Myelin.',
+      },
     },
     importMarkdown: {
       unsupportedFile: 'Elige un archivo Markdown (.md, .markdown o .mdx).',

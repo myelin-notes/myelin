@@ -16,7 +16,7 @@ export interface NoteLinkPreview {
 
 export type NoteLinkPreviewSource = Pick<
   Repository,
-  'getNode' | 'searchNodes' | 'getFolderChain'
+  'getNode' | 'getNodesByName' | 'getFolderChain'
 > &
   Pick<YjsSyncTarget, 'loadDocument'>;
 

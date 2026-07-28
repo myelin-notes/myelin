@@ -56,7 +56,7 @@ describe('getNoteLinkPreview', () => {
     );
     const repository = {
       getNode: vi.fn(async () => createFileNode('note-1', 'Alpha Note')),
-      searchNodes: vi.fn(async () => []),
+      getNodesByName: vi.fn(async () => []),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(update)),
     } satisfies NoteLinkPreviewSource;
@@ -71,7 +71,7 @@ describe('getNoteLinkPreview', () => {
       title: 'Alpha Note',
       body: 'Alpha Note\nPreview paragraph with enough text to display.',
     });
-    expect(repository.searchNodes).not.toHaveBeenCalled();
+    expect(repository.getNodesByName).not.toHaveBeenCalled();
     expect(repository.loadDocument).toHaveBeenCalledWith('note-1');
   });
 
@@ -79,17 +79,10 @@ describe('getNoteLinkPreview', () => {
     const update = await createNoteUpdate('Resolved body.');
     const repository = {
       getNode: vi.fn(async () => createFileNode('note-2', 'Resolved Note')),
-      searchNodes: vi.fn(async () =>
-        [
-          createFolderNode('folder-1', 'Folder'),
-          createFileNode('note-2', 'Resolved Note'),
-        ].map((node) => ({
-          node,
-          score: 1,
-          contentSnippet: null,
-          matchedTerms: [],
-        })),
-      ),
+      getNodesByName: vi.fn(async () => [
+        createFolderNode('folder-1', 'Folder'),
+        createFileNode('note-2', 'Resolved Note'),
+      ]),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(update)),
     } satisfies NoteLinkPreviewSource;
@@ -101,13 +94,13 @@ describe('getNoteLinkPreview', () => {
 
     expect(preview?.noteId).toBe('note-2');
     expect(preview?.body).toBe('Resolved body.');
-    expect(repository.searchNodes).toHaveBeenCalledWith('Resolved Note');
+    expect(repository.getNodesByName).toHaveBeenCalledWith('Resolved Note');
   });
 
   it('returns null when the link cannot resolve to a canvas note', async () => {
     const repository = {
       getNode: vi.fn(async () => createFileNode('image-1', 'Image', 'png')),
-      searchNodes: vi.fn(async () => []),
+      getNodesByName: vi.fn(async () => []),
       getFolderChain: vi.fn(async () => []),
       loadDocument: vi.fn(async () => createSnapshot(null)),
     } satisfies NoteLinkPreviewSource;

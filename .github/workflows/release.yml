@@ -29,9 +29,6 @@ env:
   # vars to CMake, so this is the only knob that reaches GGML_NATIVE. Value just
   # needs to be a valid post-1980 epoch (2024-01-01 here).
   SOURCE_DATE_EPOCH: "1704067200"
-  # Must match the updater endpoint host in src-tauri/tauri.conf.json.
-  R2_BUCKET: myelin-updates
-  UPDATER_DOMAIN: https://updates.trymyelin.app
 
 jobs:
   test:
@@ -213,42 +210,6 @@ jobs:
           releaseId: ${{ github.event.release.id }}
           args: ${{ matrix.args }}
 
-      - name: Stage updater artifacts
-        shell: bash
-        run: |
-          mkdir -p updater-out
-          # Copy every signed updater bundle alongside its .sig. Globbing by
-          # .sig keeps us platform-agnostic: each .sig names its own bundle.
-          # macOS is a single universal build, so its "<product>.app.tar.gz" no
-          # longer collides across arches and needs no arch tagging (the manifest
-          # builder maps the universal bundle to both darwin arch keys).
-          while IFS= read -r sig; do
-            bundle="${sig%.sig}"
-            # Strip spaces from the staged name: productName ("Myelin Notes")
-            # bakes a space into the bundle filename, which would land in the
-            # manifest URL, the R2 object key, and promote-release.mjs's
-            # filename round-trip. Removing it keeps all three space-free and
-            # consistent. Suffix matching (-setup.exe/.appimage/.app.tar.gz) is
-            # unaffected, and the .sig sidecar is renamed to match.
-            base="$(basename "$bundle" | tr -d ' ')"
-            cp "$bundle" "updater-out/$base"
-            cp "$sig" "updater-out/$base.sig"
-          done < <(find src-tauri/target -type f -name '*.sig')
-          # Stage the macOS .dmg too: it's the human-facing installer the website
-          # links to, not an updater artifact, so it rides along here to reach the
-          # publish job. Exactly one universal dmg is produced.
-          while IFS= read -r dmg; do
-            cp "$dmg" "updater-out/$(basename "$dmg")"
-          done < <(find src-tauri/target -type f -name '*.dmg')
-
-      - name: Upload updater artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: updater-${{ matrix.platform }}${{ matrix.args && format('-{0}', matrix.args) || '' }}
-          path: updater-out/
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Upload workflow artifacts
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
@@ -259,85 +220,6 @@ jobs:
             src-tauri/target/release/bundle/**/*
           if-no-files-found: ignore
           retention-days: 14
-
-  publish-stable:
-    name: Publish stable to R2
-    needs: build
-    if: github.event_name == 'release' && !github.event.release.prerelease
-    runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # R2 token (Object Read & Write) for the S3 prefix delete in
-      # prune-channel.mjs; wrangler can't bulk-delete a folder.
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_S3_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_S3_SECRET_ACCESS_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-
-      - name: Download updater artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: updater-*
-          path: incoming
-          merge-multiple: true
-
-      - name: Assemble manifest
-        env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: |
-          # The repo's own version is pinned to 0.0.0; the release tag is the
-          # source of truth (same derivation the build jobs stamped in).
-          VERSION="${TAG#v}"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "::error::resolved VERSION is not a semver: '$VERSION'"
-            exit 1
-          fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          node scripts/build-updater-manifest.mjs \
-            --dir incoming \
-            --version "$VERSION" \
-            --base-url "$UPDATER_DOMAIN/stable/$VERSION" \
-            --out latest.json
-          cat latest.json
-
-      - name: Prune old stable versions
-        run: node scripts/prune-channel.mjs stable
-
-      - name: Upload bundles + manifest to R2
-        run: |
-          # Upload the updater bundles (.app.tar.gz / -setup.exe / .AppImage) plus
-          # the macOS .dmg. The .dmg is the human-facing installer the website
-          # links to; it isn't an updater artifact (absent from latest.json), so it
-          # goes up under a fixed name the website can find. Everything else keeps
-          # its own name and is discoverable straight from the manifest.
-          #
-          # Skip the .sig sidecars: their contents are already inlined into
-          # latest.json's signature field, so the app never fetches them. Leaving
-          # them out keeps R2 under its storage cap.
-          for f in incoming/*; do
-            [ -e "$f" ] || continue
-            name="$(basename "$f")"
-            case "$name" in
-              *.sig) continue ;;
-              *.dmg) name="Myelin-macOS.dmg" ;;
-            esac
-            npx --yes wrangler@4 r2 object put \
-              "$R2_BUCKET/stable/$VERSION/$name" --file "$f" --remote
-          done
-          # Versioned copy pins this exact version's manifest.
-          npx --yes wrangler@4 r2 object put \
-            "$R2_BUCKET/stable/$VERSION/latest.json" --file latest.json --remote
-          # The channel-root manifest is the live switch the app polls. Upload last.
-          npx --yes wrangler@4 r2 object put \
-            "$R2_BUCKET/stable/latest.json" --file latest.json --remote
 
   android:
     name: Build (android)

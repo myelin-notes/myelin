@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
+import { IS_DEV } from '@/lib/env';
 
 interface DrawableCanvasViewState {
   zoomLevel: number;
@@ -36,10 +37,15 @@ export function useDrawableCanvasViewState(
     });
 
     canvas.viewport.setOnZoomChange((zoom) => {
-      setViewState((current) => ({
-        ...current,
-        zoomLevel: Math.round(zoom * 100),
-      }));
+      // Fires on every frame of the zoom animation and every wheel/pinch tick;
+      // the rounded percentage is unchanged across most consecutive frames, so
+      // reuse the current state reference to skip redundant re-renders.
+      setViewState((current) => {
+        const zoomLevel = Math.round(zoom * 100);
+        return zoomLevel === current.zoomLevel
+          ? current
+          : { ...current, zoomLevel };
+      });
     });
     canvas.setOnElementEdit((editingElement) => {
       setViewState((current) => ({
@@ -48,10 +54,15 @@ export function useDrawableCanvasViewState(
       }));
     });
     const stopAnimation = startDrawableCanvasAnimationLoop(canvas, (fps) => {
-      setViewState((current) => ({
-        ...current,
-        fps,
-      }));
+      // The FPS counter is only rendered in dev (StatusBar gates it behind
+      // IS_DEV). In production, threading fps into React state would reconcile
+      // the whole canvas tree twice a second to update an invisible value.
+      if (!IS_DEV) {
+        return;
+      }
+      setViewState((current) =>
+        current.fps === fps ? current : { ...current, fps },
+      );
     });
 
     return () => {

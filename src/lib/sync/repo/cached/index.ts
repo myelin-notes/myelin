@@ -321,6 +321,10 @@ export class CachedRepository
     return this.cache.listDirectory(folderId);
   }
 
+  async listChildIds(folderId: string | null): Promise<readonly string[]> {
+    return this.cache.listChildIds(folderId);
+  }
+
   async getFolderChain(folderId: string | null): Promise<VFSFolderNode[]> {
     return this.cache.getFolderChain(folderId);
   }
@@ -330,6 +334,10 @@ export class CachedRepository
     options?: SearchNodesOptions,
   ): Promise<NodeSearchResult[]> {
     return this.cache.searchNodes(query, options);
+  }
+
+  async getNodesByName(name: string): Promise<VFSNode[]> {
+    return this.cache.getNodesByName(name);
   }
 
   async listIndexBackfillItems(): Promise<ReindexItem[]> {
@@ -384,6 +392,13 @@ export class CachedRepository
       });
       return result;
     });
+  }
+
+  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
+    // The manifest lives in the local cache; writes below land on it and queue a
+    // remote op each. Batching there collapses the cache's per-node manifest
+    // saves into one; the outbox still queues an op per node as before.
+    return this.cache.batchManifestWrites(fn);
   }
 
   async createFolder(name: string, parentId: string | null): Promise<string> {
@@ -1630,8 +1645,9 @@ export class CachedRepository
       return { nodeIds: [nodeId], fileIds: [nodeId] };
     }
 
+    const childIds = await this.cache.listChildIds(nodeId);
     const childEntries = await Promise.all(
-      node.children.map((childId) => this.collectDeletedSubtree(childId)),
+      childIds.map((childId) => this.collectDeletedSubtree(childId)),
     );
 
     return {
