@@ -25,7 +25,6 @@ function createFolderNode(
     name,
     type: 'folder',
     parentId,
-    children: [],
     tags: [],
     createdAt: 0,
     modifiedAt: 0,

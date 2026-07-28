@@ -17,7 +17,6 @@ function folder(id: string, name: string): VFSFolderNode {
     name,
     type: 'folder',
     parentId: null,
-    children: [],
     tags: [],
     createdAt: 0,
     modifiedAt: 0,
