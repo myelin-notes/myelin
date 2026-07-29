@@ -12,9 +12,19 @@ Thank you for contributing to Myelin Notes. This Contributor License Agreement (
 "Agreement") records the terms under which you contribute to the Myelin Notes project.
 It is a **license, not an assignment** — you keep ownership of your work.
 
+**TLDR:** Myelin Notes is a personal project
+with one maintainer. You keep the copyright to everything you write. What you're
+granting is permission for me to ship your contribution under the project's
+current source-available license and, if I ever offer a paid version, under
+commercial terms too. There is no paid version today, and I can't promise there
+will be. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the reasoning. If that
+tradeoff isn't one you want to make, please don't sign — issues and bug reports
+are still welcome.
+
 In this Agreement, **"We"** / **"Us"** means Caden Zhang, the licensor and steward
 of the Myelin Notes project (the "Project"), and **"You"** means the individual agreeing
-to these terms. A **"Contribution"** means any original work of authorship,
+to these terms. ("We" is a drafting convention carried over from the templates
+this Agreement is modeled on; it refers to one individual, not a company.) A **"Contribution"** means any original work of authorship,
 including any modifications or additions to existing work, that You intentionally
 submit to Us for inclusion in the Project (for example, by pull request, patch,
 or commit), in any form.
