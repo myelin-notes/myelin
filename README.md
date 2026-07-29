@@ -11,3 +11,6 @@ This project is heavily inspired by
 
 ## Contributing
 Checkout [CONTRIBUTING.md](CONTRIBUTING.md) I plan on maybe monetizing this project one day for non personal use
+
+## AI Usage
+AI is used in the development of the program to speed up the process
