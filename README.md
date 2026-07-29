@@ -1,7 +1,13 @@
-# Tauri + React + Typescript
+# Myelin Notes
+A source-available cross platform notes taking and knowledge management app.
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+## Why?
 
-## Recommended IDE Setup
+I built this for myself because I wanted something like obsidian, but also have the ability to write hand written notes on my tablet for classes. Maybe it will be helpful for you too!
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+This project is heavily inspired by
+- Obsidian
+- Emacs ORG Mode
+
+## Contributing
+Checkout [CONTRIBUTING.md](CONTRIBUTING.md) I plan on maybe monetizing this project one day for non personal use
