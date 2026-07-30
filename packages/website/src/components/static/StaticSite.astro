@@ -78,7 +78,10 @@ const ctaOutline = cn(
           <p class={lede}>{copy.ink.pdfBody}</p>
         </div>
         <div class="lg:col-span-7 lg:pl-6">
-          <Placeholder label="A PDF embedded on the canvas, annotated in ink" />
+          <Shot
+            src="/pdf.png"
+            alt="A PDF embedded on the Myelin canvas, with an equation boxed and an arrow drawn in ink beside it"
+          />
         </div>
       </div>
     </div>
@@ -88,8 +91,9 @@ const ctaOutline = cn(
   <section class:list={[wrap, band]}>
     <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
       <div class="order-2 lg:order-1 lg:col-span-7 lg:pr-6">
-        <Placeholder
-          label="A page frame with headings, tables, math, and a runnable code block"
+        <Shot
+          src="/page-frame.png"
+          alt="A Myelin page frame with headings, note links, a checklist, inline math, and code blocks running with their output beside them"
         />
       </div>
       <div class="order-1 lg:order-2 lg:col-span-5">
@@ -111,9 +115,9 @@ const ctaOutline = cn(
           <p class={lede}>{copy.audioSearch.searchBody}</p>
         </div>
         <div class="grid gap-5 lg:col-span-7 lg:pl-6">
-          <Placeholder
-            label="A recording on the canvas, transcribed on-device"
-            class="aspect-[16/7]"
+          <Shot
+            src="/audio.png"
+            alt="A recording on the Myelin canvas, its waveform drawn as it captures"
           />
           <Placeholder
             label="Search across pages, ink, and audio"
