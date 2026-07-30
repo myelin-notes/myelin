@@ -145,7 +145,6 @@ for step in range(3):
   localFirst: {
     heading: 'It all lives\non your machine.',
     lede: 'No cloud in the middle. Your notes are ordinary files on your own disk, and Myelin works completely offline.',
-    annotation: 'delete the app,\nkeep every note',
     bullets: [
       'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
       'Everything works fully offline, with no account and no server in the middle.',

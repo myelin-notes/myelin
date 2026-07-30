@@ -469,8 +469,7 @@ async function buildInk(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   const y = r.y + SCENE_PAD;
   // Left half: the PDF story, with the shape-recognition demo as a playful
   // aside underneath.
-  title(canvas, x, y + 150, copy.ink.pdfHeading, 72, 1000);
-  drawUnderline(canvas, x + 4, y + 365, 520, ORANGE, 8);
+  title(canvas, x, y + 170, copy.ink.pdfHeading, 72, 1000);
   addText(canvas, x, y + 430, copy.ink.pdfBody, {
     size: 26,
     color: MUTED,
@@ -559,8 +558,8 @@ async function buildLinked(
 ): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.linked.heading, 62, 760);
-  addText(canvas, x, y + 160, copy.linked.body, {
+  title(canvas, x, y + 185, copy.linked.heading, 62, 760);
+  addText(canvas, x, y + 305, copy.linked.body, {
     size: 25,
     color: MUTED,
     width: 740,
@@ -579,31 +578,36 @@ async function buildLinked(
 }
 
 function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
+  // Pull the left column in from the scene edge so it sits closer to the
+  // checklist instead of hugging the far side. The checklist stays put (it is
+  // anchored off r.x below), so this closes the gutter from the left and evens
+  // out the scene's outer margins at the same time.
+  const x = r.x + SCENE_PAD + 100;
   const y = r.y + SCENE_PAD;
 
   // Left column: the thesis. A two-line headline with the highlighter riding
-  // "your machine.", a short lede on a tight measure, and one hand-drawn
-  // aside pointing across the gutter at the proof panel.
-  title(canvas, x, y + 40, copy.localFirst.heading, 68, 700);
+  // "your machine.", and a short lede on a tight measure. The whole block is
+  // pushed down so its center lines up with the checklist across the gutter:
+  // the headline and lede span roughly 370 units against the checklist's ~540,
+  // so the offsets below sit the pair mid-height in the scene rather than
+  // hanging the left column from the top edge.
+  title(canvas, x, y + 160, copy.localFirst.heading, 68, 700);
   addStroke(
     canvas,
-    wobblyLine([x + 120, y + 172], [x + 502, y + 166], 4, 0.8),
+    wobblyLine([x + 120, y + 292], [x + 502, y + 286], 4, 0.8),
     HIGHLIGHT,
     50,
   );
-  addText(canvas, x, y + 300, copy.localFirst.lede, {
+  addText(canvas, x, y + 420, copy.localFirst.lede, {
     size: 26,
     color: MUTED,
     width: 620,
   });
-  hand(canvas, x + 50, y + 480, copy.localFirst.annotation, GREEN, 40, 420);
-  drawArrow(canvas, [x + 410, y + 545], [x + 706, y + 450], GREEN, 4);
 
   // Right column: the five proof points as a checklist. Fixed row rhythm; the
   // closing bullet stays inked darker as the emphasis.
   const bullets = copy.localFirst.bullets;
-  const px = x + 780;
+  const px = r.x + 870;
   const py = y + 10;
   bullets.forEach((bullet, i) => {
     const by = py + 62 + i * 118;
