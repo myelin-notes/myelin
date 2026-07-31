@@ -11,7 +11,6 @@
 // will run, so desktop never renders a frame of it.
 import { Wordmark, buttonVariants, cn } from '@myelin/ui';
 import CheckList from './CheckList.astro';
-import Placeholder from './Placeholder.astro';
 import Shot from './Shot.astro';
 import { copy, faqs, siteLinks } from '../../content/site';
 
@@ -118,10 +117,6 @@ const ctaOutline = cn(
           <Shot
             src="/audio.png"
             alt="A recording on the Myelin canvas, its waveform drawn as it captures"
-          />
-          <Placeholder
-            label="Search across pages, ink, and audio"
-            class="aspect-[16/7]"
           />
         </div>
       </div>

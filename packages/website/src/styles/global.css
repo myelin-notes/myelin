@@ -85,16 +85,6 @@ html {
   text-transform: uppercase;
 }
 
-/* A section of the static page whose visual is a stand-in rather than a real
-   screenshot: the app's dotted canvas, framed like a Shot. */
-.placeholder-shot {
-  background-image: radial-gradient(
-    var(--border-divider) 1.5px,
-    transparent 1.5px
-  );
-  background-size: 22px 22px;
-}
-
 /* One orchestrated load for the static hero: staggered rise, no bounce. */
 @keyframes rise {
   from {
@@ -151,13 +141,45 @@ html {
   padding: 0.15rem 0.55rem;
 }
 
+/* Pushed right so the nav sits beside the Download button rather than crowding
+   the wordmark. This carries the `margin-left: auto` for the whole right-hand
+   group, which is why `.topbar-download` no longer needs its own. */
+.site-topbar .topbar-nav {
+  align-items: center;
+  display: flex;
+  gap: 1.25rem;
+  margin-left: auto;
+}
+
+.site-topbar .topbar-nav a {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.site-topbar .topbar-nav a:hover {
+  color: var(--text-primary);
+}
+
+/* Five links plus the wordmark, badge, and CTA overflow a 3rem bar on a phone.
+   The static page below this width still carries all of them in its footer. */
+@media (max-width: 640px) {
+  .site-topbar .topbar-nav {
+    display: none;
+  }
+  /* With the nav gone, the CTA has to carry the auto margin itself. */
+  .site-topbar .topbar-download {
+    margin-left: auto;
+  }
+}
+
 .site-topbar .topbar-download {
   background: var(--accent-dark);
   border-radius: 0.4rem;
   color: var(--text-on-dark);
   font-size: 0.8rem;
   font-weight: 500;
-  margin-left: auto;
   padding: 0.4rem 0.8rem;
   text-decoration: none;
 }
