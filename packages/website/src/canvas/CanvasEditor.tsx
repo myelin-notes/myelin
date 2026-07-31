@@ -38,12 +38,42 @@ function jumpToScene(canvas: DrawableCanvas, rect: WorldRect): void {
 }
 
 /**
+ * The rect to frame at a fractional scroll position: scene 2.4 is the framing
+ * 40% of the way from scene 2 to scene 3. Centers move linearly, but the size
+ * interpolates geometrically because zoom is inversely proportional to it —
+ * linear sizes would make the zoom race at the wide end of a pan and crawl at
+ * the narrow one.
+ */
+function sceneRectAt(progress: number): WorldRect {
+  const last = SCENES.length - 1;
+  const clamped = Math.max(0, Math.min(last, progress));
+  const i = Math.min(Math.floor(clamped), last - 1);
+  const t = clamped - i;
+  const a = SCENES[i].rect;
+  const b = SCENES[i + 1].rect;
+
+  const width = a.width * (b.width / a.width) ** t;
+  const height = a.height * (b.height / a.height) ** t;
+  const centerX =
+    a.x + a.width / 2 + (b.x + b.width / 2 - (a.x + a.width / 2)) * t;
+  const centerY =
+    a.y + a.height / 2 + (b.y + b.height / 2 - (a.y + a.height / 2)) * t;
+
+  return {
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height,
+  };
+}
+
+/**
  * The landing experience: the real Myelin canvas engine mounted on an
  * in-memory Y.Doc, pre-populated with the whole content plan as canvas
  * elements laid out in world space. A fake scroll (wheel/keys/rail, no real
- * scrollbar) steps through preset scenes, and the engine's own view animation
- * flies the camera between them. Visitors can still draw, select, and type
- * on everything.
+ * scrollbar) produces a continuous position across the preset scenes, and the
+ * camera is interpolated to match it every frame. Visitors can still draw,
+ * select, and type on everything.
  */
 export default function CanvasEditor() {
   return (
@@ -152,7 +182,14 @@ function CanvasEditorInner() {
     };
   }, [canvasTools, setSelectedToolIndex, hideOptions]);
 
-  const { index, goTo } = useFakeScroll({
+  const applyCamera = (progress: number) => {
+    drawableCanvasRef.current?.viewport.setViewToFitRect(
+      toDomRect(sceneRectAt(progress)),
+      SCENE_FIT,
+    );
+  };
+
+  const { index, goTo, getProgress } = useFakeScroll({
     sceneCount: SCENES.length,
     isBlocked: () => {
       const c = drawableCanvasRef.current;
@@ -160,12 +197,9 @@ function CanvasEditorInner() {
       // frames scroll along their page axis).
       return !c || c.editingElement !== null;
     },
-    onIndexChange: (i) => {
+    onScroll: (progress) => {
       userNavigatedRef.current = true;
-      drawableCanvasRef.current?.viewport.animateViewToFitRect(
-        toDomRect(SCENES[i].rect),
-        SCENE_FIT,
-      );
+      applyCamera(progress);
     },
   });
 
@@ -214,12 +248,9 @@ function CanvasEditorInner() {
     })),
   ];
 
-  // Keep the active scene framed across window resizes.
+  // Keep the current position framed across window resizes.
   const refitScene = useEffectEvent(() => {
-    drawableCanvasRef.current?.viewport.animateViewToFitRect(
-      toDomRect(SCENES[index].rect),
-      SCENE_FIT,
-    );
+    applyCamera(getProgress());
   });
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
