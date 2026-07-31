@@ -1,12 +1,12 @@
 export const siteTitle =
   'Myelin Notes: a local-first note-taking app for handwriting, type, and PDFs';
 export const siteDescription =
-  'Myelin Notes is a native, local-first note-taking app for Mac, Windows, Linux, iOS, and Android: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Free in early access.';
+  'Myelin Notes is a native, local-first note-taking app for Mac, Windows, Linux, iOS, and Android: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Completely free for personal use.';
 
 /**
  * External destinations, centralized so a URL change is a one-line edit.
- * TODO(links): confirm the Discord invite, Sponsors, and Ko-fi URLs before
- * launch; the GitHub repo and releases links are real today.
+ * TODO(links): confirm the Discord invite before launch; the GitHub repo and
+ * releases links are real today.
  */
 export const siteLinks = {
   github: 'https://github.com/myelin-notes/myelin',
@@ -18,8 +18,6 @@ export const siteLinks = {
   roadmap: 'https://github.com/myelin-notes/myelin/issues',
   license: 'https://github.com/myelin-notes/myelin/blob/main/LICENSE.md',
   discord: 'https://github.com/myelin-notes/myelin',
-  sponsors: 'https://github.com/sponsors/winterSteve25',
-  kofi: 'https://ko-fi.com/wintersteve25',
 };
 
 /** Every platform Myelin ships a native build for. */
@@ -51,7 +49,7 @@ export const copy = {
     subheadline:
       'Myelin Notes is a native, local-first note-taking app: one canvas where ink, rich text, PDFs, images, and audio live together. Your notes stay on your machine, and you can still edit live with others, no server required.',
     trustLine:
-      'Free while in early access · No account required · Your notes are never paywalled',
+      'Completely free for personal use · No account required · Your notes are never paywalled',
     ctaPrimary: 'Download',
     ctaSecondary: 'See it in action',
   },
@@ -175,23 +173,9 @@ for step in range(3):
       {
         badge: 'Coming',
         title: 'Myelin Sync',
-        body: 'Optional end-to-end encrypted cloud sync for always-on, multi-device sync. Founding Supporters get a lifetime discount when it launches.',
+        body: 'Optional end-to-end encrypted cloud sync for always-on, multi-device sync.',
       },
     ],
-  },
-
-  supporter: {
-    heading: 'Free during early access.\nNever a paywall on your notes.',
-    body: 'The editor and your notes stay free. If you want Myelin to exist long-term, become a Founding Supporter.',
-    benefits: [
-      'Early insider builds',
-      'Supporters Discord',
-      'Founding Supporter badge',
-      'Lifetime discount on Myelin Sync when it launches',
-    ],
-    reassurance: 'None of these benefits gate the editor or your notes.',
-    ctaPrimary: 'Sponsor on GitHub',
-    ctaSecondary: 'Support on Ko-fi',
   },
 
   download: {
@@ -237,7 +221,7 @@ for step in range(3):
 
 ## Is it really free?
 
-Yes, during early access. The editor and your notes stay free forever; a paid, optional Sync service comes later.
+Yes, completely free for personal use. A paid, optional Sync service comes later.
 
 ## Where are my notes stored?
 
@@ -278,8 +262,6 @@ Myelin Notes is native on all three, with the same notes, the same canvas, and t
       { label: 'GitHub', href: siteLinks.github },
       { label: 'Roadmap', href: siteLinks.roadmap },
       { label: 'Discord', href: siteLinks.discord },
-      { label: 'Sponsor', href: siteLinks.sponsors },
-      { label: 'Ko-fi', href: siteLinks.kofi },
       { label: 'License', href: siteLinks.license },
     ],
     download: 'Download Myelin',

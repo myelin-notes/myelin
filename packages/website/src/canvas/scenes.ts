@@ -51,7 +51,6 @@ const SIZES: Array<{
   { id: 'linked', label: 'Linked notes', w: 1750, h: 800, y: -150 },
   { id: 'local-first', label: 'Local-first', w: 1850, h: 850, y: 900 },
   { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150, y: 1850 },
-  { id: 'supporter', label: 'Support', w: 1800, h: 1150, y: 550 },
   { id: 'download', label: 'Download', w: 2100, h: 1400, y: 1400 },
 ];
 
@@ -691,30 +690,6 @@ function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
   });
 }
 
-function buildSupporter(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
-  const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.supporter.heading, 56, 1100);
-  addText(canvas, x, y + 240, copy.supporter.body, {
-    size: 26,
-    color: MUTED,
-    width: 820,
-  });
-  copy.supporter.benefits.forEach((benefit, i) => {
-    const by = y + 400 + i * 90;
-    drawCheck(canvas, x + 6, by + 6, 0.9);
-    addText(canvas, x + 64, by, benefit, { size: 25, width: 900 });
-  });
-  addText(canvas, x, y + 790, copy.supporter.reassurance, {
-    size: 21,
-    color: MUTED,
-    width: 800,
-  });
-  // Sponsor buttons (DOM overlay) render to the right of the benefits list.
-  addStroke(canvas, sketchEllipse(r.x + 1400, y + 510, 240, 140, 0.2), PINK, 6);
-  hand(canvas, r.x + 1290, y + 450, 'keep it\nindependent', PINK, 44, 260);
-}
-
 async function buildDownload(
   canvas: DrawableCanvas,
   r: WorldRect,
@@ -761,7 +736,6 @@ export async function populateScenes(canvas: DrawableCanvas): Promise<void> {
   buildAudioSearch(canvas, rect('audio-search'));
   buildLocalFirst(canvas, rect('local-first'));
   buildSync(canvas, rect('sync'));
-  buildSupporter(canvas, rect('supporter'));
   await buildInk(canvas, rect('ink'));
   await buildHero(canvas, rect('hero'));
   await buildLinked(canvas, rect('linked'));

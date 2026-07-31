@@ -191,38 +191,10 @@ const ctaOutline = cn(
     </div>
   </section>
 
-  <!-- Founding supporters -->
-  <section class="bg-surface">
-    <div class:list={[wrap, band, 'text-center']}>
-      <p class={kicker}>07 / Support</p>
-      <h2
-        class="mx-auto mt-6 max-w-3xl font-heading text-[clamp(2rem,4vw,3.5rem)] leading-[1.08] font-medium tracking-[-0.015em] whitespace-pre-line text-text-primary"
-      >
-        {copy.supporter.heading}
-      </h2>
-      <p
-        class="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-text-secondary"
-      >
-        {copy.supporter.body}
-      </p>
-      <CheckList
-        items={copy.supporter.benefits}
-        class="mx-auto mt-10 w-fit text-left sm:grid-cols-2 sm:gap-x-8"
-      />
-      <p class="mt-8 text-sm text-text-muted">{copy.supporter.reassurance}</p>
-      <div class="mt-10 flex flex-wrap justify-center gap-4">
-        <a href={siteLinks.sponsors} class={cta}>{copy.supporter.ctaPrimary}</a>
-        <a href={siteLinks.kofi} class={ctaOutline}>
-          {copy.supporter.ctaSecondary}
-        </a>
-      </div>
-    </div>
-  </section>
-
   <!-- FAQ -->
   <section id="faq" class:list={[wrap, band]}>
     <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-      <p class:list={[kicker, 'lg:col-span-3']}>08 / Questions</p>
+      <p class:list={[kicker, 'lg:col-span-3']}>07 / Questions</p>
       <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
     </div>
     {/* Two columns from `sm` up, not `lg`: this page only ever renders below
@@ -246,7 +218,7 @@ const ctaOutline = cn(
   <!-- Download -->
   <section id="download" class="bg-primary text-text-on-dark">
     <div class:list={[wrap, 'py-28 lg:py-36']}>
-      <p class="kicker text-text-on-dark/55">09 / Download</p>
+      <p class="kicker text-text-on-dark/55">08 / Download</p>
       <h2
         class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] whitespace-pre-line"
       >
