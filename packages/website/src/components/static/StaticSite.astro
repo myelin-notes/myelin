@@ -143,17 +143,16 @@ const ctaOutline = cn(
   <!-- Local-first -->
   <section id="local" class="bg-surface">
     <div class:list={[wrap, band]}>
-      <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-        <p class:list={[kicker, 'lg:col-span-3']}>05 / Local-first</p>
-        <h2 class:list={[heading, 'lg:col-span-9']}>
-          {copy.localFirst.heading}
-        </h2>
-      </div>
-      <div class="mt-12 grid gap-x-10 gap-y-8 lg:mt-16 lg:grid-cols-12">
-        <p class="text-text-secondary lg:col-span-5 lg:col-start-4">
-          {copy.localFirst.lede}
-        </p>
-        <CheckList items={copy.localFirst.bullets} class="lg:col-span-4" />
+      <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
+        <div class="lg:col-span-5">
+          <p class={kicker}>05 / Local-first</p>
+          <h2 class:list={[heading, 'mt-6']}>{copy.localFirst.heading}</h2>
+          <p class={lede}>{copy.localFirst.lede}</p>
+        </div>
+        <CheckList
+          items={copy.localFirst.bullets}
+          class="lg:col-span-7 lg:pl-6"
+        />
       </div>
     </div>
   </section>
