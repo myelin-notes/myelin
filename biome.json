@@ -34,7 +34,7 @@
     "lineWidth": 80
   },
   "javascript": {
-    "globals": ["__TABLET_BUILD__"],
+    "globals": ["__MOBILE_BUILD__"],
     "formatter": {
       "quoteStyle": "single",
       "trailingCommas": "all",

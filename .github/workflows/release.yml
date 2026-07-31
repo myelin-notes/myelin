@@ -228,6 +228,11 @@ jobs:
     env:
       NDK_VERSION: 26.3.11579264
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      # Ships the tablet full-page library layout instead of the desktop
+      # sidebar, matching the ios job. `tauri android build` already exports
+      # TAURI_ENV_PLATFORM=android, which vite.config.ts keys off; this is the
+      # same belt-and-suspenders the ios job carries.
+      VITE_TABLET_LAYOUT: "true"
     steps:
       - uses: actions/checkout@v4
         with:
