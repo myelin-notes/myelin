@@ -397,6 +397,7 @@ export class AudioElement extends DrawableElement {
         }
         this._waveform = waveform;
         this.render();
+        this.requestRedraw();
       })
       .catch(() => {});
   }

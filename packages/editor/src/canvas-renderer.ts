@@ -8,6 +8,29 @@ import { UserPrefs } from './user-prefs';
 
 type CanvasBackground = 'grid' | 'dots' | 'blank';
 
+/** Side length of one background pattern tile, in world units. */
+const BG_TILE_SIZE = 24;
+
+let maxDevicePixelRatio = Number.POSITIVE_INFINITY;
+
+/**
+ * Cap the backing-store scale of every canvas layer. Tablet builds set this at
+ * bootstrap so an old iPad rasterizes far fewer pixels per layer per frame
+ * (each layer is cleared and repainted every frame, so the saving is paid three
+ * times over); desktop and the website leave it uncapped.
+ *
+ * Set it once, before any canvas mounts: `redraw` derives logical size from the
+ * backing store using this same scale, so changing it mid-session would
+ * mismatch a canvas sized under the old value until its next resize.
+ */
+export function setMaxDevicePixelRatio(max: number): void {
+  maxDevicePixelRatio = max;
+}
+
+function renderScale(): number {
+  return Math.min(window.devicePixelRatio || 1, maxDevicePixelRatio);
+}
+
 /**
  * Owns the three canvas layers (background grid/dots, foreground content +
  * cursor, selection overlay) and their RenderingContext-scoped concerns: DPR
@@ -27,28 +50,40 @@ export class CanvasRenderer {
   private unsubBgPref: (() => void) | null = null;
   private unsubTheme: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private readonly onInvalidate: () => void;
 
+  /**
+   * @param onInvalidate Called when something the renderer owns changes what
+   * the next frame should look like (theme, background pref, a resize that
+   * cleared the backing stores). Frames are only drawn when the canvas is
+   * dirty, so without this those changes would not reach the screen.
+   */
   public constructor(
     foregroundCtx: CanvasRenderingContext2D,
     foregroundCanvas: HTMLCanvasElement,
+    onInvalidate: () => void = () => {},
   ) {
     this.ctx = foregroundCtx;
     this.canvas = foregroundCanvas;
+    this.onInvalidate = onInvalidate;
     this.syncSizeToContainer();
     this.bgStyle = UserPrefs.get('canvasBackground');
     this.buildBgPattern(this.bgStyle);
     this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
       this.buildBgPattern(bg);
+      this.onInvalidate();
     });
     // Theme toggle changes the grid color, but the pattern is cached — rebuild.
     this.unsubTheme = onCanvasThemeChange(() => {
       this.buildBgPattern(this.bgStyle);
+      this.onInvalidate();
     });
     // The canvas fills its pane, whose width changes when the sidebar is
     // toggled/resized or the pane is split — not only on window resize. Track
     // the element's own laid-out size so the viewport center stays correct.
     this.resizeObserver = new ResizeObserver(() => {
       this.syncSizeToContainer();
+      this.onInvalidate();
     });
     this.resizeObserver.observe(this.canvas);
   }
@@ -72,7 +107,7 @@ export class CanvasRenderer {
       return;
     }
 
-    const spacing = 24;
+    const spacing = BG_TILE_SIZE;
     const tile = new OffscreenCanvas(spacing, spacing);
     const pctx = tile.getContext('2d')!;
     const color = getCanvasPalette().grid;
@@ -107,7 +142,7 @@ export class CanvasRenderer {
     placementController: PlacementController,
     domOverlayHost: HTMLElement | null,
   ): void {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = renderScale();
     const logicalW = this.canvas.width / dpr;
     const logicalH = this.canvas.height / dpr;
 
@@ -126,11 +161,16 @@ export class CanvasRenderer {
         this.bgCtx.scale(zoom, zoom);
         this.bgCtx.translate(offset.x, offset.y);
         this.bgCtx.fillStyle = this.bgPattern;
+        // Under this transform the visible viewport is exactly
+        // (-offset, bg/zoom), and a 'repeat' pattern tiles to fill whatever
+        // rect it is given — so fill just that, plus one tile of slack against
+        // float error at the edges. Filling a 3x3 viewport block here (as this
+        // once did) discarded 8/9 of the rasterized pixels every frame.
         this.bgCtx.fillRect(
-          -offset.x - bgW / zoom,
-          -offset.y - bgH / zoom,
-          (bgW * 3) / zoom,
-          (bgH * 3) / zoom,
+          -offset.x - BG_TILE_SIZE,
+          -offset.y - BG_TILE_SIZE,
+          bgW / zoom + BG_TILE_SIZE * 2,
+          bgH / zoom + BG_TILE_SIZE * 2,
         );
         this.bgCtx.restore();
       }
@@ -229,7 +269,7 @@ export class CanvasRenderer {
   }
 
   private resizeCanvas(width: number, height: number): void {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = renderScale();
     this.canvas.width = width * dpr;
     this.canvas.height = height * dpr;
     // Assigning width/height resets context state; re-apply smoothing quality
@@ -241,7 +281,7 @@ export class CanvasRenderer {
     if (!this.bgCanvas) {
       return;
     }
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = renderScale();
     this.bgCanvas.width = width * dpr;
     this.bgCanvas.height = height * dpr;
   }
@@ -250,7 +290,7 @@ export class CanvasRenderer {
     if (!this.overlayCanvas) {
       return;
     }
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = renderScale();
     this.overlayCanvas.width = width * dpr;
     this.overlayCanvas.height = height * dpr;
   }

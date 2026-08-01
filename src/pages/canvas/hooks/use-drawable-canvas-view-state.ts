@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
-import { IS_DEV } from '@/lib/env';
+import { IS_DEV, IS_TABLET_BUILD } from '@/lib/env';
+
+// Where the status bar actually shows the FPS readout. Tablet builds are
+// included while we chase the iPad frame rate: without it there is no way to
+// turn "feels slow" into a number on a sideloaded device, which cannot be
+// attached to Safari Web Inspector.
+const SHOW_FPS = IS_DEV || IS_TABLET_BUILD;
 
 interface DrawableCanvasViewState {
   zoomLevel: number;
@@ -54,10 +60,10 @@ export function useDrawableCanvasViewState(
       }));
     });
     const stopAnimation = startDrawableCanvasAnimationLoop(canvas, (fps) => {
-      // The FPS counter is only rendered in dev (StatusBar gates it behind
-      // IS_DEV). In production, threading fps into React state would reconcile
-      // the whole canvas tree twice a second to update an invisible value.
-      if (!IS_DEV) {
+      // Only thread fps into React state where StatusBar actually renders it;
+      // elsewhere this would reconcile the whole canvas tree twice a second to
+      // update an invisible value.
+      if (!SHOW_FPS) {
         return;
       }
       setViewState((current) =>

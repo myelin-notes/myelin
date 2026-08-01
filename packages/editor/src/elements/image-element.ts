@@ -90,6 +90,7 @@ export class ImageElement extends DrawableElement {
         const blob = new Blob([(v as Uint8Array).slice()]);
         createImageBitmap(blob).then((bmp) => {
           this._bitmap = bmp;
+          this.requestRedraw();
         });
       },
     });
@@ -120,6 +121,10 @@ export class ImageElement extends DrawableElement {
     this._cropW = this._naturalWidth;
     this._cropH = this._naturalHeight;
     this.updateBox();
+    // The bitmap landed after the insert that added this element repainted, and
+    // syncToYMap below writes with the local origin (which the deep observer
+    // skips), so nothing else would ask for the frame that first shows it.
+    this.requestRedraw();
     this.syncToYMap({
       imageData: new Uint8Array(data),
       naturalWidth: this._naturalWidth,

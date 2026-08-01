@@ -52,6 +52,35 @@ type YElementsDeepEvent = YElementsDeepEvents[number];
 
 const ELEMENT_Z_ORDER_KEY = 'zOrder';
 
+/**
+ * Repaint at least this often even when nothing reported a change. Every source
+ * that alters the frame is meant to call `invalidate`, but that is a list a
+ * future element can forget to join; this bounds the damage of a missed call to
+ * a visible lag instead of a canvas that never updates again. At 1s it costs
+ * one frame per second against the ~60 the loop used to draw unconditionally.
+ */
+export const MAX_CLEAN_FRAME_GAP_MS = 1000;
+
+/**
+ * Whether the animation loop should paint this frame.
+ *
+ * `hasAnimatingSelection` is a callback rather than a value so the scan over
+ * every element it implies is skipped on the common dirty path.
+ */
+export function shouldRepaintFrame(
+  dirty: boolean,
+  msSinceLastPaint: number,
+  hasAnimatingSelection: () => boolean,
+): boolean {
+  if (dirty) {
+    return true;
+  }
+  if (msSinceLastPaint >= MAX_CLEAN_FRAME_GAP_MS) {
+    return true;
+  }
+  return hasAnimatingSelection();
+}
+
 function isBackgroundElement(type: ElementType): boolean {
   return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
 }
@@ -228,6 +257,16 @@ export class DrawableCanvas {
   private _contentBoundsCache: DOMRect | null = null;
   private _contentBoundsValid = false;
 
+  /**
+   * Set whenever something changes what the next frame should look like; the
+   * animation loop skips `redraw` entirely while it is false. An idle canvas
+   * otherwise repaints three DPR-scaled layers 60 times a second for nothing,
+   * which is most of the frame budget on a low-end tablet.
+   */
+  private _dirty = true;
+  /** Timestamp of the last painted frame, for {@link MAX_CLEAN_FRAME_GAP_MS}. */
+  private _lastPaintedAt = 0;
+
   /** Latest live-session membership; null until the app feeds a snapshot. */
   private _livePeers: LivePeersSnapshot | null = null;
 
@@ -247,9 +286,13 @@ export class DrawableCanvas {
     this.canvas = canvas;
     this.canvas.style.zIndex = '10';
     this.ctx = ctx!;
-    this.renderer = new CanvasRenderer(this.ctx, canvas);
+    this.renderer = new CanvasRenderer(this.ctx, canvas, () =>
+      this.invalidate(),
+    );
     this.viewport = new CanvasViewport(canvas);
     this.viewport.setContentBoundsProvider(() => this.getContentBounds());
+    // Covers every pan, zoom, pinch and view-animation frame in one hook.
+    this.viewport.onViewChange(() => this.invalidate());
     this.state = new StateMachine(InteractState.Idle);
     this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
@@ -293,6 +336,7 @@ export class DrawableCanvas {
         element.setLivePeers(snapshot);
       }
     }
+    this.invalidate();
   }
 
   /**
@@ -328,6 +372,7 @@ export class DrawableCanvas {
 
   private notifyChange(): void {
     this._contentBoundsValid = false;
+    this.invalidate();
     for (const listener of this._changeListeners) {
       listener();
     }
@@ -404,13 +449,18 @@ export class DrawableCanvas {
   }
 
   private configureElement(element: DrawableElement): void {
+    element.onNeedsRedraw = () => {
+      this.invalidate();
+    };
     element.onSelectionChanged = () => {
       this.notifyChange();
     };
     element.onTransformChanged = () => {
-      // Any element geometry change invalidates the cached content bounds, even
-      // for unselected elements (notifyChange only fires for selected ones).
+      // Any element geometry change invalidates the cached content bounds and
+      // repaints, even for unselected elements (notifyChange, which does both,
+      // only fires for selected ones).
       this._contentBoundsValid = false;
+      this.invalidate();
       if (element.isSelected) {
         this.notifyChange();
       }
@@ -453,8 +503,10 @@ export class DrawableCanvas {
 
     // Remote field syncs update element geometry without going through
     // notifyChange or onTransformChanged, so invalidate the content-bounds cache
-    // here to keep pan clamping correct after a peer moves an element.
+    // here to keep pan clamping correct after a peer moves an element — and
+    // repaint, or a peer's edit would not show up until something local did.
     this._contentBoundsValid = false;
+    this.invalidate();
 
     let changedElementOrder = false;
     const insertedMaps = new Set<Y.Map<unknown>>();
@@ -589,6 +641,7 @@ export class DrawableCanvas {
 
   public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
     this.renderer.setBackgroundCanvas(canvas);
+    this.invalidate();
   }
 
   /**
@@ -598,10 +651,12 @@ export class DrawableCanvas {
    */
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
     this.renderer.setOverlayCanvas(canvas);
+    this.invalidate();
   }
 
   public setDomOverlayHost(host: HTMLElement): void {
     this._domOverlayHost = host;
+    this.invalidate();
   }
 
   public setOnElementEdit(callback: (element: DrawableElement | null) => void) {
@@ -894,7 +949,39 @@ export class DrawableCanvas {
     window.removeEventListener('resize', this._handleResize);
   }
 
+  /**
+   * Mark the canvas as needing a repaint. Cheap and idempotent — call it from
+   * anything that changes what the canvas should look like, including async
+   * completions that land outside a user interaction.
+   */
+  public invalidate(): void {
+    this._dirty = true;
+  }
+
+  /**
+   * Whether the next animation frame has anything to paint. The selection ramp
+   * is the one animation that advances on its own, so it has to keep frames
+   * coming while it runs; everything else sets `_dirty`.
+   */
+  private needsRepaint(now: number): boolean {
+    return shouldRepaintFrame(this._dirty, now - this._lastPaintedAt, () => {
+      for (const element of this._store.all()) {
+        if (element.isSelectionAnimating) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
   public redraw(deltaTime: number) {
+    const now = performance.now();
+    if (!this.needsRepaint(now)) {
+      return;
+    }
+    this._dirty = false;
+    this._lastPaintedAt = now;
+
     this.renderer.redraw(
       deltaTime,
       this.viewport,
@@ -1176,6 +1263,9 @@ export class DrawableCanvas {
     // canvas heard about until the cursor left that DOM again. Hover still
     // only fires for the bare canvas.
     this._handlePointerMove = (evt) => {
+      // Unconditional: the tool cursor tracks the pointer, and an in-progress
+      // stroke or drag mutates element internals that nothing else reports.
+      this.invalidate();
       this.screenPosition = this.viewport.getScreenPoint(evt);
       this.state.update(evt);
       if (evt.target === canvas) {
@@ -1187,6 +1277,7 @@ export class DrawableCanvas {
     window.addEventListener('pointermove', this._handlePointerMove);
 
     this._handlePointerDown = (evt) => {
+      this.invalidate();
       // One-shot placement intercepts primary-button clicks regardless of tool.
       if (this._placement.isActive) {
         if (evt.button === 0) {
@@ -1246,6 +1337,7 @@ export class DrawableCanvas {
     canvas.addEventListener('pointerdown', this._handlePointerDown);
 
     this._handlePointerUp = (evt) => {
+      this.invalidate();
       this._activeTouchPointers.delete(evt.pointerId);
       this.state.change(InteractState.Idle, evt);
     };
@@ -1257,6 +1349,7 @@ export class DrawableCanvas {
 
     this._handleResize = () => {
       this.renderer.refreshSize();
+      this.invalidate();
     };
     window.addEventListener('resize', this._handleResize);
   }
@@ -1381,6 +1474,9 @@ export class DrawableCanvas {
     this.toolSelected = this.tools[to];
     this._toolCursor = 'default';
     this.updateCursor();
+    // The new tool draws its own on-canvas cursor. Unselecting above only
+    // repaints when something was actually selected.
+    this.invalidate();
     // Single sync point: every tool switch notifies React so the toolbar
     // selection follows, whether triggered by the UI, a keybind, or a tool
     // handing control back (e.g. the text tool reverting to select).
@@ -1402,10 +1498,12 @@ export class DrawableCanvas {
 
   public undo() {
     this._ydoc.undoManager.undo();
+    this.invalidate();
   }
 
   public redo() {
     this._ydoc.undoManager.redo();
+    this.invalidate();
   }
 
   public static makeTools(getStrings: MessageGetter): ITool[] {

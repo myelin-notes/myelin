@@ -91,6 +91,13 @@ export abstract class DrawableElement {
   private _hidden: boolean = false;
   public onSelectionChanged?: () => void;
   public onTransformChanged?: () => void;
+  /**
+   * Installed by the canvas. Frames are only drawn when something has changed,
+   * so content that becomes paintable outside a user interaction (an image
+   * bitmap decoding, a PDF page rasterizing, a webfont loading) must say so or
+   * it will not appear until the next unrelated change.
+   */
+  public onNeedsRedraw?: () => void;
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
   protected _yMap: Y.Map<unknown> | null = null;
@@ -191,6 +198,23 @@ export abstract class DrawableElement {
   }
   public set hidden(value: boolean) {
     this._hidden = value;
+  }
+
+  /**
+   * Ask the canvas to paint a frame. Call after async work makes this element
+   * look different (see {@link onNeedsRedraw}).
+   */
+  protected requestRedraw(): void {
+    this.onNeedsRedraw?.();
+  }
+
+  /**
+   * Whether the selection ramp is still running, so the canvas must keep
+   * drawing frames. This is the only time-driven animation in the element
+   * render path: no `draw2D` override reads `deltaTime`.
+   */
+  public get isSelectionAnimating(): boolean {
+    return this.selected && this.selectionT < 1;
   }
 
   /** Draw element content. Selection outline is drawn separately by `drawSelectionOverlay`. */

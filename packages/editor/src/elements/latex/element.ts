@@ -303,6 +303,7 @@ export class LatexElement extends DrawableElement {
     void fonts.ready.then(() => {
       if (token === this._fontRemeasureToken) {
         this._naturalDirty = true;
+        this.requestRedraw();
       }
     });
   }

@@ -1,8 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { setMaxDevicePixelRatio } from '@myelin/editor/canvas-renderer';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
 import { setLogErrorReporter, setLogSink } from '@myelin/shared/logger';
 import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
+import { IS_TABLET_BUILD } from '@/lib/env';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
 import { I18nProvider } from '@/lib/i18n';
 import { flushLogs } from '@/lib/logger';
@@ -27,6 +29,13 @@ import './index.css';
 // covers throws during the synchronous startup calls below.
 try {
   setPlatform(tauriPlatform);
+  // An iPad's DPR of 2 means each of the canvas's three layers rasterizes 4x
+  // the logical pixel count, every frame. 1.5 cuts that by ~1.8x per layer at
+  // a cost in ink/text crispness that only shows up on close inspection; drop
+  // it to 1 for another 2.25x if older devices still can't keep up.
+  if (IS_TABLET_BUILD) {
+    setMaxDevicePixelRatio(1.5);
+  }
   setLogSink(writeLogs);
   // Drain log lines queued while modules were importing (pre-sink).
   void flushLogs();

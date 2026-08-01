@@ -1,8 +1,12 @@
 import { memo } from 'react';
 import { Crosshair, ImageDown, Lock, Unlock } from 'lucide-react';
 import { formatNumber } from '@myelin/editor/i18n/format';
-import { IS_DEV } from '@/lib/env';
+import { IS_DEV, IS_TABLET_BUILD } from '@/lib/env';
 import { useLocale, useMessages } from '@/lib/i18n';
+
+// Keep in sync with useDrawableCanvasViewState, which only threads fps into
+// React state when this is true.
+const SHOW_FPS = IS_DEV || IS_TABLET_BUILD;
 
 interface StatusBarProps {
   zoomLevel: number;
@@ -62,22 +66,24 @@ export const StatusBar = memo(function StatusBar({
       >
         {formatNumber(zoomLevel, locale)}%
       </span>
-      {IS_DEV && (
+      {SHOW_FPS && (
         <>
           <span className="mx-1 text-text-muted/30">|</span>
           <span className="pr-1 font-medium text-text-muted text-xs tabular-nums">
             {strings.canvas.statusBar.fps(fps)}
           </span>
-          <button
-            type="button"
-            onClick={onRegenerateThumbnail}
-            aria-label="Regenerate thumbnail"
-            title="Regenerate thumbnail (debug)"
-            className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
-          >
-            <ImageDown className="h-3.5 w-3.5" />
-          </button>
         </>
+      )}
+      {IS_DEV && (
+        <button
+          type="button"
+          onClick={onRegenerateThumbnail}
+          aria-label="Regenerate thumbnail"
+          title="Regenerate thumbnail (debug)"
+          className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
+        >
+          <ImageDown className="h-3.5 w-3.5" />
+        </button>
       )}
     </div>
   );
