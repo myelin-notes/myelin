@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react';
+import {
+  canvasPerfSummary,
+  formatCanvasPerf,
+  isCanvasPerfEnabled,
+} from '@myelin/editor/canvas-perf';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
@@ -13,12 +18,15 @@ const SHOW_FPS = IS_DEV || IS_TABLET_BUILD;
 interface DrawableCanvasViewState {
   zoomLevel: number;
   fps: number;
+  /** Frame-time breakdown, empty when perf sampling is off. */
+  perf: string;
   editingElement: DrawableElement | null;
 }
 
 const EMPTY_VIEW_STATE: DrawableCanvasViewState = {
   zoomLevel: 100,
   fps: 0,
+  perf: '',
   editingElement: null,
 };
 
@@ -39,6 +47,7 @@ export function useDrawableCanvasViewState(
     setViewState({
       zoomLevel: Math.round(canvas.viewport.zoom * 100),
       fps: 0,
+      perf: '',
       editingElement: canvas.editingElement,
     });
 
@@ -66,8 +75,15 @@ export function useDrawableCanvasViewState(
       if (!SHOW_FPS) {
         return;
       }
+      // Piggybacks the fps callback's twice-a-second cadence rather than
+      // sampling per frame, so reading the breakdown cannot perturb it.
+      const perf = isCanvasPerfEnabled()
+        ? formatCanvasPerf(canvasPerfSummary())
+        : '';
       setViewState((current) =>
-        current.fps === fps ? current : { ...current, fps },
+        current.fps === fps && current.perf === perf
+          ? current
+          : { ...current, fps, perf },
       );
     });
 

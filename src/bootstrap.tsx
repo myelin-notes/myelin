@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { setCanvasPerfEnabled } from '@myelin/editor/canvas-perf';
 import { setMaxDevicePixelRatio } from '@myelin/editor/canvas-renderer';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
 import { setLogErrorReporter, setLogSink } from '@myelin/shared/logger';
@@ -35,6 +36,9 @@ try {
   // it to 1 for another 2.25x if older devices still can't keep up.
   if (IS_TABLET_BUILD) {
     setMaxDevicePixelRatio(1.5);
+    // A sideloaded iPad cannot reach Safari Web Inspector, so the canvas
+    // status bar carries its own frame-time breakdown instead.
+    setCanvasPerfEnabled(true);
   }
   setLogSink(writeLogs);
   // Drain log lines queued while modules were importing (pre-sink).

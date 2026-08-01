@@ -1,3 +1,4 @@
+import { recordCanvasPerf } from './canvas-perf';
 import type { DrawableCanvas } from './drawable-canvas';
 
 /**
@@ -23,7 +24,13 @@ export function startDrawableCanvasAnimationLoop(
 
     const dt = (time - previousTime) / 1000;
     previousTime = time;
+    // Wall-clock gap between frames vs. time spent inside our redraw. The
+    // difference is the browser's own layout/paint/composite work, which is the
+    // one thing an on-device readout can show that inspecting our code cannot.
+    recordCanvasPerf('frame', dt * 1000);
+    const jsStart = performance.now();
     drawableCanvas.redraw(dt);
+    recordCanvasPerf('js', performance.now() - jsStart);
     if (stopped) {
       return;
     }

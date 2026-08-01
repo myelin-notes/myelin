@@ -1,3 +1,4 @@
+import { measureCanvasPerf } from './canvas-perf';
 import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
 import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
@@ -150,7 +151,10 @@ export class CanvasRenderer {
     const offset = viewport.offset;
 
     // Background canvas: dot grid + chrome (when not editing)
-    if (this.bgCtx && this.bgCanvas) {
+    measureCanvasPerf('bg', () => {
+      if (!this.bgCtx || !this.bgCanvas) {
+        return;
+      }
       const bgW = this.bgCanvas.width / dpr;
       const bgH = this.bgCanvas.height / dpr;
       this.bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -174,33 +178,38 @@ export class CanvasRenderer {
         );
         this.bgCtx.restore();
       }
-    }
+    });
 
     // Foreground canvas: element content + tool cursor
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.ctx.clearRect(0, 0, logicalW, logicalH);
+    measureCanvasPerf('fg', () => {
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.ctx.clearRect(0, 0, logicalW, logicalH);
 
-    this.ctx.save();
-    this.ctx.scale(zoom, zoom);
-    this.ctx.translate(offset.x, offset.y);
+      this.ctx.save();
+      this.ctx.scale(zoom, zoom);
+      this.ctx.translate(offset.x, offset.y);
 
-    for (const element of elements) {
-      element.draw(this.ctx, deltaTime);
-    }
-    // Cursor: compute fresh from screen position so it's correct even if
-    // the user wheel-zoomed without moving the mouse since.
-    const mouseWorld = viewport.screenToWorld(screenPosition);
-    if (placementController.isActive) {
-      placementController.drawGhost(this.ctx, mouseWorld);
-    } else {
-      toolSelected.drawCursor(this.ctx, mouseWorld);
-    }
-    this.ctx.restore();
+      for (const element of elements) {
+        element.draw(this.ctx, deltaTime);
+      }
+      // Cursor: compute fresh from screen position so it's correct even if
+      // the user wheel-zoomed without moving the mouse since.
+      const mouseWorld = viewport.screenToWorld(screenPosition);
+      if (placementController.isActive) {
+        placementController.drawGhost(this.ctx, mouseWorld);
+      } else {
+        toolSelected.drawCursor(this.ctx, mouseWorld);
+      }
+      this.ctx.restore();
+    });
 
     // Overlay canvas: selection outline + handles. Always above DOM chrome
     // so selection stays visible while a page frame is being edited (the
     // foreground canvas is lowered below chrome in that mode).
-    if (this.overlayCtx && this.overlayCanvas) {
+    measureCanvasPerf('overlay', () => {
+      if (!this.overlayCtx || !this.overlayCanvas) {
+        return;
+      }
       const overlayW = this.overlayCanvas.width / dpr;
       const overlayH = this.overlayCanvas.height / dpr;
       this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -215,9 +224,12 @@ export class CanvasRenderer {
         );
       }
       this.overlayCtx.restore();
-    }
+    });
 
-    if (domOverlayHost) {
+    measureCanvasPerf('dom', () => {
+      if (!domOverlayHost) {
+        return;
+      }
       for (const element of elements) {
         element.syncDOM(viewport, domOverlayHost);
       }
@@ -229,7 +241,7 @@ export class CanvasRenderer {
       // position, so steady-state frames touch nothing and an already-correct
       // node (e.g. the focused editing textarea) is never re-inserted.
       reorderDomOverlay(domOverlayHost, elements);
-    }
+    });
   }
 
   /**

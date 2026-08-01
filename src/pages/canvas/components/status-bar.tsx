@@ -1,5 +1,13 @@
 import { memo } from 'react';
-import { Crosshair, ImageDown, Lock, Unlock } from 'lucide-react';
+import {
+  ClipboardCopy,
+  Crosshair,
+  ImageDown,
+  Lock,
+  Unlock,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { exportCanvasPerfTrace } from '@myelin/editor/canvas-perf';
 import { formatNumber } from '@myelin/editor/i18n/format';
 import { IS_DEV, IS_TABLET_BUILD } from '@/lib/env';
 import { useLocale, useMessages } from '@/lib/i18n';
@@ -8,9 +16,23 @@ import { useLocale, useMessages } from '@/lib/i18n';
 // React state when this is true.
 const SHOW_FPS = IS_DEV || IS_TABLET_BUILD;
 
+// Hands over the full retained frame history rather than the summary on screen,
+// so a device with no Safari Web Inspector can still produce a real trace.
+async function copyPerfTrace(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(exportCanvasPerfTrace());
+    toast.success('Performance trace copied');
+  } catch (error) {
+    toast.error('Could not copy performance trace', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 interface StatusBarProps {
   zoomLevel: number;
   fps: number;
+  perf: string;
   zoomLocked: boolean;
   onToggleZoomLock: () => void;
   onRecenter: () => void;
@@ -20,6 +42,7 @@ interface StatusBarProps {
 export const StatusBar = memo(function StatusBar({
   zoomLevel,
   fps,
+  perf,
   zoomLocked,
   onToggleZoomLock,
   onRecenter,
@@ -72,6 +95,23 @@ export const StatusBar = memo(function StatusBar({
           <span className="pr-1 font-medium text-text-muted text-xs tabular-nums">
             {strings.canvas.statusBar.fps(fps)}
           </span>
+        </>
+      )}
+      {perf !== '' && (
+        <>
+          <span className="mx-1 text-text-muted/30">|</span>
+          <span className="pr-1 font-mono text-[10px] text-text-muted tabular-nums">
+            {perf}
+          </span>
+          <button
+            type="button"
+            onClick={copyPerfTrace}
+            aria-label="Copy performance trace"
+            title="Copy performance trace"
+            className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
+          >
+            <ClipboardCopy className="h-3.5 w-3.5" />
+          </button>
         </>
       )}
       {IS_DEV && (

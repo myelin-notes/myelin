@@ -583,6 +583,7 @@ function CanvasViewInner({
       <StatusBar
         zoomLevel={engine.zoomLevel}
         fps={engine.fps}
+        perf={engine.perf}
         zoomLocked={zoomLocked}
         onToggleZoomLock={onToggleZoomLock}
         onRecenter={onRecenterViewport}
