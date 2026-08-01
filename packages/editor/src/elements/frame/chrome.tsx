@@ -11,6 +11,7 @@ import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { type ChromeMenuItem, openChromeMenu } from '../../chrome-menu';
 import { getMessages } from '../../i18n';
+import { setStyleIfChanged } from '../../utils';
 import {
   CHROME_BOTTOM_PADDING,
   CHROME_CORNER_RADIUS,
@@ -135,10 +136,20 @@ export class FrameChrome {
     const rootX = screenX - CHROME_SIDE_PADDING * zoom;
     const rootY = screenY - CHROME_HEADER_HEIGHT * zoom;
 
-    this.root.style.transform = `translate(${rootX}px, ${rootY}px)`;
-    this.root.style.width = `${chromeWidth * zoom}px`;
-    this.root.style.height = `${chromeHeight * zoom}px`;
-    this.root.style.borderRadius = `${CHROME_CORNER_RADIUS * zoom}px`;
+    // Only the translate changes while panning; guarding the rest keeps a pan
+    // frame to one composited transform instead of a chrome relayout.
+    setStyleIfChanged(
+      this.root,
+      'transform',
+      `translate(${rootX}px, ${rootY}px)`,
+    );
+    setStyleIfChanged(this.root, 'width', `${chromeWidth * zoom}px`);
+    setStyleIfChanged(this.root, 'height', `${chromeHeight * zoom}px`);
+    setStyleIfChanged(
+      this.root,
+      'border-radius',
+      `${CHROME_CORNER_RADIUS * zoom}px`,
+    );
     // Imperative writes on the header elements themselves — NOT custom
     // properties on this.root: the root is an ancestor of the whole editor
     // subtree, and inherited custom-property changes there forced a
@@ -149,9 +160,13 @@ export class FrameChrome {
       zoom,
     });
 
-    this.contentSlot.style.transform = `translate(${CHROME_SIDE_PADDING * zoom}px, ${CHROME_HEADER_HEIGHT * zoom}px)`;
-    this.contentSlot.style.width = `${contentWidth * zoom}px`;
-    this.contentSlot.style.height = `${contentHeight * zoom}px`;
+    setStyleIfChanged(
+      this.contentSlot,
+      'transform',
+      `translate(${CHROME_SIDE_PADDING * zoom}px, ${CHROME_HEADER_HEIGHT * zoom}px)`,
+    );
+    setStyleIfChanged(this.contentSlot, 'width', `${contentWidth * zoom}px`);
+    setStyleIfChanged(this.contentSlot, 'height', `${contentHeight * zoom}px`);
 
     const buttonRect = getFrameChromeMenuButtonRect({
       screenX,
