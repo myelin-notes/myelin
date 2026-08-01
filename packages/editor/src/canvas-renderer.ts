@@ -33,6 +33,40 @@ function renderScale(): number {
 }
 
 /**
+ * Whether a canvas layer needs touching this frame.
+ *
+ * Clearing a full-viewport layer invalidates its whole GPU texture and costs a
+ * re-rasterize plus re-upload, even when the draw that follows paints nothing.
+ * So a layer is skipped unless it will paint, or it painted last frame and now
+ * has to be cleared.
+ */
+export function shouldTouchLayer(
+  willPaint: boolean,
+  hasContent: boolean,
+): boolean {
+  return willPaint || hasContent;
+}
+
+/**
+ * Whether the background layer needs touching. It differs from the other two
+ * because its content depends only on the view: an element-only change (drawing
+ * a stroke) must leave it alone, while a theme or background-pref swap has to
+ * repaint it even though the view has not moved.
+ */
+export function shouldRepaintBackground(params: {
+  stale: boolean;
+  viewMoved: boolean;
+  willPaint: boolean;
+  hasContent: boolean;
+}): boolean {
+  const { stale, viewMoved, willPaint, hasContent } = params;
+  if (!shouldTouchLayer(willPaint, hasContent)) {
+    return false;
+  }
+  return stale || viewMoved || willPaint !== hasContent;
+}
+
+/**
  * Owns the three canvas layers (background grid/dots, foreground content +
  * cursor, selection overlay) and their RenderingContext-scoped concerns: DPR
  * math, sizing, and the per-frame clear/transform/draw passes. It reads
@@ -52,6 +86,23 @@ export class CanvasRenderer {
   private unsubTheme: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private readonly onInvalidate: () => void;
+
+  /**
+   * Whether each layer currently holds anything. Clearing a full-viewport
+   * canvas invalidates its entire GPU texture and costs a re-rasterize and
+   * re-upload, whether or not the draw that follows paints anything — three
+   * layers' worth of that, every frame, was the bulk of the frame budget on a
+   * low-end tablet. So a layer is only touched when it will paint something, or
+   * when it painted last frame and now has to be cleared.
+   */
+  private bgHasContent = false;
+  private fgHasContent = false;
+  private overlayHasContent = false;
+  /** Set when a resize or pattern rebuild makes the background stale. */
+  private bgStale = true;
+  private bgLastZoom = Number.NaN;
+  private bgLastOffsetX = Number.NaN;
+  private bgLastOffsetY = Number.NaN;
 
   /**
    * @param onInvalidate Called when something the renderer owns changes what
@@ -93,16 +144,21 @@ export class CanvasRenderer {
     this.bgCanvas = canvas;
     this.bgCtx = canvas.getContext('2d', { alpha: true });
     this.resizeBgCanvas(this.canvas.clientWidth, this.canvas.clientHeight);
+    this.invalidateLayerState();
   }
 
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
     this.overlayCanvas = canvas;
     this.overlayCtx = canvas.getContext('2d', { alpha: true });
     this.resizeOverlayCanvas(this.canvas.clientWidth, this.canvas.clientHeight);
+    this.invalidateLayerState();
   }
 
   public buildBgPattern(style: CanvasBackground): void {
     this.bgStyle = style;
+    // A new pattern (theme swap, background pref) changes what this layer
+    // should show even though the view has not moved.
+    this.bgStale = true;
     if (style === 'blank') {
       this.bgPattern = null;
       return;
@@ -155,6 +211,28 @@ export class CanvasRenderer {
       if (!this.bgCtx || !this.bgCanvas) {
         return;
       }
+      // The grid only moves with the view, so an element-only change (drawing a
+      // stroke) leaves this layer alone entirely.
+      const viewMoved =
+        zoom !== this.bgLastZoom ||
+        offset.x !== this.bgLastOffsetX ||
+        offset.y !== this.bgLastOffsetY;
+      const willPaint = this.bgPattern !== null;
+      const repaint = shouldRepaintBackground({
+        stale: this.bgStale,
+        viewMoved,
+        willPaint,
+        hasContent: this.bgHasContent,
+      });
+      this.bgStale = false;
+      if (!repaint) {
+        return;
+      }
+      this.bgHasContent = willPaint;
+      this.bgLastZoom = zoom;
+      this.bgLastOffsetX = offset.x;
+      this.bgLastOffsetY = offset.y;
+
       const bgW = this.bgCanvas.width / dpr;
       const bgH = this.bgCanvas.height / dpr;
       this.bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -182,6 +260,17 @@ export class CanvasRenderer {
 
     // Foreground canvas: element content + tool cursor
     measureCanvasPerf('fg', () => {
+      // On an empty canvas with a tool that paints no cursor (the pen), this
+      // layer has nothing to show, so panning never touches its texture.
+      const willPaint =
+        elements.length > 0 ||
+        placementController.isActive ||
+        toolSelected.drawsCursor;
+      if (!shouldTouchLayer(willPaint, this.fgHasContent)) {
+        return;
+      }
+      this.fgHasContent = willPaint;
+
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       this.ctx.clearRect(0, 0, logicalW, logicalH);
 
@@ -210,6 +299,13 @@ export class CanvasRenderer {
       if (!this.overlayCtx || !this.overlayCanvas) {
         return;
       }
+      // Nothing selected means nothing on this layer, which is the usual case.
+      const willPaint = elements.some((e) => e.hasSelectionVisual);
+      if (!shouldTouchLayer(willPaint, this.overlayHasContent)) {
+        return;
+      }
+      this.overlayHasContent = willPaint;
+
       const overlayW = this.overlayCanvas.width / dpr;
       const overlayH = this.overlayCanvas.height / dpr;
       this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -278,6 +374,21 @@ export class CanvasRenderer {
     this.resizeCanvas(width, height);
     this.resizeBgCanvas(width, height);
     this.resizeOverlayCanvas(width, height);
+    // Assigning width/height blanks every backing store, so the layer-skip
+    // bookkeeping has to forget what it thought was on screen or a layer that
+    // still "has content" would never be repainted.
+    this.invalidateLayerState();
+  }
+
+  /**
+   * Force all three layers to repaint on the next frame. Call after anything
+   * that changes their contents behind the renderer's back.
+   */
+  private invalidateLayerState(): void {
+    this.bgStale = true;
+    this.bgHasContent = false;
+    this.fgHasContent = false;
+    this.overlayHasContent = false;
   }
 
   private resizeCanvas(width: number, height: number): void {

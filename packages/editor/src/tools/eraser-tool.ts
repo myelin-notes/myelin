@@ -38,6 +38,11 @@ export class EraserTool implements ITool {
       });
   }
 
+  /** The eraser disc tracks the pointer whenever the tool is active. */
+  public get drawsCursor(): boolean {
+    return true;
+  }
+
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
     const palette = getCanvasPalette();
     ctx.fillStyle = palette.selectionFill;

@@ -40,6 +40,17 @@ export interface ITool {
   finish(canvas: DrawableCanvas, event: PointerEvent): void;
   interrupt(canvas: DrawableCanvas): void;
   drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void;
+  /**
+   * Whether {@link drawCursor} would paint anything right now.
+   *
+   * The renderer skips a canvas layer entirely when nothing will land on it,
+   * because clearing a full-viewport layer invalidates its whole GPU texture
+   * and costs a re-upload even when the draw that follows is a no-op. Tools
+   * that only paint mid-gesture (marquee, text drag) report false when idle.
+   * Answering true when nothing is drawn only wastes a layer; answering false
+   * when something is drawn would drop it, so err toward true.
+   */
+  get drawsCursor(): boolean;
   hover?(canvas: DrawableCanvas, position: Vector2): void;
   get icon(): SvgIcon;
   get label(): string;

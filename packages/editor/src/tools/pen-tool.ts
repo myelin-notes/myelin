@@ -146,6 +146,11 @@ export class PenTool implements ITool {
 
   public drawCursor(_ctx: CanvasRenderingContext2D, _position: Vector2): void {}
 
+  /** The pen shows no on-canvas cursor; the stroke itself is the feedback. */
+  public get drawsCursor(): boolean {
+    return false;
+  }
+
   get icon(): SvgIcon {
     return PenIcon;
   }

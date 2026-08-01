@@ -217,6 +217,15 @@ export abstract class DrawableElement {
     return this.selected && this.selectionT < 1;
   }
 
+  /**
+   * Whether {@link drawSelectionOverlay} would paint anything. Matches its
+   * early-out exactly, so the renderer can skip the whole overlay layer when no
+   * element would mark it.
+   */
+  public get hasSelectionVisual(): boolean {
+    return !this._hidden && this.selectionT > 0;
+  }
+
   /** Draw element content. Selection outline is drawn separately by `drawSelectionOverlay`. */
   public draw(ctx: CanvasRenderingContext2D, deltaTime: number): void {
     if (this._hidden) {

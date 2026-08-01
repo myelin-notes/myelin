@@ -65,6 +65,11 @@ export class SelectTool implements ITool {
     return 'select';
   }
 
+  /** Only the marquee rectangle paints, and only while dragging one out. */
+  public get drawsCursor(): boolean {
+    return this.mode === SelectMode.Marquee;
+  }
+
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
     const palette = getCanvasPalette();
     if (this.mode === SelectMode.Marquee) {

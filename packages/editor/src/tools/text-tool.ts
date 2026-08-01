@@ -155,6 +155,15 @@ export class TextTool implements ITool {
     this.dragCurrent = null;
   }
 
+  /**
+   * Only the drag rectangle paints. Reports true for the whole drag, including
+   * the sub-threshold part where drawCursor bails, since that is cheap and the
+   * costly mistake would be under-reporting.
+   */
+  get drawsCursor(): boolean {
+    return this.dragStart !== null && this.dragCurrent !== null;
+  }
+
   drawCursor(ctx: CanvasRenderingContext2D, _position: Vector2): void {
     if (!(this.dragStart && this.dragCurrent)) {
       return;
