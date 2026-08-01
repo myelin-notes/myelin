@@ -3,6 +3,7 @@ import type * as Y from 'yjs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { ElementType } from '../elements/element-type';
 import { PageFrameElement } from '../elements/page-frame-element';
+import { canvasLogicalSize } from '../render-scale';
 import type { VFSNodeId } from '../sync/types';
 import {
   cloneYMap,
@@ -107,12 +108,12 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
       return null;
     }
 
-    const dpr = window.devicePixelRatio || 1;
+    const { width, height } = canvasLogicalSize(canvas.ctx.canvas);
     return {
       noteId: this.noteId,
       viewportCenter: canvas.viewport.screenToWorld({
-        x: canvas.ctx.canvas.width / dpr / 2,
-        y: canvas.ctx.canvas.height / dpr / 2,
+        x: width / 2,
+        y: height / 2,
       }),
     };
   }

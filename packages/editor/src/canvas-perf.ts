@@ -17,13 +17,33 @@
  * `fillRect` shows up in the gap, not in `js`.
  */
 
+import { renderScale } from './render-scale';
+
 /**
  * Frames retained per metric. At 20fps this is ~15 seconds of history, enough
  * that a trace copied straight after a pan covers the whole gesture.
  */
 const WINDOW = 300;
 
-export type CanvasPerfMetric = 'frame' | 'js' | 'bg' | 'fg' | 'overlay' | 'dom';
+/**
+ * `*Paint` metrics are 0/1 per redraw rather than milliseconds: the share of
+ * frames on which that layer actually cleared and repainted. They exist because
+ * the ms metrics cannot answer the question that matters here — issuing the
+ * draw calls is nearly free, and the real cost is that touching a full-viewport
+ * layer at all forces a re-rasterize and texture upload after we return. So the
+ * count of layers touched per frame predicts the frame time; the time spent
+ * inside the layer's callback does not.
+ */
+export type CanvasPerfMetric =
+  | 'frame'
+  | 'js'
+  | 'bg'
+  | 'fg'
+  | 'overlay'
+  | 'dom'
+  | 'bgPaint'
+  | 'fgPaint'
+  | 'overlayPaint';
 
 const METRICS: CanvasPerfMetric[] = [
   'frame',
@@ -32,6 +52,9 @@ const METRICS: CanvasPerfMetric[] = [
   'fg',
   'overlay',
   'dom',
+  'bgPaint',
+  'fgPaint',
+  'overlayPaint',
 ];
 
 let enabled = false;
@@ -119,6 +142,10 @@ export interface CanvasPerfSummary {
   fg: number;
   overlay: number;
   dom: number;
+  /** Share of redraws (0-1) on which each layer actually repainted. */
+  bgPaint: number;
+  fgPaint: number;
+  overlayPaint: number;
 }
 
 export function canvasPerfSummary(): CanvasPerfSummary {
@@ -133,13 +160,17 @@ export function canvasPerfSummary(): CanvasPerfSummary {
     fg: mean('fg'),
     overlay: mean('overlay'),
     dom: mean('dom'),
+    bgPaint: mean('bgPaint'),
+    fgPaint: mean('fgPaint'),
+    overlayPaint: mean('overlayPaint'),
   };
 }
 
 /** Compact one-line rendering for the canvas status bar. */
 export function formatCanvasPerf(s: CanvasPerfSummary): string {
   const n = (v: number) => v.toFixed(1);
-  return `f ${n(s.frame)}/${n(s.frameP95)} js ${n(s.js)} br ${n(s.browser)} | bg ${n(s.bg)} fg ${n(s.fg)} ov ${n(s.overlay)} dom ${n(s.dom)}`;
+  const pct = (v: number) => Math.round(v * 100);
+  return `f ${n(s.frame)}/${n(s.frameP95)} js ${n(s.js)} br ${n(s.browser)} | bg ${n(s.bg)} fg ${n(s.fg)} ov ${n(s.overlay)} dom ${n(s.dom)} | paint ${pct(s.bgPaint)}/${pct(s.fgPaint)}/${pct(s.overlayPaint)}`;
 }
 
 /** Samples for one metric, oldest first. */
@@ -170,6 +201,9 @@ function browserEnvironment(): Record<string, unknown> {
   return {
     userAgent: navigator.userAgent,
     devicePixelRatio: window.devicePixelRatio,
+    // The capped scale canvases are actually sized at, so a trace shows whether
+    // the tablet cap took effect rather than leaving it to be inferred.
+    renderScale: renderScale(),
     viewport: { width: window.innerWidth, height: window.innerHeight },
   };
 }
@@ -191,7 +225,7 @@ export function exportCanvasPerfTrace(
       ...browserEnvironment(),
       ...context,
       summary: canvasPerfSummary(),
-      note: 'ms per frame. frame=wall-clock gap, js=our redraw, browser=frame-js (layout/paint/composite). Phases sampled only on painted frames.',
+      note: 'ms per frame. frame=wall-clock gap, js=our redraw, browser=frame-js (layout/paint/composite). Phases sampled only on painted frames. *Paint metrics are 0/1 per redraw, not ms.',
       samples: Object.fromEntries(METRICS.map((m) => [m, orderedSamples(m)])),
     },
     null,

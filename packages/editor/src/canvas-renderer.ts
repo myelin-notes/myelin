@@ -1,9 +1,10 @@
-import { measureCanvasPerf } from './canvas-perf';
+import { measureCanvasPerf, recordCanvasPerf } from './canvas-perf';
 import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
 import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
+import { renderScale } from './render-scale';
 import type { ITool } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 
@@ -11,26 +12,6 @@ type CanvasBackground = 'grid' | 'dots' | 'blank';
 
 /** Side length of one background pattern tile, in world units. */
 const BG_TILE_SIZE = 24;
-
-let maxDevicePixelRatio = Number.POSITIVE_INFINITY;
-
-/**
- * Cap the backing-store scale of every canvas layer. Tablet builds set this at
- * bootstrap so an old iPad rasterizes far fewer pixels per layer per frame
- * (each layer is cleared and repainted every frame, so the saving is paid three
- * times over); desktop and the website leave it uncapped.
- *
- * Set it once, before any canvas mounts: `redraw` derives logical size from the
- * backing store using this same scale, so changing it mid-session would
- * mismatch a canvas sized under the old value until its next resize.
- */
-export function setMaxDevicePixelRatio(max: number): void {
-  maxDevicePixelRatio = max;
-}
-
-function renderScale(): number {
-  return Math.min(window.devicePixelRatio || 1, maxDevicePixelRatio);
-}
 
 /**
  * Whether a canvas layer needs touching this frame.
@@ -225,6 +206,7 @@ export class CanvasRenderer {
         hasContent: this.bgHasContent,
       });
       this.bgStale = false;
+      recordCanvasPerf('bgPaint', repaint ? 1 : 0);
       if (!repaint) {
         return;
       }
@@ -266,7 +248,9 @@ export class CanvasRenderer {
         elements.length > 0 ||
         placementController.isActive ||
         toolSelected.drawsCursor;
-      if (!shouldTouchLayer(willPaint, this.fgHasContent)) {
+      const paint = shouldTouchLayer(willPaint, this.fgHasContent);
+      recordCanvasPerf('fgPaint', paint ? 1 : 0);
+      if (!paint) {
         return;
       }
       this.fgHasContent = willPaint;
@@ -301,7 +285,9 @@ export class CanvasRenderer {
       }
       // Nothing selected means nothing on this layer, which is the usual case.
       const willPaint = elements.some((e) => e.hasSelectionVisual);
-      if (!shouldTouchLayer(willPaint, this.overlayHasContent)) {
+      const paint = shouldTouchLayer(willPaint, this.overlayHasContent);
+      recordCanvasPerf('overlayPaint', paint ? 1 : 0);
+      if (!paint) {
         return;
       }
       this.overlayHasContent = willPaint;

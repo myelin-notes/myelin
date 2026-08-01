@@ -34,6 +34,7 @@ import {
 } from '@myelin/editor/page-frame/note-link/preview';
 import type { NoteLinkOpenRequestDetail } from '@myelin/editor/page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from '@myelin/editor/page-frame/use-page-frame-autocomplete';
+import { canvasLogicalSize } from '@myelin/editor/render-scale';
 import { usePresence } from '@myelin/ui';
 import { Button } from '@/components/ui/button';
 import {
@@ -245,10 +246,10 @@ function CanvasViewInner({
       if (!canvas) {
         return;
       }
-      const dpr = window.devicePixelRatio || 1;
+      const { width, height } = canvasLogicalSize(canvas);
       const centerWorld = dc.viewport.screenToWorld({
-        x: canvas.width / dpr / 2,
-        y: canvas.height / dpr / 2,
+        x: width / 2,
+        y: height / 2,
       });
       const frame = dc.addElement(
         (uuid) =>

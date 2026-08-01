@@ -1,4 +1,5 @@
 import type { Vector2 } from './geometry';
+import { canvasLogicalSize } from './render-scale';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
 
@@ -288,11 +289,9 @@ export class CanvasViewport {
   }
 
   public getWorldRect(): DOMRect {
-    const dpr = window.devicePixelRatio || 1;
-    const screenW = this.canvas.width / dpr;
-    const screenH = this.canvas.height / dpr;
+    const { width, height } = canvasLogicalSize(this.canvas);
     const tl = this.screenToWorld({ x: 0, y: 0 });
-    return new DOMRect(tl.x, tl.y, screenW / this._zoom, screenH / this._zoom);
+    return new DOMRect(tl.x, tl.y, width / this._zoom, height / this._zoom);
   }
 
   /** Pointer position in canvas-local screen pixels (origin = canvas top-left). */
@@ -319,9 +318,7 @@ export class CanvasViewport {
     targetZoom: number;
     worldFocus: Vector2;
   } {
-    const dpr = window.devicePixelRatio || 1;
-    const screenW = this.canvas.width / dpr;
-    const screenH = this.canvas.height / dpr;
+    const { width: screenW, height: screenH } = canvasLogicalSize(this.canvas);
     const fitOptions = typeof fit === 'number' ? { widthRatio: fit } : fit;
     const targetZoomCandidates: number[] = [];
 
@@ -499,9 +496,9 @@ export class CanvasViewport {
     if (!bounds) {
       return;
     }
-    const dpr = window.devicePixelRatio || 1;
-    const halfVW = this.canvas.width / dpr / this._zoom / 2;
-    const halfVH = this.canvas.height / dpr / this._zoom / 2;
+    const { width, height } = canvasLogicalSize(this.canvas);
+    const halfVW = width / this._zoom / 2;
+    const halfVH = height / this._zoom / 2;
     const slackX = halfVW * 1.5;
     const slackY = halfVH * 1.5;
     this._offset.x = Math.min(
@@ -539,10 +536,7 @@ export class CanvasViewport {
    * center so it stays at the canvas center after the zoom.
    */
   private zoomAroundViewportCenter(targetZoom: number): void {
-    const dpr = window.devicePixelRatio || 1;
-    this.zoomAroundPoint(targetZoom, {
-      x: this.canvas.width / dpr / 2,
-      y: this.canvas.height / dpr / 2,
-    });
+    const { width, height } = canvasLogicalSize(this.canvas);
+    this.zoomAroundPoint(targetZoom, { x: width / 2, y: height / 2 });
   }
 }

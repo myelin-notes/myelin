@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { setCanvasPerfEnabled } from '@myelin/editor/canvas-perf';
-import { setMaxDevicePixelRatio } from '@myelin/editor/canvas-renderer';
+import { setMaxDevicePixelRatio } from '@myelin/editor/render-scale';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
 import { setLogErrorReporter, setLogSink } from '@myelin/shared/logger';
 import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
@@ -30,12 +30,14 @@ import './index.css';
 // covers throws during the synchronous startup calls below.
 try {
   setPlatform(tauriPlatform);
-  // An iPad's DPR of 2 means each of the canvas's three layers rasterizes 4x
-  // the logical pixel count, every frame. 1.5 cuts that by ~1.8x per layer at
-  // a cost in ink/text crispness that only shows up on close inspection; drop
-  // it to 1 for another 2.25x if older devices still can't keep up.
+  // An iPad's DPR of 2 means each painting canvas layer rasterizes and
+  // re-uploads 4x the logical pixel count every frame the view moves, which on
+  // an older device is the whole frame budget. Frame rate scales with that
+  // pixel count, so 1 buys 4x over native (2.25x over the 1.5 this used to be)
+  // — a real cost in ink crispness, but ink that lags is worse than ink that is
+  // soft. Page-frame text is DOM and stays sharp regardless.
   if (IS_TABLET_BUILD) {
-    setMaxDevicePixelRatio(1.5);
+    setMaxDevicePixelRatio(1);
     // A sideloaded iPad cannot reach Safari Web Inspector, so the canvas
     // status bar carries its own frame-time breakdown instead.
     setCanvasPerfEnabled(true);

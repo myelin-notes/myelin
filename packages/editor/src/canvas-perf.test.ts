@@ -19,6 +19,29 @@ afterEach(() => {
   resetCanvasPerf();
 });
 
+describe('layer paint rate', () => {
+  it('reports the share of redraws on which a layer repainted', () => {
+    // The diagnostic that matters: how many full-viewport layers get touched
+    // per frame, which is what the frame time tracks — not the ms spent
+    // issuing their draw calls.
+    for (let i = 0; i < 10; i++) {
+      recordCanvasPerf('bgPaint', i < 4 ? 1 : 0);
+      recordCanvasPerf('fgPaint', 1);
+      recordCanvasPerf('overlayPaint', 0);
+    }
+
+    const summary = canvasPerfSummary();
+    expect(summary.bgPaint).toBeCloseTo(0.4);
+    expect(summary.fgPaint).toBe(1);
+    expect(summary.overlayPaint).toBe(0);
+    expect(formatCanvasPerf(summary)).toContain('paint 40/100/0');
+  });
+
+  it('reads as zero before any frame has been drawn', () => {
+    expect(formatCanvasPerf(canvasPerfSummary())).toContain('paint 0/0/0');
+  });
+});
+
 describe('canvas perf sampling', () => {
   it('records nothing while disabled', () => {
     setCanvasPerfEnabled(false);
