@@ -5,8 +5,6 @@ export const siteDescription =
 
 /**
  * External destinations, centralized so a URL change is a one-line edit.
- * TODO(links): confirm the Discord invite before launch; the GitHub repo and
- * releases links are real today.
  */
 export const siteLinks = {
   github: 'https://github.com/myelin-notes/myelin',
@@ -17,7 +15,6 @@ export const siteLinks = {
     'https://api.github.com/repos/myelin-notes/myelin/releases/latest',
   roadmap: 'https://github.com/myelin-notes/myelin/issues',
   license: 'https://github.com/myelin-notes/myelin/blob/main/LICENSE.md',
-  discord: 'https://github.com/myelin-notes/myelin',
 };
 
 /** Every platform Myelin ships a native build for. */
@@ -261,7 +258,6 @@ Myelin Notes is native on all three, with the same notes, the same canvas, and t
       { label: 'Privacy', href: '/privacy' },
       { label: 'GitHub', href: siteLinks.github },
       { label: 'Roadmap', href: siteLinks.roadmap },
-      { label: 'Discord', href: siteLinks.discord },
       { label: 'License', href: siteLinks.license },
     ],
     download: 'Download Myelin',
