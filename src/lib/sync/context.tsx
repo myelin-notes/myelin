@@ -138,32 +138,25 @@ export function RepositoryProvider({
           initializing: false,
         }));
 
-        // Hydrate the search corpus and backfill any unindexed notes in the
-        // background. The index cache is namespaced per repository; Rust skips
-        // notes whose content hash is unchanged. Both engines are optional
+        // Hydrate the search corpus from the artifacts already on disk. The
+        // index cache is namespaced per repository. Both engines are optional
         // platform capabilities; absence means no indexing on this client.
+        //
+        // TEMPORARY (iOS frame-rate probe): the startup backfill is disabled
+        // while we measure whether the Rust indexing work is what pins an old
+        // iPad's frame rate. It used to chain
+        // `repository.listIndexBackfillItems()` off this init and hand the
+        // items to `noteIndex.startBackfill()` / `handwriting.startBackfill()`
+        // (guarding on `disposed` first, so a repo switch mid-chain could not
+        // backfill the previous repo's items under the current one). Restore
+        // that chain once the measurement is done.
         const { noteIndex, handwriting } = getPlatform();
         handwriting?.init(getRepositoryStorageKey(resolvedConfig));
-        if (noteIndex || handwriting) {
-          void (
-            noteIndex?.init(getRepositoryStorageKey(resolvedConfig)) ??
-            Promise.resolve()
-          )
-            .then(() => repository.listIndexBackfillItems())
-            .then((items) => {
-              // A repo switch may have run cleanup (reset + next init) while
-              // this chain was resolving; bail so we don't backfill the
-              // previous repo's items under the now-current repo.
-              if (disposed) {
-                return;
-              }
-              noteIndex?.startBackfill(items);
-              handwriting?.startBackfill(items);
-            })
-            .catch((error) => {
-              logger.error('Failed to start note-index backfill', error);
-            });
-        }
+        void noteIndex
+          ?.init(getRepositoryStorageKey(resolvedConfig))
+          .catch((error) => {
+            logger.error('Failed to hydrate note index', error);
+          });
       })
       .catch((error) => {
         if (disposed) {
