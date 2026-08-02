@@ -7,11 +7,34 @@ import type { PlacementController } from './placement-controller';
 import { renderScale } from './render-scale';
 import type { ITool } from './tools/tool';
 import { UserPrefs } from './user-prefs';
+import { setStyleIfChanged } from './utils/style-cache';
 
 type CanvasBackground = 'grid' | 'dots' | 'blank';
 
 /** Side length of one background pattern tile, in world units. */
 const BG_TILE_SIZE = 24;
+
+/**
+ * Screen-pixel shift that reproduces a pan of the background pattern without
+ * repainting it.
+ *
+ * The pattern is periodic, so sliding it by a whole tile is invisible; reducing
+ * the pan modulo the tile leaves a remainder inside the one tile of slack the
+ * paint already draws beyond each edge. That makes this exact rather than an
+ * approximation — the pixels the compositor slides into view are the pixels a
+ * repaint would have drawn, so the grid never blurs, tears, or runs out.
+ *
+ * Only valid at constant zoom: a zoom changes the tiles themselves.
+ */
+export function backgroundPanShift(
+  panScreenPx: number,
+  tileScreenPx: number,
+): number {
+  if (!(tileScreenPx > 0) || !Number.isFinite(panScreenPx)) {
+    return 0;
+  }
+  return ((panScreenPx % tileScreenPx) + tileScreenPx) % tileScreenPx;
+}
 
 /**
  * Whether a canvas layer needs touching this frame.
@@ -81,6 +104,11 @@ export class CanvasRenderer {
   private overlayHasContent = false;
   /** Set when a resize or pattern rebuild makes the background stale. */
   private bgStale = true;
+  /**
+   * The view the background bitmap was last painted at. Doubles as the anchor
+   * {@link backgroundPanShift} measures a pan against, so a run of panned
+   * frames all shift relative to one painted bitmap rather than accumulating.
+   */
   private bgLastZoom = Number.NaN;
   private bgLastOffsetX = Number.NaN;
   private bgLastOffsetY = Number.NaN;
@@ -199,6 +227,39 @@ export class CanvasRenderer {
         offset.x !== this.bgLastOffsetX ||
         offset.y !== this.bgLastOffsetY;
       const willPaint = this.bgPattern !== null;
+
+      // A pan at constant zoom moves a periodic pattern by whole tiles plus a
+      // remainder, and the paint below already covers a tile beyond each edge —
+      // so the compositor can slide the existing bitmap and the pixels it
+      // brings in are exactly the ones a repaint would have drawn. Worth the
+      // branch because the alternative is re-rasterizing and re-uploading a
+      // full-viewport texture, which on a low-end tablet costs more than the
+      // whole frame budget allows for a grid that did not change shape.
+      if (
+        willPaint &&
+        this.bgHasContent &&
+        !this.bgStale &&
+        viewMoved &&
+        zoom === this.bgLastZoom
+      ) {
+        const tile = BG_TILE_SIZE * zoom;
+        const x = backgroundPanShift(
+          (offset.x - this.bgLastOffsetX) * zoom,
+          tile,
+        );
+        const y = backgroundPanShift(
+          (offset.y - this.bgLastOffsetY) * zoom,
+          tile,
+        );
+        setStyleIfChanged(
+          this.bgCanvas,
+          'transform',
+          `translate(${x}px, ${y}px)`,
+        );
+        addCanvasPerf('bgPaint', 0);
+        return;
+      }
+
       const repaint = shouldRepaintBackground({
         stale: this.bgStale,
         viewMoved,
@@ -214,6 +275,9 @@ export class CanvasRenderer {
       this.bgLastZoom = zoom;
       this.bgLastOffsetX = offset.x;
       this.bgLastOffsetY = offset.y;
+      // The bitmap is about to match the live view again, so drop any shift a
+      // preceding run of panned frames left on the element.
+      setStyleIfChanged(this.bgCanvas, 'transform', '');
 
       const bgW = this.bgCanvas.width / dpr;
       const bgH = this.bgCanvas.height / dpr;
@@ -393,6 +457,10 @@ export class CanvasRenderer {
     const dpr = renderScale();
     this.bgCanvas.width = width * dpr;
     this.bgCanvas.height = height * dpr;
+    // Assigning width/height blanks the bitmap, so a shift left over from a
+    // preceding pan would slide a blank canvas for the frame before the
+    // repaint lands.
+    setStyleIfChanged(this.bgCanvas, 'transform', '');
   }
 
   private resizeOverlayCanvas(width: number, height: number): void {
