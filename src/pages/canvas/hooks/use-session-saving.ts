@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { POINT_FLUSH_INTERVAL_MS } from '@myelin/editor/elements/stroke-element';
 import { Logger } from '@/lib/logger';
 import {
   type NoteSession,
@@ -13,7 +14,21 @@ import {
 import { saveSessionAndCreateVersion } from './session-version-history';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;
-const SAVE_DEBOUNCE_MS = 250;
+
+/**
+ * How long local changes must stay quiet before a save runs.
+ *
+ * Must stay above {@link POINT_FLUSH_INTERVAL_MS}, and that is the whole reason
+ * for the derivation. A stroke in progress flushes its points to Yjs on that
+ * interval, and each flush is a local change that restarts this timer. With a
+ * shorter debounce the timer expires in each gap, so the "debounce" degenerates
+ * into a full document save every flush for as long as the pen is down —
+ * encode, orphan sweep and a write to disk, several times a second, none of it
+ * visible to the frame profiler because it runs in a timer rather than in the
+ * render loop or an input handler. Above the flush interval, a continuous
+ * stroke coalesces into a single save once the pen stops.
+ */
+const SAVE_DEBOUNCE_MS = POINT_FLUSH_INTERVAL_MS + 200;
 const logger = new Logger('CanvasSessionSaveScheduler');
 
 interface UseSessionSavingArgs {

@@ -21,7 +21,7 @@ export interface StrokeStyle {
  * window keeps the whole stroke (creation → points) in a single undo step
  * without paying a transaction per pointer sample.
  */
-const POINT_FLUSH_INTERVAL_MS = 300;
+export const POINT_FLUSH_INTERVAL_MS = 300;
 
 export class StrokeElement extends DrawableElement {
   protected box: DOMRect;

@@ -5,7 +5,7 @@ import { ShapeElement } from '../elements/shape-element';
 import { StrokeElement } from '../elements/stroke-element';
 import { catalogs } from '../i18n/messages';
 import { YDocManager } from '../ydoc-manager';
-import { PenTool } from './pen-tool';
+import { PenTool, shouldRecordStrokePoint } from './pen-tool';
 
 type Pt = [number, number];
 
@@ -148,6 +148,7 @@ function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
     addElement,
     removeElement,
     transact,
+    viewport: { zoom: 1 },
   } as unknown as DrawableCanvas;
 
   return {
@@ -180,6 +181,62 @@ function feed(
 function makeTool(): PenTool {
   return new PenTool(() => catalogs.en);
 }
+
+describe('shouldRecordStrokePoint', () => {
+  it('always records the first point', () => {
+    expect(shouldRecordStrokePoint(pos(0, 0), null, 1)).toBe(true);
+  });
+
+  it('drops samples that land under a pixel from the last one', () => {
+    expect(shouldRecordStrokePoint(pos(0.4, 0), pos(0, 0), 1)).toBe(false);
+  });
+
+  it('keeps samples a pixel or more apart', () => {
+    expect(shouldRecordStrokePoint(pos(1, 0), pos(0, 0), 1)).toBe(true);
+  });
+
+  it('measures on screen, so zooming in keeps finer detail', () => {
+    // The same world-space gap is sub-pixel at 0.5x and two pixels at 2x.
+    expect(shouldRecordStrokePoint(pos(1, 0), pos(0, 0), 0.5)).toBe(false);
+    expect(shouldRecordStrokePoint(pos(0.5, 0), pos(0, 0), 2)).toBe(true);
+  });
+});
+
+describe('PenTool point thinning', () => {
+  it('records one point per pixel of travel, not one per sample', () => {
+    const { canvas, created } = makeCanvas();
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+
+    // A slow, deliberate line: 40 samples covering 4 world pixels, which is
+    // what a stylus reporting at 120Hz produces while writing carefully.
+    for (let i = 0; i < 40; i++) {
+      tool.update(canvas, PRESSURE_EVENT, pos(i * 0.1, 0));
+    }
+
+    expect(stroke.xyPoints.length).toBeLessThanOrEqual(5);
+    // The line still spans what was drawn; it is thinner, not shorter.
+    expect(stroke.xyPoints[0]).toEqual([0, 0]);
+    expect(stroke.xyPoints.at(-1)?.[0]).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps every sample of a fast stroke', () => {
+    const { canvas, created } = makeCanvas();
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+
+    feed(tool, canvas, [
+      [0, 0],
+      [20, 0],
+      [40, 0],
+      [60, 0],
+    ]);
+
+    expect(stroke.xyPoints).toHaveLength(4);
+  });
+});
 
 describe('PenTool draw-and-hold recognition', () => {
   beforeEach(() => {

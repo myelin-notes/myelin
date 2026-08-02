@@ -22,6 +22,34 @@ const DWELL_MS = 600;
 /** Movement beyond this (px) re-arms the dwell timer (cancels recognition). */
 const DWELL_MOVE_PX = 12;
 
+/**
+ * Minimum on-screen gap between recorded stroke points, in CSS pixels.
+ *
+ * A stylus reports at 120Hz or better, so writing slowly logs several samples
+ * per pixel. Each one permanently lengthens the outline that gets rebuilt and
+ * re-rasterized on every remaining frame of the stroke, which is why a long
+ * stroke costs more per frame than a short one. Below a pixel they cannot
+ * change what is drawn, and perfect-freehand's smoothing spans them anyway.
+ */
+const MIN_POINT_SPACING_PX = 1;
+
+/**
+ * Whether a sample is far enough from the last recorded point to keep.
+ *
+ * Measured on screen, not in world units, so the density of a stroke does not
+ * depend on the zoom it happened to be drawn at.
+ */
+export function shouldRecordStrokePoint(
+  position: Vector2,
+  lastRecorded: Vector2 | null,
+  zoom: number,
+): boolean {
+  if (!lastRecorded) {
+    return true;
+  }
+  return distance(position, lastRecorded) * zoom >= MIN_POINT_SPACING_PX;
+}
+
 export class PenTool implements ITool {
   public constructor(protected readonly getStrings: MessageGetter) {}
 
@@ -32,6 +60,8 @@ export class PenTool implements ITool {
   /** When false, the dwell-and-recognize shape-snapping path is skipped. */
   protected recognizeShapes: boolean = true;
 
+  /** Last sample actually written to the stroke. @see shouldRecordStrokePoint */
+  private lastRecorded: Vector2 | null = null;
   private dwellAnchor: Vector2 | null = null;
   private recognitionAttemptedForAnchor: boolean = false;
   private snapped: boolean = false;
@@ -43,6 +73,7 @@ export class PenTool implements ITool {
 
   public start(canvas: DrawableCanvas, _event: PointerEvent): void {
     this.clearDwellTimer();
+    this.lastRecorded = null;
     this.dwellAnchor = null;
     this.recognitionAttemptedForAnchor = false;
     this.snapped = false;
@@ -65,7 +96,15 @@ export class PenTool implements ITool {
     if (this.snapped) {
       return;
     }
-    this.currentStroke?.addPoint(position.x, position.y, event.pressure);
+    // Thinned, but the dwell tracking below still sees every sample: holding
+    // still is exactly the case that records no points, and gating recognition
+    // on recorded points would stop it firing.
+    if (
+      shouldRecordStrokePoint(position, this.lastRecorded, canvas.viewport.zoom)
+    ) {
+      this.currentStroke?.addPoint(position.x, position.y, event.pressure);
+      this.lastRecorded = { x: position.x, y: position.y };
+    }
 
     // Standard clear-and-re-arm dwell pattern: every meaningful move resets the
     // anchor and re-arms a single timer, so recognition fires exactly once per
@@ -133,6 +172,7 @@ export class PenTool implements ITool {
     this.currentStroke = null;
     this.currentShape = null;
     this.snapped = false;
+    this.lastRecorded = null;
     this.dwellAnchor = null;
     this.recognitionAttemptedForAnchor = false;
   }

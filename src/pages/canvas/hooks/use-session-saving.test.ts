@@ -42,6 +42,7 @@ vi.mock('./session-version-history', () => ({
   saveSessionAndCreateVersion: mocks.saveSessionAndCreateVersion,
 }));
 
+import { POINT_FLUSH_INTERVAL_MS } from '@myelin/editor/elements/stroke-element';
 import { useCanvasSessionSaving } from './use-session-saving';
 
 interface MockNoteSession {
@@ -125,6 +126,29 @@ describe('useCanvasSessionSaving', () => {
       noteB.session,
       mocks.repository,
     );
+  });
+
+  it('debounces saves for longer than a live stroke flushes points', () => {
+    // A stroke in progress writes its points to Yjs every
+    // POINT_FLUSH_INTERVAL_MS, and every one of those restarts this debounce.
+    // If the debounce were the shorter of the two it would expire inside each
+    // gap, turning "save once the edits stop" into a full document save several
+    // times a second for as long as the pen is down.
+    vi.stubGlobal('window', {
+      setTimeout: vi.fn(() => 1),
+      clearTimeout: vi.fn(),
+      setInterval: vi.fn(() => 2),
+      clearInterval: vi.fn(),
+    });
+    const note = createSession('note-a');
+
+    renderSaving('note-a', note.session);
+    mocks.effects[0]?.();
+    note.emitLocalChange();
+
+    const delay = (window.setTimeout as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0]?.[1] as number;
+    expect(delay).toBeGreaterThan(POINT_FLUSH_INTERVAL_MS);
   });
 
   it('does not regenerate the thumbnail when leaving an unchanged note', async () => {

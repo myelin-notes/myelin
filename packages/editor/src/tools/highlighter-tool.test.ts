@@ -72,6 +72,7 @@ function makeCanvas() {
     addElement,
     removeElement,
     transact,
+    viewport: { zoom: 1 },
   } as unknown as DrawableCanvas;
 
   return { canvas, ydoc, created, addElement, removeElement, transact };
