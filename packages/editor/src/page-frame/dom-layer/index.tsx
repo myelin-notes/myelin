@@ -15,6 +15,7 @@ import {
 } from '../../elements/page-frame-element';
 import { PM_UPDATE_EVENT } from '../../events';
 import { getMessages } from '../../i18n';
+import { renderScale } from '../../render-scale';
 import {
   getDevicePixelRatio,
   removeStyleIfPresent,
@@ -511,13 +512,19 @@ export function PageFrameDomLayer({
         setStyleIfChanged(refs.frameDiv, 'height', `${contentHeight * zoom}px`);
         setStyleIfChanged(refs.frameDiv, 'transform', '');
 
-        // Inner viewport: world-sized. A fixed CSS zoom of devicePixelRatio
-        // tells WebKit to rasterise the compositing-layer backing store at
-        // DPR² resolution, producing crisp text at every canvas zoom level.
-        // Because the zoom value is constant, text metrics and line breaks
-        // never change — the variable canvas zoom is handled entirely by
-        // transform: scale(), which is a post-layout GPU operation.
-        const dpr = getDevicePixelRatio();
+        // Inner viewport: world-sized. A fixed CSS zoom tells WebKit to
+        // rasterise the compositing-layer backing store at that multiple of
+        // the logical resolution, producing crisp text at every canvas zoom
+        // level. Because the value is constant for the session, text metrics
+        // and line breaks never change — the variable canvas zoom is handled
+        // entirely by transform: scale(), a post-layout GPU operation.
+        //
+        // The capped scale, not the raw device ratio: on a tablet this layer
+        // has to be re-rasterised on every frame of a zoom, and at the iPad's
+        // ratio of 2 that is four times the pixels of the canvas layers we
+        // already capped for exactly this reason. Same trade as the ink —
+        // softer text, but text that keeps up.
+        const dpr = renderScale();
         setStyleIfChanged(refs.viewportDiv, 'width', `${contentWidth}px`);
         setStyleIfChanged(refs.viewportDiv, 'height', `${contentHeight}px`);
         setStyleIfChanged(refs.viewportDiv, 'zoom', `${dpr}`);
