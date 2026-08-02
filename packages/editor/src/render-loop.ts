@@ -1,4 +1,4 @@
-import { flushCanvasInputSample, recordCanvasPerf } from './canvas-perf';
+import { flushCanvasPerfFrame, recordCanvasPerf } from './canvas-perf';
 import type { DrawableCanvas } from './drawable-canvas';
 
 /**
@@ -28,12 +28,13 @@ export function startDrawableCanvasAnimationLoop(
     // difference is the browser's own layout/paint/composite work, which is the
     // one thing an on-device readout can show that inspecting our code cannot.
     recordCanvasPerf('frame', dt * 1000);
-    // Closes the input total for the gap just measured, so `input` is ms per
-    // frame and lines up with `frame` rather than being per-event.
-    flushCanvasInputSample();
     const jsStart = performance.now();
     drawableCanvas.redraw(dt);
     recordCanvasPerf('js', performance.now() - jsStart);
+    // Closes the frame: everything measured outside the redraw (input handled
+    // during the gap just ended, the page-frame layer's own loop, each canvas
+    // phase) lands on this frame's row, so the trace reads across.
+    flushCanvasPerfFrame();
     if (stopped) {
       return;
     }

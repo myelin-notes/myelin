@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { measureCanvasPerf } from '../../canvas-perf';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
@@ -441,6 +442,14 @@ export function PageFrameDomLayer({
         return;
       }
 
+      // This loop runs alongside the canvas render loop but is not part of it,
+      // so without its own metric its cost lands in the trace's "browser"
+      // column, indistinguishable from paint and compositing.
+      measureCanvasPerf('pageFrame', () => syncFrames(dc, container));
+      rafId = requestAnimationFrame(sync);
+    }
+
+    function syncFrames(dc: DrawableCanvas, container: HTMLDivElement): void {
       const zoom = dc.viewport.zoom;
       const offset = dc.viewport.offset;
       const viewAnimating = dc.viewport.isAnimatingView;
@@ -552,17 +561,6 @@ export function PageFrameDomLayer({
       }
 
       removeStaleFrames(frameMap.current, activeFrames);
-
-      // The browser may try to scrollIntoView the focused contentEditable on
-      // its own. Zero those out so they don't accumulate, but DON'T convert
-      // them into a canvas pan — the follow-cursor effect below is the
-      // single source of truth for keeping the caret in view.
-      if (container.scrollTop !== 0 || container.scrollLeft !== 0) {
-        container.scrollTop = 0;
-        container.scrollLeft = 0;
-      }
-
-      rafId = requestAnimationFrame(sync);
     }
 
     rafId = requestAnimationFrame(sync);
@@ -574,6 +572,31 @@ export function PageFrameDomLayer({
       frameMap.current.clear();
     };
   }, [canvasRef]);
+
+  // The browser may try to scrollIntoView the focused contentEditable on its
+  // own. Zero those out so they don't accumulate, but DON'T convert them into a
+  // canvas pan — the follow-cursor effect below is the single source of truth
+  // for keeping the caret in view.
+  //
+  // Driven by the scroll event rather than polled in the sync loop above.
+  // Reading `scrollTop` there meant reading layout immediately after writing
+  // every frame's styles, which forces WebKit to flush layout synchronously
+  // over the whole page-frame subtree — a ProseMirror document, multi-column —
+  // on every frame, to detect a scroll that almost never happens.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+    const resetScroll = () => {
+      if (container.scrollTop !== 0 || container.scrollLeft !== 0) {
+        container.scrollTop = 0;
+        container.scrollLeft = 0;
+      }
+    };
+    container.addEventListener('scroll', resetScroll, { passive: true });
+    return () => container.removeEventListener('scroll', resetScroll);
+  }, []);
 
   // Follow-cursor: keep the caret inside a margin-padded viewport while
   // editing. Fires on every PM transaction (typing, arrow-key navigation,

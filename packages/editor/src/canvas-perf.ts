@@ -41,6 +41,7 @@ export type CanvasPerfMetric =
   | 'frame'
   | 'js'
   | 'input'
+  | 'pageFrame'
   | 'bg'
   | 'fg'
   | 'overlay'
@@ -53,6 +54,7 @@ const METRICS: CanvasPerfMetric[] = [
   'frame',
   'js',
   'input',
+  'pageFrame',
   'bg',
   'fg',
   'overlay',
@@ -61,6 +63,20 @@ const METRICS: CanvasPerfMetric[] = [
   'fgPaint',
   'overlayPaint',
 ];
+
+/**
+ * Metrics sampled once per animation frame by the render loop rather than at
+ * the point they are measured.
+ *
+ * Everything except `frame` and `js` is gathered somewhere that does not run
+ * on every frame — phases are skipped when a layer does not repaint, input
+ * arrives in event handlers, the page-frame layer runs its own loop. Recording
+ * at the measurement point left each series a different length, so a trace
+ * could not be read across rows: you could not line a 40ms frame up against
+ * what was happening during it. Accumulating and flushing per frame keeps every
+ * series the same length and index-aligned with `frame`.
+ */
+const PER_FRAME_METRICS = METRICS.filter((m) => m !== 'frame' && m !== 'js');
 
 let enabled = false;
 
@@ -98,7 +114,18 @@ export function recordCanvasPerf(metric: CanvasPerfMetric, ms: number): void {
   counts.set(metric, Math.min(WINDOW, (counts.get(metric) ?? 0) + 1));
 }
 
-/** Time `fn`, record it, and return whatever it returned. */
+/** Totals accumulated for the frame currently in flight. */
+const pending = new Map<CanvasPerfMetric, number>();
+
+/** Add to this frame's running total for a metric. @see PER_FRAME_METRICS */
+export function addCanvasPerf(metric: CanvasPerfMetric, value: number): void {
+  if (!enabled) {
+    return;
+  }
+  pending.set(metric, (pending.get(metric) ?? 0) + value);
+}
+
+/** Time `fn`, add it to this frame's total, and return whatever it returned. */
 export function measureCanvasPerf<T>(metric: CanvasPerfMetric, fn: () => T): T {
   if (!enabled) {
     return fn();
@@ -107,41 +134,34 @@ export function measureCanvasPerf<T>(metric: CanvasPerfMetric, fn: () => T): T {
   try {
     return fn();
   } finally {
-    recordCanvasPerf(metric, performance.now() - start);
+    addCanvasPerf(metric, performance.now() - start);
   }
 }
-
-/** Input-handling time since the last frame, in ms. */
-let pendingInput = 0;
 
 /**
  * Time `fn` as pointer-input handling.
  *
- * Accumulated rather than recorded per call, because pointer events do not
- * arrive one per frame — a stylus reporting at 120Hz+ delivers several between
- * frames — and the useful quantity is how much of a frame's budget input ate,
- * not the cost of one event. {@link flushCanvasInputSample} closes each frame's
- * total.
+ * Pointer events do not arrive one per frame — a stylus reporting at 120Hz+
+ * delivers several between frames — and the useful quantity is how much of a
+ * frame's budget input ate, not the cost of one event.
  */
 export function measureCanvasInput<T>(fn: () => T): T {
-  if (!enabled) {
-    return fn();
-  }
-  const start = performance.now();
-  try {
-    return fn();
-  } finally {
-    pendingInput += performance.now() - start;
-  }
+  return measureCanvasPerf('input', fn);
 }
 
-/** Record the input time accumulated since the previous frame, and reset it. */
-export function flushCanvasInputSample(): void {
+/**
+ * Close out the frame: record every per-frame total and reset for the next one.
+ * A metric nothing touched this frame records a zero, which is the point — a
+ * skipped layer costs nothing and must read as nothing, not as a missing row.
+ */
+export function flushCanvasPerfFrame(): void {
   if (!enabled) {
     return;
   }
-  recordCanvasPerf('input', pendingInput);
-  pendingInput = 0;
+  for (const metric of PER_FRAME_METRICS) {
+    recordCanvasPerf(metric, pending.get(metric) ?? 0);
+  }
+  pending.clear();
 }
 
 function mean(metric: CanvasPerfMetric): number {
@@ -176,7 +196,9 @@ export interface CanvasPerfSummary {
   js: number;
   /** Mean time handling pointer input per frame, ms. */
   input: number;
-  /** Frame gap left after our redraw and input: the browser's share, ms. */
+  /** Mean time in the page-frame DOM layer's own sync loop, ms. */
+  pageFrame: number;
+  /** Frame gap left after our own work: the browser's share, ms. */
   browser: number;
   bg: number;
   fg: number;
@@ -192,12 +214,14 @@ export function canvasPerfSummary(): CanvasPerfSummary {
   const frame = mean('frame');
   const js = mean('js');
   const input = mean('input');
+  const pageFrame = mean('pageFrame');
   return {
     frame,
     frameP95: p95('frame'),
     js,
     input,
-    browser: Math.max(0, frame - js - input),
+    pageFrame,
+    browser: Math.max(0, frame - js - input - pageFrame),
     bg: mean('bg'),
     fg: mean('fg'),
     overlay: mean('overlay'),
@@ -212,7 +236,7 @@ export function canvasPerfSummary(): CanvasPerfSummary {
 export function formatCanvasPerf(s: CanvasPerfSummary): string {
   const n = (v: number) => v.toFixed(1);
   const pct = (v: number) => Math.round(v * 100);
-  return `f ${n(s.frame)}/${n(s.frameP95)} js ${n(s.js)} in ${n(s.input)} br ${n(s.browser)} | bg ${n(s.bg)} fg ${n(s.fg)} ov ${n(s.overlay)} dom ${n(s.dom)} | paint ${pct(s.bgPaint)}/${pct(s.fgPaint)}/${pct(s.overlayPaint)}`;
+  return `f ${n(s.frame)}/${n(s.frameP95)} js ${n(s.js)} in ${n(s.input)} pf ${n(s.pageFrame)} br ${n(s.browser)} | bg ${n(s.bg)} fg ${n(s.fg)} ov ${n(s.overlay)} dom ${n(s.dom)} | paint ${pct(s.bgPaint)}/${pct(s.fgPaint)}/${pct(s.overlayPaint)}`;
 }
 
 /** Samples for one metric, oldest first. */
@@ -254,9 +278,9 @@ function browserEnvironment(): Record<string, unknown> {
  * The whole retained history plus the environment it was captured in, as JSON.
  *
  * This exists so a sideloaded device can hand over a real trace instead of a
- * number read off the screen. Phase metrics are only sampled on frames that
- * actually painted (the render loop skips clean frames), so they can be shorter
- * than `frame` and are not row-aligned with it.
+ * number read off the screen. Every series is the same length and index-aligned
+ * with `frame`, so a slow frame can be read across rows to see what ran during
+ * it.
  */
 export function exportCanvasPerfTrace(
   context: Record<string, unknown> = {},
@@ -267,7 +291,7 @@ export function exportCanvasPerfTrace(
       ...browserEnvironment(),
       ...context,
       summary: canvasPerfSummary(),
-      note: 'ms per frame. frame=wall-clock gap, js=our redraw, input=pointer handling, browser=frame-js-input (layout/paint/composite/GC). Phases sampled only on painted frames. *Paint metrics are 0/1 per redraw, not ms.',
+      note: 'ms per frame. frame=wall-clock gap, js=our redraw, input=pointer handling, pageFrame=page-frame DOM sync loop, browser=whatever is left (layout/paint/composite/GC). Every series is index-aligned with frame; a zero means that work did not run. *Paint metrics are 0/1, not ms.',
       samples: Object.fromEntries(METRICS.map((m) => [m, orderedSamples(m)])),
     },
     null,

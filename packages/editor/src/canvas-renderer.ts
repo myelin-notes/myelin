@@ -1,4 +1,4 @@
-import { measureCanvasPerf, recordCanvasPerf } from './canvas-perf';
+import { addCanvasPerf, measureCanvasPerf } from './canvas-perf';
 import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
 import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
@@ -206,7 +206,7 @@ export class CanvasRenderer {
         hasContent: this.bgHasContent,
       });
       this.bgStale = false;
-      recordCanvasPerf('bgPaint', repaint ? 1 : 0);
+      addCanvasPerf('bgPaint', repaint ? 1 : 0);
       if (!repaint) {
         return;
       }
@@ -249,7 +249,7 @@ export class CanvasRenderer {
         placementController.isActive ||
         toolSelected.drawsCursor;
       const paint = shouldTouchLayer(willPaint, this.fgHasContent);
-      recordCanvasPerf('fgPaint', paint ? 1 : 0);
+      addCanvasPerf('fgPaint', paint ? 1 : 0);
       if (!paint) {
         return;
       }
@@ -286,7 +286,7 @@ export class CanvasRenderer {
       // Nothing selected means nothing on this layer, which is the usual case.
       const willPaint = elements.some((e) => e.hasSelectionVisual);
       const paint = shouldTouchLayer(willPaint, this.overlayHasContent);
-      recordCanvasPerf('overlayPaint', paint ? 1 : 0);
+      addCanvasPerf('overlayPaint', paint ? 1 : 0);
       if (!paint) {
         return;
       }

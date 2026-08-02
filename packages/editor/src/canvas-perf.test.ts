@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  addCanvasPerf,
   canvasPerfSummary,
   exportCanvasPerfTrace,
+  flushCanvasPerfFrame,
   formatCanvasPerf,
   measureCanvasPerf,
   recordCanvasPerf,
@@ -25,20 +27,53 @@ describe('layer paint rate', () => {
     // per frame, which is what the frame time tracks — not the ms spent
     // issuing their draw calls.
     for (let i = 0; i < 10; i++) {
-      recordCanvasPerf('bgPaint', i < 4 ? 1 : 0);
-      recordCanvasPerf('fgPaint', 1);
-      recordCanvasPerf('overlayPaint', 0);
+      addCanvasPerf('bgPaint', i < 4 ? 1 : 0);
+      addCanvasPerf('fgPaint', 1);
+      flushCanvasPerfFrame();
     }
 
     const summary = canvasPerfSummary();
     expect(summary.bgPaint).toBeCloseTo(0.4);
     expect(summary.fgPaint).toBe(1);
+    // Never touched, so it flushed a zero every frame rather than no row.
     expect(summary.overlayPaint).toBe(0);
     expect(formatCanvasPerf(summary)).toContain('paint 40/100/0');
   });
 
   it('reads as zero before any frame has been drawn', () => {
     expect(formatCanvasPerf(canvasPerfSummary())).toContain('paint 0/0/0');
+  });
+});
+
+describe('per-frame alignment', () => {
+  it('gives every series a row per frame, so a trace reads across', () => {
+    // Work measured outside the redraw (a skipped layer, the page-frame loop)
+    // used to leave its series shorter than `frame`, which made it impossible
+    // to line a slow frame up against what ran during it.
+    for (let i = 0; i < 3; i++) {
+      recordCanvasPerf('frame', 16);
+      if (i === 1) {
+        addCanvasPerf('pageFrame', 9);
+      }
+      flushCanvasPerfFrame();
+    }
+
+    const trace = JSON.parse(exportCanvasPerfTrace()) as {
+      samples: Record<string, number[]>;
+    };
+    expect(trace.samples.frame).toEqual([16, 16, 16]);
+    expect(trace.samples.pageFrame).toEqual([0, 9, 0]);
+    expect(trace.samples.bg).toEqual([0, 0, 0]);
+  });
+
+  it('accumulates repeated measurements within one frame', () => {
+    // Several pointer events can arrive between two frames; the useful number
+    // is what input cost that frame, not what one event cost.
+    addCanvasPerf('input', 2);
+    addCanvasPerf('input', 3);
+    flushCanvasPerfFrame();
+
+    expect(canvasPerfSummary().input).toBe(5);
   });
 });
 
