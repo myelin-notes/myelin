@@ -31,6 +31,9 @@ export class StrokeElement extends DrawableElement {
   /** Wall-clock of the last Yjs flush, for throttling live writes. */
   private lastFlush: number = 0;
 
+  /** Reused perfect-freehand input, kept in step with `points`. @see toTuples */
+  private tuples: [number, number, number][] = [];
+
   public get strokeStyle(): StrokeStyle {
     return this.style;
   }
@@ -89,6 +92,9 @@ export class StrokeElement extends DrawableElement {
       },
       points: (v) => {
         this.points = (v as number[]).slice();
+        // Wholesale replacement, not an append: the cached tuples describe the
+        // previous buffer and cannot be reused for any index.
+        this.tuples.length = 0;
         this.dirty = true;
         this.updateBounds();
       },
@@ -119,16 +125,29 @@ export class StrokeElement extends DrawableElement {
     }
   }
 
-  /** Materialize the flat buffer as perfect-freehand input tuples (transient). */
+  /**
+   * The flat buffer as perfect-freehand input tuples.
+   *
+   * Grown in step with `points` rather than rebuilt, because this runs on every
+   * frame of a live stroke: allocating one array per point per frame, over a
+   * point list that grows as you draw, was enough garbage to show up in the
+   * frame gap on a low-end tablet.
+   *
+   * The returned array is shared and reused — callers must not retain or mutate
+   * it. Anything that *replaces* `points` instead of appending to it has to
+   * clear this (see the `points` field binding), or the stale prefix survives.
+   */
   private toTuples(): [number, number, number][] {
     const pts = this.points;
     const n = (pts.length / 3) | 0;
-    const out = new Array<[number, number, number]>(n);
-    for (let i = 0; i < n; i++) {
-      const j = i * 3;
-      out[i] = [pts[j], pts[j + 1], pts[j + 2]];
+    if (this.tuples.length > n) {
+      this.tuples.length = n;
     }
-    return out;
+    for (let i = this.tuples.length; i < n; i++) {
+      const j = i * 3;
+      this.tuples.push([pts[j], pts[j + 1], pts[j + 2]]);
+    }
+    return this.tuples;
   }
 
   public draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
@@ -141,7 +160,7 @@ export class StrokeElement extends DrawableElement {
         simulatePressure: !this.hasPressure,
         size: this.style.size,
       });
-      this.cachedPath = new Path2D(this.getSvgPathFromStroke(outline));
+      this.cachedPath = strokeOutlineToPath(outline);
       this.dirty = false;
     }
 
@@ -240,42 +259,54 @@ export class StrokeElement extends DrawableElement {
 
     this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
   }
+}
 
-  protected average(a: number, b: number) {
-    return (a + b) / 2;
+/**
+ * The perfect-freehand outline as a closed, fillable path.
+ *
+ * Same geometry as the `getSvgPathFromStroke` snippet in perfect-freehand's
+ * docs, but written straight into a Path2D instead of formatted as an SVG `d`
+ * string for the browser to parse back. The string form cost four `toFixed`
+ * calls and a concatenation per outline point — on every frame of a live
+ * stroke, over an outline that grows as you draw — to produce a path the
+ * canvas can build directly.
+ *
+ * The `T` (smooth quadratic) commands are expanded by hand: each control point
+ * is the previous control point reflected about the current point.
+ */
+export function strokeOutlineToPath(outline: number[][]): Path2D {
+  const path = new Path2D();
+  const len = outline.length;
+  if (len < 4) {
+    return path;
   }
 
-  private getSvgPathFromStroke(points: number[][], closed = true) {
-    const len = points.length;
+  const start = outline[0];
+  const first = outline[1];
+  const second = outline[2];
 
-    if (len < 4) {
-      return ``;
-    }
+  path.moveTo(start[0], start[1]);
+  // The one explicit quadratic; its control point seeds the reflection chain.
+  let ctrlX = first[0];
+  let ctrlY = first[1];
+  let curX = (first[0] + second[0]) / 2;
+  let curY = (first[1] + second[1]) / 2;
+  path.quadraticCurveTo(ctrlX, ctrlY, curX, curY);
 
-    let a = points[0];
-    let b = points[1];
-    const c = points[2];
-
-    let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(
-      2,
-    )},${b[1].toFixed(2)} ${this.average(b[0], c[0]).toFixed(2)},${this.average(
-      b[1],
-      c[1],
-    ).toFixed(2)} T`;
-
-    for (let i = 2, max = len - 1; i < max; i++) {
-      a = points[i];
-      b = points[i + 1];
-      result += `${this.average(a[0], b[0]).toFixed(2)},${this.average(
-        a[1],
-        b[1],
-      ).toFixed(2)} `;
-    }
-
-    if (closed) {
-      result += 'Z';
-    }
-
-    return result;
+  for (let i = 2, max = len - 1; i < max; i++) {
+    const a = outline[i];
+    const b = outline[i + 1];
+    const reflectedX = 2 * curX - ctrlX;
+    const reflectedY = 2 * curY - ctrlY;
+    const nextX = (a[0] + b[0]) / 2;
+    const nextY = (a[1] + b[1]) / 2;
+    path.quadraticCurveTo(reflectedX, reflectedY, nextX, nextY);
+    ctrlX = reflectedX;
+    ctrlY = reflectedY;
+    curX = nextX;
+    curY = nextY;
   }
+
+  path.closePath();
+  return path;
 }

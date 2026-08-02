@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { Logger } from '@myelin/shared/logger';
+import { measureCanvasInput } from './canvas-perf';
 import { CanvasRenderer } from './canvas-renderer';
 import { CanvasViewport } from './canvas-viewport';
 import { ElementStore } from './element-store';
@@ -30,6 +31,7 @@ import { TextTool } from './tools/text-tool';
 import type { ITool, ToolId } from './tools/tool';
 import { CollisionHelper } from './utils/collision-helper';
 import { StateMachine } from './utils/state-machine';
+import { setStyleIfChanged } from './utils/style-cache';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export type { Vector2 } from './geometry';
@@ -1263,16 +1265,18 @@ export class DrawableCanvas {
     // canvas heard about until the cursor left that DOM again. Hover still
     // only fires for the bare canvas.
     this._handlePointerMove = (evt) => {
-      // Unconditional: the tool cursor tracks the pointer, and an in-progress
-      // stroke or drag mutates element internals that nothing else reports.
-      this.invalidate();
-      this.screenPosition = this.viewport.getScreenPoint(evt);
-      this.state.update(evt);
-      if (evt.target === canvas) {
-        const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
-        this.toolSelected.hover?.(this, mouseWorld);
-      }
-      this.updateCursor();
+      measureCanvasInput(() => {
+        // Unconditional: the tool cursor tracks the pointer, and an in-progress
+        // stroke or drag mutates element internals that nothing else reports.
+        this.invalidate();
+        this.screenPosition = this.viewport.getScreenPoint(evt);
+        this.state.update(evt);
+        if (evt.target === canvas) {
+          const mouseWorld = this.viewport.screenToWorld(this.screenPosition);
+          this.toolSelected.hover?.(this, mouseWorld);
+        }
+        this.updateCursor();
+      });
     };
     window.addEventListener('pointermove', this._handlePointerMove);
 
@@ -1457,13 +1461,17 @@ export class DrawableCanvas {
   }
 
   private updateCursor() {
-    if (this.state.current === InteractState.Moving) {
-      this.canvas.style.cursor = 'grabbing';
-    } else if (this.spaceDown) {
-      this.canvas.style.cursor = 'grab';
-    } else {
-      this.canvas.style.cursor = this._toolCursor;
-    }
+    // Via the style cache because this runs on every pointer sample — a stylus
+    // reporting at 120Hz+ means twice a frame while drawing — and WebKit
+    // dirties style and layout on an inline write even when the value it is
+    // given is the one already there.
+    const cursor =
+      this.state.current === InteractState.Moving
+        ? 'grabbing'
+        : this.spaceDown
+          ? 'grab'
+          : this._toolCursor;
+    setStyleIfChanged(this.canvas, 'cursor', cursor);
   }
 
   public switchTool(to: number) {

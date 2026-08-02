@@ -8,9 +8,12 @@
  * Safari Web Inspector to tell them apart.
  *
  * `frame` is the wall-clock gap between animation frames. `js` is how long our
- * redraw took inside that gap. Whatever separates them is the browser: layout,
- * paint, rasterization, compositing. A large `frame` with a small `js` means
- * the cost is not in code we can make faster by doing less of it.
+ * redraw took inside that gap, and `input` how long pointer handling took (it
+ * runs in event listeners, outside the redraw, so it would otherwise be
+ * invisible — and while drawing it is not small). Whatever is left is the
+ * browser: layout, paint, rasterization, compositing, GC. A large `frame` with
+ * a small `js` and `input` means the cost is not in code we can make faster by
+ * doing less of it.
  *
  * Caveat worth remembering when reading the numbers: canvas 2D calls are
  * recorded into a display list and rasterized later, so the cost of a heavy
@@ -37,6 +40,7 @@ const WINDOW = 300;
 export type CanvasPerfMetric =
   | 'frame'
   | 'js'
+  | 'input'
   | 'bg'
   | 'fg'
   | 'overlay'
@@ -48,6 +52,7 @@ export type CanvasPerfMetric =
 const METRICS: CanvasPerfMetric[] = [
   'frame',
   'js',
+  'input',
   'bg',
   'fg',
   'overlay',
@@ -106,6 +111,39 @@ export function measureCanvasPerf<T>(metric: CanvasPerfMetric, fn: () => T): T {
   }
 }
 
+/** Input-handling time since the last frame, in ms. */
+let pendingInput = 0;
+
+/**
+ * Time `fn` as pointer-input handling.
+ *
+ * Accumulated rather than recorded per call, because pointer events do not
+ * arrive one per frame — a stylus reporting at 120Hz+ delivers several between
+ * frames — and the useful quantity is how much of a frame's budget input ate,
+ * not the cost of one event. {@link flushCanvasInputSample} closes each frame's
+ * total.
+ */
+export function measureCanvasInput<T>(fn: () => T): T {
+  if (!enabled) {
+    return fn();
+  }
+  const start = performance.now();
+  try {
+    return fn();
+  } finally {
+    pendingInput += performance.now() - start;
+  }
+}
+
+/** Record the input time accumulated since the previous frame, and reset it. */
+export function flushCanvasInputSample(): void {
+  if (!enabled) {
+    return;
+  }
+  recordCanvasPerf('input', pendingInput);
+  pendingInput = 0;
+}
+
 function mean(metric: CanvasPerfMetric): number {
   const buffer = samples.get(metric);
   const count = counts.get(metric) ?? 0;
@@ -136,7 +174,9 @@ export interface CanvasPerfSummary {
   frameP95: number;
   /** Mean time inside our redraw, ms. */
   js: number;
-  /** Frame gap not accounted for by our redraw: the browser's share, ms. */
+  /** Mean time handling pointer input per frame, ms. */
+  input: number;
+  /** Frame gap left after our redraw and input: the browser's share, ms. */
   browser: number;
   bg: number;
   fg: number;
@@ -151,11 +191,13 @@ export interface CanvasPerfSummary {
 export function canvasPerfSummary(): CanvasPerfSummary {
   const frame = mean('frame');
   const js = mean('js');
+  const input = mean('input');
   return {
     frame,
     frameP95: p95('frame'),
     js,
-    browser: Math.max(0, frame - js),
+    input,
+    browser: Math.max(0, frame - js - input),
     bg: mean('bg'),
     fg: mean('fg'),
     overlay: mean('overlay'),
@@ -170,7 +212,7 @@ export function canvasPerfSummary(): CanvasPerfSummary {
 export function formatCanvasPerf(s: CanvasPerfSummary): string {
   const n = (v: number) => v.toFixed(1);
   const pct = (v: number) => Math.round(v * 100);
-  return `f ${n(s.frame)}/${n(s.frameP95)} js ${n(s.js)} br ${n(s.browser)} | bg ${n(s.bg)} fg ${n(s.fg)} ov ${n(s.overlay)} dom ${n(s.dom)} | paint ${pct(s.bgPaint)}/${pct(s.fgPaint)}/${pct(s.overlayPaint)}`;
+  return `f ${n(s.frame)}/${n(s.frameP95)} js ${n(s.js)} in ${n(s.input)} br ${n(s.browser)} | bg ${n(s.bg)} fg ${n(s.fg)} ov ${n(s.overlay)} dom ${n(s.dom)} | paint ${pct(s.bgPaint)}/${pct(s.fgPaint)}/${pct(s.overlayPaint)}`;
 }
 
 /** Samples for one metric, oldest first. */
@@ -225,7 +267,7 @@ export function exportCanvasPerfTrace(
       ...browserEnvironment(),
       ...context,
       summary: canvasPerfSummary(),
-      note: 'ms per frame. frame=wall-clock gap, js=our redraw, browser=frame-js (layout/paint/composite). Phases sampled only on painted frames. *Paint metrics are 0/1 per redraw, not ms.',
+      note: 'ms per frame. frame=wall-clock gap, js=our redraw, input=pointer handling, browser=frame-js-input (layout/paint/composite/GC). Phases sampled only on painted frames. *Paint metrics are 0/1 per redraw, not ms.',
       samples: Object.fromEntries(METRICS.map((m) => [m, orderedSamples(m)])),
     },
     null,
