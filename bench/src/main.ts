@@ -13,6 +13,7 @@ import { applyExactZoomBackground } from './background-ablation';
 import { applyDprOverride, type BenchConfig, readConfig } from './config';
 import { mountPageFrameDomLayer } from './dom-layer';
 import { makeInputStep } from './input';
+import { promotePageFrameViewports } from './page-frame-promotion';
 import { initBenchPlatform } from './platform';
 import { installRafProbe, rafTotalMs } from './raf-probe';
 import { postResult } from './report';
@@ -195,6 +196,12 @@ function run(): void {
         const jsMs = performance.now() - before;
 
         const elapsed = before - startedAt;
+        // Only during warmup: the frames are created by the DOM layer's own
+        // sync loop, so they do not exist on the first frame, and searching for
+        // them once measurement has started would cost the thing being measured.
+        if (config.promoteFrame && elapsed < config.warmupMs) {
+          promotePageFrameViewports();
+        }
         if (elapsed >= config.warmupMs) {
           if (measuringSince === 0) {
             // First measured frame: its gap spans the warmup boundary and the

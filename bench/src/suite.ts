@@ -168,6 +168,17 @@ export const SUITES: Record<string, SuiteCase[]> = {
       },
     },
     {
+      label: '  same, viewport promoted',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '1',
+        domLayer: '1',
+        promoteFrame: '1',
+      },
+    },
+    {
       label: '+ 3 page frames',
       params: {
         layers: 'all',
@@ -175,6 +186,17 @@ export const SUITES: Record<string, SuiteCase[]> = {
         scene: 'pageframe',
         pages: '3',
         domLayer: '1',
+      },
+    },
+    {
+      label: '  same, viewport promoted',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '3',
+        domLayer: '1',
+        promoteFrame: '1',
       },
     },
   ],
