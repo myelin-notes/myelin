@@ -326,6 +326,7 @@ function printTable(rows) {
     ['spread', (r) => r.spread.toFixed(2)],
     ['p95', (r) => r.frameP95.toFixed(2)],
     ['js', (r) => r.jsMean.toFixed(2)],
+    ['other', (r) => r.otherJsMean.toFixed(2)],
     ['browser', (r) => r.browserMean.toFixed(2)],
   ];
   const cells = [

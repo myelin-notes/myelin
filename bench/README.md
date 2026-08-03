@@ -69,10 +69,16 @@ Interactive runs take the same knobs as query parameters, e.g.
 
 ## Reading the numbers
 
-`js` is time inside `DrawableCanvas.redraw`. `frame` is the wall-clock gap
-between animation frames. `browser` is the difference: raster, texture upload,
-compositing, GC. When `browser` dominates and `js` is ~0, the fix is to make the
-browser composite something cheaper, not to make our code do less.
+`js` is time inside `DrawableCanvas.redraw`. `other` is JavaScript run by every
+*other* animation loop on the page — chiefly the page-frame DOM layer, which
+syncs frame geometry from its own `requestAnimationFrame`. `frame` is the
+wall-clock gap between animation frames, and `browser` is what is left after
+both: raster, texture upload, compositing, GC.
+
+When `browser` dominates and both JS figures are ~0, the fix is to make the
+browser composite something cheaper, not to make our code do less. `other`
+exists because that conclusion was reached several times while a whole
+animation loop went unmeasured.
 
 `spread` is the range across repeats. **A result is only meaningful if the
 effect you are measuring is larger than `spread`.** Software rasterization is

@@ -282,7 +282,7 @@ export function suiteRows(name: string): SuiteRow[] {
 /** Fixed-width table of a finished suite, for reading straight off a tablet. */
 export function formatSuite(rows: SuiteRow[]): string {
   const width = Math.max(...rows.map((r) => r.label.length));
-  const header = `${'case'.padEnd(width)}   fps   frame  spread     p95      js`;
+  const header = `${'case'.padEnd(width)}   fps   frame  spread     p95      js   other`;
   const body = rows.map((row) => {
     if (!('result' in row)) {
       // First line only: a stack would push the surviving rows off a tablet
@@ -297,6 +297,7 @@ export function formatSuite(rows: SuiteRow[]): string {
       (row.spread === undefined ? '-' : row.spread.toFixed(2)).padStart(7),
       result.frameP95.toFixed(2).padStart(7),
       result.jsMean.toFixed(2).padStart(7),
+      result.otherJsMean.toFixed(2).padStart(7),
     ].join(' ');
   });
   return [header, '-'.repeat(header.length), ...body].join('\n');

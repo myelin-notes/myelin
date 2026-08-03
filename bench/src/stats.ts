@@ -55,7 +55,15 @@ export interface BenchResult {
   jsMean: number;
   jsP95: number;
   /**
-   * Frame gap not accounted for by our redraw: the browser's share (raster,
+   * JavaScript run by animation loops other than ours, ms per frame.
+   *
+   * Chiefly the page-frame DOM layer, which syncs frame geometry from its own
+   * `requestAnimationFrame`. This is work `js` cannot see, so before it existed
+   * a page frame's cost looked like it came from nowhere.
+   */
+  otherJsMean: number;
+  /**
+   * Frame gap not accounted for by any JavaScript: the browser's share (raster,
    * texture upload, composite, GC). With vsync disabled this is the number
    * that answers "is the cost in our code or in the compositor".
    */
@@ -64,9 +72,18 @@ export interface BenchResult {
   fps: number;
 }
 
-export function summarize(frame: Series, js: Series): BenchResult {
+export function summarize(
+  frame: Series,
+  js: Series,
+  /** Total animation-frame callback time over the measured window, ms. */
+  rafMs = 0,
+): BenchResult {
   const frameMean = frame.mean;
   const jsMean = js.mean;
+  // Everything the animation frames ran, less our own redraw. Measured in
+  // aggregate rather than per frame because our redraw is itself one of those
+  // callbacks, so a per-frame subtraction would depend on callback ordering.
+  const rafPerFrame = frame.count > 0 ? rafMs / frame.count : 0;
   return {
     frames: frame.count,
     frameMean,
@@ -75,7 +92,8 @@ export function summarize(frame: Series, js: Series): BenchResult {
     frameP99: frame.percentile(0.99),
     jsMean,
     jsP95: js.percentile(0.95),
-    browserMean: Math.max(0, frameMean - jsMean),
+    otherJsMean: Math.max(0, rafPerFrame - jsMean),
+    browserMean: Math.max(0, frameMean - rafPerFrame),
     fps: frameMean > 0 ? 1000 / frameMean : 0,
   };
 }

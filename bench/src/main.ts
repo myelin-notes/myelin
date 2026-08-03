@@ -13,6 +13,7 @@ import { applyDprOverride, type BenchConfig, readConfig } from './config';
 import { mountPageFrameDomLayer } from './dom-layer';
 import { makeInputStep } from './input';
 import { initBenchPlatform } from './platform';
+import { installRafProbe, rafTotalMs } from './raf-probe';
 import { postResult } from './report';
 import { buildScene } from './scenes';
 import { installSecureContextShims } from './secure-context-shim';
@@ -74,6 +75,7 @@ function formatReadout(config: BenchConfig, result: BenchResult): string {
     `frames ${result.frames}  fps ${result.fps.toFixed(1)}`,
     `frame  mean ${n(result.frameMean)}  p50 ${n(result.frameP50)}  p95 ${n(result.frameP95)}  p99 ${n(result.frameP99)}`,
     `js     mean ${n(result.jsMean)}  p95 ${n(result.jsP95)}`,
+    `otherJs mean ${n(result.otherJsMean)}  (other animation loops)`,
     `browser mean ${n(result.browserMean)}`,
   ].join('\n');
 }
@@ -86,8 +88,10 @@ function formatReadout(config: BenchConfig, result: BenchResult): string {
 let completeSuiteCase: (outcome: SuiteOutcome) => void = () => {};
 
 function run(): void {
-  // Before the engine can reach for anything a secure context would have.
+  // Before the engine can reach for anything a secure context would have, and
+  // before any loop registers a callback the probe would otherwise miss.
   installSecureContextShims();
+  installRafProbe();
 
   const params = new URLSearchParams(window.location.search);
   const suiteName = params.get('suite');
@@ -159,6 +163,9 @@ function run(): void {
   const jsSeries = new Series();
   let frame = 0;
   let measuringSince = 0;
+  // Animation-frame time already banked before measurement began, subtracted
+  // out so warmup does not count against the measured window.
+  let rafAtMeasureStart = 0;
   const startedAt = performance.now();
 
   // The engine's own loop is the code under test, so drive it rather than
@@ -179,6 +186,7 @@ function run(): void {
             // First measured frame: its gap spans the warmup boundary and the
             // scene build, so it is not a sample of steady state.
             measuringSince = before;
+            rafAtMeasureStart = rafTotalMs();
           } else {
             frameSeries.push(deltaTime * 1000);
             jsSeries.push(jsMs);
@@ -200,7 +208,11 @@ function run(): void {
         `bench: no frames measured in ${config.durationMs}ms. The animation loop did not run — check that the window is visible and not backgrounded.`,
       );
     }
-    const result = summarize(frameSeries, jsSeries);
+    const result = summarize(
+      frameSeries,
+      jsSeries,
+      rafTotalMs() - rafAtMeasureStart,
+    );
     window.__benchResult = { ...result, config };
 
     if (!suite) {
