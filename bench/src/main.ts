@@ -13,6 +13,7 @@ import { applyExactZoomBackground } from './background-ablation';
 import { applyDprOverride, type BenchConfig, readConfig } from './config';
 import { mountPageFrameDomLayer } from './dom-layer';
 import { makeInputStep } from './input';
+import { layoutProbeTotals, startLayoutProbe } from './layout-probe';
 import {
   promotePageFrameViewports,
   stripPageFrameShadows,
@@ -97,6 +98,9 @@ function run(): void {
   // before any loop registers a callback the probe would otherwise miss.
   installSecureContextShims();
   installRafProbe();
+  // After the rAF probe, so the forced flush is counted as animation-frame time
+  // and can be broken back out of it rather than double counted.
+  startLayoutProbe();
 
   const params = new URLSearchParams(window.location.search);
   const suiteName = params.get('suite');
@@ -183,6 +187,7 @@ function run(): void {
   // Animation-frame time already banked before measurement began, subtracted
   // out so warmup does not count against the measured window.
   let rafAtMeasureStart = 0;
+  let layoutAtMeasureStart = { ms: 0, frames: 0 };
   const startedAt = performance.now();
 
   // The engine's own loop is the code under test, so drive it rather than
@@ -216,6 +221,7 @@ function run(): void {
             // scene build, so it is not a sample of steady state.
             measuringSince = before;
             rafAtMeasureStart = rafTotalMs();
+            layoutAtMeasureStart = layoutProbeTotals();
           } else {
             frameSeries.push(deltaTime * 1000);
             jsSeries.push(jsMs);
@@ -240,10 +246,13 @@ function run(): void {
         `bench: no frames measured in ${config.durationMs}ms. The animation loop did not run — check that the window is visible and not backgrounded.`,
       );
     }
+    const layout = layoutProbeTotals();
     const result = summarize(
       frameSeries,
       jsSeries,
       rafTotalMs() - rafAtMeasureStart,
+      layout.ms - layoutAtMeasureStart.ms,
+      layout.frames - layoutAtMeasureStart.frames,
     );
     window.__benchResult = { ...result, config };
 

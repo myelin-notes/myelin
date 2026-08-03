@@ -63,9 +63,18 @@ export interface BenchResult {
    */
   otherJsMean: number;
   /**
-   * Frame gap not accounted for by any JavaScript: the browser's share (raster,
-   * texture upload, composite, GC). With vsync disabled this is the number
-   * that answers "is the cost in our code or in the compositor".
+   * Style recalculation and layout, ms per frame, measured by forcing the
+   * flush at the end of the frame and timing it.
+   *
+   * Broken out of `otherJsMean` rather than added to it: the probe runs as an
+   * animation callback, so its time is already inside the total this is
+   * subtracted from.
+   */
+  layoutMean: number;
+  /**
+   * Frame gap not accounted for by any JavaScript or by the forced layout:
+   * paint, raster, texture upload, composite, GC. With vsync disabled this is
+   * the number that answers "is the cost in our code or in the compositor".
    */
   browserMean: number;
   /** Frame gap expressed as a rate, for eyeballing against 60. */
@@ -77,9 +86,14 @@ export function summarize(
   js: Series,
   /** Total animation-frame callback time over the measured window, ms. */
   rafMs = 0,
+  /** Total forced style-and-layout time over the measured window, ms. */
+  layoutMs = 0,
+  /** Frames the layout probe covered, which need not match `frame.count`. */
+  layoutFrames = 0,
 ): BenchResult {
   const frameMean = frame.mean;
   const jsMean = js.mean;
+  const layoutMean = layoutFrames > 0 ? layoutMs / layoutFrames : 0;
   // Everything the animation frames ran, less our own redraw. Measured in
   // aggregate rather than per frame because our redraw is itself one of those
   // callbacks, so a per-frame subtraction would depend on callback ordering.
@@ -92,7 +106,8 @@ export function summarize(
     frameP99: frame.percentile(0.99),
     jsMean,
     jsP95: js.percentile(0.95),
-    otherJsMean: Math.max(0, rafPerFrame - jsMean),
+    otherJsMean: Math.max(0, rafPerFrame - jsMean - layoutMean),
+    layoutMean,
     browserMean: Math.max(0, frameMean - rafPerFrame),
     fps: frameMean > 0 ? 1000 / frameMean : 0,
   };
