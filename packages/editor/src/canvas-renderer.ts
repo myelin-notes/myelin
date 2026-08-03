@@ -38,6 +38,30 @@ export function backgroundPanShift(
 }
 
 /**
+ * Zoom levels the tiling is actually painted at. Half-octave steps.
+ *
+ * Sizing the tiles to the exact zoom repaints the layer on every frame of a
+ * zoom, which a trace measured at 47 tile rasterizations per frame — the single
+ * largest cost in a zoom, and larger than everything the page frame does. The
+ * remainder between a step and the real zoom rides on the layer's transform
+ * instead, which the compositor applies to the texture it already has.
+ *
+ * Always rounded down, so the remaining scale is in [1, √2) and the layer can
+ * only ever be scaled up: a layer scaled down would stop covering the viewport
+ * it was sized to fill. The cost is that the tiling is at most 41% softer than
+ * a fresh paint, on a faint dot grid, mid-gesture.
+ */
+export function backgroundRasterZoom(zoom: number): number {
+  if (!(zoom > 0) || !Number.isFinite(zoom)) {
+    return 1;
+  }
+  // In log2, not in log(zoom)/log(√2): the latter puts an exact 2x zoom at
+  // 1.9999999999999998, which floors into the step below and leaves the layer
+  // permanently scaled at a round zoom level.
+  return 2 ** (Math.floor(Math.log2(zoom) * 2) / 2);
+}
+
+/**
  * Paint one pattern tile and return it as a data URL.
  *
  * Rendered at `resolution` times its logical size so the dot stays crisp on a
@@ -88,7 +112,8 @@ export function buildBackgroundTile(
  * `CanvasPattern` cost roughly 8ms of a 24ms frame, and a third full-viewport
  * canvas is a third of the canvas memory that decides whether WebKit keeps 2D
  * contexts GPU-accelerated at all. As CSS, panning is a compositor translate
- * that repaints nothing, and only a zoom touches the layer's paint.
+ * that repaints nothing, and a zoom repaints only when it crosses one of the
+ * half-octave steps the tiling is painted at.
  */
 export class CanvasRenderer {
   private readonly ctx: CanvasRenderingContext2D;
@@ -106,9 +131,8 @@ export class CanvasRenderer {
    * has to be re-sized when the zoom changes; a pan is a translate, and a run
    * of panned frames all measure against the same painted tiling.
    */
-  private bgLastZoom = Number.NaN;
-  private bgLastShiftX = Number.NaN;
-  private bgLastShiftY = Number.NaN;
+  private bgLastRasterZoom = Number.NaN;
+  private bgLastTransform = '';
 
   public constructor(
     foregroundCtx: CanvasRenderingContext2D,
@@ -151,6 +175,10 @@ export class CanvasRenderer {
     host.style.pointerEvents = 'none';
     host.style.backgroundRepeat = 'repeat';
     host.style.backgroundPosition = '0 0';
+    // Anchor the raster-step scale to the top-left corner. About the centre it
+    // would pull the layer's left and top edges inward, and the overdraw only
+    // covers the bottom-right growth of a scale that is never below 1.
+    host.style.transformOrigin = '0 0';
     // Promote the layer up front. Without this the per-frame transform can be
     // serviced by repainting the tiling instead of moving an existing texture,
     // which is the entire cost this layer exists to avoid — and the promotion
@@ -269,20 +297,25 @@ export class CanvasRenderer {
     if (!host) {
       return;
     }
-    const tile = BG_TILE_SIZE * zoom;
-    if (zoom !== this.bgLastZoom) {
-      host.style.backgroundSize = `${tile}px ${tile}px`;
-      this.bgLastZoom = zoom;
+    const rasterZoom = backgroundRasterZoom(zoom);
+    if (rasterZoom !== this.bgLastRasterZoom) {
+      const painted = BG_TILE_SIZE * rasterZoom;
+      host.style.backgroundSize = `${painted}px ${painted}px`;
+      this.bgLastRasterZoom = rasterZoom;
     }
+
     // The world origin sits at screen (offset * zoom), and the tiling is
     // anchored there. Reducing modulo the tile keeps the translate inside the
     // overdraw no matter how far the canvas has been panned.
+    const tile = BG_TILE_SIZE * zoom;
     const shiftX = backgroundPanShift(offset.x * zoom, tile);
     const shiftY = backgroundPanShift(offset.y * zoom, tile);
-    if (shiftX !== this.bgLastShiftX || shiftY !== this.bgLastShiftY) {
-      host.style.transform = `translate3d(${shiftX}px, ${shiftY}px, 0)`;
-      this.bgLastShiftX = shiftX;
-      this.bgLastShiftY = shiftY;
+    // The translate is listed first, so it applies in screen pixels and the
+    // scale after it does not multiply the pan shift.
+    const transform = `translate3d(${shiftX}px, ${shiftY}px, 0) scale(${zoom / rasterZoom})`;
+    if (transform !== this.bgLastTransform) {
+      host.style.transform = transform;
+      this.bgLastTransform = transform;
     }
   }
 
