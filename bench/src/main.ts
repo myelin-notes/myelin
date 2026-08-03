@@ -16,7 +16,7 @@ import { makeInputStep } from './input';
 import { layoutProbeTotals, startLayoutProbe } from './layout-probe';
 import {
   promotePageFrameViewports,
-  stripPageFrameShadows,
+  setPageFrameShadows,
 } from './page-frame-ablations';
 import { initBenchPlatform } from './platform';
 import { installRafProbe, rafTotalMs } from './raf-probe';
@@ -211,8 +211,8 @@ function run(): void {
           if (config.promoteFrame) {
             promotePageFrameViewports();
           }
-          if (!config.frameShadow) {
-            stripPageFrameShadows();
+          if (config.frameShadow !== 'on') {
+            setPageFrameShadows(config.frameShadow);
           }
         }
         if (elapsed >= config.warmupMs) {

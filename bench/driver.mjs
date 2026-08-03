@@ -92,7 +92,7 @@ const MATRIX = {
   domLayer: list(args.domLayer, ['0']),
   bgRaster: list(args.bgRaster, ['stepped']),
   promoteFrame: list(args.promoteFrame, ['0']),
-  frameShadow: list(args.frameShadow, ['1']),
+  frameShadow: list(args.frameShadow, ['on']),
 };
 
 const DURATION_MS = Number(args.duration ?? 4000);

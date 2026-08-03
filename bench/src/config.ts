@@ -25,6 +25,9 @@ export type BackgroundStyle = 'grid' | 'dots' | 'blank';
  */
 export type BackgroundRaster = 'stepped' | 'exact';
 
+/** @see FrameShadow usage in `page-frame-ablations.ts` for the actual values. */
+export type FrameShadow = 'on' | 'small' | 'off';
+
 export interface BenchConfig {
   scene: SceneName;
   /** Element count for the `strokes` scene. */
@@ -52,10 +55,11 @@ export interface BenchConfig {
    */
   promoteFrame: boolean;
   /**
-   * Keep the page sheet's drop shadow. Off prices the blur, which only costs
-   * on a gesture that repaints.
+   * The page sheet's drop shadow. `off` prices the blur; `small` prices it
+   * against a narrower one, which is what says whether the cost follows the
+   * blur radius or merely the presence of a shadow.
    */
-  frameShadow: boolean;
+  frameShadow: FrameShadow;
   /**
    * Backing-store pixels per CSS pixel. Overrides `window.devicePixelRatio`
    * rather than going through CDP's `deviceScaleFactor`, which would also
@@ -81,7 +85,7 @@ const DEFAULTS: BenchConfig = {
   domLayer: false,
   pages: 1,
   promoteFrame: false,
-  frameShadow: true,
+  frameShadow: 'on',
   dpr: window.devicePixelRatio || 1,
   warmupMs: 600,
   durationMs: 4000,
@@ -147,7 +151,12 @@ export function readConfig(search: string): BenchConfig {
     domLayer: params.get('domLayer') === '1',
     pages: num(params, 'pages', DEFAULTS.pages),
     promoteFrame: params.get('promoteFrame') === '1',
-    frameShadow: params.get('frameShadow') !== '0',
+    frameShadow: oneOf(
+      params,
+      'frameShadow',
+      ['on', 'small', 'off'] as const,
+      DEFAULTS.frameShadow,
+    ),
     dpr: num(params, 'dpr', DEFAULTS.dpr),
     warmupMs: num(params, 'warmup', DEFAULTS.warmupMs),
     durationMs: num(params, 'duration', DEFAULTS.durationMs),

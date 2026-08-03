@@ -154,10 +154,6 @@ export const SUITES: Record<string, SuiteCase[]> = {
     { label: 'canvas only, blank', params: { layers: 'all', bg: 'blank' } },
     { label: '+ dot background', params: { layers: 'all', bg: 'dots' } },
     {
-      label: '  same, repainted every frame',
-      params: { layers: 'all', bg: 'dots', bgRaster: 'exact' },
-    },
-    {
       label: '+ 1 page frame',
       params: {
         layers: 'all',
@@ -165,6 +161,22 @@ export const SUITES: Record<string, SuiteCase[]> = {
         scene: 'pageframe',
         pages: '1',
         domLayer: '1',
+      },
+    },
+    // The shadow is 7.74ms of a page frame's 14.38ms, all of it paint. These
+    // two say how to spend that: if a narrow blur is much cheaper than a wide
+    // one, the radius is the fix. If it costs the same, then any shadow at all
+    // is too expensive to recompute per frame and it has to be pre-rendered
+    // once and scaled, the way the canvas background now is.
+    {
+      label: '  same, small shadow',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '1',
+        domLayer: '1',
+        frameShadow: 'small',
       },
     },
     {
@@ -175,33 +187,7 @@ export const SUITES: Record<string, SuiteCase[]> = {
         scene: 'pageframe',
         pages: '1',
         domLayer: '1',
-        frameShadow: '0',
-      },
-    },
-    // The last pair prices the page's raster area. The DOM layer has WebKit
-    // rasterize each page at `zoom: devicePixelRatio`, so at dpr 2 a page is
-    // painted over four times its own area — and unlike the shadow there is no
-    // way to switch that off from outside without fighting the sync loop for
-    // the same property every frame.
-    //
-    // Halving the ratio halves it for the canvases too, so the pair is read as
-    // a difference: what the page frame costs at dpr 1 is this row minus its
-    // control, against 'the same at dpr 2' further up. If the page's share
-    // falls by roughly four when the ratio halves, its cost is the area it is
-    // painted over, and the `zoom: dpr` trick is what a zoom is paying for.
-    {
-      label: '+ dot background, dpr 1',
-      params: { layers: 'all', bg: 'dots', dpr: '1' },
-    },
-    {
-      label: '+ 1 page frame, dpr 1',
-      params: {
-        layers: 'all',
-        bg: 'dots',
-        scene: 'pageframe',
-        pages: '1',
-        domLayer: '1',
-        dpr: '1',
+        frameShadow: 'off',
       },
     },
   ],
