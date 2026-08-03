@@ -185,29 +185,52 @@ export const SUITES: Record<string, SuiteCase[]> = {
         chromePromoted: '0',
       },
     },
-    // A page frame costs 14ms of a zoom frame while being, on screen, a blank
-    // sheet. Every ablation above still contains the whole chrome, so none of
-    // them can say whether that is what an element of this size costs on this
-    // hardware or something the chrome does to it. These three contain no
-    // chrome at all — one white rectangle, page-sized, positioned like a page,
-    // with nothing in it and nothing on it.
-    //
-    // They differ only in how the rectangle follows the view: scaled by its
-    // transform, resized in screen pixels every frame the way the chrome does
-    // it, and resized while promoted the way the chrome also does it. Whatever
-    // separates them is the cost of the technique rather than of the content,
-    // and it is the same technique the chrome uses.
+    // Dropping the shadow saves 7.69ms and dropping the promotion saves
+    // 7.77ms, separately. Either they are two names for one cost — a promoted
+    // layer being resized has to repaint whole, and the most expensive thing in
+    // that repaint is the shadow — or they are independent and stack. One row
+    // decides it, and the answer decides whether there is anything left to find
+    // after those two.
     {
-      label: '+ plain div, scaled',
-      params: { layers: 'all', bg: 'dots', plainFrame: 'scale' },
+      label: '  same, neither',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '1',
+        domLayer: '1',
+        frameShadow: 'off',
+        chromePromoted: '0',
+      },
+    },
+    // A page-sized white rectangle costs 0.4ms even resized and promoted every
+    // frame, so neither the element, its size, nor how it follows the view can
+    // explain 14.63ms. That leaves what is inside, and the largest thing inside
+    // is a live contenteditable carrying the editor's whole stylesheet — over
+    // an empty document, which ought to be free.
+    {
+      label: '  same, and no editor',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '1',
+        domLayer: '1',
+        frameShadow: 'off',
+        chromePromoted: '0',
+        frameEditor: '0',
+      },
     },
     {
-      label: '+ plain div, resized',
-      params: { layers: 'all', bg: 'dots', plainFrame: 'resize' },
-    },
-    {
-      label: '+ plain div, resized + promoted',
-      params: { layers: 'all', bg: 'dots', plainFrame: 'promoted' },
+      label: '  editor hidden only',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '1',
+        domLayer: '1',
+        frameEditor: '0',
+      },
     },
   ],
 };

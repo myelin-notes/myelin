@@ -29,6 +29,34 @@
  * else on the page sets. That is sturdier than walking a fixed depth of
  * wrappers, which the chrome is free to change.
  */
+import { PM_EDITOR_CLASS } from '@myelin/editor/page-frame/pm/constants';
+
+const hiddenEditors = new WeakSet<HTMLElement>();
+
+/**
+ * Hide the ProseMirror editor inside each page frame.
+ *
+ * A page-sized white rectangle costs nothing on the device — 0.4ms even when
+ * resized and promoted every frame — while a page frame costs 14.63ms. So the
+ * cost is not the element, its size, or how it follows the view. It is what is
+ * inside it, and the largest thing inside it is a live contenteditable with the
+ * editor's whole stylesheet applied.
+ *
+ * The bench's documents are empty, so this should be free and almost certainly
+ * is not. Nothing in the sync loop writes `display`, so one write holds.
+ */
+export function hidePageFrameEditors(): void {
+  for (const element of document.querySelectorAll<HTMLElement>(
+    `[data-frame-chrome] .${PM_EDITOR_CLASS}`,
+  )) {
+    if (hiddenEditors.has(element)) {
+      continue;
+    }
+    element.style.display = 'none';
+    hiddenEditors.add(element);
+  }
+}
+
 const promoted = new WeakSet<HTMLElement>();
 const deshadowed = new WeakSet<HTMLElement>();
 const demoted = new WeakSet<HTMLElement>();

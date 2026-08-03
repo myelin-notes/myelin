@@ -17,6 +17,7 @@ import { makeInputStep } from './input';
 import { layoutProbeTotals, startLayoutProbe } from './layout-probe';
 import {
   demotePageFrameChrome,
+  hidePageFrameEditors,
   promotePageFrameViewports,
   setPageFrameShadows,
 } from './page-frame-ablations';
@@ -226,6 +227,9 @@ function run(): void {
           }
           if (!config.chromePromoted) {
             demotePageFrameChrome();
+          }
+          if (!config.frameEditor) {
+            hidePageFrameEditors();
           }
         }
         if (elapsed >= config.warmupMs) {

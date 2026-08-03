@@ -77,6 +77,11 @@ export interface BenchConfig {
    */
   chromePromoted: boolean;
   /**
+   * Keep the ProseMirror editor visible inside each page frame. Off asks
+   * whether the live contenteditable is what a blank-looking page costs.
+   */
+  frameEditor: boolean;
+  /**
    * Backing-store pixels per CSS pixel. Overrides `window.devicePixelRatio`
    * rather than going through CDP's `deviceScaleFactor`, which would also
    * rescale CSS layout. The variable under test is how many pixels each layer
@@ -104,6 +109,7 @@ const DEFAULTS: BenchConfig = {
   frameShadow: 'on',
   plainFrame: null,
   chromePromoted: true,
+  frameEditor: true,
   dpr: window.devicePixelRatio || 1,
   warmupMs: 600,
   durationMs: 4000,
@@ -180,6 +186,7 @@ export function readConfig(search: string): BenchConfig {
         (mode) => mode === params.get('plainFrame'),
       ) ?? null,
     chromePromoted: params.get('chromePromoted') !== '0',
+    frameEditor: params.get('frameEditor') !== '0',
     dpr: num(params, 'dpr', DEFAULTS.dpr),
     warmupMs: num(params, 'warmup', DEFAULTS.warmupMs),
     durationMs: num(params, 'duration', DEFAULTS.durationMs),
