@@ -91,7 +91,9 @@ function run(): void {
 
   const params = new URLSearchParams(window.location.search);
   const suiteName = params.get('suite');
-  const suite = suiteName ? beginSuiteCase(suiteName) : null;
+  const suite = suiteName
+    ? beginSuiteCase(suiteName, Number(params.get('repeat')) || undefined)
+    : null;
   if (suiteName && !suite) {
     throw new Error(`bench: no suite named "${suiteName}"`);
   }
@@ -111,11 +113,12 @@ function run(): void {
   const config = readConfig(params.toString());
   const readout = requireElement('readout');
   if (suite) {
-    readout.textContent = `running: ${suite.case.label}`;
+    readout.textContent = `running: ${suite.case.label} (run ${suite.state.current.length + 1}/${suite.state.repeat})`;
     completeSuiteCase = (outcome) => {
       const next = advanceSuite(suite.state, outcome, {
         warmup: String(config.warmupMs),
         duration: String(config.durationMs),
+        repeat: String(suite.state.repeat),
       });
       if (next) {
         window.location.href = next;

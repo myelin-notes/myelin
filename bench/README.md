@@ -19,11 +19,17 @@ not depend on a proxy being faithful.
 yarn bench:serve      # builds, then serves on all interfaces; prints a Network URL
 ```
 
-Open `http://<that-address>:1431/?suite=layers` on the tablet. It runs seven
-configurations back to back, reloading between each, and prints a table you can
-read (and select, and copy) off the screen. Keep the tab in the foreground —
-iOS throttles `requestAnimationFrame` in background tabs, and the run will
-abort with an error rather than report zeros.
+Open `http://<that-address>:1431/?suite=layers` on the tablet. It runs each
+configuration three times, reloading between runs, and prints a table you can
+read (and select, and copy) off the screen — and posts it back to the terminal
+serving it. Keep the tab in the foreground — iOS throttles
+`requestAnimationFrame` in background tabs, and the run will abort with an
+error rather than report zeros.
+
+**Read the `spread` column before believing any difference.** Two runs of an
+identical configuration once came back 16.90ms and 21.28ms, which is wider than
+most of the effects worth chasing. A difference smaller than the spread is not
+a result.
 
 Each row differs from the one above it in one respect, so reading top to bottom
 attributes cost to each change: adding a layer, painting the background into
@@ -49,15 +55,17 @@ Interactive runs take the same knobs as query parameters, e.g.
 
 | Flag / param | Values | What it isolates |
 | --- | --- | --- |
-| `scene` | `empty`, `strokes` | Whether cost comes from elements at all |
+| `scene` | `empty`, `strokes`, `pageframe`, `note` | Whether cost comes from elements at all |
 | `strokes`, `points` | numbers | Element count vs. per-element complexity |
+| `pages` | number | Page frames in the `pageframe` / `note` scenes |
+| `domLayer` | `1` | Mount the app's React page-frame DOM layer, which runs its own sync loop |
 | `layers` | `fg`, `fg+bg`, `all` | Cost of a layer merely existing and being cleared |
 | `bg` | `blank`, `dots`, `grid` | Cost of the background *paint*, with the layer held constant. Since the background became a CSS layer rather than a canvas, this should measure as nothing while panning — a gap here is a regression in that layer's promotion |
 | `dpr` | number | Backing-store pixels per CSS pixel — fill rate |
 | `input` | `idle`, `pan`, `zoom`, `draw` | Whether cost depends on anything changing |
 | `cpu` (driver) | throttle multiplier | CPU-bound vs. pixel-bound |
 | `raster` (driver) | `gpu`, `software` | See below |
-| `repeat` (driver) | count | Runs per case; the median is reported |
+| `repeat` | count | Runs per case; the median is reported and the spread shown. Applies to both the driver and the device suite (default 3 on device) |
 
 ## Reading the numbers
 
@@ -107,8 +115,10 @@ a local win of that shape as unproven until the device agrees.
 - `input=draw` extends a stroke by calling `addPoint` directly rather than
   synthesizing pointer events, so it measures the cost of rebuilding a growing
   stroke without the tool state machine and hit-testing around it.
-- Page frames are not covered: they need the React `PageFrameDomLayer`, which
-  the harness deliberately does not mount so that React is not a variable.
+- Page frames render empty. `domLayer=1` mounts the real React
+  `PageFrameDomLayer` and its per-frame sync loop, but that loop runs its own
+  `requestAnimationFrame` — so its cost lands in `frame` and never in `js`,
+  which only wraps `DrawableCanvas.redraw`.
 - The first case in a browser session reads slightly slow even after the
   per-page warmup. Compare cases within a run, and put the case you care about
   somewhere other than first.

@@ -24,7 +24,7 @@ export interface SuiteCase {
  */
 export type SuiteOutcome = { result: BenchResult } | { error: string };
 
-export type SuiteRow = { label: string } & SuiteOutcome;
+export type SuiteRow = { label: string; spread?: number } & SuiteOutcome;
 
 const STORAGE_KEY = 'myelin-bench-suite';
 
@@ -154,9 +154,24 @@ export const SUITE_DEFAULTS: Record<string, Record<string, string>> = {
   },
 };
 
+/**
+ * Repeats per case, with the median reported.
+ *
+ * A single run per case was enough while the effects being measured were
+ * 8-12ms. It stopped being enough once they were not: two runs of an identical
+ * configuration came back 16.90ms and 21.28ms, a spread wider than every
+ * difference the sweep was trying to resolve. The CDP driver has always taken a
+ * median of repeats; the device suite now does the same, and reports the spread
+ * so a result that is really noise is visible as noise.
+ */
+const DEFAULT_REPEAT = 3;
+
 interface SuiteState {
   name: string;
   index: number;
+  repeat: number;
+  /** Results for the case in progress, until it has been run `repeat` times. */
+  current: BenchResult[];
   rows: SuiteRow[];
 }
 
@@ -183,6 +198,7 @@ export function clearSuite(): void {
  */
 export function beginSuiteCase(
   name: string,
+  repeat = DEFAULT_REPEAT,
 ): { state: SuiteState; case: SuiteCase } | null {
   const cases = SUITES[name];
   if (!cases) {
@@ -192,14 +208,28 @@ export function beginSuiteCase(
   const state =
     existing && existing.name === name
       ? existing
-      : { name, index: 0, rows: [] };
+      : {
+          name,
+          index: 0,
+          repeat: Math.max(1, Math.floor(repeat)),
+          current: [],
+          rows: [],
+        };
   return { state, case: cases[state.index] };
 }
 
+function median(values: number[]): number {
+  return [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+}
+
 /**
- * Record a finished case and hand back the next URL, or null when the suite is
+ * Record a finished run and hand back the next URL, or null when the suite is
  * complete. Shared params (duration, warmup) ride along so the whole sweep uses
  * the settings the first URL asked for.
+ *
+ * A case is repeated until it has `repeat` results, then collapses to the
+ * median. A case that throws is not retried — it would only throw again — and
+ * is recorded as failed so the rest of the sweep still finishes.
  */
 export function advanceSuite(
   state: SuiteState,
@@ -207,8 +237,30 @@ export function advanceSuite(
   shared: Record<string, string>,
 ): string | null {
   const cases = SUITES[state.name];
-  state.rows.push({ label: cases[state.index].label, ...outcome });
-  state.index += 1;
+
+  if ('error' in outcome) {
+    state.rows.push({ label: cases[state.index].label, error: outcome.error });
+    state.current = [];
+    state.index += 1;
+  } else {
+    state.current.push(outcome.result);
+    if (state.current.length >= state.repeat) {
+      const means = state.current.map((r) => r.frameMean);
+      const mid = median(means);
+      // Report the run that *is* the median rather than averaging fields
+      // across runs that disagree, so every number in a row is self-consistent.
+      const chosen =
+        state.current.find((r) => r.frameMean === mid) ?? state.current[0];
+      state.rows.push({
+        label: cases[state.index].label,
+        result: chosen,
+        spread: Math.max(...means) - Math.min(...means),
+      });
+      state.current = [];
+      state.index += 1;
+    }
+  }
+
   writeState(state);
   if (state.index >= cases.length) {
     return null;
@@ -230,7 +282,7 @@ export function suiteRows(name: string): SuiteRow[] {
 /** Fixed-width table of a finished suite, for reading straight off a tablet. */
 export function formatSuite(rows: SuiteRow[]): string {
   const width = Math.max(...rows.map((r) => r.label.length));
-  const header = `${'case'.padEnd(width)}   fps   frame     p95      js`;
+  const header = `${'case'.padEnd(width)}   fps   frame  spread     p95      js`;
   const body = rows.map((row) => {
     if (!('result' in row)) {
       // First line only: a stack would push the surviving rows off a tablet
@@ -242,6 +294,7 @@ export function formatSuite(rows: SuiteRow[]): string {
       row.label.padEnd(width),
       result.fps.toFixed(0).padStart(5),
       result.frameMean.toFixed(2).padStart(7),
+      (row.spread === undefined ? '-' : row.spread.toFixed(2)).padStart(7),
       result.frameP95.toFixed(2).padStart(7),
       result.jsMean.toFixed(2).padStart(7),
     ].join(' ');
