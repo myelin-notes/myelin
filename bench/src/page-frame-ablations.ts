@@ -31,6 +31,34 @@
  */
 const promoted = new WeakSet<HTMLElement>();
 const deshadowed = new WeakSet<HTMLElement>();
+const demoted = new WeakSet<HTMLElement>();
+
+/**
+ * Take `will-change: transform` off the frame chrome's root.
+ *
+ * The root is promoted so that a pan moves a texture instead of repainting the
+ * subtree, which it measurably does. But a zoom also rewrites that element's
+ * width, height and border radius every frame — and resizing a compositing
+ * layer is not the same as moving one. The backing store has to be
+ * reallocated at the new size and repainted whole, every frame, with no
+ * partial invalidation possible.
+ *
+ * So the hint that makes panning cheap may be what makes zooming expensive,
+ * and if so the fix is not to trim what the chrome draws but to stop changing
+ * the layer's size — put the zoom on its transform, the way the background
+ * layer now works.
+ */
+export function demotePageFrameChrome(): void {
+  for (const element of document.querySelectorAll<HTMLElement>(
+    '[data-frame-chrome]',
+  )) {
+    if (demoted.has(element)) {
+      continue;
+    }
+    element.style.willChange = 'auto';
+    demoted.add(element);
+  }
+}
 
 export function promotePageFrameViewports(): void {
   for (const element of document.querySelectorAll<HTMLElement>(

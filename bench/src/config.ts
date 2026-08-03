@@ -1,3 +1,5 @@
+import type { PlainFrameMode } from './plain-frame';
+
 /** Which canvas layers the scenario mounts. @see index.html */
 export type LayerSet = 'fg' | 'fg+bg' | 'all';
 
@@ -27,6 +29,8 @@ export type BackgroundRaster = 'stepped' | 'exact';
 
 /** @see FrameShadow usage in `page-frame-ablations.ts` for the actual values. */
 export type FrameShadow = 'on' | 'small' | 'off';
+
+export type { PlainFrameMode } from './plain-frame';
 
 export interface BenchConfig {
   scene: SceneName;
@@ -61,6 +65,18 @@ export interface BenchConfig {
    */
   frameShadow: FrameShadow;
   /**
+   * Replace the page frame with a bare white rectangle of the same size,
+   * followed the same way. The control for "should an element this size cost
+   * this much at all". @see plain-frame.ts
+   */
+  plainFrame: PlainFrameMode | null;
+  /**
+   * Keep `will-change: transform` on the frame chrome's root. Off asks whether
+   * a compositing layer that is resized every zoom frame is costing more than
+   * it saves.
+   */
+  chromePromoted: boolean;
+  /**
    * Backing-store pixels per CSS pixel. Overrides `window.devicePixelRatio`
    * rather than going through CDP's `deviceScaleFactor`, which would also
    * rescale CSS layout. The variable under test is how many pixels each layer
@@ -86,6 +102,8 @@ const DEFAULTS: BenchConfig = {
   pages: 1,
   promoteFrame: false,
   frameShadow: 'on',
+  plainFrame: null,
+  chromePromoted: true,
   dpr: window.devicePixelRatio || 1,
   warmupMs: 600,
   durationMs: 4000,
@@ -157,6 +175,11 @@ export function readConfig(search: string): BenchConfig {
       ['on', 'small', 'off'] as const,
       DEFAULTS.frameShadow,
     ),
+    plainFrame:
+      (['scale', 'resize', 'promoted'] as const).find(
+        (mode) => mode === params.get('plainFrame'),
+      ) ?? null,
+    chromePromoted: params.get('chromePromoted') !== '0',
     dpr: num(params, 'dpr', DEFAULTS.dpr),
     warmupMs: num(params, 'warmup', DEFAULTS.warmupMs),
     durationMs: num(params, 'duration', DEFAULTS.durationMs),

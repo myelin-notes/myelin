@@ -16,9 +16,11 @@ import { mountPageFrameDomLayer } from './dom-layer';
 import { makeInputStep } from './input';
 import { layoutProbeTotals, startLayoutProbe } from './layout-probe';
 import {
+  demotePageFrameChrome,
   promotePageFrameViewports,
   setPageFrameShadows,
 } from './page-frame-ablations';
+import { createPlainFrame } from './plain-frame';
 import { initBenchPlatform } from './platform';
 import { installRafProbe, rafTotalMs } from './raf-probe';
 import { postResult } from './report';
@@ -176,6 +178,9 @@ function run(): void {
   }
 
   const step = makeInputStep(canvas, config.input);
+  const syncPlainFrame = config.plainFrame
+    ? createPlainFrame(requireElement('page-frame-layer'), config.plainFrame)
+    : null;
   // Runs after the renderer's own background writes, so the frame ends in the
   // old layer state. Null in the shipped configuration, which costs nothing.
   const bgHost = document.getElementById('bg');
@@ -205,6 +210,7 @@ function run(): void {
         const before = performance.now();
         canvas.redraw(deltaTime);
         restoreOldBackground?.();
+        syncPlainFrame?.(canvas.viewport);
         const jsMs = performance.now() - before;
 
         const elapsed = before - startedAt;
@@ -217,6 +223,9 @@ function run(): void {
           }
           if (config.frameShadow !== 'on') {
             setPageFrameShadows(config.frameShadow);
+          }
+          if (!config.chromePromoted) {
+            demotePageFrameChrome();
           }
         }
         if (elapsed >= config.warmupMs) {

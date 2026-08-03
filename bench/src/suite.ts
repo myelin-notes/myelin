@@ -163,22 +163,6 @@ export const SUITES: Record<string, SuiteCase[]> = {
         domLayer: '1',
       },
     },
-    // The shadow is 7.74ms of a page frame's 14.38ms, all of it paint. These
-    // two say how to spend that: if a narrow blur is much cheaper than a wide
-    // one, the radius is the fix. If it costs the same, then any shadow at all
-    // is too expensive to recompute per frame and it has to be pre-rendered
-    // once and scaled, the way the canvas background now is.
-    {
-      label: '  same, small shadow',
-      params: {
-        layers: 'all',
-        bg: 'dots',
-        scene: 'pageframe',
-        pages: '1',
-        domLayer: '1',
-        frameShadow: 'small',
-      },
-    },
     {
       label: '  same, no page shadow',
       params: {
@@ -189,6 +173,41 @@ export const SUITES: Record<string, SuiteCase[]> = {
         domLayer: '1',
         frameShadow: 'off',
       },
+    },
+    {
+      label: '  same, chrome not promoted',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '1',
+        domLayer: '1',
+        chromePromoted: '0',
+      },
+    },
+    // A page frame costs 14ms of a zoom frame while being, on screen, a blank
+    // sheet. Every ablation above still contains the whole chrome, so none of
+    // them can say whether that is what an element of this size costs on this
+    // hardware or something the chrome does to it. These three contain no
+    // chrome at all — one white rectangle, page-sized, positioned like a page,
+    // with nothing in it and nothing on it.
+    //
+    // They differ only in how the rectangle follows the view: scaled by its
+    // transform, resized in screen pixels every frame the way the chrome does
+    // it, and resized while promoted the way the chrome also does it. Whatever
+    // separates them is the cost of the technique rather than of the content,
+    // and it is the same technique the chrome uses.
+    {
+      label: '+ plain div, scaled',
+      params: { layers: 'all', bg: 'dots', plainFrame: 'scale' },
+    },
+    {
+      label: '+ plain div, resized',
+      params: { layers: 'all', bg: 'dots', plainFrame: 'resize' },
+    },
+    {
+      label: '+ plain div, resized + promoted',
+      params: { layers: 'all', bg: 'dots', plainFrame: 'promoted' },
     },
   ],
 };
