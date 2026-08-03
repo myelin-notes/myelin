@@ -3,6 +3,7 @@ import { type CanvasViewport, MAX_ZOOM } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
+import { quantizeRasterZoom } from './raster-zoom';
 import type { ITool } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 
@@ -35,30 +36,6 @@ export function backgroundPanShift(
     return 0;
   }
   return ((panScreenPx % tileScreenPx) + tileScreenPx) % tileScreenPx;
-}
-
-/**
- * Zoom levels the tiling is actually painted at. Half-octave steps.
- *
- * Sizing the tiles to the exact zoom repaints the layer on every frame of a
- * zoom, which a trace measured at 47 tile rasterizations per frame — the single
- * largest cost in a zoom, and larger than everything the page frame does. The
- * remainder between a step and the real zoom rides on the layer's transform
- * instead, which the compositor applies to the texture it already has.
- *
- * Always rounded down, so the remaining scale is in [1, √2) and the layer can
- * only ever be scaled up: a layer scaled down would stop covering the viewport
- * it was sized to fill. The cost is that the tiling is at most 41% softer than
- * a fresh paint, on a faint dot grid, mid-gesture.
- */
-export function backgroundRasterZoom(zoom: number): number {
-  if (!(zoom > 0) || !Number.isFinite(zoom)) {
-    return 1;
-  }
-  // In log2, not in log(zoom)/log(√2): the latter puts an exact 2x zoom at
-  // 1.9999999999999998, which floors into the step below and leaves the layer
-  // permanently scaled at a round zoom level.
-  return 2 ** (Math.floor(Math.log2(zoom) * 2) / 2);
 }
 
 /**
@@ -297,7 +274,7 @@ export class CanvasRenderer {
     if (!host) {
       return;
     }
-    const rasterZoom = backgroundRasterZoom(zoom);
+    const rasterZoom = quantizeRasterZoom(zoom);
     if (rasterZoom !== this.bgLastRasterZoom) {
       const painted = BG_TILE_SIZE * rasterZoom;
       host.style.backgroundSize = `${painted}px ${painted}px`;

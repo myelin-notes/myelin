@@ -14,6 +14,7 @@ import {
 } from '../../elements/page-frame-element';
 import { PM_UPDATE_EVENT } from '../../events';
 import { getMessages } from '../../i18n';
+import { quantizeRasterZoom } from '../../raster-zoom';
 import { getDevicePixelRatio } from '../../utils';
 import {
   removeStyleIfPresent,
@@ -502,14 +503,28 @@ export function PageFrameDomLayer({
           ),
         });
 
-        // Inner frame: screen-sized clip box, lives inside chrome contentSlot
-        // so no extra translate needed — contentSlot positions it.
+        // Inner frame: clip box, lives inside chrome contentSlot so no extra
+        // translate needed — contentSlot positions it.
         //
-        // Guarded because none of this changes while panning: it is derived
-        // from the frame's world size and the zoom, so a pan rewrites the
-        // identical value and relays out the page for nothing.
-        setStyleIfChanged(refs.frameDiv, 'width', `${contentWidth * zoom}px`);
-        setStyleIfChanged(refs.frameDiv, 'height', `${contentHeight * zoom}px`);
+        // Sized for the quantized zoom, not the exact one, because the chrome
+        // root carries the remainder as a scale. Resizing this box is resizing
+        // the promoted layer it lives in, which repaints the whole subtree; at
+        // steps, a run of zoom frames reuses one painting.
+        //
+        // Guarded for the same reason as before: none of this changes while
+        // panning, so a pan would otherwise rewrite identical values and relay
+        // out the page for nothing.
+        const rasterZoom = quantizeRasterZoom(zoom);
+        setStyleIfChanged(
+          refs.frameDiv,
+          'width',
+          `${contentWidth * rasterZoom}px`,
+        );
+        setStyleIfChanged(
+          refs.frameDiv,
+          'height',
+          `${contentHeight * rasterZoom}px`,
+        );
         removeStyleIfPresent(refs.frameDiv, 'transform');
 
         // Inner viewport: world-sized. A fixed CSS zoom of devicePixelRatio
@@ -529,10 +544,13 @@ export function PageFrameDomLayer({
         setStyleIfChanged(refs.viewportDiv, 'width', `${contentWidth}px`);
         setStyleIfChanged(refs.viewportDiv, 'height', `${contentHeight}px`);
         setStyleIfChanged(refs.viewportDiv, 'zoom', `${dpr}`);
+        // Quantized, like the boxes above: the chrome root supplies the
+        // remainder, so between two steps this transform holds still and the
+        // subtree it scales is not repainted.
         setStyleIfChanged(
           refs.viewportDiv,
           'transform',
-          `scale(${zoom / dpr})`,
+          `scale(${rasterZoom / dpr})`,
         );
 
         if (frame.editing) {

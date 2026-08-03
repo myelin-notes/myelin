@@ -11,6 +11,7 @@ import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { type ChromeMenuItem, openChromeMenu } from '../../chrome-menu';
 import { getMessages } from '../../i18n';
+import { quantizeRasterZoom } from '../../raster-zoom';
 import { setStyleIfChanged } from '../../utils/style-cache';
 import {
   CHROME_BOTTOM_PADDING,
@@ -143,38 +144,60 @@ export class FrameChrome {
     const rootX = screenX - CHROME_SIDE_PADDING * zoom;
     const rootY = screenY - CHROME_HEADER_HEIGHT * zoom;
 
-    // The transform is the only one of these that changes while panning; the
-    // rest follow the zoom. Guarding them keeps a pan to a single compositor
-    // translate instead of relaying out the chrome and everything under it.
+    // Everything under the root is laid out for a quantized zoom, and the
+    // remainder is a scale on the root itself.
+    //
+    // Sizing this subtree to the exact zoom is what a zoom costs. Measured on
+    // an iPad, this element with this content costs 4.5ms of a panned frame and
+    // 14.63ms of a zoomed one — a pan translates the root, a zoom rewrites its
+    // width and height, and a compositing layer that is resized has to be
+    // repainted whole rather than moved. A blank div of the same size, resized
+    // and promoted the same way, costs 0.4ms, so the repaint is not inherent to
+    // the size or the technique; it is the cost of repainting *this* subtree,
+    // which is why it has to stop happening rather than get cheaper.
+    //
+    // Positions stay on the exact zoom — those are a translate, which is free
+    // and must stay pixel-accurate against the canvas beneath.
+    const rasterZoom = quantizeRasterZoom(zoom);
+    const residual = zoom / rasterZoom;
+
     setStyleIfChanged(
       this.root,
       'transform',
-      `translate(${rootX}px, ${rootY}px)`,
+      `translate(${rootX}px, ${rootY}px) scale(${residual})`,
     );
-    setStyleIfChanged(this.root, 'width', `${chromeWidth * zoom}px`);
-    setStyleIfChanged(this.root, 'height', `${chromeHeight * zoom}px`);
+    setStyleIfChanged(this.root, 'width', `${chromeWidth * rasterZoom}px`);
+    setStyleIfChanged(this.root, 'height', `${chromeHeight * rasterZoom}px`);
     setStyleIfChanged(
       this.root,
       'border-radius',
-      `${CHROME_CORNER_RADIUS * zoom}px`,
+      `${CHROME_CORNER_RADIUS * rasterZoom}px`,
     );
     // Imperative writes on the header elements themselves — NOT custom
     // properties on this.root: the root is an ancestor of the whole editor
     // subtree, and inherited custom-property changes there forced a
     // full-subtree style recalc on every zoom frame.
     this.viewRef.current?.syncHeaderGeometry({
-      headerHeight: CHROME_HEADER_HEIGHT * zoom,
+      headerHeight: CHROME_HEADER_HEIGHT * rasterZoom,
       innerWidth: chromeWidth,
-      zoom,
+      zoom: rasterZoom,
     });
 
     setStyleIfChanged(
       this.contentSlot,
       'transform',
-      `translate(${CHROME_SIDE_PADDING * zoom}px, ${CHROME_HEADER_HEIGHT * zoom}px)`,
+      `translate(${CHROME_SIDE_PADDING * rasterZoom}px, ${CHROME_HEADER_HEIGHT * rasterZoom}px)`,
     );
-    setStyleIfChanged(this.contentSlot, 'width', `${contentWidth * zoom}px`);
-    setStyleIfChanged(this.contentSlot, 'height', `${contentHeight * zoom}px`);
+    setStyleIfChanged(
+      this.contentSlot,
+      'width',
+      `${contentWidth * rasterZoom}px`,
+    );
+    setStyleIfChanged(
+      this.contentSlot,
+      'height',
+      `${contentHeight * rasterZoom}px`,
+    );
 
     const buttonRect = getFrameChromeMenuButtonRect({
       screenX,
