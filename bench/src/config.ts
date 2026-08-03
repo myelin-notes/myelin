@@ -1,0 +1,136 @@
+/** Which canvas layers the scenario mounts. @see index.html */
+export type LayerSet = 'fg' | 'fg+bg' | 'all';
+
+/** What drives change between frames. */
+export type InputMode = 'idle' | 'pan' | 'zoom' | 'draw';
+
+export type SceneName = 'empty' | 'strokes' | 'pageframe' | 'note';
+
+/**
+ * Background style, mirroring the `canvasBackground` user pref.
+ *
+ * `blank` is the control: the layer still exists, is still sized to the
+ * viewport, and is still cleared every frame — it just paints nothing. The gap
+ * between `blank` and `dots` is the cost of the pattern fill alone.
+ */
+export type BackgroundStyle = 'grid' | 'dots' | 'blank';
+
+export interface BenchConfig {
+  scene: SceneName;
+  /** Element count for the `strokes` scene. */
+  strokes: number;
+  /** Recorded points per stroke. */
+  points: number;
+  layers: LayerSet;
+  background: BackgroundStyle;
+  input: InputMode;
+  /**
+   * Mount the app's React page-frame DOM layer.
+   *
+   * Off by default so the canvas renderer can be measured on its own; the real
+   * app always has it, so it is on for any case meant to represent the app.
+   */
+  domLayer: boolean;
+  /** Page frames created by the `pageframe` scene. */
+  pages: number;
+  /**
+   * Backing-store pixels per CSS pixel. Overrides `window.devicePixelRatio`
+   * rather than going through CDP's `deviceScaleFactor`, which would also
+   * rescale CSS layout. The variable under test is how many pixels each layer
+   * rasterizes and uploads per frame, and this changes only that.
+   */
+  dpr: number;
+  /** Discarded before measurement: JIT warmup, first-paint, pattern build. */
+  warmupMs: number;
+  durationMs: number;
+  /** Report and exit rather than looping forever (the driver reads the result). */
+  auto: boolean;
+}
+
+const DEFAULTS: BenchConfig = {
+  scene: 'empty',
+  strokes: 0,
+  points: 64,
+  layers: 'all',
+  background: 'dots',
+  input: 'pan',
+  domLayer: false,
+  pages: 1,
+  dpr: window.devicePixelRatio || 1,
+  warmupMs: 600,
+  durationMs: 4000,
+  auto: false,
+};
+
+function num(params: URLSearchParams, key: string, fallback: number): number {
+  const raw = params.get(key);
+  if (raw === null) {
+    return fallback;
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function oneOf<T extends string>(
+  params: URLSearchParams,
+  key: string,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  const raw = params.get(key);
+  return allowed.includes(raw as T) ? (raw as T) : fallback;
+}
+
+export function readConfig(search: string): BenchConfig {
+  const params = new URLSearchParams(search);
+  const scene = oneOf(
+    params,
+    'scene',
+    ['empty', 'strokes', 'pageframe', 'note'] as const,
+    'empty',
+  );
+  return {
+    scene,
+    // A `strokes` scene with no count asked for is a mistake that would
+    // silently measure an empty canvas, so give it a default population.
+    strokes: num(
+      params,
+      'strokes',
+      scene === 'strokes' || scene === 'note' ? 50 : 0,
+    ),
+    points: num(params, 'points', DEFAULTS.points),
+    layers: oneOf(params, 'layers', ['fg', 'fg+bg', 'all'] as const, 'all'),
+    background: oneOf(
+      params,
+      'bg',
+      ['grid', 'dots', 'blank'] as const,
+      DEFAULTS.background,
+    ),
+    input: oneOf(
+      params,
+      'input',
+      ['idle', 'pan', 'zoom', 'draw'] as const,
+      'pan',
+    ),
+    domLayer: params.get('domLayer') === '1',
+    pages: num(params, 'pages', DEFAULTS.pages),
+    dpr: num(params, 'dpr', DEFAULTS.dpr),
+    warmupMs: num(params, 'warmup', DEFAULTS.warmupMs),
+    durationMs: num(params, 'duration', DEFAULTS.durationMs),
+    auto: params.get('auto') === '1',
+  };
+}
+
+/**
+ * Install the configured backing-store scale.
+ *
+ * Must run before any canvas is sized. `devicePixelRatio` is an accessor on
+ * `window`, so it can be redefined; the renderer reads it on every resize and
+ * every frame, so nothing caches the real value behind our back.
+ */
+export function applyDprOverride(dpr: number): void {
+  Object.defineProperty(window, 'devicePixelRatio', {
+    configurable: true,
+    get: () => dpr,
+  });
+}

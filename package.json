@@ -14,7 +14,7 @@
     "dev": "vite",
     "build": "tsc && vite build && node scripts/posthog-sourcemaps.mjs",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/editor && tsc --noEmit -p packages/shared",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/editor && tsc --noEmit -p packages/shared && tsc --noEmit -p bench",
     "preview": "vite preview",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -22,6 +22,9 @@
     "tauri": "node ./scripts/tauri.mjs",
     "tauri:mac-deep-links:check": "node scripts/tauri-deep-links.mjs check",
     "tauri:mac-deep-links:clear": "node scripts/tauri-deep-links.mjs clear",
+    "bench": "node bench/driver.mjs",
+    "bench:dev": "vite --config bench/vite.config.ts",
+    "bench:serve": "vite build --config bench/vite.config.ts && vite preview --config bench/vite.config.ts",
     "website:dev": "yarn workspace @myelin/website dev",
     "website:build": "yarn workspace @myelin/website build",
     "prepare": "husky"

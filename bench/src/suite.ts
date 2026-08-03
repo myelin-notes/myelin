@@ -1,0 +1,250 @@
+import type { BenchResult } from './stats';
+
+/**
+ * A run of several configurations back to back, driven by the page itself.
+ *
+ * The CDP driver cannot reach a tablet, and a tablet is where the numbers that
+ * matter are. Each case is a full page load — layers are mounted once and the
+ * pixel ratio is patched before anything is sized, so they cannot be varied
+ * within a load — with the queue and the accumulated results carried in
+ * sessionStorage. The device runs the whole sweep from one tap.
+ */
+export interface SuiteCase {
+  label: string;
+  params: Record<string, string>;
+}
+
+/**
+ * A finished case: either measurements, or why it produced none.
+ *
+ * A case that throws must not take the sweep down with it. On a tablet the
+ * whole run is one tap and several page loads, so losing six good rows because
+ * the seventh hit an unsupported API means starting over with no record of
+ * what failed.
+ */
+export type SuiteOutcome = { result: BenchResult } | { error: string };
+
+export type SuiteRow = { label: string } & SuiteOutcome;
+
+const STORAGE_KEY = 'myelin-bench-suite';
+
+/**
+ * The default sweep, ordered so each row differs from the one above it in
+ * exactly one respect. Reading it top to bottom attributes cost to each change.
+ *
+ * `dpr` is left unset on all but one case so the device measures itself at its
+ * own pixel ratio; the explicit `dpr=1` case is what quantifies the cap that
+ * tablet builds apply.
+ */
+export const SUITES: Record<string, SuiteCase[]> = {
+  layers: [
+    { label: 'fg only, blank', params: { layers: 'fg', bg: 'blank' } },
+    { label: '+bg layer, blank', params: { layers: 'fg+bg', bg: 'blank' } },
+    { label: '+overlay layer, blank', params: { layers: 'all', bg: 'blank' } },
+    { label: 'all layers, dots', params: { layers: 'all', bg: 'dots' } },
+    {
+      label: 'all layers, dots, idle',
+      params: { layers: 'all', bg: 'dots', input: 'idle' },
+    },
+    {
+      label: 'all layers, dots, dpr 1',
+      params: { layers: 'all', bg: 'dots', dpr: '1' },
+    },
+    {
+      label: 'all layers, dots, 200 strokes',
+      params: { layers: 'all', bg: 'dots', scene: 'strokes', strokes: '200' },
+    },
+  ],
+
+  /**
+   * Why the app is slower than the canvas renderer alone.
+   *
+   * On-device the renderer with no elements already beat what the real app
+   * manages with one or two, so the cost is in something the canvas-only bench
+   * does not have. Each rung adds one of those things. The rung where the
+   * number falls off is the answer; every rung holds layers, background, and
+   * pixel ratio fixed so nothing else can explain a drop.
+   */
+  gap: [
+    {
+      label: 'canvas only (baseline)',
+      params: { layers: 'all', bg: 'dots' },
+    },
+    {
+      label: '+ react dom layer, no pages',
+      params: { layers: 'all', bg: 'dots', domLayer: '1' },
+    },
+    {
+      label: '+ 1 page frame, no dom layer',
+      params: { layers: 'all', bg: 'dots', scene: 'pageframe', pages: '1' },
+    },
+    {
+      label: '+ 1 page frame, dom layer',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '1',
+        domLayer: '1',
+      },
+    },
+    {
+      label: '+ 3 page frames, dom layer',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '3',
+        domLayer: '1',
+      },
+    },
+  ],
+
+  /**
+   * Where a *moving* frame's time goes, in the app's real configuration.
+   *
+   * Skipping frames on which nothing changed does not make anything smoother —
+   * it only stops the counter from reporting the cost. The frames that decide
+   * whether panning feels good are the ones where the view moved, so every
+   * case here pans, over a page frame with ink on it.
+   *
+   * Run at dpr 3 on purpose. iOS caps rAF at 60fps, so anything cheaper than
+   * 16.67ms reads as exactly 16.67ms and cannot be told apart from anything
+   * else that fits. Tripling the pixel count puts every case above that floor;
+   * cost scales with pixels, so the *shares* still describe dpr 2.
+   */
+  moving: [
+    {
+      label: 'fg only, blank',
+      params: { layers: 'fg', bg: 'blank' },
+    },
+    {
+      label: '+ bg layer, blank',
+      params: { layers: 'fg+bg', bg: 'blank' },
+    },
+    {
+      label: '+ dot pattern',
+      params: { layers: 'fg+bg', bg: 'dots' },
+    },
+    {
+      label: '+ overlay layer',
+      params: { layers: 'all', bg: 'dots' },
+    },
+    {
+      label: '+ page frame dom sync (= the app)',
+      params: { layers: 'all', bg: 'dots', domLayer: '1' },
+    },
+  ],
+};
+
+/**
+ * Params applied to every case in a suite, before the case's own.
+ *
+ * `moving` fixes the scene and pixel ratio across all of its rows: the point is
+ * to attribute one frame's cost to its parts, so everything except the part
+ * under test has to be identical.
+ */
+export const SUITE_DEFAULTS: Record<string, Record<string, string>> = {
+  moving: {
+    scene: 'note',
+    pages: '1',
+    strokes: '200',
+    input: 'pan',
+    dpr: '3',
+  },
+};
+
+interface SuiteState {
+  name: string;
+  index: number;
+  rows: SuiteRow[];
+}
+
+function readState(): SuiteState | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as SuiteState) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeState(state: SuiteState): void {
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+export function clearSuite(): void {
+  sessionStorage.removeItem(STORAGE_KEY);
+}
+
+/**
+ * The case this page load should run, starting the suite if it is not already
+ * in progress. Returns null when `name` is not a known suite.
+ */
+export function beginSuiteCase(
+  name: string,
+): { state: SuiteState; case: SuiteCase } | null {
+  const cases = SUITES[name];
+  if (!cases) {
+    return null;
+  }
+  const existing = readState();
+  const state =
+    existing && existing.name === name
+      ? existing
+      : { name, index: 0, rows: [] };
+  return { state, case: cases[state.index] };
+}
+
+/**
+ * Record a finished case and hand back the next URL, or null when the suite is
+ * complete. Shared params (duration, warmup) ride along so the whole sweep uses
+ * the settings the first URL asked for.
+ */
+export function advanceSuite(
+  state: SuiteState,
+  outcome: SuiteOutcome,
+  shared: Record<string, string>,
+): string | null {
+  const cases = SUITES[state.name];
+  state.rows.push({ label: cases[state.index].label, ...outcome });
+  state.index += 1;
+  writeState(state);
+  if (state.index >= cases.length) {
+    return null;
+  }
+  const params = new URLSearchParams({
+    ...shared,
+    ...(SUITE_DEFAULTS[state.name] ?? {}),
+    ...cases[state.index].params,
+    suite: state.name,
+  });
+  return `${window.location.pathname}?${params}`;
+}
+
+export function suiteRows(name: string): SuiteRow[] {
+  const state = readState();
+  return state && state.name === name ? state.rows : [];
+}
+
+/** Fixed-width table of a finished suite, for reading straight off a tablet. */
+export function formatSuite(rows: SuiteRow[]): string {
+  const width = Math.max(...rows.map((r) => r.label.length));
+  const header = `${'case'.padEnd(width)}   fps   frame     p95      js`;
+  const body = rows.map((row) => {
+    if (!('result' in row)) {
+      // First line only: a stack would push the surviving rows off a tablet
+      // screen. The full text goes to the sink with the rest of the payload.
+      return `${row.label.padEnd(width)}  FAILED: ${row.error.split('\n')[0]}`;
+    }
+    const { result } = row;
+    return [
+      row.label.padEnd(width),
+      result.fps.toFixed(0).padStart(5),
+      result.frameMean.toFixed(2).padStart(7),
+      result.frameP95.toFixed(2).padStart(7),
+      result.jsMean.toFixed(2).padStart(7),
+    ].join(' ');
+  });
+  return [header, '-'.repeat(header.length), ...body].join('\n');
+}

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Myelin canvas bench</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #fff;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #stage {
+        position: absolute;
+        inset: 0;
+        overflow: clip;
+      }
+      #stage canvas {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #dom-overlay {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 5;
+      }
+      #canvas-chrome-controls {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 20;
+      }
+      #readout {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        max-width: calc(100% - 16px);
+        max-height: calc(100% - 16px);
+        z-index: 100;
+        padding: 8px 10px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        white-space: pre;
+        font-size: 14px;
+        /* Results are read (and copied) straight off the device when the bench
+           is served to a tablet, so the readout stays selectable and can
+           scroll if a suite table is taller than the viewport. */
+        overflow: auto;
+        -webkit-user-select: text;
+        user-select: text;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Layer stack mirrors src/pages/canvas/index.tsx so compositing behaves
+         the same. Layers the scenario disables are removed from the DOM, not
+         just left unpainted: an untouched full-viewport canvas still costs the
+         compositor, which is exactly the cost under test. -->
+    <div id="stage">
+      <div id="bg" style="z-index: 0"></div>
+      <div id="page-frame-layer"></div>
+      <div id="dom-overlay"></div>
+      <canvas id="fg"></canvas>
+      <canvas id="overlay" style="z-index: 12"></canvas>
+      <!-- Frame chrome portals into this by id (CONTROLS_LAYER_ID). -->
+      <div id="canvas-chrome-controls"></div>
+    </div>
+    <div id="readout">starting…</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
