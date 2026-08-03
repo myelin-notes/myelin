@@ -1,3 +1,9 @@
+// Both, in this order, exactly as the app's src/index.css does it. The editor
+// stylesheet reads shared tokens (--bg-card, --shadow-rgb, --border-ghost) that
+// live in the UI theme and are the host's job to supply. Without them the page
+// sheet renders with no fill, no border, and no box-shadow — so the bench would
+// quietly measure a cheaper page frame than the app ever draws.
+import '@myelin/ui/theme.css';
 import '@myelin/editor/styles.css';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
