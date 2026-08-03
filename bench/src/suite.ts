@@ -135,6 +135,39 @@ export const SUITES: Record<string, SuiteCase[]> = {
       params: { layers: 'all', bg: 'dots', domLayer: '1' },
     },
   ],
+
+  /**
+   * The same attribution for a zoom, which is the one gesture that repaints.
+   *
+   * A pan is a translate of layers that already exist, so it rasterizes
+   * nothing. A zoom changes their scale, and everything sized in screen pixels
+   * has to be repainted at the new one. The rows separate the two things that
+   * do that: the background tiling, and the page-frame chrome.
+   */
+  zoom: [
+    { label: 'canvas only, blank', params: { layers: 'all', bg: 'blank' } },
+    { label: '+ dot background', params: { layers: 'all', bg: 'dots' } },
+    {
+      label: '+ 1 page frame',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '1',
+        domLayer: '1',
+      },
+    },
+    {
+      label: '+ 3 page frames',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '3',
+        domLayer: '1',
+      },
+    },
+  ],
 };
 
 /**
@@ -150,6 +183,14 @@ export const SUITE_DEFAULTS: Record<string, Record<string, string>> = {
     pages: '1',
     strokes: '200',
     input: 'pan',
+    dpr: '3',
+  },
+  // dpr 3 for the same reason `moving` uses it: iOS caps rAF at 60fps, so
+  // every case that fits in 16.67ms reports 16.67ms and the rows stop being
+  // distinguishable. Cost scales with pixels, so the shares still describe
+  // dpr 2.
+  zoom: {
+    input: 'zoom',
     dpr: '3',
   },
 };

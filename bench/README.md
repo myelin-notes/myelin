@@ -19,7 +19,10 @@ not depend on a proxy being faithful.
 yarn bench:serve      # builds, then serves on all interfaces; prints a Network URL
 ```
 
-Open `http://<that-address>:1431/?suite=layers` on the tablet. It runs each
+Open `http://<that-address>:1431/?suite=layers` on the tablet. The suites are
+`layers` (what each canvas layer costs), `gap` (why the app is slower than the
+renderer alone), `moving` (where a panned frame goes), and `zoom` (where a
+zoomed one goes — the only gesture that repaints). It runs each
 configuration three times, reloading between runs, and prints a table you can
 read (and select, and copy) off the screen — and posts it back to the terminal
 serving it. Keep the tab in the foreground — iOS throttles
