@@ -9,7 +9,7 @@ import { UserPrefs } from './user-prefs';
 type CanvasBackground = 'grid' | 'dots' | 'blank';
 
 /** Side length of one background pattern tile, in world units. */
-const BG_TILE_SIZE = 24;
+export const BG_TILE_SIZE = 24;
 
 /**
  * How far the background layer extends past the viewport on every side.

@@ -90,6 +90,7 @@ background layer resizing its tiles every frame.
 | `domLayer` | `1` | Mount the app's React page-frame DOM layer, which runs its own sync loop |
 | `layers` | `fg`, `fg+bg`, `all` | Cost of a layer merely existing and being cleared |
 | `bg` | `blank`, `dots`, `grid` | Cost of the background *paint*, with the layer held constant. Since the background became a CSS layer rather than a canvas, this should measure as nothing while panning — a gap here is a regression in that layer's promotion |
+| `bgRaster` | `stepped`, `exact` | `stepped` ships: the tiling is painted at half-octave zoom steps and the remainder rides on the transform. `exact` restores the per-frame repaint it replaced, so the difference can be priced on a device that reports no raster counts |
 | `dpr` | number | Backing-store pixels per CSS pixel — fill rate |
 | `input` | `idle`, `pan`, `zoom`, `draw` | Whether cost depends on anything changing |
 | `cpu` (driver) | throttle multiplier | CPU-bound vs. pixel-bound |

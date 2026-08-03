@@ -9,6 +9,7 @@ import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
+import { applyExactZoomBackground } from './background-ablation';
 import { applyDprOverride, type BenchConfig, readConfig } from './config';
 import { mountPageFrameDomLayer } from './dom-layer';
 import { makeInputStep } from './input';
@@ -163,6 +164,13 @@ function run(): void {
   }
 
   const step = makeInputStep(canvas, config.input);
+  // Runs after the renderer's own background writes, so the frame ends in the
+  // old layer state. Null in the shipped configuration, which costs nothing.
+  const bgHost = document.getElementById('bg');
+  const restoreOldBackground =
+    config.bgRaster === 'exact' && bgHost
+      ? () => applyExactZoomBackground(bgHost, canvas.viewport)
+      : null;
 
   const frameSeries = new Series();
   const jsSeries = new Series();
@@ -183,6 +191,7 @@ function run(): void {
         step(frame);
         const before = performance.now();
         canvas.redraw(deltaTime);
+        restoreOldBackground?.();
         const jsMs = performance.now() - before;
 
         const elapsed = before - startedAt;

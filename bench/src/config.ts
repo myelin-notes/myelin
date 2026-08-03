@@ -15,6 +15,16 @@ export type SceneName = 'empty' | 'strokes' | 'pageframe' | 'note';
  */
 export type BackgroundStyle = 'grid' | 'dots' | 'blank';
 
+/**
+ * How the background layer decides what to paint.
+ *
+ * `stepped` is what ships: the tiling is painted at half-octave zoom steps and
+ * the remainder rides on the transform. `exact` restores the behaviour it
+ * replaced, so a device that cannot report raster counts can still price the
+ * difference by running both.
+ */
+export type BackgroundRaster = 'stepped' | 'exact';
+
 export interface BenchConfig {
   scene: SceneName;
   /** Element count for the `strokes` scene. */
@@ -24,6 +34,7 @@ export interface BenchConfig {
   layers: LayerSet;
   background: BackgroundStyle;
   input: InputMode;
+  bgRaster: BackgroundRaster;
   /**
    * Mount the app's React page-frame DOM layer.
    *
@@ -54,6 +65,7 @@ const DEFAULTS: BenchConfig = {
   layers: 'all',
   background: 'dots',
   input: 'pan',
+  bgRaster: 'stepped',
   domLayer: false,
   pages: 1,
   dpr: window.devicePixelRatio || 1,
@@ -111,6 +123,12 @@ export function readConfig(search: string): BenchConfig {
       'input',
       ['idle', 'pan', 'zoom', 'draw'] as const,
       'pan',
+    ),
+    bgRaster: oneOf(
+      params,
+      'bgRaster',
+      ['stepped', 'exact'] as const,
+      DEFAULTS.bgRaster,
     ),
     domLayer: params.get('domLayer') === '1',
     pages: num(params, 'pages', DEFAULTS.pages),

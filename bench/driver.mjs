@@ -90,6 +90,7 @@ const MATRIX = {
   points: list(args.points, ['64']),
   pages: list(args.pages, ['1']),
   domLayer: list(args.domLayer, ['0']),
+  bgRaster: list(args.bgRaster, ['stepped']),
 };
 
 const DURATION_MS = Number(args.duration ?? 4000);
@@ -260,6 +261,7 @@ function benchUrl(config, extra = {}) {
     points: config.points,
     pages: config.pages,
     domLayer: config.domLayer,
+    bgRaster: config.bgRaster,
     warmup: String(WARMUP_MS),
     duration: String(DURATION_MS),
     auto: '1',

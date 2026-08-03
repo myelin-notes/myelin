@@ -143,10 +143,20 @@ export const SUITES: Record<string, SuiteCase[]> = {
    * nothing. A zoom changes their scale, and everything sized in screen pixels
    * has to be repainted at the new one. The rows separate the two things that
    * do that: the background tiling, and the page-frame chrome.
+   *
+   * The two `dot background` rows are one layer painted two ways, and the gap
+   * between them is what painting it at zoom steps is worth. It is here because
+   * WebKit reports no raster counts to JavaScript: subtracting two runs is the
+   * only way the device can price a change that a Chrome trace found, and a
+   * Chrome trace has priced this particular layer wrong before.
    */
   zoom: [
     { label: 'canvas only, blank', params: { layers: 'all', bg: 'blank' } },
     { label: '+ dot background', params: { layers: 'all', bg: 'dots' } },
+    {
+      label: '  same, repainted every frame',
+      params: { layers: 'all', bg: 'dots', bgRaster: 'exact' },
+    },
     {
       label: '+ 1 page frame',
       params: {
