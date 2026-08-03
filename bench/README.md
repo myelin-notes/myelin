@@ -29,6 +29,16 @@ serving it. Keep the tab in the foreground — iOS throttles
 `requestAnimationFrame` in background tabs, and the run will abort with an
 error rather than report zeros.
 
+**Do not raise `dpr` to get above the 60fps cap on an iPad.** It is tempting —
+iOS caps `requestAnimationFrame` at 60fps, so every case that fits in 16.67ms
+reports 16.67ms and cannot be told apart. But dpr 3 crosses WebKit's
+canvas-memory threshold, past which 2D contexts are no longer accelerated:
+frame cost starts scaling with the *number* of canvases rather than what is
+drawn, `js` jumps by an order of magnitude, and adding a layer that paints
+nothing doubles the frame. The rows can even invert. A run there measures the
+cliff and nothing else. The `moving` suite still does this and its numbers
+should be read with that in mind.
+
 **Read the `spread` column before believing any difference.** Two runs of an
 identical configuration once came back 16.90ms and 21.28ms, which is wider than
 most of the effects worth chasing. A difference smaller than the spread is not

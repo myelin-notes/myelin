@@ -195,13 +195,18 @@ export const SUITE_DEFAULTS: Record<string, Record<string, string>> = {
     input: 'pan',
     dpr: '3',
   },
-  // dpr 3 for the same reason `moving` uses it: iOS caps rAF at 60fps, so
-  // every case that fits in 16.67ms reports 16.67ms and the rows stop being
-  // distinguishable. Cost scales with pixels, so the shares still describe
-  // dpr 2.
+  // Deliberately NOT dpr 3, which is what `moving` uses to get above the 60fps
+  // rAF cap. On an iPad that overshoots into WebKit's canvas-memory threshold,
+  // where 2D contexts stop being accelerated: cost then scales with the number
+  // of canvases rather than what is drawn, `js` jumps by an order of magnitude,
+  // and adding a *blank* layer doubles the frame. A run there measures the
+  // cliff, not the gesture. Zoom does not need the trick anyway — it is already
+  // far enough below 60fps at the device's own pixel ratio to be resolvable.
+  //
+  // A row reading exactly 16.6x has hit the cap and only means "fast enough";
+  // it does not report its headroom.
   zoom: {
     input: 'zoom',
-    dpr: '3',
   },
 };
 
