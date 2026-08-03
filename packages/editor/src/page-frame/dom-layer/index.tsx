@@ -570,21 +570,36 @@ export function PageFrameDomLayer({
 
       removeStaleFrames(frameMap.current, activeFrames);
 
-      // The browser may try to scrollIntoView the focused contentEditable on
-      // its own. Zero those out so they don't accumulate, but DON'T convert
-      // them into a canvas pan — the follow-cursor effect below is the
-      // single source of truth for keeping the caret in view.
-      if (container.scrollTop !== 0 || container.scrollLeft !== 0) {
-        container.scrollTop = 0;
-        container.scrollLeft = 0;
-      }
-
       rafId = requestAnimationFrame(sync);
     }
 
     rafId = requestAnimationFrame(sync);
+
+    // The browser may try to scrollIntoView the focused contentEditable on its
+    // own. Zero those out so they don't accumulate, but DON'T convert them into
+    // a canvas pan — the follow-cursor effect below is the single source of
+    // truth for keeping the caret in view.
+    //
+    // Driven by the scroll event rather than polled from the sync loop. Reading
+    // scrollTop is a geometry read, so polling it right after the loop wrote
+    // the chrome's transform forced a synchronous layout flush on every frame —
+    // write, read, relayout, forever. The event fires only when the container
+    // actually scrolls, which is also sooner than the next frame's poll.
+    const container = containerRef.current;
+    const resetScroll = () => {
+      if (
+        container &&
+        (container.scrollTop !== 0 || container.scrollLeft !== 0)
+      ) {
+        container.scrollTop = 0;
+        container.scrollLeft = 0;
+      }
+    };
+    container?.addEventListener('scroll', resetScroll);
+
     return () => {
       cancelAnimationFrame(rafId);
+      container?.removeEventListener('scroll', resetScroll);
       for (const refs of frameMap.current.values()) {
         disposeFrameRefs(refs);
       }
