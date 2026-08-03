@@ -518,6 +518,13 @@ export function PageFrameDomLayer({
         // Because the zoom value is constant, text metrics and line breaks
         // never change — the variable canvas zoom is handled entirely by
         // transform: scale(), which is a post-layout GPU operation.
+        //
+        // It is not cheap in the abstract: `zoom` scales the layout box, so on
+        // a 2x display one blank page rasterizes ~9.6 megapixels against ~2.8
+        // of visible area. Measured on an iPad it is nonetheless free while
+        // panning — the chrome root is a promoted layer, so a pan moves the
+        // texture rather than redrawing it, and dropping to 1x changed nothing.
+        // It is worth ~5ms per frame only while zooming, which re-rasterizes.
         const dpr = getDevicePixelRatio();
         setStyleIfChanged(refs.viewportDiv, 'width', `${contentWidth}px`);
         setStyleIfChanged(refs.viewportDiv, 'height', `${contentHeight}px`);
