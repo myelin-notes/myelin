@@ -15,7 +15,7 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
         elements: [],
         viewport: { screenToWorld: vi.fn() },
         addElement: vi.fn(),
-        setBackgroundCanvas: vi.fn(),
+        setBackgroundHost: vi.fn(),
         setOverlayCanvas: vi.fn(),
         setDomOverlayHost: vi.fn(),
         setOnPageFrameRenamed: vi.fn(),

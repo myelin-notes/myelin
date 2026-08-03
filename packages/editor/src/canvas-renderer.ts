@@ -1,5 +1,5 @@
 import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
-import type { CanvasViewport } from './canvas-viewport';
+import { type CanvasViewport, MAX_ZOOM } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
@@ -8,25 +8,107 @@ import { UserPrefs } from './user-prefs';
 
 type CanvasBackground = 'grid' | 'dots' | 'blank';
 
+/** Side length of one background pattern tile, in world units. */
+const BG_TILE_SIZE = 24;
+
 /**
- * Owns the three canvas layers (background grid/dots, foreground content +
- * cursor, selection overlay) and their RenderingContext-scoped concerns: DPR
- * math, sizing, and the per-frame clear/transform/draw passes. It reads
+ * How far the background layer extends past the viewport on every side.
+ *
+ * A pan is applied to this layer as a translate of up to one tile, so the
+ * layer has to already cover one tile beyond each edge or the translate would
+ * drag a bare edge into view. One tile at maximum zoom bounds that for good,
+ * which keeps the element's geometry a constant — nothing has to be re-laid-out
+ * when the zoom changes.
+ */
+const BG_OVERDRAW_PX = BG_TILE_SIZE * MAX_ZOOM;
+
+/**
+ * The offset to translate the background layer by, given how far the view has
+ * panned. The pattern repeats every tile, so shifting by a whole tile is
+ * invisible and only the remainder has to be applied.
+ */
+export function backgroundPanShift(
+  panScreenPx: number,
+  tileScreenPx: number,
+): number {
+  if (!(tileScreenPx > 0) || !Number.isFinite(panScreenPx)) {
+    return 0;
+  }
+  return ((panScreenPx % tileScreenPx) + tileScreenPx) % tileScreenPx;
+}
+
+/**
+ * Paint one pattern tile and return it as a data URL.
+ *
+ * Rendered at `resolution` times its logical size so the dot stays crisp on a
+ * retina display; the layer scales it back down through `background-size`.
+ */
+export function buildBackgroundTile(
+  style: Exclude<CanvasBackground, 'blank'>,
+  color: string,
+  resolution: number,
+): string {
+  const size = BG_TILE_SIZE * resolution;
+  const tile = document.createElement('canvas');
+  tile.width = size;
+  tile.height = size;
+  const ctx = tile.getContext('2d');
+  if (!ctx) {
+    return '';
+  }
+  ctx.scale(resolution, resolution);
+
+  if (style === 'dots') {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(BG_TILE_SIZE / 2, BG_TILE_SIZE / 2, 0.75, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(BG_TILE_SIZE, 0);
+    ctx.lineTo(BG_TILE_SIZE, BG_TILE_SIZE);
+    ctx.moveTo(0, BG_TILE_SIZE);
+    ctx.lineTo(BG_TILE_SIZE, BG_TILE_SIZE);
+    ctx.stroke();
+  }
+  return tile.toDataURL();
+}
+
+/**
+ * Owns the canvas layers (foreground content + cursor, selection overlay) and
+ * the CSS-backed background layer, plus their RenderingContext-scoped concerns:
+ * DPR math, sizing, and the per-frame clear/transform/draw passes. It reads
  * everything it needs from the canvas at `redraw()` time and never mutates it;
  * element ordering, selection, and placement lifecycle stay on DrawableCanvas.
+ *
+ * The background is a plain element with a repeating CSS background rather than
+ * a third canvas. Measured on an iPad, filling one viewport with a
+ * `CanvasPattern` cost roughly 8ms of a 24ms frame, and a third full-viewport
+ * canvas is a third of the canvas memory that decides whether WebKit keeps 2D
+ * contexts GPU-accelerated at all. As CSS, panning is a compositor translate
+ * that repaints nothing, and only a zoom touches the layer's paint.
  */
 export class CanvasRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly canvas: HTMLCanvasElement;
-  private bgCtx: CanvasRenderingContext2D | null = null;
-  private bgCanvas: HTMLCanvasElement | null = null;
   private overlayCtx: CanvasRenderingContext2D | null = null;
   private overlayCanvas: HTMLCanvasElement | null = null;
-  private bgPattern: CanvasPattern | null = null;
+  private bgHost: HTMLElement | null = null;
   private bgStyle: CanvasBackground;
   private unsubBgPref: (() => void) | null = null;
   private unsubTheme: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
+
+  /**
+   * The view the background layer's CSS was last written for. The tile only
+   * has to be re-sized when the zoom changes; a pan is a translate, and a run
+   * of panned frames all measure against the same painted tiling.
+   */
+  private bgLastZoom = Number.NaN;
+  private bgLastShiftX = Number.NaN;
+  private bgLastShiftY = Number.NaN;
 
   public constructor(
     foregroundCtx: CanvasRenderingContext2D,
@@ -36,13 +118,12 @@ export class CanvasRenderer {
     this.canvas = foregroundCanvas;
     this.syncSizeToContainer();
     this.bgStyle = UserPrefs.get('canvasBackground');
-    this.buildBgPattern(this.bgStyle);
     this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
-      this.buildBgPattern(bg);
+      this.setBackgroundStyle(bg);
     });
-    // Theme toggle changes the grid color, but the pattern is cached — rebuild.
+    // Theme toggle changes the grid color, but the tile is cached — rebuild.
     this.unsubTheme = onCanvasThemeChange(() => {
-      this.buildBgPattern(this.bgStyle);
+      this.setBackgroundStyle(this.bgStyle);
     });
     // The canvas fills its pane, whose width changes when the sidebar is
     // toggled/resized or the pane is split — not only on window resize. Track
@@ -53,10 +134,29 @@ export class CanvasRenderer {
     this.resizeObserver.observe(this.canvas);
   }
 
-  public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
-    this.bgCanvas = canvas;
-    this.bgCtx = canvas.getContext('2d', { alpha: true });
-    this.resizeBgCanvas(this.canvas.clientWidth, this.canvas.clientHeight);
+  /**
+   * Adopt the element that shows the canvas background.
+   *
+   * Its geometry is written here rather than left to the host's stylesheet
+   * because the overdraw is not a styling choice — it is what makes the pan
+   * translate safe, and it belongs with the code that relies on it.
+   */
+  public setBackgroundHost(host: HTMLElement): void {
+    this.bgHost = host;
+    host.style.position = 'absolute';
+    host.style.left = `${-BG_OVERDRAW_PX}px`;
+    host.style.top = `${-BG_OVERDRAW_PX}px`;
+    host.style.width = `calc(100% + ${BG_OVERDRAW_PX * 2}px)`;
+    host.style.height = `calc(100% + ${BG_OVERDRAW_PX * 2}px)`;
+    host.style.pointerEvents = 'none';
+    host.style.backgroundRepeat = 'repeat';
+    host.style.backgroundPosition = '0 0';
+    // Promote the layer up front. Without this the per-frame transform can be
+    // serviced by repainting the tiling instead of moving an existing texture,
+    // which is the entire cost this layer exists to avoid — and the promotion
+    // has to be standing, not decided on the first frame of a pan.
+    host.style.willChange = 'transform';
+    this.setBackgroundStyle(this.bgStyle);
   }
 
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
@@ -65,36 +165,19 @@ export class CanvasRenderer {
     this.resizeOverlayCanvas(this.canvas.clientWidth, this.canvas.clientHeight);
   }
 
-  public buildBgPattern(style: CanvasBackground): void {
+  /**
+   * Swap the background pattern. Repaints the layer once; panning and zooming
+   * afterwards reuse the tile.
+   */
+  public setBackgroundStyle(style: CanvasBackground): void {
     this.bgStyle = style;
-    if (style === 'blank') {
-      this.bgPattern = null;
+    if (!this.bgHost) {
       return;
     }
-
-    const spacing = 24;
-    const tile = new OffscreenCanvas(spacing, spacing);
-    const pctx = tile.getContext('2d')!;
-    const color = getCanvasPalette().grid;
-
-    if (style === 'dots') {
-      pctx.fillStyle = color;
-      pctx.beginPath();
-      pctx.arc(spacing / 2, spacing / 2, 0.75, 0, Math.PI * 2);
-      pctx.fill();
-    } else {
-      // grid
-      pctx.strokeStyle = color;
-      pctx.lineWidth = 0.5;
-      pctx.beginPath();
-      pctx.moveTo(spacing, 0);
-      pctx.lineTo(spacing, spacing);
-      pctx.moveTo(0, spacing);
-      pctx.lineTo(spacing, spacing);
-      pctx.stroke();
-    }
-
-    this.bgPattern = this.ctx.createPattern(tile, 'repeat');
+    this.bgHost.style.backgroundImage =
+      style === 'blank'
+        ? 'none'
+        : `url(${buildBackgroundTile(style, getCanvasPalette().grid, window.devicePixelRatio || 1)})`;
   }
 
   public redraw(
@@ -114,27 +197,7 @@ export class CanvasRenderer {
     const zoom = viewport.zoom;
     const offset = viewport.offset;
 
-    // Background canvas: dot grid + chrome (when not editing)
-    if (this.bgCtx && this.bgCanvas) {
-      const bgW = this.bgCanvas.width / dpr;
-      const bgH = this.bgCanvas.height / dpr;
-      this.bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.bgCtx.clearRect(0, 0, bgW, bgH);
-
-      if (this.bgPattern) {
-        this.bgCtx.save();
-        this.bgCtx.scale(zoom, zoom);
-        this.bgCtx.translate(offset.x, offset.y);
-        this.bgCtx.fillStyle = this.bgPattern;
-        this.bgCtx.fillRect(
-          -offset.x - bgW / zoom,
-          -offset.y - bgH / zoom,
-          (bgW * 3) / zoom,
-          (bgH * 3) / zoom,
-        );
-        this.bgCtx.restore();
-      }
-    }
+    this.syncBackground(zoom, offset);
 
     // Foreground canvas: element content + tool cursor
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -193,6 +256,37 @@ export class CanvasRenderer {
   }
 
   /**
+   * Move the background layer to match the view.
+   *
+   * A pan is a translate of the already-painted tiling — no repaint, no
+   * rasterization, no texture upload; the compositor moves an existing layer.
+   * Only a zoom resizes the tiles, and that is the one case that repaints.
+   * Styles are written only when the value they encode actually changed, since
+   * assigning an identical string still dirties the element.
+   */
+  private syncBackground(zoom: number, offset: Vector2): void {
+    const host = this.bgHost;
+    if (!host) {
+      return;
+    }
+    const tile = BG_TILE_SIZE * zoom;
+    if (zoom !== this.bgLastZoom) {
+      host.style.backgroundSize = `${tile}px ${tile}px`;
+      this.bgLastZoom = zoom;
+    }
+    // The world origin sits at screen (offset * zoom), and the tiling is
+    // anchored there. Reducing modulo the tile keeps the translate inside the
+    // overdraw no matter how far the canvas has been panned.
+    const shiftX = backgroundPanShift(offset.x * zoom, tile);
+    const shiftY = backgroundPanShift(offset.y * zoom, tile);
+    if (shiftX !== this.bgLastShiftX || shiftY !== this.bgLastShiftY) {
+      host.style.transform = `translate3d(${shiftX}px, ${shiftY}px, 0)`;
+      this.bgLastShiftX = shiftX;
+      this.bgLastShiftY = shiftY;
+    }
+  }
+
+  /**
    * Re-measure the container and resize all backing stores. Called on DPR
    * changes (e.g. moving the window between monitors), which fire a window
    * resize but may not change the element's CSS box, so the ResizeObserver
@@ -214,8 +308,9 @@ export class CanvasRenderer {
   /**
    * Size every backing store to the foreground canvas's laid-out size. The
    * canvas is stretched to its pane by CSS (`inset-0`), so `clientWidth/Height`
-   * is the visible viewport — the sidebar's width is already excluded. All
-   * three layers share the same container, so one measurement drives them all.
+   * is the visible viewport — the sidebar's width is already excluded. Both
+   * canvas layers share the same container, so one measurement drives them
+   * both; the background layer is sized in CSS and needs nothing here.
    */
   private syncSizeToContainer(): void {
     const width = this.canvas.clientWidth;
@@ -224,8 +319,10 @@ export class CanvasRenderer {
       return;
     }
     this.resizeCanvas(width, height);
-    this.resizeBgCanvas(width, height);
     this.resizeOverlayCanvas(width, height);
+    // A DPR change arrives as a resize, and the tile is rasterized for a
+    // specific DPR — rebuild it so it stays crisp on the new display.
+    this.setBackgroundStyle(this.bgStyle);
   }
 
   private resizeCanvas(width: number, height: number): void {
@@ -235,15 +332,6 @@ export class CanvasRenderer {
     // Assigning width/height resets context state; re-apply smoothing quality
     // so downscaled images (screenshots, photos) don't alias when zoomed out.
     this.ctx.imageSmoothingQuality = 'high';
-  }
-
-  private resizeBgCanvas(width: number, height: number): void {
-    if (!this.bgCanvas) {
-      return;
-    }
-    const dpr = window.devicePixelRatio || 1;
-    this.bgCanvas.width = width * dpr;
-    this.bgCanvas.height = height * dpr;
   }
 
   private resizeOverlayCanvas(width: number, height: number): void {

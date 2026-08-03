@@ -56,7 +56,7 @@ export default function CanvasEditor() {
 }
 
 function CanvasEditorInner() {
-  const bgRef = useRef<HTMLCanvasElement>(null);
+  const bgRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const domHostRef = useRef<HTMLDivElement>(null);
@@ -85,7 +85,7 @@ function CanvasEditorInner() {
     initWebPlatform();
     const ydoc = new YDocManager();
     const canvas = new DrawableCanvas(fg, ydoc, canvasTools);
-    canvas.setBackgroundCanvas(bg);
+    canvas.setBackgroundHost(bg);
     canvas.setOverlayCanvas(overlay);
     canvas.setDomOverlayHost(domHost);
     canvas.setOnToolSwitched(setSelectedToolIndex);
@@ -242,7 +242,7 @@ function CanvasEditorInner() {
           descendant) or its scrollable menus (e.g. the font picker) can't
           scroll. */}
       <div className="absolute inset-0">
-        <canvas ref={bgRef} className={layerClass} style={{ zIndex: 0 }} />
+        <div ref={bgRef} style={{ zIndex: 0 }} />
 
         {/* Mock app surfaces render under the ink so annotations draw on top
             of them. */}

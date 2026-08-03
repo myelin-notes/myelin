@@ -587,8 +587,12 @@ export class DrawableCanvas {
     });
   }
 
-  public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
-    this.renderer.setBackgroundCanvas(canvas);
+  /**
+   * Element that shows the canvas background (grid / dots). Not a canvas: it
+   * carries a repeating CSS background so panning is a compositor translate.
+   */
+  public setBackgroundHost(host: HTMLElement): void {
+    this.renderer.setBackgroundHost(host);
   }
 
   /**
