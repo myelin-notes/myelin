@@ -8,6 +8,7 @@ import {
 import { Menu as MenuIcon } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { getMessages } from '../../i18n';
+import { setStyleIfChanged } from '../../utils/style-cache';
 import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
@@ -104,9 +105,11 @@ export const FrameChromeView = forwardRef<
         if (!clip || !inner) {
           return;
         }
-        clip.style.height = `${headerHeight}px`;
-        inner.style.width = `${innerWidth}px`;
-        inner.style.transform = `scale(${zoom})`;
+        // Called from the per-frame sync loop, and all three follow the zoom —
+        // so while panning every one of these rewrites the same value.
+        setStyleIfChanged(clip, 'height', `${headerHeight}px`);
+        setStyleIfChanged(inner, 'width', `${innerWidth}px`);
+        setStyleIfChanged(inner, 'transform', `scale(${zoom})`);
       },
     }),
     [canRenameTitle, fileName, isEditingTitle],

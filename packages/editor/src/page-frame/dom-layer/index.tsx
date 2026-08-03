@@ -15,6 +15,10 @@ import {
 import { PM_UPDATE_EVENT } from '../../events';
 import { getMessages } from '../../i18n';
 import { getDevicePixelRatio } from '../../utils';
+import {
+  removeStyleIfPresent,
+  setStyleIfChanged,
+} from '../../utils/style-cache';
 import type {
   NoteLinkPreview,
   NoteLinkPreviewTarget,
@@ -164,14 +168,26 @@ function syncPageChrome(
   while (refs.pageChromeDivs.length > chromeCount) {
     refs.pageChromeDivs.pop()!.remove();
   }
+  // These are world-space, so they do not change with pan or zoom at all —
+  // only when the page count or page size does.
   for (let p = 0; p < chromeCount; p++) {
-    refs.pageChromeDivs[p].style.left =
-      pageLayout === 'horizontal' ? `${p * (pageWidth + PAGE_GAP)}px` : '0px';
-    refs.pageChromeDivs[p].style.top =
-      pageLayout === 'horizontal' ? '0px' : `${p * (pageHeight + PAGE_GAP)}px`;
-    refs.pageChromeDivs[p].style.width = `${pageWidth}px`;
-    refs.pageChromeDivs[p].style.height =
-      pageLayout === 'continuous' ? `${stripHeight}px` : `${pageHeight}px`;
+    const div = refs.pageChromeDivs[p];
+    setStyleIfChanged(
+      div,
+      'left',
+      pageLayout === 'horizontal' ? `${p * (pageWidth + PAGE_GAP)}px` : '0px',
+    );
+    setStyleIfChanged(
+      div,
+      'top',
+      pageLayout === 'horizontal' ? '0px' : `${p * (pageHeight + PAGE_GAP)}px`,
+    );
+    setStyleIfChanged(div, 'width', `${pageWidth}px`);
+    setStyleIfChanged(
+      div,
+      'height',
+      pageLayout === 'continuous' ? `${stripHeight}px` : `${pageHeight}px`,
+    );
   }
 }
 
@@ -194,24 +210,35 @@ function syncEditorLayout(
     return;
   }
 
+  // Guarded for the same reason as the attribute above: this is the editor's
+  // own root, so an unguarded write — including clearing a property that was
+  // never set — relays out the document on every frame.
   if (pageLayout === 'horizontal') {
     const columnWidth = Math.max(1, pageWidth - PAGE_PADDING * 2);
     const columnHeight = Math.max(1, pageHeight - PAGE_PADDING * 2);
-    editorDom.style.width = `${columnWidth}px`;
-    editorDom.style.height = `${columnHeight}px`;
-    editorDom.style.columnWidth = `${columnWidth}px`;
-    editorDom.style.columnGap = `${PAGE_GAP + PAGE_PADDING * 2}px`;
-    editorDom.style.columnFill = 'auto';
-    editorDom.style.overflow = 'visible';
+    setStyleIfChanged(editorDom, 'width', `${columnWidth}px`);
+    setStyleIfChanged(editorDom, 'height', `${columnHeight}px`);
+    setStyleIfChanged(editorDom, 'column-width', `${columnWidth}px`);
+    setStyleIfChanged(
+      editorDom,
+      'column-gap',
+      `${PAGE_GAP + PAGE_PADDING * 2}px`,
+    );
+    setStyleIfChanged(editorDom, 'column-fill', 'auto');
+    setStyleIfChanged(editorDom, 'overflow', 'visible');
     return;
   }
 
-  editorDom.style.removeProperty('width');
-  editorDom.style.removeProperty('height');
-  editorDom.style.removeProperty('column-width');
-  editorDom.style.removeProperty('column-gap');
-  editorDom.style.removeProperty('column-fill');
-  editorDom.style.removeProperty('overflow');
+  for (const property of [
+    'width',
+    'height',
+    'column-width',
+    'column-gap',
+    'column-fill',
+    'overflow',
+  ]) {
+    removeStyleIfPresent(editorDom, property);
+  }
 }
 
 function createFrameRefs(
@@ -477,9 +504,13 @@ export function PageFrameDomLayer({
 
         // Inner frame: screen-sized clip box, lives inside chrome contentSlot
         // so no extra translate needed — contentSlot positions it.
-        refs.frameDiv.style.width = `${contentWidth * zoom}px`;
-        refs.frameDiv.style.height = `${contentHeight * zoom}px`;
-        refs.frameDiv.style.transform = '';
+        //
+        // Guarded because none of this changes while panning: it is derived
+        // from the frame's world size and the zoom, so a pan rewrites the
+        // identical value and relays out the page for nothing.
+        setStyleIfChanged(refs.frameDiv, 'width', `${contentWidth * zoom}px`);
+        setStyleIfChanged(refs.frameDiv, 'height', `${contentHeight * zoom}px`);
+        removeStyleIfPresent(refs.frameDiv, 'transform');
 
         // Inner viewport: world-sized. A fixed CSS zoom of devicePixelRatio
         // tells WebKit to rasterise the compositing-layer backing store at
@@ -488,12 +519,20 @@ export function PageFrameDomLayer({
         // never change — the variable canvas zoom is handled entirely by
         // transform: scale(), which is a post-layout GPU operation.
         const dpr = getDevicePixelRatio();
-        refs.viewportDiv.style.width = `${contentWidth}px`;
-        refs.viewportDiv.style.height = `${contentHeight}px`;
-        refs.viewportDiv.style.zoom = `${dpr}`;
-        refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
+        setStyleIfChanged(refs.viewportDiv, 'width', `${contentWidth}px`);
+        setStyleIfChanged(refs.viewportDiv, 'height', `${contentHeight}px`);
+        setStyleIfChanged(refs.viewportDiv, 'zoom', `${dpr}`);
+        setStyleIfChanged(
+          refs.viewportDiv,
+          'transform',
+          `scale(${zoom / dpr})`,
+        );
 
-        refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
+        if (frame.editing) {
+          setStyleIfChanged(refs.frameDiv, 'pointer-events', 'auto');
+        } else {
+          removeStyleIfPresent(refs.frameDiv, 'pointer-events');
+        }
         // Editing chrome (the math source panel) is display:none while the
         // view animates: painting it mid-zoom roughly doubles the edit-enter
         // frame hitch, and it isn't readable until the camera lands anyway.
