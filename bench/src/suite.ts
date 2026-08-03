@@ -168,35 +168,40 @@ export const SUITES: Record<string, SuiteCase[]> = {
       },
     },
     {
-      label: '  same, viewport promoted',
+      label: '  same, no page shadow',
       params: {
         layers: 'all',
         bg: 'dots',
         scene: 'pageframe',
         pages: '1',
         domLayer: '1',
-        promoteFrame: '1',
+        frameShadow: '0',
       },
     },
+    // The last pair prices the page's raster area. The DOM layer has WebKit
+    // rasterize each page at `zoom: devicePixelRatio`, so at dpr 2 a page is
+    // painted over four times its own area — and unlike the shadow there is no
+    // way to switch that off from outside without fighting the sync loop for
+    // the same property every frame.
+    //
+    // Halving the ratio halves it for the canvases too, so the pair is read as
+    // a difference: what the page frame costs at dpr 1 is this row minus its
+    // control, against 'the same at dpr 2' further up. If the page's share
+    // falls by roughly four when the ratio halves, its cost is the area it is
+    // painted over, and the `zoom: dpr` trick is what a zoom is paying for.
     {
-      label: '+ 3 page frames',
+      label: '+ dot background, dpr 1',
+      params: { layers: 'all', bg: 'dots', dpr: '1' },
+    },
+    {
+      label: '+ 1 page frame, dpr 1',
       params: {
         layers: 'all',
         bg: 'dots',
         scene: 'pageframe',
-        pages: '3',
+        pages: '1',
         domLayer: '1',
-      },
-    },
-    {
-      label: '  same, viewport promoted',
-      params: {
-        layers: 'all',
-        bg: 'dots',
-        scene: 'pageframe',
-        pages: '3',
-        domLayer: '1',
-        promoteFrame: '1',
+        dpr: '1',
       },
     },
   ],

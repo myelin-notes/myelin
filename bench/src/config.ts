@@ -52,6 +52,11 @@ export interface BenchConfig {
    */
   promoteFrame: boolean;
   /**
+   * Keep the page sheet's drop shadow. Off prices the blur, which only costs
+   * on a gesture that repaints.
+   */
+  frameShadow: boolean;
+  /**
    * Backing-store pixels per CSS pixel. Overrides `window.devicePixelRatio`
    * rather than going through CDP's `deviceScaleFactor`, which would also
    * rescale CSS layout. The variable under test is how many pixels each layer
@@ -76,6 +81,7 @@ const DEFAULTS: BenchConfig = {
   domLayer: false,
   pages: 1,
   promoteFrame: false,
+  frameShadow: true,
   dpr: window.devicePixelRatio || 1,
   warmupMs: 600,
   durationMs: 4000,
@@ -141,6 +147,7 @@ export function readConfig(search: string): BenchConfig {
     domLayer: params.get('domLayer') === '1',
     pages: num(params, 'pages', DEFAULTS.pages),
     promoteFrame: params.get('promoteFrame') === '1',
+    frameShadow: params.get('frameShadow') !== '0',
     dpr: num(params, 'dpr', DEFAULTS.dpr),
     warmupMs: num(params, 'warmup', DEFAULTS.warmupMs),
     durationMs: num(params, 'duration', DEFAULTS.durationMs),
