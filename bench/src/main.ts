@@ -10,6 +10,7 @@ import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { applyExactZoomBackground } from './background-ablation';
+import { BUILD_ID } from './build-id';
 import { applyDprOverride, type BenchConfig, readConfig } from './config';
 import { mountPageFrameDomLayer } from './dom-layer';
 import { makeInputStep } from './input';
@@ -30,6 +31,7 @@ import {
   clearSuite,
   formatSuite,
   SUITE_DEFAULTS,
+  SUITES,
   type SuiteOutcome,
   suiteRows,
 } from './suite';
@@ -131,7 +133,7 @@ function run(): void {
   const markFrames = params.get('mark') === '1';
   const readout = requireElement('readout');
   if (suite) {
-    readout.textContent = `running: ${suite.case.label} (run ${suite.state.current.length + 1}/${suite.state.repeat})`;
+    readout.textContent = `build ${BUILD_ID} — case ${suite.state.index + 1}/${SUITES[suiteName as string].length}: ${suite.case.label} (run ${suite.state.current.length + 1}/${suite.state.repeat})`;
     completeSuiteCase = (outcome) => {
       const next = advanceSuite(suite.state, outcome, {
         warmup: String(config.warmupMs),
@@ -145,7 +147,9 @@ function run(): void {
       // Render before clearing: the table is the whole point of the sweep, and
       // it has to survive on screen for someone to read it off a tablet.
       const rows = suiteRows(suite.state.name);
-      const text = formatSuite(rows);
+      // Stamped onto the table itself, not just the payload: the table is what
+      // gets read off a tablet screen and reported back.
+      const text = `build ${BUILD_ID}\n${formatSuite(rows)}`;
       readout.textContent = text;
       postResult({ text, rows });
       clearSuite();

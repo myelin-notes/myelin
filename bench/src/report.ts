@@ -1,3 +1,4 @@
+import { BUILD_ID } from './build-id';
 import type { SuiteRow } from './suite';
 
 /** Must match `RESULT_ENDPOINT` in ../result-sink.ts. */
@@ -18,6 +19,7 @@ export function postResult(payload: { text: string; rows: SuiteRow[] }): void {
   const body = JSON.stringify({
     ...payload,
     capturedAt: new Date().toISOString(),
+    build: BUILD_ID,
     userAgent: navigator.userAgent,
     devicePixelRatio: window.devicePixelRatio,
     viewport: { width: window.innerWidth, height: window.innerHeight },

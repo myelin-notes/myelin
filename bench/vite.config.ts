@@ -12,8 +12,20 @@ import { resultSink } from './result-sink';
 // measures the engine's render loop, which is plain TypeScript; adding a
 // compiler pass would only change how the few React leaves behave and make
 // bench numbers diverge from the code under test for no gain.
+/**
+ * Which build a page came from, stamped in at build time.
+ *
+ * A tablet reloading a bench URL is the one part of this loop nobody can see.
+ * Safari held a finished run on screen across a rebuild once, and the table it
+ * was showing was old — indistinguishable from a fresh one, and reported as a
+ * result. Every run now carries the build that produced it, so a stale page is
+ * a fact on the screen and in the posted payload rather than a suspicion.
+ */
+const BUILD_ID = new Date().toISOString().slice(11, 19);
+
 export default defineConfig({
   root: __dirname,
+  define: { __BENCH_BUILD__: JSON.stringify(BUILD_ID) },
   plugins: [react(), tailwindcss(), resultSink(__dirname)],
   resolve: {
     alias: {
@@ -36,5 +48,10 @@ export default defineConfig({
     host: true,
     port: 1431,
     strictPort: true,
+    // Safari will otherwise hold `index.html` across a rebuild, and the hashed
+    // bundle it names is gone the moment anything is rebuilt. The device is
+    // reloading this by hand between builds — the whole workflow depends on a
+    // reload actually fetching.
+    headers: { 'Cache-Control': 'no-store' },
   },
 });
