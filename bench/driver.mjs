@@ -16,6 +16,12 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  formatTraceReport,
+  startTracing,
+  summarizeTrace,
+  writeTrace,
+} from './trace.mjs';
 
 const BENCH_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(BENCH_DIR, '..');
@@ -82,6 +88,8 @@ const MATRIX = {
   raster: list(args.raster, ['gpu', 'software']),
   strokes: list(args.strokes, ['0']),
   points: list(args.points, ['64']),
+  pages: list(args.pages, ['1']),
+  domLayer: list(args.domLayer, ['0']),
 };
 
 const DURATION_MS = Number(args.duration ?? 4000);
@@ -165,6 +173,7 @@ class Cdp {
   #socket;
   #nextId = 1;
   #pending = new Map();
+  #listeners = new Map();
 
   static async attach(port) {
     const response = await waitForHttp(
@@ -190,6 +199,12 @@ class Cdp {
       );
       this.#socket.addEventListener('message', (event) => {
         const message = JSON.parse(event.data);
+        if (message.id === undefined) {
+          for (const handler of this.#listeners.get(message.method) ?? []) {
+            handler(message.params);
+          }
+          return;
+        }
         const entry = this.#pending.get(message.id);
         if (!entry) {
           return;
@@ -202,6 +217,23 @@ class Cdp {
         }
       });
     });
+  }
+
+  on(method, handler) {
+    const handlers = this.#listeners.get(method) ?? [];
+    handlers.push(handler);
+    this.#listeners.set(method, handlers);
+  }
+
+  once(method, handler) {
+    const wrapped = (params) => {
+      this.#listeners.set(
+        method,
+        (this.#listeners.get(method) ?? []).filter((h) => h !== wrapped),
+      );
+      handler(params);
+    };
+    this.on(method, wrapped);
   }
 
   send(method, params = {}) {
@@ -217,7 +249,7 @@ class Cdp {
   }
 }
 
-function benchUrl(config) {
+function benchUrl(config, extra = {}) {
   const params = new URLSearchParams({
     scene: config.scene,
     input: config.input,
@@ -226,14 +258,17 @@ function benchUrl(config) {
     dpr: config.dpr,
     strokes: config.strokes,
     points: config.points,
+    pages: config.pages,
+    domLayer: config.domLayer,
     warmup: String(WARMUP_MS),
     duration: String(DURATION_MS),
     auto: '1',
+    ...extra,
   });
   return `http://127.0.0.1:${PREVIEW_PORT}/?${params}`;
 }
 
-async function runCase(cdp, config) {
+async function applyEmulation(cdp, config) {
   await cdp.send('Emulation.setCPUThrottlingRate', {
     rate: Number(config.cpu),
   });
@@ -246,8 +281,9 @@ async function runCase(cdp, config) {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await cdp.send('Page.navigate', { url: benchUrl(config) });
+}
 
+async function waitForResult(cdp, config) {
   const deadline = Date.now() + WARMUP_MS + DURATION_MS + 30_000;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 250));
@@ -265,6 +301,12 @@ async function runCase(cdp, config) {
     }
   }
   throw new Error(`Timed out running ${JSON.stringify(config)}`);
+}
+
+async function runCase(cdp, config) {
+  await applyEmulation(cdp, config);
+  await cdp.send('Page.navigate', { url: benchUrl(config) });
+  return waitForResult(cdp, config);
 }
 
 function chromeFlags(raster, profileDir) {
@@ -301,6 +343,62 @@ function chromeFlags(raster, profileDir) {
     flags.unshift('--headless=new');
   }
   return flags;
+}
+
+/**
+ * Record one case with tracing on and print where its frame actually goes.
+ *
+ * One case, not a sweep: a trace answers "what is this frame made of", and the
+ * way to use it is to trace the configuration a sweep has already shown to be
+ * slow. Every axis takes its first value, so the same flags that select a row
+ * in the table select the case to trace.
+ */
+async function traceOnce(chromePath, profileDirs) {
+  const config = Object.fromEntries(
+    Object.entries(MATRIX).map(([key, values]) => [key, values[0]]),
+  );
+  const profileDir = mkdtempSync(path.join(tmpdir(), 'myelin-bench-'));
+  profileDirs.push(profileDir);
+  const chrome = spawn(chromePath, chromeFlags(config.raster, profileDir), {
+    stdio: 'ignore',
+  });
+
+  let cdp;
+  try {
+    cdp = await Cdp.attach(CDP_PORT);
+    await applyEmulation(cdp, config);
+    await cdp.send('Page.navigate', {
+      url: benchUrl(config, { mark: '1' }),
+    });
+
+    // Start recording after the warmup has elapsed. Traced from the first
+    // frame, the loudest entries are scene construction, script compilation and
+    // first paint — none of which happen again, and all of which would swamp
+    // the steady-state cost the trace exists to show.
+    await new Promise((resolve) => setTimeout(resolve, WARMUP_MS + 500));
+    console.log(`Tracing ${JSON.stringify(config)} …`);
+    const tracing = await startTracing(cdp);
+    const result = await waitForResult(cdp, config);
+    const events = await tracing.stop();
+
+    console.log(
+      `\nbench: ${result.fps.toFixed(1)} fps  frame ${result.frameMean.toFixed(2)}  js ${result.jsMean.toFixed(2)}  other ${result.otherJsMean.toFixed(2)}  browser ${result.browserMean.toFixed(2)}\n`,
+    );
+    console.log(formatTraceReport(summarizeTrace(events)));
+
+    const outPath = path.resolve(
+      REPO_ROOT,
+      args['trace-out'] ??
+        `bench/trace-${config.scene}-${config.input}-${config.raster}.json`,
+    );
+    writeTrace(outPath, events);
+    console.log(
+      `\nWrote ${outPath} (${events.length} events) — open it in DevTools ▸ Performance ▸ Load profile`,
+    );
+  } finally {
+    cdp?.close();
+    chrome.kill();
+  }
 }
 
 function expand(matrix) {
@@ -361,6 +459,11 @@ async function main() {
 
   try {
     await waitForHttp(`http://127.0.0.1:${PREVIEW_PORT}/`, 30_000);
+
+    if (args.trace !== undefined) {
+      await traceOnce(chromePath, profileDirs);
+      return;
+    }
 
     // Rasterization backend is a launch flag, so it brackets the sweep: one
     // browser per backend, every other axis varied inside it.

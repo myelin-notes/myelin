@@ -115,6 +115,11 @@ function run(): void {
   }
 
   const config = readConfig(params.toString());
+  // Emit a user-timing mark per measured frame, so a Chrome trace can find the
+  // measured window and count frames in it. Off unless asked for: a mark is
+  // cheap but not free, and every other run's numbers should describe the app
+  // rather than the app plus an instrument.
+  const markFrames = params.get('mark') === '1';
   const readout = requireElement('readout');
   if (suite) {
     readout.textContent = `running: ${suite.case.label} (run ${suite.state.current.length + 1}/${suite.state.repeat})`;
@@ -190,6 +195,9 @@ function run(): void {
           } else {
             frameSeries.push(deltaTime * 1000);
             jsSeries.push(jsMs);
+          }
+          if (markFrames) {
+            performance.mark('bench-frame');
           }
         }
         frame++;

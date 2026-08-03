@@ -51,6 +51,32 @@ backend produced a confident and wrong answer once already.
 Interactive runs take the same knobs as query parameters, e.g.
 `http://localhost:1430/?scene=strokes&strokes=400&layers=all&dpr=2&input=pan`.
 
+### Tracing one case
+
+```
+yarn bench --trace --raster=software --input=zoom --scene=pageframe --domLayer=1
+```
+
+Runs a single case with Chrome's tracing on and prints self time per event, per
+thread, per frame. This is the tool for "what is the browser actually doing",
+which the table above can only answer by subtraction — `browser` is whatever no
+JavaScript claimed, and it cannot tell raster apart from compositing.
+
+Every knob takes its first value, so the flags that select a table row select
+the case to trace. The scenario emits a `bench-frame` user-timing mark per
+measured frame (only under `--trace`), which is what bounds the analysis window
+and gives the frame count.
+
+The raw trace is written to `bench/trace-<scene>-<input>-<raster>.json`, which
+DevTools ▸ Performance ▸ Load profile will open. These run to ~100MB and are
+gitignored.
+
+The counts matter more than the milliseconds. `DisplayItemList::Raster` at 47
+per frame means the layer is being repainted every frame, and that is a fact
+about the layer tree that holds on WebKit too; the milliseconds next to it are
+SwiftShader's and are not. Reading the zoom path this way is what found the
+background layer resizing its tiles every frame.
+
 ### Knobs
 
 | Flag / param | Values | What it isolates |
