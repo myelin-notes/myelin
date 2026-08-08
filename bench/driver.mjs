@@ -96,6 +96,7 @@ const MATRIX = {
   plainFrame: list(args.plainFrame, ['']),
   chromePromoted: list(args.chromePromoted, ['1']),
   frameEditor: list(args.frameEditor, ['1']),
+  chromeRescaled: list(args.chromeRescaled, ['1']),
 };
 
 const DURATION_MS = Number(args.duration ?? 4000);
@@ -272,6 +273,7 @@ function benchUrl(config, extra = {}) {
     plainFrame: config.plainFrame,
     chromePromoted: config.chromePromoted,
     frameEditor: config.frameEditor,
+    chromeRescaled: config.chromeRescaled,
     warmup: String(WARMUP_MS),
     duration: String(DURATION_MS),
     auto: '1',

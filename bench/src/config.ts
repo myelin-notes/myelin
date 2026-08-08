@@ -67,7 +67,8 @@ export interface BenchConfig {
   /**
    * Replace the page frame with a bare white rectangle of the same size,
    * followed the same way. The control for "should an element this size cost
-   * this much at all". @see plain-frame.ts
+   * this much at all", and — as the `stepped`/`held` pair — for "does rescaling
+   * a promoted layer repaint it". @see plain-frame.ts
    */
   plainFrame: PlainFrameMode | null;
   /**
@@ -81,6 +82,12 @@ export interface BenchConfig {
    * whether the live contenteditable is what a blank-looking page costs.
    */
   frameEditor: boolean;
+  /**
+   * Keep the residual zoom on the chrome root's transform between raster steps.
+   * Off asks whether rescaling that layer is what repaints its subtree every
+   * zoom frame. @see pinChromeRasterScale
+   */
+  chromeRescaled: boolean;
   /**
    * Backing-store pixels per CSS pixel. Overrides `window.devicePixelRatio`
    * rather than going through CDP's `deviceScaleFactor`, which would also
@@ -110,6 +117,7 @@ const DEFAULTS: BenchConfig = {
   plainFrame: null,
   chromePromoted: true,
   frameEditor: true,
+  chromeRescaled: true,
   dpr: window.devicePixelRatio || 1,
   warmupMs: 600,
   durationMs: 4000,
@@ -182,11 +190,12 @@ export function readConfig(search: string): BenchConfig {
       DEFAULTS.frameShadow,
     ),
     plainFrame:
-      (['scale', 'resize', 'promoted'] as const).find(
+      (['scale', 'resize', 'promoted', 'stepped', 'held'] as const).find(
         (mode) => mode === params.get('plainFrame'),
       ) ?? null,
     chromePromoted: params.get('chromePromoted') !== '0',
     frameEditor: params.get('frameEditor') !== '0',
+    chromeRescaled: params.get('chromeRescaled') !== '0',
     dpr: num(params, 'dpr', DEFAULTS.dpr),
     warmupMs: num(params, 'warmup', DEFAULTS.warmupMs),
     durationMs: num(params, 'duration', DEFAULTS.durationMs),

@@ -18,6 +18,7 @@ import { layoutProbeTotals, startLayoutProbe } from './layout-probe';
 import {
   demotePageFrameChrome,
   hidePageFrameEditors,
+  pinChromeRasterScale,
   promotePageFrameViewports,
   setPageFrameShadows,
 } from './page-frame-ablations';
@@ -179,8 +180,14 @@ function run(): void {
   }
 
   const step = makeInputStep(canvas, config.input);
+  // `pages` doubles as the rect count: the plain-frame rows run `scene=empty`,
+  // so nothing else on the page reads it.
   const syncPlainFrame = config.plainFrame
-    ? createPlainFrame(requireElement('page-frame-layer'), config.plainFrame)
+    ? createPlainFrame(
+        requireElement('page-frame-layer'),
+        config.plainFrame,
+        config.pages,
+      )
     : null;
   // Runs after the renderer's own background writes, so the frame ends in the
   // old layer state. Null in the shipped configuration, which costs nothing.
@@ -230,6 +237,9 @@ function run(): void {
           }
           if (!config.frameEditor) {
             hidePageFrameEditors();
+          }
+          if (!config.chromeRescaled) {
+            pinChromeRasterScale();
           }
         }
         if (elapsed >= config.warmupMs) {

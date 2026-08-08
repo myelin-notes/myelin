@@ -243,6 +243,15 @@ export abstract class DrawableElement {
   }
 
   /**
+   * Whether `drawSelectionOverlay` would put anything on the overlay canvas.
+   * Exactly the condition that method early-returns on, so the renderer can
+   * decide whether the overlay has to be touched at all this frame.
+   */
+  public get hasSelectionOverlay(): boolean {
+    return !this._hidden && this.selectionT > 0;
+  }
+
+  /**
    * Draw the selection outline + handles. Lives on a separate always-on-top
    * canvas so it's visible above DOM-backed editing chrome.
    */

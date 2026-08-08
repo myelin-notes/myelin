@@ -29,6 +29,7 @@
  * else on the page sets. That is sturdier than walking a fixed depth of
  * wrappers, which the chrome is free to change.
  */
+import { FrameChrome } from '@myelin/editor/elements/frame/chrome';
 import { PM_EDITOR_CLASS } from '@myelin/editor/page-frame/pm/constants';
 
 const hiddenEditors = new WeakSet<HTMLElement>();
@@ -86,6 +87,70 @@ export function demotePageFrameChrome(): void {
     element.style.willChange = 'auto';
     demoted.add(element);
   }
+}
+
+let rasterScalePinned = false;
+
+/**
+ * Stop the chrome root carrying the residual zoom on its transform.
+ *
+ * The subtree is laid out at half-octave zoom steps and the root scales by
+ * `zoom / rasterZoom` to make up the difference, on the premise that the
+ * compositor then rescales a texture it already has. An iPad timeline says it
+ * does not: the subtree still repainted on 56 of 60 zoom frames, at 42.0ms of
+ * compositing against 8.4ms for the four that did not, with no style recalc or
+ * layout in the subtree to account for it — and the tiles came back 512px wide
+ * on some frames and 524px on others, which is one grid rasterized at scales
+ * 2.4% apart rather than a grid that changed size.
+ *
+ * A rectangle already answered the narrow version of this and answered it no:
+ * eight promoted, shadowed, page-sized layers rescaled every frame measured
+ * 19.04ms against 18.82ms for eight that were never rescaled, inside a 2.11ms
+ * spread. But that rect is a leaf, and the chrome root is not — it wraps an
+ * inner viewport carrying `zoom: devicePixelRatio` and a nested `scale()`, and
+ * keeping *that* crisp across a changing ancestor scale is a different job from
+ * keeping a flat fill crisp. This ablation asks the question of the real thing.
+ *
+ * Patched onto the prototype rather than written over the element afterwards.
+ * The transform is authored by the DOM layer's own animation loop, which
+ * registers after the bench's and therefore writes last; anything written from
+ * outside would be overwritten before the frame was composited. Running inside
+ * the call makes write order irrelevant.
+ *
+ * The original still writes the scaled transform first, so the layer takes two
+ * transform writes per frame instead of one. Both are transform-only writes on
+ * a promoted layer, which the rectangle above priced at nothing.
+ *
+ * With this on, the frame renders up to 41% small between steps and snaps at
+ * each one. That is wrong on screen and expected: it is what a subtree that is
+ * never rescaled looks like.
+ */
+export function pinChromeRasterScale(): void {
+  if (rasterScalePinned) {
+    return;
+  }
+  rasterScalePinned = true;
+
+  const original = FrameChrome.prototype.sync;
+  FrameChrome.prototype.sync = function pinned(
+    this: FrameChrome,
+    params: Parameters<typeof original>[0],
+  ): void {
+    original.call(this, params);
+    const transform = this.root.style.transform;
+    const translateOnly = transform.replace(/\s*scale\([^)]*\)\s*$/, '');
+    if (translateOnly === transform) {
+      // Nothing was stripped, so this row is measuring the shipped behaviour
+      // under a label that says otherwise — a "no difference" result that means
+      // the ablation broke, not that the scale is free. The chrome would have
+      // to have changed how it writes the transform for this to happen; fail
+      // the run rather than report a number that reads like an answer.
+      throw new Error(
+        `bench: chrome transform carried no scale to pin ("${transform}")`,
+      );
+    }
+    this.root.style.transform = translateOnly;
+  };
 }
 
 export function promotePageFrameViewports(): void {

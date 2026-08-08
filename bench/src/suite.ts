@@ -144,15 +144,20 @@ export const SUITES: Record<string, SuiteCase[]> = {
    * has to be repainted at the new one. The rows separate the two things that
    * do that: the background tiling, and the page-frame chrome.
    *
-   * The two `dot background` rows are one layer painted two ways, and the gap
-   * between them is what painting it at zoom steps is worth. It is here because
-   * WebKit reports no raster counts to JavaScript: subtracting two runs is the
-   * only way the device can price a change that a Chrome trace found, and a
-   * Chrome trace has priced this particular layer wrong before.
+   * The first two rows no longer differ, and are kept as the check that they
+   * don't. The background layer is now taken out of the tree for the length of
+   * a zoom — it is wider than the viewport, so it is tiled, and a tiled layer
+   * is re-rasterized as its contents scale drifts no matter what size its
+   * pattern is painted at. So `blank` and `dots` are the same layer state here,
+   * and the `bgRaster` knob decides nothing during this gesture. A gap opening
+   * up between these two rows means the takedown stopped working.
    */
   zoom: [
     { label: 'canvas only, blank', params: { layers: 'all', bg: 'blank' } },
-    { label: '+ dot background', params: { layers: 'all', bg: 'dots' } },
+    {
+      label: '+ dot background (should match)',
+      params: { layers: 'all', bg: 'dots' },
+    },
     {
       label: '+ 1 page frame',
       params: {
@@ -230,6 +235,97 @@ export const SUITES: Record<string, SuiteCase[]> = {
         pages: '1',
         domLayer: '1',
         frameEditor: '0',
+      },
+    },
+    // The last two rows are one question, asked of a rectangle instead of a
+    // page frame: does a promoted layer repaint because its transform scale
+    // changed, with nothing about its layout changing?
+    //
+    // That is what the shipped chrome now does between zoom steps, and an iPad
+    // timeline says the subtree still repaints on 56 of 60 zoom frames — 42.0ms
+    // of compositing on those against 8.4ms on the four that do not — with no
+    // style recalc or layout in the subtree to explain it. If that is the
+    // residual scale, `stepped` costs what a repaint costs and `held` does not,
+    // and laying the chrome out at steps cannot be made to work as designed.
+    // If the two read the same, the repaint has some other cause and the page
+    // frame rows above are where to keep looking.
+    //
+    // No page frame in the scene: the rectangle is the only page-sized thing on
+    // screen, so nothing else can absorb or explain the difference.
+    //
+    // Do not read this pair locally — it has been run. Chromium's compositor
+    // holds a raster scale across a changing transform and only re-rasters once
+    // the scale has drifted far enough, which is the behaviour in question, so
+    // the backend cannot rule it in or out. At one rect it reported no gap at
+    // all (2.33 vs 2.16 `DisplayItemList::Raster` per frame); at eight it leans
+    // the right way but nowhere near enough to call (8.88 vs 7.38, with the
+    // milliseconds inside the noise). This pair is for the device.
+    // Eight stacked rects, not one. The first device run put both at 16.65 and
+    // 16.66 with spreads of 0.02 and 0.00 — the 60fps cap, which reports that
+    // one page-sized rect is cheap and nothing else. Stacking them multiplies
+    // the raster without moving the geometry, so the pair clears the cap and
+    // the difference between them, if there is one, has room to show. Override
+    // with `?pages=16` on the URL if eight still reads 16.6x; no rebuild.
+    //
+    // ANSWERED, NO: 19.04ms rescaled against 18.82ms never rescaled, inside a
+    // 2.11ms spread, and both only ~2.2ms above the blank-canvas baseline's
+    // paint. Rescaling a promoted layer every frame costs nothing here.
+    //
+    // Kept, because the answer is only as wide as the control. These rects are
+    // leaves. The chrome root wraps an inner viewport carrying `zoom:
+    // devicePixelRatio` and a nested `scale()`, and holding that crisp across a
+    // changing ancestor scale is not the same job as holding a flat fill crisp.
+    // The last pair below asks the same question of the real subtree.
+    {
+      label: '  8 rects, stepped + rescaled (= the chrome)',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'empty',
+        plainFrame: 'stepped',
+        pages: '8',
+      },
+    },
+    {
+      label: '  8 rects, stepped, never rescaled',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'empty',
+        plainFrame: 'held',
+        pages: '8',
+      },
+    },
+    // The same question, asked of the real subtree instead of a rectangle.
+    //
+    // Three frames rather than one for the same reason the rects are stacked:
+    // one page frame reads 16.9ms, which is the cap and not a measurement.
+    // Three was 41.98ms when it was last measured on this device, so the pair
+    // has room.
+    //
+    // The second row keeps the layout on zoom steps and takes the residual off
+    // the root's transform, so nothing about the subtree changes between steps
+    // at all. It renders up to 41% small and snaps at each step — wrong on
+    // screen, and the point.
+    {
+      label: '+ 3 page frames',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '3',
+        domLayer: '1',
+      },
+    },
+    {
+      label: '  same, chrome never rescaled',
+      params: {
+        layers: 'all',
+        bg: 'dots',
+        scene: 'pageframe',
+        pages: '3',
+        domLayer: '1',
+        chromeRescaled: '0',
       },
     },
   ],

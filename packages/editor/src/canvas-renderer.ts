@@ -24,6 +24,64 @@ export const BG_TILE_SIZE = 24;
 const BG_OVERDRAW_PX = BG_TILE_SIZE * MAX_ZOOM;
 
 /**
+ * Frames of continuous zoom change before the background layer is taken down,
+ * and how long the zoom has to hold still before it comes back.
+ *
+ * The layer is wider than the viewport, so WebKit backs it with a tile grid,
+ * and a tile grid is re-rasterized when the layer's contents scale drifts —
+ * which the residual on its transform does, continuously, for the whole of a
+ * pinch. Profiled on an iPad mid-zoom, the frames that re-rasterized it cost
+ * 40.4ms against 19.3ms for the frames that did not, and they were a seventh of
+ * the frames but a quarter of the elapsed time. Painting the tiling at zoom
+ * steps stopped the *pattern* being redrawn per frame; it could never stop the
+ * layer being re-rastered, because that follows the scale and not the pattern.
+ *
+ * A layer that is not in the tree cannot be rasterized at all, so it comes out
+ * for the duration of the gesture. The frame count is what keeps a single wheel
+ * notch — which changes the zoom once and is over — from flickering the grid;
+ * only a sustained zoom reaches it. The settle window covers the gap between
+ * two notches of the same trackpad gesture.
+ */
+const BG_ZOOM_GESTURE_FRAMES = 3;
+const BG_ZOOM_SETTLE_MS = 150;
+
+export interface ZoomGestureState {
+  lastZoom: number;
+  changedAt: number;
+  run: number;
+}
+
+export function createZoomGestureState(): ZoomGestureState {
+  return { lastZoom: Number.NaN, changedAt: 0, run: 0 };
+}
+
+/**
+ * Whether the zoom is mid-gesture, from nothing but the value it had on the
+ * previous frames.
+ *
+ * Deliberately not asked of the viewport. A pinch, a trackpad zoom and an
+ * animated view transition all have different starts and only one of them has
+ * an end event, so gesture state would have to be threaded from three places
+ * and would still miss the interrupted cases. The zoom's own behaviour over
+ * time says the same thing and cannot get stuck: if nothing is changing it,
+ * this reads false within {@link BG_ZOOM_SETTLE_MS} no matter how it got here.
+ */
+export function isZoomGestureActive(
+  state: ZoomGestureState,
+  zoom: number,
+  now: number,
+): boolean {
+  if (zoom !== state.lastZoom) {
+    state.lastZoom = zoom;
+    state.changedAt = now;
+    state.run += 1;
+  } else if (now - state.changedAt >= BG_ZOOM_SETTLE_MS) {
+    state.run = 0;
+  }
+  return state.run >= BG_ZOOM_GESTURE_FRAMES;
+}
+
+/**
  * The offset to translate the background layer by, given how far the view has
  * panned. The pattern repeats every tile, so shifting by a whole tile is
  * invisible and only the remainder has to be applied.
@@ -111,6 +169,24 @@ export class CanvasRenderer {
   private bgLastRasterZoom = Number.NaN;
   private bgLastTransform = '';
 
+  /** Zoom-gesture tracking for the layer's takedown. @see BG_ZOOM_SETTLE_MS */
+  private readonly bgZoomGesture = createZoomGestureState();
+  private bgTakenDown = false;
+
+  /**
+   * Whether the last frame left anything on the overlay canvas.
+   *
+   * Nothing is selected for most of a session, and `clearRect` on a
+   * full-viewport canvas invalidates its layer just as thoroughly as drawing
+   * into it does — the compositor then re-rasterizes and re-uploads the whole
+   * thing for a frame that ends up transparent. Profiled on an iPad, the two
+   * canvases repainted 12 tiles between them on every frame including idle
+   * ones, and the pair cost ~11ms of compositing per frame. Skipping the clear
+   * when the overlay was already empty and stays empty removes half of that
+   * from every frame with no selection, panning and zooming included.
+   */
+  private overlayHasContent = false;
+
   public constructor(
     foregroundCtx: CanvasRenderingContext2D,
     foregroundCanvas: HTMLCanvasElement,
@@ -161,6 +237,10 @@ export class CanvasRenderer {
     // which is the entire cost this layer exists to avoid — and the promotion
     // has to be standing, not decided on the first frame of a pan.
     host.style.willChange = 'transform';
+    // A host adopted while a previous renderer had the layer down would stay
+    // down: nothing else ever clears this, and `bgTakenDown` starts false.
+    host.style.display = '';
+    this.bgTakenDown = false;
     this.setBackgroundStyle(this.bgStyle);
   }
 
@@ -228,7 +308,16 @@ export class CanvasRenderer {
     // Overlay canvas: selection outline + handles. Always above DOM chrome
     // so selection stays visible while a page frame is being edited (the
     // foreground canvas is lowered below chrome in that mode).
-    if (this.overlayCtx && this.overlayCanvas) {
+    // Read after the draw loop above, which is what advances `selectionT` from
+    // zero on the frame an element is selected.
+    const overlayHasContent = elements.some(
+      (element) => element.hasSelectionOverlay,
+    );
+    if (
+      this.overlayCtx &&
+      this.overlayCanvas &&
+      (overlayHasContent || this.overlayHasContent)
+    ) {
       const overlayW = this.overlayCanvas.width / dpr;
       const overlayH = this.overlayCanvas.height / dpr;
       this.overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -243,6 +332,7 @@ export class CanvasRenderer {
         );
       }
       this.overlayCtx.restore();
+      this.overlayHasContent = overlayHasContent;
     }
 
     if (domOverlayHost) {
@@ -265,15 +355,33 @@ export class CanvasRenderer {
    *
    * A pan is a translate of the already-painted tiling — no repaint, no
    * rasterization, no texture upload; the compositor moves an existing layer.
-   * Only a zoom resizes the tiles, and that is the one case that repaints.
    * Styles are written only when the value they encode actually changed, since
    * assigning an identical string still dirties the element.
+   *
+   * A zoom is the case this cannot win, so for the length of one the layer is
+   * taken out of the tree instead. @see BG_ZOOM_SETTLE_MS
    */
   private syncBackground(zoom: number, offset: Vector2): void {
     const host = this.bgHost;
     if (!host) {
       return;
     }
+
+    const zooming = isZoomGestureActive(
+      this.bgZoomGesture,
+      zoom,
+      performance.now(),
+    );
+    if (zooming !== this.bgTakenDown) {
+      host.style.display = zooming ? 'none' : '';
+      this.bgTakenDown = zooming;
+    }
+    if (zooming) {
+      // Nothing below this would be visible, and writing it would only dirty an
+      // element that is about to be laid out again when the gesture ends.
+      return;
+    }
+
     const rasterZoom = quantizeRasterZoom(zoom);
     if (rasterZoom !== this.bgLastRasterZoom) {
       const painted = BG_TILE_SIZE * rasterZoom;
