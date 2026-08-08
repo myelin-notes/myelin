@@ -25,7 +25,13 @@ const BUILD_ID = new Date().toISOString().slice(11, 19);
 
 export default defineConfig({
   root: __dirname,
-  define: { __BENCH_BUILD__: JSON.stringify(BUILD_ID) },
+  define: {
+    __BENCH_BUILD__: JSON.stringify(BUILD_ID),
+    // The bench stands in for the tablet build, which is the only one that
+    // takes the background layer down during a zoom. Unset, every zoom case
+    // would silently measure a configuration no tablet runs.
+    __MOBILE_BUILD__: 'true',
+  },
   plugins: [react(), tailwindcss(), resultSink(__dirname)],
   resolve: {
     alias: {

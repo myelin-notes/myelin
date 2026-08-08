@@ -1,6 +1,7 @@
 import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
 import { type CanvasViewport, MAX_ZOOM } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
+import { IS_MOBILE_BUILD } from './env';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
 import { quantizeRasterZoom } from './raster-zoom';
@@ -24,23 +25,15 @@ export const BG_TILE_SIZE = 24;
 const BG_OVERDRAW_PX = BG_TILE_SIZE * MAX_ZOOM;
 
 /**
- * Frames of continuous zoom change before the background layer is taken down,
- * and how long the zoom has to hold still before it comes back.
+ * Frames of sustained zoom before the background layer leaves the tree, and how
+ * long the zoom must hold still before it returns.
  *
- * The layer is wider than the viewport, so WebKit backs it with a tile grid,
- * and a tile grid is re-rasterized when the layer's contents scale drifts —
- * which the residual on its transform does, continuously, for the whole of a
- * pinch. Profiled on an iPad mid-zoom, the frames that re-rasterized it cost
- * 40.4ms against 19.3ms for the frames that did not, and they were a seventh of
- * the frames but a quarter of the elapsed time. Painting the tiling at zoom
- * steps stopped the *pattern* being redrawn per frame; it could never stop the
- * layer being re-rastered, because that follows the scale and not the pattern.
- *
- * A layer that is not in the tree cannot be rasterized at all, so it comes out
- * for the duration of the gesture. The frame count is what keeps a single wheel
- * notch — which changes the zoom once and is over — from flickering the grid;
- * only a sustained zoom reaches it. The settle window covers the gap between
- * two notches of the same trackpad gesture.
+ * The layer is wider than the viewport, so WebKit tiles it, and a tiled layer
+ * re-rasterizes as its contents scale drifts — which the residual on its
+ * transform does for the whole of a pinch, whatever size the pattern is painted
+ * at. On an iPad the frames that re-rastered it cost 40.4ms against 19.3ms for
+ * the frames that didn't. The frame count keeps a single wheel notch from
+ * flickering the grid; the settle window bridges two notches of one gesture.
  */
 const BG_ZOOM_GESTURE_FRAMES = 3;
 const BG_ZOOM_SETTLE_MS = 150;
@@ -56,15 +49,11 @@ export function createZoomGestureState(): ZoomGestureState {
 }
 
 /**
- * Whether the zoom is mid-gesture, from nothing but the value it had on the
- * previous frames.
+ * Whether the zoom is mid-gesture, from nothing but its value on earlier frames.
  *
- * Deliberately not asked of the viewport. A pinch, a trackpad zoom and an
- * animated view transition all have different starts and only one of them has
- * an end event, so gesture state would have to be threaded from three places
- * and would still miss the interrupted cases. The zoom's own behaviour over
- * time says the same thing and cannot get stuck: if nothing is changing it,
- * this reads false within {@link BG_ZOOM_SETTLE_MS} no matter how it got here.
+ * Not asked of the viewport: a pinch, a trackpad zoom and an animated
+ * transition have three different starts and only one has an end event, so
+ * reading it off the zoom itself is both simpler and impossible to get stuck.
  */
 export function isZoomGestureActive(
   state: ZoomGestureState,
@@ -176,14 +165,10 @@ export class CanvasRenderer {
   /**
    * Whether the last frame left anything on the overlay canvas.
    *
-   * Nothing is selected for most of a session, and `clearRect` on a
-   * full-viewport canvas invalidates its layer just as thoroughly as drawing
-   * into it does — the compositor then re-rasterizes and re-uploads the whole
-   * thing for a frame that ends up transparent. Profiled on an iPad, the two
-   * canvases repainted 12 tiles between them on every frame including idle
-   * ones, and the pair cost ~11ms of compositing per frame. Skipping the clear
-   * when the overlay was already empty and stays empty removes half of that
-   * from every frame with no selection, panning and zooming included.
+   * `clearRect` on a full-viewport canvas invalidates its layer as thoroughly
+   * as drawing does, so an unconditional clear re-uploads the whole thing for a
+   * frame that ends up transparent — and nothing is selected for most of a
+   * session. On an iPad that was half of ~11ms of compositing per frame.
    */
   private overlayHasContent = false;
 
@@ -237,8 +222,7 @@ export class CanvasRenderer {
     // which is the entire cost this layer exists to avoid — and the promotion
     // has to be standing, not decided on the first frame of a pan.
     host.style.willChange = 'transform';
-    // A host adopted while a previous renderer had the layer down would stay
-    // down: nothing else ever clears this, and `bgTakenDown` starts false.
+    // A host adopted mid-takedown would otherwise stay hidden forever.
     host.style.display = '';
     this.bgTakenDown = false;
     this.setBackgroundStyle(this.bgStyle);
@@ -358,8 +342,8 @@ export class CanvasRenderer {
    * Styles are written only when the value they encode actually changed, since
    * assigning an identical string still dirties the element.
    *
-   * A zoom is the case this cannot win, so for the length of one the layer is
-   * taken out of the tree instead. @see BG_ZOOM_SETTLE_MS
+   * A zoom is the case this cannot win, so on tablet builds the layer is taken
+   * out of the tree for the length of one. @see BG_ZOOM_SETTLE_MS
    */
   private syncBackground(zoom: number, offset: Vector2): void {
     const host = this.bgHost;
@@ -367,18 +351,16 @@ export class CanvasRenderer {
       return;
     }
 
-    const zooming = isZoomGestureActive(
-      this.bgZoomGesture,
-      zoom,
-      performance.now(),
-    );
+    const zooming =
+      IS_MOBILE_BUILD &&
+      isZoomGestureActive(this.bgZoomGesture, zoom, performance.now());
     if (zooming !== this.bgTakenDown) {
       host.style.display = zooming ? 'none' : '';
       this.bgTakenDown = zooming;
     }
     if (zooming) {
-      // Nothing below this would be visible, and writing it would only dirty an
-      // element that is about to be laid out again when the gesture ends.
+      // Nothing below would be visible, and writing it only dirties an element
+      // that gets laid out again when the gesture ends.
       return;
     }
 
