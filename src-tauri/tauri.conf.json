@@ -58,6 +58,9 @@
     "macOS": {
       "entitlements": "entitlements.plist",
       "minimumSystemVersion": "10.15"
+    },
+    "iOS": {
+      "developmentTeam": "P4Z946QP26"
     }
   }
 }

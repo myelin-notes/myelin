@@ -1,3 +1,5 @@
 xcuserdata/
 build/
 Externals/
+# Copied from src-tauri/resources/ at build time; ~100MB of models already tracked there.
+/assets/
