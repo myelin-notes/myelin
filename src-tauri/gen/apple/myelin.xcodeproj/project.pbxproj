@@ -346,10 +346,11 @@
 					"-lswiftCompatibilityConcurrency",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.github.wintersteve25.myelin;
-				PRODUCT_NAME = "myelin";
+				PRODUCT_NAME = "Myelin Notes";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
+				DEVELOPMENT_TEAM = "P4Z946QP26";
 			};
 			name = release;
 		};
@@ -384,10 +385,11 @@
 					"-lswiftCompatibilityConcurrency",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.github.wintersteve25.myelin;
-				PRODUCT_NAME = "myelin";
+				PRODUCT_NAME = "Myelin Notes";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
+				DEVELOPMENT_TEAM = "P4Z946QP26";
 			};
 			name = debug;
 		};
