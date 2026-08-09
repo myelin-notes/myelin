@@ -91,7 +91,7 @@ export class CanvasSessionController {
   constructor(
     private readonly repository: ActiveRepository,
     private readonly canvasRef: RefObject<HTMLCanvasElement | null>,
-    private readonly bgCanvasRef: RefObject<HTMLCanvasElement | null>,
+    private readonly bgHostRef: RefObject<HTMLDivElement | null>,
     private readonly overlayCanvasRef: RefObject<HTMLCanvasElement | null>,
     private readonly domOverlayRef: RefObject<HTMLDivElement | null>,
     private readonly drawableCanvasRef: RefObject<DrawableCanvas | null>,
@@ -167,8 +167,8 @@ export class CanvasSessionController {
         this.handlePageFrameRenamed(noteId, uuid, newName);
       });
 
-      if (this.bgCanvasRef.current) {
-        drawableCanvas.setBackgroundCanvas(this.bgCanvasRef.current);
+      if (this.bgHostRef.current) {
+        drawableCanvas.setBackgroundHost(this.bgHostRef.current);
       }
       if (this.overlayCanvasRef.current) {
         drawableCanvas.setOverlayCanvas(this.overlayCanvasRef.current);
@@ -356,7 +356,7 @@ export class CanvasSessionController {
 interface UseCanvasSessionControllerArgs {
   id: VFSNodeId | undefined;
   canvasRef: RefObject<HTMLCanvasElement | null>;
-  bgCanvasRef: RefObject<HTMLCanvasElement | null>;
+  bgHostRef: RefObject<HTMLDivElement | null>;
   overlayCanvasRef: RefObject<HTMLCanvasElement | null>;
   domOverlayRef: RefObject<HTMLDivElement | null>;
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
@@ -366,7 +366,7 @@ interface UseCanvasSessionControllerArgs {
 export function useCanvasSessionController({
   id,
   canvasRef,
-  bgCanvasRef,
+  bgHostRef,
   overlayCanvasRef,
   domOverlayRef,
   drawableCanvasRef,
@@ -382,14 +382,14 @@ export function useCanvasSessionController({
       new CanvasSessionController(
         repository,
         canvasRef,
-        bgCanvasRef,
+        bgHostRef,
         overlayCanvasRef,
         domOverlayRef,
         drawableCanvasRef,
         canvasToolsRef,
       ),
     [
-      bgCanvasRef,
+      bgHostRef,
       canvasRef,
       domOverlayRef,
       drawableCanvasRef,

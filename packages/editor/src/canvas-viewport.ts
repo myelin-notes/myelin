@@ -3,6 +3,13 @@ import type { Vector2 } from './geometry';
 type EditModePanAxis = 'vertical' | 'horizontal';
 
 /**
+ * Zoom bounds. Exported because the background layer sizes its overdraw from
+ * the largest tile it can ever have to show, which is set by MAX_ZOOM.
+ */
+export const MIN_ZOOM = 0.2;
+export const MAX_ZOOM = 3;
+
+/**
  * How much of the viewport a framed rect should fill. A bare number is the
  * width ratio; both ratios given, the tighter one wins.
  */
@@ -344,7 +351,7 @@ export class CanvasViewport {
     return {
       screenW,
       screenH,
-      targetZoom: Math.min(3, Math.max(0.2, unclampedTargetZoom)),
+      targetZoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, unclampedTargetZoom)),
       worldFocus: {
         x: worldRect.x + worldRect.width / 2,
         y: worldRect.y + worldRect.height / 2,
@@ -520,7 +527,7 @@ export class CanvasViewport {
    */
   private zoomAroundPoint(targetZoom: number, screen: Vector2): void {
     const prevZoom = this._zoom;
-    this._zoom = Math.min(3, Math.max(0.2, targetZoom));
+    this._zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetZoom));
 
     const wxBefore = screen.x / prevZoom - this._offset.x;
     const wyBefore = screen.y / prevZoom - this._offset.y;

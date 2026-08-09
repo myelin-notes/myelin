@@ -14,7 +14,12 @@ import {
 } from '../../elements/page-frame-element';
 import { PM_UPDATE_EVENT } from '../../events';
 import { getMessages } from '../../i18n';
+import { quantizeRasterZoom } from '../../raster-zoom';
 import { getDevicePixelRatio } from '../../utils';
+import {
+  removeStyleIfPresent,
+  setStyleIfChanged,
+} from '../../utils/style-cache';
 import type {
   NoteLinkPreview,
   NoteLinkPreviewTarget,
@@ -164,14 +169,26 @@ function syncPageChrome(
   while (refs.pageChromeDivs.length > chromeCount) {
     refs.pageChromeDivs.pop()!.remove();
   }
+  // These are world-space, so they do not change with pan or zoom at all —
+  // only when the page count or page size does.
   for (let p = 0; p < chromeCount; p++) {
-    refs.pageChromeDivs[p].style.left =
-      pageLayout === 'horizontal' ? `${p * (pageWidth + PAGE_GAP)}px` : '0px';
-    refs.pageChromeDivs[p].style.top =
-      pageLayout === 'horizontal' ? '0px' : `${p * (pageHeight + PAGE_GAP)}px`;
-    refs.pageChromeDivs[p].style.width = `${pageWidth}px`;
-    refs.pageChromeDivs[p].style.height =
-      pageLayout === 'continuous' ? `${stripHeight}px` : `${pageHeight}px`;
+    const div = refs.pageChromeDivs[p];
+    setStyleIfChanged(
+      div,
+      'left',
+      pageLayout === 'horizontal' ? `${p * (pageWidth + PAGE_GAP)}px` : '0px',
+    );
+    setStyleIfChanged(
+      div,
+      'top',
+      pageLayout === 'horizontal' ? '0px' : `${p * (pageHeight + PAGE_GAP)}px`,
+    );
+    setStyleIfChanged(div, 'width', `${pageWidth}px`);
+    setStyleIfChanged(
+      div,
+      'height',
+      pageLayout === 'continuous' ? `${stripHeight}px` : `${pageHeight}px`,
+    );
   }
 }
 
@@ -194,24 +211,35 @@ function syncEditorLayout(
     return;
   }
 
+  // Guarded for the same reason as the attribute above: this is the editor's
+  // own root, so an unguarded write — including clearing a property that was
+  // never set — relays out the document on every frame.
   if (pageLayout === 'horizontal') {
     const columnWidth = Math.max(1, pageWidth - PAGE_PADDING * 2);
     const columnHeight = Math.max(1, pageHeight - PAGE_PADDING * 2);
-    editorDom.style.width = `${columnWidth}px`;
-    editorDom.style.height = `${columnHeight}px`;
-    editorDom.style.columnWidth = `${columnWidth}px`;
-    editorDom.style.columnGap = `${PAGE_GAP + PAGE_PADDING * 2}px`;
-    editorDom.style.columnFill = 'auto';
-    editorDom.style.overflow = 'visible';
+    setStyleIfChanged(editorDom, 'width', `${columnWidth}px`);
+    setStyleIfChanged(editorDom, 'height', `${columnHeight}px`);
+    setStyleIfChanged(editorDom, 'column-width', `${columnWidth}px`);
+    setStyleIfChanged(
+      editorDom,
+      'column-gap',
+      `${PAGE_GAP + PAGE_PADDING * 2}px`,
+    );
+    setStyleIfChanged(editorDom, 'column-fill', 'auto');
+    setStyleIfChanged(editorDom, 'overflow', 'visible');
     return;
   }
 
-  editorDom.style.removeProperty('width');
-  editorDom.style.removeProperty('height');
-  editorDom.style.removeProperty('column-width');
-  editorDom.style.removeProperty('column-gap');
-  editorDom.style.removeProperty('column-fill');
-  editorDom.style.removeProperty('overflow');
+  for (const property of [
+    'width',
+    'height',
+    'column-width',
+    'column-gap',
+    'column-fill',
+    'overflow',
+  ]) {
+    removeStyleIfPresent(editorDom, property);
+  }
 }
 
 function createFrameRefs(
@@ -475,11 +503,22 @@ export function PageFrameDomLayer({
           ),
         });
 
-        // Inner frame: screen-sized clip box, lives inside chrome contentSlot
-        // so no extra translate needed — contentSlot positions it.
-        refs.frameDiv.style.width = `${contentWidth * zoom}px`;
-        refs.frameDiv.style.height = `${contentHeight * zoom}px`;
-        refs.frameDiv.style.transform = '';
+        // Inner frame: clip box, positioned by the chrome contentSlot it lives
+        // in, so it needs no translate of its own. Sized for the quantized zoom
+        // rather than the exact one because resizing it repaints the promoted
+        // layer it sits in; at steps, a run of zoom frames reuses one painting.
+        const rasterZoom = quantizeRasterZoom(zoom);
+        setStyleIfChanged(
+          refs.frameDiv,
+          'width',
+          `${contentWidth * rasterZoom}px`,
+        );
+        setStyleIfChanged(
+          refs.frameDiv,
+          'height',
+          `${contentHeight * rasterZoom}px`,
+        );
+        removeStyleIfPresent(refs.frameDiv, 'transform');
 
         // Inner viewport: world-sized. A fixed CSS zoom of devicePixelRatio
         // tells WebKit to rasterise the compositing-layer backing store at
@@ -487,13 +526,31 @@ export function PageFrameDomLayer({
         // Because the zoom value is constant, text metrics and line breaks
         // never change — the variable canvas zoom is handled entirely by
         // transform: scale(), which is a post-layout GPU operation.
+        //
+        // It is not cheap in the abstract: `zoom` scales the layout box, so on
+        // a 2x display one blank page rasterizes ~9.6 megapixels against ~2.8
+        // of visible area. Measured on an iPad it is nonetheless free while
+        // panning — the chrome root is a promoted layer, so a pan moves the
+        // texture rather than redrawing it, and dropping to 1x changed nothing.
+        // It is worth ~5ms per frame only while zooming, which re-rasterizes.
         const dpr = getDevicePixelRatio();
-        refs.viewportDiv.style.width = `${contentWidth}px`;
-        refs.viewportDiv.style.height = `${contentHeight}px`;
-        refs.viewportDiv.style.zoom = `${dpr}`;
-        refs.viewportDiv.style.transform = `scale(${zoom / dpr})`;
+        setStyleIfChanged(refs.viewportDiv, 'width', `${contentWidth}px`);
+        setStyleIfChanged(refs.viewportDiv, 'height', `${contentHeight}px`);
+        setStyleIfChanged(refs.viewportDiv, 'zoom', `${dpr}`);
+        // Quantized, like the boxes above: the chrome root supplies the
+        // remainder, so between two steps this transform holds still and the
+        // subtree it scales is not repainted.
+        setStyleIfChanged(
+          refs.viewportDiv,
+          'transform',
+          `scale(${rasterZoom / dpr})`,
+        );
 
-        refs.frameDiv.style.pointerEvents = frame.editing ? 'auto' : '';
+        if (frame.editing) {
+          setStyleIfChanged(refs.frameDiv, 'pointer-events', 'auto');
+        } else {
+          removeStyleIfPresent(refs.frameDiv, 'pointer-events');
+        }
         // Editing chrome (the math source panel) is display:none while the
         // view animates: painting it mid-zoom roughly doubles the edit-enter
         // frame hitch, and it isn't readable until the camera lands anyway.
@@ -524,21 +581,36 @@ export function PageFrameDomLayer({
 
       removeStaleFrames(frameMap.current, activeFrames);
 
-      // The browser may try to scrollIntoView the focused contentEditable on
-      // its own. Zero those out so they don't accumulate, but DON'T convert
-      // them into a canvas pan — the follow-cursor effect below is the
-      // single source of truth for keeping the caret in view.
-      if (container.scrollTop !== 0 || container.scrollLeft !== 0) {
-        container.scrollTop = 0;
-        container.scrollLeft = 0;
-      }
-
       rafId = requestAnimationFrame(sync);
     }
 
     rafId = requestAnimationFrame(sync);
+
+    // The browser may try to scrollIntoView the focused contentEditable on its
+    // own. Zero those out so they don't accumulate, but DON'T convert them into
+    // a canvas pan — the follow-cursor effect below is the single source of
+    // truth for keeping the caret in view.
+    //
+    // Driven by the scroll event rather than polled from the sync loop. Reading
+    // scrollTop is a geometry read, so polling it right after the loop wrote
+    // the chrome's transform forced a synchronous layout flush on every frame —
+    // write, read, relayout, forever. The event fires only when the container
+    // actually scrolls, which is also sooner than the next frame's poll.
+    const container = containerRef.current;
+    const resetScroll = () => {
+      if (
+        container &&
+        (container.scrollTop !== 0 || container.scrollLeft !== 0)
+      ) {
+        container.scrollTop = 0;
+        container.scrollLeft = 0;
+      }
+    };
+    container?.addEventListener('scroll', resetScroll);
+
     return () => {
       cancelAnimationFrame(rafId);
+      container?.removeEventListener('scroll', resetScroll);
       for (const refs of frameMap.current.values()) {
         disposeFrameRefs(refs);
       }

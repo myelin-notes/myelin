@@ -21,7 +21,7 @@ interface UseCanvasEngineArgs {
   id: VFSNodeId | undefined;
   thumbnailRootRef: React.RefObject<HTMLElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  bgCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  bgHostRef: React.RefObject<HTMLDivElement | null>;
   overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   domOverlayRef: React.RefObject<HTMLDivElement | null>;
   wheelRef: React.RefObject<WheelPickerHandle | null>;
@@ -38,7 +38,7 @@ export function useCanvasEngine({
   id,
   thumbnailRootRef,
   canvasRef,
-  bgCanvasRef,
+  bgHostRef,
   overlayCanvasRef,
   domOverlayRef,
   wheelRef,
@@ -65,7 +65,7 @@ export function useCanvasEngine({
   const sessionController = useCanvasSessionController({
     id,
     canvasRef,
-    bgCanvasRef,
+    bgHostRef,
     overlayCanvasRef,
     domOverlayRef,
     drawableCanvasRef,

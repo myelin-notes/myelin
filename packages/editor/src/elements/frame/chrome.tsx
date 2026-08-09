@@ -11,6 +11,8 @@ import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { type ChromeMenuItem, openChromeMenu } from '../../chrome-menu';
 import { getMessages } from '../../i18n';
+import { quantizeRasterZoom } from '../../raster-zoom';
+import { setStyleIfChanged } from '../../utils/style-cache';
 import {
   CHROME_BOTTOM_PADDING,
   CHROME_CORNER_RADIUS,
@@ -67,6 +69,7 @@ export class FrameChrome {
       pointerEvents: 'none',
       overflow: 'visible',
       borderRadius: `${CHROME_CORNER_RADIUS}px`,
+      willChange: 'transform',
     } as Partial<CSSStyleDeclaration>);
     this.root.dataset.frameChrome = 'true';
 
@@ -87,6 +90,7 @@ export class FrameChrome {
       transformOrigin: '0 0',
       pointerEvents: 'auto',
       visibility: 'hidden',
+      willChange: 'transform',
     } as Partial<CSSStyleDeclaration>);
 
     getFrameChromeControlsLayer()?.appendChild(this.controlsSlot);
@@ -135,23 +139,51 @@ export class FrameChrome {
     const rootX = screenX - CHROME_SIDE_PADDING * zoom;
     const rootY = screenY - CHROME_HEADER_HEIGHT * zoom;
 
-    this.root.style.transform = `translate(${rootX}px, ${rootY}px)`;
-    this.root.style.width = `${chromeWidth * zoom}px`;
-    this.root.style.height = `${chromeHeight * zoom}px`;
-    this.root.style.borderRadius = `${CHROME_CORNER_RADIUS * zoom}px`;
+    // Sizing this subtree to the exact zoom repaints the whole promoted layer
+    // on every zoom frame (4.5ms panning vs 14.63ms zooming on an iPad), so it
+    // is laid out at a quantized zoom and the root carries the remainder as a
+    // scale. Positions stay on the exact zoom: a translate is free, and they
+    // must stay pixel-accurate against the canvas beneath.
+    const rasterZoom = quantizeRasterZoom(zoom);
+    const residual = zoom / rasterZoom;
+
+    setStyleIfChanged(
+      this.root,
+      'transform',
+      `translate(${rootX}px, ${rootY}px) scale(${residual})`,
+    );
+    setStyleIfChanged(this.root, 'width', `${chromeWidth * rasterZoom}px`);
+    setStyleIfChanged(this.root, 'height', `${chromeHeight * rasterZoom}px`);
+    setStyleIfChanged(
+      this.root,
+      'border-radius',
+      `${CHROME_CORNER_RADIUS * rasterZoom}px`,
+    );
     // Imperative writes on the header elements themselves — NOT custom
     // properties on this.root: the root is an ancestor of the whole editor
     // subtree, and inherited custom-property changes there forced a
     // full-subtree style recalc on every zoom frame.
     this.viewRef.current?.syncHeaderGeometry({
-      headerHeight: CHROME_HEADER_HEIGHT * zoom,
+      headerHeight: CHROME_HEADER_HEIGHT * rasterZoom,
       innerWidth: chromeWidth,
-      zoom,
+      zoom: rasterZoom,
     });
 
-    this.contentSlot.style.transform = `translate(${CHROME_SIDE_PADDING * zoom}px, ${CHROME_HEADER_HEIGHT * zoom}px)`;
-    this.contentSlot.style.width = `${contentWidth * zoom}px`;
-    this.contentSlot.style.height = `${contentHeight * zoom}px`;
+    setStyleIfChanged(
+      this.contentSlot,
+      'transform',
+      `translate(${CHROME_SIDE_PADDING * rasterZoom}px, ${CHROME_HEADER_HEIGHT * rasterZoom}px)`,
+    );
+    setStyleIfChanged(
+      this.contentSlot,
+      'width',
+      `${contentWidth * rasterZoom}px`,
+    );
+    setStyleIfChanged(
+      this.contentSlot,
+      'height',
+      `${contentHeight * rasterZoom}px`,
+    );
 
     const buttonRect = getFrameChromeMenuButtonRect({
       screenX,
@@ -159,12 +191,19 @@ export class FrameChrome {
       contentWidth,
       zoom,
     });
-    this.controlsSlot.style.visibility =
-      params.controlsVisible === false ? 'hidden' : 'visible';
-    this.controlsSlot.style.transform = `translate(${buttonRect.left}px, ${buttonRect.top}px)`;
-    this.controlsSlot.style.width = `${buttonRect.size}px`;
-    this.controlsSlot.style.height = `${buttonRect.size}px`;
-    this.controlsSlot.style.borderRadius = `${10 * zoom}px`;
+    setStyleIfChanged(
+      this.controlsSlot,
+      'visibility',
+      params.controlsVisible === false ? 'hidden' : 'visible',
+    );
+    setStyleIfChanged(
+      this.controlsSlot,
+      'transform',
+      `translate(${buttonRect.left}px, ${buttonRect.top}px)`,
+    );
+    setStyleIfChanged(this.controlsSlot, 'width', `${buttonRect.size}px`);
+    setStyleIfChanged(this.controlsSlot, 'height', `${buttonRect.size}px`);
+    setStyleIfChanged(this.controlsSlot, 'border-radius', `${10 * zoom}px`);
   }
 
   public dispose(): void {

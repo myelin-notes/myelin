@@ -26,9 +26,15 @@ const SELECTION_RADIUS = 4;
 const SELECTION_ANIM_SPEED = 8;
 
 // Screen-space radius (px) for grabbing a resize handle, divided by zoom to get
-// a world-space tolerance. Shared by every consumer of `hitHandle` so the grab
-// target stays identical wherever a resize can start.
+// a world-space tolerance. Shared by every mouse/pen consumer of `hitHandle` so
+// the grab target stays identical wherever a resize can start.
 const HANDLE_HIT_RADIUS = 10;
+
+// The same target for a fingertip, which lands far less precisely than a cursor
+// and covers the handle it is aiming at. 10px is close to unhittable by touch;
+// this is nearer the ~44pt Apple asks for. Touch call sites opt in through
+// `hitHandle`, so mouse and pen keep the tighter radius.
+export const HANDLE_TOUCH_HIT_RADIUS = 22;
 
 export const MIN_SCALE = 0.05;
 
@@ -240,6 +246,15 @@ export abstract class DrawableElement {
    */
   public drawThumbnail(ctx: CanvasRenderingContext2D, deltaTime: number): void {
     this.draw2D(ctx, deltaTime);
+  }
+
+  /**
+   * Whether `drawSelectionOverlay` would put anything on the overlay canvas.
+   * Exactly the condition that method early-returns on, so the renderer can
+   * decide whether the overlay has to be touched at all this frame.
+   */
+  public get hasSelectionOverlay(): boolean {
+    return !this._hidden && this.selectionT > 0;
   }
 
   /**
@@ -484,17 +499,33 @@ export abstract class DrawableElement {
     return result;
   }
 
-  /** The resize handle under `point` (world space), or null if none. */
-  public hitHandle(point: Vector2, zoom: number): ResizeHandle | null {
-    const hitRadius = HANDLE_HIT_RADIUS / zoom;
+  /**
+   * The resize handle under `point` (world space), or null if none. Pass
+   * `touch` for finger input, which grabs with the larger radius.
+   */
+  public hitHandle(
+    point: Vector2,
+    zoom: number,
+    touch = false,
+  ): ResizeHandle | null {
+    const hitRadius =
+      (touch ? HANDLE_TOUCH_HIT_RADIUS : HANDLE_HIT_RADIUS) / zoom;
+    // Nearest match, not first: on an element small enough that the radius
+    // spans neighbouring handles, taking whichever `getHandles` happens to list
+    // first would resize along the wrong axis (a corner grab turning into a
+    // horizontal-only stretch).
+    let best: ResizeHandle | null = null;
+    let bestDistSq = hitRadius * hitRadius;
     for (const h of this.getHandles()) {
       const dx = point.x - h.position.x;
       const dy = point.y - h.position.y;
-      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
-        return h;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= bestDistSq) {
+        best = h;
+        bestDistSq = distSq;
       }
     }
-    return null;
+    return best;
   }
 
   /**
