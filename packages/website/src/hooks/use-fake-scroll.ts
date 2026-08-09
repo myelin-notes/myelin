@@ -6,24 +6,10 @@ import {
   useState,
 } from 'react';
 
-/** Wheel distance (px) that moves the camera exactly one scene. */
-const SCROLL_PER_SCENE = 600;
-/**
- * Time constant (ms) of the exponential smoothing that pulls the rendered
- * position toward the raw scroll value. Mouse wheels arrive as coarse notches
- * and rail/keyboard jumps arrive all at once; smoothing turns both into a
- * continuous glide without ever holding input back.
- */
-const SMOOTHING_TAU_MS = 120;
-/** Remaining travel (in scenes) at which we land exactly and stop the loop. */
-const SETTLE_EPSILON = 0.0005;
-/**
- * How close (in scenes) the wheel has to stop to the scene it is heading
- * toward for that scene to pull it the rest of the way in.
- */
-const SNAP_RANGE = 0.25;
-/** Quiet time after the last wheel event before the magnet is allowed to act. */
-const SNAP_IDLE_MS = 160;
+/** Accumulated wheel distance (px) that counts as one scene step. */
+const STEP_THRESHOLD = 150;
+/** Ignore further wheel input while the camera flies to the new scene. */
+const STEP_COOLDOWN_MS = 620;
 
 interface FakeScrollOptions {
   sceneCount: number;
@@ -32,18 +18,13 @@ interface FakeScrollOptions {
    * the engine routes wheel to scrolling it, or a toolbar menu is open).
    */
   isBlocked: () => boolean;
-  /** Called each frame with the current position, in fractional scene units. */
-  onScroll: (progress: number) => void;
+  onIndexChange: (index: number) => void;
 }
 
 /**
  * The site's fake scroll: there is no scrollable document, only a virtual
- * scroll value accumulated from wheel/keyboard input. That value is continuous
- * — scene 2.4 is a real position, 40% of the way from scene 2 to scene 3 — and
- * the caller interpolates the camera to match, so the view tracks the wheel
- * instead of stepping between fixed stops. Scenes are lightly magnetic in the
- * direction of travel: stop the wheel just short of the scene you are heading
- * for and it pulls you the rest of the way in.
+ * scroll value accumulated from wheel/keyboard input. Crossing a threshold
+ * advances the active scene, which the caller translates into a camera move.
  *
  * Wheel is intercepted in the capture phase so the canvas viewport (which
  * otherwise wheel-pans) never sees it; ctrl+wheel / trackpad pinch is passed
@@ -53,86 +34,29 @@ interface FakeScrollOptions {
 export function useFakeScroll({
   sceneCount,
   isBlocked,
-  onScroll,
+  onIndexChange,
 }: FakeScrollOptions) {
   const [index, setIndex] = useState(0);
-  /** Rendered position; trails `targetRef` by the smoothing time constant. */
-  const progressRef = useRef(0);
-  /** Raw scroll value: where the input has asked to be, un-smoothed. */
-  const targetRef = useRef(0);
-  const rafRef = useRef(0);
-  const lastFrameRef = useRef(0);
-  const snapTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
-  /** Sign of the most recent wheel delta; the magnet only pulls this way. */
-  const scrollDirRef = useRef(1);
+  const indexRef = useRef(0);
+  const accumulatedRef = useRef(0);
+  const cooldownUntilRef = useRef(0);
 
-  const emit = useEffectEvent(onScroll);
+  const notify = useEffectEvent(onIndexChange);
   const blocked = useEffectEvent(isBlocked);
-
-  // Runs only while the rendered position is catching up, so the page is idle
-  // whenever nobody is scrolling.
-  const startLoop = useCallback(() => {
-    if (rafRef.current) {
-      return;
-    }
-    lastFrameRef.current = performance.now();
-    const step = (now: number) => {
-      // Clamped so a backgrounded tab doesn't resume with one huge jump.
-      const dt = Math.min(64, now - lastFrameRef.current);
-      lastFrameRef.current = now;
-
-      const remaining = targetRef.current - progressRef.current;
-      const settled = Math.abs(remaining) < SETTLE_EPSILON;
-      progressRef.current = settled
-        ? targetRef.current
-        : progressRef.current +
-          remaining * (1 - Math.exp(-dt / SMOOTHING_TAU_MS));
-
-      emit(progressRef.current);
-      setIndex(Math.round(progressRef.current));
-
-      rafRef.current = settled ? 0 : requestAnimationFrame(step);
-    };
-    rafRef.current = requestAnimationFrame(step);
-  }, []);
 
   const goTo = useCallback(
     (target: number) => {
-      clearTimeout(snapTimerRef.current);
-      targetRef.current = Math.max(0, Math.min(sceneCount - 1, target));
-      // Started even when the target is unchanged: re-selecting the current
+      const next = Math.max(0, Math.min(sceneCount - 1, target));
+      accumulatedRef.current = 0;
+      cooldownUntilRef.current = performance.now() + STEP_COOLDOWN_MS;
+      indexRef.current = next;
+      setIndex(next);
+      // Notify even when the index is unchanged: re-selecting the current
       // scene re-centers the camera after the visitor panned away.
-      startLoop();
+      notify(next);
     },
-    [sceneCount, startLoop],
+    [sceneCount],
   );
-
-  /**
-   * Once the wheel goes quiet, let the scene the visitor was heading toward
-   * pull the position the rest of the way in — never the one they just left.
-   * A magnet that also pulled backwards would undo a small overshoot by
-   * reversing the visitor's own scroll, which reads as the page fighting them.
-   * Retargets rather than jumps, so the same smoothing that carried the scroll
-   * also carries the snap.
-   */
-  const snapAlongTravel = useCallback(() => {
-    const ahead =
-      scrollDirRef.current > 0
-        ? Math.ceil(targetRef.current)
-        : Math.floor(targetRef.current);
-    if (Math.abs(ahead - targetRef.current) <= SNAP_RANGE) {
-      goTo(ahead);
-    }
-  }, [goTo]);
-
-  useEffect(() => {
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      clearTimeout(snapTimerRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     const handleWheel = (evt: WheelEvent) => {
@@ -149,15 +73,31 @@ export function useFakeScroll({
       evt.preventDefault();
       evt.stopPropagation();
 
+      const now = performance.now();
+      if (now < cooldownUntilRef.current) {
+        return;
+      }
       const delta =
         evt.deltaMode === WheelEvent.DOM_DELTA_LINE
           ? evt.deltaY * 16
           : evt.deltaY;
-      if (delta !== 0) {
-        scrollDirRef.current = Math.sign(delta);
+      if (Math.sign(delta) !== Math.sign(accumulatedRef.current)) {
+        accumulatedRef.current = 0;
       }
-      goTo(targetRef.current + delta / SCROLL_PER_SCENE);
-      snapTimerRef.current = setTimeout(snapAlongTravel, SNAP_IDLE_MS);
+      accumulatedRef.current += delta;
+      if (Math.abs(accumulatedRef.current) < STEP_THRESHOLD) {
+        return;
+      }
+      const dir = accumulatedRef.current > 0 ? 1 : -1;
+      accumulatedRef.current = 0;
+      const next = indexRef.current + dir;
+      if (next < 0 || next >= sceneCount) {
+        return;
+      }
+      cooldownUntilRef.current = now + STEP_COOLDOWN_MS;
+      indexRef.current = next;
+      setIndex(next);
+      notify(next);
     };
 
     const handleKey = (evt: KeyboardEvent) => {
@@ -176,20 +116,17 @@ export function useFakeScroll({
       if (blocked()) {
         return;
       }
-      // Keys step between whole scenes, so they resolve a mid-pan position to
-      // the nearest scene first rather than carrying its fraction along.
-      const current = Math.round(targetRef.current);
       let next: number;
       switch (evt.key) {
         case 'ArrowDown':
         case 'ArrowRight':
         case 'PageDown':
-          next = current + 1;
+          next = indexRef.current + 1;
           break;
         case 'ArrowUp':
         case 'ArrowLeft':
         case 'PageUp':
-          next = current - 1;
+          next = indexRef.current - 1;
           break;
         case 'Home':
           next = 0;
@@ -216,9 +153,7 @@ export function useFakeScroll({
       window.removeEventListener('wheel', handleWheel, { capture: true });
       window.removeEventListener('keydown', handleKey);
     };
-  }, [sceneCount, goTo, snapAlongTravel]);
+  }, [sceneCount, goTo]);
 
-  const getProgress = useCallback(() => progressRef.current, []);
-
-  return { index, goTo, getProgress };
+  return { index, goTo };
 }
