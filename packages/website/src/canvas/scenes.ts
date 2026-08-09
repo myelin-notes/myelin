@@ -49,8 +49,8 @@ const SIZES: Array<{
   { id: 'pages', label: 'Pages', w: 1900, h: 1140, y: 1350 },
   { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000, y: 180 },
   { id: 'linked', label: 'Linked notes', w: 1750, h: 800, y: -150 },
-  { id: 'local-first', label: 'Local-first', w: 1850, h: 850, y: 900 },
-  { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150, y: 1850 },
+  { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150, y: 900 },
+  { id: 'local-first', label: 'Local-first', w: 1850, h: 850, y: 1850 },
   { id: 'download', label: 'Download', w: 2100, h: 1400, y: 1400 },
 ];
 
@@ -628,18 +628,21 @@ export const COLLAB_CURSORS = {
 function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.sync.heading, 62, 800);
-  addText(canvas, x, y + 200, copy.sync.kicker, {
+  // Dropped below the scene's top pad so the heading block sits level with the
+  // cursor graphic on the right rather than riding above it.
+  const textTop = y + 140;
+  title(canvas, x, textTop, copy.sync.heading, 62, 800);
+  addText(canvas, x, textTop + 200, copy.sync.kicker, {
     size: 26,
     width: 780,
   });
-  drawUnderline(canvas, x, y + 310, 480, ORANGE, 6);
+  drawUnderline(canvas, x, textTop + 310, 480, ORANGE, 6);
 
   // Two live cursors (DOM, Figma-style) converging on a shared scrap of the
   // canvas; light ink trails mark where each one came from.
   const cx = r.x + 1150;
   const cy = r.y + 160;
-  hand(canvas, cx + 200, cy + 215, copy.sync.sharedNote, INK, 40, 260);
+  hand(canvas, cx + 200, cy + 240, copy.sync.sharedNote, INK, 40, 260);
   addStroke(canvas, sketchEllipse(cx + 320, cy + 290, 260, 170, 1.1), MUTED, 4);
   addStroke(
     canvas,
@@ -673,7 +676,7 @@ function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
       tx + 40,
       ty + 26,
       tier.badge,
-      tier.badge === 'Coming' ? ORANGE : GREEN,
+      tier.badge === 'Today' ? GREEN : ORANGE,
       34,
       200,
     );
@@ -696,7 +699,7 @@ async function buildDownload(
 ): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.download.heading, 72, 900);
+  title(canvas, x, y + 40, copy.download.heading, 72, 900);
   addText(canvas, x, y + 160, copy.download.body, {
     size: 25,
     color: MUTED,
@@ -717,12 +720,8 @@ async function buildDownload(
     copy.download.faqMarkdown,
   );
 
-  title(canvas, x, y + 900, copy.footer.tagline, 32, 700);
-  addText(canvas, x, y + 970, copy.footer.privacyNote, {
-    size: 19,
-    color: MUTED,
-    width: 800,
-  });
+  // Sits just above the footer links, which the overlay anchors at y+1080.
+  title(canvas, x, y + 1010, copy.footer.tagline, 32, 700);
 }
 
 /**

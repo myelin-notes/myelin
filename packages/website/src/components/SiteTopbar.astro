@@ -4,9 +4,9 @@
 // download scene, since the canvas is the whole page with no anchor to jump to.
 import { copy } from '../content/site';
 
-// The same links the download scene's footer row carries. Off-site ones open in
-// a new tab so a visitor on the canvas does not lose their camera position.
-const navLinks = copy.footer.links;
+// A shorter list than the footer's. Off-site links open in a new tab so a
+// visitor on the canvas does not lose their camera position.
+const navLinks = copy.header.links;
 const isExternal = (href: string) => href.startsWith('http');
 ---
 

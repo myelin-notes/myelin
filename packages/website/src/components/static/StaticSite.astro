@@ -140,48 +140,45 @@ const ctaOutline = cn(
     </div>
   </section>
 
-  <!-- Local-first -->
-  <section id="local" class="bg-surface">
+  <!-- Sync and collaboration -->
+  <section id="sync" class="bg-surface">
     <div class:list={[wrap, band]}>
-      <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
+      <div class="grid gap-x-10 gap-y-12 lg:grid-cols-12">
         <div class="lg:col-span-5">
-          <p class={kicker}>05 / Local-first</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.localFirst.heading}</h2>
-          <p class={lede}>{copy.localFirst.lede}</p>
+          <p class={kicker}>05 / Sync &amp; collab</p>
+          <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
+          <p class={lede}>{copy.sync.kicker}</p>
         </div>
-        <CheckList
-          items={copy.localFirst.bullets}
-          class="lg:col-span-7 lg:pl-6"
-        />
+        <div class="grid gap-5 lg:col-span-7 lg:pl-6">
+          {
+            copy.sync.tiers.map((tier) => (
+              <div class="rounded-3xl bg-card p-7 shadow-elevated lg:p-8">
+                <span class="rounded-full bg-tag px-2.5 py-1 text-xs font-medium text-text-tag">
+                  {tier.badge}
+                </span>
+                <h3 class="mt-4 font-heading text-xl font-medium text-text-primary">
+                  {tier.title}
+                </h3>
+                <p class="mt-2.5 text-sm leading-relaxed text-text-secondary">
+                  {tier.body}
+                </p>
+              </div>
+            ))
+          }
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Sync and collaboration -->
-  <section id="sync" class:list={[wrap, band]}>
-    <div class="grid gap-x-10 gap-y-12 lg:grid-cols-12">
+  <!-- Local-first -->
+  <section id="local" class:list={[wrap, band]}>
+    <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
       <div class="lg:col-span-5">
-        <p class={kicker}>06 / Sync &amp; collab</p>
-        <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
-        <p class={lede}>{copy.sync.kicker}</p>
+        <p class={kicker}>06 / Local-first</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.localFirst.heading}</h2>
+        <p class={lede}>{copy.localFirst.lede}</p>
       </div>
-      <div class="grid gap-5 lg:col-span-7 lg:pl-6">
-        {
-          copy.sync.tiers.map((tier) => (
-            <div class="rounded-3xl bg-card p-7 shadow-elevated lg:p-8">
-              <span class="rounded-full bg-tag px-2.5 py-1 text-xs font-medium text-text-tag">
-                {tier.badge}
-              </span>
-              <h3 class="mt-4 font-heading text-xl font-medium text-text-primary">
-                {tier.title}
-              </h3>
-              <p class="mt-2.5 text-sm leading-relaxed text-text-secondary">
-                {tier.body}
-              </p>
-            </div>
-          ))
-        }
-      </div>
+      <CheckList items={copy.localFirst.bullets} class="lg:col-span-7 lg:pl-6" />
     </div>
   </section>
 
@@ -279,7 +276,6 @@ const ctaOutline = cn(
     <div
       class="flex flex-wrap items-center justify-between gap-4 py-10 text-sm text-text-muted"
     >
-      <p class="max-w-xl">{copy.footer.privacyNote}</p>
       <p class="kicker">Mac · Windows · Linux · iPhone · iPad · Android</p>
     </div>
   </footer>

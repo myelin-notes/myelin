@@ -152,32 +152,32 @@ for step in range(3):
   sync: {
     heading: 'Sync and collaborate,\nno server in the middle.',
     kicker:
-      'Real-time collaboration is usually the excuse for putting your notes in someone’s cloud. Myelin does it without one.',
+      'Real-time editing normally means a server holding your notes. Myelin connects the devices directly instead.',
     cursorYou: 'you',
     cursorPeer: 'ada',
-    sharedNote: 'same note,\ntwo machines,\nzero servers',
+    sharedNote: 'same note,\ntwo machines',
     tiers: [
       {
         badge: 'Today',
         title: 'Live collaboration',
-        body: 'Invite someone into a note and edit together in real time, over an encrypted QUIC connection straight between your devices (iroh). Ink, text, and annotations sync live, with owner, editor, and viewer roles.',
+        body: 'Two devices with the same note open find each other automatically, then edit in step over an encrypted QUIC connection straight between them (iroh).',
       },
       {
         badge: 'Today',
         title: 'GitHub sync',
-        body: 'Point Myelin at a repo and branch, and your workspace syncs across devices through infrastructure you already control.',
+        body: 'Point Myelin at a repo and branch, and your workspace syncs across devices through a repo you control.',
       },
       {
-        badge: 'Coming',
-        title: 'Myelin Sync',
-        body: 'Optional end-to-end encrypted cloud sync for always-on, multi-device sync.',
+        badge: 'Coming soon',
+        title: 'Invites',
+        body: 'Bring someone into a single note without handing over the whole repo, with owner, editor, and viewer roles deciding what they can do.',
       },
     ],
   },
 
   download: {
-    heading: 'Take your notes home.',
-    body: 'Native builds for Mac, Windows, Linux, iOS, and Android, with auto-updates built in. English, Spanish, and Simplified Chinese today.',
+    heading: 'Download',
+    body: 'Available in English, Spanish, and Simplified Chinese.',
     cta: 'Download Myelin Notes',
     platforms: [
       {
@@ -218,7 +218,7 @@ for step in range(3):
 
 ## Is it really free?
 
-Yes, completely free for personal use. A paid, optional Sync service comes later.
+Yes, completely free for personal use.
 
 ## Where are my notes stored?
 
@@ -234,7 +234,7 @@ Source available under FSL-1.1, and each release converts to Apache 2.0 after tw
 
 ## Can I collaborate with others?
 
-Yes, live, peer to peer, today. No account or server needed. Shared notebooks with permissions arrive in v1.0.
+Yes, live and peer to peer, today. There is no Myelin account and nothing sitting in the middle. Devices find each other through GitHub sync, so both ends need access to the same repo. Shared notebooks with permissions arrive in v1.0.
 
 ## Can I import from Obsidian or GoodNotes?
 
@@ -250,10 +250,16 @@ Myelin Notes is native on all three, with the same notes, the same canvas, and t
 `,
   },
 
+  /** Top-bar nav. Deliberately shorter than the footer's list. */
+  header: {
+    links: [
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'License', href: siteLinks.license },
+    ],
+  },
+
   footer: {
     tagline: 'Handwriting, typing, and PDFs. One note.',
-    privacyNote:
-      'Telemetry: crash reports and a few product events only, and you can disable all of it in settings.',
     links: [
       { label: 'Privacy', href: '/privacy' },
       { label: 'GitHub', href: siteLinks.github },
