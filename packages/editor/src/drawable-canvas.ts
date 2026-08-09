@@ -801,16 +801,17 @@ export class DrawableCanvas {
         this.state.change(InteractState.UsingTool, e);
         return;
       }
-      if (!editDomRoot) {
-        if (e.target === this.canvas) {
-          return;
-        }
-        if (
-          e.target instanceof Element &&
-          e.target.closest('[data-selection-toolbar="true"]')
-        ) {
-          return;
-        }
+      // The selection toolbar can act on the element currently being edited
+      // (e.g. the text style controls), so a press there must never tear down
+      // edit mode — including for elements that own a DOM edit root.
+      if (
+        e.target instanceof Element &&
+        e.target.closest('[data-selection-toolbar="true"]')
+      ) {
+        return;
+      }
+      if (!editDomRoot && e.target === this.canvas) {
+        return;
       }
       if (!editDomRoot?.contains(e.target as Node)) {
         this.exitElementEdit();

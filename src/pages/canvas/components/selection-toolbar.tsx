@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
+import {
+  TextElement,
+  type TextStyle,
+} from '@myelin/editor/elements/text/element';
 import type { Messages } from '@myelin/editor/i18n/messages';
 import {
   Tooltip,
@@ -22,6 +26,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
+import { TextStyleControls } from './text-style-controls';
 
 interface SelectionToolbarProps {
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
@@ -32,6 +37,9 @@ interface ToolbarState {
   canMoveHigher: boolean;
   canMoveLower: boolean;
   elementItems: SelectionToolbarItem[];
+  /** Set when exactly one text box is selected, so its style is editable here. */
+  textElement: TextElement | null;
+  textStyle: TextStyle | null;
 }
 
 const HIDDEN_STATE: ToolbarState = {
@@ -39,6 +47,8 @@ const HIDDEN_STATE: ToolbarState = {
   canMoveHigher: false,
   canMoveLower: false,
   elementItems: [],
+  textElement: null,
+  textStyle: null,
 };
 
 const VIEWPORT_MARGIN = 12;
@@ -71,13 +81,35 @@ function sameElementItems(
   return true;
 }
 
+function sameTextStyle(a: TextStyle | null, b: TextStyle | null): boolean {
+  if (!(a && b)) {
+    return a === b;
+  }
+  return (
+    a.color === b.color &&
+    a.fontSize === b.fontSize &&
+    a.fontFamily === b.fontFamily
+  );
+}
+
 function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
   return (
     a.visible === b.visible &&
     a.canMoveHigher === b.canMoveHigher &&
     a.canMoveLower === b.canMoveLower &&
-    sameElementItems(a.elementItems, b.elementItems)
+    sameElementItems(a.elementItems, b.elementItems) &&
+    a.textElement === b.textElement &&
+    sameTextStyle(a.textStyle, b.textStyle)
   );
+}
+
+function findTextTarget(canvas: DrawableCanvas): TextElement | null {
+  const selected = canvas.getSelectedElements();
+  if (selected.length !== 1) {
+    return null;
+  }
+  const [only] = selected;
+  return only instanceof TextElement ? only : null;
 }
 
 function collectElementItems(
@@ -110,17 +142,23 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
       const toolbar = toolbarRef.current;
       let bounds: DOMRect | null = null;
       let nextState = HIDDEN_STATE;
+      const editing = canvas.editingElement;
       if (
-        (!canvas.editingElement || canvas.isCanvasInteractiveEditMode) &&
+        (!editing ||
+          canvas.isCanvasInteractiveEditMode ||
+          editing.keepsSelectionToolbarWhileEditing) &&
         !canvas.isPlacing
       ) {
         bounds = canvas.getSelectedElementScreenBounds();
         if (bounds) {
+          const textElement = findTextTarget(canvas);
           nextState = {
             visible: true,
             canMoveHigher: canvas.canReorderSelection('higher'),
             canMoveLower: canvas.canReorderSelection('lower'),
             elementItems: collectElementItems(canvas, strings),
+            textElement,
+            textStyle: textElement ? { ...textElement.style } : null,
           };
         }
       }
@@ -242,6 +280,16 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
         aria-label={strings.canvas.selectionToolbar.label}
         aria-hidden={!state.visible}
       >
+        {state.textElement && state.textStyle && (
+          <>
+            <TextStyleControls
+              key={state.textElement.uuid}
+              element={state.textElement}
+              style={state.textStyle}
+            />
+            <Divider />
+          </>
+        )}
         <ToolbarItemGroup items={state.elementItems} />
         {state.elementItems.length > 0 && reorderItems.length > 0 && (
           <Divider />

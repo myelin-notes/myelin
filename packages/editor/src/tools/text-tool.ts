@@ -6,7 +6,7 @@ import type { MessageGetter } from '../i18n';
 import { CollisionHelper } from '../utils/collision-helper';
 import type { FontEntry, ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
-const TEXT_COLORS = [
+export const TEXT_COLORS = [
   ADAPTIVE_INK,
   '#64748b',
   '#1c2738',
@@ -17,7 +17,7 @@ const TEXT_COLORS = [
   '#8b5cf6',
 ];
 
-const TEXT_FONTS: FontEntry[] = [
+export const TEXT_FONTS: FontEntry[] = [
   { family: 'Inter', category: 'sans-serif' },
   { family: 'Roboto', category: 'sans-serif' },
   { family: 'Open Sans', category: 'sans-serif' },
@@ -32,6 +32,10 @@ const TEXT_FONTS: FontEntry[] = [
   { family: 'Caveat', category: 'cursive' },
   { family: 'Kalam', category: 'cursive' },
 ];
+
+export const TEXT_FONT_SIZE_MIN = 12;
+export const TEXT_FONT_SIZE_MAX = 72;
+export const TEXT_FONT_SIZE_STEP = 2;
 
 const DEFAULT_BOX_WIDTH = 200;
 const DEFAULT_BOX_HEIGHT = 80;
@@ -220,9 +224,9 @@ export class TextTool implements ITool {
         key: 'fontSize',
         label: strings.toolOptions.fontSize,
         value: this.fontSize,
-        min: 12,
-        max: 72,
-        step: 2,
+        min: TEXT_FONT_SIZE_MIN,
+        max: TEXT_FONT_SIZE_MAX,
+        step: TEXT_FONT_SIZE_STEP,
         set: (fontSize) => {
           this.fontSize = fontSize;
         },

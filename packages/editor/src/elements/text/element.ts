@@ -131,6 +131,10 @@ export class TextElement extends DrawableElement {
     return true;
   }
 
+  public override get keepsSelectionToolbarWhileEditing(): boolean {
+    return true;
+  }
+
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
     const textarea = this._textarea ?? this.createDom(host);
 
@@ -297,6 +301,10 @@ export class TextElement extends DrawableElement {
       fontSize: this._style.fontSize,
       fontFamily: this._style.fontFamily,
     });
+    // Font size and family change how the text wraps, so the box this element
+    // occupies moves with the style. Notify like the other geometry setters do
+    // so the selection outline and toolbar follow.
+    this.onTransformChanged?.();
   }
 
   // The DOM overlay paints the text; nothing to draw on the 2D canvas.
