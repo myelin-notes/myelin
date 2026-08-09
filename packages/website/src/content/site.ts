@@ -230,7 +230,7 @@ No. Myelin Notes has no account system at all: you download it, open it, and you
 
 ## Is it open source?
 
-Source available under FSL-1.1, and each release converts to Apache 2.0 after two years.
+Not quite. The source is public, so anyone can read it and check what the app does with their notes, and it is free to use for personal and other noncommercial purposes. It is licensed under PolyForm Strict 1.0.0, which means you cannot redistribute it or publish modified versions, and commercial use needs a separate license.
 
 ## Can I collaborate with others?
 
