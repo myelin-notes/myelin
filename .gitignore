@@ -27,5 +27,3 @@ dist-ssr
 .claude/**local**
 .claude/worktrees/
 .vscode
-# Chrome traces from `yarn bench --trace`. ~100MB each.
-bench/trace-*.json

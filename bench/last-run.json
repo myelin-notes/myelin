@@ -1,0 +1,54 @@
+{
+  "viewport": {
+    "width": 1180,
+    "height": 820
+  },
+  "rows": [
+    {
+      "frames": 572,
+      "frameMean": 5.227447552447552,
+      "frameP50": 2.7999999999999545,
+      "frameP95": 13.700000000000045,
+      "frameP99": 14.699999999999818,
+      "jsMean": 0.036538461614009386,
+      "jsP95": 0.10000000149011612,
+      "browserMean": 5.190909090833543,
+      "fps": 191.2979499013411,
+      "config": {
+        "scene": "empty",
+        "input": "pan",
+        "layers": "all",
+        "bg": "blank",
+        "dpr": "2",
+        "cpu": "1",
+        "raster": "software",
+        "strokes": "0",
+        "points": "64"
+      },
+      "spread": 0.32873922640319453
+    },
+    {
+      "frames": 1066,
+      "frameMean": 2.811163227016886,
+      "frameP50": 2.7999999999999545,
+      "frameP95": 3.2000000000000455,
+      "frameP99": 3.3999999999999773,
+      "jsMean": 0.03836772984023054,
+      "jsP95": 0.10000000149011612,
+      "browserMean": 2.7727954971766553,
+      "fps": 355.7246304268028,
+      "config": {
+        "scene": "empty",
+        "input": "pan",
+        "layers": "all",
+        "bg": "dots",
+        "dpr": "2",
+        "cpu": "1",
+        "raster": "software",
+        "strokes": "0",
+        "points": "64"
+      },
+      "spread": 0.17201212121212128
+    }
+  ]
+}

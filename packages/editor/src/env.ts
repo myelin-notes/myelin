@@ -6,7 +6,7 @@ export const PAGINATION_PROFILING =
   String(import.meta.env.VITE_PAGINATION_PROFILING ?? '').toLowerCase() ===
   'true';
 
-// Injected by the app's vite.config from TAURI_ENV_PLATFORM, and by the bench.
+// Injected by the app's vite.config from TAURI_ENV_PLATFORM.
 // Declared here, not in vite-env.d.ts, which only this package's tsconfig sees.
 declare const __MOBILE_BUILD__: boolean | undefined;
 
