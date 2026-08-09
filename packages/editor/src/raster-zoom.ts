@@ -1,18 +1,12 @@
 /**
  * The zoom levels that layers are actually painted at.
  *
- * Sizing a layer to the exact zoom repaints it on every frame of a zoom. That
- * is what a zoom costs: measured on an iPad, a page frame costs 4.5ms of a
- * panned frame and 14.63ms of a zoomed one, with the same content on screen —
- * the difference being that a pan translates the chrome while a zoom rewrites
- * its width and height, and a compositing layer that is resized has to be
- * repainted whole.
- *
- * Painting at fixed steps and carrying the remainder on the layer's transform
- * lets the compositor scale the texture it already has. Half-octave steps put
- * that remainder in [1, √2): always scaled up, never down, so a layer cannot
- * shrink away from the area it was sized to cover, and never more than 41%
- * softer than a fresh paint before the next step repaints it sharp.
+ * Sizing a layer to the exact zoom repaints it on every zoom frame; painting at
+ * fixed steps and carrying the remainder on the layer's transform lets the
+ * compositor scale the texture it already has. Half-octave steps put that
+ * remainder in [1, √2): always scaled up, never down, so a layer cannot shrink
+ * away from the area it was sized to cover, and is never more than 41% softer
+ * than a fresh paint before the next step repaints it sharp.
  */
 export function quantizeRasterZoom(zoom: number): number {
   if (!(zoom > 0) || !Number.isFinite(zoom)) {

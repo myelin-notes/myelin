@@ -503,17 +503,10 @@ export function PageFrameDomLayer({
           ),
         });
 
-        // Inner frame: clip box, lives inside chrome contentSlot so no extra
-        // translate needed — contentSlot positions it.
-        //
-        // Sized for the quantized zoom, not the exact one, because the chrome
-        // root carries the remainder as a scale. Resizing this box is resizing
-        // the promoted layer it lives in, which repaints the whole subtree; at
-        // steps, a run of zoom frames reuses one painting.
-        //
-        // Guarded for the same reason as before: none of this changes while
-        // panning, so a pan would otherwise rewrite identical values and relay
-        // out the page for nothing.
+        // Inner frame: clip box, positioned by the chrome contentSlot it lives
+        // in, so it needs no translate of its own. Sized for the quantized zoom
+        // rather than the exact one because resizing it repaints the promoted
+        // layer it sits in; at steps, a run of zoom frames reuses one painting.
         const rasterZoom = quantizeRasterZoom(zoom);
         setStyleIfChanged(
           refs.frameDiv,

@@ -105,8 +105,6 @@ export const FrameChromeView = forwardRef<
         if (!clip || !inner) {
           return;
         }
-        // Called from the per-frame sync loop, and all three follow the zoom —
-        // so while panning every one of these rewrites the same value.
         setStyleIfChanged(clip, 'height', `${headerHeight}px`);
         setStyleIfChanged(inner, 'width', `${innerWidth}px`);
         setStyleIfChanged(inner, 'transform', `scale(${zoom})`);

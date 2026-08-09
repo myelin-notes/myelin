@@ -69,10 +69,6 @@ export class FrameChrome {
       pointerEvents: 'none',
       overflow: 'visible',
       borderRadius: `${CHROME_CORNER_RADIUS}px`,
-      // This element is translated on every frame of a pan. Unpromoted, that
-      // repaints its whole subtree each time — the page sheet, its 24px-blur
-      // shadow, and ProseMirror text that viewportDiv has WebKit rasterize at
-      // DPR squared. Promoted, a pan moves an existing texture instead.
       willChange: 'transform',
     } as Partial<CSSStyleDeclaration>);
     this.root.dataset.frameChrome = 'true';
@@ -94,7 +90,6 @@ export class FrameChrome {
       transformOrigin: '0 0',
       pointerEvents: 'auto',
       visibility: 'hidden',
-      // Also re-positioned every pan frame, for the same reason.
       willChange: 'transform',
     } as Partial<CSSStyleDeclaration>);
 
@@ -144,20 +139,11 @@ export class FrameChrome {
     const rootX = screenX - CHROME_SIDE_PADDING * zoom;
     const rootY = screenY - CHROME_HEADER_HEIGHT * zoom;
 
-    // Everything under the root is laid out for a quantized zoom, and the
-    // remainder is a scale on the root itself.
-    //
-    // Sizing this subtree to the exact zoom is what a zoom costs. Measured on
-    // an iPad, this element with this content costs 4.5ms of a panned frame and
-    // 14.63ms of a zoomed one — a pan translates the root, a zoom rewrites its
-    // width and height, and a compositing layer that is resized has to be
-    // repainted whole rather than moved. A blank div of the same size, resized
-    // and promoted the same way, costs 0.4ms, so the repaint is not inherent to
-    // the size or the technique; it is the cost of repainting *this* subtree,
-    // which is why it has to stop happening rather than get cheaper.
-    //
-    // Positions stay on the exact zoom — those are a translate, which is free
-    // and must stay pixel-accurate against the canvas beneath.
+    // Sizing this subtree to the exact zoom repaints the whole promoted layer
+    // on every zoom frame (4.5ms panning vs 14.63ms zooming on an iPad), so it
+    // is laid out at a quantized zoom and the root carries the remainder as a
+    // scale. Positions stay on the exact zoom: a translate is free, and they
+    // must stay pixel-accurate against the canvas beneath.
     const rasterZoom = quantizeRasterZoom(zoom);
     const residual = zoom / rasterZoom;
 
