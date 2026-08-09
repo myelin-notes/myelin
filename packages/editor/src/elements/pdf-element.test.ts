@@ -8,6 +8,7 @@ import {
   type Mock,
   vi,
 } from 'vitest';
+import type { CanvasViewport } from '../canvas-viewport';
 import {
   getPdfDocumentPageSizes,
   openPdfDocument,
@@ -16,6 +17,7 @@ import {
   type PdfPageSize,
   renderPdfPageToCanvas,
 } from '../pdf-renderer';
+import { quantizeRasterZoom } from '../raster-zoom';
 import { LOCAL_ORIGIN, YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
 import { PAGE_GAP } from './page-frame-constants';
@@ -31,6 +33,16 @@ vi.mock('../pdf-renderer', async () => {
     renderPdfPageToCanvas: vi.fn(),
   };
 });
+
+// The gap/delete buttons mount React into a real DOM node, which the geometry
+// test has no use for.
+vi.mock('./pdf-chrome-button', () => ({
+  createPdfChromeButton: () => ({
+    root: { isConnected: true, style: {} },
+    sync: vi.fn(),
+    dispose: vi.fn(),
+  }),
+}));
 
 function mockOpenedPdf(pageCount: number): {
   destroy: Mock<() => Promise<void>>;
@@ -822,5 +834,74 @@ describe('PdfElement page rendering', () => {
     expect(vi.mocked(renderPdfPageToCanvas).mock.calls[1][0].canvas).toBe(
       renderCanvas,
     );
+  });
+});
+
+interface TestablePdfGeometry {
+  _pageSizes: PdfPageSize[];
+  _pageOrder: PdfPageOrderEntry[];
+  _contentRoot: { style: Record<string, string> };
+  _pageDoms: Map<number, { root: { style: Record<string, string> } }>;
+  syncDOM: (viewport: CanvasViewport, host: HTMLElement) => void;
+}
+
+describe('PdfElement page geometry', () => {
+  /**
+   * Pages live inside the chrome root, which is laid out at a quantized zoom
+   * and carries the remainder as a scale. Sizing pages to the exact zoom
+   * applies that remainder twice, so they render outside the frame.
+   */
+  it('lays pages out in the same units as the chrome it sits inside', () => {
+    const pageSize = { w: 612, h: 792 };
+    const element = new PdfElement(
+      'pdf-uuid',
+    ) as unknown as TestablePdfGeometry;
+    element._pageSizes = [pageSize, pageSize];
+    element._pageOrder = [
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 1 },
+    ];
+
+    const chromeSync = vi.fn();
+    const contentRoot = { style: {} as Record<string, string> };
+    const pageDoms = new Map([
+      [0, { root: { style: {} as Record<string, string> } }],
+      [1, { root: { style: {} as Record<string, string> } }],
+    ]);
+    element._contentRoot = contentRoot;
+    element._pageDoms = pageDoms;
+    (element as unknown as { _chrome: unknown })._chrome = {
+      sync: chromeSync,
+    };
+
+    // Residual scale 1.2 on top of a raster zoom of 1: the exact-zoom bug
+    // shows up as pages 20% too large.
+    const zoom = 1.2;
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    const viewport = {
+      zoom,
+      offset: { x: 0, y: 0 },
+      getWorldRect: () => new DOMRect(0, 0, 2000, 4000),
+    } as unknown as CanvasViewport;
+
+    element.syncDOM(viewport, {} as HTMLElement);
+
+    const { contentWidth, contentHeight } = chromeSync.mock.calls[0][0];
+    expect(contentWidth).toBe(pageSize.w);
+    expect(contentHeight).toBe(pageSize.h * 2 + PAGE_GAP);
+
+    // chrome.sync sizes its content slot at contentWidth * rasterZoom, so the
+    // content root and pages have to use the same factor.
+    const rasterZoom = quantizeRasterZoom(zoom);
+    expect(contentRoot.style.width).toBe(`${contentWidth * rasterZoom}px`);
+    expect(contentRoot.style.height).toBe(`${contentHeight * rasterZoom}px`);
+
+    for (const [pagePosition, pageDom] of pageDoms) {
+      expect(pageDom.root.style.width).toBe(`${pageSize.w * rasterZoom}px`);
+      expect(pageDom.root.style.height).toBe(`${pageSize.h * rasterZoom}px`);
+      expect(pageDom.root.style.transform).toBe(
+        `translate(0px, ${pagePosition * (pageSize.h + PAGE_GAP) * rasterZoom}px)`,
+      );
+    }
   });
 });

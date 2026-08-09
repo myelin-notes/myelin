@@ -39,6 +39,7 @@ import {
   renderPdfPageToCanvas,
 } from '../pdf-renderer';
 import { getPlatform } from '../platform';
+import { quantizeRasterZoom } from '../raster-zoom';
 import { DrawableElement, ResizeHandles } from './drawable-element';
 import { ElementType } from './element-type';
 import {
@@ -575,8 +576,14 @@ export class PdfElement extends DrawableElement {
       zoom,
     });
 
-    this.syncContentRoot(contentWidth, contentHeight, zoom);
-    this.syncPageDoms(viewport, zoom, scaleX, scaleY, layout);
+    // The chrome lays its subtree out at a quantized zoom and carries the
+    // remainder as a scale on its root. Pages live inside that root, so their
+    // geometry has to be in the same units — sizing them to the exact zoom
+    // makes the residual scale apply twice and the pages overflow the chrome
+    // by up to 41%.
+    const rasterZoom = quantizeRasterZoom(zoom);
+    this.syncContentRoot(contentWidth, contentHeight, rasterZoom);
+    this.syncPageDoms(viewport, zoom, rasterZoom, scaleX, scaleY, layout);
     this.syncGapButtons(viewport, zoom, scaleX, scaleY, layout);
     this.syncDeleteButtons(viewport, zoom, scaleX, scaleY, layout);
   }
@@ -938,19 +945,20 @@ export class PdfElement extends DrawableElement {
   private syncContentRoot(
     contentWidth: number,
     contentHeight: number,
-    zoom: number,
+    rasterZoom: number,
   ): void {
     if (!this._contentRoot) {
       return;
     }
 
-    this._contentRoot.style.width = `${contentWidth * zoom}px`;
-    this._contentRoot.style.height = `${contentHeight * zoom}px`;
+    this._contentRoot.style.width = `${contentWidth * rasterZoom}px`;
+    this._contentRoot.style.height = `${contentHeight * rasterZoom}px`;
   }
 
   private syncPageDoms(
     viewport: CanvasViewport,
     zoom: number,
+    rasterZoom: number,
     scaleX: number,
     scaleY: number,
     layout: PdfLayout,
@@ -1034,10 +1042,10 @@ export class PdfElement extends DrawableElement {
 
       // Geometry syncs for retained pages too — a stale transform from a
       // previous zoom level could place an off-range dom inside the viewport.
-      const cssLeft = page.localLeft * scaleX * zoom;
-      const cssTop = page.localTop * scaleY * zoom;
-      const cssWidth = page.size.w * scaleX * zoom;
-      const cssHeight = page.size.h * scaleY * zoom;
+      const cssLeft = page.localLeft * scaleX * rasterZoom;
+      const cssTop = page.localTop * scaleY * rasterZoom;
+      const cssWidth = page.size.w * scaleX * rasterZoom;
+      const cssHeight = page.size.h * scaleY * rasterZoom;
 
       pageDom.root.style.transform = `translate(${cssLeft}px, ${cssTop}px)`;
       pageDom.root.style.width = `${cssWidth}px`;
