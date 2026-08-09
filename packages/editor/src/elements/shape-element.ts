@@ -1,4 +1,5 @@
 import type * as Y from 'yjs';
+import { resolveInkColor } from '../canvas-theme';
 import type { Vector2 } from '../geometry';
 import { parseCssColor } from '../pdf-export/color';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
@@ -175,7 +176,7 @@ export class ShapeElement extends DrawableElement {
     if (g.length < 4) {
       return;
     }
-    ctx.strokeStyle = this.style.color;
+    ctx.strokeStyle = resolveInkColor(this.style.color);
     ctx.lineWidth = this.style.size;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';

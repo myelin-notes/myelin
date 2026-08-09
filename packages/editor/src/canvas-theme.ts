@@ -6,7 +6,8 @@
  * notified so they can rebuild any cached artifacts (e.g. the grid pattern).
  *
  * User-drawn content (ink, highlighter, text the user colors) is NOT sourced
- * from here — that is document data, not chrome.
+ * from here — that is document data, not chrome. The one exception is
+ * {@link resolveInkColor}; see its doc comment.
  */
 export interface CanvasPalette {
   /** Background grid / dot pattern. */
@@ -101,6 +102,29 @@ export function onCanvasThemeChange(listener: () => void): () => void {
   return () => {
     listeners.delete(listener);
   };
+}
+
+/**
+ * The "black" every tool palette leads with. It is stored in the document
+ * verbatim — this is still document data — but it is the one user color that
+ * names an *intent* ("default ink") rather than a literal shade, so painting
+ * resolves it against the theme. The stored hex is exactly `--text-primary`'s
+ * light-mode value, so light mode renders unchanged.
+ */
+export const ADAPTIVE_INK = '#191c1e';
+
+/**
+ * Resolve a stored element color for painting. Adaptive ink follows the theme
+ * so strokes drawn in light mode stay legible in dark mode and vice versa;
+ * every other color is the literal shade the user picked and is returned as-is.
+ *
+ * Not used for PDF export — exported pages are printed on white, so ink there
+ * keeps its stored (light) value.
+ */
+export function resolveInkColor(color: string): string {
+  return color.toLowerCase() === ADAPTIVE_INK
+    ? getCanvasPalette().textPrimary
+    : color;
 }
 
 /** Apply an alpha to a `#rgb` / `#rrggbb` / `rgb(...)` color, returning `rgba(...)`. */

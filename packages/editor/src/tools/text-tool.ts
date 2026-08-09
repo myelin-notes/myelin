@@ -1,5 +1,5 @@
 import { Type as TypeIcon } from 'lucide-react';
-import { getCanvasPalette } from '../canvas-theme';
+import { ADAPTIVE_INK, getCanvasPalette } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { TextElement, type TextStyle } from '../elements/text/element';
 import type { MessageGetter } from '../i18n';
@@ -7,7 +7,7 @@ import { CollisionHelper } from '../utils/collision-helper';
 import type { FontEntry, ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const TEXT_COLORS = [
-  '#191c1e',
+  ADAPTIVE_INK,
   '#64748b',
   '#1c2738',
   '#3b82f6',
@@ -40,7 +40,7 @@ const CLICK_THRESHOLD = 5;
 export class TextTool implements ITool {
   public constructor(private readonly getStrings: MessageGetter) {}
 
-  private color: string = '#191c1e';
+  private color: string = ADAPTIVE_INK;
   private fontSize: number = 24;
   private fontFamily: string = 'Inter';
 
