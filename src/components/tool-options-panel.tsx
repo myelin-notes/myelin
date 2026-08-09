@@ -5,6 +5,7 @@ import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
+import { FontSizeField } from '@/components/font-size-field';
 import { useCustomColors } from '@/lib/custom-colors';
 
 interface ToolOptionsPanelProps {
@@ -157,20 +158,30 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
               <span className="select-none font-bold text-[10px] text-text-muted uppercase tracking-[0.1em]">
                 {option.label}
               </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
+              {option.control === 'stepper' ? (
+                <FontSizeField
+                  value={option.value}
                   min={option.min}
                   max={option.max}
                   step={option.step}
-                  value={option.value}
-                  onChange={(e) => option.set(Number(e.target.value))}
-                  className="tool-slider w-20"
+                  onChange={option.set}
                 />
-                <span className="w-5 select-none text-right font-medium text-[10px] text-text-secondary tabular-nums">
-                  {option.value}
-                </span>
-              </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={option.min}
+                    max={option.max}
+                    step={option.step}
+                    value={option.value}
+                    onChange={(e) => option.set(Number(e.target.value))}
+                    className="tool-slider w-20"
+                  />
+                  <span className="w-5 select-none text-right font-medium text-[10px] text-text-secondary tabular-nums">
+                    {option.value}
+                  </span>
+                </div>
+              )}
             </div>
           );
         }

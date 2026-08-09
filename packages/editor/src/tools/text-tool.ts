@@ -227,6 +227,7 @@ export class TextTool implements ITool {
         min: TEXT_FONT_SIZE_MIN,
         max: TEXT_FONT_SIZE_MAX,
         step: TEXT_FONT_SIZE_STEP,
+        control: 'stepper',
         set: (fontSize) => {
           this.fontSize = fontSize;
         },

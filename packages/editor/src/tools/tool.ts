@@ -25,6 +25,12 @@ export type ToolOption =
       min: number;
       max: number;
       step: number;
+      /**
+       * How the number should be presented. A slider fits a continuous feel
+       * like brush width; values users think of as numbers, like font size,
+       * want typed entry instead. Default: 'slider'.
+       */
+      control?: 'slider' | 'stepper';
     })
   | (ToolOptionBase<'font', string> & {
       fonts: FontEntry[];
