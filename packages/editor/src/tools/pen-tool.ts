@@ -1,4 +1,5 @@
 import { PenTool as PenIcon } from 'lucide-react';
+import { ADAPTIVE_INK } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { ShapeElement } from '../elements/shape-element';
 import { StrokeElement } from '../elements/stroke-element';
@@ -7,7 +8,7 @@ import { recognizeShape } from '../shape-recognizer';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 export const PEN_COLORS = [
-  '#191c1e', // black
+  ADAPTIVE_INK, // black in light mode, near-white in dark
   '#64748b', // slate
   '#ef4444', // red
   '#f59e0b', // orange
@@ -27,7 +28,7 @@ export class PenTool implements ITool {
 
   protected currentStroke: StrokeElement | null = null;
   protected currentShape: ShapeElement | null = null;
-  protected color: string = '#191c1e';
+  protected color: string = ADAPTIVE_INK;
   protected size: number = 8;
   /** When false, the dwell-and-recognize shape-snapping path is skipped. */
   protected recognizeShapes: boolean = true;

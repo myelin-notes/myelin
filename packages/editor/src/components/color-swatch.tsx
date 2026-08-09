@@ -1,4 +1,5 @@
 import type { PointerEvent } from 'react';
+import { ADAPTIVE_INK } from '../canvas-theme';
 
 interface ColorSwatchProps {
   color: string;
@@ -25,7 +26,10 @@ export function ColorSwatch({
       onClick={onClick}
       className="size-5 cursor-pointer rounded-lg border-none p-0 transition-transform duration-150 hover:scale-110"
       style={{
-        backgroundColor: color,
+        // The ink swatch previews what the theme will actually paint. Left as a
+        // CSS var so it re-resolves on theme toggle without a re-render.
+        backgroundColor:
+          color.toLowerCase() === ADAPTIVE_INK ? 'var(--text-primary)' : color,
         boxShadow: active
           ? '0 0 0 2px var(--bg-card), 0 0 0 3.5px rgb(var(--shadow-rgb) / 0.25)'
           : 'inset 0 0 0 1px var(--border-ghost)',

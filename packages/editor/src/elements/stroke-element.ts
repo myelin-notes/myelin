@@ -4,6 +4,7 @@ import {
   getStrokePoints,
 } from 'perfect-freehand';
 import type * as Y from 'yjs';
+import { resolveInkColor } from '../canvas-theme';
 import { parseCssColor } from '../pdf-export/color';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { CollisionHelper } from '../utils/collision-helper';
@@ -145,7 +146,7 @@ export class StrokeElement extends DrawableElement {
       this.dirty = false;
     }
 
-    ctx.fillStyle = this.style.color;
+    ctx.fillStyle = resolveInkColor(this.style.color);
     ctx.fill(this.cachedPath);
   }
 

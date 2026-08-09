@@ -4,6 +4,7 @@ import {
   layoutWithLines,
   prepareWithSegments,
 } from '@chenglou/pretext';
+import { resolveInkColor } from '../../canvas-theme';
 import type { CanvasViewport } from '../../canvas-viewport';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import { ensureDisplayFont, fetchFontTtfBase64 } from '../../google-fonts';
@@ -148,7 +149,7 @@ export class TextElement extends DrawableElement {
     textarea.style.top = `${screen.y}px`;
     textarea.style.transform = `scale(${viewport.zoom})`;
     textarea.style.height = `${this.box.height * sy}px`;
-    textarea.style.color = this._style.color;
+    textarea.style.color = resolveInkColor(this._style.color);
     textarea.dataset.editing = this._editing ? 'true' : 'false';
   }
 
@@ -316,7 +317,7 @@ export class TextElement extends DrawableElement {
 
     const fontSize = this._style.fontSize;
     ctx.font = `${fontSize}px ${this._style.fontFamily}`;
-    ctx.fillStyle = this._style.color;
+    ctx.fillStyle = resolveInkColor(this._style.color);
     ctx.textBaseline = 'top';
 
     const lh = this._cachedLineHeight;

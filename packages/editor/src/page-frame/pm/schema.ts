@@ -1,5 +1,9 @@
 import { type MarkSpec, type NodeSpec, Schema } from 'prosemirror-model';
 import { tableNodes } from 'prosemirror-tables';
+import { ADAPTIVE_INK } from '../../canvas-theme';
+
+/** CSS the adaptive-ink hex renders as; see the `textColor` mark. */
+const INK_VAR = 'var(--text-primary)';
 
 const doc: NodeSpec = {
   content: 'block+',
@@ -310,7 +314,11 @@ const fontFamily: MarkSpec = {
 const textColor: MarkSpec = {
   attrs: { color: {} },
   toDOM(mark) {
-    return ['span', { style: `color: ${mark.attrs.color}` }, 0];
+    // The doc stores the adaptive-ink hex; display resolves it to the theme
+    // token so ink stays legible on a dark page. parseDOM folds it back.
+    const color =
+      mark.attrs.color === ADAPTIVE_INK ? INK_VAR : mark.attrs.color;
+    return ['span', { style: `color: ${color}` }, 0];
   },
   parseDOM: [
     {
@@ -319,7 +327,7 @@ const textColor: MarkSpec = {
         if (typeof value !== 'string' || !value) {
           return false;
         }
-        return { color: value };
+        return { color: value === INK_VAR ? ADAPTIVE_INK : value };
       },
     },
   ],
