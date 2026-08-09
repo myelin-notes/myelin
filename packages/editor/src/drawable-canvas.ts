@@ -52,6 +52,9 @@ type YElementsDeepEvent = YElementsDeepEvents[number];
 
 const ELEMENT_Z_ORDER_KEY = 'zOrder';
 
+/** Screen-pixel travel a finger may drift and still count as a tap. */
+const TOUCH_TAP_SLOP = 8;
+
 function isBackgroundElement(type: ElementType): boolean {
   return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
 }
@@ -158,11 +161,16 @@ export class DrawableCanvas {
   private spaceDown: boolean = false;
   private screenPosition: Vector2 = { x: 0, y: 0 };
 
-  // Touch double-tap → element edit. A single finger pans (Moving state), which
-  // never runs the select tool, so its double-click edit path can't fire on
-  // touch; we detect the double-tap here instead.
+  // Touch double-tap → element edit. A single finger that starts a pan never
+  // reaches the select tool's double-click path, so we detect the double-tap
+  // here instead.
   private _lastTouchTapTime: number = 0;
   private _lastTouchTapPos: Vector2 = { x: 0, y: 0 };
+
+  // Screen position of a single finger that began panning with the select
+  // tool active. If it lifts without dragging, the gesture was a tap and is
+  // replayed through the tool so it can select / clear the selection.
+  private _touchTapCandidate: Vector2 | null = null;
 
   // Active touch pointers by id. A two-finger touch is a viewport pinch/pan
   // gesture (handled by CanvasViewport's touch listeners), so single-finger
@@ -1173,6 +1181,31 @@ export class DrawableCanvas {
     });
   }
 
+  /**
+   * Whether a single finger at this world point should drive the select tool
+   * instead of panning: a resize handle of a selected element, or an element
+   * body other than an unselected page frame / PDF. Those backdrops cover the
+   * area you pan across, so a finger inside one pans until it is selected.
+   */
+  private touchGrabsElement(point: Vector2): boolean {
+    for (let i = this.elements.length - 1; i >= 0; i--) {
+      const element = this.elements[i];
+      if (element.isSelected && element.hitHandle(point, this.viewport.zoom)) {
+        return true;
+      }
+    }
+    for (let i = this.elements.length - 1; i >= 0; i--) {
+      const element = this.elements[i];
+      if (!CollisionHelper.inBox(point, element.boundingBox)) {
+        continue;
+      }
+      if (element.isSelected || !isBackgroundElement(element.type)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private initEventListeners(canvas: HTMLCanvasElement) {
     // Bound to the window, not the canvas: DOM layered above the canvas
     // (page-frame chrome, the site's world-anchored links) swallows
@@ -1207,6 +1240,7 @@ export class DrawableCanvas {
           // Second finger down → the viewport owns the pinch/pan gesture; stop
           // any single-finger pan in progress and ignore this pointer.
           if (this._activeTouchPointers.size >= 2) {
+            this._touchTapCandidate = null;
             this.state.change(InteractState.Idle, evt);
             break;
           }
@@ -1224,6 +1258,21 @@ export class DrawableCanvas {
           }
           this._lastTouchTapTime = now;
           this._lastTouchTapPos = point;
+
+          // With the select tool, a finger on something already grabbable
+          // drives the tool, so touch moves and resizes like the pen does.
+          const selecting = this.toolSelected.id === 'select';
+          if (selecting && this.touchGrabsElement(point)) {
+            this._touchTapCandidate = null;
+            this.state.change(InteractState.UsingTool, evt);
+            this.state.update(evt);
+            break;
+          }
+          // Everything else keeps panning with one finger; pointerup replays
+          // the gesture through the tool if it turned out to be a tap.
+          this._touchTapCandidate = selecting
+            ? { x: evt.clientX, y: evt.clientY }
+            : null;
           this.state.change(InteractState.Moving, evt);
           this.state.update(evt);
           break;
@@ -1251,6 +1300,20 @@ export class DrawableCanvas {
 
     this._handlePointerUp = (evt) => {
       this._activeTouchPointers.delete(evt.pointerId);
+      // A finger that lifts without dragging is a tap: run it through the
+      // select tool so it selects what's under it, or clears the selection on
+      // empty canvas. Dragging pans instead, and never reaches this.
+      const tap = this._touchTapCandidate;
+      this._touchTapCandidate = null;
+      if (
+        tap &&
+        evt.type === 'pointerup' &&
+        evt.pointerType === 'touch' &&
+        this.state.current === InteractState.Moving &&
+        Math.hypot(evt.clientX - tap.x, evt.clientY - tap.y) <= TOUCH_TAP_SLOP
+      ) {
+        this.state.change(InteractState.UsingTool, evt);
+      }
       this.state.change(InteractState.Idle, evt);
     };
     window.addEventListener('pointerup', this._handlePointerUp);
