@@ -783,11 +783,19 @@ export class DrawableCanvas {
       // handle. Canvas-interactive edit modes already route handle clicks
       // through the tool; this covers modes where a DOM editor root has taken
       // over canvas pointer events.
+      // The wider touch radius is gated on the select tool because this hands
+      // the gesture to whichever tool is active: a finger that lands near a
+      // handle with, say, the pen tool would start drawing rather than resize,
+      // so every other tool keeps the tighter mouse radius.
       if (
         editDomRoot &&
         !editDomRoot.contains(e.target as Node) &&
         element.isSelected &&
-        element.hitHandle(this.viewport.getPoint(e), this.viewport.zoom)
+        element.hitHandle(
+          this.viewport.getPoint(e),
+          this.viewport.zoom,
+          e.pointerType === 'touch' && this.toolSelected.id === 'select',
+        )
       ) {
         this.exitElementEdit();
         this.state.change(InteractState.UsingTool, e);
@@ -1190,7 +1198,10 @@ export class DrawableCanvas {
   private touchGrabsElement(point: Vector2): boolean {
     for (let i = this.elements.length - 1; i >= 0; i--) {
       const element = this.elements[i];
-      if (element.isSelected && element.hitHandle(point, this.viewport.zoom)) {
+      if (
+        element.isSelected &&
+        element.hitHandle(point, this.viewport.zoom, true)
+      ) {
         return true;
       }
     }

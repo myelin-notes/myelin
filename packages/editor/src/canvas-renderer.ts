@@ -22,7 +22,7 @@ const BG_TILE_SIZE = 24;
  * which keeps the element's geometry a constant — nothing has to be re-laid-out
  * when the zoom changes.
  */
-const BG_OVERDRAW_PX = BG_TILE_SIZE * MAX_ZOOM;
+export const BG_OVERDRAW_PX = BG_TILE_SIZE * MAX_ZOOM;
 
 /**
  * Frames of sustained zoom before the background layer leaves the tree, and how
@@ -158,6 +158,9 @@ export class CanvasRenderer {
   private bgLastRasterZoom = Number.NaN;
   private bgLastTransform = '';
 
+  /** The DPR the layer's tile was last written at; NaN until one has been. */
+  private bgTileDpr = Number.NaN;
+
   /** Zoom-gesture tracking for the layer's takedown. @see BG_ZOOM_SETTLE_MS */
   private readonly bgZoomGesture = createZoomGestureState();
   private bgTakenDown = false;
@@ -178,8 +181,10 @@ export class CanvasRenderer {
   ) {
     this.ctx = foregroundCtx;
     this.canvas = foregroundCanvas;
-    this.syncSizeToContainer();
+    // Read before the sync below, which reaches setBackgroundStyle(this.bgStyle)
+    // and would otherwise write the still-undefined value straight back.
     this.bgStyle = UserPrefs.get('canvasBackground');
+    this.syncSizeToContainer();
     this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
       this.setBackgroundStyle(bg);
     });
@@ -225,6 +230,10 @@ export class CanvasRenderer {
     // A host adopted mid-takedown would otherwise stay hidden forever.
     host.style.display = '';
     this.bgTakenDown = false;
+    // The memo describes the adopted element, not the view: a fresh host has
+    // none of these styles, so forget them or the next sync skips writing them.
+    this.bgLastRasterZoom = Number.NaN;
+    this.bgLastTransform = '';
     this.setBackgroundStyle(this.bgStyle);
   }
 
@@ -243,10 +252,12 @@ export class CanvasRenderer {
     if (!this.bgHost) {
       return;
     }
+    const dpr = window.devicePixelRatio || 1;
     this.bgHost.style.backgroundImage =
       style === 'blank'
         ? 'none'
-        : `url(${buildBackgroundTile(style, getCanvasPalette().grid, window.devicePixelRatio || 1)})`;
+        : `url(${buildBackgroundTile(style, getCanvasPalette().grid, dpr)})`;
+    this.bgTileDpr = dpr;
   }
 
   public redraw(
@@ -372,11 +383,15 @@ export class CanvasRenderer {
     }
 
     // The world origin sits at screen (offset * zoom), and the tiling is
-    // anchored there. Reducing modulo the tile keeps the translate inside the
-    // overdraw no matter how far the canvas has been panned.
+    // anchored there. The layer's own top-left starts BG_OVERDRAW_PX before it,
+    // which is a whole number of tiles only when 3/zoom is an integer, so the
+    // overdraw is reduced along with the pan — left out, it is a phase error
+    // that slides the grid against the content as the zoom changes. Reducing
+    // modulo the tile keeps the translate inside the overdraw no matter how far
+    // the canvas has been panned.
     const tile = BG_TILE_SIZE * zoom;
-    const shiftX = backgroundPanShift(offset.x * zoom, tile);
-    const shiftY = backgroundPanShift(offset.y * zoom, tile);
+    const shiftX = backgroundPanShift(offset.x * zoom + BG_OVERDRAW_PX, tile);
+    const shiftY = backgroundPanShift(offset.y * zoom + BG_OVERDRAW_PX, tile);
     // The translate is listed first, so it applies in screen pixels and the
     // scale after it does not multiply the pan shift.
     const transform = `translate3d(${shiftX}px, ${shiftY}px, 0) scale(${zoom / rasterZoom})`;
@@ -421,8 +436,13 @@ export class CanvasRenderer {
     this.resizeCanvas(width, height);
     this.resizeOverlayCanvas(width, height);
     // A DPR change arrives as a resize, and the tile is rasterized for a
-    // specific DPR — rebuild it so it stays crisp on the new display.
-    this.setBackgroundStyle(this.bgStyle);
+    // specific DPR — rebuild it so it stays crisp on the new display. Only
+    // then, though: dragging the sidebar or a split divider fires a resize per
+    // frame, and rebuilding encodes a PNG and repaints the whole overdrawn
+    // layer for a tile that would come out identical.
+    if ((window.devicePixelRatio || 1) !== this.bgTileDpr) {
+      this.setBackgroundStyle(this.bgStyle);
+    }
   }
 
   private resizeCanvas(width: number, height: number): void {

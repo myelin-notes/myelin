@@ -115,13 +115,18 @@ export class SelectTool implements ITool {
     // shortcut convention (and avoiding the macOS Ctrl+click right-click gesture).
     const additive = isApplePlatform ? event.metaKey : event.ctrlKey;
 
+    // A finger reaches handles with the larger touch radius. This has to match
+    // the test DrawableCanvas ran to hand the gesture to this tool, or a handle
+    // a finger grabbed there would miss here and fall through to a move.
+    const touch = event.pointerType === 'touch';
+
     // 1. Check handles on selected elements first
     for (let i = canvas.elements.length - 1; i >= 0; i--) {
       const e = canvas.elements[i];
       if (!e.isSelected) {
         continue;
       }
-      const handle = e.hitHandle(point, canvas.viewport.zoom);
+      const handle = e.hitHandle(point, canvas.viewport.zoom, touch);
       if (handle) {
         this.mode = SelectMode.Scaling;
         this.scalingElement = e;

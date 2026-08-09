@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BG_OVERDRAW_PX,
   backgroundPanShift,
   createZoomGestureState,
   isZoomGestureActive,
 } from './canvas-renderer';
+import { MAX_ZOOM, MIN_ZOOM } from './canvas-viewport';
 
 describe('backgroundPanShift', () => {
   const TILE = 24;
@@ -46,6 +48,48 @@ describe('backgroundPanShift', () => {
     expect(backgroundPanShift(10, 0)).toBe(0);
     expect(backgroundPanShift(Number.NaN, TILE)).toBe(0);
     expect(backgroundPanShift(Number.POSITIVE_INFINITY, TILE)).toBe(0);
+  });
+});
+
+/**
+ * Where the tiling's own origin lands on screen, which is what the grid is
+ * drawn from: the layer element starts at -BG_OVERDRAW_PX and the per-frame
+ * translate moves it from there.
+ */
+describe('background tiling origin', () => {
+  const TILE_WORLD = 24;
+
+  it('stays anchored to the world origin at every zoom', () => {
+    // The world origin is at screen (offset * zoom) and the pattern repeats
+    // every tile, so the tiling origin only has to agree with it modulo one
+    // tile. -BG_OVERDRAW_PX is a whole number of tiles only when 3/zoom is an
+    // integer, so a shift that ignores it leaves a phase error — the grid then
+    // slides against the canvas content as the user zooms, which is exactly
+    // what the CanvasPattern this layer replaced never did.
+    const zooms = [MIN_ZOOM, 0.5, 0.75, 1, 1.3, 1.5, 2, 2.5, MAX_ZOOM];
+    for (const zoom of zooms) {
+      for (const offset of [0, 37.5, -412.25, 10000]) {
+        const tile = TILE_WORLD * zoom;
+        const shift = backgroundPanShift(offset * zoom + BG_OVERDRAW_PX, tile);
+        const origin = -BG_OVERDRAW_PX + shift;
+        const error = Math.abs(
+          (((origin - offset * zoom) % tile) + tile) % tile,
+        );
+        expect(Math.min(error, tile - error)).toBeLessThan(1e-6);
+      }
+    }
+  });
+
+  it('never translates the layer past its overdraw', () => {
+    // Folding the overdraw into the shift must not push the translate out of
+    // [0, tile) — beyond that the layer's own edge is dragged into view.
+    for (const zoom of [MIN_ZOOM, 1, 1.3, MAX_ZOOM]) {
+      const tile = TILE_WORLD * zoom;
+      const shift = backgroundPanShift(-98765.43 * zoom + BG_OVERDRAW_PX, tile);
+      expect(shift).toBeGreaterThanOrEqual(0);
+      expect(shift).toBeLessThan(tile);
+      expect(tile).toBeLessThanOrEqual(BG_OVERDRAW_PX);
+    }
   });
 });
 

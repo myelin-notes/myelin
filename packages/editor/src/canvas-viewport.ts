@@ -351,7 +351,7 @@ export class CanvasViewport {
     return {
       screenW,
       screenH,
-      targetZoom: Math.min(3, Math.max(0.2, unclampedTargetZoom)),
+      targetZoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, unclampedTargetZoom)),
       worldFocus: {
         x: worldRect.x + worldRect.width / 2,
         y: worldRect.y + worldRect.height / 2,
