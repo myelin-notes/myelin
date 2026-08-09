@@ -1454,10 +1454,17 @@ export class DrawableCanvas {
 
   public switchTool(to: number) {
     this.toolSelected.interrupt(this);
-    for (const e of this._store.all()) {
-      e.unselect();
+    const next = this.tools[to];
+    // A tool that can push its options onto the selection (the text tool) needs
+    // that selection to survive the switch, or its options panel has nothing to
+    // act on and picking it up is a dead end. Every other tool starts clean, so
+    // a stale outline doesn't linger while drawing or erasing.
+    if (!next.applyOptionToSelection) {
+      for (const e of this._store.all()) {
+        e.unselect();
+      }
     }
-    this.toolSelected = this.tools[to];
+    this.toolSelected = next;
     this._toolCursor = 'default';
     this.updateCursor();
     // Single sync point: every tool switch notifies React so the toolbar
