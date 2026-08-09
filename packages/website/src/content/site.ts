@@ -1,12 +1,10 @@
 export const siteTitle =
   'Myelin Notes: a local-first note-taking app for handwriting, type, and PDFs';
 export const siteDescription =
-  'Myelin Notes is a native, local-first note-taking app for Mac, Windows, Linux, iOS, and Android: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Free in early access.';
+  'Myelin Notes is a native, local-first note-taking app for Mac, Windows, Linux, iOS, and Android: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Completely free for personal use.';
 
 /**
  * External destinations, centralized so a URL change is a one-line edit.
- * TODO(links): confirm the Discord invite, Sponsors, and Ko-fi URLs before
- * launch; the GitHub repo and releases links are real today.
  */
 export const siteLinks = {
   github: 'https://github.com/myelin-notes/myelin',
@@ -17,9 +15,6 @@ export const siteLinks = {
     'https://api.github.com/repos/myelin-notes/myelin/releases/latest',
   roadmap: 'https://github.com/myelin-notes/myelin/issues',
   license: 'https://github.com/myelin-notes/myelin/blob/main/LICENSE.md',
-  discord: 'https://github.com/myelin-notes/myelin',
-  sponsors: 'https://github.com/sponsors/winterSteve25',
-  kofi: 'https://ko-fi.com/wintersteve25',
 };
 
 /** Every platform Myelin ships a native build for. */
@@ -51,7 +46,7 @@ export const copy = {
     subheadline:
       'Myelin Notes is a native, local-first note-taking app: one canvas where ink, rich text, PDFs, images, and audio live together. Your notes stay on your machine, and you can still edit live with others, no server required.',
     trustLine:
-      'Free while in early access · No account required · Your notes are never paywalled',
+      'Completely free for personal use · No account required · Your notes are never paywalled',
     ctaPrimary: 'Download',
     ctaSecondary: 'See it in action',
   },
@@ -145,7 +140,6 @@ for step in range(3):
   localFirst: {
     heading: 'It all lives\non your machine.',
     lede: 'No cloud in the middle. Your notes are ordinary files on your own disk, and Myelin works completely offline.',
-    annotation: 'delete the app,\nkeep every note',
     bullets: [
       'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
       'Everything works fully offline, with no account and no server in the middle.',
@@ -158,46 +152,32 @@ for step in range(3):
   sync: {
     heading: 'Sync and collaborate,\nno server in the middle.',
     kicker:
-      'Real-time collaboration is usually the excuse for putting your notes in someone’s cloud. Myelin does it without one.',
+      'Real-time editing normally means a server holding your notes. Myelin connects the devices directly instead.',
     cursorYou: 'you',
     cursorPeer: 'ada',
-    sharedNote: 'same note,\ntwo machines,\nzero servers',
+    sharedNote: 'same note,\ntwo machines',
     tiers: [
       {
         badge: 'Today',
         title: 'Live collaboration',
-        body: 'Invite someone into a note and edit together in real time, over an encrypted QUIC connection straight between your devices (iroh). Ink, text, and annotations sync live, with owner, editor, and viewer roles.',
+        body: 'Two devices with the same note open find each other automatically, then edit in step over an encrypted QUIC connection straight between them (iroh).',
       },
       {
         badge: 'Today',
         title: 'GitHub sync',
-        body: 'Point Myelin at a repo and branch, and your workspace syncs across devices through infrastructure you already control.',
+        body: 'Point Myelin at a repo and branch, and your workspace syncs across devices through a repo you control.',
       },
       {
-        badge: 'Coming',
-        title: 'Myelin Sync',
-        body: 'Optional end-to-end encrypted cloud sync for always-on, multi-device sync. Founding Supporters get a lifetime discount when it launches.',
+        badge: 'Coming soon',
+        title: 'Invites',
+        body: 'Bring someone into a single note without handing over the whole repo, with owner, editor, and viewer roles deciding what they can do.',
       },
     ],
-  },
-
-  supporter: {
-    heading: 'Free during early access.\nNever a paywall on your notes.',
-    body: 'The editor and your notes stay free. If you want Myelin to exist long-term, become a Founding Supporter.',
-    benefits: [
-      'Early insider builds',
-      'Supporters Discord',
-      'Founding Supporter badge',
-      'Lifetime discount on Myelin Sync when it launches',
-    ],
-    reassurance: 'None of these benefits gate the editor or your notes.',
-    ctaPrimary: 'Sponsor on GitHub',
-    ctaSecondary: 'Support on Ko-fi',
   },
 
   download: {
-    heading: 'Take your notes home.',
-    body: 'Native builds for Mac, Windows, Linux, iOS, and Android, with auto-updates built in. English, Spanish, and Simplified Chinese today.',
+    heading: 'Download',
+    body: 'Available in English, Spanish, and Simplified Chinese.',
     cta: 'Download Myelin Notes',
     platforms: [
       {
@@ -238,7 +218,7 @@ for step in range(3):
 
 ## Is it really free?
 
-Yes, during early access. The editor and your notes stay free forever; a paid, optional Sync service comes later.
+Yes, completely free for personal use.
 
 ## Where are my notes stored?
 
@@ -250,11 +230,11 @@ No. Myelin Notes has no account system at all: you download it, open it, and you
 
 ## Is it open source?
 
-Source available under FSL-1.1, and each release converts to Apache 2.0 after two years.
+Not quite. The source is public, so anyone can read it and check what the app does with their notes, and it is free to use for personal and other noncommercial purposes. It is licensed under PolyForm Strict 1.0.0, which means you cannot redistribute it or publish modified versions, and commercial use needs a separate license.
 
 ## Can I collaborate with others?
 
-Yes, live, peer to peer, today. No account or server needed. Shared notebooks with permissions arrive in v1.0.
+Yes, live and peer to peer, today. There is no Myelin account and nothing sitting in the middle. Devices find each other through GitHub sync, so both ends need access to the same repo. Shared notebooks with permissions arrive in v1.0.
 
 ## Can I import from Obsidian or GoodNotes?
 
@@ -270,17 +250,20 @@ Myelin Notes is native on all three, with the same notes, the same canvas, and t
 `,
   },
 
+  /** Top-bar nav. Deliberately shorter than the footer's list. */
+  header: {
+    links: [
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'License', href: siteLinks.license },
+    ],
+  },
+
   footer: {
     tagline: 'Handwriting, typing, and PDFs. One note.',
-    privacyNote:
-      'Telemetry: crash reports and a few product events only, and you can disable all of it in settings.',
     links: [
       { label: 'Privacy', href: '/privacy' },
       { label: 'GitHub', href: siteLinks.github },
       { label: 'Roadmap', href: siteLinks.roadmap },
-      { label: 'Discord', href: siteLinks.discord },
-      { label: 'Sponsor', href: siteLinks.sponsors },
-      { label: 'Ko-fi', href: siteLinks.kofi },
       { label: 'License', href: siteLinks.license },
     ],
     download: 'Download Myelin',

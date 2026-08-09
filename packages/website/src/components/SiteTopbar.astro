@@ -2,11 +2,29 @@
 // App-chrome style top bar, fixed above the full-screen canvas. Static markup
 // only: CanvasEditor intercepts the Download link and flies the camera to the
 // download scene, since the canvas is the whole page with no anchor to jump to.
+import { copy } from '../content/site';
+
+// A shorter list than the footer's. Off-site links open in a new tab so a
+// visitor on the canvas does not lose their camera position.
+const navLinks = copy.header.links;
+const isExternal = (href: string) => href.startsWith('http');
 ---
 
 <header class="site-topbar">
   <a href="/" class="wordmark">Myelin Notes</a>
-  <span class="badge">early access</span>
+  <nav class="topbar-nav" aria-label="Site">
+    {
+      navLinks.map((link) => (
+        <a
+          href={link.href}
+          target={isExternal(link.href) ? '_blank' : undefined}
+          rel={isExternal(link.href) ? 'noreferrer' : undefined}
+        >
+          {link.label}
+        </a>
+      ))
+    }
+  </nav>
   <a href="/#download" class="topbar-download" data-download-platform-jump>
     Download
   </a>

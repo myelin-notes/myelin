@@ -49,9 +49,8 @@ const SIZES: Array<{
   { id: 'pages', label: 'Pages', w: 1900, h: 1140, y: 1350 },
   { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000, y: 180 },
   { id: 'linked', label: 'Linked notes', w: 1750, h: 800, y: -150 },
-  { id: 'local-first', label: 'Local-first', w: 1850, h: 850, y: 900 },
-  { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150, y: 1850 },
-  { id: 'supporter', label: 'Support', w: 1800, h: 1150, y: 550 },
+  { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150, y: 900 },
+  { id: 'local-first', label: 'Local-first', w: 1850, h: 850, y: 1850 },
   { id: 'download', label: 'Download', w: 2100, h: 1400, y: 1400 },
 ];
 
@@ -469,8 +468,7 @@ async function buildInk(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   const y = r.y + SCENE_PAD;
   // Left half: the PDF story, with the shape-recognition demo as a playful
   // aside underneath.
-  title(canvas, x, y + 150, copy.ink.pdfHeading, 72, 1000);
-  drawUnderline(canvas, x + 4, y + 365, 520, ORANGE, 8);
+  title(canvas, x, y + 170, copy.ink.pdfHeading, 72, 1000);
   addText(canvas, x, y + 430, copy.ink.pdfBody, {
     size: 26,
     color: MUTED,
@@ -559,8 +557,8 @@ async function buildLinked(
 ): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.linked.heading, 62, 760);
-  addText(canvas, x, y + 160, copy.linked.body, {
+  title(canvas, x, y + 185, copy.linked.heading, 62, 760);
+  addText(canvas, x, y + 305, copy.linked.body, {
     size: 25,
     color: MUTED,
     width: 740,
@@ -579,31 +577,36 @@ async function buildLinked(
 }
 
 function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
+  // Pull the left column in from the scene edge so it sits closer to the
+  // checklist instead of hugging the far side. The checklist stays put (it is
+  // anchored off r.x below), so this closes the gutter from the left and evens
+  // out the scene's outer margins at the same time.
+  const x = r.x + SCENE_PAD + 100;
   const y = r.y + SCENE_PAD;
 
   // Left column: the thesis. A two-line headline with the highlighter riding
-  // "your machine.", a short lede on a tight measure, and one hand-drawn
-  // aside pointing across the gutter at the proof panel.
-  title(canvas, x, y + 40, copy.localFirst.heading, 68, 700);
+  // "your machine.", and a short lede on a tight measure. The whole block is
+  // pushed down so its center lines up with the checklist across the gutter:
+  // the headline and lede span roughly 370 units against the checklist's ~540,
+  // so the offsets below sit the pair mid-height in the scene rather than
+  // hanging the left column from the top edge.
+  title(canvas, x, y + 160, copy.localFirst.heading, 68, 700);
   addStroke(
     canvas,
-    wobblyLine([x + 120, y + 172], [x + 502, y + 166], 4, 0.8),
+    wobblyLine([x + 120, y + 292], [x + 502, y + 286], 4, 0.8),
     HIGHLIGHT,
     50,
   );
-  addText(canvas, x, y + 300, copy.localFirst.lede, {
+  addText(canvas, x, y + 420, copy.localFirst.lede, {
     size: 26,
     color: MUTED,
     width: 620,
   });
-  hand(canvas, x + 50, y + 480, copy.localFirst.annotation, GREEN, 40, 420);
-  drawArrow(canvas, [x + 410, y + 545], [x + 706, y + 450], GREEN, 4);
 
   // Right column: the five proof points as a checklist. Fixed row rhythm; the
   // closing bullet stays inked darker as the emphasis.
   const bullets = copy.localFirst.bullets;
-  const px = x + 780;
+  const px = r.x + 870;
   const py = y + 10;
   bullets.forEach((bullet, i) => {
     const by = py + 62 + i * 118;
@@ -625,18 +628,21 @@ export const COLLAB_CURSORS = {
 function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.sync.heading, 62, 800);
-  addText(canvas, x, y + 200, copy.sync.kicker, {
+  // Dropped below the scene's top pad so the heading block sits level with the
+  // cursor graphic on the right rather than riding above it.
+  const textTop = y + 140;
+  title(canvas, x, textTop, copy.sync.heading, 62, 800);
+  addText(canvas, x, textTop + 200, copy.sync.kicker, {
     size: 26,
     width: 780,
   });
-  drawUnderline(canvas, x, y + 310, 480, ORANGE, 6);
+  drawUnderline(canvas, x, textTop + 310, 480, ORANGE, 6);
 
   // Two live cursors (DOM, Figma-style) converging on a shared scrap of the
   // canvas; light ink trails mark where each one came from.
   const cx = r.x + 1150;
   const cy = r.y + 160;
-  hand(canvas, cx + 200, cy + 215, copy.sync.sharedNote, INK, 40, 260);
+  hand(canvas, cx + 200, cy + 240, copy.sync.sharedNote, INK, 40, 260);
   addStroke(canvas, sketchEllipse(cx + 320, cy + 290, 260, 170, 1.1), MUTED, 4);
   addStroke(
     canvas,
@@ -670,7 +676,7 @@ function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
       tx + 40,
       ty + 26,
       tier.badge,
-      tier.badge === 'Coming' ? ORANGE : GREEN,
+      tier.badge === 'Today' ? GREEN : ORANGE,
       34,
       200,
     );
@@ -687,37 +693,13 @@ function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
   });
 }
 
-function buildSupporter(canvas: DrawableCanvas, r: WorldRect): void {
-  const x = r.x + SCENE_PAD;
-  const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.supporter.heading, 56, 1100);
-  addText(canvas, x, y + 240, copy.supporter.body, {
-    size: 26,
-    color: MUTED,
-    width: 820,
-  });
-  copy.supporter.benefits.forEach((benefit, i) => {
-    const by = y + 400 + i * 90;
-    drawCheck(canvas, x + 6, by + 6, 0.9);
-    addText(canvas, x + 64, by, benefit, { size: 25, width: 900 });
-  });
-  addText(canvas, x, y + 790, copy.supporter.reassurance, {
-    size: 21,
-    color: MUTED,
-    width: 800,
-  });
-  // Sponsor buttons (DOM overlay) render to the right of the benefits list.
-  addStroke(canvas, sketchEllipse(r.x + 1400, y + 510, 240, 140, 0.2), PINK, 6);
-  hand(canvas, r.x + 1290, y + 450, 'keep it\nindependent', PINK, 44, 260);
-}
-
 async function buildDownload(
   canvas: DrawableCanvas,
   r: WorldRect,
 ): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
-  title(canvas, x, y, copy.download.heading, 72, 900);
+  title(canvas, x, y + 40, copy.download.heading, 72, 900);
   addText(canvas, x, y + 160, copy.download.body, {
     size: 25,
     color: MUTED,
@@ -738,12 +720,8 @@ async function buildDownload(
     copy.download.faqMarkdown,
   );
 
-  title(canvas, x, y + 900, copy.footer.tagline, 32, 700);
-  addText(canvas, x, y + 970, copy.footer.privacyNote, {
-    size: 19,
-    color: MUTED,
-    width: 800,
-  });
+  // Sits just above the footer links, which the overlay anchors at y+1080.
+  title(canvas, x, y + 1010, copy.footer.tagline, 32, 700);
 }
 
 /**
@@ -757,7 +735,6 @@ export async function populateScenes(canvas: DrawableCanvas): Promise<void> {
   buildAudioSearch(canvas, rect('audio-search'));
   buildLocalFirst(canvas, rect('local-first'));
   buildSync(canvas, rect('sync'));
-  buildSupporter(canvas, rect('supporter'));
   await buildInk(canvas, rect('ink'));
   await buildHero(canvas, rect('hero'));
   await buildLinked(canvas, rect('linked'));

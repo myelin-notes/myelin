@@ -174,7 +174,6 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
     downloads[key] ?? siteLinks.releases;
 
   const hero = sceneById('hero').rect;
-  const supporter = sceneById('supporter').rect;
   const download = sceneById('download').rect;
 
   const platforms = copy.download.platforms;
@@ -198,23 +197,6 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
         </WorldButton>
         <WorldButton variant="outline" size={30} onClick={onSeeItInAction}>
           {copy.hero.ctaSecondary} ↓
-        </WorldButton>
-      </div>
-
-      {/* Founding Supporter CTAs. */}
-      <div
-        className="absolute flex items-center"
-        style={{
-          left: supporter.x + SCENE_PAD,
-          top: supporter.y + SCENE_PAD + 880,
-          gap: 24,
-        }}
-      >
-        <WorldButton href={siteLinks.sponsors} size={28}>
-          {copy.supporter.ctaPrimary}
-        </WorldButton>
-        <WorldButton href={siteLinks.kofi} variant="outline" size={28}>
-          {copy.supporter.ctaSecondary}
         </WorldButton>
       </div>
 
