@@ -149,140 +149,226 @@ function textSchema(
   };
 }
 
-function stringArraySchema(): Record<string, unknown> {
-  return { type: 'array', items: { type: 'string' } };
+function stringArraySchema(description: string): Record<string, unknown> {
+  return { type: 'array', items: { type: 'string' }, description };
 }
+
+const NOTE_ID_PROPERTY = {
+  type: 'string',
+  description:
+    'Canvas note id (a UUID), taken from the "id" field returned by list_notes, search_notes, list_recent_notes, or list_directory. Titles and paths are not accepted; resolve a title with search_notes first.',
+};
+
+const PAGE_FRAME_ID_PROPERTY = {
+  type: 'string',
+  description:
+    'Page frame id, from an element with kind "page-frame" in the "elements" array returned by read_note.',
+};
+
+function elementIdProperty(kind: string): Record<string, unknown> {
+  return {
+    type: 'string',
+    description: `Element id, from an element with kind "${kind}" in the "elements" array returned by read_note. Passing an element of a different kind is an error.`,
+  };
+}
+
+const LIMIT_PROPERTY = {
+  type: 'number',
+  description: 'Maximum results to return. Defaults to 50, clamped to 1-200.',
+};
+
+const TAG_FILTER_PROPERTY = {
+  type: 'string',
+  description:
+    'Keep only results carrying exactly this tag. Matching is exact rather than hierarchical, so a note tagged "work/q3" is not returned for tag "work". Call list_tags to see the tags actually in use.',
+};
+
+const PARENT_FOLDER_PROPERTY = {
+  type: 'string',
+  description:
+    'Id of the containing folder, from list_directory. Omit to use the repository root.',
+};
+
+const MARKDOWN_PROPERTY = {
+  type: 'string',
+  description:
+    'Page frame body as Markdown. Supported: ATX headings, paragraphs, "- " and "1. " lists (indent nested items by two spaces), "- [ ]" / "- [x]" tasks, blockquotes and "> [!note]" callouts, fenced code blocks, "$$" math blocks and "$...$" inline math, pipe tables, "---" rules, **bold**, *italic*, <u>underline</u>, ~~strikethrough~~, `code`, [links](url), and wiki-style "[[Note Title]]" or "[[Note Title#Page Frame]]" links to other Myelin notes (resolved against note titles at import time). Anything else is imported as plain text.',
+};
 
 export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'list_notes',
-    description: 'List Myelin canvas notes with compact metadata and previews.',
+    description:
+      "Browse the user's Myelin canvas notes, returning id, title, folder path, tags, timestamps, and a ~500 character preview of indexed text for each. Use this to discover what exists; use search_notes when you have specific terms to look for. Only canvas notes (.mcanvas) are listed - call list_directory to see other file types. Result order is unspecified, so treat a truncated result as an arbitrary subset rather than the top matches.",
     inputSchema: textSchema({
-      query: { type: 'string' },
-      folderId: { type: 'string' },
-      tag: { type: 'string' },
-      limit: { type: 'number' },
+      query: {
+        type: 'string',
+        description:
+          'Optional keyword filter over note titles and indexed content. When set, results come back relevance-ranked and folderId/tag are applied on top; when omitted, notes are collected by walking the folder tree.',
+      },
+      folderId: {
+        type: 'string',
+        description:
+          'Restrict to notes anywhere beneath this folder (recursive, not just direct children). Omit for the whole repository.',
+      },
+      tag: TAG_FILTER_PROPERTY,
+      limit: LIMIT_PROPERTY,
     }),
   },
   {
     name: 'search_notes',
     description:
-      'Search Myelin canvas notes and return ranked matches with snippets.',
+      'Keyword search across canvas note titles and indexed body text, returning matches ranked by relevance with a score, the terms that matched, and a snippet showing the match in context. Prefer this over list_notes whenever you know what you are looking for. Matching is lexical, not semantic, so retry with synonyms or a shorter query if nothing comes back. Follow up with read_note or read_note_full on a promising match to get its actual content.',
     inputSchema: textSchema(
       {
-        query: { type: 'string' },
-        tag: { type: 'string' },
-        limit: { type: 'number' },
+        query: {
+          type: 'string',
+          description:
+            'Search terms matched against note titles and indexed body text.',
+        },
+        tag: TAG_FILTER_PROPERTY,
+        limit: LIMIT_PROPERTY,
       },
       ['query'],
     ),
   },
   {
     name: 'list_recent_notes',
-    description: 'List recently modified Myelin canvas notes.',
+    description:
+      'List canvas notes ordered by most recently modified. Use this to answer "what has the user been working on" or to pick up where a previous session left off.',
     inputSchema: textSchema({
-      limit: { type: 'number' },
+      limit: LIMIT_PROPERTY,
     }),
   },
   {
     name: 'list_tags',
-    description: 'List tags used by notes, files, and folders.',
+    description:
+      'List every tag in use with the number of nodes carrying it, most used first. Tags are hierarchical, written with "/" (for example "work/q3/planning"). Call this before filtering by tag anywhere else, because the tag filters match exactly and will silently return nothing for a tag that does not exist verbatim.',
     inputSchema: textSchema({
-      includeAncestors: { type: 'boolean' },
+      includeAncestors: {
+        type: 'boolean',
+        description:
+          'When true, also report each parent segment of a hierarchical tag as its own entry, counting every node tagged beneath it - so "work/q3" contributes to "work" as well. Defaults to false, which reports only tags exactly as stored.',
+      },
     }),
   },
   {
     name: 'list_directory',
     description:
-      'List the immediate notes, files, and folders in one Myelin folder. Omit folderId for the root.',
+      'List the direct children of one folder: subfolders (with child counts) and files of every type, not just canvas notes. Use this to explore how the user organizes their vault, or to resolve a folder id before creating or moving something. Not recursive - call again on each subfolder to go deeper.',
     inputSchema: textSchema({
-      folderId: { type: 'string' },
+      folderId: {
+        type: 'string',
+        description:
+          'Folder to list. Omit for the repository root. Ids come from the "folders" array of a previous list_directory call, or from the "parentId" of any node.',
+      },
     }),
   },
   {
     name: 'read_note',
     description:
-      'Read structured note inventory, including page frames, floating text, assets, drawings, and cached indexed text.',
-    inputSchema: textSchema({ noteId: { type: 'string' } }, ['noteId']),
+      'Read the structure of one canvas note: its metadata plus an inventory of every element on the canvas. A Myelin note is an infinite 2D canvas, and each element carries a "kind" (page-frame, text, latex, image, pdf, stroke), an id, and pixel bounds {x, y, width, height} with y increasing downward. Page frames hold the rich text and are the only writable content; text and latex float directly on the canvas; strokes are handwritten ink whose content is not readable. Only snippets are included here - each element names the follow-up tool in its "reader" field, or call read_note_full to get every text body in one shot. Use this first when you need to locate or modify something specific inside a note.',
+    inputSchema: textSchema({ noteId: NOTE_ID_PROPERTY }, ['noteId']),
   },
   {
     name: 'read_links',
-    description: 'Read outgoing note links from one canvas note.',
-    inputSchema: textSchema({ noteId: { type: 'string' } }, ['noteId']),
+    description:
+      'List the wiki-style "[[...]]" links written inside one canvas note, with each link\'s surrounding snippet and the resolved target note when it exists. Use this to traverse the note graph outward. A link whose targetExists is false points at a note the user has not created yet.',
+    inputSchema: textSchema({ noteId: NOTE_ID_PROPERTY }, ['noteId']),
   },
   {
     name: 'read_backlinks',
-    description: 'Read notes that link to one canvas note.',
-    inputSchema: textSchema({ noteId: { type: 'string' } }, ['noteId']),
+    description:
+      'List the notes that link to this one, with the source note and the snippet around each link. Use this to find the context a note is referenced in, or to judge how central a note is before renaming or deleting it.',
+    inputSchema: textSchema({ noteId: NOTE_ID_PROPERTY }, ['noteId']),
   },
   {
     name: 'read_page_frame',
-    description: 'Read full markdown and plain text for one page frame.',
+    description:
+      'Read one page frame in full, as both Markdown (round-trips through replace_page_frame_markdown) and plain text. Call this after read_note to get the complete body behind a truncated snippet. Read the current Markdown before replacing a frame so you preserve content you did not intend to change.',
     inputSchema: textSchema(
-      { noteId: { type: 'string' }, pageFrameId: { type: 'string' } },
+      { noteId: NOTE_ID_PROPERTY, pageFrameId: PAGE_FRAME_ID_PROPERTY },
       ['noteId', 'pageFrameId'],
     ),
   },
   {
     name: 'read_canvas_text',
-    description: 'Read one floating canvas text element.',
+    description:
+      'Read one floating text element - a plain text box placed directly on the canvas rather than inside a page frame. Returns its full text and bounds. There is no tool to edit these; report changes to the user instead.',
     inputSchema: textSchema(
-      { noteId: { type: 'string' }, elementId: { type: 'string' } },
+      { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('text') },
       ['noteId', 'elementId'],
     ),
   },
   {
     name: 'read_latex',
-    description: 'Read one floating LaTeX element.',
+    description:
+      'Read the LaTeX source of one floating math element on the canvas. Returns the raw source, not a rendered image. There is no tool to edit these; report changes to the user instead.',
     inputSchema: textSchema(
-      { noteId: { type: 'string' }, elementId: { type: 'string' } },
+      { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('latex') },
       ['noteId', 'elementId'],
     ),
   },
   {
     name: 'read_image',
-    description: 'Read metadata for one image element.',
+    description:
+      'Read metadata for one image on the canvas: pixel dimensions, crop rectangle, byte size, and bounds. This returns no pixels and you cannot see the image - do not describe or interpret its contents. Ask the user to share the image directly if its contents matter.',
     inputSchema: textSchema(
-      { noteId: { type: 'string' }, elementId: { type: 'string' } },
+      { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('image') },
       ['noteId', 'elementId'],
     ),
   },
   {
     name: 'read_pdf',
-    description: 'Read metadata for one PDF element.',
+    description:
+      'Read metadata for one PDF embedded on the canvas: file name, page count, byte size, and bounds. The PDF text is not extractable through this server (textAvailable is always false), so do not claim knowledge of its contents.',
     inputSchema: textSchema(
-      { noteId: { type: 'string' }, elementId: { type: 'string' } },
+      { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('pdf') },
       ['noteId', 'elementId'],
     ),
   },
   {
     name: 'read_note_full',
     description:
-      'Read a note inventory plus full page-frame, canvas text, and LaTeX contents.',
-    inputSchema: textSchema({ noteId: { type: 'string' } }, ['noteId']),
+      'Read everything textual in one note at once: the same inventory as read_note, plus the complete Markdown of every page frame and the full text of every canvas text and LaTeX element. Use this when you need the whole note; prefer read_note plus a targeted reader when the note is large, since this response is not paginated or truncated and can be very long.',
+    inputSchema: textSchema({ noteId: NOTE_ID_PROPERTY }, ['noteId']),
   },
   {
     name: 'create_page_frame',
-    description: 'Create a new page frame from markdown in an existing note.',
+    description:
+      'Add a new page frame rendered from Markdown to an existing canvas note, and return the created frame. This is the way to write content into a note the user already has. Requires direct MCP writes to be enabled in Myelin settings.',
     inputSchema: textSchema(
       {
-        noteId: { type: 'string' },
-        markdown: { type: 'string' },
-        displayName: { type: 'string' },
-        x: { type: 'number' },
-        y: { type: 'number' },
+        noteId: NOTE_ID_PROPERTY,
+        markdown: MARKDOWN_PROPERTY,
+        displayName: {
+          type: 'string',
+          description:
+            'Label shown on the frame in the canvas UI and usable as the "#Page Frame" part of a note link. Defaults to "Page Frame".',
+        },
+        x: {
+          type: 'number',
+          description:
+            "Canvas x of the frame's top-left corner, in pixels; the canvas is unbounded and coordinates may be negative. Omit both x and y to place the frame automatically, offset from existing frames so it does not overlap them. A frame is 680x880 pixels, so leave at least that much clearance from the bounds reported by read_note if you set this manually.",
+        },
+        y: {
+          type: 'number',
+          description:
+            "Canvas y of the frame's top-left corner, in pixels; y increases downward. Omit together with x for automatic placement.",
+        },
       },
       ['noteId', 'markdown'],
     ),
   },
   {
     name: 'replace_page_frame_markdown',
-    description: 'Replace one existing page frame with markdown.',
+    description:
+      "Overwrite one page frame's entire body with new Markdown. There is no partial or append edit, so read_page_frame first and send the full intended content - anything you leave out is destroyed. Passing an empty string clears the frame. Requires direct MCP writes to be enabled in Myelin settings.",
     inputSchema: textSchema(
       {
-        noteId: { type: 'string' },
-        pageFrameId: { type: 'string' },
-        markdown: { type: 'string' },
+        noteId: NOTE_ID_PROPERTY,
+        pageFrameId: PAGE_FRAME_ID_PROPERTY,
+        markdown: MARKDOWN_PROPERTY,
       },
       ['noteId', 'pageFrameId', 'markdown'],
     ),
@@ -290,34 +376,54 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'create_note',
     description:
-      'Create a new canvas note, optionally with an initial markdown page frame.',
+      'Create a new canvas note and return its structure, including the new id. Check with search_notes first that a suitable note does not already exist. Requires direct MCP writes to be enabled in Myelin settings.',
     inputSchema: textSchema(
       {
-        title: { type: 'string' },
-        parentId: { type: 'string' },
-        markdown: { type: 'string' },
+        title: {
+          type: 'string',
+          description:
+            'Note title, also its file name. A numeric suffix is appended automatically if the folder already contains this name, so the created title may differ from what you pass - read it back from the response.',
+        },
+        parentId: PARENT_FOLDER_PROPERTY,
+        markdown: {
+          ...MARKDOWN_PROPERTY,
+          description: `Optional initial page frame content. Omit to create an empty canvas. ${MARKDOWN_PROPERTY.description}`,
+        },
       },
       ['title'],
     ),
   },
   {
     name: 'create_folder',
-    description: 'Create a new folder.',
+    description:
+      'Create a new folder. Requires direct MCP writes to be enabled in Myelin settings.',
     inputSchema: textSchema(
       {
-        name: { type: 'string' },
-        parentId: { type: 'string' },
+        name: {
+          type: 'string',
+          description:
+            'Folder name. A numeric suffix is appended automatically if the parent already contains this name, so read the final name back from the response.',
+        },
+        parentId: PARENT_FOLDER_PROPERTY,
       },
       ['name'],
     ),
   },
   {
     name: 'move_node',
-    description: 'Move a note, file, or folder to another folder.',
+    description:
+      'Move a note, file, or folder into another folder. Note links follow the note, so links keep resolving after a move. Requires direct MCP writes to be enabled in Myelin settings.',
     inputSchema: textSchema(
       {
-        nodeId: { type: 'string' },
-        newParentId: { type: 'string' },
+        nodeId: {
+          type: 'string',
+          description: 'Id of the note, file, or folder to move.',
+        },
+        newParentId: {
+          type: 'string',
+          description:
+            'Destination folder id. Omit to move to the repository root. Moving a folder into its own descendant is rejected.',
+        },
       },
       ['nodeId'],
     ),
@@ -325,12 +431,23 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'rename_node',
     description:
-      'Rename a note, file, or folder. Canvas-note backlinks are rewritten unless updateReferences=false.',
+      'Rename a note, file, or folder. Because "[[...]]" links reference notes by title, renaming a canvas note rewrites those links across the vault by default and reports what changed. Consider read_backlinks first to see how widely the note is referenced. Requires direct MCP writes to be enabled in Myelin settings.',
     inputSchema: textSchema(
       {
-        nodeId: { type: 'string' },
-        newName: { type: 'string' },
-        updateReferences: { type: 'boolean' },
+        nodeId: {
+          type: 'string',
+          description: 'Id of the note, file, or folder to rename.',
+        },
+        newName: {
+          type: 'string',
+          description:
+            'New name. Unlike create_note, this is not deduplicated against siblings.',
+        },
+        updateReferences: {
+          type: 'boolean',
+          description:
+            'Defaults to true: rewrite "[[...]]" links in other canvas notes to the new title. Pass false to leave them pointing at the old title, which will break them. Ignored for anything other than a canvas note.',
+        },
       },
       ['nodeId', 'newName'],
     ),
@@ -338,12 +455,23 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'delete_node',
     description:
-      'Delete a note, file, or folder. Requires confirm=true; non-empty folders also require recursive=true.',
+      'Permanently delete a note, file, or folder. Links pointing at a deleted note are left broken and are not rewritten, so check read_backlinks first. Confirm with the user before calling this. Requires direct MCP writes to be enabled in Myelin settings.',
     inputSchema: textSchema(
       {
-        nodeId: { type: 'string' },
-        confirm: { type: 'boolean' },
-        recursive: { type: 'boolean' },
+        nodeId: {
+          type: 'string',
+          description: 'Id of the note, file, or folder to delete.',
+        },
+        confirm: {
+          type: 'boolean',
+          description:
+            'Must be true. This exists so a deletion cannot happen by accident; set it only once you intend to delete.',
+        },
+        recursive: {
+          type: 'boolean',
+          description:
+            'Required (true) to delete a folder that still has children, which also deletes everything inside it. Not needed for files or empty folders.',
+        },
       },
       ['nodeId', 'confirm'],
     ),
@@ -351,12 +479,16 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'delete_page_frame',
     description:
-      'Delete one page frame from a canvas note. Requires confirm=true.',
+      'Permanently delete one page frame and all its content from a canvas note, leaving the rest of the canvas untouched. The deleted content is returned so it can be restored with create_page_frame if this was a mistake. Requires direct MCP writes to be enabled in Myelin settings.',
     inputSchema: textSchema(
       {
-        noteId: { type: 'string' },
-        pageFrameId: { type: 'string' },
-        confirm: { type: 'boolean' },
+        noteId: NOTE_ID_PROPERTY,
+        pageFrameId: PAGE_FRAME_ID_PROPERTY,
+        confirm: {
+          type: 'boolean',
+          description:
+            'Must be true. This exists so a deletion cannot happen by accident; set it only once you intend to delete.',
+        },
       },
       ['noteId', 'pageFrameId', 'confirm'],
     ),
@@ -364,13 +496,20 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'edit_tags',
     description:
-      'Edit tags on a note, file, or folder. Provide set to replace tags, or add/remove arrays for incremental edits. If combined, they apply in order: set (full replace) first, then add, then remove.',
+      'Change the tags on a note, file, or folder, returning the node with its resulting tags. Provide at least one of set, add, or remove; if several are given they apply in that order. Tags are hierarchical using "/" - call list_tags first and reuse the vocabulary the user already has rather than inventing near-duplicates. Requires direct MCP writes to be enabled in Myelin settings.',
     inputSchema: textSchema(
       {
-        nodeId: { type: 'string' },
-        set: stringArraySchema(),
-        add: stringArraySchema(),
-        remove: stringArraySchema(),
+        nodeId: {
+          type: 'string',
+          description: 'Id of the note, file, or folder to tag.',
+        },
+        set: stringArraySchema(
+          'Replace all existing tags with exactly these. Destructive - read the current tags first, and prefer add/remove for incremental edits.',
+        ),
+        add: stringArraySchema('Tags to add, keeping existing ones.'),
+        remove: stringArraySchema(
+          'Tags to remove. Removal is exact, so "work" does not remove "work/q3".',
+        ),
       },
       ['nodeId'],
     ),
