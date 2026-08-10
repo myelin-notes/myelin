@@ -346,10 +346,12 @@ async fn call_frontend_tool(
     }
 
     let result = response.result.unwrap_or(Value::Null);
+    // Compact, not pretty: the reader is a model paying per token, and indenting
+    // a nested payload like read_note's costs ~37% more for no added meaning.
     Ok(json!({
         "content": [{
             "type": "text",
-            "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| "null".to_string())
+            "text": serde_json::to_string(&result).unwrap_or_else(|_| "null".to_string())
         }],
         "isError": false
     }))

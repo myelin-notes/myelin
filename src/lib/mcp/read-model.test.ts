@@ -75,6 +75,15 @@ async function createRepositoryNote() {
     color: '#000000',
     size: 5,
   });
+  ydoc.createElementMap(ElementType.STROKE, 'stroke-2', {
+    offsetX: 100,
+    offsetY: 200,
+    scaleX: 1,
+    scaleY: 1,
+    points: [0, 0, 0.5, 10, 10, 0.6, 20, 10, 0.7],
+    color: '#000000',
+    size: 5,
+  });
   ydoc.createElementMap(999 as ElementType, 'unknown-1', {
     offsetX: 100,
     offsetY: 110,
@@ -107,7 +116,7 @@ describe('MCP read model', () => {
       'image',
       'pdf',
       'latex',
-      'stroke',
+      'stroke-group',
       'unknown',
     ]);
     expect(note.elements[0]).toMatchObject({
@@ -128,18 +137,22 @@ describe('MCP read model', () => {
   });
 
   // A note can hold hundreds of strokes, so anything the model cannot act on is
-  // pure context cost. Exact equality here is the point: it fails if a field
-  // creeps back in.
-  it('summarizes ink as id and bounds only, at one-decimal precision', async () => {
+  // pure context cost. Exact equality here is the point: it fails if per-stroke
+  // ids, styles or wrapper objects creep back in.
+  it('collapses every stroke into one group of boxes, at one-decimal precision', async () => {
     const { repository, noteId } = await createRepositoryNote();
 
     const note = await buildMcpNoteReadModel(repository, noteId);
 
     expect(note.elements[5]).toEqual({
-      kind: 'stroke',
-      id: 'stroke-1',
-      bounds: { x: 9.8, y: 43.2, width: 25, height: 15 },
+      kind: 'stroke-group',
       reader: 'read_handwriting',
+      count: 2,
+      bounds: { x: 9.8, y: 43.2, width: 112.7, height: 169.3 },
+      boxes: [
+        [9.8, 43.2, 25, 15],
+        [97.5, 197.5, 25, 15],
+      ],
     });
   });
 

@@ -64,15 +64,19 @@ export interface McpLatexSummary extends McpElementBase {
 }
 
 /**
- * Ink is summarized more thinly than other elements: a note can hold hundreds of
- * strokes, and only the id and bounds are actionable (bounds frame a
- * screenshot_canvas capture). Style and point counts are omitted deliberately.
+ * Ink collapses into a single entry rather than one element per stroke. A note
+ * holds hundreds of strokes and no tool accepts a stroke id, so per-stroke
+ * objects were repeating an id, a kind and a reader to say nothing; the only
+ * actionable part is geometry, which survives here as `boxes`.
  */
-export interface McpStrokeSummary {
-  kind: 'stroke';
-  id: string;
-  bounds: McpBounds;
+export interface McpStrokeGroupSummary {
+  kind: 'stroke-group';
   reader: string;
+  count: number;
+  /** Union of every stroke box, for framing one capture over all the ink. */
+  bounds: McpBounds;
+  /** Per-stroke `[x, y, width, height]`, in document order. */
+  boxes: [number, number, number, number][];
 }
 
 export interface McpUnknownElementSummary extends McpElementBase {
@@ -86,7 +90,7 @@ export type McpNoteElementSummary =
   | McpImageSummary
   | McpPdfSummary
   | McpLatexSummary
-  | McpStrokeSummary
+  | McpStrokeGroupSummary
   | McpUnknownElementSummary;
 
 export interface McpNoteReadModel {
