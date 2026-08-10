@@ -54,7 +54,9 @@ export function FontSizeField({
     : undefined;
 
   return (
-    <div className="flex items-center gap-0.5 rounded-lg bg-surface p-0.5">
+    // Sized to its content in the selection toolbar, but stretched to the
+    // panel width in the tool options column — center so it reads right in both.
+    <div className="flex items-center justify-center gap-0.5 rounded-lg bg-surface p-0.5">
       <button
         type="button"
         aria-label={strings.canvas.toolOptions.decreaseFontSize}
