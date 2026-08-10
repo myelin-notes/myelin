@@ -128,6 +128,27 @@ export interface McpNoteFullReadModel extends McpNoteReadModel {
   latexBlocks: McpLatexContent[];
 }
 
+export interface McpScreenshot {
+  noteId: VFSNodeId;
+  /** World-space rect actually captured, after defaults were applied. */
+  region: McpBounds;
+  mimeType: 'image/png';
+  base64: string;
+}
+
+/**
+ * MCP content blocks a tool can return instead of a JSON payload. The bridge
+ * passes these through to `tools/call` verbatim, so an image reaches the model
+ * as an image rather than as an unreadable base64 string.
+ */
+export type McpContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
+
+export interface McpToolContentResult {
+  content: McpContentBlock[];
+}
+
 export interface McpToolDefinition {
   name: string;
   description: string;
@@ -143,6 +164,8 @@ export interface McpBridgeToolCallPayload {
 export interface McpBridgeToolResponse {
   requestId: string;
   result?: unknown;
+  /** Pre-built MCP content blocks, used instead of serializing `result`. */
+  content?: McpContentBlock[];
   error?: string;
 }
 

@@ -33,6 +33,7 @@ import {
   readMcpPageFrame,
   readMcpPdf,
 } from './read-model';
+import { clampScreenshotMaxSize, renderMcpScreenshot } from './screenshot';
 import type {
   McpDirectoryListing,
   McpFileListItem,
@@ -40,6 +41,7 @@ import type {
   McpNodeListItem,
   McpNoteListItem,
   McpPageFrameContent,
+  McpToolContentResult,
   McpToolDefinition,
 } from './types';
 
@@ -199,7 +201,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'list_notes',
     description:
-      "Browse the user's Myelin canvas notes, returning id, title, folder path, tags, timestamps, and a ~500 character preview of indexed text for each. Use this to discover what exists; use search_notes when you have specific terms to look for. Only canvas notes (.mcanvas) are listed - call list_directory to see other file types. Result order is unspecified, so treat a truncated result as an arbitrary subset rather than the top matches.",
+      "Browse the user's Myelin canvas notes, returning id, title, folder path, tags, timestamps, and a ~500 character preview of indexed text for each. Use this to discover what exists; use search_notes when you have specific terms to look for. Only canvas notes (.mcanvas) are listed - call list_directory to see other file types. A null or empty preview does not mean an empty note: handwritten ink is not indexed, so a note that is entirely handwriting previews as blank and must be inspected with read_note and screenshot_canvas. Result order is unspecified, so treat a truncated result as an arbitrary subset rather than the top matches.",
     inputSchema: textSchema({
       query: {
         type: 'string',
@@ -218,7 +220,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'search_notes',
     description:
-      'Keyword search across canvas note titles and indexed body text, returning matches ranked by relevance with a score, the terms that matched, and a snippet showing the match in context. Prefer this over list_notes whenever you know what you are looking for. Matching is lexical, not semantic, so retry with synonyms or a shorter query if nothing comes back. Follow up with read_note or read_note_full on a promising match to get its actual content.',
+      'Keyword search across canvas note titles and indexed body text, returning matches ranked by relevance with a score, the terms that matched, and a snippet showing the match in context. Prefer this over list_notes whenever you know what you are looking for. Matching is lexical, not semantic, so retry with synonyms or a shorter query if nothing comes back. Handwritten ink is not indexed and never matches here, so a handwritten note is invisible to search however well it fits the query - when a search comes up short, fall back to browsing candidates with read_note and screenshot_canvas rather than concluding the content does not exist. Follow up with read_note or read_note_full on a promising match to get its actual content.',
     inputSchema: textSchema(
       {
         query: {
@@ -267,7 +269,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'read_note',
     description:
-      'Read the structure of one canvas note: its metadata plus an inventory of every element on the canvas. A Myelin note is an infinite 2D canvas, and each element carries a "kind" (page-frame, text, latex, image, pdf, stroke), an id, and pixel bounds {x, y, width, height} with y increasing downward. Page frames hold the rich text and are the only writable content; text and latex float directly on the canvas; strokes are handwritten ink whose content is not readable. Only snippets are included here - each element names the follow-up tool in its "reader" field, or call read_note_full to get every text body in one shot. Use this first when you need to locate or modify something specific inside a note.',
+      'Read the structure of one canvas note: its metadata plus an inventory of every element on the canvas. A Myelin note is an infinite 2D canvas, and each element carries a "kind" (page-frame, text, latex, image, pdf, stroke), an id, and pixel bounds {x, y, width, height} with y increasing downward. Page frames hold the rich text and are the only writable content; text and latex float directly on the canvas. Elements of kind "stroke" are handwritten ink: they carry no text at all, and the ONLY way to read handwriting is screenshot_canvas over their bounds - never report a note as empty or contentless just because its strokes returned no text. Only snippets are included here; each element names the follow-up tool in its "reader" field. Use this first when you need to locate or modify something specific inside a note.',
     inputSchema: textSchema({ noteId: NOTE_ID_PROPERTY }, ['noteId']),
   },
   {
@@ -312,7 +314,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'read_image',
     description:
-      'Read metadata for one image on the canvas: pixel dimensions, crop rectangle, byte size, and bounds. This returns no pixels and you cannot see the image - do not describe or interpret its contents. Ask the user to share the image directly if its contents matter.',
+      "Read metadata for one image on the canvas: pixel dimensions, crop rectangle, byte size, and bounds. This returns no pixels - do not describe or interpret the image from this alone. To actually see it, call screenshot_canvas with this element's bounds.",
     inputSchema: textSchema(
       { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('image') },
       ['noteId', 'elementId'],
@@ -321,16 +323,52 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'read_pdf',
     description:
-      'Read metadata for one PDF embedded on the canvas: file name, page count, byte size, and bounds. The PDF text is not extractable through this server (textAvailable is always false), so do not claim knowledge of its contents.',
+      "Read metadata for one PDF embedded on the canvas: file name, page count, byte size, and bounds. The PDF text is not extractable through this server (textAvailable is always false), so do not claim knowledge of its contents from this alone. To read a page, call screenshot_canvas over the part of this element's bounds that covers it - pages are laid out down or across the element according to its layout, so a single page is roughly the element height divided by pageCount.",
     inputSchema: textSchema(
       { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('pdf') },
       ['noteId', 'elementId'],
     ),
   },
   {
+    name: 'screenshot_canvas',
+    description:
+      'Render part of a canvas note to a PNG image and return it, so you can actually see the note the way the user does. THIS IS THE ONLY WAY TO READ HANDWRITING. Ink strokes hold no text and are absent from every other tool, so any time you need to read handwritten notes, or read_note lists elements of kind "stroke", or a note looks empty but the user says it has content, come here and look at it. Also use it for diagrams, sketches, spatial arrangement, and anything where layout carries the meaning. Coordinates are canvas pixels matching the "bounds" that read_note reports, so read_note first and pass the bounds of the strokes you want to read. Omit the region entirely to fit the whole note. To read handwriting reliably, capture one region at a time rather than the whole note - ink shrunk to fit a wide capture is illegible, so frame a cluster of strokes and, if the writing is still too small, capture a smaller region again. Transcribe only what you can actually see, and say so rather than guessing when it is unclear. Text inside page frames is typeset, not handwritten; prefer read_page_frame when you want to read that rather than see it.',
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        x: {
+          type: 'number',
+          description:
+            'Left edge of the region, in canvas pixels; may be negative. Omit x, y, width, and height together to frame the whole note.',
+        },
+        y: {
+          type: 'number',
+          description:
+            'Top edge of the region, in canvas pixels; y increases downward.',
+        },
+        width: {
+          type: 'number',
+          description:
+            'Region width in canvas pixels. A page frame is 680 wide, so roughly 800 covers one frame with margin.',
+        },
+        height: {
+          type: 'number',
+          description:
+            'Region height in canvas pixels. A page frame is 880 tall.',
+        },
+        maxSize: {
+          type: 'number',
+          description:
+            "Longest side of the returned image in pixels. Defaults to 1200, clamped to 64-2400. The region is never cropped to fit - it is scaled down - so a very wide region at a low maxSize renders its text illegibly. Capture a smaller region instead of raising this when you need detail; the image is never upscaled beyond the region's own pixel size.",
+        },
+      },
+      ['noteId'],
+    ),
+  },
+  {
     name: 'read_note_full',
     description:
-      'Read everything textual in one note at once: the same inventory as read_note, plus the complete Markdown of every page frame and the full text of every canvas text and LaTeX element. Use this when you need the whole note; prefer read_note plus a targeted reader when the note is large, since this response is not paginated or truncated and can be very long.',
+      'Read everything textual in one note at once: the same inventory as read_note, plus the complete Markdown of every page frame and the full text of every canvas text and LaTeX element. Despite the name this is NOT the whole note - handwritten ink, images, and PDF pages contribute no text and are absent from the result. If the inventory lists stroke elements, call screenshot_canvas to see the handwriting before drawing any conclusion about what the note contains. Prefer read_note plus a targeted reader when the note is large, since this response is not paginated or truncated and can be very long.',
     inputSchema: textSchema({ noteId: NOTE_ID_PROPERTY }, ['noteId']),
   },
   {
@@ -800,6 +838,7 @@ export class McpToolService {
       read_image: (input) => this.readImage(input),
       read_pdf: (input) => this.readPdf(input),
       read_note_full: (input) => this.readNoteFull(input),
+      screenshot_canvas: (input) => this.screenshotCanvas(input),
       create_page_frame: (input) => this.createPageFrame(input),
       replace_page_frame_markdown: (input) =>
         this.replacePageFrameMarkdown(input),
@@ -1054,6 +1093,40 @@ export class McpToolService {
     return readMcpNoteFull(this.options.repository, noteId, {
       indexedText: this.indexedTextByNode.get(noteId) ?? null,
     });
+  }
+
+  private async screenshotCanvas(args: unknown): Promise<McpToolContentResult> {
+    const input = objectArg(args);
+    const screenshot = await renderMcpScreenshot(
+      this.options.repository,
+      requiredString(input, 'noteId'),
+      {
+        x: optionalNumber(input, 'x'),
+        y: optionalNumber(input, 'y'),
+        width: optionalNumber(input, 'width'),
+        height: optionalNumber(input, 'height'),
+      },
+      clampScreenshotMaxSize(optionalNumber(input, 'maxSize')),
+    );
+
+    // The rect is echoed as text so the model can map what it sees back to
+    // canvas coordinates and frame a follow-up capture.
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            noteId: screenshot.noteId,
+            region: screenshot.region,
+          }),
+        },
+        {
+          type: 'image',
+          data: screenshot.base64,
+          mimeType: screenshot.mimeType,
+        },
+      ],
+    };
   }
 
   private assertWritesAllowed(): void {

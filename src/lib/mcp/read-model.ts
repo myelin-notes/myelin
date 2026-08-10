@@ -389,7 +389,8 @@ function summarizeStroke(yMap: Y.Map<unknown>): McpStrokeSummary {
     id: getElementId(yMap),
     type: ElementType.STROKE,
     bounds: getStrokeBounds(yMap),
-    reader: null,
+    // Ink carries no text; rendering the region is the only way to read it.
+    reader: 'screenshot_canvas',
     pointCount: Math.floor(points.length / 3),
     color: asString(yMap.get('color')),
     size: asNumber(yMap.get('size')),

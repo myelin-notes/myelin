@@ -33,6 +33,12 @@ interface CropEntrySnapshot {
 export class ImageElement extends DrawableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
   private _bitmap: ImageBitmap | null = null;
+  /**
+   * In-flight decode of `imageData`, so a render that starts before the bitmap
+   * lands can await it instead of silently drawing nothing. Settles (never
+   * rejects) once the decode finishes or fails.
+   */
+  private _bitmapDecode: Promise<void> | null = null;
   private _naturalWidth: number = 0;
   private _naturalHeight: number = 0;
   private _cropX: number = 0;
@@ -88,9 +94,14 @@ export class ImageElement extends DrawableElement {
       },
       imageData: (v) => {
         const blob = new Blob([(v as Uint8Array).slice()]);
-        createImageBitmap(blob).then((bmp) => {
-          this._bitmap = bmp;
-        });
+        this._bitmapDecode = createImageBitmap(blob).then(
+          (bmp) => {
+            this._bitmap = bmp;
+          },
+          () => {
+            // A corrupt blob leaves _bitmap null; draw passes already no-op.
+          },
+        );
       },
     });
     this.updateBox();
@@ -129,6 +140,15 @@ export class ImageElement extends DrawableElement {
       cropW: this._naturalWidth,
       cropH: this._naturalHeight,
     });
+  }
+
+  /**
+   * Hydration decodes `imageData` asynchronously, so a thumbnail taken right
+   * after a document loads would otherwise draw an empty box. Wait for the
+   * pending decode before the draw pass.
+   */
+  public override async prepareThumbnail(): Promise<void> {
+    await this._bitmapDecode;
   }
 
   private updateBox() {
