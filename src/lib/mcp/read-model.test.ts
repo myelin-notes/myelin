@@ -66,6 +66,11 @@ async function createRepositoryNote() {
     latex: 'E = mc^2',
   });
   ydoc.createElementMap(ElementType.STROKE, 'stroke-1', {
+    // Fractional offsets so the summarized bounds exercise coordinate rounding.
+    offsetX: 12.3456789,
+    offsetY: 45.6789,
+    scaleX: 1,
+    scaleY: 1,
     points: [0, 0, 0.5, 10, 10, 0.6, 20, 10, 0.7],
     color: '#000000',
     size: 5,
@@ -119,6 +124,22 @@ describe('MCP read model', () => {
       fileName: 'Paper.pdf',
       pageCount: 2,
       textAvailable: false,
+    });
+  });
+
+  // A note can hold hundreds of strokes, so anything the model cannot act on is
+  // pure context cost. Exact equality here is the point: it fails if a field
+  // creeps back in.
+  it('summarizes ink as id and bounds only, at one-decimal precision', async () => {
+    const { repository, noteId } = await createRepositoryNote();
+
+    const note = await buildMcpNoteReadModel(repository, noteId);
+
+    expect(note.elements[5]).toEqual({
+      kind: 'stroke',
+      id: 'stroke-1',
+      bounds: { x: 9.8, y: 43.2, width: 25, height: 15 },
+      reader: 'read_handwriting',
     });
   });
 

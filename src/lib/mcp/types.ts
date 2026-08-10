@@ -63,11 +63,16 @@ export interface McpLatexSummary extends McpElementBase {
   latex: string;
 }
 
-export interface McpStrokeSummary extends McpElementBase {
+/**
+ * Ink is summarized more thinly than other elements: a note can hold hundreds of
+ * strokes, and only the id and bounds are actionable (bounds frame a
+ * screenshot_canvas capture). Style and point counts are omitted deliberately.
+ */
+export interface McpStrokeSummary {
   kind: 'stroke';
-  pointCount: number;
-  color: string | null;
-  size: number | null;
+  id: string;
+  bounds: McpBounds;
+  reader: string;
 }
 
 export interface McpUnknownElementSummary extends McpElementBase {
@@ -141,7 +146,8 @@ export type McpHandwritingStatus =
 export interface McpHandwritingLine {
   text: string;
   bounds: McpBounds;
-  strokeIds: string[];
+  /** Only the count: no tool accepts a stroke id, so the ids themselves are noise. */
+  strokeCount: number;
 }
 
 export interface McpHandwritingReadModel {

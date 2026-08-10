@@ -4,7 +4,12 @@ import type {
 } from '@myelin/editor/platform/types';
 import { isMac } from '@myelin/shared/os';
 import type { VFSNodeId } from '@/lib/sync';
-import type { McpHandwritingReadModel, McpHandwritingStatus } from './types';
+import { roundBounds } from './bounds';
+import type {
+  McpHandwritingLine,
+  McpHandwritingReadModel,
+  McpHandwritingStatus,
+} from './types';
 
 /**
  * Handwriting OCR is backed by Apple's Vision framework (`tauri-plugin-ocr`),
@@ -42,12 +47,12 @@ function statusFor(
     : 'text-unavailable';
 }
 
-function toLine(line: RecognizedLine) {
+function toLine(line: RecognizedLine): McpHandwritingLine {
   const [x, y, width, height] = line.bbox;
   return {
     text: line.text,
-    bounds: { x, y, width, height },
-    strokeIds: [...line.strokeIds],
+    bounds: roundBounds({ x, y, width, height }),
+    strokeCount: line.strokeIds.length,
   };
 }
 

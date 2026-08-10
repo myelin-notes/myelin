@@ -13,6 +13,7 @@ import { serializeDocToMarkdown } from '@myelin/editor/page-frame/markdown/seria
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
+import { roundBounds } from './bounds';
 import type {
   McpBounds,
   McpCanvasTextContent,
@@ -108,12 +109,12 @@ function scaleBounds(
   const y1 = localY * scale.y + offsetY;
   const x2 = (localX + width) * scale.x + offsetX;
   const y2 = (localY + height) * scale.y + offsetY;
-  return {
+  return roundBounds({
     x: Math.min(x1, x2),
     y: Math.min(y1, y2),
     width: Math.abs(x2 - x1),
     height: Math.abs(y2 - y1),
-  };
+  });
 }
 
 function getPageFrameBounds(yMap: Y.Map<unknown>): McpBounds {
@@ -383,17 +384,12 @@ function summarizeLatex(yMap: Y.Map<unknown>): McpLatexSummary {
 }
 
 function summarizeStroke(yMap: Y.Map<unknown>): McpStrokeSummary {
-  const points = getNumberArray(yMap.get('points'));
   return {
     kind: 'stroke',
     id: getElementId(yMap),
-    type: ElementType.STROKE,
     bounds: getStrokeBounds(yMap),
     // Ink carries no text of its own; recognition first, pixels as the fallback.
     reader: 'read_handwriting',
-    pointCount: Math.floor(points.length / 3),
-    color: asString(yMap.get('color')),
-    size: asNumber(yMap.get('size')),
   };
 }
 

@@ -49,7 +49,7 @@ describe('readMcpHandwriting', () => {
     expect(result.lines[0]).toEqual({
       text: 'shopping list',
       bounds: { x: 10, y: 0, width: 200, height: 40 },
-      strokeIds: ['s-0'],
+      strokeCount: 1,
     });
   });
 
@@ -98,6 +98,27 @@ describe('readMcpHandwriting', () => {
     expect(result.status).toBe('no-handwriting');
     expect(result.recognizedAt).toBe(1700000000000);
     expect(result.note).not.toMatch(/screenshot_canvas/);
+  });
+
+  it('rounds line bounds to one decimal', async () => {
+    const fractional: RecognizedLine = {
+      text: 'milk',
+      bbox: [-166.05759058460694, 43.1789, 200.44, 40.05],
+      strokeIds: ['s-0'],
+      hash: 'h-0',
+    };
+
+    const result = await readMcpHandwriting(
+      capability(page([fractional])),
+      'note-1',
+    );
+
+    expect(result.lines[0].bounds).toEqual({
+      x: -166.1,
+      y: 43.2,
+      width: 200.4,
+      height: 40.1,
+    });
   });
 
   it('handles a platform with no handwriting capability at all', async () => {
