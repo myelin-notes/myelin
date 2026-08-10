@@ -159,13 +159,17 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
                 {option.label}
               </span>
               {option.control === 'stepper' ? (
-                <FontSizeField
-                  value={option.value}
-                  min={option.min}
-                  max={option.max}
-                  step={option.step}
-                  onChange={option.set}
-                />
+                // Wrapped so the field sizes to its content instead of
+                // stretching to the panel width, matching the color swatches.
+                <div className="flex">
+                  <FontSizeField
+                    value={option.value}
+                    min={option.min}
+                    max={option.max}
+                    step={option.step}
+                    onChange={option.set}
+                  />
+                </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <input
