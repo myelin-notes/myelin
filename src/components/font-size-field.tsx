@@ -15,8 +15,11 @@ interface FontSizeFieldProps {
   preserveFocus?: boolean;
 }
 
+// `grow` keeps the steppers at their 24px square wherever the field is sized to
+// its content (the selection toolbar), and splits any extra width between them
+// when it is stretched (the tool options column) so the value stays centered.
 const STEPPER_CLASS =
-  'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-text-secondary';
+  'flex size-6 shrink-0 grow cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-text-secondary';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -81,7 +84,7 @@ export function FontSizeField({
             e.currentTarget.blur();
           }
         }}
-        className="w-7 border-none bg-transparent text-center font-medium text-text-primary text-xs tabular-nums outline-none"
+        className="w-7 shrink-0 border-none bg-transparent text-center font-medium text-text-primary text-xs tabular-nums outline-none"
       />
       <button
         type="button"
