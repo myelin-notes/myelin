@@ -210,17 +210,6 @@ jobs:
           releaseId: ${{ github.event.release.id }}
           args: ${{ matrix.args }}
 
-      - name: Upload workflow artifacts
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: myelin-${{ matrix.platform }}${{ matrix.args && format('-{0}', matrix.args) || '' }}
-          path: |
-            src-tauri/target/*/release/bundle/**/*
-            src-tauri/target/release/bundle/**/*
-          if-no-files-found: ignore
-          retention-days: 14
-
   android:
     name: Build (android)
     needs: test
@@ -388,22 +377,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
         run: |
+          # Match the real output depth. `**` without globstar is just `*`, so
+          # the two-deep APK path (apk/<flavor>/release/) never matched and
+          # 0.2.4 shipped the AAB alone -- the AAB path is one level shallower
+          # and matched by accident.
           shopt -s nullglob
-          files=(src-tauri/gen/android/app/build/outputs/apk/**/*.apk src-tauri/gen/android/app/build/outputs/bundle/**/*.aab)
-          if [ ${#files[@]} -gt 0 ]; then
-            gh release upload "$TAG" "${files[@]}" --clobber
+          files=(src-tauri/gen/android/app/build/outputs/apk/*/release/*.apk src-tauri/gen/android/app/build/outputs/bundle/*/*.aab)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no APK or AAB found to upload"
+            exit 1
           fi
-
-      - name: Upload workflow artifacts
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: myelin-android
-          path: |
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-            src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
-          if-no-files-found: warn
-          retention-days: 14
+          gh release upload "$TAG" "${files[@]}" --clobber
 
   ios:
     name: Build (ios)
@@ -494,13 +478,3 @@ jobs:
           if [ ${#files[@]} -gt 0 ]; then
             gh release upload "$TAG" "${files[@]}" --clobber
           fi
-
-      - name: Upload workflow artifacts
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: myelin-ios
-          path: |
-            src-tauri/gen/apple/build/**/*.ipa
-          if-no-files-found: warn
-          retention-days: 14
