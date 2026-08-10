@@ -207,10 +207,22 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     const unsubView = canvas.viewport.onViewChange(scheduleSync);
     window.addEventListener('resize', scheduleSync);
 
+    // sync() centers on the width it measures, but the content that decides
+    // that width is rendered by the setState below it — so the pass that swaps
+    // the toolbar's contents always positions against the previous width. The
+    // text style controls make that swing wide enough to see (a long font name
+    // alone moves it), so re-position once the new layout has settled.
+    const observedToolbar = toolbarRef.current;
+    const resizeObserver = new ResizeObserver(scheduleSync);
+    if (observedToolbar) {
+      resizeObserver.observe(observedToolbar);
+    }
+
     return () => {
       if (pendingFrame !== 0) {
         cancelAnimationFrame(pendingFrame);
       }
+      resizeObserver.disconnect();
       unsubChange();
       unsubView();
       window.removeEventListener('resize', scheduleSync);
