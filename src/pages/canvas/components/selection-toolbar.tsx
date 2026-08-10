@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
+import {
+  TextElement,
+  type TextStyle,
+} from '@myelin/editor/elements/text/element';
 import type { Messages } from '@myelin/editor/i18n/messages';
 import {
   Tooltip,
@@ -22,6 +26,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
+import { TextStyleControls } from './text-style-controls';
 
 interface SelectionToolbarProps {
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
@@ -32,6 +37,9 @@ interface ToolbarState {
   canMoveHigher: boolean;
   canMoveLower: boolean;
   elementItems: SelectionToolbarItem[];
+  /** Set when exactly one text box is selected, so its style is editable here. */
+  textElement: TextElement | null;
+  textStyle: TextStyle | null;
 }
 
 const HIDDEN_STATE: ToolbarState = {
@@ -39,6 +47,8 @@ const HIDDEN_STATE: ToolbarState = {
   canMoveHigher: false,
   canMoveLower: false,
   elementItems: [],
+  textElement: null,
+  textStyle: null,
 };
 
 const VIEWPORT_MARGIN = 12;
@@ -71,13 +81,35 @@ function sameElementItems(
   return true;
 }
 
+function sameTextStyle(a: TextStyle | null, b: TextStyle | null): boolean {
+  if (!(a && b)) {
+    return a === b;
+  }
+  return (
+    a.color === b.color &&
+    a.fontSize === b.fontSize &&
+    a.fontFamily === b.fontFamily
+  );
+}
+
 function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
   return (
     a.visible === b.visible &&
     a.canMoveHigher === b.canMoveHigher &&
     a.canMoveLower === b.canMoveLower &&
-    sameElementItems(a.elementItems, b.elementItems)
+    sameElementItems(a.elementItems, b.elementItems) &&
+    a.textElement === b.textElement &&
+    sameTextStyle(a.textStyle, b.textStyle)
   );
+}
+
+function findTextTarget(canvas: DrawableCanvas): TextElement | null {
+  const selected = canvas.getSelectedElements();
+  if (selected.length !== 1) {
+    return null;
+  }
+  const [only] = selected;
+  return only instanceof TextElement ? only : null;
 }
 
 function collectElementItems(
@@ -109,18 +141,28 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     const sync = () => {
       const toolbar = toolbarRef.current;
       let bounds: DOMRect | null = null;
-      let nextState = HIDDEN_STATE;
+      // Hiding only flips `visible` — the toolbar fades out over 150ms, and
+      // clearing the contents here would play that fade on a toolbar that had
+      // already collapsed to its element-agnostic buttons. The stale contents
+      // are replaced wholesale by the next selection.
+      let nextState: ToolbarState = { ...currentState, visible: false };
+      const editing = canvas.editingElement;
       if (
-        (!canvas.editingElement || canvas.isCanvasInteractiveEditMode) &&
+        (!editing ||
+          canvas.isCanvasInteractiveEditMode ||
+          editing.keepsSelectionToolbarWhileEditing) &&
         !canvas.isPlacing
       ) {
         bounds = canvas.getSelectedElementScreenBounds();
         if (bounds) {
+          const textElement = findTextTarget(canvas);
           nextState = {
             visible: true,
             canMoveHigher: canvas.canReorderSelection('higher'),
             canMoveLower: canvas.canReorderSelection('lower'),
             elementItems: collectElementItems(canvas, strings),
+            textElement,
+            textStyle: textElement ? { ...textElement.style } : null,
           };
         }
       }
@@ -169,10 +211,22 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     const unsubView = canvas.viewport.onViewChange(scheduleSync);
     window.addEventListener('resize', scheduleSync);
 
+    // sync() centers on the width it measures, but the content that decides
+    // that width is rendered by the setState below it — so the pass that swaps
+    // the toolbar's contents always positions against the previous width. The
+    // text style controls make that swing wide enough to see (a long font name
+    // alone moves it), so re-position once the new layout has settled.
+    const observedToolbar = toolbarRef.current;
+    const resizeObserver = new ResizeObserver(scheduleSync);
+    if (observedToolbar) {
+      resizeObserver.observe(observedToolbar);
+    }
+
     return () => {
       if (pendingFrame !== 0) {
         cancelAnimationFrame(pendingFrame);
       }
+      resizeObserver.disconnect();
       unsubChange();
       unsubView();
       window.removeEventListener('resize', scheduleSync);
@@ -242,6 +296,16 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
         aria-label={strings.canvas.selectionToolbar.label}
         aria-hidden={!state.visible}
       >
+        {state.textElement && state.textStyle && (
+          <>
+            <TextStyleControls
+              key={state.textElement.uuid}
+              element={state.textElement}
+              style={state.textStyle}
+            />
+            <Divider />
+          </>
+        )}
         <ToolbarItemGroup items={state.elementItems} />
         {state.elementItems.length > 0 && reorderItems.length > 0 && (
           <Divider />

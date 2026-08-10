@@ -798,6 +798,8 @@ const en = {
       medium: (value: number) => `Medium (${value})`,
       bold: (value: number) => `Bold (${value})`,
       addCustomColor: 'Add custom color',
+      decreaseFontSize: 'Decrease font size',
+      increaseFontSize: 'Increase font size',
     },
     embedComposer: {
       dropToEmbed: 'Drop to embed',

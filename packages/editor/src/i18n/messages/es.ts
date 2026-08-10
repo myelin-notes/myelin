@@ -805,6 +805,8 @@ const es: typeof en = {
       medium: (value: number) => `Medio (${value})`,
       bold: (value: number) => `Grueso (${value})`,
       addCustomColor: 'Añadir color personalizado',
+      decreaseFontSize: 'Reducir tamaño de fuente',
+      increaseFontSize: 'Aumentar tamaño de fuente',
     },
     embedComposer: {
       dropToEmbed: 'Soltar para insertar',

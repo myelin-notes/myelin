@@ -373,6 +373,15 @@ export abstract class DrawableElement {
   }
 
   /**
+   * Whether the selection toolbar stays up while this element is in edit mode.
+   * Elements whose toolbar acts on the thing being edited (text style controls)
+   * want this; elements that carry their own in-place editing chrome don't.
+   */
+  public get keepsSelectionToolbarWhileEditing(): boolean {
+    return false;
+  }
+
+  /**
    * Whether editing this element locks the viewport to single-axis pan (and
    * routes wheel/two-finger gestures to scrolling the element). This is a
    * paged-surface behavior — only multi-page elements like the page frame want

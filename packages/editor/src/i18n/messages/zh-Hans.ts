@@ -782,6 +782,8 @@ const zhHans: typeof en = {
       medium: (value: number) => `中（${value}）`,
       bold: (value: number) => `粗（${value}）`,
       addCustomColor: '添加自定义颜色',
+      decreaseFontSize: '减小字号',
+      increaseFontSize: '增大字号',
     },
     embedComposer: {
       dropToEmbed: '拖放以嵌入',
