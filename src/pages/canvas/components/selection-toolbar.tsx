@@ -141,7 +141,11 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     const sync = () => {
       const toolbar = toolbarRef.current;
       let bounds: DOMRect | null = null;
-      let nextState = HIDDEN_STATE;
+      // Hiding only flips `visible` — the toolbar fades out over 150ms, and
+      // clearing the contents here would play that fade on a toolbar that had
+      // already collapsed to its element-agnostic buttons. The stale contents
+      // are replaced wholesale by the next selection.
+      let nextState: ToolbarState = { ...currentState, visible: false };
       const editing = canvas.editingElement;
       if (
         (!editing ||
