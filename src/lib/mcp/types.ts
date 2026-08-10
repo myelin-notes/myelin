@@ -128,6 +128,34 @@ export interface McpNoteFullReadModel extends McpNoteReadModel {
   latexBlocks: McpLatexContent[];
 }
 
+export type McpHandwritingStatus =
+  /** Ink was found and at least one line produced text. */
+  | 'recognized'
+  /** Ink was found and located, but no line produced text. */
+  | 'text-unavailable'
+  /** Recognition has run and this note contains no ink. */
+  | 'no-handwriting'
+  /** No recognition artifact exists, so nothing is known either way. */
+  | 'not-recognized';
+
+export interface McpHandwritingLine {
+  text: string;
+  bounds: McpBounds;
+  strokeIds: string[];
+}
+
+export interface McpHandwritingReadModel {
+  noteId: VFSNodeId;
+  status: McpHandwritingStatus;
+  /** False on platforms with no OCR backend, where every line's text is empty. */
+  recognitionSupported: boolean;
+  /** How to interpret this result, and what to do next. */
+  note: string;
+  lineCount: number;
+  recognizedAt: number | null;
+  lines: McpHandwritingLine[];
+}
+
 export interface McpScreenshot {
   noteId: VFSNodeId;
   /** World-space rect actually captured, after defaults were applied. */

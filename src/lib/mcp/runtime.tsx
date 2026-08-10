@@ -74,6 +74,7 @@ export function McpRuntime() {
     const service = new McpToolService({
       repository,
       indexedTextByNode: getPlatform().noteIndex?.getContent() ?? new Map(),
+      handwriting: getPlatform().handwriting,
       allowDirectWrites: () => allowDirectWrites,
     });
     trackEvent('mcp_tool_called', { tool_name: payload.toolName });
