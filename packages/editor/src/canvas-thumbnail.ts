@@ -21,8 +21,20 @@ export async function renderCanvasThumbnail(
   region: DOMRect,
   maxSize: number,
 ): Promise<Blob> {
-  const capture = snapToThumbnailAspect(region);
+  return renderCanvasRegion(elements, snapToThumbnailAspect(region), maxSize);
+}
 
+/**
+ * Rasterize exactly `capture` (world-space) at up to `maxSize` on its longer
+ * side, culling elements outside it. Unlike `renderCanvasThumbnail` the region
+ * is honoured as given, so callers that need a precise crop — MCP screenshots —
+ * get the framing they asked for rather than one snapped to a display aspect.
+ */
+export async function renderCanvasRegion(
+  elements: readonly DrawableElement[],
+  capture: DOMRect,
+  maxSize: number,
+): Promise<Blob> {
   const visible = elements.filter(
     (el) => !el.hidden && intersects(el.boundingBox, capture),
   );

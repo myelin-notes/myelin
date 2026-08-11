@@ -13,6 +13,7 @@ import { serializeDocToMarkdown } from '@myelin/editor/page-frame/markdown/seria
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
+import { roundBounds } from './bounds';
 import type {
   McpBounds,
   McpCanvasTextContent,
@@ -28,7 +29,7 @@ import type {
   McpPageFrameSummary,
   McpPdfContent,
   McpPdfSummary,
-  McpStrokeSummary,
+  McpStrokeGroupSummary,
   McpTextElementSummary,
   McpUnknownElementSummary,
 } from './types';
@@ -108,12 +109,12 @@ function scaleBounds(
   const y1 = localY * scale.y + offsetY;
   const x2 = (localX + width) * scale.x + offsetX;
   const y2 = (localY + height) * scale.y + offsetY;
-  return {
+  return roundBounds({
     x: Math.min(x1, x2),
     y: Math.min(y1, y2),
     width: Math.abs(x2 - x1),
     height: Math.abs(y2 - y1),
-  };
+  });
 }
 
 function getPageFrameBounds(yMap: Y.Map<unknown>): McpBounds {
@@ -382,17 +383,32 @@ function summarizeLatex(yMap: Y.Map<unknown>): McpLatexSummary {
   };
 }
 
-function summarizeStroke(yMap: Y.Map<unknown>): McpStrokeSummary {
-  const points = getNumberArray(yMap.get('points'));
+function summarizeStrokeGroup(
+  boxes: [number, number, number, number][],
+): McpStrokeGroupSummary {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const [x, y, width, height] of boxes) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
+  }
+
   return {
-    kind: 'stroke',
-    id: getElementId(yMap),
-    type: ElementType.STROKE,
-    bounds: getStrokeBounds(yMap),
-    reader: null,
-    pointCount: Math.floor(points.length / 3),
-    color: asString(yMap.get('color')),
-    size: asNumber(yMap.get('size')),
+    kind: 'stroke-group',
+    // Ink carries no text of its own; recognition first, pixels as the fallback.
+    reader: 'read_handwriting',
+    count: boxes.length,
+    bounds: roundBounds({
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    }),
+    boxes,
   };
 }
 
@@ -423,8 +439,8 @@ function summarizeElement(
       return summarizePdf(noteId, yMap);
     case ElementType.LATEX:
       return summarizeLatex(yMap);
-    case ElementType.STROKE:
-      return summarizeStroke(yMap);
+    // ElementType.STROKE is absent on purpose: strokes never reach here because
+    // noteReadModelFromLoaded collects them into one stroke-group instead.
     default:
       return summarizeUnknown(yMap);
   }
@@ -435,14 +451,25 @@ function noteReadModelFromLoaded(
   options: { indexedText?: string | null } = {},
 ): McpNoteReadModel {
   const elements: McpNoteElementSummary[] = [];
+  const strokeBoxes: [number, number, number, number][] = [];
+  // Where the first stroke sat, so the collapsed group keeps document order.
+  let strokeSlot = -1;
+
   for (let index = 0; index < loaded.ydoc.elements.length; index++) {
-    elements.push(
-      summarizeElement(
-        loaded.metadata.id,
-        loaded.ydoc,
-        loaded.ydoc.elements.get(index),
-      ),
-    );
+    const yMap = loaded.ydoc.elements.get(index);
+    if (getElementType(yMap) === ElementType.STROKE) {
+      const bounds = getStrokeBounds(yMap);
+      strokeBoxes.push([bounds.x, bounds.y, bounds.width, bounds.height]);
+      if (strokeSlot < 0) {
+        strokeSlot = elements.length;
+      }
+      continue;
+    }
+    elements.push(summarizeElement(loaded.metadata.id, loaded.ydoc, yMap));
+  }
+
+  if (strokeBoxes.length > 0) {
+    elements.splice(strokeSlot, 0, summarizeStrokeGroup(strokeBoxes));
   }
 
   return {

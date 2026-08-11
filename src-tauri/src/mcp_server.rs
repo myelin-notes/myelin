@@ -60,6 +60,10 @@ struct McpToolCallPayload {
 pub struct McpFrontendToolResponse {
     request_id: String,
     result: Option<Value>,
+    /// Ready-made MCP content blocks (used by image-producing tools). Takes
+    /// precedence over `result`, which is otherwise serialized into one text
+    /// block.
+    content: Option<Value>,
     error: Option<String>,
 }
 
@@ -337,11 +341,17 @@ async fn call_frontend_tool(
         }));
     }
 
+    if let Some(content) = response.content {
+        return Ok(json!({ "content": content, "isError": false }));
+    }
+
     let result = response.result.unwrap_or(Value::Null);
+    // Compact, not pretty: the reader is a model paying per token, and indenting
+    // a nested payload like read_note's costs ~37% more for no added meaning.
     Ok(json!({
         "content": [{
             "type": "text",
-            "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| "null".to_string())
+            "text": serde_json::to_string(&result).unwrap_or_else(|_| "null".to_string())
         }],
         "isError": false
     }))

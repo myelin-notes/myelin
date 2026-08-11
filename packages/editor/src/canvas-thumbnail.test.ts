@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderCanvasThumbnail } from './canvas-thumbnail';
+import { renderCanvasRegion, renderCanvasThumbnail } from './canvas-thumbnail';
 import type { DrawableElement } from './elements/drawable-element';
 
 class TestDOMRect {
@@ -164,6 +164,61 @@ describe('renderCanvasThumbnail', () => {
       600,
     );
     expect(getScratchCanvasContext).toHaveBeenLastCalledWith(320, 200);
+  });
+
+  it('renders the exact region without snapping to 16:10', async () => {
+    const { getScratchCanvasContext } = await import('./scratch-canvas');
+    const element = makeElement();
+
+    await renderCanvasRegion(
+      asElements([element]),
+      new DOMRect(0, 0, 100, 200),
+      600,
+    );
+
+    expect(getScratchCanvasContext).toHaveBeenLastCalledWith(100, 200);
+    expect(element.prepareThumbnail).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ x: 0, y: 0, width: 100, height: 200 }),
+    );
+  });
+
+  it('culls against the exact region, not an expanded one', async () => {
+    // renderCanvasThumbnail would snap this region out to x=-30 and keep the
+    // element; the region renderer must not.
+    const outside = makeElement({ boundingBox: new DOMRect(-25, 10, 10, 10) });
+
+    await renderCanvasRegion(
+      asElements([outside]),
+      new DOMRect(0, 0, 100, 100),
+      600,
+    );
+
+    expect(outside.drawThumbnail).not.toHaveBeenCalled();
+  });
+
+  it('scales a region down to maxSize on its longer side', async () => {
+    const { getScratchCanvasContext } = await import('./scratch-canvas');
+
+    await renderCanvasRegion(
+      asElements([makeElement()]),
+      new DOMRect(0, 0, 2000, 1000),
+      500,
+    );
+
+    expect(getScratchCanvasContext).toHaveBeenLastCalledWith(500, 250);
+  });
+
+  it('never upscales a region smaller than maxSize', async () => {
+    const { getScratchCanvasContext } = await import('./scratch-canvas');
+
+    await renderCanvasRegion(
+      asElements([makeElement()]),
+      new DOMRect(0, 0, 120, 80),
+      600,
+    );
+
+    expect(getScratchCanvasContext).toHaveBeenLastCalledWith(120, 80);
   });
 
   it('returns a blank thumbnail when no element intersects the region', async () => {
