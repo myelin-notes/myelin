@@ -294,8 +294,10 @@ const en = {
       },
       backgroundColor: {
         label: 'Background color',
+        description:
+          'Fill the canvas behind the pattern with the theme color or one you pick.',
         options: {
-          theme: 'Theme color',
+          theme: 'Default',
           custom: 'Custom',
         },
         confirm: 'Apply',

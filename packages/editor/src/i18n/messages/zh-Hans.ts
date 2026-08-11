@@ -290,8 +290,9 @@ const zhHans: typeof en = {
       },
       backgroundColor: {
         label: '背景颜色',
+        description: '用主题颜色或自定义颜色填充图案背后的画布。',
         options: {
-          theme: '主题颜色',
+          theme: '默认',
           custom: '自定义',
         },
         confirm: '应用',

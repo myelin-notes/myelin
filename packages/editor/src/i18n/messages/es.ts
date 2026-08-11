@@ -298,8 +298,10 @@ const es: typeof en = {
       },
       backgroundColor: {
         label: 'Color de fondo',
+        description:
+          'Rellena el lienzo detrás del patrón con el color del tema o con uno que elijas.',
         options: {
-          theme: 'Color del tema',
+          theme: 'Predeterminado',
           custom: 'Personalizado',
         },
         confirm: 'Aplicar',

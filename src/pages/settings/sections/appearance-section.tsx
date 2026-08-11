@@ -6,6 +6,7 @@ import { useUserPref } from '@/lib/use-user-pref';
 import type { UserPrefValue } from '@/lib/user-prefs';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
+import { OptionsRow, type OptionsRowOption } from '../components/options-row';
 
 type CanvasBg = 'grid' | 'dots' | 'blank';
 type ThemeMode = UserPrefValue<'theme'>;
@@ -106,6 +107,15 @@ export function AppearanceSection() {
   };
   const themeLabels = strings.settings.theme.options;
   const bgColorStrings = strings.settings.canvasStyle.backgroundColor;
+  const bgColorRowOptions: ReadonlyArray<OptionsRowOption<BgColorMode>> = [
+    // A CSS var, not a resolved value, so the chip re-resolves on theme toggle.
+    {
+      value: 'theme',
+      label: bgColorStrings.options.theme,
+      swatch: 'var(--bg-page)',
+    },
+    { value: 'custom', label: bgColorStrings.options.custom, swatch: bgColor },
+  ];
 
   return (
     <section id="appearance" className="scroll-mt-12 space-y-10">
@@ -176,49 +186,14 @@ export function AppearanceSection() {
           ))}
         </div>
 
-        <div className="mt-8">
-          <div className="mb-3 text-text-muted text-xs">
-            {bgColorStrings.label}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(['theme', 'custom'] as const).map((mode) => {
-              const selected = bgColorMode === mode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => handleBgColorMode(mode)}
-                  aria-pressed={selected}
-                  className={cn(
-                    'inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all duration-200',
-                    selected
-                      ? 'bg-card shadow-ambient ring-2 ring-accent-navy/20'
-                      : 'bg-input ring-1 ring-border-subtle/70 hover:bg-card-active hover:shadow-ambient',
-                  )}
-                >
-                  {mode === 'custom' && (
-                    <span
-                      className="size-4 rounded-md"
-                      style={{
-                        backgroundColor: bgColor,
-                        boxShadow: 'inset 0 0 0 1px var(--border-ghost)',
-                      }}
-                    />
-                  )}
-                  <span
-                    className={cn(
-                      'text-xs transition-colors',
-                      selected
-                        ? 'font-semibold text-text-brand'
-                        : 'text-text-muted',
-                    )}
-                  >
-                    {bgColorStrings.options[mode]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        <div className="mt-5">
+          <OptionsRow
+            value={bgColorMode}
+            onChange={handleBgColorMode}
+            label={bgColorStrings.label}
+            description={bgColorStrings.description}
+            options={bgColorRowOptions}
+          />
         </div>
       </div>
 
