@@ -296,6 +296,16 @@ const es: typeof en = {
         dots: 'Puntos',
         blank: 'En blanco',
       },
+      backgroundColor: {
+        label: 'Color de fondo',
+        description:
+          'Rellena el lienzo detrás del patrón con el color del tema o con uno que elijas.',
+        options: {
+          theme: 'Predeterminado',
+          custom: 'Personalizado',
+        },
+        confirm: 'Aplicar',
+      },
     },
     language: {
       title: 'Idioma',

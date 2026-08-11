@@ -288,6 +288,15 @@ const zhHans: typeof en = {
         dots: '点阵',
         blank: '空白',
       },
+      backgroundColor: {
+        label: '背景颜色',
+        description: '用主题颜色或自定义颜色填充图案背后的画布。',
+        options: {
+          theme: '默认',
+          custom: '自定义',
+        },
+        confirm: '应用',
+      },
     },
     language: {
       title: '语言',
