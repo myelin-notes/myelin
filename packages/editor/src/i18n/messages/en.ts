@@ -292,6 +292,14 @@ const en = {
         dots: 'Dots',
         blank: 'Blank',
       },
+      backgroundColor: {
+        label: 'Background color',
+        options: {
+          theme: 'Theme color',
+          custom: 'Custom',
+        },
+        confirm: 'Apply',
+      },
     },
     language: {
       title: 'Language',

@@ -288,6 +288,14 @@ const zhHans: typeof en = {
         dots: '点阵',
         blank: '空白',
       },
+      backgroundColor: {
+        label: '背景颜色',
+        options: {
+          theme: '主题颜色',
+          custom: '自定义',
+        },
+        confirm: '应用',
+      },
     },
     language: {
       title: '语言',

@@ -296,6 +296,14 @@ const es: typeof en = {
         dots: 'Puntos',
         blank: 'En blanco',
       },
+      backgroundColor: {
+        label: 'Color de fondo',
+        options: {
+          theme: 'Color del tema',
+          custom: 'Personalizado',
+        },
+        confirm: 'Aplicar',
+      },
     },
     language: {
       title: 'Idioma',

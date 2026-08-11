@@ -1,5 +1,6 @@
-import type { ComponentType } from 'react';
+import { type ComponentType, useState } from 'react';
 import { Check, Monitor, Moon, Sun } from 'lucide-react';
+import { ColorPickerDialog } from '@myelin/editor/components/color-picker-dialog';
 import { useMessages } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
 import type { UserPrefValue } from '@/lib/user-prefs';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils';
 
 type CanvasBg = 'grid' | 'dots' | 'blank';
 type ThemeMode = UserPrefValue<'theme'>;
+type BgColorMode = UserPrefValue<'canvasBackgroundColorMode'>;
 
 const THEME_OPTIONS: {
   value: ThemeMode;
@@ -92,10 +94,18 @@ export function AppearanceSection() {
   const strings = useMessages();
   const theme = useUserPref('theme');
   const canvasBg = useUserPref('canvasBackground');
+  const bgColorMode = useUserPref('canvasBackgroundColorMode');
+  const bgColor = useUserPref('canvasBackgroundColor');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const handleCanvasBg = (bg: CanvasBg) => {
     UserPrefs.set('canvasBackground', bg);
   };
+  const handleBgColorMode = (mode: BgColorMode) => {
+    UserPrefs.set('canvasBackgroundColorMode', mode);
+    setPickerOpen(mode === 'custom');
+  };
   const themeLabels = strings.settings.theme.options;
+  const bgColorStrings = strings.settings.canvasStyle.backgroundColor;
 
   return (
     <section id="appearance" className="scroll-mt-12 space-y-10">
@@ -165,7 +175,64 @@ export function AppearanceSection() {
             />
           ))}
         </div>
+
+        <div className="mt-8">
+          <div className="mb-3 text-text-muted text-xs">
+            {bgColorStrings.label}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(['theme', 'custom'] as const).map((mode) => {
+              const selected = bgColorMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleBgColorMode(mode)}
+                  aria-pressed={selected}
+                  className={cn(
+                    'inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 transition-all duration-200',
+                    selected
+                      ? 'bg-card shadow-ambient ring-2 ring-accent-navy/20'
+                      : 'bg-input ring-1 ring-border-subtle/70 hover:bg-card-active hover:shadow-ambient',
+                  )}
+                >
+                  {mode === 'custom' && (
+                    <span
+                      className="size-4 rounded-md"
+                      style={{
+                        backgroundColor: bgColor,
+                        boxShadow: 'inset 0 0 0 1px var(--border-ghost)',
+                      }}
+                    />
+                  )}
+                  <span
+                    className={cn(
+                      'text-xs transition-colors',
+                      selected
+                        ? 'font-semibold text-text-brand'
+                        : 'text-text-muted',
+                    )}
+                  >
+                    {bgColorStrings.options[mode]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
+
+      <ColorPickerDialog
+        open={pickerOpen}
+        initialColor={bgColor}
+        title={bgColorStrings.label}
+        confirmLabel={bgColorStrings.confirm}
+        onConfirm={(hex) => {
+          UserPrefs.set('canvasBackgroundColor', hex);
+          setPickerOpen(false);
+        }}
+        onCancel={() => setPickerOpen(false)}
+      />
     </section>
   );
 }
