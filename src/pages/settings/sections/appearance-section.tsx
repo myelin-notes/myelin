@@ -1,13 +1,16 @@
-import type { ComponentType } from 'react';
+import { type ComponentType, useState } from 'react';
 import { Check, Monitor, Moon, Sun } from 'lucide-react';
+import { ColorPickerDialog } from '@myelin/editor/components/color-picker-dialog';
 import { useMessages } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
 import type { UserPrefValue } from '@/lib/user-prefs';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
+import { OptionsRow, type OptionsRowOption } from '../components/options-row';
 
 type CanvasBg = 'grid' | 'dots' | 'blank';
 type ThemeMode = UserPrefValue<'theme'>;
+type BgColorMode = UserPrefValue<'canvasBackgroundColorMode'>;
 
 const THEME_OPTIONS: {
   value: ThemeMode;
@@ -92,10 +95,27 @@ export function AppearanceSection() {
   const strings = useMessages();
   const theme = useUserPref('theme');
   const canvasBg = useUserPref('canvasBackground');
+  const bgColorMode = useUserPref('canvasBackgroundColorMode');
+  const bgColor = useUserPref('canvasBackgroundColor');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const handleCanvasBg = (bg: CanvasBg) => {
     UserPrefs.set('canvasBackground', bg);
   };
+  const handleBgColorMode = (mode: BgColorMode) => {
+    UserPrefs.set('canvasBackgroundColorMode', mode);
+    setPickerOpen(mode === 'custom');
+  };
   const themeLabels = strings.settings.theme.options;
+  const bgColorStrings = strings.settings.canvasStyle.backgroundColor;
+  const bgColorRowOptions: ReadonlyArray<OptionsRowOption<BgColorMode>> = [
+    // A CSS var, not a resolved value, so the chip re-resolves on theme toggle.
+    {
+      value: 'theme',
+      label: bgColorStrings.options.theme,
+      swatch: 'var(--bg-page)',
+    },
+    { value: 'custom', label: bgColorStrings.options.custom, swatch: bgColor },
+  ];
 
   return (
     <section id="appearance" className="scroll-mt-12 space-y-10">
@@ -165,7 +185,29 @@ export function AppearanceSection() {
             />
           ))}
         </div>
+
+        <div className="mt-5">
+          <OptionsRow
+            value={bgColorMode}
+            onChange={handleBgColorMode}
+            label={bgColorStrings.label}
+            description={bgColorStrings.description}
+            options={bgColorRowOptions}
+          />
+        </div>
       </div>
+
+      <ColorPickerDialog
+        open={pickerOpen}
+        initialColor={bgColor}
+        title={bgColorStrings.label}
+        confirmLabel={bgColorStrings.confirm}
+        onConfirm={(hex) => {
+          UserPrefs.set('canvasBackgroundColor', hex);
+          setPickerOpen(false);
+        }}
+        onCancel={() => setPickerOpen(false)}
+      />
     </section>
   );
 }

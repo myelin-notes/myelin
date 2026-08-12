@@ -9,9 +9,23 @@ import { useRepository } from '@/lib/sync';
 import { useUserPref } from '@/lib/use-user-pref';
 import { getPlatform } from '@/platform';
 import { MCP_TOOL_DEFINITIONS, McpToolService } from './tools';
-import type { McpBridgeToolCallPayload } from './types';
+import type {
+  McpBridgeToolCallPayload,
+  McpBridgeToolResponse,
+  McpToolContentResult,
+} from './types';
 
 const logger = new Logger('McpRuntime');
+
+// Tools that produce images return ready-made MCP content blocks; everything
+// else is JSON the bridge serializes into a single text block.
+function isToolContentResult(value: unknown): value is McpToolContentResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as McpToolContentResult).content)
+  );
+}
 
 // Serializes mcp_start/mcp_stop so a cleanup's stop can never overtake the
 // next effect run's start (and vice versa) — Tauri invokes are not ordered.
@@ -28,7 +42,7 @@ function errorMessage(error: unknown): string {
 
 async function respond(
   requestId: string,
-  response: { result?: unknown; error?: string },
+  response: Omit<McpBridgeToolResponse, 'requestId'>,
 ) {
   try {
     await invoke('mcp_respond', {
@@ -60,12 +74,20 @@ export function McpRuntime() {
     const service = new McpToolService({
       repository,
       indexedTextByNode: getPlatform().noteIndex?.getContent() ?? new Map(),
+      handwriting: getPlatform().handwriting,
       allowDirectWrites: () => allowDirectWrites,
     });
     trackEvent('mcp_tool_called', { tool_name: payload.toolName });
     void service
       .callTool(payload.toolName, payload.arguments)
-      .then((result) => respond(payload.requestId, { result }))
+      .then((result) =>
+        respond(
+          payload.requestId,
+          isToolContentResult(result)
+            ? { content: result.content }
+            : { result },
+        ),
+      )
       .catch((error) =>
         respond(payload.requestId, { error: errorMessage(error) }),
       );

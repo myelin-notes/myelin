@@ -31,6 +31,11 @@ const PREFS = {
     'canvas-background',
     'dots',
   ),
+  canvasBackgroundColorMode: pref<'theme' | 'custom'>(
+    'canvas-background-color-mode',
+    'theme',
+  ),
+  canvasBackgroundColor: pref<string>('canvas-background-color', '#f7f9fb'),
   pageFrameEditFitWholePage: pref<boolean>(
     'page-frame-edit-fit-whole-page',
     true,

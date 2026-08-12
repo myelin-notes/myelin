@@ -292,6 +292,16 @@ const en = {
         dots: 'Dots',
         blank: 'Blank',
       },
+      backgroundColor: {
+        label: 'Background color',
+        description:
+          'Fill the canvas behind the pattern with the theme color or one you pick.',
+        options: {
+          theme: 'Default',
+          custom: 'Custom',
+        },
+        confirm: 'Apply',
+      },
     },
     language: {
       title: 'Language',

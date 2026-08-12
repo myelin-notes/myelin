@@ -53,6 +53,7 @@ import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
 import { regenerateThumbnailNow } from '@/lib/thumbnails';
+import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { getPlatform } from '@/platform';
@@ -346,6 +347,12 @@ function CanvasViewInner({
   useEffect(() => {
     return UserPrefs.subscribe('noteLinkHoverPreview', setHoverPreviewEnabled);
   }, []);
+  // A custom canvas color overrides the theme's `bg-page` fill on the surface
+  // behind the background pattern.
+  const bgColorMode = useUserPref('canvasBackgroundColorMode');
+  const customBgColor = useUserPref('canvasBackgroundColor');
+  const surfaceStyle =
+    bgColorMode === 'custom' ? { backgroundColor: customBgColor } : undefined;
   const loadNoteLinkPreview = useCallback(
     (target: NoteLinkPreviewTarget, signal: AbortSignal) =>
       getNoteLinkPreview(repository, target, signal),
@@ -520,11 +527,15 @@ function CanvasViewInner({
   // scrollable, so the browser's caret-reveal for offscreen page-frame
   // carets can scroll them and desync the DOM from the canvas.
   return (
-    <div className="relative h-full w-full overflow-clip bg-page">
+    <div
+      className="relative h-full w-full overflow-clip bg-page"
+      style={surfaceStyle}
+    >
       <div
         ref={thumbnailRootRef}
         data-thumbnail-root="true"
         className="absolute inset-0 overflow-clip bg-page"
+        style={surfaceStyle}
       >
         {/* Background layer: dot grid, as a repeating CSS background rather
             than a canvas — panning it is a compositor translate that

@@ -17,16 +17,19 @@ import {
   type SearchNodesOptions,
   useRepository,
   useRepositoryStatus,
+  type VFSFolderNode,
   type VFSNode,
 } from '@/lib/sync';
 import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
 import { cn } from '@/lib/utils';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
+import { buildResultTree, type ResultTreeNode } from './result-tree';
 import { SidebarFileRow, SidebarFolderRow } from './tree-rows';
 
 const logger = new Logger('SidebarTree');
 const SEARCH_DEBOUNCE_MS = 150;
 const ROOT_KEY: string | null = null;
+const NO_COLLAPSED_IDS: ReadonlySet<string> = new Set();
 
 export type SortMode = 'name-asc' | 'name-desc' | 'modified' | 'created';
 export type SearchMode = NonNullable<SearchNodesOptions['mode']>;
@@ -50,25 +53,35 @@ function getInitialRepositorySetupState(
     : 'setup-required';
 }
 
-function sortNodes(nodes: VFSNode[], sortMode: SortMode): VFSNode[] {
-  return [...nodes].sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'folder' ? -1 : 1;
-    }
-    switch (sortMode) {
-      case 'name-asc':
-        return a.name.localeCompare(b.name);
-      case 'name-desc':
-        return b.name.localeCompare(a.name);
-      case 'modified':
-        return b.modifiedAt - a.modifiedAt;
-      case 'created':
-        return b.createdAt - a.createdAt;
-      default:
-        return 0;
-    }
-  });
+function compareNodes(a: VFSNode, b: VFSNode, sortMode: SortMode): number {
+  if (a.type !== b.type) {
+    return a.type === 'folder' ? -1 : 1;
+  }
+  switch (sortMode) {
+    case 'name-asc':
+      return a.name.localeCompare(b.name);
+    case 'name-desc':
+      return b.name.localeCompare(a.name);
+    case 'modified':
+      return b.modifiedAt - a.modifiedAt;
+    case 'created':
+      return b.createdAt - a.createdAt;
+    default:
+      return 0;
+  }
 }
+
+function sortNodes(nodes: VFSNode[], sortMode: SortMode): VFSNode[] {
+  return [...nodes].sort((a, b) => compareNodes(a, b, sortMode));
+}
+
+interface FlatResults {
+  nodes: VFSNode[];
+  /** Parent chains of every node in `nodes`, so the hierarchy can be rebuilt. */
+  ancestors: VFSFolderNode[];
+}
+
+const EMPTY_RESULTS: FlatResults = { nodes: [], ancestors: [] };
 
 interface SidebarTreeProps {
   ref?: React.Ref<SidebarTreeHandle>;
@@ -100,7 +113,8 @@ export function SidebarTree({
   );
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<VFSNode[]>([]);
+  const [searchResults, setSearchResults] =
+    useState<FlatResults>(EMPTY_RESULTS);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
 
@@ -109,6 +123,18 @@ export function SidebarTree({
   const isFiltering = filterTags.length > 0;
   const isFlat = isSearching || isFiltering;
   const ready = setupState === 'ready';
+
+  // Result folders start expanded; collapsing is remembered only for as long as
+  // the query and tag filter stay put.
+  const resultKey = `${trimmedQuery}\u0000${filterTags.join('\u0000')}`;
+  const [collapsedResults, setCollapsedResults] = useState<{
+    key: string;
+    ids: ReadonlySet<string>;
+  }>({ key: resultKey, ids: NO_COLLAPSED_IDS });
+  const collapsedIds =
+    collapsedResults.key === resultKey
+      ? collapsedResults.ids
+      : NO_COLLAPSED_IDS;
 
   useEffect(() => {
     let cancelled = false;
@@ -163,9 +189,24 @@ export function SidebarTree({
     );
   }, [loadFolder, ready]);
 
+  const loadAncestors = useCallback(
+    async (nodes: VFSNode[]): Promise<VFSFolderNode[]> => {
+      const parentIds = new Set(
+        nodes
+          .map((node) => node.parentId)
+          .filter((id): id is string => id !== null),
+      );
+      const chains = await Promise.all(
+        [...parentIds].map((id) => repository.getFolderChain(id)),
+      );
+      return chains.flat();
+    },
+    [repository],
+  );
+
   const loadFlatResults = useCallback(async () => {
     if (!ready) {
-      setSearchResults([]);
+      setSearchResults(EMPTY_RESULTS);
       return;
     }
     try {
@@ -183,7 +224,7 @@ export function SidebarTree({
       } else {
         nodes = await repository.getNodesByAnyTag(filterTags, ROOT_KEY);
       }
-      setSearchResults(nodes);
+      setSearchResults({ nodes, ancestors: await loadAncestors(nodes) });
     } catch (err) {
       logger.error('Failed to load search results', err);
     }
@@ -191,6 +232,7 @@ export function SidebarTree({
     filterTags,
     isFiltering,
     isSearching,
+    loadAncestors,
     ready,
     repository,
     searchMode,
@@ -335,42 +377,73 @@ export function SidebarTree({
     [childrenMap, expanded, renamingId, notifyNested, sortMode, toggle],
   );
 
-  const flatRows = useMemo(() => {
+  const toggleResultFolder = useCallback(
+    (folderId: string) => {
+      setCollapsedResults((prev) => {
+        const ids = new Set(prev.key === resultKey ? prev.ids : []);
+        if (!ids.delete(folderId)) {
+          ids.add(folderId);
+        }
+        return { key: resultKey, ids };
+      });
+    },
+    [resultKey],
+  );
+
+  const resultTree = useMemo(() => {
     if (!isFlat) {
       return null;
     }
-    const nodes = isSearching
-      ? searchResults
-      : sortNodes(searchResults, sortMode);
-    return nodes.map((node) =>
-      node.type === 'folder' ? (
-        <SidebarFolderRow
-          key={node.id}
-          node={node}
-          depth={0}
-          expanded={false}
-          autoRename={false}
-          onToggle={() => toggle(node.id)}
-          onChanged={notifyFlat}
-        />
-      ) : (
-        <SidebarFileRow
-          key={node.id}
-          node={node}
-          depth={0}
-          autoRename={false}
-          onChanged={notifyFlat}
-        />
-      ),
+    return buildResultTree(
+      searchResults.nodes,
+      searchResults.ancestors,
+      (nodes) =>
+        isSearching
+          ? nodes.sort((a, b) => a.rank - b.rank)
+          : nodes.sort((a, b) => compareNodes(a.node, b.node, sortMode)),
     );
-  }, [isFlat, isSearching, notifyFlat, searchResults, sortMode, toggle]);
+  }, [isFlat, isSearching, searchResults, sortMode]);
+
+  const renderResultNodes = useCallback(
+    (nodes: ResultTreeNode[], depth: number): React.ReactNode[] => {
+      return nodes.flatMap(({ node, children }) => {
+        if (node.type === 'folder') {
+          const isExpanded = !collapsedIds.has(node.id);
+          return [
+            <SidebarFolderRow
+              key={node.id}
+              node={node}
+              depth={depth}
+              expanded={isExpanded}
+              autoRename={false}
+              onToggle={() => toggleResultFolder(node.id)}
+              onChanged={notifyFlat}
+            />,
+            ...(isExpanded ? renderResultNodes(children, depth + 1) : []),
+          ];
+        }
+        return [
+          <SidebarFileRow
+            key={node.id}
+            node={node}
+            depth={depth}
+            autoRename={false}
+            onChanged={notifyFlat}
+          />,
+        ];
+      });
+    },
+    [collapsedIds, notifyFlat, toggleResultFolder],
+  );
 
   if (!ready) {
     return null;
   }
 
   const rootNodes = childrenMap.get(ROOT_KEY) ?? [];
-  const rows = isFlat ? (flatRows ?? []) : renderNodes(rootNodes, 0);
+  const rows = isFlat
+    ? renderResultNodes(resultTree ?? [], 0)
+    : renderNodes(rootNodes, 0);
   const emptyMessage = isSearching
     ? strings.library.explorerTree.emptySearch
     : isFiltering

@@ -63,11 +63,20 @@ export interface McpLatexSummary extends McpElementBase {
   latex: string;
 }
 
-export interface McpStrokeSummary extends McpElementBase {
-  kind: 'stroke';
-  pointCount: number;
-  color: string | null;
-  size: number | null;
+/**
+ * Ink collapses into a single entry rather than one element per stroke. A note
+ * holds hundreds of strokes and no tool accepts a stroke id, so per-stroke
+ * objects were repeating an id, a kind and a reader to say nothing; the only
+ * actionable part is geometry, which survives here as `boxes`.
+ */
+export interface McpStrokeGroupSummary {
+  kind: 'stroke-group';
+  reader: string;
+  count: number;
+  /** Union of every stroke box, for framing one capture over all the ink. */
+  bounds: McpBounds;
+  /** Per-stroke `[x, y, width, height]`, in document order. */
+  boxes: [number, number, number, number][];
 }
 
 export interface McpUnknownElementSummary extends McpElementBase {
@@ -81,7 +90,7 @@ export type McpNoteElementSummary =
   | McpImageSummary
   | McpPdfSummary
   | McpLatexSummary
-  | McpStrokeSummary
+  | McpStrokeGroupSummary
   | McpUnknownElementSummary;
 
 export interface McpNoteReadModel {
@@ -128,6 +137,56 @@ export interface McpNoteFullReadModel extends McpNoteReadModel {
   latexBlocks: McpLatexContent[];
 }
 
+export type McpHandwritingStatus =
+  /** Ink was found and at least one line produced text. */
+  | 'recognized'
+  /** Ink was found and located, but no line produced text. */
+  | 'text-unavailable'
+  /** Recognition has run and this note contains no ink. */
+  | 'no-handwriting'
+  /** No recognition artifact exists, so nothing is known either way. */
+  | 'not-recognized';
+
+export interface McpHandwritingLine {
+  text: string;
+  bounds: McpBounds;
+  /** Only the count: no tool accepts a stroke id, so the ids themselves are noise. */
+  strokeCount: number;
+}
+
+export interface McpHandwritingReadModel {
+  noteId: VFSNodeId;
+  status: McpHandwritingStatus;
+  /** False on platforms with no OCR backend, where every line's text is empty. */
+  recognitionSupported: boolean;
+  /** How to interpret this result, and what to do next. */
+  note: string;
+  lineCount: number;
+  recognizedAt: number | null;
+  lines: McpHandwritingLine[];
+}
+
+export interface McpScreenshot {
+  noteId: VFSNodeId;
+  /** World-space rect actually captured, after defaults were applied. */
+  region: McpBounds;
+  mimeType: 'image/png';
+  base64: string;
+}
+
+/**
+ * MCP content blocks a tool can return instead of a JSON payload. The bridge
+ * passes these through to `tools/call` verbatim, so an image reaches the model
+ * as an image rather than as an unreadable base64 string.
+ */
+export type McpContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
+
+export interface McpToolContentResult {
+  content: McpContentBlock[];
+}
+
 export interface McpToolDefinition {
   name: string;
   description: string;
@@ -143,6 +202,8 @@ export interface McpBridgeToolCallPayload {
 export interface McpBridgeToolResponse {
   requestId: string;
   result?: unknown;
+  /** Pre-built MCP content blocks, used instead of serializing `result`. */
+  content?: McpContentBlock[];
   error?: string;
 }
 

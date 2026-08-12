@@ -6,6 +6,7 @@
   "exports": {
     "./command-context": "./src/command-context.tsx",
     "./components/add-color-swatch": "./src/components/add-color-swatch.tsx",
+    "./components/color-picker-dialog": "./src/components/color-picker-dialog.tsx",
     "./components/color-swatch": "./src/components/color-swatch.tsx",
     "./components/custom-color-swatch": "./src/components/custom-color-swatch.tsx",
     "./components/virtual-list": "./src/components/virtual-list.tsx",
