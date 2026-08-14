@@ -24,8 +24,9 @@ function makeCanvas(elements: DrawableElement[]) {
 }
 
 describe('EraserTool', () => {
-  it('erases only strokes under the cursor', () => {
+  it('erases only strokes and shapes under the cursor', () => {
     const stroke = makeElement(ElementType.STROKE);
+    const shape = makeElement(ElementType.SHAPE);
     const text = makeElement(ElementType.TEXT);
     const image = makeElement(ElementType.IMAGE);
     const pageFrame = makeElement(ElementType.PAGE_FRAME);
@@ -36,6 +37,7 @@ describe('EraserTool', () => {
       text.element,
       image.element,
       stroke.element,
+      shape.element,
     ]);
 
     new EraserTool(() => catalogs.en).update(canvas, {} as PointerEvent, {
@@ -43,18 +45,24 @@ describe('EraserTool', () => {
       y: 20,
     });
 
-    expect(removeElement).toHaveBeenCalledTimes(1);
+    expect(removeElement).toHaveBeenCalledTimes(2);
     expect(removeElement).toHaveBeenCalledWith(stroke.element);
+    expect(removeElement).toHaveBeenCalledWith(shape.element);
     expect(stroke.isOver).toHaveBeenCalledWith(10, 20, 20, ctx);
+    expect(shape.isOver).toHaveBeenCalledWith(10, 20, 20, ctx);
     expect(text.isOver).not.toHaveBeenCalled();
     expect(image.isOver).not.toHaveBeenCalled();
     expect(pageFrame.isOver).not.toHaveBeenCalled();
     expect(pdf.isOver).not.toHaveBeenCalled();
   });
 
-  it('leaves strokes outside the cursor untouched', () => {
+  it('leaves strokes and shapes outside the cursor untouched', () => {
     const stroke = makeElement(ElementType.STROKE, false);
-    const { canvas, removeElement } = makeCanvas([stroke.element]);
+    const shape = makeElement(ElementType.SHAPE, false);
+    const { canvas, removeElement } = makeCanvas([
+      stroke.element,
+      shape.element,
+    ]);
 
     new EraserTool(() => catalogs.en).update(canvas, {} as PointerEvent, {
       x: 10,
