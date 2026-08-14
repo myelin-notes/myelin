@@ -7,6 +7,8 @@ import type { EmbedFilesFn } from './use-embed-files';
 const PEN_HOLD_MS = 350;
 /** Movement past this (px) during the hold means the pen is drawing, not resting. */
 const PEN_HOLD_SLOP = 6;
+/** PointerEvent.button for a stylus barrel button. */
+const PEN_BARREL_BUTTON = 2;
 
 interface UsePageCanvasBindingsArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -23,6 +25,14 @@ export function usePageCanvasBindings({
   onCanvasPointerDown,
   embedFiles,
 }: UsePageCanvasBindingsArgs) {
+  // The pen may already have begun using the active tool — resting to summon
+  // the wheel starts a stroke, and the barrel can be pressed mid-stroke — so
+  // whatever is in flight is thrown away rather than committed.
+  const openToolWheelWithPen = useEffectEvent((event: PointerEvent) => {
+    drawableCanvasRef.current?.abortInteraction();
+    wheelRef.current?.show(event);
+  });
+
   const handleCanvasPointerDown = useEffectEvent((event: PointerEvent) => {
     onCanvasPointerDown();
     if (event.shiftKey) {
@@ -34,14 +44,14 @@ export function usePageCanvasBindings({
       } else {
         wheelRef.current?.hide();
       }
+      return;
     }
-  });
-
-  // The pen has already begun using the active tool by the time the hold
-  // resolves, so the nascent stroke is thrown away rather than committed.
-  const openWheelFromPenHold = useEffectEvent((event: PointerEvent) => {
-    drawableCanvasRef.current?.abortInteraction();
-    wheelRef.current?.show(event);
+    // A stylus barrel button is the pen-side right-click, so it opens the wheel
+    // outright rather than making the user wait out the hold. Apple Pencils
+    // have no barrel button; S Pen / Surface Pen / Wacom do.
+    if (event.pointerType === 'pen' && event.button === PEN_BARREL_BUTTON) {
+      openToolWheelWithPen(event);
+    }
   });
 
   const handleCanvasDrop = useEffectEvent((event: DragEvent) => {
@@ -88,13 +98,15 @@ export function usePageCanvasBindings({
     const handlePointerDown = (event: PointerEvent) => {
       handleCanvasPointerDown(event);
       cancelHold();
+      // Button 0 is the pen tip: the barrel opens the wheel on its own, and the
+      // eraser end is there to erase, so neither arms the hold.
       if (event.pointerType !== 'pen' || event.button !== 0 || event.shiftKey) {
         return;
       }
       hold = { id: event.pointerId, x: event.clientX, y: event.clientY };
       holdTimer = setTimeout(() => {
         cancelHold();
-        openWheelFromPenHold(event);
+        openToolWheelWithPen(event);
       }, PEN_HOLD_MS);
     };
     canvas.addEventListener('pointerdown', handlePointerDown);
