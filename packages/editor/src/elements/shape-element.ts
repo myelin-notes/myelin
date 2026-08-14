@@ -75,6 +75,23 @@ export class ShapeElement extends DrawableElement {
     return this.box;
   }
 
+  /**
+   * Grow a bbox axis thinner than the drawn stroke out to the stroke's width. A
+   * snapped horizontal line has an exactly-zero-height geometry bbox, which no
+   * box test can ever hit: click selection (`inBox`) uses strict inequalities,
+   * marquee needs a non-zero area, and resize bails on an empty local box.
+   */
+  private withStrokeThickness(box: DOMRect): DOMRect {
+    const w = Math.max(box.width, this.style.size);
+    const h = Math.max(box.height, this.style.size);
+    return new DOMRect(
+      box.x - (w - box.width) / 2,
+      box.y - (h - box.height) / 2,
+      w,
+      h,
+    );
+  }
+
   protected updateBoundingBox(): void {
     const g = this.geom;
     if (this.shapeType === 'rect' || this.shapeType === 'ellipse') {
@@ -82,7 +99,7 @@ export class ShapeElement extends DrawableElement {
         this.box = new DOMRect(0, 0, 0, 0);
         return;
       }
-      this.box = new DOMRect(g[0], g[1], g[2], g[3]);
+      this.box = this.withStrokeThickness(new DOMRect(g[0], g[1], g[2], g[3]));
       return;
     }
     // line / triangle: min/max of flat coordinate pairs.
@@ -110,7 +127,9 @@ export class ShapeElement extends DrawableElement {
         maxY = y;
       }
     }
-    this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
+    this.box = this.withStrokeThickness(
+      new DOMRect(minX, minY, maxX - minX, maxY - minY),
+    );
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -245,19 +264,22 @@ export class ShapeElement extends DrawableElement {
     if (g.length < 4) {
       return;
     }
-    const worldBox = this.boundingBox;
+    // World-space polyline for this shape (PageItem.path has no line width, so
+    // shapes are emitted as width-carrying `line` segments instead).
+    const worldPts = this.toWorldOutline();
+
+    // Measured off the outline, not boundingBox — the latter is inflated to the
+    // stroke thickness for hit-testing, which would hide degenerate geometry.
+    const xs = worldPts.map(([x]) => x);
+    const ys = worldPts.map(([, y]) => y);
     if (
-      worldBox.width < MIN_PDF_WORLD_SIZE &&
-      worldBox.height < MIN_PDF_WORLD_SIZE
+      Math.max(...xs) - Math.min(...xs) < MIN_PDF_WORLD_SIZE &&
+      Math.max(...ys) - Math.min(...ys) < MIN_PDF_WORLD_SIZE
     ) {
       return;
     }
     const { rgb } = parseCssColor(this.style.color);
     const width = ctx.ptPerWorldY * this.style.size;
-
-    // World-space polyline for this shape (PageItem.path has no line width, so
-    // shapes are emitted as width-carrying `line` segments instead).
-    const worldPts = this.toWorldOutline();
     const closed =
       this.shapeType === 'rect' ||
       this.shapeType === 'triangle' ||

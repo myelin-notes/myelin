@@ -187,6 +187,29 @@ describe('ShapeElement resize', () => {
   });
 });
 
+describe('ShapeElement bounding box', () => {
+  it('gives a horizontal line a selectable box', () => {
+    // The recognizer levels near-horizontal lines, so both endpoints share a y.
+    // A zero-height box is unhittable: inBox uses strict inequalities and
+    // marquee selection compares against the box area.
+    const shape = new ShapeElement('hl', 'line', [0, 0, 200, 0], STYLE);
+    shape.setOffset(50, 100);
+
+    const box = shape.boundingBox;
+    expect(box.height).toBe(STYLE.size);
+    expect(box.width).toBe(200);
+    // Centered on the geometry, so the drawn stroke sits inside the box.
+    expect(box.y).toBe(100 - STYLE.size / 2);
+    // A click on the line lands strictly inside.
+    expect(box.y < 100 && 100 < box.bottom).toBe(true);
+  });
+
+  it('leaves a box wider than the stroke untouched', () => {
+    const shape = new ShapeElement('r', 'rect', [0, 0, 200, 100], STYLE);
+    expect(shape.localBoundingBox).toEqual(new DOMRect(0, 0, 200, 100));
+  });
+});
+
 function makePdfCtx(): { ctx: PdfHarvestContext; items: PageItem[] } {
   const items: PageItem[] = [];
   const ctx: PdfHarvestContext = {

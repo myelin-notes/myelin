@@ -37,6 +37,14 @@ export const ELLIPSE_STRONG = 0.8;
 export const RECT_MAX_CIRC = 0.78;
 
 /**
+ * Minimum polygon area / bbox area for a closed stroke to be a rectangle. A
+ * rect fills its bounding box (~1.0) while an ellipse fills only π/4 (~0.785),
+ * so this separates the two far better than circularity, whose ranges overlap
+ * badly (a clean square is 0.79-0.90, a jittery circle 0.85).
+ */
+export const RECT_MIN_FILL = 0.82;
+
+/**
  * Max perpendicular deviation (as a fraction of the longer bbox side) for a
  * stroke to count as a straight line.
  */
@@ -44,6 +52,9 @@ export const LINE_DEVIATION_RATIO = 0.06;
 
 /** Minimum world-space span for a line to be accepted. */
 export const MIN_LINE_SPAN = 20;
+
+/** A line within this many degrees of horizontal snaps to exactly horizontal. */
+export const LINE_HORIZONTAL_SNAP_DEG = 5;
 
 /** Confidence below this gate yields no recognition. */
 export const MIN_CONFIDENCE = 0.7;

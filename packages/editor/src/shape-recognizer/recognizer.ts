@@ -13,12 +13,14 @@ import {
   CORNER_CLUSTER_WINDOW,
   ELLIPSE_STRONG,
   LINE_DEVIATION_RATIO,
+  LINE_HORIZONTAL_SNAP_DEG,
   MIN_CONFIDENCE,
   MIN_LINE_SPAN,
   MIN_POINTS,
   RECT_ASPECT_MAX,
   RECT_ASPECT_MIN,
   RECT_MAX_CIRC,
+  RECT_MIN_FILL,
   RESAMPLE_N,
 } from './config';
 
@@ -297,9 +299,18 @@ export function recognizeShape(
     // confidence falloff it shrank the effective straightness tolerance to
     // ~1.8%, far tighter than a hand-drawn line, so freehand lines silently
     // failed to snap.
+    // A near-horizontal line snaps flat, pivoting about the segment midpoint.
+    const tiltDeg = Math.abs(
+      (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI,
+    );
+    const fromHorizontal = Math.min(tiltDeg, 180 - tiltDeg);
+    const [ay, by] =
+      fromHorizontal <= LINE_HORIZONTAL_SNAP_DEG
+        ? [(a[1] + b[1]) / 2, (a[1] + b[1]) / 2]
+        : [a[1], b[1]];
     return {
       shapeType: 'line',
-      geom: [a[0], a[1], b[0], b[1]],
+      geom: [a[0], ay, b[0], by],
       confidence: 1 - deviationRatio / LINE_DEVIATION_RATIO,
     };
   }
@@ -316,6 +327,24 @@ export function recognizeShape(
       : pts;
   const corners = detectCorners(cornerPts, closed);
   const cornerCount = corners.length;
+  const fill = box.w * box.h <= 1e-9 ? 0 : polygonArea(pts) / (box.w * box.h);
+
+  // Fill precedence: a closed stroke that fills its bounding box is a rect, and
+  // this is checked before circularity because a hand-drawn square's corners
+  // round off enough to read as "very circular" (and to hide from the corner
+  // detector) long before its fill drops anywhere near an ellipse's π/4.
+  if (
+    closed &&
+    fill >= RECT_MIN_FILL &&
+    aspect >= RECT_ASPECT_MIN &&
+    aspect <= RECT_ASPECT_MAX
+  ) {
+    return {
+      shapeType: 'rect',
+      geom: [box.minX, box.minY, box.w, box.h],
+      confidence: Math.min(1, fill),
+    };
+  }
 
   // Strong-circularity precedence: a very round closed stroke is ALWAYS an
   // ellipse, regardless of how many corners the detector hallucinated.

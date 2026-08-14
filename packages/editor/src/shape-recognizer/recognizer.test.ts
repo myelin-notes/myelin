@@ -40,6 +40,21 @@ function rectStroke(
   return out;
 }
 
+/** Moving-average smoothing — approximates the rounded corners a real hand draws. */
+function smooth(pts: Pt[], k: number): Pt[] {
+  const n = pts.length;
+  return pts.map((_, i) => {
+    let sx = 0;
+    let sy = 0;
+    for (let j = -k; j <= k; j++) {
+      const p = pts[(i + j + n) % n];
+      sx += p[0];
+      sy += p[1];
+    }
+    return [sx / (2 * k + 1), sy / (2 * k + 1)] as Pt;
+  });
+}
+
 function ellipseStroke(
   cx: number,
   cy: number,
@@ -152,6 +167,21 @@ describe('recognizeShape', () => {
     expect(r?.shapeType).toBe('rect');
   });
 
+  it('classifies a square with rounded corners as rect, not ellipse', () => {
+    // A real hand rounds the corners of a square, which pushes circularity up to
+    // ~0.86 — past ELLIPSE_STRONG — and hides the corners from the turn-angle
+    // detector. Only the bbox fill ratio still says "box".
+    for (const k of [3, 6, 10]) {
+      const r = recognizeShape(smooth(rectStroke(0, 0, 120, 120, 50), k));
+      expect(r?.shapeType, `smoothing ${k}`).toBe('rect');
+    }
+  });
+
+  it('classifies a heavily jittered square as rect', () => {
+    const r = recognizeShape(jitter(rectStroke(0, 0, 120, 120, 50), 7));
+    expect(r?.shapeType).toBe('rect');
+  });
+
   it('classifies a clean circle as ellipse', () => {
     const r = recognizeShape(ellipseStroke(100, 100, 60, 60))!;
     expect(r.shapeType).toBe('ellipse');
@@ -193,6 +223,20 @@ describe('recognizeShape', () => {
     const r = recognizeShape(jitter(lineStroke(0, 0, 220, 60), 6, 7))!;
     expect(r).not.toBeNull();
     expect(r.shapeType).toBe('line');
+  });
+
+  it('snaps a near-horizontal line flat', () => {
+    // ~2.9deg tilt — inside LINE_HORIZONTAL_SNAP_DEG.
+    const r = recognizeShape(jitter(lineStroke(0, 100, 200, 110), 1))!;
+    expect(r.shapeType).toBe('line');
+    expect(r.geom[1]).toBeCloseTo(r.geom[3], 6);
+  });
+
+  it('leaves a clearly tilted line alone', () => {
+    // ~14deg tilt — outside LINE_HORIZONTAL_SNAP_DEG.
+    const r = recognizeShape(jitter(lineStroke(0, 100, 200, 150), 1))!;
+    expect(r.shapeType).toBe('line');
+    expect(Math.abs(r.geom[3] - r.geom[1])).toBeGreaterThan(30);
   });
 
   it('rejects a too-short stroke', () => {
