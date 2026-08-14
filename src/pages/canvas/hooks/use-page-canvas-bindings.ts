@@ -1,10 +1,17 @@
 import { useEffect, useEffectEvent } from 'react';
+import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import type { EmbedFilesFn } from './use-embed-files';
+
+/** A resting pen summons the tool wheel after this long (ms). */
+const PEN_HOLD_MS = 350;
+/** Movement past this (px) during the hold means the pen is drawing, not resting. */
+const PEN_HOLD_SLOP = 6;
 
 interface UsePageCanvasBindingsArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   wheelRef: React.RefObject<WheelPickerHandle | null>;
+  drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
   onCanvasPointerDown: () => void;
   embedFiles: EmbedFilesFn;
 }
@@ -12,6 +19,7 @@ interface UsePageCanvasBindingsArgs {
 export function usePageCanvasBindings({
   canvasRef,
   wheelRef,
+  drawableCanvasRef,
   onCanvasPointerDown,
   embedFiles,
 }: UsePageCanvasBindingsArgs) {
@@ -27,6 +35,13 @@ export function usePageCanvasBindings({
         wheelRef.current?.hide();
       }
     }
+  });
+
+  // The pen has already begun using the active tool by the time the hold
+  // resolves, so the nascent stroke is thrown away rather than committed.
+  const openWheelFromPenHold = useEffectEvent((event: PointerEvent) => {
+    drawableCanvasRef.current?.abortInteraction();
+    wheelRef.current?.show(event);
   });
 
   const handleCanvasDrop = useEffectEvent((event: DragEvent) => {
@@ -56,10 +71,52 @@ export function usePageCanvasBindings({
     };
     canvas.addEventListener('contextmenu', handleContextMenu);
 
+    // Pen press-and-hold opens the tool wheel, so the tool can be swapped
+    // without setting the pen down. Tracked by pointer id: a palm resting on
+    // the screen emits its own moves, and those must not cancel the hold.
+    let holdTimer: ReturnType<typeof setTimeout> | null = null;
+    let hold: { id: number; x: number; y: number } | null = null;
+
+    const cancelHold = () => {
+      if (holdTimer !== null) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      hold = null;
+    };
+
     const handlePointerDown = (event: PointerEvent) => {
       handleCanvasPointerDown(event);
+      cancelHold();
+      if (event.pointerType !== 'pen' || event.button !== 0 || event.shiftKey) {
+        return;
+      }
+      hold = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      holdTimer = setTimeout(() => {
+        cancelHold();
+        openWheelFromPenHold(event);
+      }, PEN_HOLD_MS);
     };
     canvas.addEventListener('pointerdown', handlePointerDown);
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!hold || event.pointerId !== hold.id) {
+        return;
+      }
+      const moved = Math.hypot(event.clientX - hold.x, event.clientY - hold.y);
+      if (moved > PEN_HOLD_SLOP) {
+        cancelHold();
+      }
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+
+    const handlePointerUp = (event: PointerEvent) => {
+      if (hold && event.pointerId === hold.id) {
+        cancelHold();
+      }
+    };
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
     const handleDragOver = (event: DragEvent) => event.preventDefault();
     canvas.addEventListener('dragover', handleDragOver);
@@ -70,8 +127,12 @@ export function usePageCanvasBindings({
     canvas.addEventListener('drop', handleDrop);
 
     return () => {
+      cancelHold();
       canvas.removeEventListener('contextmenu', handleContextMenu);
       canvas.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
       canvas.removeEventListener('dragover', handleDragOver);
       canvas.removeEventListener('drop', handleDrop);
     };

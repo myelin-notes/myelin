@@ -53,6 +53,7 @@ export function useCanvasEngine({
   usePageCanvasBindings({
     canvasRef,
     wheelRef,
+    drawableCanvasRef,
     onCanvasPointerDown,
     embedFiles,
   });

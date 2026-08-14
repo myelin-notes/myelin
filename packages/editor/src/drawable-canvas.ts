@@ -173,6 +173,10 @@ export class DrawableCanvas {
   // pointer panning must yield while 2+ fingers are down.
   private readonly _activeTouchPointers = new Set<number>();
 
+  // Set for the duration of abortInteraction() so the UsingTool end handler
+  // discards the interaction instead of committing it.
+  private _abortingInteraction: boolean = false;
+
   /** Owns the element collections and keeps them mutating as a unit. */
   private readonly _store = new ElementStore(() => this.notifyChange());
   private _ydoc: YDocManager;
@@ -1148,7 +1152,15 @@ export class DrawableCanvas {
 
   private initStates() {
     this.state.addEnd(InteractState.UsingTool, (event) => {
-      this.toolSelected.finish(this, event);
+      if (this._abortingInteraction) {
+        if (this.toolSelected.abort) {
+          this.toolSelected.abort(this);
+        } else {
+          this.toolSelected.interrupt(this);
+        }
+      } else {
+        this.toolSelected.finish(this, event);
+      }
       this._ydoc.undoManager.stopCapturing();
     });
 
@@ -1437,6 +1449,20 @@ export class DrawableCanvas {
     } else {
       this.canvas.style.cursor = this._toolCursor;
     }
+  }
+
+  /**
+   * Drop the in-progress tool interaction without committing it. Used when a
+   * pointer gesture that started as tool use turns out to be something else —
+   * a pen resting on the canvas to summon the tool wheel.
+   */
+  public abortInteraction() {
+    if (this.state.current !== InteractState.UsingTool) {
+      return;
+    }
+    this._abortingInteraction = true;
+    this.state.change(InteractState.Idle, null);
+    this._abortingInteraction = false;
   }
 
   public switchTool(to: number) {

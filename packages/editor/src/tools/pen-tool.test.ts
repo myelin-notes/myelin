@@ -382,6 +382,39 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(created).toHaveLength(1); // committed as a stroke
   });
 
+  it('abort() discards the nascent stroke instead of committing it', () => {
+    const { canvas, created, removeElement } = makeCanvas();
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+
+    // The pen-hold that opens the tool wheel: a couple of points, then gone.
+    feed(tool, canvas, [
+      [0, 0],
+      [2, 2],
+    ]);
+    tool.abort(canvas);
+
+    expect(removeElement).toHaveBeenCalledWith(stroke);
+    // Dwell timer went with it — no stale recognition once the wheel is up.
+    vi.runAllTimers();
+    expect(created).toHaveLength(1);
+  });
+
+  it('abort() removes the snapped shape when recognition already ran', () => {
+    const { canvas, created, removeElement } = makeCanvas();
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    feed(tool, canvas, rectStroke(10, 20, 200, 120));
+    vi.advanceTimersByTime(600);
+
+    const shape = created[1] as ShapeElement;
+    expect(shape).toBeInstanceOf(ShapeElement);
+
+    tool.abort(canvas);
+    expect(removeElement).toHaveBeenCalledWith(shape);
+  });
+
   it('no-ops when the stroke has no bound Y.Map (guard)', () => {
     const { canvas, created, removeElement } = makeCanvas({ bind: false });
     const tool = makeTool();
