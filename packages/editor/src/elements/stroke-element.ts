@@ -24,6 +24,16 @@ export interface StrokeStyle {
  */
 const POINT_FLUSH_INTERVAL_MS = 300;
 
+/**
+ * Pointer Events reports a flat 0.5 for the whole drag on hardware with no
+ * pressure sensor (mouse, sensorless pen), so a sample that differs from it is
+ * the only proof a real sensor is behind the stroke. Until one arrives the
+ * stroke keeps perfect-freehand's velocity simulation, which is what a mouse
+ * wants — switching it off unconditionally would flatten every mouse stroke to
+ * a constant width.
+ */
+const NO_SENSOR_PRESSURE = 0.5;
+
 export class StrokeElement extends DrawableElement {
   protected box: DOMRect;
   protected dirty: boolean = true;
@@ -100,6 +110,17 @@ export class StrokeElement extends DrawableElement {
     this.points.push(x, y, pressure ?? 0);
     this.dirty = true;
 
+    // Every sample already carries its real value, so flipping mid-stroke
+    // re-renders the whole stroke from recorded pressure, not just the rest.
+    if (
+      !this.hasPressure &&
+      pressure !== undefined &&
+      pressure > 0 &&
+      pressure !== NO_SENSOR_PRESSURE
+    ) {
+      this.hasPressure = true;
+    }
+
     // Throttled live flush so a long stroke stays in one undo group; the final
     // state is always persisted by commit() on pointer-up.
     const now = Date.now();
@@ -116,7 +137,12 @@ export class StrokeElement extends DrawableElement {
 
   private flushPoints(): void {
     if (this.yMap) {
-      this.syncToYMap({ points: [...this.points] });
+      // hasPressure rides along: it is serialized as false when the element is
+      // created and only settles once a sample proves the device has a sensor.
+      this.syncToYMap({
+        hasPressure: this.hasPressure,
+        points: [...this.points],
+      });
     }
   }
 

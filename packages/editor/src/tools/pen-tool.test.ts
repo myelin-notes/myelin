@@ -210,6 +210,26 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(stroke.xyPoints).toHaveLength(3);
   });
 
+  it('adopts stylus pressure, but not the constant 0.5 a mouse reports', () => {
+    const { canvas, created } = makeCanvas();
+    const tool = makeTool();
+
+    tool.start(canvas, {} as PointerEvent);
+    const mouseStroke = created[0] as StrokeElement;
+    feed(tool, canvas, [
+      [0, 0],
+      [5, 5],
+    ]);
+    expect(mouseStroke.pressureEnabled).toBe(false);
+    tool.finish(canvas, {} as PointerEvent);
+
+    tool.start(canvas, {} as PointerEvent);
+    const penStroke = created[1] as StrokeElement;
+    tool.update(canvas, { pressure: 0.5 } as PointerEvent, pos(0, 0));
+    tool.update(canvas, { pressure: 0.74 } as PointerEvent, pos(5, 5));
+    expect(penStroke.pressureEnabled).toBe(true);
+  });
+
   it('snaps a clean rectangle to a rect ShapeElement after dwell', () => {
     const { canvas, created, removeElement } = makeCanvas();
     const tool = makeTool();

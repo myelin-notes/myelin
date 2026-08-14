@@ -54,6 +54,42 @@ describe('StrokeElement points', () => {
     expect(reloaded.localBoundingBox.height).toBeGreaterThan(0);
   });
 
+  it('keeps simulated pressure while every sample is the sensorless 0.5', () => {
+    const s = new StrokeElement('p1', [], false, STYLE);
+    s.addPoint(0, 0, 0.5);
+    s.addPoint(10, 0, 0.5);
+    s.addPoint(20, 0, undefined);
+    expect(s.pressureEnabled).toBe(false);
+  });
+
+  it('switches to recorded pressure once a sample proves a real sensor', () => {
+    const s = new StrokeElement('p2', [], false, STYLE);
+    s.addPoint(0, 0, 0.5);
+    s.addPoint(10, 0, 0.82);
+    expect(s.pressureEnabled).toBe(true);
+  });
+
+  it('persists a mid-stroke pressure switch to the Y.Map', () => {
+    const s = new StrokeElement('p3', [], false, STYLE);
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.STROKE, 'p3', {
+      offsetX: 0,
+      offsetY: 0,
+      scaleX: 1,
+      scaleY: 1,
+      ...s.getYMapProps(),
+    });
+    // Bound before the sensor is detected, as the pen tool binds on pointerdown.
+    s.bindToYMap(yMap);
+    expect(yMap.get('hasPressure')).toBe(false);
+
+    s.addPoint(0, 0, 0.3);
+    s.addPoint(10, 0, 0.9);
+    s.commit();
+
+    expect(yMap.get('hasPressure')).toBe(true);
+  });
+
   it('hit-tests against the centerline inflated by the stroke half-width', () => {
     const s = new StrokeElement('s3', [], false, { color: '#000', size: 8 });
     s.addPoint(0, 0, 0.5);
