@@ -8,3 +8,12 @@ export enum ElementType {
   LATEX = 6,
   AUDIO = 7,
 }
+
+/**
+ * Backdrops: page-sized surfaces that live on the bottom layer and are drawn
+ * on top of. Their body covers the area gestures travel across, so input
+ * handling treats them differently from ordinary elements.
+ */
+export function isBackgroundElement(type: ElementType): boolean {
+  return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
+}

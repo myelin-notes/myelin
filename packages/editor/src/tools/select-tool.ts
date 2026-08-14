@@ -53,6 +53,10 @@ export class SelectTool implements ITool {
   // Lasso state
   private lassoPath: Vector2[] = [];
 
+  // Backdrop click state: the element a marquee started on top of, selected on
+  // finish() if the marquee caught nothing.
+  private backdropClickCandidate: DrawableElement | null = null;
+
   // Double-click state
   private lastClickTime: number = 0;
   private lastClickPos: Vector2 = { x: 0, y: 0 };
@@ -177,29 +181,35 @@ export class SelectTool implements ITool {
       return;
     }
 
-    if (hits.length > 0) {
-      const selectedHit = hits.find((e) => e.isSelected);
-      let pick = selectedHit ?? hits[0];
+    // An unselected backdrop (page frame, PDF) doesn't grab: a drag starting on
+    // its body draws a marquee over what is drawn on top of it instead of moving
+    // it. A marquee that catches nothing was a click on the backdrop after all —
+    // finish() selects it then.
+    const grabbable = hits.filter((e) => e.grabsFromBody);
+
+    if (grabbable.length > 0) {
+      const selectedHit = grabbable.find((e) => e.isSelected);
+      let pick = selectedHit ?? grabbable[0];
       this.pendingCycle = null;
 
       if (selectedHit) {
         if (
-          hits.length > 1 &&
+          grabbable.length > 1 &&
           this.lastCycledElement &&
-          hits.includes(this.lastCycledElement)
+          grabbable.includes(this.lastCycledElement)
         ) {
-          this.pendingCycle = { hits, from: this.lastCycledElement };
+          this.pendingCycle = { hits: grabbable, from: this.lastCycledElement };
         } else {
           this.lastCycledElement = pick;
         }
       } else {
         if (
-          hits.length > 1 &&
+          grabbable.length > 1 &&
           this.lastCycledElement &&
-          hits.includes(this.lastCycledElement)
+          grabbable.includes(this.lastCycledElement)
         ) {
-          const idx = hits.indexOf(this.lastCycledElement);
-          pick = hits[(idx + 1) % hits.length];
+          const idx = grabbable.indexOf(this.lastCycledElement);
+          pick = grabbable[(idx + 1) % grabbable.length];
         }
         this.lastCycledElement = pick;
       }
@@ -243,11 +253,12 @@ export class SelectTool implements ITool {
       return;
     }
 
-    // 3. Empty space → marquee or lasso
+    // 3. Empty space (or a backdrop body) → marquee or lasso
     if (canvas.isCanvasInteractiveEditMode) {
       canvas.exitElementEdit();
     }
     this.lastCycledElement = null;
+    this.backdropClickCandidate = hits[0] ?? null;
     if (this.selectionStyle === 'lasso') {
       this.mode = SelectMode.Lasso;
       this.lassoPath = [point];
@@ -375,6 +386,17 @@ export class SelectTool implements ITool {
         this.scalingElement?.endResize();
         break;
       }
+      case SelectMode.Marquee:
+      case SelectMode.Lasso: {
+        // Nothing caught means the gesture was a click on the backdrop it
+        // started from, not a selection of what sits on top of it.
+        const backdrop = this.backdropClickCandidate;
+        if (backdrop && !canvas.elements.some((e) => e.isSelected)) {
+          backdrop.select();
+          this.lastCycledElement = backdrop;
+        }
+        break;
+      }
     }
 
     this.lastClickTime = Date.now();
@@ -448,6 +470,7 @@ export class SelectTool implements ITool {
     this.lassoPath = [];
     this.pendingCycle = null;
     this.clickToEditCandidate = null;
+    this.backdropClickCandidate = null;
   }
 
   private cyclePendingSelection(canvas: DrawableCanvas): void {

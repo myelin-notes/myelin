@@ -7,7 +7,7 @@ import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { SyncOrigin, YDocManager } from '../ydoc-manager';
-import type { ElementType } from './element-type';
+import { type ElementType, isBackgroundElement } from './element-type';
 
 export interface SelectionToolbarItem {
   /** Stable id within an element's items, used as React key. */
@@ -361,6 +361,17 @@ export abstract class DrawableElement {
   /** Whether this element supports inline editing (double-click to edit). */
   public get editable(): boolean {
     return false;
+  }
+
+  /**
+   * Whether a press inside this element's bounding box grabs it — for moving it
+   * with the select tool, or for handing a finger to that tool instead of
+   * panning. An unselected backdrop says no: its body covers the area gestures
+   * travel across, so a drag starting there belongs to whatever is drawn on top
+   * of it (a marquee, or a one-finger pan) rather than to the backdrop.
+   */
+  public get grabsFromBody(): boolean {
+    return this.isSelected || !isBackgroundElement(this.type);
   }
 
   /**

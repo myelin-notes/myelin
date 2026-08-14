@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import type { DrawableElement } from '../elements/drawable-element';
 import { ElementType } from '../elements/element-type';
 import { ImageElement } from '../elements/image-element';
+import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
+import { PageFrameElement } from '../elements/page-frame-element';
 import { catalogs } from '../i18n/messages';
 import { CollisionHelper } from '../utils/collision-helper';
 import { YDocManager } from '../ydoc-manager';
@@ -54,7 +57,24 @@ function makeImageElement(uuid = 'image-uuid', offsetX = 0, offsetY = 0) {
   return { image, ydoc };
 }
 
-function makeCanvas(elements: ImageElement[], point: Vector2) {
+function makePageFrame(uuid = 'frame-uuid', offsetX = 0, offsetY = 0) {
+  vi.stubGlobal('DOMRect', TestDOMRect);
+  const ydoc = new YDocManager();
+  const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, uuid, {
+    offsetX,
+    offsetY,
+    scaleX: 1,
+    scaleY: 1,
+    pageWidth: PAGE_WIDTH,
+    pageHeight: PAGE_HEIGHT,
+    pageLayout: 'vertical',
+  });
+  const frame = new PageFrameElement(uuid);
+  frame.bindToYMap(yMap);
+  return frame;
+}
+
+function makeCanvas(elements: DrawableElement[], point: Vector2) {
   const enterElementEdit = vi.fn();
   // Mirrors DrawableCanvas.enterEditAtPoint: hit-test the topmost editable
   // element under the point, select it exclusively, and enter its edit mode.
@@ -81,9 +101,10 @@ function makeCanvas(elements: ImageElement[], point: Vector2) {
     enterEditAtPoint,
     viewport: {
       getPoint: vi.fn(() => point),
+      zoom: 1,
     },
   } as unknown as DrawableCanvas;
-  enterElementEdit.mockImplementation((element: ImageElement) => {
+  enterElementEdit.mockImplementation((element: DrawableElement) => {
     element.enterEditMode(canvas);
   });
 
@@ -178,6 +199,55 @@ describe('SelectTool', () => {
     tool.finish(canvas, event);
 
     expect(a.isSelected).toBe(true);
+  });
+
+  it('marquees over an unselected page frame instead of moving it', () => {
+    const frame = makePageFrame();
+    const { image } = makeImageElement('ink', 200, 200);
+    const start = { x: 50, y: 50 };
+    const { canvas } = makeCanvas([frame, image], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 400, y: 400 });
+    tool.finish(canvas, event);
+
+    expect(image.isSelected).toBe(true);
+    expect(frame.isSelected).toBe(false);
+    expect(frame.offset).toEqual({ x: 0, y: 0 });
+  });
+
+  it('selects the page frame a marquee started on when it caught nothing', () => {
+    const frame = makePageFrame();
+    const point = { x: 50, y: 50 };
+    const { canvas } = makeCanvas([frame], point);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    // A pen tap wobbles by a pixel or two before it lifts.
+    tool.update(canvas, event, { x: 52, y: 51 });
+    tool.finish(canvas, event);
+
+    expect(frame.isSelected).toBe(true);
+    expect(frame.offset).toEqual({ x: 0, y: 0 });
+  });
+
+  it('moves an already-selected page frame dragged from its body', () => {
+    const frame = makePageFrame();
+    frame.select();
+    const start = { x: 50, y: 50 };
+    const { canvas } = makeCanvas([frame], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 80, y: 90 });
+    tool.finish(canvas, event);
+
+    expect(frame.isSelected).toBe(true);
+    expect(frame.offset).toEqual({ x: 30, y: 40 });
   });
 
   it('does not write element position when clicking to select without moving', () => {

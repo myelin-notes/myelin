@@ -9,7 +9,7 @@ import {
   ELEMENT_FACTORIES,
   type ElementFactory,
 } from './elements/element-factories';
-import { ElementType } from './elements/element-type';
+import { ElementType, isBackgroundElement } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
 import type { Vector2 } from './geometry';
@@ -54,10 +54,6 @@ const ELEMENT_Z_ORDER_KEY = 'zOrder';
 
 /** Screen-pixel travel a finger may drift and still count as a tap. */
 const TOUCH_TAP_SLOP = 8;
-
-function isBackgroundElement(type: ElementType): boolean {
-  return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
-}
 
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
@@ -1183,9 +1179,9 @@ export class DrawableCanvas {
 
   /**
    * Whether a single finger at this world point should drive the select tool
-   * instead of panning: a resize handle of a selected element, or an element
-   * body other than an unselected page frame / PDF. Those backdrops cover the
-   * area you pan across, so a finger inside one pans until it is selected.
+   * instead of panning: a resize handle of a selected element, or a body that
+   * grabs (see `DrawableElement.grabsFromBody` — a finger inside an unselected
+   * backdrop pans until that backdrop is selected).
    */
   private touchGrabsElement(point: Vector2): boolean {
     for (let i = this.elements.length - 1; i >= 0; i--) {
@@ -1202,7 +1198,7 @@ export class DrawableCanvas {
       if (!CollisionHelper.inBox(point, element.boundingBox)) {
         continue;
       }
-      if (element.isSelected || !isBackgroundElement(element.type)) {
+      if (element.grabsFromBody) {
         return true;
       }
     }
