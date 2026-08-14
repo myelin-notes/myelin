@@ -127,10 +127,6 @@ export class TextElement extends DrawableElement {
     return true;
   }
 
-  public override get lowersCanvasWhileEditing(): boolean {
-    return true;
-  }
-
   public override get keepsSelectionToolbarWhileEditing(): boolean {
     return true;
   }

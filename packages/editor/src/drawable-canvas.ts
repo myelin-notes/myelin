@@ -605,8 +605,7 @@ export class DrawableCanvas {
 
   /**
    * Always-on-top canvas used to render selection outline + handles, so they
-   * remain visible above DOM-backed editing chrome (where the main canvas is
-   * lowered to z=2 to avoid strokes bleeding onto edited text).
+   * remain visible above DOM-backed editing chrome.
    */
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
     this.renderer.setOverlayCanvas(canvas);
@@ -751,13 +750,6 @@ export class DrawableCanvas {
       // Canvas stops intercepting pointer events so the DOM editor (chrome
       // contentEditable / inline text input) receives them.
       this.canvas.style.pointerEvents = 'none';
-      // For elements with DOM-backed editing chrome, drop the
-      // foreground canvas below the chrome so strokes don't bleed onto the
-      // editing surface. The selection outline lives on a separate overlay
-      // canvas (z=12) so it stays visible above chrome.
-      if (element.lowersCanvasWhileEditing) {
-        this.canvas.style.zIndex = '2';
-      }
     }
 
     // Camera switches to edit-mode pan + two-finger touch handling.
@@ -860,7 +852,6 @@ export class DrawableCanvas {
     this.notifyChange();
     this.syncViewportEditModePan();
     this.canvas.style.pointerEvents = '';
-    this.canvas.style.zIndex = '10';
     this.onElementEdit?.(null);
     logger.debug('Exited canvas element edit mode', {
       uuid: element.uuid,

@@ -567,7 +567,7 @@ function CanvasViewInner({
           style={{ zIndex: 5 }}
         />
 
-        {/* Foreground canvas: strokes, images, element content (z-index toggled by DrawableCanvas during edit) */}
+        {/* Foreground canvas: strokes, images, element content */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 block h-full w-full touch-none"

@@ -364,15 +364,6 @@ export abstract class DrawableElement {
   }
 
   /**
-   * Whether the foreground canvas should drop below the DOM chrome while this
-   * element is in edit mode (so strokes don't bleed onto the editing surface).
-   * The selection outline still renders on the overlay canvas above chrome.
-   */
-  public get lowersCanvasWhileEditing(): boolean {
-    return false;
-  }
-
-  /**
    * Whether the selection toolbar stays up while this element is in edit mode.
    * Elements whose toolbar acts on the thing being edited (text style controls)
    * want this; elements that carry their own in-place editing chrome don't.

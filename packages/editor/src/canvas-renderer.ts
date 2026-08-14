@@ -301,8 +301,7 @@ export class CanvasRenderer {
     this.ctx.restore();
 
     // Overlay canvas: selection outline + handles. Always above DOM chrome
-    // so selection stays visible while a page frame is being edited (the
-    // foreground canvas is lowered below chrome in that mode).
+    // so selection stays visible while a page frame is being edited.
     // Read after the draw loop above, which is what advances `selectionT` from
     // zero on the frame an element is selected.
     const overlayHasContent = elements.some(
