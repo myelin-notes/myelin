@@ -532,7 +532,7 @@ export class TabStateController {
   }
 
   // Deactivate the pane's current tab so it falls back to the empty-pane home
-  // view (activeTabId === ''), without closing any tabs. Used by the tablet
+  // view (activeTabId === ''), without closing any tabs. Used by the mobile
   // layout's library button to reveal the full-page explorer.
   showHome(paneId: PaneId): void {
     const state = this.state;

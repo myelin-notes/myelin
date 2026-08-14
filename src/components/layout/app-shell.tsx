@@ -1,7 +1,7 @@
 import { PaneIdProvider, useWindowState } from '@/lib/tabs/context';
 import type { PaneNode } from '@/lib/tabs/types';
 import { HomePage } from '@/pages/home';
-import { TabletLibrary } from '@/pages/library/tablet-library';
+import { MobileLibrary } from '@/pages/library/mobile-library';
 import { PaneContent } from './pane';
 import { PaneDropTarget, PaneLayout } from './pane-layout';
 import { useSidebar } from './sidebar/context';
@@ -9,7 +9,7 @@ import { TabBar } from './tab-bar';
 
 export function AppShell() {
   const windowState = useWindowState();
-  const { tabletLayout } = useSidebar();
+  const { mobileLayout } = useSidebar();
   const hasSplits = windowState.layout.type === 'split';
 
   if (hasSplits) {
@@ -38,8 +38,8 @@ export function AppShell() {
           <PaneDropTarget paneId={pane.id} className="min-h-0 flex-1">
             {activeTab ? (
               <PaneContent tab={activeTab} />
-            ) : tabletLayout ? (
-              <TabletLibrary />
+            ) : mobileLayout ? (
+              <MobileLibrary />
             ) : (
               <HomePage />
             )}

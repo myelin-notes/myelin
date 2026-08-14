@@ -27,9 +27,8 @@ export const MODE = import.meta.env.MODE;
 
 // Baked in at build time by vite.config.ts through a `define` global (not an
 // import.meta.env read): true for iOS and Android app builds, or when
-// VITE_TABLET_LAYOUT is set for local preview. Selects the tablet full-page
-// library layout over the desktop sidebar. The final runtime decision also
-// gates on viewport size so a narrow phone still uses the compact drawer —
+// VITE_TABLET_LAYOUT is set for local preview. Selects the full-page mobile
+// library layout over the desktop sidebar, at every mobile viewport size —
 // see SidebarProvider.
 export const IS_MOBILE_BUILD = __MOBILE_BUILD__;
 

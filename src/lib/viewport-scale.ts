@@ -4,17 +4,6 @@ const TABLET_SCALE = 1.25;
 /** Shorter screen edge, in CSS px, at or above which we scale. */
 const TABLET_MIN_EDGE = 700;
 
-let appliedScale = 1;
-
-/**
- * The page scale in effect, or 1 when unscaled. Layout thresholds expressed in
- * CSS px need to divide by this — scaling shrinks the viewport without taking
- * away any physical room.
- */
-export function getViewportScale(): number {
-  return appliedScale;
-}
-
 /**
  * Zoom the whole webview on tablet mobile builds, so mouse-sized controls land
  * on a comfortable touch target. Must run before first paint.
@@ -39,5 +28,4 @@ export function applyMobileViewportScale(): void {
     'content',
     `initial-scale=${TABLET_SCALE}, minimum-scale=${TABLET_SCALE}, maximum-scale=${TABLET_SCALE}, user-scalable=no, viewport-fit=cover`,
   );
-  appliedScale = TABLET_SCALE;
 }

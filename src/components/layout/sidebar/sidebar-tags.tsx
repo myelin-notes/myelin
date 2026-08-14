@@ -41,7 +41,7 @@ interface SidebarTagsProps {
   /**
    * 'collapsible' (default): the desktop sidebar's bottom panel with a collapse
    * toggle and a drag-to-resize handle. 'panel': always-open, fills its
-   * container height with no toggle or resize handle — used as the tablet
+   * container height with no toggle or resize handle — used as the mobile
    * library's left tags column.
    */
   variant?: 'collapsible' | 'panel';

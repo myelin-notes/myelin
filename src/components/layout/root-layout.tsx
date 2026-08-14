@@ -12,14 +12,14 @@ import { SidebarResizeHandle } from './sidebar/resize-handle';
  * content keeps the full width — an adaptive, screen-size-driven layout, not a
  * separate mobile UI.
  *
- * Tablet builds ({@link SidebarContextValue.tabletLayout}) drop the sidebar
+ * Mobile builds ({@link SidebarContextValue.mobileLayout}) drop the sidebar
  * entirely: the explorer becomes a full-page library home rendered inside
  * {@link AppShell}, so documents open over the full width like the pre-sidebar
  * layout.
  */
 export function RootLayout() {
-  const { collapsed, isCompact, tabletLayout } = useSidebar();
-  const showColumn = !tabletLayout && !isCompact && !collapsed;
+  const { collapsed, isCompact, mobileLayout } = useSidebar();
+  const showColumn = !mobileLayout && !isCompact && !collapsed;
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -28,7 +28,7 @@ export function RootLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <AppShell />
       </div>
-      {!tabletLayout && isCompact && <SidebarDrawer />}
+      {!mobileLayout && isCompact && <SidebarDrawer />}
     </div>
   );
 }

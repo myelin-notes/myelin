@@ -104,21 +104,21 @@ export const TabBar = memo(function TabBar({
   const {
     collapsed,
     isCompact,
-    tabletLayout,
+    mobileLayout,
     drawerOpen,
     toggle: toggleSidebar,
   } = useSidebar();
   // In compact layout the sidebar is an overlay drawer; elsewhere it's the
   // persistent column. `sidebarShown` unifies both for the toggle's a11y state.
   const sidebarShown = isCompact ? drawerOpen : !collapsed;
-  // Tablet layout has no sidebar; the top-left button returns to the full-page
+  // Mobile layout has no sidebar; the top-left button returns to the full-page
   // library home instead of toggling one. It's "active" while the pane is
   // already showing home (no active tab).
   const showingHome = pane.activeTabId === '';
   const showLibrary = useCallback(() => {
     controller.showHome(pane.id);
   }, [controller, pane.id]);
-  // Tablets have no keyboard for Cmd/Ctrl+P, which is otherwise the palette's
+  // Mobile has no keyboard for Cmd/Ctrl+P, which is otherwise the palette's
   // only way in — and with it the only route to several commands.
   const openCommandPalette = useCallback(() => {
     keybindings.runAction('app:command-palette');
@@ -216,9 +216,9 @@ export const TabBar = memo(function TabBar({
           top-left — only on the leftmost pane's bar, so split views don't show
           duplicate toggles. When collapsed on macOS the whole bar insets to
           clear the traffic lights, leaving the toggle just right of them. On
-          tablet there's no sidebar, so this button returns to the library. */}
+          mobile there's no sidebar, so this button returns to the library. */}
       {isTopLeft &&
-        (tabletLayout ? (
+        (mobileLayout ? (
           <button
             type="button"
             onClick={showLibrary}
@@ -246,9 +246,9 @@ export const TabBar = memo(function TabBar({
           </button>
         ))}
 
-      {/* Desktop reaches the palette by its shortcut, so the button is tablet-
+      {/* Desktop reaches the palette by its shortcut, so the button is mobile-
           only. Leftmost pane only, like the button above it. */}
-      {isTopLeft && tabletLayout && (
+      {isTopLeft && mobileLayout && (
         <button
           type="button"
           onClick={openCommandPalette}
