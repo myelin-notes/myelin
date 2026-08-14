@@ -20,6 +20,7 @@ import {
 } from './note/state-summary';
 import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
+import { PalmRejection } from './palm-rejection';
 import { PlacementController } from './placement-controller';
 import type { LivePeersSnapshot } from './sync/live/peers';
 import { EraserTool } from './tools/eraser-tool';
@@ -190,6 +191,10 @@ export class DrawableCanvas {
   // The tool to hand back when the stylus's eraser end lifts.
   private _eraserOverride: ITool | null = null;
 
+  // While the stylus is on the glass — and briefly after — a hand resting on
+  // the screen must drive nothing.
+  private readonly _palm = new PalmRejection();
+
   /** Owns the element collections and keeps them mutating as a unit. */
   private readonly _store = new ElementStore(() => this.notifyChange());
   private _ydoc: YDocManager;
@@ -271,6 +276,7 @@ export class DrawableCanvas {
     this.renderer = new CanvasRenderer(this.ctx, canvas);
     this.viewport = new CanvasViewport(canvas);
     this.viewport.setContentBoundsProvider(() => this.getContentBounds());
+    this.viewport.setTouchSuppressedProvider(() => this._palm.suppressed);
     this.state = new StateMachine(InteractState.Idle);
     this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
@@ -1237,6 +1243,12 @@ export class DrawableCanvas {
     // canvas heard about until the cursor left that DOM again. Hover still
     // only fires for the bare canvas.
     this._handlePointerMove = (evt) => {
+      // A rejected palm still emits moves, and this handler feeds them to the
+      // active tool regardless of which pointer opened the interaction — so
+      // without this the palm would draw into the pen's own stroke.
+      if (this._palm.isKnownPalm(evt.pointerId)) {
+        return;
+      }
       this.screenPosition = this.viewport.getScreenPoint(evt);
       this.state.update(evt);
       if (evt.target === canvas) {
@@ -1260,6 +1272,9 @@ export class DrawableCanvas {
 
       switch (evt.pointerType) {
         case 'touch': {
+          if (this._palm.isPalm(evt.pointerId)) {
+            break;
+          }
           this._activeTouchPointers.add(evt.pointerId);
           // Second finger down → the viewport owns the pinch/pan gesture; stop
           // any single-finger pan in progress and ignore this pointer.
@@ -1313,6 +1328,7 @@ export class DrawableCanvas {
           if (evt.buttons & PEN_ERASER_BUTTONS) {
             this.beginEraserOverride();
           }
+          this.beginPenContact(evt);
           this.state.change(InteractState.UsingTool, evt);
           this.state.update(evt);
           break;
@@ -1340,6 +1356,12 @@ export class DrawableCanvas {
 
     this._handlePointerUp = (evt) => {
       this._activeTouchPointers.delete(evt.pointerId);
+      // A palm drove nothing, so its lift must end nothing: this handler is on
+      // the window and would otherwise finish the stylus's live stroke the
+      // moment the hand shifted.
+      if (this._palm.pointerUp(evt.pointerId)) {
+        return;
+      }
       // A finger that lifts without dragging is a tap: run it through the
       // select tool so it selects what's under it, or clears the selection on
       // empty canvas. Dragging pans instead, and never reaches this.
@@ -1487,6 +1509,21 @@ export class DrawableCanvas {
    * `switchTool`: flipping the pen over shouldn't clear the selection or move
    * the toolbar's highlight, and the on-canvas eraser ring is feedback enough.
    */
+  /**
+   * The stylus has touched down. PalmRejection reclassifies the touches that
+   * were already on the screen; the gesture they had started still has to be
+   * unwound here, since the pen typically lands just after the hand does.
+   */
+  private beginPenContact(evt: PointerEvent) {
+    this._palm.penDown(evt.pointerId, this._activeTouchPointers);
+    if (this._activeTouchPointers.size > 0) {
+      this._activeTouchPointers.clear();
+      this._touchTapCandidate = null;
+      this.abortInteraction();
+      this.state.change(InteractState.Idle, evt);
+    }
+  }
+
   private beginEraserOverride() {
     const eraser = this.tools.find((t) => t.id === 'eraser');
     if (!eraser || this._eraserOverride || this.toolSelected === eraser) {

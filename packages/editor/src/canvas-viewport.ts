@@ -56,6 +56,7 @@ export class CanvasViewport {
   private _viewListeners = new Set<() => void>();
   private _zoomLocked: boolean = false;
   private _contentBoundsProvider: (() => DOMRect | null) | null = null;
+  private _touchSuppressedProvider: (() => boolean) | null = null;
 
   /**
    * When true, plain wheel/touch pan is restricted to the edit-mode axis.
@@ -117,6 +118,14 @@ export class CanvasViewport {
     // pointer state machine pans the free canvas with one finger, and in edit
     // mode the contentEditable uses it for cursor placement / selection.
     this._handleTouchStart = (evt) => {
+      // Palm rejection: a hand resting on the screen while the stylus draws
+      // reads as a multi-touch blob, which would otherwise pinch and pan the
+      // camera out from under the stroke.
+      if (this._touchSuppressedProvider?.()) {
+        this._touchPanLast = null;
+        this._touchPinchLastDist = null;
+        return;
+      }
       if (evt.touches.length >= 2) {
         const t0 = evt.touches[0];
         const t1 = evt.touches[1];
@@ -133,6 +142,14 @@ export class CanvasViewport {
     };
 
     this._handleTouchMove = (evt) => {
+      // Dropping the anchors rather than just bailing: fingers still down when
+      // suppression lifts would otherwise pan by everything they travelled
+      // while the pen was on the page, snapping the camera.
+      if (this._touchSuppressedProvider?.()) {
+        this._touchPanLast = null;
+        this._touchPinchLastDist = null;
+        return;
+      }
       if (
         evt.touches.length < 2 ||
         this._touchPanLast == null ||
@@ -234,6 +251,15 @@ export class CanvasViewport {
     provider: (() => DOMRect | null) | null,
   ): void {
     this._contentBoundsProvider = provider;
+  }
+
+  /**
+   * Provider for whether touch gestures are currently palm-rejected. Owned by
+   * DrawableCanvas, which is the side that sees the stylus: the camera has no
+   * pointer state machine of its own to judge from.
+   */
+  public setTouchSuppressedProvider(provider: (() => boolean) | null): void {
+    this._touchSuppressedProvider = provider;
   }
 
   public setOnZoomChange(cb: (zoom: number) => void): void {
