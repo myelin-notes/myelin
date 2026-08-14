@@ -1,0 +1,125 @@
+name: Android Debug Build
+
+# On-demand debuggable Android APK for testing on a physical tablet. Produces a
+# workflow artifact; it is never uploaded to a release. Built with `--debug`, so
+# the APK is debuggable and the WebView accepts remote debugging — attach desktop
+# Chrome via chrome://inspect over USB to record a Performance timeline.
+#
+# The APK is signed with Gradle's auto-generated debug keystore, not the release
+# key, so it cannot install over an existing release build: uninstall that first.
+on:
+  # Temporary: run on every push to the working branch. workflow_dispatch only
+  # becomes available once this file lands on the default branch — drop the
+  # push trigger when it does.
+  push:
+    branches: [android-build]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or SHA to build (defaults to the ref the workflow is run from)
+        required: false
+        default: ''
+      target:
+        description: ABI to build (x86_64 for emulators)
+        required: false
+        default: aarch64
+        type: choice
+        options: [aarch64, armv7, x86_64, i686]
+
+concurrency:
+  group: android-debug-build-${{ github.event.inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (android debug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NDK_VERSION: 26.3.11579264
+      # Ships the tablet full-page library layout, matching the release android
+      # and ios jobs, so the build behaves like what users have installed.
+      VITE_TABLET_LAYOUT: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;${{ env.NDK_VERSION }}'
+
+      # See release.yml: without these, cargo-mobile's NDK resolver picks the
+      # newest NDK the runner image ships instead of the pinned one.
+      - name: Pin NDK
+        run: |
+          NDK_PATH="$ANDROID_HOME/ndk/$NDK_VERSION"
+          test -d "$NDK_PATH" || { echo "::error::pinned NDK not found at $NDK_PATH"; exit 1; }
+          for v in ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK ANDROID_NDK_LATEST_HOME NDK_HOME; do
+            echo "$v=$NDK_PATH" >> "$GITHUB_ENV"
+          done
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+
+      # Separate key from the release job: the dev profile writes different
+      # artifacts into the same target dir and the two would evict each other.
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          key: android-debug
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # `tauri android build` rejects the versionCode 0 derived from the repo's
+      # permanent 0.0.0 dev version, so stamp a valid one.
+      - name: Set version
+        run: node scripts/set-version.mjs 0.0.1
+
+      - name: Init Android project
+        run: |
+          if [ ! -d src-tauri/gen/android ]; then
+            yarn tauri android init
+          fi
+
+      # See release.yml for the full story: a warm Rust cache makes the `cmake`
+      # crate re-configure whisper-rs-sys's restored build dir, which resets the
+      # CMake cache and fails on whisper.cpp's missing examples/ dir.
+      - name: Purge cached whisper-rs-sys build (avoid stale CMake cache reset)
+        run: |
+          find src-tauri/target -type d -name 'whisper-rs-sys-*' -prune -exec rm -rf {} + 2>/dev/null || true
+          echo "Purged whisper-rs-sys build + fingerprint dirs"
+
+      - name: Build Android
+        env:
+          # Both from release.yml: 16 KB page alignment keeps the native libs
+          # loadable on 16 KB-page devices, and the bindgen sysroot stops
+          # whisper-rs-sys falling back to its bundled 64-bit bindings.
+          CARGO_ENCODED_RUSTFLAGS: -Clink-arg=-Wl,-z,max-page-size=16384
+          BINDGEN_EXTRA_CLANG_ARGS: --sysroot=${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+        run: yarn tauri android build --debug --apk --target ${{ github.event.inputs.target || 'aarch64' }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myelin-android-debug
+          path: src-tauri/gen/android/app/build/outputs/apk/*/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
