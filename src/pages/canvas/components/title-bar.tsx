@@ -1,6 +1,6 @@
 import { memo, type ReactNode } from 'react';
+import { IS_MOBILE_BUILD } from '@/lib/env';
 import { type Action, registry } from '@/lib/keybinds';
-import { isMobile } from '@/lib/platform';
 
 interface TitleBarProps {
   trailing?: ReactNode;
@@ -18,7 +18,7 @@ export function TitleBarTooltip({
   label: string;
   action: Action;
 }) {
-  const hotkey = isMobile ? '' : registry.format(action);
+  const hotkey = IS_MOBILE_BUILD ? '' : registry.format(action);
   return (
     <div className="flex items-center gap-2">
       <span>{label}</span>

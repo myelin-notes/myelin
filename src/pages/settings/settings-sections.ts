@@ -10,7 +10,7 @@ import {
   PenLine,
   ShieldCheck,
 } from 'lucide-react';
-import { isMobile } from '@/lib/platform';
+import { IS_MOBILE_BUILD } from '@/lib/env';
 
 export type SettingsSectionId =
   | 'appearance'
@@ -36,7 +36,10 @@ export interface SettingsSectionMeta {
     | 'keybinds'
     | 'about';
   icon: ComponentType<{ className?: string }>;
-  /** Hidden on mobile — the feature is desktop-only (see {@link isMobile}). */
+  /**
+   * Hidden on mobile — the feature is desktop-only (see
+   * {@link IS_MOBILE_BUILD}).
+   */
   desktopOnly?: boolean;
 }
 
@@ -63,4 +66,6 @@ const ALL_SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
  * the rendered section list so they can't drift apart.
  */
 export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] =
-  ALL_SETTINGS_SECTIONS.filter((section) => !(isMobile && section.desktopOnly));
+  ALL_SETTINGS_SECTIONS.filter(
+    (section) => !(IS_MOBILE_BUILD && section.desktopOnly),
+  );
