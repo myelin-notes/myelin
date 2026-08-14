@@ -36,6 +36,7 @@ const SEARCH_DEBOUNCE_MS = 120;
 
 export interface CanvasSearchController {
   open: boolean;
+  openSearch: () => void;
   query: string;
   setQuery: (query: string) => void;
   /** Total matches for the current query. */
@@ -294,6 +295,7 @@ export function useCanvasSearch(
 
   return {
     open,
+    openSearch,
     query,
     setQuery,
     total: matches.length,

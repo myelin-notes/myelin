@@ -1,7 +1,34 @@
 import { memo, type ReactNode } from 'react';
+import { type Action, registry } from '@/lib/keybinds';
+import { isMobile } from '@/lib/platform';
 
 interface TitleBarProps {
   trailing?: ReactNode;
+}
+
+/**
+ * Tooltip body for a title-bar button: label plus its key combo, styled to
+ * match the canvas toolbar's tool tooltips. The combo is hidden on mobile,
+ * where there's no keyboard to press it with.
+ */
+export function TitleBarTooltip({
+  label,
+  action,
+}: {
+  label: string;
+  action: Action;
+}) {
+  const hotkey = isMobile ? '' : registry.format(action);
+  return (
+    <div className="flex items-center gap-2">
+      <span>{label}</span>
+      {hotkey && (
+        <kbd className="flex min-w-[18px] items-center justify-center rounded-[4px] border border-white/20 bg-white/10 px-1 py-[1px] font-sans font-semibold text-[10px] text-white/80">
+          {hotkey}
+        </kbd>
+      )}
+    </div>
+  );
 }
 
 export const TitleBar = memo(function TitleBar({ trailing }: TitleBarProps) {

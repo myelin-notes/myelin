@@ -10,6 +10,7 @@ import {
   Download,
   History,
   Redo2,
+  Search,
   Undo2,
   WifiOff,
   X as XIcon,
@@ -67,7 +68,7 @@ import { InsertPopover } from './components/insert-popover';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
-import { TitleBar } from './components/title-bar';
+import { TitleBar, TitleBarTooltip } from './components/title-bar';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
@@ -388,6 +389,7 @@ function CanvasViewInner({
       liveDiscoveryPauseError?.message ?? strings.canvas.peerSync.livePaused;
     const undoLabel = strings.settings.keybinds.actions['canvas:undo'].label;
     const redoLabel = strings.settings.keybinds.actions['canvas:redo'].label;
+    const findLabel = strings.settings.keybinds.actions['canvas:find'].label;
 
     return (
       <>
@@ -409,6 +411,25 @@ function CanvasViewInner({
                   type="button"
                   variant="ghost"
                   size="icon-xs"
+                  onClick={canvasSearch.openSearch}
+                  aria-label={findLabel}
+                  disabled={!engine.ready}
+                />
+              }
+            >
+              <Search className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <TitleBarTooltip label={findLabel} action="canvas:find" />
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={onUndo}
                   aria-label={undoLabel}
                   disabled={!engine.ready}
@@ -417,7 +438,9 @@ function CanvasViewInner({
             >
               <Undo2 className="size-3.5" />
             </TooltipTrigger>
-            <TooltipContent>{undoLabel}</TooltipContent>
+            <TooltipContent>
+              <TitleBarTooltip label={undoLabel} action="canvas:undo" />
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -434,7 +457,9 @@ function CanvasViewInner({
             >
               <Redo2 className="size-3.5" />
             </TooltipTrigger>
-            <TooltipContent>{redoLabel}</TooltipContent>
+            <TooltipContent>
+              <TitleBarTooltip label={redoLabel} action="canvas:redo" />
+            </TooltipContent>
           </Tooltip>
           {getPlatform().pdfExport && (
             <Tooltip>
@@ -483,6 +508,7 @@ function CanvasViewInner({
     onExportCanvasPdf,
     onUndo,
     onRedo,
+    canvasSearch.openSearch,
     id,
     engine.ready,
     liveDiscoveryPauseError,

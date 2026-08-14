@@ -2,6 +2,7 @@ import { memo, useCallback, useRef, useState } from 'react';
 import {
   Columns2,
   Home,
+  MoreHorizontal,
   Network,
   PanelLeft,
   Plus,
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/context-menu';
 import { trackEvent } from '@/lib/analytics';
 import { type Messages, useMessages } from '@/lib/i18n';
+import { keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import {
@@ -116,6 +118,11 @@ export const TabBar = memo(function TabBar({
   const showLibrary = useCallback(() => {
     controller.showHome(pane.id);
   }, [controller, pane.id]);
+  // Tablets have no keyboard for Cmd/Ctrl+P, which is otherwise the palette's
+  // only way in — and with it the only route to several commands.
+  const openCommandPalette = useCallback(() => {
+    keybindings.runAction('app:command-palette');
+  }, []);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
@@ -238,6 +245,20 @@ export const TabBar = memo(function TabBar({
             <PanelLeft className="size-3.5" />
           </button>
         ))}
+
+      {/* Desktop reaches the palette by its shortcut, so the button is tablet-
+          only. Leftmost pane only, like the button above it. */}
+      {isTopLeft && tabletLayout && (
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          aria-label={strings.commandPalette.title}
+          title={strings.commandPalette.title}
+          className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        >
+          <MoreHorizontal className="size-3.5" />
+        </button>
+      )}
 
       <div
         className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
