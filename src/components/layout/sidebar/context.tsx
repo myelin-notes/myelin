@@ -9,6 +9,7 @@ import {
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { IS_MOBILE_BUILD } from '@/lib/env';
 import { UserPrefs } from '@/lib/user-prefs';
+import { getViewportScale } from '@/lib/viewport-scale';
 
 export const SIDEBAR_MIN_WIDTH = 220;
 export const SIDEBAR_MAX_WIDTH = 480;
@@ -16,7 +17,10 @@ export const SIDEBAR_MAX_WIDTH = 480;
 // Below this viewport width the persistent column can't coexist with usable
 // content, so the sidebar becomes an overlay drawer instead. Runtime/adaptive
 // by design — the same Sidebar reflows, it isn't a separate mobile UI.
-const SIDEBAR_COMPACT_QUERY = '(max-width: 767px)';
+// Divided by the page scale: the threshold is about physical room, and
+// upscaling a tablet shrinks its viewport past 767 without taking any away.
+const SIDEBAR_COMPACT_MAX_WIDTH = 767;
+const SIDEBAR_COMPACT_QUERY = `(max-width: ${Math.round(SIDEBAR_COMPACT_MAX_WIDTH / getViewportScale())}px)`;
 
 function clampWidth(width: number): number {
   return Math.min(Math.max(width, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH);
