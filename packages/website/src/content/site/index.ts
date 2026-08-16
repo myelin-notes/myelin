@@ -28,16 +28,13 @@ export const SCENE_IDS = [
 export type SceneId = (typeof SCENE_IDS)[number];
 
 /** Every link the header or footer can point at. */
-export type LinkId = 'privacy' | 'license' | 'github' | 'roadmap';
+export type LinkId = 'privacy' | 'license';
 
-/** The nav sets themselves are the same everywhere; only the labels translate. */
-export const headerLinks: LinkId[] = ['privacy', 'license'];
-export const footerLinks: LinkId[] = [
-  'privacy',
-  'license',
-  'github',
-  'roadmap',
-];
+/**
+ * The header and footer carry the same two links. The set itself is the same in
+ * every language; only the labels translate.
+ */
+export const navLinks: LinkId[] = ['privacy', 'license'];
 
 /**
  * The privacy policy is published in English only, so its href carries no

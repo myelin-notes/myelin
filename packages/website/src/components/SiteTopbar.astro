@@ -5,7 +5,7 @@
 //
 // Being outside the island is what lets one language picker serve both
 // renderings: the canvas and the static page share this bar.
-import { getCopy, headerLinks, isExternalLink, linkHref } from '../content/site';
+import { getCopy, isExternalLink, linkHref, navLinks } from '../content/site';
 import {
   LOCALES,
   type Locale,
@@ -32,7 +32,7 @@ const { path } = splitLocalePath(Astro.url.pathname);
   <a href={localizePath('/', locale)} class="wordmark">Myelin Notes</a>
   <nav class="topbar-nav" aria-label={copy.topbar.nav}>
     {
-      headerLinks.map((id) => (
+      navLinks.map((id) => (
         <a
           href={linkHref(id)}
           target={isExternalLink(id) ? '_blank' : undefined}

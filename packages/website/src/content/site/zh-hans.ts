@@ -247,8 +247,6 @@ Myelin Notes 在这三个平台上都是原生应用，笔记、画布和同步�
   linkLabels: {
     privacy: '隐私政策',
     license: '许可协议',
-    github: 'GitHub',
-    roadmap: '路线图',
   },
 
   footer: {

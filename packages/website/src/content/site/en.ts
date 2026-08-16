@@ -257,8 +257,6 @@ Myelin Notes is native on all three, with the same notes, the same canvas, and t
   linkLabels: {
     privacy: 'Privacy',
     license: 'License',
-    github: 'GitHub',
-    roadmap: 'Roadmap',
   },
 
   footer: {

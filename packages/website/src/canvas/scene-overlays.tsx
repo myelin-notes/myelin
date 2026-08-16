@@ -1,7 +1,7 @@
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { useCopy } from '@/content/copy-context';
-import { footerLinks, isExternalLink, linkHref } from '@/content/site';
+import { isExternalLink, linkHref, navLinks } from '@/content/site';
 import { type PlatformKey, siteLinks } from '@/content/site/links';
 import {
   type DownloadUrls,
@@ -257,7 +257,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
           fontSize: 22,
         }}
       >
-        {footerLinks.map((id) => (
+        {navLinks.map((id) => (
           <a
             key={id}
             className="pointer-events-auto underline underline-offset-4"

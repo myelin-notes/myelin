@@ -250,8 +250,6 @@ Myelin Notes es nativa en los tres, con las mismas notas, el mismo lienzo y la m
   linkLabels: {
     privacy: 'Privacidad',
     license: 'Licencia',
-    github: 'GitHub',
-    roadmap: 'Hoja de ruta',
   },
 
   footer: {

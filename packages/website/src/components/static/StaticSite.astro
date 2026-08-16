@@ -13,7 +13,7 @@ import { Wordmark, buttonVariants, cn } from '@myelin/ui';
 import CheckList from './CheckList.astro';
 import Shot from './Shot.astro';
 import {
-  footerLinks,
+  navLinks,
   getCopy,
   getFaqs,
   isExternalLink,
@@ -260,7 +260,7 @@ const ctaOutline = cn(
       <nav class="lg:col-span-7" aria-label={copy.footer.nav}>
         <ul class="flex flex-wrap gap-x-8 gap-y-3">
           {
-            footerLinks.map((id) => (
+            navLinks.map((id) => (
               <li>
                 <a
                   href={linkHref(id)}
