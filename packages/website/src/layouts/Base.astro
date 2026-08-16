@@ -1,20 +1,27 @@
 ---
 import Seo from '../components/Seo.astro';
 import SiteTopbar from '../components/SiteTopbar.astro';
+import { getCopy } from '../content/site';
+import { type Locale, localeTags } from '../lib/locale';
 import '../styles/global.css';
 
 interface Props {
   title: string;
+  locale: Locale;
   description?: string;
   image?: string;
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  /** False on pages published in one language only (the privacy policy). */
+  translated?: boolean;
 }
 
 const {
   title,
-  description = 'Myelin Notes is a native, local-first canvas where handwriting, type, PDFs, images, and audio live in one note, kept on your own machine. Completely free for personal use.',
+  locale,
+  description = getCopy(locale).meta.description,
   image,
   jsonLd,
+  translated = true,
 } = Astro.props;
 
 const organization = {
@@ -27,7 +34,7 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={localeTags[locale]}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -54,6 +61,7 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       title={title}
       description={description}
       image={image}
+      translated={translated}
       jsonLd={[organization, ...pageJsonLd]}
     />
     <script>
@@ -70,7 +78,7 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     </script>
   </head>
   <body>
-    <SiteTopbar />
+    <SiteTopbar locale={locale} translated={translated} />
     <slot />
   </body>
 </html>

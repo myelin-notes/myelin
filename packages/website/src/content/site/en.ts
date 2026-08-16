@@ -1,41 +1,40 @@
-export const siteTitle =
-  'Myelin Notes: a local-first note-taking app for handwriting, type, and PDFs';
-export const siteDescription =
-  'Myelin Notes is a native, local-first note-taking app for Mac, Windows, Linux, iOS, and Android: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Completely free for personal use.';
+import type { SiteCopy } from './index';
 
 /**
- * External destinations, centralized so a URL change is a one-line edit.
+ * English site copy, and the reference every other locale is written against.
+ * The shape is `SiteCopy` in `./index`, so a key added there is a compile error
+ * here and in `es.ts` and `zh-hans.ts` until all three are written.
+ *
+ * Site style: no em dashes.
  */
-export const siteLinks = {
-  github: 'https://github.com/myelin-notes/myelin',
-  releases: 'https://github.com/myelin-notes/myelin/releases/latest',
-  /** Latest stable release, as JSON: where `src/lib/downloads.ts` finds the
-   *  per-platform installer asset behind every download button. */
-  latestReleaseApi:
-    'https://api.github.com/repos/myelin-notes/myelin/releases/latest',
-  roadmap: 'https://github.com/myelin-notes/myelin/issues',
-  license: 'https://github.com/myelin-notes/myelin/blob/main/LICENSE.md',
-};
+const en: SiteCopy = {
+  meta: {
+    title:
+      'Myelin Notes: a local-first note-taking app for handwriting, type, and PDFs',
+    description:
+      'Myelin Notes is a native, local-first note-taking app for Mac, Windows, Linux, iOS, and Android: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Completely free for personal use.',
+  },
 
-/** Every platform Myelin ships a native build for. */
-export type PlatformKey = 'mac' | 'windows' | 'linux' | 'ios' | 'android';
+  topbar: {
+    nav: 'Site',
+    download: 'Download',
+    language: 'Language',
+  },
 
-export interface Platform {
-  key: PlatformKey;
-  /** Bare platform, for lists where repeating "Download for" would grate. */
-  name: string;
-  /** Full call to action, for wherever a platform stands on its own. */
-  label: string;
-  /** Minimum version or artifact kind. */
-  sub: string;
-}
+  /** Rail dots on the canvas, and the section kickers on the static page. */
+  sceneLabels: {
+    hero: 'Myelin',
+    ink: 'PDFs',
+    pages: 'Pages',
+    'audio-search': 'Audio & search',
+    linked: 'Linked notes',
+    sync: 'Sync & collab',
+    'local-first': 'Local-first',
+    download: 'Download',
+  },
+  /** The one static-page section with no scene of its own. */
+  faqKicker: 'Questions',
 
-/**
- * All copy for the scrollytelling canvas, one entry per scene. Layout
- * (world coordinates) lives in `src/canvas/scenes.ts`; this file owns only the
- * words. Site style: no em dashes.
- */
-export const copy = {
   hero: {
     // The canvas names the product in the topbar wordmark it flies over; the
     // static page has no such anchor, so it labels the hero directly. Keeps the
@@ -114,17 +113,17 @@ for step in range(3):
       query: 'node of ranvier',
       results: [
         {
-          kind: 'page' as const,
+          kind: 'page',
           title: 'Lecture 12 · Action potentials',
           snippet: '…the signal jumps between nodes of Ranvier…',
         },
         {
-          kind: 'ink' as const,
+          kind: 'ink',
           title: 'Whiteboard · myelination sketch',
           snippet: 'Handwriting match, OCR on-device',
         },
         {
-          kind: 'audio' as const,
+          kind: 'audio',
           title: 'Recording · Lecture 12',
           snippet: 'Transcript match at 31:42',
         },
@@ -158,16 +157,19 @@ for step in range(3):
     sharedNote: 'same note,\ntwo machines',
     tiers: [
       {
+        shipped: true,
         badge: 'Today',
         title: 'Live collaboration',
         body: 'Two devices with the same note open find each other automatically, then edit in step over an encrypted QUIC connection straight between them (iroh).',
       },
       {
+        shipped: true,
         badge: 'Today',
         title: 'GitHub sync',
         body: 'Point Myelin at a repo and branch, and your workspace syncs across devices through a repo you control.',
       },
       {
+        shipped: false,
         badge: 'Coming soon',
         title: 'Invites',
         body: 'Bring someone into a single note without handing over the whole repo, with owner, editor, and viewer roles deciding what they can do.',
@@ -179,6 +181,7 @@ for step in range(3):
     heading: 'Download',
     body: 'Available in English, Spanish, and Simplified Chinese.',
     cta: 'Download Myelin Notes',
+    autoUpdates: 'auto-updates\nincluded',
     platforms: [
       {
         key: 'mac',
@@ -210,7 +213,7 @@ for step in range(3):
         label: 'Download for Android',
         sub: 'Phone and tablet',
       },
-    ] satisfies Platform[],
+    ],
     otherPlatforms: 'Also available for',
     mobileBadge: 'Same notes on your phone and tablet, not a cut-down viewer',
     faqTitle: 'FAQ',
@@ -250,36 +253,71 @@ Myelin Notes is native on all three, with the same notes, the same canvas, and t
 `,
   },
 
-  /** Top-bar nav. Deliberately shorter than the footer's list. */
-  header: {
-    links: [
-      { label: 'Privacy', href: '/privacy' },
-      { label: 'License', href: siteLinks.license },
-    ],
+  /** Labels for the shared link set; the hrefs live in `index.ts`. */
+  linkLabels: {
+    privacy: 'Privacy',
+    license: 'License',
+    github: 'GitHub',
+    roadmap: 'Roadmap',
   },
 
   footer: {
+    nav: 'Footer',
     tagline: 'Handwriting, typing, and PDFs. One note.',
-    links: [
-      { label: 'Privacy', href: '/privacy' },
-      { label: 'GitHub', href: siteLinks.github },
-      { label: 'Roadmap', href: siteLinks.roadmap },
-      { label: 'License', href: siteLinks.license },
-    ],
     download: 'Download Myelin',
+    platforms: 'Mac · Windows · Linux · iPhone · iPad · Android',
+  },
+
+  /** Alt text for the static page's screenshots. */
+  shots: {
+    library:
+      'The Myelin Notes library with folders, note cards, tags, and search',
+    pdf: 'A PDF embedded on the Myelin canvas, with an equation boxed and an arrow drawn in ink beside it',
+    pageFrame:
+      'A Myelin page frame with headings, note links, a checklist, inline math, and code blocks running with their output beside them',
+    audio:
+      'A recording on the Myelin canvas, its waveform drawn as it captures',
+    graph:
+      "The Myelin Notes graph view, showing a note's outgoing links and backlinks",
+  },
+
+  /** Canvas-only chrome: the scene rail, the palette, and the color prompt. */
+  canvas: {
+    rail: {
+      label: 'Sections',
+      previous: 'Previous section',
+      next: 'Next section',
+      scrollHint: 'Scroll to explore',
+    },
+    palette: {
+      label: 'Command palette',
+      placeholder: 'Jump anywhere in the notebook',
+      empty: 'Nothing matches. Try a scene name or "download".',
+      groupGoTo: 'Go to',
+      groupGetIt: 'Get it',
+      download: 'Download Myelin Notes',
+    },
+    addCustomColor: 'Add a custom color (hex, e.g. #3b82f6)',
+  },
+
+  /**
+   * Hand-drawn ink that decorates specific words in a headline, so its geometry
+   * depends on how long that headline is in this language. Offsets are world
+   * units from each scene's own text origin (see `src/canvas/scenes.ts`).
+   *
+   * These are the one thing here that cannot be checked by reading: they are
+   * tuned against rendered glyph widths. Load the canvas in the locale you
+   * changed and look, rather than trusting the numbers to carry over. The
+   * values below are the ones the English canvas was designed around.
+   */
+  decorations: {
+    /** Under line 2 of the hero headline. */
+    heroUnderline: { dx: 4, dy: 290, width: 540 },
+    /** Highlighter over "your machine." in the local-first headline. */
+    localFirstHighlight: { dx: 120, dy: 292, width: 382 },
+    /** Under the last line of the sync kicker. */
+    syncUnderline: { dx: 0, dy: 310, width: 480 },
   },
 };
 
-/**
- * `download.faqMarkdown` as question/answer pairs. The canvas renders that
- * string as a page frame; the static page needs headings and paragraphs, and
- * the page needs it a third time as FAQ structured data. One source, three
- * renderings, so they cannot drift.
- */
-export const faqs = copy.download.faqMarkdown
-  .split('\n## ')
-  .slice(1)
-  .map((block) => {
-    const [question, ...answer] = block.split('\n');
-    return { question: question.trim(), answer: answer.join(' ').trim() };
-  });
+export default en;

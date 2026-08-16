@@ -7,7 +7,25 @@ import tailwindcss from '@tailwindcss/vite';
 // https://astro.build/config
 export default defineConfig({
   site: 'https://trymyelin.app',
-  integrations: [sitemap(), react()],
+  // English is unprefixed (`/`), every other locale sits under its own segment
+  // (`/es/`, `/zh-hans/`). Route segments stay lowercase; the BCP 47 tags that
+  // `<html lang>` and hreflang need live in `src/lib/locale.ts`.
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en', 'es', 'zh-hans'],
+    routing: { prefixDefaultLocale: false },
+  },
+  integrations: [
+    // Groups each page with its translations in the sitemap, so a crawler that
+    // finds one language is told about the others.
+    sitemap({
+      i18n: {
+        defaultLocale: 'en',
+        locales: { en: 'en', es: 'es', 'zh-hans': 'zh-Hans' },
+      },
+    }),
+    react(),
+  ],
   vite: {
     plugins: [tailwindcss()],
     resolve: {

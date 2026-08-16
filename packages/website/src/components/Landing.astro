@@ -1,0 +1,59 @@
+---
+// The home page, in one language. `src/pages/index.astro` renders this for
+// English and `src/pages/[locale]/index.astro` for every other locale, so the
+// two renderings and their structured data cannot drift apart.
+import CanvasIsland from '../canvas/CanvasIsland';
+import StaticSite from './static/StaticSite.astro';
+import Base from '../layouts/Base.astro';
+import { getCopy, getFaqs } from '../content/site';
+import { type Locale, localeTags } from '../lib/locale';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = getCopy(locale);
+const faqs = getFaqs(locale);
+const languageTag = localeTags[locale];
+
+const softwareJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Myelin Notes',
+  applicationCategory: 'ProductivityApplication',
+  operatingSystem: 'macOS, Windows, Linux, iOS, iPadOS, Android',
+  description: copy.meta.description,
+  inLanguage: languageTag,
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+  },
+};
+
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  inLanguage: languageTag,
+  mainEntity: faqs.map(({ question, answer }) => ({
+    '@type': 'Question',
+    name: question,
+    acceptedAnswer: { '@type': 'Answer', text: answer },
+  })),
+};
+---
+
+<Base
+  locale={locale}
+  title={copy.meta.title}
+  description={copy.meta.description}
+  jsonLd={[softwareJsonLd, faqJsonLd]}
+>
+  <!-- Both renderings ship in the HTML; the gate in Base.astro picks one before
+       first paint. Static first so it is what a crawler reads. -->
+  <StaticSite locale={locale} />
+  <!-- The live editor: the real Myelin canvas engine, full screen, with the
+       app's tool rail. Client-only so React Fast Refresh works in dev. -->
+  <CanvasIsland client:only="react" locale={locale} />
+</Base>

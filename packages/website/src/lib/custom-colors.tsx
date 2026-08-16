@@ -1,5 +1,6 @@
 import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
 import { CustomColorsContext } from '@myelin/editor/custom-colors';
+import { useCopy } from '@/content/copy-context';
 
 /**
  * Repository-free stand-in for the app's custom-colors provider. The app
@@ -34,6 +35,7 @@ function saveColors(colors: string[]) {
 }
 
 export function CustomColorsProvider({ children }: PropsWithChildren) {
+  const promptLabel = useCopy().canvas.addCustomColor;
   const [colors, setColors] = useState<string[]>(loadColors);
 
   const addColor = useCallback(async (color: string) => {
@@ -56,7 +58,7 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
   }, []);
 
   const promptAddColor = useCallback(() => {
-    const raw = window.prompt('Add a custom color (hex, e.g. #3b82f6)');
+    const raw = window.prompt(promptLabel);
     if (!raw) {
       return;
     }
@@ -64,7 +66,7 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
     if (match) {
       void addColor(`#${match[1].toLowerCase()}`);
     }
-  }, [addColor]);
+  }, [addColor, promptLabel]);
 
   const value = useMemo(
     () => ({

@@ -1,0 +1,16 @@
+---
+// The home page for every locale other than the default, which lives
+// unprefixed at `src/pages/index.astro`.
+import Landing from '../../components/Landing.astro';
+import { DEFAULT_LOCALE, LOCALES, type Locale } from '../../lib/locale';
+
+export function getStaticPaths() {
+  return LOCALES.filter((locale) => locale !== DEFAULT_LOCALE).map(
+    (locale) => ({ params: { locale } }),
+  );
+}
+
+const { locale } = Astro.params as { locale: Locale };
+---
+
+<Landing locale={locale} />

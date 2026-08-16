@@ -1,6 +1,8 @@
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
-import { copy, type PlatformKey, siteLinks } from '@/content/site';
+import { useCopy } from '@/content/copy-context';
+import { footerLinks, isExternalLink, linkHref } from '@/content/site';
+import { type PlatformKey, siteLinks } from '@/content/site/links';
 import {
   type DownloadUrls,
   detectPlatform,
@@ -118,6 +120,7 @@ function WorldButton({
  * the background grid canvas and the foreground element canvas.
  */
 export function SceneUnderlay({ canvas }: { canvas: DrawableCanvas }) {
+  const copy = useCopy();
   const audio = sceneById('audio-search').rect;
   const sync = sceneById('sync').rect;
 
@@ -152,6 +155,7 @@ interface SceneOverlayProps {
  * layout constants in `scenes.ts` (same SCENE_PAD inset).
  */
 export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
+  const copy = useCopy();
   const [platformKey] = useState<PlatformKey>(detectPlatform);
   // Resolved from the GitHub release, so a button points at the installer
   // itself rather than the releases page. Empty until it lands, and stays empty
@@ -253,16 +257,16 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
           fontSize: 22,
         }}
       >
-        {copy.footer.links.map((link) => (
+        {footerLinks.map((id) => (
           <a
-            key={link.label}
+            key={id}
             className="pointer-events-auto underline underline-offset-4"
             style={{ color: '#374151' }}
-            href={link.href}
-            target="_blank"
-            rel="noreferrer"
+            href={linkHref(id)}
+            target={isExternalLink(id) ? '_blank' : undefined}
+            rel={isExternalLink(id) ? 'noreferrer' : undefined}
           >
-            {link.label}
+            {copy.linkLabels[id]}
           </a>
         ))}
         <a

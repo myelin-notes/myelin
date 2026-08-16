@@ -2,30 +2,103 @@
 // App-chrome style top bar, fixed above the full-screen canvas. Static markup
 // only: CanvasEditor intercepts the Download link and flies the camera to the
 // download scene, since the canvas is the whole page with no anchor to jump to.
-import { copy } from '../content/site';
+//
+// Being outside the island is what lets one language picker serve both
+// renderings: the canvas and the static page share this bar.
+import { getCopy, headerLinks, isExternalLink, linkHref } from '../content/site';
+import {
+  LOCALES,
+  type Locale,
+  localeNames,
+  localizePath,
+  splitLocalePath,
+} from '../lib/locale';
 
-// A shorter list than the footer's. Off-site links open in a new tab so a
-// visitor on the canvas does not lose their camera position.
-const navLinks = copy.header.links;
-const isExternal = (href: string) => href.startsWith('http');
+interface Props {
+  locale: Locale;
+  /** False on pages published in one language only, which hides the picker. */
+  translated?: boolean;
+}
+
+const { locale, translated = true } = Astro.props;
+const copy = getCopy(locale);
+
+// The route the current URL maps to in another language, so the picker keeps
+// you on the page you are reading rather than dropping you at the home page.
+const { path } = splitLocalePath(Astro.url.pathname);
 ---
 
 <header class="site-topbar">
-  <a href="/" class="wordmark">Myelin Notes</a>
-  <nav class="topbar-nav" aria-label="Site">
+  <a href={localizePath('/', locale)} class="wordmark">Myelin Notes</a>
+  <nav class="topbar-nav" aria-label={copy.topbar.nav}>
     {
-      navLinks.map((link) => (
+      headerLinks.map((id) => (
         <a
-          href={link.href}
-          target={isExternal(link.href) ? '_blank' : undefined}
-          rel={isExternal(link.href) ? 'noreferrer' : undefined}
+          href={linkHref(id)}
+          target={isExternalLink(id) ? '_blank' : undefined}
+          rel={isExternalLink(id) ? 'noreferrer' : undefined}
         >
-          {link.label}
+          {copy.linkLabels[id]}
         </a>
       ))
     }
   </nav>
-  <a href="/#download" class="topbar-download" data-download-platform-jump>
-    Download
+  {
+    translated && (
+      /* `details` rather than a scripted menu: the canvas island owns the
+         page's JavaScript budget, and this needs none. */
+      <details class="lang-picker">
+        <summary aria-label={copy.topbar.language}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+          </svg>
+          <span>{localeNames[locale]}</span>
+        </summary>
+        <ul>
+          {LOCALES.map((code) => (
+            <li>
+              <a
+                href={localizePath(path, code)}
+                hreflang={code}
+                aria-current={code === locale ? 'true' : undefined}
+              >
+                {localeNames[code]}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </details>
+    )
+  }
+  <a
+    href={`${localizePath('/', locale)}#download`}
+    class="topbar-download"
+    data-download-platform-jump
+  >
+    {copy.topbar.download}
   </a>
 </header>
+
+{
+  translated && (
+    /* A `details` element only closes on its own summary, and on the canvas
+       every other click lands on a canvas layer that never bubbles a close. */
+    <script is:inline>
+      document.addEventListener('pointerdown', (event) => {
+        const picker = document.querySelector('.lang-picker[open]');
+        if (picker && !picker.contains(event.target)) {
+          picker.removeAttribute('open');
+        }
+      });
+    </script>
+  )
+}

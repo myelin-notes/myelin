@@ -10,6 +10,10 @@
 //   - redaction ................ packages/shared/src/logger.ts
 //   - update endpoint .......... src-tauri/tauri.conf.json
 //   - live discovery ........... app src/lib/sync/live/
+//
+// Published in English only, which is what `translated={false}` below marks:
+// it drops the hreflang alternates and hides the topbar's language picker, so
+// no locale advertises a translation that does not exist.
 import Base from '../layouts/Base.astro';
 
 const updated = '22 July 2026';
@@ -24,6 +28,8 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
 ---
 
 <Base
+  locale="en"
+  translated={false}
   title="Privacy | Myelin Notes"
   description="What Myelin Notes collects, what it never collects, who else touches it, and how to turn it off."
 >

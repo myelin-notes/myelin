@@ -1,4 +1,12 @@
 ---
+import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  localeTags,
+  localizePath,
+  splitLocalePath,
+} from '../lib/locale';
+
 interface Props {
   title: string;
   description: string;
@@ -6,19 +14,46 @@ interface Props {
   image?: string;
   /** Structured data object(s) injected as JSON-LD. */
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  /** False on pages published in one language only, which emits no alternates. */
+  translated?: boolean;
 }
 
 // TODO: replace placeholder with a real 1200×630 share image, then update this default.
-const { title, description, image = '/todo-placeholder-og.png', jsonLd } = Astro.props;
+const {
+  title,
+  description,
+  image = '/todo-placeholder-og.png',
+  jsonLd,
+  translated = true,
+} = Astro.props;
 
 // Astro.site comes from the `site` config; canonical strips query/hash noise.
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const imageUrl = new URL(image, Astro.site).href;
 
+// One `alternate` per language this route is published in, plus `x-default`
+// pointing at the unprefixed English URL. Google needs every version, including
+// the current one, to list every other.
+const { path } = splitLocalePath(Astro.url.pathname);
+const alternates = translated
+  ? LOCALES.map((code) => ({
+      hreflang: localeTags[code],
+      href: new URL(localizePath(path, code), Astro.site).href,
+    }))
+  : [];
+const xDefault = new URL(localizePath(path, DEFAULT_LOCALE), Astro.site).href;
+
 const structuredData = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 ---
 
 <link rel="canonical" href={canonical} />
+
+{
+  alternates.map((alternate) => (
+    <link rel="alternate" hreflang={alternate.hreflang} href={alternate.href} />
+  ))
+}
+{translated && <link rel="alternate" hreflang="x-default" href={xDefault} />}
 
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Myelin Notes" />

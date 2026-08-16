@@ -8,7 +8,7 @@ import { TextElement } from '@myelin/editor/elements/text/element';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import { writeMarkdownToPageFrameFragment } from '@myelin/editor/page-frame/markdown/import';
 import { getPdfPageSizes } from '@myelin/editor/pdf-renderer';
-import { copy } from '@/content/site';
+import type { SceneId, SiteCopy } from '@/content/site';
 
 /** Plain world-space rect (DOMRect is constructed lazily, client-side only). */
 export interface WorldRect {
@@ -19,8 +19,7 @@ export interface WorldRect {
 }
 
 export interface SceneDef {
-  id: string;
-  label: string;
+  id: SceneId;
   rect: WorldRect;
 }
 
@@ -38,20 +37,19 @@ const SCENE_GAP = 700;
 // alternation. That forces the camera into steep, diagonal pans between scenes
 // so the site reads as a 2D space you move through, not a flat horizontal strip.
 const SIZES: Array<{
-  id: string;
-  label: string;
+  id: SceneId;
   w: number;
   h: number;
   y: number;
 }> = [
-  { id: 'hero', label: 'Myelin', w: 2000, h: 1000, y: 600 },
-  { id: 'ink', label: 'PDFs', w: 2250, h: 1180, y: 1500 },
-  { id: 'pages', label: 'Pages', w: 1900, h: 1140, y: 1350 },
-  { id: 'audio-search', label: 'Audio & search', w: 1900, h: 1000, y: 180 },
-  { id: 'linked', label: 'Linked notes', w: 1750, h: 800, y: -150 },
-  { id: 'sync', label: 'Sync & collab', w: 1950, h: 1150, y: 900 },
-  { id: 'local-first', label: 'Local-first', w: 1850, h: 850, y: 1850 },
-  { id: 'download', label: 'Download', w: 2100, h: 1400, y: 1400 },
+  { id: 'hero', w: 2000, h: 1000, y: 600 },
+  { id: 'ink', w: 2250, h: 1180, y: 1500 },
+  { id: 'pages', w: 1900, h: 1140, y: 1350 },
+  { id: 'audio-search', w: 1900, h: 1000, y: 180 },
+  { id: 'linked', w: 1750, h: 800, y: -150 },
+  { id: 'sync', w: 1950, h: 1150, y: 900 },
+  { id: 'local-first', w: 1850, h: 850, y: 1850 },
+  { id: 'download', w: 2100, h: 1400, y: 1400 },
 ];
 
 /** Scenes laid out left-to-right with a varied vertical rhythm (see SIZES). */
@@ -60,7 +58,6 @@ export const SCENES: SceneDef[] = (() => {
   return SIZES.map((s) => {
     const def: SceneDef = {
       id: s.id,
-      label: s.label,
       rect: { x, y: s.y, width: s.w, height: s.h },
     };
     x += s.w + SCENE_GAP;
@@ -68,7 +65,7 @@ export const SCENES: SceneDef[] = (() => {
   });
 })();
 
-export function sceneById(id: string): SceneDef {
+export function sceneById(id: SceneId): SceneDef {
   const scene = SCENES.find((s) => s.id === id);
   if (!scene) {
     throw new Error(`Unknown scene: ${id}`);
@@ -424,11 +421,23 @@ async function addImage(
   return img;
 }
 
-async function buildHero(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
+async function buildHero(
+  canvas: DrawableCanvas,
+  r: WorldRect,
+  copy: SiteCopy,
+): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
+  const underline = copy.decorations.heroUnderline;
   title(canvas, x, y + 30, copy.hero.headline, 88, 1120);
-  drawUnderline(canvas, x + 4, y + 290, 540, ORANGE, 8);
+  drawUnderline(
+    canvas,
+    x + underline.dx,
+    y + underline.dy,
+    underline.width,
+    ORANGE,
+    8,
+  );
   addText(canvas, x, y + 350, copy.hero.subheadline, {
     size: 27,
     color: MUTED,
@@ -461,7 +470,11 @@ async function buildHero(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
  */
 const INK_PDF = { dx: 1270, dy: 130, width: 760 } as const;
 
-async function buildInk(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
+async function buildInk(
+  canvas: DrawableCanvas,
+  r: WorldRect,
+  copy: SiteCopy,
+): Promise<void> {
   // Pull the left column in from the scene edge so it and the PDF sit closer to
   // the middle rather than hugging opposite sides.
   const x = r.x + SCENE_PAD + 130;
@@ -507,7 +520,11 @@ async function buildInk(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   drawArrow(canvas, [px + 560, py + 734], [px + 526, py + 749], BLUE, 4);
 }
 
-async function buildPages(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
+async function buildPages(
+  canvas: DrawableCanvas,
+  r: WorldRect,
+  copy: SiteCopy,
+): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
   // Left column is centered against the page frame to its right, which runs
@@ -533,7 +550,11 @@ async function buildPages(canvas: DrawableCanvas, r: WorldRect): Promise<void> {
   );
 }
 
-function buildAudioSearch(canvas: DrawableCanvas, r: WorldRect): void {
+function buildAudioSearch(
+  canvas: DrawableCanvas,
+  r: WorldRect,
+  copy: SiteCopy,
+): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
   title(canvas, x, y, copy.audioSearch.heading, 62, 980);
@@ -554,6 +575,7 @@ function buildAudioSearch(canvas: DrawableCanvas, r: WorldRect): void {
 async function buildLinked(
   canvas: DrawableCanvas,
   r: WorldRect,
+  copy: SiteCopy,
 ): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
@@ -576,7 +598,11 @@ async function buildLinked(
   );
 }
 
-function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
+function buildLocalFirst(
+  canvas: DrawableCanvas,
+  r: WorldRect,
+  copy: SiteCopy,
+): void {
   // Pull the left column in from the scene edge so it sits closer to the
   // checklist instead of hugging the far side. The checklist stays put (it is
   // anchored off r.x below), so this closes the gutter from the left and evens
@@ -590,10 +616,16 @@ function buildLocalFirst(canvas: DrawableCanvas, r: WorldRect): void {
   // the headline and lede span roughly 370 units against the checklist's ~540,
   // so the offsets below sit the pair mid-height in the scene rather than
   // hanging the left column from the top edge.
+  const highlight = copy.decorations.localFirstHighlight;
   title(canvas, x, y + 160, copy.localFirst.heading, 68, 700);
   addStroke(
     canvas,
-    wobblyLine([x + 120, y + 292], [x + 502, y + 286], 4, 0.8),
+    wobblyLine(
+      [x + highlight.dx, y + highlight.dy],
+      [x + highlight.dx + highlight.width, y + highlight.dy - 6],
+      4,
+      0.8,
+    ),
     HIGHLIGHT,
     50,
   );
@@ -625,18 +657,26 @@ export const COLLAB_CURSORS = {
   peer: { dx: 1670, dy: 240 },
 } as const;
 
-function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
+function buildSync(canvas: DrawableCanvas, r: WorldRect, copy: SiteCopy): void {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
   // Dropped below the scene's top pad so the heading block sits level with the
   // cursor graphic on the right rather than riding above it.
   const textTop = y + 140;
+  const underline = copy.decorations.syncUnderline;
   title(canvas, x, textTop, copy.sync.heading, 62, 800);
   addText(canvas, x, textTop + 200, copy.sync.kicker, {
     size: 26,
     width: 780,
   });
-  drawUnderline(canvas, x, textTop + 310, 480, ORANGE, 6);
+  drawUnderline(
+    canvas,
+    x + underline.dx,
+    textTop + underline.dy,
+    underline.width,
+    ORANGE,
+    6,
+  );
 
   // Two live cursors (DOM, Figma-style) converging on a shared scrap of the
   // canvas; light ink trails mark where each one came from.
@@ -676,7 +716,7 @@ function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
       tx + 40,
       ty + 26,
       tier.badge,
-      tier.badge === 'Today' ? GREEN : ORANGE,
+      tier.shipped ? GREEN : ORANGE,
       34,
       200,
     );
@@ -696,6 +736,7 @@ function buildSync(canvas: DrawableCanvas, r: WorldRect): void {
 async function buildDownload(
   canvas: DrawableCanvas,
   r: WorldRect,
+  copy: SiteCopy,
 ): Promise<void> {
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
@@ -709,7 +750,7 @@ async function buildDownload(
   // leaves the band from y+280 to y+700 for them. The arrow lands just off the
   // primary button's right edge, which is why that button is laid out at a
   // fixed world width rather than sized by its text (see scene-overlays.tsx).
-  hand(canvas, x + 680, y + 285, 'auto-updates\nincluded', GREEN, 36, 300);
+  hand(canvas, x + 680, y + 285, copy.download.autoUpdates, GREEN, 36, 300);
   drawArrow(canvas, [x + 665, y + 340], [x + 545, y + 345], GREEN, 4);
 
   await addPage(
@@ -729,15 +770,18 @@ async function buildDownload(
  * empty in-memory Y.Doc; the caller clears undo history afterwards so a
  * visitor's Ctrl+Z can't erase the site.
  */
-export async function populateScenes(canvas: DrawableCanvas): Promise<void> {
+export async function populateScenes(
+  canvas: DrawableCanvas,
+  copy: SiteCopy,
+): Promise<void> {
   ensureDisplayFont(HAND_FONT);
-  const rect = (id: string) => sceneById(id).rect;
-  buildAudioSearch(canvas, rect('audio-search'));
-  buildLocalFirst(canvas, rect('local-first'));
-  buildSync(canvas, rect('sync'));
-  await buildInk(canvas, rect('ink'));
-  await buildHero(canvas, rect('hero'));
-  await buildLinked(canvas, rect('linked'));
-  await buildPages(canvas, rect('pages'));
-  await buildDownload(canvas, rect('download'));
+  const rect = (id: SceneId) => sceneById(id).rect;
+  buildAudioSearch(canvas, rect('audio-search'), copy);
+  buildLocalFirst(canvas, rect('local-first'), copy);
+  buildSync(canvas, rect('sync'), copy);
+  await buildInk(canvas, rect('ink'), copy);
+  await buildHero(canvas, rect('hero'), copy);
+  await buildLinked(canvas, rect('linked'), copy);
+  await buildPages(canvas, rect('pages'), copy);
+  await buildDownload(canvas, rect('download'), copy);
 }

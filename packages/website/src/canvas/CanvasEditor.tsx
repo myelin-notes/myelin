@@ -16,9 +16,11 @@ import {
 } from '@/components/command-palette';
 import { SceneRail, ScrollHint } from '@/components/scene-rail';
 import { SelectionToolbar } from '@/components/selection-toolbar';
+import { SiteCopyProvider, useCopy } from '@/content/copy-context';
 import { useFakeScroll } from '@/hooks/use-fake-scroll';
 import { useToolState } from '@/hooks/use-tool-state';
 import { CustomColorsProvider } from '@/lib/custom-colors';
+import type { Locale } from '@/lib/locale';
 import { initWebPlatform } from '@/lib/web-platform';
 import { SceneOverlay, SceneUnderlay } from './scene-overlays';
 import { populateScenes, SCENES, type WorldRect } from './scenes';
@@ -45,17 +47,22 @@ function jumpToScene(canvas: DrawableCanvas, rect: WorldRect): void {
  * flies the camera between them. Visitors can still draw, select, and type
  * on everything.
  */
-export default function CanvasEditor() {
+export default function CanvasEditor({ locale }: { locale: Locale }) {
+  // The locale is pinned from the URL: the site prerenders one page per
+  // language, so a `language` preference left by the app must not override it.
   return (
-    <I18nProvider>
-      <CustomColorsProvider>
-        <CanvasEditorInner />
-      </CustomColorsProvider>
+    <I18nProvider locale={locale}>
+      <SiteCopyProvider locale={locale}>
+        <CustomColorsProvider>
+          <CanvasEditorInner />
+        </CustomColorsProvider>
+      </SiteCopyProvider>
     </I18nProvider>
   );
 }
 
 function CanvasEditorInner() {
+  const copy = useCopy();
   const bgRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -102,7 +109,7 @@ function CanvasEditorInner() {
     // Seed the whole landing document, then drop it from undo history so a
     // visitor's Ctrl+Z can't erase the site (only their own edits).
     let disposed = false;
-    void populateScenes(canvas)
+    void populateScenes(canvas, copy)
       .then(() => {
         if (!disposed) {
           ydoc.undoManager.clear();
@@ -150,7 +157,7 @@ function CanvasEditorInner() {
       setCanvas(null);
       setEditingElement(null);
     };
-  }, [canvasTools, setSelectedToolIndex, hideOptions]);
+  }, [canvasTools, setSelectedToolIndex, hideOptions, copy]);
 
   const { index, goTo } = useFakeScroll({
     sceneCount: SCENES.length,
@@ -202,14 +209,14 @@ function CanvasEditorInner() {
   const paletteCommands: PaletteCommand[] = [
     {
       id: 'download',
-      group: 'Get it' as const,
-      label: 'Download Myelin Notes',
+      group: 'getIt' as const,
+      label: copy.canvas.palette.download,
       run: () => goTo(SCENES.length - 1),
     },
     ...SCENES.map((scene, i) => ({
       id: `scene-${scene.id}`,
-      group: 'Go to' as const,
-      label: scene.label,
+      group: 'goTo' as const,
+      label: copy.sceneLabels[scene.id],
       run: () => goTo(i),
     })),
   ];
