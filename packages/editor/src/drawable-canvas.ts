@@ -132,6 +132,21 @@ export function canMoveElementOrderForSelection(
   return false;
 }
 
+/**
+ * Every stylus sample behind a `pointermove`, oldest first.
+ *
+ * A stylus samples far faster than the display refreshes, so the platform
+ * batches the samples taken since the last frame into a single pointermove and
+ * exposes them as coalesced events. Reading only the delivered event keeps the
+ * newest sample and discards the rest, drawing a straight chord across the
+ * batch — the flat segments that show up in handwriting whenever a frame runs
+ * long. Falls back to the event itself where coalescing is unsupported.
+ */
+export function coalescedPointerSamples(event: PointerEvent): PointerEvent[] {
+  const samples = event.getCoalescedEvents?.() ?? [];
+  return samples.length > 0 ? samples : [event];
+}
+
 export function moveElementOrderForSelection(
   items: readonly ElementOrderItem[],
   selectedUuids: Iterable<string>,
@@ -1189,7 +1204,9 @@ export class DrawableCanvas {
     });
 
     this.state.addUpdate(InteractState.UsingTool, (event: PointerEvent) => {
-      this.toolSelected.update(this, event, this.viewport.getPoint(event));
+      for (const sample of coalescedPointerSamples(event)) {
+        this.toolSelected.update(this, sample, this.viewport.getPoint(sample));
+      }
     });
 
     this.state.addStart(InteractState.Moving, () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canMoveElementOrderForSelection,
+  coalescedPointerSamples,
   type ElementOrderItem,
   moveElementOrderForSelection,
 } from './drawable-canvas';
@@ -8,6 +9,30 @@ import { ElementType } from './elements/element-type';
 
 const order = (...items: Array<[string, ElementType]>): ElementOrderItem[] =>
   items.map(([uuid, type]) => ({ uuid, type }));
+
+describe('coalescedPointerSamples', () => {
+  const event = (getCoalescedEvents?: () => PointerEvent[]): PointerEvent =>
+    ({ getCoalescedEvents }) as unknown as PointerEvent;
+
+  it('returns every batched sample so a long frame keeps the whole stroke', () => {
+    const batch = [event(), event(), event()];
+    const delivered = event(() => batch);
+
+    expect(coalescedPointerSamples(delivered)).toEqual(batch);
+  });
+
+  it('falls back to the delivered event when coalescing is unsupported', () => {
+    const delivered = event();
+
+    expect(coalescedPointerSamples(delivered)).toEqual([delivered]);
+  });
+
+  it('falls back to the delivered event when the batch is empty', () => {
+    const delivered = event(() => []);
+
+    expect(coalescedPointerSamples(delivered)).toEqual([delivered]);
+  });
+});
 
 describe('moveElementOrderForSelection', () => {
   it('moves a selected element higher or lower by one step', () => {
