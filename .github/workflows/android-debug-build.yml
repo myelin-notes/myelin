@@ -8,11 +8,6 @@ name: Android Debug Build
 # The APK is signed with Gradle's auto-generated debug keystore, not the release
 # key, so it cannot install over an existing release build: uninstall that first.
 on:
-  # Temporary: run on every push to the working branch. workflow_dispatch only
-  # becomes available once this file lands on the default branch — drop the
-  # push trigger when it does.
-  push:
-    branches: [android-build]
   workflow_dispatch:
     inputs:
       ref:
