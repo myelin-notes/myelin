@@ -114,6 +114,15 @@ jobs:
           # whisper-rs-sys falling back to its bundled 64-bit bindings.
           CARGO_ENCODED_RUSTFLAGS: -Clink-arg=-Wl,-z,max-page-size=16384
           BINDGEN_EXTRA_CLANG_ARGS: --sysroot=${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+          # The Tauri-generated gradle keeps debug symbols in jniLibs rather
+          # than letting AGP strip them, so a stock dev profile ships an 820 MB
+          # libmyelin_lib.so in a 936 MB APK. Drop debuginfo and optimize: the
+          # Rust side then runs at roughly release speed, which matters because
+          # this build is used to diagnose performance. `debug-assertions` stays
+          # on (dev profile default), so wry still enables WebView remote
+          # debugging — that is what makes this build worth shipping.
+          CARGO_PROFILE_DEV_DEBUG: "0"
+          CARGO_PROFILE_DEV_OPT_LEVEL: "2"
         run: yarn tauri android build --debug --apk --target ${{ github.event.inputs.target || 'aarch64' }}
 
       - name: Upload APK artifact
