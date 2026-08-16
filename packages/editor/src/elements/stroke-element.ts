@@ -168,7 +168,9 @@ export class StrokeElement extends DrawableElement {
         simulatePressure: !this.hasPressure,
         size: this.style.size,
       });
-      this.cachedPath = new Path2D(this.getSvgPathFromStroke(outline));
+      const path = new Path2D();
+      appendStrokeOutline(path, outline);
+      this.cachedPath = path;
       this.dirty = false;
     }
 
@@ -267,42 +269,59 @@ export class StrokeElement extends DrawableElement {
 
     this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
   }
+}
 
-  protected average(a: number, b: number) {
-    return (a + b) / 2;
+/** The subset of `Path2D` {@link appendStrokeOutline} drives. */
+export interface QuadraticPathSink {
+  moveTo(x: number, y: number): void;
+  quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void;
+  closePath(): void;
+}
+
+/**
+ * Trace a perfect-freehand outline onto `path` as the closed curve the stroke
+ * renders as: a quadratic through the first three points, then one smooth
+ * quadratic per remaining point, each ending at the midpoint of a point and its
+ * successor.
+ *
+ * This used to be formatted as an SVG path string and handed to the `Path2D`
+ * constructor to parse. That string is rebuilt on every frame an in-progress
+ * stroke grows, and its two `toFixed(2)` calls per outline point made it ~72%
+ * of the rebuild -- more than perfect-freehand's own geometry pass -- before
+ * the parse it then paid for. Driving `Path2D` directly skips both.
+ *
+ * Each curve after the first was an SVG `T` command, which takes only an
+ * endpoint and derives its control point by reflecting the previous one about
+ * the current point. `quadraticCurveTo` has no such shorthand, so the
+ * reflection is computed here to keep the rendered shape identical.
+ */
+export function appendStrokeOutline(
+  path: QuadraticPathSink,
+  outline: number[][],
+): void {
+  if (outline.length < 4) {
+    return;
   }
 
-  private getSvgPathFromStroke(points: number[][], closed = true) {
-    const len = points.length;
+  path.moveTo(outline[0][0], outline[0][1]);
 
-    if (len < 4) {
-      return ``;
-    }
+  let ctrlX = outline[1][0];
+  let ctrlY = outline[1][1];
+  let curX = (outline[1][0] + outline[2][0]) / 2;
+  let curY = (outline[1][1] + outline[2][1]) / 2;
+  path.quadraticCurveTo(ctrlX, ctrlY, curX, curY);
 
-    let a = points[0];
-    let b = points[1];
-    const c = points[2];
-
-    let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(
-      2,
-    )},${b[1].toFixed(2)} ${this.average(b[0], c[0]).toFixed(2)},${this.average(
-      b[1],
-      c[1],
-    ).toFixed(2)} T`;
-
-    for (let i = 2, max = len - 1; i < max; i++) {
-      a = points[i];
-      b = points[i + 1];
-      result += `${this.average(a[0], b[0]).toFixed(2)},${this.average(
-        a[1],
-        b[1],
-      ).toFixed(2)} `;
-    }
-
-    if (closed) {
-      result += 'Z';
-    }
-
-    return result;
+  for (let i = 2, max = outline.length - 1; i < max; i++) {
+    const endX = (outline[i][0] + outline[i + 1][0]) / 2;
+    const endY = (outline[i][1] + outline[i + 1][1]) / 2;
+    const reflectedX = 2 * curX - ctrlX;
+    const reflectedY = 2 * curY - ctrlY;
+    path.quadraticCurveTo(reflectedX, reflectedY, endX, endY);
+    ctrlX = reflectedX;
+    ctrlY = reflectedY;
+    curX = endX;
+    curY = endY;
   }
+
+  path.closePath();
 }

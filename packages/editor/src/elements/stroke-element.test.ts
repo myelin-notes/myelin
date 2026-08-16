@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
-import { StrokeElement, type StrokeStyle } from './stroke-element';
+import {
+  appendStrokeOutline,
+  StrokeElement,
+  type StrokeStyle,
+} from './stroke-element';
 
 const STYLE: StrokeStyle = { color: '#191c1e', size: 8 };
 const CTX = {} as CanvasRenderingContext2D;
@@ -102,5 +106,53 @@ describe('StrokeElement points', () => {
     expect(s.isOver(50, 5, 2, CTX)).toBe(true);
     // Well outside.
     expect(s.isOver(50, 100, 2, CTX)).toBe(false);
+  });
+});
+
+describe('appendStrokeOutline', () => {
+  function recordingSink() {
+    const calls: string[] = [];
+    return {
+      calls,
+      moveTo: (x: number, y: number) => calls.push(`M ${x},${y}`),
+      quadraticCurveTo: (cx: number, cy: number, x: number, y: number) =>
+        calls.push(`Q ${cx},${cy} ${x},${y}`),
+      closePath: () => calls.push('Z'),
+    };
+  }
+
+  it('draws each curve to the midpoint, reflecting the previous control point', () => {
+    const sink = recordingSink();
+
+    appendStrokeOutline(sink, [
+      [0, 0],
+      [10, 10],
+      [20, 0],
+      [30, 10],
+      [40, 0],
+    ]);
+
+    expect(sink.calls).toEqual([
+      'M 0,0',
+      // Control is the second point; the curve ends between it and the third.
+      'Q 10,10 15,5',
+      // 2 * (15,5) - (10,10) = (20,0), the previous control reflected.
+      'Q 20,0 25,5',
+      // 2 * (25,5) - (20,0) = (30,10).
+      'Q 30,10 35,5',
+      'Z',
+    ]);
+  });
+
+  it('leaves the path untouched for an outline too short to curve', () => {
+    const sink = recordingSink();
+
+    appendStrokeOutline(sink, [
+      [0, 0],
+      [10, 10],
+      [20, 0],
+    ]);
+
+    expect(sink.calls).toEqual([]);
   });
 });
