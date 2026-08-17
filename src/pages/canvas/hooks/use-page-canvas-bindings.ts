@@ -7,6 +7,13 @@ import type { EmbedFilesFn } from './use-embed-files';
 const PEN_HOLD_MS = 350;
 /** Movement past this (px) during the hold means the pen is drawing, not resting. */
 const PEN_HOLD_SLOP = 6;
+/**
+ * A resting finger summons it too, but slower and with more room to wobble: a
+ * finger has no barrel button to fall back on, is far less precise than a tip,
+ * and pausing briefly part-way through a pan is ordinary.
+ */
+const TOUCH_HOLD_MS = 450;
+const TOUCH_HOLD_SLOP = 10;
 /** PointerEvent.button for a stylus barrel button. */
 const PEN_BARREL_BUTTON = 2;
 
@@ -27,9 +34,18 @@ export function usePageCanvasBindings({
 }: UsePageCanvasBindingsArgs) {
   // The pen may already have begun using the active tool — resting to summon
   // the wheel starts a stroke, and the barrel can be pressed mid-stroke — so
-  // whatever is in flight is thrown away rather than committed.
-  const openToolWheelWithPen = useEffectEvent((event: PointerEvent) => {
-    drawableCanvasRef.current?.abortInteraction();
+  // whatever is in flight is thrown away rather than committed. A finger is
+  // panning rather than drawing, and the canvas is the side that knows whether
+  // that gesture is free to take.
+  const openToolWheel = useEffectEvent((event: PointerEvent) => {
+    const canvas = drawableCanvasRef.current;
+    if (event.pointerType === 'touch') {
+      if (!canvas?.releaseTouchForToolWheel()) {
+        return;
+      }
+    } else {
+      canvas?.abortInteraction();
+    }
     wheelRef.current?.show(event);
   });
 
@@ -50,7 +66,7 @@ export function usePageCanvasBindings({
     // outright rather than making the user wait out the hold. Apple Pencils
     // have no barrel button; S Pen / Surface Pen / Wacom do.
     if (event.pointerType === 'pen' && event.button === PEN_BARREL_BUTTON) {
-      openToolWheelWithPen(event);
+      openToolWheel(event);
     }
   });
 
@@ -81,11 +97,12 @@ export function usePageCanvasBindings({
     };
     canvas.addEventListener('contextmenu', handleContextMenu);
 
-    // Pen press-and-hold opens the tool wheel, so the tool can be swapped
-    // without setting the pen down. Tracked by pointer id: a palm resting on
-    // the screen emits its own moves, and those must not cancel the hold.
+    // Press-and-hold opens the tool wheel, so the tool can be swapped without
+    // setting the pen down or reaching the tool bar. Tracked by pointer id: a
+    // palm resting on the screen emits its own moves, and those must not
+    // cancel the hold.
     let holdTimer: ReturnType<typeof setTimeout> | null = null;
-    let hold: { id: number; x: number; y: number } | null = null;
+    let hold: { id: number; x: number; y: number; slop: number } | null = null;
 
     const cancelHold = () => {
       if (holdTimer !== null) {
@@ -97,17 +114,32 @@ export function usePageCanvasBindings({
 
     const handlePointerDown = (event: PointerEvent) => {
       handleCanvasPointerDown(event);
+      // A second finger down means the viewport owns the gesture as a pinch,
+      // so this also disarms a hold the first finger had started.
       cancelHold();
       // Button 0 is the pen tip: the barrel opens the wheel on its own, and the
       // eraser end is there to erase, so neither arms the hold.
-      if (event.pointerType !== 'pen' || event.button !== 0 || event.shiftKey) {
+      const isPen = event.pointerType === 'pen';
+      if (
+        (!isPen && event.pointerType !== 'touch') ||
+        event.button !== 0 ||
+        event.shiftKey
+      ) {
         return;
       }
-      hold = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      holdTimer = setTimeout(() => {
-        cancelHold();
-        openToolWheelWithPen(event);
-      }, PEN_HOLD_MS);
+      hold = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        slop: isPen ? PEN_HOLD_SLOP : TOUCH_HOLD_SLOP,
+      };
+      holdTimer = setTimeout(
+        () => {
+          cancelHold();
+          openToolWheel(event);
+        },
+        isPen ? PEN_HOLD_MS : TOUCH_HOLD_MS,
+      );
     };
     canvas.addEventListener('pointerdown', handlePointerDown);
 
@@ -116,7 +148,7 @@ export function usePageCanvasBindings({
         return;
       }
       const moved = Math.hypot(event.clientX - hold.x, event.clientY - hold.y);
-      if (moved > PEN_HOLD_SLOP) {
+      if (moved > hold.slop) {
         cancelHold();
       }
     };

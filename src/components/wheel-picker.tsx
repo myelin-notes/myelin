@@ -110,6 +110,9 @@ export const WheelPicker = memo(function WheelPicker({
   const groupRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const centerRef = useRef([0, 0]);
+  // Only the pointer that opened the wheel may commit a slice. A second finger
+  // landing while the wheel is up is part of a pinch, not a choice.
+  const openedByRef = useRef<number | null>(null);
   const focusPathRef = useRef<number[]>([]);
   const [focusPath, setFocusPath] = useState<number[]>([]);
   const itemsRef = useRef(items);
@@ -145,6 +148,7 @@ export const WheelPicker = memo(function WheelPicker({
       }
       setVisible(true);
       centerRef.current = [cx, cy];
+      openedByRef.current = event.pointerId;
       focusPathRef.current = [];
       setFocusPath([]);
     },
@@ -153,6 +157,7 @@ export const WheelPicker = memo(function WheelPicker({
 
   const hide = useCallback(() => {
     setVisible(false);
+    openedByRef.current = null;
     focusPathRef.current = [];
     setFocusPath([]);
   }, []);
@@ -182,7 +187,7 @@ export const WheelPicker = memo(function WheelPicker({
 
     function handlePointerMove(evt: PointerEvent) {
       const its = itemsRef.current;
-      if (its.length === 0) {
+      if (its.length === 0 || evt.pointerId !== openedByRef.current) {
         return;
       }
 
@@ -251,9 +256,10 @@ export const WheelPicker = memo(function WheelPicker({
     }
 
     function handlePointerUp(evt: PointerEvent) {
-      // Mouse opens the wheel with the right button, pen with a press-and-hold;
-      // touch has no trigger yet, so a stray finger must not commit a slice.
-      if (evt.pointerType !== 'mouse' && evt.pointerType !== 'pen') {
+      // Mouse opens the wheel with the right button, pen and touch with a
+      // press-and-hold. Whichever it was, only that pointer's lift commits, so
+      // a stray second finger cannot choose for it.
+      if (evt.pointerId !== openedByRef.current) {
         return;
       }
 
@@ -279,6 +285,7 @@ export const WheelPicker = memo(function WheelPicker({
       }
 
       setVisible(false);
+      openedByRef.current = null;
       focusPathRef.current = [];
       setFocusPath([]);
     }
