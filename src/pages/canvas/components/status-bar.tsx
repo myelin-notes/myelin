@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Crosshair, ImageDown, Lock, Unlock } from 'lucide-react';
 import { formatNumber } from '@myelin/editor/i18n/format';
+import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
 import { IS_DEV } from '@/lib/env';
 import { useLocale, useMessages } from '@/lib/i18n';
 
@@ -21,11 +22,21 @@ export const StatusBar = memo(function StatusBar({
   onRecenter,
   onRegenerateThumbnail,
 }: StatusBarProps) {
+  const compact = useCompactCanvasLayout();
   const strings = useMessages();
   const locale = useLocale();
 
+  // Compact takes the top-right corner the title bar vacates: the bottom-right
+  // is where the tool bar now runs, and this is a passive readout that belongs
+  // out of the thumb zone anyway.
   return (
-    <div className="fade-in-0 slide-in-from-bottom-2 absolute right-4 bottom-3 z-[100] inline-flex animate-in select-none items-center gap-1 rounded-xl bg-card fill-mode-backwards py-2 pr-3 pl-2 ring-1 ring-border-subtle/70 delay-[100ms] duration-[350ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]">
+    <div
+      className={
+        compact
+          ? 'fade-in-0 slide-in-from-top-2 absolute top-3 right-4 z-[100] inline-flex animate-in select-none items-center gap-1 rounded-xl bg-card fill-mode-backwards py-2 pr-3 pl-2 ring-1 ring-border-subtle/70 delay-[100ms] duration-[350ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+          : 'fade-in-0 slide-in-from-bottom-2 absolute right-4 bottom-3 z-[100] inline-flex animate-in select-none items-center gap-1 rounded-xl bg-card fill-mode-backwards py-2 pr-3 pl-2 ring-1 ring-border-subtle/70 delay-[100ms] duration-[350ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+      }
+    >
       <button
         type="button"
         onClick={onRecenter}
