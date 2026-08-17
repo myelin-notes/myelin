@@ -53,9 +53,6 @@ const PREFS = {
   mcpEnabled: pref<boolean>('mcp-enabled', false),
   mcpPort: pref<number>('mcp-port', 3846),
   mcpAllowDirectWrites: pref<boolean>('mcp-allow-direct-writes', false),
-  // Opt-in, not opt-out: storing an analytics identifier on the device needs
-  // prior consent, which the first-run onboarding asks for. Nothing is captured
-  // and PostHog is not even initialized until this flips to true.
   analyticsEnabled: pref<boolean>('analytics-enabled', false),
   onboardingCompleted: pref<boolean>('onboarding-completed', false),
   language: pref<string>('language', 'en'),
