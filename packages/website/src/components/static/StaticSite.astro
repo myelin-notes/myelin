@@ -12,7 +12,23 @@
 import { Wordmark, buttonVariants, cn } from '@myelin/ui';
 import CheckList from './CheckList.astro';
 import Shot from './Shot.astro';
-import { copy, faqs, siteLinks } from '../../content/site';
+import {
+  navLinks,
+  getCopy,
+  getFaqs,
+  isExternalLink,
+  linkHref,
+  siteLinks,
+} from '../../content/site';
+import type { Locale } from '../../lib/locale';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = getCopy(locale);
+const faqs = getFaqs(locale);
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
@@ -58,11 +74,7 @@ const ctaOutline = cn(
       </p>
 
       <div class="rise mt-16 lg:mt-20" style="animation-delay:.36s">
-        <Shot
-          src="/library.png"
-          alt="The Myelin Notes library with folders, note cards, tags, and search"
-          eager
-        />
+        <Shot src="/library.png" alt={copy.shots.library} eager />
       </div>
     </div>
   </section>
@@ -72,15 +84,12 @@ const ctaOutline = cn(
     <div class:list={[wrap, band]}>
       <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
         <div class="lg:col-span-5">
-          <p class={kicker}>01 / PDFs</p>
+          <p class={kicker}>01 / {copy.sceneLabels.ink}</p>
           <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
           <p class={lede}>{copy.ink.pdfBody}</p>
         </div>
         <div class="lg:col-span-7 lg:pl-6">
-          <Shot
-            src="/pdf.png"
-            alt="A PDF embedded on the Myelin canvas, with an equation boxed and an arrow drawn in ink beside it"
-          />
+          <Shot src="/pdf.png" alt={copy.shots.pdf} />
         </div>
       </div>
     </div>
@@ -90,13 +99,10 @@ const ctaOutline = cn(
   <section class:list={[wrap, band]}>
     <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
       <div class="order-2 lg:order-1 lg:col-span-7 lg:pr-6">
-        <Shot
-          src="/page-frame.png"
-          alt="A Myelin page frame with headings, note links, a checklist, inline math, and code blocks running with their output beside them"
-        />
+        <Shot src="/page-frame.png" alt={copy.shots.pageFrame} />
       </div>
       <div class="order-1 lg:order-2 lg:col-span-5">
-        <p class={kicker}>02 / Pages</p>
+        <p class={kicker}>02 / {copy.sceneLabels.pages}</p>
         <h2 class:list={[heading, 'mt-6']}>{copy.pages.heading}</h2>
         <p class={lede}>{copy.pages.body}</p>
       </div>
@@ -108,16 +114,13 @@ const ctaOutline = cn(
     <div class:list={[wrap, band]}>
       <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
         <div class="lg:col-span-5">
-          <p class={kicker}>03 / Audio &amp; search</p>
+          <p class={kicker}>03 / {copy.sceneLabels['audio-search']}</p>
           <h2 class:list={[heading, 'mt-6']}>{copy.audioSearch.heading}</h2>
           <p class={lede}>{copy.audioSearch.audioBody}</p>
           <p class={lede}>{copy.audioSearch.searchBody}</p>
         </div>
         <div class="grid gap-5 lg:col-span-7 lg:pl-6">
-          <Shot
-            src="/audio.png"
-            alt="A recording on the Myelin canvas, its waveform drawn as it captures"
-          />
+          <Shot src="/audio.png" alt={copy.shots.audio} />
         </div>
       </div>
     </div>
@@ -127,13 +130,10 @@ const ctaOutline = cn(
   <section class:list={[wrap, band]}>
     <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
       <div class="order-2 lg:order-1 lg:col-span-7 lg:pr-6">
-        <Shot
-          src="/graph.png"
-          alt="The Myelin Notes graph view, showing a note's outgoing links and backlinks"
-        />
+        <Shot src="/graph.png" alt={copy.shots.graph} />
       </div>
       <div class="order-1 lg:order-2 lg:col-span-5">
-        <p class={kicker}>04 / Linked notes</p>
+        <p class={kicker}>04 / {copy.sceneLabels.linked}</p>
         <h2 class:list={[heading, 'mt-6']}>{copy.linked.heading}</h2>
         <p class={lede}>{copy.linked.body}</p>
       </div>
@@ -145,7 +145,7 @@ const ctaOutline = cn(
     <div class:list={[wrap, band]}>
       <div class="grid gap-x-10 gap-y-12 lg:grid-cols-12">
         <div class="lg:col-span-5">
-          <p class={kicker}>05 / Sync &amp; collab</p>
+          <p class={kicker}>05 / {copy.sceneLabels.sync}</p>
           <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
           <p class={lede}>{copy.sync.kicker}</p>
         </div>
@@ -174,7 +174,7 @@ const ctaOutline = cn(
   <section id="local" class:list={[wrap, band]}>
     <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
       <div class="lg:col-span-5">
-        <p class={kicker}>06 / Local-first</p>
+        <p class={kicker}>06 / {copy.sceneLabels['local-first']}</p>
         <h2 class:list={[heading, 'mt-6']}>{copy.localFirst.heading}</h2>
         <p class={lede}>{copy.localFirst.lede}</p>
       </div>
@@ -185,7 +185,7 @@ const ctaOutline = cn(
   <!-- FAQ -->
   <section id="faq" class:list={[wrap, band]}>
     <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-      <p class:list={[kicker, 'lg:col-span-3']}>07 / Questions</p>
+      <p class:list={[kicker, 'lg:col-span-3']}>07 / {copy.faqKicker}</p>
       <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
     </div>
     {/* Two columns from `sm` up, not `lg`: this page only ever renders below
@@ -209,7 +209,9 @@ const ctaOutline = cn(
   <!-- Download -->
   <section id="download" class="bg-primary text-text-on-dark">
     <div class:list={[wrap, 'py-28 lg:py-36']}>
-      <p class="kicker text-text-on-dark/55">08 / Download</p>
+      <p class="kicker text-text-on-dark/55">
+        08 / {copy.sceneLabels.download}
+      </p>
       <h2
         class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] whitespace-pre-line"
       >
@@ -255,16 +257,18 @@ const ctaOutline = cn(
           {copy.footer.tagline}
         </p>
       </div>
-      <nav class="lg:col-span-7" aria-label="Footer">
+      <nav class="lg:col-span-7" aria-label={copy.footer.nav}>
         <ul class="flex flex-wrap gap-x-8 gap-y-3">
           {
-            copy.footer.links.map((link) => (
+            navLinks.map((id) => (
               <li>
                 <a
-                  href={link.href}
+                  href={linkHref(id)}
+                  target={isExternalLink(id) ? '_blank' : undefined}
+                  rel={isExternalLink(id) ? 'noreferrer' : undefined}
                   class="text-sm text-text-secondary transition-colors hover:text-text-primary"
                 >
-                  {link.label}
+                  {copy.linkLabels[id]}
                 </a>
               </li>
             ))
@@ -276,14 +280,14 @@ const ctaOutline = cn(
     <div
       class="flex flex-wrap items-center justify-between gap-4 py-10 text-sm text-text-muted"
     >
-      <p class="kicker">Mac · Windows · Linux · iPhone · iPad · Android</p>
+      <p class="kicker">{copy.footer.platforms}</p>
     </div>
   </footer>
 </div>
 
 <script>
   import { detectPlatform, fetchDownloadUrls } from '../../lib/downloads';
-  import type { PlatformKey } from '../../content/site';
+  import type { PlatformKey } from '../../content/site/links';
 
   // Every download link ships pointing at the releases page; upgrade the ones
   // whose platform has a real installer in the latest release. "auto" means the

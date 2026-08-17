@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import type { Locale } from '@/lib/locale';
 
 /**
  * Tiny client island that lazy-loads the heavy canvas editor. This is a real
@@ -35,13 +36,13 @@ if (editorModule) {
   editorModule.then(() => clearTimeout(failsafe), revealStaticSite);
 }
 
-export default function CanvasIsland() {
+export default function CanvasIsland({ locale }: { locale: Locale }) {
   if (!Editor) {
     return null;
   }
   return (
     <Suspense fallback={null}>
-      <Editor />
+      <Editor locale={locale} />
     </Suspense>
   );
 }

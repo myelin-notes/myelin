@@ -125,21 +125,22 @@ html {
   z-index: 40;
 }
 
+/* The wordmark carries the auto margin for the whole bar, so everything after
+   it sits in one right-hand group. Putting it here rather than on the first of
+   those items keeps the layout correct as items come and go: the nav is hidden
+   on phones and the language picker is absent on English-only pages. */
 .site-topbar .wordmark {
   color: var(--text-primary);
   font-family: var(--font-heading);
   font-size: 1.1rem;
+  margin-right: auto;
   text-decoration: none;
 }
 
-/* Pushed right so the nav sits beside the Download button rather than crowding
-   the wordmark. This carries the `margin-left: auto` for the whole right-hand
-   group, which is why `.topbar-download` no longer needs its own. */
 .site-topbar .topbar-nav {
   align-items: center;
   display: flex;
   gap: 1.25rem;
-  margin-left: auto;
 }
 
 .site-topbar .topbar-nav a {
@@ -153,15 +154,15 @@ html {
   color: var(--text-primary);
 }
 
-/* Five links plus the wordmark and CTA overflow a 3rem bar on a phone.
-   The static page below this width still carries all of them in its footer. */
+/* Five links plus the wordmark, the picker, and the CTA overflow a 3rem bar on
+   a phone. The static page below this width still carries all of them in its
+   footer, and the picker keeps only its globe. */
 @media (max-width: 640px) {
   .site-topbar .topbar-nav {
     display: none;
   }
-  /* With the nav gone, the CTA has to carry the auto margin itself. */
-  .site-topbar .topbar-download {
-    margin-left: auto;
+  .site-topbar .lang-picker summary span {
+    display: none;
   }
 }
 
@@ -173,4 +174,85 @@ html {
   font-weight: 500;
   padding: 0.4rem 0.8rem;
   text-decoration: none;
+}
+
+/* Language picker. A bare `details`, so it costs no JavaScript beyond the
+   click-outside handler in SiteTopbar.astro. */
+.site-topbar .lang-picker {
+  position: relative;
+}
+
+.site-topbar .lang-picker summary {
+  align-items: center;
+  border-radius: 0.4rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.8rem;
+  gap: 0.35rem;
+  list-style: none;
+  padding: 0.35rem 0.5rem;
+  transition: color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+}
+
+/* Safari draws its own disclosure triangle through a pseudo-element the
+   standard `list-style: none` above does not reach. */
+.site-topbar .lang-picker summary::-webkit-details-marker {
+  display: none;
+}
+
+.site-topbar .lang-picker summary:hover,
+.site-topbar .lang-picker[open] summary {
+  background: var(--bg-hover-tint);
+  color: var(--text-primary);
+}
+
+.site-topbar .lang-picker summary svg {
+  height: 0.95rem;
+  width: 0.95rem;
+}
+
+.site-topbar .lang-picker ul {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.6rem;
+  box-shadow: var(--shadow-ambient);
+  list-style: none;
+  margin: 0;
+  min-width: 9rem;
+  padding: 0.25rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+}
+
+.site-topbar .lang-picker ul a {
+  border-radius: 0.4rem;
+  color: var(--text-secondary);
+  display: block;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.6rem;
+  text-decoration: none;
+}
+
+.site-topbar .lang-picker ul a:hover {
+  background: var(--bg-hover-tint);
+  color: var(--text-primary);
+}
+
+.site-topbar .lang-picker ul a[aria-current] {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* The bundled faces (Hanken Grotesk, Newsreader) carry no CJK glyphs, so a
+   Chinese page would otherwise fall through to whatever `sans-serif` resolves
+   to and mix two unrelated designs mid-sentence. Naming the platform UI faces
+   keeps Latin text in the site's own font and hands CJK to a face designed
+   for it. */
+:root:lang(zh-Hans) {
+  --font-sans: 'Hanken Grotesk', 'PingFang SC', 'Microsoft YaHei',
+    'Noto Sans SC', 'Source Han Sans SC', sans-serif;
+  --font-heading: 'Newsreader', 'Songti SC', 'Noto Serif SC', 'SimSun', serif;
 }

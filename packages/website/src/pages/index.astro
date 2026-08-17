@@ -1,43 +1,6 @@
 ---
-import CanvasIsland from '../canvas/CanvasIsland';
-import StaticSite from '../components/static/StaticSite.astro';
-import Base from '../layouts/Base.astro';
-import { faqs, siteDescription, siteTitle } from '../content/site';
-
-const softwareJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: 'Myelin Notes',
-  applicationCategory: 'ProductivityApplication',
-  operatingSystem: 'macOS, Windows, Linux, iOS, iPadOS, Android',
-  description: siteDescription,
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-  },
-};
-
-const faqJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: faqs.map(({ question, answer }) => ({
-    '@type': 'Question',
-    name: question,
-    acceptedAnswer: { '@type': 'Answer', text: answer },
-  })),
-};
+import Landing from '../components/Landing.astro';
+import { DEFAULT_LOCALE } from '../lib/locale';
 ---
 
-<Base
-  title={siteTitle}
-  description={siteDescription}
-  jsonLd={[softwareJsonLd, faqJsonLd]}
->
-  <!-- Both renderings ship in the HTML; the gate in Base.astro picks one before
-       first paint. Static first so it is what a crawler reads. -->
-  <StaticSite />
-  <!-- The live editor: the real Myelin canvas engine, full screen, with the
-       app's tool rail. Client-only so React Fast Refresh works in dev. -->
-  <CanvasIsland client:only="react" />
-</Base>
+<Landing locale={DEFAULT_LOCALE} />

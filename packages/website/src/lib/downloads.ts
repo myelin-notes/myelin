@@ -1,4 +1,4 @@
-import { type PlatformKey, siteLinks } from '@/content/site';
+import { type PlatformKey, siteLinks } from '@/content/site/links';
 
 /**
  * Best guess at the visitor's platform, so the primary download button offers

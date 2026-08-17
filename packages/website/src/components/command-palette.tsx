@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { ArrowDownToLine, MapPin, Search } from 'lucide-react';
+import { useCopy } from '@/content/copy-context';
 
 export interface PaletteCommand {
   id: string;
-  group: 'Go to' | 'Get it';
+  group: 'goTo' | 'getIt';
   label: string;
   run: () => void;
 }
 
 const GROUP_ICON: Record<PaletteCommand['group'], LucideIcon> = {
-  'Go to': MapPin,
-  'Get it': ArrowDownToLine,
+  goTo: MapPin,
+  getIt: ArrowDownToLine,
 };
 
 interface CommandPaletteProps {
@@ -26,6 +27,7 @@ export function CommandPalette({
   commands,
   onClose,
 }: CommandPaletteProps) {
+  const strings = useCopy().canvas.palette;
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +73,11 @@ export function CommandPalette({
     }
   };
 
+  const groupLabels: Record<PaletteCommand['group'], string> = {
+    goTo: strings.groupGoTo,
+    getIt: strings.groupGetIt,
+  };
+
   let lastGroup: string | null = null;
 
   return (
@@ -87,7 +94,7 @@ export function CommandPalette({
     >
       <div
         role="dialog"
-        aria-label="Command palette"
+        aria-label={strings.label}
         className="mx-auto mt-28 w-[min(560px,calc(100vw-2rem))] overflow-hidden rounded-xl bg-card shadow-elevated ring-1 ring-border-subtle"
         onKeyDown={handleKeyDown}
       >
@@ -100,7 +107,7 @@ export function CommandPalette({
               setQuery(event.target.value);
               setSelected(0);
             }}
-            placeholder="Jump anywhere in the notebook"
+            placeholder={strings.placeholder}
             className="w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
           />
           <kbd className="rounded bg-key px-1.5 py-0.5 text-[10px] text-text-muted ring-1 ring-border-key">
@@ -110,7 +117,7 @@ export function CommandPalette({
         <ul className="max-h-80 overflow-y-auto p-2">
           {filtered.length === 0 && (
             <li className="px-3 py-6 text-center text-sm text-text-muted">
-              Nothing matches. Try a scene name or "download".
+              {strings.empty}
             </li>
           )}
           {filtered.map((command, index) => {
@@ -121,7 +128,7 @@ export function CommandPalette({
               <li key={command.id}>
                 {showGroup && (
                   <p className="px-3 pt-2 pb-1 font-medium text-[11px] text-text-muted uppercase tracking-wide">
-                    {command.group}
+                    {groupLabels[command.group]}
                   </p>
                 )}
                 <button

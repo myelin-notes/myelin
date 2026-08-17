@@ -7,7 +7,7 @@ import {
   Search as SearchIcon,
 } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
-import { copy } from '@/content/site';
+import { useCopy } from '@/content/copy-context';
 
 interface WorldLayerProps {
   canvas: DrawableCanvas;
@@ -83,7 +83,7 @@ const WAVE_HEIGHTS = Array.from({ length: 46 }, (_, i) => {
 });
 
 export function AudioCardMock({ x, y }: WorldPos) {
-  const mock = copy.audioSearch.audioMock;
+  const mock = useCopy().audioSearch.audioMock;
   const [pre, post] = mock.transcript.split(mock.match);
   return (
     <div
@@ -157,7 +157,7 @@ const RESULT_ICONS = {
 } as const;
 
 export function SearchPaletteMock({ x, y }: WorldPos) {
-  const mock = copy.audioSearch.searchMock;
+  const mock = useCopy().audioSearch.searchMock;
   return (
     <div
       className="absolute overflow-hidden rounded-2xl border border-neutral-200 bg-white"

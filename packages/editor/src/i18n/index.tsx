@@ -57,20 +57,39 @@ function getInitialLocale(): SupportedLocale {
   return defaultLocale;
 }
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<SupportedLocale>(getInitialLocale);
+interface I18nProviderProps {
+  children: React.ReactNode;
+  /**
+   * Pin the locale instead of following the `language` preference. The website
+   * serves one prerendered page per locale, so the URL decides the language and
+   * a stray preference from a previous visit must not override it.
+   */
+  locale?: SupportedLocale;
+}
+
+export function I18nProvider({
+  children,
+  locale: pinnedLocale,
+}: I18nProviderProps) {
+  const [prefLocale, setPrefLocale] =
+    useState<SupportedLocale>(getInitialLocale);
+  const locale = pinnedLocale ?? prefLocale;
 
   useEffect(
     () =>
       UserPrefs.subscribe('language', (value) => {
-        setLocaleState(resolveLocale(value));
+        setPrefLocale(resolveLocale(value));
       }),
     [],
   );
 
   useEffect(() => {
-    document.documentElement.lang = locale;
-  }, [locale]);
+    // A pinned locale means the document already carries the right `lang` from
+    // the server (in its canonical casing), so leave it alone.
+    if (!pinnedLocale) {
+      document.documentElement.lang = locale;
+    }
+  }, [locale, pinnedLocale]);
 
   const setLocale = (nextLocale: SupportedLocale) => {
     UserPrefs.set('language', nextLocale);
