@@ -443,6 +443,28 @@ export abstract class DrawableElement {
     );
   }
 
+  /**
+   * Whether the world-space bounding box overlaps `rect`, inflated on every
+   * side by `margin`.
+   *
+   * Same geometry as intersecting `boundingBox`, but without the DOMRect it
+   * allocates — the renderer asks this of every element on the canvas, every
+   * frame.
+   */
+  public intersectsWorldRect(rect: DOMRect, margin: number): boolean {
+    const raw = this.localBoundingBox;
+    const x1 = raw.x * this._scale.x + this._offset.x;
+    const y1 = raw.y * this._scale.y + this._offset.y;
+    const x2 = (raw.x + raw.width) * this._scale.x + this._offset.x;
+    const y2 = (raw.y + raw.height) * this._scale.y + this._offset.y;
+    return (
+      Math.max(x1, x2) >= rect.x - margin &&
+      Math.min(x1, x2) <= rect.right + margin &&
+      Math.max(y1, y2) >= rect.y - margin &&
+      Math.min(y1, y2) <= rect.bottom + margin
+    );
+  }
+
   /** World-space hit test, delegates to local-space after transforming coords */
   public isOver(
     x: number,

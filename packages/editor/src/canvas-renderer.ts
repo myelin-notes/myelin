@@ -25,6 +25,28 @@ const BG_TILE_SIZE = 24;
 export const BG_OVERDRAW_PX = BG_TILE_SIZE * MAX_ZOOM;
 
 /**
+ * Screen-space slack around the viewport for culling. A bounding box is the
+ * extent of an element's geometry, and a few element types paint a little
+ * outside it (a shape's stroke straddles its path, a glyph can overhang its
+ * measured box), so the test is deliberately loose — the cost of drawing one
+ * element that turned out to be just off-screen is nothing next to the cost of
+ * clipping one that wasn't.
+ */
+const CULL_MARGIN_PX = 128;
+
+/**
+ * The cull margin in world units at a given zoom. Kept constant on screen
+ * rather than in the document, so zooming in doesn't drag a widening band of
+ * off-screen ink back into the frame.
+ */
+export function cullMarginWorld(zoom: number): number {
+  if (!(zoom > 0) || !Number.isFinite(zoom)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return CULL_MARGIN_PX / zoom;
+}
+
+/**
  * Frames of sustained zoom before the background layer leaves the tree, and how
  * long the zoom must hold still before it returns.
  *
@@ -287,7 +309,16 @@ export class CanvasRenderer {
     this.ctx.scale(zoom, zoom);
     this.ctx.translate(offset.x, offset.y);
 
+    // Cull off-screen elements. Without this a frame costs what the whole note
+    // costs rather than what the screen shows, and a note is only ever added
+    // to — which is why inking gets slower the longer a page has been worked
+    // on, and why the ink then trails the pen.
+    const viewRect = viewport.getWorldRect();
+    const cullMargin = cullMarginWorld(zoom);
     for (const element of elements) {
+      if (!element.intersectsWorldRect(viewRect, cullMargin)) {
+        continue;
+      }
       element.draw(this.ctx, deltaTime);
     }
     // Cursor: compute fresh from screen position so it's correct even if

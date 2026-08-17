@@ -156,3 +156,63 @@ describe('appendStrokeOutline', () => {
     expect(sink.calls).toEqual([]);
   });
 });
+
+/**
+ * `updateBoundingBox` only runs when a stroke is finished, but the renderer
+ * culls by the bounding box on every frame — so the box has to track the ink
+ * as it is drawn or the stroke in progress is the one thing not on screen.
+ */
+describe('StrokeElement live bounds', () => {
+  const VIEW = new DOMRect(0, 0, 1000, 1000);
+
+  it('covers the first sample of a stroke', () => {
+    const s = new StrokeElement('live1', [], false, STYLE);
+    expect(s.intersectsWorldRect(VIEW, 0)).toBe(true);
+
+    s.addPoint(500, 500, 0.5);
+    expect(s.localBoundingBox.width).toBeGreaterThan(0);
+    expect(s.intersectsWorldRect(VIEW, 0)).toBe(true);
+  });
+
+  it('grows to hold every sample as the stroke is drawn', () => {
+    const s = new StrokeElement('live2', [], false, STYLE);
+    s.addPoint(100, 100, 0.5);
+    s.addPoint(200, 400, 0.5);
+    s.addPoint(50, 250, 0.5);
+
+    const box = s.localBoundingBox;
+    expect(box.x).toBeLessThanOrEqual(50);
+    expect(box.y).toBeLessThanOrEqual(100);
+    expect(box.right).toBeGreaterThanOrEqual(200);
+    expect(box.bottom).toBeGreaterThanOrEqual(400);
+  });
+
+  it('stays a superset of the finished outline', () => {
+    // The live box pads by the stroke size because it cannot know the outline
+    // yet. Too small and the finished stroke would be clipped; this pins the
+    // direction of the error.
+    const s = new StrokeElement('live3', [], false, STYLE);
+    for (let i = 0; i < 40; i++) {
+      s.addPoint(100 + i * 5, 300 + Math.sin(i / 3) * 40, 0.5);
+    }
+    const live = s.localBoundingBox;
+
+    s.updateBounds();
+    const finished = s.localBoundingBox;
+
+    expect(live.x).toBeLessThanOrEqual(finished.x);
+    expect(live.y).toBeLessThanOrEqual(finished.y);
+    expect(live.right).toBeGreaterThanOrEqual(finished.right);
+    expect(live.bottom).toBeGreaterThanOrEqual(finished.bottom);
+  });
+
+  it('does not stretch back to the origin for a stroke drawn far from it', () => {
+    // A fresh element's box starts at 0,0 — carrying that into the union would
+    // make every stroke intersect the whole document.
+    const s = new StrokeElement('live4', [], false, STYLE);
+    s.addPoint(5000, 5000, 0.5);
+    s.addPoint(5010, 5010, 0.5);
+
+    expect(s.intersectsWorldRect(new DOMRect(0, 0, 100, 100), 0)).toBe(false);
+  });
+});

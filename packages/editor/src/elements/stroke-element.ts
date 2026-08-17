@@ -107,8 +107,10 @@ export class StrokeElement extends DrawableElement {
   }
 
   public addPoint(x: number, y: number, pressure: number | undefined) {
+    const isFirst = this.points.length === 0;
     this.points.push(x, y, pressure ?? 0);
     this.dirty = true;
+    this.growBoundsTo(x, y, isFirst);
 
     // Every sample already carries its real value, so flipping mid-stroke
     // re-renders the whole stroke from recorded pressure, not just the rest.
@@ -128,6 +130,29 @@ export class StrokeElement extends DrawableElement {
       this.lastFlush = now;
       this.flushPoints();
     }
+  }
+
+  /**
+   * Widen the cached box to hold one more sample.
+   *
+   * `updateBoundingBox` only runs when the stroke is finished, so without this
+   * a live stroke would carry the empty box it was constructed with — and the
+   * renderer culls by that box, which would leave the ink being drawn
+   * invisible until the pen lifted. Padding by the full `size` is a bound on
+   * perfect-freehand's radius (at most 0.75 * size at maximum pressure), so
+   * the box is never too small; `updateBoundingBox` tightens it at the end.
+   */
+  private growBoundsTo(x: number, y: number, isFirst: boolean): void {
+    const pad = this.style.size;
+    if (isFirst) {
+      this.box = new DOMRect(x - pad, y - pad, pad * 2, pad * 2);
+      return;
+    }
+    const minX = Math.min(this.box.x, x - pad);
+    const minY = Math.min(this.box.y, y - pad);
+    const maxX = Math.max(this.box.x + this.box.width, x + pad);
+    const maxY = Math.max(this.box.y + this.box.height, y + pad);
+    this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
   }
 
   /** Persist the full point buffer to Yjs. Called when the stroke is finished. */
