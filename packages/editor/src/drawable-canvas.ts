@@ -215,6 +215,8 @@ export class DrawableCanvas {
   private _ydoc: YDocManager;
   private _domOverlayHost: HTMLElement | null = null;
   private _toolCursor: string = 'default';
+  /** Last value written to `canvas.style.cursor`. @see updateCursor */
+  private _appliedCursor: string | null = null;
   private toolSelected: ITool;
   private readonly resolveNoteLink?: ResolveNoteLink;
   private readonly resolveMedia?: ResolveMediaSrc;
@@ -1512,12 +1514,19 @@ export class DrawableCanvas {
   }
 
   private updateCursor() {
+    let cursor: string;
     if (this.state.current === InteractState.Moving) {
-      this.canvas.style.cursor = 'grabbing';
+      cursor = 'grabbing';
     } else if (this.spaceDown) {
-      this.canvas.style.cursor = 'grab';
+      cursor = 'grab';
     } else {
-      this.canvas.style.cursor = this._toolCursor;
+      cursor = this._toolCursor;
+    }
+    // Every pointermove reaches here — 120 a second from a stylus — and
+    // assigning an identical value still invalidates the element's style.
+    if (cursor !== this._appliedCursor) {
+      this._appliedCursor = cursor;
+      this.canvas.style.cursor = cursor;
     }
   }
 
