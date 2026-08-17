@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
 import { formatNumber } from '@myelin/editor/i18n/format';
 import { TimeAgo } from '@/components/time-ago';
@@ -30,8 +30,17 @@ type RepoKind = RepositoryConfig['kind'];
  * Repository picker and GitHub connection flow, without the surrounding section
  * heading. Shared by the Settings sync section and the first-run onboarding
  * step so both drive the same config through the same code path.
+ *
+ * `onSetupCompleteChange` reports whether the chosen repository is actually
+ * usable — always true for a local one, and true for GitHub only once it is
+ * signed in with an owner, repo, and branch picked. Onboarding gates its
+ * Continue button on it so nobody leaves the step half-connected.
  */
-export function RepositorySetup() {
+export function RepositorySetup({
+  onSetupCompleteChange,
+}: {
+  onSetupCompleteChange?: (complete: boolean) => void;
+} = {}) {
   const strings = useMessages();
   const locale = useLocale();
   const [config, setConfig] = useState<RepositoryConfig>(getRepositoryConfig);
@@ -126,6 +135,14 @@ export function RepositorySetup() {
     Boolean((config.branch ?? '').trim()) &&
     githubAuth.tokenPresent;
   const remoteConfigReady = githubConfigReady;
+  const setupComplete = config.kind === 'local' || remoteConfigReady;
+
+  const notifySetupComplete = useEffectEvent((complete: boolean) => {
+    onSetupCompleteChange?.(complete);
+  });
+  useEffect(() => {
+    notifySetupComplete(setupComplete);
+  }, [setupComplete]);
 
   const {
     label: syncBadgeLabel,

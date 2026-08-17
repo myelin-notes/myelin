@@ -43,7 +43,11 @@ export function OnboardingFlow({
   const repository = useRepository();
   const tabController = useTabController();
   const [index, setIndex] = useState(0);
+  const [syncComplete, setSyncComplete] = useState(false);
   const step = STEPS[index];
+  // A half-connected GitHub repository would leave the app unable to sync, so
+  // the step holds Continue until the choice is actually usable.
+  const blocked = step === 'sync' && !syncComplete;
 
   const finish = useCallback(
     async (requestedTour: boolean) => {
@@ -97,7 +101,12 @@ export function OnboardingFlow({
           <div className="fade-in-0 slide-in-from-bottom-2 w-full max-w-xl animate-in duration-[150ms] ease-out">
             {step === 'welcome' && <WelcomeStep />}
             {step === 'privacy' && <PrivacyStep />}
-            {step === 'sync' && <SyncStep />}
+            {step === 'sync' && (
+              <SyncStep
+                complete={syncComplete}
+                onCompleteChange={setSyncComplete}
+              />
+            )}
             {step === 'tour' && <TourStep />}
           </div>
         </div>
@@ -128,7 +137,10 @@ export function OnboardingFlow({
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setIndex((current) => current + 1)}>
+              <Button
+                disabled={blocked}
+                onClick={() => setIndex((current) => current + 1)}
+              >
                 {step === 'welcome'
                   ? strings.onboarding.welcome.start
                   : strings.onboarding.continue}

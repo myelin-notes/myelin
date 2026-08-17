@@ -917,6 +917,8 @@ const es: typeof en = {
       description:
         'Tus notas se guardan en este dispositivo. Conecta un repositorio de GitHub para tener copia de seguridad y sincronizarlas entre equipos.',
       later: 'Puedes configurarlo más tarde en Ajustes.',
+      incomplete:
+        'Inicia sesión y elige un repositorio para continuar, o selecciona Local para decidirlo más tarde.',
     },
     tour: {
       eyebrow: 'Recorrido',

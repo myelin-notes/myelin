@@ -908,6 +908,8 @@ const en = {
       description:
         'Notes are stored on this device. Connect a GitHub repository to keep them backed up and in sync across machines.',
       later: 'You can set this up later in Settings.',
+      incomplete:
+        'Sign in and pick a repository to continue, or choose Local to decide later.',
     },
     tour: {
       eyebrow: 'Tour',

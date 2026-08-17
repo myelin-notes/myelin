@@ -888,6 +888,7 @@ const zhHans: typeof en = {
       description:
         '笔记默认保存在本设备上。连接 GitHub 仓库即可备份，并在多台设备之间同步。',
       later: '也可以稍后在设置中配置。',
+      incomplete: '请登录并选择一个仓库后继续，或选择「本地」稍后再决定。',
     },
     tour: {
       eyebrow: '导览',

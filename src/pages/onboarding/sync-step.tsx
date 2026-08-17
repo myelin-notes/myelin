@@ -2,7 +2,13 @@ import { useMessages } from '@/lib/i18n';
 import { RepositorySetup } from '@/pages/settings/repository-section/setup';
 import { StepHeader } from './step-header';
 
-export function SyncStep() {
+export function SyncStep({
+  complete,
+  onCompleteChange,
+}: {
+  complete: boolean;
+  onCompleteChange: (complete: boolean) => void;
+}) {
   const strings = useMessages();
 
   return (
@@ -12,9 +18,11 @@ export function SyncStep() {
         title={strings.onboarding.sync.title}
         description={strings.onboarding.sync.description}
       />
-      <RepositorySetup />
+      <RepositorySetup onSetupCompleteChange={onCompleteChange} />
       <p className="mt-4 text-text-muted text-xs">
-        {strings.onboarding.sync.later}
+        {complete
+          ? strings.onboarding.sync.later
+          : strings.onboarding.sync.incomplete}
       </p>
     </div>
   );
