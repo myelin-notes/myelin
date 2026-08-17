@@ -898,6 +898,52 @@ const zhHans: typeof en = {
       skip: '跳过导览',
       canvasName: '入门',
     },
+    starter: {
+      frameName: '基础功能',
+      title: '入门',
+      intro:
+        '这是一个页面框：一份存在于画布上的文档。你可以拖动它、调整大小，也可以在旁边再放一个。',
+      tipTitle: '按 / 插入内容',
+      tipBody:
+        '在页面框中按 `/` 会打开插入菜单：标题、表格、代码、公式、嵌入内容和日期。',
+      codeHeading: '代码块',
+      codeBody:
+        '用三个反引号加语言名包住一段内容即可。它是一个真正的编辑器，而不是加了底色的文字。',
+      mathHeading: '数学公式',
+      mathBody:
+        '像 $E = mc^2$ 这样的行内公式可以写在句子里。用 `$$` 包住一段内容，公式就会独占一行：',
+      diagramHeading: 'Mermaid 图表',
+      diagramBody: '标记为 `mermaid` 的代码块会渲染成图表。',
+      diagramNodes: {
+        idea: '想法',
+        note: '笔记',
+        canvas: '画布',
+      },
+      syntaxHeading: '值得一记',
+      syntaxColumns: {
+        type: '输入',
+        get: '得到',
+      },
+      syntaxRows: {
+        checklist: '待办清单',
+        callout: '提示框，就像上面那个',
+        math: '公式块',
+      },
+      linkTip: '连续输入两个左方括号即可开始链接其他笔记，自动补全会帮你完成。',
+      mediaHeading: '图片、PDF 和视频',
+      mediaBody:
+        '把文件拖到画布上，或者在页面中输入 / 并选择「嵌入」把它放进去。粘贴 YouTube 或 Vimeo 链接也一样，会变成播放器。',
+      checklistHeading: '动手试试',
+      checklistDone: '打开入门画布',
+      checklistTodo1: '自己添加一个页面框',
+      checklistTodo2: '在里面写点内容',
+      canvas: {
+        heading: '外面就是画布',
+        body: '文本框和 LaTeX 块可以自由摆放。拖动、缩放，或者把它们排列在页面旁边。',
+        latexCaption: '画布上的一个 LaTeX 块：',
+        toolbarHint: '其余内容都可以从工具栏顶部的 + 按钮插入。',
+      },
+    },
   },
   tour: {
     next: '下一步',

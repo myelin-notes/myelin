@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
 import { useMessages } from '@/lib/i18n';
 import { Logger } from '@/lib/logger';
-import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   isMac,
   isWindows,
@@ -16,6 +15,7 @@ import { useTabController } from '@/lib/tabs/context';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { PrivacyStep } from './privacy-step';
+import { createStarterCanvasFile } from './starter-canvas';
 import { SyncStep } from './sync-step';
 import { TourStep } from './tour-step';
 import { WelcomeStep } from './welcome-step';
@@ -55,7 +55,7 @@ export function OnboardingFlow({
             strings.onboarding.tour.canvasName,
             null,
           );
-          const id = await createBlankCanvasFile(repository, name, null);
+          const id = await createStarterCanvasFile(repository, name, strings);
           tabController.openTab({ type: 'canvas', id }, name);
         } catch (error) {
           // The tour walks the canvas toolbar, so without a canvas there is
@@ -69,7 +69,7 @@ export function OnboardingFlow({
       trackEvent('onboarding_completed', { tour_started: startTour });
       onDone({ startTour });
     },
-    [onDone, repository, strings.onboarding.tour.canvasName, tabController],
+    [onDone, repository, strings, tabController],
   );
 
   return (

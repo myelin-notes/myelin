@@ -918,6 +918,57 @@ const en = {
       skip: 'Skip the tour',
       canvasName: 'Getting started',
     },
+    // Content of the starter canvas the tour opens. Syntax inside these strings
+    // (`$E = mc^2$`, `![](…)`) is part of what the page demonstrates, so keep it
+    // literal when translating.
+    starter: {
+      frameName: 'The basics',
+      title: 'Getting started',
+      intro:
+        'This is a page frame: a document that lives on the canvas. Drag it, resize it, or drop another one beside it.',
+      tipTitle: 'Press / to insert',
+      tipBody:
+        'Inside a page frame, `/` opens the insert menu: headings, tables, code, math, embeds, dates.',
+      codeHeading: 'Code blocks',
+      codeBody:
+        'Fence a block with three backticks and a language. What you get is a real editor, not shaded text.',
+      mathHeading: 'Math',
+      mathBody:
+        'Inline math like $E = mc^2$ sits in a sentence. Fence a block with `$$` to give it a line of its own:',
+      diagramHeading: 'Mermaid diagrams',
+      diagramBody: 'A code block tagged `mermaid` renders as a diagram.',
+      diagramNodes: {
+        idea: 'Idea',
+        note: 'Note',
+        canvas: 'Canvas',
+      },
+      syntaxHeading: 'Worth knowing',
+      syntaxColumns: {
+        type: 'Type this',
+        get: 'To get',
+      },
+      syntaxRows: {
+        checklist: 'A checklist',
+        callout: 'A callout, like the one above',
+        math: 'A block of math',
+      },
+      linkTip:
+        'Two opening square brackets start a link to another note, and the autocomplete finishes it.',
+      mediaHeading: 'Images, PDFs and video',
+      mediaBody:
+        'Drag a file onto the canvas, or type / inside a page and choose Embed to place one there. Paste a YouTube or Vimeo link the same way and it becomes a player.',
+      checklistHeading: 'Your turn',
+      checklistDone: 'Open the starter canvas',
+      checklistTodo1: 'Add a page frame of your own',
+      checklistTodo2: 'Write something in it',
+      canvas: {
+        heading: 'Out here is the canvas',
+        body: 'Text boxes and LaTeX blocks float freely on it. Drag them around, scale them, or line them up beside a page.',
+        latexCaption: 'A LaTeX block on the canvas:',
+        toolbarHint:
+          'Everything else comes from the + button at the top of the toolbar.',
+      },
+    },
   },
   tour: {
     next: 'Next',

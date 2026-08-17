@@ -927,6 +927,55 @@ const es: typeof en = {
       skip: 'Omitir el recorrido',
       canvasName: 'Primeros pasos',
     },
+    starter: {
+      frameName: 'Lo básico',
+      title: 'Primeros pasos',
+      intro:
+        'Esto es un marco de página: un documento que vive en el lienzo. Arrástralo, cambia su tamaño o coloca otro al lado.',
+      tipTitle: 'Pulsa / para insertar',
+      tipBody:
+        'Dentro de un marco de página, `/` abre el menú de inserción: encabezados, tablas, código, fórmulas, incrustaciones y fechas.',
+      codeHeading: 'Bloques de código',
+      codeBody:
+        'Delimita un bloque con tres comillas invertidas y un lenguaje. Lo que obtienes es un editor de verdad, no texto sombreado.',
+      mathHeading: 'Fórmulas',
+      mathBody:
+        'Las fórmulas en línea como $E = mc^2$ caben en una frase. Delimita un bloque con `$$` para darle su propia línea:',
+      diagramHeading: 'Diagramas de Mermaid',
+      diagramBody:
+        'Un bloque de código etiquetado como `mermaid` se dibuja como un diagrama.',
+      diagramNodes: {
+        idea: 'Idea',
+        note: 'Nota',
+        canvas: 'Lienzo',
+      },
+      syntaxHeading: 'Vale la pena saberlo',
+      syntaxColumns: {
+        type: 'Escribe esto',
+        get: 'Para obtener',
+      },
+      syntaxRows: {
+        checklist: 'Una lista de tareas',
+        callout: 'Un aviso, como el de arriba',
+        math: 'Un bloque de fórmulas',
+      },
+      linkTip:
+        'Dos corchetes de apertura inician un enlace a otra nota, y el autocompletado lo termina.',
+      mediaHeading: 'Imágenes, PDF y vídeo',
+      mediaBody:
+        'Arrastra un archivo al lienzo, o escribe / dentro de una página y elige Incrustar para colocarlo ahí. Pega un enlace de YouTube o Vimeo de la misma forma y se convierte en un reproductor.',
+      checklistHeading: 'Te toca',
+      checklistDone: 'Abrir el lienzo de inicio',
+      checklistTodo1: 'Añadir tu propio marco de página',
+      checklistTodo2: 'Escribir algo en él',
+      canvas: {
+        heading: 'Aquí fuera está el lienzo',
+        body: 'Los cuadros de texto y los bloques de LaTeX flotan libremente. Arrástralos, escálalos o alinéalos junto a una página.',
+        latexCaption: 'Un bloque de LaTeX en el lienzo:',
+        toolbarHint:
+          'Todo lo demás sale del botón + en la parte superior de la barra de herramientas.',
+      },
+    },
   },
   tour: {
     next: 'Siguiente',
