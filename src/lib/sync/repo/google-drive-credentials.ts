@@ -1,8 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { fetch } from '@tauri-apps/plugin-http';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { GOOGLE_CLIENT_ID } from '@/lib/env';
+import {
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_ID_ANDROID,
+  GOOGLE_CLIENT_ID_IOS,
+  MOBILE_PLATFORM,
+} from '@/lib/env';
 import { Logger } from '@/lib/logger';
 import { createCredentialVault } from './credential-vault';
 
@@ -26,6 +32,27 @@ const REDIRECT_EVENT = 'oauth-loopback-redirect';
 /** Refresh this far before nominal expiry so an in-flight request never races it. */
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
 
+/**
+ * Google's iOS and Android OAuth client types reject the loopback redirect the
+ * desktop flow uses, so mobile comes back through a custom URI scheme instead.
+ * The scheme is the app identifier, which is also the iOS bundle id and the
+ * Android package name Google validates the client against — it must stay in
+ * sync with `identifier` and the deep-link scheme in `tauri.conf.json`.
+ */
+const MOBILE_REDIRECT_SCHEME = 'com.github.wintersteve25.myelin';
+const MOBILE_REDIRECT_URI = `${MOBILE_REDIRECT_SCHEME}:/oauth2redirect`;
+
+// Google issues a separate client per platform, and each only accepts the
+// redirect style of its own type.
+const CLIENT_IDS = {
+  ios: { value: GOOGLE_CLIENT_ID_IOS, envVar: 'VITE_GOOGLE_CLIENT_ID_IOS' },
+  android: {
+    value: GOOGLE_CLIENT_ID_ANDROID,
+    envVar: 'VITE_GOOGLE_CLIENT_ID_ANDROID',
+  },
+  desktop: { value: GOOGLE_CLIENT_ID, envVar: 'VITE_GOOGLE_CLIENT_ID' },
+} as const;
+
 interface StoredGoogleDriveToken {
   accessToken: string;
   refreshToken: string;
@@ -33,10 +60,11 @@ interface StoredGoogleDriveToken {
 }
 
 function getGoogleClientId(): string {
-  if (!GOOGLE_CLIENT_ID) {
-    throw new Error('VITE_GOOGLE_CLIENT_ID is not configured.');
+  const { value, envVar } = CLIENT_IDS[MOBILE_PLATFORM ?? 'desktop'];
+  if (!value) {
+    throw new Error(`${envVar} is not configured.`);
   }
-  return GOOGLE_CLIENT_ID;
+  return value;
 }
 
 function normalizeCredentialId(credentialId?: string | null): string {
@@ -275,9 +303,15 @@ export async function getGoogleDriveToken(
   return refresh;
 }
 
-/** Waits for the loopback listener to report the redirect's query string. */
-function waitForRedirect(signal?: AbortSignal): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
+/**
+ * Resolves with the first value `subscribe` emits, unsubscribing once it does
+ * or as soon as the sign-in is cancelled.
+ */
+function firstEmitted<T>(
+  subscribe: (emit: (value: T) => void) => Promise<() => void>,
+  signal?: AbortSignal,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
     let unlisten: (() => void) | null = null;
     let settled = false;
 
@@ -301,9 +335,7 @@ function waitForRedirect(signal?: AbortSignal): Promise<string> {
     }
     signal?.addEventListener('abort', onAbort);
 
-    listen<string>(REDIRECT_EVENT, (event) => {
-      finish(() => resolve(event.payload));
-    }).then(
+    subscribe((value) => finish(() => resolve(value))).then(
       (dispose) => {
         if (settled) {
           dispose();
@@ -316,7 +348,74 @@ function waitForRedirect(signal?: AbortSignal): Promise<string> {
   });
 }
 
+/** The channel Google's authorization response comes back through. */
+interface RedirectListener {
+  /** Sent as `redirect_uri`, and repeated in the token exchange. */
+  redirectUri: string;
+  /** Query parameters of the response, e.g. `code` and `state`. */
+  params: Promise<URLSearchParams>;
+  dispose: () => Promise<void>;
+}
+
+/**
+ * The port is part of `redirect_uri`, so the listener binds before the
+ * authorize URL can be built.
+ */
+async function listenOnLoopback(
+  signal?: AbortSignal,
+): Promise<RedirectListener> {
+  const port = await invoke<number>('oauth_loopback_start');
+  const query = firstEmitted<string>(
+    (emit) => listen<string>(REDIRECT_EVENT, (event) => emit(event.payload)),
+    signal,
+  );
+
+  return {
+    redirectUri: `http://127.0.0.1:${port}`,
+    params: query.then((value) => new URLSearchParams(value)),
+    dispose: () => invoke<void>('oauth_loopback_cancel'),
+  };
+}
+
+async function listenOnDeepLink(
+  signal?: AbortSignal,
+): Promise<RedirectListener> {
+  // Held separately from firstEmitted's own cleanup so a sign-in that fails
+  // before the redirect arrives — leaving that promise pending — still
+  // unsubscribes.
+  let unlisten: (() => void) | null = null;
+
+  const url = firstEmitted<string>(async (emit) => {
+    unlisten = await onOpenUrl((urls) => {
+      const redirect = urls.find((candidate) =>
+        candidate.startsWith(`${MOBILE_REDIRECT_SCHEME}:`),
+      );
+      if (redirect) {
+        emit(redirect);
+      }
+    });
+    return unlisten;
+  }, signal);
+
+  return {
+    redirectUri: MOBILE_REDIRECT_URI,
+    params: url.then((value) => new URL(value).searchParams),
+    dispose: async () => {
+      unlisten?.();
+    },
+  };
+}
+
+function listenForRedirect(signal?: AbortSignal): Promise<RedirectListener> {
+  return MOBILE_PLATFORM ? listenOnDeepLink(signal) : listenOnLoopback(signal);
+}
+
 export async function cancelGoogleDriveAuth(): Promise<void> {
+  if (MOBILE_PLATFORM) {
+    // The deep-link subscription is released when the sign-in promise settles,
+    // which the caller's abort signal already triggers.
+    return;
+  }
   await invoke('oauth_loopback_cancel');
 }
 
@@ -332,16 +431,14 @@ export async function startGoogleDriveAuth(
   const normalized = normalizeCredentialId(credentialId);
   const clientId = getGoogleClientId();
 
-  // The port is part of redirect_uri, so bind before building the authorize URL.
-  const port = await invoke<number>('oauth_loopback_start');
-  const redirectUri = `http://127.0.0.1:${port}`;
+  const listener = await listenForRedirect(options.signal);
   const verifier = randomBase64Url(32);
   const state = randomBase64Url(16);
 
   try {
     const authorizeUrl = `${GOOGLE_AUTHORIZE_URL}?${encodeFormBody({
       client_id: clientId,
-      redirect_uri: redirectUri,
+      redirect_uri: listener.redirectUri,
       response_type: 'code',
       scope: GOOGLE_DRIVE_SCOPE,
       code_challenge: await deriveCodeChallenge(verifier),
@@ -352,9 +449,8 @@ export async function startGoogleDriveAuth(
       prompt: 'consent',
     })}`;
 
-    const redirect = waitForRedirect(options.signal);
     await openUrl(authorizeUrl);
-    const params = new URLSearchParams(await redirect);
+    const params = await listener.params;
 
     const authError = params.get('error');
     if (authError) {
@@ -378,7 +474,7 @@ export async function startGoogleDriveAuth(
       client_id: clientId,
       code,
       code_verifier: verifier,
-      redirect_uri: redirectUri,
+      redirect_uri: listener.redirectUri,
       grant_type: 'authorization_code',
     });
     if (error) {
@@ -397,8 +493,8 @@ export async function startGoogleDriveAuth(
       toStoredToken(payload, payload.refresh_token),
     );
   } finally {
-    await cancelGoogleDriveAuth().catch(() => {
-      // best-effort teardown of the loopback listener
+    await listener.dispose().catch(() => {
+      // best-effort teardown of the redirect listener
     });
   }
 }

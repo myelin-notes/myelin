@@ -11,7 +11,6 @@ import { formatNumber } from '@myelin/editor/i18n/format';
 import { TimeAgo } from '@/components/time-ago';
 import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
-import { IS_MOBILE_BUILD } from '@/lib/env';
 import { type Messages, useLocale, useMessages } from '@/lib/i18n';
 import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
@@ -196,20 +195,15 @@ export function RepositorySection() {
           label={strings.settings.repository.kinds.github.label}
           description={strings.settings.repository.kinds.github.description}
         />
-        {/* Drive sign-in redirects to a loopback listener, which only desktop
-            OAuth clients accept; mobile needs a custom scheme and the
-            deep-link plugin, which is not installed yet. */}
-        {!IS_MOBILE_BUILD && (
-          <KindCard
-            selected={config.kind === 'google-drive'}
-            onSelect={() => handleKindChange('google-drive')}
-            icon={Cloud}
-            label={strings.settings.repository.kinds.googleDrive.label}
-            description={
-              strings.settings.repository.kinds.googleDrive.description
-            }
-          />
-        )}
+        <KindCard
+          selected={config.kind === 'google-drive'}
+          onSelect={() => handleKindChange('google-drive')}
+          icon={Cloud}
+          label={strings.settings.repository.kinds.googleDrive.label}
+          description={
+            strings.settings.repository.kinds.googleDrive.description
+          }
+        />
       </div>
 
       <div

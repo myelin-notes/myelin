@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Google Drive OAuth redirect delivered through the app's custom URI scheme",
+  "platforms": ["android", "iOS"],
+  "windows": ["*"],
+  "permissions": ["deep-link:default"]
+}

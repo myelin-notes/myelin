@@ -22,6 +22,9 @@ pub fn run() {
                 app.handle().plugin(tauri_plugin_process::init())?;
             }
 
+            #[cfg(mobile)]
+            app.handle().plugin(tauri_plugin_deep_link::init())?;
+
             let salt_path = app
                 .path()
                 .app_local_data_dir()
