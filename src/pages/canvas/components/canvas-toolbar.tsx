@@ -14,8 +14,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
 import { useMessages } from '@/lib/i18n';
-import { useCompactCanvasLayout } from '../hooks/use-compact-layout';
 
 interface CanvasToolbarProps {
   tools: ITool[];
@@ -56,9 +56,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 }: CanvasToolbarProps) {
   const strings = useMessages();
   const compact = useCompactCanvasLayout();
-  const optionsPresence = usePresence(
-    optionsVisible && hasOptions && !shelfOpen,
-  );
+  const optionsOpen = optionsVisible && hasOptions && !shelfOpen;
+  const optionsPresence = usePresence(optionsOpen);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
@@ -86,9 +85,27 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const dividerClass = compact
     ? 'mx-1 h-4 w-px bg-border-divider'
     : 'my-1 h-px w-4 bg-border-divider';
+  // 44px touch target on compact, against 36px for a cursor.
+  const buttonPadClass = compact ? 'p-3.5' : 'p-2.5';
 
   return (
     <TooltipProvider>
+      {/* Compact panels open over the canvas with no room left to click beside
+          them, so dismissing means tapping the canvas — which would start a
+          stroke. This swallows that tap. Sits below the toolbar's own z-100 so
+          the tools stay live while a panel is open. Shelf and insert close
+          themselves on an outside pointerdown; the options panel has no such
+          handler. */}
+      {compact && (optionsOpen || shelfOpen || insertOpen) && (
+        <div
+          className="fixed inset-0 z-[99]"
+          onPointerDown={() => {
+            if (optionsOpen) {
+              onToggleOptions();
+            }
+          }}
+        />
+      )}
       <div
         ref={toolbarRef}
         className={
@@ -116,7 +133,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               data-insert-trigger
               data-tour="canvas-insert"
               aria-label={strings.canvas.toolbar.insert}
-              className={`shrink-0 cursor-pointer rounded-lg p-2.5 transition-colors ${
+              className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
                 insertOpen
                   ? 'bg-accent-dark text-text-on-dark'
                   : 'bg-transparent text-text-secondary hover:bg-hover-tint'
@@ -144,7 +161,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                     toolButtonRefs.current[index] = el;
                   }}
                   aria-label={tool.label}
-                  className={`group relative shrink-0 cursor-pointer rounded-lg p-2.5 transition-colors ${
+                  className={`group relative shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
                     isActive
                       ? 'bg-accent-dark text-text-on-dark'
                       : 'bg-transparent text-text-secondary hover:bg-hover-tint'
@@ -195,7 +212,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                 shelfButtonRef.current = el;
               }}
               aria-label={strings.canvas.toolbar.customizeWheel}
-              className={`shrink-0 cursor-pointer rounded-lg p-2.5 transition-colors ${
+              className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
                 shelfOpen
                   ? 'bg-accent-dark text-text-on-dark'
                   : 'bg-transparent text-text-secondary hover:bg-hover-tint'

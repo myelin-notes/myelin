@@ -6,6 +6,7 @@ import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { FontSizeField } from '@/components/font-size-field';
+import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
 import { useCustomColors } from '@/lib/custom-colors';
 
 interface ToolOptionsPanelProps {
@@ -30,6 +31,9 @@ function FontPicker({
   onChange: (family: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // On compact the whole panel sits just above the bottom bar, so a list
+  // dropping below the button would land off the bottom of the screen.
+  const dropUp = useCompactCanvasLayout();
   const containerRef = useRef<HTMLDivElement>(null);
   const handleWindowPointerDown = useEffectEvent((event: PointerEvent) => {
     if (!containerRef.current?.contains(event.target as Node)) {
@@ -68,7 +72,11 @@ function FontPicker({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1.5 max-h-60 w-52 overflow-y-auto rounded-xl bg-card py-1 shadow-ambient">
+        <div
+          className={`absolute left-0 z-50 max-h-60 w-52 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl bg-card py-1 shadow-ambient ${
+            dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          }`}
+        >
           {fonts.map((font) => (
             <button
               key={font.family}
