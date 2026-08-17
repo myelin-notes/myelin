@@ -353,6 +353,10 @@ const en = {
           label: 'GitHub',
           description: 'Sync to a private GitHub repository',
         },
+        googleDrive: {
+          label: 'Google Drive',
+          description: 'Sync to a folder in your Google Drive',
+        },
       },
       auth: {
         title: 'Repository Authentication',
@@ -387,6 +391,7 @@ const en = {
         queuedChanges: 'Queued changes',
         lastSync: 'Last sync',
         remoteRepository: 'Remote Repository',
+        driveFolder: 'Drive Folder',
         status: {
           setupRequired: {
             label: 'Setup required',
@@ -439,6 +444,11 @@ const en = {
           loading: 'Loading branches...',
           error: 'Failed to load branches.',
           empty: 'No branches',
+        },
+        folder: {
+          label: 'Drive folder name',
+          placeholder: 'Myelin',
+          error: 'Failed to open the Drive folder.',
         },
       },
     },

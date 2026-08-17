@@ -345,6 +345,10 @@ const zhHans: typeof en = {
           label: 'GitHub',
           description: '同步到私有 GitHub 仓库',
         },
+        googleDrive: {
+          label: 'Google 云端硬盘',
+          description: '同步到你的 Google 云端硬盘中的文件夹',
+        },
       },
       auth: {
         title: '仓库身份验证',
@@ -379,6 +383,7 @@ const zhHans: typeof en = {
         queuedChanges: '排队中的更改',
         lastSync: '上次同步',
         remoteRepository: '远程仓库',
+        driveFolder: '云端硬盘文件夹',
         status: {
           setupRequired: {
             label: '需要设置',
@@ -428,6 +433,11 @@ const zhHans: typeof en = {
           loading: '正在加载分支…',
           error: '无法加载分支',
           empty: '没有分支',
+        },
+        folder: {
+          label: '云端硬盘文件夹名称',
+          placeholder: 'Myelin',
+          error: '无法打开云端硬盘文件夹。',
         },
       },
     },

@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, Github, HardDrive, LogOut, X } from 'lucide-react';
+import {
+  Cloud,
+  ExternalLink,
+  Github,
+  HardDrive,
+  LogOut,
+  X,
+} from 'lucide-react';
 import { formatNumber } from '@myelin/editor/i18n/format';
 import { TimeAgo } from '@/components/time-ago';
 import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
+import { IS_MOBILE_BUILD } from '@/lib/env';
 import { type Messages, useLocale, useMessages } from '@/lib/i18n';
 import {
+  DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   getRepositoryConfig,
   type RepositoryConfig,
   type RepositoryStatus,
@@ -17,12 +26,15 @@ import { cn } from '@/lib/utils';
 import { AuthStatusBadge } from './auth-status-badge';
 import { BranchField } from './branch-field';
 import { DeviceCodeDisplay } from './device-code-display';
+import { FolderField } from './folder-field';
 import { KindCard } from './kind-card';
 import { OwnerField } from './owner-field';
 import { RepoField } from './repo-field';
 import { SyncStatusBadge, type SyncStatusTone } from './sync-status-badge';
 import { useGitHubAuth } from './use-github-auth';
 import { useGitHubSelectors } from './use-github-selectors';
+import { useGoogleDriveAuth } from './use-google-drive-auth';
+import { useGoogleDriveFolder } from './use-google-drive-folder';
 
 type RepoKind = RepositoryConfig['kind'];
 
@@ -47,8 +59,19 @@ export function RepositorySection() {
     config,
   });
 
-  const remoteAuth = githubAuth;
-  const RemoteAuthIcon = Github;
+  const googleDriveCredentialId =
+    config.kind === 'google-drive'
+      ? config.credentialId.trim() || 'default'
+      : 'default';
+  const googleDriveAuth = useGoogleDriveAuth(googleDriveCredentialId);
+  const driveFolder = useGoogleDriveFolder({
+    config,
+    tokenPresent: googleDriveAuth.tokenPresent,
+  });
+
+  const isDrive = config.kind === 'google-drive';
+  const remoteAuth = isDrive ? googleDriveAuth : githubAuth;
+  const RemoteAuthIcon = isDrive ? Cloud : Github;
 
   const handleKindChange = (kind: RepoKind) => {
     if (kind !== config.kind) {
@@ -70,6 +93,20 @@ export function RepositorySection() {
         repo: config.kind === 'github' ? config.repo : '',
         branch: config.kind === 'github' ? config.branch : 'main',
         credentialId: config.kind === 'github' ? githubCredentialId : 'default',
+      });
+      return;
+    }
+
+    if (kind === 'google-drive') {
+      setRepositoryConfig({
+        kind: 'google-drive',
+        folderName:
+          config.kind === 'google-drive'
+            ? config.folderName
+            : DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
+        folderId: config.kind === 'google-drive' ? config.folderId : '',
+        credentialId:
+          config.kind === 'google-drive' ? googleDriveCredentialId : 'default',
       });
       return;
     }
@@ -120,7 +157,12 @@ export function RepositorySection() {
     Boolean(config.repo.trim()) &&
     Boolean((config.branch ?? '').trim()) &&
     githubAuth.tokenPresent;
-  const remoteConfigReady = githubConfigReady;
+  const googleDriveConfigReady =
+    config.kind === 'google-drive' &&
+    Boolean(config.folderName.trim()) &&
+    Boolean(config.folderId.trim()) &&
+    googleDriveAuth.tokenPresent;
+  const remoteConfigReady = githubConfigReady || googleDriveConfigReady;
 
   const {
     label: syncBadgeLabel,
@@ -154,6 +196,20 @@ export function RepositorySection() {
           label={strings.settings.repository.kinds.github.label}
           description={strings.settings.repository.kinds.github.description}
         />
+        {/* Drive sign-in redirects to a loopback listener, which only desktop
+            OAuth clients accept; mobile needs a custom scheme and the
+            deep-link plugin, which is not installed yet. */}
+        {!IS_MOBILE_BUILD && (
+          <KindCard
+            selected={config.kind === 'google-drive'}
+            onSelect={() => handleKindChange('google-drive')}
+            icon={Cloud}
+            label={strings.settings.repository.kinds.googleDrive.label}
+            description={
+              strings.settings.repository.kinds.googleDrive.description
+            }
+          />
+        )}
       </div>
 
       <div
@@ -300,6 +356,30 @@ export function RepositorySection() {
                     {selectors.error && (
                       <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
                         {selectors.error}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {config.kind === 'google-drive' && (
+                  <>
+                    <div>
+                      <p className="mb-1.5 text-[10px] text-text-muted uppercase tracking-widest">
+                        {strings.settings.repository.sync.driveFolder}
+                      </p>
+                      <div className="rounded-xl bg-input/40 p-2 ring-1 ring-border-subtle/70">
+                        <FolderField
+                          value={config.folderName}
+                          disabled={!googleDriveAuth.tokenPresent}
+                          resolving={driveFolder.resolving}
+                          onCommit={driveFolder.setFolderName}
+                        />
+                      </div>
+                    </div>
+
+                    {driveFolder.error && (
+                      <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                        {driveFolder.error}
                       </p>
                     )}
                   </>

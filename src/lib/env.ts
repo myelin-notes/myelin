@@ -17,6 +17,12 @@
 //
 // Runtime Vite env vars:
 //   - VITE_GITHUB_CLIENT_ID — GitHub OAuth client id
+//   - VITE_GOOGLE_CLIENT_ID — Google OAuth client id for Drive sync. Google
+//     issues OAuth clients per platform, so this must be the id of the
+//     *Desktop app* client (only those accept the loopback redirect the PKCE
+//     flow uses). iOS/Android clients redirect through a custom scheme and need
+//     the deep-link plugin, which is not installed — Drive sync is hidden on
+//     mobile builds. No client secret is used or needed: PKCE replaces it.
 //   - VITE_LIVE_DISCOVERY_URL — Cloudflare Worker URL for automatic live sync
 //     peer discovery
 //   - VITE_POSTHOG_KEY  — PostHog project API key
@@ -34,6 +40,13 @@ export const IS_MOBILE_BUILD = __MOBILE_BUILD__;
 
 export const GITHUB_CLIENT_ID = (
   import.meta.env.VITE_GITHUB_CLIENT_ID ?? 'Ov23lio3GBRJhHIcx6ow'
+).trim();
+
+// No production default yet — the Cloud project's Desktop client is being
+// created separately. Until it is set, Google Drive sign-in reports itself as
+// unavailable instead of failing mid-flow.
+export const GOOGLE_CLIENT_ID = (
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
 ).trim();
 
 export const LIVE_DISCOVERY_URL = (

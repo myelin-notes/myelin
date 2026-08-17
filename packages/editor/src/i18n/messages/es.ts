@@ -357,6 +357,10 @@ const es: typeof en = {
           label: 'GitHub',
           description: 'Sincronizar con un repositorio privado de GitHub',
         },
+        googleDrive: {
+          label: 'Google Drive',
+          description: 'Sincronizar con una carpeta de tu Google Drive',
+        },
       },
       auth: {
         title: 'Autenticación del repositorio',
@@ -392,6 +396,7 @@ const es: typeof en = {
         queuedChanges: 'Cambios en cola',
         lastSync: 'Última sincronización',
         remoteRepository: 'Repositorio remoto',
+        driveFolder: 'Carpeta de Drive',
         status: {
           setupRequired: {
             label: 'Configuración requerida',
@@ -445,6 +450,11 @@ const es: typeof en = {
           loading: 'Cargando ramas...',
           error: 'Error al cargar las ramas.',
           empty: 'No hay ramas',
+        },
+        folder: {
+          label: 'Nombre de la carpeta de Drive',
+          placeholder: 'Myelin',
+          error: 'Error al abrir la carpeta de Drive.',
         },
       },
     },

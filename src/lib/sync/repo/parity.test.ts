@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createCanvasNoteState,
   createNoteState,
+  getRepositoryTestGoogleDriveApi,
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import type { BaseRepository } from './base';
 import { GitHubRepository } from './github';
+import { GoogleDriveRepository } from './google-drive';
 import { LocalRepository } from './local';
 
 const repositoryCases: {
@@ -24,6 +26,14 @@ const repositoryCases: {
         owner: 'myelin',
         repo: label,
         branch: 'main',
+        credentialId: 'test-credential',
+      }),
+  },
+  {
+    name: 'google-drive',
+    createRepository: () =>
+      new GoogleDriveRepository({
+        folderId: getRepositoryTestGoogleDriveApi().rootFolderId,
         credentialId: 'test-credential',
       }),
   },
