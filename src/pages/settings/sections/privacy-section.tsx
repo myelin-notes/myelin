@@ -10,7 +10,7 @@ import { ToggleRow } from '../components/toggle-row';
  * guideline 5.1.1(i) requires it to be reachable from inside the app, not just
  * from the store listing, which is what the row below the toggle is for.
  */
-const PRIVACY_POLICY_URL = 'https://trymyelin.app/privacy';
+export const PRIVACY_POLICY_URL = 'https://trymyelin.app/privacy';
 
 export function PrivacySection() {
   const strings = useMessages();

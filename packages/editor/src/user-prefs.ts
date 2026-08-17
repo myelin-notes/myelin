@@ -53,7 +53,8 @@ const PREFS = {
   mcpEnabled: pref<boolean>('mcp-enabled', false),
   mcpPort: pref<number>('mcp-port', 3846),
   mcpAllowDirectWrites: pref<boolean>('mcp-allow-direct-writes', false),
-  analyticsEnabled: pref<boolean>('analytics-enabled', true),
+  analyticsEnabled: pref<boolean>('analytics-enabled', false),
+  onboardingCompleted: pref<boolean>('onboarding-completed', false),
   language: pref<string>('language', 'en'),
   repositoryConfig: pref<RepositoryConfig>('repository-config', {
     kind: 'local',

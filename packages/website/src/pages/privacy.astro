@@ -16,7 +16,7 @@
 // no locale advertises a translation that does not exist.
 import Base from '../layouts/Base.astro';
 
-const updated = '22 July 2026';
+const updated = '17 August 2026';
 
 const wrap = 'mx-auto max-w-3xl px-6 lg:px-10';
 const h2 =
@@ -136,7 +136,9 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
       <h2 class={h2}>Analytics and error reports in the app</h2>
       <p class={p}>
         The app can send two kinds of data, both governed by a single switch in
-        Settings, under Privacy.
+        Settings, under Privacy. The switch starts off. First-run setup asks you
+        about it, and until you turn it on the app does not contact our
+        analytics provider at all.
       </p>
       <ul class={list}>
         <li>
