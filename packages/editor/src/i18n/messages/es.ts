@@ -895,6 +895,134 @@ const es: typeof en = {
   dialogs: {
     closeSrOnly: 'Cerrar',
   },
+  onboarding: {
+    skip: 'Omitir configuración',
+    back: 'Atrás',
+    continue: 'Continuar',
+    finish: 'Finalizar',
+    stepLabel: (current: number, total: number) =>
+      `Paso ${current} de ${total}`,
+    welcome: {
+      eyebrow: 'Bienvenido',
+      title: 'Myelin Notes',
+      description:
+        'Un lienzo infinito para escritura a mano, texto y todo lo que hay entre medias. Cuatro preguntas rápidas y listo.',
+      language: 'Idioma',
+      start: 'Empezar',
+    },
+    privacy: {
+      eyebrow: 'Privacidad',
+      title: 'Ayuda a mejorar Myelin Notes',
+      description:
+        'Las analíticas están desactivadas hasta que las actives aquí. Puedes cambiarlo cuando quieras en Ajustes.',
+      collected:
+        'Qué se envía: qué funciones se usan, la versión de la app e informes de errores.',
+      notCollected:
+        'Qué nunca se envía: tus notas, su contenido, los nombres de archivo ni tu escritura a mano.',
+      policy: 'Leer la política de privacidad',
+    },
+    sync: {
+      eyebrow: 'Sincronización',
+      title: '¿Dónde quieres guardar tus notas?',
+      description:
+        'Tus notas se guardan en este dispositivo. Conecta un repositorio de GitHub o Google Drive para tener copia de seguridad y sincronizarlas entre equipos.',
+      later: 'Puedes configurarlo más tarde en Ajustes.',
+      incomplete:
+        'Inicia sesión y termina de elegir dónde se guardan tus notas para continuar, o selecciona Local para decidirlo más tarde.',
+    },
+    tour: {
+      eyebrow: 'Recorrido',
+      title: '¿Quieres un recorrido rápido?',
+      description:
+        'Unas cuantas paradas por la app: tu biblioteca, la búsqueda, la barra de herramientas y cómo insertar cosas. Abre un lienzo en blanco para probar.',
+      start: 'Muéstrame la app',
+      skip: 'Omitir el recorrido',
+      canvasName: 'Primeros pasos',
+    },
+    starter: {
+      frameName: 'Lo básico',
+      title: 'Primeros pasos',
+      intro:
+        'Esto es un marco de página: un documento que vive en el lienzo. Arrástralo, cambia su tamaño o coloca otro al lado.',
+      tipTitle: 'Pulsa / para insertar',
+      tipBody:
+        'Dentro de un marco de página, `/` abre el menú de inserción: encabezados, tablas, código, fórmulas, incrustaciones y fechas.',
+      codeHeading: 'Bloques de código',
+      codeBody:
+        'Delimita un bloque con tres comillas invertidas y un lenguaje. Lo que obtienes es un editor de verdad, no texto sombreado.',
+      mathHeading: 'Fórmulas',
+      mathBody:
+        'Las fórmulas en línea como $E = mc^2$ caben en una frase. Delimita un bloque con `$$` para darle su propia línea:',
+      diagramHeading: 'Diagramas de Mermaid',
+      diagramBody:
+        'Un bloque de código etiquetado como `mermaid` se dibuja como un diagrama.',
+      diagramNodes: {
+        idea: 'Idea',
+        note: 'Nota',
+        canvas: 'Lienzo',
+      },
+      syntaxHeading: 'Vale la pena saberlo',
+      syntaxColumns: {
+        type: 'Escribe esto',
+        get: 'Para obtener',
+      },
+      syntaxRows: {
+        checklist: 'Una lista de tareas',
+        callout: 'Un aviso, como el de arriba',
+        math: 'Un bloque de fórmulas',
+      },
+      linkTip:
+        'Dos corchetes de apertura inician un enlace a otra nota, y el autocompletado lo termina.',
+      mediaHeading: 'Imágenes, PDF y vídeo',
+      mediaBody:
+        'Arrastra un archivo al lienzo, o escribe / dentro de una página y elige Incrustar para colocarlo ahí. Pega un enlace de YouTube o Vimeo de la misma forma y se convierte en un reproductor.',
+      checklistHeading: 'Te toca',
+      checklistDone: 'Abrir el lienzo de inicio',
+      checklistTodo1: 'Añadir tu propio marco de página',
+      checklistTodo2: 'Escribir algo en él',
+      canvas: {
+        heading: 'Aquí fuera está el lienzo',
+        body: 'Los cuadros de texto y los bloques de LaTeX flotan libremente. Arrástralos, escálalos o alinéalos junto a una página.',
+        latexCaption: 'Un bloque de LaTeX en el lienzo:',
+        toolbarHint:
+          'Todo lo demás sale del botón + en la parte superior de la barra de herramientas.',
+      },
+    },
+  },
+  tour: {
+    next: 'Siguiente',
+    back: 'Atrás',
+    done: 'Listo',
+    skip: 'Omitir recorrido',
+    progress: (current: number, total: number) => `${current} de ${total}`,
+    steps: {
+      explorer: {
+        title: 'Tu biblioteca',
+        description:
+          'Aquí vive cada nota. Haz clic derecho en una fila para renombrarla, moverla o etiquetarla.',
+      },
+      search: {
+        title: 'Encuentra lo que sea',
+        description:
+          'Busca por texto o cambia a búsqueda semántica para encontrar notas por significado en lugar de palabras exactas.',
+      },
+      tools: {
+        title: 'La barra de herramientas',
+        description:
+          'Lápiz, marcador, borrador, texto y selección. Pasa el cursor por una herramienta para ver su atajo.',
+      },
+      insert: {
+        title: 'Añade contenido',
+        description:
+          'Añade páginas, imágenes, PDF, audio y LaTeX directamente al lienzo.',
+      },
+      settings: {
+        title: 'Ajustes y sincronización',
+        description:
+          'El tema, el idioma, la privacidad y la conexión con tu repositorio están aquí.',
+      },
+    },
+  },
   shutdown: {
     title: 'Guardando cambios…',
     description:

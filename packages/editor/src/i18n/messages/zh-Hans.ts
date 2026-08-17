@@ -869,6 +869,126 @@ const zhHans: typeof en = {
   dialogs: {
     closeSrOnly: '关闭',
   },
+  onboarding: {
+    skip: '跳过设置',
+    back: '上一步',
+    continue: '继续',
+    finish: '完成',
+    stepLabel: (current: number, total: number) =>
+      `第 ${current} 步，共 ${total} 步`,
+    welcome: {
+      eyebrow: '欢迎',
+      title: 'Myelin Notes',
+      description:
+        '一块无限画布，可以手写、输入文字，以及两者之间的一切。回答四个问题即可开始。',
+      language: '语言',
+      start: '开始使用',
+    },
+    privacy: {
+      eyebrow: '隐私',
+      title: '帮助改进 Myelin Notes',
+      description: '在你打开之前不会收集任何分析数据。随时可以在设置中更改。',
+      collected: '会发送的内容：使用了哪些功能、应用版本以及崩溃报告。',
+      notCollected: '绝不会发送的内容：你的笔记、笔记内容、文件名或手写内容。',
+      policy: '阅读隐私政策',
+    },
+    sync: {
+      eyebrow: '同步',
+      title: '笔记要保存在哪里？',
+      description:
+        '笔记默认保存在本设备上。连接 GitHub 仓库或 Google 云端硬盘即可备份，并在多台设备之间同步。',
+      later: '也可以稍后在设置中配置。',
+      incomplete:
+        '请登录并选好笔记的存放位置后继续，或选择「本地」稍后再决定。',
+    },
+    tour: {
+      eyebrow: '导览',
+      title: '要快速了解一下吗？',
+      description:
+        '带你看几个地方：笔记库、搜索、工具栏，以及如何插入内容。会打开一块空白画布供你试用。',
+      start: '带我看看',
+      skip: '跳过导览',
+      canvasName: '入门',
+    },
+    starter: {
+      frameName: '基础功能',
+      title: '入门',
+      intro:
+        '这是一个页面框：一份存在于画布上的文档。你可以拖动它、调整大小，也可以在旁边再放一个。',
+      tipTitle: '按 / 插入内容',
+      tipBody:
+        '在页面框中按 `/` 会打开插入菜单：标题、表格、代码、公式、嵌入内容和日期。',
+      codeHeading: '代码块',
+      codeBody:
+        '用三个反引号加语言名包住一段内容即可。它是一个真正的编辑器，而不是加了底色的文字。',
+      mathHeading: '数学公式',
+      mathBody:
+        '像 $E = mc^2$ 这样的行内公式可以写在句子里。用 `$$` 包住一段内容，公式就会独占一行：',
+      diagramHeading: 'Mermaid 图表',
+      diagramBody: '标记为 `mermaid` 的代码块会渲染成图表。',
+      diagramNodes: {
+        idea: '想法',
+        note: '笔记',
+        canvas: '画布',
+      },
+      syntaxHeading: '值得一记',
+      syntaxColumns: {
+        type: '输入',
+        get: '得到',
+      },
+      syntaxRows: {
+        checklist: '待办清单',
+        callout: '提示框，就像上面那个',
+        math: '公式块',
+      },
+      linkTip: '连续输入两个左方括号即可开始链接其他笔记，自动补全会帮你完成。',
+      mediaHeading: '图片、PDF 和视频',
+      mediaBody:
+        '把文件拖到画布上，或者在页面中输入 / 并选择「嵌入」把它放进去。粘贴 YouTube 或 Vimeo 链接也一样，会变成播放器。',
+      checklistHeading: '动手试试',
+      checklistDone: '打开入门画布',
+      checklistTodo1: '自己添加一个页面框',
+      checklistTodo2: '在里面写点内容',
+      canvas: {
+        heading: '外面就是画布',
+        body: '文本框和 LaTeX 块可以自由摆放。拖动、缩放，或者把它们排列在页面旁边。',
+        latexCaption: '画布上的一个 LaTeX 块：',
+        toolbarHint: '其余内容都可以从工具栏顶部的 + 按钮插入。',
+      },
+    },
+  },
+  tour: {
+    next: '下一步',
+    back: '上一步',
+    done: '完成',
+    skip: '跳过导览',
+    progress: (current: number, total: number) => `${current} / ${total}`,
+    steps: {
+      explorer: {
+        title: '你的笔记库',
+        description:
+          '所有笔记都在这里。右键点击某一行可重命名、移动或添加标签。',
+      },
+      search: {
+        title: '快速查找',
+        description:
+          '可以按文字搜索，也可以切换到语义搜索，按含义而非精确词语查找笔记。',
+      },
+      tools: {
+        title: '工具栏',
+        description:
+          '钢笔、荧光笔、橡皮擦、文字和选择工具。悬停在工具上可查看快捷键。',
+      },
+      insert: {
+        title: '插入内容',
+        description: '可以直接向画布中添加页面、图片、PDF、音频和 LaTeX。',
+      },
+      settings: {
+        title: '设置与同步',
+        description: '主题、语言、隐私以及仓库连接都在这里。',
+      },
+    },
+  },
   shutdown: {
     title: '正在保存更改…',
     description: '退出前正在将待同步的更改推送到仓库。',
