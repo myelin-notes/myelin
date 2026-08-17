@@ -10,6 +10,7 @@ import {
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { NODES_DELETED_EVENT, type NodesDeletedDetail } from '@/lib/events';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { createWindowStateWithTab, TabStateController } from './controller';
 import { listenForTabDrops } from './multi-window';
 import type { PaneId, Tab, WindowState } from './types';
@@ -36,17 +37,19 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
     const closeWindow = () => {
       void getCurrentWebviewWindow().close();
     };
+    const options = { singleTab: IS_PHONE_BUILD };
     const initTab = readInitTab();
     if (initTab) {
       // Tabs torn off into their own window close that window when emptied.
       return new TabStateController(
         createWindowStateWithTab(initTab),
         closeWindow,
+        options,
       );
     }
     // The main window never closes from emptying its tabs; it falls back to an
     // empty home pane (recents + welcome).
-    return new TabStateController(undefined);
+    return new TabStateController(undefined, undefined, options);
   }, []);
 
   useTabCloseShortcut(controller);

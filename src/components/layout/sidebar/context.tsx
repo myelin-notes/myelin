@@ -9,6 +9,7 @@ import {
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { IS_MOBILE_BUILD } from '@/lib/env';
 import { UserPrefs } from '@/lib/user-prefs';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 export const SIDEBAR_MIN_WIDTH = 220;
 export const SIDEBAR_MAX_WIDTH = 480;
@@ -35,6 +36,12 @@ interface SidebarContextValue {
    * layout, and the library page itself reflows down to a single column.
    */
   mobileLayout: boolean;
+  /**
+   * Mobile build on a phone-sized screen. Narrower than {@link mobileLayout}:
+   * the tab strip is replaced by the active document's title, and the tab
+   * controller keeps a single tab per pane to match.
+   */
+  phoneLayout: boolean;
   /** Compact layout: the overlay drawer is open. */
   drawerOpen: boolean;
   /** Flips visibility for the current mode: drawer when compact, else column. */
@@ -74,6 +81,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       collapsed,
       isCompact,
       mobileLayout: IS_MOBILE_BUILD,
+      phoneLayout: IS_PHONE_BUILD,
       drawerOpen,
       toggle,
       close,

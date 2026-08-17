@@ -105,6 +105,7 @@ export const TabBar = memo(function TabBar({
     collapsed,
     isCompact,
     mobileLayout,
+    phoneLayout,
     drawerOpen,
     toggle: toggleSidebar,
   } = useSidebar();
@@ -115,6 +116,8 @@ export const TabBar = memo(function TabBar({
   // library home instead of toggling one. It's "active" while the pane is
   // already showing home (no active tab).
   const showingHome = pane.activeTabId === '';
+  const activeTab =
+    pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
   const showLibrary = useCallback(() => {
     controller.showHome(pane.id);
   }, [controller, pane.id]);
@@ -260,26 +263,38 @@ export const TabBar = memo(function TabBar({
         </button>
       )}
 
-      <div
-        className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
-        style={{ scrollbarWidth: 'none' }}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {pane.tabs.map((tab, i) => (
-          <TabItem
-            key={tab.id}
-            tab={tab}
-            isActive={tab.id === pane.activeTabId}
-            isDragging={tab.id === dragTabId}
-            paneId={pane.id}
-            showDropIndicator={dropIndex === i}
-            onDragStateChange={setDragTabId}
-          />
-        ))}
-        {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
-      </div>
+      {/* Phones hold one document per pane (see TabControllerOptions.singleTab),
+          so there's nothing to switch between — the strip becomes the active
+          document's title. It also drops tab drag/reorder and the split context
+          menu, none of which work by touch anyway. */}
+      {phoneLayout ? (
+        <div className="mb-1 flex h-6 min-w-0 flex-1 items-center justify-center px-2">
+          <span className="truncate font-medium text-[11px] text-text-primary">
+            {activeTab ? tabTitle(activeTab, strings) : strings.library.title}
+          </span>
+        </div>
+      ) : (
+        <div
+          className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
+          style={{ scrollbarWidth: 'none' }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {pane.tabs.map((tab, i) => (
+            <TabItem
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === pane.activeTabId}
+              isDragging={tab.id === dragTabId}
+              paneId={pane.id}
+              showDropIndicator={dropIndex === i}
+              onDragStateChange={setDragTabId}
+            />
+          ))}
+          {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
+        </div>
+      )}
 
       {/* Kept outside the scroll strip so it stays beside the tabs and never
           scrolls off when they overflow. */}
@@ -292,7 +307,7 @@ export const TabBar = memo(function TabBar({
         <Plus className="size-3.5" />
       </button>
 
-      <div className="flex-1 self-stretch" {...dragRegion} />
+      {!phoneLayout && <div className="flex-1 self-stretch" {...dragRegion} />}
 
       {/* Frameless Windows has no native title bar, so the top-right pane's
           bar carries the window controls (sits right of the utility buttons). */}

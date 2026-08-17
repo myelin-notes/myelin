@@ -345,19 +345,34 @@ export function createWindowStateWithTab(tab: Tab): WindowState {
   };
 }
 
+export interface TabControllerOptions {
+  /**
+   * Keep at most one tab per pane: opening a document replaces the pane's
+   * current tab instead of stacking beside it. Set on phone layouts, which have
+   * no tab strip to switch or close with.
+   */
+  singleTab?: boolean;
+}
+
 export class TabStateController {
   private state: WindowState;
   private readonly listeners = new Set<() => void>();
   private readonly onEmpty?: () => void;
+  private readonly singleTab: boolean;
 
   // `onEmpty` runs when the last pane is closed, i.e. the window has no tabs
   // left. The window layer uses it to close the native window. Without it, the
   // window falls back to a fresh default state (used by tests).
-  constructor(initialState?: WindowState, onEmpty?: () => void) {
+  constructor(
+    initialState?: WindowState,
+    onEmpty?: () => void,
+    options?: TabControllerOptions,
+  ) {
     this.state = initialState
       ? normalizeWindowState(initialState)
       : createDefaultWindowState();
     this.onEmpty = onEmpty;
+    this.singleTab = options?.singleTab ?? false;
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -431,9 +446,11 @@ export class TabStateController {
       (candidate) => candidate.id === pane.activeTabId,
     );
     const insertIndex = activeIndex === -1 ? pane.tabs.length : activeIndex + 1;
+    // Single-tab panes show one document at a time, so the new tab takes the
+    // pane over rather than joining a strip the user can't see.
     const nextPane: PaneNode = {
       ...pane,
-      tabs: insertAt(pane.tabs, tab, insertIndex),
+      tabs: this.singleTab ? [tab] : insertAt(pane.tabs, tab, insertIndex),
       activeTabId: tab.id,
     };
 
