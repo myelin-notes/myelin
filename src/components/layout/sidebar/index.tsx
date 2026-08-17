@@ -195,6 +195,7 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
         </button>
         <button
           type="button"
+          data-tour="sidebar-settings"
           onClick={openSettings}
           aria-label={strings.tabBar.settings}
           title={strings.tabBar.settings}
@@ -205,7 +206,10 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
       </header>
 
       <div className="px-2 pb-2">
-        <div className="group flex items-center gap-1 rounded-xl bg-card/75 px-1.5 py-1 ring-1 ring-border-subtle/70 transition-colors duration-150 focus-within:bg-card focus-within:ring-accent-dark/15 hover:bg-card">
+        <div
+          data-tour="sidebar-search"
+          className="group flex items-center gap-1 rounded-xl bg-card/75 px-1.5 py-1 ring-1 ring-border-subtle/70 transition-colors duration-150 focus-within:bg-card focus-within:ring-accent-dark/15 hover:bg-card"
+        >
           <span className="flex size-6 shrink-0 items-center justify-center text-text-muted group-focus-within:text-accent-dark">
             <Search className="size-3.5" />
           </span>
@@ -299,7 +303,10 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
+      <div
+        data-tour="sidebar-explorer"
+        className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2"
+      >
         <SidebarTree
           ref={treeRef}
           sortMode={sortMode}

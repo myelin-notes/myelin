@@ -876,6 +876,83 @@ const en = {
   dialogs: {
     closeSrOnly: 'Close',
   },
+  onboarding: {
+    skip: 'Skip setup',
+    back: 'Back',
+    continue: 'Continue',
+    finish: 'Finish',
+    stepLabel: (current: number, total: number) =>
+      `Step ${current} of ${total}`,
+    welcome: {
+      eyebrow: 'Welcome',
+      title: 'Myelin Notes',
+      description:
+        'An infinite canvas for handwriting, text, and everything in between. Four quick questions and you are done.',
+      language: 'Language',
+      start: 'Get started',
+    },
+    privacy: {
+      eyebrow: 'Privacy',
+      title: 'Help improve Myelin Notes',
+      description:
+        'Analytics are off until you turn them on here. You can change this any time in Settings.',
+      collected:
+        'What is sent: which features get used, the app version, and crash reports.',
+      notCollected:
+        'What is never sent: your notes, their contents, file names, or handwriting.',
+      policy: 'Read the privacy policy',
+    },
+    sync: {
+      eyebrow: 'Sync',
+      title: 'Where should your notes live?',
+      description:
+        'Notes are stored on this device. Connect a GitHub repository to keep them backed up and in sync across machines.',
+      later: 'You can set this up later in Settings.',
+    },
+    tour: {
+      eyebrow: 'Tour',
+      title: 'Want a quick tour?',
+      description:
+        'A few stops around the app: your library, search, the toolbar, and where things get inserted. It opens a blank canvas to try on.',
+      start: 'Show me around',
+      skip: 'Skip the tour',
+      canvasName: 'Getting started',
+    },
+  },
+  tour: {
+    next: 'Next',
+    back: 'Back',
+    done: 'Done',
+    skip: 'Skip tour',
+    progress: (current: number, total: number) => `${current} of ${total}`,
+    steps: {
+      explorer: {
+        title: 'Your library',
+        description:
+          'Every note lives here. Right-click a row to rename, move, or tag it.',
+      },
+      search: {
+        title: 'Find anything',
+        description:
+          'Search by text, or switch to semantic search to find notes by meaning rather than exact words.',
+      },
+      tools: {
+        title: 'The toolbar',
+        description:
+          'Pen, highlighter, eraser, text, and selection. Hover a tool to see its hotkey.',
+      },
+      insert: {
+        title: 'Bring things in',
+        description:
+          'Add pages, images, PDFs, audio, and LaTeX straight onto the canvas.',
+      },
+      settings: {
+        title: 'Settings and sync',
+        description:
+          'Theme, language, privacy, and your repository connection all live here.',
+      },
+    },
+  },
   shutdown: {
     title: 'Saving changes…',
     description: 'Syncing pending changes to your repository before quitting.',

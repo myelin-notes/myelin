@@ -859,6 +859,78 @@ const zhHans: typeof en = {
   dialogs: {
     closeSrOnly: '关闭',
   },
+  onboarding: {
+    skip: '跳过设置',
+    back: '上一步',
+    continue: '继续',
+    finish: '完成',
+    stepLabel: (current: number, total: number) =>
+      `第 ${current} 步，共 ${total} 步`,
+    welcome: {
+      eyebrow: '欢迎',
+      title: 'Myelin Notes',
+      description:
+        '一块无限画布，可以手写、输入文字，以及两者之间的一切。回答四个问题即可开始。',
+      language: '语言',
+      start: '开始使用',
+    },
+    privacy: {
+      eyebrow: '隐私',
+      title: '帮助改进 Myelin Notes',
+      description: '在你打开之前不会收集任何分析数据。随时可以在设置中更改。',
+      collected: '会发送的内容：使用了哪些功能、应用版本以及崩溃报告。',
+      notCollected: '绝不会发送的内容：你的笔记、笔记内容、文件名或手写内容。',
+      policy: '阅读隐私政策',
+    },
+    sync: {
+      eyebrow: '同步',
+      title: '笔记要保存在哪里？',
+      description:
+        '笔记默认保存在本设备上。连接 GitHub 仓库即可备份，并在多台设备之间同步。',
+      later: '也可以稍后在设置中配置。',
+    },
+    tour: {
+      eyebrow: '导览',
+      title: '要快速了解一下吗？',
+      description:
+        '带你看几个地方：笔记库、搜索、工具栏，以及如何插入内容。会打开一块空白画布供你试用。',
+      start: '带我看看',
+      skip: '跳过导览',
+      canvasName: '入门',
+    },
+  },
+  tour: {
+    next: '下一步',
+    back: '上一步',
+    done: '完成',
+    skip: '跳过导览',
+    progress: (current: number, total: number) => `${current} / ${total}`,
+    steps: {
+      explorer: {
+        title: '你的笔记库',
+        description:
+          '所有笔记都在这里。右键点击某一行可重命名、移动或添加标签。',
+      },
+      search: {
+        title: '快速查找',
+        description:
+          '可以按文字搜索，也可以切换到语义搜索，按含义而非精确词语查找笔记。',
+      },
+      tools: {
+        title: '工具栏',
+        description:
+          '钢笔、荧光笔、橡皮擦、文字和选择工具。悬停在工具上可查看快捷键。',
+      },
+      insert: {
+        title: '插入内容',
+        description: '可以直接向画布中添加页面、图片、PDF、音频和 LaTeX。',
+      },
+      settings: {
+        title: '设置与同步',
+        description: '主题、语言、隐私以及仓库连接都在这里。',
+      },
+    },
+  },
   shutdown: {
     title: '正在保存更改…',
     description: '退出前正在将待同步的更改推送到仓库。',

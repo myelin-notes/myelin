@@ -11,8 +11,19 @@ let initialized = false;
 // opt-in/opt-out, so turning analytics off stops error reporting too. No-ops
 // when no project key is configured.
 export function initErrorTracking(): void {
-  if (initialized || !POSTHOG_KEY) {
-    return;
+  applyAnalyticsConsent(UserPrefs.get('analyticsEnabled'));
+  UserPrefs.subscribe('analyticsEnabled', applyAnalyticsConsent);
+}
+
+// `posthog.init` fetches remote config over the network, which is a request the
+// user's IP rides on, so it is deferred until consent rather than run at boot.
+// Granting consent later in Settings initializes it at that point.
+function ensureInitialized(): boolean {
+  if (initialized) {
+    return true;
+  }
+  if (!POSTHOG_KEY) {
+    return false;
   }
 
   posthog.init(POSTHOG_KEY, {
@@ -22,12 +33,11 @@ export function initErrorTracking(): void {
     capture_pageleave: false,
     disable_session_recording: true,
     capture_exceptions: true,
+    opt_out_capturing_by_default: true,
   });
   posthog.register({ environment: MODE, source: 'app' });
   initialized = true;
-
-  applyAnalyticsConsent(UserPrefs.get('analyticsEnabled'));
-  UserPrefs.subscribe('analyticsEnabled', applyAnalyticsConsent);
+  return true;
 }
 
 // Mirror the analytics setting onto PostHog. Opting out disables every kind of
@@ -35,10 +45,14 @@ export function initErrorTracking(): void {
 // setting governs error tracking as well. `captureEventName: false` keeps the
 // opt-in from emitting its own event.
 function applyAnalyticsConsent(enabled: boolean): void {
-  if (enabled) {
+  if (!enabled) {
+    if (initialized) {
+      posthog.opt_out_capturing();
+    }
+    return;
+  }
+  if (ensureInitialized()) {
     posthog.opt_in_capturing({ captureEventName: false });
-  } else {
-    posthog.opt_out_capturing();
   }
 }
 

@@ -885,6 +885,83 @@ const es: typeof en = {
   dialogs: {
     closeSrOnly: 'Cerrar',
   },
+  onboarding: {
+    skip: 'Omitir configuración',
+    back: 'Atrás',
+    continue: 'Continuar',
+    finish: 'Finalizar',
+    stepLabel: (current: number, total: number) =>
+      `Paso ${current} de ${total}`,
+    welcome: {
+      eyebrow: 'Bienvenido',
+      title: 'Myelin Notes',
+      description:
+        'Un lienzo infinito para escritura a mano, texto y todo lo que hay entre medias. Cuatro preguntas rápidas y listo.',
+      language: 'Idioma',
+      start: 'Empezar',
+    },
+    privacy: {
+      eyebrow: 'Privacidad',
+      title: 'Ayuda a mejorar Myelin Notes',
+      description:
+        'Las analíticas están desactivadas hasta que las actives aquí. Puedes cambiarlo cuando quieras en Ajustes.',
+      collected:
+        'Qué se envía: qué funciones se usan, la versión de la app e informes de errores.',
+      notCollected:
+        'Qué nunca se envía: tus notas, su contenido, los nombres de archivo ni tu escritura a mano.',
+      policy: 'Leer la política de privacidad',
+    },
+    sync: {
+      eyebrow: 'Sincronización',
+      title: '¿Dónde quieres guardar tus notas?',
+      description:
+        'Tus notas se guardan en este dispositivo. Conecta un repositorio de GitHub para tener copia de seguridad y sincronizarlas entre equipos.',
+      later: 'Puedes configurarlo más tarde en Ajustes.',
+    },
+    tour: {
+      eyebrow: 'Recorrido',
+      title: '¿Quieres un recorrido rápido?',
+      description:
+        'Unas cuantas paradas por la app: tu biblioteca, la búsqueda, la barra de herramientas y cómo insertar cosas. Abre un lienzo en blanco para probar.',
+      start: 'Muéstrame la app',
+      skip: 'Omitir el recorrido',
+      canvasName: 'Primeros pasos',
+    },
+  },
+  tour: {
+    next: 'Siguiente',
+    back: 'Atrás',
+    done: 'Listo',
+    skip: 'Omitir recorrido',
+    progress: (current: number, total: number) => `${current} de ${total}`,
+    steps: {
+      explorer: {
+        title: 'Tu biblioteca',
+        description:
+          'Aquí vive cada nota. Haz clic derecho en una fila para renombrarla, moverla o etiquetarla.',
+      },
+      search: {
+        title: 'Encuentra lo que sea',
+        description:
+          'Busca por texto o cambia a búsqueda semántica para encontrar notas por significado en lugar de palabras exactas.',
+      },
+      tools: {
+        title: 'La barra de herramientas',
+        description:
+          'Lápiz, marcador, borrador, texto y selección. Pasa el cursor por una herramienta para ver su atajo.',
+      },
+      insert: {
+        title: 'Añade contenido',
+        description:
+          'Añade páginas, imágenes, PDF, audio y LaTeX directamente al lienzo.',
+      },
+      settings: {
+        title: 'Ajustes y sincronización',
+        description:
+          'El tema, el idioma, la privacidad y la conexión con tu repositorio están aquí.',
+      },
+    },
+  },
   shutdown: {
     title: 'Guardando cambios…',
     description:
