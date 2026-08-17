@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useMessages } from '@/lib/i18n';
+import { useCompactCanvasLayout } from '../hooks/use-compact-layout';
 
 interface CanvasToolbarProps {
   tools: ITool[];
@@ -54,6 +55,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   embedComposer,
 }: CanvasToolbarProps) {
   const strings = useMessages();
+  const compact = useCompactCanvasLayout();
   const optionsPresence = usePresence(
     optionsVisible && hasOptions && !shelfOpen,
   );
@@ -63,8 +65,10 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const shelfButtonRef = useRef<HTMLElement | null>(null);
   const insertButtonRef = useRef<HTMLElement | null>(null);
 
+  // Compact stacks the panels above a bottom bar, where they span its width and
+  // need no per-button alignment.
   const getButtonOffset = (btn: HTMLElement | null) => {
-    if (!(btn && toolbarInnerRef.current)) {
+    if (compact || !(btn && toolbarInnerRef.current)) {
       return 0;
     }
     return btn.offsetTop - toolbarInnerRef.current.offsetTop;
@@ -74,19 +78,35 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   );
   const shelfPanelOffset = getButtonOffset(shelfButtonRef.current);
   const insertPanelOffset = getButtonOffset(insertButtonRef.current);
+  const tooltipSide = compact ? 'top' : 'right';
+  // Panels hang off the rail's right edge, or off the top of the bottom bar.
+  const panelAnchorClass = compact
+    ? 'absolute right-0 bottom-full left-0 mb-2'
+    : 'absolute top-0 left-full';
+  const dividerClass = compact
+    ? 'mx-1 h-4 w-px bg-border-divider'
+    : 'my-1 h-px w-4 bg-border-divider';
 
   return (
     <TooltipProvider>
       <div
         ref={toolbarRef}
-        className="fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+        className={
+          compact
+            ? 'fade-in-0 slide-in-from-bottom-3 absolute inset-x-0 bottom-0 z-[100] flex animate-in justify-center px-3 pb-3 duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+            : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+        }
         role="toolbar"
         aria-label="Canvas tools"
       >
         <div
           ref={toolbarInnerRef}
           data-tour="canvas-toolbar"
-          className="flex max-h-[calc(100dvh-6rem)] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-card px-2 py-3 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className={
+            compact
+              ? 'flex max-w-full flex-row items-center gap-1 overflow-x-auto rounded-xl bg-card px-2 py-2 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+              : 'flex max-h-[calc(100dvh-6rem)] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-card px-2 py-3 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          }
         >
           <Tooltip>
             <TooltipTrigger
@@ -96,7 +116,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               data-insert-trigger
               data-tour="canvas-insert"
               aria-label={strings.canvas.toolbar.insert}
-              className={`cursor-pointer rounded-lg p-2.5 transition-colors ${
+              className={`shrink-0 cursor-pointer rounded-lg p-2.5 transition-colors ${
                 insertOpen
                   ? 'bg-accent-dark text-text-on-dark'
                   : 'bg-transparent text-text-secondary hover:bg-hover-tint'
@@ -105,12 +125,12 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             >
               <PlusIcon className="size-4" />
             </TooltipTrigger>
-            <TooltipContent side="right">
+            <TooltipContent side={tooltipSide}>
               <p>{strings.canvas.toolbar.insert}</p>
             </TooltipContent>
           </Tooltip>
 
-          <div className="my-1 h-px w-4 bg-border-divider" />
+          <div className={`shrink-0 ${dividerClass}`} />
 
           {tools.map((tool, index) => {
             const Icon = tool.icon;
@@ -124,7 +144,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                     toolButtonRefs.current[index] = el;
                   }}
                   aria-label={tool.label}
-                  className={`group relative cursor-pointer rounded-lg p-2.5 transition-colors ${
+                  className={`group relative shrink-0 cursor-pointer rounded-lg p-2.5 transition-colors ${
                     isActive
                       ? 'bg-accent-dark text-text-on-dark'
                       : 'bg-transparent text-text-secondary hover:bg-hover-tint'
@@ -148,7 +168,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                     />
                   )}
                 </TooltipTrigger>
-                <TooltipContent side="right">
+                <TooltipContent side={tooltipSide}>
                   <div className="flex items-center gap-2">
                     <span>
                       {tool.label}
@@ -167,7 +187,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             );
           })}
 
-          <div className="my-1 h-px w-4 bg-border-divider" />
+          <div className={`shrink-0 ${dividerClass}`} />
 
           <Tooltip>
             <TooltipTrigger
@@ -175,7 +195,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                 shelfButtonRef.current = el;
               }}
               aria-label={strings.canvas.toolbar.customizeWheel}
-              className={`cursor-pointer rounded-lg p-2.5 transition-colors ${
+              className={`shrink-0 cursor-pointer rounded-lg p-2.5 transition-colors ${
                 shelfOpen
                   ? 'bg-accent-dark text-text-on-dark'
                   : 'bg-transparent text-text-secondary hover:bg-hover-tint'
@@ -184,7 +204,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             >
               <SlidersIcon className="size-4" />
             </TooltipTrigger>
-            <TooltipContent side="right">
+            <TooltipContent side={tooltipSide}>
               <p>{strings.canvas.toolbar.customizeWheel}</p>
             </TooltipContent>
           </Tooltip>
@@ -194,8 +214,12 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           <div
             {...optionsPresence.state}
             onAnimationEnd={optionsPresence.onAnimationEnd}
-            className="data-closed:slide-out-to-left-2 data-closed:fade-out-0 data-open:slide-in-from-left-2 data-open:fade-in-0 absolute left-full ml-2 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
-            style={{ top: optionsPanelOffset }}
+            className={`data-closed:fade-out-0 data-open:fade-in-0 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in ${
+              compact
+                ? 'data-closed:slide-out-to-bottom-2 data-open:slide-in-from-bottom-2'
+                : 'data-closed:slide-out-to-left-2 data-open:slide-in-from-left-2 ml-2'
+            } ${panelAnchorClass}`}
+            style={compact ? undefined : { top: optionsPanelOffset }}
           >
             <ToolOptionsPanel options={activeOptions} />
           </div>
@@ -203,8 +227,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 
         {shelfOpen && (
           <div
-            className="absolute top-0 left-full ml-2"
-            style={{ paddingTop: shelfPanelOffset }}
+            className={compact ? panelAnchorClass : `${panelAnchorClass} ml-2`}
+            style={compact ? undefined : { paddingTop: shelfPanelOffset }}
           >
             <ToolShelf
               tools={tools}
@@ -218,8 +242,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 
         {!shelfOpen && embedComposer && (
           <div
-            className="absolute top-0 left-full"
-            style={{ paddingTop: insertPanelOffset }}
+            className={panelAnchorClass}
+            style={compact ? undefined : { paddingTop: insertPanelOffset }}
           >
             {embedComposer}
           </div>
@@ -227,8 +251,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 
         {insertOpen && !shelfOpen && (
           <div
-            className="absolute top-0 left-full"
-            style={{ paddingTop: insertPanelOffset }}
+            className={panelAnchorClass}
+            style={compact ? undefined : { paddingTop: insertPanelOffset }}
           >
             {insertPopover}
           </div>
