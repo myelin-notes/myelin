@@ -302,7 +302,12 @@ export const TabBar = memo(function TabBar({
         type="button"
         onClick={handleNewTab}
         aria-label="New tab"
-        className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        className={cn(
+          'mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary',
+          // Nothing follows the button on phones, so it needs its own inset to
+          // match the home button's on the left edge.
+          phoneLayout && 'mr-2',
+        )}
       >
         <Plus className="size-3.5" />
       </button>
