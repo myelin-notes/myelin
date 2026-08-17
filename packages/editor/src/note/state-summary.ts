@@ -1,4 +1,4 @@
-import * as Y from 'yjs';
+import type * as Y from 'yjs';
 import type { DrawableElement } from '../elements/drawable-element';
 import { ElementType } from '../elements/element-type';
 import type { YDocManager } from '../ydoc-manager';
@@ -143,23 +143,4 @@ export function summarizeYDoc(doc: Y.Doc) {
 
 export function summarizeYDocManager(ydoc: YDocManager) {
   return summarizeYDoc(ydoc.doc);
-}
-
-export function summarizeNoteBytes(bytes: Uint8Array | null | undefined) {
-  if (!bytes || bytes.byteLength === 0) {
-    return {
-      byteLength: 0,
-      hasBytes: false,
-      ...summarizeYDoc(new Y.Doc()),
-    };
-  }
-
-  const doc = new Y.Doc();
-  Y.applyUpdate(doc, bytes);
-
-  return {
-    byteLength: bytes.byteLength,
-    hasBytes: true,
-    ...summarizeYDoc(doc),
-  };
 }

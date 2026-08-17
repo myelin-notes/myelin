@@ -205,13 +205,14 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
           described above, and processes them in the United States.
         </li>
         <li>
-          <span class={term}>Cloudflare</span> serves this website, the update endpoint,
-          and the live collaboration discovery service, so it handles the network requests
-          your device makes to them.
+          <span class={term}>Cloudflare</span> serves this website and the live collaboration
+          discovery service, so it handles the network requests your device makes
+          to them.
         </li>
         <li>
-          <span class={term}>GitHub</span> receives your notes, but only if you set
-          up GitHub sync.
+          <span class={term}>GitHub</span> hosts our releases, so it handles the update
+          check every copy of the app makes. It also receives your notes, but only
+          if you set up GitHub sync.
         </li>
         <li>
           <span class={term}>The iroh project</span> runs the relay servers that carry
@@ -240,9 +241,9 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
           automatically when it passes, within minutes of the session ending.
         </li>
         <li>
-          We keep no server-side request logs of our own for the website, the
-          update endpoint, or the discovery service beyond what Cloudflare
-          retains to operate and protect them.
+          We keep no server-side request logs of our own for the website or the
+          discovery service beyond what Cloudflare retains to operate and protect
+          them, and update checks are logged by GitHub rather than by us.
         </li>
         <li>
           There is nothing else to keep, because there is no account and no copy

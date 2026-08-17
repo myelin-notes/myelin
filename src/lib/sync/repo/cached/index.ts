@@ -1,5 +1,4 @@
 import * as Y from 'yjs';
-import { summarizeNoteBytes } from '@myelin/editor/note/state-summary';
 import { trackEvent } from '@/lib/analytics';
 import { Logger } from '@/lib/logger';
 import type { ReindexItem } from '@/platform';
@@ -1392,7 +1391,7 @@ export class CachedRepository
       nodeId,
       revision: localSnapshot.revision,
       stateVectorByteLength: localSnapshot.stateVector.byteLength,
-      ...summarizeNoteBytes(localSnapshot.update),
+      updateByteLength: localSnapshot.update?.byteLength ?? 0,
     });
 
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -1409,7 +1408,7 @@ export class CachedRepository
           attempt: attempt + 1,
           revision: result.revision,
           stateVectorByteLength: result.stateVector.byteLength,
-          ...summarizeNoteBytes(result.update),
+          updateByteLength: result.update?.byteLength ?? 0,
         });
         return;
       }

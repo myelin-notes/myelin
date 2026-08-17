@@ -45,6 +45,13 @@ export interface ITool {
   update(canvas: DrawableCanvas, event: PointerEvent, position: Vector2): void;
   finish(canvas: DrawableCanvas, event: PointerEvent): void;
   interrupt(canvas: DrawableCanvas): void;
+  /**
+   * Throw away the in-progress interaction instead of committing it, for
+   * gestures that turn out not to be tool use after all (the pen hold that
+   * opens the tool wheel). Tools whose `interrupt` already discards rather
+   * than commits can leave this off — the canvas falls back to `interrupt`.
+   */
+  abort?(canvas: DrawableCanvas): void;
   drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void;
   hover?(canvas: DrawableCanvas, position: Vector2): void;
   get icon(): SvgIcon;

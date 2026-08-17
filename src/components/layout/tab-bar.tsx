@@ -1,7 +1,8 @@
 import { memo, useCallback, useRef, useState } from 'react';
 import {
   Columns2,
-  LayoutGrid,
+  Home,
+  MoreHorizontal,
   Network,
   PanelLeft,
   Plus,
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/context-menu';
 import { trackEvent } from '@/lib/analytics';
 import { type Messages, useMessages } from '@/lib/i18n';
+import { keybindings } from '@/lib/keybinds';
 import { Logger } from '@/lib/logger';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import {
@@ -102,20 +104,28 @@ export const TabBar = memo(function TabBar({
   const {
     collapsed,
     isCompact,
-    tabletLayout,
+    mobileLayout,
+    phoneLayout,
     drawerOpen,
     toggle: toggleSidebar,
   } = useSidebar();
   // In compact layout the sidebar is an overlay drawer; elsewhere it's the
   // persistent column. `sidebarShown` unifies both for the toggle's a11y state.
   const sidebarShown = isCompact ? drawerOpen : !collapsed;
-  // Tablet layout has no sidebar; the top-left button returns to the full-page
+  // Mobile layout has no sidebar; the top-left button returns to the full-page
   // library home instead of toggling one. It's "active" while the pane is
   // already showing home (no active tab).
   const showingHome = pane.activeTabId === '';
+  const activeTab =
+    pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
   const showLibrary = useCallback(() => {
     controller.showHome(pane.id);
   }, [controller, pane.id]);
+  // Mobile has no keyboard for Cmd/Ctrl+P, which is otherwise the palette's
+  // only way in — and with it the only route to several commands.
+  const openCommandPalette = useCallback(() => {
+    keybindings.runAction('app:command-palette');
+  }, []);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
@@ -209,9 +219,9 @@ export const TabBar = memo(function TabBar({
           top-left — only on the leftmost pane's bar, so split views don't show
           duplicate toggles. When collapsed on macOS the whole bar insets to
           clear the traffic lights, leaving the toggle just right of them. On
-          tablet there's no sidebar, so this button returns to the library. */}
+          mobile there's no sidebar, so this button returns to the library. */}
       {isTopLeft &&
-        (tabletLayout ? (
+        (mobileLayout ? (
           <button
             type="button"
             onClick={showLibrary}
@@ -220,7 +230,7 @@ export const TabBar = memo(function TabBar({
             aria-pressed={showingHome}
             className="mb-1 ml-2 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary aria-pressed:text-text-primary"
           >
-            <LayoutGrid className="size-3.5" />
+            <Home className="size-3.5" />
           </button>
         ) : (
           <button
@@ -239,26 +249,52 @@ export const TabBar = memo(function TabBar({
           </button>
         ))}
 
-      <div
-        className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
-        style={{ scrollbarWidth: 'none' }}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {pane.tabs.map((tab, i) => (
-          <TabItem
-            key={tab.id}
-            tab={tab}
-            isActive={tab.id === pane.activeTabId}
-            isDragging={tab.id === dragTabId}
-            paneId={pane.id}
-            showDropIndicator={dropIndex === i}
-            onDragStateChange={setDragTabId}
-          />
-        ))}
-        {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
-      </div>
+      {/* Desktop reaches the palette by its shortcut, so the button is mobile-
+          only. Leftmost pane only, like the button above it. */}
+      {isTopLeft && mobileLayout && (
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          aria-label={strings.commandPalette.title}
+          title={strings.commandPalette.title}
+          className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        >
+          <MoreHorizontal className="size-3.5" />
+        </button>
+      )}
+
+      {/* Phones hold one document per pane (see TabControllerOptions.singleTab),
+          so there's nothing to switch between — the strip becomes the active
+          document's title. It also drops tab drag/reorder and the split context
+          menu, none of which work by touch anyway. */}
+      {phoneLayout ? (
+        <div className="mb-1 flex h-6 min-w-0 flex-1 items-center justify-center px-2">
+          <span className="truncate font-medium text-[11px] text-text-primary">
+            {activeTab ? tabTitle(activeTab, strings) : strings.library.title}
+          </span>
+        </div>
+      ) : (
+        <div
+          className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
+          style={{ scrollbarWidth: 'none' }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {pane.tabs.map((tab, i) => (
+            <TabItem
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === pane.activeTabId}
+              isDragging={tab.id === dragTabId}
+              paneId={pane.id}
+              showDropIndicator={dropIndex === i}
+              onDragStateChange={setDragTabId}
+            />
+          ))}
+          {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
+        </div>
+      )}
 
       {/* Kept outside the scroll strip so it stays beside the tabs and never
           scrolls off when they overflow. */}
@@ -266,12 +302,17 @@ export const TabBar = memo(function TabBar({
         type="button"
         onClick={handleNewTab}
         aria-label="New tab"
-        className="mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+        className={cn(
+          'mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary',
+          // Nothing follows the button on phones, so it needs its own inset to
+          // match the home button's on the left edge.
+          phoneLayout && 'mr-2',
+        )}
       >
         <Plus className="size-3.5" />
       </button>
 
-      <div className="flex-1 self-stretch" {...dragRegion} />
+      {!phoneLayout && <div className="flex-1 self-stretch" {...dragRegion} />}
 
       {/* Frameless Windows has no native title bar, so the top-right pane's
           bar carries the window controls (sits right of the utility buttons). */}

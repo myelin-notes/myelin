@@ -251,7 +251,9 @@ export const WheelPicker = memo(function WheelPicker({
     }
 
     function handlePointerUp(evt: PointerEvent) {
-      if (evt.pointerType !== 'mouse') {
+      // Mouse opens the wheel with the right button, pen with a press-and-hold;
+      // touch has no trigger yet, so a stray finger must not commit a slice.
+      if (evt.pointerType !== 'mouse' && evt.pointerType !== 'pen') {
         return;
       }
 

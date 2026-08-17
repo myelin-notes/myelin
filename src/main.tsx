@@ -3,6 +3,7 @@
 import '@/lib/structured-clone-polyfill';
 
 import { reportFatalError } from '@/lib/fatal-error';
+import { applyMobileViewportScale } from '@/lib/viewport-scale';
 
 // Install global failure handlers BEFORE the app module graph loads, then pull
 // the app in via dynamic import. Because the app is imported asynchronously, a
@@ -18,6 +19,10 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
   void reportFatalError('unhandledrejection', event.reason);
 });
+
+// Before the app module graph loads, so the first paint is already scaled and
+// every breakpoint the app reads sees the post-scale viewport.
+applyMobileViewportScale();
 
 void import('./bootstrap').catch((error) => {
   void reportFatalError('bootstrap-import', error);

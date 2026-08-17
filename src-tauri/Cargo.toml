@@ -86,6 +86,14 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.gemm-f32]
 opt-level = 3
+# gemm-f16 additionally *must* stay optimized on aarch64-linux-android: it
+# instantiates gemm-common's `#[inline]` fp16 vector helpers (vmulq_f16 and
+# friends), which upstream left without `#[target_feature(enable = "fp16")]`.
+# At opt-level 0 they get standalone codegen instead of being inlined into
+# their fp16-enabled callers, and the assembler rejects the .8h instructions
+# with "instruction requires: fullfp16". Release builds never hit this.
+[profile.dev.package.gemm-f16]
+opt-level = 3
 [profile.dev.package.half]
 opt-level = 3
 

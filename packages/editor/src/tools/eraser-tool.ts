@@ -30,7 +30,7 @@ export class EraserTool implements ITool {
     canvas.elements
       .filter(
         (e) =>
-          e.type === ElementType.STROKE &&
+          (e.type === ElementType.STROKE || e.type === ElementType.SHAPE) &&
           e.isOver(position.x, position.y, this.radius, canvas.ctx),
       )
       .forEach((e) => {

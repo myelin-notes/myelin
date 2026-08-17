@@ -32,6 +32,8 @@ export class PenTool implements ITool {
   protected size: number = 8;
   /** When false, the dwell-and-recognize shape-snapping path is skipped. */
   protected recognizeShapes: boolean = true;
+  /** When false, stylus pressure is dropped and stroke width stays uniform. */
+  protected usePressure: boolean = true;
 
   private dwellAnchor: Vector2 | null = null;
   private recognitionAttemptedForAnchor: boolean = false;
@@ -66,7 +68,11 @@ export class PenTool implements ITool {
     if (this.snapped) {
       return;
     }
-    this.currentStroke?.addPoint(position.x, position.y, event.pressure);
+    this.currentStroke?.addPoint(
+      position.x,
+      position.y,
+      this.usePressure ? event.pressure : undefined,
+    );
 
     // Standard clear-and-re-arm dwell pattern: every meaningful move resets the
     // anchor and re-arms a single timer, so recognition fires exactly once per
@@ -131,6 +137,24 @@ export class PenTool implements ITool {
     } else {
       this.currentShape?.updateBounds();
     }
+    this.reset();
+  }
+
+  public abort(canvas: DrawableCanvas): void {
+    this.clearDwellTimer();
+    // The element was added to the canvas on start(), so discarding the
+    // interaction means removing it — leaving it would drop an ink blob at
+    // the point the pen came to rest.
+    if (this.currentStroke) {
+      canvas.removeElement(this.currentStroke);
+    }
+    if (this.currentShape) {
+      canvas.removeElement(this.currentShape);
+    }
+    this.reset();
+  }
+
+  private reset(): void {
     this.currentStroke = null;
     this.currentShape = null;
     this.snapped = false;

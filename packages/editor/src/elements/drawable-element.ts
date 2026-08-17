@@ -7,7 +7,7 @@ import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { SyncOrigin, YDocManager } from '../ydoc-manager';
-import type { ElementType } from './element-type';
+import { type ElementType, isBackgroundElement } from './element-type';
 
 export interface SelectionToolbarItem {
   /** Stable id within an element's items, used as React key. */
@@ -364,12 +364,14 @@ export abstract class DrawableElement {
   }
 
   /**
-   * Whether the foreground canvas should drop below the DOM chrome while this
-   * element is in edit mode (so strokes don't bleed onto the editing surface).
-   * The selection outline still renders on the overlay canvas above chrome.
+   * Whether a press inside this element's bounding box grabs it — for moving it
+   * with the select tool, or for handing a finger to that tool instead of
+   * panning. An unselected backdrop says no: its body covers the area gestures
+   * travel across, so a drag starting there belongs to whatever is drawn on top
+   * of it (a marquee, or a one-finger pan) rather than to the backdrop.
    */
-  public get lowersCanvasWhileEditing(): boolean {
-    return false;
+  public get grabsFromBody(): boolean {
+    return this.isSelected || !isBackgroundElement(this.type);
   }
 
   /**
@@ -438,6 +440,28 @@ export abstract class DrawableElement {
       Math.min(y1, y2),
       Math.abs(x2 - x1),
       Math.abs(y2 - y1),
+    );
+  }
+
+  /**
+   * Whether the world-space bounding box overlaps `rect`, inflated on every
+   * side by `margin`.
+   *
+   * Same geometry as intersecting `boundingBox`, but without the DOMRect it
+   * allocates — the renderer asks this of every element on the canvas, every
+   * frame.
+   */
+  public intersectsWorldRect(rect: DOMRect, margin: number): boolean {
+    const raw = this.localBoundingBox;
+    const x1 = raw.x * this._scale.x + this._offset.x;
+    const y1 = raw.y * this._scale.y + this._offset.y;
+    const x2 = (raw.x + raw.width) * this._scale.x + this._offset.x;
+    const y2 = (raw.y + raw.height) * this._scale.y + this._offset.y;
+    return (
+      Math.max(x1, x2) >= rect.x - margin &&
+      Math.min(x1, x2) <= rect.right + margin &&
+      Math.max(y1, y2) >= rect.y - margin &&
+      Math.min(y1, y2) <= rect.bottom + margin
     );
   }
 

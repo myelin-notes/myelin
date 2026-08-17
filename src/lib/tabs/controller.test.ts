@@ -129,6 +129,30 @@ describe('TabStateController', () => {
     expectValidWindowState(controller.getSnapshot());
   });
 
+  it('replaces the pane tab instead of stacking when singleTab is set', () => {
+    const controller = new TabStateController(undefined, undefined, {
+      singleTab: true,
+    });
+    const paneId = focusedPane(controller).id;
+
+    openCanvas(controller, 'alpha', 'Alpha', paneId);
+    const betaId = openCanvas(controller, 'beta', 'Beta', paneId);
+
+    const pane = rootPane(controller);
+    expect(tabTitles(pane)).toEqual(['Beta']);
+    expect(pane.activeTabId).toBe(betaId);
+
+    // Reopening the live document still reuses its tab rather than recreating.
+    const reopenedId = openCanvas(controller, 'beta', 'Beta again', paneId);
+    expect(reopenedId).toBe(betaId);
+    expect(tabTitles(rootPane(controller))).toEqual(['Beta again']);
+
+    // Closing the only tab falls back to the home view, as on desktop.
+    controller.closeTab(betaId, paneId);
+    expect(tabTitles(focusedPane(controller))).toEqual([]);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
   it('focuses an existing tab in another pane when navigating without a pane', () => {
     const controller = new TabStateController();
     const rootPaneId = focusedPane(controller).id;

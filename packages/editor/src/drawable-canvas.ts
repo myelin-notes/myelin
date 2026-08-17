@@ -9,7 +9,7 @@ import {
   ELEMENT_FACTORIES,
   type ElementFactory,
 } from './elements/element-factories';
-import { ElementType } from './elements/element-type';
+import { ElementType, isBackgroundElement } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
 import type { Vector2 } from './geometry';
@@ -20,6 +20,7 @@ import {
 } from './note/state-summary';
 import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
+import { PalmRejection } from './palm-rejection';
 import { PlacementController } from './placement-controller';
 import type { LivePeersSnapshot } from './sync/live/peers';
 import { EraserTool } from './tools/eraser-tool';
@@ -55,9 +56,15 @@ const ELEMENT_Z_ORDER_KEY = 'zOrder';
 /** Screen-pixel travel a finger may drift and still count as a tap. */
 const TOUCH_TAP_SLOP = 8;
 
-function isBackgroundElement(type: ElementType): boolean {
-  return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
-}
+/**
+ * PointerEvent.buttons bit for a stylus's eraser end (Pointer Events L3). Set
+ * by S Pen / Surface Pen / Wacom when the tail is flipped down; no Apple Pencil
+ * reports it.
+ */
+const PEN_ERASER_BUTTONS = 32;
+
+/** PointerEvent.button for a stylus barrel button — the pen-side right-click. */
+const PEN_BARREL_BUTTON = 2;
 
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
@@ -125,6 +132,21 @@ export function canMoveElementOrderForSelection(
   return false;
 }
 
+/**
+ * Every stylus sample behind a `pointermove`, oldest first.
+ *
+ * A stylus samples far faster than the display refreshes, so the platform
+ * batches the samples taken since the last frame into a single pointermove and
+ * exposes them as coalesced events. Reading only the delivered event keeps the
+ * newest sample and discards the rest, drawing a straight chord across the
+ * batch — the flat segments that show up in handwriting whenever a frame runs
+ * long. Falls back to the event itself where coalescing is unsupported.
+ */
+export function coalescedPointerSamples(event: PointerEvent): PointerEvent[] {
+  const samples = event.getCoalescedEvents?.() ?? [];
+  return samples.length > 0 ? samples : [event];
+}
+
 export function moveElementOrderForSelection(
   items: readonly ElementOrderItem[],
   selectedUuids: Iterable<string>,
@@ -177,11 +199,24 @@ export class DrawableCanvas {
   // pointer panning must yield while 2+ fingers are down.
   private readonly _activeTouchPointers = new Set<number>();
 
+  // Set for the duration of abortInteraction() so the UsingTool end handler
+  // discards the interaction instead of committing it.
+  private _abortingInteraction: boolean = false;
+
+  // The tool to hand back when the stylus's eraser end lifts.
+  private _eraserOverride: ITool | null = null;
+
+  // While the stylus is on the glass — and briefly after — a hand resting on
+  // the screen must drive nothing.
+  private readonly _palm = new PalmRejection();
+
   /** Owns the element collections and keeps them mutating as a unit. */
   private readonly _store = new ElementStore(() => this.notifyChange());
   private _ydoc: YDocManager;
   private _domOverlayHost: HTMLElement | null = null;
   private _toolCursor: string = 'default';
+  /** Last value written to `canvas.style.cursor`. @see updateCursor */
+  private _appliedCursor: string | null = null;
   private toolSelected: ITool;
   private readonly resolveNoteLink?: ResolveNoteLink;
   private readonly resolveMedia?: ResolveMediaSrc;
@@ -258,6 +293,7 @@ export class DrawableCanvas {
     this.renderer = new CanvasRenderer(this.ctx, canvas);
     this.viewport = new CanvasViewport(canvas);
     this.viewport.setContentBoundsProvider(() => this.getContentBounds());
+    this.viewport.setTouchSuppressedProvider(() => this._palm.suppressed);
     this.state = new StateMachine(InteractState.Idle);
     this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
@@ -605,8 +641,7 @@ export class DrawableCanvas {
 
   /**
    * Always-on-top canvas used to render selection outline + handles, so they
-   * remain visible above DOM-backed editing chrome (where the main canvas is
-   * lowered to z=2 to avoid strokes bleeding onto edited text).
+   * remain visible above DOM-backed editing chrome.
    */
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
     this.renderer.setOverlayCanvas(canvas);
@@ -751,13 +786,6 @@ export class DrawableCanvas {
       // Canvas stops intercepting pointer events so the DOM editor (chrome
       // contentEditable / inline text input) receives them.
       this.canvas.style.pointerEvents = 'none';
-      // For elements with DOM-backed editing chrome, drop the
-      // foreground canvas below the chrome so strokes don't bleed onto the
-      // editing surface. The selection outline lives on a separate overlay
-      // canvas (z=12) so it stays visible above chrome.
-      if (element.lowersCanvasWhileEditing) {
-        this.canvas.style.zIndex = '2';
-      }
     }
 
     // Camera switches to edit-mode pan + two-finger touch handling.
@@ -860,7 +888,6 @@ export class DrawableCanvas {
     this.notifyChange();
     this.syncViewportEditModePan();
     this.canvas.style.pointerEvents = '';
-    this.canvas.style.zIndex = '10';
     this.onElementEdit?.(null);
     logger.debug('Exited canvas element edit mode', {
       uuid: element.uuid,
@@ -1161,7 +1188,15 @@ export class DrawableCanvas {
 
   private initStates() {
     this.state.addEnd(InteractState.UsingTool, (event) => {
-      this.toolSelected.finish(this, event);
+      if (this._abortingInteraction) {
+        if (this.toolSelected.abort) {
+          this.toolSelected.abort(this);
+        } else {
+          this.toolSelected.interrupt(this);
+        }
+      } else {
+        this.toolSelected.finish(this, event);
+      }
       this._ydoc.undoManager.stopCapturing();
     });
 
@@ -1171,7 +1206,9 @@ export class DrawableCanvas {
     });
 
     this.state.addUpdate(InteractState.UsingTool, (event: PointerEvent) => {
-      this.toolSelected.update(this, event, this.viewport.getPoint(event));
+      for (const sample of coalescedPointerSamples(event)) {
+        this.toolSelected.update(this, sample, this.viewport.getPoint(sample));
+      }
     });
 
     this.state.addStart(InteractState.Moving, () => {
@@ -1192,9 +1229,9 @@ export class DrawableCanvas {
 
   /**
    * Whether a single finger at this world point should drive the select tool
-   * instead of panning: a resize handle of a selected element, or an element
-   * body other than an unselected page frame / PDF. Those backdrops cover the
-   * area you pan across, so a finger inside one pans until it is selected.
+   * instead of panning: a resize handle of a selected element, or a body that
+   * grabs (see `DrawableElement.grabsFromBody` — a finger inside an unselected
+   * backdrop pans until that backdrop is selected).
    */
   private touchGrabsElement(point: Vector2): boolean {
     for (let i = this.elements.length - 1; i >= 0; i--) {
@@ -1211,7 +1248,7 @@ export class DrawableCanvas {
       if (!CollisionHelper.inBox(point, element.boundingBox)) {
         continue;
       }
-      if (element.isSelected || !isBackgroundElement(element.type)) {
+      if (element.grabsFromBody) {
         return true;
       }
     }
@@ -1225,6 +1262,12 @@ export class DrawableCanvas {
     // canvas heard about until the cursor left that DOM again. Hover still
     // only fires for the bare canvas.
     this._handlePointerMove = (evt) => {
+      // A rejected palm still emits moves, and this handler feeds them to the
+      // active tool regardless of which pointer opened the interaction — so
+      // without this the palm would draw into the pen's own stroke.
+      if (this._palm.isKnownPalm(evt.pointerId)) {
+        return;
+      }
       this.screenPosition = this.viewport.getScreenPoint(evt);
       this.state.update(evt);
       if (evt.target === canvas) {
@@ -1248,6 +1291,9 @@ export class DrawableCanvas {
 
       switch (evt.pointerType) {
         case 'touch': {
+          if (this._palm.isPalm(evt.pointerId)) {
+            break;
+          }
           this._activeTouchPointers.add(evt.pointerId);
           // Second finger down → the viewport owns the pinch/pan gesture; stop
           // any single-finger pan in progress and ignore this pointer.
@@ -1289,6 +1335,23 @@ export class DrawableCanvas {
           this.state.update(evt);
           break;
         }
+        case 'pen':
+          // The barrel button opens the tool wheel (the app layer listens for
+          // it) and must not also lay down a mark, the same way a right-click
+          // doesn't. Pressing it mid-stroke lands here too.
+          if (evt.button === PEN_BARREL_BUTTON) {
+            break;
+          }
+          // Flipping the stylus over to its eraser end swaps the tool for as
+          // long as that end is down, then hands the previous tool back.
+          if (evt.buttons & PEN_ERASER_BUTTONS) {
+            this.beginEraserOverride();
+          }
+          this.beginPenContact(evt);
+          this.state.change(InteractState.UsingTool, evt);
+          this.state.update(evt);
+          break;
+
         // @ts-expect-error
         // biome-ignore lint/suspicious/noFallthroughSwitchClause: intentional fallthrough to default
         case 'mouse':
@@ -1312,6 +1375,12 @@ export class DrawableCanvas {
 
     this._handlePointerUp = (evt) => {
       this._activeTouchPointers.delete(evt.pointerId);
+      // A palm drove nothing, so its lift must end nothing: this handler is on
+      // the window and would otherwise finish the stylus's live stroke the
+      // moment the hand shifted.
+      if (this._palm.pointerUp(evt.pointerId)) {
+        return;
+      }
       // A finger that lifts without dragging is a tap: run it through the
       // select tool so it selects what's under it, or clears the selection on
       // empty canvas. Dragging pans instead, and never reaches this.
@@ -1327,6 +1396,8 @@ export class DrawableCanvas {
         this.state.change(InteractState.UsingTool, evt);
       }
       this.state.change(InteractState.Idle, evt);
+      // After the interaction ends, so the eraser gets to finish its own.
+      this.endEraserOverride();
     };
     window.addEventListener('pointerup', this._handlePointerUp);
     // iOS fires pointercancel (not pointerup) for touches it absorbs into a
@@ -1443,16 +1514,76 @@ export class DrawableCanvas {
   }
 
   private updateCursor() {
+    let cursor: string;
     if (this.state.current === InteractState.Moving) {
-      this.canvas.style.cursor = 'grabbing';
+      cursor = 'grabbing';
     } else if (this.spaceDown) {
-      this.canvas.style.cursor = 'grab';
+      cursor = 'grab';
     } else {
-      this.canvas.style.cursor = this._toolCursor;
+      cursor = this._toolCursor;
+    }
+    // Every pointermove reaches here — 120 a second from a stylus — and
+    // assigning an identical value still invalidates the element's style.
+    if (cursor !== this._appliedCursor) {
+      this._appliedCursor = cursor;
+      this.canvas.style.cursor = cursor;
     }
   }
 
+  /**
+   * Swap in the eraser for the length of one stylus gesture. Deliberately not
+   * `switchTool`: flipping the pen over shouldn't clear the selection or move
+   * the toolbar's highlight, and the on-canvas eraser ring is feedback enough.
+   */
+  /**
+   * The stylus has touched down. PalmRejection reclassifies the touches that
+   * were already on the screen; the gesture they had started still has to be
+   * unwound here, since the pen typically lands just after the hand does.
+   */
+  private beginPenContact(evt: PointerEvent) {
+    this._palm.penDown(evt.pointerId, this._activeTouchPointers);
+    if (this._activeTouchPointers.size > 0) {
+      this._activeTouchPointers.clear();
+      this._touchTapCandidate = null;
+      this.abortInteraction();
+      this.state.change(InteractState.Idle, evt);
+    }
+  }
+
+  private beginEraserOverride() {
+    const eraser = this.tools.find((t) => t.id === 'eraser');
+    if (!eraser || this._eraserOverride || this.toolSelected === eraser) {
+      return;
+    }
+    this._eraserOverride = this.toolSelected;
+    this.toolSelected = eraser;
+  }
+
+  private endEraserOverride() {
+    if (this._eraserOverride) {
+      this.toolSelected = this._eraserOverride;
+      this._eraserOverride = null;
+    }
+  }
+
+  /**
+   * Drop the in-progress tool interaction without committing it. Used when a
+   * pointer gesture that started as tool use turns out to be something else —
+   * a pen resting on the canvas to summon the tool wheel.
+   */
+  public abortInteraction() {
+    if (this.state.current !== InteractState.UsingTool) {
+      return;
+    }
+    this._abortingInteraction = true;
+    this.state.change(InteractState.Idle, null);
+    this._abortingInteraction = false;
+  }
+
   public switchTool(to: number) {
+    // An explicit switch wins over a live eraser-end override, or lifting the
+    // stylus would silently restore the tool the user just switched away from.
+    this._eraserOverride = null;
     this.toolSelected.interrupt(this);
     const next = this.tools[to];
     // A tool that can push its options onto the selection (the text tool) needs

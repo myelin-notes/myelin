@@ -1,4 +1,3 @@
-import { summarizeNoteBytes } from '@myelin/editor/note/state-summary';
 import { join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
@@ -28,13 +27,16 @@ import type { FileType, RepositoryCapabilities, VFSNodeId } from './types';
 
 const logger = new Logger('LocalRepository');
 
+/**
+ * Deliberately just the byte count. This used to run canvas bytes through
+ * `summarizeNoteBytes`, which decodes the whole note into a throwaway Y.Doc to
+ * count its elements — on both the read and the write of every save, and on the
+ * thread that has to paint the next ink frame. A stroke drawn on a large note
+ * paid for two full CRDT decodes to fill in a log line production discards.
+ */
 function summarizeStoredBytes(
-  fileType: FileType,
   bytes: Uint8Array | null,
 ): Record<string, unknown> {
-  if (fileType === 'mcanvas') {
-    return summarizeNoteBytes(bytes);
-  }
   return {
     byteLength: bytes?.byteLength ?? 0,
     hasBytes: Boolean(bytes && bytes.byteLength > 0),
@@ -193,7 +195,7 @@ export class LocalRepository extends BaseRepository {
       storageRoot: this.storageRoot,
       filePath,
       revision,
-      ...summarizeStoredBytes(node.fileType, bytes),
+      ...summarizeStoredBytes(bytes),
     });
     return { bytes, revision };
   }
@@ -220,7 +222,7 @@ export class LocalRepository extends BaseRepository {
         storageRoot: this.storageRoot,
         filePath,
         revision,
-        ...summarizeStoredBytes(node.fileType, bytes),
+        ...summarizeStoredBytes(bytes),
       });
       return revision;
     }

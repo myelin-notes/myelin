@@ -55,21 +55,21 @@ import { useDropTarget } from './explorer/use-drop-target';
 import { ImportDialog } from './import/dialog';
 import { RecentCard } from './recent-card';
 
-const logger = new Logger('TabletLibrary');
+const logger = new Logger('MobileLibrary');
 const SORT_MODES: SortMode[] = ['name-asc', 'name-desc', 'modified', 'created'];
 const RECENT_LIMIT = 3;
 
 /**
- * Tablet-layout home surface. Instead of the desktop sidebar, the explorer gets
+ * Mobile-layout home surface. Instead of the desktop sidebar, the explorer gets
  * its own full page — a faithful revival of the pre-sidebar library home: a
  * single scrolling page with a "Library" header, a recently-opened card grid
  * (the first card featured), then an Explorer section (search, breadcrumbs, a
  * list/grid file explorer with folder drill-in) beside a tag-filter panel.
  * Shown by {@link AppShell} on the empty-pane home view; opening a document
  * covers it with a tab and the tab bar's library button returns here. Only
- * rendered in a tablet build — see {@link RootLayout}.
+ * rendered in a mobile build — see {@link RootLayout}.
  */
-export function TabletLibrary() {
+export function MobileLibrary() {
   const strings = useMessages();
   const locale = useLocale();
   const repository = useRepository();

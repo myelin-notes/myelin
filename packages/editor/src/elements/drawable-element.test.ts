@@ -93,3 +93,52 @@ describe('hitHandle', () => {
     );
   });
 });
+
+/**
+ * The renderer draws only the elements this reports as visible, so anything it
+ * answers `false` for is invisible that frame no matter what it would paint.
+ */
+describe('intersectsWorldRect', () => {
+  const VIEW = new DOMRect(0, 0, 100, 100);
+
+  function strokeAt(x: number, y: number): StrokeElement {
+    const stroke = new StrokeElement(
+      'k',
+      [x, y, 0.5, x + 4, y + 4, 0.5, x + 8, y, 0.5],
+      false,
+      STYLE,
+    );
+    stroke.updateBounds();
+    return stroke;
+  }
+
+  it('keeps an element inside the view', () => {
+    expect(strokeAt(40, 40).intersectsWorldRect(VIEW, 0)).toBe(true);
+  });
+
+  it('keeps one that only overlaps an edge', () => {
+    expect(strokeAt(-4, 50).intersectsWorldRect(VIEW, 0)).toBe(true);
+  });
+
+  it('drops one well outside on either axis', () => {
+    expect(strokeAt(500, 50).intersectsWorldRect(VIEW, 0)).toBe(false);
+    expect(strokeAt(50, -500).intersectsWorldRect(VIEW, 0)).toBe(false);
+  });
+
+  it('keeps one just outside when a margin is allowed for', () => {
+    const stroke = strokeAt(140, 50);
+    expect(stroke.intersectsWorldRect(VIEW, 0)).toBe(false);
+    expect(stroke.intersectsWorldRect(VIEW, 128)).toBe(true);
+  });
+
+  it('follows the element offset rather than its local geometry', () => {
+    // Local coordinates put this one in view; the offset is what actually
+    // decides where it lands, and a test that ignored it would cull visible ink.
+    const stroke = strokeAt(10, 10);
+    stroke.setOffset(1000, 1000);
+    expect(stroke.intersectsWorldRect(VIEW, 0)).toBe(false);
+
+    stroke.setOffset(0, 0);
+    expect(stroke.intersectsWorldRect(VIEW, 0)).toBe(true);
+  });
+});

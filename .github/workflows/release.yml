@@ -210,17 +210,6 @@ jobs:
           releaseId: ${{ github.event.release.id }}
           args: ${{ matrix.args }}
 
-      - name: Upload workflow artifacts
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: myelin-${{ matrix.platform }}${{ matrix.args && format('-{0}', matrix.args) || '' }}
-          path: |
-            src-tauri/target/*/release/bundle/**/*
-            src-tauri/target/release/bundle/**/*
-          if-no-files-found: ignore
-          retention-days: 14
-
   android:
     name: Build (android)
     needs: test
@@ -302,6 +291,12 @@ jobs:
             yarn tauri android init
           fi
 
+      - name: Require signing secrets for releases
+        if: github.event_name == 'release' && env.ANDROID_KEYSTORE_BASE64 == ''
+        run: |
+          echo "::error::ANDROID_KEYSTORE_BASE64 is unset; refusing to publish unsigned Android artifacts"
+          exit 1
+
       - name: Decode Android keystore
         if: env.ANDROID_KEYSTORE_BASE64 != ''
         run: |
@@ -337,6 +332,15 @@ jobs:
 
       - name: Build Android
         env:
+          # Play rejects targetSdk 35+ apps whose 64-bit native libs have 4 KB
+          # page alignment, and the pinned NDK 26 still links that way (r27+
+          # made 16 KB the default -- drop this when NDK_VERSION moves up).
+          # Every native lib we ship -- whisper.cpp/ggml, candle, iroh -- links
+          # into the Rust cdylib, so setting it on the Rust link covers all of
+          # them. Passed as CARGO_ENCODED_RUSTFLAGS, not RUSTFLAGS, because the
+          # CLI hands gradle a whitelisted env (see the ios job) that keeps
+          # CARGO_* but not a bare RUSTFLAGS.
+          CARGO_ENCODED_RUSTFLAGS: -Clink-arg=-Wl,-z,max-page-size=16384
           # whisper-rs-sys runs bindgen against the Android target. bindgen sets
           # the correct --target per ABI from cargo's TARGET, but without the NDK
           # sysroot clang falls back to the host /usr/include, can't find libc
@@ -347,28 +351,49 @@ jobs:
           BINDGEN_EXTRA_CLANG_ARGS: --sysroot=${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
         run: yarn tauri android build --apk --aab
 
+      # The alignment above rides on an env var through two process hops
+      # (CLI -> gradle -> CLI -> cargo), and a dropped var fails silently: the
+      # build succeeds and only the Play upload rejects it. Check the shipped
+      # 64-bit libs directly. 32-bit ABIs are exempt from the requirement.
+      - name: Verify 16 KB page alignment
+        run: |
+          OBJDUMP="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objdump"
+          rm -rf /tmp/align-check && mkdir -p /tmp/align-check
+          for apk in src-tauri/gen/android/app/build/outputs/apk/*/release/*.apk; do
+            unzip -oq "$apk" 'lib/arm64-v8a/*.so' 'lib/x86_64/*.so' -d /tmp/align-check
+          done
+          checked=0
+          for so in $(find /tmp/align-check -name '*.so'); do
+            checked=$((checked + 1))
+            if "$OBJDUMP" -p "$so" | awk '$1 == "LOAD" { print $NF }' | grep -qv '2\*\*1[4-9]'; then
+              echo "::error::$(basename "$so") has LOAD segments below 16 KB alignment"
+              "$OBJDUMP" -p "$so" | awk '$1 == "LOAD"'
+              exit 1
+            fi
+          done
+          if [ "$checked" -eq 0 ]; then
+            echo "::error::no 64-bit libraries found to check"
+            exit 1
+          fi
+          echo "$checked library(s) are 16 KB aligned"
+
       - name: Upload to release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
         run: |
+          # Match the real output depth. `**` without globstar is just `*`, so
+          # the two-deep APK path (apk/<flavor>/release/) never matched and
+          # 0.2.4 shipped the AAB alone -- the AAB path is one level shallower
+          # and matched by accident.
           shopt -s nullglob
-          files=(src-tauri/gen/android/app/build/outputs/apk/**/*.apk src-tauri/gen/android/app/build/outputs/bundle/**/*.aab)
-          if [ ${#files[@]} -gt 0 ]; then
-            gh release upload "$TAG" "${files[@]}" --clobber
+          files=(src-tauri/gen/android/app/build/outputs/apk/*/release/*.apk src-tauri/gen/android/app/build/outputs/bundle/*/*.aab)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no APK or AAB found to upload"
+            exit 1
           fi
-
-      - name: Upload workflow artifacts
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: myelin-android
-          path: |
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-            src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
-          if-no-files-found: warn
-          retention-days: 14
+          gh release upload "$TAG" "${files[@]}" --clobber
 
   ios:
     name: Build (ios)
@@ -459,13 +484,3 @@ jobs:
           if [ ${#files[@]} -gt 0 ]; then
             gh release upload "$TAG" "${files[@]}" --clobber
           fi
-
-      - name: Upload workflow artifacts
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: myelin-ios
-          path: |
-            src-tauri/gen/apple/build/**/*.ipa
-          if-no-files-found: warn
-          retention-days: 14

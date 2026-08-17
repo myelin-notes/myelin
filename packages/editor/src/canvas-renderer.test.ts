@@ -3,6 +3,7 @@ import {
   BG_OVERDRAW_PX,
   backgroundPanShift,
   createZoomGestureState,
+  cullMarginWorld,
   isZoomGestureActive,
 } from './canvas-renderer';
 import { MAX_ZOOM, MIN_ZOOM } from './canvas-viewport';
@@ -158,5 +159,27 @@ describe('isZoomGestureActive', () => {
       return isZoomGestureActive(state, 1.4, now);
     });
     expect(settled.at(-1)).toBe(false);
+  });
+});
+
+describe('cullMarginWorld', () => {
+  it('is a constant band in screen pixels, whatever the zoom', () => {
+    for (const zoom of [MIN_ZOOM, 0.5, 1, 4, MAX_ZOOM]) {
+      expect(cullMarginWorld(zoom) * zoom).toBeCloseTo(128, 6);
+    }
+  });
+
+  it('shrinks in world units as the view zooms in', () => {
+    expect(cullMarginWorld(4)).toBeLessThan(cullMarginWorld(1));
+    expect(cullMarginWorld(1)).toBeLessThan(cullMarginWorld(0.25));
+  });
+
+  it('culls nothing when the zoom is unusable', () => {
+    // Before the viewport has been measured. An unbounded margin keeps every
+    // element in the frame, which is the pre-culling behaviour — a bad frame
+    // is recoverable, a blank canvas reads as data loss.
+    for (const zoom of [0, -1, Number.NaN]) {
+      expect(cullMarginWorld(zoom)).toBe(Number.POSITIVE_INFINITY);
+    }
   });
 });

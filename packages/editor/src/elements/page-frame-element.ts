@@ -345,10 +345,6 @@ export class PageFrameElement extends DrawableElement {
     return true;
   }
 
-  public override get lowersCanvasWhileEditing(): boolean {
-    return true;
-  }
-
   public override get locksViewportPanWhileEditing(): boolean {
     return true;
   }

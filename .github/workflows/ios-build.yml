@@ -47,9 +47,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
-          # See release.yml: LFS-tracked model binaries must be materialized,
-          # not left as pointer stubs, or the bundled models fail to load.
-          lfs: true
 
       - name: Setup Node
         uses: actions/setup-node@v4

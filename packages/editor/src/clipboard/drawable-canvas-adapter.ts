@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import type * as Y from 'yjs';
 import type { DrawableCanvas } from '../drawable-canvas';
-import { ElementType } from '../elements/element-type';
+import { ElementType, isBackgroundElement } from '../elements/element-type';
 import { PageFrameElement } from '../elements/page-frame-element';
 import type { VFSNodeId } from '../sync/types';
 import {
@@ -18,10 +18,6 @@ import type {
   CanvasPasteResult,
   CanvasRect,
 } from './types';
-
-function isBackgroundElement(type: ElementType): boolean {
-  return type === ElementType.PAGE_FRAME || type === ElementType.PDF;
-}
 
 function rectFromDomRect(rect: DOMRect): CanvasRect {
   return {

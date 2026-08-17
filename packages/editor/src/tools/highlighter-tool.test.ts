@@ -128,4 +128,16 @@ describe('HighlighterTool does not snap into shapes', () => {
     tool.update(canvas, PRESSURE_EVENT, pos(500, 500));
     expect(stroke.xyPoints.length).toBe(before + 1);
   });
+
+  it('stays uniform width even under a real stylus pressure stream', () => {
+    const { canvas, created } = makeCanvas();
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+
+    tool.update(canvas, { pressure: 0.2 } as PointerEvent, pos(0, 0));
+    tool.update(canvas, { pressure: 0.9 } as PointerEvent, pos(30, 0));
+
+    expect(stroke.pressureEnabled).toBe(false);
+  });
 });

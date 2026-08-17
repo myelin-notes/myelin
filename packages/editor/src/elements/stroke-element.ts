@@ -24,6 +24,16 @@ export interface StrokeStyle {
  */
 const POINT_FLUSH_INTERVAL_MS = 300;
 
+/**
+ * Pointer Events reports a flat 0.5 for the whole drag on hardware with no
+ * pressure sensor (mouse, sensorless pen), so a sample that differs from it is
+ * the only proof a real sensor is behind the stroke. Until one arrives the
+ * stroke keeps perfect-freehand's velocity simulation, which is what a mouse
+ * wants — switching it off unconditionally would flatten every mouse stroke to
+ * a constant width.
+ */
+const NO_SENSOR_PRESSURE = 0.5;
+
 export class StrokeElement extends DrawableElement {
   protected box: DOMRect;
   protected dirty: boolean = true;
@@ -97,8 +107,21 @@ export class StrokeElement extends DrawableElement {
   }
 
   public addPoint(x: number, y: number, pressure: number | undefined) {
+    const isFirst = this.points.length === 0;
     this.points.push(x, y, pressure ?? 0);
     this.dirty = true;
+    this.growBoundsTo(x, y, isFirst);
+
+    // Every sample already carries its real value, so flipping mid-stroke
+    // re-renders the whole stroke from recorded pressure, not just the rest.
+    if (
+      !this.hasPressure &&
+      pressure !== undefined &&
+      pressure > 0 &&
+      pressure !== NO_SENSOR_PRESSURE
+    ) {
+      this.hasPressure = true;
+    }
 
     // Throttled live flush so a long stroke stays in one undo group; the final
     // state is always persisted by commit() on pointer-up.
@@ -109,6 +132,29 @@ export class StrokeElement extends DrawableElement {
     }
   }
 
+  /**
+   * Widen the cached box to hold one more sample.
+   *
+   * `updateBoundingBox` only runs when the stroke is finished, so without this
+   * a live stroke would carry the empty box it was constructed with — and the
+   * renderer culls by that box, which would leave the ink being drawn
+   * invisible until the pen lifted. Padding by the full `size` is a bound on
+   * perfect-freehand's radius (at most 0.75 * size at maximum pressure), so
+   * the box is never too small; `updateBoundingBox` tightens it at the end.
+   */
+  private growBoundsTo(x: number, y: number, isFirst: boolean): void {
+    const pad = this.style.size;
+    if (isFirst) {
+      this.box = new DOMRect(x - pad, y - pad, pad * 2, pad * 2);
+      return;
+    }
+    const minX = Math.min(this.box.x, x - pad);
+    const minY = Math.min(this.box.y, y - pad);
+    const maxX = Math.max(this.box.x + this.box.width, x + pad);
+    const maxY = Math.max(this.box.y + this.box.height, y + pad);
+    this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
+  }
+
   /** Persist the full point buffer to Yjs. Called when the stroke is finished. */
   public commit(): void {
     this.flushPoints();
@@ -116,7 +162,12 @@ export class StrokeElement extends DrawableElement {
 
   private flushPoints(): void {
     if (this.yMap) {
-      this.syncToYMap({ points: [...this.points] });
+      // hasPressure rides along: it is serialized as false when the element is
+      // created and only settles once a sample proves the device has a sensor.
+      this.syncToYMap({
+        hasPressure: this.hasPressure,
+        points: [...this.points],
+      });
     }
   }
 
@@ -142,7 +193,9 @@ export class StrokeElement extends DrawableElement {
         simulatePressure: !this.hasPressure,
         size: this.style.size,
       });
-      this.cachedPath = new Path2D(this.getSvgPathFromStroke(outline));
+      const path = new Path2D();
+      appendStrokeOutline(path, outline);
+      this.cachedPath = path;
       this.dirty = false;
     }
 
@@ -241,42 +294,59 @@ export class StrokeElement extends DrawableElement {
 
     this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
   }
+}
 
-  protected average(a: number, b: number) {
-    return (a + b) / 2;
+/** The subset of `Path2D` {@link appendStrokeOutline} drives. */
+export interface QuadraticPathSink {
+  moveTo(x: number, y: number): void;
+  quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void;
+  closePath(): void;
+}
+
+/**
+ * Trace a perfect-freehand outline onto `path` as the closed curve the stroke
+ * renders as: a quadratic through the first three points, then one smooth
+ * quadratic per remaining point, each ending at the midpoint of a point and its
+ * successor.
+ *
+ * This used to be formatted as an SVG path string and handed to the `Path2D`
+ * constructor to parse. That string is rebuilt on every frame an in-progress
+ * stroke grows, and its two `toFixed(2)` calls per outline point made it ~72%
+ * of the rebuild -- more than perfect-freehand's own geometry pass -- before
+ * the parse it then paid for. Driving `Path2D` directly skips both.
+ *
+ * Each curve after the first was an SVG `T` command, which takes only an
+ * endpoint and derives its control point by reflecting the previous one about
+ * the current point. `quadraticCurveTo` has no such shorthand, so the
+ * reflection is computed here to keep the rendered shape identical.
+ */
+export function appendStrokeOutline(
+  path: QuadraticPathSink,
+  outline: number[][],
+): void {
+  if (outline.length < 4) {
+    return;
   }
 
-  private getSvgPathFromStroke(points: number[][], closed = true) {
-    const len = points.length;
+  path.moveTo(outline[0][0], outline[0][1]);
 
-    if (len < 4) {
-      return ``;
-    }
+  let ctrlX = outline[1][0];
+  let ctrlY = outline[1][1];
+  let curX = (outline[1][0] + outline[2][0]) / 2;
+  let curY = (outline[1][1] + outline[2][1]) / 2;
+  path.quadraticCurveTo(ctrlX, ctrlY, curX, curY);
 
-    let a = points[0];
-    let b = points[1];
-    const c = points[2];
-
-    let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(
-      2,
-    )},${b[1].toFixed(2)} ${this.average(b[0], c[0]).toFixed(2)},${this.average(
-      b[1],
-      c[1],
-    ).toFixed(2)} T`;
-
-    for (let i = 2, max = len - 1; i < max; i++) {
-      a = points[i];
-      b = points[i + 1];
-      result += `${this.average(a[0], b[0]).toFixed(2)},${this.average(
-        a[1],
-        b[1],
-      ).toFixed(2)} `;
-    }
-
-    if (closed) {
-      result += 'Z';
-    }
-
-    return result;
+  for (let i = 2, max = outline.length - 1; i < max; i++) {
+    const endX = (outline[i][0] + outline[i + 1][0]) / 2;
+    const endY = (outline[i][1] + outline[i + 1][1]) / 2;
+    const reflectedX = 2 * curX - ctrlX;
+    const reflectedY = 2 * curY - ctrlY;
+    path.quadraticCurveTo(reflectedX, reflectedY, endX, endY);
+    ctrlX = reflectedX;
+    ctrlY = reflectedY;
+    curX = endX;
+    curY = endY;
   }
+
+  path.closePath();
 }
