@@ -115,7 +115,7 @@ function addText(
 }
 
 /**
- * The canvas the tour opens: one page frame demonstrating the page features
+ * The starter canvas: one page frame demonstrating the page features
  * people miss (code, math, mermaid, callouts, tables, embeds) and, beside it,
  * the free-floating text and LaTeX elements that only exist on the canvas.
  *

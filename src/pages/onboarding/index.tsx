@@ -15,30 +15,26 @@ import { useTabController } from '@/lib/tabs/context';
 import { UserPrefs } from '@/lib/user-prefs';
 import { cn } from '@/lib/utils';
 import { PrivacyStep } from './privacy-step';
+import { SampleCanvasStep } from './sample-canvas-step';
 import { createStarterCanvasFile } from './starter-canvas';
 import { SyncStep } from './sync-step';
-import { TourStep } from './tour-step';
 import { WelcomeStep } from './welcome-step';
 
 const logger = new Logger('Onboarding');
 
-const STEPS = ['welcome', 'privacy', 'sync', 'tour'] as const;
+const STEPS = ['welcome', 'privacy', 'sync', 'sample'] as const;
 
 /**
  * First-run setup, shown in place of the app shell until
  * `onboardingCompleted` is set. It owns the two decisions that cannot be made
- * for the user — analytics consent and where their notes live — and hands off
- * to the coachmark tour on the way out.
+ * for the user — analytics consent and where their notes live — and offers the
+ * starter canvas on the way out.
  *
  * The analytics toggle writes straight through to the preference rather than
  * being staged until the end: turning it on is the consent, and quitting
  * halfway must not leave a decision half-applied.
  */
-export function OnboardingFlow({
-  onDone,
-}: {
-  onDone: (options: { startTour: boolean }) => void;
-}) {
+export function OnboardingFlow() {
   const strings = useMessages();
   const repository = useRepository();
   const tabController = useTabController();
@@ -50,30 +46,28 @@ export function OnboardingFlow({
   const blocked = step === 'sync' && !syncComplete;
 
   const finish = useCallback(
-    async (requestedTour: boolean) => {
-      let startTour = requestedTour;
+    async (openStarterCanvas: boolean) => {
+      let opened = openStarterCanvas;
 
-      if (startTour) {
+      if (opened) {
         try {
           const name = await repository.getUniqueFileName(
-            strings.onboarding.tour.canvasName,
+            strings.onboarding.sample.canvasName,
             null,
           );
           const id = await createStarterCanvasFile(repository, name, strings);
           tabController.openTab({ type: 'canvas', id }, name);
         } catch (error) {
-          // The tour walks the canvas toolbar, so without a canvas there is
-          // nothing to point at — finish into the empty app shell instead.
-          logger.error('Failed to create the tour canvas', error);
-          startTour = false;
+          // Nothing to open, so finish into the empty app shell instead.
+          logger.error('Failed to create the starter canvas', error);
+          opened = false;
         }
       }
 
       UserPrefs.set('onboardingCompleted', true);
-      trackEvent('onboarding_completed', { tour_started: startTour });
-      onDone({ startTour });
+      trackEvent('onboarding_completed', { starter_canvas_opened: opened });
     },
-    [onDone, repository, strings, tabController],
+    [repository, strings, tabController],
   );
 
   return (
@@ -107,15 +101,20 @@ export function OnboardingFlow({
                 onCompleteChange={setSyncComplete}
               />
             )}
-            {step === 'tour' && <TourStep />}
+            {step === 'sample' && <SampleCanvasStep />}
           </div>
         </div>
       </main>
 
       <footer className="shrink-0 border-border-subtle border-t px-6 py-4 sm:px-8">
         <div className="mx-auto flex w-full max-w-xl items-center justify-between gap-4">
-          <span className="text-[10px] text-text-muted uppercase tracking-widest">
-            {strings.onboarding.stepLabel(index + 1, STEPS.length)}
+          <span className="shrink-0 text-[10px] text-text-muted uppercase tracking-widest">
+            <span aria-hidden className="sm:hidden">
+              {index + 1}/{STEPS.length}
+            </span>
+            <span className="sr-only sm:not-sr-only">
+              {strings.onboarding.stepLabel(index + 1, STEPS.length)}
+            </span>
           </span>
           <div className="flex items-center gap-2">
             {index > 0 && (
@@ -127,13 +126,13 @@ export function OnboardingFlow({
                 {strings.onboarding.back}
               </Button>
             )}
-            {step === 'tour' ? (
+            {step === 'sample' ? (
               <>
                 <Button variant="ghost" onClick={() => void finish(false)}>
-                  {strings.onboarding.tour.skip}
+                  {strings.onboarding.sample.skip}
                 </Button>
                 <Button onClick={() => void finish(true)}>
-                  {strings.onboarding.tour.start}
+                  {strings.onboarding.sample.start}
                 </Button>
               </>
             ) : (

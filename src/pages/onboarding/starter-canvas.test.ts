@@ -53,7 +53,7 @@ describe('createStarterCanvasFile', () => {
     }
   });
 
-  it('fills the page frame with the blocks the tour promises', async () => {
+  it('fills the page frame with the blocks the onboarding step promises', async () => {
     const ydoc = await encodedCanvas();
     const frame = ydoc.elements
       .toArray()

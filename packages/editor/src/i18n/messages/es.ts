@@ -920,14 +920,20 @@ const es: typeof en = {
       incomplete:
         'Inicia sesión y elige un repositorio para continuar, o selecciona Local para decidirlo más tarde.',
     },
-    tour: {
-      eyebrow: 'Recorrido',
-      title: '¿Quieres un recorrido rápido?',
+    sample: {
+      eyebrow: 'Lienzo',
+      title: '¿Empezar con un lienzo de ejemplo?',
       description:
-        'Unas cuantas paradas por la app: tu biblioteca, la búsqueda, la barra de herramientas y cómo insertar cosas. Abre un lienzo en blanco para probar.',
-      start: 'Muéstrame la app',
-      skip: 'Omitir el recorrido',
+        'Crea un lienzo de ejemplo con una muestra de funciones para que pruebes a tu aire',
+      start: 'Abrir el lienzo',
+      skip: 'Empezar en blanco',
       canvasName: 'Primeros pasos',
+      highlights: {
+        frame: 'Una página con código, fórmulas y un diagrama de Mermaid',
+        canvas: 'Texto y LaTeX flotando en el lienzo, junto a la página',
+        syntax: 'Una chuleta con los atajos de markdown',
+        checklist: 'Una lista breve para que pruebes tú mismo',
+      },
     },
     starter: {
       frameName: 'Lo básico',
@@ -976,40 +982,6 @@ const es: typeof en = {
         latexCaption: 'Un bloque de LaTeX en el lienzo:',
         toolbarHint:
           'Todo lo demás sale del botón + en la parte superior de la barra de herramientas.',
-      },
-    },
-  },
-  tour: {
-    next: 'Siguiente',
-    back: 'Atrás',
-    done: 'Listo',
-    skip: 'Omitir recorrido',
-    progress: (current: number, total: number) => `${current} de ${total}`,
-    steps: {
-      explorer: {
-        title: 'Tu biblioteca',
-        description:
-          'Aquí vive cada nota. Haz clic derecho en una fila para renombrarla, moverla o etiquetarla.',
-      },
-      search: {
-        title: 'Encuentra lo que sea',
-        description:
-          'Busca por texto o cambia a búsqueda semántica para encontrar notas por significado en lugar de palabras exactas.',
-      },
-      tools: {
-        title: 'La barra de herramientas',
-        description:
-          'Lápiz, marcador, borrador, texto y selección. Pasa el cursor por una herramienta para ver su atajo.',
-      },
-      insert: {
-        title: 'Añade contenido',
-        description:
-          'Añade páginas, imágenes, PDF, audio y LaTeX directamente al lienzo.',
-      },
-      settings: {
-        title: 'Ajustes y sincronización',
-        description:
-          'El tema, el idioma, la privacidad y la conexión con tu repositorio están aquí.',
       },
     },
   },

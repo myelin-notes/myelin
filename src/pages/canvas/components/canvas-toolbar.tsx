@@ -118,7 +118,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
       >
         <div
           ref={toolbarInnerRef}
-          data-tour="canvas-toolbar"
           className={
             compact
               ? 'flex max-w-full flex-row items-center gap-1 overflow-x-auto rounded-xl bg-card px-2 py-2 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
@@ -131,7 +130,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                 insertButtonRef.current = el;
               }}
               data-insert-trigger
-              data-tour="canvas-insert"
               aria-label={strings.canvas.toolbar.insert}
               className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
                 insertOpen
