@@ -12,9 +12,6 @@ use tokio::{
     sync::{oneshot, Mutex},
 };
 
-/// How long the loopback listener stays open waiting for the browser to come
-/// back. Authorization codes are short lived, so a user who wanders off
-/// mid-sign-in is better served by a clean timeout than a socket held open.
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(300);
 const CALLBACK_PATH: &str = "/oauth/callback";
 
