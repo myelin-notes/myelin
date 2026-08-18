@@ -32,9 +32,8 @@ jobs:
     timeout-minutes: 90
     env:
       NDK_VERSION: 26.3.11579264
-      # Ships the tablet full-page library layout, matching the release android
-      # and ios jobs, so the build behaves like what users have installed.
       VITE_TABLET_LAYOUT: "true"
+      VITE_GITHUB_CLIENT_SECRET: ${{ secrets.VITE_GITHUB_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
         with:
