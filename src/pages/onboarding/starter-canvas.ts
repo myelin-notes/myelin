@@ -1,3 +1,4 @@
+import { ADAPTIVE_INK } from '@myelin/editor/canvas-theme';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -106,7 +107,7 @@ function addText(
     scaleX: 1,
     scaleY: 1,
     text,
-    color: '#1a1a1a',
+    color: ADAPTIVE_INK,
     fontSize,
     fontFamily: 'sans-serif',
     boxWidth: CANVAS_COLUMN_WIDTH,
