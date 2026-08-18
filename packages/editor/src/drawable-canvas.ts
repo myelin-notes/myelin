@@ -1580,6 +1580,23 @@ export class DrawableCanvas {
     this._abortingInteraction = false;
   }
 
+  /**
+   * Give up what a resting finger was doing so the tool wheel can take the
+   * gesture over, and report whether it was the app layer's to take.
+   *
+   * Only a plain one-finger pan is: a palm under the stylus is not input at
+   * all, and a finger that grabbed an element is mid-drag, which a long press
+   * must not turn into a tool switch.
+   */
+  public releaseTouchForToolWheel(): boolean {
+    if (this._palm.suppressed || this.state.current !== InteractState.Moving) {
+      return false;
+    }
+    this._touchTapCandidate = null;
+    this.state.change(InteractState.Idle, null);
+    return true;
+  }
+
   public switchTool(to: number) {
     // An explicit switch wins over a live eraser-end override, or lifting the
     // stylus would silently restore the tool the user just switched away from.

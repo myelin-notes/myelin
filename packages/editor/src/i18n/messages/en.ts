@@ -911,16 +911,22 @@ const en = {
       incomplete:
         'Sign in and pick a repository to continue, or choose Local to decide later.',
     },
-    tour: {
-      eyebrow: 'Tour',
-      title: 'Want a quick tour?',
+    sample: {
+      eyebrow: 'Canvas',
+      title: 'Start with a sample canvas?',
       description:
-        'A few stops around the app: your library, search, the toolbar, and where things get inserted. It opens a blank canvas to try on.',
-      start: 'Show me around',
-      skip: 'Skip the tour',
+        'Create a sample canvas with some feature showcase that you can play around with',
+      start: 'Open the canvas',
+      skip: 'Start empty',
       canvasName: 'Getting started',
+      highlights: {
+        frame: 'A page frame with code, math, and a Mermaid diagram',
+        canvas: 'Text and LaTeX floating on the canvas beside it',
+        syntax: 'A cheat sheet for the markdown shortcuts',
+        checklist: 'A short checklist to try things yourself',
+      },
     },
-    // Content of the starter canvas the tour opens. Syntax inside these strings
+    // Content of the starter canvas. Syntax inside these strings
     // (`$E = mc^2$`, `![](…)`) is part of what the page demonstrates, so keep it
     // literal when translating.
     starter: {
@@ -969,40 +975,6 @@ const en = {
         latexCaption: 'A LaTeX block on the canvas:',
         toolbarHint:
           'Everything else comes from the + button at the top of the toolbar.',
-      },
-    },
-  },
-  tour: {
-    next: 'Next',
-    back: 'Back',
-    done: 'Done',
-    skip: 'Skip tour',
-    progress: (current: number, total: number) => `${current} of ${total}`,
-    steps: {
-      explorer: {
-        title: 'Your library',
-        description:
-          'Every note lives here. Right-click a row to rename, move, or tag it.',
-      },
-      search: {
-        title: 'Find anything',
-        description:
-          'Search by text, or switch to semantic search to find notes by meaning rather than exact words.',
-      },
-      tools: {
-        title: 'The toolbar',
-        description:
-          'Pen, highlighter, eraser, text, and selection. Hover a tool to see its hotkey.',
-      },
-      insert: {
-        title: 'Bring things in',
-        description:
-          'Add pages, images, PDFs, audio, and LaTeX straight onto the canvas.',
-      },
-      settings: {
-        title: 'Settings and sync',
-        description:
-          'Theme, language, privacy, and your repository connection all live here.',
       },
     },
   },

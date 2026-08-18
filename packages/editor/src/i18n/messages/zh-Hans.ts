@@ -890,14 +890,19 @@ const zhHans: typeof en = {
       later: '也可以稍后在设置中配置。',
       incomplete: '请登录并选择一个仓库后继续，或选择「本地」稍后再决定。',
     },
-    tour: {
-      eyebrow: '导览',
-      title: '要快速了解一下吗？',
-      description:
-        '带你看几个地方：笔记库、搜索、工具栏，以及如何插入内容。会打开一块空白画布供你试用。',
-      start: '带我看看',
-      skip: '跳过导览',
+    sample: {
+      eyebrow: '画布',
+      title: '要从示例画布开始吗？',
+      description: '创建一块示例画布，里面有一些功能演示，可以随意试试',
+      start: '打开画布',
+      skip: '从空白开始',
       canvasName: '入门',
+      highlights: {
+        frame: '一个页面框，里面有代码、公式和 Mermaid 图',
+        canvas: '页面旁边浮在画布上的文本和 LaTeX 块',
+        syntax: '一份 Markdown 语法速查表',
+        checklist: '一份简短的清单，方便你自己动手试试',
+      },
     },
     starter: {
       frameName: '基础功能',
@@ -943,38 +948,6 @@ const zhHans: typeof en = {
         body: '文本框和 LaTeX 块可以自由摆放。拖动、缩放，或者把它们排列在页面旁边。',
         latexCaption: '画布上的一个 LaTeX 块：',
         toolbarHint: '其余内容都可以从工具栏顶部的 + 按钮插入。',
-      },
-    },
-  },
-  tour: {
-    next: '下一步',
-    back: '上一步',
-    done: '完成',
-    skip: '跳过导览',
-    progress: (current: number, total: number) => `${current} / ${total}`,
-    steps: {
-      explorer: {
-        title: '你的笔记库',
-        description:
-          '所有笔记都在这里。右键点击某一行可重命名、移动或添加标签。',
-      },
-      search: {
-        title: '快速查找',
-        description:
-          '可以按文字搜索，也可以切换到语义搜索，按含义而非精确词语查找笔记。',
-      },
-      tools: {
-        title: '工具栏',
-        description:
-          '钢笔、荧光笔、橡皮擦、文字和选择工具。悬停在工具上可查看快捷键。',
-      },
-      insert: {
-        title: '插入内容',
-        description: '可以直接向画布中添加页面、图片、PDF、音频和 LaTeX。',
-      },
-      settings: {
-        title: '设置与同步',
-        description: '主题、语言、隐私以及仓库连接都在这里。',
       },
     },
   },

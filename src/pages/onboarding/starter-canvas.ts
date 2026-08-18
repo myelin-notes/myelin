@@ -1,3 +1,4 @@
+import { ADAPTIVE_INK } from '@myelin/editor/canvas-theme';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -106,7 +107,7 @@ function addText(
     scaleX: 1,
     scaleY: 1,
     text,
-    color: '#1a1a1a',
+    color: ADAPTIVE_INK,
     fontSize,
     fontFamily: 'sans-serif',
     boxWidth: CANVAS_COLUMN_WIDTH,
@@ -115,7 +116,7 @@ function addText(
 }
 
 /**
- * The canvas the tour opens: one page frame demonstrating the page features
+ * The starter canvas: one page frame demonstrating the page features
  * people miss (code, math, mermaid, callouts, tables, embeds) and, beside it,
  * the free-floating text and LaTeX elements that only exist on the canvas.
  *

@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/tooltip';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
+import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
@@ -77,6 +78,13 @@ import { useToolState } from './hooks/use-tool-state';
 import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
+
+/**
+ * The wheel's rings sit at fixed offsets outside this radius, so the default
+ * 100 spans 478px — wider than any phone. 52 brings the outer ring to 382px,
+ * which clears a 390px portrait screen.
+ */
+const COMPACT_WHEEL_RADIUS = 52;
 
 interface CanvasViewProps {
   id: VFSNodeId;
@@ -113,6 +121,7 @@ function CanvasViewInner({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgHostRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const compactLayout = useCompactCanvasLayout();
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
@@ -676,7 +685,11 @@ function CanvasViewInner({
         style={{ zIndex: 100 }}
         className="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto"
       >
-        <WheelPicker ref={wheelRef} radius={100} items={toolState.wheelItems}>
+        <WheelPicker
+          ref={wheelRef}
+          radius={compactLayout ? COMPACT_WHEEL_RADIUS : 100}
+          items={toolState.wheelItems}
+        >
           {wheelCenterIcon}
         </WheelPicker>
       </div>
