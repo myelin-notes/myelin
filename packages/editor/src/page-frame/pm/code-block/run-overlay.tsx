@@ -1,5 +1,6 @@
 import {
   type CSSProperties,
+  useCallback,
   useEffect,
   useEffectEvent,
   useRef,
@@ -11,20 +12,23 @@ import { createPortal } from 'react-dom';
 import { VirtualList } from '../../../components/virtual-list';
 import { PM_EDITOR_CLASS } from '../constants';
 import { getPageFramePmScreenRectForElement } from '../screen-rect';
-import { type CodeRunEntry, codeRunStore } from './run-store';
+import { DisplayItemView } from './run-display';
+import { type CodeRunEntry, type CodeRunItem, codeRunStore } from './run-store';
 
 const ANCHOR_GAP = 12;
 const EDGE_MARGIN = 12;
-/** Row height before measurement; corrected once each line mounts. */
+/** Row height before measurement; corrected once each row mounts. */
 const ESTIMATED_LINE_HEIGHT = 18;
+/** Rich output is taller than a line; a closer guess keeps scrolling steadier
+ * while the real height is measured. */
+const ESTIMATED_DISPLAY_HEIGHT = 200;
 /** Treat the body as "at the bottom" within this many px (tail-follow). */
 const STICK_THRESHOLD = 4;
 
-// Stable identities: the virtualizer keys its memoized layout off these, so
-// passing fresh closures each render would force an O(line count) rebuild on
+// Stable identity: the virtualizer keys its memoized layout off this, so
+// passing a fresh closure each render would force an O(item count) rebuild on
 // every scroll frame.
 const getLineRowKey = (index: number) => String(index);
-const estimateLineHeight = () => ESTIMATED_LINE_HEIGHT;
 
 /**
  * Renders the floating output overlay for every active code run. Anchored to
@@ -128,19 +132,33 @@ function CodeRunOverlay({ entry }: { entry: CodeRunEntry }) {
       document.removeEventListener('pointerdown', onPointerDown, true);
   }, [entry.id, entry.blockDom]);
 
-  // Follow the tail as new lines arrive, unless the user scrolled up.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when line count grows
+  // Follow the tail as new output arrives, unless the user scrolled up.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when item count grows
   useEffect(() => {
     const body = bodyRef.current;
     if (body && stickToBottom.current) {
       body.scrollTop = body.scrollHeight;
     }
-  }, [entry.lines.length]);
+  }, [entry.items.length]);
+
+  // `entry.items` is mutated in place by the store, so this identity is stable
+  // and the virtualizer's layout memo survives re-renders.
+  const estimateRowHeight = useCallback(
+    (index: number) =>
+      entry.items[index]?.kind === 'display'
+        ? ESTIMATED_DISPLAY_HEIGHT
+        : ESTIMATED_LINE_HEIGHT,
+    [entry.items],
+  );
 
   return (
     <div
       ref={rootRef}
-      className="pm-code-block__output"
+      className={
+        entry.hasDisplay
+          ? 'pm-code-block__output has-display'
+          : 'pm-code-block__output'
+      }
       style={style}
       onPointerDown={(event) => event.stopPropagation()}
       onWheel={(event) => event.stopPropagation()}
@@ -170,26 +188,34 @@ function CodeRunOverlay({ entry }: { entry: CodeRunEntry }) {
       >
         <VirtualList
           scrollRef={bodyRef}
-          count={entry.lines.length}
-          estimateHeight={estimateLineHeight}
+          count={entry.items.length}
+          estimateHeight={estimateRowHeight}
           getRowKey={getLineRowKey}
           gap={0}
-          renderRow={(index) => {
-            const line = entry.lines[index];
-            return (
-              <div
-                className={
-                  line.stream === 'stderr'
-                    ? 'pm-code-block__output-line is-stderr'
-                    : 'pm-code-block__output-line'
-                }
-              >
-                {line.text === '' ? ' ' : line.text}
-              </div>
-            );
-          }}
+          renderRow={(index) => <OutputRow item={entry.items[index]} />}
         />
       </div>
+    </div>
+  );
+}
+
+function OutputRow({ item }: { item: CodeRunItem }) {
+  if (item.kind === 'display') {
+    return (
+      <div className="pm-code-block__output-display">
+        <DisplayItemView payload={item.payload} />
+      </div>
+    );
+  }
+  return (
+    <div
+      className={
+        item.stream === 'stderr'
+          ? 'pm-code-block__output-line is-stderr'
+          : 'pm-code-block__output-line'
+      }
+    >
+      {item.text === '' ? ' ' : item.text}
     </div>
   );
 }

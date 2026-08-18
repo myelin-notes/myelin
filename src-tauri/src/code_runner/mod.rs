@@ -97,6 +97,9 @@ pub async fn run_code(
     std::fs::create_dir_all(&dir).map_err(|e| format!("create run dir: {e}"))?;
     std::fs::write(dir.join(plan.source_filename), source)
         .map_err(|e| format!("write source: {e}"))?;
+    for (name, contents) in &plan.aux_files {
+        std::fs::write(dir.join(name), contents).map_err(|e| format!("write {name}: {e}"))?;
+    }
 
     let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
     state
@@ -181,6 +184,7 @@ async fn run_to_completion(
 
     let mut child = Command::new(&plan.run.program)
         .args(&plan.run.args)
+        .envs(plan.env.iter().copied())
         .current_dir(dir)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

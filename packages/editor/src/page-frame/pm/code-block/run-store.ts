@@ -1,22 +1,35 @@
 import type { EditorView } from 'prosemirror-view';
+import type { DisplayPayload } from '../../../code-runner/contract';
 
-export interface CodeRunLine {
+export interface CodeRunTextItem {
+  kind: 'text';
   text: string;
   stream: 'stdout' | 'stderr';
 }
+
+/** A rich payload the run emitted in place of a text line. */
+export interface CodeRunDisplayItem {
+  kind: 'display';
+  payload: DisplayPayload;
+}
+
+export type CodeRunItem = CodeRunTextItem | CodeRunDisplayItem;
 
 export interface CodeRunEntry {
   /** Stable per code-block node view; one overlay per block. */
   id: string;
   view: EditorView;
   blockDom: HTMLElement;
-  lines: CodeRunLine[];
+  items: CodeRunItem[];
+  /** Tracked on append so the overlay can widen for rich output without
+   * rescanning every item each render. */
+  hasDisplay: boolean;
   visible: boolean;
 }
 
 /**
- * Line appends are coalesced to at most one notify per this interval. The
- * overlay re-render is O(line count) (the virtualizer rebuilds its offsets), so
+ * Item appends are coalesced to at most one notify per this interval. The
+ * overlay re-render is O(item count) (the virtualizer rebuilds its offsets), so
  * pacing updates well below the display refresh rate keeps a flood of output
  * from saturating the main thread — ~15 Hz still reads as continuous streaming.
  */
@@ -24,9 +37,9 @@ const OUTPUT_FLUSH_MS = 64;
 
 /**
  * Bridges the vanilla code-block node views to the React output overlay layer.
- * Node views push run state here; {@link CodeRunOverlayLayer} renders it. Line
+ * Node views push run state here; {@link CodeRunOverlayLayer} renders it. Item
  * appends are coalesced (see {@link OUTPUT_FLUSH_MS}) so a flood of output
- * doesn't trigger a render per line.
+ * doesn't trigger a render per item.
  */
 class CodeRunStore {
   private readonly entries = new Map<string, CodeRunEntry>();
@@ -55,31 +68,34 @@ class CodeRunStore {
       id,
       view,
       blockDom,
-      lines: [],
+      items: [],
+      hasDisplay: false,
       visible: true,
     });
     this.emit();
   }
 
-  appendLine(id: string, line: CodeRunLine): void {
+  appendItem(id: string, item: CodeRunItem): void {
     const entry = this.entries.get(id);
     if (!entry) {
       return;
     }
     // Mutate in place (O(1)); the snapshot array identity still changes on the
-    // batched notify, and the overlay re-reads `lines.length`.
-    entry.lines.push(line);
+    // batched notify, and the overlay re-reads `items.length`.
+    entry.items.push(item);
+    entry.hasDisplay ||= item.kind === 'display';
     this.scheduleEmit();
   }
 
-  /** Append a coalesced batch of lines with a single notify. */
-  appendLines(id: string, lines: CodeRunLine[]): void {
+  /** Append a coalesced batch of items with a single notify. */
+  appendItems(id: string, items: CodeRunItem[]): void {
     const entry = this.entries.get(id);
-    if (!entry || lines.length === 0) {
+    if (!entry || items.length === 0) {
       return;
     }
-    for (const line of lines) {
-      entry.lines.push(line);
+    for (const item of items) {
+      entry.items.push(item);
+      entry.hasDisplay ||= item.kind === 'display';
     }
     this.scheduleEmit();
   }

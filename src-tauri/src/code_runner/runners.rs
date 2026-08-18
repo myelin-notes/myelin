@@ -1,12 +1,19 @@
 use std::path::Path;
 
+#[derive(Default)]
 pub struct CommandSpec {
     pub program: String,
     pub args: Vec<String>,
 }
 
+#[derive(Default)]
 pub struct RunPlan {
     pub source_filename: &'static str,
+    /// Extra `(filename, contents)` files written into the run dir alongside
+    /// the source, for languages whose run command needs a bootstrap.
+    pub aux_files: Vec<(&'static str, &'static str)>,
+    /// Environment overrides applied to the run command.
+    pub env: Vec<(&'static str, &'static str)>,
     /// Candidate build commands tried in order; the first compiler present on
     /// PATH wins. Empty for interpreted languages.
     pub build: Vec<CommandSpec>,
@@ -23,51 +30,65 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
     let plan = match language.to_ascii_lowercase().as_str() {
         "python" => RunPlan {
             source_filename: "main.py",
-            build: vec![],
+            // The bootstrap execs main.py (resolved against the run dir, which
+            // is the command's cwd) with rich-output support layered on.
+            aux_files: vec![("_myelin_boot.py", include_str!("python_boot.py"))],
+            env: vec![
+                // Rich payloads must reach the UI as they are produced; block
+                // buffering would hold them until the process exits.
+                ("PYTHONUNBUFFERED", "1"),
+                // Output is decoded as UTF-8 line by line, but Windows would
+                // otherwise encode stdout in the ANSI codepage.
+                ("PYTHONIOENCODING", "utf-8"),
+                // Never let a plotting library try to open a GUI window from a
+                // headless subprocess.
+                ("MPLBACKEND", "Agg"),
+            ],
             run: CommandSpec {
                 program: python_program(),
-                args: vec![join("main.py")],
+                args: vec![join("_myelin_boot.py")],
             },
+            ..Default::default()
         },
         "javascript" => RunPlan {
             source_filename: "main.js",
-            build: vec![],
             run: CommandSpec {
                 program: "node".into(),
                 args: vec![join("main.js")],
             },
+            ..Default::default()
         },
         "typescript" => RunPlan {
             source_filename: "main.ts",
-            build: vec![],
             run: CommandSpec {
                 program: "node".into(),
                 args: vec![join("main.ts")],
             },
+            ..Default::default()
         },
         "ruby" => RunPlan {
             source_filename: "main.rb",
-            build: vec![],
             run: CommandSpec {
                 program: "ruby".into(),
                 args: vec![join("main.rb")],
             },
+            ..Default::default()
         },
         "bash" => RunPlan {
             source_filename: "main.sh",
-            build: vec![],
             run: CommandSpec {
                 program: "bash".into(),
                 args: vec![join("main.sh")],
             },
+            ..Default::default()
         },
         "go" => RunPlan {
             source_filename: "main.go",
-            build: vec![],
             run: CommandSpec {
                 program: "go".into(),
                 args: vec!["run".into(), join("main.go")],
             },
+            ..Default::default()
         },
         "rust" => RunPlan {
             source_filename: "main.rs",
@@ -76,6 +97,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
                 program: bin,
                 args: vec![],
             },
+            ..Default::default()
         },
         "c" => {
             let src = join("main.c");
@@ -91,6 +113,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
                     program: bin,
                     args: vec![],
                 },
+                ..Default::default()
             }
         }
         "cpp" => {
@@ -107,6 +130,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
                     program: bin,
                     args: vec![],
                 },
+                ..Default::default()
             }
         }
         _ => return None,
@@ -161,6 +185,17 @@ mod tests {
         let plan = resolve_plan("rust", Path::new("/tmp/run")).unwrap();
         assert_eq!(plan.build.first().expect("rust has a build step").program, "rustc");
         assert!(plan.run.args.is_empty());
+    }
+
+    #[test]
+    fn python_runs_through_the_rich_output_bootstrap() {
+        let plan = resolve_plan("python", Path::new("/tmp/run")).unwrap();
+        assert_eq!(plan.source_filename, "main.py");
+        assert!(plan.run.args[0].ends_with("_myelin_boot.py"));
+        let (name, contents) = plan.aux_files.first().expect("bootstrap is written");
+        assert_eq!(*name, "_myelin_boot.py");
+        assert!(contents.contains("myelin-display"));
+        assert!(plan.env.iter().any(|(k, _)| *k == "PYTHONUNBUFFERED"));
     }
 
     #[test]

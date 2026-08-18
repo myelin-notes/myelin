@@ -134,6 +134,34 @@
   color: var(--text-error, #e5484d);
 }
 
+/* Rich output needs more room than a column of text lines. */
+.pm-code-block__output.has-display {
+  width: 520px;
+  max-height: 480px;
+}
+
+.pm-code-block__output-display {
+  padding: 4px 0;
+}
+
+.pm-code-block__output-image {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.pm-code-block__output-frame {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+}
+
+.pm-code-block__output-math {
+  overflow-x: auto;
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
 /* The * descendant variant overrides the markdown highlighter's CodeMark /
    CodeInfo token colors — CodeMirror nests highlight spans inside the
    delimiter mark span, and inherited color loses to the inner span's own. */

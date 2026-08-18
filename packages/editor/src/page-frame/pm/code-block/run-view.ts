@@ -1,10 +1,13 @@
 import type { EditorView } from 'prosemirror-view';
 import { trackEvent } from '@myelin/shared/analytics';
 import { Logger } from '@myelin/shared/logger';
-import type { RunnableLanguage } from '../../../code-runner/contract';
+import {
+  parseDisplayPayload,
+  type RunnableLanguage,
+} from '../../../code-runner/contract';
 import { getPlatform, type Unsubscribe } from '../../../platform';
 import type { RunSource } from './concat';
-import { codeRunStore } from './run-store';
+import { type CodeRunItem, codeRunStore } from './run-store';
 
 const logger = new Logger('CodeBlockRun');
 
@@ -106,9 +109,9 @@ export class CodeBlockRunView {
     // Subscribe before invoking so a fast-exiting process can't emit before a
     // listener exists.
     this.unlistenOutput = await codeRunner.onRunOutput(executionId, (event) => {
-      codeRunStore.appendLines(
+      codeRunStore.appendItems(
         this.id,
-        event.lines.map((text) => ({ text, stream: event.stream })),
+        event.lines.map((text) => toItem(text, event.stream)),
       );
     });
     this.unlistenFinished = await codeRunner.onRunFinished(
@@ -135,9 +138,14 @@ export class CodeBlockRunView {
     this.setRunning(false);
 
     if (error) {
-      codeRunStore.appendLine(this.id, { text: error, stream: 'stderr' });
+      codeRunStore.appendItem(this.id, {
+        kind: 'text',
+        text: error,
+        stream: 'stderr',
+      });
     } else if (exitCode !== 0) {
-      codeRunStore.appendLine(this.id, {
+      codeRunStore.appendItem(this.id, {
+        kind: 'text',
         text: `Process exited with code ${exitCode}`,
         stream: 'stderr',
       });
@@ -172,4 +180,18 @@ export class CodeBlockRunView {
     this.unlistenOutput = null;
     this.unlistenFinished = null;
   }
+}
+
+/**
+ * Turns one output line into a store item. Rich payloads ride on stdout inside
+ * a sentinel (see {@link parseDisplayPayload}); everything else is text.
+ */
+function toItem(text: string, stream: 'stdout' | 'stderr'): CodeRunItem {
+  if (stream === 'stdout') {
+    const payload = parseDisplayPayload(text);
+    if (payload) {
+      return { kind: 'display', payload };
+    }
+  }
+  return { kind: 'text', text, stream };
 }
