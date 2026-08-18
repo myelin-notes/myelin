@@ -361,8 +361,8 @@ const es: typeof en = {
       auth: {
         title: 'Autenticación del repositorio',
         descriptions: {
-          polling:
-            'Introduce el código en tu navegador para completar el inicio de sesión',
+          awaitingRedirect:
+            'Completa el inicio de sesión con GitHub en tu navegador',
           connected: 'El inicio de sesión se completó',
           unavailable: 'La autenticación no está disponible',
           signIn: 'Inicia sesión para conectar este repositorio',
@@ -375,7 +375,10 @@ const es: typeof en = {
           signIn: 'Iniciar sesión',
           signOut: 'Cerrar sesión',
         },
-        deviceCode: 'Introduce este código en tu navegador',
+        browserCallback: {
+          title: 'Sesión iniciada en GitHub',
+          message: 'Puedes cerrar esta pestaña y volver a Myelin Notes.',
+        },
         notices: {
           credentialReset: (provider: string) =>
             `Tu sesión de ${provider} expiró y se restableció. Vuelve a conectar.`,

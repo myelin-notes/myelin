@@ -45,20 +45,21 @@ export {
   type RepositoryLifecycle,
 } from './repo/config';
 export { createRepository } from './repo/factory';
-export type { GitHubDeviceAuthPollResult } from './repo/github-credentials';
+export type {
+  GitHubOAuthResult,
+  GitHubOAuthStartPayload,
+} from './repo/github-credentials';
 export {
-  beginGitHubDeviceAuth,
-  cancelGitHubDeviceAuth,
+  beginGitHubOAuth,
+  cancelGitHubOAuth,
   clearGitHubToken,
   consumeGitHubVaultDiscarded,
   hasGitHubToken,
-  isGitHubDeviceAuthAvailable,
+  isGitHubOAuthAvailable,
   isGitHubSecureStorageAvailable,
-  openGitHubDeviceAuth,
-  pollGitHubDeviceAuth,
-  startGitHubDeviceAuth,
+  openGitHubOAuth,
   storeGitHubToken,
-  waitForGitHubDeviceAuth,
+  waitForGitHubOAuth,
 } from './repo/github-credentials';
 export {
   isRepositoryConfigStructurallyComplete,

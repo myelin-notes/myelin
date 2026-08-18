@@ -42,6 +42,19 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.github.wintersteve25.myelin</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.github.wintersteve25.myelin</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record audio notes in Myelin Notes.</string>
 </dict>

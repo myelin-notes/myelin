@@ -1,22 +1,15 @@
 // Central registry of runtime environment variables.
 //
-// All `import.meta.env.*` reads in the app should live here so we have a
-// single place to audit which env vars the app depends on. The editor and
-// shared packages read their own flags in `packages/editor/src/env.ts` and
-// `packages/shared/src/env.ts` — keep any shared flag semantics in sync with
-// those files.
+// All `import.meta.env.*` reads in the app should live here
 //
 // Build-time env vars consumed by vite.config.ts (Node context, `process.env`)
-// are documented here for discoverability but must be read there directly:
+// documented here for discoverability but must be read there directly:
 //   - MYELIN_TAURI_DEV_PORT — dev server port override, defaults to 1420
 //   - TAURI_DEV_HOST       — host override for the Tauri dev server
 //
-// These are non-secret, client-embedded values (OAuth client id, public
-// PostHog key, discovery URL), so the production defaults are baked in below.
-// An env var, when set, overrides the default — useful for local overrides.
-//
 // Runtime Vite env vars:
 //   - VITE_GITHUB_CLIENT_ID — GitHub OAuth client id
+//   - VITE_GITHUB_CLIENT_SECRET — GitHub OAuth client secret
 //   - VITE_LIVE_DISCOVERY_URL — Cloudflare Worker URL for automatic live sync
 //     peer discovery
 //   - VITE_POSTHOG_KEY  — PostHog project API key
@@ -35,6 +28,9 @@ export const IS_MOBILE_BUILD = __MOBILE_BUILD__;
 export const GITHUB_CLIENT_ID = (
   import.meta.env.VITE_GITHUB_CLIENT_ID ?? 'Ov23lio3GBRJhHIcx6ow'
 ).trim();
+
+export const GITHUB_CLIENT_SECRET =
+  import.meta.env.VITE_GITHUB_CLIENT_SECRET.trim();
 
 export const LIVE_DISCOVERY_URL = (
   import.meta.env.VITE_LIVE_DISCOVERY_URL ?? 'https://live.trymyelin.app'

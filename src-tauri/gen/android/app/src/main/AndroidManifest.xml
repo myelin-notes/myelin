@@ -20,6 +20,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- OAuth redirect target. The activity is singleTask, so GitHub's
+                 redirect resumes the sign-in already in progress rather than
+                 launching a second one that has lost its PKCE verifier. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.github.wintersteve25.myelin" />
+            </intent-filter>
         </activity>
 
         <provider

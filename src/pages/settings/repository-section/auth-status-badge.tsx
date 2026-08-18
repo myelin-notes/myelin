@@ -4,11 +4,11 @@ import { useMessages } from '@/lib/i18n';
 export function AuthStatusBadge({
   hasToken,
   checking,
-  polling,
+  authorizing,
 }: {
   hasToken: boolean;
   checking: boolean;
-  polling: boolean;
+  authorizing: boolean;
 }) {
   const strings = useMessages();
 
@@ -21,7 +21,7 @@ export function AuthStatusBadge({
     );
   }
 
-  if (polling) {
+  if (authorizing) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-hover-tint px-2.5 py-1 text-[10px] text-text-muted uppercase tracking-widest">
         <Loader2 className="size-3 animate-spin" />
