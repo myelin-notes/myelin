@@ -1,9 +1,14 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, convert::Infallible, sync::Arc, time::Duration};
 
+use bytes::Bytes;
+use http_body_util::Full;
+use hyper::{
+    header, server::conn::http1, service::service_fn, Method, Request, Response, StatusCode,
+};
+use hyper_util::rt::TokioIo;
 use serde::Serialize;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
+    net::TcpListener,
     sync::{oneshot, Mutex},
 };
 
@@ -12,7 +17,6 @@ use tokio::{
 /// mid-sign-in is better served by a clean timeout than a socket held open.
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(300);
 const CALLBACK_PATH: &str = "/oauth/callback";
-const MAX_REQUEST_BYTES: usize = 8 * 1024;
 
 #[derive(Default)]
 pub struct OAuthLoopbackState {
@@ -126,6 +130,7 @@ async fn serve(
     result: oneshot::Sender<CallbackParams>,
     mut shutdown: oneshot::Receiver<()>,
 ) {
+    let page = Arc::new(page);
     let mut result = Some(result);
     loop {
         tokio::select! {
@@ -134,10 +139,24 @@ async fn serve(
                 let Ok((stream, _addr)) = accepted else {
                     continue;
                 };
+                let captured = Arc::new(Mutex::new(None));
+                let service = service_fn(|request| {
+                    let page = Arc::clone(&page);
+                    let captured = Arc::clone(&captured);
+                    async move { Ok::<_, Infallible>(respond(request, &page, &captured).await) }
+                });
+                // One request per connection: the browser reconnects for the
+                // redirect, and this keeps `serve_connection` from parking on a
+                // kept-alive socket after the callback has already arrived.
+                let _ = http1::Builder::new()
+                    .keep_alive(false)
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await;
                 // Browsers also request /favicon.ico against the callback
                 // origin, so keep listening until a request actually carries
                 // the redirect parameters.
-                if let Some(params) = handle_connection(stream, &page).await {
+                let params = captured.lock().await.take();
+                if let Some(params) = params {
                     if let Some(sender) = result.take() {
                         let _ = sender.send(params);
                     }
@@ -148,60 +167,36 @@ async fn serve(
     }
 }
 
-async fn handle_connection(mut stream: TcpStream, page: &str) -> Option<CallbackParams> {
-    let query = read_request_query(&mut stream).await?;
-    let params = parse_callback_params(&query);
-    let complete = params.code.is_some() || params.error.is_some();
+/// Answers a single request, recording the parameters in `captured` when the
+/// request is the awaited redirect. Anything else gets a bare 404 so favicon
+/// probes and stray local connections don't end the wait.
+async fn respond(
+    request: Request<hyper::body::Incoming>,
+    page: &str,
+    captured: &Mutex<Option<CallbackParams>>,
+) -> Response<Full<Bytes>> {
+    let params = (request.method() == Method::GET && request.uri().path() == CALLBACK_PATH)
+        .then(|| parse_callback_params(request.uri().query().unwrap_or_default()))
+        .filter(|params| params.code.is_some() || params.error.is_some());
 
-    let body = if complete { page } else { "" };
-    let response = format!(
-        "HTTP/1.1 {}\r\n\
-         Content-Type: text/html; charset=utf-8\r\n\
-         Content-Length: {}\r\n\
-         Connection: close\r\n\r\n{}",
-        if complete { "200 OK" } else { "404 Not Found" },
-        body.len(),
-        body,
-    );
-    let _ = stream.write_all(response.as_bytes()).await;
-
-    complete.then_some(params)
-}
-
-/// Reads just the request line and returns its query string. The callback is a
-/// bare GET, so headers and body are irrelevant.
-async fn read_request_query(stream: &mut TcpStream) -> Option<String> {
-    let mut buffer = Vec::new();
-    let mut chunk = [0_u8; 1024];
-    let line_end = loop {
-        if let Some(index) = buffer.windows(2).position(|window| window == b"\r\n") {
-            break index;
-        }
-        if buffer.len() > MAX_REQUEST_BYTES {
-            return None;
-        }
-        match stream.read(&mut chunk).await {
-            Ok(0) | Err(_) => return None,
-            Ok(read) => buffer.extend_from_slice(&chunk[..read]),
-        }
+    let Some(params) = params else {
+        return Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Full::default())
+            .expect("static 404 response is valid");
     };
 
-    let line = String::from_utf8_lossy(&buffer[..line_end]).into_owned();
-    let mut parts = line.split(' ');
-    if parts.next()? != "GET" {
-        return None;
-    }
-    let target = parts.next()?;
-    let (path, query) = target.split_once('?').unwrap_or((target, ""));
-    (path == CALLBACK_PATH).then(|| query.to_string())
+    *captured.lock().await = Some(params);
+    Response::builder()
+        .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+        .body(Full::new(Bytes::from(page.to_owned())))
+        .expect("static callback response is valid")
 }
 
 fn parse_callback_params(query: &str) -> CallbackParams {
-    let mut entries: HashMap<&str, String> = HashMap::new();
-    for pair in query.split('&').filter(|pair| !pair.is_empty()) {
-        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
-        entries.insert(key, percent_decode(value));
-    }
+    let mut entries: HashMap<String, String> = form_urlencoded::parse(query.as_bytes())
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .collect();
 
     CallbackParams {
         code: entries.remove("code"),
@@ -209,37 +204,6 @@ fn parse_callback_params(query: &str) -> CallbackParams {
         error: entries.remove("error"),
         error_description: entries.remove("error_description"),
     }
-}
-
-fn percent_decode(value: &str) -> String {
-    let bytes = value.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        match bytes[index] {
-            b'+' => {
-                out.push(b' ');
-                index += 1;
-            }
-            b'%' if index + 3 <= bytes.len() => {
-                match u8::from_str_radix(&value[index + 1..index + 3], 16) {
-                    Ok(decoded) => {
-                        out.push(decoded);
-                        index += 3;
-                    }
-                    Err(_) => {
-                        out.push(b'%');
-                        index += 1;
-                    }
-                }
-            }
-            byte => {
-                out.push(byte);
-                index += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 fn callback_page(title: &str, message: &str) -> String {
@@ -269,6 +233,10 @@ fn escape_html(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpStream,
+    };
 
     #[test]
     fn parses_code_and_state() {
@@ -296,10 +264,13 @@ mod tests {
     }
 
     #[test]
-    fn percent_decode_leaves_trailing_escapes_alone() {
-        assert_eq!(percent_decode("a%2"), "a%2");
-        assert_eq!(percent_decode("a%zz"), "a%zz");
-        assert_eq!(percent_decode("a%20b"), "a b");
+    fn decoding_leaves_trailing_escapes_alone() {
+        assert_eq!(parse_callback_params("code=a%2").code.as_deref(), Some("a%2"));
+        assert_eq!(parse_callback_params("code=a%zz").code.as_deref(), Some("a%zz"));
+        assert_eq!(
+            parse_callback_params("code=a%20b").code.as_deref(),
+            Some("a b")
+        );
     }
 
     #[tokio::test]

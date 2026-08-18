@@ -44,6 +44,11 @@ candle-nn = "0.10"
 candle-transformers = "0.10"
 tokenizers = { version = "0.23", default-features = false, features = ["fancy-regex"] }
 tauri-plugin-deep-link = "2"
+# Already in the tree via reqwest/iroh, so declaring them adds no build cost.
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+form_urlencoded = "1"
 
 [features]
 # Opt-in GPU acceleration via whisper.cpp's Vulkan backend. Kept off by default
