@@ -229,7 +229,7 @@ export function RepositorySetup({
           config.kind !== 'local' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
         )}
       >
-        <div className="min-h-0">
+        <div className="min-h-0 min-w-0">
           <div className="mt-5 space-y-4">
             {!remoteAuth.tokenPresent ? (
               <>
@@ -276,7 +276,7 @@ export function RepositorySetup({
                 </div>
 
                 {remoteAuth.authError && (
-                  <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                  <p className="wrap-anywhere rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
                     {remoteAuth.authError}
                   </p>
                 )}
@@ -314,7 +314,7 @@ export function RepositorySetup({
                 </div>
 
                 {remoteAuth.authError && (
-                  <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                  <p className="wrap-anywhere rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
                     {remoteAuth.authError}
                   </p>
                 )}
@@ -361,7 +361,7 @@ export function RepositorySetup({
                     </div>
 
                     {selectors.error && (
-                      <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                      <p className="wrap-anywhere rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
                         {selectors.error}
                       </p>
                     )}
@@ -385,7 +385,7 @@ export function RepositorySetup({
                     </div>
 
                     {driveFolder.error && (
-                      <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                      <p className="wrap-anywhere rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
                         {driveFolder.error}
                       </p>
                     )}
@@ -441,7 +441,7 @@ export function RepositorySetup({
                   </div>
 
                   {remoteConfigReady && repositoryStatus.lastError && (
-                    <p className="mt-3 rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
+                    <p className="wrap-anywhere mt-3 rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
                       {repositoryStatus.lastError.message}
                     </p>
                   )}
