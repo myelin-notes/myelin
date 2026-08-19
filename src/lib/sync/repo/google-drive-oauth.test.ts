@@ -13,6 +13,7 @@ vi.mock('@/lib/env', () => ({
   GITHUB_CLIENT_ID: 'test-github-client-id',
   GITHUB_CLIENT_SECRET: 'test-github-client-secret',
   GOOGLE_CLIENT_ID: 'test-google-client-id',
+  GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
   GOOGLE_CLIENT_ID_IOS: '',
   GOOGLE_CLIENT_ID_ANDROID: '',
   LIVE_DISCOVERY_URL: 'https://live.test',
@@ -80,6 +81,7 @@ vi.mock('@tauri-apps/plugin-http', () => ({
 const {
   beginGoogleDriveAuth,
   cancelGoogleDriveAuth,
+  getGoogleDriveToken,
   hasGoogleDriveToken,
   waitForGoogleDriveAuth,
 } = await import('./google-drive-credentials');
@@ -145,8 +147,9 @@ describe('Google Drive OAuth', () => {
     expect(exchange?.grant_type).toBe('authorization_code');
     expect(exchange?.code).toBe('auth-code');
     expect(exchange?.redirect_uri).toBe(REDIRECT_URI);
-    // No client secret: PKCE is what proves this is the client that started it.
-    expect(exchange?.client_secret).toBeUndefined();
+    // Google rejects a Desktop client's exchange with invalid_request when the
+    // secret is missing, PKCE notwithstanding.
+    expect(exchange?.client_secret).toBe('test-google-client-secret');
     expect(await base64UrlSha256(exchange?.code_verifier ?? '')).toBe(
       query.get('code_challenge'),
     );
@@ -207,6 +210,35 @@ describe('Google Drive OAuth', () => {
 
     await expect(pending).resolves.toMatchObject({ status: 'failed' });
     expect(await hasGoogleDriveToken('default')).toBe(false);
+  });
+
+  it('sends the client secret on refresh too, once per expiry', async () => {
+    storedSecrets.set(
+      'token:default',
+      JSON.stringify({
+        accessToken: 'stale',
+        refreshToken: 'refresh-1',
+        expiresAtMs: Date.now() - 1_000,
+      }),
+    );
+    tokenResponses.push({ access_token: 'access-2', expires_in: 3600 });
+
+    // Concurrent callers must share one refresh: Google invalidates the prior
+    // access token each time, so a second refresh would revoke the first result.
+    const [a, b] = await Promise.all([
+      getGoogleDriveToken('default'),
+      getGoogleDriveToken('default'),
+    ]);
+
+    expect(a).toBe('access-2');
+    expect(b).toBe('access-2');
+    expect(tokenRequests).toHaveLength(1);
+    expect(tokenRequests[0]?.grant_type).toBe('refresh_token');
+    expect(tokenRequests[0]?.client_secret).toBe('test-google-client-secret');
+
+    // The refreshed token is cached, so a later read makes no request.
+    expect(await getGoogleDriveToken('default')).toBe('access-2');
+    expect(tokenRequests).toHaveLength(1);
   });
 
   it('cancelling tears the redirect listener down', async () => {

@@ -4,6 +4,7 @@ import {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_ID_ANDROID,
   GOOGLE_CLIENT_ID_IOS,
+  GOOGLE_CLIENT_SECRET,
   MOBILE_PLATFORM,
 } from '@/lib/env';
 import { Logger } from '@/lib/logger';
@@ -49,14 +50,27 @@ const TOKEN_EXPIRY_SKEW_MS = 60_000;
 const MOBILE_REDIRECT_URI = `${MOBILE_REDIRECT_SCHEME}:/oauth2redirect`;
 
 // Google issues a separate client per platform, and each only accepts the
-// redirect style of its own type.
-const CLIENT_IDS = {
-  ios: { value: GOOGLE_CLIENT_ID_IOS, envVar: 'VITE_GOOGLE_CLIENT_ID_IOS' },
-  android: {
-    value: GOOGLE_CLIENT_ID_ANDROID,
-    envVar: 'VITE_GOOGLE_CLIENT_ID_ANDROID',
+// redirect style of its own type. Only the Desktop client has a secret: iOS and
+// Android clients are true public clients and Google issues none for them.
+const CLIENTS = {
+  ios: {
+    id: GOOGLE_CLIENT_ID_IOS,
+    idEnvVar: 'VITE_GOOGLE_CLIENT_ID_IOS',
+    secret: null,
+    secretEnvVar: null,
   },
-  desktop: { value: GOOGLE_CLIENT_ID, envVar: 'VITE_GOOGLE_CLIENT_ID' },
+  android: {
+    id: GOOGLE_CLIENT_ID_ANDROID,
+    idEnvVar: 'VITE_GOOGLE_CLIENT_ID_ANDROID',
+    secret: null,
+    secretEnvVar: null,
+  },
+  desktop: {
+    id: GOOGLE_CLIENT_ID,
+    idEnvVar: 'VITE_GOOGLE_CLIENT_ID',
+    secret: GOOGLE_CLIENT_SECRET,
+    secretEnvVar: 'VITE_GOOGLE_CLIENT_SECRET',
+  },
 } as const;
 
 interface StoredGoogleDriveToken {
@@ -65,12 +79,32 @@ interface StoredGoogleDriveToken {
   expiresAtMs: number;
 }
 
-function getGoogleClientId(): string {
-  const { value, envVar } = CLIENT_IDS[MOBILE_PLATFORM ?? 'desktop'];
-  if (!value) {
-    throw new Error(`${envVar} is not configured.`);
+/**
+ * Client id, plus the secret when the platform's client type has one. Google
+ * rejects the token exchange with `invalid_request` if a Desktop client omits
+ * its secret, even though PKCE is in play and the docs call the parameter
+ * optional, so it is validated up front alongside the id.
+ */
+function getGoogleClientCredentials(): {
+  clientId: string;
+  clientSecret: string | null;
+} {
+  const client = CLIENTS[MOBILE_PLATFORM ?? 'desktop'];
+  if (!client.id) {
+    throw new Error(`${client.idEnvVar} is not configured.`);
   }
-  return value;
+  if (client.secretEnvVar && !client.secret) {
+    throw new Error(`${client.secretEnvVar} is not configured.`);
+  }
+  return { clientId: client.id, clientSecret: client.secret ?? null };
+}
+
+function clientCredentialEntries(): Record<string, string> {
+  const { clientId, clientSecret } = getGoogleClientCredentials();
+  return {
+    client_id: clientId,
+    ...(clientSecret ? { client_secret: clientSecret } : {}),
+  };
 }
 
 function normalizeCredentialId(credentialId?: string | null): string {
@@ -133,7 +167,7 @@ export async function isGoogleDriveSecureStorageAvailable(): Promise<boolean> {
 
 export async function isGoogleDriveAuthAvailable(): Promise<boolean> {
   try {
-    getGoogleClientId();
+    getGoogleClientCredentials();
   } catch {
     return false;
   }
@@ -217,7 +251,7 @@ async function refreshAccessToken(
   stored: StoredGoogleDriveToken,
 ): Promise<string> {
   const { payload, error } = await postTokenRequest({
-    client_id: getGoogleClientId(),
+    ...clientCredentialEntries(),
     refresh_token: stored.refreshToken,
     grant_type: 'refresh_token',
   });
@@ -299,15 +333,14 @@ export type GoogleDriveOAuthResult =
  * before the URL is handed back so the callback cannot land before anything is
  * ready to catch it; the caller must follow up with `waitForGoogleDriveAuth` or
  * `cancelGoogleDriveAuth` so the listener is torn down either way.
- *
- * No client secret is sent: `code_verifier` replaces it, which is what lets
- * these client ids ship in a public repository.
  */
 export async function beginGoogleDriveAuth(
   credentialId: string,
 ): Promise<GoogleDriveOAuthStartPayload> {
   const normalized = normalizeCredentialId(credentialId);
-  const clientId = getGoogleClientId();
+  // Resolved up front: a missing secret only surfaces at the token exchange
+  // otherwise, after the user has already consented in the browser.
+  const { clientId } = getGoogleClientCredentials();
 
   await cancelGoogleDriveAuth(normalized);
 
@@ -392,7 +425,7 @@ export async function waitForGoogleDriveAuth(
     }
 
     const { payload, error } = await postTokenRequest({
-      client_id: getGoogleClientId(),
+      ...clientCredentialEntries(),
       code: params.code,
       code_verifier: session.codeVerifier,
       redirect_uri: session.listener.redirectUri,

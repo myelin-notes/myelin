@@ -13,7 +13,12 @@
 //   - VITE_GOOGLE_CLIENT_ID — Google OAuth client id for Drive sync. Google
 //     issues OAuth clients per platform, so this must be the id of the
 //     *Desktop app* client (only those accept the loopback redirect the PKCE
-//     flow uses). No client secret is used or needed: PKCE replaces it.
+//     flow uses).
+//   - VITE_GOOGLE_CLIENT_SECRET: secret of that Desktop client. Google rejects
+//     the token exchange without it even on the PKCE flow, the same way GitHub
+//     does; its own docs note that an installed app's secret "is obviously not
+//     treated as a secret". Unused on mobile, where Google issues no secret for
+//     the iOS and Android client types.
 //     VITE_GOOGLE_CLIENT_ID_IOS / VITE_GOOGLE_CLIENT_ID_ANDROID hold the iOS
 //     and Android clients of the same project, used instead on those builds;
 //     they redirect through the app's custom URI scheme, which the deep-link
@@ -43,7 +48,15 @@ export const GITHUB_CLIENT_SECRET =
   import.meta.env.VITE_GITHUB_CLIENT_SECRET.trim();
 
 export const GOOGLE_CLIENT_ID = (
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ??
+  '150843770497-9i6tupvq4g4o1vhrkjk4pqevb2kpemc4.apps.googleusercontent.com'
+).trim();
+
+// No default: unlike the client id, this is not committed, so until it is set
+// Google Drive sign-in reports itself as unavailable rather than failing at the
+// token exchange after the user has already consented in the browser.
+export const GOOGLE_CLIENT_SECRET = (
+  import.meta.env.VITE_GOOGLE_CLIENT_SECRET ?? ''
 ).trim();
 
 export const GOOGLE_CLIENT_ID_IOS = (
