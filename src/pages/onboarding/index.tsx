@@ -41,8 +41,6 @@ export function OnboardingFlow() {
   const [index, setIndex] = useState(0);
   const [syncComplete, setSyncComplete] = useState(false);
   const step = STEPS[index];
-  // A half-connected GitHub repository would leave the app unable to sync, so
-  // the step holds Continue until the choice is actually usable.
   const blocked = step === 'sync' && !syncComplete;
 
   const finish = useCallback(

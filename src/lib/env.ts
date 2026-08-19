@@ -10,6 +10,14 @@
 // Runtime Vite env vars:
 //   - VITE_GITHUB_CLIENT_ID — GitHub OAuth client id
 //   - VITE_GITHUB_CLIENT_SECRET — GitHub OAuth client secret
+//   - VITE_GOOGLE_CLIENT_ID — Google OAuth client id for Drive sync. Google
+//     issues OAuth clients per platform, so this must be the id of the
+//     *Desktop app* client (only those accept the loopback redirect the PKCE
+//     flow uses). No client secret is used or needed: PKCE replaces it.
+//     VITE_GOOGLE_CLIENT_ID_IOS / VITE_GOOGLE_CLIENT_ID_ANDROID hold the iOS
+//     and Android clients of the same project, used instead on those builds;
+//     they redirect through the app's custom URI scheme, which the deep-link
+//     plugin registers (see google-drive-credentials.ts).
 //   - VITE_LIVE_DISCOVERY_URL — Cloudflare Worker URL for automatic live sync
 //     peer discovery
 //   - VITE_POSTHOG_KEY  — PostHog project API key
@@ -24,6 +32,8 @@ export const MODE = import.meta.env.MODE;
 // library layout over the desktop sidebar, at every mobile viewport size —
 // see SidebarProvider.
 export const IS_MOBILE_BUILD = __MOBILE_BUILD__;
+// The mobile OS
+export const MOBILE_PLATFORM = __MOBILE_PLATFORM__;
 
 export const GITHUB_CLIENT_ID = (
   import.meta.env.VITE_GITHUB_CLIENT_ID ?? 'Ov23lio3GBRJhHIcx6ow'
@@ -31,6 +41,18 @@ export const GITHUB_CLIENT_ID = (
 
 export const GITHUB_CLIENT_SECRET =
   import.meta.env.VITE_GITHUB_CLIENT_SECRET.trim();
+
+export const GOOGLE_CLIENT_ID = (
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+).trim();
+
+export const GOOGLE_CLIENT_ID_IOS = (
+  import.meta.env.VITE_GOOGLE_CLIENT_ID_IOS ?? ''
+).trim();
+
+export const GOOGLE_CLIENT_ID_ANDROID = (
+  import.meta.env.VITE_GOOGLE_CLIENT_ID_ANDROID ?? ''
+).trim();
 
 export const LIVE_DISCOVERY_URL = (
   import.meta.env.VITE_LIVE_DISCOVERY_URL ?? 'https://live.trymyelin.app'

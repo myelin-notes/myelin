@@ -39,6 +39,7 @@ export type {
 } from './live/protocol';
 export {
   type ActiveRepository,
+  DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   DEFAULT_REPOSITORY_CONFIG,
   type ReadableRepository,
   type RepositoryConfig,
@@ -61,6 +62,23 @@ export {
   storeGitHubToken,
   waitForGitHubOAuth,
 } from './repo/github-credentials';
+export { ensureGoogleDriveFolder } from './repo/google-drive';
+export type {
+  GoogleDriveOAuthResult,
+  GoogleDriveOAuthStartPayload,
+} from './repo/google-drive-credentials';
+export {
+  beginGoogleDriveAuth,
+  cancelGoogleDriveAuth,
+  clearGoogleDriveToken,
+  consumeGoogleDriveVaultDiscarded,
+  GOOGLE_DRIVE_PROVIDER_NAME,
+  hasGoogleDriveToken,
+  isGoogleDriveAuthAvailable,
+  isGoogleDriveSecureStorageAvailable,
+  openGoogleDriveAuth,
+  waitForGoogleDriveAuth,
+} from './repo/google-drive-credentials';
 export {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,

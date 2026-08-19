@@ -102,6 +102,10 @@ export function getLiveDiscoveryRepositoryKey(
         config.repo.trim().toLowerCase(),
         (config.branch?.trim() || 'main').toLowerCase(),
       ].join('\0');
+    // Keyed on the folder id: it is the account-unique identity of the folder,
+    // and unlike its name it survives a rename.
+    case 'google-drive':
+      return ['google-drive', config.folderId.trim()].join('\0');
   }
 }
 

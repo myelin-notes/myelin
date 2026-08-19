@@ -345,11 +345,16 @@ const zhHans: typeof en = {
           label: 'GitHub',
           description: '同步到私有 GitHub 仓库',
         },
+        googleDrive: {
+          label: 'Google 云端硬盘',
+          description: '同步到你的 Google 云端硬盘中的文件夹',
+        },
       },
       auth: {
         title: '仓库身份验证',
         descriptions: {
-          awaitingRedirect: '请在浏览器中完成 GitHub 登录',
+          awaitingRedirect: (provider: string) =>
+            `请在浏览器中完成 ${provider} 登录`,
           connected: '登录已完成',
           unavailable: '身份验证不可用',
           signIn: '登录以连接此仓库',
@@ -363,7 +368,7 @@ const zhHans: typeof en = {
           signOut: '退出登录',
         },
         browserCallback: {
-          title: '已登录 GitHub',
+          title: (provider: string) => `已登录 ${provider}`,
           message: '你可以关闭此标签页并返回 Myelin Notes。',
         },
         notices: {
@@ -382,6 +387,7 @@ const zhHans: typeof en = {
         queuedChanges: '排队中的更改',
         lastSync: '上次同步',
         remoteRepository: '远程仓库',
+        driveFolder: '云端硬盘文件夹',
         status: {
           setupRequired: {
             label: '需要设置',
@@ -431,6 +437,11 @@ const zhHans: typeof en = {
           loading: '正在加载分支…',
           error: '无法加载分支',
           empty: '没有分支',
+        },
+        folder: {
+          label: '云端硬盘文件夹名称',
+          placeholder: 'Myelin',
+          error: '无法打开云端硬盘文件夹。',
         },
       },
     },
@@ -889,9 +900,10 @@ const zhHans: typeof en = {
       eyebrow: '同步',
       title: '笔记要保存在哪里？',
       description:
-        '笔记默认保存在本设备上。连接 GitHub 仓库即可备份，并在多台设备之间同步。',
+        '笔记默认保存在本设备上。连接 GitHub 仓库或 Google 云端硬盘即可备份，并在多台设备之间同步。',
       later: '也可以稍后在设置中配置。',
-      incomplete: '请登录并选择一个仓库后继续，或选择「本地」稍后再决定。',
+      incomplete:
+        '请登录并选好笔记的存放位置后继续，或选择「本地」稍后再决定。',
     },
     sample: {
       eyebrow: '画布',

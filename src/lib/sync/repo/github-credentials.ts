@@ -1,27 +1,28 @@
-import { join } from '@tauri-apps/api/path';
-import { remove } from '@tauri-apps/plugin-fs';
 import { fetch } from '@tauri-apps/plugin-http';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import {
-  Stronghold,
-  type Client as StrongholdClient,
-  type Store as StrongholdStore,
-} from '@tauri-apps/plugin-stronghold';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@/lib/env';
 import { Logger } from '@/lib/logger';
-import { UserPrefs } from '@/lib/user-prefs';
-import { getAppDataDir } from '@/platform/tauri/fs-cache';
+import { createCredentialVault } from './credential-vault';
+import {
+  deriveCodeChallenge,
+  encodeFormBody,
+  raceAbort,
+  randomUrlSafeToken,
+} from './oauth/pkce';
 import {
   type OAuthRedirectListener,
   startOAuthRedirectListener,
-} from './github-oauth-redirect';
+} from './oauth/redirect';
 
 const logger = new Logger('GitHubCredentials');
 
-const SECURE_STORAGE_UNAVAILABLE_ERROR =
-  'Encrypted credential storage is unavailable on this device.';
-const GITHUB_STRONGHOLD_FILENAME = 'github-credentials.hold';
-const GITHUB_STRONGHOLD_CLIENT = 'github';
+export const GITHUB_PROVIDER_NAME = 'GitHub';
+
+const vault = createCredentialVault({
+  filename: 'github-credentials.hold',
+  clientName: 'github',
+  passwordPref: 'githubVaultPassword',
+});
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
@@ -52,140 +53,8 @@ function getGitHubTokenKey(credentialId: string): string {
   return `token:${normalizeCredentialId(credentialId)}`;
 }
 
-function generateGitHubVaultPassword(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join(
-    '',
-  );
-}
-
-function getGitHubVaultPassword(): string {
-  const existing = UserPrefs.get('githubVaultPassword').trim();
-  if (existing) {
-    return existing;
-  }
-
-  const generated = generateGitHubVaultPassword();
-  UserPrefs.set('githubVaultPassword', generated);
-  return generated;
-}
-
-function isVaultKeyError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('BadFileKey') || message.includes('decode/decrypt');
-}
-
-// Set when a stale, undecryptable vault is discarded so the UI can surface a
-// one-time "sign-in expired, please reconnect" notice. Read-and-cleared via
-// consumeGitHubVaultDiscarded().
-let githubVaultDiscarded = false;
-
 export function consumeGitHubVaultDiscarded(): boolean {
-  const discarded = githubVaultDiscarded;
-  githubVaultDiscarded = false;
-  return discarded;
-}
-
-async function loadGitHubStronghold(
-  vaultPath: string,
-  password: string,
-): Promise<Stronghold> {
-  try {
-    return await Stronghold.load(vaultPath, password);
-  } catch (error) {
-    if (!isVaultKeyError(error)) {
-      throw error;
-    }
-
-    // The vault file exists but can't be decrypted with the current password
-    // (e.g. the stored vault password was reset/regenerated). Any token inside
-    // is unrecoverable, so discard the file and start fresh — the user simply
-    // re-authenticates. Logged as a warning so it isn't reported as an
-    // exception for an expected, self-healing condition.
-    logger.warn('Discarding unreadable GitHub credential vault', error);
-    githubVaultDiscarded = true;
-    await remove(vaultPath).catch((removeError) => {
-      logger.warn('Failed to remove unreadable GitHub vault', removeError);
-    });
-    return Stronghold.load(vaultPath, password);
-  }
-}
-
-async function createGitHubStrongholdStore(): Promise<{
-  stronghold: Stronghold;
-  store: StrongholdStore;
-}> {
-  const vaultPath = await join(
-    await getAppDataDir(),
-    GITHUB_STRONGHOLD_FILENAME,
-  );
-  const stronghold = await loadGitHubStronghold(
-    vaultPath,
-    getGitHubVaultPassword(),
-  );
-
-  let client: StrongholdClient;
-  try {
-    client = await stronghold.loadClient(GITHUB_STRONGHOLD_CLIENT);
-  } catch {
-    client = await stronghold.createClient(GITHUB_STRONGHOLD_CLIENT);
-  }
-
-  return {
-    stronghold,
-    store: client.getStore(),
-  };
-}
-
-let githubStorePromise: Promise<{
-  stronghold: Stronghold;
-  store: StrongholdStore;
-}> | null = null;
-
-async function getGitHubStrongholdStore(): Promise<{
-  stronghold: Stronghold;
-  store: StrongholdStore;
-}> {
-  if (!githubStorePromise) {
-    githubStorePromise = createGitHubStrongholdStore().catch((error) => {
-      githubStorePromise = null;
-      throw error;
-    });
-  }
-
-  return githubStorePromise;
-}
-
-function storageUnavailableError(error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
-  return new Error(`${SECURE_STORAGE_UNAVAILABLE_ERROR} ${message}`.trim());
-}
-
-async function withGitHubStronghold<T>(
-  run: (store: StrongholdStore, stronghold: Stronghold) => Promise<T>,
-): Promise<T> {
-  try {
-    const { store, stronghold } = await getGitHubStrongholdStore();
-    return await run(store, stronghold);
-  } catch (error) {
-    throw storageUnavailableError(error);
-  }
-}
-
-function decodeGitHubToken(bytes: Uint8Array | null): string | null {
-  if (!bytes || bytes.byteLength === 0) {
-    return null;
-  }
-
-  const token = new TextDecoder().decode(bytes).trim();
-  return token || null;
-}
-
-async function readGitHubToken(credentialId: string): Promise<string | null> {
-  return withGitHubStronghold(async (store) => {
-    const bytes = await store.get(getGitHubTokenKey(credentialId));
-    return decodeGitHubToken(bytes);
-  });
+  return vault.consumeDiscarded();
 }
 
 interface PendingOAuthSession {
@@ -221,15 +90,6 @@ export type GitHubOAuthResult =
   | GitHubOAuthCompletePayload
   | GitHubOAuthFailedPayload;
 
-function encodeFormBody(entries: Record<string, string>): string {
-  return Object.entries(entries)
-    .map(
-      ([key, value]) =>
-        `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
-    )
-    .join('&');
-}
-
 async function postGitHubForm<T>(
   url: string,
   entries: Record<string, string>,
@@ -253,29 +113,6 @@ async function postGitHubForm<T>(
   return (await response.json()) as T;
 }
 
-function base64UrlEncode(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-function randomUrlSafeToken(): string {
-  return base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
-}
-
-async function deriveCodeChallenge(codeVerifier: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(codeVerifier),
-  );
-  return base64UrlEncode(new Uint8Array(digest));
-}
-
 function oauthFailureMessage(
   error: string,
   description: string | null | undefined,
@@ -285,40 +122,12 @@ function oauthFailureMessage(
   return `GitHub authorization failed: ${error} (${detail})`;
 }
 
-/**
- * Rejects as soon as `signal` aborts so a cancelled sign-in stops waiting on a
- * redirect that is never coming, rather than holding the listener open.
- */
-function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) {
-    return promise;
-  }
-
-  return Promise.race([
-    promise,
-    new Promise<never>((_resolve, reject) => {
-      const abort = () =>
-        reject(new Error('GitHub authorization wait aborted.'));
-      if (signal.aborted) {
-        abort();
-        return;
-      }
-      signal.addEventListener('abort', abort, { once: true });
-    }),
-  ]);
-}
-
 export async function isGitHubSecureStorageAvailable(): Promise<boolean> {
-  try {
-    await getGitHubStrongholdStore();
-    return true;
-  } catch {
-    return false;
-  }
+  return vault.isAvailable();
 }
 
 export async function getGitHubToken(credentialId: string): Promise<string> {
-  const token = await readGitHubToken(credentialId);
+  const token = await vault.read(getGitHubTokenKey(credentialId));
   if (!token) {
     throw new Error('GitHub token is not configured.');
   }
@@ -327,7 +136,7 @@ export async function getGitHubToken(credentialId: string): Promise<string> {
 }
 
 export async function hasGitHubToken(credentialId: string): Promise<boolean> {
-  return Boolean(await readGitHubToken(credentialId));
+  return Boolean(await vault.read(getGitHubTokenKey(credentialId)));
 }
 
 export async function storeGitHubToken(
@@ -339,18 +148,11 @@ export async function storeGitHubToken(
     throw new Error('GitHub token cannot be empty.');
   }
 
-  await withGitHubStronghold(async (store, stronghold) => {
-    const bytes = Array.from(new TextEncoder().encode(trimmed));
-    await store.insert(getGitHubTokenKey(credentialId), bytes);
-    await stronghold.save();
-  });
+  await vault.write(getGitHubTokenKey(credentialId), trimmed);
 }
 
 export async function clearGitHubToken(credentialId: string): Promise<void> {
-  await withGitHubStronghold(async (store, stronghold) => {
-    await store.remove(getGitHubTokenKey(credentialId));
-    await stronghold.save();
-  });
+  await vault.remove(getGitHubTokenKey(credentialId));
 }
 
 export async function isGitHubOAuthAvailable(): Promise<boolean> {
@@ -385,7 +187,9 @@ export async function beginGitHubOAuth(
   const state = randomUrlSafeToken();
   const codeChallenge = await deriveCodeChallenge(codeVerifier);
 
-  const listener = await startOAuthRedirectListener();
+  const listener = await startOAuthRedirectListener({
+    provider: GITHUB_PROVIDER_NAME,
+  });
   pendingOAuthSessions.set(normalized, { codeVerifier, state, listener });
 
   const query = new URLSearchParams({
@@ -420,7 +224,11 @@ export async function waitForGitHubOAuth(
   }
 
   try {
-    const params = await raceAbort(session.listener.wait(), options?.signal);
+    const params = await raceAbort(
+      session.listener.wait(),
+      options?.signal,
+      'GitHub authorization wait aborted.',
+    );
 
     if (params.error) {
       return {
