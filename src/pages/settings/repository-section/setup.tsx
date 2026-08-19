@@ -16,7 +16,6 @@ import {
 import { cn } from '@/lib/utils';
 import { AuthStatusBadge } from './auth-status-badge';
 import { BranchField } from './branch-field';
-import { DeviceCodeDisplay } from './device-code-display';
 import { KindCard } from './kind-card';
 import { OwnerField } from './owner-field';
 import { RepoField } from './repo-field';
@@ -120,8 +119,8 @@ export function RepositorySetup({
     setRepositoryConfig({ ...config, branch });
   };
 
-  const authDescription = remoteAuth.polling
-    ? strings.settings.repository.auth.descriptions.polling
+  const authDescription = remoteAuth.awaitingRedirect
+    ? strings.settings.repository.auth.descriptions.awaitingRedirect
     : remoteAuth.tokenPresent
       ? strings.settings.repository.auth.descriptions.connected
       : !remoteAuth.authAvailable
@@ -192,12 +191,12 @@ export function RepositorySetup({
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
-                    {remoteAuth.polling ? (
+                    {remoteAuth.awaitingRedirect ? (
                       <>
                         <AuthStatusBadge
                           hasToken={false}
                           checking={false}
-                          polling
+                          authorizing
                         />
                         <Button
                           variant="ghost"
@@ -220,10 +219,6 @@ export function RepositorySetup({
                     )}
                   </div>
                 </div>
-
-                {remoteAuth.userCode && (
-                  <DeviceCodeDisplay userCode={remoteAuth.userCode} />
-                )}
 
                 {remoteAuth.authError && (
                   <p className="rounded-lg bg-destructive/5 px-4 py-2.5 text-destructive text-xs">
@@ -249,7 +244,7 @@ export function RepositorySetup({
                     <AuthStatusBadge
                       hasToken={remoteAuth.tokenPresent}
                       checking={remoteAuth.checkingToken}
-                      polling={remoteAuth.polling}
+                      authorizing={remoteAuth.awaitingRedirect}
                     />
                     <Button
                       variant="ghost"

@@ -357,7 +357,7 @@ const en = {
       auth: {
         title: 'Repository Authentication',
         descriptions: {
-          polling: 'Enter the code in your browser to finish signing in',
+          awaitingRedirect: 'Finish signing in with GitHub in your browser',
           connected: 'Sign-in is complete',
           unavailable: 'Authentication is unavailable',
           signIn: 'Sign in to connect this repository',
@@ -370,7 +370,10 @@ const en = {
           signIn: 'Sign in',
           signOut: 'Sign out',
         },
-        deviceCode: 'Enter this code in your browser',
+        browserCallback: {
+          title: 'Signed in to GitHub',
+          message: 'You can close this tab and return to Myelin Notes.',
+        },
         notices: {
           credentialReset: (provider: string) =>
             `Your ${provider} sign-in expired and was reset. Please reconnect.`,

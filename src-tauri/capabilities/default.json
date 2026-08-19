@@ -33,6 +33,7 @@
     "fs:allow-document-write-recursive",
     "fs:allow-download-write-recursive",
     "dialog:default",
+    "deep-link:default",
     "stronghold:default",
     "stronghold:allow-remove-store-record",
     "mcp-bridge:default",
@@ -41,7 +42,6 @@
       "allow": [
         { "url": "https://api.github.com/*" },
         { "url": "https://codeload.github.com/*" },
-        { "url": "https://github.com/login/device/code" },
         { "url": "https://github.com/login/oauth/access_token" },
         { "url": "https://oauth2.googleapis.com/device/code" },
         { "url": "https://oauth2.googleapis.com/token" },

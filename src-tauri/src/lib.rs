@@ -6,6 +6,7 @@ mod handwriting;
 mod iroh_transport;
 mod mcp_server;
 mod note_index;
+mod oauth_loopback;
 mod pdf_export;
 mod transcription;
 mod workspace_export;
@@ -61,6 +62,7 @@ pub fn run() {
 
             Ok(())
         })
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
@@ -72,6 +74,7 @@ pub fn run() {
         .manage(handwriting::HandwritingState::new())
         .manage(transcription::TranscriptionState::new())
         .manage(code_runner::CodeRunnerState::new())
+        .manage(oauth_loopback::OAuthLoopbackState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
             iroh_transport::iroh_join,
@@ -96,6 +99,9 @@ pub fn run() {
             transcription::cancel_audio_transcription,
             code_runner::run_code,
             code_runner::cancel_run,
+            oauth_loopback::oauth_loopback_start,
+            oauth_loopback::oauth_loopback_wait,
+            oauth_loopback::oauth_loopback_cancel,
         ]);
 
     #[cfg(debug_assertions)]

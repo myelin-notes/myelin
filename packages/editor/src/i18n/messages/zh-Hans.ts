@@ -349,7 +349,7 @@ const zhHans: typeof en = {
       auth: {
         title: '仓库身份验证',
         descriptions: {
-          polling: '在浏览器中输入代码以完成登录',
+          awaitingRedirect: '请在浏览器中完成 GitHub 登录',
           connected: '登录已完成',
           unavailable: '身份验证不可用',
           signIn: '登录以连接此仓库',
@@ -362,7 +362,10 @@ const zhHans: typeof en = {
           signIn: '登录',
           signOut: '退出登录',
         },
-        deviceCode: '在浏览器中输入此代码',
+        browserCallback: {
+          title: '已登录 GitHub',
+          message: '你可以关闭此标签页并返回 Myelin Notes。',
+        },
         notices: {
           credentialReset: (provider: string) =>
             `你的 ${provider} 登录凭据已过期并被重置，请重新连接。`,

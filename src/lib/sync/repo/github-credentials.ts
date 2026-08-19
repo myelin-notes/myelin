@@ -7,10 +7,14 @@ import {
   type Client as StrongholdClient,
   type Store as StrongholdStore,
 } from '@tauri-apps/plugin-stronghold';
-import { GITHUB_CLIENT_ID } from '@/lib/env';
+import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@/lib/env';
 import { Logger } from '@/lib/logger';
 import { UserPrefs } from '@/lib/user-prefs';
 import { getAppDataDir } from '@/platform/tauri/fs-cache';
+import {
+  type OAuthRedirectListener,
+  startOAuthRedirectListener,
+} from './github-oauth-redirect';
 
 const logger = new Logger('GitHubCredentials');
 
@@ -19,16 +23,24 @@ const SECURE_STORAGE_UNAVAILABLE_ERROR =
 const GITHUB_STRONGHOLD_FILENAME = 'github-credentials.hold';
 const GITHUB_STRONGHOLD_CLIENT = 'github';
 
-const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
+const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_OAUTH_SCOPE = 'repo';
-const GITHUB_DEVICE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:device_code';
 
 function getGitHubClientId(): string {
   if (!GITHUB_CLIENT_ID) {
     throw new Error('VITE_GITHUB_CLIENT_ID is not configured.');
   }
   return GITHUB_CLIENT_ID;
+}
+
+// GitHub demands a client secret even on the PKCE flow, since it draws no
+// distinction between public and confidential clients. See lib/env.ts.
+function getGitHubClientSecret(): string {
+  if (!GITHUB_CLIENT_SECRET) {
+    throw new Error('VITE_GITHUB_CLIENT_SECRET is not configured.');
+  }
+  return GITHUB_CLIENT_SECRET;
 }
 
 function normalizeCredentialId(credentialId?: string | null): string {
@@ -176,60 +188,38 @@ async function readGitHubToken(credentialId: string): Promise<string | null> {
   });
 }
 
-interface PendingDeviceAuthSession {
-  deviceCode: string;
-  intervalSeconds: number;
-  expiresAtMs: number;
-  nextPollAtMs: number;
+interface PendingOAuthSession {
+  codeVerifier: string;
+  state: string;
+  listener: OAuthRedirectListener;
 }
 
-const pendingDeviceAuthSessions = new Map<string, PendingDeviceAuthSession>();
+const pendingOAuthSessions = new Map<string, PendingOAuthSession>();
 
-interface GitHubDeviceCodeResponse {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  verification_uri_complete?: string | null;
-  expires_in: number;
-  interval?: number;
-}
-
-interface GitHubDeviceTokenResponse {
+interface GitHubTokenResponse {
   access_token?: string;
   error?: string;
   error_description?: string;
 }
 
-export interface GitHubDeviceAuthStartPayload {
+export interface GitHubOAuthStartPayload {
   credentialId: string;
-  userCode: string;
-  verificationUri: string;
-  verificationUriComplete?: string | null;
-  expiresAtMs: number;
-  intervalSeconds: number;
+  authorizeUrl: string;
 }
 
-export type GitHubDeviceAuthPendingPayload = {
-  status: 'pending';
-  intervalSeconds: number;
-  expiresAtMs: number;
-  nextPollAtMs: number;
-};
-
-export type GitHubDeviceAuthCompletePayload = {
+export type GitHubOAuthCompletePayload = {
   status: 'complete';
   credentialId: string;
 };
 
-export type GitHubDeviceAuthFailedPayload = {
+export type GitHubOAuthFailedPayload = {
   status: 'failed';
   error: string;
 };
 
-export type GitHubDeviceAuthPollResult =
-  | GitHubDeviceAuthPendingPayload
-  | GitHubDeviceAuthCompletePayload
-  | GitHubDeviceAuthFailedPayload;
+export type GitHubOAuthResult =
+  | GitHubOAuthCompletePayload
+  | GitHubOAuthFailedPayload;
 
 function encodeFormBody(entries: Record<string, string>): string {
   return Object.entries(entries)
@@ -263,19 +253,59 @@ async function postGitHubForm<T>(
   return (await response.json()) as T;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
-function deviceAuthFailureMessage(
+function randomUrlSafeToken(): string {
+  return base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+async function deriveCodeChallenge(codeVerifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(codeVerifier),
+  );
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
+function oauthFailureMessage(
   error: string,
-  description: string | undefined,
+  description: string | null | undefined,
 ): string {
   const trimmed = (description ?? '').trim();
-  const detail = trimmed || 'GitHub device authorization failed.';
-  return `GitHub device authorization failed: ${error} (${detail})`;
+  const detail = trimmed || 'GitHub authorization failed.';
+  return `GitHub authorization failed: ${error} (${detail})`;
+}
+
+/**
+ * Rejects as soon as `signal` aborts so a cancelled sign-in stops waiting on a
+ * redirect that is never coming, rather than holding the listener open.
+ */
+function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) {
+    return promise;
+  }
+
+  return Promise.race([
+    promise,
+    new Promise<never>((_resolve, reject) => {
+      const abort = () =>
+        reject(new Error('GitHub authorization wait aborted.'));
+      if (signal.aborted) {
+        abort();
+        return;
+      }
+      signal.addEventListener('abort', abort, { once: true });
+    }),
+  ]);
 }
 
 export async function isGitHubSecureStorageAvailable(): Promise<boolean> {
@@ -323,9 +353,10 @@ export async function clearGitHubToken(credentialId: string): Promise<void> {
   });
 }
 
-export async function isGitHubDeviceAuthAvailable(): Promise<boolean> {
+export async function isGitHubOAuthAvailable(): Promise<boolean> {
   try {
     getGitHubClientId();
+    getGitHubClientSecret();
   } catch {
     return false;
   }
@@ -333,165 +364,130 @@ export async function isGitHubDeviceAuthAvailable(): Promise<boolean> {
   return isGitHubSecureStorageAvailable();
 }
 
-export async function beginGitHubDeviceAuth(
+/**
+ * Starts the authorization code flow with PKCE. The redirect listener is opened
+ * before the URL is handed back so the callback cannot land before anything is
+ * ready to catch it; the caller must follow up with `waitForGitHubOAuth` or
+ * `cancelGitHubOAuth` so the listener is torn down either way.
+ */
+export async function beginGitHubOAuth(
   credentialId: string,
-): Promise<GitHubDeviceAuthStartPayload> {
+): Promise<GitHubOAuthStartPayload> {
   const normalized = normalizeCredentialId(credentialId);
   const clientId = getGitHubClientId();
+  // Checked up front: a missing secret only surfaces at token exchange
+  // otherwise, after the user has already authorized in the browser.
+  getGitHubClientSecret();
 
-  const payload = await postGitHubForm<GitHubDeviceCodeResponse>(
-    GITHUB_DEVICE_CODE_URL,
-    { client_id: clientId, scope: GITHUB_OAUTH_SCOPE },
-    'GitHub device auth request failed',
-  );
+  await cancelGitHubOAuth(normalized);
 
-  const intervalSeconds = payload.interval ?? 5;
-  const expiresAtMs = Date.now() + payload.expires_in * 1000;
+  const codeVerifier = randomUrlSafeToken();
+  const state = randomUrlSafeToken();
+  const codeChallenge = await deriveCodeChallenge(codeVerifier);
 
-  pendingDeviceAuthSessions.set(normalized, {
-    deviceCode: payload.device_code,
-    intervalSeconds,
-    expiresAtMs,
-    nextPollAtMs: Date.now() + intervalSeconds * 1000,
+  const listener = await startOAuthRedirectListener();
+  pendingOAuthSessions.set(normalized, { codeVerifier, state, listener });
+
+  const query = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: listener.redirectUri,
+    scope: GITHUB_OAUTH_SCOPE,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
   });
 
   return {
     credentialId: normalized,
-    userCode: payload.user_code,
-    verificationUri: payload.verification_uri,
-    verificationUriComplete: payload.verification_uri_complete ?? null,
-    expiresAtMs,
-    intervalSeconds,
+    authorizeUrl: `${GITHUB_AUTHORIZE_URL}?${query.toString()}`,
   };
 }
 
-export async function openGitHubDeviceAuth(
-  payload: GitHubDeviceAuthStartPayload,
+export async function openGitHubOAuth(
+  payload: GitHubOAuthStartPayload,
 ): Promise<void> {
-  await openUrl(payload.verificationUriComplete ?? payload.verificationUri);
+  await openUrl(payload.authorizeUrl);
 }
 
-export async function startGitHubDeviceAuth(
+export async function waitForGitHubOAuth(
   credentialId: string,
-): Promise<GitHubDeviceAuthStartPayload> {
-  const payload = await beginGitHubDeviceAuth(credentialId);
-  await openGitHubDeviceAuth(payload);
-  return payload;
-}
-
-export async function pollGitHubDeviceAuth(
-  credentialId: string,
-): Promise<GitHubDeviceAuthPollResult> {
+  options?: { signal?: AbortSignal },
+): Promise<GitHubOAuthResult> {
   const normalized = normalizeCredentialId(credentialId);
-  const session = pendingDeviceAuthSessions.get(normalized);
+  const session = pendingOAuthSessions.get(normalized);
   if (!session) {
-    throw new Error('No active GitHub device authorization session.');
+    throw new Error('No active GitHub authorization session.');
   }
 
-  const now = Date.now();
-  if (now >= session.expiresAtMs) {
-    pendingDeviceAuthSessions.delete(normalized);
-    return {
-      status: 'failed',
-      error: 'GitHub device authorization expired. Start sign-in again.',
-    };
-  }
+  try {
+    const params = await raceAbort(session.listener.wait(), options?.signal);
 
-  if (now < session.nextPollAtMs) {
-    return {
-      status: 'pending',
-      intervalSeconds: session.intervalSeconds,
-      expiresAtMs: session.expiresAtMs,
-      nextPollAtMs: session.nextPollAtMs,
-    };
-  }
-
-  const clientId = getGitHubClientId();
-  const response = await postGitHubForm<GitHubDeviceTokenResponse>(
-    GITHUB_TOKEN_URL,
-    {
-      client_id: clientId,
-      device_code: session.deviceCode,
-      grant_type: GITHUB_DEVICE_GRANT_TYPE,
-    },
-    'GitHub device auth poll failed',
-  );
-
-  if (response.access_token) {
-    const trimmed = response.access_token.trim();
-    if (!trimmed) {
-      pendingDeviceAuthSessions.delete(normalized);
+    if (params.error) {
       return {
         status: 'failed',
-        error: 'GitHub device authorization returned an empty access token.',
+        error: oauthFailureMessage(params.error, params.errorDescription),
       };
     }
 
-    pendingDeviceAuthSessions.delete(normalized);
-    await storeGitHubToken(normalized, trimmed);
+    // A mismatched state means the redirect did not originate from the request
+    // this app made, so the code that came with it is not ours to redeem.
+    if (params.state !== session.state) {
+      return {
+        status: 'failed',
+        error: 'GitHub authorization state did not match. Start sign-in again.',
+      };
+    }
+
+    if (!params.code) {
+      return {
+        status: 'failed',
+        error: 'GitHub authorization returned no code.',
+      };
+    }
+
+    const response = await postGitHubForm<GitHubTokenResponse>(
+      GITHUB_TOKEN_URL,
+      {
+        client_id: getGitHubClientId(),
+        client_secret: getGitHubClientSecret(),
+        code: params.code,
+        code_verifier: session.codeVerifier,
+        redirect_uri: session.listener.redirectUri,
+      },
+      'GitHub token exchange failed',
+    );
+
+    if (response.error) {
+      return {
+        status: 'failed',
+        error: oauthFailureMessage(response.error, response.error_description),
+      };
+    }
+
+    const token = response.access_token?.trim();
+    if (!token) {
+      return {
+        status: 'failed',
+        error: 'GitHub authorization returned an empty access token.',
+      };
+    }
+
+    await storeGitHubToken(normalized, token);
     return { status: 'complete', credentialId: normalized };
-  }
-
-  const error = response.error ?? 'unknown_error';
-  switch (error) {
-    case 'authorization_pending': {
-      const nextPollAtMs = Date.now() + session.intervalSeconds * 1000;
-      session.nextPollAtMs = nextPollAtMs;
-      return {
-        status: 'pending',
-        intervalSeconds: session.intervalSeconds,
-        expiresAtMs: session.expiresAtMs,
-        nextPollAtMs,
-      };
-    }
-    case 'slow_down': {
-      const intervalSeconds = session.intervalSeconds + 5;
-      const nextPollAtMs = Date.now() + intervalSeconds * 1000;
-      session.intervalSeconds = intervalSeconds;
-      session.nextPollAtMs = nextPollAtMs;
-      return {
-        status: 'pending',
-        intervalSeconds,
-        expiresAtMs: session.expiresAtMs,
-        nextPollAtMs,
-      };
-    }
-    default: {
-      pendingDeviceAuthSessions.delete(normalized);
-      return {
-        status: 'failed',
-        error: deviceAuthFailureMessage(error, response.error_description),
-      };
-    }
+  } finally {
+    await cancelGitHubOAuth(normalized);
   }
 }
 
-export async function cancelGitHubDeviceAuth(
-  credentialId: string,
-): Promise<void> {
-  pendingDeviceAuthSessions.delete(normalizeCredentialId(credentialId));
-}
-
-export async function waitForGitHubDeviceAuth(
-  credentialId: string,
-  options?: {
-    signal?: AbortSignal;
-    onPending?: (result: GitHubDeviceAuthPendingPayload) => void;
-  },
-): Promise<GitHubDeviceAuthCompletePayload | GitHubDeviceAuthFailedPayload> {
+export async function cancelGitHubOAuth(credentialId: string): Promise<void> {
   const normalized = normalizeCredentialId(credentialId);
-  for (;;) {
-    if (options?.signal?.aborted) {
-      throw new Error('GitHub device authorization wait aborted.');
-    }
-
-    const result = await pollGitHubDeviceAuth(normalized);
-    if (result.status !== 'pending') {
-      return result;
-    }
-
-    options?.onPending?.(result);
-    const delayMs = Math.max(250, result.nextPollAtMs - Date.now());
-    await sleep(delayMs);
+  const session = pendingOAuthSessions.get(normalized);
+  if (!session) {
+    return;
   }
+
+  pendingOAuthSessions.delete(normalized);
+  await session.listener.cancel().catch((error) => {
+    logger.warn('Failed to close GitHub OAuth redirect listener', error);
+  });
 }
