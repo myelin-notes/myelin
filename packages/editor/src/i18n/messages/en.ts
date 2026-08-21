@@ -15,6 +15,13 @@ const en = {
     home: 'Home',
     settings: 'Settings',
   },
+  updater: {
+    action: 'Update',
+    installing: 'Updating',
+    available: (version: string) =>
+      `Version ${version} is available. Install it and restart.`,
+    failed: 'Update failed',
+  },
   sidebar: {
     searchPlaceholder: 'Search your library...',
     searchModeText: 'Text',

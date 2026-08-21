@@ -17,6 +17,13 @@ const es: typeof en = {
     home: 'Inicio',
     settings: 'Ajustes',
   },
+  updater: {
+    action: 'Actualizar',
+    installing: 'Actualizando',
+    available: (version: string) =>
+      `La versión ${version} está disponible. Instálala y reinicia.`,
+    failed: 'La actualización falló',
+  },
   sidebar: {
     searchPlaceholder: 'Busca en tu biblioteca...',
     searchModeText: 'Texto',

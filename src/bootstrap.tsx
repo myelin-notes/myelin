@@ -18,7 +18,6 @@ import {
 } from './lib/posthog';
 import { initRustErrorReporting } from './lib/rust-errors';
 import { RepositoryProvider } from './lib/sync';
-import { initAutoUpdate } from './lib/updater';
 import './index.css';
 
 // Loaded via dynamic import from main.tsx so that a throw while *importing* any
@@ -55,8 +54,6 @@ try {
   );
 
   markBootComplete();
-
-  void initAutoUpdate();
 } catch (error) {
   void reportFatalError('bootstrap', error);
 }

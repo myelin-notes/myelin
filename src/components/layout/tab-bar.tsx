@@ -46,6 +46,7 @@ import {
 } from '@/lib/tabs/multi-window';
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { cn } from '@/lib/utils';
+import { UpdateButton } from './update-button';
 import { WindowControls } from './window-controls';
 
 const logger = new Logger('TabBar');
@@ -313,6 +314,9 @@ export const TabBar = memo(function TabBar({
       </button>
 
       {!phoneLayout && <div className="flex-1 self-stretch" {...dragRegion} />}
+
+      {/* Only the top-right bar, so split views don't repeat it. */}
+      {isTopRight && <UpdateButton />}
 
       {/* Frameless Windows has no native title bar, so the top-right pane's
           bar carries the window controls (sits right of the utility buttons). */}

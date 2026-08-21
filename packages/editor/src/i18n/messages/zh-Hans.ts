@@ -17,6 +17,12 @@ const zhHans: typeof en = {
     home: '主页',
     settings: '设置',
   },
+  updater: {
+    action: '更新',
+    installing: '更新中',
+    available: (version: string) => `版本 ${version} 已发布，安装后将重启。`,
+    failed: '更新失败',
+  },
   sidebar: {
     searchPlaceholder: '搜索你的资料库…',
     searchModeText: '文本',
