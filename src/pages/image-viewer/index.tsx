@@ -48,7 +48,7 @@ export function ImageViewerPage({ id }: ImageViewerPageProps) {
         throw new Error('Image data is missing.');
       }
 
-      const blob = new Blob([bytes], {
+      const blob = new Blob([bytes as BlobPart], {
         type: getMimeTypeForFileType(node.fileType),
       });
       const nextObjectUrl = URL.createObjectURL(blob);
