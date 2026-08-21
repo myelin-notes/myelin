@@ -81,9 +81,14 @@ async function startDeepLinkListener(
   redirectUri: string,
 ): Promise<OAuthRedirectListener> {
   let settle: ((params: OAuthCallbackParams) => void) | null = null;
-  const received = new Promise<OAuthCallbackParams>((resolve) => {
+  let abandon: ((reason: Error) => void) | null = null;
+  const received = new Promise<OAuthCallbackParams>((resolve, reject) => {
     settle = resolve;
+    abandon = reject;
   });
+  // Cancelling often happens before anything awaits `received`, and an
+  // unobserved rejection is reported as an unhandled one.
+  received.catch(() => undefined);
 
   const unlisten = await onOpenUrl((urls) => {
     const match = urls.find((url) => url.startsWith(redirectUri));
@@ -97,6 +102,8 @@ async function startDeepLinkListener(
     wait: () => received,
     cancel: async () => {
       unlisten();
+      // Settles a wait already in flight: no redirect is coming now.
+      abandon?.(new Error('OAuth sign-in was cancelled.'));
     },
   };
 }
