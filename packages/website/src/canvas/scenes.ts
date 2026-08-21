@@ -747,7 +747,7 @@ async function buildDownload(
     width: 800,
   });
   // Download buttons + mobile note + footer links are DOM overlays; the canvas
-  // leaves the band from y+280 to y+700 for them. The arrow lands just off the
+  // leaves the band from y+280 to y+800 for them. The arrow lands just off the
   // primary button's right edge, which is why that button is laid out at a
   // fixed world width rather than sized by its text (see scene-overlays.tsx).
   hand(canvas, x + 680, y + 285, copy.download.autoUpdates, GREEN, 36, 300);

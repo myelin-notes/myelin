@@ -12,7 +12,7 @@ const zhHans: SiteCopy = {
   meta: {
     title: 'Myelin Notes：手写、输入与 PDF 合一的本地优先笔记应用',
     description:
-      'Myelin Notes 是一款原生、本地优先的笔记应用，支持 Mac、Windows、Linux、iOS 与 Android：在同一块画布上，手写、文字、PDF、图片与音频共处于一则笔记中，全部保存在你自己的设备上。个人使用完全免费。',
+      'Myelin Notes 是一款原生、本地优先的笔记应用，支持 Mac、Windows 与 Linux，iPhone、iPad 与 Android 版本即将推出：在同一块画布上，手写、文字、PDF、图片与音频共处于一则笔记中，全部保存在你自己的设备上。个人使用完全免费。',
   },
 
   topbar: {
@@ -206,7 +206,9 @@ for step in range(3):
       },
     ],
     otherPlatforms: '同时支持',
-    mobileBadge: '手机和平板上是同样的笔记，而不是功能缩水的阅读器',
+    comingSoon: '即将推出',
+    mobileBadge:
+      'iPhone、iPad 与 Android 版本正在开发中：同样的笔记，而不是功能缩水的阅读器',
     faqTitle: '常见问题',
     faqMarkdown: `# 常见问题
 
@@ -240,7 +242,7 @@ for step in range(3):
 
 ## iPhone、iPad 和 Android 上如何？
 
-Myelin Notes 在这三个平台上都是原生应用，笔记、画布和同步都与桌面版一致。只要硬件支持，触控笔就能用：iPad 上的 Apple Pencil、Android 上的 S Pen 或主动式触控笔，以及桌面端的数位板。
+即将推出。目前 Myelin Notes 支持 Mac、Windows 与 Linux。移动版正在开发中，并且会是原生应用而不是功能缩水的阅读器：笔记、画布和同步都与桌面版一致，iPad 上支持 Apple Pencil，Android 上支持 S Pen 或主动式触控笔。
 `,
   },
 
@@ -253,7 +255,7 @@ Myelin Notes 在这三个平台上都是原生应用，笔记、画布和同步�
     nav: '页脚',
     tagline: '手写、打字与 PDF，都在同一则笔记。',
     download: '下载 Myelin',
-    platforms: 'Mac · Windows · Linux · iPhone · iPad · Android',
+    platforms: 'Mac · Windows · Linux · iPhone、iPad 与 Android 即将推出',
   },
 
   shots: {

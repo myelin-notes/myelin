@@ -12,7 +12,7 @@ const en: SiteCopy = {
     title:
       'Myelin Notes: a local-first note-taking app for handwriting, type, and PDFs',
     description:
-      'Myelin Notes is a native, local-first note-taking app for Mac, Windows, Linux, iOS, and Android: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Completely free for personal use.',
+      'Myelin Notes is a native, local-first note-taking app for Mac, Windows, and Linux, with iPhone, iPad, and Android on the way: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Completely free for personal use.',
   },
 
   topbar: {
@@ -215,7 +215,9 @@ for step in range(3):
       },
     ],
     otherPlatforms: 'Also available for',
-    mobileBadge: 'Same notes on your phone and tablet, not a cut-down viewer',
+    comingSoon: 'Coming soon',
+    mobileBadge:
+      'iPhone, iPad, and Android are on the way: the same notes, not a cut-down viewer',
     faqTitle: 'FAQ',
     faqMarkdown: `# FAQ
 
@@ -249,7 +251,7 @@ Fully. Editing, full-text and semantic search, handwriting recognition, audio tr
 
 ## What about iPhone, iPad, and Android?
 
-Myelin Notes is native on all three, with the same notes, the same canvas, and the same sync as the desktop apps. Stylus input works wherever the hardware does: Apple Pencil on iPad, an S Pen or active stylus on Android, and pen tablets on desktop.
+Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps are in development, and they are native builds rather than a cut-down viewer: the same notes, the same canvas, and the same sync as the desktop apps, with Apple Pencil on iPad and an S Pen or active stylus on Android.
 `,
   },
 
@@ -263,7 +265,7 @@ Myelin Notes is native on all three, with the same notes, the same canvas, and t
     nav: 'Footer',
     tagline: 'Handwriting, typing, and PDFs. One note.',
     download: 'Download Myelin',
-    platforms: 'Mac · Windows · Linux · iPhone · iPad · Android',
+    platforms: 'Mac · Windows · Linux · iPhone, iPad, and Android coming soon',
   },
 
   /** Alt text for the static page's screenshots. */

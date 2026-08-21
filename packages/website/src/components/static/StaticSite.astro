@@ -16,6 +16,7 @@ import {
   navLinks,
   getCopy,
   getFaqs,
+  isComingSoon,
   isExternalLink,
   linkHref,
   siteLinks,
@@ -230,16 +231,34 @@ const ctaOutline = cn(
       </a>
       <div class="mt-8 flex flex-wrap gap-3">
         {
-          copy.download.platforms.map((platform) => (
-            <a
-              href={siteLinks.releases}
-              data-download={platform.key}
-              class="rounded-xl bg-white/10 px-5 py-2.5 text-sm text-text-on-dark transition-colors hover:bg-white/20"
-            >
-              <span class="font-medium">{platform.name}</span>
-              <span class="ml-2 opacity-60">{platform.sub}</span>
-            </a>
-          ))
+          copy.download.platforms
+            .filter((platform) => !isComingSoon(platform.key))
+            .map((platform) => (
+              <a
+                href={siteLinks.releases}
+                data-download={platform.key}
+                class="rounded-xl bg-white/10 px-5 py-2.5 text-sm text-text-on-dark transition-colors hover:bg-white/20"
+              >
+                <span class="font-medium">{platform.name}</span>
+                <span class="ml-2 opacity-60">{platform.sub}</span>
+              </a>
+            ))
+        }
+      </div>
+      {/* Listed, but as plain chips: there is no build to link to yet. */}
+      <p class="mt-10 text-sm text-text-on-dark/55">
+        {copy.download.comingSoon}
+      </p>
+      <div class="mt-3 flex flex-wrap gap-3">
+        {
+          copy.download.platforms
+            .filter((platform) => isComingSoon(platform.key))
+            .map((platform) => (
+              <span class="rounded-xl border border-white/20 px-5 py-2.5 text-sm text-text-on-dark/60">
+                <span class="font-medium">{platform.name}</span>
+                <span class="ml-2 opacity-70">{platform.sub}</span>
+              </span>
+            ))
         }
       </div>
       <p class="mt-10 text-sm text-text-on-dark/55">

@@ -2,7 +2,11 @@ import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { useCopy } from '@/content/copy-context';
 import { isExternalLink, linkHref, navLinks } from '@/content/site';
-import { type PlatformKey, siteLinks } from '@/content/site/links';
+import {
+  isComingSoon,
+  type PlatformKey,
+  siteLinks,
+} from '@/content/site/links';
 import {
   type DownloadUrls,
   detectPlatform,
@@ -28,6 +32,8 @@ interface ButtonProps {
   size?: number;
   children: ReactNode;
   sub?: string;
+  /** Renders as inert text, for a platform there is nothing to download yet. */
+  disabled?: boolean;
   /**
    * Fixed world width, with the label centred inside it. Set this when canvas
    * ink has to meet the button: text widths depend on the loaded font, so an
@@ -49,6 +55,7 @@ function WorldButton({
   size = 26,
   children,
   sub,
+  disabled,
   width,
 }: ButtonProps) {
   const style: CSSProperties = {
@@ -77,13 +84,15 @@ function WorldButton({
           boxShadow: `0 0 0 ${size * 0.06}px var(--border-subtle)`,
         }),
   };
-  const className = [
-    'pointer-events-auto inline-block cursor-pointer whitespace-nowrap no-underline',
-    'transition-colors active:translate-y-px',
-    variant === 'primary'
-      ? 'hover:brightness-110 active:brightness-95'
-      : 'hover:bg-hover-tint',
-  ].join(' ');
+  const className = disabled
+    ? 'inline-block whitespace-nowrap opacity-55'
+    : [
+        'pointer-events-auto inline-block cursor-pointer whitespace-nowrap no-underline',
+        'transition-colors active:translate-y-px',
+        variant === 'primary'
+          ? 'hover:brightness-110 active:brightness-95'
+          : 'hover:bg-hover-tint',
+      ].join(' ');
   const inner = (
     <span
       className={`flex flex-col ${width == null ? 'items-start' : 'items-center'}`}
@@ -94,6 +103,13 @@ function WorldButton({
       )}
     </span>
   );
+  if (disabled) {
+    return (
+      <span className={className} style={style}>
+        {inner}
+      </span>
+    );
+  }
   if (href) {
     return (
       <a
@@ -180,10 +196,12 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
   const hero = sceneById('hero').rect;
   const download = sceneById('download').rect;
 
-  const platforms = copy.download.platforms;
-  // Every PlatformKey has an entry, so the fallback is only for the type.
-  const primary = platforms.find((p) => p.key === platformKey) ?? platforms[0];
-  const others = platforms.filter((p) => p !== primary);
+  const available = copy.download.platforms.filter((p) => !isComingSoon(p.key));
+  const upcoming = copy.download.platforms.filter((p) => isComingSoon(p.key));
+  // A visitor on a platform we have no build for falls through to the first
+  // one we do, so the hero CTA is never a button that downloads nothing.
+  const primary = available.find((p) => p.key === platformKey) ?? available[0];
+  const others = available.filter((p) => p !== primary);
 
   return (
     <WorldLayer canvas={canvas} zIndex={30}>
@@ -234,6 +252,23 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
               variant="outline"
               size={26}
               sub={platform.sub}
+            >
+              {platform.name}
+            </WorldButton>
+          ))}
+        </div>
+
+        <span style={{ fontSize: 22, color: MUTED, marginTop: 44 }}>
+          {copy.download.comingSoon}
+        </span>
+        <div className="flex" style={{ gap: 20, marginTop: 20 }}>
+          {upcoming.map((platform) => (
+            <WorldButton
+              key={platform.key}
+              variant="outline"
+              size={26}
+              sub={platform.sub}
+              disabled
             >
               {platform.name}
             </WorldButton>

@@ -20,6 +20,17 @@ export const siteLinks = {
 /** Every platform Myelin ships a native build for. */
 export type PlatformKey = 'mac' | 'windows' | 'linux' | 'ios' | 'android';
 
+/**
+ * Platforms with no build to download yet. The site still lists them, as
+ * "coming soon" rather than as a link, so nothing offers an installer that the
+ * release has no asset for.
+ */
+const COMING_SOON: readonly PlatformKey[] = ['ios', 'android'];
+
+export function isComingSoon(key: PlatformKey): boolean {
+  return COMING_SOON.includes(key);
+}
+
 export interface Platform {
   key: PlatformKey;
   /** Bare platform, for lists where repeating "Download for" would grate. */

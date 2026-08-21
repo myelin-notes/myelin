@@ -13,7 +13,7 @@ const es: SiteCopy = {
     title:
       'Myelin Notes: una app de notas local para escritura a mano, texto y PDFs',
     description:
-      'Myelin Notes es una app de notas nativa y local para Mac, Windows, Linux, iOS y Android: un lienzo donde la escritura a mano, el texto, los PDFs, las imágenes y el audio conviven en la misma nota, en tu propio dispositivo. Totalmente gratis para uso personal.',
+      'Myelin Notes es una app de notas nativa y local para Mac, Windows y Linux, con iPhone, iPad y Android en camino: un lienzo donde la escritura a mano, el texto, los PDFs, las imágenes y el audio conviven en la misma nota, en tu propio dispositivo. Totalmente gratis para uso personal.',
   },
 
   topbar: {
@@ -208,8 +208,9 @@ for step in range(3):
       },
     ],
     otherPlatforms: 'También disponible para',
+    comingSoon: 'Muy pronto',
     mobileBadge:
-      'Las mismas notas en el móvil y en la tablet, no un visor recortado',
+      'iPhone, iPad y Android están en camino: las mismas notas, no un visor recortado',
     faqTitle: 'Preguntas frecuentes',
     faqMarkdown: `# Preguntas frecuentes
 
@@ -243,7 +244,7 @@ Del todo. La edición, la búsqueda por texto y semántica, el reconocimiento de
 
 ## ¿Y en iPhone, iPad y Android?
 
-Myelin Notes es nativa en los tres, con las mismas notas, el mismo lienzo y la misma sincronización que las apps de escritorio. El lápiz funciona allí donde lo permita el hardware: Apple Pencil en iPad, S Pen o lápiz activo en Android, y tabletas gráficas en el escritorio.
+Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles están en desarrollo, y serán nativas en lugar de un visor recortado: las mismas notas, el mismo lienzo y la misma sincronización que las apps de escritorio, con Apple Pencil en iPad y S Pen o lápiz activo en Android.
 `,
   },
 
@@ -256,7 +257,7 @@ Myelin Notes es nativa en los tres, con las mismas notas, el mismo lienzo y la m
     nav: 'Pie de página',
     tagline: 'Escritura a mano, texto y PDFs. Una sola nota.',
     download: 'Descargar Myelin',
-    platforms: 'Mac · Windows · Linux · iPhone · iPad · Android',
+    platforms: 'Mac · Windows · Linux · iPhone, iPad y Android muy pronto',
   },
 
   shots: {

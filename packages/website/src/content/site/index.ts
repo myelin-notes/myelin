@@ -7,7 +7,12 @@ import zhHans from './zh-hans';
 // Re-exported so build-time callers can take everything from this one barrel.
 // Client-side code must import them from `./links` instead: this module pulls
 // in every locale's catalog.
-export { type Platform, type PlatformKey, siteLinks } from './links';
+export {
+  isComingSoon,
+  type Platform,
+  type PlatformKey,
+  siteLinks,
+} from './links';
 
 /**
  * Scenes of the scrollytelling canvas, in order. Layout (world coordinates)
@@ -143,6 +148,8 @@ export interface SiteCopy {
     autoUpdates: string;
     platforms: Platform[];
     otherPlatforms: string;
+    /** Heads the row of platforms that have no build yet. */
+    comingSoon: string;
     mobileBadge: string;
     faqTitle: string;
     /** `## ` headings become the FAQ entries; see `getFaqs`. */
