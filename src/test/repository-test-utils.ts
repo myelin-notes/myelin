@@ -657,6 +657,9 @@ export interface MemoryGoogleDriveApi {
    * window the conflict retry has to cover.
    */
   beforeNextDownload(callback: () => void | Promise<void>): void;
+  /** Answers every request with a rate limit, until reset. */
+  rateLimitEveryRequest(status: number, retryAfterSeconds: number): void;
+  readonly requestCount: number;
   /** Paths are relative to the repository's root folder, e.g. `manifest.json`. */
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
@@ -689,6 +692,8 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
   let uploadCallCount = 0;
   let deleteCallCount = 0;
   let beforeDownload: (() => void | Promise<void>) | null = null;
+  let rateLimit: { status: number; retryAfterSeconds: number } | null = null;
+  let requestCount = 0;
 
   function createNode(
     name: string,
@@ -761,6 +766,14 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
 
   return {
     async fetch(url, init) {
+      requestCount += 1;
+      if (rateLimit) {
+        return createRateLimitResponse(
+          rateLimit.status,
+          rateLimit.retryAfterSeconds,
+        );
+      }
+
       const parsed = new URL(url);
       const path = parsed.pathname;
 
@@ -850,6 +863,12 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
     },
     beforeNextDownload(callback) {
       beforeDownload = callback;
+    },
+    rateLimitEveryRequest(status, retryAfterSeconds) {
+      rateLimit = { status, retryAfterSeconds };
+    },
+    get requestCount() {
+      return requestCount;
     },
     readBytes(path) {
       const node = resolveNode(path, false);

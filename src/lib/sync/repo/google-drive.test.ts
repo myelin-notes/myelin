@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createNoteState,
   getRepositoryTestGoogleDriveApi,
@@ -40,6 +40,38 @@ function injectExternalNode(nodeId: string): void {
 describe('GoogleDriveRepository', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('honours a long Retry-After once, then gives up', async () => {
+    vi.useFakeTimers();
+    const drive = getRepositoryTestGoogleDriveApi();
+    // Four attempts each honouring `Retry-After: 60` would park the caller for
+    // three minutes; the budget spends that wait once and fails instead.
+    drive.rateLimitEveryRequest(429, 60);
+
+    const pending = createRepository().initialize();
+    const settled = expect(pending).rejects.toThrow(/429/);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await settled;
+
+    expect(drive.requestCount).toBe(2);
+  });
+
+  it('stops waiting out a rate limit once disposed', async () => {
+    vi.useFakeTimers();
+    const drive = getRepositoryTestGoogleDriveApi();
+    drive.rateLimitEveryRequest(429, 60);
+
+    const repository = createRepository();
+    const pending = repository.initialize();
+    const settled = expect(pending).rejects.toThrow(/cancelled/);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await repository.dispose();
+    await settled;
   });
 
   it('stores the manifest and files in the GitHub-compatible layout', async () => {

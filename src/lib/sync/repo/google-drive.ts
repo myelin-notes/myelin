@@ -43,6 +43,12 @@ const ENTRY_FIELDS = 'files(id,name,headRevisionId)';
 const MAX_MANIFEST_RETRIES = 4;
 const MAX_REQUEST_ATTEMPTS = 4;
 const MAX_RETRY_DELAY_MS = 60_000;
+/**
+ * Total time one request may spend waiting out rate limits before it gives up.
+ * A Drive `Retry-After: 60` is worth honouring once, but not three times over:
+ * a sync the user is watching must fail rather than sit there for minutes.
+ */
+const MAX_TOTAL_RETRY_DELAY_MS = 60_000;
 const LIST_PAGE_SIZE = 1000;
 const SNAPSHOT_DOWNLOAD_CONCURRENCY = 8;
 
@@ -75,6 +81,14 @@ interface GoogleDriveRepositoryConfig {
   credentialId: string;
 }
 
+/** Which account a request authenticates as, and what cancels it. */
+interface DriveContext {
+  credentialId: string;
+  signal?: AbortSignal;
+}
+
+const REQUEST_CANCELLED = 'Google Drive request was cancelled.';
+
 function toDriveEntry(resource: DriveFileResource): DriveEntry {
   return {
     id: resource.id,
@@ -98,8 +112,23 @@ function baseNameOf(path: string): string {
   return slash === -1 ? path : path.slice(slash + 1);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error(REQUEST_CANCELLED));
+      return;
+    }
+
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new Error(REQUEST_CANCELLED));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 // Drive reports quota exhaustion as 403 as well as 429, so 403 is retried even
@@ -131,27 +160,29 @@ interface DriveRequestInit {
  * the meantime is picked up. Returns null only for a 404 the caller opted into.
  */
 async function driveRequest(
-  credentialId: string,
+  ctx: DriveContext,
   label: string,
   url: string,
   init: DriveRequestInit,
 ): Promise<Response>;
 async function driveRequest(
-  credentialId: string,
+  ctx: DriveContext,
   label: string,
   url: string,
   init: DriveRequestInit,
   options: { allowNotFound: true },
 ): Promise<Response | null>;
 async function driveRequest(
-  credentialId: string,
+  ctx: DriveContext,
   label: string,
   url: string,
   init: DriveRequestInit,
   options: { allowNotFound?: boolean } = {},
 ): Promise<Response | null> {
+  let sleptMs = 0;
+
   for (let attempt = 0; attempt < MAX_REQUEST_ATTEMPTS; attempt++) {
-    const accessToken = await getGoogleDriveToken(credentialId);
+    const accessToken = await getGoogleDriveToken(ctx.credentialId);
     const response = await fetch(url, {
       ...init,
       // DOM types only accept ArrayBuffer-backed views; a plain Uint8Array is
@@ -161,6 +192,7 @@ async function driveRequest(
         ...init.headers,
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: ctx.signal,
     });
 
     if (response.ok) {
@@ -169,22 +201,25 @@ async function driveRequest(
     if (response.status === 404 && options.allowNotFound) {
       return null;
     }
+    const delayMs = readRetryDelayMs(response, attempt);
     if (
       !isRetryableStatus(response.status) ||
-      attempt === MAX_REQUEST_ATTEMPTS - 1
+      attempt === MAX_REQUEST_ATTEMPTS - 1 ||
+      sleptMs + delayMs > MAX_TOTAL_RETRY_DELAY_MS
     ) {
       const body = await response.text().catch(() => '<no response body>');
       throw new Error(`${label} (${response.status}): ${body}`);
     }
 
-    await sleep(readRetryDelayMs(response, attempt));
+    sleptMs += delayMs;
+    await sleep(delayMs, ctx.signal);
   }
 
   throw new Error(`${label}: exhausted retries.`);
 }
 
 async function findDriveEntry(
-  credentialId: string,
+  ctx: DriveContext,
   parentId: string,
   name: string,
   mimeType?: string,
@@ -201,19 +236,16 @@ async function findDriveEntry(
   const url = `${DRIVE_API_BASE}/files?q=${encodeURIComponent(
     clauses.join(' and '),
   )}&fields=${encodeURIComponent(ENTRY_FIELDS)}&pageSize=1`;
-  const response = await driveRequest(
-    credentialId,
-    'Google Drive lookup failed',
-    url,
-    { method: 'GET' },
-  );
+  const response = await driveRequest(ctx, 'Google Drive lookup failed', url, {
+    method: 'GET',
+  });
   const payload = (await response.json()) as DriveListResponse;
   const file = payload.files?.[0];
   return file ? toDriveEntry(file) : null;
 }
 
 async function listDriveFolder(
-  credentialId: string,
+  ctx: DriveContext,
   parentId: string,
 ): Promise<DriveEntry[]> {
   const query = `'${escapeDriveQueryValue(parentId)}' in parents and trashed = false`;
@@ -226,12 +258,9 @@ async function listDriveFolder(
       `&fields=${encodeURIComponent(`nextPageToken,${ENTRY_FIELDS}`)}` +
       `&pageSize=${LIST_PAGE_SIZE}` +
       (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '');
-    const response = await driveRequest(
-      credentialId,
-      'Google Drive list failed',
-      url,
-      { method: 'GET' },
-    );
+    const response = await driveRequest(ctx, 'Google Drive list failed', url, {
+      method: 'GET',
+    });
     const payload = (await response.json()) as DriveListResponse;
     for (const file of payload.files ?? []) {
       entries.push(toDriveEntry(file));
@@ -243,13 +272,13 @@ async function listDriveFolder(
 }
 
 async function createDriveFile(
-  credentialId: string,
+  ctx: DriveContext,
   parentId: string,
   name: string,
   mimeType?: string,
 ): Promise<string> {
   const response = await driveRequest(
-    credentialId,
+    ctx,
     'Google Drive create failed',
     `${DRIVE_API_BASE}/files?fields=id`,
     {
@@ -267,33 +296,28 @@ async function createDriveFile(
 }
 
 async function uploadDriveFile(
-  credentialId: string,
+  ctx: DriveContext,
   fileId: string,
   bytes: Uint8Array,
 ): Promise<string | null> {
   const url =
     `${DRIVE_UPLOAD_BASE}/files/${encodeURIComponent(fileId)}` +
     `?uploadType=media&fields=${encodeURIComponent('id,headRevisionId')}`;
-  const response = await driveRequest(
-    credentialId,
-    'Google Drive upload failed',
-    url,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: bytes,
-    },
-  );
+  const response = await driveRequest(ctx, 'Google Drive upload failed', url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: bytes,
+  });
   const payload = (await response.json()) as DriveFileResource;
   return payload.headRevisionId ?? null;
 }
 
 async function downloadDriveFile(
-  credentialId: string,
+  ctx: DriveContext,
   fileId: string,
 ): Promise<Uint8Array | null> {
   const response = await driveRequest(
-    credentialId,
+    ctx,
     'Google Drive download failed',
     `${DRIVE_API_BASE}/files/${encodeURIComponent(fileId)}?alt=media`,
     { method: 'GET' },
@@ -306,11 +330,11 @@ async function downloadDriveFile(
 }
 
 async function deleteDriveFile(
-  credentialId: string,
+  ctx: DriveContext,
   fileId: string,
 ): Promise<void> {
   await driveRequest(
-    credentialId,
+    ctx,
     'Google Drive delete failed',
     `${DRIVE_API_BASE}/files/${encodeURIComponent(fileId)}`,
     { method: 'DELETE' },
@@ -332,15 +356,15 @@ export async function ensureGoogleDriveFolder(
     throw new Error('Google Drive folder name cannot be empty.');
   }
 
+  const ctx = { credentialId };
   const existing = await findDriveEntry(
-    credentialId,
+    ctx,
     DRIVE_ROOT_ID,
     name,
     FOLDER_MIME_TYPE,
   );
   return (
-    existing?.id ??
-    createDriveFile(credentialId, DRIVE_ROOT_ID, name, FOLDER_MIME_TYPE)
+    existing?.id ?? createDriveFile(ctx, DRIVE_ROOT_ID, name, FOLDER_MIME_TYPE)
   );
 }
 
@@ -359,7 +383,7 @@ export async function renameGoogleDriveFolder(
   }
 
   await driveRequest(
-    credentialId,
+    { credentialId },
     'Google Drive rename failed',
     `${DRIVE_API_BASE}/files/${encodeURIComponent(folderId)}`,
     {
@@ -384,8 +408,23 @@ export class GoogleDriveRepository extends BaseRepository {
    */
   private readonly folderIds = new Map<string, Promise<string>>();
 
+  /**
+   * Aborted on dispose, so a request parked on a rate-limit retry stops when
+   * the repository is torn down instead of holding the teardown behind it.
+   */
+  private readonly aborter = new AbortController();
+  private readonly drive: DriveContext;
+
   constructor(private readonly config: GoogleDriveRepositoryConfig) {
     super();
+    this.drive = {
+      credentialId: config.credentialId,
+      signal: this.aborter.signal,
+    };
+  }
+
+  async dispose(): Promise<void> {
+    this.aborter.abort();
   }
 
   protected manifestMaxRetries(): number {
@@ -429,7 +468,7 @@ export class GoogleDriveRepository extends BaseRepository {
 
     const target = current ?? (await this.ensureEntry(MANIFEST_PATH));
     const bytes = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
-    return uploadDriveFile(this.config.credentialId, target.id, bytes);
+    return uploadDriveFile(this.drive, target.id, bytes);
   }
 
   protected async loadFileBytes(nodeId: VFSNodeId): Promise<{
@@ -466,7 +505,7 @@ export class GoogleDriveRepository extends BaseRepository {
     }
 
     const entry = await this.ensureEntry(getStoredFilePath(node));
-    return uploadDriveFile(this.config.credentialId, entry.id, bytes);
+    return uploadDriveFile(this.drive, entry.id, bytes);
   }
 
   protected async deleteFileBytes(
@@ -480,7 +519,7 @@ export class GoogleDriveRepository extends BaseRepository {
 
     const entry = await this.findEntry(getStoredFilePath(node));
     if (entry) {
-      await deleteDriveFile(this.config.credentialId, entry.id);
+      await deleteDriveFile(this.drive, entry.id);
     }
   }
 
@@ -501,10 +540,7 @@ export class GoogleDriveRepository extends BaseRepository {
     const filesFolderId = await this.findFolderId(FILES_DIR);
     const idsByName = new Map<string, string>();
     if (filesFolderId) {
-      for (const entry of await listDriveFolder(
-        this.config.credentialId,
-        filesFolderId,
-      )) {
+      for (const entry of await listDriveFolder(this.drive, filesFolderId)) {
         idsByName.set(entry.name, entry.id);
       }
     }
@@ -535,7 +571,7 @@ export class GoogleDriveRepository extends BaseRepository {
   }
 
   private download(fileId: string): Promise<Uint8Array | null> {
-    return downloadDriveFile(this.config.credentialId, fileId);
+    return downloadDriveFile(this.drive, fileId);
   }
 
   /**
@@ -568,23 +604,19 @@ export class GoogleDriveRepository extends BaseRepository {
     if (!parentId) {
       return null;
     }
-    return findDriveEntry(this.config.credentialId, parentId, baseNameOf(path));
+    return findDriveEntry(this.drive, parentId, baseNameOf(path));
   }
 
   /** The entry for `path`, creating the file and its directories if missing. */
   private async ensureEntry(path: string): Promise<DriveEntry> {
     const name = baseNameOf(path);
     const parentId = await this.ensureFolderId(dirNameOf(path));
-    const existing = await findDriveEntry(
-      this.config.credentialId,
-      parentId,
-      name,
-    );
+    const existing = await findDriveEntry(this.drive, parentId, name);
     if (existing) {
       return existing;
     }
 
-    const id = await createDriveFile(this.config.credentialId, parentId, name);
+    const id = await createDriveFile(this.drive, parentId, name);
     return { id, name, headRevisionId: null };
   }
 
@@ -603,7 +635,7 @@ export class GoogleDriveRepository extends BaseRepository {
       return null;
     }
     const existing = await findDriveEntry(
-      this.config.credentialId,
+      this.drive,
       parentId,
       baseNameOf(dirPath),
       FOLDER_MIME_TYPE,
@@ -630,19 +662,14 @@ export class GoogleDriveRepository extends BaseRepository {
       const parentId = await this.ensureFolderId(dirNameOf(dirPath));
       const name = baseNameOf(dirPath);
       const existing = await findDriveEntry(
-        this.config.credentialId,
+        this.drive,
         parentId,
         name,
         FOLDER_MIME_TYPE,
       );
       return (
         existing?.id ??
-        createDriveFile(
-          this.config.credentialId,
-          parentId,
-          name,
-          FOLDER_MIME_TYPE,
-        )
+        createDriveFile(this.drive, parentId, name, FOLDER_MIME_TYPE)
       );
     })();
 
