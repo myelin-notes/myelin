@@ -1,5 +1,4 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_ID_ANDROID,
@@ -10,16 +9,15 @@ import {
 import { Logger } from '@/lib/logger';
 import { createCredentialVault } from './credential-vault';
 import {
-  deriveCodeChallenge,
-  encodeFormBody,
-  raceAbort,
-  randomUrlSafeToken,
-} from './oauth/pkce';
-import {
-  MOBILE_REDIRECT_SCHEME,
-  type OAuthRedirectListener,
-  startOAuthRedirectListener,
-} from './oauth/redirect';
+  credentialTokenKey,
+  normalizeCredentialId,
+  OAuthClient,
+  type OAuthExchange,
+  type OAuthResult,
+  type OAuthStartPayload,
+} from './oauth/client';
+import { encodeFormBody } from './oauth/pkce';
+import { MOBILE_REDIRECT_SCHEME } from './oauth/redirect';
 
 const logger = new Logger('GoogleDriveCredentials');
 
@@ -107,15 +105,6 @@ function clientCredentialEntries(): Record<string, string> {
   };
 }
 
-function normalizeCredentialId(credentialId?: string | null): string {
-  const trimmed = typeof credentialId === 'string' ? credentialId.trim() : '';
-  return trimmed || 'default';
-}
-
-function getTokenKey(credentialId: string): string {
-  return `token:${normalizeCredentialId(credentialId)}`;
-}
-
 export function consumeGoogleDriveVaultDiscarded(): boolean {
   return vault.consumeDiscarded();
 }
@@ -123,7 +112,7 @@ export function consumeGoogleDriveVaultDiscarded(): boolean {
 async function readStoredToken(
   credentialId: string,
 ): Promise<StoredGoogleDriveToken | null> {
-  const raw = await vault.read(getTokenKey(credentialId));
+  const raw = await vault.read(credentialTokenKey(credentialId));
   if (!raw) {
     return null;
   }
@@ -146,13 +135,13 @@ async function writeStoredToken(
   credentialId: string,
   token: StoredGoogleDriveToken,
 ): Promise<void> {
-  await vault.write(getTokenKey(credentialId), JSON.stringify(token));
+  await vault.write(credentialTokenKey(credentialId), JSON.stringify(token));
 }
 
 export async function clearGoogleDriveToken(
   credentialId: string,
 ): Promise<void> {
-  await vault.remove(getTokenKey(credentialId));
+  await vault.remove(credentialTokenKey(credentialId));
 }
 
 export async function hasGoogleDriveToken(
@@ -311,167 +300,83 @@ export async function getGoogleDriveToken(
   return refresh;
 }
 
-interface PendingOAuthSession {
-  codeVerifier: string;
-  state: string;
-  listener: OAuthRedirectListener;
-}
+export type GoogleDriveOAuthStartPayload = OAuthStartPayload;
+export type GoogleDriveOAuthResult = OAuthResult;
 
-const pendingOAuthSessions = new Map<string, PendingOAuthSession>();
-
-export interface GoogleDriveOAuthStartPayload {
-  credentialId: string;
-  authorizeUrl: string;
-}
-
-export type GoogleDriveOAuthResult =
-  | { status: 'complete'; credentialId: string }
-  | { status: 'failed'; error: string };
-
-/**
- * Starts the authorization code flow with PKCE. The redirect listener is opened
- * before the URL is handed back so the callback cannot land before anything is
- * ready to catch it; the caller must follow up with `waitForGoogleDriveAuth` or
- * `cancelGoogleDriveAuth` so the listener is torn down either way.
- */
-export async function beginGoogleDriveAuth(
-  credentialId: string,
-): Promise<GoogleDriveOAuthStartPayload> {
-  const normalized = normalizeCredentialId(credentialId);
-  // Resolved up front: a missing secret only surfaces at the token exchange
-  // otherwise, after the user has already consented in the browser.
-  const { clientId } = getGoogleClientCredentials();
-
-  await cancelGoogleDriveAuth(normalized);
-
-  const codeVerifier = randomUrlSafeToken();
-  const state = randomUrlSafeToken();
-  const codeChallenge = await deriveCodeChallenge(codeVerifier);
-
-  const listener = await startOAuthRedirectListener({
-    provider: GOOGLE_DRIVE_PROVIDER_NAME,
-    mobileRedirectUri: MOBILE_REDIRECT_URI,
+async function exchangeGoogleDriveCode({
+  credentialId,
+  code,
+  codeVerifier,
+  redirectUri,
+}: OAuthExchange): Promise<OAuthResult> {
+  const { payload, error } = await postTokenRequest({
+    ...clientCredentialEntries(),
+    code,
+    code_verifier: codeVerifier,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
   });
-  pendingOAuthSessions.set(normalized, { codeVerifier, state, listener });
 
-  const query = encodeFormBody({
-    client_id: clientId,
-    redirect_uri: listener.redirectUri,
+  if (error) {
+    return {
+      status: 'failed',
+      error: tokenErrorMessage(
+        'token exchange',
+        error,
+        payload.error_description,
+      ),
+    };
+  }
+
+  if (!payload.refresh_token) {
+    return {
+      status: 'failed',
+      error:
+        'Google token exchange returned no refresh token. Revoke Myelin Notes access in your Google account and sign in again.',
+    };
+  }
+
+  await writeStoredToken(
+    credentialId,
+    toStoredToken(payload, payload.refresh_token),
+  );
+  return { status: 'complete', credentialId };
+}
+
+const oauth = new OAuthClient({
+  provider: GOOGLE_DRIVE_PROVIDER_NAME,
+  authorizeUrl: GOOGLE_AUTHORIZE_URL,
+  scope: GOOGLE_DRIVE_SCOPE,
+  mobileRedirectUri: MOBILE_REDIRECT_URI,
+  resolveClientId: () => getGoogleClientCredentials().clientId,
+  authorizeParams: {
     response_type: 'code',
-    scope: GOOGLE_DRIVE_SCOPE,
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
     // Both are needed to reliably receive a refresh token.
     access_type: 'offline',
     prompt: 'consent',
-  });
+  },
+  exchange: exchangeGoogleDriveCode,
+});
 
-  return {
-    credentialId: normalized,
-    authorizeUrl: `${GOOGLE_AUTHORIZE_URL}?${query}`,
-  };
+export function beginGoogleDriveAuth(
+  credentialId: string,
+): Promise<GoogleDriveOAuthStartPayload> {
+  return oauth.begin(credentialId);
 }
 
-export async function openGoogleDriveAuth(
+export function openGoogleDriveAuth(
   payload: GoogleDriveOAuthStartPayload,
 ): Promise<void> {
-  await openUrl(payload.authorizeUrl);
+  return oauth.open(payload);
 }
 
-export async function waitForGoogleDriveAuth(
+export function waitForGoogleDriveAuth(
   credentialId: string,
   options?: { signal?: AbortSignal },
 ): Promise<GoogleDriveOAuthResult> {
-  const normalized = normalizeCredentialId(credentialId);
-  const session = pendingOAuthSessions.get(normalized);
-  if (!session) {
-    throw new Error('No active Google Drive authorization session.');
-  }
-
-  try {
-    const params = await raceAbort(
-      session.listener.wait(),
-      options?.signal,
-      'Google Drive authorization wait aborted.',
-    );
-
-    if (params.error) {
-      return {
-        status: 'failed',
-        error: tokenErrorMessage(
-          'authorization',
-          params.error,
-          params.errorDescription,
-        ),
-      };
-    }
-
-    // A mismatched state means the redirect did not originate from the request
-    // this app made, so the code that came with it is not ours to redeem.
-    if (params.state !== session.state) {
-      return {
-        status: 'failed',
-        error:
-          'Google Drive authorization state did not match. Start sign-in again.',
-      };
-    }
-
-    if (!params.code) {
-      return {
-        status: 'failed',
-        error: 'Google Drive authorization returned no code.',
-      };
-    }
-
-    const { payload, error } = await postTokenRequest({
-      ...clientCredentialEntries(),
-      code: params.code,
-      code_verifier: session.codeVerifier,
-      redirect_uri: session.listener.redirectUri,
-      grant_type: 'authorization_code',
-    });
-
-    if (error) {
-      return {
-        status: 'failed',
-        error: tokenErrorMessage(
-          'token exchange',
-          error,
-          payload.error_description,
-        ),
-      };
-    }
-
-    if (!payload.refresh_token) {
-      return {
-        status: 'failed',
-        error:
-          'Google token exchange returned no refresh token. Revoke Myelin Notes access in your Google account and sign in again.',
-      };
-    }
-
-    await writeStoredToken(
-      normalized,
-      toStoredToken(payload, payload.refresh_token),
-    );
-    return { status: 'complete', credentialId: normalized };
-  } finally {
-    await cancelGoogleDriveAuth(normalized);
-  }
+  return oauth.wait(credentialId, options);
 }
 
-export async function cancelGoogleDriveAuth(
-  credentialId: string,
-): Promise<void> {
-  const normalized = normalizeCredentialId(credentialId);
-  const session = pendingOAuthSessions.get(normalized);
-  if (!session) {
-    return;
-  }
-
-  pendingOAuthSessions.delete(normalized);
-  await session.listener.cancel().catch((error) => {
-    logger.warn('Failed to close Google Drive OAuth redirect listener', error);
-  });
+export function cancelGoogleDriveAuth(credentialId: string): Promise<void> {
+  return oauth.cancel(credentialId);
 }

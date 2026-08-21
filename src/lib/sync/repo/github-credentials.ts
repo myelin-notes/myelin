@@ -1,20 +1,14 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@/lib/env';
-import { Logger } from '@/lib/logger';
 import { createCredentialVault } from './credential-vault';
 import {
-  deriveCodeChallenge,
-  encodeFormBody,
-  raceAbort,
-  randomUrlSafeToken,
-} from './oauth/pkce';
-import {
-  type OAuthRedirectListener,
-  startOAuthRedirectListener,
-} from './oauth/redirect';
-
-const logger = new Logger('GitHubCredentials');
+  credentialTokenKey,
+  OAuthClient,
+  type OAuthExchange,
+  type OAuthResult,
+  type OAuthStartPayload,
+} from './oauth/client';
+import { encodeFormBody } from './oauth/pkce';
 
 export const GITHUB_PROVIDER_NAME = 'GitHub';
 
@@ -44,26 +38,9 @@ function getGitHubClientSecret(): string {
   return GITHUB_CLIENT_SECRET;
 }
 
-function normalizeCredentialId(credentialId?: string | null): string {
-  const trimmed = typeof credentialId === 'string' ? credentialId.trim() : '';
-  return trimmed || 'default';
-}
-
-function getGitHubTokenKey(credentialId: string): string {
-  return `token:${normalizeCredentialId(credentialId)}`;
-}
-
 export function consumeGitHubVaultDiscarded(): boolean {
   return vault.consumeDiscarded();
 }
-
-interface PendingOAuthSession {
-  codeVerifier: string;
-  state: string;
-  listener: OAuthRedirectListener;
-}
-
-const pendingOAuthSessions = new Map<string, PendingOAuthSession>();
 
 interface GitHubTokenResponse {
   access_token?: string;
@@ -71,24 +48,8 @@ interface GitHubTokenResponse {
   error_description?: string;
 }
 
-export interface GitHubOAuthStartPayload {
-  credentialId: string;
-  authorizeUrl: string;
-}
-
-export type GitHubOAuthCompletePayload = {
-  status: 'complete';
-  credentialId: string;
-};
-
-export type GitHubOAuthFailedPayload = {
-  status: 'failed';
-  error: string;
-};
-
-export type GitHubOAuthResult =
-  | GitHubOAuthCompletePayload
-  | GitHubOAuthFailedPayload;
+export type GitHubOAuthStartPayload = OAuthStartPayload;
+export type GitHubOAuthResult = OAuthResult;
 
 async function postGitHubForm<T>(
   url: string,
@@ -127,7 +88,7 @@ export async function isGitHubSecureStorageAvailable(): Promise<boolean> {
 }
 
 export async function getGitHubToken(credentialId: string): Promise<string> {
-  const token = await vault.read(getGitHubTokenKey(credentialId));
+  const token = await vault.read(credentialTokenKey(credentialId));
   if (!token) {
     throw new Error('GitHub token is not configured.');
   }
@@ -136,7 +97,7 @@ export async function getGitHubToken(credentialId: string): Promise<string> {
 }
 
 export async function hasGitHubToken(credentialId: string): Promise<boolean> {
-  return Boolean(await vault.read(getGitHubTokenKey(credentialId)));
+  return Boolean(await vault.read(credentialTokenKey(credentialId)));
 }
 
 export async function storeGitHubToken(
@@ -148,11 +109,11 @@ export async function storeGitHubToken(
     throw new Error('GitHub token cannot be empty.');
   }
 
-  await vault.write(getGitHubTokenKey(credentialId), trimmed);
+  await vault.write(credentialTokenKey(credentialId), trimmed);
 }
 
 export async function clearGitHubToken(credentialId: string): Promise<void> {
-  await vault.remove(getGitHubTokenKey(credentialId));
+  await vault.remove(credentialTokenKey(credentialId));
 }
 
 export async function isGitHubOAuthAvailable(): Promise<boolean> {
@@ -166,136 +127,75 @@ export async function isGitHubOAuthAvailable(): Promise<boolean> {
   return isGitHubSecureStorageAvailable();
 }
 
-/**
- * Starts the authorization code flow with PKCE. The redirect listener is opened
- * before the URL is handed back so the callback cannot land before anything is
- * ready to catch it; the caller must follow up with `waitForGitHubOAuth` or
- * `cancelGitHubOAuth` so the listener is torn down either way.
- */
-export async function beginGitHubOAuth(
+async function exchangeGitHubCode({
+  credentialId,
+  code,
+  codeVerifier,
+  redirectUri,
+}: OAuthExchange): Promise<OAuthResult> {
+  const response = await postGitHubForm<GitHubTokenResponse>(
+    GITHUB_TOKEN_URL,
+    {
+      client_id: getGitHubClientId(),
+      client_secret: getGitHubClientSecret(),
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: redirectUri,
+    },
+    'GitHub token exchange failed',
+  );
+
+  if (response.error) {
+    return {
+      status: 'failed',
+      error: oauthFailureMessage(response.error, response.error_description),
+    };
+  }
+
+  const token = response.access_token?.trim();
+  if (!token) {
+    return {
+      status: 'failed',
+      error: 'GitHub authorization returned an empty access token.',
+    };
+  }
+
+  await storeGitHubToken(credentialId, token);
+  return { status: 'complete', credentialId };
+}
+
+const oauth = new OAuthClient({
+  provider: GITHUB_PROVIDER_NAME,
+  authorizeUrl: GITHUB_AUTHORIZE_URL,
+  scope: GITHUB_OAUTH_SCOPE,
+  resolveClientId: () => {
+    // The secret is checked alongside the id: a missing one only surfaces at
+    // the token exchange otherwise.
+    getGitHubClientSecret();
+    return getGitHubClientId();
+  },
+  exchange: exchangeGitHubCode,
+});
+
+export function beginGitHubOAuth(
   credentialId: string,
 ): Promise<GitHubOAuthStartPayload> {
-  const normalized = normalizeCredentialId(credentialId);
-  const clientId = getGitHubClientId();
-  // Checked up front: a missing secret only surfaces at token exchange
-  // otherwise, after the user has already authorized in the browser.
-  getGitHubClientSecret();
-
-  await cancelGitHubOAuth(normalized);
-
-  const codeVerifier = randomUrlSafeToken();
-  const state = randomUrlSafeToken();
-  const codeChallenge = await deriveCodeChallenge(codeVerifier);
-
-  const listener = await startOAuthRedirectListener({
-    provider: GITHUB_PROVIDER_NAME,
-  });
-  pendingOAuthSessions.set(normalized, { codeVerifier, state, listener });
-
-  const query = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: listener.redirectUri,
-    scope: GITHUB_OAUTH_SCOPE,
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
-  });
-
-  return {
-    credentialId: normalized,
-    authorizeUrl: `${GITHUB_AUTHORIZE_URL}?${query.toString()}`,
-  };
+  return oauth.begin(credentialId);
 }
 
-export async function openGitHubOAuth(
+export function openGitHubOAuth(
   payload: GitHubOAuthStartPayload,
 ): Promise<void> {
-  await openUrl(payload.authorizeUrl);
+  return oauth.open(payload);
 }
 
-export async function waitForGitHubOAuth(
+export function waitForGitHubOAuth(
   credentialId: string,
   options?: { signal?: AbortSignal },
 ): Promise<GitHubOAuthResult> {
-  const normalized = normalizeCredentialId(credentialId);
-  const session = pendingOAuthSessions.get(normalized);
-  if (!session) {
-    throw new Error('No active GitHub authorization session.');
-  }
-
-  try {
-    const params = await raceAbort(
-      session.listener.wait(),
-      options?.signal,
-      'GitHub authorization wait aborted.',
-    );
-
-    if (params.error) {
-      return {
-        status: 'failed',
-        error: oauthFailureMessage(params.error, params.errorDescription),
-      };
-    }
-
-    // A mismatched state means the redirect did not originate from the request
-    // this app made, so the code that came with it is not ours to redeem.
-    if (params.state !== session.state) {
-      return {
-        status: 'failed',
-        error: 'GitHub authorization state did not match. Start sign-in again.',
-      };
-    }
-
-    if (!params.code) {
-      return {
-        status: 'failed',
-        error: 'GitHub authorization returned no code.',
-      };
-    }
-
-    const response = await postGitHubForm<GitHubTokenResponse>(
-      GITHUB_TOKEN_URL,
-      {
-        client_id: getGitHubClientId(),
-        client_secret: getGitHubClientSecret(),
-        code: params.code,
-        code_verifier: session.codeVerifier,
-        redirect_uri: session.listener.redirectUri,
-      },
-      'GitHub token exchange failed',
-    );
-
-    if (response.error) {
-      return {
-        status: 'failed',
-        error: oauthFailureMessage(response.error, response.error_description),
-      };
-    }
-
-    const token = response.access_token?.trim();
-    if (!token) {
-      return {
-        status: 'failed',
-        error: 'GitHub authorization returned an empty access token.',
-      };
-    }
-
-    await storeGitHubToken(normalized, token);
-    return { status: 'complete', credentialId: normalized };
-  } finally {
-    await cancelGitHubOAuth(normalized);
-  }
+  return oauth.wait(credentialId, options);
 }
 
-export async function cancelGitHubOAuth(credentialId: string): Promise<void> {
-  const normalized = normalizeCredentialId(credentialId);
-  const session = pendingOAuthSessions.get(normalized);
-  if (!session) {
-    return;
-  }
-
-  pendingOAuthSessions.delete(normalized);
-  await session.listener.cancel().catch((error) => {
-    logger.warn('Failed to close GitHub OAuth redirect listener', error);
-  });
+export function cancelGitHubOAuth(credentialId: string): Promise<void> {
+  return oauth.cancel(credentialId);
 }

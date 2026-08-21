@@ -187,7 +187,8 @@ describe('Google Drive OAuth', () => {
 
     await expect(pending).resolves.toEqual({
       status: 'failed',
-      error: 'Google authorization failed: access_denied (The user said no)',
+      error:
+        'Google Drive authorization failed: access_denied (The user said no)',
     });
     expect(tokenRequests).toHaveLength(0);
   });
