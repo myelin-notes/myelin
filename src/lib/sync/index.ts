@@ -62,7 +62,10 @@ export {
   storeGitHubToken,
   waitForGitHubOAuth,
 } from './repo/github-credentials';
-export { ensureGoogleDriveFolder } from './repo/google-drive';
+export {
+  ensureGoogleDriveFolder,
+  renameGoogleDriveFolder,
+} from './repo/google-drive';
 export type {
   GoogleDriveOAuthResult,
   GoogleDriveOAuthStartPayload,

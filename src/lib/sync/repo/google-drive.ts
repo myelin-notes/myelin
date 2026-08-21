@@ -154,6 +154,9 @@ async function driveRequest(
     const accessToken = await getGoogleDriveToken(credentialId);
     const response = await fetch(url, {
       ...init,
+      // DOM types only accept ArrayBuffer-backed views; a plain Uint8Array is
+      // fine at runtime.
+      body: init.body as BodyInit | undefined,
       headers: {
         ...init.headers,
         Authorization: `Bearer ${accessToken}`,
@@ -338,6 +341,32 @@ export async function ensureGoogleDriveFolder(
   return (
     existing?.id ??
     createDriveFile(credentialId, DRIVE_ROOT_ID, name, FOLDER_MIME_TYPE)
+  );
+}
+
+/**
+ * Renames the repository's root folder in place. Keeping the id keeps the notes
+ * inside it, and keeps the local cache, which is keyed on the id.
+ */
+export async function renameGoogleDriveFolder(
+  credentialId: string,
+  folderId: string,
+  folderName: string,
+): Promise<void> {
+  const name = folderName.trim();
+  if (!name) {
+    throw new Error('Google Drive folder name cannot be empty.');
+  }
+
+  await driveRequest(
+    credentialId,
+    'Google Drive rename failed',
+    `${DRIVE_API_BASE}/files/${encodeURIComponent(folderId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    },
   );
 }
 

@@ -5,13 +5,14 @@ import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   ensureGoogleDriveFolder,
   type RepositoryConfig,
+  renameGoogleDriveFolder,
   setRepositoryConfig,
 } from '@/lib/sync';
 
 const logger = new Logger('GoogleDriveFolder');
 
 export interface GoogleDriveFolderState {
-  /** True while the folder is being looked up or created in Drive. */
+  /** True while the folder is being resolved or renamed in Drive. */
   resolving: boolean;
   error: string | null;
   setFolderName: (name: string) => void;
@@ -22,7 +23,8 @@ export interface GoogleDriveFolderState {
  * app cannot browse the user's existing folders, so there is nothing to pick
  * from: the folder is created on demand and found again by name. Resolving it
  * writes to Drive, so it runs only once a name is committed and the account is
- * connected.
+ * connected. Once an id exists, a new name renames that folder rather than
+ * resolving a different one.
  */
 export function useGoogleDriveFolder({
   config,
@@ -85,10 +87,31 @@ export function useGoogleDriveFolder({
       if (next === config.folderName) {
         return;
       }
-      // Clearing the id makes the effect above resolve the renamed folder.
-      setRepositoryConfig({ ...config, folderName: next, folderId: '' });
+      if (!config.folderId) {
+        // Nothing resolved yet; the effect above finds or creates the folder.
+        setRepositoryConfig({ ...config, folderName: next });
+        return;
+      }
+
+      // Rename in place rather than resolving a new folder: the id keeps the
+      // existing notes and the local cache, which is keyed on it.
+      setResolving(true);
+      setError(null);
+      renameGoogleDriveFolder(config.credentialId, config.folderId, next)
+        .then(() => {
+          setRepositoryConfig({ ...config, folderName: next });
+        })
+        .catch((cause: unknown) => {
+          logger.error('Failed to rename Google Drive folder', cause, {
+            folderName: next,
+          });
+          setError(cause instanceof Error ? cause.message : resolveError);
+        })
+        .finally(() => {
+          setResolving(false);
+        });
     },
-    [config],
+    [config, resolveError],
   );
 
   return { resolving, error, setFolderName };
