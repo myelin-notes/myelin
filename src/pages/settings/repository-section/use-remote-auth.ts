@@ -43,9 +43,15 @@ export interface RemoteOAuthProvider<TStartPayload> {
   clearToken: (credentialId: string) => Promise<void>;
 }
 
+/**
+ * `enabled` gates the state read: opening a provider's vault creates its
+ * snapshot file and password, so the unselected provider must not be touched
+ * just because both hooks mount.
+ */
 export function useRemoteAuth<TStartPayload>(
   provider: RemoteOAuthProvider<TStartPayload>,
   credentialId: string,
+  enabled: boolean,
 ): RemoteAuthState {
   const strings = useMessages();
   const [tokenPresent, setTokenPresent] = useState(false);
@@ -98,8 +104,11 @@ export function useRemoteAuth<TStartPayload>(
   ]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     void checkToken();
-  }, [checkToken]);
+  }, [enabled, checkToken]);
 
   // Abandoning the flow (unmount) has to tear down the redirect listener too,
   // otherwise the loopback server or deep link handler outlives the attempt.

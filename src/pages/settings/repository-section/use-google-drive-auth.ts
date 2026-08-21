@@ -29,6 +29,9 @@ const PROVIDER: RemoteOAuthProvider<GoogleDriveOAuthStartPayload> = {
   clearToken: clearGoogleDriveToken,
 };
 
-export function useGoogleDriveAuth(credentialId: string): RemoteAuthState {
-  return useRemoteAuth(PROVIDER, credentialId);
+export function useGoogleDriveAuth(
+  credentialId: string,
+  enabled: boolean,
+): RemoteAuthState {
+  return useRemoteAuth(PROVIDER, credentialId, enabled);
 }

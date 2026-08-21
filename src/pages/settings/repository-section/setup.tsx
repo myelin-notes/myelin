@@ -66,7 +66,10 @@ export function RepositorySetup({
     config.kind === 'github'
       ? config.credentialId.trim() || 'default'
       : 'default';
-  const githubAuth = useGitHubAuth(githubCredentialId);
+  const githubAuth = useGitHubAuth(
+    githubCredentialId,
+    config.kind === 'github',
+  );
   const selectors = useGitHubSelectors({
     tokenPresent: githubAuth.tokenPresent,
     credentialId: githubCredentialId,
@@ -77,7 +80,10 @@ export function RepositorySetup({
     config.kind === 'google-drive'
       ? config.credentialId.trim() || 'default'
       : 'default';
-  const googleDriveAuth = useGoogleDriveAuth(googleDriveCredentialId);
+  const googleDriveAuth = useGoogleDriveAuth(
+    googleDriveCredentialId,
+    config.kind === 'google-drive',
+  );
   const driveFolder = useGoogleDriveFolder({
     config,
     tokenPresent: googleDriveAuth.tokenPresent,

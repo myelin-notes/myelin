@@ -30,6 +30,9 @@ const PROVIDER: RemoteOAuthProvider<GitHubOAuthStartPayload> = {
 
 export type GitHubAuthState = RemoteAuthState;
 
-export function useGitHubAuth(credentialId: string): RemoteAuthState {
-  return useRemoteAuth(PROVIDER, credentialId);
+export function useGitHubAuth(
+  credentialId: string,
+  enabled: boolean,
+): RemoteAuthState {
+  return useRemoteAuth(PROVIDER, credentialId, enabled);
 }
