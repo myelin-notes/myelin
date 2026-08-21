@@ -44,27 +44,27 @@ export const GITHUB_CLIENT_ID = (
   import.meta.env.VITE_GITHUB_CLIENT_ID ?? 'Ov23lio3GBRJhHIcx6ow'
 ).trim();
 
-export const GITHUB_CLIENT_SECRET =
-  import.meta.env.VITE_GITHUB_CLIENT_SECRET.trim();
+export const GITHUB_CLIENT_SECRET = (
+  import.meta.env.VITE_GITHUB_CLIENT_SECRET ?? ''
+).trim();
 
 export const GOOGLE_CLIENT_ID = (
   import.meta.env.VITE_GOOGLE_CLIENT_ID ??
   '150843770497-9i6tupvq4g4o1vhrkjk4pqevb2kpemc4.apps.googleusercontent.com'
 ).trim();
 
-// No default: unlike the client id, this is not committed, so until it is set
-// Google Drive sign-in reports itself as unavailable rather than failing at the
-// token exchange after the user has already consented in the browser.
 export const GOOGLE_CLIENT_SECRET = (
   import.meta.env.VITE_GOOGLE_CLIENT_SECRET ?? ''
 ).trim();
 
 export const GOOGLE_CLIENT_ID_IOS = (
-  import.meta.env.VITE_GOOGLE_CLIENT_ID_IOS ?? ''
+  import.meta.env.VITE_GOOGLE_CLIENT_ID_IOS ??
+  '150843770497-rr48hcanpqd6v40rhedd6ar38rfr5n3l.apps.googleusercontent.com'
 ).trim();
 
 export const GOOGLE_CLIENT_ID_ANDROID = (
-  import.meta.env.VITE_GOOGLE_CLIENT_ID_ANDROID ?? ''
+  import.meta.env.VITE_GOOGLE_CLIENT_ID_ANDROID ??
+  '150843770497-e7ujhf3bpnl6i703lil10fadmb5jllpt.apps.googleusercontent.com'
 ).trim();
 
 export const LIVE_DISCOVERY_URL = (
