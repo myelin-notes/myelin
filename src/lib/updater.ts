@@ -2,13 +2,19 @@ import { getVersion } from '@tauri-apps/api/app';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
+import { MOBILE_PLATFORM } from '@/lib/env';
 
 /**
+ * DESKTOP ONLY
  * Check the stable channel for a newer release and, if the user agrees,
- * download + install it and relaunch. Desktop-only: the updater plugin is
- * not registered on mobile, so check() throws there and we silently skip.
+ * download + install it and relaunch
+ * on mobile.
  */
 export async function initAutoUpdate(): Promise<void> {
+  if (MOBILE_PLATFORM !== null) {
+    return;
+  }
+
   try {
     // The repo's version is pinned to 0.0.0; real versions are stamped in by
     // CI from the release tag. Anything still at 0.0.0 is a dev/local build,
@@ -33,8 +39,8 @@ export async function initAutoUpdate(): Promise<void> {
     await update.downloadAndInstall();
     await relaunch();
   } catch (error) {
-    // No updater on this platform, offline, or no release published yet.
-    // Auto-update is best-effort; never block app startup on it.
+    // Offline, or no release published yet. Auto-update is best-effort;
+    // never block app startup on it.
     if (import.meta.env.DEV) {
       console.warn('Auto-update check failed:', error);
     }
