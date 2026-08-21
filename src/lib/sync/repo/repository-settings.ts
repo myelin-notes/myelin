@@ -2,6 +2,7 @@ import { Logger } from '@/lib/logger';
 import { clearAllThumbnails } from '@/lib/thumbnails';
 import { UserPrefs } from '@/lib/user-prefs';
 import {
+  DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   DEFAULT_REPOSITORY_CONFIG,
   getRepositoryStorageKey,
   type RepositoryConfig,
@@ -19,6 +20,14 @@ function normalizeRepositoryConfig(config: RepositoryConfig): RepositoryConfig {
         owner: config.owner.trim(),
         repo: config.repo.trim(),
         branch: config.branch?.trim() || 'main',
+        credentialId: config.credentialId.trim() || 'default',
+      };
+    case 'google-drive':
+      return {
+        kind: 'google-drive',
+        folderName:
+          config.folderName.trim() || DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
+        folderId: config.folderId.trim(),
         credentialId: config.credentialId.trim() || 'default',
       };
   }

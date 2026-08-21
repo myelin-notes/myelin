@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OAuthCallbackParams } from './github-oauth-redirect';
+import type { OAuthCallbackParams } from './oauth/redirect';
 
 // The shared setup replaces this module wholesale for consumers that only need
 // a token; here the real implementation is what's under test.
@@ -25,7 +25,7 @@ const REDIRECT_URI = 'http://127.0.0.1:54321/oauth/callback';
 let resolveRedirect: (params: OAuthCallbackParams) => void;
 const cancelListener = vi.fn(async () => {});
 
-vi.mock('./github-oauth-redirect', () => ({
+vi.mock('./oauth/redirect', () => ({
   startOAuthRedirectListener: async () => ({
     redirectUri: REDIRECT_URI,
     wait: () =>

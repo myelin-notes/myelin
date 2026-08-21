@@ -353,11 +353,16 @@ const en = {
           label: 'GitHub',
           description: 'Sync to a private GitHub repository',
         },
+        googleDrive: {
+          label: 'Google Drive',
+          description: 'Sync to a folder in your Google Drive',
+        },
       },
       auth: {
         title: 'Repository Authentication',
         descriptions: {
-          awaitingRedirect: 'Finish signing in with GitHub in your browser',
+          awaitingRedirect: (provider: string) =>
+            `Finish signing in with ${provider} in your browser`,
           connected: 'Sign-in is complete',
           unavailable: 'Authentication is unavailable',
           signIn: 'Sign in to connect this repository',
@@ -371,7 +376,7 @@ const en = {
           signOut: 'Sign out',
         },
         browserCallback: {
-          title: 'Signed in to GitHub',
+          title: (provider: string) => `Signed in to ${provider}`,
           message: 'You can close this tab and return to Myelin Notes.',
         },
         notices: {
@@ -390,6 +395,7 @@ const en = {
         queuedChanges: 'Queued changes',
         lastSync: 'Last sync',
         remoteRepository: 'Remote Repository',
+        driveFolder: 'Drive Folder',
         status: {
           setupRequired: {
             label: 'Setup required',
@@ -442,6 +448,11 @@ const en = {
           loading: 'Loading branches...',
           error: 'Failed to load branches.',
           empty: 'No branches',
+        },
+        folder: {
+          label: 'Drive folder name',
+          placeholder: 'Myelin',
+          error: 'Failed to open the Drive folder.',
         },
       },
     },
@@ -909,10 +920,10 @@ const en = {
       eyebrow: 'Sync',
       title: 'Where should your notes live?',
       description:
-        'Notes are stored on this device. Connect a GitHub repository to keep them backed up and in sync across machines.',
+        'Notes are stored on this device. Connect a GitHub repository or Google Drive to keep them backed up and in sync across machines.',
       later: 'You can set this up later in Settings.',
       incomplete:
-        'Sign in and pick a repository to continue, or choose Local to decide later.',
+        'Sign in and finish picking where notes go to continue, or choose Local to decide later.',
     },
     sample: {
       eyebrow: 'Canvas',

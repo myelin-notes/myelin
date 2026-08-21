@@ -184,7 +184,7 @@ export async function importGoodnotesZip({
           fileName: entry.fileName,
         });
         const importedId = await importPdfFile({
-          file: new File([entry.bytes], entry.fileName, {
+          file: new File([entry.bytes as BlobPart], entry.fileName, {
             type: 'application/pdf',
           }),
           repository,

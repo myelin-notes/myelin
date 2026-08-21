@@ -37,10 +37,17 @@ export default defineConfig(async ({ mode }) => {
   // SidebarProvider). Baked in as a `define` global so the choice is fixed at
   // build time. VITE_TABLET_LAYOUT lets a desktop dev preview the layout without
   // a mobile build.
-  const isMobileBuild =
+  //
+  // __MOBILE_PLATFORM__ carries the actual OS, which the Google Drive OAuth flow
+  // needs to pick a per-platform client id; VITE_TABLET_LAYOUT leaves it null
+  // because such a build still runs on a desktop.
+  const mobilePlatform =
     process.env.TAURI_ENV_PLATFORM === 'ios' ||
-    process.env.TAURI_ENV_PLATFORM === 'android' ||
-    env.VITE_TABLET_LAYOUT === 'true';
+    process.env.TAURI_ENV_PLATFORM === 'android'
+      ? process.env.TAURI_ENV_PLATFORM
+      : null;
+  const isMobileBuild =
+    mobilePlatform !== null || env.VITE_TABLET_LAYOUT === 'true';
 
   return {
     plugins: [
@@ -81,6 +88,7 @@ export default defineConfig(async ({ mode }) => {
 
     define: {
       __MOBILE_BUILD__: JSON.stringify(isMobileBuild),
+      __MOBILE_PLATFORM__: JSON.stringify(mobilePlatform),
     },
 
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

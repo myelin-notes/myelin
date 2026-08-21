@@ -357,12 +357,16 @@ const es: typeof en = {
           label: 'GitHub',
           description: 'Sincronizar con un repositorio privado de GitHub',
         },
+        googleDrive: {
+          label: 'Google Drive',
+          description: 'Sincronizar con una carpeta de tu Google Drive',
+        },
       },
       auth: {
         title: 'Autenticación del repositorio',
         descriptions: {
-          awaitingRedirect:
-            'Completa el inicio de sesión con GitHub en tu navegador',
+          awaitingRedirect: (provider: string) =>
+            `Completa el inicio de sesión con ${provider} en tu navegador`,
           connected: 'El inicio de sesión se completó',
           unavailable: 'La autenticación no está disponible',
           signIn: 'Inicia sesión para conectar este repositorio',
@@ -376,7 +380,7 @@ const es: typeof en = {
           signOut: 'Cerrar sesión',
         },
         browserCallback: {
-          title: 'Sesión iniciada en GitHub',
+          title: (provider: string) => `Sesión iniciada en ${provider}`,
           message: 'Puedes cerrar esta pestaña y volver a Myelin Notes.',
         },
         notices: {
@@ -395,6 +399,7 @@ const es: typeof en = {
         queuedChanges: 'Cambios en cola',
         lastSync: 'Última sincronización',
         remoteRepository: 'Repositorio remoto',
+        driveFolder: 'Carpeta de Drive',
         status: {
           setupRequired: {
             label: 'Configuración requerida',
@@ -448,6 +453,11 @@ const es: typeof en = {
           loading: 'Cargando ramas...',
           error: 'Error al cargar las ramas.',
           empty: 'No hay ramas',
+        },
+        folder: {
+          label: 'Nombre de la carpeta de Drive',
+          placeholder: 'Myelin',
+          error: 'Error al abrir la carpeta de Drive.',
         },
       },
     },
@@ -918,10 +928,10 @@ const es: typeof en = {
       eyebrow: 'Sincronización',
       title: '¿Dónde quieres guardar tus notas?',
       description:
-        'Tus notas se guardan en este dispositivo. Conecta un repositorio de GitHub para tener copia de seguridad y sincronizarlas entre equipos.',
+        'Tus notas se guardan en este dispositivo. Conecta un repositorio de GitHub o Google Drive para tener copia de seguridad y sincronizarlas entre equipos.',
       later: 'Puedes configurarlo más tarde en Ajustes.',
       incomplete:
-        'Inicia sesión y elige un repositorio para continuar, o selecciona Local para decidirlo más tarde.',
+        'Inicia sesión y termina de elegir dónde se guardan tus notas para continuar, o selecciona Local para decidirlo más tarde.',
     },
     sample: {
       eyebrow: 'Lienzo',

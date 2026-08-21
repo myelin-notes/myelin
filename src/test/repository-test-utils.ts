@@ -624,11 +624,288 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   };
 }
 
+const DRIVE_FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
+
+interface MemoryDriveNode {
+  id: string;
+  name: string;
+  parentId: string;
+  mimeType: string | null;
+  bytes: Uint8Array | null;
+  headRevisionId: string | null;
+}
+
+export interface MemoryGoogleDriveApi {
+  fetch(
+    url: string,
+    init: {
+      method: string;
+      headers?: Record<string, string>;
+      body?: BodyInit | null;
+    },
+  ): Promise<{
+    ok: boolean;
+    status: number;
+    json(): Promise<unknown>;
+    arrayBuffer(): Promise<ArrayBuffer>;
+    text(): Promise<string>;
+  }>;
+  /**
+   * Runs `callback` just before the next file download resolves. A repository
+   * read is `list metadata` then `download`, and the pre-write revision check
+   * is another `list`, so firing an external write here lands exactly in the
+   * window the conflict retry has to cover.
+   */
+  beforeNextDownload(callback: () => void | Promise<void>): void;
+  /** Answers every request with a rate limit, until reset. */
+  rateLimitEveryRequest(status: number, retryAfterSeconds: number): void;
+  readonly requestCount: number;
+  /** Paths are relative to the repository's root folder, e.g. `manifest.json`. */
+  readBytes(path: string): Uint8Array | null;
+  readJson<T>(path: string): T | null;
+  writeBytes(path: string, bytes: Uint8Array): void;
+  readonly rootFolderId: string;
+  readonly uploadCallCount: number;
+  readonly deleteCallCount: number;
+}
+
+function unescapeDriveQueryValue(value: string): string {
+  return value.replace(/\\(.)/g, '$1');
+}
+
+function matchDriveQueryValue(query: string, pattern: RegExp): string | null {
+  const match = pattern.exec(query);
+  return match ? unescapeDriveQueryValue(match[1] ?? '') : null;
+}
+
+function toDriveBytes(body: BodyInit | null | undefined): Uint8Array {
+  if (body instanceof Uint8Array) {
+    return new Uint8Array(body);
+  }
+  return new TextEncoder().encode(String(body ?? ''));
+}
+
+function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
+  const nodes = new Map<string, MemoryDriveNode>();
+  let idCounter = 0;
+  let revisionCounter = 0;
+  let uploadCallCount = 0;
+  let deleteCallCount = 0;
+  let beforeDownload: (() => void | Promise<void>) | null = null;
+  let rateLimit: { status: number; retryAfterSeconds: number } | null = null;
+  let requestCount = 0;
+
+  function createNode(
+    name: string,
+    parentId: string,
+    mimeType: string | null,
+  ): MemoryDriveNode {
+    const node: MemoryDriveNode = {
+      id: `drive-${++idCounter}`,
+      name,
+      parentId,
+      mimeType,
+      bytes: null,
+      headRevisionId: null,
+    };
+    nodes.set(node.id, node);
+    return node;
+  }
+
+  const rootFolder = createNode('Myelin', 'root', DRIVE_FOLDER_MIME_TYPE);
+
+  function findChild(
+    parentId: string,
+    name: string,
+    mimeType?: string,
+  ): MemoryDriveNode | null {
+    for (const node of nodes.values()) {
+      if (
+        node.parentId === parentId &&
+        node.name === name &&
+        (mimeType === undefined || node.mimeType === mimeType)
+      ) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  function resolveNode(path: string, create: boolean): MemoryDriveNode | null {
+    const segments = path.split('/');
+    let parentId = rootFolder.id;
+    for (const segment of segments.slice(0, -1)) {
+      const directory =
+        findChild(parentId, segment, DRIVE_FOLDER_MIME_TYPE) ??
+        (create ? createNode(segment, parentId, DRIVE_FOLDER_MIME_TYPE) : null);
+      if (!directory) {
+        return null;
+      }
+      parentId = directory.id;
+    }
+
+    const name = segments[segments.length - 1] ?? '';
+    return (
+      findChild(parentId, name) ??
+      (create ? createNode(name, parentId, null) : null)
+    );
+  }
+
+  function toResource(node: MemoryDriveNode) {
+    return {
+      id: node.id,
+      name: node.name,
+      ...(node.headRevisionId ? { headRevisionId: node.headRevisionId } : {}),
+    };
+  }
+
+  function writeNode(node: MemoryDriveNode, bytes: Uint8Array): void {
+    node.bytes = new Uint8Array(bytes);
+    node.headRevisionId = `rev-${++revisionCounter}`;
+  }
+
+  return {
+    async fetch(url, init) {
+      requestCount += 1;
+      if (rateLimit) {
+        return createRateLimitResponse(
+          rateLimit.status,
+          rateLimit.retryAfterSeconds,
+        );
+      }
+
+      const parsed = new URL(url);
+      const path = parsed.pathname;
+
+      const uploadMatch = /^\/upload\/drive\/v3\/files\/(.+)$/.exec(path);
+      if (uploadMatch && init.method === 'PATCH') {
+        uploadCallCount += 1;
+        const node = nodes.get(decodeURIComponent(uploadMatch[1] ?? ''));
+        if (!node) {
+          return createTextResponse(404, '{"error":{"message":"Not Found"}}');
+        }
+        writeNode(node, toDriveBytes(init.body));
+        return createJsonResponse(200, toResource(node));
+      }
+
+      const fileMatch = /^\/drive\/v3\/files\/(.+)$/.exec(path);
+      if (fileMatch) {
+        const id = decodeURIComponent(fileMatch[1] ?? '');
+        if (init.method === 'GET') {
+          // Snapshot before the hook runs: the caller is meant to observe the
+          // pre-write content and only then race with the external writer.
+          const node = nodes.get(id);
+          const bytes = node?.bytes ? new Uint8Array(node.bytes) : null;
+          if (beforeDownload) {
+            const callback = beforeDownload;
+            beforeDownload = null;
+            await callback();
+          }
+          if (bytes === null) {
+            return createTextResponse(404, '{"error":{"message":"Not Found"}}');
+          }
+          return createBinaryResponse(200, bytes);
+        }
+        if (init.method === 'DELETE') {
+          deleteCallCount += 1;
+          if (!nodes.delete(id)) {
+            return createTextResponse(404, '{"error":{"message":"Not Found"}}');
+          }
+          return createTextResponse(200, '{}');
+        }
+      }
+
+      if (path === '/drive/v3/files') {
+        if (init.method === 'GET') {
+          const query = parsed.searchParams.get('q') ?? '';
+          const parentId = matchDriveQueryValue(
+            query,
+            /'((?:[^'\\]|\\.)*)' in parents/,
+          );
+          const name = matchDriveQueryValue(
+            query,
+            /name = '((?:[^'\\]|\\.)*)'/,
+          );
+          const mimeType = matchDriveQueryValue(
+            query,
+            /mimeType = '((?:[^'\\]|\\.)*)'/,
+          );
+
+          const files = [...nodes.values()]
+            .filter(
+              (node) =>
+                (parentId === null || node.parentId === parentId) &&
+                (name === null || node.name === name) &&
+                (mimeType === null || node.mimeType === mimeType),
+            )
+            .map(toResource);
+          return createJsonResponse(200, { files });
+        }
+
+        if (init.method === 'POST') {
+          const payload = JSON.parse(String(init.body ?? '{}')) as {
+            name?: string;
+            parents?: string[];
+            mimeType?: string;
+          };
+          const node = createNode(
+            payload.name ?? '',
+            payload.parents?.[0] ?? 'root',
+            payload.mimeType ?? null,
+          );
+          return createJsonResponse(200, { id: node.id });
+        }
+      }
+
+      throw new Error(
+        `Unsupported Google Drive request: ${init.method} ${url}`,
+      );
+    },
+    beforeNextDownload(callback) {
+      beforeDownload = callback;
+    },
+    rateLimitEveryRequest(status, retryAfterSeconds) {
+      rateLimit = { status, retryAfterSeconds };
+    },
+    get requestCount() {
+      return requestCount;
+    },
+    readBytes(path) {
+      const node = resolveNode(path, false);
+      return node?.bytes ? new Uint8Array(node.bytes) : null;
+    },
+    readJson<T>(path: string): T | null {
+      const bytes = this.readBytes(path);
+      if (!bytes) {
+        return null;
+      }
+      return JSON.parse(new TextDecoder().decode(bytes)) as T;
+    },
+    writeBytes(path, bytes) {
+      const node = resolveNode(path, true);
+      if (node) {
+        writeNode(node, bytes);
+      }
+    },
+    get rootFolderId() {
+      return rootFolder.id;
+    },
+    get uploadCallCount() {
+      return uploadCallCount;
+    },
+    get deleteCallCount() {
+      return deleteCallCount;
+    },
+  };
+}
+
 let currentStorage = createMemoryStorage();
 let currentGitHubApi = createMemoryGitHubApi();
+let currentGoogleDriveApi = createMemoryGoogleDriveApi();
 export function resetRepositoryTestDoubles(): void {
   currentStorage = createMemoryStorage();
   currentGitHubApi = createMemoryGitHubApi();
+  currentGoogleDriveApi = createMemoryGoogleDriveApi();
 }
 
 export function getRepositoryTestStorage(): MemoryStorage {
@@ -637,6 +914,10 @@ export function getRepositoryTestStorage(): MemoryStorage {
 
 export function getRepositoryTestGitHubApi(): MemoryGitHubApi {
   return currentGitHubApi;
+}
+
+export function getRepositoryTestGoogleDriveApi(): MemoryGoogleDriveApi {
+  return currentGoogleDriveApi;
 }
 
 export function createPathModule() {
@@ -700,6 +981,9 @@ export function createPluginHttpModule() {
       const host = new URL(url).hostname;
       if (host === 'api.github.com') {
         return currentGitHubApi.fetch(url, init);
+      }
+      if (host === 'www.googleapis.com') {
+        return currentGoogleDriveApi.fetch(url, init);
       }
       throw new Error(`Unsupported mock HTTP host: ${host}`);
     },

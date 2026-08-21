@@ -64,6 +64,8 @@ function getConfigKey(config: RepositoryConfig): string {
         config.branch ?? '',
         config.credentialId,
       ].join('\0');
+    case 'google-drive':
+      return ['google-drive', config.folderId, config.credentialId].join('\0');
   }
 }
 

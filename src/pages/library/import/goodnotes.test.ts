@@ -142,7 +142,7 @@ describe('Goodnotes ZIP import', () => {
           { path: 'Math/Units/Week 2.PDF', bytes: new Uint8Array([4, 5, 6]) },
           { path: 'Math/notes.txt', bytes: new Uint8Array([7]) },
           { path: '__MACOSX/._Week 1.pdf', bytes: new Uint8Array([8]) },
-        ]),
+        ]) as BlobPart,
       ],
       'Goodnotes Export.zip',
       { type: 'application/zip' },

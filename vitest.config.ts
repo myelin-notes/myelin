@@ -11,6 +11,7 @@ export default defineConfig({
   // vite.config.ts in real builds) is absent here, so define it explicitly.
   define: {
     __MOBILE_BUILD__: JSON.stringify(false),
+    __MOBILE_PLATFORM__: JSON.stringify(null),
   },
   test: {
     environment: 'node',

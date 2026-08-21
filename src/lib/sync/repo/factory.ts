@@ -5,6 +5,7 @@ import {
   type RepositoryConfig,
 } from './config';
 import { GitHubRepository } from './github';
+import { GoogleDriveRepository } from './google-drive';
 import { LocalRepository } from './local';
 import {
   isRepositoryFullyConfigured,
@@ -58,6 +59,18 @@ export function createRepository(config: RepositoryConfig): ActiveRepository {
           owner: config.owner,
           repo: config.repo,
           branch: config.branch ?? 'main',
+          credentialId: config.credentialId,
+        }),
+        new LocalRepository(cacheRoot),
+        `${cacheRoot}/outbox.json`,
+      );
+      break;
+    }
+    case 'google-drive': {
+      const cacheRoot = `repositories/google-drive/${getRepositoryStorageKey(config)}`;
+      repository = new CachedRepository(
+        new GoogleDriveRepository({
+          folderId: config.folderId,
           credentialId: config.credentialId,
         }),
         new LocalRepository(cacheRoot),

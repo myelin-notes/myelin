@@ -113,7 +113,7 @@ export function ensureDisplayFont(family: string): void {
     try {
       // Throws synchronously on unparseable bytes (e.g. an HTML error body
       // served with 200); without the catch that's an unhandled rejection.
-      document.fonts.add(new FontFace(family, bytes));
+      document.fonts.add(new FontFace(family, bytes as BufferSource));
     } catch (error) {
       logger.warn('Failed to register font face', { family, error });
     }
@@ -148,7 +148,10 @@ async function loadTtf(family: string): Promise<Uint8Array | null> {
   const bytes = await fetchFromGoogle(family);
   if (bytes) {
     try {
-      await platform.artifactCache.write(cachePath, new Blob([bytes]));
+      await platform.artifactCache.write(
+        cachePath,
+        new Blob([bytes as BlobPart]),
+      );
     } catch (error) {
       logger.warn('Failed to cache font', { family, error });
     }

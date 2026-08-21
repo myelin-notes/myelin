@@ -9,6 +9,14 @@ export type RepositoryConfig =
       repo: string;
       branch?: string;
       credentialId: string;
+    }
+  | {
+      kind: 'google-drive';
+      /** Display name of the app-created Drive folder; the user may rename it. */
+      folderName: string;
+      /** Drive id of that folder, resolved once during setup. */
+      folderId: string;
+      credentialId: string;
     };
 
 function normalizeStorageKeyPart(value: string): string {
@@ -32,6 +40,11 @@ export function getRepositoryStorageKey(config: RepositoryConfig): string {
         normalizeStorageKeyPart(config.repo),
         normalizeStorageKeyPart(config.branch ?? 'main'),
       ].join('__');
+    // Keyed on the folder id, not its name: renaming the Drive folder must keep
+    // the local cache, and two accounts each holding a folder named `Myelin`
+    // must not share one cache directory.
+    case 'google-drive':
+      return normalizeStorageKeyPart(config.folderId);
   }
 }
 
@@ -74,3 +87,5 @@ export type ActiveRepository = Repository &
   RepositoryStatusSource;
 
 export const DEFAULT_REPOSITORY_CONFIG: RepositoryConfig = { kind: 'local' };
+
+export const DEFAULT_GOOGLE_DRIVE_FOLDER_NAME = 'Myelin';

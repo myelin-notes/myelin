@@ -94,7 +94,7 @@ export function createMediaPathResolver(
       return null;
     }
 
-    const blob = new Blob([bytes], {
+    const blob = new Blob([bytes as BlobPart], {
       type: getMimeTypeForFileType(node.fileType),
     });
     const url = URL.createObjectURL(blob);
