@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getVersion } from '@tauri-apps/api/app';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { IS_DEV, MOBILE_PLATFORM } from '@/lib/env';
@@ -18,9 +19,9 @@ export async function checkForUpdate(): Promise<Update | null> {
 
   try {
     // Dev is pinned to 0.0.0; real versions set by CI
-    // if ((await getVersion()) === '0.0.0') {
-    //   return null;
-    // }
+    if ((await getVersion()) === '0.0.0') {
+      return null;
+    }
     return await check();
   } catch (error) {
     if (!IS_DEV) {
