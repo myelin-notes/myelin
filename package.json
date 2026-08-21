@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "license": "SEE LICENSE IN LICENSE.md",
   "type": "module",
+  "packageManager": "yarn@1.22.22",
   "workspaces": [
     "packages/editor",
     "packages/shared",
