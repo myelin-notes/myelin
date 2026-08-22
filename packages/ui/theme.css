@@ -378,3 +378,13 @@
   /* Pure black on dark, matching --sh-ambient */
   --shadow-rgb: 0 0 0;
 }
+
+@layer base {
+  /* tw-animate-css's `animate-out` leaves `animation-fill-mode: none`, so the
+     exit keyframe's end state is dropped in the frame between `animationend`
+     and unmount — the panel flashes back to full opacity. Hold it instead.
+     `fill-mode-*` utilities still override this. */
+  [data-closed] {
+    --tw-animation-fill-mode: forwards;
+  }
+}

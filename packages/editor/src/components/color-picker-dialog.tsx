@@ -119,15 +119,12 @@ function ColorPickerPanel({
     }
   }, []);
 
-  // `fill-mode-forwards` holds the exit keyframe's end state until React
-  // unmounts us. animate-out defaults to `fill-mode: none`, which snaps the
-  // panel back to full opacity for a frame once the fade ends — a visible flash.
   return (
     <div
       {...presenceState}
       onAnimationEnd={onAnimationEnd}
       ref={ref}
-      className="data-closed:slide-out-to-top-1 data-closed:zoom-out-95 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:zoom-in-95 data-open:fade-in-0 pointer-events-auto fixed top-1/2 left-1/2 z-[200] w-[240px] origin-center -translate-x-1/2 -translate-y-1/2 rounded-xl bg-popover/90 fill-mode-forwards p-3 shadow-ambient backdrop-blur-2xl duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
+      className="data-closed:slide-out-to-top-1 data-closed:zoom-out-95 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:zoom-in-95 data-open:fade-in-0 pointer-events-auto fixed top-1/2 left-1/2 z-[200] w-[240px] origin-center -translate-x-1/2 -translate-y-1/2 rounded-xl bg-popover/90 p-3 shadow-ambient backdrop-blur-2xl duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
       style={{ border: '0.5px solid var(--border-ghost)' }}
       role="dialog"
       aria-label={title}
