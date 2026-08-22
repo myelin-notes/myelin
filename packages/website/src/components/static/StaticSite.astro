@@ -302,22 +302,28 @@ const ctaOutline = cn(
 </div>
 
 <script>
-  import { detectPlatform, fetchDownloadUrls } from '../../lib/downloads';
+  import {
+    autoDownloadUrl,
+    detectPlatform,
+    fetchDownloadUrls,
+  } from '../../lib/downloads';
   import type { PlatformKey } from '../../content/site/links';
 
   // Every download link ships pointing at the releases page; upgrade the ones
   // whose platform has a real installer in the latest release. "auto" means the
   // link is a bare "Download", so it follows the visitor's OS. Anything left
-  // unresolved (no build for that platform, no JS, GitHub unreachable) keeps
-  // the releases page, which is a working destination on its own.
+  // unresolved (no JS, GitHub unreachable) keeps the releases page, which is a
+  // working destination on its own.
   void fetchDownloadUrls().then((urls) => {
     const detected = detectPlatform();
     const links =
       document.querySelectorAll<HTMLAnchorElement>('a[data-download]');
     for (const link of links) {
       const attr = link.dataset.download;
-      const key = (attr === 'auto' ? detected : attr) as PlatformKey;
-      const url = urls[key];
+      const url =
+        attr === 'auto'
+          ? autoDownloadUrl(urls, detected)
+          : urls[attr as PlatformKey];
       if (url) {
         link.href = url;
       }

@@ -79,3 +79,19 @@ async function loadDownloadUrls(): Promise<DownloadUrls> {
     return {};
   }
 }
+
+/** Platforms with a build, in the order the copy lists them. */
+const FALLTHROUGH: readonly PlatformKey[] = ['mac', 'windows', 'linux'];
+
+/**
+ * Installer for the visitor's own platform, falling through to the first
+ * platform that does have one. The release ships no `.ipa`, so without this an
+ * iPhone visitor is left on the releases page. Matches how the canvas overlay
+ * picks its `primary` platform.
+ */
+export function autoDownloadUrl(
+  urls: DownloadUrls,
+  detected: PlatformKey,
+): string | undefined {
+  return urls[detected] ?? FALLTHROUGH.map((key) => urls[key]).find(Boolean);
+}
