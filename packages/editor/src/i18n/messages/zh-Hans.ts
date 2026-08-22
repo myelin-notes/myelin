@@ -90,6 +90,10 @@ const zhHans: typeof en = {
       cta: '新建画布',
     },
     recentlyOpened: '最近打开',
+    betaFeedback: {
+      title: '测试版反馈',
+      description: '遇到问题或有想法？填写简短表单告诉我们。',
+    },
     searchPlaceholder: '搜索工作室…',
     semanticSearchLabel: '语义搜索',
     explorer: '资源管理器',
@@ -307,6 +311,20 @@ const zhHans: typeof en = {
     language: {
       title: '语言',
       eyebrow: '界面语言',
+    },
+    input: {
+      title: '输入',
+      eyebrow: '手写笔与触摸',
+      mode: {
+        label: '绘图输入',
+        description:
+          '手指在画布上的作用。自动：在检测到手写笔之前用手指绘图；手写笔：只有手写笔能绘图；触摸：手指始终绘图，双指平移和缩放。',
+        options: {
+          auto: '自动',
+          pen: '手写笔',
+          touch: '触摸',
+        },
+      },
     },
     pageFrameEditing: {
       title: '页面框编辑',

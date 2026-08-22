@@ -92,6 +92,11 @@ const es: typeof en = {
       cta: 'Nuevo lienzo',
     },
     recentlyOpened: 'Abiertos recientemente',
+    betaFeedback: {
+      title: 'Comentarios de la beta',
+      description:
+        '¿Encontraste un error o tienes una idea? Cuéntanos en un formulario breve.',
+    },
     searchPlaceholder: 'Buscar en el estudio...',
     semanticSearchLabel: 'Búsqueda semántica',
     explorer: 'Navegador',
@@ -317,6 +322,20 @@ const es: typeof en = {
     language: {
       title: 'Idioma',
       eyebrow: 'Interfaz',
+    },
+    input: {
+      title: 'Entrada',
+      eyebrow: 'Lápiz y toque',
+      mode: {
+        label: 'Entrada de dibujo',
+        description:
+          'Qué hace un dedo en el lienzo. Automático dibuja con el dedo hasta que aparece un lápiz; Lápiz deja el dibujo al lápiz; Toque siempre dibuja con el dedo, y desplaza y hace zoom con dos.',
+        options: {
+          auto: 'Automático',
+          pen: 'Lápiz',
+          touch: 'Toque',
+        },
+      },
     },
     pageFrameEditing: {
       title: 'Edición de marcos de página',

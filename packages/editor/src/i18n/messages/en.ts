@@ -90,6 +90,10 @@ const en = {
       cta: 'New Canvas',
     },
     recentlyOpened: 'Recently Opened',
+    betaFeedback: {
+      title: 'Beta feedback',
+      description: 'Hit a bug or have an idea? Tell us in a short form.',
+    },
     searchPlaceholder: 'Search studio...',
     semanticSearchLabel: 'Semantic search',
     explorer: 'Explorer',
@@ -313,6 +317,20 @@ const en = {
     language: {
       title: 'Language',
       eyebrow: 'Interface',
+    },
+    input: {
+      title: 'Input',
+      eyebrow: 'Pen & Touch',
+      mode: {
+        label: 'Drawing input',
+        description:
+          'What a finger does on the canvas. Auto draws with a finger until a stylus turns up; Pen leaves drawing to the stylus; Touch always draws with a finger, and pans and zooms with two.',
+        options: {
+          auto: 'Auto',
+          pen: 'Pen',
+          touch: 'Touch',
+        },
+      },
     },
     pageFrameEditing: {
       title: 'Page Frame Editing',

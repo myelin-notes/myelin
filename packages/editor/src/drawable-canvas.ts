@@ -14,6 +14,7 @@ import { PageFrameElement } from './elements/page-frame-element';
 import { PdfElement } from './elements/pdf-element';
 import type { Vector2 } from './geometry';
 import { catalogs, type MessageGetter } from './i18n/messages';
+import { InputModeController } from './input-mode';
 import {
   describeElementType,
   summarizeDrawableElements,
@@ -209,6 +210,9 @@ export class DrawableCanvas {
   // While the stylus is on the glass — and briefly after — a hand resting on
   // the screen must drive nothing.
   private readonly _palm = new PalmRejection();
+
+  // Whether a finger draws or pans — see InputModeController.
+  private readonly _input = new InputModeController();
 
   /** Owns the element collections and keeps them mutating as a unit. */
   private readonly _store = new ElementStore(() => this.notifyChange());
@@ -935,6 +939,7 @@ export class DrawableCanvas {
     }
     this._store.clear();
     this.viewport.destroy();
+    this._input.destroy();
     window.removeEventListener('pointermove', this._handlePointerMove);
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
     window.removeEventListener('pointerup', this._handlePointerUp);
@@ -1262,6 +1267,7 @@ export class DrawableCanvas {
     // canvas heard about until the cursor left that DOM again. Hover still
     // only fires for the bare canvas.
     this._handlePointerMove = (evt) => {
+      this._input.observe(evt);
       // A rejected palm still emits moves, and this handler feeds them to the
       // active tool regardless of which pointer opened the interaction — so
       // without this the palm would draw into the pen's own stroke.
@@ -1279,6 +1285,7 @@ export class DrawableCanvas {
     window.addEventListener('pointermove', this._handlePointerMove);
 
     this._handlePointerDown = (evt) => {
+      this._input.observe(evt);
       // One-shot placement intercepts primary-button clicks regardless of tool.
       if (this._placement.isActive) {
         if (evt.button === 0) {
@@ -1299,7 +1306,22 @@ export class DrawableCanvas {
           // any single-finger pan in progress and ignore this pointer.
           if (this._activeTouchPointers.size >= 2) {
             this._touchTapCandidate = null;
+            // The two fingers of a pinch never land together, so in touch mode
+            // the first one has already begun a stroke. That mark is not what
+            // the user asked for: discard it rather than commit it.
+            if (this._input.touchDrivesTool(this.toolSelected.id)) {
+              this.abortInteraction();
+            }
             this.state.change(InteractState.Idle, evt);
+            break;
+          }
+          // In touch mode a finger is the brush, so it goes straight to the
+          // tool — ahead of the double-tap and pan gestures, which would eat
+          // the start of a stroke.
+          if (this._input.touchDrivesTool(this.toolSelected.id)) {
+            this._touchTapCandidate = null;
+            this.state.change(InteractState.UsingTool, evt);
+            this.state.update(evt);
             break;
           }
           // Double-tap enters element edit (matches the mouse/pen double-click);

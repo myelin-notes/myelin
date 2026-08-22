@@ -8,13 +8,16 @@ import {
   Keyboard,
   Languages,
   PenLine,
+  Pointer,
   ShieldCheck,
 } from 'lucide-react';
 import { IS_MOBILE_BUILD } from '@/lib/env';
+import { isTouchDevice } from '@/lib/platform';
 
 export type SettingsSectionId =
   | 'appearance'
   | 'language'
+  | 'input'
   | 'editing'
   | 'sync'
   | 'data'
@@ -28,6 +31,7 @@ export interface SettingsSectionMeta {
   titleKey:
     | 'canvasStyle'
     | 'language'
+    | 'input'
     | 'pageFrameEditing'
     | 'repository'
     | 'dataExport'
@@ -41,11 +45,14 @@ export interface SettingsSectionMeta {
    * {@link IS_MOBILE_BUILD}).
    */
   desktopOnly?: boolean;
+  /** Hidden without a touch screen — there is nothing to choose there. */
+  touchOnly?: boolean;
 }
 
 const ALL_SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: 'appearance', titleKey: 'canvasStyle', icon: Brush },
   { id: 'language', titleKey: 'language', icon: Languages },
+  { id: 'input', titleKey: 'input', icon: Pointer, touchOnly: true },
   { id: 'editing', titleKey: 'pageFrameEditing', icon: PenLine },
   { id: 'sync', titleKey: 'repository', icon: Cloud },
   {
@@ -62,10 +69,13 @@ const ALL_SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
 
 /**
  * Sections to show on the current platform. Desktop-only sections (MCP, data
- * export, keybindings) are dropped on mobile. Drives both the settings rail and
- * the rendered section list so they can't drift apart.
+ * export, keybindings) are dropped on mobile, and touch-only ones (input mode)
+ * on a machine with no touch screen. Drives both the settings rail and the
+ * rendered section list so they can't drift apart.
  */
 export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] =
   ALL_SETTINGS_SECTIONS.filter(
-    (section) => !(IS_MOBILE_BUILD && section.desktopOnly),
+    (section) =>
+      !(IS_MOBILE_BUILD && section.desktopOnly) &&
+      !(!isTouchDevice && section.touchOnly),
   );

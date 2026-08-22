@@ -44,6 +44,9 @@ const PREFS = {
     'default-page-layout',
     'vertical',
   ),
+  inputMode: pref<import('./input-mode').InputMode>('input-mode', 'auto'),
+  /** Epoch ms a stylus was last seen. @see input-mode */
+  stylusLastSeenAt: pref<number>('stylus-last-seen-at', 0),
   noteLinkHoverPreview: pref<boolean>('note-link-hover-preview', true),
   linkRequireModifier: pref<boolean>('link-require-modifier', true),
   alwaysRenameNoteReferences: pref<boolean>(
