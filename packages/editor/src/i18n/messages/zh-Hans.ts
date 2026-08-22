@@ -90,6 +90,10 @@ const zhHans: typeof en = {
       cta: '新建画布',
     },
     recentlyOpened: '最近打开',
+    betaFeedback: {
+      title: '测试版反馈',
+      description: '遇到问题或有想法？填写简短表单告诉我们。',
+    },
     searchPlaceholder: '搜索工作室…',
     semanticSearchLabel: '语义搜索',
     explorer: '资源管理器',

@@ -92,6 +92,11 @@ const es: typeof en = {
       cta: 'Nuevo lienzo',
     },
     recentlyOpened: 'Abiertos recientemente',
+    betaFeedback: {
+      title: 'Comentarios de la beta',
+      description:
+        '¿Encontraste un error o tienes una idea? Cuéntanos en un formulario breve.',
+    },
     searchPlaceholder: 'Buscar en el estudio...',
     semanticSearchLabel: 'Búsqueda semántica',
     explorer: 'Navegador',

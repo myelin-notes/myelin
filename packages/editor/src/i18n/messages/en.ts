@@ -90,6 +90,10 @@ const en = {
       cta: 'New Canvas',
     },
     recentlyOpened: 'Recently Opened',
+    betaFeedback: {
+      title: 'Beta feedback',
+      description: 'Hit a bug or have an idea? Tell us in a short form.',
+    },
     searchPlaceholder: 'Search studio...',
     semanticSearchLabel: 'Semantic search',
     explorer: 'Explorer',

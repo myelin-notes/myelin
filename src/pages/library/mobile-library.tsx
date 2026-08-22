@@ -43,6 +43,7 @@ import {
 } from '@/lib/sync/manual-refresh';
 import { useTabController } from '@/lib/tabs/context';
 import { cn } from '@/lib/utils';
+import { BetaFeedbackBanner } from './beta-feedback-banner';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
   ExplorerTree,
@@ -280,6 +281,10 @@ export function MobileLibrary() {
                 <Settings className="size-4" />
               </button>
             </div>
+          </div>
+
+          <div className="mt-6 max-w-xl">
+            <BetaFeedbackBanner />
           </div>
 
           <section className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-12">

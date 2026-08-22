@@ -15,6 +15,7 @@ import {
   type VFSFileNode,
 } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
+import { BetaFeedbackBanner } from '@/pages/library/beta-feedback-banner';
 import { RecentCard } from '@/pages/library/recent-card';
 
 const logger = new Logger('HomePage');
@@ -92,6 +93,10 @@ export function HomePage() {
         id="home-main"
         className="flex flex-1 flex-col overflow-y-auto px-6 pt-8 pb-12 sm:px-8 md:px-10 md:pt-12 lg:px-12"
       >
+        <div className="mb-8 max-w-xl">
+          <BetaFeedbackBanner />
+        </div>
+
         {recentFiles.length === 0 ? (
           <div className="fade-in-0 slide-in-from-bottom-2 flex flex-1 animate-in flex-col items-center justify-center text-center duration-[250ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]">
             <div className="flex size-16 items-center justify-center rounded-2xl bg-surface ring-1 ring-border-subtle/70">
