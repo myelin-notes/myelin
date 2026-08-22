@@ -1,7 +1,7 @@
 import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { useCopy } from '@/content/copy-context';
-import { isExternalLink, linkHref, navLinks } from '@/content/site';
+import { linkHref, navLinks } from '@/content/site';
 import {
   isComingSoon,
   type PlatformKey,
@@ -298,8 +298,6 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
             className="pointer-events-auto underline underline-offset-4"
             style={{ color: '#374151' }}
             href={linkHref(id)}
-            target={isExternalLink(id) ? '_blank' : undefined}
-            rel={isExternalLink(id) ? 'noreferrer' : undefined}
           >
             {copy.linkLabels[id]}
           </a>

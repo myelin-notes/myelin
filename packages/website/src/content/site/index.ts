@@ -1,7 +1,7 @@
 import { DEFAULT_LOCALE, type Locale } from '@/lib/locale';
 import en from './en';
 import es from './es';
-import { type Platform, siteLinks } from './links';
+import type { Platform } from './links';
 import zhHans from './zh-hans';
 
 // Re-exported so build-time callers can take everything from this one barrel.
@@ -33,24 +33,22 @@ export const SCENE_IDS = [
 export type SceneId = (typeof SCENE_IDS)[number];
 
 /** Every link the header or footer can point at. */
-export type LinkId = 'privacy' | 'license';
+export type LinkId = 'privacy';
 
 /**
- * The header and footer carry the same two links. The set itself is the same in
+ * The header and footer carry the same links. The set itself is the same in
  * every language; only the labels translate.
  */
-export const navLinks: LinkId[] = ['privacy', 'license'];
+export const navLinks: LinkId[] = ['privacy'];
 
 /**
  * The privacy policy is published in English only, so its href carries no
  * locale prefix and every locale links to the same page.
  */
-export function linkHref(id: LinkId): string {
-  return id === 'privacy' ? '/privacy' : siteLinks[id];
-}
+const hrefs: Record<LinkId, string> = { privacy: '/privacy' };
 
-export function isExternalLink(id: LinkId): boolean {
-  return id !== 'privacy';
+export function linkHref(id: LinkId): string {
+  return hrefs[id];
 }
 
 interface SearchResultMock {

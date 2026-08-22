@@ -17,7 +17,6 @@ import {
   getCopy,
   getFaqs,
   isComingSoon,
-  isExternalLink,
   linkHref,
   siteLinks,
 } from '../../content/site';
@@ -283,8 +282,6 @@ const ctaOutline = cn(
               <li>
                 <a
                   href={linkHref(id)}
-                  target={isExternalLink(id) ? '_blank' : undefined}
-                  rel={isExternalLink(id) ? 'noreferrer' : undefined}
                   class="text-sm text-text-secondary transition-colors hover:text-text-primary"
                 >
                   {copy.linkLabels[id]}

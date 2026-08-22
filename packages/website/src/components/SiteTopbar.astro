@@ -5,7 +5,7 @@
 //
 // Being outside the island is what lets one language picker serve both
 // renderings: the canvas and the static page share this bar.
-import { getCopy, isExternalLink, linkHref, navLinks } from '../content/site';
+import { getCopy, linkHref, navLinks } from '../content/site';
 import {
   LOCALES,
   type Locale,
@@ -33,13 +33,7 @@ const { path } = splitLocalePath(Astro.url.pathname);
   <nav class="topbar-nav" aria-label={copy.topbar.nav}>
     {
       navLinks.map((id) => (
-        <a
-          href={linkHref(id)}
-          target={isExternalLink(id) ? '_blank' : undefined}
-          rel={isExternalLink(id) ? 'noreferrer' : undefined}
-        >
-          {copy.linkLabels[id]}
-        </a>
+        <a href={linkHref(id)}>{copy.linkLabels[id]}</a>
       ))
     }
   </nav>

@@ -248,7 +248,6 @@ for step in range(3):
 
   linkLabels: {
     privacy: '隐私政策',
-    license: '许可协议',
   },
 
   footer: {

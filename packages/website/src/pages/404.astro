@@ -1,0 +1,32 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  locale="en"
+  translated={false}
+  title="Page not found | Myelin Notes"
+  description="This page does not exist."
+>
+  <div class="mx-auto max-w-3xl px-6 lg:px-10 pt-12 pb-24">
+    <header class="pt-16 pb-12">
+      <p class="kicker text-text-muted">404</p>
+      <h1
+        class="mt-6 font-heading text-[clamp(2.2rem,4.5vw,3.4rem)] leading-[1.05] font-medium tracking-[-0.02em] text-text-primary"
+      >
+        Page not found
+      </h1>
+      <p class="mt-7 text-lg leading-relaxed text-text-secondary">
+        Nothing lives at this address. It may have moved, or the link that
+        brought you here may have a typo in it.
+      </p>
+      <p class="mt-7">
+        <a
+          href="/"
+          class="underline underline-offset-4 text-text-secondary hover:text-text-primary"
+          >Back to Myelin Notes</a
+        >
+      </p>
+    </header>
+  </div>
+</Base>

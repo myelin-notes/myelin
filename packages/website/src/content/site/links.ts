@@ -14,7 +14,6 @@ export const siteLinks = {
    *  per-platform installer asset behind every download button. */
   latestReleaseApi:
     'https://api.github.com/repos/myelin-notes/myelin/releases/latest',
-  license: 'https://github.com/myelin-notes/myelin/blob/main/LICENSE.md',
 };
 
 /** Every platform Myelin ships a native build for. */
