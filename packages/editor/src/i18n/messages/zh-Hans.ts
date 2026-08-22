@@ -308,6 +308,20 @@ const zhHans: typeof en = {
       title: '语言',
       eyebrow: '界面语言',
     },
+    input: {
+      title: '输入',
+      eyebrow: '手写笔与触摸',
+      mode: {
+        label: '绘图输入',
+        description:
+          '手指在画布上的作用。自动：在检测到手写笔之前用手指绘图；手写笔：只有手写笔能绘图；触摸：手指始终绘图，双指平移和缩放。',
+        options: {
+          auto: '自动',
+          pen: '手写笔',
+          touch: '触摸',
+        },
+      },
+    },
     pageFrameEditing: {
       title: '页面框编辑',
       eyebrow: '文档视图',

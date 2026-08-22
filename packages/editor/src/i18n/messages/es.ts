@@ -318,6 +318,20 @@ const es: typeof en = {
       title: 'Idioma',
       eyebrow: 'Interfaz',
     },
+    input: {
+      title: 'Entrada',
+      eyebrow: 'Lápiz y toque',
+      mode: {
+        label: 'Entrada de dibujo',
+        description:
+          'Qué hace un dedo en el lienzo. Automático dibuja con el dedo hasta que aparece un lápiz; Lápiz deja el dibujo al lápiz; Toque siempre dibuja con el dedo, y desplaza y hace zoom con dos.',
+        options: {
+          auto: 'Automático',
+          pen: 'Lápiz',
+          touch: 'Toque',
+        },
+      },
+    },
     pageFrameEditing: {
       title: 'Edición de marcos de página',
       eyebrow: 'Vista de documento',

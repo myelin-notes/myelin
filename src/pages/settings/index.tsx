@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { IS_MOBILE_BUILD } from '@/lib/env';
 import { useMessages } from '@/lib/i18n';
+import { isTouchDevice } from '@/lib/platform';
 import { KeybindsSection } from './keybinds-section';
 import { AboutSection } from './sections/about-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { DataSection } from './sections/data-section';
 import { EditingSection } from './sections/editing-section';
+import { InputSection } from './sections/input-section';
 import { LanguageSection } from './sections/language-section';
 import { McpSection } from './sections/mcp-section';
 import { PrivacySection } from './sections/privacy-section';
@@ -65,6 +67,7 @@ export function SettingsPage() {
             <div className="space-y-12 md:space-y-16">
               <AppearanceSection />
               <LanguageSection />
+              {isTouchDevice && <InputSection />}
               <EditingSection />
               <SyncSection />
               {!IS_MOBILE_BUILD && <DataSection />}

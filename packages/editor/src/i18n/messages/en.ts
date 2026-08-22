@@ -314,6 +314,20 @@ const en = {
       title: 'Language',
       eyebrow: 'Interface',
     },
+    input: {
+      title: 'Input',
+      eyebrow: 'Pen & Touch',
+      mode: {
+        label: 'Drawing input',
+        description:
+          'What a finger does on the canvas. Auto draws with a finger until a stylus turns up; Pen leaves drawing to the stylus; Touch always draws with a finger, and pans and zooms with two.',
+        options: {
+          auto: 'Auto',
+          pen: 'Pen',
+          touch: 'Touch',
+        },
+      },
+    },
     pageFrameEditing: {
       title: 'Page Frame Editing',
       eyebrow: 'Document View',

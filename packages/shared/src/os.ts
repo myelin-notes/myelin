@@ -7,10 +7,14 @@
 
 const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
 
-// iPadOS 13+ reports "Macintosh" in its UA, but a real Mac has no touch screen
-// (maxTouchPoints === 0) whereas iPad reports > 1. Used to keep desktop-only
-// chrome (e.g. the traffic-light inset) off iPad.
-const isTouchDevice =
+/**
+ * Running on a device with a touch screen — a tablet or phone rather than a
+ * desktop. iPadOS 13+ reports "Macintosh" in its UA, but a real Mac has no
+ * touch screen (maxTouchPoints === 0) whereas iPad reports > 1. Used to keep
+ * desktop-only chrome (e.g. the traffic-light inset) off iPad, and to surface
+ * touch-only preferences.
+ */
+export const isTouchDevice =
   typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1;
 
 /**
