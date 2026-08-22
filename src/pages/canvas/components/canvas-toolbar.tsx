@@ -82,6 +82,11 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const panelAnchorClass = compact
     ? 'absolute right-0 bottom-full left-0 mb-2'
     : 'absolute top-0 left-full';
+  // The options controls are narrow, so stretched across the bar the panel is
+  // mostly empty. On compact it sizes to its content and centres over the bar.
+  const optionsAnchorClass = compact
+    ? 'absolute right-0 bottom-full left-0 mx-auto mb-2 w-fit max-w-[calc(100vw-1.5rem)]'
+    : panelAnchorClass;
   const dividerClass = compact
     ? 'mx-1 h-4 w-px bg-border-divider'
     : 'my-1 h-px w-4 bg-border-divider';
@@ -233,7 +238,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               compact
                 ? 'data-closed:slide-out-to-bottom-2 data-open:slide-in-from-bottom-2'
                 : 'data-closed:slide-out-to-left-2 data-open:slide-in-from-left-2 ml-2'
-            } ${panelAnchorClass}`}
+            } ${optionsAnchorClass}`}
             style={compact ? undefined : { top: optionsPanelOffset }}
           >
             <ToolOptionsPanel options={activeOptions} />
