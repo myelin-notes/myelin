@@ -14,8 +14,14 @@ const PEN_HOLD_SLOP = 6;
  */
 const TOUCH_HOLD_MS = 450;
 const TOUCH_HOLD_SLOP = 10;
-/** PointerEvent.button for a stylus barrel button. */
-const PEN_BARREL_BUTTON = 2;
+/**
+ * PointerEvent.buttons bit for a second barrel button, which reports as the
+ * middle button. The primary barrel erases while held (the canvas owns that),
+ * so the wheel goes to the one above it on pens that have two.
+ */
+const PEN_WHEEL_BUTTONS = 4;
+/** Held while the primary barrel or the eraser end is erasing. */
+const PEN_ERASER_BUTTONS = 32 | 2;
 
 interface UsePageCanvasBindingsArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -62,10 +68,7 @@ export function usePageCanvasBindings({
       }
       return;
     }
-    // A stylus barrel button is the pen-side right-click, so it opens the wheel
-    // outright rather than making the user wait out the hold. Apple Pencils
-    // have no barrel button; S Pen / Surface Pen / Wacom do.
-    if (event.pointerType === 'pen' && event.button === PEN_BARREL_BUTTON) {
+    if (event.pointerType === 'pen' && event.buttons & PEN_WHEEL_BUTTONS) {
       openToolWheel(event);
     }
   });
@@ -117,12 +120,14 @@ export function usePageCanvasBindings({
       // A second finger down means the viewport owns the gesture as a pinch,
       // so this also disarms a hold the first finger had started.
       cancelHold();
-      // Button 0 is the pen tip: the barrel opens the wheel on its own, and the
-      // eraser end is there to erase, so neither arms the hold.
+      // Button 0 is the pen tip. A pen already erasing off its barrel or its
+      // eraser end doesn't arm the hold: pausing mid-erase is ordinary, and
+      // the wheel would take the gesture away from it.
       const isPen = event.pointerType === 'pen';
       if (
         (!isPen && event.pointerType !== 'touch') ||
         event.button !== 0 ||
+        event.buttons & PEN_ERASER_BUTTONS ||
         event.shiftKey
       ) {
         return;

@@ -67,6 +67,7 @@ import { EmbedComposer } from './components/embed-composer';
 import { ExportDialog } from './components/export-dialog';
 import { InsertPopover } from './components/insert-popover';
 import { PeerSyncPanel } from './components/peer-sync-panel';
+import { PenDebugPanel } from './components/pen-debug-panel';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
 import { TitleBar, TitleBarTooltip } from './components/title-bar';
@@ -642,6 +643,9 @@ function CanvasViewInner({
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
       )}
+      {/* Temporary: raw stylus button readout. Remove once the S Pen
+          barrel button is confirmed working. */}
+      <PenDebugPanel drawableCanvasRef={drawableCanvasRef} />
       <TitleBar trailing={titleTrailing} />
 
       <CanvasToolbar
