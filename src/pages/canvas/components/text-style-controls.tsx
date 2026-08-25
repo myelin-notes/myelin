@@ -40,11 +40,17 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
   } = useCustomColors('text');
   const containerRef = useRef<HTMLDivElement>(null);
   const [openMenu, setOpenMenu] = useState<'font' | 'color' | null>(null);
+  const [swatchMenuOpen, setSwatchMenuOpen] = useState(false);
 
-  // The custom color picker portals outside this subtree, so leave the menu up
-  // while it's in use or the swatch grid would vanish under it.
+  // The custom color picker and a swatch's delete menu portal outside this
+  // subtree, so leave the menu up while either is in use or the swatch grid
+  // would vanish under it.
   const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
-    if (pickerOpen || containerRef.current?.contains(event.target as Node)) {
+    if (
+      pickerOpen ||
+      swatchMenuOpen ||
+      containerRef.current?.contains(event.target as Node)
+    ) {
       return;
     }
     setOpenMenu(null);
@@ -167,6 +173,7 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
                     void removeColor(color);
                   }}
                   onPointerDown={(e) => e.preventDefault()}
+                  onMenuOpenChange={setSwatchMenuOpen}
                 />
               ))}
               {canAddColor && (

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FileText } from 'lucide-react';
+import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
-import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { IS_DEV } from '@/lib/env';
 import { openNote } from '@/lib/note/navigation';

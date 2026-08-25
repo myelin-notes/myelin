@@ -188,6 +188,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   const [visible, setVisible] = useState(false);
   const [style, setStyle] = useState<CSSProperties>({});
   const [openMenu, setOpenMenu] = useState<'font' | 'color' | null>(null);
+  const [swatchMenuOpen, setSwatchMenuOpen] = useState(false);
   // Tracked marks re-computed on every PM update so button states stay in sync.
   const [active, setActive] = useState<Set<string>>(new Set());
   const [fontAttrs, setFontAttrs] = useState<Record<string, unknown> | null>(
@@ -246,7 +247,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     setVisible(true);
   });
   const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
-    if (pickerOpen) {
+    if (pickerOpen || swatchMenuOpen) {
       return;
     }
     const target = event.target as Node | null;
@@ -326,8 +327,9 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   }, [visible]);
 
   // Pointer outside the toolbar + outside the editor: dismiss + clear menu.
-  // Suspended while the custom-color picker is open — it portals outside the
-  // toolbar's subtree, so clicks inside it would otherwise trigger dismiss.
+  // Suspended while the custom-color picker or a swatch's delete menu is open —
+  // both portal outside the toolbar's subtree, so clicks inside them would
+  // otherwise trigger dismiss.
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       handleDocumentPointerDown(event);
@@ -469,6 +471,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
                     void removeColor(color);
                   }}
                   onPointerDown={(e) => e.preventDefault()}
+                  onMenuOpenChange={setSwatchMenuOpen}
                 />
               ))}
               {canAddColor && (

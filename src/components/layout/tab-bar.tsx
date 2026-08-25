@@ -11,14 +11,14 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { errorDescription } from '@/components/command-palette/utils';
-import { useSidebar } from '@/components/layout/sidebar/context';
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+} from '@myelin/ui/context-menu';
+import { errorDescription } from '@/components/command-palette/utils';
+import { useSidebar } from '@/components/layout/sidebar/context';
 import { trackEvent } from '@/lib/analytics';
 import { type Messages, useMessages } from '@/lib/i18n';
 import { keybindings } from '@/lib/keybinds';

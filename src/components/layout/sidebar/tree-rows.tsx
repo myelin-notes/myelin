@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, FileText, Folder } from 'lucide-react';
-import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { openNote } from '@/lib/note/navigation';
 import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
