@@ -179,6 +179,7 @@ function styleEqual(a: CSSProperties, b: CSSProperties): boolean {
 export function FloatingToolbar({ view }: FloatingToolbarProps) {
   const {
     colors: customColors,
+    canAddColor,
     promptAddColor,
     removeColor,
     pickerOpen,
@@ -470,13 +471,15 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
                   onPointerDown={(e) => e.preventDefault()}
                 />
               ))}
-              <AddColorSwatch
-                onClick={() => {
-                  setOpenMenu(null);
-                  promptAddColor();
-                }}
-                onPointerDown={(e) => e.preventDefault()}
-              />
+              {canAddColor && (
+                <AddColorSwatch
+                  onClick={() => {
+                    setOpenMenu(null);
+                    promptAddColor();
+                  }}
+                  onPointerDown={(e) => e.preventDefault()}
+                />
+              )}
             </div>
           </Popover>
         )}

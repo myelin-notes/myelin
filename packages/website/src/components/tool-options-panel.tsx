@@ -110,6 +110,7 @@ export function ToolOptionsPanel({
 }: ToolOptionsPanelProps) {
   const {
     colors: customColors,
+    canAddColor,
     promptAddColor,
     removeColor,
   } = useCustomColors(customColorTool ?? 'pen');
@@ -154,7 +155,9 @@ export function ToolOptionsPanel({
                       }}
                     />
                   ))}
-                {customColorTool && <AddColorSwatch onClick={promptAddColor} />}
+                {customColorTool && canAddColor && (
+                  <AddColorSwatch onClick={promptAddColor} />
+                )}
               </div>
             </div>
           );

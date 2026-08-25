@@ -33,6 +33,7 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
   const strings = useMessages();
   const {
     colors: customColors,
+    canAddColor,
     promptAddColor,
     removeColor,
     pickerOpen,
@@ -168,13 +169,15 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
                   onPointerDown={(e) => e.preventDefault()}
                 />
               ))}
-              <AddColorSwatch
-                onClick={() => {
-                  setOpenMenu(null);
-                  promptAddColor();
-                }}
-                onPointerDown={(e) => e.preventDefault()}
-              />
+              {canAddColor && (
+                <AddColorSwatch
+                  onClick={() => {
+                    setOpenMenu(null);
+                    promptAddColor();
+                  }}
+                  onPointerDown={(e) => e.preventDefault()}
+                />
+              )}
             </div>
           </Popover>
         )}

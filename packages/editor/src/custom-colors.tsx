@@ -27,6 +27,9 @@ export interface CustomColorsContextValue {
 
 export interface ToolCustomColorsContextValue {
   colors: string[];
+  // False once this tool's list is full. Callers drop their add affordance
+  // rather than letting a user pick a color that has nowhere to go.
+  canAddColor: boolean;
   addColor: (color: string) => Promise<void>;
   removeColor: (color: string) => Promise<void>;
   promptAddColor: () => void;
@@ -40,6 +43,9 @@ export const CustomColorsContext =
 const logger = new Logger('CustomColors');
 
 const INITIAL_PICKER_COLOR = '#3b82f6';
+
+/** Custom swatches a single tool may keep. Deleting one frees a slot. */
+export const MAX_CUSTOM_COLORS = 8;
 
 export function CustomColorsProvider({ children }: PropsWithChildren) {
   const repository = useRepository();
@@ -151,6 +157,7 @@ export function useCustomColors(
   return useMemo(
     () => ({
       colors: context.colors[tool],
+      canAddColor: context.colors[tool].length < MAX_CUSTOM_COLORS,
       addColor,
       removeColor,
       promptAddColor,

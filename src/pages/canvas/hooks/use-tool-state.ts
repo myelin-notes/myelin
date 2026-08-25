@@ -14,7 +14,7 @@ import {
   saveWheelToolIndices,
 } from '@/components/tool-shelf';
 import type { WheelItem } from '@/components/wheel-picker';
-import { useCustomColors } from '@/lib/custom-colors';
+import { MAX_CUSTOM_COLORS, useCustomColors } from '@/lib/custom-colors';
 import { type Messages, useMessages } from '@/lib/i18n';
 import { UserPrefs } from '@/lib/user-prefs';
 
@@ -112,15 +112,16 @@ function toolToWheelItem(
         ? makeSizeChildren(tool, sizeOpt, applyRef, strings)
         : undefined,
     }));
-    colorChildren.push({
-      label: strings.canvas.toolOptions.addCustomColor,
-      icon: PlusIcon,
-      command: () => {
-        if (customColorTool) {
-          promptAddColor(customColorTool);
-        }
-      },
-    });
+    if (
+      customColorTool &&
+      customColors[customColorTool].length < MAX_CUSTOM_COLORS
+    ) {
+      colorChildren.push({
+        label: strings.canvas.toolOptions.addCustomColor,
+        icon: PlusIcon,
+        command: () => promptAddColor(customColorTool),
+      });
+    }
     children = colorChildren;
   } else if (sizeOpt) {
     children = makeSizeChildren(tool, sizeOpt, applyRef, strings);
