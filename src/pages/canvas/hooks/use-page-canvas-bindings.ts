@@ -20,8 +20,6 @@ const TOUCH_HOLD_SLOP = 10;
  * so the wheel goes to the one above it on pens that have two.
  */
 const PEN_WHEEL_BUTTONS = 4;
-/** Held while the primary barrel or the eraser end is erasing. */
-const PEN_ERASER_BUTTONS = 32 | 2;
 
 interface UsePageCanvasBindingsArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -73,6 +71,10 @@ export function usePageCanvasBindings({
     }
   });
 
+  const penIsErasing = useEffectEvent(
+    () => drawableCanvasRef.current?.penIsErasing ?? false,
+  );
+
   const handleCanvasDrop = useEffectEvent((event: DragEvent) => {
     event.preventDefault();
     const canvas = canvasRef.current;
@@ -122,12 +124,14 @@ export function usePageCanvasBindings({
       cancelHold();
       // Button 0 is the pen tip. A pen already erasing off its barrel or its
       // eraser end doesn't arm the hold: pausing mid-erase is ordinary, and
-      // the wheel would take the gesture away from it.
+      // the wheel would take the gesture away from it. The canvas is asked
+      // rather than the event: on Android the barrel button and the tip share
+      // a bit in `buttons`, so only the canvas knows which is down.
       const isPen = event.pointerType === 'pen';
       if (
         (!isPen && event.pointerType !== 'touch') ||
         event.button !== 0 ||
-        event.buttons & PEN_ERASER_BUTTONS ||
+        (isPen && penIsErasing()) ||
         event.shiftKey
       ) {
         return;

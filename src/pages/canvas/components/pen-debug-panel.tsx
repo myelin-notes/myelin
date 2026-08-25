@@ -58,10 +58,13 @@ export function PenDebugPanel({ drawableCanvasRef }: PenDebugPanelProps) {
 
       const canvas = drawableCanvasRef.current;
       const tool = canvas
-        ? `${canvas.activeToolId}${canvas.toolIsOverridden ? '*' : ''}`
+        ? `${canvas.activeToolId}${canvas.penIsErasing ? '*' : ''}`
         : '?';
       const label = type.replace('pointer', 'p.');
-      const text = `${gap.padStart(7)} ${pointerType.padEnd(5)} ${label.padEnd(9)} b=${button} bs=${buttons} ${describeButtons(buttons)} [${tool}]`;
+      // Pressure separates a hovering pen from a touching one, which is the
+      // only thing that tells the barrel button apart from the tip.
+      const pressure = 'pressure' in event ? event.pressure.toFixed(2) : '----';
+      const text = `${gap.padStart(7)} ${pointerType.padEnd(5)} ${label.padEnd(9)} bs=${buttons} p=${pressure} ${describeButtons(buttons)} [${tool}]`;
       nextId.current += 1;
       const entry = { id: nextId.current, text };
       setLines((prev) => [...prev.slice(-(MAX_LINES - 1)), entry]);

@@ -68,6 +68,13 @@ const PEN_ERASER_BUTTONS = 32 | 2;
 /** A second barrel button reports as the middle button, and opens the wheel. */
 const PEN_WHEEL_BUTTONS = 4;
 
+/**
+ * The primary button bit. A pen sets it with its tip — and the Android WebView
+ * sets it for an S Pen's barrel button too, which is what makes the barrel
+ * invisible while the tip is down. See syncPenBarrelFromHover.
+ */
+const PEN_PRIMARY_BUTTONS = 1;
+
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
 }
@@ -209,6 +216,10 @@ export class DrawableCanvas {
   // held state that decides it — see syncEraserOverride.
   private _eraserOverride: ITool | null = null;
   private _eraserButtonsHeld: boolean = false;
+  // Barrel state read out of hover, and the contact flag that keeps a stroke
+  // from being mistaken for one — see syncPenBarrelFromHover.
+  private _penBarrelHeld: boolean = false;
+  private _penInContact: boolean = false;
 
   // While the stylus is on the glass — and briefly after — a hand resting on
   // the screen must drive nothing.
@@ -1420,6 +1431,9 @@ export class DrawableCanvas {
         this.state.change(InteractState.UsingTool, evt);
       }
       this.state.change(InteractState.Idle, evt);
+      if (evt.pointerType === 'pen') {
+        this._penInContact = false;
+      }
       // After the interaction ends, so the eraser gets to finish its own. A
       // barrel still held as the tip lifts keeps erasing into the next stroke.
       this.syncEraserOverride(evt);
@@ -1561,6 +1575,7 @@ export class DrawableCanvas {
    * unwound here, since the pen typically lands just after the hand does.
    */
   private beginPenContact(evt: PointerEvent) {
+    this._penInContact = true;
     this._palm.penDown(evt.pointerId, this._activeTouchPointers);
     if (this._activeTouchPointers.size > 0) {
       this._activeTouchPointers.clear();
@@ -1568,6 +1583,38 @@ export class DrawableCanvas {
       this.abortInteraction();
       this.state.change(InteractState.Idle, evt);
     }
+  }
+
+  /** The tool actually receiving input, eraser override included. */
+  public get activeToolId(): string {
+    return this.toolSelected.id;
+  }
+
+  /** Whether the pen's barrel or eraser end is currently forcing the eraser. */
+  public get penIsErasing(): boolean {
+    return this._eraserButtonsHeld;
+  }
+
+  /**
+   * Read the barrel button out of hover.
+   *
+   * The Android WebView reports an S Pen's barrel as the primary button — the
+   * same bit the tip sets — so while the pen is on the glass the two can't be
+   * told apart. Hover has no tip to confuse it with: a primary button held
+   * with nothing touching the screen is the barrel and nothing else. The
+   * reading is latched there and carried through the stroke that follows,
+   * which is the order the button is used in anyway — held first, then drawn
+   * with. A press or release made mid-stroke is invisible and stays that way
+   * until the pen lifts.
+   *
+   * Contact is taken from the pointerdown/up pair rather than from `pressure`,
+   * which some digitizers report as nonzero in hover.
+   */
+  private syncPenBarrelFromHover(evt: PointerEvent) {
+    if (this._penInContact || evt.type !== 'pointermove') {
+      return;
+    }
+    this._penBarrelHeld = (evt.buttons & PEN_PRIMARY_BUTTONS) !== 0;
   }
 
   /**
@@ -1578,21 +1625,13 @@ export class DrawableCanvas {
    * way an S Pen is used. `buttons` carries the held state on every event
    * instead, hover included, so both edges are visible wherever they happen.
    */
-  /** The tool actually receiving input, eraser override included. */
-  public get activeToolId(): string {
-    return this.toolSelected.id;
-  }
-
-  /** Whether that tool is a temporary override rather than the chosen one. */
-  public get toolIsOverridden(): boolean {
-    return this._eraserOverride !== null;
-  }
-
   private syncEraserOverride(evt: PointerEvent) {
     if (evt.pointerType !== 'pen') {
       return;
     }
-    const held = (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
+    this.syncPenBarrelFromHover(evt);
+    const held =
+      this._penBarrelHeld || (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
     if (held === this._eraserButtonsHeld) {
       return;
     }
