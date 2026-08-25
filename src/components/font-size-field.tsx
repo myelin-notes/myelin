@@ -8,16 +8,12 @@ interface FontSizeFieldProps {
   max: number;
   step: number;
   onChange: (value: number) => void;
-  /**
-   * Keep focus where it is when a stepper is pressed. The canvas text controls
-   * need this so the textarea being edited keeps its caret.
-   */
+  /** The canvas text controls need this so the textarea being edited keeps its caret. */
   preserveFocus?: boolean;
 }
 
-// `grow` keeps the steppers at their 24px square wherever the field is sized to
-// its content (the selection toolbar), and splits any extra width between them
-// when it is stretched (the tool options column) so the value stays centered.
+// `grow` keeps the steppers at their 24px square where the field is sized to its content (the
+// selection toolbar), and splits extra width between them when stretched (the tool options column).
 const STEPPER_CLASS =
   'flex size-6 shrink-0 grow cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-text-secondary';
 
@@ -34,9 +30,8 @@ export function FontSizeField({
   preserveFocus,
 }: FontSizeFieldProps) {
   const strings = useMessages();
-  // Null while the field isn't being typed into, so it mirrors the live value.
-  // A string while typing, so a half-entered "1" isn't clamped up to the min
-  // before the user gets to the "8".
+  // Null while the field isn't being typed into, so it mirrors the live value. A string while typing,
+  // so a half-entered "1" isn't clamped up to the min before the user gets to the "8".
   const [draft, setDraft] = useState<string | null>(null);
 
   const commit = (raw: string) => {

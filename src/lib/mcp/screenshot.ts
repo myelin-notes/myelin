@@ -25,13 +25,10 @@ export function clampScreenshotMaxSize(maxSize: number | undefined): number {
 }
 
 /**
- * Rasterize part of a canvas note to PNG without the note being open in the
- * editor: hydrate a `DrawableCanvas` from the stored doc against a detached
- * canvas element, replay the thumbnail draw pass, then tear it down.
- *
- * The detached canvas is never laid out, so nothing paints to screen and the
- * viewport is unused — `renderCanvasRegion` takes the world-space rect
- * directly.
+ * Rasterize part of a canvas note to PNG without it being open in the editor: hydrate a
+ * `DrawableCanvas` from the stored doc against a detached canvas element, replay the thumbnail draw
+ * pass, then tear it down. The detached canvas is never laid out, so nothing paints and the
+ * viewport is unused — `renderCanvasRegion` takes the world-space rect directly.
  */
 export async function renderMcpScreenshot(
   repository: ReadableRepository,
@@ -91,10 +88,8 @@ function isFitting(region: McpScreenshotRegion): boolean {
   );
 }
 
-/**
- * Any of x/y/width/height may be omitted, in which case that edge falls back to
- * the note's content bounds — so no arguments at all fits the whole note.
- */
+// Any of x/y/width/height may be omitted, in which case that edge falls back to the note's content
+// bounds — so no arguments at all fits the whole note.
 function resolveCaptureRect(
   region: McpScreenshotRegion,
   content: DOMRect,

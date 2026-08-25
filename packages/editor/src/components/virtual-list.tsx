@@ -14,7 +14,6 @@ import { useVirtualizer } from './use-virtualizer';
 interface VirtualListProps {
   /** Scroll container the list lives inside (commonly an ancestor). */
   scrollRef: RefObject<HTMLElement | null>;
-  /** Number of rows. */
   count: number;
   /** Height estimate for a row before it has been measured. */
   estimateHeight: (index: number) => number;
@@ -27,7 +26,6 @@ interface VirtualListProps {
   overscan?: number;
   /** A row that must always render and be scrolled into view. */
   pinnedIndex?: number | null;
-  /** Renders the contents of the row at `index`. */
   renderRow: (index: number) => ReactNode;
   /** Called with the container's content width whenever it changes. */
   onWidthChange?: (width: number) => void;
@@ -37,14 +35,9 @@ interface VirtualListProps {
 }
 
 /**
- * Reusable single-column windowing list: renders only the rows that intersect
- * the scroll viewport (plus overscan), each absolutely positioned within a
- * relative container of the full content height. Rows are measured as they
- * mount and reflow automatically.
- *
- * The list does not own a scrollbar; pass `scrollRef` to whichever ancestor
- * scrolls. For multi-column layouts that must preserve item identity across
- * reordering, use VirtualGrid instead.
+ * Single-column windowing list. Does not own a scrollbar — pass `scrollRef` to whichever ancestor
+ * scrolls. For multi-column layouts that must preserve item identity across reordering, use
+ * VirtualGrid instead.
  */
 export function VirtualList({
   scrollRef,

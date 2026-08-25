@@ -2,27 +2,17 @@ import type * as Y from 'yjs';
 import type { DrawableElement } from './elements/drawable-element';
 
 /**
- * Owns the canvas element collections and guarantees they mutate as a unit:
- * the uuid->element map, the z-ordered uuid list, the lazily-built ordered
- * snapshot, and the Y.Map->element map. Every mutation that affects ordering
- * invalidates the snapshot and fires the change callback, matching what the
- * canvas previously did inline.
+ * Owns the canvas element collections and guarantees they mutate as a unit. Every mutation that
+ * affects ordering invalidates the snapshot and fires `onChange`.
  */
 export class ElementStore {
-  /** Element lookup keyed by stable uuid. */
   private _elements = new Map<string, DrawableElement>();
   /** Ordered list of element uuids in z-order (background first, foreground last). */
   private _elementOrder: string[] = [];
   /** Cached array snapshot for the public `elements` getter; null when stale. */
   private _orderedSnapshot: DrawableElement[] | null = null;
-  /** Maps Y.Map instances to their DrawableElement wrappers. */
   private _yMapToElement = new Map<Y.Map<unknown>, DrawableElement>();
 
-  /**
-   * Called whenever the snapshot is invalidated. The canvas uses this to fire
-   * its own change listeners at exactly the moments it did before; the store
-   * never owns the listener fan-out itself.
-   */
   private readonly onChange: () => void;
 
   public constructor(onChange: () => void) {
@@ -46,10 +36,6 @@ export class ElementStore {
     return this._elements.values();
   }
 
-  /**
-   * Atomic insert: add to the element map, splice the uuid into the order at
-   * `position`, and register the Y.Map mapping. Invalidates the snapshot.
-   */
   public add(
     element: DrawableElement,
     yMap: Y.Map<unknown>,
@@ -61,10 +47,6 @@ export class ElementStore {
     this.invalidateSnapshot();
   }
 
-  /**
-   * Atomic remove by uuid: drop from the element map, filter the order list,
-   * and remove the Y.Map mapping. Invalidates the snapshot.
-   */
   public remove(uuid: string): void {
     const element = this._elements.get(uuid);
     if (!element) {
@@ -78,11 +60,6 @@ export class ElementStore {
     this.invalidateSnapshot();
   }
 
-  /**
-   * Bulk remove by uuid set in one atomic step (single snapshot invalidation),
-   * matching the Y.Array deletion phase. The Y.Map mappings for these uuids are
-   * removed too.
-   */
   public removeMany(uuids: ReadonlySet<string>): void {
     if (uuids.size === 0) {
       return;
@@ -109,11 +86,7 @@ export class ElementStore {
     return this._elementOrder;
   }
 
-  /**
-   * Lazily-built ordered snapshot. Rebuilt only when stale; walks the order
-   * list and looks up each uuid, silently skipping any uuid not present in the
-   * element map.
-   */
+  // Rebuilt only when stale, silently skipping any uuid not present in the element map.
   public getOrdered(): DrawableElement[] {
     if (!this._orderedSnapshot) {
       const snapshot: DrawableElement[] = [];

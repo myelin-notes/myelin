@@ -27,11 +27,9 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Arrow-at-boundary escape, Mod/Shift-Enter block exit, and ProseMirror
- * history forwarding — the bindings every nested editor needs. Callbacks
- * resolve through a thunk so editors with a swappable owner (the shared math
- * source editor) can reuse them; with no owner the binding falls through to
- * CodeMirror's defaults.
+ * Arrow-at-boundary escape, Mod/Shift-Enter block exit, and ProseMirror history forwarding.
+ * Callbacks resolve through a thunk so editors with a swappable owner (the shared math source
+ * editor) can reuse them; with no owner the binding falls through to CodeMirror's defaults.
  */
 export function nestedEditorKeyBindings(
   getCallbacks: () => NestedEditorKeyCallbacks | null,
@@ -82,18 +80,16 @@ interface NestedEditorConfig {
 }
 
 /**
- * Common wrapper around a CodeMirror EditorView nested inside a ProseMirror
- * node view (code blocks, math source). Owns the document/selection/focus
- * API the node views forward through, plus the wheel guard; subclasses
+ * Common wrapper around a CodeMirror EditorView nested inside a ProseMirror node view. Owns the
+ * document/selection/focus API the node views forward through, plus the wheel guard; subclasses
  * supply extensions and decide where the view mounts.
  */
 export abstract class NestedEditor {
   protected readonly view: EditorView;
 
-  // Without this the canvas pan handler swallows wheel events, so a
-  // scrollable editor could never scroll. Only consume the event while the
-  // editor is focused, and never for ctrl-wheel (pinch zoom). Subclasses
-  // attach it to their host element.
+  // Without this the canvas pan handler swallows wheel events and a scrollable editor could never
+  // scroll. Only consumed while the editor is focused, and never for ctrl-wheel (pinch zoom).
+  // Subclasses attach it to their host element.
   protected readonly handleWheel = (event: WheelEvent): void => {
     if (event.ctrlKey || !this.view.hasFocus) {
       return;

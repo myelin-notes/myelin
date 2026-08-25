@@ -1,16 +1,14 @@
 /**
- * Shared contract for the workspace JSON export/import round-trip. Keeping the
- * version, binary marker and base64 codec in one place stops the exporter and
- * importer from drifting apart.
+ * Shared contract for the workspace JSON export/import round-trip. Keeping the version, binary
+ * marker and base64 codec in one place stops the exporter and importer from drifting apart.
  */
 
 /** Schema version stamped on each exported note, for future import migration. */
 export const NOTE_JSON_VERSION = 1;
 
 /**
- * Wrapper key marking a base64-encoded binary value (e.g. an image's bytes), so
- * the importer can tell binaries apart from ordinary strings without knowing
- * which element fields are binary.
+ * Marks a base64-encoded binary value, so the importer can tell binaries from ordinary strings
+ * without knowing which element fields are binary.
  */
 export const BYTES_MARKER = '__bytes__';
 

@@ -30,12 +30,8 @@ interface Size {
 const measureCache = new Map<string, Size>();
 const MEASURE_CACHE_LIMIT = 500;
 
-/**
- * Natural rendered size of a block formula (CSS px at scale 1). Mounts the
- * shared KaTeX probe and reads its box — the only reliable way to size
- * HTML/font content. Cached per source since KaTeX layout is the expensive
- * part.
- */
+// Mounts the shared KaTeX probe and reads its box — the only reliable way to size HTML/font
+// content. Cached per source since KaTeX layout is the expensive part.
 function measureLatex(latex: string): Size {
   const cached = measureCache.get(latex);
   if (cached) {
@@ -62,15 +58,10 @@ function measureLatex(latex: string): Size {
 }
 
 /**
- * A free-floating LaTeX block on the canvas — the page frame's math block
- * lifted out of ProseMirror. Rendering and the source editor are the page
- * frame's (renderKatex + the shared MathSourceEditor); only positioning and
- * the DrawableElement plumbing are canvas-specific.
- *
- * KaTeX is HTML, so the block paints as a DOM overlay (like PdfElement) rather
- * than to the 2D canvas: draw2D is a no-op and the visual lives in syncDOM.
- * Resize scales the whole formula uniformly (it doesn't reflow), so it exposes
- * corner handles with a locked aspect ratio, like an image.
+ * A free-floating LaTeX block — the page frame's math block lifted out of ProseMirror. Rendering
+ * and the source editor are the page frame's; only positioning and DrawableElement plumbing are
+ * canvas-specific. KaTeX is HTML, so this paints as a DOM overlay: draw2D is a no-op and the
+ * visual lives in syncDOM. Resize scales uniformly (no reflow), hence locked-aspect corner handles.
  */
 export class LatexElement extends DrawableElement {
   private _latex: string;
@@ -79,9 +70,8 @@ export class LatexElement extends DrawableElement {
 
   private _root: HTMLDivElement | null = null;
   private _renderedLatex: string | null = null;
-  // The rendered preview's natural size only changes when the formula changes or
-  // when web fonts finish loading, not every frame. Measure (a forced reflow)
-  // only when this is set rather than polling offsetWidth/Height on every redraw.
+  // The natural size only changes when the formula changes or web fonts finish loading. Measuring
+  // forces a reflow, so do it on this flag rather than polling offsetWidth/Height every redraw.
   private _naturalDirty = true;
   private _fontRemeasureToken = 0;
 
@@ -107,10 +97,8 @@ export class LatexElement extends DrawableElement {
     this.bindYFields(yMap, {
       latex: (v) => {
         this._latex = typeof v === 'string' ? v : '';
-        // Remote/undo edits land here (setLatex handles local typing).
-        // remeasure already covers updateBounds (whose only job is to
-        // remeasure); the matching repaint nudge keeps a selected block's
-        // outline on the formula now instead of one syncDOM frame later.
+        // Remote/undo edits land here (setLatex handles local typing). The repaint nudge keeps a
+        // selected block's outline on the formula now instead of one syncDOM frame later.
         this.remeasure();
         this._renderedLatex = null;
         this._raster = null;
@@ -177,11 +165,7 @@ export class LatexElement extends DrawableElement {
   // DOM overlay paints the formula; nothing to draw on the 2D canvas.
   protected draw2D(): void {}
 
-  /**
-   * Rasterize the current formula to a bitmap for the synchronous export draws
-   * (drawToPdf / drawThumbnail). KaTeX has no vector output, so both export
-   * paths blit this raster; the shared helper is the page frame's.
-   */
+  // KaTeX has no vector output, so drawToPdf and drawThumbnail both blit this raster.
   private async ensureRaster(): Promise<void> {
     const latex = this._latex;
     if (!latex.trim()) {
@@ -280,20 +264,8 @@ export class LatexElement extends DrawableElement {
     }
   }
 
-  /**
-   * Keep `_natural` in lockstep with the actually-rendered formula. The preview
-   * shrink-wraps its content (CSS `width: max-content`), so its layout size is
-   * the true formula size — including whatever the synchronous offscreen probe
-   * got wrong before KaTeX's web fonts loaded. The selection box and hit-test
-   * both derive from `_natural`, so reading it back keeps them on the glyphs at
-   * every zoom; `offsetWidth/Height` ignore the element's scale transform, so
-   * they report the unscaled natural size directly.
-   */
-  /**
-   * Request one remeasure once web fonts settle. The token guards against a
-   * stale `fonts.ready` resolving after the formula changed again or the DOM was
-   * disposed, which would otherwise force an unnecessary reflow.
-   */
+  // Request one remeasure once web fonts settle. The token guards against a stale `fonts.ready`
+  // resolving after the formula changed again or the DOM was disposed.
   private scheduleFontRemeasure(): void {
     const fonts = document.fonts;
     if (!fonts?.ready) {
@@ -307,6 +279,9 @@ export class LatexElement extends DrawableElement {
     });
   }
 
+  // The preview shrink-wraps its content (CSS `width: max-content`), so its layout size is the
+  // true formula size — including what the offscreen probe got wrong before KaTeX's fonts loaded.
+  // `offsetWidth/Height` ignore the scale transform, so they report the unscaled natural size.
   private syncNaturalSize(root: HTMLDivElement): void {
     if (!this._latex.trim()) {
       root.style.width = `${EMPTY_WIDTH}px`;
@@ -364,11 +339,9 @@ export class LatexElement extends DrawableElement {
     top: number;
     width: number;
   } {
-    // Anchor to the preview's real on-screen rect (true page coords) so the
-    // panel sits flush below it like the page frame's source editor —
-    // worldToScreen is canvas-local, which drifts off the preview by however
-    // far the canvas is offset within the page. Fall back to the viewport math
-    // only before the preview's first sync.
+    // Anchor to the preview's real on-screen rect so the panel sits flush below it — worldToScreen
+    // is canvas-local, which drifts by however far the canvas is offset within the page. The
+    // viewport math is only a fallback before the preview's first sync.
     const root = this._root;
     if (root) {
       const r = root.getBoundingClientRect();

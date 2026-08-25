@@ -1,8 +1,7 @@
 /**
- * Bridges imperative canvas elements (chrome-menu callbacks) to the app-level
- * `<ExportDialog>`, mirroring the chrome-menu opener pattern. An element describes
- * what it can export via an `ExportTarget`; the dialog renders the options and calls
- * `run` with the user's choices.
+ * Bridges imperative canvas elements (chrome-menu callbacks) to the app-level `<ExportDialog>`.
+ * An element describes what it can export via an `ExportTarget`; the dialog renders the options and
+ * calls `run` with the user's choices.
  */
 
 export type ExportFormat = 'markdown' | 'pdf';

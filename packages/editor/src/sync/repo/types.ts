@@ -131,9 +131,8 @@ export interface Repository {
     options?: SearchNodesOptions,
   ): Promise<NodeSearchResult[]>;
   /**
-   * Nodes whose name exactly equals `name`, excluding system nodes. Note-link
-   * resolution needs an exact-title match, not a fuzzy search, so it must not
-   * pay to rebuild a MiniSearch index on every document change.
+   * Exact-name match excluding system nodes. Note-link resolution needs this rather than a fuzzy
+   * search, so it must not pay to rebuild a MiniSearch index on every document change.
    */
   getNodesByName(name: string): Promise<VFSNode[]>;
   /** Candidate notes for the content-index startup backfill. */
@@ -162,10 +161,8 @@ export interface Repository {
     options?: CreateFileOptions,
   ): Promise<VFSNodeId>;
   /**
-   * Runs `fn` with the manifest writes it makes batched onto one manifest and
-   * saved once when `fn` resolves, instead of once per mutation. For additive
-   * bulk work such as imports — no deletes inside. Reads inside `fn` observe the
-   * pending writes.
+   * Batches `fn`'s manifest writes onto one manifest, saved once when `fn` resolves. For additive
+   * bulk work such as imports — no deletes inside. Reads inside `fn` observe the pending writes.
    */
   batchManifestWrites<T>(fn: () => Promise<T>): Promise<T>;
   readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null>;

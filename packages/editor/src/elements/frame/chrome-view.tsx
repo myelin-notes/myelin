@@ -18,10 +18,9 @@ import {
 export interface FrameChromeViewHandle {
   startTitleRename: () => void;
   /**
-   * Writes the zoom-dependent header geometry imperatively. These values
-   * change every frame while zooming; routing them as CSS custom properties
-   * on the chrome root (an ancestor of the whole editor subtree) forced a
-   * full-subtree style recalc per frame because custom properties inherit.
+   * Written imperatively because these change every frame while zooming. Routing them as CSS custom
+   * properties on the chrome root (an ancestor of the whole editor subtree) forced a full-subtree
+   * style recalc per frame, since custom properties inherit.
    */
   syncHeaderGeometry: (params: {
     headerHeight: number;
@@ -147,9 +146,8 @@ export const FrameChromeView = forwardRef<
         <div
           ref={headerClipRef}
           className="pointer-events-none absolute top-0 right-0 left-0 overflow-hidden"
-          // height set imperatively via syncHeaderGeometry (changes per
-          // frame while zooming) — keep it out of JSX so React re-renders
-          // don't fight the imperative writes.
+          // Height is set imperatively via syncHeaderGeometry — keep it out of JSX so React re-renders don't
+          // fight the imperative writes.
         >
           <div
             ref={headerInnerRef}

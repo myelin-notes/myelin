@@ -3,18 +3,17 @@ import type { VFSFolderNode, VFSNode } from '@/lib/sync';
 export interface ResultTreeNode {
   node: VFSNode;
   /**
-   * Lowest result index in this subtree. Folders pulled in only to hold a hit
-   * inherit their best descendant's rank so relevance order survives nesting.
+   * Lowest result index in this subtree. Folders pulled in only to hold a hit inherit their best
+   * descendant's rank, so relevance order survives nesting.
    */
   rank: number;
   children: ResultTreeNode[];
 }
 
 /**
- * Rebuilds the folder hierarchy around a flat result list, so search and tag
- * hits render under their real parents instead of all at the root. `ancestors`
- * must cover every result's parent chain; a hit whose chain is missing is
- * dropped rather than surfaced at the wrong depth.
+ * Rebuilds the folder hierarchy around a flat result list so hits render under their real parents
+ * instead of at the root. `ancestors` must cover every result's parent chain; a hit whose chain is
+ * missing is dropped rather than surfaced at the wrong depth.
  */
 export function buildResultTree(
   results: VFSNode[],

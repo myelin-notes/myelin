@@ -141,10 +141,8 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     const sync = () => {
       const toolbar = toolbarRef.current;
       let bounds: DOMRect | null = null;
-      // Hiding only flips `visible` — the toolbar fades out over 150ms, and
-      // clearing the contents here would play that fade on a toolbar that had
-      // already collapsed to its element-agnostic buttons. The stale contents
-      // are replaced wholesale by the next selection.
+      // Hiding only flips `visible` — the toolbar fades out over 150ms, and clearing the contents here
+      // would play that fade on a toolbar already collapsed to its element-agnostic buttons.
       let nextState: ToolbarState = { ...currentState, visible: false };
       const editing = canvas.editingElement;
       if (
@@ -211,11 +209,9 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     const unsubView = canvas.viewport.onViewChange(scheduleSync);
     window.addEventListener('resize', scheduleSync);
 
-    // sync() centers on the width it measures, but the content that decides
-    // that width is rendered by the setState below it — so the pass that swaps
-    // the toolbar's contents always positions against the previous width. The
-    // text style controls make that swing wide enough to see (a long font name
-    // alone moves it), so re-position once the new layout has settled.
+    // sync() centers on the width it measures, but the content deciding that width is rendered by the
+    // setState below it — so the pass that swaps contents always positions against the previous width.
+    // The text style controls swing it wide enough to see, so re-position once the layout has settled.
     const observedToolbar = toolbarRef.current;
     const resizeObserver = new ResizeObserver(scheduleSync);
     if (observedToolbar) {

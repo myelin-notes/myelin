@@ -125,9 +125,8 @@ function setAttributedMark(
   view.focus();
 }
 
-// Screen-pixel rect for the current selection, anchored on the editor's own
-// frame DOM so it tracks the page-frame's zoom/scale regardless of where the
-// canvas sits in the window.
+// Anchored on the editor's own frame DOM so it tracks the page frame's zoom/scale regardless of
+// where the canvas sits in the window.
 function selectionScreenRect(
   view: EditorView,
 ): { centerX: number; top: number; bottom: number } | null {
@@ -303,13 +302,10 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     };
   }, [visible]);
 
-  // Native pointerdown listener on the toolbar DOM node. This stops the
-  // event from bubbling to the canvas's document-level exit-edit handler,
-  // which would otherwise tear down edit mode (and unmount this toolbar)
-  // before a button's click event fires. React synthetic stopPropagation
-  // isn't reliable here because the toolbar is portaled to document.body
-  // and the native event reaches document through the DOM, not React's
-  // fiber tree.
+  // Native listener, not React's: the toolbar is portaled to document.body, so the native event
+  // reaches document through the DOM rather than React's fiber tree and synthetic stopPropagation
+  // won't hold. Without it the canvas's document-level exit-edit handler tears down edit mode (and
+  // unmounts this toolbar) before a button's click fires.
   useEffect(() => {
     if (!visible) {
       return;
@@ -326,10 +322,8 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     return () => el.removeEventListener('pointerdown', block);
   }, [visible]);
 
-  // Pointer outside the toolbar + outside the editor: dismiss + clear menu.
-  // Suspended while the custom-color picker or a swatch's delete menu is open —
-  // both portal outside the toolbar's subtree, so clicks inside them would
-  // otherwise trigger dismiss.
+  // Suspended while the custom-color picker or a swatch's delete menu is open — both portal outside
+  // the toolbar's subtree, so clicks inside them would otherwise trigger dismiss.
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       handleDocumentPointerDown(event);

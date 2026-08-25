@@ -1,12 +1,9 @@
 export type VFSNodeId = string;
 
 /**
- * Full or incremental snapshot of a document's sync state.
- *
- * `update` contains the Yjs changes needed to bring a local document forward.
- * `stateVector` describes the remote side's known state after that snapshot.
- * `revision` is repository-specific optimistic concurrency metadata and may be
- * null for backends that do not version documents explicitly.
+ * `update` holds the Yjs changes needed to bring a local document forward; `stateVector` describes
+ * the remote's known state after that snapshot. `revision` is repository-specific optimistic
+ * concurrency metadata, null for backends that don't version documents.
  */
 export interface YjsSyncSnapshot {
   /** Full document contents on initial load, or a diff on pull. */
@@ -17,9 +14,6 @@ export interface YjsSyncSnapshot {
   revision: string | null;
 }
 
-/**
- * Context supplied when pushing local Yjs changes to a sync target.
- */
 export interface YjsSyncPushOptions {
   /** Revision the caller believes it is writing against. */
   baseRevision: string | null;
@@ -28,10 +22,8 @@ export interface YjsSyncPushOptions {
 }
 
 /**
- * Result of attempting to push local changes to a sync target.
- *
- * When `accepted` is false, the backend rejected the write and may include
- * `remoteUpdate` so the caller can merge and retry.
+ * When `accepted` is false the backend rejected the write and may include `remoteUpdate` so the
+ * caller can merge and retry.
  */
 export interface YjsSyncPushResult extends YjsSyncSnapshot {
   /** Whether the backend accepted the pushed update. */
@@ -42,10 +34,6 @@ export interface YjsSyncPushResult extends YjsSyncSnapshot {
   remoteUpdate: Uint8Array | null;
 }
 
-/**
- * Minimal document-sync contract implemented by repositories that can store
- * note contents as Yjs documents.
- */
 export interface YjsSyncTarget {
   /** Load the current document state for an initial session open. */
   loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot>;
@@ -62,9 +50,6 @@ export interface YjsSyncTarget {
   ): Promise<YjsSyncPushResult>;
 }
 
-/**
- * Observable sync status exposed by an open note session.
- */
 export interface NoteSessionStatus {
   /** Current high-level sync activity for the session. */
   phase: 'idle' | 'pulling' | 'pushing' | 'closed';

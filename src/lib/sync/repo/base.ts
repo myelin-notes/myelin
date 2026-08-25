@@ -128,14 +128,9 @@ export abstract class BaseRepository
     (status: RepositoryRuntimeStatus) => void
   >();
 
-  /**
-   * Cached lexical search index, reused across search-as-you-type queries so a
-   * keystroke burst doesn't rebuild a MiniSearch index over the whole corpus
-   * each time. Keyed on the manifest reference (a wholesale replace/reload swaps
-   * the object), the mutation counter (in-place edits bump dataVersion), and the
-   * note-index content revision, so it rebuilds exactly when the searchable
-   * corpus changes and never serves stale results.
-   */
+  // Reused across search-as-you-type so a keystroke burst doesn't rebuild a MiniSearch index over
+  // the whole corpus each time. Keyed on the manifest reference, the mutation counter, and the
+  // note-index content revision, so it rebuilds exactly when the searchable corpus changes.
   private nodeSearchCache: {
     manifest: VFSManifest;
     dataVersion: number;
@@ -143,25 +138,16 @@ export abstract class BaseRepository
     index: SearchIndex<VFSNode>;
   } | null = null;
 
-  /**
-   * Nesting depth of `batchManifestWrites`. While positive, manifest mutations
-   * accumulate on one held manifest and defer their save to the outermost close.
-   */
+  // While positive, manifest mutations accumulate on one held manifest and defer their save to the
+  // outermost close.
   private manifestBatchDepth = 0;
-  /**
-   * The single manifest every mutation in the open batch reads from and writes
-   * to, loaded once. Reads inside the batch see pending writes because they
-   * share this object; the flush persists it.
-   */
+  // Loaded once. Reads inside the batch see pending writes because they share this object.
   private manifestBatchLoad: Promise<{
     manifest: VFSManifest;
     revision: string | null;
   }> | null = null;
-  /**
-   * The batch's mutators, in order, replayed onto the manifest that wins the
-   * race if the flush hits a conflict — so mutators must be replay-safe: ids and
-   * any values the caller kept are minted outside the mutator.
-   */
+  // Replayed onto the manifest that wins the race if the flush hits a conflict — so mutators must
+  // be replay-safe: ids and any values the caller kept are minted outside the mutator.
   private manifestBatchMutators: Array<(manifest: VFSManifest) => void> = [];
 
   protected abstract loadManifestImpl(): Promise<{
@@ -267,13 +253,9 @@ export abstract class BaseRepository
     };
   }
 
-  /**
-   * Runs `fn` with every manifest mutation it makes applied to one held
-   * manifest and saved once, when the outermost batch closes. Reads inside `fn`
-   * observe the pending writes. Intended for additive bulk work like imports:
-   * the batch has no delete semantics, so callers must not delete nodes inside
-   * it. A throwing `fn` discards the batch — nothing partial is saved.
-   */
+  // Reads inside `fn` observe the pending writes. For additive bulk work like imports: the batch
+  // has no delete semantics, so callers must not delete nodes inside it. A throwing `fn` discards
+  // the batch — nothing partial is saved.
   async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
     this.manifestBatchDepth += 1;
     let succeeded = false;
@@ -288,10 +270,8 @@ export abstract class BaseRepository
         const mutators = this.manifestBatchMutators;
         this.manifestBatchLoad = null;
         this.manifestBatchMutators = [];
-        // Persist only a batch that both succeeded and actually mutated. A read
-        // -only batch has nothing to save; a failed one is dropped so no partial
-        // manifest lands — the caller's own rollback handles bytes already
-        // written.
+        // A read-only batch has nothing to save; a failed one is dropped so no partial manifest lands —
+        // the caller's own rollback handles bytes already written.
         if (succeeded && load && mutators.length > 0) {
           const { manifest, revision } = await load;
           await this.flushBatchedManifest(manifest, revision, mutators);
@@ -300,11 +280,8 @@ export abstract class BaseRepository
     }
   }
 
-  /**
-   * Saves the batched manifest, retrying conflicts the way a single mutation
-   * does: reload the manifest that won the race and replay the whole batch onto
-   * it so neither side's writes are lost.
-   */
+  // Conflicts retry like a single mutation: reload the manifest that won the race and replay the
+  // whole batch onto it so neither side's writes are lost.
   private async flushBatchedManifest(
     manifest: VFSManifest,
     revision: string | null,
@@ -335,11 +312,8 @@ export abstract class BaseRepository
     throw new Error('Failed to import after retrying manifest conflicts.');
   }
 
-  /**
-   * The manifest to read from and mutate. Inside a batch this is the one held
-   * manifest, so reads and writes within the batch observe each other's pending
-   * changes; outside a batch it delegates straight to `loadManifestImpl`.
-   */
+  // Inside a batch this is the one held manifest, so reads and writes within the batch observe each
+  // other's pending changes; outside a batch it delegates straight to `loadManifestImpl`.
   protected async loadManifest(): Promise<{
     manifest: VFSManifest;
     revision: string | null;
@@ -442,10 +416,7 @@ export abstract class BaseRepository
     );
   }
 
-  /**
-   * The lexical search index for `manifest`, rebuilt only when the searchable
-   * corpus (manifest nodes or indexed content) has changed since it was cached.
-   */
+  // Rebuilt only when the searchable corpus (manifest nodes or indexed content) has changed.
   private getNodeSearchIndex(
     manifest: VFSManifest,
     content: ReadonlyMap<VFSNodeId, string>,

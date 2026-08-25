@@ -1,11 +1,8 @@
 /**
- * Single pipeline for Google-hosted text-tool fonts: one TTF fetch feeds both
- * the DOM display path (registered via the FontFace API) and PDF export
- * (embedded via the request's `fontsB64` table). Display could render woff2,
- * but krilla can only embed TTF/OTF, so everything standardizes on the TTF
- * the css2 API serves to non-browser User-Agents — the platform fetch runs
- * outside the webview, so the UA is ours to set. Fetched faces persist in the
- * artifact cache, so previously-used fonts display and export offline.
+ * One TTF fetch feeds both the DOM display path (FontFace API) and PDF export (the request's
+ * `fontsB64` table). Display could render woff2, but krilla can only embed TTF/OTF, so everything
+ * standardizes on the TTF the css2 API serves to non-browser User-Agents — the platform fetch runs
+ * outside the webview, so the UA is ours to set. Fetched faces persist in the artifact cache.
  */
 
 import { Logger } from '@myelin/shared/logger';
@@ -17,11 +14,8 @@ const logger = new Logger('GoogleFonts');
 /** Families shipped with the app's CSS (`@font-face` in foundations.css). */
 const LOCAL_DISPLAY_FAMILIES = new Set(['hanken grotesk', 'newsreader']);
 
-/**
- * Families whose bundled export font IS the display font (see
- * `src-tauri/src/pdf_export/fonts.rs`) — the sans/serif/mono mapping is
- * already exact for these, so embedding would only bloat the PDF.
- */
+// Families whose bundled export font IS the display font (see `src-tauri/src/pdf_export/fonts.rs`).
+// Embedding would only bloat the PDF.
 const EXPORT_BUNDLED_FAMILIES = new Set([
   'hanken grotesk',
   'newsreader',
@@ -47,13 +41,9 @@ function normalize(family: string): string {
   return family.trim().toLowerCase();
 }
 
-/**
- * Filesystem-safe cache key for a family. `fontFamily` is read from the shared
- * Y.Map without validation, so a malformed document could carry `/`, `\`, `..`,
- * `:` etc.; collapsing everything outside `[a-z0-9]` to a single `-` keeps the
- * key inside the `fonts/` keyspace and valid on Windows. Google family names
- * are ASCII alphanumerics and spaces, so real families stay distinct.
- */
+// `fontFamily` is read from the shared Y.Map without validation, so a malformed document could
+// carry `/`, `\`, `..`, `:`. Collapsing everything outside `[a-z0-9]` keeps the key inside the
+// `fonts/` keyspace and valid on Windows; Google family names are ASCII, so real families stay distinct.
 function fontCacheKey(family: string): string {
   return (
     normalize(family)
@@ -62,10 +52,7 @@ function fontCacheKey(family: string): string {
   );
 }
 
-/**
- * TTF bytes for a family at regular weight, or `null` when the fetch fails.
- * Failures aren't cached, so a later call retries (e.g. back online).
- */
+// Failures aren't cached, so a later call retries (e.g. back online).
 export function fetchFontTtf(family: string): Promise<Uint8Array | null> {
   const key = normalize(family);
   if (!key || GENERIC_FAMILIES.has(key)) {
@@ -87,10 +74,7 @@ export function fetchFontTtf(family: string): Promise<Uint8Array | null> {
   return pending;
 }
 
-/**
- * Make a Google-hosted family renderable in the DOM (canvas text boxes, font
- * picker previews). Fire-and-forget; no-op for families the app ships locally.
- */
+// Fire-and-forget; no-op for families the app ships locally.
 export function ensureDisplayFont(family: string): void {
   const key = normalize(family);
   if (
@@ -101,10 +85,8 @@ export function ensureDisplayFont(family: string): void {
   ) {
     return;
   }
-  // Registration is attempted once per session per family — callers run per
-  // frame (TextElement.syncDOM), so a failure must NOT re-arm here or an
-  // offline session retries the fetch every frame. Export calls still retry
-  // (fetchFontTtf doesn't cache failures).
+  // Attempted once per session per family — callers run per frame (TextElement.syncDOM), so a
+  // failure must NOT re-arm or an offline session refetches every frame. Export still retries.
   registeredFaces.add(key);
   fetchFontTtf(family).then((bytes) => {
     if (!bytes) {
@@ -120,10 +102,8 @@ export function ensureDisplayFont(family: string): void {
   });
 }
 
-/**
- * Base64 TTF for PDF export, or `null` when the family needs no embedding or
- * the fetch fails (callers fall back to the bundled `familyToKey` mapping).
- */
+// `null` when the family needs no embedding or the fetch fails (callers fall back to the bundled
+// `familyToKey` mapping).
 export function fetchFontTtfBase64(family: string): Promise<string | null> {
   if (EXPORT_BUNDLED_FAMILIES.has(normalize(family))) {
     return Promise.resolve(null);

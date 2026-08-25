@@ -1,17 +1,14 @@
 /**
- * Escape syntax for note-link titles (`[[…]]`).
- *
- * The syntax is `[[note ('#' frame)?]]`, where note may contain `/`-separated
- * path segments. Inside any segment, the characters `\` and `#` are special
- * and may be escaped with a leading `\`. The rules:
+ * Escape syntax for note-link titles: `[[note ('#' frame)?]]`, where note may contain `/`-separated
+ * path segments. Inside a segment, `\` and `#` are special and escapable:
  *
  * - `\\` → literal `\`
  * - `\#` → literal `#` (does not start the frame)
  * - `\X` for any other X → literal `X` (forgiving; never an error)
- * - A trailing lone `\` is preserved as a literal backslash
+ * - a trailing lone `\` is preserved as a literal backslash
  *
- * `[[`, `]]`, and `/` are NOT escapable. `]]` always ends the link, and `/`
- * always separates path segments — file systems disallow them in names.
+ * `[[`, `]]` and `/` are NOT escapable: `]]` always ends the link and `/` always separates path
+ * segments, since file systems disallow them in names.
  */
 
 const SPECIAL_CHARS = new Set(['\\', '#']);

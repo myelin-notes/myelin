@@ -74,9 +74,8 @@ export class PenTool implements ITool {
       this.usePressure ? event.pressure : undefined,
     );
 
-    // Standard clear-and-re-arm dwell pattern: every meaningful move resets the
-    // anchor and re-arms a single timer, so recognition fires exactly once per
-    // stationary hold even when pointermove stops firing for a still pen.
+    // Every meaningful move resets the anchor and re-arms a single timer, so recognition fires exactly
+    // once per stationary hold even when pointermove stops firing for a still pen.
     if (
       this.dwellAnchor === null ||
       distance(position, this.dwellAnchor) > DWELL_MOVE_PX
@@ -142,9 +141,8 @@ export class PenTool implements ITool {
 
   public abort(canvas: DrawableCanvas): void {
     this.clearDwellTimer();
-    // The element was added to the canvas on start(), so discarding the
-    // interaction means removing it — leaving it would drop an ink blob at
-    // the point the pen came to rest.
+    // The element was added to the canvas on start(), so discarding the interaction means removing it —
+    // leaving it would drop an ink blob where the pen came to rest.
     if (this.currentStroke) {
       canvas.removeElement(this.currentStroke);
     }

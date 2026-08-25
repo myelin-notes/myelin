@@ -82,13 +82,11 @@ function buildClosedMathInputRule(schema: Schema): InputRule {
 }
 
 /**
- * Converts a single-line `$$...$$` paragraph into a math block the moment the
- * final `$` is typed. This mirrors the markdown importer, which canonicalizes
- * single-line block math into the multi-line form (`$$\n...\n$$`); without this
- * rule such math stays plain text in the live editor until a save/reload.
+ * Mirrors the markdown importer, which canonicalizes single-line block math into the multi-line
+ * form (`$$\n...\n$$`); without this rule such math stays plain text until a save/reload.
  *
- * At input-rule time the typed `$` is not in the doc yet, so the paragraph's
- * text is `$$...$` while the match text (`match[0]`) is the full `$$...$$`.
+ * At input-rule time the typed `$` is not in the doc yet, so the paragraph's text is `$$...$` while
+ * `match[0]` is the full `$$...$$`.
  */
 function buildSingleLineMathInputRule(schema: Schema): InputRule {
   return new InputRule(SINGLE_LINE_MATH_BLOCK_RE, (state, match, start) => {
@@ -148,12 +146,9 @@ export function mathBlockNormalizationPlugin(schema: Schema): Plugin {
   );
 }
 
-/**
- * Mod-A inside a math block selects the block's LaTeX content (between the
- * `$$` fences) instead of the whole document, so the raw-source editor feels
- * self-contained like a code block. The fences stay unselected so typing over
- * the selection replaces the formula without dissolving the block.
- */
+// Selects the LaTeX between the `$$` fences rather than the whole document, so the raw-source
+// editor feels self-contained like a code block. The fences stay unselected, so typing over the
+// selection replaces the formula without dissolving the block.
 export const selectAllInMathBlock: Command = (state, dispatch) => {
   const { $from, $to } = state.selection;
   if (

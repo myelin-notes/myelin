@@ -51,9 +51,8 @@ import { WindowControls } from './window-controls';
 
 const logger = new Logger('TabBar');
 
-// Built-in tabs store a title captured at creation time, so they don't follow
-// language changes. Derive their title from the current messages instead and
-// fall back to the stored title for content tabs (canvas/image file names).
+// Built-in tabs store a title captured at creation time, so they don't follow language changes.
+// Content tabs (canvas/image file names) fall back to the stored title.
 function tabTitle(tab: Tab, strings: Messages): string {
   switch (tab.target.type) {
     case 'graph':
@@ -113,9 +112,8 @@ export const TabBar = memo(function TabBar({
   // In compact layout the sidebar is an overlay drawer; elsewhere it's the
   // persistent column. `sidebarShown` unifies both for the toggle's a11y state.
   const sidebarShown = isCompact ? drawerOpen : !collapsed;
-  // Mobile layout has no sidebar; the top-left button returns to the full-page
-  // library home instead of toggling one. It's "active" while the pane is
-  // already showing home (no active tab).
+  // Mobile layout has no sidebar; the top-left button returns to the full-page library home instead
+  // of toggling one, and is "active" while the pane already shows home.
   const showingHome = pane.activeTabId === '';
   const activeTab =
     pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
@@ -207,9 +205,8 @@ export const TabBar = memo(function TabBar({
         'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
         TAB_BAR_HEIGHT_CLASS,
         !isFocused && 'opacity-75',
-        // The sidebar column normally clears the macOS traffic lights; inset
-        // the top-left bar whenever that column isn't present (collapsed, or
-        // reflowed into the compact overlay drawer).
+        // The sidebar column normally clears the macOS traffic lights; inset the top-left bar whenever
+        // that column isn't present (collapsed, or reflowed into the compact overlay drawer).
         isMac &&
           isTopLeft &&
           (collapsed || isCompact) &&

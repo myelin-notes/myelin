@@ -11,12 +11,9 @@ import type {
   McpHandwritingStatus,
 } from './types';
 
-/**
- * Handwriting OCR is backed by Apple's Vision framework (`tauri-plugin-ocr`),
- * which has no counterpart on other platforms — recognition there returns no
- * text at all. Stroke clustering still runs everywhere, so line geometry is
- * trustworthy even when the text is not.
- */
+// Handwriting OCR is backed by Apple's Vision framework (`tauri-plugin-ocr`), which has no
+// counterpart elsewhere — recognition returns no text there. Stroke clustering still runs
+// everywhere, so line geometry is trustworthy even when the text is not.
 const RECOGNITION_SUPPORTED = isMac;
 
 const STATUS_NOTES: Record<McpHandwritingStatus, string> = {
@@ -31,10 +28,8 @@ const STATUS_NOTES: Record<McpHandwritingStatus, string> = {
     'No recognition artifact exists for this note, so nothing is known about its ink either way - recognition may simply not have run yet. Check read_note for elements of kind "stroke" and read any it lists with screenshot_canvas.',
 };
 
-/**
- * An artifact with no lines is a real answer (recognition ran and clustered no
- * ink); a missing artifact is not, so the two must not collapse into one status.
- */
+// An artifact with no lines is a real answer (recognition ran and clustered no ink); a missing
+// artifact is not, so the two must not collapse into one status.
 function statusFor(
   hasArtifact: boolean,
   lines: readonly { text: string }[],
@@ -56,11 +51,8 @@ function toLine(line: RecognizedLine): McpHandwritingLine {
   };
 }
 
-/**
- * Read a note's recognized handwriting. Every clustered line is returned, even
- * one that recognized as empty, because its bounds are what makes a follow-up
- * screenshot possible.
- */
+// Every clustered line is returned, even one that recognized as empty: its bounds are what makes a
+// follow-up screenshot possible.
 export async function readMcpHandwriting(
   handwriting: HandwritingCapability | undefined,
   noteId: VFSNodeId,

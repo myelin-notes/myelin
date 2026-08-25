@@ -1,20 +1,15 @@
 import type { DrawableElement } from './elements/drawable-element';
 import { getScratchCanvasContext } from './scratch-canvas';
 
-/**
- * Thumbnails display in fixed-aspect `aspect-[16/10]` object-cover containers
- * (see `src/pages/library/explorer/grid/item-styles.ts`), so the capture
- * region is expanded to this aspect to avoid crop/zoom on display.
- */
+// Thumbnails display in fixed-aspect `aspect-[16/10]` object-cover containers (see
+// `src/pages/library/explorer/grid/item-styles.ts`), so the capture region is expanded to match.
 const THUMBNAIL_ASPECT = 16 / 10;
 
 /**
- * Render a document thumbnail by replaying each element's draw pass into an
- * off-screen canvas, mirroring the live 2D render. `region` is the world-space
- * rect to capture (the viewport's visible area), so the thumbnail is a snapshot
- * of what the user currently sees. The region is expanded to 16:10 to match
- * the display containers; elements outside the expanded region are culled.
- * When there's nothing to draw, returns a blank image of the capture region.
+ * Replays each element's draw pass into an off-screen canvas, mirroring the live 2D render.
+ * `region` is the world-space rect to capture (the viewport's visible area). It is expanded to
+ * 16:10 to match the display containers; elements outside the expanded region are culled. Returns
+ * a blank image of the capture region when there's nothing to draw.
  */
 export async function renderCanvasThumbnail(
   elements: readonly DrawableElement[],
@@ -25,10 +20,8 @@ export async function renderCanvasThumbnail(
 }
 
 /**
- * Rasterize exactly `capture` (world-space) at up to `maxSize` on its longer
- * side, culling elements outside it. Unlike `renderCanvasThumbnail` the region
- * is honoured as given, so callers that need a precise crop — MCP screenshots —
- * get the framing they asked for rather than one snapped to a display aspect.
+ * Unlike `renderCanvasThumbnail` the region is honoured as given, so callers needing a precise
+ * crop — MCP screenshots — get the framing they asked for rather than one snapped to an aspect.
  */
 export async function renderCanvasRegion(
   elements: readonly DrawableElement[],
@@ -68,10 +61,7 @@ export async function renderCanvasRegion(
   }
 }
 
-/**
- * Expand `region` (centered) to exactly 16:10, growing the short dimension so
- * everything originally in frame stays in frame.
- */
+// Centered, growing the short dimension so everything originally in frame stays in frame.
 function snapToThumbnailAspect(region: DOMRect): DOMRect {
   if (region.width / region.height < THUMBNAIL_ASPECT) {
     const width = region.height * THUMBNAIL_ASPECT;

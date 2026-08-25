@@ -17,9 +17,8 @@ function isMediaFile(file: VFSFileNode): boolean {
   return isImageFileType(file.fileType) || isVideoFileType(file.fileType);
 }
 
-// Paths are stored as literal VFS names — `![](/My Pics/cat.png)` matches the
-// folder "My Pics" / file "cat.png" verbatim, with no percent-encoding. `/`
-// always separates segments (filesystems disallow it in names).
+// Paths are literal VFS names — `![](/My Pics/cat.png)` matches the folder "My Pics" / file
+// "cat.png" verbatim, no percent-encoding. `/` always separates segments.
 function splitMediaPath(path: string): string[] {
   return path.split('/').filter((segment) => segment.length > 0);
 }
@@ -66,11 +65,8 @@ export async function resolveLibraryMediaNode(
   return files.find((file) => file.name === fileName) ?? null;
 }
 
-/**
- * Build a resolver that turns a `/`-rooted library path into a renderable
- * object URL. Returns `null` when the path does not point at an existing
- * image/video so the embed can fall back to showing the raw path.
- */
+// Returns `null` when the path does not point at an existing image/video, so the embed can fall
+// back to showing the raw path.
 export function createMediaPathResolver(
   repository: MediaPathResolveSource,
 ): ResolveMediaSrc {
@@ -119,11 +115,8 @@ function parseMediaPathQuery(query: string): MediaPathQuery {
   };
 }
 
-/**
- * Autocomplete the path inside `![](/…)`: folders (so the user can drill in)
- * and image/video files within the folder typed so far, prefix-filtered by the
- * trailing path segment.
- */
+// Offers folders (so the user can drill in) and image/video files within the folder typed so far,
+// prefix-filtered by the trailing path segment.
 export async function searchMediaPathAutocompleteItems(
   repository: MediaPathSearchSource,
   query: string,

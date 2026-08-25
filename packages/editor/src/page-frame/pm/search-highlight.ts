@@ -10,11 +10,8 @@ interface SearchHighlightState {
   query: string;
   /** Index (in reading order) of the occurrence to mark as current, or null. */
   current: number | null;
-  /**
-   * Cached match ranges for the current (doc, query). Recomputed only when the
-   * doc or query changes, so selection-only and current-only updates (stepping
-   * through occurrences) reuse them instead of rescanning the whole document.
-   */
+  // Recomputed only when the doc or query changes, so stepping through occurrences reuses them
+  // instead of rescanning the whole document.
   ranges: { from: number; to: number }[];
 }
 
@@ -22,12 +19,8 @@ export const searchHighlightKey = new PluginKey<SearchHighlightState>(
   'searchHighlight',
 );
 
-/**
- * Every occurrence of `query` (literal, case-insensitive) across the doc's text
- * nodes, in reading order. The same function backs both occurrence enumeration
- * (for the match list) and highlighting, so a frame's occurrence ordinals line
- * up between the two.
- */
+// Literal, case-insensitive, in reading order. Backs both occurrence enumeration and highlighting,
+// so a frame's occurrence ordinals line up between the two.
 export function findTextMatches(
   doc: PMNode,
   query: string,
@@ -52,10 +45,8 @@ export function findTextMatches(
 }
 
 /**
- * Highlights search matches inside a page frame, with the current match marked
- * distinctly so in-canvas find can step through occurrences. State is pushed in
- * via {@link setSearchHighlight}; decorations recompute from the current doc, so
- * positions stay correct as the document changes. The view needn't be editable.
+ * State is pushed in via {@link setSearchHighlight}; decorations recompute from the current doc, so
+ * positions stay correct as it changes. The view needn't be editable.
  */
 export function searchHighlightPlugin(): Plugin<SearchHighlightState> {
   return new Plugin<SearchHighlightState>({
@@ -101,7 +92,6 @@ export function searchHighlightPlugin(): Plugin<SearchHighlightState> {
   });
 }
 
-/** Highlight `query` in this view, marking the `current`-th occurrence. */
 export function setSearchHighlight(
   view: EditorView,
   query: string,

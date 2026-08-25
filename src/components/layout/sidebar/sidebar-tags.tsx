@@ -39,10 +39,9 @@ interface SidebarTagsProps {
   /** Bumped externally to force a tag-list reload. */
   refreshKey: number;
   /**
-   * 'collapsible' (default): the desktop sidebar's bottom panel with a collapse
-   * toggle and a drag-to-resize handle. 'panel': always-open, fills its
-   * container height with no toggle or resize handle — used as the mobile
-   * library's left tags column.
+   * 'collapsible' (default): the desktop sidebar's bottom panel, with a collapse toggle and a
+   * drag-to-resize handle. 'panel': always open, fills its container height — the mobile library's
+   * left tags column.
    */
   variant?: 'collapsible' | 'panel';
 }

@@ -278,10 +278,7 @@ export interface ResolvedMedia {
   revoke: () => void;
 }
 
-/**
- * Resolve a `/`-rooted library path to a renderable object URL, or `null` if
- * it doesn't point at an existing image/video.
- */
+/** `null` if the path doesn't point at an existing image/video. */
 export type ResolveMediaSrc = (path: string) => Promise<ResolvedMedia | null>;
 
 function isLibraryPath(url: string): boolean {
@@ -293,11 +290,9 @@ function isLibraryPath(url: string): boolean {
 const LIBRARY_MEDIA_ROOT_MARGIN = '300px';
 
 /**
- * Render a `/`-rooted library image/video, reading its bytes only while the
- * embed is near the viewport and releasing the object URL once it scrolls away.
- * Page frames are created eagerly for the whole canvas, so resolving every
- * embed up-front would hold every referenced file in memory as a Blob for the
- * frame's lifetime; gating on visibility keeps only on-screen media resident.
+ * Reads bytes only while the embed is near the viewport and releases the object URL once it
+ * scrolls away. Page frames are created eagerly for the whole canvas, so resolving every embed
+ * up-front would hold every referenced file in memory as a Blob for the frame's lifetime.
  */
 function renderLibraryMedia(
   url: string,
@@ -314,9 +309,8 @@ function renderLibraryMedia(
     host.appendChild(next);
   };
 
-  // 'idle' allows media that resolved while off-screen to be re-read when it
-  // returns to view; 'missing' is terminal so a broken reference is not
-  // re-fetched on every intersection.
+  // 'idle' lets media that resolved while off-screen be re-read when it returns to view; 'missing'
+  // is terminal so a broken reference is not re-fetched on every intersection.
   let state: 'idle' | 'loading' | 'loaded' | 'missing' = 'idle';
   let revoke: (() => void) | null = null;
   let visible = false;

@@ -3,10 +3,9 @@ import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
 /**
- * Wheel handler for a block preview. Without it the canvas pan handler
- * swallows wheel events, so a page-capped preview can never scroll. Only
- * consume the event while the block is being edited (its `editingClass` is on
- * `dom`), and never for ctrl-wheel (pinch zoom).
+ * Without this the canvas pan handler swallows wheel events and a page-capped preview can never
+ * scroll. Only consumed while the block is being edited (its `editingClass` is on `dom`), and never
+ * for ctrl-wheel (pinch zoom).
  */
 export function makePreviewWheelHandler(
   dom: HTMLElement,
@@ -27,11 +26,10 @@ export function makePreviewWheelHandler(
 }
 
 /**
- * Mousedown handler for a block preview. Clicking the rendered preview opens
- * the source editor with the cursor at the end of the source. ProseMirror may
- * skip NodeView.setSelection while the view itself isn't focused, so open the
- * editor directly as well. `getNode` is read per click because the node view
- * reassigns its node in update().
+ * Clicking the rendered preview opens the source editor with the cursor at the end of the source.
+ * ProseMirror may skip NodeView.setSelection while the view itself isn't focused, so the editor is
+ * opened directly as well. `getNode` is read per click because the node view reassigns its node in
+ * update().
  */
 export function makePreviewMouseDownHandler(
   view: EditorView,

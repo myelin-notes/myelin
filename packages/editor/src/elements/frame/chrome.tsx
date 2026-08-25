@@ -1,8 +1,7 @@
 /**
- * Visual chrome that wraps a canvas-embedded document (page-frame or PDF).
- *
- * The React view owns the visible header/menu/title editing UI. This wrapper
- * keeps the canvas-facing imperative API for high-frequency geometry updates.
+ * Visual chrome around a canvas-embedded document (page frame or PDF). The React view owns the
+ * visible header/menu/title UI; this wrapper keeps the canvas-facing imperative API for
+ * high-frequency geometry updates.
  */
 
 import { createRef } from 'react';
@@ -32,11 +31,8 @@ export {
 
 export interface FrameChromeOptions {
   kindLabel: string;
-  /**
-   * Called when the hamburger button is clicked. Returning an empty array
-   * suppresses the menu. Called lazily (per click) so items can reflect
-   * current state.
-   */
+  // Returning an empty array suppresses the menu. Called lazily per click so items reflect
+  // current state.
   getMenuItems?: () => ChromeMenuItem[];
   onTitleCommit?: (title: string) => string | undefined;
 }
@@ -118,11 +114,8 @@ export class FrameChrome {
     this.render();
   }
 
-  /**
-   * Position and size the chrome. `screenX`/`screenY` are the device-pixel
-   * snapped screen coordinates of the underlying content's top-left. The
-   * chrome is drawn extending above and around that point by padding + header.
-   */
+  // `screenX`/`screenY` are the device-pixel snapped screen coordinates of the underlying content's
+  // top-left; the chrome extends above and around that point by padding + header.
   public sync(params: {
     screenX: number;
     screenY: number;
@@ -139,11 +132,10 @@ export class FrameChrome {
     const rootX = screenX - CHROME_SIDE_PADDING * zoom;
     const rootY = screenY - CHROME_HEADER_HEIGHT * zoom;
 
-    // Sizing this subtree to the exact zoom repaints the whole promoted layer
-    // on every zoom frame (4.5ms panning vs 14.63ms zooming on an iPad), so it
-    // is laid out at a quantized zoom and the root carries the remainder as a
-    // scale. Positions stay on the exact zoom: a translate is free, and they
-    // must stay pixel-accurate against the canvas beneath.
+    // Sizing this subtree to the exact zoom repaints the whole promoted layer on every zoom frame
+    // (4.5ms panning vs 14.63ms zooming on iPad), so it lays out at a quantized zoom and the root
+    // carries the remainder as a scale. Positions stay on the exact zoom: a translate is free, and
+    // they must stay pixel-accurate against the canvas beneath.
     const rasterZoom = quantizeRasterZoom(zoom);
     const residual = zoom / rasterZoom;
 
@@ -159,10 +151,9 @@ export class FrameChrome {
       'border-radius',
       `${CHROME_CORNER_RADIUS * rasterZoom}px`,
     );
-    // Imperative writes on the header elements themselves — NOT custom
-    // properties on this.root: the root is an ancestor of the whole editor
-    // subtree, and inherited custom-property changes there forced a
-    // full-subtree style recalc on every zoom frame.
+    // On the header elements themselves, NOT custom properties on this.root: the root is an ancestor
+    // of the whole editor subtree, and inherited custom-property changes forced a full-subtree style
+    // recalc on every zoom frame.
     this.viewRef.current?.syncHeaderGeometry({
       headerHeight: CHROME_HEADER_HEIGHT * rasterZoom,
       innerWidth: chromeWidth,

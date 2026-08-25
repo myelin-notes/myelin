@@ -157,11 +157,8 @@ describe('appendStrokeOutline', () => {
   });
 });
 
-/**
- * `updateBoundingBox` only runs when a stroke is finished, but the renderer
- * culls by the bounding box on every frame — so the box has to track the ink
- * as it is drawn or the stroke in progress is the one thing not on screen.
- */
+// `updateBoundingBox` only runs when a stroke is finished, but the renderer culls by the bounding
+// box every frame — so the box has to track the ink as it is drawn.
 describe('StrokeElement live bounds', () => {
   const VIEW = new DOMRect(0, 0, 1000, 1000);
 
@@ -188,9 +185,8 @@ describe('StrokeElement live bounds', () => {
   });
 
   it('stays a superset of the finished outline', () => {
-    // The live box pads by the stroke size because it cannot know the outline
-    // yet. Too small and the finished stroke would be clipped; this pins the
-    // direction of the error.
+    // The live box pads by the stroke size because it cannot know the outline yet. Too small and the
+    // finished stroke would be clipped; this pins the direction of the error.
     const s = new StrokeElement('live3', [], false, STYLE);
     for (let i = 0; i < 40; i++) {
       s.addPoint(100 + i * 5, 300 + Math.sin(i / 3) * 40, 0.5);

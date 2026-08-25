@@ -3,9 +3,8 @@ import { setPlatform } from '@myelin/editor/platform';
 import { createFakePlatform } from '@myelin/editor/test/fake-platform';
 import { resetFsCacheForTests } from '@/platform/tauri/fs-cache';
 
-// The `node` test environment has no DOMRect. Provide a minimal stand-in so
-// canvas elements that compute geometry (localBoundingBox / boundingBox) can be
-// unit-tested without a full DOM.
+// The `node` test environment has no DOMRect. A minimal stand-in lets canvas elements that compute
+// geometry be unit-tested without a full DOM.
 if (typeof globalThis.DOMRect === 'undefined') {
   class DOMRectPolyfill {
     public readonly left: number;
@@ -30,9 +29,8 @@ if (typeof globalThis.DOMRect === 'undefined') {
   });
 }
 
-// StrokeElement allocates a Path2D in its constructor for on-screen rendering.
-// The `node` environment has none; a no-op stand-in lets stroke geometry be
-// unit-tested without a canvas (draw2D is never exercised in those tests).
+// StrokeElement allocates a Path2D in its constructor; the `node` environment has none. draw2D is
+// never exercised in these tests.
 if (typeof globalThis.Path2D === 'undefined') {
   class Path2DPolyfill {}
   Object.defineProperty(globalThis, 'Path2D', {
@@ -69,11 +67,10 @@ Object.defineProperty(globalThis, 'localStorage', {
 
 beforeEach(() => {
   memoryLocalStorage.clear();
-  // Tests swap in a fresh in-memory filesystem, so cached mkdir promises from a
-  // previous test would wrongly suppress directory creation. This lives here
-  // rather than in resetRepositoryTestDoubles() because repository-test-utils
-  // provides the `@tauri-apps/plugin-fs` mock, and importing fs-cache (which
-  // imports that plugin) from it deadlocks vitest's module resolution.
+  // Tests swap in a fresh in-memory filesystem, so cached mkdir promises from a previous test would
+  // wrongly suppress directory creation. Here rather than in resetRepositoryTestDoubles() because
+  // repository-test-utils provides the `@tauri-apps/plugin-fs` mock, and importing fs-cache from it
+  // deadlocks vitest's module resolution.
   resetFsCacheForTests();
   // A fresh fake platform per test; tests exercising a platform seam install
   // their own via setPlatform(createFakePlatform({ ... })).

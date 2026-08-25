@@ -352,9 +352,8 @@ export function AudioPlayerView({
   }, [audioBytes]);
 
   const attemptAutoPickup = useEffectEvent(() => {
-    // transcriptionSessionRef is the synchronous "a job is already running in
-    // this window" signal — it stays accurate through onRecorded's flushSync
-    // re-render, where the isTranscribingLocally state has not yet committed.
+    // transcriptionSessionRef is the synchronous "a job is already running here" signal — it stays
+    // accurate through onRecorded's flushSync re-render, where isTranscribingLocally hasn't committed.
     if (
       !shouldStartAutoPickup({
         eligible: shouldAutoTranscribe(claimInput),
@@ -368,9 +367,8 @@ export function AudioPlayerView({
     void handleTranscribe();
   });
 
-  // Own-orphaned-claim pickup: this window started a job (e.g. before a
-  // reload) that never delivered a transcript. Remote peers see our claim as
-  // active while we're present, so no one else will ever act — resume it.
+  // This window started a job (e.g. before a reload) that never delivered a transcript. Remote
+  // peers see our claim as active while we're present, so no one else will act — resume it.
   const autoPickupEligible = shouldAutoTranscribe(claimInput);
   useEffect(() => {
     if (autoPickupEligible) {
@@ -488,10 +486,8 @@ export function AudioPlayerView({
         void transcriptionSession?.cancel();
         return;
       }
-      // Claim now, not when the transcript lands: audioData syncs with an
-      // empty transcript well before whisper finishes, and without a claim
-      // every capable peer would offer the manual Transcribe affordance in
-      // that window and invite duplicate runs.
+      // Claim now, not when the transcript lands: audioData syncs with an empty transcript well before
+      // whisper finishes, and every capable peer would otherwise offer manual Transcribe in that window.
       if (
         shouldClaimOnRecordingStart({
           transcriptionSessionStarted: transcriptionSession !== null,
@@ -586,10 +582,8 @@ export function AudioPlayerView({
       recordedWaveform = decoded.waveform;
     } catch {
       dur = (Date.now() - recordStartRef.current) / 1000;
-      // An instant start/stop produces a header-only blob no decoder accepts;
-      // keeping it would leave an unplayable, untranscribable card. Discard it
-      // and return to "tap to record". Longer recordings that fail to decode
-      // are kept with the wall-clock duration.
+      // An instant start/stop produces a header-only blob no decoder accepts. Discard it rather than
+      // leave an unplayable card. Longer recordings that fail to decode are kept with wall-clock duration.
       if (dur < 1) {
         if (transcriptionSessionRef.current === transcription) {
           transcriptionSessionRef.current = null;
@@ -604,11 +598,8 @@ export function AudioPlayerView({
     if (disposedRef.current) {
       return;
     }
-    // Publish the recording right away — waveform and playback must not wait
-    // on whisper. The transcript follows when ready, spinner in the captions
-    // slot meanwhile. transcriptionSessionRef is still set here (until the
-    // transcript resolves below), so the auto-pickup effect this render fires
-    // sees the live job in flight and won't start a duplicate run.
+    // Publish right away — waveform and playback must not wait on whisper. transcriptionSessionRef is
+    // still set here, so the auto-pickup effect this render fires sees the live job and won't duplicate.
     onRecorded(bytes, dur, recordedMimeType, recordedWaveform);
 
     if (!transcription) {
@@ -677,10 +668,9 @@ export function AudioPlayerView({
     setIsPlaying(false);
   }
 
-  // Recordings are transcribed live; this is the on-demand path for imported
-  // audio, the retry path for failed recordings, and the orphaned-claim
-  // pickup path. Any capable owner-device peer may run it — creator-ness
-  // gates recording only.
+  // Recordings are transcribed live; this is the on-demand path for imported audio, the retry path,
+  // and the orphaned-claim pickup. Any capable owner-device peer may run it — creator-ness gates
+  // recording only.
   async function handleTranscribe() {
     const transcription = getPlatform().transcription;
     if (!audioBytes || !transcription || !canTranscribeHere(claimInput)) {

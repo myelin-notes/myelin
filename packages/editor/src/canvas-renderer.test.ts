@@ -52,21 +52,15 @@ describe('backgroundPanShift', () => {
   });
 });
 
-/**
- * Where the tiling's own origin lands on screen, which is what the grid is
- * drawn from: the layer element starts at -BG_OVERDRAW_PX and the per-frame
- * translate moves it from there.
- */
+// The layer element starts at -BG_OVERDRAW_PX and the per-frame translate moves it from there.
 describe('background tiling origin', () => {
   const TILE_WORLD = 24;
 
   it('stays anchored to the world origin at every zoom', () => {
-    // The world origin is at screen (offset * zoom) and the pattern repeats
-    // every tile, so the tiling origin only has to agree with it modulo one
-    // tile. -BG_OVERDRAW_PX is a whole number of tiles only when 3/zoom is an
-    // integer, so a shift that ignores it leaves a phase error — the grid then
-    // slides against the canvas content as the user zooms, which is exactly
-    // what the CanvasPattern this layer replaced never did.
+    // The world origin is at screen (offset * zoom) and the pattern repeats every tile, so the tiling
+    // origin only has to agree modulo one tile. -BG_OVERDRAW_PX is a whole number of tiles only when
+    // 3/zoom is an integer, so a shift that ignores it leaves a phase error and the grid slides against
+    // the content as the user zooms.
     const zooms = [MIN_ZOOM, 0.5, 0.75, 1, 1.3, 1.5, 2, 2.5, MAX_ZOOM];
     for (const zoom of zooms) {
       for (const offset of [0, 37.5, -412.25, 10000]) {
@@ -94,10 +88,8 @@ describe('background tiling origin', () => {
   });
 });
 
-/**
- * The background layer leaves the tree while this reads true, so a false
- * positive flickers the grid and a stuck true loses it until something moves.
- */
+// The background layer leaves the tree while this reads true, so a false positive flickers the
+// grid and a stuck true loses it until something moves.
 describe('isZoomGestureActive', () => {
   /** Advances whole frames at 60fps, which is what the render loop feeds it. */
   const run = (zooms: number[], state = createZoomGestureState()) => {
@@ -148,9 +140,8 @@ describe('isZoomGestureActive', () => {
   });
 
   it('cannot get stuck when the zoom simply stops changing', () => {
-    // There is no gesture-end event behind this — an interrupted pinch, a
-    // cancelled animation and a released trackpad all look the same, and all
-    // have to come back.
+    // There is no gesture-end event behind this — an interrupted pinch, a cancelled animation and a
+    // released trackpad all look the same, and all have to come back.
     const state = createZoomGestureState();
     run([1, 1.1, 1.2, 1.3, 1.4], state);
     let now = 2000;
@@ -175,9 +166,8 @@ describe('cullMarginWorld', () => {
   });
 
   it('culls nothing when the zoom is unusable', () => {
-    // Before the viewport has been measured. An unbounded margin keeps every
-    // element in the frame, which is the pre-culling behaviour — a bad frame
-    // is recoverable, a blank canvas reads as data loss.
+    // Before the viewport has been measured. An unbounded margin keeps every element in frame: a bad
+    // frame is recoverable, a blank canvas reads as data loss.
     for (const zoom of [0, -1, Number.NaN]) {
       expect(cullMarginWorld(zoom)).toBe(Number.POSITIVE_INFINITY);
     }

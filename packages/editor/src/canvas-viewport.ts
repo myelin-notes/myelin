@@ -2,17 +2,11 @@ import type { Vector2 } from './geometry';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
 
-/**
- * Zoom bounds. Exported because the background layer sizes its overdraw from
- * the largest tile it can ever have to show, which is set by MAX_ZOOM.
- */
+// Exported because the background layer sizes its overdraw from the largest tile MAX_ZOOM allows.
 export const MIN_ZOOM = 0.2;
 export const MAX_ZOOM = 3;
 
-/**
- * How much of the viewport a framed rect should fill. A bare number is the
- * width ratio; both ratios given, the tighter one wins.
- */
+// A bare number is the width ratio; with both ratios given, the tighter one wins.
 export type ViewFit = number | { widthRatio?: number; heightRatio?: number };
 
 /** Handle to an in-flight RAF view transition. */
@@ -21,20 +15,9 @@ interface ViewAnimation {
 }
 
 /**
- * Camera state for the canvas: pan offset, zoom level, the wheel + touch
- * gestures that mutate them, and the animated view-fit transition.
- *
- * DrawableCanvas owns one of these and reads `offset` / `zoom` when rendering.
- * Pan-via-pointer-drag (space + drag, middle-click, single-finger touch
- * outside edit mode) lives in DrawableCanvas's pointer state machine and
- * calls `panBy()` here — deciding whether a pointerdown is a pan vs a tool
- * gesture is a scene-level concern, not a camera one.
- *
- * Two-finger touch pan + pinch zoom is always active. `editMode` is a hint
- * set by DrawableCanvas when an element is being inline-edited: it restricts
- * wheel/trackpad and two-finger pan to the edited element's page axis
- * (single-finger touch is left alone so the contentEditable can place the
- * cursor / select text).
+ * Camera state for the canvas. Pointer-drag panning lives in DrawableCanvas's pointer state
+ * machine and calls `panBy()` here — deciding pan vs tool gesture is a scene concern, not a
+ * camera one. Two-finger touch pan + pinch zoom is always active.
  */
 export class CanvasViewport {
   private readonly canvas: HTMLCanvasElement;
@@ -58,11 +41,7 @@ export class CanvasViewport {
   private _contentBoundsProvider: (() => DOMRect | null) | null = null;
   private _touchSuppressedProvider: (() => boolean) | null = null;
 
-  /**
-   * When true, plain wheel/touch pan is restricted to the edit-mode axis.
-   * Two-finger pinch zoom is unaffected. Toggled by DrawableCanvas on element
-   * edit enter/exit.
-   */
+  // Two-finger pinch zoom is unaffected. Toggled by DrawableCanvas on element edit enter/exit.
   public editMode: boolean = false;
   public editModePanAxis: EditModePanAxis = 'vertical';
 
@@ -82,13 +61,10 @@ export class CanvasViewport {
       // viewport owns wheel-driven view changes regardless of edit mode.
       evt.preventDefault();
       if (evt.ctrlKey) {
-        // Pinch-to-zoom on trackpad (browser sets ctrlKey for pinch gestures)
-        // and ctrl+wheel zoom on desktop. Anchor on the cursor so the world
-        // point under the pointer stays put.
+        // Trackpad pinch (the browser sets ctrlKey) and ctrl+wheel. Anchored on the cursor.
         if (!this._zoomLocked) {
-          // Exponential (log-based) step: each wheel notch multiplies zoom by
-          // a constant factor, so the change feels equally granular whether
-          // we're zoomed way in or way out. A small exponent keeps it smooth.
+          // Exponential step: each notch multiplies zoom by a constant factor, so it feels equally
+          // granular at any zoom level.
           this.zoomAroundPoint(
             this._zoom * Math.exp(evt.deltaY * -0.0025),
             this.getScreenPoint(evt),
@@ -113,14 +89,11 @@ export class CanvasViewport {
       return Math.hypot(dx, dy);
     };
 
-    // Two-finger touch: pan + pinch zoom. Works on the free canvas and in
-    // edit mode alike. Single-finger touch is left alone — DrawableCanvas's
-    // pointer state machine pans the free canvas with one finger, and in edit
-    // mode the contentEditable uses it for cursor placement / selection.
+    // Single-finger touch is left alone — DrawableCanvas pans the free canvas with one finger, and
+    // in edit mode the contentEditable uses it for cursor placement / selection.
     this._handleTouchStart = (evt) => {
-      // Palm rejection: a hand resting on the screen while the stylus draws
-      // reads as a multi-touch blob, which would otherwise pinch and pan the
-      // camera out from under the stroke.
+      // A hand resting on the screen while the stylus draws reads as a multi-touch blob, which would
+      // pinch and pan the camera out from under the stroke.
       if (this._touchSuppressedProvider?.()) {
         this._touchPanLast = null;
         this._touchPinchLastDist = null;
@@ -142,9 +115,8 @@ export class CanvasViewport {
     };
 
     this._handleTouchMove = (evt) => {
-      // Dropping the anchors rather than just bailing: fingers still down when
-      // suppression lifts would otherwise pan by everything they travelled
-      // while the pen was on the page, snapping the camera.
+      // Drop the anchors rather than just bail: fingers still down when suppression lifts would pan
+      // by everything they travelled while the pen was on the page, snapping the camera.
       if (this._touchSuppressedProvider?.()) {
         this._touchPanLast = null;
         this._touchPinchLastDist = null;
@@ -180,10 +152,8 @@ export class CanvasViewport {
       }
       this._touchPanLast = avg;
 
-      // Pinch zoom anchored on the midpoint between the fingers, so the world
-      // point under the pinch stays put. zoomAroundPoint already fires
-      // notifyViewChange (which picks up the pan offset above), so only notify
-      // here when no pinch zoom ran.
+      // Anchored on the midpoint between the fingers. zoomAroundPoint already fires notifyViewChange
+      // (picking up the pan offset above), so only notify here when no pinch zoom ran.
       let zoomed = false;
       if (!this._zoomLocked && this._touchPinchLastDist > 0 && dist > 0) {
         this.zoomAroundPoint(
@@ -242,22 +212,16 @@ export class CanvasViewport {
     this._zoomLocked = locked;
   }
 
-  /**
-   * Provider for the world-space union bounds of content. Used to clamp pan
-   * so the user can pan content off-screen by a controlled amount but can't
-   * drift arbitrarily far into empty space. Return `null` to disable clamping.
-   */
+  // Clamps pan so content can go off-screen by a controlled amount but can't drift arbitrarily far
+  // into empty space. Return `null` to disable clamping.
   public setContentBoundsProvider(
     provider: (() => DOMRect | null) | null,
   ): void {
     this._contentBoundsProvider = provider;
   }
 
-  /**
-   * Provider for whether touch gestures are currently palm-rejected. Owned by
-   * DrawableCanvas, which is the side that sees the stylus: the camera has no
-   * pointer state machine of its own to judge from.
-   */
+  // Owned by DrawableCanvas, which is the side that sees the stylus: the camera has no pointer
+  // state machine of its own to judge from.
   public setTouchSuppressedProvider(provider: (() => boolean) | null): void {
     this._touchSuppressedProvider = provider;
   }
@@ -338,11 +302,7 @@ export class CanvasViewport {
     return this.screenToWorld(this.getScreenPoint(evt));
   }
 
-  /**
-   * Zoom level and world focal point that frame `worldRect` per `fit`, plus
-   * the logical viewport size they were derived from. Shared by the animated
-   * and instant fit paths so both land on exactly the same view.
-   */
+  // Shared by the animated and instant fit paths so both land on exactly the same view.
   private computeFit(
     worldRect: DOMRect,
     fit: ViewFit,
@@ -386,18 +346,13 @@ export class CanvasViewport {
   }
 
   /**
-   * Instantly frame `worldRect` — the non-animated twin of
-   * `animateViewToFitRect`, for placing the camera before the first paint
-   * where an animation would only be a jump anyway.
+   * Instant twin of `animateViewToFitRect`, for placing the camera before the first paint.
    *
-   * Like the animated path, this deliberately skips `clampOffsetToContent`:
-   * framing a rect is an explicit instruction, and the clamp exists to stop
-   * the *user* drifting into empty space. Honouring it here would also make
-   * the result depend on how much content happens to exist yet, so framing a
-   * rect while a document is still being built would land off-center.
+   * Deliberately skips `clampOffsetToContent`: framing a rect is an explicit instruction, and the
+   * clamp exists to stop the *user* drifting into empty space. Honouring it would also make the
+   * result depend on how much content exists yet.
    *
-   * No-ops until the canvas has a real size; the caller is expected to try
-   * again once it does.
+   * No-ops until the canvas has a real size; the caller retries once it does.
    */
   public setViewToFitRect(worldRect: DOMRect, fit: ViewFit = 0.8): void {
     this.cancelAnimation();
@@ -417,15 +372,8 @@ export class CanvasViewport {
     this.emitViewChange();
   }
 
-  /**
-   * Animate pan & zoom so the given world-space rect is centered in the
-   * viewport and fits the requested screen ratios.
-   *
-   * Lerps the SCREEN-SPACE position of the rect's center (not offset
-   * directly) so the focal point traces a straight line on the screen.
-   * Lerping offset linearly while zoom also changes makes any fixed world
-   * point trace a curved screen-space path, which shows up as a wobble.
-   */
+  // Lerps the SCREEN-SPACE position of the rect's center, not offset directly. Lerping offset
+  // while zoom also changes makes any fixed world point trace a curved screen path — a wobble.
   public animateViewToFitRect(worldRect: DOMRect, fit: ViewFit = 0.8): void {
     const { screenW, screenH, targetZoom, worldFocus } = this.computeFit(
       worldRect,
@@ -473,25 +421,16 @@ export class CanvasViewport {
     this._viewAnim = { stop: () => cancelAnimationFrame(rafId) };
   }
 
-  /**
-   * Animate the viewport so world (0, 0) is at the screen center, preserving
-   * the current zoom. Passing an empty fit object skips both zoom candidates
-   * so animateViewToFitRect keeps `this._zoom`.
-   */
+  // An empty fit object skips both zoom candidates, so animateViewToFitRect keeps `this._zoom`.
   public animateRecenter(): void {
     this.animateViewToFitRect(new DOMRect(0, 0, 0, 0), {});
   }
 
-  /**
-   * Multiply the current zoom by `factor`, anchored on the viewport center.
-   * Used by on-screen zoom controls (e.g. the graph toolbar buttons).
-   */
   public zoomByFactor(factor: number): void {
     this.cancelAnimation();
     this.zoomAroundViewportCenter(this._zoom * factor);
   }
 
-  /** Stop any in-flight view animation. */
   public cancelAnimation(): void {
     this._viewAnim?.stop();
     this._viewAnim = null;
@@ -517,16 +456,10 @@ export class CanvasViewport {
     );
   }
 
-  /**
-   * Clamp `_offset` so the viewport center stays within the content bounds
-   * inflated by ~3/4 viewport on each side — enough slack to pan content
-   * fully off-screen, not enough to drift so far the user can't find it. No
-   * provider / empty content → no clamp, so fresh documents stay free.
-   *
-   * Derivation: viewport center in world is `-offset + halfViewport`. We
-   * constrain that to `[bounds.left - slack, bounds.right + slack]`, then
-   * solve for `offset`.
-   */
+  // Clamps the viewport center to the content bounds inflated by ~3/4 viewport on each side —
+  // enough slack to pan content fully off-screen, not enough to lose it. No provider / empty
+  // content means no clamp, so fresh documents stay free.
+  // Viewport center in world is `-offset + halfViewport`; constrain that, then solve for `offset`.
   private clampOffsetToContent(): void {
     const bounds = this._contentBoundsProvider?.();
     if (!bounds) {
@@ -547,10 +480,6 @@ export class CanvasViewport {
     );
   }
 
-  /**
-   * Set the zoom level, anchoring the world point currently under the given
-   * canvas-local screen point so it stays under that point after the zoom.
-   */
   private zoomAroundPoint(targetZoom: number, screen: Vector2): void {
     const prevZoom = this._zoom;
     this._zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetZoom));
@@ -567,10 +496,6 @@ export class CanvasViewport {
     this.notifyViewChange();
   }
 
-  /**
-   * Set the zoom level, anchoring the world point currently at the canvas
-   * center so it stays at the canvas center after the zoom.
-   */
   private zoomAroundViewportCenter(targetZoom: number): void {
     const dpr = window.devicePixelRatio || 1;
     this.zoomAroundPoint(targetZoom, {

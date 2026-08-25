@@ -21,9 +21,8 @@ export type RemoteOAuthResult =
   | { status: 'failed'; error: string };
 
 /**
- * The provider-specific half of the sign-in flow. GitHub and Google Drive both
- * run authorization code + PKCE through the same redirect listener, so only the
- * endpoints and the credential store differ.
+ * The provider-specific half of the sign-in flow. GitHub and Google Drive both run authorization
+ * code + PKCE through the same redirect listener, so only the endpoints and credential store differ.
  */
 export interface RemoteOAuthProvider<TStartPayload> {
   /** Display name, used in copy and in the analytics event prefix. */
@@ -43,11 +42,8 @@ export interface RemoteOAuthProvider<TStartPayload> {
   clearToken: (credentialId: string) => Promise<void>;
 }
 
-/**
- * `enabled` gates the state read: opening a provider's vault creates its
- * snapshot file and password, so the unselected provider must not be touched
- * just because both hooks mount.
- */
+// `enabled` gates the state read: opening a provider's vault creates its snapshot file and
+// password, so the unselected provider must not be touched just because both hooks mount.
 export function useRemoteAuth<TStartPayload>(
   provider: RemoteOAuthProvider<TStartPayload>,
   credentialId: string,

@@ -5,11 +5,9 @@ const pendingDirs = new Map<string, Promise<void>>();
 let appDataDirPromise: Promise<string> | null = null;
 
 /**
- * Creates an AppData directory, at most once per path per process.
- *
- * `mkdir` with `recursive` is idempotent, so the usual `exists` probe is
- * redundant. Caching the promise also collapses concurrent callers into a
- * single IPC round trip. Rejections are evicted so a later call can retry.
+ * Creates an AppData directory, at most once per path per process. `mkdir` with `recursive` is
+ * idempotent, so the usual `exists` probe is redundant; caching the promise also collapses
+ * concurrent callers into one IPC round trip. Rejections are evicted so a later call can retry.
  */
 export function ensureDirOnce(path: string): Promise<void> {
   let promise = pendingDirs.get(path);

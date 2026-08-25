@@ -4,19 +4,6 @@ import { useSidebar } from './sidebar/context';
 import { SidebarDrawer } from './sidebar/drawer';
 import { SidebarResizeHandle } from './sidebar/resize-handle';
 
-/**
- * Top-level window layout. On roomy viewports this is a persistent left sidebar
- * (explorer, search, tags, sync status) beside the tabbed main area, resizable
- * by dragging the divider and collapsible from the tab bar. On narrow viewports
- * the sidebar reflows into an overlay drawer ({@link SidebarDrawer}) so the
- * content keeps the full width — an adaptive, screen-size-driven layout, not a
- * separate mobile UI.
- *
- * Mobile builds ({@link SidebarContextValue.mobileLayout}) drop the sidebar
- * entirely: the explorer becomes a full-page library home rendered inside
- * {@link AppShell}, so documents open over the full width like the pre-sidebar
- * layout.
- */
 export function RootLayout() {
   const { collapsed, isCompact, mobileLayout } = useSidebar();
   const showColumn = !mobileLayout && !isCompact && !collapsed;

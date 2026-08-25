@@ -77,9 +77,8 @@ function isPaneTabBarEvent(e: React.DragEvent): boolean {
   );
 }
 
-// The drag overlay covers the whole pane, tab bar included. Report the pane's
-// tab bar when the cursor is over it so drops there merge into the tab strip
-// instead of being read as an edge split.
+// The drag overlay covers the whole pane, tab bar included. Reporting the tab bar when the cursor
+// is over it makes drops there merge into the tab strip instead of reading as an edge split.
 function tabBarAt(container: HTMLElement, clientY: number): HTMLElement | null {
   const bar = container.querySelector('[data-pane-tab-bar]');
   if (!(bar instanceof HTMLElement)) {
@@ -370,9 +369,8 @@ const LayoutRenderer = memo(function LayoutRenderer({
             <LayoutRenderer
               node={child}
               isTopLeft={isTopLeft && i === 0}
-              // A horizontal split puts the top-right corner in the last child;
-              // a vertical split stacks rows, so the top row (first child) owns
-              // both top corners.
+              // A horizontal split puts the top-right corner in the last child; a vertical split stacks rows, so
+              // the top row (first child) owns both top corners.
               isTopRight={
                 isTopRight &&
                 (node.direction === 'horizontal' ? i === lastIndex : i === 0)

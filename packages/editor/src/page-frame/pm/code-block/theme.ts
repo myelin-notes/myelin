@@ -9,14 +9,13 @@ import { EditorView } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 
 /**
- * Code-block documents are literal markdown fenced code blocks (the ``` fence
- * lines are part of the text). Parsing them AS markdown keeps the fences out
- * of the inner language's parse — a bare ``` would otherwise e.g. open an
- * unterminated template literal in JS/TS — and mounts the right grammar for
- * the interior based on the fence info string, lazily via language-data.
+ * Code-block documents are literal markdown fenced code blocks (the ``` lines are part of the
+ * text). Parsing them AS markdown keeps the fences out of the inner language's parse — a bare ```
+ * would otherwise open an unterminated template literal in JS/TS — and mounts the right grammar
+ * for the interior from the fence info string, lazily via language-data.
  *
- * Fence tokens are resolved against language names/aliases (`python`, `js`,
- * `c#`), falling back to file extensions (`py`, `rs`, `htm`, `md`).
+ * Fence tokens resolve against language names/aliases (`python`, `js`, `c#`), falling back to file
+ * extensions (`py`, `rs`, `htm`, `md`).
  */
 export function codeBlockLanguage(): LanguageSupport {
   return markdown({
@@ -31,11 +30,8 @@ export function codeBlockLanguage(): LanguageSupport {
   });
 }
 
-/**
- * Token palette sourced from CSS theme tokens (--syntax-*), so it tracks
- * light/dark automatically — CodeMirror accepts `var(...)` color strings and
- * the highlight style needs no reconfiguration on theme change.
- */
+// Sourced from CSS theme tokens (--syntax-*), so it tracks light/dark automatically — CodeMirror
+// accepts `var(...)` color strings and needs no reconfiguration on theme change.
 const codeBlockHighlightStyle = HighlightStyle.define([
   {
     tag: [t.comment, t.lineComment, t.blockComment, t.docComment],
@@ -117,9 +113,8 @@ export const codeBlockEditorTheme = EditorView.theme({
     color: 'var(--text-muted)',
     border: 'none',
   },
-  // No minWidth: `ch` resolves inconsistently under page-frame scaling, and
-  // CodeMirror already sizes the gutter to the widest line number via its
-  // hidden spacer element.
+  // No minWidth: `ch` resolves inconsistently under page-frame scaling, and CodeMirror already
+  // sizes the gutter to the widest line number via its hidden spacer.
   '.cm-lineNumbers .cm-gutterElement': {
     minWidth: '1ch',
     padding: '0 6px 0 18px',

@@ -1,13 +1,10 @@
 /**
- * Canvas 2D contexts can't reference CSS variables, so canvas *chrome* (grid,
- * selection outlines, drag previews, thumbnails painted into the canvas) reads
- * the theme tokens off the document root once and caches the result. The cache
- * is invalidated when the `.dark` class on <html> toggles; subscribers are
- * notified so they can rebuild any cached artifacts (e.g. the grid pattern).
+ * Canvas 2D contexts can't reference CSS variables, so canvas *chrome* (grid, selection outlines,
+ * drag previews, thumbnails) reads the theme tokens off the document root once and caches them.
+ * Invalidated when `.dark` toggles on <html>; subscribers rebuild cached artifacts.
  *
- * User-drawn content (ink, highlighter, text the user colors) is NOT sourced
- * from here — that is document data, not chrome. The one exception is
- * {@link resolveInkColor}; see its doc comment.
+ * User-drawn content (ink, highlighter, colored text) is document data and is NOT sourced from
+ * here. The one exception is {@link resolveInkColor}.
  */
 export interface CanvasPalette {
   /** Background grid / dot pattern. */
@@ -92,10 +89,6 @@ export function getCanvasPalette(): CanvasPalette {
   return cached;
 }
 
-/**
- * Subscribe to theme changes so cached canvas artifacts can be rebuilt. Returns
- * an unsubscribe function.
- */
 export function onCanvasThemeChange(listener: () => void): () => void {
   ensureObserver();
   listeners.add(listener);
@@ -105,21 +98,16 @@ export function onCanvasThemeChange(listener: () => void): () => void {
 }
 
 /**
- * The "black" every tool palette leads with. It is stored in the document
- * verbatim — this is still document data — but it is the one user color that
- * names an *intent* ("default ink") rather than a literal shade, so painting
- * resolves it against the theme. The stored hex is exactly `--text-primary`'s
- * light-mode value, so light mode renders unchanged.
+ * The "black" every tool palette leads with. Stored in the document verbatim, but it is the one
+ * user color that names an *intent* ("default ink") rather than a literal shade, so painting
+ * resolves it against the theme. The stored hex is `--text-primary`'s light-mode value.
  */
 export const ADAPTIVE_INK = '#191c1e';
 
 /**
- * Resolve a stored element color for painting. Adaptive ink follows the theme
- * so strokes drawn in light mode stay legible in dark mode and vice versa;
- * every other color is the literal shade the user picked and is returned as-is.
- *
- * Not used for PDF export — exported pages are printed on white, so ink there
- * keeps its stored (light) value.
+ * Adaptive ink follows the theme so strokes drawn in light mode stay legible in dark mode; every
+ * other color is the literal shade the user picked. Not used for PDF export — exported pages are
+ * printed on white, so ink there keeps its stored (light) value.
  */
 export function resolveInkColor(color: string): string {
   return color.toLowerCase() === ADAPTIVE_INK

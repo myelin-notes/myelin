@@ -1,16 +1,13 @@
 /**
  * Display-list contract shared with the Rust `export_pdf` command
- * (`src-tauri/src/pdf_export/contract.rs`). The frontend harvests the rendered DOM
- * into this flat list of draw commands with coordinates already in PDF points
- * (top-left origin, matching krilla); Rust never does layout.
- *
- * Keep field names in sync with the Rust serde structs (camelCase).
+ * (`src-tauri/src/pdf_export/contract.rs`). The frontend harvests the rendered DOM into this flat
+ * list of draw commands with coordinates already in PDF points (top-left origin, matching krilla);
+ * Rust never does layout. Keep field names in sync with the Rust serde structs (camelCase).
  */
 
 /**
- * Bundled use-case font (`sans`/`serif`/`mono`) or an embedded custom face —
- * `custom` indexes into {@link PdfExportRequest.fontsB64}. Matches the serde
- * encoding of the Rust `FontKey` enum (externally tagged).
+ * `custom` indexes into {@link PdfExportRequest.fontsB64}. Matches the serde encoding of the Rust
+ * `FontKey` enum (externally tagged).
  */
 export type FontKey = 'sans' | 'serif' | 'mono' | { custom: number };
 
@@ -103,10 +100,7 @@ export interface PdfExportRequest {
   originalPdfB64?: string;
 }
 
-/**
- * Base64-encode bytes in chunks (avoids stack overflow on large buffers).
- * Used to fill the `*B64` fields of a {@link PdfExportRequest}.
- */
+// Chunked to avoid a stack overflow on large buffers.
 export function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
   const chunk = 0x8000;

@@ -54,10 +54,7 @@ function buildFrontmatter(node: VFSFileNode): string {
   return lines.join('\n');
 }
 
-/**
- * Concatenate every page frame of a canvas note into a single markdown body.
- * Non-page-frame elements (embedded media, canvas text, drawings) are ignored.
- */
+// Non-page-frame elements (embedded media, canvas text, drawings) are ignored.
 async function noteMarkdownBody(
   repository: ReadableRepository,
   noteId: VFSNodeId,

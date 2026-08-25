@@ -26,12 +26,8 @@ import {
 /** Frames to keep retrying the highlight while a panned-to frame's view mounts. */
 const HIGHLIGHT_MOUNT_RETRY_FRAMES = 60;
 
-/**
- * Find-as-you-type debounce. A typing burst restarts a 0.7s camera animation
- * and dispatches a highlight transaction per keystroke; debouncing the query
- * collapses a burst into a single match-compute + pan + highlight. next/prev
- * stay instant — they move `currentIndex`, not the query.
- */
+// A typing burst restarts a 0.7s camera animation and dispatches a highlight transaction per
+// keystroke. next/prev stay instant — they move `currentIndex`, not the query.
 const SEARCH_DEBOUNCE_MS = 120;
 
 export interface CanvasSearchController {
@@ -60,13 +56,6 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-/**
- * In-canvas find, browser-style. Cmd/Ctrl+F opens a find bar that matches text,
- * page frames, audio transcripts (live from the doc) and handwriting (from the
- * recognized artifact). Matches are a flat ordered list stepped through with
- * next/prev; each step pans to the match and, for page frames, highlights the
- * current occurrence inside the frame.
- */
 export function useCanvasSearch(
   drawableCanvasRef: RefObject<DrawableCanvas | null>,
   nodeId: VFSNodeId,
@@ -84,9 +73,8 @@ export function useCanvasSearch(
     [sources, debouncedQuery],
   );
 
-  // Restart at the first match whenever the matched query changes (not on every
-  // keystroke — only once the debounce settles), so find-as-you-type jumps to
-  // the first hit while next/prev keep their position.
+  // Only once the debounce settles, so find-as-you-type jumps to the first hit while next/prev
+  // keep their position.
   // biome-ignore lint/correctness/useExhaustiveDependencies: debouncedQuery is a trigger; the body only resets position
   useEffect(() => {
     setCurrentIndex(0);
@@ -200,11 +188,8 @@ export function useCanvasSearch(
     setQueryState('');
   }, []);
 
-  // Read this node's recognized handwriting from disk and re-collect sources
-  // with it merged in. Re-collecting also refreshes the live text/frame/
-  // transcript sources, which is fine — collection is cheap. Without the
-  // handwriting capability there is no artifact — search simply has no
-  // handwriting layer.
+  // Re-collecting also refreshes the live text/frame/transcript sources, which is fine — collection
+  // is cheap. Without the handwriting capability there is no artifact and no handwriting layer.
   const refreshHandwritingSources = useCallback(() => {
     const handwriting = getPlatform().handwriting;
     if (!handwriting) {
@@ -232,10 +217,8 @@ export function useCanvasSearch(
     refreshHandwritingSources();
   }, [drawableCanvasRef, clearActiveHighlight, refreshHandwritingSources]);
 
-  // Recognition can land after the find bar is already open; refresh the
-  // handwriting sources when this node's artifact updates so late hits appear
-  // without reopening. New handwriting matches append after the element
-  // matches, so the current position stays put.
+  // Recognition can land after the find bar is open. New handwriting matches append after the
+  // element matches, so the current position stays put.
   useEffect(() => {
     if (!open || !getPlatform().handwriting) {
       return;

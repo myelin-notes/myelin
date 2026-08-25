@@ -64,9 +64,8 @@ const logger = new Logger('PdfElement');
 const DEFAULT_PAGE_SIZE: PdfPageSize = { w: PAGE_WIDTH, h: PAGE_HEIGHT };
 const PAGE_RENDER_MARGIN = PAGE_GAP * 2;
 const PDF_RENDER_DEBOUNCE_MS = 120;
-// Screen-px viewport movement per sync frame above which a scroll counts as
-// "fast": first renders of newly visible pages are debounced instead of
-// started immediately, so a fling doesn't queue a worker render per page.
+// Above this, first renders of newly visible pages are debounced rather than started immediately,
+// so a fling doesn't queue a worker render per page.
 const FAST_SCROLL_PX_PER_FRAME = 24;
 // Staging canvases kept (at size) between renders to avoid reallocating a
 // page-sized backing store for every render.
@@ -379,10 +378,8 @@ export class PdfElement extends DrawableElement {
     );
   }
 
-  /**
-   * Content scales with `_scale`; chrome padding is fixed world units. Override
-   * so selection outline + handles track the visible chrome.
-   */
+  // Content scales with `_scale`; chrome padding is fixed world units. Override so the selection
+  // outline and handles track the visible chrome.
   public override get boundingBox(): DOMRect {
     const sX = this._scale.x;
     const sY = this._scale.y;
@@ -414,12 +411,8 @@ export class PdfElement extends DrawableElement {
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
-  /**
-   * Render the pages visible in the capture region into cached offscreen
-   * canvases so the thumbnail can blit them. Uses dedicated canvases (not the
-   * on-screen staging pool) so thumbnail rendering never evicts or contends
-   * with live page renders.
-   */
+  // Uses dedicated canvases, not the on-screen staging pool, so thumbnail rendering never evicts or
+  // contends with live page renders.
   public override async prepareThumbnail(
     scale: number,
     region: DOMRect,
@@ -576,11 +569,9 @@ export class PdfElement extends DrawableElement {
       zoom,
     });
 
-    // The chrome lays its subtree out at a quantized zoom and carries the
-    // remainder as a scale on its root. Pages live inside that root, so their
-    // geometry has to be in the same units — sizing them to the exact zoom
-    // makes the residual scale apply twice and the pages overflow the chrome
-    // by up to 41%.
+    // The chrome lays its subtree out at a quantized zoom and carries the remainder as a scale on its
+    // root. Pages live inside that root, so sizing them to the exact zoom applies the residual twice
+    // and overflows the chrome by up to 41%.
     const rasterZoom = quantizeRasterZoom(zoom);
     this.syncContentRoot(contentWidth, contentHeight, rasterZoom);
     this.syncPageDoms(viewport, zoom, rasterZoom, scaleX, scaleY, layout);
@@ -908,11 +899,9 @@ export class PdfElement extends DrawableElement {
       pageDom.rendered?.pageIndex ?? pageDom.rendering?.pageIndex;
     this.releasePageRender(pageDom, true);
     pageDom.root.remove();
-    // Skip cleanup when another surviving dom still uses this page index:
-    // scroll jitter at the retain edge can evict then immediately re-create a
-    // page whose render is rAF/debounce-scheduled, so cleanup() (which only
-    // refuses while a render is in flight) would wipe caches the pending
-    // render is about to reuse.
+    // Scroll jitter at the retain edge can evict then immediately re-create a page whose render is
+    // rAF/debounce-scheduled, so cleanup() (which only refuses while a render is in flight) would
+    // wipe caches the pending render is about to reuse.
     if (
       this._pdfDocument &&
       cachedPageIndex !== undefined &&
@@ -997,10 +986,9 @@ export class PdfElement extends DrawableElement {
       scaleY,
       PAGE_RENDER_MARGIN,
     );
-    // Rendered bitmaps within a viewport's reach of the visible range are
-    // kept alive instead of evicted, so scrolling back doesn't re-render
-    // through the pdf.js worker. The retained count scales with 1/zoom while
-    // bitmap size scales with zoom², keeping memory roughly constant.
+    // Bitmaps within a viewport's reach of the visible range are retained, so scrolling back doesn't
+    // re-render through the pdf.js worker. Retained count scales with 1/zoom while bitmap size scales
+    // with zoom², keeping memory roughly constant.
     const retainMargin =
       PAGE_RENDER_MARGIN +
       (this._pageLayout === 'horizontal' ? worldRect.width : worldRect.height);

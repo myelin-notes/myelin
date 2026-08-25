@@ -47,11 +47,8 @@ export type PdfExportOverlayElement = Pick<
   'uuid' | 'boundingBox' | 'hidden' | 'drawToPdf' | 'prepareForPdf'
 >;
 
-/**
- * Await every overlay's async PDF preparation (raster bitmaps, etc.) before the
- * synchronous harvest pass — `drawToPdf` can't await, so its inputs must be
- * ready first.
- */
+// `drawToPdf` can't await, so every overlay's async preparation (raster bitmaps, etc.) must be
+// done before the synchronous harvest pass.
 export async function prepareExportOverlays(
   elements: readonly PdfExportOverlayElement[],
 ): Promise<void> {
@@ -87,11 +84,8 @@ export function getPdfExportPages(
   }));
 }
 
-/**
- * Harvest the overlay elements into a display-list request: the original PDF pages
- * are kept (referenced by `pageMap`) and each overlapping element emits native draw
- * commands positioned in that page's PDF-point space. Rust assembles the result.
- */
+// The original PDF pages are kept (referenced by `pageMap`) and each overlapping element emits
+// native draw commands positioned in that page's PDF-point space. Rust assembles the result.
 export function buildPdfElementRequest(
   target: PdfElementExportSource,
   elements: readonly PdfExportOverlayElement[],

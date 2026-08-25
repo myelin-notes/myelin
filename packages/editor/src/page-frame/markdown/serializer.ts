@@ -1,8 +1,7 @@
 /**
- * Tiny ProseMirror → Markdown serializer for the page-frame schema.
- * The schema is custom (flat bullet/ordered/checklist items with an
- * `indent` attr, mentions, etc.) so we can't lean on `prosemirror-markdown`'s
- * default serializer. This walks the doc node-by-node and emits CommonMark.
+ * ProseMirror → Markdown for the page-frame schema. The schema is custom (flat bullet/ordered/
+ * checklist items with an `indent` attr, mentions), so `prosemirror-markdown`'s default serializer
+ * doesn't apply.
  */
 
 import type { Mark, Node as PMNode } from 'prosemirror-model';
@@ -20,11 +19,7 @@ export function serializeDocToMarkdown(doc: PMNode): string {
   return finalize(parts);
 }
 
-/**
- * Chunked variant — yields to the event loop every {@link BATCH_SIZE}
- * blocks so large documents don't freeze the UI while serializing. Use
- * this from interactive paths (export menu, etc.).
- */
+// Yields to the event loop every {@link BATCH_SIZE} blocks. Use from interactive paths.
 export async function serializeDocToMarkdownChunked(
   doc: PMNode,
 ): Promise<string> {
@@ -94,9 +89,8 @@ function serializeBlock(node: PMNode): string | null {
     case 'blockquote':
       return serializeBlockquote(node);
     case 'codeBlock':
-      // The page-frame schema stores fence delimiters (```lang / ```) as
-      // part of the code block's own text content — the editor renders
-      // them as visual fences. Emit the text verbatim to avoid nesting.
+      // The schema stores fence delimiters (```lang / ```) as part of the code block's own text
+      // content, so emit it verbatim to avoid nesting.
       return node.textContent;
     case 'mathBlock':
       // Math blocks store their $$ fence lines as text, like codeBlock.
@@ -228,13 +222,10 @@ function serializeTableCell(cell: PMNode): string {
 }
 
 /**
- * Escapes the literal pipes in already-serialized cell content so they
- * don't split the row on re-parse. The input is the output of
- * {@link serializeInline}, which has already escaped markdown specials and
- * emitted `$...$` math verbatim — re-running {@link escapeMarkdown} here
- * would double LaTeX backslashes (`$e^{i\pi}$` → `$e^{i\\pi}$`) and grow
- * escapes across save cycles. Pipes are escaped everywhere (including inside
- * math) because the table parser unescapes `\|` back to a literal `|`.
+ * The input is already {@link serializeInline} output, which escaped markdown specials and emitted
+ * `$...$` math verbatim — re-running {@link escapeMarkdown} would double LaTeX backslashes and grow
+ * escapes across save cycles. Pipes are escaped even inside math, since the table parser unescapes
+ * `\|` back to a literal `|`.
  */
 function escapeTableCellPipes(text: string): string {
   return text.replace(/\|/g, '\\|');
@@ -292,11 +283,7 @@ function escapeMarkdown(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/([*_`[\]~])/g, '\\$1');
 }
 
-/**
- * Escapes markdown like `escapeMarkdown`, but emits inline-math spans
- * (`$...$`) verbatim — LaTeX is full of backslashes that must not be
- * doubled (e.g. `$e^{i\pi}$`).
- */
+// Inline-math spans are emitted verbatim — LaTeX backslashes must not be doubled.
 function escapeMarkdownPreservingMath(text: string): string {
   if (!text.includes('$')) {
     return escapeMarkdown(text);

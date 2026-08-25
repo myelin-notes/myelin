@@ -79,11 +79,8 @@ import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
 
-/**
- * The wheel's rings sit at fixed offsets outside this radius, so the default
- * 100 spans 478px — wider than any phone. 52 brings the outer ring to 382px,
- * which clears a 390px portrait screen.
- */
+// The wheel's rings sit at fixed offsets outside this radius, so the default 100 spans 478px —
+// wider than any phone. 52 brings the outer ring to 382px, clearing a 390px portrait screen.
 const COMPACT_WHEEL_RADIUS = 52;
 
 interface CanvasViewProps {
@@ -205,10 +202,9 @@ function CanvasViewInner({
   }, [engine.fileName]);
 
   useEffect(() => {
-    // engine.fileName lags `id` during a tab switch because CanvasView is
-    // reused (not remounted) and the session opens asynchronously. Only sync
-    // the title once the loaded session actually matches this tab's id,
-    // otherwise we briefly write the previous note's name onto the new tab.
+    // engine.fileName lags `id` during a tab switch because CanvasView is reused, not remounted, and
+    // the session opens asynchronously — otherwise the previous note's name is briefly written onto
+    // the new tab.
     if (engine.fileName && engine.noteSession?.id === id) {
       const pane = tabController.getPane(paneId);
       if (!pane) {
@@ -227,12 +223,9 @@ function CanvasViewInner({
     if (!engine.ready) {
       return;
     }
-    // Like the title effect above, `engine` lags `id` during a tab switch
-    // (CanvasView is reused, not remounted, and the session opens
-    // asynchronously). Until the loaded session matches this tab's id,
-    // drawableCanvasRef.current still points at the previous note's document, so
-    // the focus/create-fallback below would mutate (create a page frame in) the
-    // wrong canvas. Only run once the session actually matches.
+    // Same lag as the title effect above: until the loaded session matches this tab's id,
+    // drawableCanvasRef.current still points at the previous note's document, so the focus/create
+    // fallback below would create a page frame in the wrong canvas.
     if (engine.noteSession?.id !== id) {
       return;
     }
@@ -557,9 +550,8 @@ function CanvasViewInner({
     [],
   );
 
-  // overflow-clip (not -hidden): hidden boxes are still programmatically
-  // scrollable, so the browser's caret-reveal for offscreen page-frame
-  // carets can scroll them and desync the DOM from the canvas.
+  // overflow-clip, not -hidden: hidden boxes are still programmatically scrollable, so the browser's
+  // caret-reveal for offscreen page-frame carets can scroll them and desync the DOM from the canvas.
   return (
     <div
       className="relative h-full w-full overflow-clip bg-page"

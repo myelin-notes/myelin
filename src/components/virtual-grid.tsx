@@ -14,7 +14,6 @@ import { useVirtualizer } from '@myelin/editor/components/use-virtualizer';
 interface VirtualGridProps {
   /** Scroll container the grid lives inside (commonly an ancestor). */
   scrollRef: RefObject<HTMLElement | null>;
-  /** Total number of items. */
   itemCount: number;
   /** Number of columns. Items flow left-to-right, top-to-bottom. */
   columns: number;
@@ -29,7 +28,6 @@ interface VirtualGridProps {
   /** Stable key per item. Measured heights are cached by this key, so an item
    *  keeps its height (and DOM node) across reordering and re-grouping. */
   getItemKey: (index: number) => string;
-  /** Renders the item at `index`. */
   renderItem: (index: number) => ReactNode;
   /** Item that must always render and be scrolled into view. */
   pinnedIndex?: number | null;
@@ -43,14 +41,11 @@ interface VirtualGridProps {
 }
 
 /**
- * Reusable multi-column windowing grid. Unlike a row-of-cells approach, every
- * item is positioned individually under one stable container and keyed by its
- * own id, so reordering or changing the column count just repositions existing
- * DOM nodes — items never remount, and their measured heights are reused
- * rather than thrown away.
+ * Multi-column windowing grid. Every item is positioned individually under one stable container
+ * and keyed by its own id, so reordering or changing the column count repositions existing DOM
+ * nodes instead of remounting them and discarding their measured heights.
  *
- * A row's height is the tallest item in it; items are top-aligned within their
- * row (heights are measured at natural size, not stretched to match).
+ * A row's height is the tallest item in it; items are top-aligned (measured at natural size).
  */
 export function VirtualGrid({
   scrollRef,

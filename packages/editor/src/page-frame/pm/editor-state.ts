@@ -14,11 +14,8 @@ import { schema } from './schema';
 const CODE_BLOCK_NODE_VIEW_SELECTOR = '.pm-code-block';
 
 /**
- * Manages ProseMirror document state for a single PageFrameElement.
- *
- * The Y.XmlFragment is the source of truth for document content.
- * The EditorView is created once and kept alive. Editing is toggled
- * via `setEditable()` rather than creating/destroying the view.
+ * The Y.XmlFragment is the source of truth for content. The EditorView is created once and kept
+ * alive; editing is toggled via `setEditable()` rather than creating/destroying the view.
  */
 export class PageFrameEditorState {
   private _view: EditorView | null = null;
@@ -46,14 +43,8 @@ export class PageFrameEditorState {
     );
   }
 
-  /**
-   * Create a persistent EditorView mounted into the given container.
-   * Starts non-editable. Call `setEditable(true)` to enable editing.
-   *
-   * `onLayout`, when provided, is invoked whenever the pagination plugin
-   * recomputes the document layout: the page count, plus the natural content
-   * height for `continuous` layout (`null` in paginated/column layouts).
-   */
+  // Starts non-editable. `onLayout` fires whenever the pagination plugin recomputes layout: page
+  // count, plus the natural content height for `continuous` layout (`null` in paginated/column).
   createView(
     container: HTMLElement,
     onLayout?: (pageCount: number, contentHeight: number | null) => void,
@@ -74,21 +65,17 @@ export class PageFrameEditorState {
 
     this._editable = false;
 
-    // Use a regular function for dispatchTransaction so ProseMirror binds
-    // the EditorView as `this`. This is critical because ySyncPlugin
-    // dispatches a transaction during the EditorView constructor (to load
-    // XmlFragment content), before `this._view` is assigned.
+    // A regular function so ProseMirror binds the EditorView as `this` — ySyncPlugin dispatches a
+    // transaction during the EditorView constructor, before `this._view` is assigned.
     const editable = () => this._editable;
 
     this._view = new EditorView(container, {
       state,
       editable: (_state) => editable(),
       nodeViews: buildNodeViews(),
-      // Page frames never scroll internally — the canvas follow-cursor pan
-      // keeps the caret on screen. PM's default ancestor scroll-walk would
-      // scroll the frame's clip boxes (or the canvas page root) and desync
-      // the DOM from the canvas-drawn chrome. The nested CodeMirror editors
-      // (code blocks, math source) manage their own caret visibility.
+      // Page frames never scroll internally — the canvas follow-cursor pan keeps the caret on screen.
+      // PM's default ancestor scroll-walk would scroll the frame's clip boxes and desync the DOM from
+      // the canvas-drawn chrome. Nested CodeMirror editors manage their own caret visibility.
       handleScrollToSelection() {
         return true;
       },
@@ -122,9 +109,6 @@ export class PageFrameEditorState {
     return this._view;
   }
 
-  /**
-   * Toggle whether the editor accepts input.
-   */
   setEditable(editable: boolean): void {
     this._editable = editable;
     this._view?.setProps({ editable: (_state) => this._editable });
@@ -178,9 +162,7 @@ export class PageFrameEditorState {
     }
   }
 
-  /**
-   * Tear down the view entirely (only needed when the frame is removed).
-   */
+  // Only needed when the frame is removed.
   destroyView(): void {
     if (this._view) {
       this._view.destroy();

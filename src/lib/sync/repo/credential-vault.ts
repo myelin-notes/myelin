@@ -29,10 +29,7 @@ export interface CredentialVault {
   read(key: string): Promise<string | null>;
   write(key: string, value: string): Promise<void>;
   remove(key: string): Promise<void>;
-  /**
-   * True once if a stale, undecryptable vault was discarded since the last
-   * call, so the UI can surface a one-time "sign-in expired" notice.
-   */
+  /** True once if a stale, undecryptable vault was discarded, so the UI can show a one-time notice. */
   consumeDiscarded(): boolean;
 }
 
@@ -84,11 +81,9 @@ export function createCredentialVault(
         throw error;
       }
 
-      // The vault file exists but can't be decrypted with the current password
-      // (e.g. the stored vault password was reset/regenerated). Any token inside
-      // is unrecoverable, so discard the file and start fresh — the user simply
-      // re-authenticates. Logged as a warning so it isn't reported as an
-      // exception for an expected, self-healing condition.
+      // The vault exists but can't be decrypted with the current password (e.g. it was regenerated).
+      // Any token inside is unrecoverable, so discard and start fresh — the user re-authenticates.
+      // A warning, not an exception, since this is expected and self-healing.
       logger.warn(`Discarding unreadable ${options.clientName} vault`, error);
       discarded = true;
       await remove(vaultPath).catch((removeError) => {

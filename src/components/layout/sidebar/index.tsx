@@ -79,12 +79,8 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     strings,
   });
 
-  // Refresh tag counts when a remote sync lands or any local
-  // repository mutation occurs (create/rename/delete/move/tag), including
-  // changes made outside the sidebar such as the tab bar's new-tab button.
-  // `dataVersion` is the only refresh signal for local repos, where
-  // `lastRemoteSyncAt` stays null. Skip the initial render — the tags list
-  // already loads on mount.
+  // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
+  // Skip the initial render — the tags list already loads on mount.
   const didMountMetaRefresh = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
@@ -177,9 +173,8 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
           // vertically with the tabs and the macOS traffic lights.
           'flex shrink-0 items-center gap-0.5 px-2',
           TAB_BAR_HEIGHT_CLASS,
-          // Only macOS right-aligns the buttons, since the traffic lights hold
-          // the top-left. Every other platform (Windows, iPad, Linux) has no
-          // lights there, so center them instead of stranding them in a corner.
+          // Only macOS right-aligns the buttons, since the traffic lights hold the top-left. Every other
+          // platform has no lights there, so center them instead of stranding them in a corner.
           isMac ? 'justify-end' : 'justify-center',
           isMac && TRAFFIC_LIGHT_INSET_CLASS,
         )}

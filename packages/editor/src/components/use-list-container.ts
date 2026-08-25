@@ -3,7 +3,6 @@ import { type RefObject, useCallback, useRef } from 'react';
 interface ListContainer {
   /** Object ref to the container element, for the virtualizer's rect math. */
   containerRef: RefObject<HTMLDivElement | null>;
-  /** Callback ref to attach to the container element. */
   setContainerEl: (el: HTMLDivElement | null) => void;
 }
 

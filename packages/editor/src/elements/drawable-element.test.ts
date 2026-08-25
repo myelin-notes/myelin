@@ -9,11 +9,8 @@ const CTX = new Proxy(
   { get: () => () => undefined },
 ) as CanvasRenderingContext2D;
 
-/**
- * The renderer skips the whole overlay canvas — clear included — on frames
- * where no element would draw into it, so this predicate has to agree with
- * `drawSelectionOverlay`'s own early return or the outline goes missing.
- */
+// The renderer skips the whole overlay canvas — clear included — on frames where no element would
+// draw into it, so this predicate has to agree with `drawSelectionOverlay`'s own early return.
 describe('hasSelectionOverlay', () => {
   it('is false until an element is both selected and drawn', () => {
     const stroke = new StrokeElement('s1', [], false, STYLE);
@@ -94,10 +91,8 @@ describe('hitHandle', () => {
   });
 });
 
-/**
- * The renderer draws only the elements this reports as visible, so anything it
- * answers `false` for is invisible that frame no matter what it would paint.
- */
+// The renderer draws only the elements this reports as visible, so anything it answers `false` for
+// is invisible that frame no matter what it would paint.
 describe('intersectsWorldRect', () => {
   const VIEW = new DOMRect(0, 0, 100, 100);
 

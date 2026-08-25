@@ -2,10 +2,9 @@ import { getCanvasPalette } from './canvas-theme';
 import type { PlacementGhost, Vector2 } from './drawable-canvas';
 
 /**
- * Holds the one-shot placement ghost state — orthogonal to tools. When active,
- * the next primary-button click finalizes placement and the state clears. The
- * controller owns only the ghost and its Escape-key cleanup; the canvas drives
- * lifecycle (start/cancel) and supplies the click that finalizes placement.
+ * One-shot placement ghost state, orthogonal to tools: the next primary-button click finalizes
+ * placement and clears the state. Owns only the ghost and its Escape-key cleanup; the canvas drives
+ * start/cancel and supplies the finalizing click.
  */
 export class PlacementController {
   private _placement: PlacementGhost | null = null;
@@ -24,10 +23,7 @@ export class PlacementController {
     this.onPlacementEnd = callback;
   }
 
-  /**
-   * Begin placement with `ghost`. Registers an Escape listener that cancels
-   * placement. Caller is responsible for ending any prior placement first.
-   */
+  // The caller must end any prior placement first.
   public start(ghost: PlacementGhost): void {
     this._placement = ghost;
 
@@ -43,10 +39,7 @@ export class PlacementController {
     };
   }
 
-  /**
-   * Clear the ghost, remove its Escape listener, and fire the end callback.
-   * Always clears `_placement` so the active state can never linger.
-   */
+  // Always clears `_placement`, so the active state can never linger.
   public end(): void {
     this._placement = null;
     this._placementCleanup?.();
@@ -54,7 +47,6 @@ export class PlacementController {
     this.onPlacementEnd?.();
   }
 
-  /** Draw the placement ghost rectangle at the pointer's world position. */
   public drawGhost(ctx: CanvasRenderingContext2D, worldPos: Vector2): void {
     if (!this._placement) {
       return;

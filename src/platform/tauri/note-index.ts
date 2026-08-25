@@ -30,10 +30,8 @@ function yieldToIdle(): Promise<void> {
 }
 
 /**
- * Thin client over the Rust note-index engine: triggers reindexing, listens for
- * completion events, and holds the in-memory search corpus the search layer
- * reads. The heavy work (provider selection, extraction, queueing, staleness)
- * all lives in Rust.
+ * Thin client over the Rust note-index engine. The heavy work — provider selection, extraction,
+ * queueing, staleness — all lives in Rust.
  */
 export class TauriNoteIndexService implements NoteIndexCapability {
   /** node id -> extracted text. The synchronous corpus the search layer reads. */
@@ -42,19 +40,11 @@ export class TauriNoteIndexService implements NoteIndexCapability {
   /** Bumped whenever {@link contentByNode} changes; see {@link contentRevision}. */
   private _contentRevision = 0;
   private unlisten: UnlistenFn | null = null;
-  /**
-   * The repository the corpus currently reflects. Index artifacts are namespaced
-   * per repo on disk, and reindex/remove target this repo. Null between a
-   * {@link reset} and the next {@link init} (e.g. mid repository switch).
-   */
+  // Index artifacts are namespaced per repo on disk, and reindex/remove target this repo. Null
+  // between a {@link reset} and the next {@link init}.
   private repoId: string | null = null;
 
-  /**
-   * Point the service at a repository: register the completion listener (once)
-   * and hydrate the in-memory corpus from that repo's previously-written
-   * artifacts. Call on startup and after every repository switch (paired with
-   * {@link reset} on teardown).
-   */
+  // Call on startup and after every repository switch, paired with {@link reset} on teardown.
   async init(repoId: string): Promise<void> {
     this.repoId = repoId;
     if (!this.unlisten) {
@@ -68,11 +58,8 @@ export class TauriNoteIndexService implements NoteIndexCapability {
     await this.hydrate(repoId);
   }
 
-  /**
-   * Drop the corpus and detach from the active repository. The completion
-   * listener stays registered (it is engine-wide, not per-repo); events for a
-   * non-current repo are ignored until the next {@link init}.
-   */
+  // The completion listener stays registered (it is engine-wide, not per-repo); events for a
+  // non-current repo are ignored until the next {@link init}.
   reset(): void {
     this.repoId = null;
     this.contentByNode.clear();
@@ -176,10 +163,9 @@ export class TauriNoteIndexService implements NoteIndexCapability {
     }
     this._contentRevision++;
 
-    // Keep any well-formed embedding regardless of model id; search correctness
-    // is enforced downstream by matching the query embedding's model against
-    // each passage's (see searchNodeResultsSemantically). Hardcoding a model id
-    // here previously silently dropped the whole corpus after a model swap.
+    // Keep any well-formed embedding regardless of model id; search correctness is enforced
+    // downstream by matching the query embedding's model against each passage's. Hardcoding a model
+    // id here previously silently dropped the whole corpus after a model swap.
     const embedding = record?.embedding;
     if (
       embedding &&

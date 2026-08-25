@@ -1,13 +1,10 @@
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import type { CanvasPalette } from '../../canvas-theme';
 
-/**
- * Approximate visual metrics for the thumbnail. These don't need to match the
- * live editor exactly — the result is shown at <=600px, so coarse line heights
- * and greedy word-wrap read fine.
- */
-// Theme-aware chrome colors, refreshed from the canvas palette at render entry
-// so the thumbnail tracks light/dark. Fallbacks are the original light values.
+// Approximate visual metrics. They don't need to match the live editor — the result is shown at
+// <=600px, so coarse line heights and greedy word-wrap read fine.
+// Chrome colors are refreshed from the canvas palette at render entry so the thumbnail tracks
+// light/dark; the fallbacks are the original light values.
 let TEXT_COLOR = '#1f2933';
 let MUTED_COLOR = '#7b8794';
 let SHADE_COLOR = '#f0f2f5';
@@ -45,12 +42,9 @@ interface Cursor {
 }
 
 /**
- * Render an approximate visual of a ProseMirror document into a 2D context.
- *
- * Pure: reads the doc model and emits draw calls into `ctx`. No DOM access —
- * theme colors come from the `palette` the caller passes in. The caller is also
- * responsible for translating `ctx` so (0, 0) is the top-left of the content
- * area and for drawing any page background first.
+ * Pure: reads the doc model and emits draw calls into `ctx`. No DOM access — theme colors come from
+ * the `palette` the caller passes in. The caller must translate `ctx` so (0, 0) is the top-left of
+ * the content area, and draw any page background first.
  */
 export function renderPageFrameThumbnail(
   doc: ProseMirrorNode,
@@ -280,9 +274,6 @@ interface DrawTextOptions {
   lineHeight: number;
 }
 
-/**
- * Greedy word-wrap `text` to `width` and paint each line, advancing the cursor.
- */
 function drawText(
   ctx: CanvasRenderingContext2D,
   cursor: Cursor,

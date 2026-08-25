@@ -116,14 +116,9 @@ function addText(
 }
 
 /**
- * The starter canvas: one page frame demonstrating the page features
- * people miss (code, math, mermaid, callouts, tables, embeds) and, beside it,
- * the free-floating text and LaTeX elements that only exist on the canvas.
- *
- * Built and encoded in one pass like {@link createBlankCanvasFile}, so no
- * session has to be opened to fill it in. Note links are left as literal
- * syntax in the table rather than real links: the file does not exist yet at
- * this point, so nothing they pointed at could resolve.
+ * Built and encoded in one pass like {@link createBlankCanvasFile}, so no session has to be opened
+ * to fill it in. Note links are left as literal syntax in the table: the file does not exist yet,
+ * so nothing they pointed at could resolve.
  */
 export async function createStarterCanvasFile(
   repository: Repository,

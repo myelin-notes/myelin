@@ -11,11 +11,9 @@ function iconMarkup(kind: DragItemKind): string {
 }
 
 /**
- * Builds an off-screen pill element to use as the drag ghost via
- * `dataTransfer.setDragImage`, and returns a cleanup to remove it once the
- * browser has snapshotted it. The element must stay in the DOM for the
- * duration of the dragstart handler, so callers schedule cleanup on the next
- * frame.
+ * Builds an off-screen pill for `dataTransfer.setDragImage` and returns a cleanup. The element must
+ * stay in the DOM for the duration of the dragstart handler, so callers schedule cleanup on the
+ * next frame.
  */
 export function createItemDragImage(
   name: string,
@@ -24,10 +22,9 @@ export function createItemDragImage(
   const element = document.createElement('div');
   element.style.cssText = [
     'position: fixed',
-    // Verified on macOS WKWebView: negative-coordinate placement snapshots
-    // fine. Don't "fix" this to `top: 0` + `transform: translateX(-9999px)` —
-    // that variant produces NO drag image at all there (the snapshot follows
-    // the transformed paint position, so it captures nothing).
+    // Verified on macOS WKWebView: negative-coordinate placement snapshots fine. Don't "fix" this to
+    // `top: 0` + `transform: translateX(-9999px)` — that produces NO drag image at all, since the
+    // snapshot follows the transformed paint position.
     'top: -1000px',
     'left: -1000px',
     'display: inline-flex',

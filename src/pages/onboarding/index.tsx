@@ -25,14 +25,10 @@ const logger = new Logger('Onboarding');
 const STEPS = ['welcome', 'privacy', 'sync', 'sample'] as const;
 
 /**
- * First-run setup, shown in place of the app shell until
- * `onboardingCompleted` is set. It owns the two decisions that cannot be made
- * for the user — analytics consent and where their notes live — and offers the
- * starter canvas on the way out.
+ * First-run setup, shown in place of the app shell until `onboardingCompleted` is set.
  *
- * The analytics toggle writes straight through to the preference rather than
- * being staged until the end: turning it on is the consent, and quitting
- * halfway must not leave a decision half-applied.
+ * The analytics toggle writes straight through to the preference rather than being staged until the
+ * end: turning it on is the consent, and quitting halfway must not leave a decision half-applied.
  */
 export function OnboardingFlow() {
   const strings = useMessages();

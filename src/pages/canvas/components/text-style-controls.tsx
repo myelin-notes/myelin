@@ -24,11 +24,8 @@ interface TextStyleControlsProps {
   style: TextStyle;
 }
 
-/**
- * Font / size / color for the selected text box, applied straight to the
- * element. This is the object-first path: the tool options panel only ever sets
- * the defaults used by the *next* box.
- */
+// The object-first path: applied straight to the element. The tool options panel only sets the
+// defaults used by the *next* box.
 export function TextStyleControls({ element, style }: TextStyleControlsProps) {
   const strings = useMessages();
   const {
@@ -42,9 +39,8 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
   const [openMenu, setOpenMenu] = useState<'font' | 'color' | null>(null);
   const [swatchMenuOpen, setSwatchMenuOpen] = useState(false);
 
-  // The custom color picker and a swatch's delete menu portal outside this
-  // subtree, so leave the menu up while either is in use or the swatch grid
-  // would vanish under it.
+  // The custom color picker and a swatch's delete menu portal outside this subtree, so leave the menu
+  // up while either is in use or the swatch grid would vanish under it.
   const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
     if (
       pickerOpen ||

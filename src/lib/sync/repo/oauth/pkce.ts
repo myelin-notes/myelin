@@ -1,7 +1,4 @@
-/**
- * Provider-neutral pieces of the authorization code + PKCE flow, shared by the
- * GitHub and Google Drive credential modules.
- */
+/** Provider-neutral pieces of the authorization code + PKCE flow, shared by GitHub and Drive. */
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = '';
@@ -38,10 +35,8 @@ export function encodeFormBody(entries: Record<string, string>): string {
     .join('&');
 }
 
-/**
- * Rejects as soon as `signal` aborts so a cancelled sign-in stops waiting on a
- * redirect that is never coming, rather than holding the listener open.
- */
+// Rejects as soon as `signal` aborts, so a cancelled sign-in stops waiting on a redirect that is
+// never coming rather than holding the listener open.
 export function raceAbort<T>(
   promise: Promise<T>,
   signal: AbortSignal | undefined,

@@ -46,14 +46,8 @@ interface BlockInfo {
   isPageHeightConstrained: boolean;
 }
 
-/**
- * Walk the doc and emit one BlockInfo per leaf block.
- *
- * This is the *only* DOM measurement done up-front. Breakable text blocks are NOT
- * expanded into per-line points here — that expensive work is deferred to
- * `paginateParagraph`, which is only called for text blocks that actually
- * cross a page boundary.
- */
+// The *only* up-front DOM measurement. Breakable text blocks are not expanded into per-line
+// points here — deferred to `paginateParagraph` for blocks that actually cross a boundary.
 function collectBlocks(view: EditorView, editorOffsetTop: number): BlockInfo[] {
   const result: BlockInfo[] = [];
   view.state.doc.forEach((node, pos) => {
@@ -430,12 +424,8 @@ function linesFromCachedTextOnlyParagraphLineResult(
   }));
 }
 
-/**
- * `Range#getClientRects()` tells us which visual line fragments a text node
- * occupies, but not which character starts each fragment. To recover a stable
- * doc position we binary-search the prefix length where the rect count grows:
- * that's the first visible character on the next wrapped line.
- */
+// `Range#getClientRects()` gives the visual line fragments but not which character starts each.
+// Binary-search the prefix length where the rect count grows: that's the first char of the next line.
 function collectDomLineFragments(
   textNode: Text,
   metrics: PaginationRunMetrics | null,
@@ -504,9 +494,8 @@ function collectDomLineFragments(
     searchStart = Math.min(textNode.length, firstVisibleEnd + 1);
   }
 
-  // Cache only the horizontal line signature and the recovered start offsets.
-  // The next pass still reads live rect tops/bottoms, so spacer widgets can
-  // move lines vertically without invalidating the cached char positions.
+  // Only the horizontal line signature and recovered start offsets. The next pass still reads live
+  // rect tops/bottoms, so spacer widgets can move lines vertically without invalidating this.
   const nextCacheEntry = {
     text: textNode.data,
     startOffsets,
@@ -523,12 +512,8 @@ function collectDomLineFragments(
   return { fragments, cacheEntry: nextCacheEntry };
 }
 
-/**
- * Convert a Pretext layout cursor into a character offset. For ASCII text,
- * grapheme index equals char index within a segment; summing segment
- * lengths gives the global offset. Complex Unicode (emoji ZWJ, combining
- * marks) may be off by a few units — acceptable for line-start placement.
- */
+// For ASCII, grapheme index equals char index within a segment. Complex Unicode (emoji ZWJ,
+// combining marks) may be off by a few units — acceptable for line-start placement.
 function cursorToCharOffset(
   cursor: LayoutCursor,
   segments: readonly string[],
@@ -541,19 +526,10 @@ function cursorToCharOffset(
   return offset + cursor.graphemeIndex;
 }
 
-/**
- * Measure a text block's lines using Pretext's canvas-based layout.
- *
- * Pure arithmetic after a single `prepareWithSegments` call — no DOM reads
- * for line positions, no `view.posAtCoords`. Character offsets come from
- * each `LayoutLine.start` cursor and map directly to PM doc positions via
- * `block.pos + 1 + charOffset` (only valid when the text block contains no
- * inline atoms — mentions/images inflate node size without contributing to
- * `textContent`, which would break the mapping).
- *
- * Returns `null` for text blocks Pretext can't handle (non-text children,
- * empty text, missing CSS inputs, or Pretext itself throwing).
- */
+// Pure arithmetic after one `prepareWithSegments` call — no DOM reads, no `view.posAtCoords`.
+// Offsets map to PM positions via `block.pos + 1 + charOffset`, valid only when the block has no
+// inline atoms (mentions/images inflate node size without contributing to `textContent`).
+// Returns `null` for blocks Pretext can't handle (non-text children, empty text, missing CSS).
 function measureLinesWithPretext(
   block: BlockInfo,
   view: EditorView,
@@ -635,15 +611,9 @@ function measureLinesWithPretext(
   return lines;
 }
 
-/**
- * Measure a text block's lines using DOM range rects — the fallback when
- * Pretext can't handle the block (contains mentions, images, etc.).
- *
- * Walks text descendants, collects one rect per visual line, and remembers
- * the text node/offset that starts each fragment. That keeps split positions
- * tied to the rendered DOM instead of caret hit-testing, which changes when
- * the editor flips between editable and read-only modes.
- */
+// Fallback when Pretext can't handle the block (mentions, images). Remembers the text
+// node/offset starting each fragment, which ties split positions to the rendered DOM instead of
+// caret hit-testing — the latter changes when the editor flips between editable and read-only.
 function measureLinesWithDom(
   block: BlockInfo,
   view: EditorView,
@@ -927,11 +897,7 @@ function measureLinesWithDom(
   return lines;
 }
 
-/**
- * Measure a text block's lines. Prefer DOM rects so pagination follows the
- * browser's actual wrapped lines. Fall back to Pretext if the DOM path can't
- * produce line boxes.
- */
+// Prefer DOM rects so pagination follows the browser's actual wrapped lines.
 function measureParagraphLines(
   block: BlockInfo,
   view: EditorView,
@@ -1179,13 +1145,8 @@ function measureTableRows(
   return rows;
 }
 
-/**
- * Walk blocks in document order and emit page breaks.
- *
- * Cheap by default: per-block this only reads `offsetTop` / `offsetHeight`
- * (which are cached layout values, not reflows). Breakable text blocks are only
- * line-expanded when they actually overflow the current page boundary.
- */
+// Cheap by default: per-block this only reads cached `offsetTop`/`offsetHeight`, no reflow.
+// Breakable text blocks are line-expanded only when they overflow the current page boundary.
 function calculateLayout(
   blocks: BlockInfo[],
   view: EditorView,
@@ -1403,12 +1364,8 @@ const BLOCKQUOTE_RULE_PROPS = [
   '--pm-callout-fill-repeats',
 ] as const;
 
-/**
- * Write only the properties that actually changed ('' means "not set").
- * This runs on every pagination pass, so unconditional writes — including
- * the old clear-then-set pattern — dirty style and force a layer flush even
- * when nothing moved.
- */
+// Only write properties that changed ('' means "not set"). This runs on every pagination pass,
+// so unconditional writes dirty style and force a layer flush even when nothing moved.
 function applyBlockquoteRuleStyle(
   blockquote: HTMLElement,
   values: Record<string, string>,
@@ -1508,12 +1465,9 @@ function syncBlockquoteRuleStyles(view: EditorView): void {
   }
 }
 
-// Spacer heights come from sub-pixel DOM measurements and wobble by
-// fractions of a pixel between passes (inserting a spacer shifts the rects
-// the next pass measures). Exact float equality reads that noise as a layout
-// change, so the settle loop never converges and dispatches a pagination
-// transaction every frame. Anything under half a pixel is visually identical;
-// real layout changes move spacers by at least a line height.
+// Spacer heights come from sub-pixel measurements and wobble between passes. Exact float
+// equality reads that noise as a layout change, so the settle loop never converges. Real layout
+// changes move spacers by at least a line height.
 const SPACER_EPSILON = 0.5;
 
 function breaksEqual(a: Break[], b: Break[]): boolean {
@@ -1545,9 +1499,7 @@ function getPageLayout(view: EditorView): PageLayout | null {
     : null;
 }
 
-// scrollWidth that exactly equals N*stride - gap can drift to N*stride - gap + ε
-// in floating-point, flipping ceil() from N to N+1. Shave a sub-pixel epsilon
-// off the quotient before ceiling so the natural N-column width stays at N.
+// scrollWidth exactly equal to N*stride - gap can drift up by ε, flipping ceil() from N to N+1.
 const PAGE_COUNT_STRIDE_EPSILON = 0.01;
 
 function getHorizontalPageCount(view: EditorView): number {
@@ -1594,15 +1546,12 @@ function observeLayoutInvalidations(
     });
   }
 
-  // Switching between vertical and continuous changes no editor styles, so the
-  // ResizeObserver above never fires for that toggle. Watch the layout
-  // attribute directly so changing modes always triggers a fresh pass (clearing
-  // or re-inserting page breaks as needed).
+  // Switching between vertical and continuous changes no editor styles, so the ResizeObserver
+  // never fires for that toggle. Watch the layout attribute directly.
   const layoutHost = view.dom.closest('.pm-editor');
   if (layoutHost instanceof HTMLElement) {
-    // Single source of truth for the page-break cap: page-capped blocks in
-    // editor-blocks.css read this var so the CONTENT_HEIGHT constant and the
-    // CSS max-height can't drift apart.
+    // Single source of truth for the page-break cap: page-capped blocks in editor-blocks.css read
+    // this var, so CONTENT_HEIGHT and the CSS max-height can't drift apart.
     layoutHost.style.setProperty('--pm-content-height', `${CONTENT_HEIGHT}px`);
   }
   if (layoutHost && typeof MutationObserver !== 'undefined') {
@@ -1737,9 +1686,8 @@ export function paginationPlugin(
         try {
           const pageLayout = getPageLayout(editorView);
           if (pageLayout === 'continuous') {
-            // One uninterrupted strip: no page breaks. Report the editor's
-            // natural height so the frame can size its single sheet, and clear
-            // any breaks left over from a previous paginated layout.
+            // One uninterrupted strip: report the editor's natural height so the frame can size its single
+            // sheet, and clear any breaks left from a previous paginated layout.
             const contentHeight = editorView.dom.offsetHeight;
             onLayout?.(1, contentHeight);
 
@@ -1802,10 +1750,8 @@ export function paginationPlugin(
             return;
           }
 
-          // CSS↔viewport scale: ancestor `transform: scale(zoom)` makes
-          // viewport coords from getClientRects scaled. offsetWidth is the
-          // unscaled CSS width. Width is used (not height) to avoid
-          // divide-by-zero on a 0-height empty doc.
+          // Ancestor `transform: scale(zoom)` makes getClientRects coords scaled; offsetWidth is unscaled
+          // CSS width. Width, not height, to avoid divide-by-zero on a 0-height empty doc.
           const screenRect = editorView.dom.getBoundingClientRect();
           const cssWidth = editorView.dom.offsetWidth;
           const invScale = cssWidth > 0 ? cssWidth / screenRect.width : 1;
@@ -1853,10 +1799,8 @@ export function paginationPlugin(
           tr.setMeta(paginationKey, { decos, breaks, pageCount });
           tr.setMeta(PM_ADD_TO_HISTORY, false);
 
-          // Spacer widgets mutate the editor height and can trip the
-          // ResizeObserver. Ignore that self-induced resize for one frame and
-          // rely on the bounded settle loop below instead of reopening a fresh
-          // full repagination chain on every dispatch.
+          // Spacer widgets mutate the editor height and can trip the ResizeObserver. Ignore that
+          // self-induced resize for one frame and rely on the bounded settle loop below.
           suppressResizeInvalidation = true;
           if (clearSuppressResizeRafId !== 0) {
             cancelAnimationFrame(clearSuppressResizeRafId);
@@ -1873,10 +1817,8 @@ export function paginationPlugin(
             metrics.dispatchMs = performance.now() - dispatchStartedAt;
           }
 
-          // The first pass often measures an unpaginated DOM and then mutates it
-          // by inserting spacer widgets. Run a bounded number of follow-up
-          // frames against that new DOM so reopen-time layout can converge
-          // without waiting for a keystroke.
+          // The first pass often measures an unpaginated DOM and then mutates it. Run a bounded number of
+          // follow-up frames so reopen-time layout converges without waiting for a keystroke.
           if (remainingFollowUpPasses > 0) {
             schedule(remainingFollowUpPasses - 1);
           }
@@ -1895,10 +1837,8 @@ export function paginationPlugin(
         }
       }
 
-      // Reopen-time bug source: the doc can stay unchanged while the DOM keeps
-      // settling underneath it (web fonts swap in, Monaco/node views resize,
-      // etc.). If we only repaginate on PM transactions, those stale breaks
-      // survive until the next edit.
+      // The doc can stay unchanged while the DOM settles underneath it (web fonts swap in, node views
+      // resize). Repaginating only on PM transactions leaves those stale breaks until the next edit.
       const stopObservingLayout = observeLayoutInvalidations(
         editorView,
         schedule,

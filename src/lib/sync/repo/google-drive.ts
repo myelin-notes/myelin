@@ -1,18 +1,11 @@
 /**
- * Google Drive repository backend.
+ * Google Drive repository backend. Files live in one app-created folder in My Drive, laid out
+ * like the GitHub backend: `manifest.json` plus `files/`. The `drive.file` scope only exposes
+ * files this app created, so the folder is found by name rather than picked by the user.
  *
- * Files live in one app-created folder in the user's My Drive, laid out exactly
- * like the GitHub backend: `manifest.json` plus a `files/` directory. The
- * `drive.file` scope only exposes files this app created, so the folder is
- * found by name among the app's own files rather than picked by the user.
- *
- * Conflict handling caveat: Drive has no compare-and-swap write — there is no
- * `If-Match` on `files.update`. `saveManifestImpl` therefore re-reads the
- * manifest's `headRevisionId` immediately before uploading and refuses if it
- * moved, which `BaseRepository` retries against the fresh manifest. That closes
- * the realistic multi-device window (another device wrote minutes ago) but not
- * the sub-round-trip one: two devices writing inside the same round trip still
- * resolve last-writer-wins.
+ * Drive has no compare-and-swap write (no `If-Match` on `files.update`), so `saveManifestImpl`
+ * re-reads `headRevisionId` immediately before uploading and refuses if it moved. That closes the
+ * realistic multi-device window but not the sub-round-trip one, which stays last-writer-wins.
  */
 import { fetch } from '@tauri-apps/plugin-http';
 import { BaseRepository } from './base';
@@ -43,11 +36,8 @@ const ENTRY_FIELDS = 'files(id,name,headRevisionId)';
 const MAX_MANIFEST_RETRIES = 4;
 const MAX_REQUEST_ATTEMPTS = 4;
 const MAX_RETRY_DELAY_MS = 60_000;
-/**
- * Total time one request may spend waiting out rate limits before it gives up.
- * A Drive `Retry-After: 60` is worth honouring once, but not three times over:
- * a sync the user is watching must fail rather than sit there for minutes.
- */
+// A Drive `Retry-After: 60` is worth honouring once but not three times over: a sync the user is
+// watching must fail rather than sit there for minutes.
 const MAX_TOTAL_RETRY_DELAY_MS = 60_000;
 const LIST_PAGE_SIZE = 1000;
 const SNAPSHOT_DOWNLOAD_CONCURRENCY = 8;
@@ -154,11 +144,8 @@ interface DriveRequestInit {
   body?: string | Uint8Array;
 }
 
-/**
- * Sends an authenticated Drive request, retrying rate limits and server errors
- * with backoff. Auth headers are rebuilt per attempt so a token refreshed in
- * the meantime is picked up. Returns null only for a 404 the caller opted into.
- */
+// Auth headers are rebuilt per attempt so a token refreshed in the meantime is picked up.
+// Returns null only for a 404 the caller opted into.
 async function driveRequest(
   ctx: DriveContext,
   label: string,
@@ -342,11 +329,8 @@ async function deleteDriveFile(
   );
 }
 
-/**
- * Resolves the repository's root folder in My Drive, creating it if this app
- * has not created one by that name yet. Settings calls this to fill in
- * `folderId` before the repository is used.
- */
+// Creates it if this app has not created one by that name yet. Settings calls this to fill in
+// `folderId` before the repository is used.
 export async function ensureGoogleDriveFolder(
   credentialId: string,
   folderName: string,
@@ -368,10 +352,7 @@ export async function ensureGoogleDriveFolder(
   );
 }
 
-/**
- * Renames the repository's root folder in place. Keeping the id keeps the notes
- * inside it, and keeps the local cache, which is keyed on the id.
- */
+// Keeping the id keeps the notes inside it, and keeps the local cache, which is keyed on the id.
 export async function renameGoogleDriveFolder(
   credentialId: string,
   folderId: string,
@@ -402,16 +383,10 @@ export class GoogleDriveRepository extends BaseRepository {
     batchedCommit: false,
   };
 
-  /**
-   * Drive ids of directories under the repository root, keyed by relative path.
-   * Only this app creates them, so an id, once resolved, stays valid.
-   */
+  // Only this app creates them, so an id, once resolved, stays valid.
   private readonly folderIds = new Map<string, Promise<string>>();
 
-  /**
-   * Aborted on dispose, so a request parked on a rate-limit retry stops when
-   * the repository is torn down instead of holding the teardown behind it.
-   */
+  // Aborted on dispose, so a request parked on a rate-limit retry doesn't hold up teardown.
   private readonly aborter = new AbortController();
   private readonly drive: DriveContext;
 
@@ -523,11 +498,8 @@ export class GoogleDriveRepository extends BaseRepository {
     }
   }
 
-  /**
-   * Overridden because the inherited default resolves each node's path through
-   * its own manifest load — one manifest download per file. Drive has no bulk
-   * download, so this lists `files/` once and fetches in bounded batches.
-   */
+  // The inherited default resolves each node's path through its own manifest load — one manifest
+  // download per file. Drive has no bulk download, so list `files/` once and fetch in batches.
   async exportSnapshot(): Promise<RepositorySnapshot> {
     const { manifest } = await this.loadManifestImpl();
     const fileNodes = Object.values(manifest.nodes).filter(
@@ -574,12 +546,9 @@ export class GoogleDriveRepository extends BaseRepository {
     return downloadDriveFile(this.drive, fileId);
   }
 
-  /**
-   * Settings resolves the folder id before the repository is usable, so an
-   * empty one means setup is unfinished. Failing here surfaces that as the
-   * repository's error instead of a confusing Drive rejection, and the cached
-   * wrapper keeps serving local data meanwhile.
-   */
+  // Settings resolves the folder id before the repository is usable, so an empty one means setup
+  // is unfinished. Failing here surfaces that as the repository's error rather than a confusing
+  // Drive rejection, and the cached wrapper keeps serving local data meanwhile.
   private get rootFolderId(): string {
     if (!this.config.folderId) {
       throw new Error('Google Drive folder is not configured.');
