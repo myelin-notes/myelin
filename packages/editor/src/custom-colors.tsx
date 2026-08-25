@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { Logger } from '@myelin/shared/logger';
 import { ColorPickerDialog } from './components/color-picker-dialog';
+import { MAX_CUSTOM_COLORS } from './sync/repo/config';
 import type { CustomColorTool } from './sync/repo/types';
 import { useRepository } from './sync/repo-context';
 
@@ -43,9 +44,6 @@ export const CustomColorsContext =
 const logger = new Logger('CustomColors');
 
 const INITIAL_PICKER_COLOR = '#3b82f6';
-
-/** Custom swatches a single tool may keep. Deleting one frees a slot. */
-export const MAX_CUSTOM_COLORS = 8;
 
 export function CustomColorsProvider({ children }: PropsWithChildren) {
   const repository = useRepository();

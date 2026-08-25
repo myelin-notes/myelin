@@ -7,6 +7,7 @@ import {
 } from '@/lib/search';
 import type { NoteEmbedding } from '@/platform';
 import { addChild, dropNode, getChildIds, removeChild } from './child-index';
+import { MAX_CUSTOM_COLORS } from './config';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import type {
   CustomColorTool,
@@ -83,7 +84,7 @@ export function migrate(manifest: VFSManifest): void {
   };
   if (manifest.version < 3) {
     manifest.colors = {
-      pen: legacyManifest.customColors ?? [],
+      pen: (legacyManifest.customColors ?? []).slice(0, MAX_CUSTOM_COLORS),
       highlighter: [],
       text: [],
     };
