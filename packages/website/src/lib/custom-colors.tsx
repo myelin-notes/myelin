@@ -1,5 +1,6 @@
 import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
 import { CustomColorsContext } from '@myelin/editor/custom-colors';
+import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import { useCopy } from '@/content/copy-context';
 
 /**
@@ -14,21 +15,25 @@ import { useCopy } from '@/content/copy-context';
 const STORAGE_KEY = 'myelin-web-custom-colors';
 const HEX_PATTERN = /^#?([0-9a-fA-F]{6})$/;
 
-function loadColors(): string[] {
+function getStorageKey(tool: CustomColorTool): string {
+  return tool === 'pen' ? STORAGE_KEY : `${STORAGE_KEY}-${tool}`;
+}
+
+function loadColors(tool: CustomColorTool): string[] {
   if (typeof localStorage === 'undefined') {
     return [];
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey(tool));
     return raw ? (JSON.parse(raw) as string[]) : [];
   } catch {
     return [];
   }
 }
 
-function saveColors(colors: string[]) {
+function saveColors(tool: CustomColorTool, colors: string[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(colors));
+    localStorage.setItem(getStorageKey(tool), JSON.stringify(colors));
   } catch {
     // Ignore storage failures (private mode, quota).
   }
@@ -36,37 +41,49 @@ function saveColors(colors: string[]) {
 
 export function CustomColorsProvider({ children }: PropsWithChildren) {
   const promptLabel = useCopy().canvas.addCustomColor;
-  const [colors, setColors] = useState<string[]>(loadColors);
+  const [colors, setColors] = useState<Record<CustomColorTool, string[]>>(
+    () => ({
+      pen: loadColors('pen'),
+      highlighter: loadColors('highlighter'),
+      text: loadColors('text'),
+    }),
+  );
 
-  const addColor = useCallback(async (color: string) => {
+  const addColor = useCallback(async (tool: CustomColorTool, color: string) => {
     setColors((prev) => {
-      if (prev.includes(color)) {
+      if (prev[tool].includes(color)) {
         return prev;
       }
-      const next = [...prev, color];
-      saveColors(next);
-      return next;
+      const next = [...prev[tool], color];
+      saveColors(tool, next);
+      return { ...prev, [tool]: next };
     });
   }, []);
 
-  const removeColor = useCallback(async (color: string) => {
-    setColors((prev) => {
-      const next = prev.filter((c) => c !== color);
-      saveColors(next);
-      return next;
-    });
-  }, []);
+  const removeColor = useCallback(
+    async (tool: CustomColorTool, color: string) => {
+      setColors((prev) => {
+        const next = prev[tool].filter((c) => c !== color);
+        saveColors(tool, next);
+        return { ...prev, [tool]: next };
+      });
+    },
+    [],
+  );
 
-  const promptAddColor = useCallback(() => {
-    const raw = window.prompt(promptLabel);
-    if (!raw) {
-      return;
-    }
-    const match = HEX_PATTERN.exec(raw.trim());
-    if (match) {
-      void addColor(`#${match[1].toLowerCase()}`);
-    }
-  }, [addColor, promptLabel]);
+  const promptAddColor = useCallback(
+    (tool: CustomColorTool) => {
+      const raw = window.prompt(promptLabel);
+      if (!raw) {
+        return;
+      }
+      const match = HEX_PATTERN.exec(raw.trim());
+      if (match) {
+        void addColor(tool, `#${match[1].toLowerCase()}`);
+      }
+    },
+    [addColor, promptLabel],
+  );
 
   const value = useMemo(
     () => ({

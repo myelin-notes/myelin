@@ -5,6 +5,8 @@ import type { FileType } from './file-types';
 export type { VFSNodeId } from '../types';
 export type { FileType } from './file-types';
 
+export type CustomColorTool = 'pen' | 'highlighter' | 'text';
+
 export interface VFSFileNode {
   id: VFSNodeId;
   name: string;
@@ -184,9 +186,9 @@ export interface Repository {
   /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
   getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;
 
-  getCustomColors(): Promise<string[]>;
-  addCustomColor(color: string): Promise<string[]>;
-  removeCustomColor(color: string): Promise<string[]>;
+  getCustomColors(tool: CustomColorTool): Promise<string[]>;
+  addCustomColor(color: string, tool: CustomColorTool): Promise<string[]>;
+  removeCustomColor(color: string, tool: CustomColorTool): Promise<string[]>;
 
   getRegistryTags(): Promise<string[]>;
   addRegistryTags(tags: string[]): Promise<string[]>;

@@ -36,7 +36,7 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
     promptAddColor,
     removeColor,
     pickerOpen,
-  } = useCustomColors();
+  } = useCustomColors('text');
   const containerRef = useRef<HTMLDivElement>(null);
   const [openMenu, setOpenMenu] = useState<'font' | 'color' | null>(null);
 

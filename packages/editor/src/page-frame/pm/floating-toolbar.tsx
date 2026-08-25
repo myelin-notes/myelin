@@ -182,7 +182,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     promptAddColor,
     removeColor,
     pickerOpen,
-  } = useCustomColors();
+  } = useCustomColors('text');
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [style, setStyle] = useState<CSSProperties>({});

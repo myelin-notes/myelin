@@ -58,6 +58,7 @@ import {
 import { expandTagWithAncestors, normalizeTagInput } from './tag-hierarchy';
 import type {
   CreateFileOptions,
+  CustomColorTool,
   FileType,
   FileVersion,
   NodeSearchResult,
@@ -755,34 +756,41 @@ export abstract class BaseRepository
     return null;
   }
 
-  async getCustomColors(): Promise<string[]> {
+  async getCustomColors(tool: CustomColorTool): Promise<string[]> {
     const { manifest } = await this.loadManifest();
-    return [...manifest.customColors];
+    return [...manifest.colors[tool]];
   }
 
-  async addCustomColor(color: string): Promise<string[]> {
+  async addCustomColor(
+    color: string,
+    tool: CustomColorTool,
+  ): Promise<string[]> {
     const normalized = normalizeCustomColor(color);
     if (!normalized) {
       throw new Error(`Invalid color: ${color}`);
     }
     return this.mutateManifest('Add custom color', (manifest) => {
-      if (!manifest.customColors.includes(normalized)) {
-        manifest.customColors = [...manifest.customColors, normalized];
+      const colors = manifest.colors[tool];
+      if (!colors.includes(normalized)) {
+        manifest.colors[tool] = [...colors, normalized];
       }
-      return [...manifest.customColors];
+      return [...manifest.colors[tool]];
     });
   }
 
-  async removeCustomColor(color: string): Promise<string[]> {
+  async removeCustomColor(
+    color: string,
+    tool: CustomColorTool,
+  ): Promise<string[]> {
     const normalized = normalizeCustomColor(color);
     if (!normalized) {
       throw new Error(`Invalid color: ${color}`);
     }
     return this.mutateManifest('Remove custom color', (manifest) => {
-      manifest.customColors = manifest.customColors.filter(
+      manifest.colors[tool] = manifest.colors[tool].filter(
         (c) => c !== normalized,
       );
-      return [...manifest.customColors];
+      return [...manifest.colors[tool]];
     });
   }
 

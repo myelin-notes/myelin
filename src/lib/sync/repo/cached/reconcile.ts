@@ -5,7 +5,9 @@ export function isSnapshotEmpty(snapshot: RepositorySnapshot): boolean {
   return (
     Object.keys(snapshot.manifest.nodes).length === 0 &&
     Object.keys(snapshot.manifest.linksBySource ?? {}).length === 0 &&
-    snapshot.manifest.customColors.length === 0
+    Object.values(snapshot.manifest.colors).every(
+      (colors) => colors.length === 0,
+    )
   );
 }
 

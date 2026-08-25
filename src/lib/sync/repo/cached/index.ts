@@ -43,6 +43,7 @@ import {
 } from '../shared';
 import type {
   CreateFileOptions,
+  CustomColorTool,
   FileType,
   FileVersion,
   NodeSearchResult,
@@ -610,22 +611,28 @@ export class CachedRepository
     return this.cache.getStoredAbsolutePath(nodeId);
   }
 
-  async getCustomColors(): Promise<string[]> {
-    return this.cache.getCustomColors();
+  async getCustomColors(tool: CustomColorTool): Promise<string[]> {
+    return this.cache.getCustomColors(tool);
   }
 
-  async addCustomColor(color: string): Promise<string[]> {
+  async addCustomColor(
+    color: string,
+    tool: CustomColorTool,
+  ): Promise<string[]> {
     return this.writeLocalAndQueue(
-      () => this.cache.addCustomColor(color),
+      () => this.cache.addCustomColor(color, tool),
       (ops) => {
         enqueueCustomColorsSync(ops);
       },
     );
   }
 
-  async removeCustomColor(color: string): Promise<string[]> {
+  async removeCustomColor(
+    color: string,
+    tool: CustomColorTool,
+  ): Promise<string[]> {
     return this.writeLocalAndQueue(
-      () => this.cache.removeCustomColor(color),
+      () => this.cache.removeCustomColor(color, tool),
       (ops) => {
         enqueueCustomColorsSync(ops);
       },
@@ -998,7 +1005,7 @@ export class CachedRepository
           plan.messages.push(`Delete node ${op.nodeId}`);
           break;
         case 'sync-custom-colors':
-          plan.manifest.customColors = [...cacheSnapshot.manifest.customColors];
+          plan.manifest.colors = structuredClone(cacheSnapshot.manifest.colors);
           plan.manifestChanged = true;
           plan.messages.push('Sync custom colors');
           break;
@@ -1198,13 +1205,15 @@ export class CachedRepository
   private async applyCustomColorsSync(): Promise<void> {
     // Cache is the source of truth — overwriting remote is what lets deletes
     // propagate (a merge-only strategy could never remove).
-    const cacheColors = await this.withLocalStateLock(() =>
-      this.cache.getCustomColors(),
-    );
+    const cacheColors = await this.withLocalStateLock(async () => ({
+      pen: await this.cache.getCustomColors('pen'),
+      highlighter: await this.cache.getCustomColors('highlighter'),
+      text: await this.cache.getCustomColors('text'),
+    }));
     await this.remote.applyManifestMutation(
       'Sync custom colors',
       (remoteManifest) => {
-        remoteManifest.customColors = [...cacheColors];
+        remoteManifest.colors = cacheColors;
       },
     );
   }

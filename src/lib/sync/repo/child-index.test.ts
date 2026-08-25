@@ -94,7 +94,7 @@ describe('child index', () => {
         },
       },
       linksBySource: {},
-      customColors: [],
+      customColors: ['#111111'],
       tagRegistry: [],
     } as unknown as VFSManifest;
 
@@ -104,6 +104,14 @@ describe('child index', () => {
     expect(JSON.parse(JSON.stringify(legacy))).not.toHaveProperty('children');
     expect(JSON.parse(JSON.stringify(legacy)).nodes.folder).not.toHaveProperty(
       'children',
+    );
+    expect(legacy.colors).toEqual({
+      pen: ['#111111'],
+      highlighter: [],
+      text: [],
+    });
+    expect(JSON.parse(JSON.stringify(legacy))).not.toHaveProperty(
+      'customColors',
     );
   });
 

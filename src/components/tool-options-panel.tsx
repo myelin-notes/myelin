@@ -4,6 +4,7 @@ import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
+import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { FontSizeField } from '@/components/font-size-field';
 import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
@@ -11,6 +12,7 @@ import { useCustomColors } from '@/lib/custom-colors';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];
+  customColorTool: CustomColorTool | null;
 }
 
 function preloadAllFonts(fonts: FontEntry[]) {
@@ -111,12 +113,15 @@ function FontPicker({
 
 /* ── Main panel ─────────────────────────────────────────── */
 
-export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
+export function ToolOptionsPanel({
+  options,
+  customColorTool,
+}: ToolOptionsPanelProps) {
   const {
     colors: customColors,
     promptAddColor,
     removeColor,
-  } = useCustomColors();
+  } = useCustomColors(customColorTool ?? 'pen');
 
   if (options.length === 0) {
     return null;
@@ -140,21 +145,25 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
                     onClick={() => option.set(color)}
                   />
                 ))}
-                {customColors.map((color) => (
-                  <CustomColorSwatch
-                    key={color}
-                    color={color}
-                    active={option.value === color}
-                    onClick={() => option.set(color)}
-                    onDelete={() => {
-                      if (option.value === color && option.palette.length > 0) {
-                        option.set(option.palette[0]);
-                      }
-                      void removeColor(color);
-                    }}
-                  />
-                ))}
-                <AddColorSwatch onClick={promptAddColor} />
+                {customColorTool &&
+                  customColors.map((color) => (
+                    <CustomColorSwatch
+                      key={color}
+                      color={color}
+                      active={option.value === color}
+                      onClick={() => option.set(color)}
+                      onDelete={() => {
+                        if (
+                          option.value === color &&
+                          option.palette.length > 0
+                        ) {
+                          option.set(option.palette[0]);
+                        }
+                        void removeColor(color);
+                      }}
+                    />
+                  ))}
+                {customColorTool && <AddColorSwatch onClick={promptAddColor} />}
               </div>
             </div>
           );

@@ -9,18 +9,27 @@ import {
 } from 'react';
 import { Logger } from '@myelin/shared/logger';
 import { ColorPickerDialog } from './components/color-picker-dialog';
+import type { CustomColorTool } from './sync/repo/types';
 import { useRepository } from './sync/repo-context';
 
 export interface CustomColorsContextValue {
-  colors: string[];
-  addColor: (color: string) => Promise<void>;
-  removeColor: (color: string) => Promise<void>;
-  // Opens the color picker; on confirm, persists the chosen color to the repo
-  // manifest and broadcasts it to every color menu in the app.
-  promptAddColor: () => void;
+  colors: Record<CustomColorTool, string[]>;
+  addColor: (tool: CustomColorTool, color: string) => Promise<void>;
+  removeColor: (tool: CustomColorTool, color: string) => Promise<void>;
+  // Opens the color picker; on confirm, persists the chosen color to the
+  // matching tool's list in the repo manifest.
+  promptAddColor: (tool: CustomColorTool) => void;
   // True while the picker is open. Menus that self-dismiss on outside clicks
   // (e.g. the text floating toolbar) can use this to stay alive while the
   // picker — which portals outside their subtree — is in use.
+  pickerOpen: boolean;
+}
+
+export interface ToolCustomColorsContextValue {
+  colors: string[];
+  addColor: (color: string) => Promise<void>;
+  removeColor: (color: string) => Promise<void>;
+  promptAddColor: () => void;
   pickerOpen: boolean;
 }
 
@@ -34,16 +43,24 @@ const INITIAL_PICKER_COLOR = '#3b82f6';
 
 export function CustomColorsProvider({ children }: PropsWithChildren) {
   const repository = useRepository();
-  const [colors, setColors] = useState<string[]>([]);
+  const [colors, setColors] = useState<Record<CustomColorTool, string[]>>({
+    pen: [],
+    highlighter: [],
+    text: [],
+  });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTool, setPickerTool] = useState<CustomColorTool>('pen');
 
   useEffect(() => {
     let cancelled = false;
-    repository
-      .getCustomColors()
-      .then((loaded) => {
+    Promise.all([
+      repository.getCustomColors('pen'),
+      repository.getCustomColors('highlighter'),
+      repository.getCustomColors('text'),
+    ])
+      .then(([pen, highlighter, text]) => {
         if (!cancelled) {
-          setColors(loaded);
+          setColors({ pen, highlighter, text });
         }
       })
       .catch((error) => {
@@ -55,33 +72,34 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
   }, [repository]);
 
   const addColor = useCallback(
-    async (color: string) => {
-      const updated = await repository.addCustomColor(color);
-      setColors(updated);
+    async (tool: CustomColorTool, color: string) => {
+      const updated = await repository.addCustomColor(color, tool);
+      setColors((current) => ({ ...current, [tool]: updated }));
     },
     [repository],
   );
 
   const removeColor = useCallback(
-    async (color: string) => {
-      const updated = await repository.removeCustomColor(color);
-      setColors(updated);
+    async (tool: CustomColorTool, color: string) => {
+      const updated = await repository.removeCustomColor(color, tool);
+      setColors((current) => ({ ...current, [tool]: updated }));
     },
     [repository],
   );
 
-  const promptAddColor = useCallback(() => {
+  const promptAddColor = useCallback((tool: CustomColorTool) => {
+    setPickerTool(tool);
     setPickerOpen(true);
   }, []);
 
   const onConfirm = useCallback(
     (hex: string) => {
       setPickerOpen(false);
-      void addColor(hex).catch((error) => {
+      void addColor(pickerTool, hex).catch((error) => {
         logger.error('Failed to add custom color', error);
       });
     },
-    [addColor],
+    [addColor, pickerTool],
   );
 
   const onCancel = useCallback(() => {
@@ -108,12 +126,43 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
   );
 }
 
-export function useCustomColors(): CustomColorsContextValue {
+export function useCustomColors(
+  tool: CustomColorTool,
+): ToolCustomColorsContextValue {
   const context = useContext(CustomColorsContext);
   if (!context) {
     throw new Error(
       'useCustomColors must be used within a CustomColorsProvider.',
     );
   }
-  return context;
+  const addColor = useCallback(
+    (color: string) => context.addColor(tool, color),
+    [context, tool],
+  );
+  const removeColor = useCallback(
+    (color: string) => context.removeColor(tool, color),
+    [context, tool],
+  );
+  const promptAddColor = useCallback(
+    () => context.promptAddColor(tool),
+    [context, tool],
+  );
+
+  return useMemo(
+    () => ({
+      colors: context.colors[tool],
+      addColor,
+      removeColor,
+      promptAddColor,
+      pickerOpen: context.pickerOpen,
+    }),
+    [
+      addColor,
+      context.colors,
+      context.pickerOpen,
+      promptAddColor,
+      removeColor,
+      tool,
+    ],
+  );
 }
