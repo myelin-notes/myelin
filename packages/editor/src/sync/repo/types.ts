@@ -7,6 +7,26 @@ export type { FileType } from './file-types';
 
 export type CustomColorTool = 'pen' | 'highlighter' | 'text';
 
+export type PenPresetTool = 'pen' | 'highlighter';
+
+/** A saved pen configuration. `id` is stable across edits and reordering. */
+export interface PenPreset {
+  id: string;
+  tool: PenPresetTool;
+  /** Normalized hex, or the `ADAPTIVE_INK` sentinel. */
+  color: string;
+  size: number;
+  /** Outer-ring membership. Unlike the built-in tools' membership, this syncs. */
+  inWheel: boolean;
+}
+
+/** Partial edit. Absent fields are left as they are. */
+export interface PenPresetChanges {
+  color?: string;
+  size?: number;
+  inWheel?: boolean;
+}
+
 export interface VFSFileNode {
   id: VFSNodeId;
   name: string;
@@ -186,6 +206,12 @@ export interface Repository {
   getCustomColors(tool: CustomColorTool): Promise<string[]>;
   addCustomColor(color: string, tool: CustomColorTool): Promise<string[]>;
   removeCustomColor(color: string, tool: CustomColorTool): Promise<string[]>;
+
+  getPenPresets(): Promise<PenPreset[]>;
+  /** Throws at `MAX_PEN_PRESETS`; an exact `{tool, color, size}` duplicate is a no-op. */
+  addPenPreset(preset: Omit<PenPreset, 'id'>): Promise<PenPreset[]>;
+  updatePenPreset(id: string, changes: PenPresetChanges): Promise<PenPreset[]>;
+  removePenPreset(id: string): Promise<PenPreset[]>;
 
   getRegistryTags(): Promise<string[]>;
   addRegistryTags(tags: string[]): Promise<string[]>;

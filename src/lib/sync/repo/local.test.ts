@@ -11,6 +11,7 @@ import {
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import { MAX_PEN_PRESETS } from './config';
 import { LocalRepository } from './local';
 import { renameNoteReferences } from './rename-note-references';
 import {
@@ -519,5 +520,39 @@ describe('LocalRepository', () => {
     expect((await repository.getNode(folderId))?.name).toBe(
       'Renamed Outside Repository',
     );
+  });
+
+  it('rejects a pen preset past the cap and ignores an exact duplicate', async () => {
+    const repository = new LocalRepository('repositories/pen-preset-cap-test');
+    await repository.initialize();
+
+    for (let i = 0; i < MAX_PEN_PRESETS; i++) {
+      await repository.addPenPreset({
+        tool: 'pen',
+        color: '#abcdef',
+        size: i + 1,
+        inWheel: false,
+      });
+    }
+
+    // The duplicate is a no-op, so it neither adds a row nor trips the cap.
+    expect(
+      await repository.addPenPreset({
+        tool: 'pen',
+        color: '#ABCDEF',
+        size: 1,
+        inWheel: false,
+      }),
+    ).toHaveLength(MAX_PEN_PRESETS);
+
+    await expect(
+      repository.addPenPreset({
+        tool: 'pen',
+        color: '#abcdef',
+        size: MAX_PEN_PRESETS + 1,
+        inWheel: false,
+      }),
+    ).rejects.toThrow();
+    expect(await repository.getPenPresets()).toHaveLength(MAX_PEN_PRESETS);
   });
 });

@@ -920,6 +920,47 @@ describe('CachedRepository', () => {
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
+  it('round-trips pen presets through to the remote', async () => {
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository('repositories/pen-preset-test');
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/pen-preset-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    const [created] = await repository.addPenPreset({
+      tool: 'pen',
+      color: '#ABCDEF',
+      size: 12,
+      inWheel: true,
+    });
+    await repository.updatePenPreset(created.id, { size: 20, inWheel: false });
+
+    expect((await remote.exportSnapshot()).manifest.penPresets).toEqual([]);
+
+    await repository.flushPending();
+
+    expect(await remote.getPenPresets()).toEqual([
+      {
+        id: created.id,
+        tool: 'pen',
+        color: '#abcdef',
+        size: 20,
+        inWheel: false,
+      },
+    ]);
+
+    await repository.removePenPreset(created.id);
+    await repository.flushPending();
+
+    expect(await remote.getPenPresets()).toEqual([]);
+    expect(await repository.getPenPresets()).toEqual([]);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
   it('counts a shared ancestor once when a node carries sibling hierarchical tags', async () => {
     const remote = new MemoryRemoteRepository();
     const cache = new LocalRepository('repositories/hierarchical-dedupe-test');

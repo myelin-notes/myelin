@@ -1,10 +1,11 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { ChevronDown as ChevronDownIcon, Plus as PlusIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
 import { useCustomColors } from '@myelin/editor/custom-colors';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
+import { useMessages } from '@myelin/editor/i18n';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { FontSizeField } from '@/components/font-size-field';
@@ -13,6 +14,9 @@ import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 interface ToolOptionsPanelProps {
   options: ToolOption[];
   customColorTool: CustomColorTool | null;
+  /** Null when the live tool can be saved as a preset; otherwise why it can't. */
+  savePresetDisabledReason: string | null;
+  onSavePreset: () => void;
 }
 
 function preloadAllFonts(fonts: FontEntry[]) {
@@ -115,7 +119,10 @@ function FontPicker({
 export function ToolOptionsPanel({
   options,
   customColorTool,
+  savePresetDisabledReason,
+  onSavePreset,
 }: ToolOptionsPanelProps) {
+  const strings = useMessages();
   const {
     colors: customColors,
     canAddColor,
@@ -255,6 +262,16 @@ export function ToolOptionsPanel({
 
         return null;
       })}
+
+      {savePresetDisabledReason === null && (
+        <button
+          onClick={onSavePreset}
+          className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-card-active hover:text-text-primary"
+        >
+          <PlusIcon className="size-3.5" />
+          {strings.canvas.toolPresets.saveShort}
+        </button>
+      )}
     </div>
   );
 }

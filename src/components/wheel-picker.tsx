@@ -6,15 +6,19 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { SvgIcon } from '@myelin/editor/tools/tool';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 const TWO_PI = 2 * Math.PI;
+// Ring 0 divides the circle evenly, so adjacent centres are a chord of 2r·sin(π/n) apart. At the
+// phone radius of 52 that chord is 40px for 8 items — 32px buttons keep a gap between them.
+const R0_BUTTON_CLASS = IS_PHONE_BUILD ? 'size-8' : 'size-10';
 const CENTER_ZONE = 40;
 const SUB_SPACING = 0.16; // radians between sub-items
 
 export interface WheelItem {
   label: string;
-  icon?: SvgIcon;
+  /** Any glyph that sizes itself off the passed class — a tool's icon, or a preset's mark. */
+  icon?: React.ComponentType<{ className?: string }>;
   color?: string;
   dot?: number;
   command?: () => void;
@@ -337,7 +341,7 @@ export const WheelPicker = memo(function WheelPicker({
             return (
               <button
                 key={i}
-                className={`absolute flex size-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl bg-card shadow-ambient outline-none ring-1 ring-border-subtle/70 transition-colors ${
+                className={`absolute flex ${R0_BUTTON_CLASS} -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl bg-popover/95 shadow-ambient outline-none ring-1 ring-border-subtle/70 transition-colors ${
                   inPath ? 'bg-secondary-container' : ''
                 }`}
                 style={{ left: x, top: y }}

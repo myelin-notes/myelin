@@ -20,6 +20,7 @@ import type {
   RepositoryRuntimeStatus,
   RepositoryStatusSource,
 } from './config';
+import { MAX_PEN_PRESETS } from './config';
 import { extractStoredNoteLinks } from './note-link-index';
 import {
   addChild,
@@ -66,6 +67,8 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  PenPreset,
+  PenPresetChanges,
   Repository,
   RepositoryCapabilities,
   RepositoryNoteGraph,
@@ -765,6 +768,74 @@ export abstract class BaseRepository
         (c) => c !== normalized,
       );
       return [...manifest.colors[tool]];
+    });
+  }
+
+  async getPenPresets(): Promise<PenPreset[]> {
+    const { manifest } = await this.loadManifest();
+    return manifest.penPresets.map((preset) => ({ ...preset }));
+  }
+
+  async addPenPreset(preset: Omit<PenPreset, 'id'>): Promise<PenPreset[]> {
+    const normalized = normalizeCustomColor(preset.color);
+    if (!normalized) {
+      throw new Error(`Invalid color: ${preset.color}`);
+    }
+    return this.mutateManifest('Add pen preset', (manifest) => {
+      const presets = manifest.penPresets;
+      const duplicate = presets.some(
+        (existing) =>
+          existing.tool === preset.tool &&
+          existing.color === normalized &&
+          existing.size === preset.size,
+      );
+      if (!duplicate) {
+        if (presets.length >= MAX_PEN_PRESETS) {
+          throw new Error(
+            `At most ${MAX_PEN_PRESETS} pen presets are allowed.`,
+          );
+        }
+        manifest.penPresets = [
+          ...presets,
+          { ...preset, color: normalized, id: createNodeId() },
+        ];
+      }
+      return manifest.penPresets.map((entry) => ({ ...entry }));
+    });
+  }
+
+  async updatePenPreset(
+    id: string,
+    changes: PenPresetChanges,
+  ): Promise<PenPreset[]> {
+    const normalized =
+      changes.color === undefined ? null : normalizeCustomColor(changes.color);
+    if (changes.color !== undefined && !normalized) {
+      throw new Error(`Invalid color: ${changes.color}`);
+    }
+    return this.mutateManifest('Update pen preset', (manifest) => {
+      manifest.penPresets = manifest.penPresets.map((preset) =>
+        preset.id === id
+          ? {
+              ...preset,
+              ...(normalized ? { color: normalized } : {}),
+              ...(changes.size !== undefined ? { size: changes.size } : {}),
+              ...(changes.inWheel !== undefined
+                ? { inWheel: changes.inWheel }
+                : {}),
+            }
+          : preset,
+      );
+      return manifest.penPresets.map((entry) => ({ ...entry }));
+    });
+  }
+
+  async removePenPreset(id: string): Promise<PenPreset[]> {
+    return this.mutateManifest('Remove pen preset', (manifest) => {
+      manifest.penPresets = manifest.penPresets.filter(
+        (preset) => preset.id !== id,
+      );
+      return manifest.penPresets.map((entry) => ({ ...entry }));
     });
   }
 

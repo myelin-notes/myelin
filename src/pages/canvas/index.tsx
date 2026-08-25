@@ -38,6 +38,7 @@ import {
 } from '@myelin/editor/page-frame/note-link/preview';
 import type { NoteLinkOpenRequestDetail } from '@myelin/editor/page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from '@myelin/editor/page-frame/use-page-frame-autocomplete';
+import { PenPresetsProvider } from '@myelin/editor/pen-presets';
 import { getPlatform } from '@myelin/editor/platform';
 import { regenerateThumbnailNow } from '@myelin/editor/thumbnails';
 import { UserPrefs } from '@myelin/editor/user-prefs';
@@ -96,11 +97,13 @@ export function CanvasView({
 }: CanvasViewProps) {
   return (
     <CustomColorsProvider>
-      <CanvasViewInner
-        id={id}
-        initialPageFrameName={initialPageFrameName}
-        initialPageFrameId={initialPageFrameId}
-      />
+      <PenPresetsProvider>
+        <CanvasViewInner
+          id={id}
+          initialPageFrameName={initialPageFrameName}
+          initialPageFrameId={initialPageFrameId}
+        />
+      </PenPresetsProvider>
     </CustomColorsProvider>
   );
 }
@@ -644,6 +647,16 @@ function CanvasViewInner({
         activeOptions={toolState.activeOptions}
         hasOptions={toolState.hasOptions}
         wheelEnabledIndices={toolState.wheelEnabledIndices}
+        presets={toolState.presets}
+        matchedPresetId={toolState.matchedPresetId}
+        activePenTool={toolState.activePenTool}
+        wheelFull={toolState.wheelFull}
+        savePresetDisabledReason={toolState.savePresetDisabledReason}
+        onApplyPreset={toolState.applyPreset}
+        onSavePreset={toolState.saveCurrentAsPreset}
+        onUpdatePresetToCurrent={toolState.updatePresetToCurrent}
+        onTogglePresetInWheel={toolState.togglePresetInWheel}
+        onDeletePreset={toolState.deletePreset}
         onSelectTool={toolState.selectTool}
         onToggleOptions={toolState.toggleOptions}
         onToggleShelf={toolState.toggleShelf}
