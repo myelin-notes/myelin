@@ -60,20 +60,22 @@ const TOUCH_TAP_SLOP = 8;
 /**
  * PointerEvent.buttons bits that put the stylus into erase mode for as long as
  * they are held: the eraser end (Pointer Events L3, set when the tail is
- * flipped down) and the primary barrel button, which on an S Pen is the only
- * one there is. No Apple Pencil reports either.
+ * flipped down) and a barrel button.
+ *
+ * This is also the contract the native stylus shims deliver against, for the
+ * platforms whose WebView hides a stylus button from this reading — see
+ * StylusButtonShim.kt.
  */
 const PEN_ERASER_BUTTONS = 32 | 2;
 
+/**
+ * The bits that mean the stylus is on the glass: its tip, or its eraser end,
+ * which replaces the tip bit rather than joining it.
+ */
+const PEN_CONTACT_BUTTONS = 1 | 32;
+
 /** A second barrel button reports as the middle button, and opens the wheel. */
 const PEN_WHEEL_BUTTONS = 4;
-
-/**
- * The primary button bit. A pen sets it with its tip — and the Android WebView
- * sets it for an S Pen's barrel button too, which is what makes the barrel
- * invisible while the tip is down. See syncPenBarrelFromHover.
- */
-const PEN_PRIMARY_BUTTONS = 1;
 
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
@@ -216,10 +218,6 @@ export class DrawableCanvas {
   // held state that decides it — see syncEraserOverride.
   private _eraserOverride: ITool | null = null;
   private _eraserButtonsHeld: boolean = false;
-  // Barrel state read out of hover, and the contact flag that keeps a stroke
-  // from being mistaken for one — see syncPenBarrelFromHover.
-  private _penBarrelHeld: boolean = false;
-  private _penInContact: boolean = false;
 
   // While the stylus is on the glass — and briefly after — a hand resting on
   // the screen must drive nothing.
@@ -1431,9 +1429,6 @@ export class DrawableCanvas {
         this.state.change(InteractState.UsingTool, evt);
       }
       this.state.change(InteractState.Idle, evt);
-      if (evt.pointerType === 'pen') {
-        this._penInContact = false;
-      }
       // After the interaction ends, so the eraser gets to finish its own. A
       // barrel still held as the tip lifts keeps erasing into the next stroke.
       this.syncEraserOverride(evt);
@@ -1575,7 +1570,6 @@ export class DrawableCanvas {
    * unwound here, since the pen typically lands just after the hand does.
    */
   private beginPenContact(evt: PointerEvent) {
-    this._penInContact = true;
     this._palm.penDown(evt.pointerId, this._activeTouchPointers);
     if (this._activeTouchPointers.size > 0) {
       this._activeTouchPointers.clear();
@@ -1596,28 +1590,6 @@ export class DrawableCanvas {
   }
 
   /**
-   * Read the barrel button out of hover.
-   *
-   * The Android WebView reports an S Pen's barrel as the primary button — the
-   * same bit the tip sets — so while the pen is on the glass the two can't be
-   * told apart. Hover has no tip to confuse it with: a primary button held
-   * with nothing touching the screen is the barrel and nothing else. The
-   * reading is latched there and carried through the stroke that follows,
-   * which is the order the button is used in anyway — held first, then drawn
-   * with. A press or release made mid-stroke is invisible and stays that way
-   * until the pen lifts.
-   *
-   * Contact is taken from the pointerdown/up pair rather than from `pressure`,
-   * which some digitizers report as nonzero in hover.
-   */
-  private syncPenBarrelFromHover(evt: PointerEvent) {
-    if (this._penInContact || evt.type !== 'pointermove') {
-      return;
-    }
-    this._penBarrelHeld = (evt.buttons & PEN_PRIMARY_BUTTONS) !== 0;
-  }
-
-  /**
    * Track the erase-while-held buttons across every pen event.
    *
    * `button` names only the button that changed on that one event, and is
@@ -1629,9 +1601,7 @@ export class DrawableCanvas {
     if (evt.pointerType !== 'pen') {
       return;
     }
-    this.syncPenBarrelFromHover(evt);
-    const held =
-      this._penBarrelHeld || (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
+    const held = (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
     if (held === this._eraserButtonsHeld) {
       return;
     }
@@ -1648,7 +1618,7 @@ export class DrawableCanvas {
     } else {
       this.endEraserOverride();
     }
-    if (inFlight && evt.buttons & 1) {
+    if (inFlight && evt.buttons & PEN_CONTACT_BUTTONS) {
       this.state.change(InteractState.UsingTool, evt);
     }
   }
