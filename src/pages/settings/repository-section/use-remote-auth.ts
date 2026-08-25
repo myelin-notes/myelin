@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useMessages } from '@myelin/editor/i18n';
+import { Logger } from '@myelin/shared/logger';
 import { trackEvent } from '@/lib/analytics';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 
 export interface RemoteAuthState {
   tokenPresent: boolean;

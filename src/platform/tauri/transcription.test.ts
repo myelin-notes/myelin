@@ -29,7 +29,7 @@ vi.mock('@tauri-apps/api/event', () => ({
   }),
 }));
 
-vi.mock('@/lib/logger', () => ({
+vi.mock('@myelin/shared/logger', () => ({
   Logger: class {
     debug = loggerDebug;
     info = vi.fn();

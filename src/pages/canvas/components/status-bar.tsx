@@ -1,8 +1,8 @@
 import { memo } from 'react';
 import { Crosshair, ImageDown, Lock, Unlock } from 'lucide-react';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatNumber } from '@myelin/editor/i18n/format';
 import { IS_DEV } from '@/lib/env';
-import { useLocale, useMessages } from '@/lib/i18n';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface StatusBarProps {

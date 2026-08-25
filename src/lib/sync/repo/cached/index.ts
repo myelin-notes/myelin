@@ -1,14 +1,14 @@
 import * as Y from 'yjs';
-import { trackEvent } from '@/lib/analytics';
-import { Logger } from '@/lib/logger';
-import type { ReindexItem } from '@/platform';
-import { NoteSession } from '../../session';
+import type { ReindexItem } from '@myelin/editor/platform';
 import type {
   YjsSyncPushOptions,
   YjsSyncPushResult,
   YjsSyncSnapshot,
   YjsSyncTarget,
-} from '../../types';
+} from '@myelin/editor/sync/types';
+import { Logger } from '@myelin/shared/logger';
+import { trackEvent } from '@/lib/analytics';
+import { NoteSession } from '../../session';
 import type { BaseRepository } from '../base';
 import {
   type BatchedCommitTarget,

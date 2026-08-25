@@ -3,11 +3,13 @@ import { ChevronDown as ChevronDownIcon, Type as TypeIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
+import { useCustomColors } from '@myelin/editor/custom-colors';
 import type {
   TextElement,
   TextStyle,
 } from '@myelin/editor/elements/text/element';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
+import { useMessages } from '@myelin/editor/i18n';
 import {
   TEXT_COLORS,
   TEXT_FONT_SIZE_MAX,
@@ -16,8 +18,6 @@ import {
   TEXT_FONTS,
 } from '@myelin/editor/tools/text-tool';
 import { FontSizeField } from '@/components/font-size-field';
-import { useCustomColors } from '@/lib/custom-colors';
-import { useMessages } from '@/lib/i18n';
 
 interface TextStyleControlsProps {
   element: TextElement;

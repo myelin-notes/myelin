@@ -11,6 +11,16 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { type Messages, useMessages } from '@myelin/editor/i18n';
+import { keybindings } from '@myelin/editor/keybinds';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
+import {
+  isMac,
+  isWindows,
+  TAB_BAR_HEIGHT_CLASS,
+  TRAFFIC_LIGHT_INSET_CLASS,
+} from '@myelin/shared/os';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -20,16 +30,7 @@ import {
 import { errorDescription } from '@/components/command-palette/utils';
 import { useSidebar } from '@/components/layout/sidebar/context';
 import { trackEvent } from '@/lib/analytics';
-import { type Messages, useMessages } from '@/lib/i18n';
-import { keybindings } from '@/lib/keybinds';
-import { Logger } from '@/lib/logger';
 import { createBlankCanvasFile } from '@/lib/note/create';
-import {
-  isMac,
-  isWindows,
-  TAB_BAR_HEIGHT_CLASS,
-  TRAFFIC_LIGHT_INSET_CLASS,
-} from '@/lib/platform';
 import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import {
@@ -45,7 +46,6 @@ import {
   spawnWindow,
 } from '@/lib/tabs/multi-window';
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
-import { cn } from '@/lib/utils';
 import { UpdateButton } from './update-button';
 import { WindowControls } from './window-controls';
 

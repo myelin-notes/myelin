@@ -8,7 +8,8 @@ import {
   LoaderCircle,
   XCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMessages } from '@myelin/editor/i18n';
+import { Button } from '@myelin/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useMessages } from '@/lib/i18n';
 export type ConflictResolution = 'rename' | 'replace';
 
 export interface ImportProgress {

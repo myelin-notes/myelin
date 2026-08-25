@@ -11,15 +11,16 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { errorDescription } from '@/components/command-palette/utils';
-import { trackEvent } from '@/lib/analytics';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import {
   isMac,
   TAB_BAR_HEIGHT_CLASS,
   TRAFFIC_LIGHT_INSET_CLASS,
-} from '@/lib/platform';
+} from '@myelin/shared/os';
+import { errorDescription } from '@/components/command-palette/utils';
+import { trackEvent } from '@/lib/analytics';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
@@ -27,7 +28,6 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController } from '@/lib/tabs/context';
-import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from '@/pages/library/create-new-dropdown';
 import { ImportDialog } from '@/pages/library/import/dialog';
 import { useSidebar } from './context';

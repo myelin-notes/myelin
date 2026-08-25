@@ -1,10 +1,10 @@
+import { isWindows } from '@myelin/shared/os';
 import { emitTo, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import {
   getAllWebviewWindows,
   getCurrentWebviewWindow,
   WebviewWindow,
 } from '@tauri-apps/api/webviewWindow';
-import { isWindows } from '@/lib/platform';
 import type { Tab } from './types';
 
 // Fired by a window when it drops one of its tabs onto another window's area.

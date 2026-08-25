@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
+import type { UserPrefValue } from '@myelin/editor/user-prefs';
 import { useUserPref } from '@/lib/use-user-pref';
-import type { UserPrefValue } from '@/lib/user-prefs';
 
 export type ThemeMode = UserPrefValue<'theme'>;
 

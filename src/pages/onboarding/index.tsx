@@ -1,19 +1,19 @@
 import { useCallback, useState } from 'react';
-import { WindowControls } from '@/components/layout/window-controls';
-import { Button } from '@/components/ui/button';
-import { trackEvent } from '@/lib/analytics';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import { useMessages } from '@myelin/editor/i18n';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import {
   isMac,
   isWindows,
   TAB_BAR_HEIGHT_CLASS,
   TRAFFIC_LIGHT_INSET_CLASS,
-} from '@/lib/platform';
+} from '@myelin/shared/os';
+import { Button } from '@myelin/ui/button';
+import { WindowControls } from '@/components/layout/window-controls';
+import { trackEvent } from '@/lib/analytics';
 import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
-import { UserPrefs } from '@/lib/user-prefs';
-import { cn } from '@/lib/utils';
 import { PrivacyStep } from './privacy-step';
 import { SampleCanvasStep } from './sample-canvas-step';
 import { createStarterCanvasFile } from './starter-canvas';

@@ -3,10 +3,10 @@ import type {
   RecognizedPage,
   ReindexItem,
 } from '@myelin/editor/platform/types';
+import type { VFSNodeId } from '@myelin/editor/sync/types';
+import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { BaseDirectory, exists, readTextFile } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
-import type { VFSNodeId } from '@/lib/sync/types';
 
 const logger = new Logger('HandwritingService');
 

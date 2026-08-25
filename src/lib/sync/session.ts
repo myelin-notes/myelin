@@ -1,12 +1,21 @@
 import { summarizeYDocManager } from '@myelin/editor/note/state-summary';
 import {
+  noopTransport,
+  type Transport,
+} from '@myelin/editor/sync/live/transport';
+import type {
+  NoteSessionStatus,
+  VFSNodeId,
+  YjsSyncTarget,
+} from '@myelin/editor/sync/types';
+import {
   FRAGMENT_SWEEP_ORIGIN,
   PEER_ORIGIN,
   REPOSITORY_SYNC_ORIGIN,
   type SyncOrigin,
   YDocManager,
 } from '@myelin/editor/ydoc-manager';
-import { Logger } from '@/lib/logger';
+import { Logger } from '@myelin/shared/logger';
 import { getOrCreatePeerId } from './identity';
 import { type PeerSnapshot, PeerState } from './live/peer-state';
 import {
@@ -16,8 +25,6 @@ import {
   type PeerMode,
   type SyncMessage,
 } from './live/protocol';
-import { noopTransport, type Transport } from './live/transport';
-import type { NoteSessionStatus, VFSNodeId, YjsSyncTarget } from './types';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;

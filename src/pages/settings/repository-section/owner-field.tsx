@@ -1,4 +1,6 @@
 import { Building2, ChevronDown, Lock, User as UserIcon } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,9 +8,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useMessages } from '@/lib/i18n';
 import type { GitHubOrg, GitHubUser } from '@/lib/sync';
-import { cn } from '@/lib/utils';
 import { Avatar, FIELD_TRIGGER_CLASS, MenuLoadingRow } from './dropdown-field';
 
 export function OwnerField({

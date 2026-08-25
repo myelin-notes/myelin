@@ -3,6 +3,7 @@ import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
 } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
 import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
@@ -15,7 +16,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useMessages } from '@/lib/i18n';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface CanvasToolbarProps {

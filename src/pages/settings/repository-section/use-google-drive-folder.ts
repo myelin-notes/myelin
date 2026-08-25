@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import { useMessages } from '@myelin/editor/i18n';
+import { Logger } from '@myelin/shared/logger';
 import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   ensureGoogleDriveFolder,

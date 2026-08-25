@@ -1,6 +1,6 @@
 import posthog from 'posthog-js';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { MODE, POSTHOG_HOST, POSTHOG_KEY } from '@/lib/env';
-import { UserPrefs } from '@/lib/user-prefs';
 
 let initialized = false;
 

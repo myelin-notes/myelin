@@ -1,8 +1,8 @@
 import { ADAPTIVE_INK } from '@myelin/editor/canvas-theme';
 import { ElementType } from '@myelin/editor/elements/element-type';
+import type { Messages } from '@myelin/editor/i18n';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { Messages } from '@/lib/i18n';
 import type { Repository, VFSNodeId } from '@/lib/sync';
 
 type StarterCopy = Messages['onboarding']['starter'];

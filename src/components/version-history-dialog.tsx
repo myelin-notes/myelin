@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Clock3, ImageIcon, LoaderCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
+import { Button } from '@myelin/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -11,14 +13,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { trackEvent } from '@/lib/analytics';
-import { useLocale, useMessages } from '@/lib/i18n';
 import {
   type FileType,
   type FileVersion,
   useRepository,
   type VFSNodeId,
 } from '@/lib/sync';
-import { cn } from '@/lib/utils';
 
 interface VersionHistoryDialogProps {
   open: boolean;

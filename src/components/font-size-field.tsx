@@ -1,6 +1,6 @@
 import { type PointerEvent, useState } from 'react';
 import { Minus as MinusIcon, Plus as PlusIcon } from 'lucide-react';
-import { useMessages } from '@/lib/i18n';
+import { useMessages } from '@myelin/editor/i18n';
 
 interface FontSizeFieldProps {
   value: number;

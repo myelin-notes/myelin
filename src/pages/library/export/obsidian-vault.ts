@@ -3,8 +3,8 @@ import { ElementType } from '@myelin/editor/elements/element-type';
 import { serializeDocToMarkdownChunked } from '@myelin/editor/page-frame/markdown/serializer';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
+import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
-import { Logger } from '@/lib/logger';
 import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
 import {
   type ExportPlan,

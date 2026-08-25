@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ChevronRight, FileText, Folder } from 'lucide-react';
+import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { openNote } from '@/lib/note/navigation';
 import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
-import { cn } from '@/lib/utils';
 import { formatExplorerItemAccessibleName } from '@/pages/library/accessibility-labels';
 import { ItemContextMenu } from '@/pages/library/explorer/item-context-menu';
 import { TagList } from '@/pages/library/explorer/tag-list';

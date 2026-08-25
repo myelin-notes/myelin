@@ -18,6 +18,7 @@ import {
   TextElement,
   type TextStyle,
 } from '@myelin/editor/elements/text/element';
+import { useMessages } from '@myelin/editor/i18n';
 import type { Messages } from '@myelin/editor/i18n/messages';
 import {
   Tooltip,
@@ -25,7 +26,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useMessages } from '@/lib/i18n';
 import { TextStyleControls } from './text-style-controls';
 
 interface SelectionToolbarProps {

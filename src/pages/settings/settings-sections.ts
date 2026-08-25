@@ -11,8 +11,8 @@ import {
   Pointer,
   ShieldCheck,
 } from 'lucide-react';
+import { isTouchDevice } from '@myelin/shared/os';
 import { IS_MOBILE_BUILD } from '@/lib/env';
-import { isTouchDevice } from '@/lib/platform';
 
 export type SettingsSectionId =
   | 'appearance'

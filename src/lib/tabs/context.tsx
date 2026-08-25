@@ -7,9 +7,12 @@ import {
   useMemo,
   useSyncExternalStore,
 } from 'react';
+import {
+  NODES_DELETED_EVENT,
+  type NodesDeletedDetail,
+} from '@myelin/editor/events';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useKeybindings } from '@/hooks/useKeybindings';
-import { NODES_DELETED_EVENT, type NodesDeletedDetail } from '@/lib/events';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { createWindowStateWithTab, TabStateController } from './controller';
 import { listenForTabDrops } from './multi-window';

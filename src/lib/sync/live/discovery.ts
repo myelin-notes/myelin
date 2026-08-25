@@ -1,5 +1,5 @@
+import type { VFSNodeId } from '@myelin/editor/sync/types';
 import type { RepositoryConfig } from '../repo/config';
-import type { VFSNodeId } from '../types';
 
 export const LIVE_DISCOVERY_RECORD_TTL_MS = 10 * 60 * 1000;
 export const LIVE_DISCOVERY_MAX_RECORDS = 16;

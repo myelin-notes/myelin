@@ -1,11 +1,11 @@
 import * as Y from 'yjs';
+import type { NoteEmbedding } from '@myelin/editor/platform';
 import {
   createSearchIndex,
   type SearchField,
   type SearchHit,
   type SearchIndex,
 } from '@/lib/search';
-import type { NoteEmbedding } from '@/platform';
 import { addChild, dropNode, getChildIds, removeChild } from './child-index';
 import { MAX_CUSTOM_COLORS } from './config';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';

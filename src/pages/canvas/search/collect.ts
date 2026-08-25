@@ -4,7 +4,7 @@ import { AudioElement } from '@myelin/editor/elements/audio/element';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import { TextElement } from '@myelin/editor/elements/text/element';
 import { findTextMatches } from '@myelin/editor/page-frame/pm/search-highlight';
-import type { RecognizedPage } from '@/platform';
+import type { RecognizedPage } from '@myelin/editor/platform';
 
 export type CanvasSearchKind =
   | 'text'

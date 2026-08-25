@@ -6,8 +6,9 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   type FileType,
@@ -21,7 +22,6 @@ import {
   type VFSNode,
 } from '@/lib/sync';
 import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
-import { cn } from '@/lib/utils';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
 import { buildResultTree, type ResultTreeNode } from './result-tree';
 import { SidebarFileRow, SidebarFolderRow } from './tree-rows';

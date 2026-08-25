@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Logger } from '@/lib/logger';
+import {
+  regenerateThumbnailNow,
+  requestThumbnailRegeneration,
+} from '@myelin/editor/thumbnails';
+import { Logger } from '@myelin/shared/logger';
 import {
   type NoteSession,
   type Repository,
   useRepository,
   type VFSNodeId,
 } from '@/lib/sync';
-import {
-  regenerateThumbnailNow,
-  requestThumbnailRegeneration,
-} from '@/lib/thumbnails';
 import { saveSessionAndCreateVersion } from './session-version-history';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;

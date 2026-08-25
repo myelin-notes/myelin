@@ -6,9 +6,9 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { IS_MOBILE_BUILD } from '@/lib/env';
-import { UserPrefs } from '@/lib/user-prefs';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 export const SIDEBAR_MIN_WIDTH = 220;

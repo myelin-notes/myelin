@@ -1,5 +1,5 @@
 import type { SVGProps } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from '@myelin/editor/utils';
 
 interface LogoProps extends Omit<SVGProps<SVGSVGElement>, 'viewBox'> {
   size?: number;

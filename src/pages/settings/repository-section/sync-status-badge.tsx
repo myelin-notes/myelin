@@ -1,5 +1,5 @@
 import { AlertCircle, Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@myelin/editor/utils';
 
 export type SyncStatusTone = 'neutral' | 'success' | 'danger';
 

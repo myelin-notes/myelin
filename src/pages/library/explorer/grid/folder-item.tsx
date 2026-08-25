@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Folder } from 'lucide-react';
+import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
-import { cn } from '@/lib/utils';
 import { formatExplorerItemAccessibleName } from '../../accessibility-labels';
 import { TagManageDialog } from '../../tag-manage-dialog';
 import { ItemContextMenu } from '../item-context-menu';

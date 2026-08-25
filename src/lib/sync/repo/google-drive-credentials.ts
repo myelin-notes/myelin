@@ -1,3 +1,4 @@
+import { Logger } from '@myelin/shared/logger';
 import { fetch } from '@tauri-apps/plugin-http';
 import {
   GOOGLE_CLIENT_ID,
@@ -6,7 +7,6 @@ import {
   GOOGLE_CLIENT_SECRET,
   MOBILE_PLATFORM,
 } from '@/lib/env';
-import { Logger } from '@/lib/logger';
 import { createCredentialVault } from './credential-vault';
 import {
   credentialTokenKey,

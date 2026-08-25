@@ -20,13 +20,16 @@ import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
 import { setChromeMenuOpener } from '@myelin/editor/chrome-menu';
 import { useCanvasCommandContext } from '@myelin/editor/command-context';
+import { CustomColorsProvider } from '@myelin/editor/custom-colors';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@myelin/editor/events';
 import {
   type ExportTarget,
   setExportDialogOpener,
 } from '@myelin/editor/export/export-controller';
+import { useMessages } from '@myelin/editor/i18n';
 import { markdownImportHandler } from '@myelin/editor/media/markdown';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
 import {
@@ -35,8 +38,12 @@ import {
 } from '@myelin/editor/page-frame/note-link/preview';
 import type { NoteLinkOpenRequestDetail } from '@myelin/editor/page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from '@myelin/editor/page-frame/use-page-frame-autocomplete';
+import { getPlatform } from '@myelin/editor/platform';
+import { regenerateThumbnailNow } from '@myelin/editor/thumbnails';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { Logger } from '@myelin/shared/logger';
 import { usePresence } from '@myelin/ui';
-import { Button } from '@/components/ui/button';
+import { Button } from '@myelin/ui/button';
 import {
   Tooltip,
   TooltipContent,
@@ -45,20 +52,13 @@ import {
 } from '@/components/ui/tooltip';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
-import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
-import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
-import { regenerateThumbnailNow } from '@/lib/thumbnails';
 import { useUserPref } from '@/lib/use-user-pref';
-import { UserPrefs } from '@/lib/user-prefs';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
-import { getPlatform } from '@/platform';
 import { BacklinksChip } from './components/backlinks-chip';
 import { CanvasSearch } from './components/canvas-search';
 import { CanvasToolbar } from './components/canvas-toolbar';

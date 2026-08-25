@@ -8,11 +8,15 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { useCanvasCommandContext } from '@myelin/editor/command-context';
+import { useMessages } from '@myelin/editor/i18n';
+import {
+  type Action,
+  type ActionBinding,
+  keybindings,
+} from '@myelin/editor/keybinds';
+import { Logger } from '@myelin/shared/logger';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { trackEvent } from '@/lib/analytics';
-import { useMessages } from '@/lib/i18n';
-import { type Action, type ActionBinding, keybindings } from '@/lib/keybinds';
-import { Logger } from '@/lib/logger';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import { useRepository, useRepositoryStatus } from '@/lib/sync';
 import {

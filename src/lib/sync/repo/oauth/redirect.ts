@@ -1,7 +1,7 @@
+import { getMessages } from '@myelin/editor/i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { IS_MOBILE_BUILD } from '@/lib/env';
-import { getMessages } from '@/lib/i18n';
 
 /**
  * A reverse-DNS scheme is what RFC 8252 asks native apps to use, and it matches

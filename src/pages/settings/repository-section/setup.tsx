@@ -7,11 +7,12 @@ import {
   LogOut,
   X,
 } from 'lucide-react';
+import { type Messages, useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatNumber } from '@myelin/editor/i18n/format';
+import { cn } from '@myelin/editor/utils';
+import { Button } from '@myelin/ui/button';
 import { TimeAgo } from '@/components/time-ago';
-import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
-import { type Messages, useLocale, useMessages } from '@/lib/i18n';
 import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   GOOGLE_DRIVE_PROVIDER_NAME,
@@ -22,7 +23,6 @@ import {
   subscribeRepositoryConfig,
   useRepositoryStatus,
 } from '@/lib/sync';
-import { cn } from '@/lib/utils';
 import { AuthStatusBadge } from './auth-status-badge';
 import { BranchField } from './branch-field';
 import { FolderField } from './folder-field';

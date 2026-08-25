@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { ElementType } from '@myelin/editor/elements/element-type';
-import {
-  REPOSITORY_SYNC_ORIGIN,
-  YDocManager,
-} from '@myelin/editor/ydoc-manager';
-import { NoteSession } from './session';
 import type {
   VFSNodeId,
   YjsSyncPushOptions,
   YjsSyncPushResult,
   YjsSyncSnapshot,
-} from './types';
+} from '@myelin/editor/sync/types';
+import {
+  REPOSITORY_SYNC_ORIGIN,
+  YDocManager,
+} from '@myelin/editor/ydoc-manager';
+import { NoteSession } from './session';
 
 function createEmptySnapshot(doc: Y.Doc = new Y.Doc()): YjsSyncSnapshot {
   return {

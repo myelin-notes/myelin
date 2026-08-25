@@ -1,6 +1,6 @@
 import { beforeEach, vi } from 'vitest';
+import { setPlatform } from '@myelin/editor/platform';
 import { createFakePlatform } from '@myelin/editor/test/fake-platform';
-import { setPlatform } from '@/platform';
 import { resetFsCacheForTests } from '@/platform/tauri/fs-cache';
 
 // The `node` test environment has no DOMRect. Provide a minimal stand-in so

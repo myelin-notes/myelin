@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Plus as PlusIcon } from 'lucide-react';
+import { useCustomColors } from '@myelin/editor/custom-colors';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
+import { type Messages, useMessages } from '@myelin/editor/i18n';
 import { MAX_CUSTOM_COLORS } from '@myelin/editor/sync/repo/config';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import {
@@ -10,14 +12,12 @@ import {
   setToolOptionValue,
   type ToolOption,
 } from '@myelin/editor/tools/tool';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import {
   loadWheelToolIndices,
   saveWheelToolIndices,
 } from '@/components/tool-shelf';
 import type { WheelItem } from '@/components/wheel-picker';
-import { useCustomColors } from '@/lib/custom-colors';
-import { type Messages, useMessages } from '@/lib/i18n';
-import { UserPrefs } from '@/lib/user-prefs';
 
 function makeSizeChildren(
   tool: ITool,

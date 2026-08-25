@@ -1,10 +1,10 @@
 import { ArrowUpRight, Check, X } from 'lucide-react';
-import { useMessages } from '@/lib/i18n';
+import { useMessages } from '@myelin/editor/i18n';
+import { getPlatform } from '@myelin/editor/platform';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { useUserPref } from '@/lib/use-user-pref';
-import { UserPrefs } from '@/lib/user-prefs';
 import { ToggleRow } from '@/pages/settings/components/toggle-row';
 import { PRIVACY_POLICY_URL } from '@/pages/settings/sections/privacy-section';
-import { getPlatform } from '@/platform';
 import { StepHeader } from './step-header';
 
 export function PrivacyStep() {

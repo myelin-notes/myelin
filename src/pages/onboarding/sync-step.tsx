@@ -1,4 +1,4 @@
-import { useMessages } from '@/lib/i18n';
+import { useMessages } from '@myelin/editor/i18n';
 import { RepositorySetup } from '@/pages/settings/repository-section/setup';
 import { StepHeader } from './step-header';
 

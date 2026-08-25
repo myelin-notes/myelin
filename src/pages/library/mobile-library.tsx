@@ -15,7 +15,10 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatRelativeTime } from '@myelin/editor/i18n/format';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import { errorDescription } from '@/components/command-palette/utils';
 import { SidebarTags } from '@/components/layout/sidebar/sidebar-tags';
 import { useExplorerImports } from '@/components/layout/sidebar/use-explorer-imports';
@@ -26,8 +29,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
-import { useLocale, useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note/navigation';
 import {
   type FileType,
@@ -42,7 +43,6 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController } from '@/lib/tabs/context';
-import { cn } from '@/lib/utils';
 import { BetaFeedbackBanner } from './beta-feedback-banner';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {

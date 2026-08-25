@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
+import { cn } from '@myelin/editor/utils';
 import {
   PaneIdProvider,
   useTabController,
@@ -23,7 +24,6 @@ import type {
   PaneNode,
   SplitDirection,
 } from '@/lib/tabs/types';
-import { cn } from '@/lib/utils';
 import { HomePage } from '@/pages/home';
 import { PaneContent } from './pane';
 import { TabBar } from './tab-bar';

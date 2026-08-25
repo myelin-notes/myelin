@@ -1,7 +1,7 @@
 import { Command } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import { usePresence } from '@myelin/ui';
 import { IS_MOBILE_BUILD } from '@/lib/env';
-import { useMessages } from '@/lib/i18n';
 import { CommandPaletteList } from './list';
 import type { CommandPaletteDialogProps } from './types';
 

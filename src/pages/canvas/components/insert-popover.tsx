@@ -6,8 +6,8 @@ import {
   Mic as MicIcon,
   Sigma as SigmaIcon,
 } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import { getInsertHotkey } from '@myelin/editor/tools/tool-keybinds';
-import { useMessages } from '@/lib/i18n';
 
 interface InsertPopoverProps {
   onInsertFrame: () => void;

@@ -1,17 +1,20 @@
 import * as Y from 'yjs';
+import {
+  NODES_DELETED_EVENT,
+  type NodesDeletedDetail,
+} from '@myelin/editor/events';
 import { summarizeYDoc } from '@myelin/editor/note/state-summary';
-import { NODES_DELETED_EVENT, type NodesDeletedDetail } from '@/lib/events';
-import { Logger } from '@/lib/logger';
-import type { SearchIndex } from '@/lib/search';
-import { removeThumbnail } from '@/lib/thumbnails';
-import { getPlatform, type ReindexItem } from '@/platform';
-import { NoteSession } from '../session';
+import { getPlatform, type ReindexItem } from '@myelin/editor/platform';
 import type {
   YjsSyncPushOptions,
   YjsSyncPushResult,
   YjsSyncSnapshot,
   YjsSyncTarget,
-} from '../types';
+} from '@myelin/editor/sync/types';
+import { removeThumbnail } from '@myelin/editor/thumbnails';
+import { Logger } from '@myelin/shared/logger';
+import type { SearchIndex } from '@/lib/search';
+import { NoteSession } from '../session';
 import type {
   RepositoryLifecycle,
   RepositoryRuntimeStatus,

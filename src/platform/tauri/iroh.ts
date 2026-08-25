@@ -1,8 +1,11 @@
+import type {
+  Transport,
+  TransportEvents,
+} from '@myelin/editor/sync/live/transport';
+import type { VFSNodeId } from '@myelin/editor/sync/types';
+import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { Logger } from '@/lib/logger';
-import type { Transport, TransportEvents } from '@/lib/sync/live/transport';
-import type { VFSNodeId } from '@/lib/sync/types';
 
 type EventName = keyof TransportEvents;
 

@@ -3,8 +3,8 @@ import * as Y from 'yjs';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
+import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
-import { Logger } from '@/lib/logger';
 import type { ReadableRepository, VFSFileNode } from '@/lib/sync';
 import {
   BYTES_MARKER,

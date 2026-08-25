@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useThumbnailUrl } from '@myelin/editor/use-thumbnail-url';
+import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
@@ -10,8 +12,6 @@ import {
   type VFSFileNode,
 } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
-import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
-import { cn } from '@/lib/utils';
 import { formatExplorerItemAccessibleName } from '../../accessibility-labels';
 import { TagManageDialog } from '../../tag-manage-dialog';
 import { ItemContextMenu } from '../item-context-menu';

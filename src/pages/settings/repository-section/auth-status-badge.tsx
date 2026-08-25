@@ -1,5 +1,5 @@
 import { Check, Circle, Loader2 } from 'lucide-react';
-import { useMessages } from '@/lib/i18n';
+import { useMessages } from '@myelin/editor/i18n';
 
 export function AuthStatusBadge({
   hasToken,

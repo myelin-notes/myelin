@@ -1,3 +1,5 @@
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { Logger } from '@myelin/shared/logger';
 import { join } from '@tauri-apps/api/path';
 import { remove } from '@tauri-apps/plugin-fs';
 import {
@@ -5,8 +7,6 @@ import {
   type Client as StrongholdClient,
   type Store as StrongholdStore,
 } from '@tauri-apps/plugin-stronghold';
-import { Logger } from '@/lib/logger';
-import { UserPrefs } from '@/lib/user-prefs';
 import { getAppDataDir } from '@/platform/tauri/fs-cache';
 
 const logger = new Logger('CredentialVault');

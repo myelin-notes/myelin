@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Logger } from '@myelin/shared/logger';
 import { getVersion } from '@tauri-apps/api/app';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { IS_DEV, MOBILE_PLATFORM } from '@/lib/env';
-import { Logger } from '@/lib/logger';
 
 const logger = new Logger('Updater');
 

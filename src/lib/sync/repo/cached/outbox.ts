@@ -1,3 +1,4 @@
+import { Logger } from '@myelin/shared/logger';
 import {
   BaseDirectory,
   exists,
@@ -5,7 +6,6 @@ import {
   rename,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
 import { ensureDirOnce } from '@/platform/tauri/fs-cache';
 import { createNodeId } from '../shared';
 import type { VFSNodeId } from '../types';

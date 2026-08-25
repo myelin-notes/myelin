@@ -8,14 +8,14 @@ import {
 } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import type { ActionBinding } from '@myelin/editor/keybinds';
 import {
   clearSearchHighlight,
   setSearchHighlight,
 } from '@myelin/editor/page-frame/pm/search-highlight';
+import { getPlatform } from '@myelin/editor/platform';
 import { useKeybindings } from '@/hooks/useKeybindings';
-import type { ActionBinding } from '@/lib/keybinds';
 import type { VFSNodeId } from '@/lib/sync';
-import { getPlatform } from '@/platform';
 import {
   buildCanvasMatches,
   type CanvasMatch,

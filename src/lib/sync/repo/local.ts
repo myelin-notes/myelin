@@ -1,3 +1,4 @@
+import { Logger } from '@myelin/shared/logger';
 import { join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
@@ -10,7 +11,6 @@ import {
   writeFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
 import { ensureDirOnce, getAppDataDir } from '@/platform/tauri/fs-cache';
 import { BaseRepository } from './base';
 import {

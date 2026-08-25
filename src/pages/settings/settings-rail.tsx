@@ -1,5 +1,5 @@
-import { useMessages } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
 import { SETTINGS_SECTIONS } from './settings-sections';
 
 interface SettingsRailProps {

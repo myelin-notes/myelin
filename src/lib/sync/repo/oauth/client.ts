@@ -6,8 +6,8 @@
  * differ — GitHub stores a bare access token, Google a refresh token and expiry.
  */
 
+import { Logger } from '@myelin/shared/logger';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { Logger } from '@/lib/logger';
 import {
   deriveCodeChallenge,
   encodeFormBody,

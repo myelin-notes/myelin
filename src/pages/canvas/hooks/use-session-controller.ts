@@ -17,8 +17,9 @@ import {
 import { buildRenamePageFrameLinkReferencesTransaction } from '@myelin/editor/page-frame/pm/markdown/note-links';
 import { schema as pageFrameSchema } from '@myelin/editor/page-frame/pm/schema';
 import type { ITool } from '@myelin/editor/tools/tool';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
-import { Logger } from '@/lib/logger';
+import { Logger } from '@myelin/shared/logger';
 import type { NoteBacklink, NoteSession, VFSNodeId } from '@/lib/sync';
 import {
   type ActiveRepository,
@@ -26,7 +27,6 @@ import {
   useRepository,
 } from '@/lib/sync';
 import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-references';
-import { UserPrefs } from '@/lib/user-prefs';
 import type {
   RenameReferencesChoice,
   RenameReferencesPrompt,

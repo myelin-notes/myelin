@@ -9,7 +9,7 @@ import {
   type PdfPageSize,
 } from '@myelin/editor/pdf-renderer';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
-import { Logger } from '@/lib/logger';
+import { Logger } from '@myelin/shared/logger';
 import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
 
 const logger = new Logger('PdfImport');
