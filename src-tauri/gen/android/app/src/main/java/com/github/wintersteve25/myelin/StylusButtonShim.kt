@@ -1,5 +1,6 @@
 package com.github.wintersteve25.myelin
 
+import android.view.InputDevice
 import android.view.MotionEvent
 
 /**
@@ -28,6 +29,14 @@ import android.view.MotionEvent
  */
 object StylusButtonShim {
   /**
+   * Temporary: reports what the native side sees to the on-screen debug panel,
+   * since the values a device puts in buttonState are not worth guessing at
+   * across round trips. Delete along with PenDebugPanel.
+   */
+  var onEvent: ((String) -> Unit)? = null
+  private var lastReported: String? = null
+
+  /**
    * The event to hand the WebView in place of [event].
    *
    * Returns [event] itself when there is nothing to correct, a replacement the
@@ -35,7 +44,9 @@ object StylusButtonShim {
    * be delivered at all.
    */
   fun forWebView(event: MotionEvent): MotionEvent? {
-    if (!hasStylusButton(event)) {
+    val stylusButton = hasStylusButton(event)
+    report(event, stylusButton)
+    if (!stylusButton) {
       return event
     }
     // Button press/release carry no movement of their own and exist only to
@@ -49,14 +60,66 @@ object StylusButtonShim {
     return asEraser(event)
   }
 
+  /** Every event whose button or tool state differs from the one before it. */
+  private fun report(event: MotionEvent, rewriting: Boolean) {
+    val listener = onEvent ?: return
+    val signature =
+      "${event.actionMasked}:${event.buttonState}:${event.actionButton}:" +
+        "${event.getToolType(0)}:${event.source}"
+    if (signature == lastReported) {
+      return
+    }
+    lastReported = signature
+    listener(
+      "${actionName(event.actionMasked)} tool=${event.getToolType(0)} " +
+        "src=0x${event.source.toString(16)} bs=${event.buttonState} " +
+        "ab=${event.actionButton}${if (rewriting) " -> eraser" else ""}"
+    )
+  }
+
+  private fun actionName(action: Int) = when (action) {
+    MotionEvent.ACTION_DOWN -> "down"
+    MotionEvent.ACTION_MOVE -> "move"
+    MotionEvent.ACTION_UP -> "up"
+    MotionEvent.ACTION_CANCEL -> "cancel"
+    MotionEvent.ACTION_HOVER_ENTER -> "hover-in"
+    MotionEvent.ACTION_HOVER_MOVE -> "hover"
+    MotionEvent.ACTION_HOVER_EXIT -> "hover-out"
+    MotionEvent.ACTION_BUTTON_PRESS -> "btn-down"
+    MotionEvent.ACTION_BUTTON_RELEASE -> "btn-up"
+    else -> "a$action"
+  }
+
+  /**
+   * Any button but the tip's own, on anything that came from a stylus.
+   *
+   * Which bit a barrel press lands on is not worth predicting: BUTTON_SECONDARY
+   * and BUTTON_STYLUS_PRIMARY are both in use across vendors, and a device that
+   * reports one may report the other in a later firmware. No stylus button
+   * should do anything but erase, so they are all treated alike — except
+   * BUTTON_PRIMARY, which some devices set for the tip itself, and which would
+   * turn every ordinary stroke into an erase.
+   *
+   * The gate is the input source rather than the tool type, because the tool
+   * type is one of the things a device may misreport while a button is held.
+   */
   private fun hasStylusButton(event: MotionEvent): Boolean {
-    if (event.getToolType(0) != MotionEvent.TOOL_TYPE_STYLUS) {
+    if (!isFromStylus(event)) {
       return false
     }
     // On release the button is already out of buttonState, so the event that
     // reports it names it in actionButton instead.
     val buttons = event.buttonState or event.actionButton
-    return (buttons and MotionEvent.BUTTON_STYLUS_PRIMARY) != 0
+    return (buttons and MotionEvent.BUTTON_PRIMARY.inv()) != 0
+  }
+
+  private fun isFromStylus(event: MotionEvent): Boolean {
+    if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
+      return true
+    }
+    val toolType = event.getToolType(0)
+    return toolType == MotionEvent.TOOL_TYPE_STYLUS ||
+      toolType == MotionEvent.TOOL_TYPE_ERASER
   }
 
   /**

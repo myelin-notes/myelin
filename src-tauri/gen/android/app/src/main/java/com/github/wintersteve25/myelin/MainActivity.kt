@@ -2,12 +2,27 @@ package com.github.wintersteve25.myelin
 
 import android.os.Bundle
 import android.view.MotionEvent
+import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
+import org.json.JSONObject
 
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+  }
+
+  // Temporary: pipes what the shim sees into the on-screen debug panel. Both
+  // sides run on the UI thread, so the call needs no hop. Delete along with
+  // PenDebugPanel.
+  override fun onWebViewCreate(webView: WebView) {
+    super.onWebViewCreate(webView)
+    StylusButtonShim.onEvent = { line ->
+      webView.evaluateJavascript(
+        "window.__stylusNative && window.__stylusNative(${JSONObject.quote(line)})",
+        null,
+      )
+    }
   }
 
   // Stylus events are corrected before the WebView ever sees them — contact
