@@ -112,10 +112,11 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           stroke. This swallows that tap. Sits below the toolbar's own z-100 so
           the tools stay live while a panel is open. Shelf and insert close
           themselves on an outside pointerdown; the options panel has no such
-          handler. */}
+          handler. Needs touch-none: without it a drag starting on the scrim
+          is handed to WebKit, which scrolls the whole webview. */}
       {compact && (optionsOpen || shelfOpen || insertOpen) && (
         <div
-          className="fixed inset-0 z-[99]"
+          className="fixed inset-0 z-[99] touch-none"
           onPointerDown={() => {
             if (optionsOpen) {
               onToggleOptions();
