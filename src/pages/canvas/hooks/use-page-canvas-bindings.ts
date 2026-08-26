@@ -11,8 +11,9 @@ const PEN_HOLD_SLOP = 6;
 // a tip, and pausing part-way through a pan is ordinary.
 const TOUCH_HOLD_MS = 450;
 const TOUCH_HOLD_SLOP = 10;
-/** PointerEvent.button for a stylus barrel button. */
-const PEN_BARREL_BUTTON = 2;
+// PointerEvent.buttons bit for a second barrel button, which reports as the middle button. The
+// primary barrel erases while held (the canvas owns that), so the wheel gets the one above it.
+const PEN_WHEEL_BUTTONS = 4;
 
 interface UsePageCanvasBindingsArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -57,12 +58,14 @@ export function usePageCanvasBindings({
       }
       return;
     }
-    // A stylus barrel button is the pen-side right-click, so it opens the wheel outright rather than
-    // waiting out the hold. Apple Pencils have no barrel button; S Pen / Surface Pen / Wacom do.
-    if (event.pointerType === 'pen' && event.button === PEN_BARREL_BUTTON) {
+    if (event.pointerType === 'pen' && event.buttons & PEN_WHEEL_BUTTONS) {
       openToolWheel(event);
     }
   });
+
+  const penIsErasing = useEffectEvent(
+    () => drawableCanvasRef.current?.penIsErasing ?? false,
+  );
 
   const handleCanvasDrop = useEffectEvent((event: DragEvent) => {
     event.preventDefault();
@@ -109,9 +112,9 @@ export function usePageCanvasBindings({
       // A second finger down means the viewport owns the gesture as a pinch,
       // so this also disarms a hold the first finger had started.
       cancelHold();
-      // Button 0 is the pen tip: the barrel opens the wheel on its own, and the
-      // eraser end is there to erase, so neither arms the hold.
       const isPen = event.pointerType === 'pen';
+      // Button 0 is the pen tip; the eraser end reports its own, so flipping the pen over to erase
+      // doesn't arm the hold.
       if (
         (!isPen && event.pointerType !== 'touch') ||
         event.button !== 0 ||
@@ -128,6 +131,11 @@ export function usePageCanvasBindings({
       holdTimer = setTimeout(
         () => {
           cancelHold();
+          // Checked at fire time, not when the hold was armed: a barrel pressed after the tip
+          // landed starts an erase mid-wait, and pausing mid-erase must not open the wheel.
+          if (isPen && penIsErasing()) {
+            return;
+          }
           openToolWheel(event);
         },
         isPen ? PEN_HOLD_MS : TOUCH_HOLD_MS,

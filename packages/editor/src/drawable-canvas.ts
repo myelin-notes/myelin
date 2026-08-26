@@ -57,11 +57,19 @@ const ELEMENT_Z_ORDER_KEY = 'zOrder';
 /** Screen-pixel travel a finger may drift and still count as a tap. */
 const TOUCH_TAP_SLOP = 8;
 
-// Stylus eraser end (Pointer Events L3). S Pen / Surface Pen / Wacom set it; Apple Pencil never does.
-const PEN_ERASER_BUTTONS = 32;
+// Buttons that erase for as long as they are held: the eraser end (Pointer Events L3; S Pen /
+// Surface Pen / Wacom set it, Apple Pencil never does) and a barrel button. Also the contract the
+// native layer rewrites to where the WebView hides a stylus button — see StylusEventRewriter.kt.
+const PEN_ERASER_BUTTONS = 32 | 2;
 
-/** PointerEvent.button for a stylus barrel button — the pen-side right-click. */
-const PEN_BARREL_BUTTON = 2;
+/**
+ * The bits that mean the stylus is on the glass: its tip, or its eraser end,
+ * which replaces the tip bit rather than joining it.
+ */
+const PEN_CONTACT_BUTTONS = 1 | 32;
+
+/** A second barrel button reports as the middle button, and opens the wheel. */
+const PEN_WHEEL_BUTTONS = 4;
 
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
@@ -189,8 +197,12 @@ export class DrawableCanvas {
   // discards the interaction instead of committing it.
   private _abortingInteraction: boolean = false;
 
-  // The tool to hand back when the stylus's eraser end lifts.
+  // The tool to hand back when the eraser end or barrel button lifts, and the
+  // held state that decides it — see syncEraserOverride.
   private _eraserOverride: ITool | null = null;
+  private _eraserButtonsHeld: boolean = false;
+  // Lets the contact edges a chorded button hides be spotted — see syncPenChordedContact.
+  private _penContactOpen: boolean = false;
 
   // While the stylus is on the glass — and briefly after — a hand resting on
   // the screen must drive nothing.
@@ -1196,6 +1208,11 @@ export class DrawableCanvas {
       if (this._palm.isKnownPalm(evt.pointerId)) {
         return;
       }
+      // Before the update, so a barrel pressed mid-gesture hands the rest of it to the tool that
+      // just took over. Android never gets here: StylusEventRewriter.kt pins a contact's tool type
+      // at touchdown.
+      this.syncEraserOverride(evt);
+      this.syncPenChordedContact(evt);
       this.screenPosition = this.viewport.getScreenPoint(evt);
       this.state.update(evt);
       if (evt.target === canvas) {
@@ -1278,16 +1295,19 @@ export class DrawableCanvas {
           break;
         }
         case 'pen':
-          // The barrel button opens the tool wheel (the app layer listens for it) and must not also lay
-          // down a mark. Pressing it mid-stroke lands here too.
-          if (evt.button === PEN_BARREL_BUTTON) {
+          // A second barrel button opens the tool wheel (the app layer listens for it) and must
+          // not also lay down a mark.
+          if (evt.buttons & PEN_WHEEL_BUTTONS) {
             break;
           }
-          // Flipping the stylus over to its eraser end swaps the tool for as
-          // long as that end is down, then hands the previous tool back.
-          if (evt.buttons & PEN_ERASER_BUTTONS) {
-            this.beginEraserOverride();
+          this.syncEraserOverride(evt);
+          // A button pressed while the pen hovers fires a pointerdown of its own, but nothing is
+          // touching the glass, so no tool may run. The override above still applies, so the ring
+          // previews where the eraser would bite.
+          if (!(evt.buttons & PEN_CONTACT_BUTTONS)) {
+            break;
           }
+          this._penContactOpen = true;
           this.beginPenContact(evt);
           this.state.change(InteractState.UsingTool, evt);
           this.state.update(evt);
@@ -1318,7 +1338,7 @@ export class DrawableCanvas {
       this._activeTouchPointers.delete(evt.pointerId);
       // A palm drove nothing, so its lift must end nothing: this window handler would otherwise finish
       // the stylus's live stroke the moment the hand shifted.
-      if (this._palm.pointerUp(evt.pointerId)) {
+      if (this._palm.pointerUp(evt.pointerId, evt.pointerType === 'pen')) {
         return;
       }
       // A finger that lifts without dragging is a tap: run it through the select tool. Dragging pans
@@ -1335,8 +1355,12 @@ export class DrawableCanvas {
         this.state.change(InteractState.UsingTool, evt);
       }
       this.state.change(InteractState.Idle, evt);
-      // After the interaction ends, so the eraser gets to finish its own.
-      this.endEraserOverride();
+      if (evt.pointerType === 'pen') {
+        this._penContactOpen = false;
+      }
+      // After the interaction ends, so the eraser gets to finish its own. A
+      // barrel still held as the tip lifts keeps erasing into the next stroke.
+      this.syncEraserOverride(evt);
     };
     window.addEventListener('pointerup', this._handlePointerUp);
     // iOS fires pointercancel, not pointerup, for touches it absorbs into a system gesture; without
@@ -1475,8 +1499,73 @@ export class DrawableCanvas {
     }
   }
 
-  // Deliberately not `switchTool`: flipping the pen over shouldn't clear the selection or move
-  // the toolbar highlight, and the on-canvas eraser ring is feedback enough.
+  /** Whether the pen's barrel or eraser end is currently forcing the eraser. */
+  public get penIsErasing(): boolean {
+    return this._eraserButtonsHeld;
+  }
+
+  /**
+   * Open and close a pen contact that a held button hid.
+   *
+   * With a barrel already down, the tip landing takes `buttons` from 2 to 3 — a chorded transition
+   * fires `pointermove`, not `pointerdown` — and lifting the tip with the button still held fires a
+   * move rather than a `pointerup`. Neither edge reaches the handlers that open and close a contact.
+   */
+  private syncPenChordedContact(evt: PointerEvent) {
+    if (evt.pointerType !== 'pen') {
+      return;
+    }
+    const contact = (evt.buttons & PEN_CONTACT_BUTTONS) !== 0;
+    if (contact === this._penContactOpen) {
+      return;
+    }
+    if (contact) {
+      if (this.state.current !== InteractState.Idle) {
+        return;
+      }
+      this._penContactOpen = true;
+      this.beginPenContact(evt);
+      this.state.change(InteractState.UsingTool, evt);
+      return;
+    }
+    this._penContactOpen = false;
+    this.state.change(InteractState.Idle, evt);
+    this._palm.pointerUp(evt.pointerId, true);
+  }
+
+  /**
+   * Track the erase-while-held buttons across every pen event.
+   *
+   * `button` names only the button that changed, and is absent when it was already held as the tip
+   * landed — the ordinary way an S Pen is used. `buttons` carries the held state on every event,
+   * hover included, so both edges are visible wherever they happen.
+   */
+  private syncEraserOverride(evt: PointerEvent) {
+    if (evt.pointerType !== 'pen') {
+      return;
+    }
+    const held = (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
+    if (held === this._eraserButtonsHeld) {
+      return;
+    }
+    this._eraserButtonsHeld = held;
+    // Swapping the tool mid-interaction would hand the new one an interaction the old one opened.
+    const inFlight = this.state.current === InteractState.UsingTool;
+    if (inFlight) {
+      this.state.change(InteractState.Idle, evt);
+    }
+    if (held) {
+      this.beginEraserOverride();
+    } else {
+      this.endEraserOverride();
+    }
+    if (inFlight && evt.buttons & PEN_CONTACT_BUTTONS) {
+      this.state.change(InteractState.UsingTool, evt);
+    }
+  }
+
+  // Deliberately not `switchTool`: erasing this way shouldn't clear the selection or move the
+  // toolbar highlight, and the on-canvas eraser ring is feedback enough.
   private beginEraserOverride() {
     const eraser = this.tools.find((t) => t.id === 'eraser');
     if (!eraser || this._eraserOverride || this.toolSelected === eraser) {
@@ -1518,7 +1607,10 @@ export class DrawableCanvas {
   public switchTool(to: number) {
     // An explicit switch wins over a live eraser-end override, or lifting the
     // stylus would silently restore the tool the user just switched away from.
+    // The held flag goes with it: left set, the button's next edge would look
+    // like no change at all and the override could never re-engage.
     this._eraserOverride = null;
+    this._eraserButtonsHeld = false;
     this.toolSelected.interrupt(this);
     const next = this.tools[to];
     // A tool that pushes options onto the selection (the text tool) needs it to survive the switch,

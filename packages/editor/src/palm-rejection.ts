@@ -1,6 +1,6 @@
-// A palm leaves the glass a moment after the pen does; without a grace window that trailing
-// contact reads as a fresh gesture and pans the canvas out from under the last stroke.
-const GRACE_MS = 500;
+// Covers only a hand settling into a *new* contact just after the tip leaves — one already resting
+// is a known palm. That lands within a few frames; every ms beyond is time the user cannot pan.
+const GRACE_MS = 150;
 
 /**
  * Rejection is driven entirely by stylus *contact*, never by hover: a pen held near the page while
@@ -12,23 +12,28 @@ export class PalmRejection {
   private penLiftedAt: number = 0;
   private readonly palmIds = new Set<number>();
 
+  public get penContact(): boolean {
+    return this.penPointerId !== null;
+  }
+
   public get suppressed(): boolean {
     return (
       this.penPointerId !== null || Date.now() - this.penLiftedAt < GRACE_MS
     );
   }
 
-  // A touch that first appears while the stylus is on the page stays rejected for its whole life —
-  // a hand that outlasts the grace window must not spring awake underneath the pen.
+  // A touch that first appears while the stylus is down stays rejected for its whole life — a hand
+  // that outlasts the grace window must not spring awake under the pen. One appearing only within
+  // the window is turned away without being remembered, so it goes live when the window closes.
   public isPalm(pointerId: number): boolean {
     if (this.palmIds.has(pointerId)) {
       return true;
     }
-    if (this.suppressed) {
+    if (this.penPointerId !== null) {
       this.palmIds.add(pointerId);
       return true;
     }
-    return false;
+    return this.suppressed;
   }
 
   public isKnownPalm(pointerId: number): boolean {
@@ -44,9 +49,18 @@ export class PalmRejection {
     }
   }
 
-  /** Returns true when the lifted pointer was a rejected palm. */
-  public pointerUp(pointerId: number): boolean {
-    if (pointerId === this.penPointerId) {
+  /**
+   * Returns true when the lifted pointer was a rejected palm.
+   *
+   * Any stylus lift ends the contact, even under an id that doesn't match the one that landed:
+   * Android renumbers a pointer when a stylus changes tool type mid-gesture, and the pen would
+   * otherwise stay recorded on the glass, rejecting every finger until the next stylus contact.
+   */
+  public pointerUp(pointerId: number, isPen: boolean = false): boolean {
+    if (
+      pointerId === this.penPointerId ||
+      (isPen && this.penPointerId !== null)
+    ) {
       this.penPointerId = null;
       this.penLiftedAt = Date.now();
     }

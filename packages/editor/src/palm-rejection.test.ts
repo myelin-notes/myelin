@@ -51,13 +51,27 @@ describe('PalmRejection', () => {
     palm.penDown(PEN, []);
     palm.pointerUp(PEN);
 
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(100);
     expect(palm.suppressed).toBe(true);
     expect(palm.isPalm(FINGER)).toBe(true);
 
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(100);
     expect(palm.suppressed).toBe(false);
     expect(palm.isPalm(FINGER + 1)).toBe(false);
+  });
+
+  it('does not condemn a touch that lands in the grace window', () => {
+    const palm = new PalmRejection();
+    palm.penDown(PEN, []);
+    palm.pointerUp(PEN);
+
+    // Turned away while the window is open...
+    expect(palm.isPalm(FINGER)).toBe(true);
+    expect(palm.isKnownPalm(FINGER)).toBe(false);
+
+    // ...but the same finger, still down, is live once it closes.
+    vi.advanceTimersByTime(200);
+    expect(palm.isPalm(FINGER)).toBe(false);
   });
 
   it('reports whether a lifted pointer was a rejected palm', () => {
@@ -69,6 +83,22 @@ describe('PalmRejection', () => {
     // Forgotten on lift, so the id is free to be reused by a real touch.
     expect(palm.isKnownPalm(PALM)).toBe(false);
     expect(palm.pointerUp(PEN)).toBe(false);
+  });
+
+  it('ends the contact when a stylus lifts under a different id', () => {
+    const palm = new PalmRejection();
+    palm.penDown(PEN, []);
+    palm.pointerUp(PEN + 1, true);
+
+    expect(palm.penContact).toBe(false);
+  });
+
+  it('leaves the contact alone when a finger lifts', () => {
+    const palm = new PalmRejection();
+    palm.penDown(PEN, []);
+    palm.pointerUp(FINGER, false);
+
+    expect(palm.penContact).toBe(true);
   });
 
   it('stays out of the way of a second stylus contact', () => {
