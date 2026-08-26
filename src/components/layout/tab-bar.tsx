@@ -276,7 +276,7 @@ export const TabBar = memo(function TabBar({
         </div>
       ) : (
         <div
-          className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
+          className="flex min-w-0 items-end gap-px overflow-x-auto overflow-y-hidden pl-2"
           style={{ scrollbarWidth: 'none' }}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
