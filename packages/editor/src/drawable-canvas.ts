@@ -1502,11 +1502,6 @@ export class DrawableCanvas {
     }
   }
 
-  /** The tool actually receiving input, eraser override included. */
-  public get activeToolId(): string {
-    return this.toolSelected.id;
-  }
-
   /** Whether the pen's barrel or eraser end is currently forcing the eraser. */
   public get penIsErasing(): boolean {
     return this._eraserButtonsHeld;

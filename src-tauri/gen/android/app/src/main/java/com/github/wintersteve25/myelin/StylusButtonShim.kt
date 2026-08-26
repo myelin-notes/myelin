@@ -29,21 +29,6 @@ import android.view.MotionEvent
  */
 object StylusButtonShim {
   /**
-   * Temporary: reports what the native side sees to the on-screen debug panel,
-   * since the values a device puts in buttonState are not worth guessing at
-   * across round trips. Delete along with PenDebugPanel.
-   */
-  var onEvent: ((String) -> Unit)? = null
-  private var lastReported: String? = null
-
-  /** Drops the debug listener and any half-finished gesture. */
-  fun reset() {
-    onEvent = null
-    lastReported = null
-    contactToolType = MotionEvent.TOOL_TYPE_UNKNOWN
-  }
-
-  /**
    * The tool type every stylus pointer must report for the contact in
    * progress, or TOOL_TYPE_UNKNOWN between contacts.
    *
@@ -82,7 +67,6 @@ object StylusButtonShim {
         action == MotionEvent.ACTION_BUTTON_RELEASE) {
       // These carry no movement and exist only to announce the button — which
       // is the announcement Chromium turns into a right-click.
-      report(event, hasButton)
       return if (hasButton) null else event
     }
 
@@ -104,7 +88,6 @@ object StylusButtonShim {
     // A button pressed mid-stroke can no longer change the tool type, but it
     // still has to be hidden, or Chromium starts its right-click on the spot.
     val rewriting = hasButton || disagreesWith(event, toolType)
-    report(event, rewriting)
     return if (rewriting) rebuilt(event, toolType) else event
   }
 
@@ -143,43 +126,6 @@ object StylusButtonShim {
     return false
   }
 
-  /** Every event whose button or tool state differs from the one before it. */
-  private fun report(event: MotionEvent, rewriting: Boolean) {
-    val listener = onEvent ?: return
-    val signature =
-      "${event.actionMasked}:${event.actionIndex}:${event.pointerCount}:" +
-        "${event.buttonState}:${event.actionButton}:" +
-        "${event.getToolType(0)}:${event.source}"
-    if (signature == lastReported) {
-      return
-    }
-    lastReported = signature
-    val line =
-      "${actionName(event.actionMasked)} tool=${event.getToolType(0)} " +
-        "src=0x${event.source.toString(16)} bs=${event.buttonState} " +
-        "ab=${event.actionButton}${if (rewriting) " -> rewritten" else ""}"
-    // The WebView this reports into may already be torn down, and a throw here
-    // would come out of touch dispatch and take the app with it.
-    try {
-      listener(line)
-    } catch (e: Exception) {
-      onEvent = null
-    }
-  }
-
-  private fun actionName(action: Int) = when (action) {
-    MotionEvent.ACTION_DOWN -> "down"
-    MotionEvent.ACTION_MOVE -> "move"
-    MotionEvent.ACTION_UP -> "up"
-    MotionEvent.ACTION_CANCEL -> "cancel"
-    MotionEvent.ACTION_HOVER_ENTER -> "hover-in"
-    MotionEvent.ACTION_HOVER_MOVE -> "hover"
-    MotionEvent.ACTION_HOVER_EXIT -> "hover-out"
-    MotionEvent.ACTION_BUTTON_PRESS -> "btn-down"
-    MotionEvent.ACTION_BUTTON_RELEASE -> "btn-up"
-    else -> "a$action"
-  }
-
   /**
    * Any button but the tip's own, on anything that came from a stylus.
    *
@@ -196,7 +142,7 @@ object StylusButtonShim {
    * BUTTON_TERTIARY is included, which means a second barrel button erases
    * here rather than opening the tool wheel as it does elsewhere. Narrowing
    * the mask would be better, but not before a device tells us which bit its
-   * barrel actually uses — the debug panel's `bs=` reports it.
+   * barrel actually uses.
    */
   private fun hasStylusButton(event: MotionEvent): Boolean {
     if (!isFromStylus(event)) {
