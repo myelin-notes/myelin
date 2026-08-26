@@ -14,6 +14,14 @@ interface ViewAnimation {
   stop: () => void;
 }
 
+// WebKit reports a macOS trackpad pinch as these, never as ctrl+wheel. `scale` is cumulative
+// from `gesturestart`.
+interface WebKitGestureEvent extends UIEvent {
+  scale: number;
+  clientX: number;
+  clientY: number;
+}
+
 /**
  * Camera state for the canvas. Pointer-drag panning lives in DrawableCanvas's pointer state
  * machine and calls `panBy()` here — deciding pan vs tool gesture is a scene concern, not a
@@ -35,6 +43,10 @@ export class CanvasViewport {
   private _touchPanLast: Vector2 | null = null;
   private _touchPinchLastDist: number | null = null;
 
+  // iOS fires both streams for one pinch; the touch path owns it there, so gesture* stands down.
+  private _touchPinching: boolean = false;
+  private _gestureLastScale: number | null = null;
+
   private _onZoomChange?: (zoom: number) => void;
   private _viewListeners = new Set<() => void>();
   private _zoomLocked: boolean = false;
@@ -50,6 +62,9 @@ export class CanvasViewport {
   private readonly _handleTouchStart: (evt: TouchEvent) => void;
   private readonly _handleTouchMove: (evt: TouchEvent) => void;
   private readonly _handleTouchEnd: (evt: TouchEvent) => void;
+  private readonly _handleGestureStart: (evt: WebKitGestureEvent) => void;
+  private readonly _handleGestureChange: (evt: WebKitGestureEvent) => void;
+  private readonly _handleGestureEnd: (evt: WebKitGestureEvent) => void;
 
   public constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -92,6 +107,9 @@ export class CanvasViewport {
     // Single-finger touch is left alone — DrawableCanvas pans the free canvas with one finger, and
     // in edit mode the contentEditable uses it for cursor placement / selection.
     this._handleTouchStart = (evt) => {
+      // Before the suppression bail: gesture* must stand down for any two-finger touch, not just
+      // the ones the camera acts on.
+      this._touchPinching = evt.touches.length >= 2;
       // A hand resting on the screen while the stylus draws reads as a multi-touch blob, which would
       // pinch and pan the camera out from under the stroke.
       if (this._touchSuppressedProvider?.()) {
@@ -172,7 +190,34 @@ export class CanvasViewport {
       if (evt.touches.length < 2) {
         this._touchPanLast = null;
         this._touchPinchLastDist = null;
+        this._touchPinching = false;
       }
+    };
+
+    this._handleGestureStart = (evt) => {
+      evt.preventDefault();
+      if (this._touchPinching) {
+        return;
+      }
+      this.cancelAnimation();
+      this._gestureLastScale = evt.scale;
+    };
+
+    this._handleGestureChange = (evt) => {
+      evt.preventDefault();
+      if (this._gestureLastScale == null || this._zoomLocked) {
+        return;
+      }
+      this.zoomAroundPoint(
+        this._zoom * (evt.scale / this._gestureLastScale),
+        this.getScreenPoint(evt),
+      );
+      this._gestureLastScale = evt.scale;
+    };
+
+    this._handleGestureEnd = (evt) => {
+      evt.preventDefault();
+      this._gestureLastScale = null;
     };
 
     this._gestureTarget.addEventListener(
@@ -193,6 +238,21 @@ export class CanvasViewport {
     this._gestureTarget.addEventListener(
       'touchend',
       this._handleTouchEnd as EventListener,
+    );
+    this._gestureTarget.addEventListener(
+      'gesturestart',
+      this._handleGestureStart as EventListener,
+      { passive: false },
+    );
+    this._gestureTarget.addEventListener(
+      'gesturechange',
+      this._handleGestureChange as EventListener,
+      { passive: false },
+    );
+    this._gestureTarget.addEventListener(
+      'gestureend',
+      this._handleGestureEnd as EventListener,
+      { passive: false },
     );
   }
 
@@ -453,6 +513,18 @@ export class CanvasViewport {
     this._gestureTarget.removeEventListener(
       'touchend',
       this._handleTouchEnd as EventListener,
+    );
+    this._gestureTarget.removeEventListener(
+      'gesturestart',
+      this._handleGestureStart as EventListener,
+    );
+    this._gestureTarget.removeEventListener(
+      'gesturechange',
+      this._handleGestureChange as EventListener,
+    );
+    this._gestureTarget.removeEventListener(
+      'gestureend',
+      this._handleGestureEnd as EventListener,
     );
   }
 
