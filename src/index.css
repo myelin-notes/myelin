@@ -6,6 +6,7 @@
 /* Shared package emits class-name constants (e.g. the tab-bar height and
    traffic-light inset); scan it too or those classes go ungenerated. */
 @source "../packages/shared/src/**/*.{ts,tsx}";
+@source "../packages/ui/src/**/*.{ts,tsx}";
 @import "katex/dist/katex.min.css";
 
 /* App-owned foundation (fonts, Tailwind theme/variants, token palette) and the

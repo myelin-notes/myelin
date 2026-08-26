@@ -43,7 +43,8 @@ function ContextMenuContent({
   return (
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Positioner
-        className="isolate z-50 outline-none"
+        // Above canvas overlays (z-100) and their popovers (z-110/111).
+        className="isolate z-[120] outline-none"
         align={align}
         alignOffset={alignOffset}
         side={side}
