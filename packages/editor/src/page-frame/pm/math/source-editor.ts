@@ -14,9 +14,8 @@ import { parseMathMarkdown, stripMathDelimiters } from './parse-math-block';
 import { mathParseError } from './render';
 
 /**
- * Callbacks of the node view currently borrowing the shared editor. The
- * object's identity doubles as the ownership token for attach/release, so
- * each node view must keep one stable instance.
+ * The object's identity doubles as the ownership token for attach/release, so each node view must
+ * keep one stable instance.
  */
 export interface MathSourceEditorOwner extends NestedEditorKeyCallbacks {
   onContentChange: () => void;
@@ -30,11 +29,8 @@ interface MathSourceEditorOwnerRef {
   current: MathSourceEditorOwner | null;
 }
 
-/**
- * Popup chrome (border, shadow, background) lives on the panel element's CSS
- * (.pm-math-block-source); the editor itself stays transparent and owns the
- * monospace font, wrapping and the height cap.
- */
+// Popup chrome (border, shadow, background) lives on .pm-math-block-source; the editor stays
+// transparent and owns the monospace font, wrapping and the height cap.
 const mathSourceEditorTheme = EditorView.theme({
   '&': {
     backgroundColor: 'transparent',
@@ -57,12 +53,9 @@ const mathSourceEditorTheme = EditorView.theme({
   '&.cm-focused': {
     outline: 'none',
   },
-  // Lint tooltip chrome, restyled from CodeMirror's defaults to match the
-  // app's tooltip (components/ui/tooltip.tsx): dark ink sheet, light text,
-  // rounded-md, 12px — high contrast against the light panel beneath it.
-  // The lint ul (.cm-tooltip-lint) nests inside the generic .cm-tooltip
-  // wrapper, and lint hovers are the only tooltips here, so style the
-  // wrapper directly.
+  // Restyled from CodeMirror's defaults to match components/ui/tooltip.tsx. The lint ul nests
+  // inside the generic .cm-tooltip wrapper, and lint hovers are the only tooltips here, so style
+  // the wrapper directly.
   '.cm-tooltip': {
     border: 'none',
     borderRadius: 'var(--radius-md)',
@@ -84,12 +77,8 @@ const mathSourceEditorTheme = EditorView.theme({
   },
 });
 
-/**
- * KaTeX parse errors as CodeMirror diagnostics — a squiggle under the
- * offending span with the message in the lint tooltip. The error's position
- * is an offset into the stripped source (content lines joined by `\n`), so
- * walk the content lines to map it back to a document offset.
- */
+// The error's position is an offset into the stripped source (content lines joined by `\n`), so
+// walk the content lines to map it back to a document offset.
 function mathDiagnostics(view: EditorView): Diagnostic[] {
   const text = view.state.doc.toString();
   const error = mathParseError(stripMathDelimiters(text));
@@ -101,10 +90,8 @@ function mathDiagnostics(view: EditorView): Diagnostic[] {
     (line) => line.kind === 'content',
   );
 
-  // katex's bundled types declare position/length as required numbers, but
-  // ParseError leaves them undefined when thrown without a token/lexer.
-  // Without a position there's nothing to map back, so underline the whole
-  // stripped range rather than produce a NaN-ranged diagnostic.
+  // katex's types declare position/length as required, but ParseError leaves them undefined when
+  // thrown without a token/lexer. Underline the whole stripped range rather than emit a NaN range.
   if (error.position === undefined) {
     const from = content[0]?.from ?? 0;
     const to = content[content.length - 1]?.to ?? text.length;
@@ -125,12 +112,10 @@ function mathDiagnostics(view: EditorView): Diagnostic[] {
 }
 
 /**
- * The floating LaTeX source editor for math blocks. A single instance is
- * shared by all math blocks (see getSharedMathSourceEditor) and re-parented
- * into the active block's panel; `owner` is the node view currently
- * borrowing it. Key bindings and update events dispatch to the owner, which
- * forwards them into ProseMirror — the PM document stays the source of
- * truth, exactly like CodeBlockEditor.
+ * The floating LaTeX source editor for math blocks. One instance is shared by all blocks and
+ * re-parented into the active block's panel; `owner` is the node view borrowing it. Keys and
+ * update events dispatch to the owner, which forwards into ProseMirror — the PM document stays
+ * the source of truth, like CodeBlockEditor.
  */
 export class MathSourceEditor extends NestedEditor {
   private readonly ownerRef: MathSourceEditorOwnerRef;
@@ -185,11 +170,8 @@ export class MathSourceEditor extends NestedEditor {
     this.view.dom.addEventListener('wheel', this.handleWheel);
   }
 
-  /**
-   * Move the editor into `host` (stealing it from any previous owner) and
-   * sync its document. The caller is responsible for suppressing the
-   * resulting change/selection events (its `updating` guard).
-   */
+  // Steals the editor from any previous owner. The caller must suppress the resulting
+  // change/selection events (its `updating` guard).
   attach(host: HTMLElement, owner: MathSourceEditorOwner, value: string): void {
     this.ownerRef.current = owner;
     if (this.view.dom.parentElement !== host) {
@@ -214,16 +196,11 @@ export class MathSourceEditor extends NestedEditor {
 
 let sharedEditor: Promise<MathSourceEditor> | null = null;
 
-/**
- * At most one math block is in editing mode at a time — the preview plugin
- * only marks a block as editing while the selection is contained inside it —
- * so all math blocks (across all page frames) share one CodeMirror instance
- * instead of constructing one per block.
- */
+// At most one math block is editing at a time — the preview plugin only marks a block editing
+// while the selection is inside it — so every block shares one CodeMirror instance.
 export function getSharedMathSourceEditor(): Promise<MathSourceEditor> {
-  // Don't cache a rejection: if construction fails (e.g. language-data's
-  // lazy load throws), clear the slot so the next caller retries instead of
-  // re-awaiting the same failed promise for the lifetime of the app.
+  // Don't cache a rejection: clear the slot so the next caller retries instead of re-awaiting the
+  // same failed promise for the lifetime of the app.
   sharedEditor ??= createSharedMathSourceEditor().catch((error) => {
     sharedEditor = null;
     throw error;

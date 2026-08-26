@@ -1,6 +1,6 @@
 import { memo, type ReactNode } from 'react';
+import { type Action, registry } from '@myelin/editor/keybinds';
 import { IS_MOBILE_BUILD } from '@/lib/env';
-import { type Action, registry } from '@/lib/keybinds';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface TitleBarProps {

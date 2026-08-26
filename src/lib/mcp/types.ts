@@ -64,10 +64,8 @@ export interface McpLatexSummary extends McpElementBase {
 }
 
 /**
- * Ink collapses into a single entry rather than one element per stroke. A note
- * holds hundreds of strokes and no tool accepts a stroke id, so per-stroke
- * objects were repeating an id, a kind and a reader to say nothing; the only
- * actionable part is geometry, which survives here as `boxes`.
+ * Ink collapses into a single entry rather than one element per stroke. A note holds hundreds of
+ * strokes and no tool accepts a stroke id, so the only actionable part is geometry — kept as `boxes`.
  */
 export interface McpStrokeGroupSummary {
   kind: 'stroke-group';
@@ -175,9 +173,8 @@ export interface McpScreenshot {
 }
 
 /**
- * MCP content blocks a tool can return instead of a JSON payload. The bridge
- * passes these through to `tools/call` verbatim, so an image reaches the model
- * as an image rather than as an unreadable base64 string.
+ * MCP content blocks a tool can return instead of a JSON payload. The bridge passes these through
+ * to `tools/call` verbatim, so an image reaches the model as an image rather than base64 text.
  */
 export type McpContentBlock =
   | { type: 'text'; text: string }

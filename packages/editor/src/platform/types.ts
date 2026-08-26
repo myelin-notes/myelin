@@ -1,11 +1,7 @@
 /**
- * The seam between the editor/app code and the host platform (Tauri today, a
- * web host later). Required members are primitives every host must provide;
- * the optional members are capabilities — their absence IS the signal that a
- * feature is unavailable, and UI affordances are gated on presence.
- *
- * Capability interfaces are high-level feature contracts (e.g. PDF export owns
- * destination picking), not emulations of any particular host API.
+ * The seam between editor/app code and the host platform. Required members are primitives every
+ * host must provide; the absence of an optional member IS the signal that a feature is
+ * unavailable, and UI affordances are gated on presence.
  */
 
 import type {
@@ -29,8 +25,8 @@ export interface SaveFileOptions {
   suggestedName: string;
   filter?: SaveFileFilter;
   /**
-   * May be a promise so callers can overlap serialization with the user's
-   * destination pick; it is awaited only after a destination is confirmed.
+   * May be a promise so callers can overlap serialization with the destination pick; awaited only
+   * after a destination is confirmed.
    */
   data: string | Uint8Array | Promise<string | Uint8Array>;
 }
@@ -40,10 +36,7 @@ export interface SaveFileResult {
   cancelled: boolean;
 }
 
-/**
- * Store for locally-derived, hash/id-keyed artifacts (thumbnails). Redundant
- * per client: losing it only costs regeneration.
- */
+/** Redundant per client: losing it only costs regeneration. */
 export interface ArtifactCache {
   /** A URL renderable in the webview for a cached artifact, or null when absent. */
   getUrl(path: string): Promise<string | null>;
@@ -54,32 +47,23 @@ export interface ArtifactCache {
 
 export interface AudioTranscriptionSession {
   /**
-   * Resolves with the full transcript once the backend flushes its final
-   * segments — however long whisper takes. Settles early only when the session
-   * is cancelled or the backend reports the session finished.
+   * Resolves once the backend flushes its final segments, however long whisper takes. Settles
+   * early only on cancel or when the backend reports the session finished.
    */
   finish(): Promise<string>;
-  /**
-   * Abandon the session: stop capture, abort any in-flight whisper run on the
-   * backend, and discard the transcript. Settles a pending finish().
-   */
+  /** Stops capture, aborts any in-flight whisper run, discards the transcript, settles a pending finish(). */
   cancel(): Promise<void>;
 }
 
 export interface TranscriptionCapability {
-  /**
-   * Start a live transcription session fed by a microphone stream. Resolves
-   * null when the backend is unavailable (the session never opened).
-   */
+  /** Resolves null when the backend is unavailable (the session never opened). */
   startSession(options: {
     elementId: string;
     stream: MediaStream;
   }): Promise<AudioTranscriptionSession | null>;
   /**
-   * Start transcribing an already-decoded audio file (the import / retry
-   * path). Resolves null when the backend is unavailable. The caller awaits
-   * `finish()` for the transcript and can `cancel()` while it is pending
-   * (e.g. when the element is deleted mid-transcription).
+   * The import / retry path. Resolves null when the backend is unavailable. The caller awaits
+   * `finish()` and can `cancel()` while it is pending (e.g. element deleted mid-transcription).
    */
   startBufferSession(
     elementId: string,
@@ -106,11 +90,7 @@ export interface NoteIndexCapability {
   reset(): void;
   /** The synchronous index corpus, keyed by node id, for the search layer. */
   getContent(): ReadonlyMap<VFSNodeId, string>;
-  /**
-   * Monotonically increasing counter bumped whenever {@link getContent}'s
-   * corpus changes. The search layer keys its cached index on this so it can
-   * reuse the index across queries and rebuild only when the content changes.
-   */
+  /** The search layer keys its cached index on this, rebuilding only when the content changes. */
   contentRevision(): number;
   getEmbeddings(): ReadonlyMap<VFSNodeId, NoteEmbedding>;
   embedSearchQuery(query: string): Promise<NoteEmbedding>;
@@ -122,9 +102,8 @@ export interface NoteIndexCapability {
 }
 
 /**
- * Recognized handwriting for one node. Each line carries the recognized
- * `text` plus the strokes it came from, so canvas search can match
- * handwriting and navigate to it.
+ * Each line carries the recognized `text` plus the strokes it came from, so canvas search can
+ * match handwriting and navigate to it.
  */
 export interface RecognizedPage {
   nodeId: VFSNodeId;
@@ -174,9 +153,8 @@ export interface PdfExportOptions {
   /** Suggested file name, including the .pdf extension. */
   suggestedName: string;
   /**
-   * Builds the display list. Called only after the user confirms a
-   * destination, so cancelling stays cheap. Return null to abort the export
-   * (nothing is written and the result reports `cancelled`).
+   * Called only after the user confirms a destination, so cancelling stays cheap. Return null to
+   * abort the export (nothing written, result reports `cancelled`).
    */
   buildRequest(): Promise<PdfExportRequest | null>;
 }

@@ -90,9 +90,8 @@ describe('markdown math round-trip', () => {
   });
 
   it('reaches a stable fixed point for escaped dollars across saves', () => {
-    // The serializer doubles backslashes (`\` -> `\\`) and cannot emit a bare
-    // `\$`, so the literal text drifts once on first save. What must hold is
-    // that further saves are stable AND the dollars never become live math.
+    // The serializer doubles backslashes and cannot emit a bare `\$`, so the literal text drifts once
+    // on first save. What must hold is that further saves are stable and the dollars never become math.
     for (const md of ['\\$a\\$', '\\$5']) {
       const once = serializeDocToMarkdown(parseMarkdownToDoc(md, schema));
       const twice = serializeDocToMarkdown(parseMarkdownToDoc(once, schema));

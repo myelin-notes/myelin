@@ -1,4 +1,4 @@
-import type { Messages } from '@/lib/i18n';
+import type { Messages } from '@myelin/editor/i18n';
 import type { Repository } from '@/lib/sync';
 import type { ImportSource } from './dialog';
 import { resolveImportRootName } from './import-tree';

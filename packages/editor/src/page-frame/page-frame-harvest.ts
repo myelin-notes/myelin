@@ -1,9 +1,8 @@
 /**
- * Harvest a page frame's rendered, paginated DOM into a display-list request for the
- * Rust renderer. The pagination is READ from the settled DOM (never recomputed), so
- * each PDF page's content matches the on-screen page exactly. Text is emitted as
- * selectable runs; code blocks are rasterized in place (the code editor can't be
- * harvested reliably).
+ * Harvest a page frame's rendered, paginated DOM into a display-list request for the Rust renderer.
+ * Pagination is READ from the settled DOM (never recomputed), so each PDF page matches the screen
+ * exactly. Text is emitted as selectable runs; code blocks are rasterized in place (the code editor
+ * can't be harvested reliably).
  */
 
 import { toPng } from 'html-to-image';
@@ -137,10 +136,9 @@ function buildOffscreenClone(source: PageFramePdfSource): {
     : source.pageWidth;
 
   const container = document.createElement('div');
-  // Force the light palette so the clone harvests light-mode colors regardless of
-  // the live theme — PDFs always render on a white page. The class re-declares
-  // the light tokens on the container, so the subtree inherits them over
-  // <html>.dark (see @myelin/ui/theme.css and ../styles/tokens.css).
+  // PDFs always render on a white page, so force the light palette regardless of the live theme.
+  // The class re-declares the light tokens on the container, so the subtree inherits them over
+  // <html>.dark.
   container.className = 'theme-light';
   Object.assign(container.style, {
     position: 'fixed',
@@ -152,10 +150,8 @@ function buildOffscreenClone(source: PageFramePdfSource): {
   });
 
   const clone = source.contentDiv.cloneNode(true) as HTMLElement;
-  // Neutralize the live transforms/zoom from dom-layer's sync loop so the clone lays
-  // out at its natural scale-1 size; the pagination spacer widgets (and, for
-  // horizontal layout, the inner editor's column styles) are already baked into the
-  // cloned DOM.
+  // Neutralize dom-layer's live transforms/zoom so the clone lays out at its natural scale-1 size;
+  // the pagination spacer widgets (and horizontal layout's column styles) are already baked in.
   Object.assign(clone.style, {
     position: 'static',
     inset: 'auto',
@@ -251,16 +247,14 @@ interface HarvestedLine {
 }
 
 /**
- * Split a text node into per-line fragments. `getClientRects()` yields one rect per
- * visual line; we assign each character to a line by its own rect's top.
+ * Split a text node into per-line fragments. `getClientRects()` yields one rect per visual line;
+ * each character is assigned to a line by its own rect's top.
  *
- * A binary search would assume `getBoundingClientRect().top` is monotonic in the
- * character offset, but a boxless character (collapsed whitespace at a wrap point, a
- * soft hyphen) returns an empty/zero rect, breaking that assumption and misplacing
- * characters. Instead we walk every character: those with real geometry advance the
- * line monotonically, and boxless ones inherit the line of the next character that
- * does have geometry (so a collapsed character leading a wrapped line joins it). This
- * is O(n) per node rather than O(lines·log n) — acceptable for export.
+ * A binary search would assume `getBoundingClientRect().top` is monotonic in the character offset,
+ * but a boxless character (collapsed whitespace at a wrap point, a soft hyphen) returns an empty
+ * rect. So walk every character: those with real geometry advance the line monotonically, and
+ * boxless ones inherit the line of the next character that has geometry. O(n) per node rather
+ * than O(lines·log n) — acceptable for export.
  */
 function splitTextNodeIntoLines(node: Text): HarvestedLine[] {
   const text = node.textContent ?? '';
@@ -483,14 +477,9 @@ async function harvestCodeBlocks(
   return failed;
 }
 
-/**
- * CodeMirror only measures line heights for editors that have been visible in
- * the window: a code block that was never scrolled into view keeps the height
- * oracle's defaults (14px rows) in its gutter inline styles, so the cloned
- * gutter drifts out of alignment with the content lines (which lay out
- * naturally). Rebuild the gutter rows from the content line geometry before
- * rasterizing.
- */
+// CodeMirror only measures line heights for editors that have been visible: a code block never
+// scrolled into view keeps the height oracle's 14px defaults in its gutter inline styles, so the
+// cloned gutter drifts out of alignment with the naturally laid-out content lines.
 function alignCodeBlockGutter(block: HTMLElement): void {
   const gutter = block.querySelector<HTMLElement>('.cm-lineNumbers');
   if (!gutter) {
@@ -511,11 +500,8 @@ function alignCodeBlockGutter(block: HTMLElement): void {
   }
 }
 
-/**
- * Stamp overlapping canvas elements (ink/text/images) onto the frame's pages, the
- * same way the PDF element overlays annotations. The frame is unscaled, so one world
- * px maps to one CSS px; each element draws itself in its page's PDF-point space.
- */
+// Same as how the PDF element overlays annotations. The frame is unscaled, so one world px maps
+// to one CSS px; each element draws itself in its page's PDF-point space.
 function harvestOverlays(h: Harvester, source: PageFramePdfSource): void {
   const overlays = source.overlays;
   if (!overlays || overlays.length === 0) {

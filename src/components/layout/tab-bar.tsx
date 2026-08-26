@@ -11,6 +11,16 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { type Messages, useMessages } from '@myelin/editor/i18n';
+import { keybindings } from '@myelin/editor/keybinds';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
+import {
+  isMac,
+  isWindows,
+  TAB_BAR_HEIGHT_CLASS,
+  TRAFFIC_LIGHT_INSET_CLASS,
+} from '@myelin/shared/os';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -20,16 +30,7 @@ import {
 import { errorDescription } from '@/components/command-palette/utils';
 import { useSidebar } from '@/components/layout/sidebar/context';
 import { trackEvent } from '@/lib/analytics';
-import { type Messages, useMessages } from '@/lib/i18n';
-import { keybindings } from '@/lib/keybinds';
-import { Logger } from '@/lib/logger';
 import { createBlankCanvasFile } from '@/lib/note/create';
-import {
-  isMac,
-  isWindows,
-  TAB_BAR_HEIGHT_CLASS,
-  TRAFFIC_LIGHT_INSET_CLASS,
-} from '@/lib/platform';
 import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import {
@@ -45,15 +46,13 @@ import {
   spawnWindow,
 } from '@/lib/tabs/multi-window';
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
-import { cn } from '@/lib/utils';
 import { UpdateButton } from './update-button';
 import { WindowControls } from './window-controls';
 
 const logger = new Logger('TabBar');
 
-// Built-in tabs store a title captured at creation time, so they don't follow
-// language changes. Derive their title from the current messages instead and
-// fall back to the stored title for content tabs (canvas/image file names).
+// Built-in tabs store a title captured at creation time, so they don't follow language changes.
+// Content tabs (canvas/image file names) fall back to the stored title.
 function tabTitle(tab: Tab, strings: Messages): string {
   switch (tab.target.type) {
     case 'graph':
@@ -113,9 +112,8 @@ export const TabBar = memo(function TabBar({
   // In compact layout the sidebar is an overlay drawer; elsewhere it's the
   // persistent column. `sidebarShown` unifies both for the toggle's a11y state.
   const sidebarShown = isCompact ? drawerOpen : !collapsed;
-  // Mobile layout has no sidebar; the top-left button returns to the full-page
-  // library home instead of toggling one. It's "active" while the pane is
-  // already showing home (no active tab).
+  // Mobile layout has no sidebar; the top-left button returns to the full-page library home instead
+  // of toggling one, and is "active" while the pane already shows home.
   const showingHome = pane.activeTabId === '';
   const activeTab =
     pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? null;
@@ -207,9 +205,8 @@ export const TabBar = memo(function TabBar({
         'flex shrink-0 select-none items-end border-border-subtle border-b bg-surface',
         TAB_BAR_HEIGHT_CLASS,
         !isFocused && 'opacity-75',
-        // The sidebar column normally clears the macOS traffic lights; inset
-        // the top-left bar whenever that column isn't present (collapsed, or
-        // reflowed into the compact overlay drawer).
+        // The sidebar column normally clears the macOS traffic lights; inset the top-left bar whenever
+        // that column isn't present (collapsed, or reflowed into the compact overlay drawer).
         isMac &&
           isTopLeft &&
           (collapsed || isCompact) &&

@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn } from '@myelin/editor/utils';
 
 export const FIELD_TRIGGER_CLASS =
   'group flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-lg bg-transparent px-2.5 text-left text-sm text-text-primary outline-none transition-colors hover:bg-input aria-expanded:bg-input disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:opacity-60';

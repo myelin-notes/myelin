@@ -77,11 +77,8 @@ export class PageFrameElement extends DrawableElement {
   private _pageLayout: PageLayout;
   private _editing = false;
   private _numPages = 1;
-  /**
-   * Natural editor content height (CSS px), reported by the pagination plugin
-   * while in `continuous` layout. `null` in paginated/column layouts, where the
-   * frame's height is derived from page math instead.
-   */
+  // Reported by the pagination plugin in `continuous` layout. `null` elsewhere, where the frame's
+  // height comes from page math.
   private _measuredContentHeight: number | null = null;
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
     null;
@@ -256,11 +253,7 @@ export class PageFrameElement extends DrawableElement {
   public set numPages(n: number) {
     this._numPages = n;
   }
-  /**
-   * Record the editor's natural content height for `continuous` layout. Pass
-   * `null` from paginated/column layouts so the geometry getters fall back to
-   * page math.
-   */
+  // Pass `null` from paginated/column layouts so the geometry getters fall back to page math.
   public setMeasuredContentHeight(height: number | null): void {
     this._measuredContentHeight = height;
   }
@@ -284,12 +277,8 @@ export class PageFrameElement extends DrawableElement {
     return n * this._pageHeight + Math.max(0, n - 1) * PAGE_GAP;
   }
 
-  /**
-   * Height of a continuous (single-sheet) frame: as tall as the content plus
-   * the page's top and bottom padding, but never shorter than a single page so
-   * an empty frame still reads as a page. `content` is the editor's natural
-   * height (CSS px), or `null` if it hasn't been measured yet.
-   */
+  // Never shorter than a single page, so an empty frame still reads as a page. `content` is the
+  // editor's natural height, or `null` if unmeasured.
   private continuousStripHeight(content: number | null): number {
     return Math.max(this._pageHeight, (content ?? 0) + PAGE_PADDING * 2);
   }
@@ -362,14 +351,11 @@ export class PageFrameElement extends DrawableElement {
     this._editing = true;
     this.pmEditor?.setEditable(true);
 
-    // The math source editor is loaded on demand (see MathBlockNodeView), so
-    // whichever formula is clicked first pays for the fetch — and since the
-    // block only reveals its source panel once CodeMirror is attached, that
-    // click reads as a no-op until the module lands. Start it here instead:
-    // becoming editable is the earliest point the source panel can be opened
-    // at all, and it precedes the click by long enough that openEditor takes
-    // its synchronous path. Failures are ignored — the click path loads it
-    // again and reports there.
+    // The math source editor is loaded on demand, so whichever formula is clicked first pays for the
+    // fetch — and the block only reveals its source panel once CodeMirror is attached, so that click
+    // reads as a no-op until the module lands. Becoming editable is the earliest the panel could be
+    // opened, and precedes the click by enough that openEditor takes its synchronous path. Failures
+    // are ignored — the click path loads it again and reports there.
     void import('../page-frame/pm/math/source-editor')
       .then((module) => module.getSharedMathSourceEditor())
       .catch(() => {});
@@ -548,9 +534,8 @@ export class PageFrameElement extends DrawableElement {
     if (!view) {
       return {};
     }
-    // Kick off serialization in the background — it runs in chunked async
-    // batches that yield to the event loop, so the save dialog animation
-    // and menu close both paint smoothly while the doc is processed.
+    // Runs in chunked async batches that yield to the event loop, so the save dialog animation and
+    // menu close both paint smoothly.
     const mdPromise = serializeDocToMarkdownChunked(view.state.doc);
     const result = await getPlatform().saveFile({
       suggestedName: `${this.getSafeExportName()}.md`,
@@ -600,12 +585,10 @@ export class PageFrameElement extends DrawableElement {
     if (!contentDiv) {
       return null;
     }
-    // Continuous frames have no page breaks: harvest them as a single page
-    // sized to the whole strip (krilla allows an arbitrarily tall page), which
-    // matches what's on screen exactly. Measure the editor's live height here
-    // rather than reading the cached `totalHeight` — the cache is only kept
-    // fresh by the pagination rAF loop, so a freshly-mounted frame could still
-    // report `null` and collapse the export box to a single page.
+    // Continuous frames have no page breaks: harvest as a single page sized to the whole strip
+    // (krilla allows an arbitrarily tall page). Measure the editor's live height rather than the
+    // cached `totalHeight` — the cache is only kept fresh by the pagination rAF loop, so a
+    // freshly-mounted frame could report `null` and collapse the export box to one page.
     const continuous = this._pageLayout === 'continuous';
     const editorDom = this.pmEditor?.view?.dom;
     const pageHeight = continuous
@@ -635,12 +618,8 @@ export class PageFrameElement extends DrawableElement {
 
   protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
 
-  /**
-   * Resolve the current ProseMirror doc for reading (thumbnails, search): prefer
-   * the live editor doc — the view is created eagerly and kept alive for every
-   * frame, and it reflects in-flight edits — otherwise convert the Y.XmlFragment
-   * with the same helper the editor uses. Returns `null` if there's no content.
-   */
+  // Prefer the live editor doc: the view is created eagerly for every frame and reflects in-flight
+  // edits. Otherwise convert the Y.XmlFragment with the same helper the editor uses.
   public getCurrentDoc(): ProseMirrorNode | null {
     const liveDoc = this.pmEditor?.view?.state.doc;
     if (liveDoc) {
@@ -653,11 +632,8 @@ export class PageFrameElement extends DrawableElement {
     return yXmlFragmentToProseMirrorRootNode(fragment, schema);
   }
 
-  /**
-   * Paint the first page's white background and the document text into the
-   * off-screen thumbnail context. Runs in element-local coordinates (origin at
-   * the top-left of page 0), matching `drawThumbnail`'s caller transform.
-   */
+  // Runs in element-local coordinates (origin at the top-left of page 0), matching
+  // `drawThumbnail`'s caller transform.
   public override drawThumbnail(
     ctx: CanvasRenderingContext2D,
     _deltaTime: number,

@@ -1,12 +1,15 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { I18nProvider } from '@myelin/editor/i18n';
+import { setPlatform } from '@myelin/editor/platform';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
-import { setLogErrorReporter, setLogSink } from '@myelin/shared/logger';
+import {
+  flushLogs,
+  setLogErrorReporter,
+  setLogSink,
+} from '@myelin/shared/logger';
 import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
-import { I18nProvider } from '@/lib/i18n';
-import { flushLogs } from '@/lib/logger';
-import { setPlatform } from '@/platform';
 import { tauriPlatform } from '@/platform/tauri';
 import { writeLogs } from '@/platform/tauri/log-sink';
 import App from './App';

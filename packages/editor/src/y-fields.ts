@@ -1,16 +1,10 @@
 import type * as Y from 'yjs';
 import { LOCAL_ORIGIN, type SyncOrigin } from './ydoc-manager';
 
-/**
- * Field mapping: Y.Map key → setter that updates the local cache.
- * Each setter receives the raw value from the Y.Map.
- */
+/** Y.Map key → setter that updates the local cache, receiving the raw Y.Map value. */
 export type YFieldMap = Record<string, (value: unknown) => void>;
 
-/**
- * Read fields from a Y.Map into element-local state.
- * This does not subscribe to the Y.Map; callers decide when to apply changes.
- */
+// Does not subscribe to the Y.Map; callers decide when to apply changes.
 export function applyYFields(
   yMap: Y.Map<unknown>,
   fields: YFieldMap,
@@ -31,9 +25,6 @@ export function applyYFields(
   }
 }
 
-/**
- * Write one or more key-value pairs to a Y.Map in a single local transaction.
- */
 export function writeYMap(
   yMap: Y.Map<unknown>,
   updates: Record<string, unknown>,

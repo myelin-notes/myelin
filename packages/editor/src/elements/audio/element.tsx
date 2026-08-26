@@ -44,9 +44,8 @@ export class AudioElement extends DrawableElement {
   private _root: HTMLDivElement | null = null;
   private _reactRoot: Root | null = null;
 
-  // Bound once so the React component always gets a stable reference.
-  // The transcript follows separately via _onTranscribed once whisper
-  // finishes, so the recording is usable immediately.
+  // Bound once so the React component gets a stable reference. The transcript follows separately
+  // via _onTranscribed, so the recording is usable immediately.
   private readonly _onRecorded = (
     data: Uint8Array,
     duration: number,
@@ -162,11 +161,8 @@ export class AudioElement extends DrawableElement {
     this.render();
   }
 
-  /**
-   * Write the transcription claim: this peer is transcribing (or about to).
-   * Written the moment transcription starts on both the live-recording and
-   * on-demand paths, so other capable peers don't self-elect meanwhile.
-   */
+  // Written the moment transcription starts on both the live-recording and on-demand paths, so
+  // other capable peers don't self-elect meanwhile.
   public claimTranscription(): void {
     if (!this._localPeerId) {
       return;
@@ -181,12 +177,9 @@ export class AudioElement extends DrawableElement {
     this.render();
   }
 
-  /**
-   * Clear our own claim after a job ends without a transcript (failure or no
-   * speech), so present-but-idle doesn't read as "still transcribing" to
-   * remote peers. Successful jobs skip this: a claim is inert once
-   * `transcript` is set.
-   */
+  // Called after a job ends without a transcript (failure or no speech), so present-but-idle
+  // doesn't read as "still transcribing" to remote peers. A successful job needs no release — a
+  // claim is inert once `transcript` is set.
   public releaseTranscriptionClaim(): void {
     if (
       this._transcribingPeerId.length === 0 ||
@@ -206,11 +199,8 @@ export class AudioElement extends DrawableElement {
     );
   }
 
-  /**
-   * Called by the React component after recording, and by the media import
-   * handler. Both callers just decoded the bytes, so they pass the waveform
-   * along rather than triggering a second full decode here.
-   */
+  // Both callers just decoded the bytes, so they pass the waveform along rather than triggering a
+  // second full decode here.
   public setAudioData(
     data: Uint8Array,
     fileName: string,
@@ -242,9 +232,8 @@ export class AudioElement extends DrawableElement {
   /** Called by the player view once on-demand transcription completes. */
   public setTranscript(transcript: string): void {
     this._transcript = transcript;
-    // This lands seconds or minutes after the click that triggered it, so it
-    // must not be undoable or merge into the undo capture window of whatever
-    // the user is editing when it arrives.
+    // Lands seconds or minutes after the click that triggered it, so it must not be undoable or merge
+    // into the undo capture window of whatever the user is editing when it arrives.
     this.syncToYMap({ transcript }, ASYNC_RESULT_ORIGIN);
     this.render();
   }

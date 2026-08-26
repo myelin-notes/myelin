@@ -365,11 +365,9 @@ export function buildResolvedNoteLinkTransaction(
       continue;
     }
 
-    // Treats stored uuids as stable: once a pageFrameId is set on a link
-    // mark, we never overwrite it from a fresh resolution. A delete+recreate
-    // of the target frame under a new uuid leaves a dead uuid here, but
-    // canvas/index.tsx falls back to focusPageFrameByName so the link still
-    // navigates correctly.
+    // Stored uuids are treated as stable: once a pageFrameId is set on a link mark it is never
+    // overwritten from a fresh resolution. A delete+recreate of the target frame leaves a dead uuid
+    // here, but canvas/index.tsx falls back to focusPageFrameByName.
     const nextNoteId = target.noteId ?? ref.noteId;
     const nextPageFrameId = target.pageFrameId ?? ref.pageFrameId;
     if (
@@ -427,10 +425,8 @@ export interface RenamePageFrameLinkTransactionResult {
 }
 
 /**
- * Shared core for note-link rename rewriters. Caller supplies a `rewriteTitle`
- * predicate-and-rewriter — given a link target, return the new title or
- * `null` to leave the link alone. Same-title returns are filtered out so
- * callers don't need to compare.
+ * Shared core for note-link rename rewriters. The caller's `rewriteTitle` returns the new title, or
+ * `null` to leave the link alone; same-title returns are filtered out so callers needn't compare.
  */
 function buildNoteLinkRewriteTransaction(
   state: EditorState,
@@ -485,9 +481,8 @@ export function buildRenamePageFrameLinkReferencesTransaction(
   if (!result) {
     return null;
   }
-  // The frame rename itself is a Y.Map mutation (syncToYMap), not PM history,
-  // so undo would otherwise revert the link title back to the old name while
-  // the frame stays renamed. Same fix as buildResolvedNoteLinkTransaction.
+  // The frame rename itself is a Y.Map mutation (syncToYMap), not PM history, so undo would revert
+  // the link title while the frame stays renamed. Same fix as buildResolvedNoteLinkTransaction.
   result.tr.setMeta(PM_ADD_TO_HISTORY, false);
   return result;
 }

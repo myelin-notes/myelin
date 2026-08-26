@@ -5,8 +5,8 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { Logger } from '@/lib/logger';
-import { getPlatform } from '@/platform';
+import { getPlatform } from '@myelin/editor/platform';
+import { Logger } from '@myelin/shared/logger';
 import {
   getRepositoryStorageKey,
   type RepositoryConfig,

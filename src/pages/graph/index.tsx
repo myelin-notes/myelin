@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Focus, Search, ZoomIn, ZoomOut } from 'lucide-react';
-import type { Messages } from '@/lib/i18n';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import type { Messages } from '@myelin/editor/i18n';
+import { useMessages } from '@myelin/editor/i18n';
+import { Logger } from '@myelin/shared/logger';
 import { openNote } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';

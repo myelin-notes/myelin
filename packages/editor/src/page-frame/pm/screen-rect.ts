@@ -18,16 +18,11 @@ interface RectLike {
 }
 
 /**
- * Map a rect from PM/contenteditable space (as returned by
- * `view.coordsAtPos` or `getClientRects`) into viewport screen pixels.
+ * Map a rect from PM/contenteditable space into viewport screen pixels.
  *
- * The page-frame viewport applies `zoom: devicePixelRatio` (NOT reflected in
- * getBoundingClientRect) plus `transform: scale(canvasZoom / dpr)` (IS
- * reflected). We anchor on the frame's real on-screen rect rather than
- * assuming the editor origin sits at viewport (0,0) — the latter only held
- * while a fixed-width sidebar pinned the canvas, and broke once it was
- * removed. This mirrors `getVisualRectForContentRect` in the dom-layer, which
- * the note-link previews rely on.
+ * The page-frame viewport applies `zoom: devicePixelRatio` (NOT reflected in getBoundingClientRect)
+ * plus `transform: scale(canvasZoom / dpr)` (IS reflected), and anchors on the frame's real
+ * on-screen rect rather than assuming the editor origin sits at viewport (0,0).
  */
 export function mapPmRectToScreen(
   frameRect: RectLike,
@@ -71,12 +66,7 @@ function mapViewRectToScreen(
   );
 }
 
-/**
- * Screen-pixel rect for a single PM document position, resolved against the
- * editor's own frame/content DOM so it stays correct wherever the canvas sits
- * in the window. Returns `null` if the DOM isn't mounted or the position is
- * stale.
- */
+// Returns `null` if the DOM isn't mounted or the position is stale.
 export function getPageFramePmScreenRectForPos(
   view: EditorView,
   position: number,
@@ -88,11 +78,6 @@ export function getPageFramePmScreenRectForPos(
   }
 }
 
-/**
- * Screen-pixel rect for a node view's DOM element, resolved against the
- * editor's frame/content DOM so it stays correct under the canvas's zoom and
- * scale. Used to anchor floating UI (e.g. code run output) to a block.
- */
 export function getPageFramePmScreenRectForElement(
   view: EditorView,
   element: HTMLElement,
@@ -101,13 +86,10 @@ export function getPageFramePmScreenRectForElement(
 }
 
 /**
- * Screen-pixel rect for the caret while it lives inside a nested CodeMirror
- * editor (code block, math source panel). Those node views have no
- * contentDOM, so `coordsAtPos` for inner positions degrades to the block's
- * boundary — following that would pan the canvas to the block instead of the
- * caret. Measure the native DOM selection instead; returns `null` when the
- * selection isn't inside a nested editor of this view (callers fall back to
- * `getPageFramePmScreenRectForPos`).
+ * Screen rect for the caret inside a nested CodeMirror editor (code block, math source). Those node
+ * views have no contentDOM, so `coordsAtPos` degrades to the block boundary — following that would
+ * pan the canvas to the block. Measures the native DOM selection instead; `null` when the selection
+ * isn't in a nested editor of this view (callers fall back to `getPageFramePmScreenRectForPos`).
  */
 export function getPageFramePmScreenRectForNestedCaret(
   view: EditorView,

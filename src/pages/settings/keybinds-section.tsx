@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard, RotateCcw } from 'lucide-react';
+import { KEYBINDS_RESET_EVENT } from '@myelin/editor/events';
+import { useMessages } from '@myelin/editor/i18n';
+import { type Action, type KeyCombo, registry } from '@myelin/editor/keybinds';
 import {
   getActionCategory,
   getActionCopy,
   getActionIcon,
 } from '@myelin/editor/keybinds/messages';
-import { KEYBINDS_RESET_EVENT } from '@/lib/events';
-import { useMessages } from '@/lib/i18n';
-import { type Action, type KeyCombo, registry } from '@/lib/keybinds';
-import { isApplePlatform } from '@/lib/platform';
-import { cn } from '@/lib/utils';
+import { cn } from '@myelin/editor/utils';
+import { isApplePlatform } from '@myelin/shared/os';
 
 function keyParts(combo: KeyCombo): string[] {
   const parts: string[] = [];

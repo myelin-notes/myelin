@@ -11,15 +11,16 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { errorDescription } from '@/components/command-palette/utils';
-import { trackEvent } from '@/lib/analytics';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import {
   isMac,
   TAB_BAR_HEIGHT_CLASS,
   TRAFFIC_LIGHT_INSET_CLASS,
-} from '@/lib/platform';
+} from '@myelin/shared/os';
+import { errorDescription } from '@/components/command-palette/utils';
+import { trackEvent } from '@/lib/analytics';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
@@ -27,7 +28,6 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController } from '@/lib/tabs/context';
-import { cn } from '@/lib/utils';
 import { CreateNewDropdown } from '@/pages/library/create-new-dropdown';
 import { ImportDialog } from '@/pages/library/import/dialog';
 import { useSidebar } from './context';
@@ -79,12 +79,8 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     strings,
   });
 
-  // Refresh tag counts when a remote sync lands or any local
-  // repository mutation occurs (create/rename/delete/move/tag), including
-  // changes made outside the sidebar such as the tab bar's new-tab button.
-  // `dataVersion` is the only refresh signal for local repos, where
-  // `lastRemoteSyncAt` stays null. Skip the initial render — the tags list
-  // already loads on mount.
+  // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
+  // Skip the initial render — the tags list already loads on mount.
   const didMountMetaRefresh = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
@@ -177,9 +173,8 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
           // vertically with the tabs and the macOS traffic lights.
           'flex shrink-0 items-center gap-0.5 px-2',
           TAB_BAR_HEIGHT_CLASS,
-          // Only macOS right-aligns the buttons, since the traffic lights hold
-          // the top-left. Every other platform (Windows, iPad, Linux) has no
-          // lights there, so center them instead of stranding them in a corner.
+          // Only macOS right-aligns the buttons, since the traffic lights hold the top-left. Every other
+          // platform has no lights there, so center them instead of stranding them in a corner.
           isMac ? 'justify-end' : 'justify-center',
           isMac && TRAFFIC_LIGHT_INSET_CLASS,
         )}

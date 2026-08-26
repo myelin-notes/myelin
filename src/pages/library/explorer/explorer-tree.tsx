@@ -9,9 +9,10 @@ import {
   useState,
 } from 'react';
 import { VirtualList } from '@myelin/editor/components/virtual-list';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import { VirtualGrid } from '@/components/virtual-grid';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import {
   type FileType,
   isRepositoryConfigStructurallyComplete,
@@ -24,7 +25,6 @@ import {
   type VFSNode,
 } from '@/lib/sync';
 import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
-import { cn } from '@/lib/utils';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
 import { GridFileItem } from './grid/file-item';

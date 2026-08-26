@@ -5,9 +5,9 @@ import { ElementType } from '@myelin/editor/elements/element-type';
 import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
+import { Logger } from '@myelin/shared/logger';
 import { join } from '@tauri-apps/api/path';
 import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
 import {
   type FileType,
   getFileTypeForName,
@@ -97,15 +97,13 @@ function decodeJsonValue(value: unknown): unknown {
 export type NoteIdResolver = (title: string) => VFSNodeId | null;
 
 /**
- * Rewrite the `noteId` on every note-link mark in a page-frame's ProseMirror
- * JSON to the id of the same-named note in *this* import.
+ * Rewrite the `noteId` on every note-link mark in a page frame's ProseMirror JSON to the id of the
+ * same-named note in *this* import.
  *
- * Exported note ids are meaningless in the destination workspace, so the ids
- * baked into note-link marks would otherwise dangle: the graph drops links
- * whose target id is unknown, and the editor treats a set id as authoritative
- * and never re-resolves it. We remap by title against the imported notes. An
- * unresolved link is cleared to null (target absent) so live title resolution
- * can reconnect it later; its stale `pageFrameId` is dropped for the same reason.
+ * Exported ids are meaningless in the destination workspace, so baked-in ids would dangle: the
+ * graph drops links whose target id is unknown, and the editor treats a set id as authoritative.
+ * An unresolved link is cleared to null so live title resolution can reconnect it later; its stale
+ * `pageFrameId` is dropped for the same reason.
  */
 function remapNoteLinkIds(
   content: unknown,
@@ -148,13 +146,10 @@ function remapNoteLinkIds(
 /**
  * Rebuild every element of a note into a freshly opened session's Y.Doc.
  *
- * `type`/`uuid` are the element identity; `content` is the reserved key holding
- * page-frame ProseMirror JSON (written to the XmlFragment, not the Y.Map). Every
- * other field is a Y.Map prop and is assumed to be a scalar or a base64-marked
- * binary — nested Yjs types are not reconstructed (none exist on elements today).
- *
- * `resolveNoteId`, when provided, remaps note-link ids to the imported notes so
- * links and the graph resolve within the destination workspace.
+ * `type`/`uuid` are the element identity; `content` is the reserved key holding page-frame
+ * ProseMirror JSON (written to the XmlFragment, not the Y.Map). Every other field is a Y.Map prop,
+ * assumed scalar or base64-marked binary — nested Yjs types are not reconstructed (none exist on
+ * elements today). `resolveNoteId` remaps note-link ids to the imported notes.
  */
 export function rebuildNote(
   ydoc: YDocManager,
@@ -286,11 +281,10 @@ async function createImportedNote({
 /**
  * Build the note document in memory, then write it once.
  *
- * The target is a file this run just created, so there is no remote revision to
- * reconcile and no peer to sync with. Opening a session would read the empty
- * placeholder back twice (once to load the document, once to merge the push)
- * before writing the same bytes. This mirrors what `NoteSession.save` does to
- * the doc -- sweep orphans, then encode -- without the round trips.
+ * The target is a file this run just created, so there is no remote revision to reconcile and no
+ * peer to sync with. Opening a session would read the empty placeholder back twice before writing
+ * the same bytes. Mirrors what `NoteSession.save` does — sweep orphans, then encode — without the
+ * round trips.
  */
 async function rebuildImportedNote(
   repository: Repository,
@@ -310,11 +304,8 @@ async function rebuildImportedNote(
   }
 }
 
-/**
- * Resolve a note-link title to one of the just-imported notes. Mirrors the live
- * resolver ({@link parseNoteLinkTarget}): path-qualified titles match on the
- * source folder path, bare titles on note name (first import wins on collision).
- */
+// Mirrors the live resolver ({@link parseNoteLinkTarget}): path-qualified titles match on the
+// source folder path, bare titles on note name (first import wins on collision).
 function createImportNoteLinkResolver(
   prepared: readonly PreparedNote[],
 ): NoteIdResolver {
@@ -376,10 +367,8 @@ export async function importWorkspaceJson({
   let failedFiles = 0;
   const total = scanned.notes.length + scanned.media.length;
 
-  // Every folder and note this import creates lands on one manifest, saved once
-  // when the batch closes, instead of a manifest write per node. Fatal setup
-  // (creating the destination folders) aborts and rolls back; per-file failures
-  // are isolated so one bad file can't discard the rest.
+  // Every folder and note lands on one manifest, saved once when the batch closes. Fatal setup
+  // aborts and rolls back; per-file failures are isolated so one bad file can't discard the rest.
   try {
     await repository.batchManifestWrites(async () => {
       const root = await repository.createFolder(rootName, parentId);
@@ -390,9 +379,8 @@ export async function importWorkspaceJson({
         scanned.folderPaths,
       );
 
-      // Notes import in two passes: create every file first so note-link ids can
-      // be remapped to the new nodes (links may point forward), then rebuild
-      // content.
+      // Two passes: create every file first so note-link ids can be remapped to the new nodes (links
+      // may point forward), then rebuild content.
       const prepared: PreparedNote[] = [];
       for (const file of scanned.notes) {
         const fallbackName =

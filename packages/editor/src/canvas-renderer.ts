@@ -13,32 +13,14 @@ type CanvasBackground = 'grid' | 'dots' | 'blank';
 /** Side length of one background pattern tile, in world units. */
 const BG_TILE_SIZE = 24;
 
-/**
- * How far the background layer extends past the viewport on every side.
- *
- * A pan is applied to this layer as a translate of up to one tile, so the
- * layer has to already cover one tile beyond each edge or the translate would
- * drag a bare edge into view. One tile at maximum zoom bounds that for good,
- * which keeps the element's geometry a constant — nothing has to be re-laid-out
- * when the zoom changes.
- */
+// Pan translates this layer by up to one tile, so it must already cover one tile
+// past each edge. Sizing for max zoom keeps its geometry constant across zooms.
 export const BG_OVERDRAW_PX = BG_TILE_SIZE * MAX_ZOOM;
 
-/**
- * Screen-space slack around the viewport for culling. A bounding box is the
- * extent of an element's geometry, and a few element types paint a little
- * outside it (a shape's stroke straddles its path, a glyph can overhang its
- * measured box), so the test is deliberately loose — the cost of drawing one
- * element that turned out to be just off-screen is nothing next to the cost of
- * clipping one that wasn't.
- */
+// Deliberately loose: strokes and glyphs paint outside their bounding box.
 const CULL_MARGIN_PX = 128;
 
-/**
- * The cull margin in world units at a given zoom. Kept constant on screen
- * rather than in the document, so zooming in doesn't drag a widening band of
- * off-screen ink back into the frame.
- */
+// Screen-constant, so zooming in doesn't drag a widening band of off-screen ink into frame.
 export function cullMarginWorld(zoom: number): number {
   if (!(zoom > 0) || !Number.isFinite(zoom)) {
     return Number.POSITIVE_INFINITY;
@@ -46,17 +28,8 @@ export function cullMarginWorld(zoom: number): number {
   return CULL_MARGIN_PX / zoom;
 }
 
-/**
- * Frames of sustained zoom before the background layer leaves the tree, and how
- * long the zoom must hold still before it returns.
- *
- * The layer is wider than the viewport, so WebKit tiles it, and a tiled layer
- * re-rasterizes as its contents scale drifts — which the residual on its
- * transform does for the whole of a pinch, whatever size the pattern is painted
- * at. On an iPad the frames that re-rastered it cost 40.4ms against 19.3ms for
- * the frames that didn't. The frame count keeps a single wheel notch from
- * flickering the grid; the settle window bridges two notches of one gesture.
- */
+// WebKit re-rasters the tiled bg layer as its scale drifts mid-pinch: 40.4ms vs 19.3ms/frame
+// on iPad. Frame count ignores a single wheel notch; settle window bridges two notches.
 const BG_ZOOM_GESTURE_FRAMES = 3;
 const BG_ZOOM_SETTLE_MS = 150;
 
@@ -70,13 +43,8 @@ export function createZoomGestureState(): ZoomGestureState {
   return { lastZoom: Number.NaN, changedAt: 0, run: 0 };
 }
 
-/**
- * Whether the zoom is mid-gesture, from nothing but its value on earlier frames.
- *
- * Not asked of the viewport: a pinch, a trackpad zoom and an animated
- * transition have three different starts and only one has an end event, so
- * reading it off the zoom itself is both simpler and impossible to get stuck.
- */
+// Derived from the zoom value rather than viewport events: pinch, trackpad and animated
+// zooms have three different starts and only one has an end event.
 export function isZoomGestureActive(
   state: ZoomGestureState,
   zoom: number,
@@ -92,11 +60,6 @@ export function isZoomGestureActive(
   return state.run >= BG_ZOOM_GESTURE_FRAMES;
 }
 
-/**
- * The offset to translate the background layer by, given how far the view has
- * panned. The pattern repeats every tile, so shifting by a whole tile is
- * invisible and only the remainder has to be applied.
- */
 export function backgroundPanShift(
   panScreenPx: number,
   tileScreenPx: number,
@@ -107,12 +70,6 @@ export function backgroundPanShift(
   return ((panScreenPx % tileScreenPx) + tileScreenPx) % tileScreenPx;
 }
 
-/**
- * Paint one pattern tile and return it as a data URL.
- *
- * Rendered at `resolution` times its logical size so the dot stays crisp on a
- * retina display; the layer scales it back down through `background-size`.
- */
 export function buildBackgroundTile(
   style: Exclude<CanvasBackground, 'blank'>,
   color: string,
@@ -147,19 +104,9 @@ export function buildBackgroundTile(
 }
 
 /**
- * Owns the canvas layers (foreground content + cursor, selection overlay) and
- * the CSS-backed background layer, plus their RenderingContext-scoped concerns:
- * DPR math, sizing, and the per-frame clear/transform/draw passes. It reads
- * everything it needs from the canvas at `redraw()` time and never mutates it;
- * element ordering, selection, and placement lifecycle stay on DrawableCanvas.
- *
- * The background is a plain element with a repeating CSS background rather than
- * a third canvas. Measured on an iPad, filling one viewport with a
- * `CanvasPattern` cost roughly 8ms of a 24ms frame, and a third full-viewport
- * canvas is a third of the canvas memory that decides whether WebKit keeps 2D
- * contexts GPU-accelerated at all. As CSS, panning is a compositor translate
- * that repaints nothing, and a zoom repaints only when it crosses one of the
- * half-octave steps the tiling is painted at.
+ * The background is a CSS-backed element, not a third canvas. On iPad, filling one viewport
+ * with a CanvasPattern cost ~8ms of a 24ms frame, and a third full-viewport canvas is a third
+ * of the canvas memory that decides whether WebKit keeps 2D contexts GPU-accelerated at all.
  */
 export class CanvasRenderer {
   private readonly ctx: CanvasRenderingContext2D;
@@ -172,11 +119,7 @@ export class CanvasRenderer {
   private unsubTheme: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
-  /**
-   * The view the background layer's CSS was last written for. The tile only
-   * has to be re-sized when the zoom changes; a pan is a translate, and a run
-   * of panned frames all measure against the same painted tiling.
-   */
+  // The tile only needs re-sizing when the zoom changes; a pan is a translate.
   private bgLastRasterZoom = Number.NaN;
   private bgLastTransform = '';
 
@@ -187,14 +130,8 @@ export class CanvasRenderer {
   private readonly bgZoomGesture = createZoomGestureState();
   private bgTakenDown = false;
 
-  /**
-   * Whether the last frame left anything on the overlay canvas.
-   *
-   * `clearRect` on a full-viewport canvas invalidates its layer as thoroughly
-   * as drawing does, so an unconditional clear re-uploads the whole thing for a
-   * frame that ends up transparent — and nothing is selected for most of a
-   * session. On an iPad that was half of ~11ms of compositing per frame.
-   */
+  // clearRect invalidates a full-viewport layer as thoroughly as drawing does, so an
+  // unconditional clear re-uploads it for a transparent frame. Half of ~11ms/frame on iPad.
   private overlayHasContent = false;
 
   public constructor(
@@ -214,22 +151,15 @@ export class CanvasRenderer {
     this.unsubTheme = onCanvasThemeChange(() => {
       this.setBackgroundStyle(this.bgStyle);
     });
-    // The canvas fills its pane, whose width changes when the sidebar is
-    // toggled/resized or the pane is split — not only on window resize. Track
-    // the element's own laid-out size so the viewport center stays correct.
+    // Pane width also changes on sidebar toggle/resize and pane splits, not just window resize.
     this.resizeObserver = new ResizeObserver(() => {
       this.syncSizeToContainer();
     });
     this.resizeObserver.observe(this.canvas);
   }
 
-  /**
-   * Adopt the element that shows the canvas background.
-   *
-   * Its geometry is written here rather than left to the host's stylesheet
-   * because the overdraw is not a styling choice — it is what makes the pan
-   * translate safe, and it belongs with the code that relies on it.
-   */
+  // Geometry is written here rather than in the host stylesheet: the overdraw is what makes
+  // the pan translate safe.
   public setBackgroundHost(host: HTMLElement): void {
     this.bgHost = host;
     host.style.position = 'absolute';
@@ -240,14 +170,11 @@ export class CanvasRenderer {
     host.style.pointerEvents = 'none';
     host.style.backgroundRepeat = 'repeat';
     host.style.backgroundPosition = '0 0';
-    // Anchor the raster-step scale to the top-left corner. About the centre it
-    // would pull the layer's left and top edges inward, and the overdraw only
-    // covers the bottom-right growth of a scale that is never below 1.
+    // About the centre this would pull the left/top edges inward, and the overdraw only covers
+    // the bottom-right growth of a scale that is never below 1.
     host.style.transformOrigin = '0 0';
-    // Promote the layer up front. Without this the per-frame transform can be
-    // serviced by repainting the tiling instead of moving an existing texture,
-    // which is the entire cost this layer exists to avoid — and the promotion
-    // has to be standing, not decided on the first frame of a pan.
+    // Standing promotion. Decided on the first frame of a pan, the transform could be serviced
+    // by repainting the tiling instead of moving an existing texture.
     host.style.willChange = 'transform';
     // A host adopted mid-takedown would otherwise stay hidden forever.
     host.style.display = '';
@@ -265,10 +192,6 @@ export class CanvasRenderer {
     this.resizeOverlayCanvas(this.canvas.clientWidth, this.canvas.clientHeight);
   }
 
-  /**
-   * Swap the background pattern. Repaints the layer once; panning and zooming
-   * afterwards reuse the tile.
-   */
   public setBackgroundStyle(style: CanvasBackground): void {
     this.bgStyle = style;
     if (!this.bgHost) {
@@ -309,10 +232,6 @@ export class CanvasRenderer {
     this.ctx.scale(zoom, zoom);
     this.ctx.translate(offset.x, offset.y);
 
-    // Cull off-screen elements. Without this a frame costs what the whole note
-    // costs rather than what the screen shows, and a note is only ever added
-    // to — which is why inking gets slower the longer a page has been worked
-    // on, and why the ink then trails the pen.
     const viewRect = viewport.getWorldRect();
     const cullMargin = cullMarginWorld(zoom);
     for (const element of elements) {
@@ -331,10 +250,7 @@ export class CanvasRenderer {
     }
     this.ctx.restore();
 
-    // Overlay canvas: selection outline + handles. Always above DOM chrome
-    // so selection stays visible while a page frame is being edited.
-    // Read after the draw loop above, which is what advances `selectionT` from
-    // zero on the frame an element is selected.
+    // Read after the draw loop, which is what advances `selectionT` from zero.
     const overlayHasContent = elements.some(
       (element) => element.hasSelectionOverlay,
     );
@@ -364,28 +280,15 @@ export class CanvasRenderer {
       for (const element of elements) {
         element.syncDOM(viewport, domOverlayHost);
       }
-      // DOM overlay nodes share one layer, so among themselves they stack by
-      // DOM order, not the element z-order. syncDOM only appends a node when it
-      // first creates it, so a reorder (send backward/forward) never moves the
-      // existing nodes. Reconcile the overlay's child order to `elements` so
-      // overlapping DOM elements paint by z-order. Nodes move only when out of
-      // position, so steady-state frames touch nothing and an already-correct
-      // node (e.g. the focused editing textarea) is never re-inserted.
+      // DOM overlay nodes share one layer and stack by DOM order, not element z-order, and syncDOM
+      // only appends on create — so a reorder never moves them. Only out-of-position nodes move.
       reorderDomOverlay(domOverlayHost, elements);
     }
   }
 
-  /**
-   * Move the background layer to match the view.
-   *
-   * A pan is a translate of the already-painted tiling — no repaint, no
-   * rasterization, no texture upload; the compositor moves an existing layer.
-   * Styles are written only when the value they encode actually changed, since
-   * assigning an identical string still dirties the element.
-   *
-   * A zoom is the case this cannot win, so on tablet builds the layer is taken
-   * out of the tree for the length of one. @see BG_ZOOM_SETTLE_MS
-   */
+  // A pan is a compositor translate of the already-painted tiling. Styles are written only when
+  // their value changed, since assigning an identical string still dirties the element.
+  // A zoom is the case this cannot win, so on tablets the layer leaves the tree. @see BG_ZOOM_SETTLE_MS
   private syncBackground(zoom: number, offset: Vector2): void {
     const host = this.bgHost;
     if (!host) {
@@ -412,13 +315,9 @@ export class CanvasRenderer {
       this.bgLastRasterZoom = rasterZoom;
     }
 
-    // The world origin sits at screen (offset * zoom), and the tiling is
-    // anchored there. The layer's own top-left starts BG_OVERDRAW_PX before it,
-    // which is a whole number of tiles only when 3/zoom is an integer, so the
-    // overdraw is reduced along with the pan — left out, it is a phase error
-    // that slides the grid against the content as the zoom changes. Reducing
-    // modulo the tile keeps the translate inside the overdraw no matter how far
-    // the canvas has been panned.
+    // The layer's top-left starts BG_OVERDRAW_PX before the world origin, which is a whole number
+    // of tiles only when 3/zoom is an integer — so the overdraw is reduced along with the pan, or
+    // the grid slides against the content as the zoom changes.
     const tile = BG_TILE_SIZE * zoom;
     const shiftX = backgroundPanShift(offset.x * zoom + BG_OVERDRAW_PX, tile);
     const shiftY = backgroundPanShift(offset.y * zoom + BG_OVERDRAW_PX, tile);
@@ -431,12 +330,8 @@ export class CanvasRenderer {
     }
   }
 
-  /**
-   * Re-measure the container and resize all backing stores. Called on DPR
-   * changes (e.g. moving the window between monitors), which fire a window
-   * resize but may not change the element's CSS box, so the ResizeObserver
-   * alone would miss them.
-   */
+  // DPR changes (e.g. moving the window between monitors) fire a window resize without
+  // necessarily changing the element's CSS box, so the ResizeObserver alone misses them.
   public refreshSize(): void {
     this.syncSizeToContainer();
   }
@@ -450,13 +345,8 @@ export class CanvasRenderer {
     this.resizeObserver = null;
   }
 
-  /**
-   * Size every backing store to the foreground canvas's laid-out size. The
-   * canvas is stretched to its pane by CSS (`inset-0`), so `clientWidth/Height`
-   * is the visible viewport — the sidebar's width is already excluded. Both
-   * canvas layers share the same container, so one measurement drives them
-   * both; the background layer is sized in CSS and needs nothing here.
-   */
+  // The canvas is stretched to its pane by CSS, so clientWidth/Height is the visible viewport
+  // with the sidebar already excluded. The background layer is sized in CSS.
   private syncSizeToContainer(): void {
     const width = this.canvas.clientWidth;
     const height = this.canvas.clientHeight;
@@ -465,11 +355,8 @@ export class CanvasRenderer {
     }
     this.resizeCanvas(width, height);
     this.resizeOverlayCanvas(width, height);
-    // A DPR change arrives as a resize, and the tile is rasterized for a
-    // specific DPR — rebuild it so it stays crisp on the new display. Only
-    // then, though: dragging the sidebar or a split divider fires a resize per
-    // frame, and rebuilding encodes a PNG and repaints the whole overdrawn
-    // layer for a tile that would come out identical.
+    // Only on a DPR change: dragging the sidebar or a split divider fires a resize per frame, and
+    // a rebuild encodes a PNG and repaints the whole overdrawn layer for an identical tile.
     if ((window.devicePixelRatio || 1) !== this.bgTileDpr) {
       this.setBackgroundStyle(this.bgStyle);
     }
@@ -494,12 +381,6 @@ export class CanvasRenderer {
   }
 }
 
-/**
- * Order the DOM overlay's children to match the element z-order. Each DOM-backed
- * element tags its overlay node with `data-element-uuid`; walking `elements` in
- * order and inserting only out-of-position nodes yields the desired stacking
- * with the minimum number of DOM moves (none once orders agree).
- */
 function reorderDomOverlay(
   host: HTMLElement,
   elements: DrawableElement[],

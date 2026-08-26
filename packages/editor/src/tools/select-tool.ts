@@ -114,14 +114,12 @@ export class SelectTool implements ITool {
     const point = canvas.viewport.getPoint(event);
     this.startPoint = point;
 
-    // Modifier+click toggles a single element in/out of the selection without
-    // clearing the rest. Cmd on macOS / Ctrl on Windows, matching the app-wide
-    // shortcut convention (and avoiding the macOS Ctrl+click right-click gesture).
+    // Cmd on macOS / Ctrl on Windows, matching the app-wide convention and avoiding the macOS
+    // Ctrl+click right-click gesture.
     const additive = isApplePlatform ? event.metaKey : event.ctrlKey;
 
-    // A finger reaches handles with the larger touch radius. This has to match
-    // the test DrawableCanvas ran to hand the gesture to this tool, or a handle
-    // a finger grabbed there would miss here and fall through to a move.
+    // Must match the test DrawableCanvas ran to hand the gesture to this tool, or a handle a finger
+    // grabbed there would miss here and fall through to a move.
     const touch = event.pointerType === 'touch';
 
     // 1. Check handles on selected elements first
@@ -181,9 +179,8 @@ export class SelectTool implements ITool {
       return;
     }
 
-    // An unselected backdrop (page frame, PDF) doesn't grab: a drag starting on
-    // its body draws a marquee over what is drawn on top of it instead of moving
-    // it. A marquee that catches nothing was a click on the backdrop after all —
+    // An unselected backdrop (page frame, PDF) doesn't grab: a drag on its body draws a marquee over
+    // what is on top of it. A marquee that catches nothing was a click on the backdrop after all —
     // finish() selects it then.
     const grabbable = hits.filter((e) => e.grabsFromBody);
 

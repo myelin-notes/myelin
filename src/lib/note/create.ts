@@ -4,9 +4,9 @@ import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
 } from '@myelin/editor/elements/page-frame-constants';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { Repository, VFSNodeId } from '@/lib/sync';
-import { UserPrefs } from '@/lib/user-prefs';
 
 export async function createBlankCanvasFile(
   repository: Repository,

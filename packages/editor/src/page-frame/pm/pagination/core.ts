@@ -23,11 +23,9 @@ export interface ParagraphPaginationResult {
 }
 
 /**
- * One visual line inside a paragraph, in CSS pixels relative to the editor
- * content top, as if no pagination decorations existed. `getPos` is lazy —
- * it's only called when the pagination loop actually decides to emit a
- * break at this line, so measurers can defer any expensive DOM lookups until
- * they're actually needed.
+ * One visual line inside a paragraph, in CSS pixels relative to the editor content top, as if no
+ * pagination decorations existed. `getPos` is lazy — called only when the loop decides to emit a
+ * break at this line, so measurers can defer expensive DOM lookups.
  */
 export interface ParagraphLine {
   naturalTop: number;
@@ -82,13 +80,9 @@ interface CalculateBreakLayoutOptions<Block extends PaginationBlock> {
 }
 
 /**
- * Walk a paragraph's line list and emit page breaks.
- *
- * This is the *only* pagination algorithm for paragraphs. It doesn't know
- * or care how the lines were measured — Pretext or DOM — it just walks
- * them in order, checks whether each one crosses the current page boundary
- * in effective coordinates (natural + accumulated shift), and emits a
- * widget break when one does.
+ * The *only* pagination algorithm for paragraphs. It doesn't know how the lines were measured —
+ * Pretext or DOM — it walks them in order, checks whether each crosses the current page boundary
+ * in effective coordinates (natural + accumulated shift), and emits a widget break when one does.
  */
 export function paginateParagraph(
   lines: ParagraphLine[],
@@ -119,9 +113,8 @@ export function paginateParagraph(
       const spacer = pageBoundary + PAGE_BREAK_GAP - lineEffectiveTop;
       if (spacer > 0) {
         if (lineIndex === 0) {
-          // If the paragraph's first visual line doesn't fit, move the whole
-          // paragraph with a block break. An inline widget at char 0 creates
-          // unstable layout inside the paragraph itself.
+          // If the paragraph's first visual line doesn't fit, move the whole paragraph with a block break:
+          // an inline widget at char 0 creates unstable layout inside the paragraph itself.
           breaks.push({ pos: blockPos, spacer, kind: 'block' });
           cumulativeShift += spacer;
         } else {

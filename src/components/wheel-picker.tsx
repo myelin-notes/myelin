@@ -135,11 +135,9 @@ export const WheelPicker = memo(function WheelPicker({
       const cx = Math.min(Math.max(event.clientX, outer), vw - outer);
       const cy = Math.min(Math.max(event.clientY, outer), vh - outer);
       if (groupRef.current) {
-        // groupRef is absolutely positioned within a container that may be
-        // offset from the viewport (e.g. by the persistent sidebar). Convert
-        // the viewport-space pointer position into the container's local
-        // coordinate space so the wheel renders under the cursor. Pointer
-        // hit-testing (centerRef) stays in viewport space to match evt.clientX.
+        // groupRef is absolutely positioned within a container that may be offset from the viewport (e.g.
+        // by the sidebar), so convert the pointer position into container-local space. Hit-testing
+        // (centerRef) stays in viewport space to match evt.clientX.
         const origin = groupRef.current.offsetParent?.getBoundingClientRect();
         const originX = origin?.left ?? 0;
         const originY = origin?.top ?? 0;
@@ -200,13 +198,11 @@ export const WheelPicker = memo(function WheelPicker({
       const count = its.length;
       const delta = TWO_PI / count;
 
-      // Center zone
       if (dist < CENTER_ZONE) {
         updateFocus([]);
         return;
       }
 
-      // Ring 0
       if (dist < r0Outer) {
         const idx = angleToIndex(angle, count);
         if (idx >= 0) {
@@ -256,9 +252,8 @@ export const WheelPicker = memo(function WheelPicker({
     }
 
     function handlePointerUp(evt: PointerEvent) {
-      // Mouse opens the wheel with the right button, pen and touch with a
-      // press-and-hold. Whichever it was, only that pointer's lift commits, so
-      // a stray second finger cannot choose for it.
+      // Mouse opens the wheel with the right button, pen and touch with a press-and-hold. Only the
+      // opening pointer's lift commits, so a stray second finger cannot choose for it.
       if (evt.pointerId !== openedByRef.current) {
         return;
       }

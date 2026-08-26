@@ -19,10 +19,8 @@ import { renderKatex } from './render';
 
 const mathPreviewKey = new PluginKey<DecorationSet>('math-preview');
 
-/**
- * Strictly inside the range — a cursor sitting at either boundary keeps the
- * rendered preview, so typing next to a formula doesn't flash its source.
- */
+// Strictly inside: a cursor at either boundary keeps the rendered preview, so typing next to a
+// formula doesn't flash its source.
 function selectionTouches(
   selection: Selection,
   from: number,
@@ -57,22 +55,17 @@ function inlineMathRanges(node: PMNode, pos: number): InlineMathRange[] {
   return ranges;
 }
 
-/**
- * Inline math sources render as KaTeX while the selection is elsewhere: an
- * inline decoration hides the `$...$` source and a widget draws the formula
- * in its place. Math blocks get an editing class while the selection is
- * inside so CSS can swap the node view's preview for the raw source.
- */
+// Inline math renders as KaTeX while the selection is elsewhere: an inline decoration hides the
+// `$...$` source and a widget draws the formula. Math blocks get an editing class while the
+// selection is inside so CSS can swap the node view's preview for the raw source.
 function buildMathDecorationsForTextblock(
   node: PMNode,
   pos: number,
   selection: Selection,
 ): Decoration[] {
   if (node.type.name === 'mathBlock') {
-    // Editing requires the selection to be contained inside the block's
-    // content, not merely overlapping it: a cross-block range keeps the
-    // preview, and containment guarantees at most one block edits at a
-    // time — the source editor is a single shared CodeMirror instance.
+    // Containment, not overlap: a cross-block range keeps the preview, and containment guarantees at
+    // most one block edits at a time — the source editor is a single shared CodeMirror instance.
     const from = pos + 1;
     const to = pos + node.nodeSize - 1;
     if (selection.from < from || selection.to > to) {
@@ -191,9 +184,8 @@ export function mathPreviewPlugin(): Plugin<DecorationSet> {
 
         const mapped = tr.docChanged ? prev.map(tr.mapping, tr.doc) : prev;
 
-        // Only textblocks whose content or swap state can change need a
-        // rebuild: blocks touched by the edit plus the blocks around the old
-        // and new selection endpoints.
+        // Only blocks touched by the edit, plus those around the old and new selection endpoints, can
+        // change content or swap state.
         const dirty = new Map<number, PMNode>();
         if (tr.docChanged) {
           const ranges = getChangedRangesForTransaction(tr);
@@ -230,9 +222,8 @@ export function mathPreviewPlugin(): Plugin<DecorationSet> {
       decorations(state) {
         return mathPreviewKey.getState(state) ?? DecorationSet.empty;
       },
-      // The browser can't place a caret reliably around display:none source
-      // text, so default horizontal arrow movement skips or misplaces the
-      // cursor at rendered formulas. Step into/over them explicitly.
+      // The browser can't place a caret reliably around display:none source text, so default horizontal
+      // arrow movement skips or misplaces the cursor at rendered formulas.
       handleKeyDown(view, event) {
         if (
           (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
@@ -257,9 +248,8 @@ export function mathPreviewPlugin(): Plugin<DecorationSet> {
         const cursor = selection.from;
         for (const { from, to } of inlineMathRanges(parent, $pos.before())) {
           if (event.key === 'ArrowRight') {
-            // Approach → boundary → just inside the opening delimiter
-            // (reveals the source) → ... → boundary after, one explicit
-            // step at a time. Default movement would skip the hidden text.
+            // Approach → boundary → just inside the opening delimiter (reveals the source) → ... → boundary
+            // after, one explicit step at a time. Default movement would skip the hidden text.
             if (cursor === from - 1) {
               setCursor(view, from);
               return true;

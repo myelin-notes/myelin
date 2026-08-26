@@ -24,11 +24,7 @@ export interface FenceSource {
   delimiterLines: readonly number[];
 }
 
-/**
- * Locates a fenced block's delimiter lines: the 1-based line numbers to dim
- * (opening + closing) and the closing fence line, or nulls when the text
- * isn't a complete `opening…closing` fenced block.
- */
+// Returns nulls when the text isn't a complete `opening…closing` fenced block.
 export function parseFenceSource(text: string): FenceSource {
   const lines = text.split('\n');
   const closingFenceLine = lines.length;
@@ -68,12 +64,8 @@ export interface RunSource {
   source: string;
 }
 
-/**
- * Builds the org-mode-style run payload for the code block at `targetPos`:
- * concatenates the bodies of every same-language code block up to and including
- * the target, in document order. Returns null when the target block isn't a
- * runnable code block.
- */
+// Org-mode style: concatenates the bodies of every same-language code block up to and including
+// the target, in document order. Null when the target isn't a runnable code block.
 export function collectRunSource(
   doc: PMNode,
   targetPos: number,

@@ -1,11 +1,11 @@
 import { type KeyboardEvent, useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMessages } from '@myelin/editor/i18n';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { Button } from '@myelin/ui/button';
 import { useResettableTimeout } from '@/hooks/use-resettable-timeout';
 import { trackEvent } from '@/lib/analytics';
-import { useMessages } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
-import { UserPrefs } from '@/lib/user-prefs';
 import { ToggleRow } from '../components/toggle-row';
 
 const MIN_PORT = 1;

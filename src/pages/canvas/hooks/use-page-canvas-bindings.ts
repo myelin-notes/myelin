@@ -7,11 +7,8 @@ import type { EmbedFilesFn } from './use-embed-files';
 const PEN_HOLD_MS = 350;
 /** Movement past this (px) during the hold means the pen is drawing, not resting. */
 const PEN_HOLD_SLOP = 6;
-/**
- * A resting finger summons it too, but slower and with more room to wobble: a
- * finger has no barrel button to fall back on, is far less precise than a tip,
- * and pausing briefly part-way through a pan is ordinary.
- */
+// Longer than the pen's: a finger has no barrel button to fall back on, is far less precise than
+// a tip, and pausing part-way through a pan is ordinary.
 const TOUCH_HOLD_MS = 450;
 const TOUCH_HOLD_SLOP = 10;
 /** PointerEvent.button for a stylus barrel button. */
@@ -32,11 +29,9 @@ export function usePageCanvasBindings({
   onCanvasPointerDown,
   embedFiles,
 }: UsePageCanvasBindingsArgs) {
-  // The pen may already have begun using the active tool — resting to summon
-  // the wheel starts a stroke, and the barrel can be pressed mid-stroke — so
-  // whatever is in flight is thrown away rather than committed. A finger is
-  // panning rather than drawing, and the canvas is the side that knows whether
-  // that gesture is free to take.
+  // The pen may already have begun using the active tool — resting to summon the wheel starts a
+  // stroke, and the barrel can be pressed mid-stroke — so whatever is in flight is thrown away.
+  // A finger is panning rather than drawing, and the canvas knows whether that gesture is free to take.
   const openToolWheel = useEffectEvent((event: PointerEvent) => {
     const canvas = drawableCanvasRef.current;
     if (event.pointerType === 'touch') {
@@ -62,9 +57,8 @@ export function usePageCanvasBindings({
       }
       return;
     }
-    // A stylus barrel button is the pen-side right-click, so it opens the wheel
-    // outright rather than making the user wait out the hold. Apple Pencils
-    // have no barrel button; S Pen / Surface Pen / Wacom do.
+    // A stylus barrel button is the pen-side right-click, so it opens the wheel outright rather than
+    // waiting out the hold. Apple Pencils have no barrel button; S Pen / Surface Pen / Wacom do.
     if (event.pointerType === 'pen' && event.button === PEN_BARREL_BUTTON) {
       openToolWheel(event);
     }
@@ -97,9 +91,7 @@ export function usePageCanvasBindings({
     };
     canvas.addEventListener('contextmenu', handleContextMenu);
 
-    // Press-and-hold opens the tool wheel, so the tool can be swapped without
-    // setting the pen down or reaching the tool bar. Tracked by pointer id: a
-    // palm resting on the screen emits its own moves, and those must not
+    // Tracked by pointer id: a palm resting on the screen emits its own moves, and those must not
     // cancel the hold.
     let holdTimer: ReturnType<typeof setTimeout> | null = null;
     let hold: { id: number; x: number; y: number; slop: number } | null = null;

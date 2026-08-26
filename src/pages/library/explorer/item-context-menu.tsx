@@ -1,10 +1,10 @@
 import { FolderOpen, History, Pencil, Tag, Trash2 } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@myelin/ui/context-menu';
-import { useMessages } from '@/lib/i18n';
 
 interface ItemContextMenuProps {
   onRename: () => void;

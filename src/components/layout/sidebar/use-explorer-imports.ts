@@ -1,9 +1,9 @@
 import { type ChangeEvent, useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import type { Messages } from '@myelin/editor/i18n';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { errorDescription } from '@/components/command-palette/utils';
 import { trackEvent } from '@/lib/analytics';
-import type { Messages } from '@/lib/i18n';
 import { useRepository } from '@/lib/sync';
 import type { ImportSource } from '@/pages/library/import/dialog';
 import {

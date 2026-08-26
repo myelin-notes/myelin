@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { ArrowDownToLine, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useMessages } from '@myelin/editor/i18n';
 import { errorDescription } from '@/components/command-palette/utils';
-import { useMessages } from '@/lib/i18n';
 import { installUpdate, useUpdate } from '@/lib/updater';
 
 /**

@@ -14,20 +14,13 @@ export interface CodeRunEntry {
   visible: boolean;
 }
 
-/**
- * Line appends are coalesced to at most one notify per this interval. The
- * overlay re-render is O(line count) (the virtualizer rebuilds its offsets), so
- * pacing updates well below the display refresh rate keeps a flood of output
- * from saturating the main thread — ~15 Hz still reads as continuous streaming.
- */
+// The overlay re-render is O(line count) (the virtualizer rebuilds its offsets), so pacing well
+// below the display refresh rate keeps a flood of output from saturating the main thread — ~15 Hz
+// still reads as continuous streaming.
 const OUTPUT_FLUSH_MS = 64;
 
-/**
- * Bridges the vanilla code-block node views to the React output overlay layer.
- * Node views push run state here; {@link CodeRunOverlayLayer} renders it. Line
- * appends are coalesced (see {@link OUTPUT_FLUSH_MS}) so a flood of output
- * doesn't trigger a render per line.
- */
+// Bridges the vanilla code-block node views to the React output overlay layer. Node views push run
+// state here; {@link CodeRunOverlayLayer} renders it.
 class CodeRunStore {
   private readonly entries = new Map<string, CodeRunEntry>();
   private readonly listeners = new Set<() => void>();

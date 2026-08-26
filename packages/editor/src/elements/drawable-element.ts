@@ -25,15 +25,11 @@ const SELECTION_PADDING = 4;
 const SELECTION_RADIUS = 4;
 const SELECTION_ANIM_SPEED = 8;
 
-// Screen-space radius (px) for grabbing a resize handle, divided by zoom to get
-// a world-space tolerance. Shared by every mouse/pen consumer of `hitHandle` so
-// the grab target stays identical wherever a resize can start.
+// Screen-space radius (px) for grabbing a resize handle, divided by zoom for world tolerance.
 const HANDLE_HIT_RADIUS = 10;
 
-// The same target for a fingertip, which lands far less precisely than a cursor
-// and covers the handle it is aiming at. 10px is close to unhittable by touch;
-// this is nearer the ~44pt Apple asks for. Touch call sites opt in through
-// `hitHandle`, so mouse and pen keep the tighter radius.
+// The same target for a fingertip, nearer the ~44pt Apple asks for. Touch call sites opt in
+// through `hitHandle`, so mouse and pen keep the tighter radius.
 export const HANDLE_TOUCH_HIT_RADIUS = 22;
 
 export const MIN_SCALE = 0.05;
@@ -103,10 +99,7 @@ export abstract class DrawableElement {
   private _yFields: YFieldMap = {};
 
   protected constructor(
-    /**
-     * Stable element identity within a canvas document. Used to key
-     * element-owned Yjs state such as page-frame ProseMirror fragments.
-     */
+    // Keys element-owned Yjs state such as page-frame ProseMirror fragments.
     public readonly uuid: string,
     public readonly type: ElementType,
   ) {}
@@ -122,10 +115,7 @@ export abstract class DrawableElement {
     return this._scale;
   }
 
-  /**
-   * Bind this element to a Y.Map and read initial values. The canvas applies
-   * future remote changes by calling syncFromYMap.
-   */
+  // Future remote changes arrive via syncFromYMap.
   public bindToYMap(yMap: Y.Map<unknown>): void {
     this._yMap = yMap;
     this._yFields = {};
@@ -217,50 +207,30 @@ export abstract class DrawableElement {
     ctx.restore();
   }
 
-  /**
-   * Emit native PDF draw commands for this element when it overlays a PDF element
-   * being exported. No-op by default; drawable overlays (ink, text, image) override.
-   */
+  // Emitted when this element overlays a PDF element being exported. Drawable overlays override.
   public drawToPdf(_ctx: PdfHarvestContext): void {}
 
-  /**
-   * Render this element into an off-screen thumbnail context. Async-rendering
-   * elements (e.g. PDF) override to prepare their raster ahead of `drawThumbnail`.
-   * No-op by default.
-   */
+  // Async-rendering elements (e.g. PDF) override to prepare their raster ahead of `drawThumbnail`.
   public async prepareThumbnail(
     _maxScale: number,
     _region: DOMRect,
   ): Promise<void> {}
 
-  /**
-   * Prepare any async resource `drawToPdf` needs before a synchronous harvest
-   * pass (e.g. rasterizing HTML/math to a bitmap). The export path awaits this
-   * for each overlay element before harvesting. No-op by default.
-   */
+  // e.g. rasterizing HTML/math to a bitmap. The export path awaits this for each overlay element.
   public async prepareForPdf(): Promise<void> {}
 
-  /**
-   * Render this element into an off-screen thumbnail context. Reuses the 2D
-   * draw pass by default; DOM-backed elements override to paint their content.
-   */
+  // Reuses the 2D draw pass by default; DOM-backed elements override to paint their content.
   public drawThumbnail(ctx: CanvasRenderingContext2D, deltaTime: number): void {
     this.draw2D(ctx, deltaTime);
   }
 
-  /**
-   * Whether `drawSelectionOverlay` would put anything on the overlay canvas.
-   * Exactly the condition that method early-returns on, so the renderer can
-   * decide whether the overlay has to be touched at all this frame.
-   */
+  // Exactly the condition `drawSelectionOverlay` early-returns on, so the renderer can skip
+  // touching the overlay canvas entirely.
   public get hasSelectionOverlay(): boolean {
     return !this._hidden && this.selectionT > 0;
   }
 
-  /**
-   * Draw the selection outline + handles. Lives on a separate always-on-top
-   * canvas so it's visible above DOM-backed editing chrome.
-   */
+  // On a separate always-on-top canvas so it stays visible above DOM-backed editing chrome.
   public drawSelectionOverlay(
     ctx: CanvasRenderingContext2D,
     isEditing: boolean,
@@ -279,9 +249,8 @@ export abstract class DrawableElement {
     t: number,
     isEditing: boolean,
   ): void {
-    // Derive from boundingBox (world, less offset) so element-specific
-    // overrides — e.g. PDF mixing scaled content with unscaled chrome padding —
-    // flow through consistently.
+    // Derive from boundingBox so element-specific overrides — e.g. PDF mixing scaled content with
+    // unscaled chrome padding — flow through consistently.
     const box = this.boundingBox;
     const eased = 1 - (1 - t) * (1 - t);
 
@@ -363,40 +332,25 @@ export abstract class DrawableElement {
     return false;
   }
 
-  /**
-   * Whether a press inside this element's bounding box grabs it — for moving it
-   * with the select tool, or for handing a finger to that tool instead of
-   * panning. An unselected backdrop says no: its body covers the area gestures
-   * travel across, so a drag starting there belongs to whatever is drawn on top
-   * of it (a marquee, or a one-finger pan) rather than to the backdrop.
-   */
+  // An unselected backdrop says no: its body covers the area gestures travel across, so a drag
+  // starting there belongs to whatever is drawn on top of it (a marquee, or a one-finger pan).
   public get grabsFromBody(): boolean {
     return this.isSelected || !isBackgroundElement(this.type);
   }
 
-  /**
-   * Whether the selection toolbar stays up while this element is in edit mode.
-   * Elements whose toolbar acts on the thing being edited (text style controls)
-   * want this; elements that carry their own in-place editing chrome don't.
-   */
+  // Elements whose toolbar acts on the thing being edited (text style controls) want this;
+  // elements carrying their own in-place editing chrome don't.
   public get keepsSelectionToolbarWhileEditing(): boolean {
     return false;
   }
 
-  /**
-   * Whether editing this element locks the viewport to single-axis pan (and
-   * routes wheel/two-finger gestures to scrolling the element). This is a
-   * paged-surface behavior — only multi-page elements like the page frame want
-   * it; free-floating editors (text, LaTeX) should pan the canvas freely.
-   */
+  // A paged-surface behavior — only multi-page elements like the page frame want it; free-floating
+  // editors (text, LaTeX) should pan the canvas freely.
   public get locksViewportPanWhileEditing(): boolean {
     return false;
   }
 
-  /**
-   * Hook for binding extra shared Yjs state that does not live on the
-   * element's main Y.Map.
-   */
+  // For shared state that does not live on the element's main Y.Map.
   public bindSharedYState(_ydoc: YDocManager): void {}
 
   /** Called when the element enters inline edit mode. Returns the root DOM element of the editing UI, if any. */
@@ -407,14 +361,9 @@ export abstract class DrawableElement {
   ): HTMLElement | null {
     return null;
   }
-  /** Called when the element exits inline edit mode. */
   public exitEditMode(): void {}
 
-  /**
-   * Hook for elements that render as DOM rather than on the 2D canvas.
-   * Called once per frame from `DrawableCanvas.redraw()` after the 2D pass,
-   * with the shared DOM overlay host. Default: no-op.
-   */
+  // Called once per frame from `DrawableCanvas.redraw()` after the 2D pass.
   public syncDOM(_viewport: CanvasViewport, _host: HTMLElement): void {}
 
   /** Detach any DOM this element created. Called on removal. Default: no-op. */
@@ -443,14 +392,8 @@ export abstract class DrawableElement {
     );
   }
 
-  /**
-   * Whether the world-space bounding box overlaps `rect`, inflated on every
-   * side by `margin`.
-   *
-   * Same geometry as intersecting `boundingBox`, but without the DOMRect it
-   * allocates — the renderer asks this of every element on the canvas, every
-   * frame.
-   */
+  // Same geometry as intersecting `boundingBox`, but without the DOMRect it allocates — the
+  // renderer asks this of every element, every frame.
   public intersectsWorldRect(rect: DOMRect, margin: number): boolean {
     const raw = this.localBoundingBox;
     const x1 = raw.x * this._scale.x + this._offset.x;
@@ -479,11 +422,7 @@ export abstract class DrawableElement {
     return this.isOverLocal(localX, localY, localRadius, ctx);
   }
 
-  /**
-   * Which resize handles this element exposes. Default: all 8.
-   * Override per element type to disable axes that don't make sense
-   * (e.g. page frames don't scale vertically).
-   */
+  // Override to disable axes that don't make sense (e.g. page frames don't scale vertically).
   public get resizeHandles(): ResizeHandles {
     return ResizeHandles.All;
   }
@@ -532,10 +471,7 @@ export abstract class DrawableElement {
     return result;
   }
 
-  /**
-   * The resize handle under `point` (world space), or null if none. Pass
-   * `touch` for finger input, which grabs with the larger radius.
-   */
+  // Pass `touch` for finger input, which grabs with the larger radius.
   public hitHandle(
     point: Vector2,
     zoom: number,
@@ -543,10 +479,8 @@ export abstract class DrawableElement {
   ): ResizeHandle | null {
     const hitRadius =
       (touch ? HANDLE_TOUCH_HIT_RADIUS : HANDLE_HIT_RADIUS) / zoom;
-    // Nearest match, not first: on an element small enough that the radius
-    // spans neighbouring handles, taking whichever `getHandles` happens to list
-    // first would resize along the wrong axis (a corner grab turning into a
-    // horizontal-only stretch).
+    // Nearest match, not first: on an element small enough that the radius spans neighbouring
+    // handles, taking whichever `getHandles` lists first would resize along the wrong axis.
     let best: ResizeHandle | null = null;
     let bestDistSq = hitRadius * hitRadius;
     for (const h of this.getHandles()) {
@@ -561,11 +495,7 @@ export abstract class DrawableElement {
     return best;
   }
 
-  /**
-   * Buttons this element contributes to the selection toolbar when it is the
-   * sole selected element. Default: none. Override to expose element-specific
-   * actions (e.g. crop on image).
-   */
+  // Only when it is the sole selected element. Override to expose element-specific actions.
   public getSelectionToolbarItems(_strings: Messages): SelectionToolbarItem[] {
     return [];
   }
@@ -573,12 +503,8 @@ export abstract class DrawableElement {
   /** Called once when a resize drag begins. Snapshot any baseline state here. */
   public beginResize(): void {}
 
-  /**
-   * Apply a resize drag update. Default implementation scales the element
-   * (setScale) and re-derives offset so the anchor side stays fixed. Override
-   * to interpret the drag differently (e.g. page frame changing page width
-   * rather than scale).
-   */
+  // Default scales the element and re-derives offset so the anchor side stays fixed. Override to
+  // interpret the drag differently (e.g. page frame changing page width rather than scale).
   public applyResize(opts: {
     handle: ResizeHandle;
     originalScale: Vector2;

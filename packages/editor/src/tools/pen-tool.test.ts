@@ -99,10 +99,9 @@ function squiggleStroke(): Pt[] {
 }
 
 /**
- * Mock DrawableCanvas that binds every added element to a REAL Y.Map (via a real
- * YDocManager). This is essential: PenTool.tryRecognize bails when
- * currentStroke.yMap === null, and StrokeElement.addPoint only mirrors into the
- * Y.Array when bound — a mock that skips binding would silently never snap.
+ * Binds every added element to a REAL Y.Map via a real YDocManager. Essential: PenTool.tryRecognize
+ * bails when currentStroke.yMap === null, and StrokeElement.addPoint only mirrors into the Y.Array
+ * when bound — a mock that skips binding would silently never snap.
  *
  * `bind: false` reproduces the unbound-stroke case for the yMap-null guard test.
  */
@@ -454,9 +453,8 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(stroke.xyPoints.length).toBe(before + 1);
   });
 
-  // Uses REAL timers: Yjs UndoManager.captureTimeout (500ms) is measured on a
-  // wall-clock that vitest fake timers do not advance, so the DWELL(600) >
-  // captureTimeout(500) separation only manifests with real elapsed time.
+  // REAL timers: Yjs UndoManager.captureTimeout (500ms) runs on a wall clock vitest fake timers do
+  // not advance, so the DWELL(600) > captureTimeout(500) separation only shows with real elapsed time.
   it('undo restores the stroke after a snap (atomic group)', async () => {
     vi.useRealTimers();
     const { canvas, ydoc, created } = makeCanvas({ realTransact: true });
@@ -473,9 +471,8 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(ydoc.elements.get(0).get('type')).toBe(shape.type);
 
     ydoc.undoManager.undo();
-    // The remove+add was one atomic, local-origin transaction captured as its own
-    // undo group (snap > captureTimeout after the stroke), so one undo step brings
-    // the stroke's Y.Map back rather than wiping both.
+    // The remove+add was one atomic, local-origin transaction captured as its own undo group, so one
+    // undo step brings the stroke's Y.Map back rather than wiping both.
     expect(ydoc.elements.length).toBe(1);
     expect(ydoc.elements.get(0).get('type')).toBe(created[0].type);
   });

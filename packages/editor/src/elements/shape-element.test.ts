@@ -8,10 +8,8 @@ import type { StrokeStyle } from './stroke-element';
 
 const STYLE: StrokeStyle = { color: '#191c1e', size: 8 };
 
-/**
- * Simulate the canvas addElement → bind path: write the element's getYMapProps
- * (with the points Y.Array) into a real Y.Map, then bind a fresh element to it.
- */
+// Simulates the canvas addElement → bind path: write getYMapProps (with the points Y.Array) into a
+// real Y.Map, then bind a fresh element to it.
 function persistAndReload(source: ShapeElement): ShapeElement {
   const ydoc = new YDocManager();
   const props = {
@@ -189,9 +187,8 @@ describe('ShapeElement resize', () => {
 
 describe('ShapeElement bounding box', () => {
   it('gives a horizontal line a selectable box', () => {
-    // The recognizer levels near-horizontal lines, so both endpoints share a y.
-    // A zero-height box is unhittable: inBox uses strict inequalities and
-    // marquee selection compares against the box area.
+    // The recognizer levels near-horizontal lines, so both endpoints share a y. A zero-height box is
+    // unhittable: inBox uses strict inequalities and marquee selection compares against the box area.
     const shape = new ShapeElement('hl', 'line', [0, 0, 200, 0], STYLE);
     shape.setOffset(50, 100);
 

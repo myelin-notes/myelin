@@ -3,14 +3,12 @@ import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { NestedEditorSelection } from './editor';
 
-/** The nested-editor state the boundary predicate inspects. */
 interface BoundaryEditor {
   getSelection: () => NestedEditorSelection;
   getCursorPosition: () => { column: number; lineNumber: number };
   getLineMaxColumn: (lineNumber: number) => number | null;
 }
 
-/** The key-event fields the boundary predicate inspects. */
 interface BoundaryInputEvent {
   altKey: boolean;
   ctrlKey: boolean;
@@ -19,13 +17,8 @@ interface BoundaryInputEvent {
   metaKey: boolean;
 }
 
-/**
- * Whether a keystroke at the very end of the closing fence line should
- * continue outside the block instead of inside the nested editor: the
- * selection is empty, the cursor sits at the end of `closingFenceLine`, no
- * modifiers/composition are active, and the key is Enter or a single
- * printable character.
- */
+// True when the selection is empty, the cursor sits at the end of `closingFenceLine`, no
+// modifiers/composition are active, and the key is Enter or a single printable character.
 export function shouldMoveInputOutsideBlock(
   editor: BoundaryEditor,
   closingFenceLine: number | null,
@@ -62,11 +55,8 @@ export function shouldMoveInputOutsideBlock(
   return event.key.length === 1;
 }
 
-/**
- * Insert typed text into a paragraph just after the block: reuse the
- * following paragraph when there is one, otherwise create it, drop the text
- * in, place the cursor after it, and hand focus back to the ProseMirror view.
- */
+// Reuses the following paragraph when there is one, otherwise creates it, then hands focus back
+// to the ProseMirror view.
 export function insertTextAfterBlock(
   view: EditorView,
   getPos: () => number,

@@ -6,18 +6,16 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { IS_MOBILE_BUILD } from '@/lib/env';
-import { UserPrefs } from '@/lib/user-prefs';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 export const SIDEBAR_MIN_WIDTH = 220;
 export const SIDEBAR_MAX_WIDTH = 480;
 
-// Below this viewport width the persistent column can't coexist with usable
-// content, so the sidebar becomes an overlay drawer instead. Runtime/adaptive
-// by design — the same Sidebar reflows, it isn't a separate mobile UI. Only
-// reached on desktop builds; mobile builds skip the sidebar entirely.
+// Below this width the persistent column can't coexist with usable content, so the sidebar becomes
+// an overlay drawer. Only reached on desktop builds; mobile builds skip the sidebar entirely.
 const SIDEBAR_COMPACT_MAX_WIDTH = 767;
 const SIDEBAR_COMPACT_QUERY = `(max-width: ${SIDEBAR_COMPACT_MAX_WIDTH}px)`;
 
@@ -31,18 +29,15 @@ interface SidebarContextValue {
   /** Viewport is narrow, so the sidebar renders as an overlay drawer. */
   isCompact: boolean;
   /**
-   * Mobile build: replace the sidebar entirely with a full-page library home.
-   * Applies at every mobile viewport size — phones and tablets get the same
-   * layout, and the library page itself reflows down to a single column.
+   * Mobile build: replace the sidebar entirely with a full-page library home, at every mobile
+   * viewport size — phones and tablets get the same layout.
    */
   mobileLayout: boolean;
   /**
-   * Mobile build on a phone-sized screen. Narrower than {@link mobileLayout}:
-   * the tab strip is replaced by the active document's title, and the tab
-   * controller keeps a single tab per pane to match.
+   * Mobile build on a phone-sized screen. Narrower than {@link mobileLayout}: the tab strip is
+   * replaced by the active document's title, and the tab controller keeps a single tab per pane.
    */
   phoneLayout: boolean;
-  /** Compact layout: the overlay drawer is open. */
   drawerOpen: boolean;
   /** Flips visibility for the current mode: drawer when compact, else column. */
   toggle: () => void;

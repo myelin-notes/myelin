@@ -33,11 +33,8 @@ interface CropEntrySnapshot {
 export class ImageElement extends DrawableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
   private _bitmap: ImageBitmap | null = null;
-  /**
-   * In-flight decode of `imageData`, so a render that starts before the bitmap
-   * lands can await it instead of silently drawing nothing. Settles (never
-   * rejects) once the decode finishes or fails.
-   */
+  // So a render that starts before the bitmap lands can await it instead of drawing nothing.
+  // Settles (never rejects) once the decode finishes or fails.
   private _bitmapDecode: Promise<void> | null = null;
   private _naturalWidth: number = 0;
   private _naturalHeight: number = 0;
@@ -142,11 +139,8 @@ export class ImageElement extends DrawableElement {
     });
   }
 
-  /**
-   * Hydration decodes `imageData` asynchronously, so a thumbnail taken right
-   * after a document loads would otherwise draw an empty box. Wait for the
-   * pending decode before the draw pass.
-   */
+  // Hydration decodes `imageData` asynchronously, so a thumbnail taken right after a document loads
+  // would otherwise draw an empty box.
   public override async prepareThumbnail(): Promise<void> {
     await this._bitmapDecode;
   }
@@ -313,9 +307,8 @@ export class ImageElement extends DrawableElement {
 
   public toggleCropMode(): void {
     if (this._cropMode) {
-      // Toolbar "Apply Crop" is the only commit path. Commit first, then
-      // tear down edit mode — the subsequent exitEditMode will see
-      // _cropMode === false and its cancel is a no-op.
+      // Toolbar "Apply Crop" is the only commit path. Commit first, then tear down edit mode — the
+      // subsequent exitEditMode sees _cropMode === false and its cancel is a no-op.
       this.exitCropMode();
       this._editingCropCanvas?.exitElementEdit();
     } else {
@@ -330,9 +323,8 @@ export class ImageElement extends DrawableElement {
   }
 
   public override exitEditMode(): void {
-    // Commits the crop. Escape cancels via the element's own keydown handler
-    // registered in enterCropMode, which clears _cropMode before this runs,
-    // so the exitCropMode below becomes a no-op on Escape.
+    // Escape cancels via the element's own keydown handler from enterCropMode, which clears _cropMode
+    // before this runs, so the exitCropMode below is a no-op on Escape.
     this.exitCropMode();
     this._editingCropCanvas = null;
   }

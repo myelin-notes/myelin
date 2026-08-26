@@ -1,8 +1,8 @@
 import { useState } from 'react';
+import { useThumbnailUrl } from '@myelin/editor/use-thumbnail-url';
+import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import type { VFSFileNode } from '@/lib/sync';
-import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
-import { cn } from '@/lib/utils';
 import { formatExplorerItemAccessibleName } from './accessibility-labels';
 import { useFileItemContextMenu } from './explorer/use-file-item-context-menu';
 

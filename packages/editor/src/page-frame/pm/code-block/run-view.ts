@@ -17,10 +17,9 @@ interface CodeBlockRunViewOptions {
 }
 
 /**
- * Owns a code block's run affordance: a Run/Stop button overlaid in the block's
- * top-right corner. The button is absolutely positioned, so it never changes
- * the block's measured size. Output (including a non-zero exit code) is pushed
- * to {@link codeRunStore} and rendered by the React overlay layer.
+ * A code block's Run/Stop button, overlaid in the top-right corner. Absolutely positioned, so it
+ * never changes the block's measured size. Output (including a non-zero exit code) is pushed to
+ * {@link codeRunStore} and rendered by the React overlay layer.
  */
 export class CodeBlockRunView {
   /** Appended into the node view's DOM as a top-right absolute overlay. */
@@ -49,10 +48,7 @@ export class CodeBlockRunView {
     this.syncButton();
   }
 
-  /**
-   * Show the button only for languages with a local runner, and only when
-   * this platform can run code at all.
-   */
+  // Shown only for languages with a local runner, and only when this platform can run code at all.
   setLanguage(language: RunnableLanguage | null): void {
     if (language === this.language) {
       return;

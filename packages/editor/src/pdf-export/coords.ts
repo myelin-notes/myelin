@@ -1,7 +1,6 @@
 /**
- * Coordinate helpers for PDF export. krilla uses a top-left origin (y down), so no
- * Y-flip is needed — we only convert CSS px → PDF points and map content-local
- * coordinates to a page index + page-local position.
+ * krilla uses a top-left origin (y down), so no Y-flip is needed — this only converts CSS px to
+ * PDF points and maps content-local coordinates to a page index + page-local position.
  */
 
 /** CSS px are treated as 96 DPI; PDF points are 72 DPI. */
@@ -25,10 +24,7 @@ export interface PageLocalPoint {
   yPx: number;
 }
 
-/**
- * Map a point in content-local CSS px (the cloned editor's coordinate space, where
- * page p is stacked along the layout axis) to its page index and page-local px.
- */
+// Content-local space is the cloned editor's, where page p is stacked along the layout axis.
 export function localToPage(
   localX: number,
   localY: number,

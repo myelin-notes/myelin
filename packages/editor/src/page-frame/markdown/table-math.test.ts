@@ -4,10 +4,8 @@ import { schema } from '../pm/schema';
 import { parseMarkdownToDoc } from './parser';
 import { serializeDocToMarkdown } from './serializer';
 
-// Builds a single-cell table doc whose body cell contains the given text
-// verbatim. This mirrors the in-editor state after a user types/edits inline
-// math in a table cell: the doc holds the raw LaTeX (e.g. `$e^{i\pi}$`) and the
-// math-preview plugin renders it. Serialization (save) must not corrupt it.
+// Mirrors the in-editor state after a user types inline math in a table cell: the doc holds raw
+// LaTeX (e.g. `$e^{i\pi}$`) and the math-preview plugin renders it. Saving must not corrupt it.
 function tableDoc(cellText: string): PMNode {
   return schema.nodes.doc.create(null, [
     schema.nodes.table.create(null, [
@@ -67,18 +65,16 @@ describe('markdown table inline-math serialization', () => {
     const once = serializeDocToMarkdown(tableDoc('$e^{i\\pi}$'));
     expect(once).toContain('$e^{i\\pi}$');
 
-    // `splitTableRow` only unescapes `\|`; other `\X` sequences (LaTeX
-    // backslashes) pass through to parseInline, so re-parsing preserves the
-    // formula and the round-trip is stable.
+    // `splitTableRow` only unescapes `\|`; other `\X` sequences (LaTeX backslashes) pass through to
+    // parseInline, so re-parsing preserves the formula and the round-trip is stable.
     const reparsed = parseMarkdownToDoc(once, schema);
     expect(reparsed.textContent).toContain('$e^{i\\pi}$');
     expect(serializeDocToMarkdown(reparsed)).toBe(once);
   });
 
   it('keeps an escaped backslash before a cell boundary as a unit', () => {
-    // Doc cell text `a\` serializes as `a\\`; on re-parse `\\` must be
-    // consumed as one escape (kept for parseInline) so the following `|`
-    // still splits the row instead of being read as an escaped pipe.
+    // Doc cell text `a\` serializes as `a\\`; on re-parse `\\` must be consumed as one escape so the
+    // following `|` still splits the row instead of reading as an escaped pipe.
     const once = serializeDocToMarkdown(tableDoc('a\\'));
     const reparsed = parseMarkdownToDoc(once, schema);
     const cells: string[] = [];

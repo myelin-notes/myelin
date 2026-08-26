@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent } from 'react';
+import { useMessages } from '@myelin/editor/i18n';
 import type { ITool } from '@myelin/editor/tools/tool';
-import { useMessages } from '@/lib/i18n';
-import { UserPrefs } from '@/lib/user-prefs';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 
 interface ToolShelfProps {
   tools: ITool[];

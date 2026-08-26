@@ -2,9 +2,9 @@ import type {
   AudioTranscriptionSession,
   TranscriptionCapability,
 } from '@myelin/editor/platform/types';
+import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { Logger } from '@/lib/logger';
 
 const logger = new Logger('AudioTranscription');
 
@@ -36,11 +36,7 @@ export const transcription: TranscriptionCapability = {
     return openSession(elementId, stream);
   },
 
-  /**
-   * Start transcribing an already-decoded audio file (the media import path).
-   * The caller awaits `finish()` for the transcript and can `cancel()` while
-   * it is pending (e.g. when the element is deleted mid-transcription).
-   */
+  // The caller awaits `finish()` for the transcript and can `cancel()` while it is pending.
   async startBufferSession(elementId, buffer) {
     const session = await openSession(elementId);
     if (!session) {
@@ -149,9 +145,8 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
   }
 
   private async doFinish(): Promise<string> {
-    // Stop capture first so nothing new is enqueued, then drain the backlog
-    // before refusing samples — the import path enqueues the whole file and
-    // finishes immediately.
+    // Stop capture first so nothing new is enqueued, then drain the backlog before refusing samples —
+    // the import path enqueues the whole file and finishes immediately.
     await this.stopCapture();
     await this.sampleSendQueue;
     this.stopped = true;
@@ -167,11 +162,9 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
       });
     }
 
-    // The backend emits FINISHED after flushing its final segments — however
-    // long whisper takes; the FINISHED handler calls close(), which resolves
-    // this promise. There is deliberately no timeout here: a slow machine is
-    // not a failure, and the worker always emits FINISHED (even on panic).
-    // cancel() also resolves it for callers that abandon the session.
+    // The backend emits FINISHED after flushing its final segments, however long whisper takes, and
+    // its handler calls close(). Deliberately no timeout: a slow machine is not a failure, and the
+    // worker always emits FINISHED (even on panic). cancel() also resolves this.
     await this.closedPromise;
     return this.segments
       .map((segment) => segment.trim())
@@ -187,10 +180,7 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
     await this.close();
   }
 
-  /**
-   * Feed a fully-decoded mono buffer (the file-import path) in bounded chunks
-   * so no single invoke payload grows unboundedly.
-   */
+  // Fed in bounded chunks so no single invoke payload grows unboundedly.
   public transcribeSamples(mono: Float32Array, sampleRate: number): void {
     for (let offset = 0; offset < mono.length; offset += IMPORT_CHUNK_SAMPLES) {
       this.enqueueSamples(
@@ -279,12 +269,10 @@ async function startPcmCapture(
 ): Promise<PcmCapture> {
   const audioContext = new AudioContext();
   const source = audioContext.createMediaStreamSource(stream);
-  // Deliberately the deprecated ScriptProcessorNode over AudioWorklet: a
-  // worklet module needs bundler plumbing and per-webview verification
-  // (AudioWorklet support in WebKitGTK is unconfirmed). Worst case here is
-  // main-thread starvation dropping samples, which degrades the live
-  // transcript — the recording itself comes from MediaRecorder and is
-  // unaffected, and the transcribe button can regenerate the transcript.
+  // Deliberately the deprecated ScriptProcessorNode over AudioWorklet: a worklet needs bundler
+  // plumbing and per-webview verification (WebKitGTK support unconfirmed). Worst case here is
+  // main-thread starvation dropping samples, which only degrades the live transcript — the recording
+  // comes from MediaRecorder and the transcribe button can regenerate it.
   const processor = audioContext.createScriptProcessor(4096, 1, 1);
   const mute = audioContext.createGain();
 

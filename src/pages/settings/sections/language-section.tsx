@@ -1,5 +1,5 @@
+import { useMessages } from '@myelin/editor/i18n';
 import { LanguagePicker } from '@/components/language-picker';
-import { useMessages } from '@/lib/i18n';
 
 export function LanguageSection() {
   const strings = useMessages();

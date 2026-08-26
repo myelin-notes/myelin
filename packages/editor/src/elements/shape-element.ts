@@ -19,10 +19,9 @@ const ELLIPSE_PDF_SEGMENTS = 32;
 const MIN_PDF_WORLD_SIZE = 1;
 
 /**
- * Parametric vector shape (rect / ellipse / line / triangle) produced by the
- * draw-and-hold recognizer. Geometry is stored once in a normalized local frame
- * so world placement, resize, translate and undo are inherited from the base
- * class transform machinery.
+ * Parametric vector shape from the draw-and-hold recognizer. Geometry is stored once in a
+ * normalized local frame, so world placement, resize, translate and undo are inherited from the
+ * base class transform machinery.
  */
 export class ShapeElement extends DrawableElement {
   protected box: DOMRect = new DOMRect(0, 0, 0, 0);
@@ -75,12 +74,8 @@ export class ShapeElement extends DrawableElement {
     return this.box;
   }
 
-  /**
-   * Grow a bbox axis thinner than the drawn stroke out to the stroke's width. A
-   * snapped horizontal line has an exactly-zero-height geometry bbox, which no
-   * box test can ever hit: click selection (`inBox`) uses strict inequalities,
-   * marquee needs a non-zero area, and resize bails on an empty local box.
-   */
+  // A snapped horizontal line has an exactly-zero-height geometry bbox, which no box test can hit:
+  // `inBox` uses strict inequalities, marquee needs a non-zero area, and resize bails on an empty box.
   private withStrokeThickness(box: DOMRect): DOMRect {
     const w = Math.max(box.width, this.style.size);
     const h = Math.max(box.height, this.style.size);
@@ -144,13 +139,9 @@ export class ShapeElement extends DrawableElement {
     this.resizeBaseGeom = [...this.geom];
   }
 
-  /**
-   * Resize by baking the drag ratio into the geometry and leaving `scale` at 1.
-   * Unlike the base implementation (which scales via a render-time ctx.scale and
-   * stretches the stroke width), this moves the shape's points so the outline
-   * thickness stays `style.size`. Offset math mirrors the base to keep the
-   * anchor side pinned.
-   */
+  // Bakes the drag ratio into the geometry and leaves `scale` at 1, unlike the base implementation
+  // (render-time ctx.scale), so the outline thickness stays `style.size`. Offset math mirrors the
+  // base to keep the anchor side pinned.
   public override applyResize(opts: {
     handle: ResizeHandle;
     originalScale: Vector2;

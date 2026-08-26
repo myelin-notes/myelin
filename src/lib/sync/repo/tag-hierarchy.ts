@@ -32,13 +32,10 @@ export interface OrderedTag {
 }
 
 /**
- * Reorder a count-sorted tag list so each parent is immediately followed by its
- * descendant subtree, annotating every entry with its `depth` and a relative
- * `label` for indented rendering. Sibling groups (and roots) keep
- * count-descending order with an alphabetical tie-break. A list with no "/" tags
- * is returned in the same order it came in, so flat repositories are
- * unaffected. Tags whose parent is missing from the list are treated as roots
- * rather than dropped (and keep their full path as the label).
+ * Reorders a count-sorted tag list so each parent is immediately followed by its descendant
+ * subtree, annotating every entry with `depth` and a relative `label`. Sibling groups keep
+ * count-descending order with an alphabetical tie-break. A list with no "/" tags comes back in the
+ * order it arrived. A tag whose parent is missing is treated as a root and keeps its full path.
  */
 export function orderTagsHierarchically(
   tags: readonly { tag: string; count: number }[],

@@ -1,11 +1,11 @@
 import * as Y from 'yjs';
+import type { NoteEmbedding } from '@myelin/editor/platform';
 import {
   createSearchIndex,
   type SearchField,
   type SearchHit,
   type SearchIndex,
 } from '@/lib/search';
-import type { NoteEmbedding } from '@/platform';
 import { addChild, dropNode, getChildIds, removeChild } from './child-index';
 import { MAX_CUSTOM_COLORS } from './config';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
@@ -69,9 +69,8 @@ export function migrate(manifest: VFSManifest): void {
   // older builds; default them so read paths don't spread `undefined`.
   manifest.tagRegistry ??= [];
   if (manifest.version < 2) {
-    // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest
-    // round-trips unknown keys back to disk on every save. `JSON.stringify`
-    // omits undefined-valued keys, so this drops them from the next write.
+    // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest round-trips unknown
+    // keys back to disk on every save; `JSON.stringify` omits undefined-valued keys.
     (manifest as VFSManifest & { children?: undefined }).children = undefined;
     for (const node of Object.values(manifest.nodes)) {
       (node as VFSNode & { children?: undefined }).children = undefined;
@@ -313,12 +312,8 @@ function nodeSearchFields(
   ];
 }
 
-/**
- * Build a reusable lexical search index over the manifest's non-system nodes.
- * Callers that search repeatedly (search-as-you-type) should build this once and
- * reuse it rather than rebuilding the MiniSearch index — which tokenizes every
- * node's name, tags, and full indexed content — on every query.
- */
+// Callers that search repeatedly (search-as-you-type) should build this once rather than
+// re-tokenizing every node's name, tags and indexed content on each query.
 export function createNodeSearchIndex(
   manifest: VFSManifest,
   indexContent?: ReadonlyMap<VFSNodeId, string>,
@@ -330,10 +325,7 @@ export function createNodeSearchIndex(
   });
 }
 
-/**
- * Build a short snippet around the first query term that matched a node's
- * indexed content. Returns null when the match came only from name/tags.
- */
+// Returns null when the match came only from name/tags.
 function buildContentSnippet(
   content: string | undefined,
   hit: SearchHit<VFSNode>,
@@ -488,10 +480,7 @@ export function getNodesByAnyTag(
   );
 }
 
-/**
- * Whether `node` lives anywhere inside `folderId`'s subtree. A null `folderId`
- * means the repository root, so every node qualifies.
- */
+// A null `folderId` means the repository root, so every node qualifies.
 function isNodeWithinFolder(
   manifest: VFSManifest,
   node: VFSNode,
@@ -593,12 +582,9 @@ export function getRecentFiles(
     .slice(0, limit);
 }
 
-/**
- * A user file node that may be offered to the index engine. The engine (Rust
- * `IndexProvider::applies_to`) is the authority on which file types actually get
- * indexed; here we only exclude system nodes (e.g. version-history snapshots),
- * which the engine has no way to recognize from a path + file type alone.
- */
+// The engine (Rust `IndexProvider::applies_to`) is the authority on which file types get indexed;
+// this only excludes system nodes (e.g. version-history snapshots), which the engine can't
+// recognize from a path + file type alone.
 export function isIndexCandidateFileNode(
   node: VFSNode | null | undefined,
 ): node is VFSFileNode {

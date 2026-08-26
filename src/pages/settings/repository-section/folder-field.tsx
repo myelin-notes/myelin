@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Folder, Loader2 } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
 import { Input } from '@/components/ui/input';
-import { useMessages } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
 
 /**
  * Folder name input. Committing creates a folder in the user's Drive, so the

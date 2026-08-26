@@ -1,13 +1,13 @@
 import { useEffect, useEffectEvent } from 'react';
 import { toast } from 'sonner';
+import { useMessages } from '@myelin/editor/i18n';
+import { getPlatform } from '@myelin/editor/platform';
+import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { trackEvent } from '@/lib/analytics';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { useUserPref } from '@/lib/use-user-pref';
-import { getPlatform } from '@/platform';
 import { MCP_TOOL_DEFINITIONS, McpToolService } from './tools';
 import type {
   McpBridgeToolCallPayload,

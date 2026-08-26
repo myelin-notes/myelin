@@ -1,5 +1,5 @@
+import { Logger } from '@myelin/shared/logger';
 import { listen } from '@tauri-apps/api/event';
-import { Logger } from '@/lib/logger';
 
 /** Mirrors the Rust `error_report::RUST_ERROR_EVENT` payload. */
 interface RustErrorPayload {

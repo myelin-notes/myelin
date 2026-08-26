@@ -1,14 +1,14 @@
 import * as Y from 'yjs';
-import { trackEvent } from '@/lib/analytics';
-import { Logger } from '@/lib/logger';
-import type { ReindexItem } from '@/platform';
-import { NoteSession } from '../../session';
+import type { ReindexItem } from '@myelin/editor/platform';
 import type {
   YjsSyncPushOptions,
   YjsSyncPushResult,
   YjsSyncSnapshot,
   YjsSyncTarget,
-} from '../../types';
+} from '@myelin/editor/sync/types';
+import { Logger } from '@myelin/shared/logger';
+import { trackEvent } from '@/lib/analytics';
+import { NoteSession } from '../../session';
 import type { BaseRepository } from '../base';
 import {
   type BatchedCommitTarget,
@@ -296,11 +296,9 @@ export class CachedRepository
       window.clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
-    // Skip the final flush when there's nothing to push. flushPending acquires
-    // the remoteSync mutex, which an in-flight background sync may be holding —
-    // that wait dominates window-close time (seconds) even though our outbox
-    // is already empty. The in-flight sync owns the same work we'd do, and the
-    // outbox is durable, so abandoning the wait is safe.
+    // flushPending acquires the remoteSync mutex, which an in-flight background sync may hold — that
+    // wait dominates window-close time. The in-flight sync owns the same work and the outbox is
+    // durable, so abandoning the wait is safe.
     if (this.outbox.length === 0) {
       return;
     }
@@ -395,9 +393,8 @@ export class CachedRepository
   }
 
   async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
-    // The manifest lives in the local cache; writes below land on it and queue a
-    // remote op each. Batching there collapses the cache's per-node manifest
-    // saves into one; the outbox still queues an op per node as before.
+    // Batching collapses the cache's per-node manifest saves into one; the outbox still queues an op
+    // per node as before.
     return this.cache.batchManifestWrites(fn);
   }
 
@@ -661,13 +658,10 @@ export class CachedRepository
     );
   }
 
-  // Tri-state return contract, relied on by enqueuePushNote/checkRawConflicts/
-  // applyRawFilePush:
-  //   undefined -> not a raw file (canvas/non-file); skip conflict check entirely
+  // Tri-state contract, relied on by enqueuePushNote/checkRawConflicts/applyRawFilePush:
+  //   undefined -> not a raw file (canvas/non-file); skip the conflict check entirely
   //   null      -> raw file whose base content is empty (computeRevision(empty))
   //   string    -> raw file base content hash
-  // `undefined` (no check) and `null` (empty base) are distinct and must not be
-  // conflated.
   private async getRawFileBaseRevision(
     nodeId: VFSNodeId,
   ): Promise<string | null | undefined> {
@@ -896,18 +890,16 @@ export class CachedRepository
       await this.drainResolvedOps(plan.resolvedOps);
       return true;
     }
-    // Unreachable: every path inside the loop returns; the only `continue` is
-    // guarded by `attempt < 1`, so attempt 1 always returns. Kept to satisfy
-    // the compiler's all-paths-return check.
+    // Unreachable: every path inside the loop returns, and the only `continue` is guarded by
+    // `attempt < 1`. Kept for the compiler's all-paths-return check.
     return false;
   }
 
   private async buildBatchPlan(
     remote: BaseRepository & BatchedCommitTarget,
   ): Promise<BatchPlan | null | 'abort-to-rest'> {
-    // Bail before any remote round-trips when there's nothing to push —
-    // dispose() calls flushPending() on every window close, and the network
-    // hops below otherwise add noticeable latency to closing.
+    // dispose() calls flushPending() on every window close, and the network hops below otherwise add
+    // noticeable latency to closing.
     const hasPending = await this.withLocalStateLock(async () => {
       await this.outbox.load();
       return this.outbox.length > 0;
@@ -919,9 +911,8 @@ export class CachedRepository
     const expectedHeadOid = await remote.getBranchHeadOid();
     const { manifest: remoteManifest } = await remote.loadManifestForBatch();
 
-    // Snapshot cache + outbox + per-op payloads atomically. A concurrent
-    // user write that lands between the outbox read and the cache reads
-    // would otherwise let us drain an op whose data we never committed.
+    // Atomically, or a concurrent user write landing between the outbox read and the cache reads
+    // would let us drain an op whose data we never committed.
     const snapshot = await this.withLocalStateLock(async () => {
       await this.outbox.load();
       const ops = this.outbox.snapshotOps();
@@ -1740,9 +1731,7 @@ export class CachedRepository
   }
 
   private updateRuntimeStatus(patch: Partial<RepositoryRuntimeStatus>): void {
-    // Single shared choke point for recording sync errors. Fire sync_failed
-    // only when a real error is newly recorded (non-null and not the same
-    // object already on record), so the multiple callers that route their
+    // Fire sync_failed only when a real error is newly recorded, so the multiple callers routing
     // errors through here don't double-fire.
     if (patch.lastError && patch.lastError !== this.runtimeStatus.lastError) {
       const error = patch.lastError;

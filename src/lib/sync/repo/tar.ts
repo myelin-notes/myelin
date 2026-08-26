@@ -65,11 +65,9 @@ function parseTar(tar: Uint8Array): Map<string, Uint8Array> {
       continue;
     }
 
-    // Pax 'x' headers can carry a `path=` override; we ignore them, so a file
-    // whose path exceeds the 100-char ustar field is silently keyed under its
-    // truncated name. Safe today (our paths are `files/<uuid>.<ext>`, well
-    // under 100 chars including GitHub's `<owner>-<repo>-<sha>/` wrapper) but
-    // a future schema change that lengthens stored paths must add pax parsing.
+    // Pax 'x' headers can carry a `path=` override; ignoring them means a path over the 100-char ustar
+    // field is silently keyed under its truncated name. Safe today (`files/<uuid>.<ext>` plus GitHub's
+    // `<owner>-<repo>-<sha>/` wrapper), but a schema change that lengthens paths must add pax parsing.
     if (typeflag === 'x' || typeflag === 'g') {
       offset = paddedEnd;
       continue;
@@ -96,9 +94,8 @@ function stripTopLevelDir(path: string): string {
   return slash === -1 ? '' : path.slice(slash + 1);
 }
 
-// Decompresses a gzipped tarball and returns regular-file entries keyed by
-// path with the top-level directory stripped (matching how GitHub's tarball
-// endpoint wraps repo contents under a single `<owner>-<repo>-<sha>/` dir).
+// Entries are keyed by path with the top-level directory stripped, matching how GitHub's tarball
+// endpoint wraps repo contents under a single `<owner>-<repo>-<sha>/` dir.
 export async function readGzippedTarballEntries(
   gzipped: Uint8Array,
 ): Promise<Map<string, Uint8Array>> {

@@ -7,11 +7,12 @@ import {
   LogOut,
   X,
 } from 'lucide-react';
+import { type Messages, useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatNumber } from '@myelin/editor/i18n/format';
+import { cn } from '@myelin/editor/utils';
+import { Button } from '@myelin/ui/button';
 import { TimeAgo } from '@/components/time-ago';
-import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
-import { type Messages, useLocale, useMessages } from '@/lib/i18n';
 import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   GOOGLE_DRIVE_PROVIDER_NAME,
@@ -22,7 +23,6 @@ import {
   subscribeRepositoryConfig,
   useRepositoryStatus,
 } from '@/lib/sync';
-import { cn } from '@/lib/utils';
 import { AuthStatusBadge } from './auth-status-badge';
 import { BranchField } from './branch-field';
 import { FolderField } from './folder-field';
@@ -38,15 +38,12 @@ import { useGoogleDriveFolder } from './use-google-drive-folder';
 type RepoKind = RepositoryConfig['kind'];
 
 /**
- * Repository picker and remote connection flow, without the surrounding section
- * heading. Shared by the Settings sync section and the first-run onboarding
- * step so both drive the same config through the same code path.
+ * Repository picker and remote connection flow, without the surrounding section heading. Shared by
+ * the Settings sync section and the first-run onboarding step.
  *
- * `onSetupCompleteChange` reports whether the chosen repository is actually
- * usable — always true for a local one, true for GitHub only once it is signed
- * in with an owner, repo, and branch picked, and true for Google Drive once it
- * is signed in with a folder resolved. Onboarding gates its Continue button on
- * it so nobody leaves the step half-connected.
+ * `onSetupCompleteChange` reports whether the chosen repository is usable — always true for a local
+ * one, true for GitHub only once signed in with an owner, repo and branch picked, and true for
+ * Google Drive once signed in with a folder resolved. Onboarding gates Continue on it.
  */
 export function RepositorySetup({
   onSetupCompleteChange,

@@ -34,19 +34,13 @@ export const MERMAID_SOURCE_PANEL_SELECTOR =
   '.pm-mermaid-block--editing .pm-mermaid-block-source';
 
 /**
- * Renders a ```mermaid code block as a diagram preview plus a floating
- * raw-source editor, mirroring MathBlockNodeView: the mermaid preview plugin
- * toggles `pm-mermaid-block--editing` on the wrapper (via a node decoration)
- * while the selection is contained in the block, and CSS shows the source
- * panel only then. The node stays an ordinary codeBlock — the node-view
- * factory picks this class from the fence language, and update() returns
- * false when the language changes so ProseMirror rebuilds through the
- * factory (and vice versa in CodeBlockNodeView).
+ * A ```mermaid code block as a diagram preview plus a floating raw-source editor, mirroring
+ * MathBlockNodeView. The node stays an ordinary codeBlock — the node-view factory picks this class
+ * from the fence language, and update() returns false when the language changes so ProseMirror
+ * rebuilds through the factory (and vice versa in CodeBlockNodeView).
  *
- * Unlike math, the source editor is a per-block CodeBlockEditor created on
- * first edit rather than a shared instance — it reuses the code block's
- * fence-aware markdown grammar and delimiter dimming as-is. The ProseMirror
- * document stays the source of truth via the nested-editor sync helpers.
+ * Unlike math, the source editor is a per-block CodeBlockEditor created on first edit, reusing the
+ * code block's fence-aware grammar and delimiter dimming as-is.
  */
 export class MermaidBlockNodeView implements NodeView {
   dom: HTMLDivElement;
@@ -101,14 +95,9 @@ export class MermaidBlockNodeView implements NodeView {
     });
     void this.renderPreview();
 
-    // When a plain code block's language becomes `mermaid`, ProseMirror
-    // rebuilds it into this view while the old block's nested CodeMirror still
-    // held focus — so the PM view itself isn't focused and ProseMirror skips
-    // the setSelection() that would open the source editor. Open it eagerly
-    // when the selection already sits inside this block (the just-edited
-    // block, or a mermaid block under the cursor on load) so the raw-source
-    // editor shows and focuses, mirroring the editor a plain code block
-    // creates in its own constructor.
+    // When a plain code block's language becomes `mermaid`, ProseMirror rebuilds it into this view
+    // while the old block's nested CodeMirror still held focus — so the PM view isn't focused and
+    // ProseMirror skips the setSelection() that would open the source editor. Open it eagerly instead.
     if (this.isSelectionInside()) {
       this.openEditor();
     }
@@ -225,15 +214,12 @@ export class MermaidBlockNodeView implements NodeView {
         this.syncSelectionFromView();
       })
       .catch((error) => {
-        // A transient chunk-load failure must not lock the block: clearing
-        // the flag lets a later click retry rather than early-returning at
-        // the guard forever.
+        // A transient chunk-load failure must not lock the block: clearing the flag lets a later click retry.
         this.initializing = false;
         console.error('Failed to load mermaid source editor', error);
       });
   }
 
-  /** Whether the current ProseMirror selection is contained in this block. */
   private isSelectionInside(): boolean {
     const start = this.getPos() + 1;
     const end = start + this.node.content.size;
@@ -241,10 +227,8 @@ export class MermaidBlockNodeView implements NodeView {
     return from >= start && to <= end;
   }
 
-  /**
-   * Attach using the current ProseMirror selection — the request that
-   * triggered loading may be stale by the time the editor module resolves.
-   */
+  // Uses the current PM selection — the request that triggered loading may be stale by the time the
+  // editor module resolves.
   private syncSelectionFromView(): void {
     const start = this.getPos() + 1;
     const end = start + this.node.content.size;
@@ -359,9 +343,8 @@ export class MermaidBlockNodeView implements NodeView {
       if (this.destroyed || seq !== this.renderSeq) {
         return;
       }
-      // Invalid source: keep the last good diagram dimmed while editing
-      // continues; fall back to the raw source when nothing rendered yet so
-      // the block's content is never invisible.
+      // Invalid source: keep the last good diagram dimmed while editing continues; fall back to the raw
+      // source when nothing rendered yet, so the block's content is never invisible.
       this.dom.classList.add('pm-mermaid-block--error');
       if (!this.hasDiagram) {
         this.preview.textContent = source;

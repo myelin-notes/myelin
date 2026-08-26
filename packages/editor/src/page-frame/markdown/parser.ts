@@ -1,13 +1,7 @@
 /**
- * Minimal Markdown → ProseMirror parser for the page-frame schema.
- *
- * The schema is bespoke (flat list items with indent attrs, custom
- * mentions) so we skip the standard `prosemirror-markdown` package and
- * hand-roll a focused parser. Supports: headings, paragraphs, bullet,
- * ordered, and checklist items (with indent), blockquote, callouts,
- * fenced code blocks, math blocks ($$ fences),
- * tables, hr,
- * and inline marks (bold, italic, strikethrough, code, link, image).
+ * Minimal Markdown → ProseMirror parser for the page-frame schema. The schema is bespoke (flat
+ * list items with indent attrs, custom mentions), so `prosemirror-markdown` is skipped in favour of
+ * this focused parser.
  */
 
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
@@ -69,10 +63,9 @@ function splitTableRow(line: string): string[] {
   for (let i = 0; i < source.length; i += 1) {
     const char = source[i];
     if (char === '\\' && i + 1 < source.length) {
-      // Only `\|` is a split-level escape; every other `\X` passes through
-      // intact (as a unit, so `\\|` keeps the backslash and splits on the
-      // pipe) for parseInline to handle — unescaping here would strip LaTeX
-      // backslashes from cell math and double-unescape markdown escapes.
+      // Only `\|` is a split-level escape; every other `\X` passes through intact (as a unit, so `\\|`
+      // keeps the backslash and splits on the pipe). Unescaping here would strip LaTeX backslashes from
+      // cell math and double-unescape markdown escapes.
       const next = source[i + 1];
       current += next === '|' ? '|' : `\\${next}`;
       i += 1;
@@ -176,11 +169,9 @@ function parseBlocks(md: string): BlockToken[] {
     }
 
     if (FENCE_RE.test(trimmed)) {
-      // The page-frame's codeBlock stores fence delimiters as part of its
-      // text content (see fenceMarkdownNormalizationPlugin). The opening
-      // fence must satisfy isOpeningFenceLine (``` + optional info token)
-      // and the closing must be exactly "```" — otherwise the plugin
-      // unwraps the block back to paragraphs.
+      // codeBlock stores fence delimiters as part of its text content (see
+      // fenceMarkdownNormalizationPlugin). The opening fence must satisfy isOpeningFenceLine and the
+      // closing must be exactly "```", or the plugin unwraps the block back to paragraphs.
       const langMatch = trimmed.match(OPENING_FENCE_TOKEN_RE);
       const openFence = langMatch?.[1] ? `\`\`\`${langMatch[1]}` : '```';
       i++;
@@ -198,9 +189,8 @@ function parseBlocks(md: string): BlockToken[] {
     }
 
     if (isMathFenceLine(trimmed)) {
-      // Like codeBlock, mathBlock stores its `$$` fence lines as part of its
-      // text content (see mathBlockNormalizationPlugin). A missing closing
-      // fence consumes to the end and is closed, mirroring code fences.
+      // Like codeBlock, mathBlock stores its `$$` fence lines as text content. A missing closing fence
+      // consumes to the end and is closed, mirroring code fences.
       i++;
       const mathLines: string[] = [];
       while (i < lines.length && !isMathFenceLine(lines[i].trim())) {
@@ -373,11 +363,9 @@ function scanInline(
   let buf = '';
   let i = 0;
 
-  // Inline-math spans are derived from the shared inline parser so the
-  // importer, the live-preview decorations, and the serializer all agree on
-  // which `$...$` runs are math. This inherits parse-inline's precedence
-  // rules (inline code / note links win via its `blocked` array) and its
-  // `\$` escape handling, avoiding a parallel scanner that could disagree.
+  // Derived from the shared inline parser so importer, live-preview decorations, and serializer all
+  // agree on which `$...$` runs are math — inheriting its precedence rules and `\$` escape handling
+  // rather than running a parallel scanner that could disagree.
   const mathEndByStart = new Map<number, number>();
   for (const range of parseInlineMarkdown(text).ranges) {
     if (range.kind === 'math') {
@@ -396,10 +384,8 @@ function scanInline(
     const ch = text[i];
 
     if (ch === '\\' && i + 1 < text.length) {
-      // Keep the backslash before a `$` so the live-preview parser
-      // (parse-inline's `isEscaped`) still treats it as an escaped, non-math
-      // dollar. Stripping it would turn `\$a\$` into `$a$`, which reloads as
-      // live math — the opposite of what the escape requested.
+      // Keep the backslash before a `$` so parse-inline's `isEscaped` still treats it as a non-math
+      // dollar. Stripping it turns `\$a\$` into `$a$`, which reloads as live math.
       buf += text[i + 1] === '$' ? `\\$` : text[i + 1];
       i += 2;
       continue;
@@ -463,9 +449,8 @@ function scanInline(
       }
     }
 
-    // Inline math: $...$ stays literal text, backslashes intact — the math
-    // preview plugin renders it. The span boundaries come from the shared
-    // inline parser (see mathEndByStart) so importer and preview agree.
+    // Inline math stays literal text, backslashes intact — the math preview plugin renders it.
+    // Span boundaries come from the shared inline parser (see mathEndByStart).
     if (ch === '$') {
       const end = mathEndByStart.get(i);
       if (end !== undefined) {

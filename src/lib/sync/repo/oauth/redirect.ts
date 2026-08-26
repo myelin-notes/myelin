@@ -1,13 +1,11 @@
+import { getMessages } from '@myelin/editor/i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { IS_MOBILE_BUILD } from '@/lib/env';
-import { getMessages } from '@/lib/i18n';
 
-/**
- * A reverse-DNS scheme is what RFC 8252 asks native apps to use, and it matches
- * the bundle identifier so no other app on the device can plausibly claim it.
- * Registered in `tauri.conf.json`, `AndroidManifest.xml` and `Info.plist`.
- */
+// A reverse-DNS scheme is what RFC 8252 asks native apps to use, and it matches the bundle
+// identifier so no other app can plausibly claim it. Registered in `tauri.conf.json`,
+// `AndroidManifest.xml` and `Info.plist`.
 export const MOBILE_REDIRECT_SCHEME = 'com.github.wintersteve25.myelin';
 
 // Registered on the GitHub OAuth app alongside `http://127.0.0.1/oauth/callback`.
@@ -20,11 +18,8 @@ export interface OAuthCallbackParams {
   errorDescription: string | null;
 }
 
-/**
- * A live redirect capture, started before the browser is opened so the callback
- * cannot arrive before anything is listening. `redirectUri` is what gets sent to
- * the authorization server.
- */
+// Started before the browser is opened so the callback cannot arrive before anything is
+// listening. `redirectUri` is what gets sent to the authorization server.
 export interface OAuthRedirectListener {
   redirectUri: string;
   wait: () => Promise<OAuthCallbackParams>;
@@ -34,11 +29,8 @@ export interface OAuthRedirectListener {
 export interface OAuthRedirectOptions {
   /** Provider display name, rendered on the page the browser lands on. */
   provider: string;
-  /**
-   * Overrides the deep link the mobile flow listens for. Google issues iOS and
-   * Android OAuth clients that only accept their own redirect form, so each
-   * provider names the URI its client is registered against.
-   */
+  // Google issues iOS and Android OAuth clients that only accept their own redirect form, so each
+  // provider names the URI its client is registered against.
   mobileRedirectUri?: string;
 }
 
@@ -46,11 +38,8 @@ interface LoopbackStart {
   redirectUri: string;
 }
 
-/**
- * Desktop captures the redirect with a throwaway loopback server on an
- * ephemeral port; mobile has no such server, so it captures a deep link back
- * into the app instead.
- */
+// Desktop captures the redirect with a throwaway loopback server on an ephemeral port; mobile has
+// no such server and captures a deep link back into the app instead.
 export function startOAuthRedirectListener(
   options: OAuthRedirectOptions,
 ): Promise<OAuthRedirectListener> {

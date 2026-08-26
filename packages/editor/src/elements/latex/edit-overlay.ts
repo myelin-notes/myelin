@@ -27,13 +27,10 @@ export interface LatexEditOverlayHandle {
 }
 
 /**
- * Floating source editor for a canvas LaTeX block. Borrows the page frame's
- * shared CodeMirror math editor (one instance, re-parented per active block)
- * by implementing its owner interface — the canvas plays the role ProseMirror
- * plays for page frame math blocks. The block's local state is the source of
- * truth here, so owner callbacks just forward edits and exits; the
- * PM-history/fence behaviors the editor also offers have no canvas analogue
- * and are intentionally inert.
+ * Borrows the page frame's shared CodeMirror math editor by implementing its owner interface — the
+ * canvas plays the role ProseMirror plays for page-frame math blocks. The block's local state is
+ * the source of truth here, so the PM-history and fence behaviors the editor also offers have no
+ * canvas analogue and are intentionally inert.
  */
 export function createLatexEditOverlay(
   options: LatexEditOverlayOptions,

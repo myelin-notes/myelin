@@ -1,5 +1,5 @@
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
-import { Logger } from '@/lib/logger';
+import { Logger } from '@myelin/shared/logger';
 import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
 
 const logger = new Logger('MarkdownImport');
