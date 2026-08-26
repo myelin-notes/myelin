@@ -7,7 +7,7 @@ import {
   type SearchIndex,
 } from '@/lib/search';
 import { addChild, dropNode, getChildIds, removeChild } from './child-index';
-import { MAX_CUSTOM_COLORS } from './config';
+import { MAX_CUSTOM_COLORS, MAX_PEN_PRESETS } from './config';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import type {
   CustomColorTool,
@@ -15,6 +15,8 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  PenPreset,
+  PenPresetTool,
   RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
@@ -32,6 +34,7 @@ export interface VFSManifest {
   linksBySource: Record<VFSNodeId, StoredNoteLink[]>;
   colors: Record<CustomColorTool, string[]>;
   tagRegistry: string[];
+  penPresets: PenPreset[];
 }
 
 export interface RepositorySnapshot {
@@ -61,6 +64,7 @@ export function createEmptyManifest(): VFSManifest {
     linksBySource: {},
     colors: { pen: [], highlighter: [], text: [] },
     tagRegistry: [],
+    penPresets: [],
   };
 }
 
@@ -68,6 +72,7 @@ export function migrate(manifest: VFSManifest): void {
   // Fields added after the initial schema are absent from manifests written by
   // older builds; default them so read paths don't spread `undefined`.
   manifest.tagRegistry ??= [];
+  manifest.penPresets = sanitizePenPresets(manifest.penPresets);
   if (manifest.version < 2) {
     // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest round-trips unknown
     // keys back to disk on every save; `JSON.stringify` omits undefined-valued keys.
@@ -95,6 +100,50 @@ export function migrate(manifest: VFSManifest): void {
     highlighter: manifest.colors?.highlighter ?? [],
     text: manifest.colors?.text ?? [],
   };
+}
+
+// Mirrors the pen and highlighter size options; a manifest can outlive the build that wrote it, so
+// the bounds are restated here rather than imported from the tools.
+const PEN_PRESET_SIZE_RANGE: Record<PenPresetTool, [number, number]> = {
+  pen: [1, 40],
+  highlighter: [12, 60],
+};
+
+/**
+ * Presets arrive from another device and possibly another build, so entries are validated rather
+ * than defaulted: anything unrecognised is dropped and out-of-range sizes are clamped.
+ */
+function sanitizePenPresets(presets: PenPreset[] | undefined): PenPreset[] {
+  if (!Array.isArray(presets)) {
+    return [];
+  }
+  const sane: PenPreset[] = [];
+  for (const entry of presets) {
+    const range = PEN_PRESET_SIZE_RANGE[entry?.tool];
+    const color =
+      typeof entry?.color === 'string'
+        ? normalizeCustomColor(entry.color)
+        : null;
+    if (
+      !range ||
+      !color ||
+      typeof entry.id !== 'string' ||
+      !Number.isFinite(entry.size)
+    ) {
+      continue;
+    }
+    sane.push({
+      id: entry.id,
+      tool: entry.tool,
+      color,
+      size: Math.min(Math.max(entry.size, range[0]), range[1]),
+      inWheel: entry.inWheel === true,
+    });
+    if (sane.length === MAX_PEN_PRESETS) {
+      break;
+    }
+  }
+  return sane;
 }
 
 export function createNodeId(): string {

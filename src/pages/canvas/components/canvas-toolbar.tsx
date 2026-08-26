@@ -3,11 +3,18 @@ import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
 } from 'lucide-react';
+import { PenPresetMark } from '@myelin/editor/components/pen-preset-mark';
 import { useMessages } from '@myelin/editor/i18n';
-import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
+import { getPenPresetLabel } from '@myelin/editor/pen-presets';
+import type {
+  CustomColorTool,
+  PenPreset,
+  PenPresetTool,
+} from '@myelin/editor/sync/repo/types';
 import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
 import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
 import { usePresence } from '@myelin/ui';
+import { PenPresetMenu } from '@/components/pen-preset-menu';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
 import {
@@ -27,6 +34,17 @@ interface CanvasToolbarProps {
   activeOptions: ToolOption[];
   hasOptions: boolean;
   wheelEnabledIndices: Set<number>;
+  presets: PenPreset[];
+  /** The preset the live tool currently matches exactly, if any. */
+  matchedPresetId: string | null;
+  activePenTool: PenPresetTool | null;
+  wheelFull: boolean;
+  savePresetDisabledReason: string | null;
+  onApplyPreset: (preset: PenPreset) => void;
+  onSavePreset: () => void;
+  onUpdatePresetToCurrent: (preset: PenPreset) => void;
+  onTogglePresetInWheel: (preset: PenPreset) => void;
+  onDeletePreset: (preset: PenPreset) => void;
   onSelectTool: (index: number) => void;
   onToggleOptions: () => void;
   onToggleShelf: () => void;
@@ -57,6 +75,16 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   activeOptions,
   hasOptions,
   wheelEnabledIndices,
+  presets,
+  matchedPresetId,
+  activePenTool,
+  wheelFull,
+  savePresetDisabledReason,
+  onApplyPreset,
+  onSavePreset,
+  onUpdatePresetToCurrent,
+  onTogglePresetInWheel,
+  onDeletePreset,
   onSelectTool,
   onToggleOptions,
   onToggleShelf,
@@ -72,7 +100,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
-  const shelfButtonRef = useRef<HTMLElement | null>(null);
   const insertButtonRef = useRef<HTMLElement | null>(null);
 
   // Compact stacks the panels above a bottom bar, where they span its width and
@@ -86,7 +113,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const optionsPanelOffset = getButtonOffset(
     toolButtonRefs.current[selectedToolIndex],
   );
-  const shelfPanelOffset = getButtonOffset(shelfButtonRef.current);
   const insertPanelOffset = getButtonOffset(insertButtonRef.current);
   const tooltipSide = IS_PHONE_BUILD ? 'top' : 'right';
   // Panels hang off the rail's right edge, or off the top of the bottom bar.
@@ -219,13 +245,47 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             );
           })}
 
+          {presets.length > 0 && <div className={`shrink-0 ${dividerClass}`} />}
+
+          {presets.map((preset) => {
+            const isMatch = matchedPresetId === preset.id;
+            return (
+              <PenPresetMenu
+                key={preset.id}
+                preset={preset}
+                canUpdateToCurrent={activePenTool === preset.tool}
+                onUpdateToCurrent={() => onUpdatePresetToCurrent(preset)}
+                onToggleInWheel={() => onTogglePresetInWheel(preset)}
+                onDelete={() => onDeletePreset(preset)}
+              >
+                <Tooltip>
+                  <TooltipTrigger
+                    aria-label={getPenPresetLabel(preset, strings)}
+                    className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
+                      isMatch
+                        ? 'bg-accent-dark'
+                        : 'bg-transparent hover:bg-hover-tint'
+                    }`}
+                    onClick={() => onApplyPreset(preset)}
+                  >
+                    <PenPresetMark
+                      preset={preset}
+                      onDark={isMatch}
+                      className="size-4"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side={tooltipSide}>
+                    <p>{getPenPresetLabel(preset, strings)}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </PenPresetMenu>
+            );
+          })}
+
           <div className={`shrink-0 ${dividerClass}`} />
 
           <Tooltip>
             <TooltipTrigger
-              ref={(el) => {
-                shelfButtonRef.current = el;
-              }}
               aria-label={strings.canvas.toolbar.customizeWheel}
               className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
                 shelfOpen
@@ -256,6 +316,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             <ToolOptionsPanel
               options={activeOptions}
               customColorTool={getCustomColorTool(tools[selectedToolIndex])}
+              savePresetDisabledReason={savePresetDisabledReason}
+              onSavePreset={onSavePreset}
             />
           </div>
         )}
@@ -263,16 +325,23 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         {shelfOpen && (
           <div
             className={
-              IS_PHONE_BUILD ? panelAnchorClass : `${panelAnchorClass} ml-2`
-            }
-            style={
-              IS_PHONE_BUILD ? undefined : { paddingTop: shelfPanelOffset }
+              IS_PHONE_BUILD
+                ? panelAnchorClass
+                : 'absolute bottom-0 left-full ml-2'
             }
           >
             <ToolShelf
               tools={tools}
               enabledIndices={wheelEnabledIndices}
+              presets={presets}
+              activePenTool={activePenTool}
+              wheelFull={wheelFull}
+              savePresetDisabledReason={savePresetDisabledReason}
               onToggle={onToggleWheelTool}
+              onSavePreset={onSavePreset}
+              onUpdatePresetToCurrent={onUpdatePresetToCurrent}
+              onTogglePresetInWheel={onTogglePresetInWheel}
+              onDeletePreset={onDeletePreset}
               onClose={onCloseShelf}
               containerRef={toolbarRef}
             />

@@ -754,7 +754,7 @@ const zhHans: typeof en = {
     },
     toolbar: {
       clickForOptions: '点击查看选项',
-      customizeWheel: '自定义轮盘',
+      customizeWheel: '工具与预设',
       insert: '插入',
     },
     selectionToolbar: {
@@ -806,8 +806,22 @@ const zhHans: typeof en = {
       transcriptionFailed: '转录失败',
     },
     toolShelf: {
-      title: '工具架',
+      title: '工具与预设',
       empty: '轮盘已停用，右键点击将不会打开',
+      tools: '工具',
+      presets: '预设',
+    },
+    toolPresets: {
+      label: (tool: string, size: number) => `${tool} · ${size}px`,
+      save: '将当前笔存为预设',
+      saveShort: '存为预设',
+      saveNeedsPen: '请先选择钢笔或荧光笔',
+      saveFull: (max: number) => `预设已满 - ${max} / ${max}`,
+      wheelFull: (max: number) => `轮盘已满 - ${max} / ${max}`,
+      updateToCurrent: '更新为当前设置',
+      showInWheel: '显示在轮盘',
+      removeFromWheel: '从轮盘移除',
+      delete: '删除预设',
     },
     tools: {
       select: '选择',

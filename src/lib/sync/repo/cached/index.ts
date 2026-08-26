@@ -48,6 +48,8 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  PenPreset,
+  PenPresetChanges,
   Repository,
   RepositoryCapabilities,
   RepositoryNoteGraph,
@@ -65,6 +67,7 @@ import {
   type DeletedSubtree,
   enqueueCustomColorsSync,
   enqueueDeleteManifestNode,
+  enqueuePenPresetsSync,
   enqueuePushNote,
   enqueueTagRegistrySync,
   enqueueUpsertManifestNode,
@@ -636,6 +639,40 @@ export class CachedRepository
     );
   }
 
+  async getPenPresets(): Promise<PenPreset[]> {
+    return this.cache.getPenPresets();
+  }
+
+  async addPenPreset(preset: Omit<PenPreset, 'id'>): Promise<PenPreset[]> {
+    return this.writeLocalAndQueue(
+      () => this.cache.addPenPreset(preset),
+      (ops) => {
+        enqueuePenPresetsSync(ops);
+      },
+    );
+  }
+
+  async updatePenPreset(
+    id: string,
+    changes: PenPresetChanges,
+  ): Promise<PenPreset[]> {
+    return this.writeLocalAndQueue(
+      () => this.cache.updatePenPreset(id, changes),
+      (ops) => {
+        enqueuePenPresetsSync(ops);
+      },
+    );
+  }
+
+  async removePenPreset(id: string): Promise<PenPreset[]> {
+    return this.writeLocalAndQueue(
+      () => this.cache.removePenPreset(id),
+      (ops) => {
+        enqueuePenPresetsSync(ops);
+      },
+    );
+  }
+
   async getRegistryTags(): Promise<string[]> {
     return this.cache.getRegistryTags();
   }
@@ -1005,6 +1042,13 @@ export class CachedRepository
           plan.manifestChanged = true;
           plan.messages.push('Sync tag registry');
           break;
+        case 'sync-pen-presets':
+          plan.manifest.penPresets = structuredClone(
+            cacheSnapshot.manifest.penPresets,
+          );
+          plan.manifestChanged = true;
+          plan.messages.push('Sync pen presets');
+          break;
         case 'push-note': {
           const node = cacheSnapshot.manifest.nodes[op.nodeId];
           if (!node || node.type !== 'file') {
@@ -1190,6 +1234,9 @@ export class CachedRepository
       case 'sync-tag-registry':
         await this.applyTagRegistrySync();
         return;
+      case 'sync-pen-presets':
+        await this.applyPenPresetsSync();
+        return;
     }
   }
 
@@ -1219,6 +1266,20 @@ export class CachedRepository
       'Sync tag registry',
       (remoteManifest) => {
         remoteManifest.tagRegistry = [...cacheTags];
+      },
+    );
+  }
+
+  private async applyPenPresetsSync(): Promise<void> {
+    // Cache is the source of truth — overwriting remote is what lets deletes
+    // propagate (a merge-only strategy could never remove).
+    const cachePresets = await this.withLocalStateLock(() =>
+      this.cache.getPenPresets(),
+    );
+    await this.remote.applyManifestMutation(
+      'Sync pen presets',
+      (remoteManifest) => {
+        remoteManifest.penPresets = structuredClone(cachePresets);
       },
     );
   }

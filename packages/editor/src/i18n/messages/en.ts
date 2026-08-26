@@ -771,7 +771,7 @@ const en = {
     },
     toolbar: {
       clickForOptions: 'click for options',
-      customizeWheel: 'Customize wheel',
+      customizeWheel: 'Tools & presets',
       insert: 'Insert',
     },
     selectionToolbar: {
@@ -824,8 +824,22 @@ const en = {
       transcriptionFailed: 'Transcription failed',
     },
     toolShelf: {
-      title: 'Tool Shelf',
+      title: 'Tools & presets',
       empty: 'Wheel disabled - right-click will not open it.',
+      tools: 'Tools',
+      presets: 'Presets',
+    },
+    toolPresets: {
+      label: (tool: string, size: number) => `${tool} · ${size}px`,
+      save: 'Save current pen as preset',
+      saveShort: 'Save as preset',
+      saveNeedsPen: 'Pick the pen or highlighter first.',
+      saveFull: (max: number) => `Presets are full - ${max} of ${max}.`,
+      wheelFull: (max: number) => `Wheel is full - ${max} of ${max}.`,
+      updateToCurrent: 'Update to current',
+      showInWheel: 'Show in wheel',
+      removeFromWheel: 'Remove from wheel',
+      delete: 'Delete preset',
     },
     tools: {
       select: 'Select',
