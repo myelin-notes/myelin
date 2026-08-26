@@ -59,7 +59,7 @@ const TOUCH_TAP_SLOP = 8;
 
 // Buttons that erase for as long as they are held: the eraser end (Pointer Events L3; S Pen /
 // Surface Pen / Wacom set it, Apple Pencil never does) and a barrel button. Also the contract the
-// native shims deliver against where the WebView hides a stylus button — see StylusButtonShim.kt.
+// native layer rewrites to where the WebView hides a stylus button — see StylusEventRewriter.kt.
 const PEN_ERASER_BUTTONS = 32 | 2;
 
 /**
@@ -1209,8 +1209,8 @@ export class DrawableCanvas {
         return;
       }
       // Before the update, so a barrel pressed mid-gesture hands the rest of it to the tool that
-      // just took over. Android never gets here: its shim pins a contact's tool type at touchdown
-      // (see StylusButtonShim.kt).
+      // just took over. Android never gets here: StylusEventRewriter.kt pins a contact's tool type
+      // at touchdown.
       this.syncEraserOverride(evt);
       this.syncPenChordedContact(evt);
       this.screenPosition = this.viewport.getScreenPoint(evt);

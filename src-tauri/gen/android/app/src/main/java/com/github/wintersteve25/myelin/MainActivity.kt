@@ -11,14 +11,14 @@ class MainActivity : TauriActivity() {
   }
 
   // Contact arrives through dispatchTouchEvent, hover through dispatchGenericMotionEvent; both are
-  // corrected before the WebView sees them. See StylusButtonShim.
+  // corrected before the WebView sees them. See StylusEventRewriter.
   override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-    val corrected = StylusButtonShim.forWebView(event) ?: return true
+    val corrected = StylusEventRewriter.forWebView(event) ?: return true
     return super.dispatchTouchEvent(corrected)
   }
 
   override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-    val corrected = StylusButtonShim.forWebView(event) ?: return true
+    val corrected = StylusEventRewriter.forWebView(event) ?: return true
     return super.dispatchGenericMotionEvent(corrected)
   }
 }

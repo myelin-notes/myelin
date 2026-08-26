@@ -12,7 +12,7 @@ import android.view.MotionEvent
  * eraser-tipped stylus with no button pressed sidesteps that, and produces the `buttons` eraser bit
  * (32) the web layer already erases on — see `syncEraserOverride` in drawable-canvas.ts.
  */
-object StylusButtonShim {
+object StylusEventRewriter {
   /**
    * The tool type every stylus pointer must report for the contact in progress, or
    * TOOL_TYPE_UNKNOWN between contacts.
