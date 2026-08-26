@@ -12,8 +12,7 @@ const PEN_HOLD_SLOP = 6;
 const TOUCH_HOLD_MS = 450;
 const TOUCH_HOLD_SLOP = 10;
 // PointerEvent.buttons bit for a second barrel button, which reports as the middle button. The
-// primary barrel erases while held (the canvas owns that), so on two-button pens the wheel gets
-// the one above it.
+// primary barrel erases while held (the canvas owns that), so the wheel gets the one above it.
 const PEN_WHEEL_BUTTONS = 4;
 
 interface UsePageCanvasBindingsArgs {
@@ -113,8 +112,9 @@ export function usePageCanvasBindings({
       // A second finger down means the viewport owns the gesture as a pinch,
       // so this also disarms a hold the first finger had started.
       cancelHold();
-      // Button 0 is the pen tip.
       const isPen = event.pointerType === 'pen';
+      // Button 0 is the pen tip; the eraser end reports its own, so flipping the pen over to erase
+      // doesn't arm the hold.
       if (
         (!isPen && event.pointerType !== 'touch') ||
         event.button !== 0 ||
@@ -131,10 +131,8 @@ export function usePageCanvasBindings({
       holdTimer = setTimeout(
         () => {
           cancelHold();
-          // Asked here rather than when the hold was armed: a barrel pressed
-          // after the tip landed starts an erase part-way through the wait,
-          // and pausing mid-erase is ordinary — the wheel must not take the
-          // gesture away from it.
+          // Checked at fire time, not when the hold was armed: a barrel pressed after the tip
+          // landed starts an erase mid-wait, and pausing mid-erase must not open the wheel.
           if (isPen && penIsErasing()) {
             return;
           }

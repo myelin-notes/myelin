@@ -151,12 +151,9 @@ export class CanvasViewport {
       };
       const dist = touchDistance(t0, t1);
 
-      // No anchors means the gesture started under suppression — the hand was
-      // down before the pen finished. Anchoring here instead of waiting for a
-      // fresh touchstart lets the pinch pick up the moment suppression lifts,
-      // rather than staying dead until the fingers are raised and replaced,
-      // and taking them from where the fingers are now keeps the camera from
-      // jumping by everything they travelled in the meantime.
+      // Null anchors mean the gesture began under palm suppression. Re-anchoring here rather than
+      // waiting for a fresh touchstart keeps the pinch from staying dead until the fingers lift and
+      // land again; taking them from where the fingers are now avoids a jump by the travel banked.
       if (this._touchPanLast == null || this._touchPinchLastDist == null) {
         this._touchPanLast = avg;
         this._touchPinchLastDist = dist;

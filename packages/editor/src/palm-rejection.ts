@@ -1,6 +1,5 @@
-// Only covers a hand settling into a *new* contact just after the tip leaves — one still resting
-// when the pen lifts is already a known palm. That happens within a few frames, and every ms beyond
-// is time the user cannot pan.
+// Covers only a hand settling into a *new* contact just after the tip leaves — one already resting
+// is a known palm. That lands within a few frames; every ms beyond is time the user cannot pan.
 const GRACE_MS = 150;
 
 /**
@@ -23,10 +22,9 @@ export class PalmRejection {
     );
   }
 
-  // A touch that first appears while the stylus is on the page stays rejected for its whole life —
-  // a hand that outlasts the grace window must not spring awake underneath the pen. One appearing
-  // only in the grace window is turned away for the moment, not remembered: the pen has already
-  // left, so condemning it would just mean a dead finger until the user lifted and retried.
+  // A touch that first appears while the stylus is down stays rejected for its whole life — a hand
+  // that outlasts the grace window must not spring awake under the pen. One appearing only within
+  // the window is turned away without being remembered, so it goes live when the window closes.
   public isPalm(pointerId: number): boolean {
     if (this.palmIds.has(pointerId)) {
       return true;
