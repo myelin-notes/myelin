@@ -1,9 +1,13 @@
 /**
- * How long touch stays rejected after the stylus lifts. A palm leaves the glass
- * a moment after the pen does, and without a grace window that trailing contact
- * reads as a fresh gesture and pans the canvas out from under the last stroke.
+ * How long touch stays rejected after the stylus lifts.
+ *
+ * A hand still resting when the pen lifts is already known as a palm and stays
+ * rejected on its own, so this window exists only for the narrower case of a
+ * hand settling into a *new* contact just after the tip leaves. That happens
+ * within a few frames, and every millisecond beyond it is time the user spent
+ * unable to pan, so it is kept short deliberately.
  */
-const GRACE_MS = 500;
+const GRACE_MS = 150;
 
 /**
  * Decides which touches are a hand resting on the screen rather than input.
@@ -32,20 +36,27 @@ export class PalmRejection {
   }
 
   /**
-   * Classify a touch that is going down. One that first appears while the
-   * stylus is on the page is remembered, so it stays rejected for its whole
-   * life — a hand that outlasts the grace window must not spring awake
-   * underneath the pen.
+   * Classify a touch that is going down.
+   *
+   * One that appears while the stylus is on the page is remembered, so it
+   * stays rejected for its whole life — a hand that outlasts the grace window
+   * must not spring awake underneath the pen.
+   *
+   * One that appears in the grace window afterwards is only turned away for
+   * the moment. Remembering it would condemn the contact for as long as the
+   * user held it, so reaching in to pan a little too soon after a stroke would
+   * mean a dead finger until they lifted it and tried again — the pen having
+   * already left the glass, there is nothing left to protect by then.
    */
   public isPalm(pointerId: number): boolean {
     if (this.palmIds.has(pointerId)) {
       return true;
     }
-    if (this.suppressed) {
+    if (this.penPointerId !== null) {
       this.palmIds.add(pointerId);
       return true;
     }
-    return false;
+    return this.suppressed;
   }
 
   /** Whether this pointer was already classified as a palm. */

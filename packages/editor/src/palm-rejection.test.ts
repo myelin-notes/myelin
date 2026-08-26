@@ -51,13 +51,27 @@ describe('PalmRejection', () => {
     palm.penDown(PEN, []);
     palm.pointerUp(PEN);
 
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(100);
     expect(palm.suppressed).toBe(true);
     expect(palm.isPalm(FINGER)).toBe(true);
 
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(100);
     expect(palm.suppressed).toBe(false);
     expect(palm.isPalm(FINGER + 1)).toBe(false);
+  });
+
+  it('does not condemn a touch that lands in the grace window', () => {
+    const palm = new PalmRejection();
+    palm.penDown(PEN, []);
+    palm.pointerUp(PEN);
+
+    // Turned away while the window is open...
+    expect(palm.isPalm(FINGER)).toBe(true);
+    expect(palm.isKnownPalm(FINGER)).toBe(false);
+
+    // ...but the same finger, still down, is live once it closes.
+    vi.advanceTimersByTime(200);
+    expect(palm.isPalm(FINGER)).toBe(false);
   });
 
   it('reports whether a lifted pointer was a rejected palm', () => {

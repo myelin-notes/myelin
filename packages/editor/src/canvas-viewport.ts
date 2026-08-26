@@ -150,16 +150,9 @@ export class CanvasViewport {
         this._touchPinchLastDist = null;
         return;
       }
-      if (
-        evt.touches.length < 2 ||
-        this._touchPanLast == null ||
-        this._touchPinchLastDist == null
-      ) {
+      if (evt.touches.length < 2) {
         return;
       }
-      evt.preventDefault();
-      this.cancelAnimation();
-
       const t0 = evt.touches[0];
       const t1 = evt.touches[1];
       const avg = {
@@ -167,6 +160,21 @@ export class CanvasViewport {
         y: (t0.clientY + t1.clientY) / 2,
       };
       const dist = touchDistance(t0, t1);
+
+      // No anchors means the gesture started under suppression — the hand was
+      // down before the pen finished. Anchoring here instead of waiting for a
+      // fresh touchstart lets the pinch pick up the moment suppression lifts,
+      // rather than staying dead until the fingers are raised and replaced,
+      // and taking them from where the fingers are now keeps the camera from
+      // jumping by everything they travelled in the meantime.
+      if (this._touchPanLast == null || this._touchPinchLastDist == null) {
+        this._touchPanLast = avg;
+        this._touchPinchLastDist = dist;
+        evt.preventDefault();
+        return;
+      }
+      evt.preventDefault();
+      this.cancelAnimation();
 
       // On the free canvas, two-finger drag pans both axes; in edit mode,
       // lock pan to the edited element's page axis (consistent with wheel).
