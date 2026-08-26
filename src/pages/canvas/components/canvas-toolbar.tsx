@@ -100,7 +100,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
-  const shelfButtonRef = useRef<HTMLElement | null>(null);
   const insertButtonRef = useRef<HTMLElement | null>(null);
 
   // Compact stacks the panels above a bottom bar, where they span its width and
@@ -114,7 +113,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const optionsPanelOffset = getButtonOffset(
     toolButtonRefs.current[selectedToolIndex],
   );
-  const shelfPanelOffset = getButtonOffset(shelfButtonRef.current);
   const insertPanelOffset = getButtonOffset(insertButtonRef.current);
   const tooltipSide = IS_PHONE_BUILD ? 'top' : 'right';
   // Panels hang off the rail's right edge, or off the top of the bottom bar.
@@ -288,9 +286,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 
           <Tooltip>
             <TooltipTrigger
-              ref={(el) => {
-                shelfButtonRef.current = el;
-              }}
               aria-label={strings.canvas.toolbar.customizeWheel}
               className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
                 shelfOpen
@@ -330,10 +325,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         {shelfOpen && (
           <div
             className={
-              IS_PHONE_BUILD ? panelAnchorClass : `${panelAnchorClass} ml-2`
-            }
-            style={
-              IS_PHONE_BUILD ? undefined : { paddingTop: shelfPanelOffset }
+              IS_PHONE_BUILD
+                ? panelAnchorClass
+                : 'absolute bottom-0 left-full ml-2'
             }
           >
             <ToolShelf

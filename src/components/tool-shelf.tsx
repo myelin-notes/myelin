@@ -194,14 +194,14 @@ export function ToolShelf({
             {savePresetDisabledReason}
           </p>
         )}
+        {(wheelFull || wheelEmpty) && (
+          <p className="px-3 pb-1 text-[11px] text-text-muted">
+            {wheelFull
+              ? strings.canvas.toolPresets.wheelFull(MAX_WHEEL_ENTRIES)
+              : strings.canvas.toolShelf.empty}
+          </p>
+        )}
       </div>
-      {(wheelFull || wheelEmpty) && (
-        <p className="px-4 pb-3 text-[11px] text-text-muted">
-          {wheelFull
-            ? strings.canvas.toolPresets.wheelFull(MAX_WHEEL_ENTRIES)
-            : strings.canvas.toolShelf.empty}
-        </p>
-      )}
     </div>
   );
 }
