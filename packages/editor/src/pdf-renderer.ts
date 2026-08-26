@@ -228,7 +228,7 @@ export async function loadPdfDocument(
     const pageSizes = await getPdfDocumentPageSizes(document);
     return { document, pageSizes };
   } catch (error) {
-    await document.destroy();
+    await document.loadingTask.destroy();
     throw error;
   }
 }
@@ -237,7 +237,7 @@ export async function getPdfPageSizes(
   bytes: Uint8Array,
 ): Promise<PdfPageSize[]> {
   const loaded = await loadPdfDocument(bytes);
-  await loaded.document.destroy();
+  await loaded.document.loadingTask.destroy();
   return loaded.pageSizes;
 }
 

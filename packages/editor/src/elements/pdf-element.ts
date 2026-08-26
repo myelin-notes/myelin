@@ -586,7 +586,7 @@ export class PdfElement extends DrawableElement {
     this._stagingCanvasPool.drain();
     this._thumbnailPages = [];
     this._lastSyncScreenOffset = null;
-    void this._pdfDocument?.destroy();
+    void this._pdfDocument?.loadingTask.destroy();
     this._pdfDocument = null;
     this._pageDoms.clear();
     this.removeAllGapButtons();
@@ -781,13 +781,13 @@ export class PdfElement extends DrawableElement {
   ): Promise<void> {
     const generation = ++this._loadGeneration;
     this.invalidatePageRenders();
-    void this._pdfDocument?.destroy();
+    void this._pdfDocument?.loadingTask.destroy();
     this._pdfDocument = null;
 
     try {
       const document = await openPdfDocument(bytes);
       if (generation !== this._loadGeneration) {
-        await document.destroy();
+        await document.loadingTask.destroy();
         return;
       }
 
