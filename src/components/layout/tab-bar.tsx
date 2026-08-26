@@ -11,14 +11,14 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { errorDescription } from '@/components/command-palette/utils';
-import { useSidebar } from '@/components/layout/sidebar/context';
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+} from '@myelin/ui/context-menu';
+import { errorDescription } from '@/components/command-palette/utils';
+import { useSidebar } from '@/components/layout/sidebar/context';
 import { trackEvent } from '@/lib/analytics';
 import { type Messages, useMessages } from '@/lib/i18n';
 import { keybindings } from '@/lib/keybinds';
@@ -276,7 +276,7 @@ export const TabBar = memo(function TabBar({
         </div>
       ) : (
         <div
-          className="flex min-w-0 items-end gap-px overflow-x-auto pl-2"
+          className="flex min-w-0 items-end gap-px overflow-x-auto overflow-y-hidden pl-2"
           style={{ scrollbarWidth: 'none' }}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}

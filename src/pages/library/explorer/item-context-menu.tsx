@@ -3,7 +3,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-} from '@/components/ui/context-menu';
+} from '@myelin/ui/context-menu';
 import { useMessages } from '@/lib/i18n';
 
 interface ItemContextMenuProps {

@@ -342,7 +342,7 @@ export const WheelPicker = memo(function WheelPicker({
             return (
               <button
                 key={i}
-                className={`absolute flex size-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl bg-popover/95 shadow-ambient outline-none transition-colors ${
+                className={`absolute flex size-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl bg-card shadow-ambient outline-none ring-1 ring-border-subtle/70 transition-colors ${
                   inPath ? 'bg-secondary-container' : ''
                 }`}
                 style={{ left: x, top: y }}
@@ -371,7 +371,7 @@ export const WheelPicker = memo(function WheelPicker({
                 className={`fade-in zoom-in-75 absolute flex animate-in cursor-pointer items-center justify-center rounded-xl shadow-ambient outline-none transition-all duration-100 ${
                   isColor
                     ? 'size-7 border-none p-0'
-                    : `size-9 bg-popover/95 ${focused ? 'bg-secondary-container' : ''}`
+                    : `size-9 bg-card ring-1 ring-border-subtle/70 ${focused ? 'bg-secondary-container' : ''}`
                 }`}
                 style={{
                   left: x,
@@ -414,7 +414,7 @@ export const WheelPicker = memo(function WheelPicker({
             return (
               <button
                 key={`r2-${r0Idx}-${r1Idx}-${k}`}
-                className="fade-in zoom-in-75 absolute flex size-9 animate-in cursor-pointer items-center justify-center rounded-xl bg-popover/95 shadow-ambient outline-none transition-all duration-100"
+                className="fade-in zoom-in-75 absolute flex size-9 animate-in cursor-pointer items-center justify-center rounded-xl bg-card shadow-ambient outline-none ring-1 ring-border-subtle/70 transition-all duration-100"
                 style={{
                   left: x,
                   top: y,

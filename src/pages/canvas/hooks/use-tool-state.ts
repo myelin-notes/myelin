@@ -2,6 +2,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Plus as PlusIcon } from 'lucide-react';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
+import { MAX_CUSTOM_COLORS } from '@myelin/editor/sync/repo/config';
+import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import {
   type ITool,
   setToolOption,
@@ -85,8 +87,8 @@ function toolToWheelItem(
     current: (tool: ITool, option: ToolOption, value: unknown) => void;
   },
   strings: Messages,
-  customColors: string[],
-  promptAddColor: () => void,
+  customColors: Record<CustomColorTool, string[]>,
+  promptAddColor: (tool: CustomColorTool) => void,
 ): WheelItem {
   const options = tool.getOptions?.() ?? [];
   const colorOpt = options.find(
@@ -99,9 +101,10 @@ function toolToWheelItem(
   let children: WheelItem[] | undefined;
 
   if (colorOpt) {
+    const customColorTool = getCustomColorTool(tool);
     const colorChildren: WheelItem[] = [
       ...colorOpt.palette,
-      ...customColors,
+      ...(customColorTool ? customColors[customColorTool] : []),
     ].map((hex) => ({
       label: hex,
       color: hex,
@@ -110,11 +113,16 @@ function toolToWheelItem(
         ? makeSizeChildren(tool, sizeOpt, applyRef, strings)
         : undefined,
     }));
-    colorChildren.push({
-      label: strings.canvas.toolOptions.addCustomColor,
-      icon: PlusIcon,
-      command: promptAddColor,
-    });
+    if (
+      customColorTool &&
+      customColors[customColorTool].length < MAX_CUSTOM_COLORS
+    ) {
+      colorChildren.push({
+        label: strings.canvas.toolOptions.addCustomColor,
+        icon: PlusIcon,
+        command: () => promptAddColor(customColorTool),
+      });
+    }
     children = colorChildren;
   } else if (sizeOpt) {
     children = makeSizeChildren(tool, sizeOpt, applyRef, strings);
@@ -128,11 +136,51 @@ function toolToWheelItem(
   };
 }
 
+function getCustomColorTool(tool: ITool): CustomColorTool | null {
+  switch (tool.id) {
+    case 'pen':
+    case 'highlighter':
+    case 'text':
+      return tool.id;
+    default:
+      return null;
+  }
+}
+
 export function useToolState(
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>,
 ) {
   const strings = useMessages();
-  const { colors: customColors, promptAddColor } = useCustomColors();
+  const penColors = useCustomColors('pen');
+  const highlighterColors = useCustomColors('highlighter');
+  const textColors = useCustomColors('text');
+  const customColors = useMemo(
+    () => ({
+      pen: penColors.colors,
+      highlighter: highlighterColors.colors,
+      text: textColors.colors,
+    }),
+    [highlighterColors.colors, penColors.colors, textColors.colors],
+  );
+  const promptAddColor = useCallback(
+    (tool: CustomColorTool) => {
+      switch (tool) {
+        case 'pen':
+          penColors.promptAddColor();
+          return;
+        case 'highlighter':
+          highlighterColors.promptAddColor();
+          return;
+        case 'text':
+          textColors.promptAddColor();
+      }
+    },
+    [
+      highlighterColors.promptAddColor,
+      penColors.promptAddColor,
+      textColors.promptAddColor,
+    ],
+  );
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsTick, setOptionsTick] = useState(0);

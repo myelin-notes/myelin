@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import type { VFSFileNode } from '@/lib/sync';
 import { useThumbnailUrl } from '@/lib/use-thumbnail-url';
 import { cn } from '@/lib/utils';

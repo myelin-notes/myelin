@@ -45,7 +45,6 @@ import {
 } from '@/components/ui/tooltip';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
-import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
@@ -57,6 +56,7 @@ import { usePaneId, useTabController } from '@/lib/tabs/context';
 import { regenerateThumbnailNow } from '@/lib/thumbnails';
 import { useUserPref } from '@/lib/use-user-pref';
 import { UserPrefs } from '@/lib/user-prefs';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { getPlatform } from '@/platform';
 import { BacklinksChip } from './components/backlinks-chip';
@@ -121,7 +121,6 @@ function CanvasViewInner({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgHostRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const compactLayout = useCompactCanvasLayout();
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
@@ -687,7 +686,7 @@ function CanvasViewInner({
       >
         <WheelPicker
           ref={wheelRef}
-          radius={compactLayout ? COMPACT_WHEEL_RADIUS : 100}
+          radius={IS_PHONE_BUILD ? COMPACT_WHEEL_RADIUS : 100}
           items={toolState.wheelItems}
         >
           {wheelCenterIcon}

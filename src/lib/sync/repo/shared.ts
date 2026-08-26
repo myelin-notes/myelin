@@ -7,8 +7,10 @@ import {
 } from '@/lib/search';
 import type { NoteEmbedding } from '@/platform';
 import { addChild, dropNode, getChildIds, removeChild } from './child-index';
+import { MAX_CUSTOM_COLORS } from './config';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import type {
+  CustomColorTool,
   FileType,
   FileVersion,
   NodeSearchResult,
@@ -28,7 +30,7 @@ export interface VFSManifest {
   version: number;
   nodes: Record<string, VFSNode>;
   linksBySource: Record<VFSNodeId, StoredNoteLink[]>;
-  customColors: string[];
+  colors: Record<CustomColorTool, string[]>;
   tagRegistry: string[];
 }
 
@@ -37,9 +39,15 @@ export interface RepositorySnapshot {
   notes: Record<VFSNodeId, Uint8Array | null>;
 }
 
+export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
+  'pen',
+  'highlighter',
+  'text',
+];
+
 // 2 dropped the `children` arrays: parentage is stored only as `node.parentId`,
 // and the adjacency index is derived at runtime by `./child-index`.
-export const CURRENT_MANIFEST_VERSION = 2;
+export const CURRENT_MANIFEST_VERSION = 3;
 export const MANIFEST_PATH = 'manifest.json';
 export const FILES_DIR = 'files';
 export const FILE_EXT = '.myelin';
@@ -51,7 +59,7 @@ export function createEmptyManifest(): VFSManifest {
     version: CURRENT_MANIFEST_VERSION,
     nodes: {},
     linksBySource: {},
-    customColors: [],
+    colors: { pen: [], highlighter: [], text: [] },
     tagRegistry: [],
   };
 }
@@ -60,9 +68,7 @@ export function migrate(manifest: VFSManifest): void {
   // Fields added after the initial schema are absent from manifests written by
   // older builds; default them so read paths don't spread `undefined`.
   manifest.tagRegistry ??= [];
-  manifest.customColors ??= [];
-
-  if (manifest.version < CURRENT_MANIFEST_VERSION) {
+  if (manifest.version < 2) {
     // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest
     // round-trips unknown keys back to disk on every save. `JSON.stringify`
     // omits undefined-valued keys, so this drops them from the next write.
@@ -70,8 +76,26 @@ export function migrate(manifest: VFSManifest): void {
     for (const node of Object.values(manifest.nodes)) {
       (node as VFSNode & { children?: undefined }).children = undefined;
     }
-    manifest.version = CURRENT_MANIFEST_VERSION;
+    manifest.version = 2;
   }
+
+  const legacyManifest = manifest as VFSManifest & {
+    customColors?: string[];
+  };
+  if (manifest.version < 3) {
+    manifest.colors = {
+      pen: (legacyManifest.customColors ?? []).slice(0, MAX_CUSTOM_COLORS),
+      highlighter: [],
+      text: [],
+    };
+    legacyManifest.customColors = undefined;
+    manifest.version = 3;
+  }
+  manifest.colors = {
+    pen: manifest.colors?.pen ?? [],
+    highlighter: manifest.colors?.highlighter ?? [],
+    text: manifest.colors?.text ?? [],
+  };
 }
 
 export function createNodeId(): string {

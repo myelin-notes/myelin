@@ -96,7 +96,9 @@ describe('Repository business logic parity', () => {
       await repository.addTag(rawFileId, 'beta');
       await repository.removeTag(rawFileId, 'beta');
       await repository.addTag(rawFileId, 'uni/math');
-      await repository.addCustomColor('#ABCDEF');
+      await repository.addCustomColor('#ABCDEF', 'pen');
+      await repository.addCustomColor('#FACC15', 'highlighter');
+      await repository.addCustomColor('#3B82F6', 'text');
       await repository.addRegistryTags(['alpha', 'orphan']);
 
       const [rootFolders, rootFiles] = await repository.listDirectory(null);
@@ -139,7 +141,11 @@ describe('Repository business logic parity', () => {
       expect(hierarchicalByTag.get('uni')).toBe(
         (await repository.getNodesByAnyTag(['uni'])).length,
       );
-      expect(await repository.getCustomColors()).toEqual(['#abcdef']);
+      expect(await repository.getCustomColors('pen')).toEqual(['#abcdef']);
+      expect(await repository.getCustomColors('highlighter')).toEqual([
+        '#facc15',
+      ]);
+      expect(await repository.getCustomColors('text')).toEqual(['#3b82f6']);
       expect((await repository.getRegistryTags()).sort()).toEqual([
         'alpha',
         'orphan',
@@ -180,13 +186,17 @@ describe('Repository business logic parity', () => {
         ],
       });
 
-      await repository.removeCustomColor('#abcdef');
+      await repository.removeCustomColor('#abcdef', 'pen');
+      await repository.removeCustomColor('#facc15', 'highlighter');
+      await repository.removeCustomColor('#3b82f6', 'text');
       await repository.removeRegistryTag('orphan');
       await repository.deleteNode(folderId);
 
       expect(await repository.getNode(folderId)).toBeNull();
       expect(await repository.getNode(rawFileId)).toBeNull();
-      expect(await repository.getCustomColors()).toEqual([]);
+      expect(await repository.getCustomColors('pen')).toEqual([]);
+      expect(await repository.getCustomColors('highlighter')).toEqual([]);
+      expect(await repository.getCustomColors('text')).toEqual([]);
       expect(await repository.getRegistryTags()).toEqual(['alpha']);
     });
   }

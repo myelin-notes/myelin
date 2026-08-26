@@ -847,6 +847,7 @@ const en = {
       medium: (value: number) => `Medium (${value})`,
       bold: (value: number) => `Bold (${value})`,
       addCustomColor: 'Add custom color',
+      deleteColor: 'Delete color',
       decreaseFontSize: 'Decrease font size',
       increaseFontSize: 'Increase font size',
     },

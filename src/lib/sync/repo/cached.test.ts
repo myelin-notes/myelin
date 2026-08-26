@@ -833,7 +833,7 @@ describe('CachedRepository', () => {
     const cache = new LocalRepository('repositories/color-bootstrap-test');
 
     await cache.initialize();
-    await cache.addCustomColor('#ABCDEF');
+    await cache.addCustomColor('#ABCDEF', 'pen');
 
     const repository = new CachedRepository(
       remote,
@@ -843,8 +843,8 @@ describe('CachedRepository', () => {
 
     await repository.initialize();
 
-    expect(await remote.getCustomColors()).toEqual([]);
-    expect(await repository.getCustomColors()).toEqual([]);
+    expect(await remote.getCustomColors('pen')).toEqual([]);
+    expect(await repository.getCustomColors('pen')).toEqual([]);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
@@ -868,7 +868,9 @@ describe('CachedRepository', () => {
     await repository.renameNode(fileId, 'Renamed local note');
     await repository.moveNode(fileId, null);
     await repository.setTags(fileId, ['uni/math']);
-    await repository.addCustomColor('#ABCDEF');
+    await repository.addCustomColor('#ABCDEF', 'pen');
+    await repository.addCustomColor('#FACC15', 'highlighter');
+    await repository.addCustomColor('#3B82F6', 'text');
 
     const [rootFolders, rootFiles] = await repository.listDirectory(null);
     const remoteBeforeFlush = await remote.exportSnapshot();
@@ -884,7 +886,11 @@ describe('CachedRepository', () => {
     expect(
       (await repository.getNodesByAnyTag(['uni'])).map((node) => node.id),
     ).toEqual([fileId]);
-    expect(await repository.getCustomColors()).toEqual(['#abcdef']);
+    expect(await repository.getCustomColors('pen')).toEqual(['#abcdef']);
+    expect(await repository.getCustomColors('highlighter')).toEqual([
+      '#facc15',
+    ]);
+    expect(await repository.getCustomColors('text')).toEqual(['#3b82f6']);
     expect(remoteBeforeFlush.manifest).toEqual(createEmptyManifest());
     expect(remoteBeforeFlush.notes).toEqual({});
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBeGreaterThan(
@@ -908,7 +914,9 @@ describe('CachedRepository', () => {
     expect(
       (await repository.listTags(true)).map((entry) => entry.tag).sort(),
     ).toEqual(['uni', 'uni/math']);
-    expect(await remote.getCustomColors()).toEqual(['#abcdef']);
+    expect(await remote.getCustomColors('pen')).toEqual(['#abcdef']);
+    expect(await remote.getCustomColors('highlighter')).toEqual(['#facc15']);
+    expect(await remote.getCustomColors('text')).toEqual(['#3b82f6']);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 

@@ -17,6 +17,7 @@
    floating toolbar, autocomplete, code-run overlay), so its sources must be
    scanned too or that chrome shows up unstyled. */
 @source '../../../editor/src/**/*.{ts,tsx}';
+@source '../../../ui/src/**/*.{ts,tsx}';
 
 /* Handwriting font for the canvas annotations. Self-hosted (matching the
    local-first pitch, no Google Fonts request): the editor's Google-font

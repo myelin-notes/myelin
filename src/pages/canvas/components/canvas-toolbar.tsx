@@ -3,6 +3,7 @@ import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
 } from 'lucide-react';
+import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
 import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
 import { usePresence } from '@myelin/ui';
@@ -14,8 +15,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
 import { useMessages } from '@/lib/i18n';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface CanvasToolbarProps {
   tools: ITool[];
@@ -34,6 +35,17 @@ interface CanvasToolbarProps {
   onToggleWheelTool: (index: number) => void;
   insertPopover?: React.ReactNode;
   embedComposer?: React.ReactNode;
+}
+
+function getCustomColorTool(tool: ITool | undefined): CustomColorTool | null {
+  switch (tool?.id) {
+    case 'pen':
+    case 'highlighter':
+    case 'text':
+      return tool.id;
+    default:
+      return null;
+  }
 }
 
 export const CanvasToolbar = memo(function CanvasToolbar({
@@ -55,7 +67,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   embedComposer,
 }: CanvasToolbarProps) {
   const strings = useMessages();
-  const compact = useCompactCanvasLayout();
   const optionsOpen = optionsVisible && hasOptions && !shelfOpen;
   const optionsPresence = usePresence(optionsOpen);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -67,7 +78,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   // Compact stacks the panels above a bottom bar, where they span its width and
   // need no per-button alignment.
   const getButtonOffset = (btn: HTMLElement | null) => {
-    if (compact || !(btn && toolbarInnerRef.current)) {
+    if (IS_PHONE_BUILD || !(btn && toolbarInnerRef.current)) {
       return 0;
     }
     return btn.offsetTop - toolbarInnerRef.current.offsetTop;
@@ -77,21 +88,21 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   );
   const shelfPanelOffset = getButtonOffset(shelfButtonRef.current);
   const insertPanelOffset = getButtonOffset(insertButtonRef.current);
-  const tooltipSide = compact ? 'top' : 'right';
+  const tooltipSide = IS_PHONE_BUILD ? 'top' : 'right';
   // Panels hang off the rail's right edge, or off the top of the bottom bar.
-  const panelAnchorClass = compact
+  const panelAnchorClass = IS_PHONE_BUILD
     ? 'absolute right-0 bottom-full left-0 mb-2'
     : 'absolute top-0 left-full';
   // The options controls are narrow, so stretched across the bar the panel is
   // mostly empty. On compact it sizes to its content and centres over the bar.
-  const optionsAnchorClass = compact
+  const optionsAnchorClass = IS_PHONE_BUILD
     ? 'absolute right-0 bottom-full left-0 mx-auto mb-2 w-fit max-w-[calc(100vw-1.5rem)]'
     : panelAnchorClass;
-  const dividerClass = compact
+  const dividerClass = IS_PHONE_BUILD
     ? 'mx-1 h-4 w-px bg-border-divider'
     : 'my-1 h-px w-4 bg-border-divider';
   // 44px touch target on compact, against 36px for a cursor.
-  const buttonPadClass = compact ? 'p-3.5' : 'p-2.5';
+  const buttonPadClass = IS_PHONE_BUILD ? 'p-3.5' : 'p-2.5';
 
   return (
     <TooltipProvider>
@@ -100,10 +111,11 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           stroke. This swallows that tap. Sits below the toolbar's own z-100 so
           the tools stay live while a panel is open. Shelf and insert close
           themselves on an outside pointerdown; the options panel has no such
-          handler. */}
-      {compact && (optionsOpen || shelfOpen || insertOpen) && (
+          handler. Needs touch-none: without it a drag starting on the scrim
+          is handed to WebKit, which scrolls the whole webview. */}
+      {IS_PHONE_BUILD && (optionsOpen || shelfOpen || insertOpen) && (
         <div
-          className="fixed inset-0 z-[99]"
+          className="fixed inset-0 z-[99] touch-none"
           onPointerDown={() => {
             if (optionsOpen) {
               onToggleOptions();
@@ -114,7 +126,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
       <div
         ref={toolbarRef}
         className={
-          compact
+          IS_PHONE_BUILD
             ? 'fade-in-0 slide-in-from-bottom-3 absolute inset-x-0 bottom-0 z-[100] flex animate-in justify-center px-3 pb-3 duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
             : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
         }
@@ -124,7 +136,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         <div
           ref={toolbarInnerRef}
           className={
-            compact
+            IS_PHONE_BUILD
               ? 'flex max-w-full flex-row items-center gap-1 overflow-x-auto rounded-xl bg-card px-2 py-2 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
               : 'flex max-h-[calc(100dvh-6rem)] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-card px-2 py-3 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           }
@@ -235,20 +247,27 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             {...optionsPresence.state}
             onAnimationEnd={optionsPresence.onAnimationEnd}
             className={`data-closed:fade-out-0 data-open:fade-in-0 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in ${
-              compact
+              IS_PHONE_BUILD
                 ? 'data-closed:slide-out-to-bottom-2 data-open:slide-in-from-bottom-2'
                 : 'data-closed:slide-out-to-left-2 data-open:slide-in-from-left-2 ml-2'
             } ${optionsAnchorClass}`}
-            style={compact ? undefined : { top: optionsPanelOffset }}
+            style={IS_PHONE_BUILD ? undefined : { top: optionsPanelOffset }}
           >
-            <ToolOptionsPanel options={activeOptions} />
+            <ToolOptionsPanel
+              options={activeOptions}
+              customColorTool={getCustomColorTool(tools[selectedToolIndex])}
+            />
           </div>
         )}
 
         {shelfOpen && (
           <div
-            className={compact ? panelAnchorClass : `${panelAnchorClass} ml-2`}
-            style={compact ? undefined : { paddingTop: shelfPanelOffset }}
+            className={
+              IS_PHONE_BUILD ? panelAnchorClass : `${panelAnchorClass} ml-2`
+            }
+            style={
+              IS_PHONE_BUILD ? undefined : { paddingTop: shelfPanelOffset }
+            }
           >
             <ToolShelf
               tools={tools}
@@ -263,7 +282,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         {!shelfOpen && embedComposer && (
           <div
             className={panelAnchorClass}
-            style={compact ? undefined : { paddingTop: insertPanelOffset }}
+            style={
+              IS_PHONE_BUILD ? undefined : { paddingTop: insertPanelOffset }
+            }
           >
             {embedComposer}
           </div>
@@ -272,7 +293,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         {insertOpen && !shelfOpen && (
           <div
             className={panelAnchorClass}
-            style={compact ? undefined : { paddingTop: insertPanelOffset }}
+            style={
+              IS_PHONE_BUILD ? undefined : { paddingTop: insertPanelOffset }
+            }
           >
             {insertPopover}
           </div>

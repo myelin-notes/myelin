@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_CUSTOM_COLORS } from './config';
 import {
   CURRENT_MANIFEST_VERSION,
   createEmptyManifest,
@@ -94,7 +95,7 @@ describe('child index', () => {
         },
       },
       linksBySource: {},
-      customColors: [],
+      customColors: ['#111111'],
       tagRegistry: [],
     } as unknown as VFSManifest;
 
@@ -104,6 +105,33 @@ describe('child index', () => {
     expect(JSON.parse(JSON.stringify(legacy))).not.toHaveProperty('children');
     expect(JSON.parse(JSON.stringify(legacy)).nodes.folder).not.toHaveProperty(
       'children',
+    );
+    expect(legacy.colors).toEqual({
+      pen: ['#111111'],
+      highlighter: [],
+      text: [],
+    });
+    expect(JSON.parse(JSON.stringify(legacy))).not.toHaveProperty(
+      'customColors',
+    );
+  });
+
+  it('caps the migrated pen palette at the custom-color limit', () => {
+    const legacy = {
+      version: 2,
+      nodes: {},
+      linksBySource: {},
+      customColors: Array.from(
+        { length: MAX_CUSTOM_COLORS + 3 },
+        (_, i) => `#00000${i}`,
+      ),
+      tagRegistry: [],
+    } as unknown as VFSManifest;
+
+    migrate(legacy);
+
+    expect(legacy.colors.pen).toEqual(
+      Array.from({ length: MAX_CUSTOM_COLORS }, (_, i) => `#00000${i}`),
     );
   });
 

@@ -89,3 +89,5 @@ export type ActiveRepository = Repository &
 export const DEFAULT_REPOSITORY_CONFIG: RepositoryConfig = { kind: 'local' };
 
 export const DEFAULT_GOOGLE_DRIVE_FOLDER_NAME = 'Myelin';
+
+export const MAX_CUSTOM_COLORS = 8;

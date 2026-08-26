@@ -1,5 +1,6 @@
 import { memo, useRef } from 'react';
 import { Plus as PlusIcon } from 'lucide-react';
+import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
 import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
 import { usePresence } from '@myelin/ui';
@@ -27,6 +28,17 @@ interface CanvasToolbarProps {
   onToggleInsert?: () => void;
   insertPopover?: React.ReactNode;
   embedComposer?: React.ReactNode;
+}
+
+function getCustomColorTool(tool: ITool | undefined): CustomColorTool | null {
+  switch (tool?.id) {
+    case 'pen':
+    case 'highlighter':
+    case 'text':
+      return tool.id;
+    default:
+      return null;
+  }
 }
 
 export const CanvasToolbar = memo(function CanvasToolbar({
@@ -162,7 +174,10 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             className="data-closed:slide-out-to-left-2 data-closed:fade-out-0 data-open:slide-in-from-left-2 data-open:fade-in-0 absolute left-full ml-2 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
             style={{ top: optionsPanelOffset }}
           >
-            <ToolOptionsPanel options={activeOptions} />
+            <ToolOptionsPanel
+              options={activeOptions}
+              customColorTool={getCustomColorTool(tools[selectedToolIndex])}
+            />
           </div>
         )}
 

@@ -4,13 +4,15 @@ import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
+import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { FontSizeField } from '@/components/font-size-field';
-import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
 import { useCustomColors } from '@/lib/custom-colors';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];
+  customColorTool: CustomColorTool | null;
 }
 
 function preloadAllFonts(fonts: FontEntry[]) {
@@ -33,7 +35,6 @@ function FontPicker({
   const [open, setOpen] = useState(false);
   // On compact the whole panel sits just above the bottom bar, so a list
   // dropping below the button would land off the bottom of the screen.
-  const dropUp = useCompactCanvasLayout();
   const containerRef = useRef<HTMLDivElement>(null);
   const handleWindowPointerDown = useEffectEvent((event: PointerEvent) => {
     if (!containerRef.current?.contains(event.target as Node)) {
@@ -74,7 +75,7 @@ function FontPicker({
       {open && (
         <div
           className={`absolute left-0 z-50 max-h-60 w-52 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl bg-card py-1 shadow-ambient ${
-            dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+            IS_PHONE_BUILD ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
           }`}
         >
           {fonts.map((font) => (
@@ -111,12 +112,16 @@ function FontPicker({
 
 /* ── Main panel ─────────────────────────────────────────── */
 
-export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
+export function ToolOptionsPanel({
+  options,
+  customColorTool,
+}: ToolOptionsPanelProps) {
   const {
     colors: customColors,
+    canAddColor,
     promptAddColor,
     removeColor,
-  } = useCustomColors();
+  } = useCustomColors(customColorTool ?? 'pen');
 
   if (options.length === 0) {
     return null;
@@ -140,21 +145,27 @@ export function ToolOptionsPanel({ options }: ToolOptionsPanelProps) {
                     onClick={() => option.set(color)}
                   />
                 ))}
-                {customColors.map((color) => (
-                  <CustomColorSwatch
-                    key={color}
-                    color={color}
-                    active={option.value === color}
-                    onClick={() => option.set(color)}
-                    onDelete={() => {
-                      if (option.value === color && option.palette.length > 0) {
-                        option.set(option.palette[0]);
-                      }
-                      void removeColor(color);
-                    }}
-                  />
-                ))}
-                <AddColorSwatch onClick={promptAddColor} />
+                {customColorTool &&
+                  customColors.map((color) => (
+                    <CustomColorSwatch
+                      key={color}
+                      color={color}
+                      active={option.value === color}
+                      onClick={() => option.set(color)}
+                      onDelete={() => {
+                        if (
+                          option.value === color &&
+                          option.palette.length > 0
+                        ) {
+                          option.set(option.palette[0]);
+                        }
+                        void removeColor(color);
+                      }}
+                    />
+                  ))}
+                {customColorTool && canAddColor && (
+                  <AddColorSwatch onClick={promptAddColor} />
+                )}
               </div>
             </div>
           );

@@ -165,7 +165,9 @@ describe('LocalRepository', () => {
     await repository.initialize();
 
     expect(await repository.getRegistryTags()).toEqual([]);
-    expect(await repository.getCustomColors()).toEqual([]);
+    expect(await repository.getCustomColors('pen')).toEqual([]);
+    expect(await repository.getCustomColors('highlighter')).toEqual([]);
+    expect(await repository.getCustomColors('text')).toEqual([]);
   });
 
   it('returns reveal paths inside app data storage', async () => {
