@@ -3,24 +3,18 @@ import { PM_EDITOR_CLASS } from '../constants';
 const SOURCE_GAP = 4;
 
 /**
- * Floating source panels (math, mermaid) sit below their block by default,
- * but near the end of the document that would extend past the page frame —
- * clipped by the frame's overflow:hidden box, and bait for scrollIntoView to
- * scroll the frame's clip divs (shifting the whole page). Clamp them to the
- * document's extent so they overlay the end of the frame instead, like a
- * popup.
+ * Floating source panels (math, mermaid) sit below their block, but near the end of the document
+ * that extends past the page frame — clipped by its overflow:hidden box, and bait for
+ * scrollIntoView to scroll the frame's clip divs. Clamp them to the document's extent instead.
  *
- * Called from each preview plugin's view-update hook so it runs after every
- * DOM sync — covering selection moves, edits inside the block, and the
- * editable toggle that makes a panel visible in the first place.
+ * Call from each preview plugin's view-update hook so it runs after every DOM sync — selection
+ * moves, edits inside the block, and the editable toggle that first makes a panel visible.
  *
- * The bound is the larger of the frame's editor box and the doc element's
- * extent: the editor box covers short documents (the page is taller than
- * the content), while the doc extent covers the flush right after content
- * grows — the frame only resizes to match one rAF later.
+ * The bound is the larger of the frame's editor box and the doc element's extent: the editor box
+ * covers short documents, the doc extent covers the flush right after content grows (the frame
+ * only resizes to match one rAF later).
  *
- * `panelSelector` matches the source panels of blocks currently in editing
- * mode (e.g. '.pm-math-block--editing .pm-math-block-source').
+ * `panelSelector` matches the source panels of blocks currently in editing mode.
  */
 export function positionBlockSourcePanels(
   viewDom: HTMLElement,

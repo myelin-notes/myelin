@@ -1,9 +1,6 @@
 /**
- * Unified persistence layer for user preferences.
- *
- * Add a new preference by adding one line to PREFS — the storage key,
- * default value, and TypeScript type are all derived from that single
- * declaration. No other code should touch localStorage directly.
+ * Add a preference by adding one line to PREFS — the storage key, default value and TypeScript
+ * type are all derived from that declaration. No other code should touch localStorage directly.
  */
 
 import type { RepositoryConfig } from './sync/repo/config';
@@ -78,9 +75,8 @@ type PrefValue<K extends PrefKey> = UserPrefValue<K>;
 type Listener<K extends PrefKey> = (value: PrefValue<K>) => void;
 const listeners = new Map<PrefKey, Set<Listener<never>>>();
 
-// Keep this as a plain module export rather than a TypeScript namespace:
-// namespaces emit extra runtime JS in our ESM setup, while this object keeps
-// the API grouped without adding another compiled wrapper.
+// A plain module export rather than a TypeScript namespace: namespaces emit extra runtime JS in
+// our ESM setup.
 export const UserPrefs = {
   get<K extends PrefKey>(key: K): PrefValue<K> {
     const { storageKey, defaultValue } = PREFS[key];

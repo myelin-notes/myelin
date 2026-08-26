@@ -1,8 +1,8 @@
 import { ArrowUpRight } from 'lucide-react';
-import { useMessages } from '@/lib/i18n';
+import { useMessages } from '@myelin/editor/i18n';
+import { getPlatform } from '@myelin/editor/platform';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { useUserPref } from '@/lib/use-user-pref';
-import { UserPrefs } from '@/lib/user-prefs';
-import { getPlatform } from '@/platform';
 import { ToggleRow } from '../components/toggle-row';
 
 /**

@@ -1,6 +1,6 @@
 import { ArrowUpRight, MessageSquarePlus } from 'lucide-react';
-import { useMessages } from '@/lib/i18n';
-import { getPlatform } from '@/platform';
+import { useMessages } from '@myelin/editor/i18n';
+import { getPlatform } from '@myelin/editor/platform';
 
 const FEEDBACK_FORM_URL = 'https://forms.gle/7afeEmmFsuwSSCyF9';
 

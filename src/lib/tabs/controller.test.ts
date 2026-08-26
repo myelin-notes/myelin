@@ -25,9 +25,8 @@ function expectValidWindowState(state: WindowState): void {
   expect(paneIds.has(state.focusedPaneId)).toBe(true);
 
   for (const pane of panes) {
-    // Panes may show the home view either by being empty or by an empty
-    // activeTabId while tabs stay open; otherwise activeTabId must point at a
-    // real tab.
+    // Panes show the home view either by being empty or by an empty activeTabId while tabs stay open;
+    // otherwise activeTabId must point at a real tab.
     if (pane.tabs.length > 0 && pane.activeTabId !== '') {
       expect(pane.tabs.some((tab) => tab.id === pane.activeTabId)).toBe(true);
     }

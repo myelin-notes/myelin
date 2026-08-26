@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useMessages } from '@myelin/editor/i18n';
+import { Logger } from '@myelin/shared/logger';
 import { getVersion } from '@tauri-apps/api/app';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 
 const logger = new Logger('AboutSection');
 

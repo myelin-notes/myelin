@@ -14,8 +14,7 @@ function isDarkTheme(): boolean {
 }
 
 function loadMermaid(): Promise<Mermaid> {
-  // Dynamic import keeps mermaid (~MBs) out of the main chunk; it only loads
-  // when the first mermaid block renders. Don't cache a rejection: clear the
+  // Dynamic import keeps mermaid (~MBs) out of the main chunk. Don't cache a rejection: clear the
   // slot so a later render retries instead of re-awaiting the same failure.
   mermaidPromise ??= import('mermaid')
     .then(({ default: mermaid }) => mermaid)
@@ -26,12 +25,8 @@ function loadMermaid(): Promise<Mermaid> {
   return mermaidPromise;
 }
 
-/**
- * Render mermaid source to an SVG string, (re)configuring the renderer for
- * the current app theme first — mermaid bakes colors into the SVG at render
- * time, so theme flips need a re-render (see onMermaidThemeChange). Throws
- * on invalid source; callers keep their last good diagram.
- */
+// Mermaid bakes colors into the SVG at render time, so theme flips need a re-render (see
+// onMermaidThemeChange). Throws on invalid source; callers keep their last good diagram.
 export async function renderMermaidSvg(source: string): Promise<string> {
   const mermaid = await loadMermaid();
   const dark = isDarkTheme();
@@ -58,13 +53,9 @@ export async function renderMermaidSvg(source: string): Promise<string> {
 }
 
 /**
- * Notifies when the app's light/dark theme flips so mounted previews can
- * re-render with matching colors. Returns an unsubscribe function.
- *
- * Piggybacks on the canvas theme observer (onCanvasThemeChange) rather than
- * owning a MutationObserver. That observer fires on any <html> class mutation,
- * so a shared handler filters down to actual dark/light flips before notifying
- * all mermaid listeners — the flip check runs once, not per subscriber.
+ * Piggybacks on the canvas theme observer rather than owning a MutationObserver. That observer
+ * fires on any <html> class mutation, so a shared handler filters down to actual dark/light flips
+ * before notifying — the flip check runs once, not per subscriber.
  */
 export function onMermaidThemeChange(listener: () => void): () => void {
   if (!themeSubscribed) {

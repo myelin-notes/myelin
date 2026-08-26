@@ -20,13 +20,16 @@ import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
 import { setChromeMenuOpener } from '@myelin/editor/chrome-menu';
 import { useCanvasCommandContext } from '@myelin/editor/command-context';
+import { CustomColorsProvider } from '@myelin/editor/custom-colors';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@myelin/editor/events';
 import {
   type ExportTarget,
   setExportDialogOpener,
 } from '@myelin/editor/export/export-controller';
+import { useMessages } from '@myelin/editor/i18n';
 import { markdownImportHandler } from '@myelin/editor/media/markdown';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
 import {
@@ -35,8 +38,13 @@ import {
 } from '@myelin/editor/page-frame/note-link/preview';
 import type { NoteLinkOpenRequestDetail } from '@myelin/editor/page-frame/pm/markdown/note-links';
 import { usePageFrameAutocomplete } from '@myelin/editor/page-frame/use-page-frame-autocomplete';
+import { PenPresetsProvider } from '@myelin/editor/pen-presets';
+import { getPlatform } from '@myelin/editor/platform';
+import { regenerateThumbnailNow } from '@myelin/editor/thumbnails';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { Logger } from '@myelin/shared/logger';
 import { usePresence } from '@myelin/ui';
-import { Button } from '@/components/ui/button';
+import { Button } from '@myelin/ui/button';
 import {
   Tooltip,
   TooltipContent,
@@ -45,20 +53,13 @@ import {
 } from '@/components/ui/tooltip';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
-import { useCompactCanvasLayout } from '@/hooks/use-compact-canvas-layout';
-import { CustomColorsProvider } from '@/lib/custom-colors';
 import { IS_DEV } from '@/lib/env';
-import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@/lib/events';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
-import { regenerateThumbnailNow } from '@/lib/thumbnails';
 import { useUserPref } from '@/lib/use-user-pref';
-import { UserPrefs } from '@/lib/user-prefs';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
-import { getPlatform } from '@/platform';
 import { BacklinksChip } from './components/backlinks-chip';
 import { CanvasSearch } from './components/canvas-search';
 import { CanvasToolbar } from './components/canvas-toolbar';
@@ -80,11 +81,8 @@ import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
 
-/**
- * The wheel's rings sit at fixed offsets outside this radius, so the default
- * 100 spans 478px — wider than any phone. 52 brings the outer ring to 382px,
- * which clears a 390px portrait screen.
- */
+// The wheel's rings sit at fixed offsets outside this radius, so the default 100 spans 478px —
+// wider than any phone. 52 brings the outer ring to 382px, clearing a 390px portrait screen.
 const COMPACT_WHEEL_RADIUS = 52;
 
 interface CanvasViewProps {
@@ -100,11 +98,13 @@ export function CanvasView({
 }: CanvasViewProps) {
   return (
     <CustomColorsProvider>
-      <CanvasViewInner
-        id={id}
-        initialPageFrameName={initialPageFrameName}
-        initialPageFrameId={initialPageFrameId}
-      />
+      <PenPresetsProvider>
+        <CanvasViewInner
+          id={id}
+          initialPageFrameName={initialPageFrameName}
+          initialPageFrameId={initialPageFrameId}
+        />
+      </PenPresetsProvider>
     </CustomColorsProvider>
   );
 }
@@ -122,7 +122,6 @@ function CanvasViewInner({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgHostRef = useRef<HTMLDivElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const compactLayout = useCompactCanvasLayout();
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
@@ -207,10 +206,9 @@ function CanvasViewInner({
   }, [engine.fileName]);
 
   useEffect(() => {
-    // engine.fileName lags `id` during a tab switch because CanvasView is
-    // reused (not remounted) and the session opens asynchronously. Only sync
-    // the title once the loaded session actually matches this tab's id,
-    // otherwise we briefly write the previous note's name onto the new tab.
+    // engine.fileName lags `id` during a tab switch because CanvasView is reused, not remounted, and
+    // the session opens asynchronously — otherwise the previous note's name is briefly written onto
+    // the new tab.
     if (engine.fileName && engine.noteSession?.id === id) {
       const pane = tabController.getPane(paneId);
       if (!pane) {
@@ -229,12 +227,9 @@ function CanvasViewInner({
     if (!engine.ready) {
       return;
     }
-    // Like the title effect above, `engine` lags `id` during a tab switch
-    // (CanvasView is reused, not remounted, and the session opens
-    // asynchronously). Until the loaded session matches this tab's id,
-    // drawableCanvasRef.current still points at the previous note's document, so
-    // the focus/create-fallback below would mutate (create a page frame in) the
-    // wrong canvas. Only run once the session actually matches.
+    // Same lag as the title effect above: until the loaded session matches this tab's id,
+    // drawableCanvasRef.current still points at the previous note's document, so the focus/create
+    // fallback below would create a page frame in the wrong canvas.
     if (engine.noteSession?.id !== id) {
       return;
     }
@@ -559,9 +554,8 @@ function CanvasViewInner({
     [],
   );
 
-  // overflow-clip (not -hidden): hidden boxes are still programmatically
-  // scrollable, so the browser's caret-reveal for offscreen page-frame
-  // carets can scroll them and desync the DOM from the canvas.
+  // overflow-clip, not -hidden: hidden boxes are still programmatically scrollable, so the browser's
+  // caret-reveal for offscreen page-frame carets can scroll them and desync the DOM from the canvas.
   return (
     <div
       className="relative h-full w-full overflow-clip bg-page"
@@ -657,6 +651,16 @@ function CanvasViewInner({
         activeOptions={toolState.activeOptions}
         hasOptions={toolState.hasOptions}
         wheelEnabledIndices={toolState.wheelEnabledIndices}
+        presets={toolState.presets}
+        matchedPresetId={toolState.matchedPresetId}
+        activePenTool={toolState.activePenTool}
+        wheelFull={toolState.wheelFull}
+        savePresetDisabledReason={toolState.savePresetDisabledReason}
+        onApplyPreset={toolState.applyPreset}
+        onSavePreset={toolState.saveCurrentAsPreset}
+        onUpdatePresetToCurrent={toolState.updatePresetToCurrent}
+        onTogglePresetInWheel={toolState.togglePresetInWheel}
+        onDeletePreset={toolState.deletePreset}
         onSelectTool={toolState.selectTool}
         onToggleOptions={toolState.toggleOptions}
         onToggleShelf={toolState.toggleShelf}
@@ -691,7 +695,7 @@ function CanvasViewInner({
       >
         <WheelPicker
           ref={wheelRef}
-          radius={compactLayout ? COMPACT_WHEEL_RADIUS : 100}
+          radius={IS_PHONE_BUILD ? COMPACT_WHEEL_RADIUS : 100}
           items={toolState.wheelItems}
         >
           {wheelCenterIcon}

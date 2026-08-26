@@ -3,11 +3,13 @@ import { ChevronDown as ChevronDownIcon, Type as TypeIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
+import { useCustomColors } from '@myelin/editor/custom-colors';
 import type {
   TextElement,
   TextStyle,
 } from '@myelin/editor/elements/text/element';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
+import { useMessages } from '@myelin/editor/i18n';
 import {
   TEXT_COLORS,
   TEXT_FONT_SIZE_MAX,
@@ -16,34 +18,35 @@ import {
   TEXT_FONTS,
 } from '@myelin/editor/tools/text-tool';
 import { FontSizeField } from '@/components/font-size-field';
-import { useCustomColors } from '@/lib/custom-colors';
-import { useMessages } from '@/lib/i18n';
 
 interface TextStyleControlsProps {
   element: TextElement;
   style: TextStyle;
 }
 
-/**
- * Font / size / color for the selected text box, applied straight to the
- * element. This is the object-first path: the tool options panel only ever sets
- * the defaults used by the *next* box.
- */
+// The object-first path: applied straight to the element. The tool options panel only sets the
+// defaults used by the *next* box.
 export function TextStyleControls({ element, style }: TextStyleControlsProps) {
   const strings = useMessages();
   const {
     colors: customColors,
+    canAddColor,
     promptAddColor,
     removeColor,
     pickerOpen,
-  } = useCustomColors();
+  } = useCustomColors('text');
   const containerRef = useRef<HTMLDivElement>(null);
   const [openMenu, setOpenMenu] = useState<'font' | 'color' | null>(null);
+  const [swatchMenuOpen, setSwatchMenuOpen] = useState(false);
 
-  // The custom color picker portals outside this subtree, so leave the menu up
-  // while it's in use or the swatch grid would vanish under it.
+  // The custom color picker and a swatch's delete menu portal outside this subtree, so leave the menu
+  // up while either is in use or the swatch grid would vanish under it.
   const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
-    if (pickerOpen || containerRef.current?.contains(event.target as Node)) {
+    if (
+      pickerOpen ||
+      swatchMenuOpen ||
+      containerRef.current?.contains(event.target as Node)
+    ) {
       return;
     }
     setOpenMenu(null);
@@ -166,15 +169,18 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
                     void removeColor(color);
                   }}
                   onPointerDown={(e) => e.preventDefault()}
+                  onMenuOpenChange={setSwatchMenuOpen}
                 />
               ))}
-              <AddColorSwatch
-                onClick={() => {
-                  setOpenMenu(null);
-                  promptAddColor();
-                }}
-                onPointerDown={(e) => e.preventDefault()}
-              />
+              {canAddColor && (
+                <AddColorSwatch
+                  onClick={() => {
+                    setOpenMenu(null);
+                    promptAddColor();
+                  }}
+                  onPointerDown={(e) => e.preventDefault()}
+                />
+              )}
             </div>
           </Popover>
         )}

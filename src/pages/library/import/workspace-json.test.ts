@@ -91,9 +91,7 @@ describe('workspace JSON round-trip', () => {
     const rebuilt = new YDocManager();
     rebuildNote(rebuilt, reparsed);
 
-    // Re-serializing the rebuilt doc must match the original serialization,
-    // which covers element order, stroke points, page-frame ProseMirror content,
-    // and base64-encoded image bytes.
+    // Covers element order, stroke points, page-frame ProseMirror content, and base64 image bytes.
     expect(serializeNoteElements(rebuilt)).toEqual(elements);
   });
 

@@ -8,28 +8,20 @@ export interface MeasuredHeights {
   measure: (key: string, index: number) => (el: HTMLElement | null) => void;
   /** Bumped whenever a cached height changes; use as a memo dependency. */
   version: number;
-  /** Lowest row index whose height changed since the last call, then resets to
-   *  Infinity. Lets a consumer rebuild derived layout from that index down
-   *  instead of from scratch. */
+  /** Lowest row index whose height changed since the last call, then resets to Infinity. */
   consumeDirtyFrom: () => number;
   /** Drops cached heights and callbacks for keys no longer present. */
   prune: (liveKeys: Set<string>) => void;
 }
 
 /**
- * Caches measured element heights keyed by a stable string (e.g. a node id),
- * updating via a single shared ResizeObserver. Because the key is content-based
- * rather than positional, a measurement survives reordering and re-grouping —
- * the same item keeps its height without re-measuring when it moves.
+ * Caches measured element heights keyed by a stable string (e.g. a node id) via one shared
+ * ResizeObserver. The key is content-based, not positional, so a measurement survives reordering
+ * and re-grouping. Changes are coalesced into one `version` bump per microtask.
  *
- * Height changes are coalesced into one `version` bump per microtask so a batch
- * of mounting rows triggers a single re-render.
- *
- * `estimateHeight` (optional) is the height the layout assumes for a row before
- * it is measured. When a first measurement comes back equal to that estimate,
- * recording it changes nothing on screen, so we skip the version bump — this is
- * what keeps scrolling through uniform-height content (code output) from
- * rebuilding offsets for every newly-mounted row.
+ * `estimateHeight` is the height the layout assumes before measurement. A first measurement equal
+ * to the estimate changes nothing on screen, so the version bump is skipped — that is what keeps
+ * scrolling through uniform-height content from rebuilding offsets for every newly-mounted row.
  */
 export function useMeasuredHeights(
   estimateHeight?: (index: number) => number,
@@ -55,9 +47,7 @@ export function useMeasuredHeights(
       return;
     }
     const index = keyIndexRef.current.get(key);
-    // The layout assumed `prev`, or the row's estimate before any measurement.
-    // If the exact height matches, store it for future reads but don't
-    // invalidate layout — nothing moved.
+    // If the exact height matches, store it for future reads but don't invalidate layout.
     const assumed =
       prev ?? (index !== undefined ? estimateRef.current?.(index) : undefined);
     heightsRef.current.set(key, height);

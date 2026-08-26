@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn } from '@myelin/editor/utils';
 
 export function KindCard({
   selected,

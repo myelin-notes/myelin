@@ -22,17 +22,13 @@ import { renderKatex } from './render';
 import type { MathSourceEditor, MathSourceEditorOwner } from './source-editor';
 
 /**
- * Renders a math block as a KaTeX preview plus a floating raw-source editor.
- * The math preview plugin toggles `pm-math-block--editing` on the wrapper
- * (via a node decoration) while the selection is contained in the block; CSS
- * shows the source panel only then — and only once the shared CodeMirror
- * editor is actually attached to it.
+ * A math block as a KaTeX preview plus a floating raw-source editor. The math preview plugin
+ * toggles `pm-math-block--editing` on the wrapper while the selection is inside the block; CSS
+ * shows the source panel only then, and only once the shared CodeMirror editor is attached.
  *
- * The source editor is one shared CodeMirror instance (see ./source-editor)
- * re-parented into the active block's panel rather than constructed per
- * block. The ProseMirror document stays the source of truth: CodeMirror
- * edits and selection moves are forwarded as transactions, mirroring
- * CodeBlockNodeView.
+ * That editor is one shared instance re-parented into the active block's panel, not one per block.
+ * The ProseMirror document stays the source of truth: CodeMirror edits and selection moves are
+ * forwarded as transactions, mirroring CodeBlockNodeView.
  */
 export class MathBlockNodeView implements NodeView {
   dom: HTMLDivElement;
@@ -151,9 +147,8 @@ export class MathBlockNodeView implements NodeView {
       return;
     }
     this.initializing = true;
-    // Dynamic import keeps the CodeMirror runtime out of the main chunk
-    // (same pattern as code blocks); the module resolves to one shared
-    // instance.
+    // Dynamic import keeps the CodeMirror runtime out of the main chunk; the module resolves to one
+    // shared instance.
     void import('./source-editor')
       .then((module) => module.getSharedMathSourceEditor())
       .then((editor) => {
@@ -165,18 +160,15 @@ export class MathBlockNodeView implements NodeView {
         this.syncSelectionFromView();
       })
       .catch((error) => {
-        // A transient chunk-load failure (or CodeMirror/language-data init
-        // throw) must not lock the block: clearing the flag lets a later
-        // click retry rather than early-returning at the guard forever.
+        // A transient chunk-load failure must not lock the block: clearing the flag lets a later click
+        // retry rather than early-returning at the guard forever.
         this.initializing = false;
         console.error('Failed to load math source editor', error);
       });
   }
 
-  /**
-   * Attach using the current ProseMirror selection — the request that
-   * triggered loading may be stale by the time the editor module resolves.
-   */
+  // Uses the current PM selection — the request that triggered loading may be stale by the time the
+  // editor module resolves.
   private syncSelectionFromView(): void {
     const start = this.getPos() + 1;
     const end = start + this.node.content.size;
@@ -265,11 +257,8 @@ export class MathBlockNodeView implements NodeView {
     return true;
   }
 
-  /**
-   * Mod-A selects the LaTeX between the `$$` fences (mirroring
-   * selectAllInMathBlock) so typing over the selection replaces the formula
-   * without dissolving the block.
-   */
+  // Selects the LaTeX between the `$$` fences so typing over it replaces the formula without
+  // dissolving the block.
   private selectAllContent(): boolean {
     if (!this.editor?.ownedBy(this.owner)) {
       return false;

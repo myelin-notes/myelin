@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import {
   Dialog,
   DialogContent,
@@ -7,11 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import { useRepository } from '@/lib/sync';
 import { normalizeTagInput } from '@/lib/sync/repo/tag-hierarchy';
-import { cn } from '@/lib/utils';
 
 const logger = new Logger('TagManageDialog');
 

@@ -21,13 +21,13 @@ export interface ResizeHandleProps {
 }
 
 /**
- * Pointer + keyboard drag logic shared by the sidebar (horizontal) and tags
- * (vertical) resize handles. Uses pointer capture so the drag keeps tracking
- * even when the cursor leaves the thin handle. Spread the returned props onto
- * the handle element; clamping and persistence live in the caller's `onChange`.
+ * Pointer + keyboard drag logic shared by the sidebar (horizontal) and tags (vertical) handles.
+ * Uses pointer capture so the drag keeps tracking when the cursor leaves the thin handle. Spread
+ * the returned props onto the handle element; clamping and persistence live in the caller's
+ * `onChange`.
  *
- * The pane splits use react-resizable-panels instead, but that is percentage
- * based and tied to the split tree — these handles need fixed pixel sizes.
+ * The pane splits use react-resizable-panels instead, but that is percentage based and tied to the
+ * split tree — these handles need fixed pixel sizes.
  */
 export function useResizeHandle({
   axis,
@@ -83,9 +83,9 @@ export function useResizeHandle({
     [axis, keyboardStep, onChange, value],
   );
 
-  // Without this, touch devices claim the drag as a scroll/pan gesture and fire
-  // pointercancel, so the handle never moves on iPad. Covers the descendant grab
-  // zone too, since ancestor touch-action applies to touches on children.
+  // Without this, touch devices claim the drag as a scroll/pan gesture and fire pointercancel, so
+  // the handle never moves on iPad. Covers the descendant grab zone too, since ancestor touch-action
+  // applies to touches on children.
   return {
     onPointerDown,
     onPointerMove,

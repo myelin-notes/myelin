@@ -50,9 +50,8 @@ const GITHUB_GRAPHQL_URL = `${GITHUB_API_BASE}/graphql`;
 const GITHUB_API_VERSION = '2022-11-28';
 const MAX_MANIFEST_RETRIES = 4;
 
-// Build the binary string in chunks so multi-MB media doesn't pay a
-// per-byte string-concatenation cost. 0x8000 keeps the apply() argument
-// count well under engine call-stack limits.
+// Chunked so multi-MB media doesn't pay a per-byte string-concatenation cost. 0x8000 keeps the
+// apply() argument count well under engine call-stack limits.
 const BASE64_CHUNK_SIZE = 0x8000;
 
 function base64EncodeBytes(bytes: Uint8Array): string {
@@ -161,9 +160,8 @@ export class GitHubRepository extends BaseRepository {
     return { manifest: parsed, revision: payload.sha };
   }
 
-  // The abstract signature is string | null (LocalRepository uses null to mean
-  // "no revision"), but putContents always resolves to a non-null commit sha or
-  // throws, so the GitHub manifest revision is never null in practice.
+  // The abstract signature is string | null (LocalRepository uses null for "no revision"), but
+  // putContents always resolves to a non-null commit sha or throws.
   protected async saveManifestImpl(
     manifest: VFSManifest,
     revision: string | null,
@@ -275,9 +273,6 @@ export class GitHubRepository extends BaseRepository {
     return new Error(`${label} (${response.status}): ${body}`);
   }
 
-  // Sends an authenticated GET; on a 403/429 with a Retry-After or
-  // X-RateLimit-Reset hint, sleeps once and retries. Re-issues authHeaders()
-  // each attempt so a refreshed token is picked up.
   private fetchWithRateLimitRetry(
     url: string,
     init: { maxRedirections?: number } = {},
@@ -289,10 +284,8 @@ export class GitHubRepository extends BaseRepository {
     }));
   }
 
-  // Shared rate-limit-honoring transport. buildInit is re-invoked per attempt
-  // so authHeaders() (and any refreshed token) is picked up on retry. On a
-  // 403/429 with a Retry-After or X-RateLimit-Reset hint, sleeps once and
-  // retries; otherwise returns the response for the caller to handle.
+  // buildInit is re-invoked per attempt so authHeaders() (and any refreshed token) is picked up on
+  // retry. On a 403/429 with a Retry-After or X-RateLimit-Reset hint, sleeps once and retries.
   private async sendWithRateLimitRetry(
     url: string,
     buildInit: () => Promise<{

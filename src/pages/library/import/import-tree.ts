@@ -14,11 +14,8 @@ export function getPathBasename(path: string, fallback: string): string {
   return normalized.split('/').pop()?.trim() || fallback;
 }
 
-/**
- * Resolve the name to give an imported root folder when one already exists.
- * `replace` deletes the existing folder and keeps the name; `rename` returns a
- * unique sibling name (e.g. "Name 2") so both are kept. No conflict → name as-is.
- */
+// `replace` deletes the existing folder and keeps the name; `rename` returns a unique sibling name
+// (e.g. "Name 2") so both are kept. No conflict → name as-is.
 export async function resolveImportRootName({
   repository,
   parentId,
@@ -42,11 +39,8 @@ export async function resolveImportRootName({
   return repository.getUniqueFileName(name, parentId);
 }
 
-/**
- * Create every folder in `folderPaths` under `rootParentId` (parents before
- * children), returning a map from relative folder path to its created node id.
- * `rootParentId` may be null to create top-level folders at the library root.
- */
+// Parents before children. Returns a map from relative folder path to created node id;
+// `rootParentId` may be null to create top-level folders at the library root.
 export async function createImportedFolders(
   repository: Repository,
   rootParentId: VFSNodeId | null,

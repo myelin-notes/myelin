@@ -26,9 +26,8 @@ export type ToolOption =
       max: number;
       step: number;
       /**
-       * How the number should be presented. A slider fits a continuous feel
-       * like brush width; values users think of as numbers, like font size,
-       * want typed entry instead. Default: 'slider'.
+       * A slider fits a continuous feel like brush width; values users think of as numbers, like
+       * font size, want typed entry. Default: 'slider'.
        */
       control?: 'slider' | 'stepper';
     })
@@ -46,10 +45,9 @@ export interface ITool {
   finish(canvas: DrawableCanvas, event: PointerEvent): void;
   interrupt(canvas: DrawableCanvas): void;
   /**
-   * Throw away the in-progress interaction instead of committing it, for
-   * gestures that turn out not to be tool use after all (the pen hold that
-   * opens the tool wheel). Tools whose `interrupt` already discards rather
-   * than commits can leave this off — the canvas falls back to `interrupt`.
+   * Throw away the in-progress interaction instead of committing it, for gestures that turn out
+   * not to be tool use (the pen hold that opens the tool wheel). Tools whose `interrupt` already
+   * discards can leave this off — the canvas falls back to `interrupt`.
    */
   abort?(canvas: DrawableCanvas): void;
   drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void;

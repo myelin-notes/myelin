@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
 import { FolderPlus, Import, LayoutGrid, Plus } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,7 +8,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useMessages } from '@/lib/i18n';
 import type { FileType } from '@/lib/sync';
 import { ImportPickerDialog } from './import/picker-dialog';
 

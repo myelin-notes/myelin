@@ -45,9 +45,8 @@ function createRenderCancelledError(): Error {
 }
 
 async function getPdfJs() {
-  // Load the pdfjs library and its worker URL together, both lazily, so nothing
-  // pdfjs-related (including the `?url` worker asset) sits in the static import
-  // graph until a PDF actually renders.
+  // Both lazily, so nothing pdfjs-related (including the `?url` worker asset) sits in the static
+  // import graph until a PDF actually renders.
   pdfJsPromise ??= Promise.all([
     import('pdfjs-dist/legacy/build/pdf.mjs'),
     import('pdfjs-dist/legacy/build/pdf.worker.mjs?url'),
@@ -301,10 +300,9 @@ export function renderPdfPageToCanvas(params: {
       viewport,
       background: 'rgb(255,255,255)',
     });
-    // No page.cleanup() here: keeping the page's operator-list/font caches
-    // makes re-renders (scroll back, zoom step) nearly free instead of a
-    // full worker round-trip. Callers clean up via cleanupPdfPage when a
-    // page's DOM is evicted.
+    // No page.cleanup() here: keeping the page's operator-list/font caches makes re-renders (scroll
+    // back, zoom step) nearly free instead of a full worker round-trip. Callers clean up via
+    // cleanupPdfPage when a page's DOM is evicted.
     await renderTask.promise;
   })();
 
@@ -317,11 +315,8 @@ export function renderPdfPageToCanvas(params: {
   };
 }
 
-/**
- * Release pdf.js's cached resources for one page. Best effort: getPage is
- * served from pdf.js's internal page cache, and cleanup() refuses (returns
- * false) while a render is still in flight.
- */
+// Best effort: getPage is served from pdf.js's internal page cache, and cleanup() refuses (returns
+// false) while a render is still in flight.
 export function cleanupPdfPage(
   document: PDFDocumentProxy,
   pageIndex: number,

@@ -44,10 +44,8 @@ import {
 } from '../pm/screen-rect';
 import type { PageFrameAutocompleteKind } from '../use-page-frame-autocomplete';
 
-// `clip` rather than `hidden`: hidden boxes are still programmatically
-// scrollable, so the browser's caret-reveal (and PM's scrollIntoView) can
-// scroll them when an overlay pokes past the clip edge — shifting the page
-// inside its chrome. Clip boxes can't scroll at all.
+// `clip` rather than `hidden`: hidden boxes are still programmatically scrollable, so
+// caret-reveal / PM's scrollIntoView can shift the page inside its chrome. Clip boxes can't.
 const FRAME_STYLE: Record<string, string> = {
   transformOrigin: '0 0',
   position: 'absolute',
@@ -65,10 +63,8 @@ const VIEWPORT_STYLE: Record<string, string> = {
 };
 
 const CONTENT_STYLE: Record<string, string> = {
-  // Fill the entire frame so clicks anywhere on the page reach PM. With
-  // auto height, an empty document only covers the top ~120px (one
-  // paragraph + padding) and the rest of the page falls outside the
-  // contenteditable area.
+  // Fill the frame so clicks anywhere on the page reach PM. With auto height an empty document
+  // only covers the top ~120px and the rest of the page falls outside the contenteditable.
   position: 'absolute',
   inset: '0',
   boxSizing: 'border-box',
@@ -198,10 +194,8 @@ function syncEditorLayout(
   pageHeight: number,
   pageLayout: PageLayout,
 ): void {
-  // Same-value guard: this runs every frame from the sync loop, and the
-  // pagination plugin (plus code-block node views) watch this attribute with
-  // MutationObservers that fire on every write — unguarded, that schedules a
-  // repagination pass every frame forever.
+  // Same-value guard: this runs every frame, and the pagination plugin (plus code-block node
+  // views) watch this attribute with MutationObservers — unguarded, that repaginates every frame.
   if (refs.contentDiv.dataset.pageLayout !== pageLayout) {
     refs.contentDiv.dataset.pageLayout = pageLayout;
   }
@@ -211,9 +205,8 @@ function syncEditorLayout(
     return;
   }
 
-  // Guarded for the same reason as the attribute above: this is the editor's
-  // own root, so an unguarded write — including clearing a property that was
-  // never set — relays out the document on every frame.
+  // Guarded for the same reason: this is the editor's own root, so an unguarded write — including
+  // clearing a property that was never set — relays out the document on every frame.
   if (pageLayout === 'horizontal') {
     const columnWidth = Math.max(1, pageWidth - PAGE_PADDING * 2);
     const columnHeight = Math.max(1, pageHeight - PAGE_PADDING * 2);
@@ -431,9 +424,8 @@ export function PageFrameDomLayer({
       getNoteLinkPreviewTargetAtPoint(frameMap.current, clientX, clientY),
     [],
   );
-  // Views are created eagerly inside createFrameRefs when a page frame first
-  // appears on the canvas — so by the time editingElement is set, the view
-  // already exists. Read it inline rather than tracking in state.
+  // Views are created eagerly in createFrameRefs, so by the time editingElement is set the view
+  // exists. Read inline rather than tracking in state.
   const activeView = editingElement?.pmEditor?.view ?? null;
 
   // Sync loop — create/remove/position frame containers each frame
@@ -503,9 +495,7 @@ export function PageFrameDomLayer({
           ),
         });
 
-        // Inner frame: clip box, positioned by the chrome contentSlot it lives
-        // in, so it needs no translate of its own. Sized for the quantized zoom
-        // rather than the exact one because resizing it repaints the promoted
+        // Sized for the quantized zoom rather than the exact one because resizing repaints the promoted
         // layer it sits in; at steps, a run of zoom frames reuses one painting.
         const rasterZoom = quantizeRasterZoom(zoom);
         setStyleIfChanged(
@@ -520,26 +510,18 @@ export function PageFrameDomLayer({
         );
         removeStyleIfPresent(refs.frameDiv, 'transform');
 
-        // Inner viewport: world-sized. A fixed CSS zoom of devicePixelRatio
-        // tells WebKit to rasterise the compositing-layer backing store at
-        // DPR² resolution, producing crisp text at every canvas zoom level.
-        // Because the zoom value is constant, text metrics and line breaks
-        // never change — the variable canvas zoom is handled entirely by
-        // transform: scale(), which is a post-layout GPU operation.
-        //
-        // It is not cheap in the abstract: `zoom` scales the layout box, so on
-        // a 2x display one blank page rasterizes ~9.6 megapixels against ~2.8
-        // of visible area. Measured on an iPad it is nonetheless free while
-        // panning — the chrome root is a promoted layer, so a pan moves the
-        // texture rather than redrawing it, and dropping to 1x changed nothing.
-        // It is worth ~5ms per frame only while zooming, which re-rasterizes.
+        // World-sized. A fixed CSS zoom of devicePixelRatio makes WebKit rasterise the compositing
+        // layer at DPR^2, giving crisp text at every canvas zoom. The constant zoom keeps text metrics
+        // and line breaks fixed; variable canvas zoom is handled by transform: scale() (post-layout GPU).
+        // Not cheap in the abstract — on a 2x display one blank page rasterizes ~9.6MP against ~2.8MP
+        // visible — but measured free while panning on iPad (promoted layer moves its texture), and
+        // worth ~5ms/frame only while zooming.
         const dpr = getDevicePixelRatio();
         setStyleIfChanged(refs.viewportDiv, 'width', `${contentWidth}px`);
         setStyleIfChanged(refs.viewportDiv, 'height', `${contentHeight}px`);
         setStyleIfChanged(refs.viewportDiv, 'zoom', `${dpr}`);
-        // Quantized, like the boxes above: the chrome root supplies the
-        // remainder, so between two steps this transform holds still and the
-        // subtree it scales is not repainted.
+        // Quantized like the boxes above: the chrome root supplies the remainder, so between two steps
+        // this transform holds still and its subtree is not repainted.
         setStyleIfChanged(
           refs.viewportDiv,
           'transform',
@@ -551,10 +533,8 @@ export function PageFrameDomLayer({
         } else {
           removeStyleIfPresent(refs.frameDiv, 'pointer-events');
         }
-        // Editing chrome (the math source panel) is display:none while the
-        // view animates: painting it mid-zoom roughly doubles the edit-enter
-        // frame hitch, and it isn't readable until the camera lands anyway.
-        // Same-value guard — observers aside, attribute writes dirty style.
+        // Editing chrome (the math source panel) is display:none while the view animates: painting it
+        // mid-zoom roughly doubles the edit-enter hitch, and it isn't readable until the camera lands.
         if ('viewAnimating' in refs.contentDiv.dataset !== viewAnimating) {
           if (viewAnimating) {
             refs.contentDiv.dataset.viewAnimating = '';
@@ -586,16 +566,10 @@ export function PageFrameDomLayer({
 
     rafId = requestAnimationFrame(sync);
 
-    // The browser may try to scrollIntoView the focused contentEditable on its
-    // own. Zero those out so they don't accumulate, but DON'T convert them into
-    // a canvas pan — the follow-cursor effect below is the single source of
-    // truth for keeping the caret in view.
-    //
-    // Driven by the scroll event rather than polled from the sync loop. Reading
-    // scrollTop is a geometry read, so polling it right after the loop wrote
-    // the chrome's transform forced a synchronous layout flush on every frame —
-    // write, read, relayout, forever. The event fires only when the container
-    // actually scrolls, which is also sooner than the next frame's poll.
+    // The browser may scrollIntoView the focused contentEditable on its own. Zero those out, but
+    // DON'T convert them into a canvas pan — the follow-cursor effect below is the single source
+    // of truth. Driven by the scroll event rather than polled: reading scrollTop right after the
+    // sync loop wrote the chrome's transform forced a synchronous layout flush every frame.
     const container = containerRef.current;
     const resetScroll = () => {
       if (
@@ -618,10 +592,8 @@ export function PageFrameDomLayer({
     };
   }, [canvasRef]);
 
-  // Follow-cursor: keep the caret inside a margin-padded viewport while
-  // editing. Fires on every PM transaction (typing, arrow-key navigation,
-  // mark toggles) AND on browser-driven selectionchange (drag-select). This
-  // is the single source of truth — the absorber above no longer pans.
+  // Keep the caret inside a margin-padded viewport while editing. Fires on every PM transaction
+  // and on browser-driven selectionchange (drag-select).
   useEffect(() => {
     if (!editingElement) {
       return;
@@ -632,19 +604,15 @@ export function PageFrameDomLayer({
     }
 
     let pendingRaf = 0;
-    // Follow only when the caret actually moved (or the doc changed under
-    // it). PM updates also fire for layout-only transactions; panning on
-    // those would yank the viewport back to the caret while the user is
-    // scrolling elsewhere in the frame.
+    // Follow only when the caret actually moved. PM also fires for layout-only transactions;
+    // panning on those yanks the viewport back to the caret while the user scrolls elsewhere.
     let lastHead = -1;
     let lastDoc = view.state.doc;
-    // Selection moves placed by pointer don't pan: the user is pointing at
-    // something already on screen. Without this, clicking a math block near
-    // the viewport edge yanks the canvas — the click parks the caret at the
-    // END of the LaTeX source, inside a panel that opens below the block and
-    // off-screen. Track the pointer here rather than relying on PM's
-    // `pointer` meta because the moves arrive as native selectionchange
-    // events from the nested CodeMirror editors, not PM transactions.
+    // Pointer-placed selections don't pan: the user is pointing at something already on screen.
+    // Without this, clicking a math block near the edge yanks the canvas — the click parks the caret
+    // at the END of the LaTeX source, in a panel that opens below the block and off-screen. Tracked
+    // here rather than via PM's `pointer` meta because nested CodeMirror editors emit native
+    // selectionchange, not PM transactions.
     let pointerActive = false;
     let lastPointerUp = 0;
     const handlePointerDown = () => {
@@ -671,21 +639,17 @@ export function PageFrameDomLayer({
         pointerActive ||
         performance.now() - lastPointerUp < POINTER_GRACE_MS
       ) {
-        // Commit as seen: the async math-source attach that follows a click
-        // re-fires selectionchange with the same head after the grace
-        // expires, and must not replay this move as a follow.
+        // The async math-source attach that follows a click re-fires selectionchange with the same head
+        // after the grace expires, and must not replay this move as a follow.
         lastHead = sel.head;
         lastDoc = view.state.doc;
         return;
       }
-      // Anchored on the editor's own frame DOM so the caret rect lands in true
-      // screen pixels wherever the canvas sits in the window. Returns null if
-      // the position is stale (mid-transaction) or the DOM isn't mounted —
-      // commit lastHead/lastDoc only after a successful measure so the next
-      // update retries instead of silently dropping the follow. When the
-      // caret sits inside a nested CodeMirror editor (code block, math
-      // source), measure the native selection — PM's coordsAtPos degrades to
-      // the block boundary there and would pan the canvas to the block.
+      // Anchored on the editor's own frame DOM so the caret rect lands in true screen pixels. Returns
+      // null if the position is stale (mid-transaction) or the DOM isn't mounted — commit
+      // lastHead/lastDoc only after a successful measure so the next update retries. Inside a nested
+      // CodeMirror editor, measure the native selection: PM's coordsAtPos degrades to the block
+      // boundary and would pan the canvas to the block.
       const screenRect =
         getPageFramePmScreenRectForNestedCaret(view) ??
         getPageFramePmScreenRectForPos(view, sel.head);

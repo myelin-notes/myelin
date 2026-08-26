@@ -6,15 +6,19 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { SvgIcon } from '@myelin/editor/tools/tool';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 const TWO_PI = 2 * Math.PI;
+// Ring 0 divides the circle evenly, so adjacent centres are a chord of 2r·sin(π/n) apart. At the
+// phone radius of 52 that chord is 40px for 8 items — 32px buttons keep a gap between them.
+const R0_BUTTON_CLASS = IS_PHONE_BUILD ? 'size-8' : 'size-10';
 const CENTER_ZONE = 40;
 const SUB_SPACING = 0.16; // radians between sub-items
 
 export interface WheelItem {
   label: string;
-  icon?: SvgIcon;
+  /** Any glyph that sizes itself off the passed class — a tool's icon, or a preset's mark. */
+  icon?: React.ComponentType<{ className?: string }>;
   color?: string;
   dot?: number;
   command?: () => void;
@@ -135,11 +139,9 @@ export const WheelPicker = memo(function WheelPicker({
       const cx = Math.min(Math.max(event.clientX, outer), vw - outer);
       const cy = Math.min(Math.max(event.clientY, outer), vh - outer);
       if (groupRef.current) {
-        // groupRef is absolutely positioned within a container that may be
-        // offset from the viewport (e.g. by the persistent sidebar). Convert
-        // the viewport-space pointer position into the container's local
-        // coordinate space so the wheel renders under the cursor. Pointer
-        // hit-testing (centerRef) stays in viewport space to match evt.clientX.
+        // groupRef is absolutely positioned within a container that may be offset from the viewport (e.g.
+        // by the sidebar), so convert the pointer position into container-local space. Hit-testing
+        // (centerRef) stays in viewport space to match evt.clientX.
         const origin = groupRef.current.offsetParent?.getBoundingClientRect();
         const originX = origin?.left ?? 0;
         const originY = origin?.top ?? 0;
@@ -200,13 +202,11 @@ export const WheelPicker = memo(function WheelPicker({
       const count = its.length;
       const delta = TWO_PI / count;
 
-      // Center zone
       if (dist < CENTER_ZONE) {
         updateFocus([]);
         return;
       }
 
-      // Ring 0
       if (dist < r0Outer) {
         const idx = angleToIndex(angle, count);
         if (idx >= 0) {
@@ -256,9 +256,8 @@ export const WheelPicker = memo(function WheelPicker({
     }
 
     function handlePointerUp(evt: PointerEvent) {
-      // Mouse opens the wheel with the right button, pen and touch with a
-      // press-and-hold. Whichever it was, only that pointer's lift commits, so
-      // a stray second finger cannot choose for it.
+      // Mouse opens the wheel with the right button, pen and touch with a press-and-hold. Only the
+      // opening pointer's lift commits, so a stray second finger cannot choose for it.
       if (evt.pointerId !== openedByRef.current) {
         return;
       }
@@ -342,7 +341,7 @@ export const WheelPicker = memo(function WheelPicker({
             return (
               <button
                 key={i}
-                className={`absolute flex size-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl bg-popover/95 shadow-ambient outline-none transition-colors ${
+                className={`absolute flex ${R0_BUTTON_CLASS} -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-xl bg-popover/95 shadow-ambient outline-none ring-1 ring-border-subtle/70 transition-colors ${
                   inPath ? 'bg-secondary-container' : ''
                 }`}
                 style={{ left: x, top: y }}
@@ -371,7 +370,7 @@ export const WheelPicker = memo(function WheelPicker({
                 className={`fade-in zoom-in-75 absolute flex animate-in cursor-pointer items-center justify-center rounded-xl shadow-ambient outline-none transition-all duration-100 ${
                   isColor
                     ? 'size-7 border-none p-0'
-                    : `size-9 bg-popover/95 ${focused ? 'bg-secondary-container' : ''}`
+                    : `size-9 bg-card ring-1 ring-border-subtle/70 ${focused ? 'bg-secondary-container' : ''}`
                 }`}
                 style={{
                   left: x,
@@ -414,7 +413,7 @@ export const WheelPicker = memo(function WheelPicker({
             return (
               <button
                 key={`r2-${r0Idx}-${r1Idx}-${k}`}
-                className="fade-in zoom-in-75 absolute flex size-9 animate-in cursor-pointer items-center justify-center rounded-xl bg-popover/95 shadow-ambient outline-none transition-all duration-100"
+                className="fade-in zoom-in-75 absolute flex size-9 animate-in cursor-pointer items-center justify-center rounded-xl bg-card shadow-ambient outline-none ring-1 ring-border-subtle/70 transition-all duration-100"
                 style={{
                   left: x,
                   top: y,

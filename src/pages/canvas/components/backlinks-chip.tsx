@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link2, X } from 'lucide-react';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatNumber } from '@myelin/editor/i18n/format';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import { usePresence } from '@myelin/ui';
-import { useLocale, useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import {
   type NoteBacklink,
   useRepository,
   useRepositoryStatus,
   type VFSNodeId,
 } from '@/lib/sync';
-import { cn } from '@/lib/utils';
 
 const logger = new Logger('BacklinksChip');
 

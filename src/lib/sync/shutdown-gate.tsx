@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
+import { Logger } from '@myelin/shared/logger';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   Dialog,
@@ -13,8 +15,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import { runShutdownTasks } from '@/lib/shutdown-tasks';
 import { useRepository } from './repo-context';
 

@@ -15,7 +15,10 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatRelativeTime } from '@myelin/editor/i18n/format';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import { errorDescription } from '@/components/command-palette/utils';
 import { SidebarTags } from '@/components/layout/sidebar/sidebar-tags';
 import { useExplorerImports } from '@/components/layout/sidebar/use-explorer-imports';
@@ -26,8 +29,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
-import { useLocale, useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import { openNote } from '@/lib/note/navigation';
 import {
   type FileType,
@@ -42,7 +43,6 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController } from '@/lib/tabs/context';
-import { cn } from '@/lib/utils';
 import { BetaFeedbackBanner } from './beta-feedback-banner';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
@@ -61,14 +61,10 @@ const SORT_MODES: SortMode[] = ['name-asc', 'name-desc', 'modified', 'created'];
 const RECENT_LIMIT = 3;
 
 /**
- * Mobile-layout home surface. Instead of the desktop sidebar, the explorer gets
- * its own full page — a faithful revival of the pre-sidebar library home: a
- * single scrolling page with a "Library" header, a recently-opened card grid
- * (the first card featured), then an Explorer section (search, breadcrumbs, a
- * list/grid file explorer with folder drill-in) beside a tag-filter panel.
- * Shown by {@link AppShell} on the empty-pane home view; opening a document
- * covers it with a tab and the tab bar's library button returns here. Only
- * rendered in a mobile build — see {@link RootLayout}.
+ * Mobile-layout home surface: the explorer as its own full page instead of the desktop sidebar.
+ * Shown by {@link AppShell} on the empty-pane home view; opening a document covers it with a tab
+ * and the tab bar's library button returns here. Only rendered in a mobile build — see
+ * {@link RootLayout}.
  */
 export function MobileLibrary() {
   const strings = useMessages();
@@ -128,8 +124,7 @@ export function MobileLibrary() {
     strings,
   });
 
-  // Reload recents (and tag counts) when a remote sync lands or any local
-  // mutation occurs; `dataVersion` is the only signal for local repos.
+  // `dataVersion` is the only change signal for local repos.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
     void loadRecentFiles();
@@ -556,11 +551,8 @@ interface BreadcrumbCrumbProps {
   onMoved: () => void;
 }
 
-/**
- * A single breadcrumb that doubles as a drop target: dragging a file/folder onto
- * it moves the item into that folder. Wraps the shared {@link useDropTarget} so
- * the breadcrumb reuses the same drag/drop plumbing as the explorer rows.
- */
+// A breadcrumb that doubles as a drop target: dragging a file/folder onto it moves the item into
+// that folder.
 function BreadcrumbCrumb({
   targetFolderId,
   label,

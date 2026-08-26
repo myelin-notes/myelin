@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { type ActionBinding, keybindings } from '@/lib/keybinds';
+import { type ActionBinding, keybindings } from '@myelin/editor/keybinds';
 
 export function useKeybindings(bindings: ActionBinding[]) {
   useEffect(() => keybindings.register(bindings), [bindings]);

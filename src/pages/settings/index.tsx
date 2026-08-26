@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react';
+import { useMessages } from '@myelin/editor/i18n';
+import { isTouchDevice } from '@myelin/shared/os';
 import { IS_MOBILE_BUILD } from '@/lib/env';
-import { useMessages } from '@/lib/i18n';
-import { isTouchDevice } from '@/lib/platform';
 import { KeybindsSection } from './keybinds-section';
 import { AboutSection } from './sections/about-section';
 import { AppearanceSection } from './sections/appearance-section';

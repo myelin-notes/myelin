@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Logger } from '@/lib/logger';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { Logger } from '@myelin/shared/logger';
 import { type NoteBacklink, useRepository, type VFSNodeId } from '@/lib/sync';
 import { renameNoteReferences } from '@/lib/sync/repo/rename-note-references';
-import { UserPrefs } from '@/lib/user-prefs';
 import { createItemDragImage, type DragItemKind } from './create-drag-image';
 import { evaluateRenameDecision } from './rename-decision';
 import { suppressHoverUntilPointerMove } from './suppress-hover';

@@ -57,15 +57,9 @@ const ELEMENT_Z_ORDER_KEY = 'zOrder';
 /** Screen-pixel travel a finger may drift and still count as a tap. */
 const TOUCH_TAP_SLOP = 8;
 
-/**
- * PointerEvent.buttons bits that put the stylus into erase mode for as long as
- * they are held: the eraser end (Pointer Events L3, set when the tail is
- * flipped down) and a barrel button.
- *
- * This is also the contract the native stylus shims deliver against, for the
- * platforms whose WebView hides a stylus button from this reading — see
- * StylusButtonShim.kt.
- */
+// Buttons that erase for as long as they are held: the eraser end (Pointer Events L3; S Pen /
+// Surface Pen / Wacom set it, Apple Pencil never does) and a barrel button. Also the contract the
+// native shims deliver against where the WebView hides a stylus button — see StylusButtonShim.kt.
 const PEN_ERASER_BUTTONS = 32 | 2;
 
 /**
@@ -143,16 +137,9 @@ export function canMoveElementOrderForSelection(
   return false;
 }
 
-/**
- * Every stylus sample behind a `pointermove`, oldest first.
- *
- * A stylus samples far faster than the display refreshes, so the platform
- * batches the samples taken since the last frame into a single pointermove and
- * exposes them as coalesced events. Reading only the delivered event keeps the
- * newest sample and discards the rest, drawing a straight chord across the
- * batch — the flat segments that show up in handwriting whenever a frame runs
- * long. Falls back to the event itself where coalescing is unsupported.
- */
+// A stylus samples faster than the display refreshes, so the platform batches samples into one
+// pointermove. Reading only the delivered event draws a straight chord across the batch — the
+// flat segments in handwriting when a frame runs long. Falls back to the event where unsupported.
 export function coalescedPointerSamples(event: PointerEvent): PointerEvent[] {
   const samples = event.getCoalescedEvents?.() ?? [];
   return samples.length > 0 ? samples : [event];
@@ -194,20 +181,16 @@ export class DrawableCanvas {
   private spaceDown: boolean = false;
   private screenPosition: Vector2 = { x: 0, y: 0 };
 
-  // Touch double-tap → element edit. A single finger that starts a pan never
-  // reaches the select tool's double-click path, so we detect the double-tap
-  // here instead.
+  // A single finger that starts a pan never reaches the select tool's double-click path.
   private _lastTouchTapTime: number = 0;
   private _lastTouchTapPos: Vector2 = { x: 0, y: 0 };
 
-  // Screen position of a single finger that began panning with the select
-  // tool active. If it lifts without dragging, the gesture was a tap and is
-  // replayed through the tool so it can select / clear the selection.
+  // A finger that began panning with the select tool. If it lifts without dragging it was a tap,
+  // replayed through the tool to select / clear.
   private _touchTapCandidate: Vector2 | null = null;
 
-  // Active touch pointers by id. A two-finger touch is a viewport pinch/pan
-  // gesture (handled by CanvasViewport's touch listeners), so single-finger
-  // pointer panning must yield while 2+ fingers are down.
+  // Two fingers are a viewport pinch/pan (CanvasViewport's touch listeners), so single-finger
+  // pointer panning must yield while 2+ are down.
   private readonly _activeTouchPointers = new Set<number>();
 
   // Set for the duration of abortInteraction() so the UsingTool end handler
@@ -229,7 +212,6 @@ export class DrawableCanvas {
   // Whether a finger draws or pans — see InputModeController.
   private readonly _input = new InputModeController();
 
-  /** Owns the element collections and keeps them mutating as a unit. */
   private readonly _store = new ElementStore(() => this.notifyChange());
   private _ydoc: YDocManager;
   private _domOverlayHost: HTMLElement | null = null;
@@ -265,28 +247,16 @@ export class DrawableCanvas {
   private _editDomRoot: HTMLElement | null = null;
   private _cleanupEditListeners: (() => void) | null = null;
 
-  // One-shot placement state — orthogonal to tools. When active, the next
-  // primary-button click finalizes placement and the state clears. The
-  // controller owns the ghost + Escape listener; the canvas drives lifecycle
-  // (cursor, edit-mode exit, change notification).
+  // Orthogonal to tools: the next primary-button click finalizes placement and clears the state.
+  // The controller owns the ghost + Escape listener; the canvas drives cursor and edit-mode exit.
   private readonly _placement = new PlacementController();
 
-  /**
-   * Listeners notified when selection, element set, element order, edit mode,
-   * or placement state changes — anything that affects view layers like the
-   * selection reorder toolbar. Viewport pan/zoom uses a separate channel on
-   * CanvasViewport.
-   */
+  // Selection / element set / order / edit mode / placement. Viewport pan/zoom has its own channel.
   private _changeListeners = new Set<() => void>();
 
-  /**
-   * Cached union of element world-space bounding boxes for `getContentBounds`,
-   * which the viewport queries on every pan/zoom frame to clamp the offset. The
-   * union only changes when elements are added/removed/reordered or an element's
-   * geometry changes, never when the viewport merely pans/zooms, so it is
-   * recomputed lazily and invalidated at every mutation funnel. `_valid` is
-   * separate because `null` is itself a valid cached result (empty document).
-   */
+  // The union only changes on element add/remove/reorder/geometry, never on pan/zoom, so it is
+  // lazy and invalidated at every mutation funnel. `_valid` is separate because `null` is itself
+  // a valid cached result (empty document).
   private _contentBoundsCache: DOMRect | null = null;
   private _contentBoundsValid = false;
 
@@ -342,10 +312,7 @@ export class DrawableCanvas {
     return this._localPeerId;
   }
 
-  /**
-   * Latest live-session membership from the app's sync layer. Forwarded to
-   * elements that coordinate work across peers (audio transcription claims).
-   */
+  // Forwarded to elements that coordinate work across peers (audio transcription claims).
   public setLivePeers(snapshot: LivePeersSnapshot | null): void {
     if (this._livePeers === snapshot) {
       return;
@@ -358,19 +325,12 @@ export class DrawableCanvas {
     }
   }
 
-  /**
-   * Run a mutation inside a single Yjs transaction. Nested element-map
-   * transacts flatten into this one, so a multi-step edit (e.g. the pen's
-   * stroke→shape swap) coalesces into one undo-stack item.
-   */
+  // Nested element-map transacts flatten into this one, so a multi-step edit (e.g. the pen's
+  // stroke->shape swap) coalesces into one undo item.
   public transact(fn: () => void): void {
     this._ydoc.transact(fn);
   }
 
-  /**
-   * Populate the element store from the current Y.Array state.
-   * Called once on construction for loaded documents.
-   */
   private hydrateFromYDoc(): void {
     for (let i = 0; i < this._ydoc.elements.length; i++) {
       const yMap = this._ydoc.elements.get(i);
@@ -442,9 +402,6 @@ export class DrawableCanvas {
     this._store.setOrder(ordered.map(({ element }) => element.uuid));
   }
 
-  /**
-   * Create a DrawableElement from a Y.Map, bind it, and return it.
-   */
   private createElementFromYMap(yMap: Y.Map<unknown>): DrawableElement | null {
     const type = yMap.get('type');
     const uuid = yMap.get('uuid');
@@ -505,7 +462,6 @@ export class DrawableCanvas {
     element.bindSharedYState(this._ydoc);
   }
 
-  /** Apply remote element-array and nested element-field changes. */
   private handleYElementsChange(
     events: YElementsDeepEvents,
     transaction: YElementsDeepTransaction,
@@ -514,9 +470,8 @@ export class DrawableCanvas {
       return;
     }
 
-    // Remote field syncs update element geometry without going through
-    // notifyChange or onTransformChanged, so invalidate the content-bounds cache
-    // here to keep pan clamping correct after a peer moves an element.
+    // Remote field syncs bypass notifyChange/onTransformChanged, so invalidate here to keep pan
+    // clamping correct after a peer moves an element.
     this._contentBoundsValid = false;
 
     let changedElementOrder = false;
@@ -650,18 +605,12 @@ export class DrawableCanvas {
     });
   }
 
-  /**
-   * Element that shows the canvas background (grid / dots). Not a canvas: it
-   * carries a repeating CSS background so panning is a compositor translate.
-   */
+  // Not a canvas: a repeating CSS background makes panning a compositor translate.
   public setBackgroundHost(host: HTMLElement): void {
     this.renderer.setBackgroundHost(host);
   }
 
-  /**
-   * Always-on-top canvas used to render selection outline + handles, so they
-   * remain visible above DOM-backed editing chrome.
-   */
+  // Always on top, so selection stays visible above DOM-backed editing chrome.
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
     this.renderer.setOverlayCanvas(canvas);
   }
@@ -790,9 +739,8 @@ export class DrawableCanvas {
       type: describeElementType(element.type),
       ...summarizeDrawableElements(this.elements),
     });
-    // DOM-backed elements can enter edit mode before their first render frame
-    // (click-to-create runs synchronously); sync now so enterEditMode has an
-    // up-to-date node to focus.
+    // Click-to-create runs synchronously, so a DOM-backed element can enter edit mode before its
+    // first render frame; sync now so enterEditMode has a node to focus.
     if (this._domOverlayHost) {
       element.syncDOM(this.viewport, this._domOverlayHost);
     }
@@ -824,16 +772,11 @@ export class DrawableCanvas {
     // Click outside editing DOM exits edit mode. Canvas-interactive edit modes
     // handle canvas clicks through the active tool so resize handles still work.
     const handlePointerDown = (e: PointerEvent) => {
-      // A pointerdown on a resize handle of a DOM-edited element (e.g. a text
-      // box) exits edit mode AND begins the resize in the same gesture, rather
-      // than only dropping out of edit mode and forcing a second click on the
-      // handle. Canvas-interactive edit modes already route handle clicks
-      // through the tool; this covers modes where a DOM editor root has taken
-      // over canvas pointer events.
-      // The wider touch radius is gated on the select tool because this hands
-      // the gesture to whichever tool is active: a finger that lands near a
-      // handle with, say, the pen tool would start drawing rather than resize,
-      // so every other tool keeps the tighter mouse radius.
+      // Lets one gesture both exit edit mode and start the resize, instead of forcing a second click.
+      // Canvas-interactive edit modes already route handle clicks through the tool; this covers modes
+      // where a DOM editor root has taken over canvas pointer events.
+      // The wider touch radius is gated on the select tool because this hands the gesture to whichever
+      // tool is active — a finger landing near a handle with the pen tool would draw, not resize.
       if (
         editDomRoot &&
         !editDomRoot.contains(e.target as Node) &&
@@ -848,9 +791,8 @@ export class DrawableCanvas {
         this.state.change(InteractState.UsingTool, e);
         return;
       }
-      // The selection toolbar can act on the element currently being edited
-      // (e.g. the text style controls), so a press there must never tear down
-      // edit mode — including for elements that own a DOM edit root.
+      // The selection toolbar can act on the element being edited (e.g. text style controls), so a
+      // press there must never tear down edit mode.
       if (
         e.target instanceof Element &&
         e.target.closest('[data-selection-toolbar="true"]')
@@ -866,11 +808,9 @@ export class DrawableCanvas {
     };
     document.addEventListener('pointerdown', handlePointerDown);
 
-    // While a DOM editor covers the canvas, the tool's hover() no longer runs
-    // (the canvas has pointer-events: none), so the resize cursor over a handle
-    // is lost. Mirror it here. `cursor` is inherited, so setting it on the
-    // canvas host makes the background canvas under the handle show it, while
-    // the textarea keeps its own text cursor inside the box.
+    // While a DOM editor covers the canvas the tool's hover() no longer runs (pointer-events: none),
+    // so mirror the resize cursor here. `cursor` is inherited, so the host shows it under the handle
+    // while the textarea keeps its own text cursor.
     const cursorHost = this.canvas.parentElement;
     const handlePointerMove = (e: PointerEvent) => {
       if (!editDomRoot || !cursorHost) {
@@ -914,12 +854,6 @@ export class DrawableCanvas {
     });
   }
 
-  /**
-   * Hit-test the topmost editable element under a world point and enter its
-   * edit mode, selecting it exclusively. Shared by the select tool's
-   * double-click path and the touch double-tap path. Returns whether an
-   * editable element was found.
-   */
   public enterEditAtPoint(point: Vector2, event?: Event): boolean {
     for (let i = this.elements.length - 1; i >= 0; i--) {
       const element = this.elements[i];
@@ -975,10 +909,7 @@ export class DrawableCanvas {
     );
   }
 
-  /**
-   * Union of element world-space bounding boxes. `null` when empty — viewport
-   * treats that as "no clamp" so fresh documents stay fully pannable.
-   */
+  // `null` when empty — the viewport reads that as "no clamp" so fresh documents stay pannable.
   public getContentBounds(): DOMRect | null {
     if (!this._contentBoundsValid) {
       this._contentBoundsCache = unionBoundingBoxes(this.elements);
@@ -987,10 +918,7 @@ export class DrawableCanvas {
     return this._contentBoundsCache;
   }
 
-  /**
-   * Union of non-hidden element bounding boxes, for thumbnail rendering.
-   * Empty content -> a zero-size DOMRect.
-   */
+  // Non-hidden elements only, for thumbnail rendering. Empty content -> zero-size DOMRect.
   public get contentBounds(): DOMRect {
     return (
       unionBoundingBoxes(this.elements.filter((e) => !e.hidden)) ??
@@ -1247,12 +1175,8 @@ export class DrawableCanvas {
     });
   }
 
-  /**
-   * Whether a single finger at this world point should drive the select tool
-   * instead of panning: a resize handle of a selected element, or a body that
-   * grabs (see `DrawableElement.grabsFromBody` — a finger inside an unselected
-   * backdrop pans until that backdrop is selected).
-   */
+  // True for a resize handle of a selected element, or a body that grabs (see
+  // `DrawableElement.grabsFromBody`). Otherwise the finger pans.
   private touchGrabsElement(point: Vector2): boolean {
     for (let i = this.elements.length - 1; i >= 0; i--) {
       const element = this.elements[i];
@@ -1276,16 +1200,12 @@ export class DrawableCanvas {
   }
 
   private initEventListeners(canvas: HTMLCanvasElement) {
-    // Bound to the window, not the canvas: DOM layered above the canvas
-    // (page-frame chrome, the site's world-anchored links) swallows
-    // pointermove, which froze an in-progress drag at the last point the
-    // canvas heard about until the cursor left that DOM again. Hover still
-    // only fires for the bare canvas.
+    // On the window, not the canvas: DOM layered above the canvas (page-frame chrome, world-anchored
+    // links) swallows pointermove, freezing an in-progress drag until the cursor left that DOM again.
     this._handlePointerMove = (evt) => {
       this._input.observe(evt);
-      // A rejected palm still emits moves, and this handler feeds them to the
-      // active tool regardless of which pointer opened the interaction — so
-      // without this the palm would draw into the pen's own stroke.
+      // A rejected palm still emits moves, and this handler feeds them to the active tool regardless
+      // of which pointer opened the interaction — so the palm would draw into the pen's own stroke.
       if (this._palm.isKnownPalm(evt.pointerId)) {
         return;
       }
@@ -1327,18 +1247,16 @@ export class DrawableCanvas {
           // any single-finger pan in progress and ignore this pointer.
           if (this._activeTouchPointers.size >= 2) {
             this._touchTapCandidate = null;
-            // The two fingers of a pinch never land together, so in touch mode
-            // the first one has already begun a stroke. That mark is not what
-            // the user asked for: discard it rather than commit it.
+            // The two fingers of a pinch never land together, so in touch mode the first has already begun
+            // a stroke. Discard it rather than commit it.
             if (this._input.touchDrivesTool(this.toolSelected.id)) {
               this.abortInteraction();
             }
             this.state.change(InteractState.Idle, evt);
             break;
           }
-          // In touch mode a finger is the brush, so it goes straight to the
-          // tool — ahead of the double-tap and pan gestures, which would eat
-          // the start of a stroke.
+          // In touch mode a finger is the brush, so it goes ahead of the double-tap and pan gestures,
+          // which would eat the start of a stroke.
           if (this._input.touchDrivesTool(this.toolSelected.id)) {
             this._touchTapCandidate = null;
             this.state.change(InteractState.UsingTool, evt);
@@ -1379,9 +1297,8 @@ export class DrawableCanvas {
           break;
         }
         case 'pen':
-          // A second barrel button opens the tool wheel (the app layer listens
-          // for it) and must not also lay down a mark, the same way a
-          // right-click doesn't.
+          // A second barrel button opens the tool wheel (the app layer listens for it) and must not
+          // also lay down a mark, the same way a right-click doesn't.
           if (evt.buttons & PEN_WHEEL_BUTTONS) {
             break;
           }
@@ -1422,15 +1339,13 @@ export class DrawableCanvas {
 
     this._handlePointerUp = (evt) => {
       this._activeTouchPointers.delete(evt.pointerId);
-      // A palm drove nothing, so its lift must end nothing: this handler is on
-      // the window and would otherwise finish the stylus's live stroke the
-      // moment the hand shifted.
+      // A palm drove nothing, so its lift must end nothing: this window handler would otherwise finish
+      // the stylus's live stroke the moment the hand shifted.
       if (this._palm.pointerUp(evt.pointerId, evt.pointerType === 'pen')) {
         return;
       }
-      // A finger that lifts without dragging is a tap: run it through the
-      // select tool so it selects what's under it, or clears the selection on
-      // empty canvas. Dragging pans instead, and never reaches this.
+      // A finger that lifts without dragging is a tap: run it through the select tool. Dragging pans
+      // instead and never reaches this.
       const tap = this._touchTapCandidate;
       this._touchTapCandidate = null;
       if (
@@ -1451,9 +1366,8 @@ export class DrawableCanvas {
       this.syncEraserOverride(evt);
     };
     window.addEventListener('pointerup', this._handlePointerUp);
-    // iOS fires pointercancel (not pointerup) for touches it absorbs into a
-    // system gesture; without this the active-touch set would leak and block
-    // future single-finger panning.
+    // iOS fires pointercancel, not pointerup, for touches it absorbs into a system gesture; without
+    // this the active-touch set leaks and blocks future single-finger panning.
     window.addEventListener('pointercancel', this._handlePointerUp);
 
     this._handleResize = () => {
@@ -1462,11 +1376,7 @@ export class DrawableCanvas {
     window.addEventListener('resize', this._handleResize);
   }
 
-  /**
-   * Add a new element to the canvas. The factory receives a freshly generated
-   * uuid. The element is created locally, bound to a new Y.Map, and added to
-   * the Y.Array.
-   */
+  // The factory receives a freshly generated uuid.
   public addElement<T extends DrawableElement>(
     factory: (uuid: string) => T,
   ): T {
@@ -1495,7 +1405,6 @@ export class DrawableCanvas {
       yMap = this._ydoc.createElementMap(element.type, uuid, props);
     }
 
-    // Bind element to its Y.Map
     element.bindToYMap(yMap);
     this.bindElementSharedYState(element);
     this._store.add(element, yMap, position);
@@ -1581,11 +1490,8 @@ export class DrawableCanvas {
     }
   }
 
-  /**
-   * The stylus has touched down. PalmRejection reclassifies the touches that
-   * were already on the screen; the gesture they had started still has to be
-   * unwound here, since the pen typically lands just after the hand does.
-   */
+  // PalmRejection reclassifies the touches already on screen; the gesture they had started still
+  // has to be unwound here, since the pen typically lands just after the hand does.
   private beginPenContact(evt: PointerEvent) {
     this._palm.penDown(evt.pointerId, this._activeTouchPointers);
     if (this._activeTouchPointers.size > 0) {
@@ -1607,22 +1513,12 @@ export class DrawableCanvas {
   }
 
   /**
-   * Track the erase-while-held buttons across every pen event.
-   *
-   * `button` names only the button that changed on that one event, and is
-   * absent when the button was already held as the tip landed — the ordinary
-   * way an S Pen is used. `buttons` carries the held state on every event
-   * instead, hover included, so both edges are visible wherever they happen.
-   */
-  /**
    * Open and close a pen contact that a held button hid.
    *
-   * With a barrel already down, the tip landing takes `buttons` from 2 to 3 —
-   * a chorded transition, which fires `pointermove` rather than `pointerdown`
-   * — and lifting the tip with the button still held fires a move rather than
-   * a `pointerup`. Neither edge reaches the handlers that normally open and
-   * close a contact, so they are taken here. A pen whose contact did arrive as
-   * a pointerdown never enters either branch.
+   * With a barrel already down, the tip landing takes `buttons` from 2 to 3 — a chorded transition,
+   * which fires `pointermove` rather than `pointerdown` — and lifting the tip with the button still
+   * held fires a move rather than a `pointerup`. Neither edge reaches the handlers that normally
+   * open and close a contact. A pen whose contact did arrive as a pointerdown enters neither branch.
    */
   private syncPenChordedContact(evt: PointerEvent) {
     if (evt.pointerType !== 'pen') {
@@ -1646,6 +1542,13 @@ export class DrawableCanvas {
     this._palm.pointerUp(evt.pointerId, true);
   }
 
+  /**
+   * Track the erase-while-held buttons across every pen event.
+   *
+   * `button` names only the button that changed on that one event, and is absent when the button
+   * was already held as the tip landed — the ordinary way an S Pen is used. `buttons` carries the
+   * held state on every event, hover included, so both edges are visible wherever they happen.
+   */
   private syncEraserOverride(evt: PointerEvent) {
     if (evt.pointerType !== 'pen') {
       return;
@@ -1672,12 +1575,9 @@ export class DrawableCanvas {
     }
   }
 
-  /**
-   * Swap in the eraser for as long as the barrel or eraser end is held.
-   * Deliberately not `switchTool`: erasing this way shouldn't clear the
-   * selection or move the toolbar's highlight, and the on-canvas eraser ring
-   * is feedback enough.
-   */
+  // Swap in the eraser for as long as the barrel or eraser end is held. Deliberately not
+  // `switchTool`: erasing this way shouldn't clear the selection or move the toolbar highlight,
+  // and the on-canvas eraser ring is feedback enough.
   private beginEraserOverride() {
     const eraser = this.tools.find((t) => t.id === 'eraser');
     if (!eraser || this._eraserOverride || this.toolSelected === eraser) {
@@ -1694,11 +1594,8 @@ export class DrawableCanvas {
     }
   }
 
-  /**
-   * Drop the in-progress tool interaction without committing it. Used when a
-   * pointer gesture that started as tool use turns out to be something else —
-   * a pen resting on the canvas to summon the tool wheel.
-   */
+  // Used when a gesture that started as tool use turns out to be something else — a pen resting
+  // on the canvas to summon the tool wheel.
   public abortInteraction() {
     if (this.state.current !== InteractState.UsingTool) {
       return;
@@ -1708,14 +1605,8 @@ export class DrawableCanvas {
     this._abortingInteraction = false;
   }
 
-  /**
-   * Give up what a resting finger was doing so the tool wheel can take the
-   * gesture over, and report whether it was the app layer's to take.
-   *
-   * Only a plain one-finger pan is: a palm under the stylus is not input at
-   * all, and a finger that grabbed an element is mid-drag, which a long press
-   * must not turn into a tool switch.
-   */
+  // Only a plain one-finger pan is the app layer's to take: a palm under the stylus is not input
+  // at all, and a finger that grabbed an element is mid-drag.
   public releaseTouchForToolWheel(): boolean {
     if (this._palm.suppressed || this.state.current !== InteractState.Moving) {
       return false;
@@ -1734,10 +1625,8 @@ export class DrawableCanvas {
     this._eraserButtonsHeld = false;
     this.toolSelected.interrupt(this);
     const next = this.tools[to];
-    // A tool that can push its options onto the selection (the text tool) needs
-    // that selection to survive the switch, or its options panel has nothing to
-    // act on and picking it up is a dead end. Every other tool starts clean, so
-    // a stale outline doesn't linger while drawing or erasing.
+    // A tool that pushes options onto the selection (the text tool) needs it to survive the switch,
+    // or its options panel has nothing to act on. Every other tool starts clean.
     if (!next.applyOptionToSelection) {
       for (const e of this._store.all()) {
         e.unselect();
@@ -1746,9 +1635,6 @@ export class DrawableCanvas {
     this.toolSelected = next;
     this._toolCursor = 'default';
     this.updateCursor();
-    // Single sync point: every tool switch notifies React so the toolbar
-    // selection follows, whether triggered by the UI, a keybind, or a tool
-    // handing control back (e.g. the text tool reverting to select).
     this.onToolSwitched?.(to);
   }
 

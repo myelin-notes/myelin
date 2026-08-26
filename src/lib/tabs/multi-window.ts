@@ -1,10 +1,10 @@
+import { isWindows } from '@myelin/shared/os';
 import { emitTo, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import {
   getAllWebviewWindows,
   getCurrentWebviewWindow,
   WebviewWindow,
 } from '@tauri-apps/api/webviewWindow';
-import { isWindows } from '@/lib/platform';
 import type { Tab } from './types';
 
 // Fired by a window when it drops one of its tabs onto another window's area.
@@ -41,11 +41,9 @@ export function isTabDragOutsideWindow(e: DragEvent): boolean {
   );
 }
 
-// Hand `tab` to another myelin window whose frame contains the drop point
-// (screen coordinates, CSS pixels). Returns true if a window accepted it, in
-// which case the caller should close the source tab. HTML5 drag events do not
-// cross native window boundaries, so we resolve the target geometrically on
-// drag end rather than via a drop handler in the other window.
+// `point` is in screen coordinates, CSS pixels. Returns true if a window accepted the tab, in which
+// case the caller closes the source tab. HTML5 drag events don't cross native window boundaries, so
+// the target is resolved geometrically on drag end rather than by a drop handler in the other window.
 export async function dropTabOntoWindow(
   tab: Tab,
   screenX: number,

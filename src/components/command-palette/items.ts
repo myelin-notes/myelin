@@ -6,13 +6,13 @@ import {
   Plus,
   RefreshCw,
 } from 'lucide-react';
+import type { Messages } from '@myelin/editor/i18n';
+import { type Action, registry } from '@myelin/editor/keybinds';
 import {
   getActionCategory,
   getActionCopy,
   getActionIcon,
 } from '@myelin/editor/keybinds/messages';
-import type { Messages } from '@/lib/i18n';
-import { type Action, registry } from '@/lib/keybinds';
 import type { TabTarget } from '@/lib/tabs/types';
 import type {
   CommandPaletteItem,

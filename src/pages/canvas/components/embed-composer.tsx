@@ -6,8 +6,8 @@ import {
   Loader2 as LoaderIcon,
   X as XIcon,
 } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import type { Presence } from '@myelin/ui';
-import { useMessages } from '@/lib/i18n';
 
 interface EmbedComposerProps {
   onEmbedFiles: (files: File[]) => void;

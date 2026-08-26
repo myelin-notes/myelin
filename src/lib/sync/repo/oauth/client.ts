@@ -1,13 +1,12 @@
 /**
- * The provider-neutral half of an authorization code + PKCE sign-in: one
- * pending session per credential, the redirect listener's lifetime, and the
- * checks that must pass before a code is worth redeeming. Providers supply
- * their endpoints and their own token exchange, which is where they genuinely
- * differ — GitHub stores a bare access token, Google a refresh token and expiry.
+ * The provider-neutral half of an authorization code + PKCE sign-in: one pending session per
+ * credential, the redirect listener's lifetime, and the checks that must pass before a code is
+ * worth redeeming. Providers supply their endpoints and their own token exchange — GitHub stores
+ * a bare access token, Google a refresh token and expiry.
  */
 
+import { Logger } from '@myelin/shared/logger';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { Logger } from '@/lib/logger';
 import {
   deriveCodeChallenge,
   encodeFormBody,
@@ -74,11 +73,8 @@ export class OAuthClient {
     this.logger = new Logger(`OAuth:${options.provider}`);
   }
 
-  /**
-   * The redirect listener is opened before the URL is handed back so the
-   * callback cannot land before anything is ready to catch it; the caller must
-   * follow up with `wait` or `cancel` so the listener is torn down either way.
-   */
+  // The redirect listener opens before the URL is handed back, so the callback cannot land before
+  // anything is ready to catch it. The caller must follow up with `wait` or `cancel` to tear it down.
   async begin(credentialId: string): Promise<OAuthStartPayload> {
     const normalized = normalizeCredentialId(credentialId);
     // Resolved up front: incomplete client config only surfaces at the token
@@ -145,9 +141,8 @@ export class OAuthClient {
         };
       }
 
-      // A mismatched state means the redirect did not originate from the
-      // request this app made, so the code that came with it is not ours to
-      // redeem.
+      // A mismatched state means the redirect did not originate from this app's request, so the code
+      // that came with it is not ours to redeem.
       if (params.state !== session.state) {
         return {
           status: 'failed',

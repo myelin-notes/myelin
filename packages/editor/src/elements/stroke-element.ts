@@ -16,22 +16,13 @@ export interface StrokeStyle {
   size: number;
 }
 
-/**
- * While a stroke is being drawn its points are buffered in memory and pushed to
- * Yjs no more than this often. One write within the UndoManager's capture
- * window keeps the whole stroke (creation → points) in a single undo step
- * without paying a transaction per pointer sample.
- */
+// One write within the UndoManager's capture window keeps the whole stroke (creation → points)
+// in a single undo step without paying a transaction per pointer sample.
 const POINT_FLUSH_INTERVAL_MS = 300;
 
-/**
- * Pointer Events reports a flat 0.5 for the whole drag on hardware with no
- * pressure sensor (mouse, sensorless pen), so a sample that differs from it is
- * the only proof a real sensor is behind the stroke. Until one arrives the
- * stroke keeps perfect-freehand's velocity simulation, which is what a mouse
- * wants — switching it off unconditionally would flatten every mouse stroke to
- * a constant width.
- */
+// Pointer Events reports a flat 0.5 for the whole drag on hardware with no pressure sensor, so a
+// differing sample is the only proof a real sensor is behind the stroke. Until one arrives the
+// stroke keeps perfect-freehand's velocity simulation, which is what a mouse wants.
 const NO_SENSOR_PRESSURE = 0.5;
 
 export class StrokeElement extends DrawableElement {
@@ -132,16 +123,10 @@ export class StrokeElement extends DrawableElement {
     }
   }
 
-  /**
-   * Widen the cached box to hold one more sample.
-   *
-   * `updateBoundingBox` only runs when the stroke is finished, so without this
-   * a live stroke would carry the empty box it was constructed with — and the
-   * renderer culls by that box, which would leave the ink being drawn
-   * invisible until the pen lifted. Padding by the full `size` is a bound on
-   * perfect-freehand's radius (at most 0.75 * size at maximum pressure), so
-   * the box is never too small; `updateBoundingBox` tightens it at the end.
-   */
+  // `updateBoundingBox` only runs when the stroke is finished, so without this a live stroke would
+  // carry the empty box it was constructed with — and the renderer culls by that box, leaving the
+  // ink invisible until the pen lifted. Padding by the full `size` bounds perfect-freehand's radius
+  // (at most 0.75 * size), so the box is never too small.
   private growBoundsTo(x: number, y: number, isFirst: boolean): void {
     const pad = this.style.size;
     if (isFirst) {
@@ -230,9 +215,8 @@ export class StrokeElement extends DrawableElement {
     radius: number,
     _ctx: CanvasRenderingContext2D,
   ): boolean {
-    // Hit-test the raw centerline inflated by the stroke half-width, instead of
-    // the perfect-freehand outline. Avoids storing (or recomputing) the outline
-    // and is what the eraser walks every pointer move.
+    // Hit-test the raw centerline inflated by the half-width, not the perfect-freehand outline:
+    // avoids storing or recomputing the outline, and the eraser walks this every pointer move.
     const pts = this.points;
     if (pts.length < 2) {
       return false;
@@ -304,21 +288,15 @@ export interface QuadraticPathSink {
 }
 
 /**
- * Trace a perfect-freehand outline onto `path` as the closed curve the stroke
- * renders as: a quadratic through the first three points, then one smooth
- * quadratic per remaining point, each ending at the midpoint of a point and its
- * successor.
+ * Trace a perfect-freehand outline onto `path`: a quadratic through the first three points, then
+ * one smooth quadratic per remaining point, each ending at the midpoint of a point and its successor.
  *
- * This used to be formatted as an SVG path string and handed to the `Path2D`
- * constructor to parse. That string is rebuilt on every frame an in-progress
- * stroke grows, and its two `toFixed(2)` calls per outline point made it ~72%
- * of the rebuild -- more than perfect-freehand's own geometry pass -- before
- * the parse it then paid for. Driving `Path2D` directly skips both.
+ * Formerly an SVG path string handed to `Path2D`. That string is rebuilt every frame an in-progress
+ * stroke grows, and its two `toFixed(2)` calls per outline point were ~72% of the rebuild — more
+ * than perfect-freehand's own geometry pass — before the parse it then paid for.
  *
- * Each curve after the first was an SVG `T` command, which takes only an
- * endpoint and derives its control point by reflecting the previous one about
- * the current point. `quadraticCurveTo` has no such shorthand, so the
- * reflection is computed here to keep the rendered shape identical.
+ * Each curve after the first was an SVG `T`, which reflects the previous control point.
+ * `quadraticCurveTo` has no shorthand, so the reflection is computed here to keep the shape identical.
  */
 export function appendStrokeOutline(
   path: QuadraticPathSink,

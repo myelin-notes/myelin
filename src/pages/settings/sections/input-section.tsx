@@ -1,8 +1,8 @@
 import { Hand, PenLine, Wand2 } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import type { InputMode } from '@myelin/editor/input-mode';
-import { useMessages } from '@/lib/i18n';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { useUserPref } from '@/lib/use-user-pref';
-import { UserPrefs } from '@/lib/user-prefs';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
 
 export function InputSection() {

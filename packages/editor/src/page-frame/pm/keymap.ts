@@ -52,10 +52,6 @@ const EDITOR_MARK_ACTIONS: Record<string, { type: MarkType }> = {
   'editor:code': { type: schema.marks.code },
 };
 
-/**
- * Enter inside a flat list-item textblock: split into a new item of the
- * same type, or convert an empty item back to a paragraph.
- */
 const splitFlatListItem: Command = (state, dispatch) => {
   const { $cursor } = state.selection as {
     $cursor?: ResolvedPos;
@@ -174,11 +170,9 @@ function deleteCalloutRange(
   setDomTextSelection(view, selectionPos, -1);
 }
 
-// After dispatching a transaction that inserts a `\n` + trailing-space caret
-// anchor in a callout, PM's selection sync can resolve the cursor onto the
-// end of the previous DOM text node (across the `<br>` from
-// `linebreakReplacement`) instead of the start of the new line. Force the
-// DOM range to the text node we want so the caret renders on the new line.
+// After inserting a `\n` + trailing-space caret anchor in a callout, PM's selection sync can
+// resolve the cursor onto the end of the previous DOM text node (across the `<br>` from
+// `linebreakReplacement`) instead of the start of the new line.
 function setDomTextSelection(
   view: EditorView | undefined,
   pos: number,
@@ -396,10 +390,6 @@ const dedentListItem: Command = (state, dispatch) => {
   return true;
 };
 
-/**
- * At the start of a non-paragraph textblock (heading, code block),
- * convert it back to a paragraph.
- */
 const clearBlockFormatting: Command = (state, dispatch) => {
   const { $cursor } = state.selection as {
     $cursor?: ResolvedPos;

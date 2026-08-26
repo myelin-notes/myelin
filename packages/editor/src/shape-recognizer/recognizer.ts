@@ -1,9 +1,7 @@
 /**
- * Pure, stateless handwriting → vector-shape recognizer.
- *
- * No canvas / Yjs / perfect-freehand imports — operates on raw [x, y] points
- * so it can be exhaustively unit-tested. Geometry is returned in WORLD space;
- * the caller normalizes to a local frame at swap time.
+ * Pure, stateless handwriting → vector-shape recognizer. No canvas / Yjs / perfect-freehand
+ * imports — operates on raw [x, y] points so it can be exhaustively unit-tested. Geometry is
+ * returned in WORLD space; the caller normalizes to a local frame at swap time.
  */
 
 import {
@@ -39,12 +37,8 @@ function dist(a: Point, b: Point): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1]);
 }
 
-/**
- * Resample a polyline to N points spaced uniformly in arc length. This removes
- * pen-speed bias (samples are even in distance, not time) and bounds the cost of
- * downstream corner detection for very long strokes. Returns null for a
- * zero-length input.
- */
+// Removes pen-speed bias (even in distance, not time) and bounds the cost of downstream corner
+// detection for long strokes. Returns null for a zero-length input.
 export function resampleByArcLength(
   pts: readonly Point[],
   n = RESAMPLE_N,
@@ -139,10 +133,6 @@ function circularity(pts: readonly Point[]): number {
   return Math.min(1, c);
 }
 
-/**
- * Least-squares line fit (total least squares via covariance) and the maximum
- * perpendicular deviation of the points from that line.
- */
 function lineFitDeviation(pts: readonly Point[]): {
   maxDev: number;
   a: Point;
@@ -200,10 +190,7 @@ function lineFitDeviation(pts: readonly Point[]): {
   return { maxDev, a: minPt, b: maxPt };
 }
 
-/**
- * Detect corners via turn angle, then cluster adjacent corners so one physical
- * corner counts once. Returns the clustered corner vertex positions.
- */
+// Adjacent corners are clustered so one physical corner counts once.
 function detectCorners(pts: readonly Point[], closed: boolean): Point[] {
   const n = pts.length;
   const cornerIdx: number[] = [];
@@ -293,12 +280,9 @@ export function recognizeShape(
   const deviationRatio = maxDev / longSide;
   const lineSpan = dist(a, b);
   if (deviationRatio < LINE_DEVIATION_RATIO && lineSpan >= MIN_LINE_SPAN) {
-    // Acceptance is governed solely by LINE_DEVIATION_RATIO (max wobble as a
-    // fraction of the long side). The generic MIN_CONFIDENCE gate used for the
-    // closed shapes is deliberately NOT applied here: combined with the linear
-    // confidence falloff it shrank the effective straightness tolerance to
-    // ~1.8%, far tighter than a hand-drawn line, so freehand lines silently
-    // failed to snap.
+    // Acceptance is governed solely by LINE_DEVIATION_RATIO. The generic MIN_CONFIDENCE gate used for
+    // closed shapes is deliberately NOT applied: combined with the linear confidence falloff it shrank
+    // the effective straightness tolerance to ~1.8%, so freehand lines silently failed to snap.
     // A near-horizontal line snaps flat, pivoting about the segment midpoint.
     const tiltDeg = Math.abs(
       (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI,
@@ -329,10 +313,9 @@ export function recognizeShape(
   const cornerCount = corners.length;
   const fill = box.w * box.h <= 1e-9 ? 0 : polygonArea(pts) / (box.w * box.h);
 
-  // Fill precedence: a closed stroke that fills its bounding box is a rect, and
-  // this is checked before circularity because a hand-drawn square's corners
-  // round off enough to read as "very circular" (and to hide from the corner
-  // detector) long before its fill drops anywhere near an ellipse's π/4.
+  // Fill precedence: a closed stroke that fills its bounding box is a rect. Checked before
+  // circularity because a hand-drawn square's corners round off enough to read as "very circular"
+  // (and hide from the corner detector) long before its fill drops near an ellipse's π/4.
   if (
     closed &&
     fill >= RECT_MIN_FILL &&

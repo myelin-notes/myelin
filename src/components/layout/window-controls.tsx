@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Minus, X } from 'lucide-react';
+import { cn } from '@myelin/editor/utils';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { cn } from '@/lib/utils';
 
 /**
  * Frameless-window controls for Windows. The native title bar is disabled

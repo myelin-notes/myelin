@@ -1,29 +1,24 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Logger } from '@/lib/logger';
+import {
+  regenerateThumbnailNow,
+  requestThumbnailRegeneration,
+} from '@myelin/editor/thumbnails';
+import { Logger } from '@myelin/shared/logger';
 import {
   type NoteSession,
   type Repository,
   useRepository,
   type VFSNodeId,
 } from '@/lib/sync';
-import {
-  regenerateThumbnailNow,
-  requestThumbnailRegeneration,
-} from '@/lib/thumbnails';
 import { saveSessionAndCreateVersion } from './session-version-history';
 
 const AUTO_SAVE_INTERVAL_MS = 10_000;
 /**
- * Must stay above `POINT_FLUSH_INTERVAL_MS` (the 300ms cadence a live stroke
- * writes its points to Yjs at), or the debounce expires between two flushes of
- * a single stroke and the save lands mid-stroke. A save is not cheap and none
- * of it is off the main thread: it reads the note back off disk, decodes it,
- * re-encodes it twice and writes it out, on the thread that owes the pen its
- * next frame. Measured over six seconds of unbroken drawing, this moved the
- * save out of the stroke entirely — it now runs once the pen lifts.
- *
- * Nothing is at risk for longer than before: the autosave interval below is
- * unchanged and still bounds what an unclean exit can lose.
+ * Must stay above `POINT_FLUSH_INTERVAL_MS` (the 300ms cadence a live stroke writes points to Yjs
+ * at), or the debounce expires between two flushes of one stroke and the save lands mid-stroke.
+ * A save reads the note back off disk, decodes it, re-encodes it twice and writes it out, all on
+ * the thread that owes the pen its next frame. Nothing is at risk for longer than before — the
+ * autosave interval below still bounds what an unclean exit can lose.
  */
 const SAVE_DEBOUNCE_MS = 1_000;
 const logger = new Logger('CanvasSessionSaveScheduler');

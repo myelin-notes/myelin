@@ -3,8 +3,8 @@ import * as Y from 'yjs';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
+import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
-import { Logger } from '@/lib/logger';
 import type { ReadableRepository, VFSFileNode } from '@/lib/sync';
 import {
   BYTES_MARKER,
@@ -38,12 +38,8 @@ export interface ExportWorkspaceJsonOptions {
   onProgress?: (progress: ExportProgress) => void;
 }
 
-/**
- * Convert a value read out of an element's Y.Map into JSON-safe data. Binary
- * payloads (e.g. an image's bytes) become a {@link BYTES_MARKER} wrapper so the
- * importer can decode them back; everything else is passed through, recursing
- * into arrays and plain objects.
- */
+// Binary payloads (e.g. an image's bytes) become a {@link BYTES_MARKER} wrapper the importer can
+// decode; everything else passes through, recursing into arrays and plain objects.
 function toJsonValue(value: unknown): unknown {
   if (value instanceof Uint8Array) {
     return { [BYTES_MARKER]: base64EncodeBytes(value) };

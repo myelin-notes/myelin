@@ -2,11 +2,8 @@ import { Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { NestedEditorDirection, NestedEditorSelection } from './editor';
 
-/**
- * The slice of a nested editor the ProseMirror forwarding helpers read.
- * Kept structural (instead of importing the editor classes) so this module
- * never drags the CodeMirror runtime into the main chunk.
- */
+// Kept structural (rather than importing the editor classes) so this module never drags the
+// CodeMirror runtime into the main chunk.
 interface NestedEditorContent {
   getValue: () => string;
   getSelection: () => NestedEditorSelection;
@@ -45,12 +42,8 @@ function findTextDiff(current: string, next: string) {
   };
 }
 
-/**
- * Apply the nested editor's document and selection to ProseMirror as a
- * minimal replace transaction. `offset` is the PM position of the block's
- * first character (node position + 1); `currentText` is the block node's
- * text the editor was last synced against.
- */
+// `offset` is the PM position of the block's first character (node position + 1); `currentText` is
+// the block node's text the editor was last synced against.
 export function forwardNestedContentUpdate(
   view: EditorView,
   offset: number,
@@ -84,7 +77,6 @@ export function forwardNestedContentUpdate(
   view.dispatch(tr);
 }
 
-/** Mirror the nested editor's cursor/selection into ProseMirror. */
 export function forwardNestedSelectionUpdate(
   view: EditorView,
   offset: number,
@@ -105,10 +97,7 @@ export function forwardNestedSelectionUpdate(
   );
 }
 
-/**
- * Move the ProseMirror selection just outside the block (arrow pressed at a
- * boundary inside the nested editor) and return focus to the PM view.
- */
+// For an arrow pressed at a boundary inside the nested editor. Returns focus to the PM view.
 export function escapeNestedEditor(
   view: EditorView,
   nodePos: number,

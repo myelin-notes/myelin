@@ -168,9 +168,8 @@ describe('recognizeShape', () => {
   });
 
   it('classifies a square with rounded corners as rect, not ellipse', () => {
-    // A real hand rounds the corners of a square, which pushes circularity up to
-    // ~0.86 — past ELLIPSE_STRONG — and hides the corners from the turn-angle
-    // detector. Only the bbox fill ratio still says "box".
+    // A real hand rounds the corners of a square, pushing circularity to ~0.86 — past ELLIPSE_STRONG —
+    // and hiding the corners from the turn-angle detector. Only the bbox fill ratio still says "box".
     for (const k of [3, 6, 10]) {
       const r = recognizeShape(smooth(rectStroke(0, 0, 120, 120, 50), k));
       expect(r?.shapeType, `smoothing ${k}`).toBe('rect');
@@ -217,9 +216,8 @@ describe('recognizeShape', () => {
   });
 
   it('classifies a wobbly freehand line', () => {
-    // ~3% perpendicular wobble — typical of a hand-drawn line and well within
-    // LINE_DEVIATION_RATIO (6%), but rejected by the old MIN_CONFIDENCE double
-    // gate that capped the effective tolerance at ~1.8%.
+    // ~3% perpendicular wobble: typical of a hand-drawn line and well within LINE_DEVIATION_RATIO
+    // (6%), but rejected by the old MIN_CONFIDENCE double gate that capped tolerance at ~1.8%.
     const r = recognizeShape(jitter(lineStroke(0, 0, 220, 60), 6, 7))!;
     expect(r).not.toBeNull();
     expect(r.shapeType).toBe('line');

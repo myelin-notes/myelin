@@ -1,13 +1,9 @@
-// Captures failures that happen *before* the app finishes mounting — the window
-// where the normal Logger (which only writes once app code calls it) and PostHog
-// are not yet running, so a thrown error would otherwise leave a blank window
-// with no log and no on-screen feedback.
+// Captures failures *before* the app finishes mounting, where the normal Logger and PostHog are
+// not yet running and a thrown error would leave a blank window with no log and no feedback.
 //
-// This module is deliberately dependency-light: it has no top-level imports, and
-// the only host API it touches (the Tauri fs plugin) is pulled in via dynamic
-// import inside the writer. That guarantees importing this module can never
-// itself throw during early bootstrap, so it stays available to report whatever
-// fails next.
+// Deliberately dependency-light: no top-level imports, and the only host API it touches (the Tauri
+// fs plugin) is pulled in via dynamic import inside the writer. Importing this module can never
+// itself throw during early bootstrap, so it stays available to report whatever fails next.
 
 let booted = false;
 let reported = false;
@@ -17,16 +13,14 @@ interface FormattedError {
   stack?: string;
 }
 
-// Marks startup as complete. After this point the app is mounted and the normal
-// Logger / PostHog own error reporting, so reportFatalError() becomes a no-op
-// and a later non-fatal error never wipes a working UI.
+// After this the normal Logger / PostHog own error reporting, so reportFatalError() becomes a
+// no-op and a later non-fatal error never wipes a working UI.
 export function markBootComplete(): void {
   booted = true;
 }
 
-// Reports a pre-mount failure: renders a visible panel and appends the error to
-// the same log file the Logger uses (logs/app.log). Only the first pre-boot
-// failure is acted on; once mounted, it does nothing.
+// Renders a visible panel and appends to the Logger's log file (logs/app.log). Only the first
+// pre-boot failure is acted on; once mounted, this does nothing.
 export async function reportFatalError(
   source: string,
   error: unknown,

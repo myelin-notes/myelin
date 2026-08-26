@@ -17,9 +17,8 @@ interface I18nContextValue {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 
-// Mirror of the active catalog for imperative code that runs outside the React
-// tree (e.g. the canvas chrome rendered through its own createRoot). Kept in
-// sync by I18nProvider; resolves to the current locale at call time.
+// Mirror of the active catalog for imperative code outside the React tree (e.g. canvas chrome
+// rendered through its own createRoot). Kept in sync by I18nProvider.
 let activeMessages: Messages = catalogs[defaultLocale];
 
 export function getMessages(): Messages {
@@ -60,9 +59,9 @@ function getInitialLocale(): SupportedLocale {
 interface I18nProviderProps {
   children: React.ReactNode;
   /**
-   * Pin the locale instead of following the `language` preference. The website
-   * serves one prerendered page per locale, so the URL decides the language and
-   * a stray preference from a previous visit must not override it.
+   * Pin the locale instead of following the `language` preference. The website serves one
+   * prerendered page per locale, so the URL decides the language and a stray preference from a
+   * previous visit must not override it.
    */
   locale?: SupportedLocale;
 }
@@ -96,9 +95,8 @@ export function I18nProvider({
   };
 
   const messages = catalogs[locale];
-  // Keep the imperative accessor in sync. Set during render (not an effect) so
-  // it is current before descendant effects build imperative UI like the canvas
-  // chrome.
+  // Set during render, not an effect, so it is current before descendant effects build imperative
+  // UI like the canvas chrome.
   activeMessages = messages;
 
   return (

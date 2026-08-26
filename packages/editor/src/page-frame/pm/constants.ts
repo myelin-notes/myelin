@@ -1,4 +1,3 @@
-/** CSS class applied to ProseMirror editor containers. */
 export const PM_EDITOR_CLASS = 'pm-editor';
 
 /**

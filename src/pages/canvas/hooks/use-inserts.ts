@@ -17,9 +17,9 @@ import {
   PageFrameElement,
 } from '@myelin/editor/elements/page-frame-element';
 import type { ITool } from '@myelin/editor/tools/tool';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { CollisionHelper } from '@myelin/editor/utils/collision-helper';
 import { trackEvent } from '@/lib/analytics';
-import { UserPrefs } from '@/lib/user-prefs';
 
 export interface ContextInsertAnchor {
   screenX: number;

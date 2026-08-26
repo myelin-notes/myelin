@@ -846,11 +846,8 @@ interface TestablePdfGeometry {
 }
 
 describe('PdfElement page geometry', () => {
-  /**
-   * Pages live inside the chrome root, which is laid out at a quantized zoom
-   * and carries the remainder as a scale. Sizing pages to the exact zoom
-   * applies that remainder twice, so they render outside the frame.
-   */
+  // Pages live inside the chrome root, which is laid out at a quantized zoom and carries the
+  // remainder as a scale. Sizing pages to the exact zoom applies that remainder twice.
   it('lays pages out in the same units as the chrome it sits inside', () => {
     const pageSize = { w: 612, h: 792 };
     const element = new PdfElement(

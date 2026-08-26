@@ -1,8 +1,8 @@
 import { Columns3, GalleryVertical, Rows3 } from 'lucide-react';
-import { useMessages } from '@/lib/i18n';
-import { isApplePlatform } from '@/lib/platform';
+import { useMessages } from '@myelin/editor/i18n';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { isApplePlatform } from '@myelin/shared/os';
 import { useUserPref } from '@/lib/use-user-pref';
-import { UserPrefs } from '@/lib/user-prefs';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
 import { ToggleRow } from '../components/toggle-row';
 

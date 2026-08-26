@@ -24,11 +24,8 @@ interface FillTextCall {
   y: number;
 }
 
-/**
- * Minimal CanvasRenderingContext2D stub that records the calls the renderer
- * makes. measureText returns a width proportional to length so word-wrap is
- * deterministic without a real canvas backend.
- */
+// measureText returns a width proportional to length, so word-wrap is deterministic without a real
+// canvas backend.
 function createStubContext(): {
   ctx: CanvasRenderingContext2D;
   fillTexts: FillTextCall[];

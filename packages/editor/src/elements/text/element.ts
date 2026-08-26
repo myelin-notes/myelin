@@ -31,12 +31,10 @@ const DEFAULT_BOX_WIDTH = 200;
 const DEFAULT_BOX_HEIGHT = 80;
 
 /**
- * A free-floating text box on the canvas. The text is a DOM overlay at all
- * times — display and editing share one persistent textarea (like
- * LatexElement's preview), so entering edit mode only toggles focus and
- * editability instead of swapping render paths. draw2D is a no-op; the
- * pretext layout in `_cachedLines` remains the source for PDF export,
- * thumbnails, and the bounding box.
+ * A free-floating text box. The text is a DOM overlay at all times — display and editing share one
+ * persistent textarea, so entering edit mode only toggles focus and editability instead of swapping
+ * render paths. draw2D is a no-op; the pretext layout in `_cachedLines` remains the source for PDF
+ * export, thumbnails, and the bounding box.
  */
 export class TextElement extends DrawableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
@@ -142,9 +140,8 @@ export class TextElement extends DrawableElement {
 
     this.applyContentStyle(textarea);
 
-    // Text renders at native font size while the element's scale widens the
-    // wrap box (matching the old canvas draw, which counter-scaled glyphs),
-    // so only the viewport zoom goes into the transform.
+    // Text renders at native font size while the element's scale widens the wrap box, so only the
+    // viewport zoom goes into the transform.
     textarea.style.left = `${screen.x}px`;
     textarea.style.top = `${screen.y}px`;
     textarea.style.transform = `scale(${viewport.zoom})`;
@@ -153,12 +150,8 @@ export class TextElement extends DrawableElement {
     textarea.dataset.editing = this._editing ? 'true' : 'false';
   }
 
-  /**
-   * The text plus everything that decides how it wraps. syncDOM pushes these
-   * each frame; the measure pass applies them first so a recomputeBox that runs
-   * before the next frame (font or scale change) measures the new wrapping
-   * rather than the last frame's.
-   */
+  // syncDOM pushes these each frame; the measure pass applies them first, so a recomputeBox running
+  // before the next frame (font or scale change) measures the new wrapping, not the last frame's.
   private applyContentStyle(textarea: HTMLTextAreaElement): void {
     // Remote/undo edits land here; skip while editing so the user's
     // in-progress typing isn't clobbered.
@@ -176,13 +169,9 @@ export class TextElement extends DrawableElement {
     textarea.style.fontFamily = this._style.fontFamily;
   }
 
-  /**
-   * Height of the textarea's content in native-font pixels, or 0 when it isn't
-   * mounted. Measured at height 0: scrollHeight never reports less than the
-   * element's own height, and syncDOM sizes the textarea from the box, so
-   * measuring as-is would echo the box height straight back and pin the box to
-   * its tallest-ever size.
-   */
+  // Measured at height 0: scrollHeight never reports less than the element's own height, and
+  // syncDOM sizes the textarea from the box, so measuring as-is would echo the box height back and
+  // pin the box to its tallest-ever size.
   private measureDomTextHeight(): number {
     const textarea = this._textarea;
     if (!textarea) {
@@ -204,9 +193,8 @@ export class TextElement extends DrawableElement {
     textarea.readOnly = true;
     // Not tab-reachable while idle; edit mode focuses it programmatically.
     textarea.tabIndex = -1;
-    // Grow the box to fit as the user types. Without this the fixed-height
-    // textarea would scroll its content (overflow: hidden) instead of the box
-    // extending downwards. recomputeBox() runs off _text, so update it first.
+    // Grow the box as the user types; otherwise the fixed-height textarea scrolls its content
+    // (overflow: hidden) instead. recomputeBox() runs off _text, so update it first.
     textarea.addEventListener('input', () => {
       this._text = textarea.value;
       this.updateBounds();
@@ -297,9 +285,8 @@ export class TextElement extends DrawableElement {
       fontSize: this._style.fontSize,
       fontFamily: this._style.fontFamily,
     });
-    // Font size and family change how the text wraps, so the box this element
-    // occupies moves with the style. Notify like the other geometry setters do
-    // so the selection outline and toolbar follow.
+    // Font size and family change how the text wraps, so the box moves with the style. Notify so the
+    // selection outline and toolbar follow.
     this.onTransformChanged?.();
   }
 
@@ -412,13 +399,10 @@ export class TextElement extends DrawableElement {
         lineHeight,
       ).lines;
 
-      // The textarea is the real renderer (display and editing share it), so
-      // when it's mounted measure its content height directly — the box then
-      // matches the displayed wrapping exactly, including trailing blank lines
-      // from Shift+Enter that pretext's normal-whitespace layout collapses.
-      // pretext's line count is the fallback for headless paths (PDF export,
-      // thumbnails, before the first render frame) where no laid-out textarea
-      // exists. Both are visual (native-font) pixel heights.
+      // The textarea is the real renderer, so when mounted measure its content height directly — the
+      // box then matches the displayed wrapping exactly, including trailing blank lines from
+      // Shift+Enter that pretext's normal-whitespace layout collapses. pretext's line count is the
+      // fallback for headless paths (PDF export, thumbnails, before the first render frame).
       const domHeight = this.measureDomTextHeight();
       const textHeight =
         domHeight > 0 ? domHeight : this._cachedLines.length * lineHeight;

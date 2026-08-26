@@ -8,10 +8,7 @@ export interface ExportProgress {
   name: string;
 }
 
-/**
- * One file the Rust side writes: a note's serialized {@link text}, or a local
- * source path to {@link copyFrom} for media stored on disk.
- */
+/** A note's serialized {@link text}, or a local source path to {@link copyFrom} for media on disk. */
 export interface VaultFileEntry {
   relPath: string;
   text?: string;
@@ -62,11 +59,8 @@ export function dedupeName(fileName: string, used: Set<string>): string {
   return candidate;
 }
 
-/**
- * Recursively walk the workspace, recording every folder and file as a flat
- * export plan. Note files (canvas documents) are given {@link noteExtension};
- * other files keep their original name to be copied verbatim.
- */
+// Note files (canvas documents) are given {@link noteExtension}; other files keep their original
+// name to be copied verbatim.
 export async function planFolder(
   repository: ReadableRepository,
   folderId: VFSNodeId | null,

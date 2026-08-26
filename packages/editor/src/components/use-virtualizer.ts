@@ -19,7 +19,6 @@ interface UseVirtualizerOptions {
   scrollRef: RefObject<HTMLElement | null>;
   /** The sized, `position: relative` element that wraps the rows. */
   containerRef: RefObject<HTMLElement | null>;
-  /** Number of rows. */
   count: number;
   /** Resolved height of a row, in pixels (measured or estimated). */
   rowHeight: (index: number) => number;
@@ -28,9 +27,8 @@ interface UseVirtualizerOptions {
   /** Returns the lowest row index whose height changed since the last call (or
    *  Infinity). Lets offsets rebuild from that index instead of from scratch. */
   consumeDirtyFrom: () => number;
-  /** Optional token identifying how `rowHeight` maps indices to heights. When it
-   *  changes, every row may have re-interpreted (e.g. a grid's column count
-   *  changing which items share a row), forcing a full offsets rebuild. */
+  /** Bump when `rowHeight`'s index→height mapping changes wholesale (e.g. a grid's column count),
+   *  forcing a full offsets rebuild. */
   layoutKey?: unknown;
   /** Vertical gap between rows, in pixels. */
   gap: number;
@@ -65,14 +63,10 @@ function findRowAt(offsets: number[], target: number): number {
 }
 
 /**
- * Windowing core: given a row count and per-row heights, resolves which rows
- * intersect the scroll viewport (plus overscan) and where each sits. Holds no
- * measurement logic — callers supply `rowHeight` and bump `heightsVersion`
- * when a height changes (see {@link useMeasuredHeights}).
- *
- * The scroll container may be any ancestor: the list's offset within it is
- * derived from live bounding rects, so unrelated content above the list
- * (headers, etc.) is accounted for automatically.
+ * Windowing core: resolves which rows intersect the scroll viewport (plus overscan) and where
+ * each sits. Holds no measurement logic — callers supply `rowHeight` and bump `heightsVersion`
+ * (see {@link useMeasuredHeights}). The scroll container may be any ancestor; the list's offset
+ * within it is derived from live bounding rects.
  */
 export function useVirtualizer({
   scrollRef,
@@ -94,12 +88,9 @@ export function useVirtualizer({
   const builtLayoutKeyRef = useRef(layoutKey);
   const [range, setRange] = useState({ start: 0, end: 0 });
 
-  // Offsets are a prefix sum of row heights. Rebuilding the whole array on every
-  // append or measurement is O(count) per frame, which tanks streaming/scroll
-  // for long lists, so we rebuild only from the lowest index that changed:
-  // appended rows (>= the previously built count) and any row the measurement
-  // cache reports dirty. The array is mutated in place — `heightsVersion` is the
-  // signal that its values changed (see the range/virtualRows deps below).
+  // Offsets are a prefix sum. Rebuilding the whole array per append/measurement is O(count) every
+  // frame, so rebuild only from the lowest changed index. The array is mutated in place —
+  // `heightsVersion` is the signal that its values changed.
   // biome-ignore lint/correctness/useExhaustiveDependencies: heightsVersion retriggers this after heights change; consumeDirtyFrom is read, not depended on
   const { offsets, totalHeight } = useMemo(() => {
     const arr = offsetsRef.current;
@@ -128,8 +119,7 @@ export function useVirtualizer({
     return { offsets: arr, totalHeight: count > 0 ? y - gap : 0 };
   }, [count, gap, layoutKey, heightsVersion]);
 
-  // `offsets` is mutated in place, so its identity is stable; `heightsVersion`
-  // signals its values moved and the range may need recomputing.
+  // `offsets` is mutated in place, so its identity is stable.
   // biome-ignore lint/correctness/useExhaustiveDependencies: heightsVersion stands in for offsets' mutated contents
   const recomputeRange = useCallback(() => {
     const frame = scrollRef.current;
@@ -166,16 +156,10 @@ export function useVirtualizer({
     pinnedIndex,
   ]);
 
-  // Subscribe once to scroll and viewport resize. The frame is a stable
-  // ancestor, so we read the latest recompute via a ref instead of
-  // re-subscribing whenever the layout changes.
-  //
-  // This must be a passive effect, not a layout effect: when the scroll frame
-  // is an ancestor that mounts in the same commit as this list (e.g. the list's
-  // own parent), React attaches refs child-first, so `scrollRef.current` is
-  // still null during layout effects and the subscription would silently never
-  // attach. Passive effects run after the whole commit, by which point every
-  // ref is set.
+  // Subscribe once; read the latest recompute via a ref instead of re-subscribing on layout change.
+  // Must be a passive effect, not a layout effect: when the scroll frame is an ancestor mounting in
+  // the same commit, React attaches refs child-first, so `scrollRef.current` is still null during
+  // layout effects and the subscription would silently never attach.
   const recomputeRef = useRef(recomputeRange);
   recomputeRef.current = recomputeRange;
   useEffect(() => {
@@ -210,9 +194,8 @@ export function useVirtualizer({
     };
   }, [scrollRef]);
 
-  // Recompute the window whenever the layout or inputs change. This also fires
-  // right after the container first mounts (offsets/count change then) and
-  // after rows are measured, all before paint to avoid a flash.
+  // Also fires right after the container first mounts and after rows are measured, both before
+  // paint to avoid a flash.
   useLayoutEffect(() => {
     recomputeRange();
   }, [recomputeRange]);
@@ -234,13 +217,9 @@ export function useVirtualizer({
     [scrollRef, containerRef],
   );
 
-  // `offsets` is mutated in place, so its identity is stable; `heightsVersion`
-  // stands in for its mutated contents (so does `count`-driven rebuilds).
   // biome-ignore lint/correctness/useExhaustiveDependencies: heightsVersion signals offsets' values changed
   const virtualRows = useMemo(() => {
-    // `range` is updated in an effect after render, so it can briefly lag a
-    // shrunk `count` (e.g. a re-run that clears the list). Clamp to `count` so
-    // we never emit an index past the current rows.
+    // `range` is updated in an effect after render, so it can briefly lag a shrunk `count`.
     const rows: VirtualRow[] = [];
     const start = Math.min(range.start, count);
     const end = Math.min(range.end, count);

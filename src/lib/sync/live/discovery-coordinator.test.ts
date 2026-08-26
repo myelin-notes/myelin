@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { TransportEvents } from '@myelin/editor/sync/live/transport';
 import type {
   LiveDiscoveryClient,
   LiveDiscoveryRecord,
@@ -9,7 +10,6 @@ import {
   type LiveDiscoveryTransport,
   LivePeerDiscoveryCoordinator,
 } from './discovery-coordinator';
-import type { TransportEvents } from './transport';
 
 type EventName = keyof TransportEvents;
 

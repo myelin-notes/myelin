@@ -33,7 +33,7 @@ vi.mock('@/lib/sync', () => ({
   useRepository: () => mocks.repository,
 }));
 
-vi.mock('@/lib/thumbnails', () => ({
+vi.mock('@myelin/editor/thumbnails', () => ({
   regenerateThumbnailNow: mocks.regenerateThumbnailNow,
   requestThumbnailRegeneration: mocks.requestThumbnailRegeneration,
 }));

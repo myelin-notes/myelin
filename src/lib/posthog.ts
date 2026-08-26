@@ -1,23 +1,19 @@
 import posthog from 'posthog-js';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { MODE, POSTHOG_HOST, POSTHOG_KEY } from '@/lib/env';
-import { UserPrefs } from '@/lib/user-prefs';
 
 let initialized = false;
 
-// Initialize PostHog for the desktop app. Autocapture, pageviews, and session
-// recording stay off; we capture unhandled exceptions, the manual error reports
-// forwarded from the logger, and explicit product events (see analytics.ts).
-// All capture is gated behind the `analyticsEnabled` setting via PostHog's
-// opt-in/opt-out, so turning analytics off stops error reporting too. No-ops
-// when no project key is configured.
+// Autocapture, pageviews and session recording stay off; only unhandled exceptions, logger-
+// forwarded error reports, and explicit product events (see analytics.ts) are captured. All capture
+// is gated behind the `analyticsEnabled` setting, so turning analytics off stops error reporting too.
 export function initErrorTracking(): void {
   applyAnalyticsConsent(UserPrefs.get('analyticsEnabled'));
   UserPrefs.subscribe('analyticsEnabled', applyAnalyticsConsent);
 }
 
-// `posthog.init` fetches remote config over the network, which is a request the
-// user's IP rides on, so it is deferred until consent rather than run at boot.
-// Granting consent later in Settings initializes it at that point.
+// `posthog.init` fetches remote config over the network, a request the user's IP rides on, so it
+// is deferred until consent rather than run at boot.
 function ensureInitialized(): boolean {
   if (initialized) {
     return true;
@@ -40,10 +36,8 @@ function ensureInitialized(): boolean {
   return true;
 }
 
-// Mirror the analytics setting onto PostHog. Opting out disables every kind of
-// capture — product events and automatic exception reporting alike — so the
-// setting governs error tracking as well. `captureEventName: false` keeps the
-// opt-in from emitting its own event.
+// Opting out disables every kind of capture — product events and automatic exception reporting
+// alike. `captureEventName: false` keeps the opt-in from emitting its own event.
 function applyAnalyticsConsent(enabled: boolean): void {
   if (!enabled) {
     if (initialized) {

@@ -778,7 +778,7 @@ const es: typeof en = {
     },
     toolbar: {
       clickForOptions: 'clic para opciones',
-      customizeWheel: 'Personalizar rueda',
+      customizeWheel: 'Herramientas y ajustes',
       insert: 'Insertar',
     },
     selectionToolbar: {
@@ -831,8 +831,22 @@ const es: typeof en = {
       transcriptionFailed: 'No se pudo transcribir',
     },
     toolShelf: {
-      title: 'Menú de herramientas',
+      title: 'Herramientas y ajustes',
       empty: 'Rueda desactivada; el clic derecho no la abrirá.',
+      tools: 'Herramientas',
+      presets: 'Ajustes',
+    },
+    toolPresets: {
+      label: (tool: string, size: number) => `${tool} · ${size} px`,
+      save: 'Guardar el lápiz actual',
+      saveShort: 'Guardar ajuste',
+      saveNeedsPen: 'Elige primero el lápiz o el marcador.',
+      saveFull: (max: number) => `Ajustes al límite: ${max} de ${max}.`,
+      wheelFull: (max: number) => `Rueda al límite: ${max} de ${max}.`,
+      updateToCurrent: 'Actualizar al actual',
+      showInWheel: 'Mostrar en la rueda',
+      removeFromWheel: 'Quitar de la rueda',
+      delete: 'Eliminar ajuste',
     },
     tools: {
       select: 'Seleccionar',
@@ -854,6 +868,7 @@ const es: typeof en = {
       medium: (value: number) => `Medio (${value})`,
       bold: (value: number) => `Grueso (${value})`,
       addCustomColor: 'Añadir color personalizado',
+      deleteColor: 'Eliminar color',
       decreaseFontSize: 'Reducir tamaño de fuente',
       increaseFontSize: 'Aumentar tamaño de fuente',
     },

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { UserPrefs } from '@/lib/user-prefs';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { createCredentialVault } from './credential-vault';
 
 interface FakeSnapshot {

@@ -1,7 +1,6 @@
 /**
- * Context passed to a canvas element while harvesting it into the display list for
- * the PDF-element overlay. Elements emit native draw commands (text/path/image)
- * positioned in the current page's PDF-point space.
+ * Context passed to a canvas element while harvesting it into the display list for the PDF-element
+ * overlay. Elements emit native draw commands positioned in the current page's PDF-point space.
  */
 
 import type { PageItem } from './contract';
@@ -15,17 +14,11 @@ export interface PdfHarvestContext {
   push(item: PageItem): void;
   /** Register a base64-encoded PNG, returns its `imageRef` index. */
   addImageBase64(pngBase64: string): number;
-  /**
-   * Register base64-encoded TTF/OTF bytes, returns the index for a
-   * `{ custom }` font ref. Identical payloads are deduped.
-   */
+  /** Returns the index for a `{ custom }` font ref. Identical payloads are deduped. */
   addFontBase64(fontB64: string): number;
 }
 
-/**
- * Build an `addFontBase64` backed by `fontsB64`. Fonts repeat across every
- * text element of the same family (unlike images), so entries are deduped.
- */
+// Fonts repeat across every text element of the same family (unlike images), so entries are deduped.
 export function createFontTable(fontsB64: string[]): (b64: string) => number {
   const indexByFont = new Map<string, number>();
   return (b64) => {

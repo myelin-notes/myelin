@@ -97,10 +97,8 @@ function normalizePane(pane: PaneNode): PaneNode {
     return pane.activeTabId === '' ? pane : { ...pane, activeTabId: '' };
   }
 
-  // An empty activeTabId is the intentional home view (see showHome). Preserve
-  // it even while tabs are open, so a pane can show home without closing them —
-  // otherwise this would snap back to the first tab and the home button (and
-  // closing a background tab while on home) would appear to do nothing.
+  // An empty activeTabId is the intentional home view (see showHome). Preserve it even while tabs
+  // are open, or this snaps back to the first tab and the home button appears to do nothing.
   if (pane.activeTabId === '') {
     return pane;
   }
@@ -346,11 +344,8 @@ export function createWindowStateWithTab(tab: Tab): WindowState {
 }
 
 export interface TabControllerOptions {
-  /**
-   * Keep at most one tab per pane: opening a document replaces the pane's
-   * current tab instead of stacking beside it. Set on phone layouts, which have
-   * no tab strip to switch or close with.
-   */
+  // Opening a document replaces the pane's current tab instead of stacking beside it. Set on phone
+  // layouts, which have no tab strip to switch or close with.
   singleTab?: boolean;
 }
 
@@ -360,9 +355,8 @@ export class TabStateController {
   private readonly onEmpty?: () => void;
   private readonly singleTab: boolean;
 
-  // `onEmpty` runs when the last pane is closed, i.e. the window has no tabs
-  // left. The window layer uses it to close the native window. Without it, the
-  // window falls back to a fresh default state (used by tests).
+  // `onEmpty` runs when the last pane is closed. The window layer uses it to close the native
+  // window; without it the window falls back to a fresh default state (used by tests).
   constructor(
     initialState?: WindowState,
     onEmpty?: () => void,
@@ -404,10 +398,9 @@ export class TabStateController {
     const preferredPaneId = paneId ?? state.focusedPaneId;
     const pane =
       findPane(state.layout, preferredPaneId) ?? findFirstPane(state.layout);
-    // When no pane is specified the caller is navigating to a document (link,
-    // command palette, dropped tab), so focus any existing tab anywhere in the
-    // layout to avoid two live editors on the same node. An explicit paneId is
-    // a deliberate placement and stays scoped to that pane.
+    // With no pane specified the caller is navigating to a document (link, command palette, dropped
+    // tab), so focus any existing tab anywhere to avoid two live editors on the same node. An explicit
+    // paneId is a deliberate placement and stays scoped to that pane.
     const match =
       paneId === undefined
         ? findTabByTargetInLayout(state.layout, target)
@@ -466,9 +459,8 @@ export class TabStateController {
     return tab.id;
   }
 
-  // Close every canvas/image tab whose document was deleted. Graph/settings
-  // tabs are not node-backed and are left alone. Panes emptied by this collapse
-  // the same way a manual close does (home pane or, in a tear-off, the window).
+  // Graph/settings tabs are not node-backed and are left alone. Panes emptied by this collapse the
+  // same way a manual close does.
   closeTabsForNodes(nodeIds: Iterable<VFSNodeId>): void {
     const ids = new Set(nodeIds);
     if (ids.size === 0) {
@@ -548,9 +540,8 @@ export class TabStateController {
     });
   }
 
-  // Deactivate the pane's current tab so it falls back to the empty-pane home
-  // view (activeTabId === ''), without closing any tabs. Used by the mobile
-  // layout's library button to reveal the full-page explorer.
+  // Falls back to the empty-pane home view (activeTabId === '') without closing any tabs. Used by
+  // the mobile layout's library button.
   showHome(paneId: PaneId): void {
     const state = this.state;
     const pane = findPane(state.layout, paneId);

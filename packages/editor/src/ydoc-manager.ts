@@ -11,11 +11,9 @@ export type RepositorySyncOrigin = typeof REPOSITORY_SYNC_ORIGIN;
 export const FRAGMENT_SWEEP_ORIGIN = 'fragment-sweep' as const;
 export type FragmentSweepOrigin = typeof FRAGMENT_SWEEP_ORIGIN;
 /**
- * Late async results (e.g. a transcript landing after whisper finishes):
- * synced and persisted like local edits, but kept out of undo history so a
- * Cmd+Z seconds later can't silently revert them. Deleting the element and
- * undoing still restores these fields — undo of a tracked deletion reverts
- * its whole delete-set regardless of which origin wrote the data.
+ * Late async results (e.g. a transcript landing after whisper finishes): synced and persisted like
+ * local edits, but kept out of undo history so a Cmd+Z seconds later can't silently revert them.
+ * Undoing a tracked deletion still restores these fields — it reverts the whole delete-set.
  */
 export const ASYNC_RESULT_ORIGIN = 'async-result' as const;
 export type AsyncResultOrigin = typeof ASYNC_RESULT_ORIGIN;
@@ -27,10 +25,8 @@ export type SyncOrigin =
   | AsyncResultOrigin;
 
 /**
- * Owns a Y.Doc for a single canvas file and provides typed access
- * to its shared types and undo manager.
+ * Owns a Y.Doc for a single canvas file.
  *
- * ## Structure
  * ```
  * Y.Doc
  * ├── Y.Array('elements')      → [ Y.Map, ... ]  per element
@@ -44,10 +40,8 @@ export class YDocManager {
 
   constructor(doc?: Y.Doc) {
     this.doc = doc ?? new Y.Doc();
-    // sweepOrphanPageFrameFragments enumerates root types via the undocumented
-    // `doc.share` internal. Assert its shape up front so a Yjs upgrade that
-    // renames/removes it surfaces loudly here instead of silently turning the
-    // orphan-fragment sweep into a no-op.
+    // sweepOrphanPageFrameFragments enumerates root types via the undocumented `doc.share`. Assert
+    // its shape up front so a Yjs upgrade that renames it fails loudly instead of silently no-oping.
     if (typeof this.doc.share?.keys !== 'function') {
       throw new Error(
         'Yjs internal doc.share is not a Map; orphan-fragment sweep would silently break.',
@@ -60,10 +54,7 @@ export class YDocManager {
     });
   }
 
-  /**
-   * Create a new element Y.Map, populate it, and append to the elements array.
-   * All inside one transaction so the Y.Array observer sees a fully-populated map.
-   */
+  // All in one transaction so the Y.Array observer sees a fully-populated map.
   createElementMap(
     type: ElementType,
     uuid: string,
@@ -81,10 +72,7 @@ export class YDocManager {
     return yMap;
   }
 
-  /**
-   * Insert an element Y.Map at a specific position (for page frames that
-   * need to be at the front).
-   */
+  // For page frames, which need to be at the front.
   insertElementMap(
     position: number,
     type: ElementType,
@@ -111,14 +99,9 @@ export class YDocManager {
     }, LOCAL_ORIGIN);
   }
 
-  /**
-   * Remove an element's Y.Map from the elements array.
-   *
-   * For PAGE_FRAME elements, also clears the matching `pf-<uuid>` fragment
-   * so the deleted page's ProseMirror content does not linger in the doc.
-   * The fragment is pulled into the UndoManager scope first so an undo of
-   * the deletion restores both the element and its content.
-   */
+  // For PAGE_FRAME elements this also clears the matching `pf-<uuid>` fragment so the deleted
+  // page's content doesn't linger. The fragment is pulled into the UndoManager scope first, so an
+  // undo of the deletion restores both the element and its content.
   removeElementMap(yMap: Y.Map<unknown>): void {
     this.doc.transact(() => {
       for (let i = 0; i < this.elements.length; i++) {
@@ -140,12 +123,8 @@ export class YDocManager {
     }, LOCAL_ORIGIN);
   }
 
-  /**
-   * Get or create the Y.XmlFragment for a PageFrame's ProseMirror content.
-   *
-   * The fragment key uses the element's stable uuid, so page content stays
-   * attached across reordering and deletion of other elements.
-   */
+  // Keyed on the element's stable uuid, so page content stays attached across reordering and
+  // deletion of other elements.
   getXmlFragment(elementUuid: string): Y.XmlFragment {
     return this.doc.getXmlFragment(`pf-${elementUuid}`);
   }
@@ -155,16 +134,9 @@ export class YDocManager {
     this.doc.transact(fn, LOCAL_ORIGIN);
   }
 
-  /**
-   * Clear `pf-<uuid>` XML fragments whose uuid no longer matches a live page
-   * frame in the elements array. Concurrent edit-while-delete races can leave
-   * items in a fragment that the deleter's delete-set never covered; this
-   * mops them up so they don't accumulate in the persisted doc.
-   *
-   * Runs under {@link FRAGMENT_SWEEP_ORIGIN} so the cleared content is not
-   * captured by the canvas UndoManager (orphan content has no element to
-   * restore it onto). Returns the number of fragments cleared.
-   */
+  // Concurrent edit-while-delete races can leave items in a fragment that the deleter's delete-set
+  // never covered. Runs under {@link FRAGMENT_SWEEP_ORIGIN} so the cleared content isn't captured
+  // by the UndoManager (orphan content has no element to restore onto). Returns fragments cleared.
   sweepOrphanPageFrameFragments(): number {
     const liveUuids = new Set<string>();
     for (let i = 0; i < this.elements.length; i++) {
@@ -179,9 +151,7 @@ export class YDocManager {
 
     let cleared = 0;
     this.doc.transact(() => {
-      // `doc.share` is a Yjs internal (not part of the documented API). If a
-      // future Yjs upgrade renames or removes it, the sweep silently becomes a
-      // no-op — there's no public way to enumerate root types today.
+      // `doc.share` is a Yjs internal — there's no public way to enumerate root types today.
       for (const key of this.doc.share.keys()) {
         if (!key.startsWith('pf-')) {
           continue;
@@ -200,7 +170,6 @@ export class YDocManager {
     return cleared;
   }
 
-  /** Encode the full document state for persistence. */
   encodeState(): Uint8Array {
     return Y.encodeStateAsUpdate(this.doc);
   }
@@ -217,12 +186,10 @@ export class YDocManager {
       : Y.encodeStateAsUpdate(this.doc);
   }
 
-  /** Apply a remote or external Yjs update to this document. */
   applyUpdate(update: Uint8Array, origin?: unknown): void {
     Y.applyUpdate(this.doc, update, origin);
   }
 
-  /** Create a YDocManager from a persisted state. */
   static fromUpdate(bytes: Uint8Array): YDocManager {
     const doc = new Y.Doc();
     Y.applyUpdate(doc, bytes);

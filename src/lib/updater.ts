@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react';
+import { Logger } from '@myelin/shared/logger';
 import { getVersion } from '@tauri-apps/api/app';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { IS_DEV, MOBILE_PLATFORM } from '@/lib/env';
-import { Logger } from '@/lib/logger';
 
 const logger = new Logger('Updater');
 
-/**
- * Ask the stable channel for a newer release. Desktop-only: the updater and
- * process plugins are registered under #[cfg(desktop)], so there is nothing to
- * call on mobile.
- */
+// Desktop-only: the updater and process plugins are registered under #[cfg(desktop)], so there is
+// nothing to call on mobile.
 export async function checkForUpdate(): Promise<Update | null> {
   if (MOBILE_PLATFORM !== null) {
     return null;
@@ -53,17 +50,13 @@ export function useUpdate(): Update | null {
 
 let inFlight: Promise<void> | null = null;
 
-/**
- * Download and install `update`, reporting download progress as a 0-1
- * fraction, then relaunch into it.
- */
 export function installUpdate(
   update: Update,
   onProgress: (fraction: number) => void,
 ): Promise<void> {
-  // The download outlives the button, which unmounts whenever the top-right
-  // tab bar changes identity (splitting or closing a pane). Sharing the
-  // in-flight promise keeps a remount from starting a second download.
+  // The download outlives the button, which unmounts whenever the top-right tab bar changes identity
+  // (splitting or closing a pane). Sharing the in-flight promise keeps a remount from starting a
+  // second download.
   inFlight ??= download(update, onProgress);
   return inFlight;
 }

@@ -1,5 +1,10 @@
 import { ChevronDown } from 'lucide-react';
 import {
+  localeLabels,
+  type SupportedLocale,
+  useI18n,
+} from '@myelin/editor/i18n';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
@@ -7,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { trackEvent } from '@/lib/analytics';
-import { localeLabels, type SupportedLocale, useI18n } from '@/lib/i18n';
 import { useUserPref } from '@/lib/use-user-pref';
 
 /** Language dropdown, shared by the settings section and first-run onboarding. */

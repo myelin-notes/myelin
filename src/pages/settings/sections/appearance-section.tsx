@@ -1,11 +1,11 @@
 import { type ComponentType, useState } from 'react';
 import { Check, Monitor, Moon, Sun } from 'lucide-react';
 import { ColorPickerDialog } from '@myelin/editor/components/color-picker-dialog';
-import { useMessages } from '@/lib/i18n';
+import { useMessages } from '@myelin/editor/i18n';
+import type { UserPrefValue } from '@myelin/editor/user-prefs';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { cn } from '@myelin/editor/utils';
 import { useUserPref } from '@/lib/use-user-pref';
-import type { UserPrefValue } from '@/lib/user-prefs';
-import { UserPrefs } from '@/lib/user-prefs';
-import { cn } from '@/lib/utils';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
 
 type CanvasBg = 'grid' | 'dots' | 'blank';

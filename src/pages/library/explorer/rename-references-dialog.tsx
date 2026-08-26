@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useMessages } from '@myelin/editor/i18n';
+import { Button } from '@myelin/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
@@ -9,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useMessages } from '@/lib/i18n';
 import type {
   RenameReferencesChoice,
   RenameReferencesPrompt,

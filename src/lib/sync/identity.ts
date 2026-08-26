@@ -1,4 +1,4 @@
-import { UserPrefs } from '../user-prefs';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 
 function createPeerId(): string {
   if (

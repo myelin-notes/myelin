@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutGrid, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatRelativeTime } from '@myelin/editor/i18n/format';
+import { Logger } from '@myelin/shared/logger';
+import { Button } from '@myelin/ui/button';
 import { errorDescription } from '@/components/command-palette/utils';
-import { Button } from '@/components/ui/button';
 import { trackEvent } from '@/lib/analytics';
-import { useLocale, useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import { openNote } from '@/lib/note/navigation';
 import {

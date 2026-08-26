@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Logger } from '@/lib/logger';
+import { Logger } from '@myelin/shared/logger';
 import { useRepository } from '@/lib/sync';
 
 const logger = new Logger('ExplorerDropTarget');

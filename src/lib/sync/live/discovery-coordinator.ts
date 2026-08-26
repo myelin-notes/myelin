@@ -1,14 +1,17 @@
-import { Logger } from '@/lib/logger';
-import type { VFSNodeId } from '../types';
+import type {
+  LiveDiscoveryTransport,
+  Transport,
+} from '@myelin/editor/sync/live/transport';
+import type { VFSNodeId } from '@myelin/editor/sync/types';
+import { Logger } from '@myelin/shared/logger';
 import {
   createLiveDiscoveryRecordInput,
   LIVE_DISCOVERY_RECORD_TTL_MS,
   type LiveDiscoveryClient,
   type LiveDiscoveryRecord,
 } from './discovery';
-import type { LiveDiscoveryTransport, Transport } from './transport';
 
-export type { LiveDiscoveryTransport } from './transport';
+export type { LiveDiscoveryTransport } from '@myelin/editor/sync/live/transport';
 
 const INITIAL_POLL_INTERVAL_MS = 2_000;
 const MAX_POLL_INTERVAL_MS = 60_000;

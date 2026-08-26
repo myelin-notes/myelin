@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import { useMessages } from '@myelin/editor/i18n';
+import { Logger } from '@myelin/shared/logger';
 import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   ensureGoogleDriveFolder,
@@ -19,12 +19,10 @@ export interface GoogleDriveFolderState {
 }
 
 /**
- * Keeps `folderId` in step with `folderName`. Under the `drive.file` scope the
- * app cannot browse the user's existing folders, so there is nothing to pick
- * from: the folder is created on demand and found again by name. Resolving it
- * writes to Drive, so it runs only once a name is committed and the account is
- * connected. Once an id exists, a new name renames that folder rather than
- * resolving a different one.
+ * Keeps `folderId` in step with `folderName`. Under the `drive.file` scope the app cannot browse
+ * existing folders, so the folder is created on demand and found again by name. Resolving it writes
+ * to Drive, so it runs only once a name is committed and the account is connected. Once an id
+ * exists, a new name renames that folder rather than resolving a different one.
  */
 export function useGoogleDriveFolder({
   config,

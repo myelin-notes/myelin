@@ -1,18 +1,22 @@
 import * as Y from 'yjs';
+import type { NoteEmbedding } from '@myelin/editor/platform';
 import {
   createSearchIndex,
   type SearchField,
   type SearchHit,
   type SearchIndex,
 } from '@/lib/search';
-import type { NoteEmbedding } from '@/platform';
 import { addChild, dropNode, getChildIds, removeChild } from './child-index';
+import { MAX_CUSTOM_COLORS, MAX_PEN_PRESETS } from './config';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import type {
+  CustomColorTool,
   FileType,
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  PenPreset,
+  PenPresetTool,
   RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
@@ -28,8 +32,9 @@ export interface VFSManifest {
   version: number;
   nodes: Record<string, VFSNode>;
   linksBySource: Record<VFSNodeId, StoredNoteLink[]>;
-  customColors: string[];
+  colors: Record<CustomColorTool, string[]>;
   tagRegistry: string[];
+  penPresets: PenPreset[];
 }
 
 export interface RepositorySnapshot {
@@ -37,9 +42,15 @@ export interface RepositorySnapshot {
   notes: Record<VFSNodeId, Uint8Array | null>;
 }
 
+export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
+  'pen',
+  'highlighter',
+  'text',
+];
+
 // 2 dropped the `children` arrays: parentage is stored only as `node.parentId`,
 // and the adjacency index is derived at runtime by `./child-index`.
-export const CURRENT_MANIFEST_VERSION = 2;
+export const CURRENT_MANIFEST_VERSION = 3;
 export const MANIFEST_PATH = 'manifest.json';
 export const FILES_DIR = 'files';
 export const FILE_EXT = '.myelin';
@@ -51,8 +62,9 @@ export function createEmptyManifest(): VFSManifest {
     version: CURRENT_MANIFEST_VERSION,
     nodes: {},
     linksBySource: {},
-    customColors: [],
+    colors: { pen: [], highlighter: [], text: [] },
     tagRegistry: [],
+    penPresets: [],
   };
 }
 
@@ -60,18 +72,78 @@ export function migrate(manifest: VFSManifest): void {
   // Fields added after the initial schema are absent from manifests written by
   // older builds; default them so read paths don't spread `undefined`.
   manifest.tagRegistry ??= [];
-  manifest.customColors ??= [];
-
-  if (manifest.version < CURRENT_MANIFEST_VERSION) {
-    // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest
-    // round-trips unknown keys back to disk on every save. `JSON.stringify`
-    // omits undefined-valued keys, so this drops them from the next write.
+  manifest.penPresets = sanitizePenPresets(manifest.penPresets);
+  if (manifest.version < 2) {
+    // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest round-trips unknown
+    // keys back to disk on every save; `JSON.stringify` omits undefined-valued keys.
     (manifest as VFSManifest & { children?: undefined }).children = undefined;
     for (const node of Object.values(manifest.nodes)) {
       (node as VFSNode & { children?: undefined }).children = undefined;
     }
-    manifest.version = CURRENT_MANIFEST_VERSION;
+    manifest.version = 2;
   }
+
+  const legacyManifest = manifest as VFSManifest & {
+    customColors?: string[];
+  };
+  if (manifest.version < 3) {
+    manifest.colors = {
+      pen: (legacyManifest.customColors ?? []).slice(0, MAX_CUSTOM_COLORS),
+      highlighter: [],
+      text: [],
+    };
+    legacyManifest.customColors = undefined;
+    manifest.version = 3;
+  }
+  manifest.colors = {
+    pen: manifest.colors?.pen ?? [],
+    highlighter: manifest.colors?.highlighter ?? [],
+    text: manifest.colors?.text ?? [],
+  };
+}
+
+// Mirrors the pen and highlighter size options; a manifest can outlive the build that wrote it, so
+// the bounds are restated here rather than imported from the tools.
+const PEN_PRESET_SIZE_RANGE: Record<PenPresetTool, [number, number]> = {
+  pen: [1, 40],
+  highlighter: [12, 60],
+};
+
+/**
+ * Presets arrive from another device and possibly another build, so entries are validated rather
+ * than defaulted: anything unrecognised is dropped and out-of-range sizes are clamped.
+ */
+function sanitizePenPresets(presets: PenPreset[] | undefined): PenPreset[] {
+  if (!Array.isArray(presets)) {
+    return [];
+  }
+  const sane: PenPreset[] = [];
+  for (const entry of presets) {
+    const range = PEN_PRESET_SIZE_RANGE[entry?.tool];
+    const color =
+      typeof entry?.color === 'string'
+        ? normalizeCustomColor(entry.color)
+        : null;
+    if (
+      !range ||
+      !color ||
+      typeof entry.id !== 'string' ||
+      !Number.isFinite(entry.size)
+    ) {
+      continue;
+    }
+    sane.push({
+      id: entry.id,
+      tool: entry.tool,
+      color,
+      size: Math.min(Math.max(entry.size, range[0]), range[1]),
+      inWheel: entry.inWheel === true,
+    });
+    if (sane.length === MAX_PEN_PRESETS) {
+      break;
+    }
+  }
+  return sane;
 }
 
 export function createNodeId(): string {
@@ -289,12 +361,8 @@ function nodeSearchFields(
   ];
 }
 
-/**
- * Build a reusable lexical search index over the manifest's non-system nodes.
- * Callers that search repeatedly (search-as-you-type) should build this once and
- * reuse it rather than rebuilding the MiniSearch index — which tokenizes every
- * node's name, tags, and full indexed content — on every query.
- */
+// Callers that search repeatedly (search-as-you-type) should build this once rather than
+// re-tokenizing every node's name, tags and indexed content on each query.
 export function createNodeSearchIndex(
   manifest: VFSManifest,
   indexContent?: ReadonlyMap<VFSNodeId, string>,
@@ -306,10 +374,7 @@ export function createNodeSearchIndex(
   });
 }
 
-/**
- * Build a short snippet around the first query term that matched a node's
- * indexed content. Returns null when the match came only from name/tags.
- */
+// Returns null when the match came only from name/tags.
 function buildContentSnippet(
   content: string | undefined,
   hit: SearchHit<VFSNode>,
@@ -464,10 +529,7 @@ export function getNodesByAnyTag(
   );
 }
 
-/**
- * Whether `node` lives anywhere inside `folderId`'s subtree. A null `folderId`
- * means the repository root, so every node qualifies.
- */
+// A null `folderId` means the repository root, so every node qualifies.
 function isNodeWithinFolder(
   manifest: VFSManifest,
   node: VFSNode,
@@ -569,12 +631,9 @@ export function getRecentFiles(
     .slice(0, limit);
 }
 
-/**
- * A user file node that may be offered to the index engine. The engine (Rust
- * `IndexProvider::applies_to`) is the authority on which file types actually get
- * indexed; here we only exclude system nodes (e.g. version-history snapshots),
- * which the engine has no way to recognize from a path + file type alone.
- */
+// The engine (Rust `IndexProvider::applies_to`) is the authority on which file types get indexed;
+// this only excludes system nodes (e.g. version-history snapshots), which the engine can't
+// recognize from a path + file type alone.
 export function isIndexCandidateFileNode(
   node: VFSNode | null | undefined,
 ): node is VFSFileNode {

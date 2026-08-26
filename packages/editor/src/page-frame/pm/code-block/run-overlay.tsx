@@ -20,17 +20,15 @@ const ESTIMATED_LINE_HEIGHT = 18;
 /** Treat the body as "at the bottom" within this many px (tail-follow). */
 const STICK_THRESHOLD = 4;
 
-// Stable identities: the virtualizer keys its memoized layout off these, so
-// passing fresh closures each render would force an O(line count) rebuild on
-// every scroll frame.
+// Stable identities: the virtualizer keys its memoized layout off these, so fresh closures each
+// render would force an O(line count) rebuild on every scroll frame.
 const getLineRowKey = (index: number) => String(index);
 const estimateLineHeight = () => ESTIMATED_LINE_HEIGHT;
 
 /**
- * Renders the floating output overlay for every active code run. Anchored to
- * each block in screen space and tracked through canvas pan/zoom via a rAF
- * loop; output lines are windowed with {@link VirtualList} so large output
- * stays cheap. Mounted once in the page-frame DOM layer.
+ * Floating output overlay for every active code run, anchored to each block in screen space and
+ * tracked through canvas pan/zoom via a rAF loop. Output lines are windowed with
+ * {@link VirtualList}. Mounted once in the page-frame DOM layer.
  */
 export function CodeRunOverlayLayer() {
   const entries = useSyncExternalStore(
@@ -74,9 +72,8 @@ function CodeRunOverlay({ entry }: { entry: CodeRunEntry }) {
 
     const width = root.offsetWidth;
     const height = root.offsetHeight;
-    // Each layout leaves an empty canvas band opposite its stacking axis:
-    // vertical/continuous stack downward (room on the side), horizontal steps
-    // sideways (room below).
+    // Each layout leaves an empty canvas band opposite its stacking axis: vertical/continuous stack
+    // downward (room on the side), horizontal steps sideways (room below).
     const horizontal = layoutOf(entry.view) === 'horizontal';
     let left = horizontal ? rect.left : rect.right + ANCHOR_GAP;
     let top = horizontal ? rect.bottom + ANCHOR_GAP : rect.top;
@@ -109,9 +106,8 @@ function CodeRunOverlay({ entry }: { entry: CodeRunEntry }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Dismiss on pointer-down outside the block and the panel — i.e. when the
-  // block is deselected — mirroring the slash insert panel. Re-running the
-  // block shows it again via codeRunStore.start.
+  // Dismiss when the block is deselected, mirroring the slash insert panel. Re-running the block
+  // shows it again via codeRunStore.start.
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;

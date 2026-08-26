@@ -651,10 +651,9 @@ export interface MemoryGoogleDriveApi {
     text(): Promise<string>;
   }>;
   /**
-   * Runs `callback` just before the next file download resolves. A repository
-   * read is `list metadata` then `download`, and the pre-write revision check
-   * is another `list`, so firing an external write here lands exactly in the
-   * window the conflict retry has to cover.
+   * A repository read is `list metadata` then `download`, and the pre-write revision check is
+   * another `list`, so firing an external write here lands exactly in the window the conflict retry
+   * has to cover.
    */
   beforeNextDownload(callback: () => void | Promise<void>): void;
   /** Answers every request with a rate limit, until reset. */

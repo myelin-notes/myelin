@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { memo } from 'react';
 import { ChevronRight, FileJson, FolderInput, Import } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import {
   Dialog,
   DialogContent,
@@ -8,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useMessages } from '@/lib/i18n';
 import { GoodnotesIcon } from './brand-icons';
 
 interface ImportPickerDialogProps {

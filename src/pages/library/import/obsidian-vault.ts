@@ -1,8 +1,8 @@
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { getPdfPageSizes } from '@myelin/editor/pdf-renderer';
+import { Logger } from '@myelin/shared/logger';
 import { join } from '@tauri-apps/api/path';
 import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
 import {
   type FileType,
   getFileTypeForName,

@@ -2,35 +2,22 @@ import type { ToolId } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 
 /**
- * Which pointers are allowed to draw.
- *
- * - `pen`: the tablet split — a stylus (or mouse) drives the tools, a finger
- *   pans and zooms the canvas.
- * - `touch`: a finger drives the tools too, so the brushes work on a device
- *   with no stylus at all. Panning is left to two fingers.
+ * - `pen`: a stylus (or mouse) drives the tools, a finger pans and zooms.
+ * - `touch`: a finger drives the tools too; panning is left to two fingers.
  * - `auto`: `pen` while a stylus looks connected, `touch` otherwise.
  */
 export type InputMode = 'auto' | 'pen' | 'touch';
 
 export type ResolvedInputMode = 'pen' | 'touch';
 
-/**
- * How long a stylus counts as connected after it was last seen.
- *
- * Nothing in the platform reports a paired stylus — a pointer event from one is
- * the only evidence there is — so `auto` infers presence from recent use, and
- * persists it so the first gesture after a launch behaves like the last one
- * before it rather than reverting to touch until the pen is picked up again.
- */
+// Nothing in the platform reports a paired stylus — a pointer event is the only evidence — so
+// `auto` infers presence from recent use, persisted so the first gesture after a launch behaves
+// like the last one before it.
 const STYLUS_PRESENT_MS = 14 * 24 * 60 * 60 * 1000;
 
 /** A stylus emits hundreds of events a minute; only one of them needs storing. */
 const STYLUS_WRITE_INTERVAL_MS = 60 * 60 * 1000;
 
-/**
- * Resolves what a pointer is allowed to do, from the user's input-mode
- * preference and whether a stylus is around.
- */
 export class InputModeController {
   private _mode: InputMode;
   private _stylusSeenAt: number;
@@ -44,11 +31,8 @@ export class InputModeController {
     });
   }
 
-  /**
-   * Feed every pointer event the canvas sees, so `auto` learns that a stylus
-   * exists. Hover counts: a pen held over the glass has to flip the mode before
-   * it lands, or its first stroke is preceded by a finger that still draws.
-   */
+  // Hover counts: a pen held over the glass has to flip the mode before it lands, or its first
+  // stroke is preceded by a finger that still draws.
   public observe(event: PointerEvent): void {
     if (event.pointerType !== 'pen') {
       return;
@@ -73,13 +57,8 @@ export class InputModeController {
       : 'touch';
   }
 
-  /**
-   * Whether a single finger drives `toolId` instead of panning the canvas.
-   *
-   * Select is excluded on purpose: it has no brush to hand a finger, and its
-   * touch gestures (tap to select, drag a handle, drag a grabbable body) are
-   * already wired up, so one finger is worth more as a pan.
-   */
+  // Select is excluded on purpose: it has no brush to hand a finger, and its touch gestures (tap,
+  // drag a handle, drag a grabbable body) are already wired up, so one finger is worth more as a pan.
   public touchDrivesTool(toolId: ToolId): boolean {
     return this.resolved === 'touch' && toolId !== 'select';
   }

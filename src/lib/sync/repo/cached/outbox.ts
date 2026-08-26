@@ -1,3 +1,4 @@
+import { Logger } from '@myelin/shared/logger';
 import {
   BaseDirectory,
   exists,
@@ -5,7 +6,6 @@ import {
   rename,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
 import { ensureDirOnce } from '@/platform/tauri/fs-cache';
 import { createNodeId } from '../shared';
 import type { VFSNodeId } from '../types';
@@ -30,7 +30,8 @@ export type PendingOp =
       queueRevision: string;
     }
   | { kind: 'sync-custom-colors'; queueRevision: string }
-  | { kind: 'sync-tag-registry'; queueRevision: string };
+  | { kind: 'sync-tag-registry'; queueRevision: string }
+  | { kind: 'sync-pen-presets'; queueRevision: string };
 
 export interface DeletedSubtree {
   nodeIds: string[];
@@ -171,6 +172,8 @@ function normalizePendingOp(value: unknown): {
       };
     }
     case 'sync-custom-colors':
+    case 'sync-tag-registry':
+    case 'sync-pen-presets':
       return {
         op: {
           kind,
@@ -296,6 +299,15 @@ export function enqueueCustomColorsSync(ops: PendingOp[]): void {
     touchPendingOp(existing);
   } else {
     ops.push(withQueueRevision({ kind: 'sync-custom-colors' }));
+  }
+}
+
+export function enqueuePenPresetsSync(ops: PendingOp[]): void {
+  const existing = ops.find((op) => op.kind === 'sync-pen-presets');
+  if (existing) {
+    touchPendingOp(existing);
+  } else {
+    ops.push(withQueueRevision({ kind: 'sync-pen-presets' }));
   }
 }
 

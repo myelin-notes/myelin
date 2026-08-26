@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { getPlatform } from '@myelin/editor/platform';
+import { Logger } from '@myelin/shared/logger';
 import { LIVE_DISCOVERY_URL } from '@/lib/env';
-import { Logger } from '@/lib/logger';
 import { registerShutdownTask } from '@/lib/shutdown-tasks';
 import {
   CloudflareLiveDiscoveryClient,
@@ -9,7 +10,6 @@ import {
   useRepositoryStatus,
 } from '@/lib/sync';
 import { LivePeerDiscoveryCoordinator } from '@/lib/sync/live/discovery-coordinator';
-import { getPlatform } from '@/platform';
 
 const logger = new Logger('useLivePeerDiscovery');
 

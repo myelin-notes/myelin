@@ -1,3 +1,4 @@
+import { Logger } from '@myelin/shared/logger';
 import { fetch } from '@tauri-apps/plugin-http';
 import {
   GOOGLE_CLIENT_ID,
@@ -6,7 +7,6 @@ import {
   GOOGLE_CLIENT_SECRET,
   MOBILE_PLATFORM,
 } from '@/lib/env';
-import { Logger } from '@/lib/logger';
 import { createCredentialVault } from './credential-vault';
 import {
   credentialTokenKey,
@@ -31,25 +31,18 @@ const vault = createCredentialVault({
 
 const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-/**
- * Not a restricted scope, so shipping it needs no CASA security assessment. It
- * grants access only to files this app created, which is exactly the
- * app-created-folder model the Drive backend uses.
- */
+// Not a restricted scope, so shipping it needs no CASA security assessment. Grants access only to
+// files this app created, which is the app-created-folder model the Drive backend uses.
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 /** Refresh this far before nominal expiry so an in-flight request never races it. */
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
 
-/**
- * Google's iOS and Android OAuth client types reject the loopback redirect the
- * desktop flow uses, so mobile comes back through the app's custom URI scheme
- * instead, in the single-slash form Google documents for native clients.
- */
+// Google's iOS and Android client types reject the loopback redirect the desktop flow uses, so
+// mobile comes back through the custom URI scheme, in the single-slash form Google documents.
 const MOBILE_REDIRECT_URI = `${MOBILE_REDIRECT_SCHEME}:/oauth2redirect`;
 
-// Google issues a separate client per platform, and each only accepts the
-// redirect style of its own type. Only the Desktop client has a secret: iOS and
-// Android clients are true public clients and Google issues none for them.
+// Google issues a separate client per platform, each accepting only its own redirect style. Only
+// the Desktop client has a secret: iOS and Android clients are true public clients.
 const CLIENTS = {
   ios: {
     id: GOOGLE_CLIENT_ID_IOS,
@@ -77,12 +70,8 @@ interface StoredGoogleDriveToken {
   expiresAtMs: number;
 }
 
-/**
- * Client id, plus the secret when the platform's client type has one. Google
- * rejects the token exchange with `invalid_request` if a Desktop client omits
- * its secret, even though PKCE is in play and the docs call the parameter
- * optional, so it is validated up front alongside the id.
- */
+// Google rejects the token exchange with `invalid_request` if a Desktop client omits its secret,
+// even under PKCE where the docs call it optional — so it is validated up front alongside the id.
 function getGoogleClientCredentials(): {
   clientId: string;
   clientSecret: string | null;
@@ -172,11 +161,8 @@ interface GoogleTokenResponse {
   error_description?: string;
 }
 
-/**
- * Google's OAuth endpoints report failures as 4xx with the detail in a JSON
- * body, so a non-2xx status is parsed rather than treated as a transport
- * failure. Returns the parsed body along with the error code, if any.
- */
+// Google's OAuth endpoints report failures as 4xx with the detail in a JSON body, so a non-2xx
+// status is parsed rather than treated as a transport failure.
 async function postTokenRequest(
   entries: Record<string, string>,
 ): Promise<{ payload: GoogleTokenResponse; error: string | null }> {
@@ -230,9 +216,8 @@ function toStoredToken(
   };
 }
 
-// One refresh in flight per credential: a page of Drive calls can find the
-// token expired at the same moment, and Google invalidates the previous access
-// token on each refresh.
+// One refresh in flight per credential: a page of Drive calls can find the token expired at the
+// same moment, and Google invalidates the previous access token on each refresh.
 const pendingRefreshes = new Map<string, Promise<string>>();
 
 async function refreshAccessToken(

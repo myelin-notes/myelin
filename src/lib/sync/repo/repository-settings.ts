@@ -1,6 +1,6 @@
-import { Logger } from '@/lib/logger';
-import { clearAllThumbnails } from '@/lib/thumbnails';
-import { UserPrefs } from '@/lib/user-prefs';
+import { clearAllThumbnails } from '@myelin/editor/thumbnails';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { Logger } from '@myelin/shared/logger';
 import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   DEFAULT_REPOSITORY_CONFIG,

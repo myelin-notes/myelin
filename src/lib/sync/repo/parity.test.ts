@@ -96,8 +96,22 @@ describe('Repository business logic parity', () => {
       await repository.addTag(rawFileId, 'beta');
       await repository.removeTag(rawFileId, 'beta');
       await repository.addTag(rawFileId, 'uni/math');
-      await repository.addCustomColor('#ABCDEF');
+      await repository.addCustomColor('#ABCDEF', 'pen');
+      await repository.addCustomColor('#FACC15', 'highlighter');
+      await repository.addCustomColor('#3B82F6', 'text');
       await repository.addRegistryTags(['alpha', 'orphan']);
+      const [penPreset] = await repository.addPenPreset({
+        tool: 'pen',
+        color: '#ABCDEF',
+        size: 12,
+        inWheel: true,
+      });
+      await repository.addPenPreset({
+        tool: 'highlighter',
+        color: '#FACC15',
+        size: 36,
+        inWheel: false,
+      });
 
       const [rootFolders, rootFiles] = await repository.listDirectory(null);
       const [, docsFiles] = await repository.listDirectory(folderId);
@@ -139,10 +153,29 @@ describe('Repository business logic parity', () => {
       expect(hierarchicalByTag.get('uni')).toBe(
         (await repository.getNodesByAnyTag(['uni'])).length,
       );
-      expect(await repository.getCustomColors()).toEqual(['#abcdef']);
+      expect(await repository.getCustomColors('pen')).toEqual(['#abcdef']);
+      expect(await repository.getCustomColors('highlighter')).toEqual([
+        '#facc15',
+      ]);
+      expect(await repository.getCustomColors('text')).toEqual(['#3b82f6']);
       expect((await repository.getRegistryTags()).sort()).toEqual([
         'alpha',
         'orphan',
+      ]);
+      expect(await repository.getPenPresets()).toEqual([
+        {
+          id: penPreset.id,
+          tool: 'pen',
+          color: '#abcdef',
+          size: 12,
+          inWheel: true,
+        },
+        expect.objectContaining({
+          tool: 'highlighter',
+          color: '#facc15',
+          size: 36,
+          inWheel: false,
+        }),
       ]);
       expect(
         Array.from((await repository.readFileBytes(rawFileId)) ?? []),
@@ -180,14 +213,30 @@ describe('Repository business logic parity', () => {
         ],
       });
 
-      await repository.removeCustomColor('#abcdef');
+      await repository.removeCustomColor('#abcdef', 'pen');
+      await repository.removeCustomColor('#facc15', 'highlighter');
+      await repository.removeCustomColor('#3b82f6', 'text');
       await repository.removeRegistryTag('orphan');
+      await repository.updatePenPreset(penPreset.id, { size: 20 });
+      const remainingPresets = await repository.getPenPresets();
+      await repository.removePenPreset(remainingPresets[1].id);
       await repository.deleteNode(folderId);
 
       expect(await repository.getNode(folderId)).toBeNull();
       expect(await repository.getNode(rawFileId)).toBeNull();
-      expect(await repository.getCustomColors()).toEqual([]);
+      expect(await repository.getCustomColors('pen')).toEqual([]);
+      expect(await repository.getCustomColors('highlighter')).toEqual([]);
+      expect(await repository.getCustomColors('text')).toEqual([]);
       expect(await repository.getRegistryTags()).toEqual(['alpha']);
+      expect(await repository.getPenPresets()).toEqual([
+        {
+          id: penPreset.id,
+          tool: 'pen',
+          color: '#abcdef',
+          size: 20,
+          inWheel: true,
+        },
+      ]);
     });
   }
 });

@@ -1,3 +1,4 @@
+import { Logger } from '@myelin/shared/logger';
 import { join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
@@ -10,7 +11,6 @@ import {
   writeFile,
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
-import { Logger } from '@/lib/logger';
 import { ensureDirOnce, getAppDataDir } from '@/platform/tauri/fs-cache';
 import { BaseRepository } from './base';
 import {
@@ -27,13 +27,9 @@ import type { FileType, RepositoryCapabilities, VFSNodeId } from './types';
 
 const logger = new Logger('LocalRepository');
 
-/**
- * Deliberately just the byte count. This used to run canvas bytes through
- * `summarizeNoteBytes`, which decodes the whole note into a throwaway Y.Doc to
- * count its elements — on both the read and the write of every save, and on the
- * thread that has to paint the next ink frame. A stroke drawn on a large note
- * paid for two full CRDT decodes to fill in a log line production discards.
- */
+// Deliberately just the byte count. This used to run canvas bytes through `summarizeNoteBytes`,
+// which decodes the whole note into a throwaway Y.Doc — on both the read and the write of every
+// save, on the thread that has to paint the next ink frame.
 function summarizeStoredBytes(
   bytes: Uint8Array | null,
 ): Record<string, unknown> {
@@ -285,13 +281,11 @@ export class LocalRepository extends BaseRepository {
   }
 
   /**
-   * Paths here are relative to `BaseDirectory.AppData` and built from app
-   * constants, UUID filenames, and a sanitized storage root, so none of
-   * `join`'s extra behaviour (`..` normalization, verbatim-prefix stripping)
-   * is reachable. Concatenating drops an IPC round trip from every file
-   * operation, which adds up across the per-node loops in import and sync.
-   * `/` is fine on every platform: Tauri's fs scope normalizes separators
-   * before matching, and Win32 accepts it in non-verbatim paths.
+   * Paths here are relative to `BaseDirectory.AppData` and built from app constants, UUID filenames
+   * and a sanitized storage root, so none of `join`'s extra behaviour (`..` normalization,
+   * verbatim-prefix stripping) is reachable. Concatenating drops an IPC round trip from every file
+   * operation, which adds up across the per-node loops in import and sync. `/` is fine everywhere:
+   * Tauri's fs scope normalizes separators before matching, and Win32 accepts it in non-verbatim paths.
    */
   private resolveStoragePath(...segments: string[]): string {
     return [...(this.storageRoot ? [this.storageRoot] : []), ...segments]

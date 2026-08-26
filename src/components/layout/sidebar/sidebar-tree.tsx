@@ -6,8 +6,9 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   type FileType,
@@ -21,7 +22,6 @@ import {
   type VFSNode,
 } from '@/lib/sync';
 import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
-import { cn } from '@/lib/utils';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
 import { buildResultTree, type ResultTreeNode } from './result-tree';
 import { SidebarFileRow, SidebarFolderRow } from './tree-rows';
@@ -239,12 +239,7 @@ export function SidebarTree({
     trimmedQuery,
   ]);
 
-  // Nested tree load (root + expanded) when not in search/filter mode. Also
-  // re-runs when a remote sync lands or any local repository mutation occurs
-  // (create/rename/delete/move/tag/write) — including changes made outside the
-  // sidebar, such as the tab bar creating a file for a new tab. `dataVersion`
-  // is the only refresh signal for local repos, where `lastRemoteSyncAt` stays
-  // null.
+  // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
     if (isFlat) {
@@ -258,8 +253,6 @@ export function SidebarTree({
     repositoryStatus.dataVersion,
   ]);
 
-  // Flat search/filter results, debounced for live typing. Re-runs on the same
-  // change signals as the nested load above.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
     if (!isFlat) {

@@ -8,17 +8,17 @@ import {
   useState,
 } from 'react';
 import { ChevronRight, Hash, Plus, X } from 'lucide-react';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatNumber } from '@myelin/editor/i18n/format';
-import { useLocale, useMessages } from '@/lib/i18n';
-import { Logger } from '@/lib/logger';
+import { UserPrefs } from '@myelin/editor/user-prefs';
+import { cn } from '@myelin/editor/utils';
+import { Logger } from '@myelin/shared/logger';
 import { useRepository } from '@/lib/sync';
 import {
   normalizeTagInput,
   orderTagsHierarchically,
   tagMatchesQuery,
 } from '@/lib/sync/repo/tag-hierarchy';
-import { UserPrefs } from '@/lib/user-prefs';
-import { cn } from '@/lib/utils';
 import { formatSemanticTagAccessibleName } from '@/pages/library/accessibility-labels';
 import { TreeIndentGuides, treeRowPadding } from './indent-guides';
 import { useResizeHandle } from './use-resize-handle';
@@ -39,10 +39,9 @@ interface SidebarTagsProps {
   /** Bumped externally to force a tag-list reload. */
   refreshKey: number;
   /**
-   * 'collapsible' (default): the desktop sidebar's bottom panel with a collapse
-   * toggle and a drag-to-resize handle. 'panel': always-open, fills its
-   * container height with no toggle or resize handle — used as the mobile
-   * library's left tags column.
+   * 'collapsible' (default): the desktop sidebar's bottom panel, with a collapse toggle and a
+   * drag-to-resize handle. 'panel': always open, fills its container height — the mobile library's
+   * left tags column.
    */
   variant?: 'collapsible' | 'panel';
 }

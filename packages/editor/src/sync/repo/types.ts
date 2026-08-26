@@ -5,6 +5,28 @@ import type { FileType } from './file-types';
 export type { VFSNodeId } from '../types';
 export type { FileType } from './file-types';
 
+export type CustomColorTool = 'pen' | 'highlighter' | 'text';
+
+export type PenPresetTool = 'pen' | 'highlighter';
+
+/** A saved pen configuration. `id` is stable across edits and reordering. */
+export interface PenPreset {
+  id: string;
+  tool: PenPresetTool;
+  /** Normalized hex, or the `ADAPTIVE_INK` sentinel. */
+  color: string;
+  size: number;
+  /** Outer-ring membership. Unlike the built-in tools' membership, this syncs. */
+  inWheel: boolean;
+}
+
+/** Partial edit. Absent fields are left as they are. */
+export interface PenPresetChanges {
+  color?: string;
+  size?: number;
+  inWheel?: boolean;
+}
+
 export interface VFSFileNode {
   id: VFSNodeId;
   name: string;
@@ -129,9 +151,8 @@ export interface Repository {
     options?: SearchNodesOptions,
   ): Promise<NodeSearchResult[]>;
   /**
-   * Nodes whose name exactly equals `name`, excluding system nodes. Note-link
-   * resolution needs an exact-title match, not a fuzzy search, so it must not
-   * pay to rebuild a MiniSearch index on every document change.
+   * Exact-name match excluding system nodes. Note-link resolution needs this rather than a fuzzy
+   * search, so it must not pay to rebuild a MiniSearch index on every document change.
    */
   getNodesByName(name: string): Promise<VFSNode[]>;
   /** Candidate notes for the content-index startup backfill. */
@@ -160,10 +181,8 @@ export interface Repository {
     options?: CreateFileOptions,
   ): Promise<VFSNodeId>;
   /**
-   * Runs `fn` with the manifest writes it makes batched onto one manifest and
-   * saved once when `fn` resolves, instead of once per mutation. For additive
-   * bulk work such as imports — no deletes inside. Reads inside `fn` observe the
-   * pending writes.
+   * Batches `fn`'s manifest writes onto one manifest, saved once when `fn` resolves. For additive
+   * bulk work such as imports — no deletes inside. Reads inside `fn` observe the pending writes.
    */
   batchManifestWrites<T>(fn: () => Promise<T>): Promise<T>;
   readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null>;
@@ -184,9 +203,15 @@ export interface Repository {
   /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
   getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;
 
-  getCustomColors(): Promise<string[]>;
-  addCustomColor(color: string): Promise<string[]>;
-  removeCustomColor(color: string): Promise<string[]>;
+  getCustomColors(tool: CustomColorTool): Promise<string[]>;
+  addCustomColor(color: string, tool: CustomColorTool): Promise<string[]>;
+  removeCustomColor(color: string, tool: CustomColorTool): Promise<string[]>;
+
+  getPenPresets(): Promise<PenPreset[]>;
+  /** Throws at `MAX_PEN_PRESETS`; an exact `{tool, color, size}` duplicate is a no-op. */
+  addPenPreset(preset: Omit<PenPreset, 'id'>): Promise<PenPreset[]>;
+  updatePenPreset(id: string, changes: PenPresetChanges): Promise<PenPreset[]>;
+  removePenPreset(id: string): Promise<PenPreset[]>;
 
   getRegistryTags(): Promise<string[]>;
   addRegistryTags(tags: string[]): Promise<string[]>;

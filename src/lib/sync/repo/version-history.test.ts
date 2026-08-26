@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import { getPlatform } from '@/platform';
+import { getPlatform } from '@myelin/editor/platform';
 import {
   createCanvasNoteState,
   getRepositoryTestStorage,

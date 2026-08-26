@@ -1,18 +1,13 @@
 import type { VFSManifest } from './shared';
 
 /**
- * Adjacency index derived from each node's `parentId`.
- *
- * `parentId` is the only stored record of parentage. This index exists purely so
- * listing a folder stays proportional to its children instead of scanning every
- * node, and it is never persisted or synced — two devices cannot disagree about
- * derived state, so a node can no longer be filed under a parent that does not
+ * Adjacency index derived from each node's `parentId`, which is the only stored record of
+ * parentage. Exists so listing a folder stays proportional to its children instead of scanning
+ * every node. Never persisted or synced, so a node can't be filed under a parent that doesn't
  * list it back.
  *
- * The index is built lazily per manifest object, so a freshly parsed or
- * `structuredClone`d manifest simply rebuilds on first read. Callers keep it
- * current through `addChild`/`removeChild`/`dropNode` at the same points that
- * used to splice the parent's `children` array.
+ * Built lazily per manifest object, so a freshly parsed or `structuredClone`d manifest rebuilds on
+ * first read. Callers keep it current through `addChild`/`removeChild`/`dropNode`.
  */
 type ChildIndex = Map<string | null, Set<string>>;
 
@@ -29,9 +24,8 @@ function canHoldChildren(
 function buildIndex(manifest: VFSManifest): ChildIndex {
   const index: ChildIndex = new Map();
   for (const node of Object.values(manifest.nodes)) {
-    // A node whose parent is missing or is a file is unreachable from the root
-    // and stays out of every listing, matching what happened when its parent
-    // simply never gained a `children` entry for it.
+    // A node whose parent is missing or is a file is unreachable from the root and stays out of every
+    // listing.
     if (!canHoldChildren(manifest, node.parentId)) {
       continue;
     }
@@ -54,10 +48,8 @@ function getIndex(manifest: VFSManifest): ChildIndex {
   return index;
 }
 
-/**
- * Ids of the nodes parented to `parentId`, as a snapshot — callers walk subtrees
- * while deleting from the index, which would otherwise mutate under iteration.
- */
+// A snapshot: callers walk subtrees while deleting from the index, which would otherwise mutate
+// under iteration.
 export function getChildIds(
   manifest: VFSManifest,
   parentId: string | null,
@@ -84,13 +76,9 @@ export function addChild(
   bucket.add(childId);
 }
 
-/**
- * Unfiles `childId` from `parentId`, leaving `node.parentId` to the caller.
- *
- * This forces the index to exist first. Callers unfile a node while its
- * `parentId` still names the old parent, so skipping the build would let a
- * later one derive the stale parentage straight back out of the node.
- */
+// Leaves `node.parentId` to the caller. Forces the index to exist first — callers unfile a node
+// while its `parentId` still names the old parent, so skipping the build would let a later one
+// derive the stale parentage straight back out of the node.
 export function removeChild(
   manifest: VFSManifest,
   parentId: string | null,

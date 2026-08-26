@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearAllThumbnails } from '@/lib/thumbnails';
+import { clearAllThumbnails } from '@myelin/editor/thumbnails';
 import { setRepositoryConfig } from './repository-settings';
 
-vi.mock('@/lib/thumbnails', () => ({
+vi.mock('@myelin/editor/thumbnails', () => ({
   clearAllThumbnails: vi.fn(async () => undefined),
 }));
 

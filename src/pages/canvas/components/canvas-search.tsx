@@ -1,7 +1,7 @@
 import { type KeyboardEvent, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import { usePresence } from '@myelin/ui';
-import { useMessages } from '@/lib/i18n';
 import type { CanvasSearchController } from '../search/use-canvas-search';
 
 export function CanvasSearch({
