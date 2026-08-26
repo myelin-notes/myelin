@@ -266,7 +266,7 @@ export function ToolOptionsPanel({
       {savePresetDisabledReason === null && (
         <button
           onClick={onSavePreset}
-          className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-card-active hover:text-text-primary"
+          className="flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-card-active hover:text-text-primary"
         >
           <PlusIcon className="size-3.5" />
           {strings.canvas.toolPresets.saveShort}

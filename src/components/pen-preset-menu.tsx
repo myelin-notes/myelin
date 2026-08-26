@@ -37,7 +37,7 @@ export function PenPresetMenu({
       <ContextMenuContent className="rounded-xl bg-page p-1.5 shadow-ambient">
         {canUpdateToCurrent && (
           <ContextMenuItem
-            className="gap-2.5 rounded-md px-3 py-2 text-sm"
+            className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"
             onClick={onUpdateToCurrent}
           >
             <RefreshCw className="size-4" />
@@ -45,7 +45,7 @@ export function PenPresetMenu({
           </ContextMenuItem>
         )}
         <ContextMenuItem
-          className="gap-2.5 rounded-md px-3 py-2 text-sm"
+          className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"
           onClick={onToggleInWheel}
         >
           {preset.inWheel ? (
