@@ -122,16 +122,11 @@ export function usePageCanvasBindings({
       // A second finger down means the viewport owns the gesture as a pinch,
       // so this also disarms a hold the first finger had started.
       cancelHold();
-      // Button 0 is the pen tip. A pen already erasing off its barrel or its
-      // eraser end doesn't arm the hold: pausing mid-erase is ordinary, and
-      // the wheel would take the gesture away from it. The canvas is asked
-      // rather than the event: on Android the barrel button and the tip share
-      // a bit in `buttons`, so only the canvas knows which is down.
+      // Button 0 is the pen tip.
       const isPen = event.pointerType === 'pen';
       if (
         (!isPen && event.pointerType !== 'touch') ||
         event.button !== 0 ||
-        (isPen && penIsErasing()) ||
         event.shiftKey
       ) {
         return;
@@ -145,6 +140,13 @@ export function usePageCanvasBindings({
       holdTimer = setTimeout(
         () => {
           cancelHold();
+          // Asked here rather than when the hold was armed: a barrel pressed
+          // after the tip landed starts an erase part-way through the wait,
+          // and pausing mid-erase is ordinary — the wheel must not take the
+          // gesture away from it.
+          if (isPen && penIsErasing()) {
+            return;
+          }
           openToolWheel(event);
         },
         isPen ? PEN_HOLD_MS : TOUCH_HOLD_MS,

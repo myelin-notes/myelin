@@ -71,6 +71,22 @@ describe('PalmRejection', () => {
     expect(palm.pointerUp(PEN)).toBe(false);
   });
 
+  it('ends the contact when a stylus lifts under a different id', () => {
+    const palm = new PalmRejection();
+    palm.penDown(PEN, []);
+    palm.pointerUp(PEN + 1, true);
+
+    expect(palm.penContact).toBe(false);
+  });
+
+  it('leaves the contact alone when a finger lifts', () => {
+    const palm = new PalmRejection();
+    palm.penDown(PEN, []);
+    palm.pointerUp(FINGER, false);
+
+    expect(palm.penContact).toBe(true);
+  });
+
   it('stays out of the way of a second stylus contact', () => {
     const palm = new PalmRejection();
     palm.penDown(PEN, []);

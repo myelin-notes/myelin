@@ -19,6 +19,11 @@ export class PalmRejection {
   private penLiftedAt: number = 0;
   private readonly palmIds = new Set<number>();
 
+  /** Whether the stylus is recorded as being on the glass. */
+  public get penContact(): boolean {
+    return this.penPointerId !== null;
+  }
+
   /** Whether touch gestures are currently rejected. */
   public get suppressed(): boolean {
     return (
@@ -61,9 +66,21 @@ export class PalmRejection {
     }
   }
 
-  /** Returns true when the lifted pointer was a rejected palm. */
-  public pointerUp(pointerId: number): boolean {
-    if (pointerId === this.penPointerId) {
+  /**
+   * Returns true when the lifted pointer was a rejected palm.
+   *
+   * Any stylus lifting ends the contact, even under an id that doesn't match
+   * the one that landed. A platform is free to renumber a pointer mid-gesture
+   * — Android does, when a stylus changes tool type part-way through — and
+   * without this the pen would be recorded as still on the glass, leaving
+   * every finger rejected with no way for the user to recover short of another
+   * stylus contact.
+   */
+  public pointerUp(pointerId: number, isPen: boolean = false): boolean {
+    if (
+      pointerId === this.penPointerId ||
+      (isPen && this.penPointerId !== null)
+    ) {
       this.penPointerId = null;
       this.penLiftedAt = Date.now();
     }
