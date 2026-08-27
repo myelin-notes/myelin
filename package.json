@@ -64,7 +64,7 @@
     "katex": "^0.17.0",
     "lucide-react": "^0.577.0",
     "minisearch": "^7.2.0",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "^6.2.108",
     "perfect-freehand": "^1.2.3",
     "posthog-js": "^1.392.0",
     "prosemirror-commands": "^1.7.1",
@@ -98,11 +98,10 @@
     "@vitejs/plugin-react": "^4.6.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "husky": "^9.1.7",
-    "react-devtools": "^7.0.1",
     "react-devtools-core": "^7.0.1",
     "tailwindcss": "^4.2.2",
     "typescript": "~7.0.2",
-    "vite": "^7.3.5",
+    "vite": "^7.3.6",
     "vite-plugin-svgr": "^4.5.0",
     "vitest": "3.2.6"
   }

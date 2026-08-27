@@ -45,11 +45,11 @@ vi.mock('./pdf-chrome-button', () => ({
 }));
 
 function mockOpenedPdf(pageCount: number): {
-  destroy: Mock<() => Promise<void>>;
+  loadingTask: { destroy: Mock<() => Promise<void>> };
 } {
   const document = {
     numPages: pageCount,
-    destroy: vi.fn(async () => {}),
+    loadingTask: { destroy: vi.fn(async () => {}) },
   };
   vi.mocked(openPdfDocument).mockResolvedValueOnce(
     document as unknown as PDFDocumentProxy,
@@ -220,7 +220,7 @@ function createRenderableElement(): TestablePdfElement {
   const element = new PdfElement('pdf-uuid') as unknown as TestablePdfElement;
   element._pdfDocument = {
     numPages: 1,
-    destroy: vi.fn(async () => {}),
+    loadingTask: { destroy: vi.fn(async () => {}) },
   } as unknown as PDFDocumentProxy;
   return element;
 }
@@ -350,7 +350,7 @@ describe('PdfElement metadata loading', () => {
     element.syncFromYMap(['pdfData']);
     await flushPromises();
 
-    expect(initialDocument.destroy).toHaveBeenCalled();
+    expect(initialDocument.loadingTask.destroy).toHaveBeenCalled();
   });
 
   it('does not subscribe to Y.Map changes during binding', async () => {
@@ -612,7 +612,7 @@ function createThumbnailElement(): TestablePdfThumbnail {
   element._layout = null;
   element._pdfDocument = {
     numPages: 2,
-    destroy: vi.fn(async () => {}),
+    loadingTask: { destroy: vi.fn(async () => {}) },
   } as unknown as PDFDocumentProxy;
   return element;
 }
@@ -743,7 +743,7 @@ describe('PdfElement thumbnail rendering', () => {
 
     openPdf({
       numPages: 1,
-      destroy: vi.fn(async () => {}),
+      loadingTask: { destroy: vi.fn(async () => {}) },
     } as unknown as PDFDocumentProxy);
     await prepared;
 
