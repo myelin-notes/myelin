@@ -10,7 +10,7 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: myelin
+      PRODUCT_NAME: Myelin Notes
       PRODUCT_BUNDLE_IDENTIFIER: com.github.wintersteve25.myelin
 targetTemplates:
   app:
@@ -53,6 +53,13 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 0.1.0
         CFBundleVersion: "0.1.0"
+        CFBundleDisplayName: Myelin Notes
+        NSMicrophoneUsageDescription: Record audio notes in Myelin Notes.
+        # OAuth redirect target
+        CFBundleURLTypes:
+          - CFBundleURLName: com.github.wintersteve25.myelin
+            CFBundleTypeRole: Editor
+            CFBundleURLSchemes: [com.github.wintersteve25.myelin]
     entitlements:
       path: myelin_iOS/myelin_iOS.entitlements
     scheme:
@@ -75,6 +82,10 @@ targets:
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
+        DEVELOPMENT_TEAM: P4Z946QP26
+        # ios-build.yml's unsigned path rewrites this exact literal to
+        # CODE_SIGNING_ALLOWED = NO and fails the build if it finds no match.
+        CODE_SIGN_IDENTITY: iPhone Developer
       groups: [app]
     dependencies:
       - framework: libapp.a
