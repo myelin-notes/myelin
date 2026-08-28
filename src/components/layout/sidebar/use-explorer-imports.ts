@@ -23,6 +23,11 @@ import {
 } from '@/pages/library/import/markdown';
 import { createObsidianVaultImportSource } from '@/pages/library/import/obsidian-source';
 import {
+  importOneNoteFile,
+  ONENOTE_DIALOG_FILTERS,
+  oneNoteRootName,
+} from '@/pages/library/import/onenote';
+import {
   importPdfFile,
   isNativeGoodnotesFile,
   isPdfFile,
@@ -37,6 +42,7 @@ export interface ExplorerImports {
   importDisabled: boolean;
   onImportFiles: () => void;
   onImportGoodnotesZip: () => void;
+  onImportOneNote: () => Promise<void>;
   onImportObsidianVault: () => Promise<void>;
   onImportWorkspaceJson: () => Promise<void>;
   storageInputRef: React.RefObject<HTMLInputElement | null>;
@@ -177,6 +183,45 @@ export function useExplorerImports({
     [onChanged, parentId, repository, strings],
   );
 
+  const onImportOneNote = useCallback(async () => {
+    if (importDisabled) {
+      return;
+    }
+    const selected = await openDialog({
+      multiple: false,
+      filters: ONENOTE_DIALOG_FILTERS,
+    });
+    if (!selected || Array.isArray(selected)) {
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await importOneNoteFile({
+        path: selected,
+        repository,
+        parentId,
+        rootName: oneNoteRootName(selected),
+        fallbackTitle: strings.library.createNew.untitledCanvas,
+      });
+      onChanged();
+      trackEvent('import_completed', {
+        import_type: 'onenote',
+        file_count: result.pagesImported,
+        partial_failure: result.skippedPages > 0,
+      });
+      if (result.skippedPages > 0) {
+        toast.info(strings.library.importOneNote.skipped(result.skippedPages));
+      }
+    } catch (error) {
+      toast.error(strings.library.importOneNote.failed, {
+        description: errorDescription(error),
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  }, [importDisabled, onChanged, parentId, repository, strings]);
+
   const handleStorageInputChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.currentTarget.files ?? []);
@@ -270,6 +315,7 @@ export function useExplorerImports({
     importDisabled,
     onImportFiles,
     onImportGoodnotesZip,
+    onImportOneNote,
     onImportObsidianVault,
     onImportWorkspaceJson,
     storageInputRef,

@@ -131,6 +131,11 @@ const en = {
         label: 'Goodnotes ZIP',
         description: 'A Goodnotes folder exported as PDFs.',
       },
+      oneNote: {
+        label: 'OneNote',
+        description:
+          'A .onepkg notebook or .one section exported from OneNote.',
+      },
       obsidianVault: {
         label: 'Obsidian Vault',
         description: 'A vault folder, with its notes and attachments.',
@@ -157,6 +162,11 @@ const en = {
       failed: 'Goodnotes ZIP import failed',
       skipped: (count: number) =>
         `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
+    },
+    importOneNote: {
+      failed: 'OneNote import failed',
+      skipped: (count: number) =>
+        `${count} page${count === 1 ? '' : 's'} could not be imported.`,
     },
     importObsidianVault: {
       failed: 'Obsidian vault import failed',

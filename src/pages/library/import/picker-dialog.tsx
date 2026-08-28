@@ -1,6 +1,12 @@
 import type { ComponentType } from 'react';
 import { memo } from 'react';
-import { ChevronRight, FileJson, FolderInput, Import } from 'lucide-react';
+import {
+  ChevronRight,
+  FileJson,
+  FolderInput,
+  Import,
+  NotebookPen,
+} from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import {
   Dialog,
@@ -16,6 +22,7 @@ interface ImportPickerDialogProps {
   onOpenChange: (open: boolean) => void;
   onImportFiles?: () => void;
   onImportGoodnotesZip?: () => void;
+  onImportOneNote?: () => void;
   onImportObsidianVault?: () => void;
   onImportWorkspaceJson?: () => void;
 }
@@ -25,6 +32,7 @@ export const ImportPickerDialog = memo(function ImportPickerDialog({
   onOpenChange,
   onImportFiles,
   onImportGoodnotesZip,
+  onImportOneNote,
   onImportObsidianVault,
   onImportWorkspaceJson,
 }: ImportPickerDialogProps) {
@@ -50,6 +58,13 @@ export const ImportPickerDialog = memo(function ImportPickerDialog({
       label: strings.goodnotesZip.label,
       description: strings.goodnotesZip.description,
       onSelect: onImportGoodnotesZip,
+    },
+    {
+      key: 'onenote',
+      icon: NotebookPen,
+      label: strings.oneNote.label,
+      description: strings.oneNote.description,
+      onSelect: onImportOneNote,
     },
     {
       key: 'obsidian',

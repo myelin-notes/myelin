@@ -287,6 +287,7 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
             onNewFile={handleNewFile}
             onImportFiles={imports.onImportFiles}
             onImportGoodnotesZip={imports.onImportGoodnotesZip}
+            onImportOneNote={imports.onImportOneNote}
             onImportObsidianVault={imports.onImportObsidianVault}
             onImportWorkspaceJson={imports.onImportWorkspaceJson}
             importDisabled={imports.importDisabled}
