@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -16,6 +17,7 @@ import {
 import { trackEvent } from '@myelin/shared/analytics';
 import { Logger } from '@myelin/shared/logger';
 import { getCanvasPalette, withCanvasAlpha } from '../../canvas-theme';
+import { VirtualList } from '../../components/virtual-list';
 import { useMessages } from '../../i18n';
 import { type AudioTranscriptionSession, getPlatform } from '../../platform';
 import type { TranscriptSegment } from '../../platform/types';
@@ -47,6 +49,9 @@ function formatPeerId(peerId: string): string {
 }
 
 type RecordingState = 'idle' | 'requesting' | 'recording' | 'error';
+
+// Unwrapped row at scale 1: 11px text × 1.5 line-height + 2px padding each side.
+const estimateSegmentRowHeight = () => 21;
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -270,7 +275,6 @@ export function AudioPlayerView({
   const noticeTimerRef = useRef(0);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
-  const activeRowRef = useRef<HTMLDivElement>(null);
   const displaySizeRef = useRef<WaveformDisplaySize | null>(null);
   const disposedRef = useRef(false);
   // One auto-pickup attempt per audio blob per window — a failed run must
@@ -418,21 +422,10 @@ export function AudioPlayerView({
     }
   }, [waveform, currentTime, duration, isRecording]);
 
-  // Keep the playing row in view. Scrolls the panel directly rather than via scrollIntoView, which
-  // would also scroll the canvas host the panel is absolutely positioned in.
-  useLayoutEffect(() => {
-    const container = transcriptRef.current;
-    const row = activeRowRef.current;
-    if (activeIndex < 0 || !followPlayhead || !container || !row) {
-      return;
-    }
-    const rowBottom = row.offsetTop + row.offsetHeight;
-    if (row.offsetTop < container.scrollTop) {
-      container.scrollTop = row.offsetTop;
-    } else if (rowBottom > container.scrollTop + container.clientHeight) {
-      container.scrollTop = rowBottom - container.clientHeight;
-    }
-  }, [followPlayhead, activeIndex]);
+  const getSegmentRowKey = useCallback(
+    (index: number) => String(segments[index].startSeconds),
+    [segments],
+  );
 
   useLayoutEffect(() => {
     const canvas = waveformCanvasRef.current;
@@ -908,26 +901,37 @@ export function AudioPlayerView({
             setFollowPlayhead(false);
           }}
         >
-          {segments.map((segment, index) => (
-            <div
-              key={segment.startSeconds}
-              ref={index === activeIndex ? activeRowRef : undefined}
-              className="canvas-audio-transcript-row"
-              data-active={index === activeIndex}
-            >
-              <button
-                type="button"
-                className="canvas-audio-transcript-time"
-                onClick={() => {
-                  seekTo(segment.startSeconds);
-                }}
-                aria-label={strings.playFrom(formatTime(segment.startSeconds))}
-              >
-                {formatTime(segment.startSeconds)}
-              </button>
-              <span>{segment.text}</span>
-            </div>
-          ))}
+          <VirtualList
+            scrollRef={transcriptRef}
+            count={segments.length}
+            estimateHeight={estimateSegmentRowHeight}
+            getRowKey={getSegmentRowKey}
+            gap={0}
+            pinnedIndex={followPlayhead ? activeIndex : null}
+            renderRow={(index) => {
+              const segment = segments[index];
+              return (
+                <div
+                  className="canvas-audio-transcript-row"
+                  data-active={index === activeIndex}
+                >
+                  <button
+                    type="button"
+                    className="canvas-audio-transcript-time"
+                    onClick={() => {
+                      seekTo(segment.startSeconds);
+                    }}
+                    aria-label={strings.playFrom(
+                      formatTime(segment.startSeconds),
+                    )}
+                  >
+                    {formatTime(segment.startSeconds)}
+                  </button>
+                  <span>{segment.text}</span>
+                </div>
+              );
+            }}
+          />
         </div>
       )}
     </div>
