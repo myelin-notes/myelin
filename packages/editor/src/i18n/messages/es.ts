@@ -134,6 +134,10 @@ const es: typeof en = {
         label: 'ZIP de Goodnotes',
         description: 'Una carpeta de Goodnotes exportada como PDF.',
       },
+      oneNote: {
+        label: 'Sección de OneNote',
+        description: 'Un archivo de sección .one exportado desde OneNote.',
+      },
       obsidianVault: {
         label: 'Bóveda de Obsidian',
         description:
@@ -161,6 +165,13 @@ const es: typeof en = {
       failed: 'No se pudo importar el ZIP de Goodnotes',
       skipped: (count: number) =>
         `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} omitido${count === 1 ? '' : 's'}.`,
+    },
+    importOneNote: {
+      unsupportedFile:
+        'Elige un archivo de sección .one exportado desde OneNote.',
+      failed: 'No se pudo importar desde OneNote',
+      skipped: (count: number) =>
+        `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}.`,
     },
     importObsidianVault: {
       failed: 'No se pudo importar la bóveda de Obsidian',

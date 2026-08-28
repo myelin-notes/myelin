@@ -438,6 +438,7 @@ export function MobileLibrary() {
                     onNewFile={handleNewFile}
                     onImportFiles={imports.onImportFiles}
                     onImportGoodnotesZip={imports.onImportGoodnotesZip}
+                    onImportOneNote={imports.onImportOneNote}
                     onImportObsidianVault={imports.onImportObsidianVault}
                     onImportWorkspaceJson={imports.onImportWorkspaceJson}
                     importDisabled={imports.importDisabled}
@@ -528,6 +529,13 @@ export function MobileLibrary() {
         accept={imports.goodnotesZipInputAccept}
         className="hidden"
         onChange={imports.handleGoodnotesZipInputChange}
+      />
+      <input
+        ref={imports.oneNoteInputRef}
+        type="file"
+        accept={imports.oneNoteInputAccept}
+        className="hidden"
+        onChange={imports.handleOneNoteInputChange}
       />
       {imports.importSource !== null && (
         <ImportDialog

@@ -19,6 +19,7 @@ interface CreateNewDropdownProps {
   onNewFile?: (title: string, type: FileType) => void;
   onImportFiles?: () => void;
   onImportGoodnotesZip?: () => void;
+  onImportOneNote?: () => void;
   onImportObsidianVault?: () => void;
   onImportWorkspaceJson?: () => void;
   importDisabled?: boolean;
@@ -29,6 +30,7 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
   onNewFile,
   onImportFiles,
   onImportGoodnotesZip,
+  onImportOneNote,
   onImportObsidianVault,
   onImportWorkspaceJson,
   importDisabled = false,
@@ -83,6 +85,7 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
         onOpenChange={setPickerOpen}
         onImportFiles={onImportFiles}
         onImportGoodnotesZip={onImportGoodnotesZip}
+        onImportOneNote={onImportOneNote}
         onImportObsidianVault={onImportObsidianVault}
         onImportWorkspaceJson={onImportWorkspaceJson}
       />

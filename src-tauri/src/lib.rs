@@ -7,6 +7,7 @@ mod iroh_transport;
 mod mcp_server;
 mod note_index;
 mod oauth_loopback;
+mod onenote_import;
 mod pdf_export;
 mod transcription;
 mod workspace_export;
@@ -102,6 +103,7 @@ pub fn run() {
             oauth_loopback::oauth_loopback_start,
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
+            onenote_import::parse_onenote_section,
         ]);
 
     #[cfg(debug_assertions)]
