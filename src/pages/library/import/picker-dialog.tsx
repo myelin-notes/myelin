@@ -1,12 +1,5 @@
-import type { ComponentType } from 'react';
 import { memo } from 'react';
-import {
-  ChevronRight,
-  FileJson,
-  FolderInput,
-  Import,
-  NotebookPen,
-} from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import {
   Dialog,
@@ -15,89 +8,39 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { GoodnotesIcon } from './brand-icons';
+import { IMPORT_PROVIDERS, type ImportProviderId } from './providers';
 
 interface ImportPickerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImportFiles?: () => void;
-  onImportGoodnotesZip?: () => void;
-  onImportOneNote?: () => void;
-  onImportObsidianVault?: () => void;
-  onImportWorkspaceJson?: () => void;
+  onSelect: (id: ImportProviderId) => void;
 }
 
 export const ImportPickerDialog = memo(function ImportPickerDialog({
   open,
   onOpenChange,
-  onImportFiles,
-  onImportGoodnotesZip,
-  onImportOneNote,
-  onImportObsidianVault,
-  onImportWorkspaceJson,
+  onSelect,
 }: ImportPickerDialogProps) {
-  const strings = useMessages().library.importPicker;
-
-  const options: {
-    key: string;
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-    description: string;
-    onSelect?: () => void;
-  }[] = [
-    {
-      key: 'files',
-      icon: Import,
-      label: strings.files.label,
-      description: strings.files.description,
-      onSelect: onImportFiles,
-    },
-    {
-      key: 'goodnotes',
-      icon: GoodnotesIcon,
-      label: strings.goodnotesZip.label,
-      description: strings.goodnotesZip.description,
-      onSelect: onImportGoodnotesZip,
-    },
-    {
-      key: 'onenote',
-      icon: NotebookPen,
-      label: strings.oneNote.label,
-      description: strings.oneNote.description,
-      onSelect: onImportOneNote,
-    },
-    {
-      key: 'obsidian',
-      icon: FolderInput,
-      label: strings.obsidianVault.label,
-      description: strings.obsidianVault.description,
-      onSelect: onImportObsidianVault,
-    },
-    {
-      key: 'workspace-json',
-      icon: FileJson,
-      label: strings.workspaceJson.label,
-      description: strings.workspaceJson.description,
-      onSelect: onImportWorkspaceJson,
-    },
-  ];
+  const strings = useMessages().library;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-4 sm:max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>{strings.title}</DialogTitle>
-          <DialogDescription>{strings.description}</DialogDescription>
+          <DialogTitle>{strings.importPicker.title}</DialogTitle>
+          <DialogDescription>
+            {strings.importPicker.description}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
-          {options.map(({ key, icon: Icon, label, description, onSelect }) => (
+          {IMPORT_PROVIDERS.map(({ id, icon: Icon }) => (
             <button
-              key={key}
+              key={id}
               type="button"
               onClick={() => {
                 onOpenChange(false);
-                onSelect?.();
+                onSelect(id);
               }}
               className="group flex w-full items-center gap-3.5 rounded-xl bg-input/40 px-4 py-3 text-left ring-1 ring-border-subtle/70 transition-colors duration-200 hover:bg-input"
             >
@@ -106,10 +49,10 @@ export const ImportPickerDialog = memo(function ImportPickerDialog({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-medium text-sm text-text-primary">
-                  {label}
+                  {strings.importSources[id].label}
                 </span>
                 <span className="mt-0.5 block text-text-muted text-xs leading-relaxed">
-                  {description}
+                  {strings.importSources[id].description}
                 </span>
               </span>
               <ChevronRight className="size-4 shrink-0 text-text-muted transition-transform duration-200 group-hover:translate-x-0.5" />

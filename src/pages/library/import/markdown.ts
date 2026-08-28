@@ -1,11 +1,10 @@
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
-import { Logger } from '@myelin/shared/logger';
-import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
+import type { Repository, VFSNodeId } from '@/lib/sync';
+import { createCanvasFile } from './canvas-file';
 
-const logger = new Logger('MarkdownImport');
 export const MARKDOWN_FILE_ACCEPT =
   'text/markdown,text/x-markdown,.md,.markdown,.mdx';
-const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
+export const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
 const MARKDOWN_MIME_TYPES = new Set(['text/markdown', 'text/x-markdown']);
 
 export function isMarkdownFile(file: File): boolean {
@@ -30,38 +29,14 @@ export async function importMarkdownFile({
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {
-  let createdId: VFSNodeId | null = null;
-  let session: NoteSession | null = null;
-
-  try {
-    const markdown = await file.text();
-    const baseTitle = getMarkdownCanvasTitle(file.name, fallbackTitle);
-    const title = await repository.getUniqueFileName(baseTitle, parentId);
-    createdId = await repository.createFile(title, 'mcanvas', parentId);
-    session = await repository.openSession(createdId);
-    await addMarkdownPageFrameToYDoc(session.ydoc, markdown, { repository });
-    await session.save();
-    await session.close();
-    session = null;
-
-    const importedId = createdId;
-    createdId = null;
-    return importedId;
-  } catch (error) {
-    logger.error('Failed to import Markdown', error, {
-      fileName: file.name,
-      createdId,
-    });
-    if (session) {
-      await session.close().catch(() => {});
-    }
-    if (createdId) {
-      await repository.deleteNode(createdId).catch((deleteError) => {
-        logger.error('Failed to clean up failed Markdown import', deleteError, {
-          createdId,
-        });
-      });
-    }
-    throw error;
-  }
+  const markdown = await file.text();
+  return createCanvasFile({
+    repository,
+    parentId,
+    title: getMarkdownCanvasTitle(file.name, fallbackTitle),
+    label: 'Markdown',
+    build: async (ydoc) => {
+      await addMarkdownPageFrameToYDoc(ydoc, markdown, { repository });
+    },
+  });
 }

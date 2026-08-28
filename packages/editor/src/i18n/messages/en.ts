@@ -123,70 +123,70 @@ const en = {
     importPicker: {
       title: 'Import',
       description: 'Choose what you want to bring into your library.',
+    },
+    importSources: {
       files: {
         label: 'Files',
         description: 'Markdown, PDFs, images, and video from your computer.',
+        title: 'Import Files',
+        scanning: 'Reading files...',
+        empty: 'None of the selected files can be imported',
+        selected: (count: number) =>
+          `${count} file${count === 1 ? '' : 's'} selected`,
+        nativeFile:
+          'Native .goodnotes files are not supported yet. Export a Goodnotes folder as PDFs, then import the ZIP.',
+        summary: (count: number) =>
+          `Imported ${count} file${count === 1 ? '' : 's'}`,
       },
-      goodnotesZip: {
+      goodnotes_zip: {
         label: 'Goodnotes ZIP',
         description: 'A Goodnotes folder exported as PDFs.',
+        title: 'Import Goodnotes ZIP',
+        scanning: 'Reading archive...',
+        empty: 'No PDFs found in this ZIP',
+        pdfs: (count: number) => `${count} PDF${count === 1 ? '' : 's'}`,
+        summary: (count: number) =>
+          `Imported ${count} PDF${count === 1 ? '' : 's'}`,
       },
-      oneNote: {
+      onenote: {
         label: 'OneNote',
         description:
           'A .onepkg notebook or .one section exported from OneNote.',
+        title: 'Import OneNote',
+        scanning: 'Reading notebook...',
+        empty: 'No pages found in this notebook',
+        pages: (count: number) => `${count} page${count === 1 ? '' : 's'}`,
+        sections: (count: number) =>
+          `${count} section${count === 1 ? '' : 's'}`,
+        summary: (count: number) =>
+          `Imported ${count} page${count === 1 ? '' : 's'}`,
+        skipped: (count: number) =>
+          `${count} page${count === 1 ? '' : 's'} could not be imported`,
       },
-      obsidianVault: {
+      obsidian_vault: {
         label: 'Obsidian Vault',
         description: 'A vault folder, with its notes and attachments.',
+        title: 'Import Obsidian Vault',
+        scanning: 'Scanning vault...',
+        empty: 'No supported files found in this vault',
       },
-      workspaceJson: {
+      workspace_json: {
         label: 'Workspace JSON',
         description: 'A folder exported from Myelin.',
+        title: 'Import Workspace JSON',
+        scanning: 'Scanning folder...',
+        empty: 'No JSON notes or media found in this folder',
       },
     },
     importMarkdown: {
       unsupportedFile: 'Choose a Markdown file (.md, .markdown, or .mdx).',
       failed: 'Markdown import failed',
     },
-    importFiles: {
-      unsupportedFile: 'Choose a Markdown, PDF, image, or video file.',
-      someUnsupported: 'Some files were not supported.',
-      failed: 'Import failed',
-      loading: 'Importing files...',
-    },
-    importGoodnotesZip: {
-      unsupportedFile: 'Choose a ZIP exported from Goodnotes as PDFs.',
-      nativeFile:
-        'Native .goodnotes files are not supported yet. Export a Goodnotes folder as PDFs, then import the ZIP.',
-      failed: 'Goodnotes ZIP import failed',
-      skipped: (count: number) =>
-        `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
-    },
-    importOneNote: {
-      failed: 'OneNote import failed',
-      skipped: (count: number) =>
-        `${count} page${count === 1 ? '' : 's'} could not be imported.`,
-    },
-    importObsidianVault: {
-      failed: 'Obsidian vault import failed',
-      loading: 'Importing Obsidian vault...',
-      skipped: (count: number) =>
-        `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
-      succeeded: (notes: number, media: number) =>
-        `Imported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
-    },
     importDialog: {
-      title: 'Import Obsidian Vault',
-      scanning: 'Scanning vault...',
-      jsonTitle: 'Import Workspace JSON',
-      jsonScanning: 'Scanning folder...',
-      jsonNoFiles: 'No JSON notes or media found in this folder',
       notes: (count: number) => `${count} note${count === 1 ? '' : 's'}`,
       media: (count: number) => `${count} media file${count === 1 ? '' : 's'}`,
       skippedFiles: (count: number) =>
         `${count} unsupported file${count === 1 ? '' : 's'} will be skipped`,
-      noFiles: 'No supported files found in this vault',
       conflict: {
         label: 'A folder with this name already exists',
         rename: 'Keep both (rename)',

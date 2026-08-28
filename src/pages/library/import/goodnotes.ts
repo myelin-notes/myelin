@@ -2,23 +2,23 @@ import { type Unzipped, unzip } from 'fflate';
 import type { Repository, VFSNodeId } from '@/lib/sync';
 import type { ImportProgress } from './dialog';
 import {
+  addFolderAncestors,
   createImportedFolders,
   getImportParentId,
   getParentPath,
 } from './import-tree';
-import { importPdfFile } from './pdf';
+import { importPdfFile, PDF_EXTENSION_RE } from './pdf';
 
 export const GOODNOTES_ZIP_FILE_ACCEPT =
   'application/zip,application/x-zip-compressed,.zip';
 
 const ZIP_EXTENSION_RE = /\.zip$/i;
-const PDF_EXTENSION_RE = /\.pdf$/i;
 const ZIP_MIME_TYPES = new Set([
   'application/zip',
   'application/x-zip-compressed',
 ]);
 
-interface GoodnotesZipEntry {
+export interface GoodnotesZipEntry {
   path: string;
   folderPath: string;
   fileName: string;
@@ -32,7 +32,7 @@ export interface GoodnotesZipImportResult {
 }
 
 export interface ImportGoodnotesZipOptions {
-  file: File;
+  scanned: ScannedGoodnotesZip;
   repository: Repository;
   parentId: VFSNodeId | null;
   fallbackTitle: string;
@@ -60,23 +60,14 @@ function normalizeZipPath(path: string): string | null {
   return segments.join('/');
 }
 
-function addFolderAncestors(
-  folderPaths: Set<string>,
-  folderPath: string,
-): void {
-  if (!folderPath) {
-    return;
-  }
-
-  const segments = folderPath.split('/');
-  for (let i = 1; i <= segments.length; i++) {
-    folderPaths.add(segments.slice(0, i).join('/'));
-  }
+export interface ScannedGoodnotesZip {
+  pdfEntries: GoodnotesZipEntry[];
+  skippedFiles: number;
 }
 
-async function readGoodnotesZipEntries(
+export async function readGoodnotesZipEntries(
   file: File,
-): Promise<{ pdfEntries: GoodnotesZipEntry[]; skippedFiles: number }> {
+): Promise<ScannedGoodnotesZip> {
   const archive = await unzipArchive(new Uint8Array(await file.arrayBuffer()));
   const pdfEntries: GoodnotesZipEntry[] = [];
   let skippedFiles = 0;
@@ -147,16 +138,13 @@ function getCleanupNodeIds(
 }
 
 export async function importGoodnotesZip({
-  file,
+  scanned,
   repository,
   parentId,
   fallbackTitle,
   onProgress,
 }: ImportGoodnotesZipOptions): Promise<GoodnotesZipImportResult> {
-  const { pdfEntries, skippedFiles } = await readGoodnotesZipEntries(file);
-  if (pdfEntries.length === 0) {
-    throw new Error('No PDF files found in the selected ZIP.');
-  }
+  const { pdfEntries, skippedFiles } = scanned;
 
   const rootFileIds: VFSNodeId[] = [];
   let folderIds = new Map<string, VFSNodeId>();
