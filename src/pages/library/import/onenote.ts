@@ -4,11 +4,12 @@ import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
 import type { ImportProgress } from './dialog';
+import { createImportedFolders } from './import-tree';
 
 const logger = new Logger('OneNoteImport');
 
-export const ONENOTE_FILE_ACCEPT = '.one';
-const ONENOTE_EXTENSION_RE = /\.one$/i;
+export const ONENOTE_FILE_ACCEPT = '.one,.onepkg';
+export const ONENOTE_EXTENSION_RE = /\.(one|onepkg)$/i;
 
 /** Rust returns page-relative CSS px; shift the whole page clear of the origin. */
 const PAGE_ORIGIN = { x: 160, y: 80 } as const;
@@ -63,7 +64,14 @@ export interface OneNotePage {
 }
 
 export interface OneNoteSection {
+  /** '/'-separated section-group path, empty at the notebook's top level. */
+  folderPath: string;
+  name: string;
   pages: OneNotePage[];
+}
+
+export interface OneNoteNotebook {
+  sections: OneNoteSection[];
 }
 
 export interface OneNoteImportResult {
@@ -72,11 +80,11 @@ export interface OneNoteImportResult {
   skippedPages: number;
 }
 
-export async function parseOneNoteSection(file: File): Promise<OneNoteSection> {
+export async function parseOneNoteFile(file: File): Promise<OneNoteNotebook> {
   // Sent as the raw invoke body: a JSON number array would balloon a
-  // multi-megabyte section into tens of megabytes of text.
+  // multi-megabyte notebook into tens of megabytes of text.
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return invoke<OneNoteSection>('parse_onenote_section', bytes);
+  return invoke<OneNoteNotebook>('parse_onenote', bytes);
 }
 
 function decodeBase64(data: string): Uint8Array<ArrayBuffer> {
@@ -188,61 +196,108 @@ function getPageTitle(page: OneNotePage, index: number, fallback: string) {
   return `${fallback} ${index + 1}`;
 }
 
-export async function importOneNoteSection({
+function getSectionPath(section: OneNoteSection): string {
+  return section.folderPath
+    ? `${section.folderPath}/${section.name}`
+    : section.name;
+}
+
+/**
+ * Every folder a section needs, ancestors included — `createImportedFolders`
+ * resolves each path against its parent, so intermediate groups must be present
+ * even when no section sits directly in them.
+ */
+function collectFolderPaths(sections: OneNoteSection[]): Set<string> {
+  const paths = new Set<string>();
+  for (const section of sections) {
+    const segments = getSectionPath(section).split('/');
+    for (let i = 1; i <= segments.length; i++) {
+      paths.add(segments.slice(0, i).join('/'));
+    }
+  }
+  return paths;
+}
+
+export async function importOneNoteFile({
   file,
   repository,
   parentId,
-  sectionName,
+  rootName,
   fallbackTitle,
   onProgress,
 }: {
   file: File;
   repository: Repository;
   parentId: VFSNodeId | null;
-  sectionName: string;
+  rootName: string;
   fallbackTitle: string;
   onProgress?: (progress: ImportProgress) => void;
 }): Promise<OneNoteImportResult> {
-  const section = await parseOneNoteSection(file);
-  const rootFolderId = await repository.createFolder(sectionName, parentId);
+  const notebook = await parseOneNoteFile(file);
+  const rootFolderId = await repository.createFolder(rootName, parentId);
+
+  // A lone top-level section is a bare .one file: its pages belong directly in
+  // the root folder rather than in a subfolder repeating the same name.
+  const flat =
+    notebook.sections.length === 1 && notebook.sections[0].folderPath === '';
+  const folderIds = flat
+    ? new Map<string, VFSNodeId>()
+    : await createImportedFolders(
+        repository,
+        rootFolderId,
+        collectFolderPaths(notebook.sections),
+      );
+
+  const totalPages = notebook.sections.reduce(
+    (sum, section) => sum + section.pages.length,
+    0,
+  );
 
   let pagesImported = 0;
   let skippedPages = 0;
+  let processed = 0;
 
-  for (const [index, page] of section.pages.entries()) {
-    const title = getPageTitle(page, index, fallbackTitle);
-    onProgress?.({
-      current: index + 1,
-      total: section.pages.length,
-      fileName: title,
-    });
+  for (const section of notebook.sections) {
+    const sectionFolderId = flat
+      ? rootFolderId
+      : (folderIds.get(getSectionPath(section)) ?? rootFolderId);
 
-    let createdId: VFSNodeId | null = null;
-    let session: NoteSession | null = null;
-    try {
-      const name = await repository.getUniqueFileName(title, rootFolderId);
-      createdId = await repository.createFile(name, 'mcanvas', rootFolderId);
-      session = await repository.openSession(createdId);
-      await addOneNotePageToYDoc(session.ydoc, page);
-      await session.save();
-      await session.close();
-      session = null;
-      createdId = null;
-      pagesImported++;
-    } catch (error) {
-      logger.error('Failed to import OneNote page', error, { title });
-      skippedPages++;
-      if (session) {
-        await session.close().catch(() => {});
-      }
-      if (createdId) {
-        await repository.deleteNode(createdId).catch((deleteError) => {
-          logger.error(
-            'Failed to clean up failed OneNote page import',
-            deleteError,
-            { createdId },
-          );
-        });
+    for (const [index, page] of section.pages.entries()) {
+      const title = getPageTitle(page, index, fallbackTitle);
+      processed++;
+      onProgress?.({ current: processed, total: totalPages, fileName: title });
+
+      let createdId: VFSNodeId | null = null;
+      let session: NoteSession | null = null;
+      try {
+        const name = await repository.getUniqueFileName(title, sectionFolderId);
+        createdId = await repository.createFile(
+          name,
+          'mcanvas',
+          sectionFolderId,
+        );
+        session = await repository.openSession(createdId);
+        await addOneNotePageToYDoc(session.ydoc, page);
+        await session.save();
+        await session.close();
+        session = null;
+        createdId = null;
+        pagesImported++;
+      } catch (error) {
+        logger.error('Failed to import OneNote page', error, { title });
+        skippedPages++;
+        if (session) {
+          await session.close().catch(() => {});
+        }
+        if (createdId) {
+          await repository.deleteNode(createdId).catch((deleteError) => {
+            logger.error(
+              'Failed to clean up failed OneNote page import',
+              deleteError,
+              { createdId },
+            );
+          });
+        }
       }
     }
   }

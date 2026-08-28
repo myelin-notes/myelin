@@ -103,7 +103,7 @@ pub fn run() {
             oauth_loopback::oauth_loopback_start,
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
-            onenote_import::parse_onenote_section,
+            onenote_import::parse_onenote,
         ]);
 
     #[cfg(debug_assertions)]

@@ -132,8 +132,8 @@ const zhHans: typeof en = {
         description: '以 PDF 形式导出的 Goodnotes 文件夹。',
       },
       oneNote: {
-        label: 'OneNote 分区',
-        description: '从 OneNote 导出的 .one 分区文件。',
+        label: 'OneNote',
+        description: '从 OneNote 导出的 .onepkg 笔记本或 .one 分区。',
       },
       obsidianVault: {
         label: 'Obsidian 仓库',
@@ -162,7 +162,7 @@ const zhHans: typeof en = {
       skipped: (count: number) => `已跳过 ${count} 个不受支持的文件`,
     },
     importOneNote: {
-      unsupportedFile: '请选择从 OneNote 导出的 .one 分区文件',
+      unsupportedFile: '请选择从 OneNote 导出的 .onepkg 笔记本或 .one 分区',
       failed: 'OneNote 导入失败',
       skipped: (count: number) => `有 ${count} 个页面无法导入`,
     },

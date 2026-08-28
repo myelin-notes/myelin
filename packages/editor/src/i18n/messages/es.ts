@@ -135,8 +135,9 @@ const es: typeof en = {
         description: 'Una carpeta de Goodnotes exportada como PDF.',
       },
       oneNote: {
-        label: 'Sección de OneNote',
-        description: 'Un archivo de sección .one exportado desde OneNote.',
+        label: 'OneNote',
+        description:
+          'Un bloc .onepkg o una sección .one exportados desde OneNote.',
       },
       obsidianVault: {
         label: 'Bóveda de Obsidian',
@@ -168,7 +169,7 @@ const es: typeof en = {
     },
     importOneNote: {
       unsupportedFile:
-        'Elige un archivo de sección .one exportado desde OneNote.',
+        'Elige un bloc .onepkg o una sección .one exportados desde OneNote.',
       failed: 'No se pudo importar desde OneNote',
       skipped: (count: number) =>
         `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}.`,

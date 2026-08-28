@@ -23,8 +23,9 @@ import {
 } from '@/pages/library/import/markdown';
 import { createObsidianVaultImportSource } from '@/pages/library/import/obsidian-source';
 import {
-  importOneNoteSection,
+  importOneNoteFile,
   isOneNoteFile,
+  ONENOTE_EXTENSION_RE,
   ONENOTE_FILE_ACCEPT,
 } from '@/pages/library/import/onenote';
 import {
@@ -196,11 +197,11 @@ export function useExplorerImports({
 
       setIsImporting(true);
       try {
-        const result = await importOneNoteSection({
+        const result = await importOneNoteFile({
           file,
           repository,
           parentId,
-          sectionName: file.name.replace(/\.one$/i, ''),
+          rootName: file.name.replace(ONENOTE_EXTENSION_RE, ''),
           fallbackTitle: strings.library.createNew.untitledCanvas,
         });
         onChanged();

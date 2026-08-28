@@ -1,20 +1,24 @@
-//! OneNote (.one) section parsing for the library importer.
+//! OneNote parsing for the library importer, covering both a bare `.one`
+//! section and a `.onepkg` notebook archive.
 //!
-//! The frontend hands over the raw bytes of a section file and gets back a flat,
-//! canvas-ready model in CSS pixels. Building the Yjs document stays in
-//! TypeScript alongside the other importers; this module only decodes and
-//! converts units.
+//! The frontend hands over the raw bytes and gets back a flat, canvas-ready
+//! model in CSS pixels. Building the Yjs document stays in TypeScript alongside
+//! the other importers; this module only decodes and converts units.
+
+use std::io;
 
 use base64::Engine as _;
 use onenote_parser::Parser;
 use onenote_parser::contents::{
     Content, EmbeddedObject, Image, Ink, Outline, OutlineItem, RichText, Table,
 };
+use onenote_parser::fs::FileSystem;
 use onenote_parser::page::{Page, PageContent};
 use onenote_parser::property::common::ColorRef;
+use onenote_parser::section::{Section, SectionEntry};
 use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request};
-use typed_path::TypedPath;
+use typed_path::{TypedPath, TypedPathBuf};
 
 /// [MS-ONE] stores every layout value in half-inch increments; 96 CSS px to the
 /// inch makes one increment 48 px.
@@ -33,13 +37,32 @@ const PX_PER_HALF_POINT: f32 = 2.0 / 3.0;
 /// and render as tofu if left in the text.
 const MATH_DELIMITERS: [char; 3] = ['\u{FDD0}', '\u{FDEE}', '\u{FDEF}'];
 
+/// Microsoft Cabinet magic. A `.onepkg` is a CAB; a bare `.one` starts with the
+/// [MS-ONESTORE] file-type GUID instead.
+const CAB_MAGIC: &[u8; 4] = b"MSCF";
+
+/// Section groups nest, and [MS-ONE] puts no bound on how deeply. A notebook is
+/// untrusted input, so cap the recursion rather than risk the stack.
+const MAX_GROUP_DEPTH: usize = 32;
+
 const DEFAULT_FONT_PX: f32 = 16.0;
 const DEFAULT_TEXT_COLOR: &str = "#1a1a1a";
 const DEFAULT_INK_COLOR: &str = "#191c1e";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ImportedNotebook {
+    sections: Vec<ImportedSection>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ImportedSection {
+    /// '/'-separated section-group path from the notebook root, empty when the
+    /// section sits at the top level. A bare `.one` always yields exactly one
+    /// section with an empty path.
+    folder_path: String,
+    name: String,
     pages: Vec<ImportedPage>,
 }
 
@@ -87,37 +110,158 @@ pub struct ImportedStroke {
     size: f32,
 }
 
-/// Section files run to several megabytes, so the bytes arrive as the raw invoke
+/// Notebooks run to tens of megabytes, so the bytes arrive as the raw invoke
 /// body rather than a JSON number array.
 #[tauri::command]
-pub async fn parse_onenote_section(request: Request<'_>) -> Result<ImportedSection, String> {
+pub async fn parse_onenote(request: Request<'_>) -> Result<ImportedNotebook, String> {
     let InvokeBody::Raw(bytes) = request.body() else {
-        return Err("expected the section file as a raw request body".to_string());
+        return Err("expected the OneNote file as a raw request body".to_string());
     };
     let bytes = bytes.clone();
 
-    // Parsing a large section is CPU-bound; keep it off the async runtime.
-    tokio::task::spawn_blocking(move || parse_section(&bytes))
+    // Parsing a large notebook is CPU-bound; keep it off the async runtime.
+    tokio::task::spawn_blocking(move || parse_file(&bytes))
         .await
         .map_err(|e| format!("OneNote parse task panicked: {e}"))?
 }
 
-fn parse_section(bytes: &[u8]) -> Result<ImportedSection, String> {
-    let parser = Parser::new();
+fn parse_file(bytes: &[u8]) -> Result<ImportedNotebook, String> {
+    if bytes.starts_with(CAB_MAGIC) {
+        parse_package(bytes)
+    } else {
+        parse_single_section(bytes)
+    }
+}
+
+fn parse_single_section(bytes: &[u8]) -> Result<ImportedNotebook, String> {
     // The name only ends up in the parser's own error text and section display
     // name; the caller already knows the real file it picked.
-    let section = parser
+    let section = Parser::new()
         .parse_section_buffer(bytes, TypedPath::derive("Section.one"))
         .map_err(|e| format!("could not read OneNote section: {e}"))?;
 
-    let pages = section
-        .page_series()
-        .iter()
-        .flat_map(|series| series.pages())
-        .map(convert_page)
-        .collect();
+    Ok(ImportedNotebook {
+        sections: vec![convert_section(&section, String::new())],
+    })
+}
 
-    Ok(ImportedSection { pages })
+fn parse_package(bytes: &[u8]) -> Result<ImportedNotebook, String> {
+    let notebook = Parser::new_with_fs(BufferFs { bytes })
+        .parse_package(TypedPath::derive("Notebook.onepkg"))
+        .map_err(|e| format!("could not read OneNote package: {e}"))?;
+
+    let mut sections = Vec::new();
+    collect_sections(notebook.entries(), "", 0, &mut sections);
+    Ok(ImportedNotebook { sections })
+}
+
+fn collect_sections(
+    entries: &[SectionEntry],
+    folder_path: &str,
+    depth: usize,
+    out: &mut Vec<ImportedSection>,
+) {
+    if depth > MAX_GROUP_DEPTH {
+        return;
+    }
+
+    for entry in entries {
+        match entry {
+            SectionEntry::Section(section) => {
+                out.push(convert_section(section, folder_path.to_string()));
+            }
+            SectionEntry::SectionGroup(group) => {
+                let nested = join_path(folder_path, &sanitize_name(group.display_name()));
+                collect_sections(group.entries(), &nested, depth + 1, out);
+            }
+        }
+    }
+}
+
+fn convert_section(section: &Section, folder_path: String) -> ImportedSection {
+    ImportedSection {
+        folder_path,
+        name: sanitize_name(section.display_name()),
+        pages: section
+            .page_series()
+            .iter()
+            .flat_map(|series| series.pages())
+            .map(convert_page)
+            .collect(),
+    }
+}
+
+/// Section and group names come from the notebook, so they can hold anything. A
+/// separator would forge extra levels in `folder_path`, which the frontend
+/// splits on.
+fn sanitize_name(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| if c == '/' || c == '\\' { '-' } else { c })
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        "Untitled".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn join_path(parent: &str, name: &str) -> String {
+    if parent.is_empty() {
+        name.to_string()
+    } else {
+        format!("{parent}/{name}")
+    }
+}
+
+/// Serves one in-memory buffer for every path. `parse_package` reads the archive
+/// with a single `read_file` and then works entirely from its own in-memory
+/// `PackageFs`, so nothing else on this trait is reached during a package parse.
+#[derive(Clone, Copy)]
+struct BufferFs<'a> {
+    bytes: &'a [u8],
+}
+
+fn unsupported() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::Unsupported,
+        "OneNote packages are parsed from memory, not from a file system",
+    )
+}
+
+impl FileSystem for BufferFs<'_> {
+    fn read_file(&self, _path: TypedPath) -> Result<Vec<u8>, io::Error> {
+        Ok(self.bytes.to_vec())
+    }
+
+    fn is_directory(&self, _path: TypedPath) -> Result<bool, io::Error> {
+        Ok(false)
+    }
+
+    fn exists(&self, _path: TypedPath) -> Result<bool, io::Error> {
+        Ok(true)
+    }
+
+    fn canonicalize(&self, path: TypedPath) -> Result<TypedPathBuf, io::Error> {
+        Ok(path.to_path_buf())
+    }
+
+    fn read_dir(&self, _path: TypedPath) -> Result<Vec<TypedPathBuf>, io::Error> {
+        Err(unsupported())
+    }
+
+    fn write_file(&self, _path: TypedPath, _data: &[u8]) -> Result<(), io::Error> {
+        Err(unsupported())
+    }
+
+    fn stream_to_file(&self, _path: TypedPath, _reader: &mut dyn io::Read) -> Result<(), io::Error> {
+        Err(unsupported())
+    }
+
+    fn make_dir(&self, _path: TypedPath) -> Result<(), io::Error> {
+        Err(unsupported())
+    }
 }
 
 fn convert_page(page: &Page) -> ImportedPage {

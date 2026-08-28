@@ -132,8 +132,9 @@ const en = {
         description: 'A Goodnotes folder exported as PDFs.',
       },
       oneNote: {
-        label: 'OneNote Section',
-        description: 'A .one section file exported from OneNote.',
+        label: 'OneNote',
+        description:
+          'A .onepkg notebook or .one section exported from OneNote.',
       },
       obsidianVault: {
         label: 'Obsidian Vault',
@@ -163,7 +164,8 @@ const en = {
         `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
     },
     importOneNote: {
-      unsupportedFile: 'Choose a .one section file exported from OneNote.',
+      unsupportedFile:
+        'Choose a .onepkg notebook or .one section exported from OneNote.',
       failed: 'OneNote import failed',
       skipped: (count: number) =>
         `${count} page${count === 1 ? '' : 's'} could not be imported.`,
