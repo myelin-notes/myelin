@@ -79,3 +79,18 @@ export function getImportParentId(
     ? (folderIds.get(folderPath) ?? rootParentId)
     : rootParentId;
 }
+
+/** Adds `a`, `a/b`, `a/b/c` for `a/b/c`, so `createImportedFolders` can resolve
+ * each path against a parent that is guaranteed to exist. No-op at the root. */
+export function addFolderAncestors(
+  folderPaths: Set<string>,
+  folderPath: string,
+): void {
+  if (!folderPath) {
+    return;
+  }
+  const segments = folderPath.split('/');
+  for (let i = 1; i <= segments.length; i++) {
+    folderPaths.add(segments.slice(0, i).join('/'));
+  }
+}

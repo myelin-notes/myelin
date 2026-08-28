@@ -21,7 +21,6 @@ import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { errorDescription } from '@/components/command-palette/utils';
 import { SidebarTags } from '@/components/layout/sidebar/sidebar-tags';
-import { useExplorerImports } from '@/components/layout/sidebar/use-explorer-imports';
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +42,8 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController } from '@/lib/tabs/context';
+import { ImportHost } from '@/pages/library/import/import-host';
+import { useImports } from '@/pages/library/import/use-imports';
 import { BetaFeedbackBanner } from './beta-feedback-banner';
 import { CreateNewDropdown } from './create-new-dropdown';
 import {
@@ -53,7 +54,6 @@ import {
   type ViewMode,
 } from './explorer/explorer-tree';
 import { useDropTarget } from './explorer/use-drop-target';
-import { ImportDialog } from './import/dialog';
 import { RecentCard } from './recent-card';
 
 const logger = new Logger('MobileLibrary');
@@ -118,10 +118,9 @@ export function MobileLibrary() {
     void loadRecentFiles();
   }, [refreshMeta, loadRecentFiles]);
 
-  const imports = useExplorerImports({
+  const imports = useImports({
     parentId: currentFolderId,
     onChanged: refreshLibraryData,
-    strings,
   });
 
   // `dataVersion` is the only change signal for local repos.
@@ -436,11 +435,7 @@ export function MobileLibrary() {
                   <CreateNewDropdown
                     onNewFolder={handleNewFolder}
                     onNewFile={handleNewFile}
-                    onImportFiles={imports.onImportFiles}
-                    onImportGoodnotesZip={imports.onImportGoodnotesZip}
-                    onImportOneNote={imports.onImportOneNote}
-                    onImportObsidianVault={imports.onImportObsidianVault}
-                    onImportWorkspaceJson={imports.onImportWorkspaceJson}
+                    onImport={imports.openPicker}
                     importDisabled={imports.importDisabled}
                   />
                 </div>
@@ -515,28 +510,7 @@ export function MobileLibrary() {
         </div>
       </main>
 
-      <input
-        ref={imports.storageInputRef}
-        type="file"
-        multiple
-        accept={imports.storageInputAccept}
-        className="hidden"
-        onChange={imports.handleStorageInputChange}
-      />
-      <input
-        ref={imports.goodnotesZipInputRef}
-        type="file"
-        accept={imports.goodnotesZipInputAccept}
-        className="hidden"
-        onChange={imports.handleGoodnotesZipInputChange}
-      />
-      {imports.importSource !== null && (
-        <ImportDialog
-          source={imports.importSource}
-          onImported={imports.handleImportDialogDone}
-          onClose={imports.closeImportSource}
-        />
-      )}
+      <ImportHost {...imports.hostProps} />
     </div>
   );
 }

@@ -9,20 +9,20 @@ import {
   type Repository,
   type VFSNodeId,
 } from '@/lib/sync';
-import { addPdfElementToYDoc } from '@/pages/library/import/pdf';
 import type { ImportProgress } from './dialog';
 import {
+  addFolderAncestors,
   createImportedFolders,
   getImportParentId,
   getPathBasename,
 } from './import-tree';
+import { MARKDOWN_EXTENSION_RE } from './markdown';
+import { addPdfElementToYDoc, PDF_EXTENSION_RE } from './pdf';
 
 const logger = new Logger('ObsidianVaultImport');
 
-const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
 const MARKDOWN_FRONT_MATTER_RE =
   /^(?:\uFEFF)?---[ \t]*\r?\n([\s\S]*?)^---[ \t]*(?:\r?\n|$)/m;
-const PDF_EXTENSION_RE = /\.pdf$/i;
 
 type VaultImportFile =
   | {
@@ -220,15 +220,6 @@ function parseObsidianMarkdown(markdown: string): ParsedObsidianMarkdown {
   };
 }
 
-function addFolderAncestors(
-  folderPaths: Set<string>,
-  folderSegments: readonly string[],
-): void {
-  for (let i = 1; i <= folderSegments.length; i++) {
-    folderPaths.add(joinRelativePath(folderSegments.slice(0, i)));
-  }
-}
-
 function getImportFile(
   absolutePath: string,
   folderSegments: readonly string[],
@@ -311,7 +302,7 @@ async function scanVaultDirectory(
     }
 
     scanned.files.push(importFile);
-    addFolderAncestors(scanned.folderPaths, relativeSegments);
+    addFolderAncestors(scanned.folderPaths, joinRelativePath(relativeSegments));
   }
 }
 

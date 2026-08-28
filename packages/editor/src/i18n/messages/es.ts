@@ -126,72 +126,71 @@ const es: typeof en = {
     importPicker: {
       title: 'Importar',
       description: 'Elige qué quieres traer a tu biblioteca.',
+    },
+    importSources: {
       files: {
         label: 'Archivos',
         description: 'Markdown, PDF, imágenes y video desde tu computadora.',
+        title: 'Importar archivos',
+        scanning: 'Leyendo archivos...',
+        empty: 'Ninguno de los archivos seleccionados se puede importar',
+        selected: (count: number) =>
+          `${count} archivo${count === 1 ? '' : 's'} seleccionado${count === 1 ? '' : 's'}`,
+        nativeFile:
+          'Los archivos .goodnotes nativos aún no son compatibles. Exporta una carpeta de Goodnotes como PDF y luego importa el ZIP.',
+        summary: (count: number) =>
+          `Se importaron ${count} archivo${count === 1 ? '' : 's'}`,
       },
-      goodnotesZip: {
+      goodnotes_zip: {
         label: 'ZIP de Goodnotes',
         description: 'Una carpeta de Goodnotes exportada como PDF.',
+        title: 'Importar ZIP de Goodnotes',
+        scanning: 'Leyendo el archivo comprimido...',
+        empty: 'No se encontraron PDF en este ZIP',
+        pdfs: (count: number) => `${count} PDF`,
+        summary: (count: number) => `Se importaron ${count} PDF`,
       },
-      oneNote: {
+      onenote: {
         label: 'OneNote',
         description:
           'Un bloc .onepkg o una sección .one exportados desde OneNote.',
+        title: 'Importar desde OneNote',
+        scanning: 'Leyendo el bloc...',
+        empty: 'No se encontraron páginas en este bloc',
+        pages: (count: number) => `${count} página${count === 1 ? '' : 's'}`,
+        sections: (count: number) =>
+          `${count} sección${count === 1 ? '' : 'es'}`,
+        summary: (count: number) =>
+          `Se ${count === 1 ? 'importó' : 'importaron'} ${count} página${count === 1 ? '' : 's'}`,
+        skipped: (count: number) =>
+          `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}`,
       },
-      obsidianVault: {
+      obsidian_vault: {
         label: 'Bóveda de Obsidian',
         description:
           'Una carpeta de bóveda, con sus notas y archivos adjuntos.',
+        title: 'Importar bóveda de Obsidian',
+        scanning: 'Escaneando la bóveda...',
+        empty: 'No se encontraron archivos compatibles en esta bóveda',
       },
-      workspaceJson: {
+      workspace_json: {
         label: 'Espacio de trabajo JSON',
         description: 'Una carpeta exportada desde Myelin.',
+        title: 'Importar espacio de trabajo JSON',
+        scanning: 'Escaneando la carpeta...',
+        empty: 'No se encontraron notas JSON ni multimedia en esta carpeta',
       },
     },
     importMarkdown: {
       unsupportedFile: 'Elige un archivo Markdown (.md, .markdown o .mdx).',
       failed: 'No se pudo importar el Markdown',
     },
-    importFiles: {
-      unsupportedFile: 'Elige un archivo Markdown, PDF, de imagen o video.',
-      someUnsupported: 'Algunos archivos no son compatibles.',
-      failed: 'No se pudo importar',
-      loading: 'Importando archivos...',
-    },
-    importGoodnotesZip: {
-      unsupportedFile: 'Elige un ZIP exportado desde Goodnotes como PDF.',
-      nativeFile:
-        'Los archivos .goodnotes nativos aún no son compatibles. Exporta una carpeta de Goodnotes como PDF y luego importa el ZIP.',
-      failed: 'No se pudo importar el ZIP de Goodnotes',
-      skipped: (count: number) =>
-        `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} omitido${count === 1 ? '' : 's'}.`,
-    },
-    importOneNote: {
-      failed: 'No se pudo importar desde OneNote',
-      skipped: (count: number) =>
-        `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}.`,
-    },
-    importObsidianVault: {
-      failed: 'No se pudo importar la bóveda de Obsidian',
-      loading: 'Importando bóveda de Obsidian...',
-      skipped: (count: number) =>
-        `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} omitido${count === 1 ? '' : 's'}.`,
-      succeeded: (notes: number, media: number) =>
-        `Se importaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
-    },
     importDialog: {
-      title: 'Importar bóveda de Obsidian',
-      scanning: 'Escaneando bóveda...',
-      jsonTitle: 'Importar espacio de trabajo JSON',
-      jsonScanning: 'Escaneando carpeta...',
-      jsonNoFiles: 'No se encontraron notas JSON ni multimedia en esta carpeta',
       notes: (count: number) => `${count} nota${count === 1 ? '' : 's'}`,
       media: (count: number) =>
         `${count} archivo${count === 1 ? '' : 's'} multimedia`,
       skippedFiles: (count: number) =>
         `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} se omitirá${count === 1 ? '' : 'n'}`,
-      noFiles: 'No se encontraron archivos compatibles en esta bóveda',
       conflict: {
         label: 'Ya existe una carpeta con este nombre',
         rename: 'Conservar ambos (renombrar)',

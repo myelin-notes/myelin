@@ -9,12 +9,11 @@ import {
   type PdfPageSize,
 } from '@myelin/editor/pdf-renderer';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
-import { Logger } from '@myelin/shared/logger';
-import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
+import type { Repository, VFSNodeId } from '@/lib/sync';
+import { createCanvasFile } from './canvas-file';
 
-const logger = new Logger('PdfImport');
 export const PDF_FILE_ACCEPT = 'application/pdf,.pdf';
-const PDF_EXTENSION_RE = /\.pdf$/i;
+export const PDF_EXTENSION_RE = /\.pdf$/i;
 const GOODNOTES_EXTENSION_RE = /\.goodnotes$/i;
 const PDF_MIME_TYPES = new Set(['application/pdf']);
 const DEFAULT_PDF_IMPORT_OFFSET = {
@@ -68,39 +67,15 @@ export async function importPdfFile({
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {
-  let createdId: VFSNodeId | null = null;
-  let session: NoteSession | null = null;
-
-  try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const pageSizes = await getPdfPageSizes(bytes);
-    const baseTitle = getPdfCanvasTitle(file.name, fallbackTitle);
-    const title = await repository.getUniqueFileName(baseTitle, parentId);
-    createdId = await repository.createFile(title, 'mcanvas', parentId);
-    session = await repository.openSession(createdId);
-    addPdfElementToYDoc(session.ydoc, bytes, file.name, pageSizes);
-    await session.save();
-    await session.close();
-    session = null;
-
-    const importedId = createdId;
-    createdId = null;
-    return importedId;
-  } catch (error) {
-    logger.error('Failed to import PDF', error, {
-      fileName: file.name,
-      createdId,
-    });
-    if (session) {
-      await session.close().catch(() => {});
-    }
-    if (createdId) {
-      await repository.deleteNode(createdId).catch((deleteError) => {
-        logger.error('Failed to clean up failed PDF import', deleteError, {
-          createdId,
-        });
-      });
-    }
-    throw error;
-  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const pageSizes = await getPdfPageSizes(bytes);
+  return createCanvasFile({
+    repository,
+    parentId,
+    title: getPdfCanvasTitle(file.name, fallbackTitle),
+    label: 'PDF',
+    build: (ydoc) => {
+      addPdfElementToYDoc(ydoc, bytes, file.name, pageSizes);
+    },
+  });
 }

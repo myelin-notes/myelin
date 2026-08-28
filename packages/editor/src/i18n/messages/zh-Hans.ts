@@ -123,65 +123,62 @@ const zhHans: typeof en = {
     importPicker: {
       title: '导入',
       description: '选择要导入到库中的内容。',
+    },
+    importSources: {
       files: {
         label: '文件',
         description: '来自电脑的 Markdown、PDF、图片和视频。',
+        title: '导入文件',
+        scanning: '正在读取文件…',
+        empty: '所选文件均无法导入',
+        selected: (count: number) => `已选择 ${count} 个文件`,
+        nativeFile:
+          '暂不支持原生 .goodnotes 文件。请先在 Goodnotes 中将文件夹导出为 PDF，再导入该 ZIP。',
+        summary: (count: number) => `已导入 ${count} 个文件`,
       },
-      goodnotesZip: {
+      goodnotes_zip: {
         label: 'Goodnotes ZIP',
         description: '以 PDF 形式导出的 Goodnotes 文件夹。',
+        title: '导入 Goodnotes ZIP',
+        scanning: '正在读取压缩包…',
+        empty: '此 ZIP 中未找到 PDF',
+        pdfs: (count: number) => `${count} 个 PDF`,
+        summary: (count: number) => `已导入 ${count} 个 PDF`,
       },
-      oneNote: {
+      onenote: {
         label: 'OneNote',
         description: '从 OneNote 导出的 .onepkg 笔记本或 .one 分区。',
+        title: '导入 OneNote',
+        scanning: '正在读取笔记本…',
+        empty: '此笔记本中未找到页面',
+        pages: (count: number) => `${count} 个页面`,
+        sections: (count: number) => `${count} 个分区`,
+        summary: (count: number) => `已导入 ${count} 个页面`,
+        skipped: (count: number) => `有 ${count} 个页面无法导入`,
       },
-      obsidianVault: {
+      obsidian_vault: {
         label: 'Obsidian 仓库',
         description: '仓库文件夹，包含其笔记和附件。',
+        title: '导入 Obsidian 仓库',
+        scanning: '正在扫描仓库…',
+        empty: '此仓库中未找到受支持的文件',
       },
-      workspaceJson: {
+      workspace_json: {
         label: '工作区 JSON',
         description: '从 Myelin 导出的文件夹。',
+        title: '导入工作区 JSON',
+        scanning: '正在扫描文件夹…',
+        empty: '此文件夹中未找到 JSON 笔记或媒体文件',
       },
     },
     importMarkdown: {
       unsupportedFile: '请选择 Markdown 文件（.md、.markdown 或 .mdx）',
       failed: 'Markdown 导入失败',
     },
-    importFiles: {
-      unsupportedFile: '请选择 Markdown、PDF、图片或视频文件',
-      someUnsupported: '部分文件不受支持',
-      failed: '导入失败',
-      loading: '正在导入文件…',
-    },
-    importGoodnotesZip: {
-      unsupportedFile: '请选择从 Goodnotes 导出为 PDF 的 ZIP 文件',
-      nativeFile:
-        '暂不支持原生 .goodnotes 文件。请先在 Goodnotes 中将文件夹导出为 PDF，再导入该 ZIP。',
-      failed: 'Goodnotes ZIP 导入失败',
-      skipped: (count: number) => `已跳过 ${count} 个不受支持的文件`,
-    },
-    importOneNote: {
-      failed: 'OneNote 导入失败',
-      skipped: (count: number) => `有 ${count} 个页面无法导入`,
-    },
-    importObsidianVault: {
-      failed: 'Obsidian 仓库导入失败',
-      loading: '正在导入 Obsidian 仓库…',
-      skipped: (count: number) => `已跳过 ${count} 个不受支持的文件`,
-      succeeded: (notes: number, media: number) =>
-        `已导入 ${notes} 个笔记和 ${media} 个媒体文件`,
-    },
     importDialog: {
-      title: '导入 Obsidian 仓库',
-      scanning: '正在扫描仓库…',
-      jsonTitle: '导入工作区 JSON',
-      jsonScanning: '正在扫描文件夹…',
-      jsonNoFiles: '此文件夹中未找到 JSON 笔记或媒体文件',
       notes: (count: number) => `${count} 个笔记`,
       media: (count: number) => `${count} 个媒体文件`,
       skippedFiles: (count: number) => `将跳过 ${count} 个不受支持的文件`,
-      noFiles: '此仓库中未找到受支持的文件',
       conflict: {
         label: '已存在同名文件夹',
         rename: '两者都保留（重命名）',

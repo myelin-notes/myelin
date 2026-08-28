@@ -29,7 +29,8 @@ import {
 } from '@/lib/sync/manual-refresh';
 import { useTabController } from '@/lib/tabs/context';
 import { CreateNewDropdown } from '@/pages/library/create-new-dropdown';
-import { ImportDialog } from '@/pages/library/import/dialog';
+import { ImportHost } from '@/pages/library/import/import-host';
+import { useImports } from '@/pages/library/import/use-imports';
 import { useSidebar } from './context';
 import { SidebarTags } from './sidebar-tags';
 import {
@@ -38,7 +39,6 @@ import {
   type SidebarTreeHandle,
   type SortMode,
 } from './sidebar-tree';
-import { useExplorerImports } from './use-explorer-imports';
 
 const logger = new Logger('Sidebar');
 const SORT_MODES: SortMode[] = ['name-asc', 'name-desc', 'modified', 'created'];
@@ -73,10 +73,9 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     refreshMeta();
   }, [refreshMeta]);
 
-  const imports = useExplorerImports({
+  const imports = useImports({
     parentId: null,
     onChanged: refreshAfterImport,
-    strings,
   });
 
   // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
@@ -285,11 +284,7 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
           <CreateNewDropdown
             onNewFolder={handleNewFolder}
             onNewFile={handleNewFile}
-            onImportFiles={imports.onImportFiles}
-            onImportGoodnotesZip={imports.onImportGoodnotesZip}
-            onImportOneNote={imports.onImportOneNote}
-            onImportObsidianVault={imports.onImportObsidianVault}
-            onImportWorkspaceJson={imports.onImportWorkspaceJson}
+            onImport={imports.openPicker}
             importDisabled={imports.importDisabled}
           />
         </div>
@@ -313,28 +308,7 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
         refreshKey={tagsRefreshKey}
       />
 
-      <input
-        ref={imports.storageInputRef}
-        type="file"
-        multiple
-        accept={imports.storageInputAccept}
-        className="hidden"
-        onChange={imports.handleStorageInputChange}
-      />
-      <input
-        ref={imports.goodnotesZipInputRef}
-        type="file"
-        accept={imports.goodnotesZipInputAccept}
-        className="hidden"
-        onChange={imports.handleGoodnotesZipInputChange}
-      />
-      {imports.importSource !== null && (
-        <ImportDialog
-          source={imports.importSource}
-          onImported={imports.handleImportDialogDone}
-          onClose={imports.closeImportSource}
-        />
-      )}
+      <ImportHost {...imports.hostProps} />
     </aside>
   );
 }

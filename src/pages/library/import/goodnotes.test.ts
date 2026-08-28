@@ -5,7 +5,11 @@ import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
-import { importGoodnotesZip, isZipFile } from './goodnotes';
+import {
+  importGoodnotesZip,
+  isZipFile,
+  readGoodnotesZipEntries,
+} from './goodnotes';
 
 vi.mock('@myelin/editor/pdf-renderer', () => ({
   createDefaultPdfPageOrder: (pageCount: number) =>
@@ -149,7 +153,7 @@ describe('Goodnotes ZIP import', () => {
     );
 
     const result = await importGoodnotesZip({
-      file: zipFile,
+      scanned: await readGoodnotesZipEntries(zipFile),
       repository,
       parentId: null,
       fallbackTitle: 'Untitled Canvas',

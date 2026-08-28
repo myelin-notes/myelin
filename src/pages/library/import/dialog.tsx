@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  Files,
   FileText,
   Image,
   LoaderCircle,
@@ -18,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import type { VFSNodeId } from '@/lib/sync';
 export type ConflictResolution = 'rename' | 'replace';
 
 export interface ImportProgress {
@@ -27,7 +29,7 @@ export interface ImportProgress {
 }
 
 export interface ImportPreviewLine {
-  icon: 'note' | 'media';
+  icon: 'note' | 'media' | 'page';
   text: string;
 }
 
@@ -44,12 +46,15 @@ export interface ImportPreviewData {
 }
 
 export interface ImportSummaryData {
-  rootFolderId: string;
+  /** Node to reveal once the import finishes; null when the source creates no root folder. */
+  focusNodeId: VFSNodeId | null;
   text: string;
   skippedText: string | null;
+  /** Item counts for analytics. Omitted when the source has no meaningful count. */
+  stats?: { count: number; skipped: number };
 }
 
-export interface ImportSource {
+export interface ImportJob {
   title: string;
   scanningLabel: string;
   emptyLabel: string;
@@ -63,6 +68,7 @@ export interface ImportSource {
 const previewIcons: Record<ImportPreviewLine['icon'], ReactNode> = {
   note: <FileText className="size-3.5 shrink-0" />,
   media: <Image className="size-3.5 shrink-0" />,
+  page: <Files className="size-3.5 shrink-0" />,
 };
 
 type DialogPhase =
@@ -77,27 +83,23 @@ type DialogPhase =
   | { kind: 'error'; message: string };
 
 interface ImportDialogProps {
-  source: ImportSource;
-  onImported: (rootFolderId: string) => void;
+  job: ImportJob;
+  onImported: (summary: ImportSummaryData) => void;
   onClose: () => void;
 }
 
-export function ImportDialog({
-  source,
-  onImported,
-  onClose,
-}: ImportDialogProps) {
+export function ImportDialog({ job, onImported, onClose }: ImportDialogProps) {
   const strings = useMessages();
   const [phase, setPhase] = useState<DialogPhase>({ kind: 'scanning' });
-  const importedRootRef = useRef<string | null>(null);
-  const sourceRef = useRef(source);
-  sourceRef.current = source;
+  const importedSummaryRef = useRef<ImportSummaryData | null>(null);
+  const jobRef = useRef(job);
+  jobRef.current = job;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await sourceRef.current.scan();
+        const data = await jobRef.current.scan();
         if (cancelled) {
           return;
         }
@@ -119,8 +121,8 @@ export function ImportDialog({
   }, []);
 
   const handleClose = useCallback(() => {
-    if (importedRootRef.current) {
-      onImported(importedRootRef.current);
+    if (importedSummaryRef.current) {
+      onImported(importedSummaryRef.current);
     }
     onClose();
   }, [onImported, onClose]);
@@ -134,7 +136,7 @@ export function ImportDialog({
     setPhase({ kind: 'importing', progress: null });
 
     try {
-      const data = await sourceRef.current.run({
+      const data = await jobRef.current.run({
         conflictResolution,
         onProgress: (progress) => {
           setPhase((prev) =>
@@ -143,7 +145,7 @@ export function ImportDialog({
         },
       });
 
-      importedRootRef.current = data.rootFolderId;
+      importedSummaryRef.current = data;
       setPhase({ kind: 'summary', data });
     } catch (error) {
       setPhase({
@@ -167,14 +169,14 @@ export function ImportDialog({
         className="sm:max-w-[420px]"
       >
         <DialogHeader>
-          <DialogTitle>{source.title}</DialogTitle>
+          <DialogTitle>{job.title}</DialogTitle>
         </DialogHeader>
 
         {phase.kind === 'scanning' && (
           <div className="flex items-center gap-3 py-6">
             <LoaderCircle className="size-5 shrink-0 animate-spin text-text-muted" />
             <span className="text-sm text-text-secondary">
-              {source.scanningLabel}
+              {job.scanningLabel}
             </span>
           </div>
         )}
@@ -186,9 +188,9 @@ export function ImportDialog({
                 {phase.data.name}
               </p>
               <div className="flex flex-col gap-1.5">
-                {phase.data.lines.map((line) => (
+                {phase.data.lines.map((line, index) => (
                   <div
-                    key={line.icon}
+                    key={`${line.icon}-${index}`}
                     className="flex items-center gap-2 text-sm text-text-secondary"
                   >
                     {previewIcons[line.icon]}
@@ -204,7 +206,7 @@ export function ImportDialog({
             </div>
 
             {phase.data.isEmpty && (
-              <p className="text-sm text-text-muted">{source.emptyLabel}</p>
+              <p className="text-sm text-text-muted">{job.emptyLabel}</p>
             )}
 
             {phase.data.conflict && (

@@ -2,9 +2,10 @@ import { ElementType } from '@myelin/editor/elements/element-type';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
-import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
+import type { Repository, VFSNodeId } from '@/lib/sync';
+import { createCanvasFile } from './canvas-file';
 import type { ImportProgress } from './dialog';
-import { createImportedFolders } from './import-tree';
+import { addFolderAncestors, createImportedFolders } from './import-tree';
 
 const logger = new Logger('OneNoteImport');
 
@@ -218,38 +219,36 @@ function getSectionPath(section: OneNoteSection): string {
     : section.name;
 }
 
-/**
- * Every folder a section needs, ancestors included — `createImportedFolders`
- * resolves each path against its parent, so intermediate groups must be present
- * even when no section sits directly in them.
- */
 function collectFolderPaths(sections: OneNoteSection[]): Set<string> {
   const paths = new Set<string>();
   for (const section of sections) {
-    const segments = getSectionPath(section).split('/');
-    for (let i = 1; i <= segments.length; i++) {
-      paths.add(segments.slice(0, i).join('/'));
-    }
+    addFolderAncestors(paths, getSectionPath(section));
   }
   return paths;
 }
 
-export async function importOneNoteFile({
-  path,
+export function countOneNotePages(notebook: OneNoteNotebook): number {
+  return notebook.sections.reduce(
+    (sum, section) => sum + section.pages.length,
+    0,
+  );
+}
+
+export async function importOneNote({
+  notebook,
   repository,
   parentId,
   rootName,
   fallbackTitle,
   onProgress,
 }: {
-  path: string;
+  notebook: OneNoteNotebook;
   repository: Repository;
   parentId: VFSNodeId | null;
   rootName: string;
   fallbackTitle: string;
   onProgress?: (progress: ImportProgress) => void;
 }): Promise<OneNoteImportResult> {
-  const notebook = await parseOneNoteFile(path);
   const rootFolderId = await repository.createFolder(rootName, parentId);
 
   // A lone top-level section is a bare .one file: its pages belong directly in
@@ -264,10 +263,7 @@ export async function importOneNoteFile({
         collectFolderPaths(notebook.sections),
       );
 
-  const totalPages = notebook.sections.reduce(
-    (sum, section) => sum + section.pages.length,
-    0,
-  );
+  const totalPages = countOneNotePages(notebook);
 
   let pagesImported = 0;
   let skippedPages = 0;
@@ -283,37 +279,18 @@ export async function importOneNoteFile({
       processed++;
       onProgress?.({ current: processed, total: totalPages, fileName: title });
 
-      let createdId: VFSNodeId | null = null;
-      let session: NoteSession | null = null;
+      // A page that fails is skipped rather than aborting the notebook.
       try {
-        const name = await repository.getUniqueFileName(title, sectionFolderId);
-        createdId = await repository.createFile(
-          name,
-          'mcanvas',
-          sectionFolderId,
-        );
-        session = await repository.openSession(createdId);
-        await addOneNotePageToYDoc(session.ydoc, page);
-        await session.save();
-        await session.close();
-        session = null;
-        createdId = null;
+        await createCanvasFile({
+          repository,
+          parentId: sectionFolderId,
+          title,
+          label: 'OneNote page',
+          build: (ydoc) => addOneNotePageToYDoc(ydoc, page),
+        });
         pagesImported++;
-      } catch (error) {
-        logger.error('Failed to import OneNote page', error, { title });
+      } catch {
         skippedPages++;
-        if (session) {
-          await session.close().catch(() => {});
-        }
-        if (createdId) {
-          await repository.deleteNode(createdId).catch((deleteError) => {
-            logger.error(
-              'Failed to clean up failed OneNote page import',
-              deleteError,
-              { createdId },
-            );
-          });
-        }
       }
     }
   }
