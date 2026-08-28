@@ -168,8 +168,6 @@ const es: typeof en = {
         `${count} archivo${count === 1 ? '' : 's'} no compatible${count === 1 ? '' : 's'} omitido${count === 1 ? '' : 's'}.`,
     },
     importOneNote: {
-      unsupportedFile:
-        'Elige un bloc .onepkg o una sección .one exportados desde OneNote.',
       failed: 'No se pudo importar desde OneNote',
       skipped: (count: number) =>
         `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}.`,

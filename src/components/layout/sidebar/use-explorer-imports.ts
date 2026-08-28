@@ -24,9 +24,8 @@ import {
 import { createObsidianVaultImportSource } from '@/pages/library/import/obsidian-source';
 import {
   importOneNoteFile,
-  isOneNoteFile,
-  ONENOTE_EXTENSION_RE,
-  ONENOTE_FILE_ACCEPT,
+  ONENOTE_DIALOG_FILTERS,
+  oneNoteRootName,
 } from '@/pages/library/import/onenote';
 import {
   importPdfFile,
@@ -43,18 +42,15 @@ export interface ExplorerImports {
   importDisabled: boolean;
   onImportFiles: () => void;
   onImportGoodnotesZip: () => void;
-  onImportOneNote: () => void;
+  onImportOneNote: () => Promise<void>;
   onImportObsidianVault: () => Promise<void>;
   onImportWorkspaceJson: () => Promise<void>;
   storageInputRef: React.RefObject<HTMLInputElement | null>;
   goodnotesZipInputRef: React.RefObject<HTMLInputElement | null>;
-  oneNoteInputRef: React.RefObject<HTMLInputElement | null>;
   storageInputAccept: string;
   goodnotesZipInputAccept: string;
-  oneNoteInputAccept: string;
   handleStorageInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
   handleGoodnotesZipInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  handleOneNoteInputChange: (event: ChangeEvent<HTMLInputElement>) => void;
   importSource: ImportSource | null;
   importType: 'obsidian_vault' | 'workspace_json';
   closeImportSource: () => void;
@@ -82,7 +78,6 @@ export function useExplorerImports({
   const repository = useRepository();
   const storageInputRef = useRef<HTMLInputElement>(null);
   const goodnotesZipInputRef = useRef<HTMLInputElement>(null);
-  const oneNoteInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importSource, setImportSource] = useState<ImportSource | null>(null);
   const [importType, setImportType] = useState<
@@ -188,43 +183,44 @@ export function useExplorerImports({
     [onChanged, parentId, repository, strings],
   );
 
-  const handleImportOneNoteFile = useCallback(
-    async (file: File) => {
-      if (!isOneNoteFile(file)) {
-        toast.error(strings.library.importOneNote.unsupportedFile);
-        return;
-      }
+  const onImportOneNote = useCallback(async () => {
+    if (importDisabled) {
+      return;
+    }
+    const selected = await openDialog({
+      multiple: false,
+      filters: ONENOTE_DIALOG_FILTERS,
+    });
+    if (!selected || Array.isArray(selected)) {
+      return;
+    }
 
-      setIsImporting(true);
-      try {
-        const result = await importOneNoteFile({
-          file,
-          repository,
-          parentId,
-          rootName: file.name.replace(ONENOTE_EXTENSION_RE, ''),
-          fallbackTitle: strings.library.createNew.untitledCanvas,
-        });
-        onChanged();
-        trackEvent('import_completed', {
-          import_type: 'onenote',
-          file_count: result.pagesImported,
-          partial_failure: result.skippedPages > 0,
-        });
-        if (result.skippedPages > 0) {
-          toast.info(
-            strings.library.importOneNote.skipped(result.skippedPages),
-          );
-        }
-      } catch (error) {
-        toast.error(strings.library.importOneNote.failed, {
-          description: errorDescription(error),
-        });
-      } finally {
-        setIsImporting(false);
+    setIsImporting(true);
+    try {
+      const result = await importOneNoteFile({
+        path: selected,
+        repository,
+        parentId,
+        rootName: oneNoteRootName(selected),
+        fallbackTitle: strings.library.createNew.untitledCanvas,
+      });
+      onChanged();
+      trackEvent('import_completed', {
+        import_type: 'onenote',
+        file_count: result.pagesImported,
+        partial_failure: result.skippedPages > 0,
+      });
+      if (result.skippedPages > 0) {
+        toast.info(strings.library.importOneNote.skipped(result.skippedPages));
       }
-    },
-    [onChanged, parentId, repository, strings],
-  );
+    } catch (error) {
+      toast.error(strings.library.importOneNote.failed, {
+        description: errorDescription(error),
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  }, [importDisabled, onChanged, parentId, repository, strings]);
 
   const handleStorageInputChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -250,28 +246,12 @@ export function useExplorerImports({
     [handleImportGoodnotesZipFile, isImporting],
   );
 
-  const handleOneNoteInputChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(event.currentTarget.files ?? []);
-      event.currentTarget.value = '';
-      if (files.length === 0 || isImporting) {
-        return;
-      }
-      void handleImportOneNoteFile(files[0]);
-    },
-    [handleImportOneNoteFile, isImporting],
-  );
-
   const onImportFiles = useCallback(() => {
     storageInputRef.current?.click();
   }, []);
 
   const onImportGoodnotesZip = useCallback(() => {
     goodnotesZipInputRef.current?.click();
-  }, []);
-
-  const onImportOneNote = useCallback(() => {
-    oneNoteInputRef.current?.click();
   }, []);
 
   const onImportObsidianVault = useCallback(async () => {
@@ -340,13 +320,10 @@ export function useExplorerImports({
     onImportWorkspaceJson,
     storageInputRef,
     goodnotesZipInputRef,
-    oneNoteInputRef,
     storageInputAccept: SIDEBAR_IMPORT_ACCEPT,
     goodnotesZipInputAccept: GOODNOTES_ZIP_FILE_ACCEPT,
-    oneNoteInputAccept: ONENOTE_FILE_ACCEPT,
     handleStorageInputChange,
     handleGoodnotesZipInputChange,
-    handleOneNoteInputChange,
     importSource,
     importType,
     closeImportSource,

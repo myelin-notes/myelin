@@ -328,13 +328,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
         className="hidden"
         onChange={imports.handleGoodnotesZipInputChange}
       />
-      <input
-        ref={imports.oneNoteInputRef}
-        type="file"
-        accept={imports.oneNoteInputAccept}
-        className="hidden"
-        onChange={imports.handleOneNoteInputChange}
-      />
       {imports.importSource !== null && (
         <ImportDialog
           source={imports.importSource}

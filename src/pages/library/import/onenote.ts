@@ -8,14 +8,31 @@ import { createImportedFolders } from './import-tree';
 
 const logger = new Logger('OneNoteImport');
 
-export const ONENOTE_FILE_ACCEPT = '.one,.onepkg';
-export const ONENOTE_EXTENSION_RE = /\.(one|onepkg)$/i;
+export const ONENOTE_DIALOG_FILTERS = [
+  { name: 'OneNote', extensions: ['one', 'onepkg'] },
+];
+
+const ONENOTE_EXTENSION_RE = /\.(one|onepkg)$/i;
 
 /** Rust returns page-relative CSS px; shift the whole page clear of the origin. */
 const PAGE_ORIGIN = { x: 160, y: 80 } as const;
 
-export function isOneNoteFile(file: File): boolean {
-  return ONENOTE_EXTENSION_RE.test(file.name);
+/**
+ * Root folder name for the import: the picked file's basename without the
+ * OneNote extension. Android hands back a `content://` URI whose document id is
+ * percent-encoded, so decode before taking the last segment.
+ */
+export function oneNoteRootName(path: string): string {
+  let decoded = path;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path)) {
+    try {
+      decoded = decodeURIComponent(path);
+    } catch {
+      // not percent-encoded; keep as-is
+    }
+  }
+  const base = decoded.split(/[/\\]/).pop() ?? decoded;
+  return base.replace(ONENOTE_EXTENSION_RE, '') || 'OneNote';
 }
 
 interface OneNoteTextElement {
@@ -80,11 +97,10 @@ export interface OneNoteImportResult {
   skippedPages: number;
 }
 
-export async function parseOneNoteFile(file: File): Promise<OneNoteNotebook> {
-  // Sent as the raw invoke body: a JSON number array would balloon a
-  // multi-megabyte notebook into tens of megabytes of text.
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  return invoke<OneNoteNotebook>('parse_onenote', bytes);
+export async function parseOneNoteFile(path: string): Promise<OneNoteNotebook> {
+  // Rust reads the file itself: Android cannot carry a raw invoke body, and a
+  // JSON number array would balloon a multi-megabyte notebook.
+  return invoke<OneNoteNotebook>('parse_onenote', { path });
 }
 
 function decodeBase64(data: string): Uint8Array<ArrayBuffer> {
@@ -219,21 +235,21 @@ function collectFolderPaths(sections: OneNoteSection[]): Set<string> {
 }
 
 export async function importOneNoteFile({
-  file,
+  path,
   repository,
   parentId,
   rootName,
   fallbackTitle,
   onProgress,
 }: {
-  file: File;
+  path: string;
   repository: Repository;
   parentId: VFSNodeId | null;
   rootName: string;
   fallbackTitle: string;
   onProgress?: (progress: ImportProgress) => void;
 }): Promise<OneNoteImportResult> {
-  const notebook = await parseOneNoteFile(file);
+  const notebook = await parseOneNoteFile(path);
   const rootFolderId = await repository.createFolder(rootName, parentId);
 
   // A lone top-level section is a bare .one file: its pages belong directly in

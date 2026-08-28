@@ -164,8 +164,6 @@ const en = {
         `${count} unsupported file${count === 1 ? '' : 's'} skipped.`,
     },
     importOneNote: {
-      unsupportedFile:
-        'Choose a .onepkg notebook or .one section exported from OneNote.',
       failed: 'OneNote import failed',
       skipped: (count: number) =>
         `${count} page${count === 1 ? '' : 's'} could not be imported.`,

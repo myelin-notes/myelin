@@ -1,9 +1,10 @@
 //! OneNote parsing for the library importer, covering both a bare `.one`
 //! section and a `.onepkg` notebook archive.
 //!
-//! The frontend hands over the raw bytes and gets back a flat, canvas-ready
-//! model in CSS pixels. Building the Yjs document stays in TypeScript alongside
-//! the other importers; this module only decodes and converts units.
+//! The frontend hands over the picked file's path and gets back a flat,
+//! canvas-ready model in CSS pixels. Building the Yjs document stays in
+//! TypeScript alongside the other importers; this module only decodes and
+//! converts units.
 
 use std::io;
 
@@ -17,7 +18,8 @@ use onenote_parser::page::{Page, PageContent};
 use onenote_parser::property::common::ColorRef;
 use onenote_parser::section::{Section, SectionEntry};
 use serde::Serialize;
-use tauri::ipc::{InvokeBody, Request};
+use tauri::AppHandle;
+use tauri_plugin_fs::{FilePath, FsExt};
 use typed_path::{TypedPath, TypedPathBuf};
 
 /// [MS-ONE] stores every layout value in half-inch increments; 96 CSS px to the
@@ -110,19 +112,21 @@ pub struct ImportedStroke {
     size: f32,
 }
 
-/// Notebooks run to tens of megabytes, so the bytes arrive as the raw invoke
-/// body rather than a JSON number array.
+/// The file is read here rather than sent over the IPC: Android cannot carry a
+/// raw invoke body, and a JSON number array would balloon a multi-megabyte
+/// notebook. `FilePath` + `FsExt` also resolve Android `content://` URIs.
 #[tauri::command]
-pub async fn parse_onenote(request: Request<'_>) -> Result<ImportedNotebook, String> {
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err("expected the OneNote file as a raw request body".to_string());
-    };
-    let bytes = bytes.clone();
-
-    // Parsing a large notebook is CPU-bound; keep it off the async runtime.
-    tokio::task::spawn_blocking(move || parse_file(&bytes))
-        .await
-        .map_err(|e| format!("OneNote parse task panicked: {e}"))?
+pub async fn parse_onenote(app: AppHandle, path: FilePath) -> Result<ImportedNotebook, String> {
+    // Reading and parsing a large notebook is CPU-bound; keep it off the async runtime.
+    tokio::task::spawn_blocking(move || {
+        let bytes = app
+            .fs()
+            .read(path)
+            .map_err(|e| format!("failed to read OneNote file: {e}"))?;
+        parse_file(&bytes)
+    })
+    .await
+    .map_err(|e| format!("OneNote parse task panicked: {e}"))?
 }
 
 fn parse_file(bytes: &[u8]) -> Result<ImportedNotebook, String> {
