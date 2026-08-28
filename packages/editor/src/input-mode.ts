@@ -1,4 +1,3 @@
-import type { ToolId } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 
 /**
@@ -57,10 +56,10 @@ export class InputModeController {
       : 'touch';
   }
 
-  // Select is excluded on purpose: it has no brush to hand a finger, and its touch gestures (tap,
-  // drag a handle, drag a grabbable body) are already wired up, so one finger is worth more as a pan.
-  public touchDrivesTool(toolId: ToolId): boolean {
-    return this.resolved === 'touch' && toolId !== 'select';
+  // Select included: a finger that pans instead can never draw a marquee or a lasso, and touch mode
+  // has two fingers for panning.
+  public get touchDrivesTool(): boolean {
+    return this.resolved === 'touch';
   }
 
   public destroy(): void {

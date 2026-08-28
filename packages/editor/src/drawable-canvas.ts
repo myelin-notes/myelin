@@ -1247,15 +1247,16 @@ export class DrawableCanvas {
             this._touchTapCandidate = null;
             // The two fingers of a pinch never land together, so in touch mode the first has already begun
             // a stroke. Discard it rather than commit it.
-            if (this._input.touchDrivesTool(this.toolSelected.id)) {
+            if (this._input.touchDrivesTool) {
               this.abortInteraction();
             }
             this.state.change(InteractState.Idle, evt);
             break;
           }
           // In touch mode a finger is the brush, so it goes ahead of the double-tap and pan gestures,
-          // which would eat the start of a stroke.
-          if (this._input.touchDrivesTool(this.toolSelected.id)) {
+          // which would eat the start of a stroke — or, with select, of a marquee. The tool runs its
+          // own double-tap and hit tests from there.
+          if (this._input.touchDrivesTool) {
             this._touchTapCandidate = null;
             this.state.change(InteractState.UsingTool, evt);
             this.state.update(evt);
