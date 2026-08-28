@@ -65,12 +65,17 @@ function startedSessionId(): string {
   return (args as { sessionId: string }).sessionId;
 }
 
-function emitSegment(sessionId: string, text: string): void {
+function emitSegment(
+  sessionId: string,
+  text: string,
+  startSeconds = 0,
+  endSeconds = 1,
+): void {
   emit('audio-transcription-segment', {
     sessionId,
     text,
-    startSeconds: 0,
-    endSeconds: 1,
+    startSeconds,
+    endSeconds,
     languageCode: 'en',
   });
 }
@@ -88,6 +93,7 @@ describe('audio transcription service', () => {
 
   class FakeAudioContext {
     public sampleRate = 32_000;
+    public currentTime = 0;
     public destination = {};
     public audioWorklet = { addModule: vi.fn(async () => {}) };
     public createMediaStreamSource = vi.fn(() => ({
@@ -158,7 +164,7 @@ describe('audio transcription service', () => {
     audioContext = null;
   });
 
-  it('streams raw PCM and resolves the accumulated transcript on finish', async () => {
+  it('streams raw PCM and resolves the accumulated segments on finish', async () => {
     stubAudioContext();
     mockInvokeDefaults();
 
@@ -167,8 +173,9 @@ describe('audio transcription service', () => {
     const sessionId = startedSessionId();
 
     emitSegment('other-session', 'ignored');
-    emitSegment(sessionId, ' hello');
-    emitSegment(sessionId, 'world ');
+    emitSegment(sessionId, ' hello', 0, 1.5);
+    emitSegment(sessionId, 'world ', 1.5, 3);
+    emitSegment(sessionId, '   ', 3, 3.2);
 
     emitSamples();
     await vi.waitFor(() => {
@@ -193,9 +200,37 @@ describe('audio transcription service', () => {
     });
     emitFinished(sessionId);
 
-    expect(await finishPromise).toBe('hello world');
+    // The blank segment is dropped; times are untouched with no recording start marked.
+    expect(await finishPromise).toEqual([
+      { startSeconds: 0, endSeconds: 1.5, text: 'hello' },
+      { startSeconds: 1.5, endSeconds: 3, text: 'world' },
+    ]);
     expect(audioContext?.close).toHaveBeenCalled();
     expect(listenerCount()).toBe(0);
+  });
+
+  it('shifts segment times onto the recorded file timeline', async () => {
+    stubAudioContext();
+    mockInvokeDefaults();
+
+    const session = await start();
+    const sessionId = startedSessionId();
+    // Capture had already been open half a second when the recorder started.
+    audioContext!.currentTime = 0.5;
+    session!.markRecordingStart();
+    emitSegment(sessionId, 'before the file', 0.25, 0.75);
+    emitSegment(sessionId, 'after the file', 1, 2);
+
+    const finishPromise = session!.finish();
+    await vi.waitFor(() => {
+      expect(invokesOf('finish_audio_transcription')).toHaveLength(1);
+    });
+    emitFinished(sessionId);
+
+    expect(await finishPromise).toEqual([
+      { startSeconds: 0, endSeconds: 0.25, text: 'before the file' },
+      { startSeconds: 0.5, endSeconds: 1.5, text: 'after the file' },
+    ]);
   });
 
   it('returns null and removes listeners when the start invoke rejects', async () => {
@@ -349,7 +384,9 @@ describe('audio transcription service', () => {
       expect(settled).toBe(false);
 
       emitFinished(sessionId);
-      expect(await finishPromise).toBe('slow transcript');
+      expect(await finishPromise).toEqual([
+        { startSeconds: 0, endSeconds: 1, text: 'slow transcript' },
+      ]);
     } finally {
       vi.useRealTimers();
     }
@@ -403,7 +440,9 @@ describe('audio transcription service', () => {
     emitSegment(sessionId, 'hola mundo');
     emitFinished(sessionId);
 
-    expect(await transcriptPromise).toBe('hola mundo');
+    expect(await transcriptPromise).toEqual([
+      { startSeconds: 0, endSeconds: 1, text: 'hola mundo' },
+    ]);
     expect(listenerCount()).toBe(0);
   });
 });

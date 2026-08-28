@@ -45,12 +45,25 @@ export interface ArtifactCache {
   remove(path: string): Promise<void>;
 }
 
+/** One whisper segment. Times are seconds from the start of the recording. */
+export interface TranscriptSegment {
+  startSeconds: number;
+  endSeconds: number;
+  text: string;
+}
+
 export interface AudioTranscriptionSession {
   /**
    * Resolves once the backend flushes its final segments, however long whisper takes. Settles
    * early only on cancel or when the backend reports the session finished.
    */
-  finish(): Promise<string>;
+  finish(): Promise<TranscriptSegment[]>;
+  /**
+   * Anchors segment times to a file recorded alongside this session: call it the instant recording
+   * starts. Mic capture opens first, so without this every segment lands early by that gap.
+   * A buffer session ignores it — its samples already share the file's timeline.
+   */
+  markRecordingStart(): void;
   /** Stops capture, aborts any in-flight whisper run, discards the transcript, settles a pending finish(). */
   cancel(): Promise<void>;
 }

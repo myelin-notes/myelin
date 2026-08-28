@@ -18,8 +18,10 @@ import { Logger } from '@myelin/shared/logger';
 import { getCanvasPalette, withCanvasAlpha } from '../../canvas-theme';
 import { useMessages } from '../../i18n';
 import { type AudioTranscriptionSession, getPlatform } from '../../platform';
+import type { TranscriptSegment } from '../../platform/types';
 import type { LivePeer, PeerMode } from '../../sync/live/peers';
 import { getDevicePixelRatio } from '../../utils';
+import { activeSegmentIndex, segmentsToText } from './segments';
 import {
   canTranscribeHere,
   getTranscriptionSlotState,
@@ -176,7 +178,7 @@ interface AudioPlayerViewProps {
   duration: number;
   mimeType: string;
   waveform: Float32Array | null;
-  transcript: string;
+  segments: readonly TranscriptSegment[];
   /** Gates the recording slot only — transcription is capability/claim-gated. */
   isCreator: boolean;
   /** The element's transcription claim; '' when never claimed. */
@@ -190,14 +192,14 @@ interface AudioPlayerViewProps {
     mimeType: string,
     waveform: Float32Array | null,
   ) => void;
-  onTranscribed: (transcript: string) => void;
+  onTranscribed: (segments: TranscriptSegment[]) => void;
   onTranscriptionClaimed: () => void;
   onTranscriptionClaimReleased: () => void;
 }
 
 interface AudioPlayerInteractionOptions {
   audioBytes: Uint8Array | null;
-  transcript: string;
+  hasTranscript: boolean;
   isCreator: boolean;
   slot: TranscriptionSlotState;
 }
@@ -211,7 +213,7 @@ export interface AudioPlayerInteractionState {
 
 export function getAudioPlayerInteractionState({
   audioBytes,
-  transcript,
+  hasTranscript,
   isCreator,
   slot,
 }: AudioPlayerInteractionOptions): AudioPlayerInteractionState {
@@ -225,7 +227,7 @@ export function getAudioPlayerInteractionState({
     primaryButtonDisabled: isWaitingForRemoteAudio,
     // Enabled to toggle an existing transcript or to start a job here;
     // disabled while a job runs (here or remotely) and when unavailable.
-    captionsButtonDisabled: !transcript && slot.kind !== 'can-transcribe',
+    captionsButtonDisabled: !hasTranscript && slot.kind !== 'can-transcribe',
   };
 }
 
@@ -235,7 +237,7 @@ export function AudioPlayerView({
   duration,
   mimeType,
   waveform,
-  transcript,
+  segments,
   isCreator,
   transcribingPeerId,
   localPeerId,
@@ -253,6 +255,8 @@ export function AudioPlayerView({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // Cleared as soon as the reader scrolls the panel themselves, re-armed on the next seek or play.
+  const [followPlayhead, setFollowPlayhead] = useState(true);
 
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -265,6 +269,8 @@ export function AudioPlayerView({
   const recordTickRef = useRef(0);
   const noticeTimerRef = useRef(0);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const activeRowRef = useRef<HTMLDivElement>(null);
   const displaySizeRef = useRef<WaveformDisplaySize | null>(null);
   const disposedRef = useRef(false);
   // One auto-pickup attempt per audio blob per window — a failed run must
@@ -273,9 +279,11 @@ export function AudioPlayerView({
   const isRecording = recordingState === 'recording';
   const isRequestingRecording = recordingState === 'requesting';
   const canTranscribe = getPlatform().transcription !== undefined;
+  const hasTranscript = segments.length > 0;
+  const activeIndex = activeSegmentIndex(segments, currentTime);
   const claimInput: TranscriptionCoordinationInput = {
     hasAudio: Boolean(audioBytes),
-    transcript,
+    hasTranscript,
     claimPeerId: transcribingPeerId,
     localPeerId,
     localMode,
@@ -287,7 +295,7 @@ export function AudioPlayerView({
   const showCaptionsButton = Boolean(audioBytes);
   const interaction = getAudioPlayerInteractionState({
     audioBytes,
-    transcript,
+    hasTranscript,
     isCreator,
     slot,
   });
@@ -348,6 +356,7 @@ export function AudioPlayerView({
       setCurrentTime(0);
       setRecordingState('idle');
       setShowTranscript(false);
+      setFollowPlayhead(true);
     };
   }, [audioBytes]);
 
@@ -408,6 +417,22 @@ export function AudioPlayerView({
       }
     }
   }, [waveform, currentTime, duration, isRecording]);
+
+  // Keep the playing row in view. Scrolls the panel directly rather than via scrollIntoView, which
+  // would also scroll the canvas host the panel is absolutely positioned in.
+  useLayoutEffect(() => {
+    const container = transcriptRef.current;
+    const row = activeRowRef.current;
+    if (activeIndex < 0 || !followPlayhead || !container || !row) {
+      return;
+    }
+    const rowBottom = row.offsetTop + row.offsetHeight;
+    if (row.offsetTop < container.scrollTop) {
+      container.scrollTop = row.offsetTop;
+    } else if (rowBottom > container.scrollTop + container.clientHeight) {
+      container.scrollTop = rowBottom - container.clientHeight;
+    }
+  }, [followPlayhead, activeIndex]);
 
   useLayoutEffect(() => {
     const canvas = waveformCanvasRef.current;
@@ -521,6 +546,8 @@ export function AudioPlayerView({
       };
 
       recorder.start(100);
+      // Capture opened above; anchor the transcript's clock to the file that starts here.
+      transcriptionSession?.markRecordingStart();
       setRecordingState('recording');
 
       clearInterval(recordTickRef.current);
@@ -556,7 +583,8 @@ export function AudioPlayerView({
     recordedMimeType: string,
     transcription: AudioTranscriptionSession | null,
   ) {
-    const transcriptPromise = transcription?.finish() ?? Promise.resolve('');
+    const transcriptPromise =
+      transcription?.finish() ?? Promise.resolve<TranscriptSegment[]>([]);
     const chunks = recordChunksRef.current;
     recordChunksRef.current = [];
 
@@ -606,7 +634,9 @@ export function AudioPlayerView({
       return;
     }
     setIsTranscribing(true);
-    const transcript = await transcriptPromise.catch(() => '');
+    const transcribed = await transcriptPromise.catch(
+      (): TranscriptSegment[] => [],
+    );
     if (transcriptionSessionRef.current === transcription) {
       transcriptionSessionRef.current = null;
     }
@@ -616,11 +646,11 @@ export function AudioPlayerView({
     setIsTranscribing(false);
     trackEvent('transcription_completed', {
       duration_seconds: Math.round(dur),
-      transcript_length: transcript.length,
-      had_speech: transcript.length > 0,
+      transcript_length: segmentsToText(transcribed).length,
+      had_speech: transcribed.length > 0,
     });
-    if (transcript) {
-      onTranscribed(transcript);
+    if (transcribed.length > 0) {
+      onTranscribed(transcribed);
     } else {
       // The claim must not outlive the job: present-but-idle would read as
       // "still transcribing" to remote peers forever.
@@ -629,9 +659,10 @@ export function AudioPlayerView({
     }
   }
 
-  function startPlayback() {
+  /** The player for the current blob, created on first use. `null` while no audio has arrived. */
+  function ensureAudio(): HTMLAudioElement | null {
     if (!audioBytes) {
-      return;
+      return null;
     }
 
     if (!audioElRef.current) {
@@ -657,10 +688,36 @@ export function AudioPlayerView({
       audioElRef.current.src = objectUrlRef.current;
     }
 
+    return audioElRef.current;
+  }
+
+  function startPlayback() {
+    const audio = ensureAudio();
+    if (!audio) {
+      return;
+    }
+
+    setFollowPlayhead(true);
     setIsPlaying(true);
-    audioElRef.current.play().catch(() => {
+    audio.play().catch(() => {
       setIsPlaying(false);
     });
+  }
+
+  function seekTo(seconds: number) {
+    const audio = ensureAudio();
+    if (!audio) {
+      return;
+    }
+
+    audio.currentTime = seconds;
+    // `timeupdate` only fires once the seek lands, so move the playhead now.
+    setCurrentTime(seconds);
+    if (isPlaying) {
+      setFollowPlayhead(true);
+    } else {
+      startPlayback();
+    }
   }
 
   function pausePlayback() {
@@ -695,15 +752,15 @@ export function AudioPlayerView({
         return;
       }
       transcriptionSessionRef.current = session;
-      const text = await session.finish();
+      const transcribed = await session.finish();
       if (transcriptionSessionRef.current === session) {
         transcriptionSessionRef.current = null;
       }
       if (disposedRef.current) {
         return;
       }
-      if (text) {
-        onTranscribed(text);
+      if (transcribed.length > 0) {
+        onTranscribed(transcribed);
         setShowTranscript(true);
       } else {
         onTranscriptionClaimReleased();
@@ -727,8 +784,10 @@ export function AudioPlayerView({
   }
 
   function handleCaptionsClick() {
-    if (transcript) {
+    if (hasTranscript) {
       setShowTranscript((open) => !open);
+      // Reopening starts following again, wherever the reader left the scroll last time.
+      setFollowPlayhead(true);
     } else if (slot.kind === 'can-transcribe') {
       void handleTranscribe();
     }
@@ -772,7 +831,7 @@ export function AudioPlayerView({
               ? strings.waitingForRecording
               : strings.tapToRecord));
 
-  const captionsLabel = transcript
+  const captionsLabel = hasTranscript
     ? showTranscript
       ? strings.hideTranscript
       : strings.showTranscript
@@ -823,7 +882,7 @@ export function AudioPlayerView({
         <button
           type="button"
           className="canvas-audio-transcribe"
-          data-active={showTranscript && Boolean(transcript)}
+          data-active={showTranscript && hasTranscript}
           onClick={handleCaptionsClick}
           disabled={interaction.captionsButtonDisabled}
           aria-label={captionsLabel}
@@ -836,15 +895,39 @@ export function AudioPlayerView({
           )}
         </button>
       )}
-      {showTranscript && transcript && (
+      {showTranscript && hasTranscript && (
         <div
+          ref={transcriptRef}
           className="canvas-audio-transcript"
           onWheel={(e) => {
             // Scroll the transcript, not the canvas zoom underneath.
             e.stopPropagation();
+            setFollowPlayhead(false);
+          }}
+          onTouchMove={() => {
+            setFollowPlayhead(false);
           }}
         >
-          {transcript}
+          {segments.map((segment, index) => (
+            <div
+              key={segment.startSeconds}
+              ref={index === activeIndex ? activeRowRef : undefined}
+              className="canvas-audio-transcript-row"
+              data-active={index === activeIndex}
+            >
+              <button
+                type="button"
+                className="canvas-audio-transcript-time"
+                onClick={() => {
+                  seekTo(segment.startSeconds);
+                }}
+                aria-label={strings.playFrom(formatTime(segment.startSeconds))}
+              >
+                {formatTime(segment.startSeconds)}
+              </button>
+              <span>{segment.text}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -828,6 +828,7 @@ const en = {
       transcribingOn: (peer: string) => `Transcribing on ${peer}...`,
       transcriptionUnavailable:
         'Transcription requires a device that supports it',
+      playFrom: (time: string) => `Play from ${time}`,
       showTranscript: 'Show transcript',
       hideTranscript: 'Hide transcript',
       noSpeechDetected: 'No speech detected',

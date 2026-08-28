@@ -4,12 +4,14 @@ import type * as Y from 'yjs';
 import { getCanvasPalette } from '../../canvas-theme';
 import type { CanvasViewport } from '../../canvas-viewport';
 import { I18nProvider } from '../../i18n';
+import type { TranscriptSegment } from '../../platform/types';
 import type { LivePeer, LivePeersSnapshot } from '../../sync/live/peers';
 import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
 import { AudioPlayerView } from './player-view';
+import { segmentsToText, toSegments } from './segments';
 import { decodeAudio, drawWaveform } from './waveform';
 
 export const AUDIO_NATURAL_WIDTH = 280;
@@ -30,7 +32,7 @@ export class AudioElement extends DrawableElement {
   private _fileName: string = '';
   private _duration: number = 0;
   private _mimeType: string = '';
-  private _transcript: string = '';
+  private _segments: TranscriptSegment[] = [];
   private _creatorPeerId: string;
   private _localPeerId: string;
   private _transcribingPeerId: string = '';
@@ -61,8 +63,8 @@ export class AudioElement extends DrawableElement {
     );
   };
 
-  private readonly _onTranscribed = (transcript: string) => {
-    this.setTranscript(transcript);
+  private readonly _onTranscribed = (segments: TranscriptSegment[]) => {
+    this.setTranscript(segments);
   };
 
   private readonly _onTranscriptionClaimed = () => {
@@ -84,7 +86,7 @@ export class AudioElement extends DrawableElement {
       fileName: this._fileName,
       duration: this._duration,
       mimeType: this._mimeType,
-      transcript: this._transcript,
+      transcriptSegments: this._segments,
       creatorPeerId: this._creatorPeerId,
       transcribingPeerId: this._transcribingPeerId,
     };
@@ -108,8 +110,8 @@ export class AudioElement extends DrawableElement {
         this._mimeType = typeof v === 'string' ? v : '';
         this.render();
       },
-      transcript: (v) => {
-        this._transcript = typeof v === 'string' ? v : '';
+      transcriptSegments: (v) => {
+        this._segments = toSegments(v);
         this.render();
       },
       creatorPeerId: (v) => {
@@ -138,7 +140,10 @@ export class AudioElement extends DrawableElement {
     return this._creatorPeerId;
   }
   public get transcript(): string {
-    return this._transcript;
+    return segmentsToText(this._segments);
+  }
+  public get transcriptSegments(): readonly TranscriptSegment[] {
+    return this._segments;
   }
   public get transcribingPeerId(): string {
     return this._transcribingPeerId;
@@ -212,13 +217,13 @@ export class AudioElement extends DrawableElement {
     this._fileName = fileName;
     this._duration = duration;
     this._mimeType = mimeType;
-    this._transcript = '';
+    this._segments = [];
     this.syncToYMap({
       audioData: this._audioData,
       fileName,
       duration,
       mimeType,
-      transcript: '',
+      transcriptSegments: [],
     });
     if (waveform) {
       this._waveform = waveform;
@@ -230,11 +235,11 @@ export class AudioElement extends DrawableElement {
   }
 
   /** Called by the player view once on-demand transcription completes. */
-  public setTranscript(transcript: string): void {
-    this._transcript = transcript;
+  public setTranscript(segments: TranscriptSegment[]): void {
+    this._segments = segments;
     // Lands seconds or minutes after the click that triggered it, so it must not be undoable or merge
     // into the undo capture window of whatever the user is editing when it arrives.
-    this.syncToYMap({ transcript }, ASYNC_RESULT_ORIGIN);
+    this.syncToYMap({ transcriptSegments: segments }, ASYNC_RESULT_ORIGIN);
     this.render();
   }
 
@@ -355,7 +360,7 @@ export class AudioElement extends DrawableElement {
             duration={this._duration}
             mimeType={this._mimeType}
             waveform={this._waveform}
-            transcript={this._transcript}
+            segments={this._segments}
             isCreator={this.isCreatedByLocalPeer}
             transcribingPeerId={this._transcribingPeerId}
             localPeerId={this._localPeerId}

@@ -22,7 +22,7 @@ function input(
 ): TranscriptionCoordinationInput {
   return {
     hasAudio: true,
-    transcript: '',
+    hasTranscript: false,
     claimPeerId: '',
     localPeerId: 'peer-b',
     localMode: 'owner-device',
@@ -60,7 +60,7 @@ describe('isClaimActive', () => {
       isClaimActive(
         input({
           claimPeerId: 'peer-c',
-          transcript: 'done',
+          hasTranscript: true,
           remotePeers: [peer('peer-c')],
         }),
       ),
@@ -127,7 +127,7 @@ describe('shouldAutoTranscribe', () => {
   it('does nothing once the transcript is set', () => {
     expect(
       shouldAutoTranscribe(
-        input({ claimPeerId: 'peer-b', transcript: 'done' }),
+        input({ claimPeerId: 'peer-b', hasTranscript: true }),
       ),
     ).toBe(false);
   });
@@ -238,7 +238,7 @@ describe('getTranscriptionSlotState', () => {
     expect(getTranscriptionSlotState(input({ hasAudio: false }))).toEqual({
       kind: 'none',
     });
-    expect(getTranscriptionSlotState(input({ transcript: 'done' }))).toEqual({
+    expect(getTranscriptionSlotState(input({ hasTranscript: true }))).toEqual({
       kind: 'none',
     });
   });
