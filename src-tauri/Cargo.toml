@@ -43,6 +43,10 @@ sha2 = "0.10.9"
 krilla = { version = "0.8.1", features = ["pdf"] }
 base64 = "0.22.1"
 onenote_parser = { version = "2", features = ["onepkg"] }
+# Reverse-engineered .sdocx parser; not on crates.io (the name is taken by an
+# unrelated GPL crate), hence the git pin.
+sdocx = { git = "https://github.com/squ1dd13/sdocx2pdf", rev = "0012ec9bd65141ec48c9555a84c7251d34bde744" }
+tempfile = "3"
 typed-path = "0.12"
 yrs = "0.26.0"
 scribble = "0.5.4"

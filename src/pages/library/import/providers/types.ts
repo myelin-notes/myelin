@@ -12,6 +12,7 @@ export type ImportProviderId =
   | 'files'
   | 'goodnotes_zip'
   | 'onenote'
+  | 'samsung_notes'
   | 'obsidian_vault'
   | 'workspace_json';
 

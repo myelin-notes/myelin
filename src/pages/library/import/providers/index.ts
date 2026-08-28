@@ -2,6 +2,7 @@ import { filesProvider } from './files';
 import { goodnotesProvider } from './goodnotes';
 import { obsidianProvider } from './obsidian';
 import { onenoteProvider } from './onenote';
+import { samsungNotesProvider } from './samsung-notes';
 import type { ImportProvider, ImportProviderId } from './types';
 import { workspaceJsonProvider } from './workspace-json';
 
@@ -10,6 +11,7 @@ export const IMPORT_PROVIDERS: readonly ImportProvider[] = [
   filesProvider,
   goodnotesProvider,
   onenoteProvider,
+  samsungNotesProvider,
   obsidianProvider,
   workspaceJsonProvider,
 ];

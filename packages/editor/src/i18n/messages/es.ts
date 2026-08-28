@@ -165,6 +165,23 @@ const es: typeof en = {
         skipped: (count: number) =>
           `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}`,
       },
+      samsung_notes: {
+        label: 'Samsung Notes (experimental)',
+        description:
+          'Una nota .sdocx. Se importan la escritura a mano y el texto; las imágenes, formas y fondos PDF todavía no, y algunas notas pueden fallar por completo.',
+        title: 'Importar desde Samsung Notes',
+        scanning: 'Leyendo la nota...',
+        empty: 'Todavía no se puede importar nada de esta nota',
+        pages: (count: number) => `${count} página${count === 1 ? '' : 's'}`,
+        elements: (count: number) =>
+          `${count} elemento${count === 1 ? '' : 's'}`,
+        summary: (count: number) =>
+          `Se ${count === 1 ? 'importó' : 'importaron'} ${count} página${count === 1 ? '' : 's'}`,
+        skippedObjects: (count: number) =>
+          count === 1
+            ? '1 objeto (imagen, forma o fondo PDF) todavía no se puede importar'
+            : `${count} objetos (imágenes, formas o fondos PDF) todavía no se pueden importar`,
+      },
       obsidian_vault: {
         label: 'Bóveda de Obsidian',
         description:

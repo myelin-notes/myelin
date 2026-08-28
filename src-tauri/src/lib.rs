@@ -9,6 +9,7 @@ mod note_index;
 mod oauth_loopback;
 mod onenote_import;
 mod pdf_export;
+mod samsung_notes_import;
 mod transcription;
 mod workspace_export;
 
@@ -104,6 +105,7 @@ pub fn run() {
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::parse_onenote,
+            samsung_notes_import::parse_samsung_notes,
         ]);
 
     #[cfg(debug_assertions)]
