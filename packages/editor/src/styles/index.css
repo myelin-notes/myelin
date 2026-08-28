@@ -19,6 +19,7 @@
 @import "./canvas-latex.css";
 @import "./text.css";
 @import "./canvas-audio.css";
+@import "./canvas-code-output.css";
 @import "./editor-inline.css";
 @import "./widgets.css";
 @import "./embeds.css";

@@ -33,7 +33,6 @@ import type {
   PageFrameAutocompleteItem,
 } from '../pm/autocomplete';
 import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
-import { CodeRunOverlayLayer } from '../pm/code-block/run-overlay';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
 import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
@@ -258,6 +257,8 @@ function createFrameRefs(
   const contentDiv = document.createElement('div');
   Object.assign(contentDiv.style, CONTENT_STYLE);
   contentDiv.classList.add(PM_EDITOR_CLASS);
+  // Lets DOM under this editor (code blocks) be resolved back to its frame element.
+  contentDiv.dataset.frameUuid = frame.uuid;
 
   viewportDiv.appendChild(contentDiv);
   frameDiv.appendChild(viewportDiv);
@@ -779,7 +780,6 @@ export function PageFrameDomLayer({
         loadPreview={loadNoteLinkPreview}
         suppressed={autocompleteKind !== null}
       />
-      <CodeRunOverlayLayer />
     </>
   );
 }

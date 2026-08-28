@@ -7,6 +7,7 @@ export enum ElementType {
   SHAPE = 5,
   LATEX = 6,
   AUDIO = 7,
+  CODE_OUTPUT = 8,
 }
 
 /**

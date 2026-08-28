@@ -87,6 +87,7 @@ describe('markdown paste', () => {
         },
         {
           type: 'codeBlock',
+          attrs: { blockId: null },
           content: [
             {
               type: 'text',

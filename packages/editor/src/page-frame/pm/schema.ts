@@ -193,10 +193,22 @@ const codeBlock: NodeSpec = {
   marks: '',
   code: true,
   defining: true,
-  toDOM() {
-    return ['pre', ['code', 0]];
+  // Minted lazily on first run; links the block to its canvas output element across reloads.
+  attrs: { blockId: { default: null } },
+  toDOM(node) {
+    return node.attrs.blockId
+      ? ['pre', { 'data-block-id': node.attrs.blockId }, ['code', 0]]
+      : ['pre', ['code', 0]];
   },
-  parseDOM: [{ tag: 'pre', preserveWhitespace: 'full' }],
+  parseDOM: [
+    {
+      tag: 'pre',
+      preserveWhitespace: 'full',
+      getAttrs(dom) {
+        return { blockId: (dom as HTMLElement).getAttribute('data-block-id') };
+      },
+    },
+  ],
 };
 
 const mathBlock: NodeSpec = {

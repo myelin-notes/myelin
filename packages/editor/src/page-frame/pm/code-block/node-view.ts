@@ -120,10 +120,12 @@ export class CodeBlockNodeView implements NodeView {
     this.runView = new CodeBlockRunView({
       view: this.view,
       blockDom: this.dom,
+      getPos: this.getPos,
       collectSource: () => collectRunSource(this.view.state.doc, this.getPos()),
     });
     this.dom.appendChild(this.runView.button);
     this.runView.setLanguage(parseBlockLanguage(this.node.textContent));
+    this.syncBlockId();
 
     // The .pm-page-capped max-height tracks data-page-layout, which the frame
     // can flip after this view mounts (e.g. switching to continuous in
@@ -152,6 +154,7 @@ export class CodeBlockNodeView implements NodeView {
 
     this.node = node;
     this.runView.setLanguage(parseBlockLanguage(node.textContent));
+    this.syncBlockId();
 
     if (!this.editor) {
       return true;
@@ -398,6 +401,16 @@ export class CodeBlockNodeView implements NodeView {
     this.setExternalSelection(
       getCodeBlockExternalSelection(from, to, start, end),
     );
+  }
+
+  // Mirrored onto the DOM so the output card can resolve its anchor block by id.
+  private syncBlockId(): void {
+    const blockId = this.node.attrs.blockId;
+    if (typeof blockId === 'string' && blockId.length > 0) {
+      this.dom.dataset.blockId = blockId;
+    } else {
+      delete this.dom.dataset.blockId;
+    }
   }
 
   private syncHeight(): void {

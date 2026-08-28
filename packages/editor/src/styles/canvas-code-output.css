@@ -1,0 +1,120 @@
+/* Code-run output card, mounted above the canvases in #canvas-chrome-controls.
+   Laid out at world px and GPU-scaled to the canvas zoom (transform on the root),
+   so the virtualizer's measured row heights are zoom-independent. */
+.canvas-code-output {
+  position: absolute;
+  transform-origin: 0 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.canvas-code-output__card {
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 8px 24px -8px rgb(var(--shadow-rgb-elevated) / 0.1);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* pointer-events: none so header drags fall through to the canvas (select/move).
+   Only the stop button and the output body opt back in. */
+.canvas-code-output__header {
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-ghost);
+  font-family: var(--font-sans, 'Hanken Grotesk', sans-serif);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.canvas-code-output__lang {
+  font-weight: 600;
+}
+
+.canvas-code-output__status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.canvas-code-output__status.is-running::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-dark);
+  animation: canvas-code-output-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes canvas-code-output-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.canvas-code-output__stop {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.canvas-code-output__stop:hover {
+  background: var(--bg-hover-tint);
+  color: var(--text-primary);
+}
+
+.canvas-code-output__body {
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.canvas-code-output__line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.canvas-code-output__line.is-stderr {
+  color: var(--text-error, #e5484d);
+}
+
+.canvas-code-output__empty {
+  color: var(--text-muted);
+}

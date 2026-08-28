@@ -329,6 +329,7 @@ describe('page-frame content shape', () => {
       content: [
         {
           type: 'codeBlock',
+          attrs: { blockId: null },
           content: [{ type: 'text', text: markdown }],
         },
       ],
