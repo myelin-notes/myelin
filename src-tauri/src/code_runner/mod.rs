@@ -1,6 +1,6 @@
 mod runners;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::ErrorKind;
 use std::path::Path;
 use std::process::Stdio;
@@ -9,22 +9,21 @@ use std::time::Duration;
 
 use runners::{resolve_plan, RunPlan};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
+use tauri::{AppHandle, Manager, State};
+use tokio::io::{AsyncRead, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::oneshot;
 
-const OUTPUT_EVENT: &str = "code-run-output";
-const FINISHED_EVENT: &str = "code-run-finished";
 /// How often the run loop checks for process exit while also watching for a
 /// cancel signal. Keeps exit latency imperceptible without busy-spinning.
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
-/// Output lines are coalesced into batches before crossing the IPC boundary.
-/// One Tauri event per line floods the webview's main thread and tanks UI frame
-/// rate when a program prints rapidly, so we flush a batch once it reaches
-/// `MAX_BATCH_LINES` or `FLUSH_INTERVAL` elapses since its first line.
-const FLUSH_INTERVAL: Duration = Duration::from_millis(33);
-const MAX_BATCH_LINES: usize = 512;
+/// Retained scrollback per execution. Output beyond this evicts the oldest
+/// lines; `poll_output` reports the gap as `skipped`.
+const RING_CAP: usize = 10_000;
+/// A line longer than this is cut and the rest of it discarded.
+const MAX_LINE_BYTES: usize = 8 * 1024;
+const POLL_MAX_LINES: usize = 2_000;
+const POLL_MAX_BYTES: usize = 256 * 1024;
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -33,30 +32,44 @@ enum OutputStream {
     Stderr,
 }
 
+// Jupyter-style rich output would generalize this into an item enum (text line | MIME display
+// bundle | display update); the ring + cursor polling transport stays the same.
 #[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OutputPayload {
-    execution_id: String,
+struct RunLine {
     stream: OutputStream,
-    lines: Vec<String>,
+    text: String,
 }
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct FinishedPayload {
-    execution_id: String,
-    exit_code: Option<i32>,
-    error: Option<String>,
+enum RunStatus {
+    Running,
+    Done {
+        exit_code: Option<i32>,
+        error: Option<String>,
+    },
+}
+
+/// `total` is the cursor space: lines ever produced, of which the newest
+/// `lines.len()` are retained. `Done` is set only after both pipe readers hit
+/// EOF, so a poll observing it knows no further lines are coming.
+struct RunBuffer {
+    lines: VecDeque<RunLine>,
+    total: u64,
+    status: RunStatus,
+}
+
+struct RunEntry {
+    buffer: Arc<Mutex<RunBuffer>>,
+    cancel: Option<oneshot::Sender<()>>,
 }
 
 pub struct CodeRunnerState {
-    cancels: Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>,
+    runs: Arc<Mutex<HashMap<String, RunEntry>>>,
 }
 
 impl CodeRunnerState {
     pub fn new() -> Self {
         Self {
-            cancels: Arc::new(Mutex::new(HashMap::new())),
+            runs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -83,51 +96,49 @@ pub async fn run_code(
         .join(&execution_id);
 
     let Some(plan) = resolve_plan(&language, &dir) else {
-        let _ = app.emit(
-            FINISHED_EVENT,
-            FinishedPayload {
-                execution_id,
-                exit_code: None,
-                error: Some(format!("Cannot run '{language}' — unsupported language.")),
-            },
-        );
-        return Ok(());
+        return Err(format!("Cannot run '{language}' — unsupported language."));
     };
 
     std::fs::create_dir_all(&dir).map_err(|e| format!("create run dir: {e}"))?;
     std::fs::write(dir.join(plan.source_filename), source)
         .map_err(|e| format!("write source: {e}"))?;
 
+    let buffer = Arc::new(Mutex::new(RunBuffer {
+        lines: VecDeque::new(),
+        total: 0,
+        status: RunStatus::Running,
+    }));
     let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
-    state
-        .cancels
-        .lock()
-        .expect("cancels mutex poisoned")
-        .insert(execution_id.clone(), cancel_tx);
+    state.runs.lock().expect("runs mutex poisoned").insert(
+        execution_id.clone(),
+        RunEntry {
+            buffer: buffer.clone(),
+            cancel: Some(cancel_tx),
+        },
+    );
 
-    let cancels = state.cancels.clone();
+    let runs = state.runs.clone();
     tauri::async_runtime::spawn(async move {
-        let result = run_to_completion(&app, &dir, plan, cancel_rx, &execution_id).await;
-
-        cancels
-            .lock()
-            .expect("cancels mutex poisoned")
-            .remove(&execution_id);
+        let result = run_to_completion(&dir, plan, cancel_rx, &buffer).await;
         let _ = std::fs::remove_dir_all(&dir);
 
-        let payload = match result {
-            Ok(exit_code) => FinishedPayload {
-                execution_id,
+        buffer.lock().expect("run buffer mutex poisoned").status = match result {
+            Ok(exit_code) => RunStatus::Done {
                 exit_code,
                 error: None,
             },
-            Err(error) => FinishedPayload {
-                execution_id,
+            Err(error) => RunStatus::Done {
                 exit_code: None,
                 error: Some(error),
             },
         };
-        let _ = app.emit(FINISHED_EVENT, payload);
+        if let Some(entry) = runs
+            .lock()
+            .expect("runs mutex poisoned")
+            .get_mut(&execution_id)
+        {
+            entry.cancel = None;
+        }
     });
 
     Ok(())
@@ -138,23 +149,94 @@ pub async fn cancel_run(
     state: State<'_, CodeRunnerState>,
     execution_id: String,
 ) -> Result<(), String> {
-    if let Some(tx) = state
-        .cancels
+    if let Some(entry) = state
+        .runs
         .lock()
-        .expect("cancels mutex poisoned")
-        .remove(&execution_id)
+        .expect("runs mutex poisoned")
+        .get_mut(&execution_id)
     {
-        let _ = tx.send(());
+        if let Some(tx) = entry.cancel.take() {
+            let _ = tx.send(());
+        }
     }
     Ok(())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PollResponse {
+    lines: Vec<RunLine>,
+    next_cursor: u64,
+    /// Lines evicted from the ring before the caller's cursor reached them.
+    skipped: u64,
+    /// With an empty `lines`, the caller has drained everything.
+    finished: bool,
+    exit_code: Option<i32>,
+    error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn poll_output(
+    state: State<'_, CodeRunnerState>,
+    execution_id: String,
+    cursor: u64,
+) -> Result<PollResponse, String> {
+    let buffer = state
+        .runs
+        .lock()
+        .expect("runs mutex poisoned")
+        .get(&execution_id)
+        .map(|entry| entry.buffer.clone())
+        .ok_or("unknown execution")?;
+
+    let buf = buffer.lock().expect("run buffer mutex poisoned");
+    let oldest = buf.total - buf.lines.len() as u64;
+    let start = cursor.clamp(oldest, buf.total);
+
+    let mut lines = Vec::new();
+    let mut bytes = 0usize;
+    let mut index = (start - oldest) as usize;
+    while index < buf.lines.len() && lines.len() < POLL_MAX_LINES && bytes < POLL_MAX_BYTES {
+        let line = &buf.lines[index];
+        bytes += line.text.len();
+        lines.push(line.clone());
+        index += 1;
+    }
+
+    let (finished, exit_code, error) = match &buf.status {
+        RunStatus::Running => (false, None, None),
+        RunStatus::Done { exit_code, error } => (true, *exit_code, error.clone()),
+    };
+    Ok(PollResponse {
+        lines,
+        next_cursor: oldest + index as u64,
+        skipped: start.saturating_sub(cursor),
+        finished,
+        exit_code,
+        error,
+    })
+}
+
+/// Drops a finished run's buffer. The frontend calls this once its poll loop
+/// has drained the run (or its block is disposed).
+#[tauri::command]
+pub async fn release_run(
+    state: State<'_, CodeRunnerState>,
+    execution_id: String,
+) -> Result<(), String> {
+    state
+        .runs
+        .lock()
+        .expect("runs mutex poisoned")
+        .remove(&execution_id);
+    Ok(())
+}
+
 async fn run_to_completion(
-    app: &AppHandle,
     dir: &Path,
     plan: RunPlan,
     cancel_rx: oneshot::Receiver<()>,
-    execution_id: &str,
+    buffer: &Arc<Mutex<RunBuffer>>,
 ) -> Result<Option<i32>, String> {
     if !plan.build.is_empty() {
         let Some(output) = try_build(dir, &plan.build).await? else {
@@ -166,13 +248,8 @@ async fn run_to_completion(
                 .join(", ");
             return Err(format!("No compiler found — install one of: {names}."));
         };
-        if !output.stderr.is_empty() {
-            emit_lines(
-                app,
-                execution_id,
-                OutputStream::Stderr,
-                vec![String::from_utf8_lossy(&output.stderr).into_owned()],
-            );
+        for line in String::from_utf8_lossy(&output.stderr).lines() {
+            push_line(buffer, OutputStream::Stderr, line.to_string());
         }
         if !output.status.success() {
             return Ok(output.status.code());
@@ -190,22 +267,15 @@ async fn run_to_completion(
 
     let stdout = child.stdout.take().expect("stdout piped");
     let stderr = child.stderr.take().expect("stderr piped");
-    let out_task = spawn_reader(
-        app.clone(),
-        execution_id.to_string(),
-        OutputStream::Stdout,
-        stdout,
-    );
-    let err_task = spawn_reader(
-        app.clone(),
-        execution_id.to_string(),
-        OutputStream::Stderr,
-        stderr,
-    );
+    let out_task =
+        tauri::async_runtime::spawn(drain_reader(stdout, OutputStream::Stdout, buffer.clone()));
+    let err_task =
+        tauri::async_runtime::spawn(drain_reader(stderr, OutputStream::Stderr, buffer.clone()));
 
     let status = wait_or_cancel(&mut child, cancel_rx).await?;
 
-    // Let the readers drain any buffered output before the finished event.
+    // Drain fully before the caller flips status to Done — a poll observing
+    // `finished` must be able to trust that no more lines are coming.
     let _ = out_task.await;
     let _ = err_task.await;
 
@@ -259,65 +329,66 @@ async fn wait_or_cancel(
     }
 }
 
-fn spawn_reader<R: AsyncRead + Unpin + Send + 'static>(
-    app: AppHandle,
-    execution_id: String,
-    stream: OutputStream,
+/// Reads a pipe to EOF into the ring at full speed — the child never blocks on
+/// a slow consumer; the ring drops the middle instead. Splits on `\r` as well
+/// as `\n` so `\r`-rewriting progress bars stream rather than buffering one
+/// giant line for the whole run.
+async fn drain_reader<R: AsyncRead + Unpin + Send + 'static>(
     reader: R,
-) -> tauri::async_runtime::JoinHandle<()> {
-    tauri::async_runtime::spawn(async move {
-        let mut lines = BufReader::new(reader).lines();
-        let mut batch: Vec<String> = Vec::new();
-        // Deadline for the current batch, anchored to its first line so a slow
-        // trickle still flushes on time instead of a per-line timer reset
-        // deferring it indefinitely.
-        let mut deadline: Option<tokio::time::Instant> = None;
+    stream: OutputStream,
+    buffer: Arc<Mutex<RunBuffer>>,
+) {
+    let mut reader = BufReader::new(reader);
+    let mut chunk = vec![0u8; 16 * 1024];
+    let mut pending: Vec<u8> = Vec::new();
+    let mut truncated = false;
+    let mut last_was_cr = false;
 
-        loop {
-            let timer = async {
-                match deadline {
-                    Some(at) => tokio::time::sleep_until(at).await,
-                    None => std::future::pending::<()>().await,
-                }
-            };
-
-            tokio::select! {
-                next = lines.next_line() => match next {
-                    Ok(Some(line)) => {
-                        if batch.is_empty() {
-                            deadline = Some(tokio::time::Instant::now() + FLUSH_INTERVAL);
-                        }
-                        batch.push(line);
-                        if batch.len() >= MAX_BATCH_LINES {
-                            emit_lines(&app, &execution_id, stream, std::mem::take(&mut batch));
-                            deadline = None;
-                        }
-                    }
-                    // EOF or a read error: stop reading; the final flush is below.
-                    _ => break,
-                },
-                _ = timer => {
-                    emit_lines(&app, &execution_id, stream, std::mem::take(&mut batch));
-                    deadline = None;
-                }
+    loop {
+        let read = match reader.read(&mut chunk).await {
+            Ok(0) | Err(_) => break,
+            Ok(n) => n,
+        };
+        for &byte in &chunk[..read] {
+            if byte == b'\n' && last_was_cr {
+                last_was_cr = false;
+                continue;
+            }
+            last_was_cr = byte == b'\r';
+            if byte == b'\n' || byte == b'\r' {
+                push_line(&buffer, stream, finish_line(&mut pending, &mut truncated));
+            } else if truncated {
+                // Discarding the rest of an over-long line.
+            } else if pending.len() >= MAX_LINE_BYTES {
+                truncated = true;
+            } else {
+                pending.push(byte);
             }
         }
+    }
 
-        if !batch.is_empty() {
-            emit_lines(&app, &execution_id, stream, batch);
-        }
-    })
+    if !pending.is_empty() || truncated {
+        push_line(&buffer, stream, finish_line(&mut pending, &mut truncated));
+    }
 }
 
-fn emit_lines(app: &AppHandle, execution_id: &str, stream: OutputStream, lines: Vec<String>) {
-    let _ = app.emit(
-        OUTPUT_EVENT,
-        OutputPayload {
-            execution_id: execution_id.to_string(),
-            stream,
-            lines,
-        },
-    );
+fn finish_line(pending: &mut Vec<u8>, truncated: &mut bool) -> String {
+    let mut text = String::from_utf8_lossy(pending).into_owned();
+    if *truncated {
+        text.push_str(" … [truncated]");
+    }
+    pending.clear();
+    *truncated = false;
+    text
+}
+
+fn push_line(buffer: &Mutex<RunBuffer>, stream: OutputStream, text: String) {
+    let mut buf = buffer.lock().expect("run buffer mutex poisoned");
+    if buf.lines.len() == RING_CAP {
+        buf.lines.pop_front();
+    }
+    buf.lines.push_back(RunLine { stream, text });
+    buf.total += 1;
 }
 
 fn spawn_error(program: &str, error: std::io::Error) -> String {

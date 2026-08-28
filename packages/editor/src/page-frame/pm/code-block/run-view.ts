@@ -1,12 +1,22 @@
 import type { EditorView } from 'prosemirror-view';
 import { trackEvent } from '@myelin/shared/analytics';
 import { Logger } from '@myelin/shared/logger';
-import type { RunnableLanguage } from '../../../code-runner/contract';
-import { getPlatform, type Unsubscribe } from '../../../platform';
+import type {
+  RunnableLanguage,
+  RunPollResponse,
+} from '../../../code-runner/contract';
+import { type CodeRunnerCapability, getPlatform } from '../../../platform';
 import type { RunSource } from './concat';
 import { codeRunStore } from './run-store';
 
 const logger = new Logger('CodeBlockRun');
+
+/** Pull cadence while a run is quiet. Each poll is one bounded IPC round-trip,
+ *  so output can never flood the webview faster than this. */
+const POLL_INTERVAL_MS = 50;
+
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 interface CodeBlockRunViewOptions {
   view: EditorView;
@@ -36,9 +46,6 @@ export class CodeBlockRunView {
   private runStartedAt = 0;
   private runCancelled = false;
 
-  private unlistenOutput: Unsubscribe | null = null;
-  private unlistenFinished: Unsubscribe | null = null;
-
   constructor(private readonly options: CodeBlockRunViewOptions) {
     this.button = document.createElement('button');
     this.button.type = 'button';
@@ -59,12 +66,17 @@ export class CodeBlockRunView {
   }
 
   dispose(): void {
-    if (this.executionId) {
-      void getPlatform()
-        .codeRunner?.cancelRun(this.executionId)
+    const executionId = this.executionId;
+    // Nulling the id stops the poll loop.
+    this.executionId = null;
+    const codeRunner = getPlatform().codeRunner;
+    if (executionId && codeRunner) {
+      void codeRunner
+        .cancelRun(executionId)
+        .catch(() => {})
+        .then(() => codeRunner.releaseRun(executionId))
         .catch(() => {});
     }
-    this.clearListeners();
     codeRunStore.remove(this.id);
   }
 
@@ -99,21 +111,6 @@ export class CodeBlockRunView {
     this.setRunning(true);
     codeRunStore.start(this.id, this.options.view, this.options.blockDom);
 
-    // Subscribe before invoking so a fast-exiting process can't emit before a
-    // listener exists.
-    this.unlistenOutput = await codeRunner.onRunOutput(executionId, (event) => {
-      codeRunStore.appendLines(
-        this.id,
-        event.lines.map((text) => ({ text, stream: event.stream })),
-      );
-    });
-    this.unlistenFinished = await codeRunner.onRunFinished(
-      executionId,
-      (event) => {
-        this.onFinished(event.exitCode, event.error);
-      },
-    );
-
     try {
       await codeRunner.runCode({
         executionId,
@@ -122,11 +119,55 @@ export class CodeBlockRunView {
       });
     } catch (err) {
       this.onFinished(null, String(err));
+      return;
+    }
+    void this.pollLoop(codeRunner, executionId);
+  }
+
+  /** Drains the backend's output ring at its own pace until the run finishes,
+   *  this view is disposed, or a new run replaces `executionId`. */
+  private async pollLoop(
+    codeRunner: CodeRunnerCapability,
+    executionId: string,
+  ): Promise<void> {
+    let cursor = 0;
+    while (this.executionId === executionId) {
+      let res: RunPollResponse;
+      try {
+        res = await codeRunner.pollOutput(executionId, cursor);
+      } catch (err) {
+        if (this.executionId === executionId) {
+          this.onFinished(null, String(err));
+        }
+        return;
+      }
+      if (this.executionId !== executionId) {
+        return;
+      }
+
+      if (res.skipped > 0) {
+        codeRunStore.appendLine(this.id, {
+          text: `… ${res.skipped} lines skipped`,
+          stream: 'stderr',
+        });
+      }
+      codeRunStore.appendLines(this.id, res.lines);
+      cursor = res.nextCursor;
+
+      if (res.finished) {
+        if (res.lines.length === 0) {
+          void codeRunner.releaseRun(executionId).catch(() => {});
+          this.onFinished(res.exitCode, res.error);
+          return;
+        }
+        // Process already exited — drain the remaining backlog without delay.
+        continue;
+      }
+      await delay(POLL_INTERVAL_MS);
     }
   }
 
   private onFinished(exitCode: number | null, error: string | null): void {
-    this.clearListeners();
     this.executionId = null;
     this.setRunning(false);
 
@@ -160,12 +201,5 @@ export class CodeBlockRunView {
   private syncButton(): void {
     this.button.textContent = this.running ? '■' : '▶';
     this.button.setAttribute('aria-label', this.running ? 'Stop' : 'Run');
-  }
-
-  private clearListeners(): void {
-    this.unlistenOutput?.();
-    this.unlistenFinished?.();
-    this.unlistenOutput = null;
-    this.unlistenFinished = null;
   }
 }

@@ -4,11 +4,7 @@
  * unavailable, and UI affordances are gated on presence.
  */
 
-import type {
-  RunCodeRequest,
-  RunFinishedEvent,
-  RunOutputEvent,
-} from '../code-runner/contract';
+import type { RunCodeRequest, RunPollResponse } from '../code-runner/contract';
 import type { PdfExportRequest } from '../pdf-export/contract';
 import type { LiveDiscoveryTransport } from '../sync/live/transport';
 import type { VFSNodeId } from '../sync/types';
@@ -137,16 +133,10 @@ export interface HandwritingCapability {
 export interface CodeRunnerCapability {
   runCode(request: RunCodeRequest): Promise<void>;
   cancelRun(executionId: string): Promise<void>;
-  /** Streams stdout/stderr lines for one execution. Await before {@link runCode}. */
-  onRunOutput(
-    executionId: string,
-    callback: (event: RunOutputEvent) => void,
-  ): Promise<Unsubscribe>;
-  /** Fires once when an execution exits (or fails to start). */
-  onRunFinished(
-    executionId: string,
-    callback: (event: RunFinishedEvent) => void,
-  ): Promise<Unsubscribe>;
+  /** Buffered output since `cursor` for one execution; rejects if unknown. */
+  pollOutput(executionId: string, cursor: number): Promise<RunPollResponse>;
+  /** Frees the backend's output buffer once a run has been drained. */
+  releaseRun(executionId: string): Promise<void>;
 }
 
 export interface PdfExportOptions {

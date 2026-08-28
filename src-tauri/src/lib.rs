@@ -100,6 +100,8 @@ pub fn run() {
             transcription::cancel_audio_transcription,
             code_runner::run_code,
             code_runner::cancel_run,
+            code_runner::poll_output,
+            code_runner::release_run,
             oauth_loopback::oauth_loopback_start,
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
