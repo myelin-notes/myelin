@@ -5,6 +5,7 @@ import type {
 import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import pcmCaptureWorkletUrl from './pcm-capture.worklet.ts?worker&url';
 
 const logger = new Logger('AudioTranscription');
 
@@ -268,28 +269,27 @@ async function startPcmCapture(
   onSamples: (samples: Float32Array, sampleRate: number) => void,
 ): Promise<PcmCapture> {
   const audioContext = new AudioContext();
+  await audioContext.audioWorklet.addModule(pcmCaptureWorkletUrl);
   const source = audioContext.createMediaStreamSource(stream);
-  // Deliberately the deprecated ScriptProcessorNode over AudioWorklet: a worklet needs bundler
-  // plumbing and per-webview verification (WebKitGTK support unconfirmed). Worst case here is
-  // main-thread starvation dropping samples, which only degrades the live transcript — the recording
-  // comes from MediaRecorder and the transcribe button can regenerate it.
-  const processor = audioContext.createScriptProcessor(4096, 1, 1);
+  const capture = new AudioWorkletNode(audioContext, 'pcm-capture');
   const mute = audioContext.createGain();
 
+  // A worklet is only pulled by the graph when it reaches the destination, so route it there
+  // through a silent gain. `capture` writes nothing to its output, so the branch is silence anyway.
   mute.gain.value = 0;
-  processor.onaudioprocess = (event) => {
-    onSamples(mixToMono(event.inputBuffer), audioContext.sampleRate);
+  capture.port.onmessage = (event: MessageEvent<Float32Array>) => {
+    onSamples(event.data, audioContext.sampleRate);
   };
 
-  source.connect(processor);
-  processor.connect(mute);
+  source.connect(capture);
+  capture.connect(mute);
   mute.connect(audioContext.destination);
   await audioContext.resume();
 
   return {
     async stop() {
-      processor.onaudioprocess = null;
-      processor.disconnect();
+      capture.port.onmessage = null;
+      capture.disconnect();
       source.disconnect();
       mute.disconnect();
       await audioContext.close();

@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { transcription } from './transcription';
 
 type EventCallback = (event: { payload: unknown }) => void;
-type FakeProcessor = {
-  onaudioprocess: ((event: AudioProcessingEvent) => void) | null;
+type FakeWorkletNode = {
+  port: { onmessage: ((event: MessageEvent<Float32Array>) => void) | null };
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
 };
@@ -13,6 +13,10 @@ const listeners = vi.hoisted(() => new Map<string, Set<EventCallback>>());
 const loggerDebug = vi.hoisted(() => vi.fn());
 const loggerWarn = vi.hoisted(() => vi.fn());
 const loggerError = vi.hoisted(() => vi.fn());
+
+vi.mock('./pcm-capture.worklet.ts?worker&url', () => ({
+  default: 'pcm-capture.worklet.js',
+}));
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
@@ -79,24 +83,17 @@ function emitFinished(sessionId: string, error: string | null = null): void {
 }
 
 describe('audio transcription service', () => {
-  let processor: FakeProcessor | null = null;
+  let workletNode: FakeWorkletNode | null = null;
   let audioContext: FakeAudioContext | null = null;
 
   class FakeAudioContext {
     public sampleRate = 32_000;
     public destination = {};
+    public audioWorklet = { addModule: vi.fn(async () => {}) };
     public createMediaStreamSource = vi.fn(() => ({
       connect: vi.fn(),
       disconnect: vi.fn(),
     }));
-    public createScriptProcessor = vi.fn(() => {
-      processor = {
-        onaudioprocess: null,
-        connect: vi.fn(),
-        disconnect: vi.fn(),
-      };
-      return processor;
-    });
     public createGain = vi.fn(() => ({
       gain: { value: 1 },
       connect: vi.fn(),
@@ -110,10 +107,24 @@ describe('audio transcription service', () => {
     }
   }
 
+  class FakeAudioWorkletNode {
+    public port: FakeWorkletNode['port'] = { onmessage: null };
+    public connect = vi.fn();
+    public disconnect = vi.fn();
+
+    public constructor() {
+      workletNode = this;
+    }
+  }
+
   function stubAudioContext(
     Ctor: typeof FakeAudioContext = FakeAudioContext,
   ): void {
     vi.stubGlobal('AudioContext', Ctor as unknown as typeof AudioContext);
+    vi.stubGlobal(
+      'AudioWorkletNode',
+      FakeAudioWorkletNode as unknown as typeof AudioWorkletNode,
+    );
   }
 
   function mockInvokeDefaults(): void {
@@ -130,16 +141,9 @@ describe('audio transcription service', () => {
   }
 
   function emitSamples(): void {
-    processor?.onaudioprocess?.({
-      inputBuffer: {
-        length: 3,
-        numberOfChannels: 2,
-        getChannelData: (channel: number) =>
-          channel === 0
-            ? new Float32Array([0, 0.5, 1])
-            : new Float32Array([1, -0.5, -1]),
-      },
-    } as unknown as AudioProcessingEvent);
+    workletNode?.port.onmessage?.({
+      data: new Float32Array([0.5, 0, 0]),
+    } as MessageEvent<Float32Array>);
   }
 
   afterEach(() => {
@@ -150,7 +154,7 @@ describe('audio transcription service', () => {
     listeners.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    processor = null;
+    workletNode = null;
     audioContext = null;
   });
 
