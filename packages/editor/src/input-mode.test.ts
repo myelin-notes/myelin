@@ -16,7 +16,7 @@ describe('InputModeController', () => {
 
   it('starts on touch when no stylus has ever been seen', () => {
     expect(input.resolved).toBe('touch');
-    expect(input.touchDrivesTool('pen')).toBe(true);
+    expect(input.touchDrivesTool).toBe(true);
   });
 
   it('switches auto to pen as soon as a stylus is seen', () => {
@@ -26,7 +26,7 @@ describe('InputModeController', () => {
     input.observe(pointer('pen'));
 
     expect(input.resolved).toBe('pen');
-    expect(input.touchDrivesTool('pen')).toBe(false);
+    expect(input.touchDrivesTool).toBe(false);
   });
 
   it('remembers a stylus across sessions, and forgets a long-gone one', () => {
@@ -37,23 +37,21 @@ describe('InputModeController', () => {
     expect(new InputModeController().resolved).toBe('touch');
   });
 
-  it('leaves the finger to panning with the select tool', () => {
+  it('drives every tool with a finger in touch mode, select included', () => {
     UserPrefs.set('inputMode', 'touch');
     input = new InputModeController();
 
-    expect(input.touchDrivesTool('select')).toBe(false);
-    expect(input.touchDrivesTool('highlighter')).toBe(true);
-    expect(input.touchDrivesTool('eraser')).toBe(true);
+    expect(input.touchDrivesTool).toBe(true);
   });
 
   it('honours an explicit mode over what the hardware says', () => {
     UserPrefs.set('inputMode', 'pen');
     input = new InputModeController();
-    expect(input.touchDrivesTool('pen')).toBe(false);
+    expect(input.touchDrivesTool).toBe(false);
 
     UserPrefs.set('inputMode', 'touch');
     input.observe(pointer('pen'));
-    expect(input.touchDrivesTool('pen')).toBe(true);
+    expect(input.touchDrivesTool).toBe(true);
   });
 
   it('stops following the preference once destroyed', () => {
