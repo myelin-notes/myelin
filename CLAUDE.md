@@ -116,6 +116,14 @@ const BG_ZOOM_GESTURE_FRAMES = 3;
 ```
 One real fact (the measurement) buried in ten lines of narration.
 
+```yaml
+# iroh 1.x pulls in hickory-resolver and netdev, which read the system DNS
+# and interface config through SystemConfiguration. Their link directives
+# are macOS-only, so iOS resolves the _SC* symbols only if declared here.
+- sdk: SystemConfiguration.framework
+```
+Three lines explaining a dependency edge anyone can look up. `# needed for iroh 1.x` is enough — it names the thing to delete this line with, which is all the reader needs.
+
 ### Good
 
 ```ts

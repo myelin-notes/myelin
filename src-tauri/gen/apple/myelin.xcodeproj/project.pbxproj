@@ -16,6 +16,7 @@
 		BC1971AB22C4D5C3AF3D8509 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = DF522A93D0FC622E0D7B5402 /* assets */; };
 		CD837D2F8F32D33D743AB590 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 829504EBF0AE5D97A2FAB7C7 /* CoreGraphics.framework */; };
 		D5D0CCF17E2D4525032C79EA /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C1058E9C1C8C584A695C31A3 /* Metal.framework */; };
+		D8C692DF6008878D013F9198 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 643F346E2AB6A7A706120A44 /* SystemConfiguration.framework */; };
 		E49F491D2D94097A2E7BAAE5 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0299DC85A36CDDC9C4B67A91 /* main.mm */; };
 		E878B93575FCB19874DBB13B /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 012EB9417413A19162A2803A /* libapp.a */; };
 		FE519F40114DCE1CEF9A5F9A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D0FFFEE600A6CE107E20A544 /* Assets.xcassets */; };
@@ -24,22 +25,47 @@
 /* Begin PBXFileReference section */
 		012EB9417413A19162A2803A /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		0299DC85A36CDDC9C4B67A91 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		0BC458936FC425F72D46C262 /* store.rs */ = {isa = PBXFileReference; path = store.rs; sourceTree = "<group>"; };
 		0FA7403E352A033DC3004A81 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		157B1ECB0D0CECDAFBC4937C /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		1F53455D1DE04EFF7DB04D68 /* engine.rs */ = {isa = PBXFileReference; path = engine.rs; sourceTree = "<group>"; };
+		211E7198C70E8796B007730E /* audio_transcript.rs */ = {isa = PBXFileReference; path = audio_transcript.rs; sourceTree = "<group>"; };
+		218031913E3011A27CE5BA43 /* engine.rs */ = {isa = PBXFileReference; path = engine.rs; sourceTree = "<group>"; };
 		2923564DBF489516CD6AAC04 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		2B851794D1B2CA42D26A683F /* runners.rs */ = {isa = PBXFileReference; path = runners.rs; sourceTree = "<group>"; };
 		2D1A5725AAEFA4E76D738607 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		2ECBCACA38730DD6B332CF9C /* semantic.rs */ = {isa = PBXFileReference; path = semantic.rs; sourceTree = "<group>"; };
+		2ECF7F10A78713A91B1034D7 /* yjs.rs */ = {isa = PBXFileReference; path = yjs.rs; sourceTree = "<group>"; };
+		2F5B774F9AFEEFAB60645AA3 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		4068D196581AAB5C35BD0721 /* myelin_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = myelin_iOS.entitlements; sourceTree = "<group>"; };
+		42859EC2385291CB68258A90 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		4B255E2F4B9CAF2EAB6B6DCA /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		515AAC95DADC66F418D39645 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		62D24DDA9D55B518923A613D /* contract.rs */ = {isa = PBXFileReference; path = contract.rs; sourceTree = "<group>"; };
+		643F346E2AB6A7A706120A44 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
+		77C6DEFAFE3C2FFC2854226C /* note_text.rs */ = {isa = PBXFileReference; path = note_text.rs; sourceTree = "<group>"; };
 		829504EBF0AE5D97A2FAB7C7 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		8E662474F8B93C3486A88174 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		A3EFDCC6BAFFED53F50D66D3 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		A55B8354775FAB68E38F0159 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		AE1CCB0A77CF548EE0B710AD /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		AE7626CE40234957003C941B /* transcription.rs */ = {isa = PBXFileReference; path = transcription.rs; sourceTree = "<group>"; };
+		AF5502E9C02FE35CDC78B947 /* iroh_transport.rs */ = {isa = PBXFileReference; path = iroh_transport.rs; sourceTree = "<group>"; };
+		B30E18EB781A5D0DAC2CD83A /* mcp_server.rs */ = {isa = PBXFileReference; path = mcp_server.rs; sourceTree = "<group>"; };
+		BEA2F370CA36603616514763 /* render.rs */ = {isa = PBXFileReference; path = render.rs; sourceTree = "<group>"; };
+		BFAC674EE0A0EFF32624F943 /* oauth_loopback.rs */ = {isa = PBXFileReference; path = oauth_loopback.rs; sourceTree = "<group>"; };
+		BFB607C313F4DD753AFBFB8F /* fonts.rs */ = {isa = PBXFileReference; path = fonts.rs; sourceTree = "<group>"; };
 		C1058E9C1C8C584A695C31A3 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		C3A3489A3A20A223CDFAC4BE /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		C81A84ED7265644C9F4C96CB /* store.rs */ = {isa = PBXFileReference; path = store.rs; sourceTree = "<group>"; };
+		C967AABA73146146D3B2180F /* error_report.rs */ = {isa = PBXFileReference; path = error_report.rs; sourceTree = "<group>"; };
 		CDAFEEBA877D6EF07A1F064A /* myelin_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = myelin_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D094E5684CA5C40DD4318389 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		D0E8E1AA7FAB05E1B87A29E0 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		D0FFFEE600A6CE107E20A544 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DF522A93D0FC622E0D7B5402 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
 		F3497E9C59EA6F72F112D695 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		F9388FE0EAD26EBFF1F28431 /* test_fixture.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = test_fixture.bin; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +79,7 @@
 				92B7E3E5C806CFB966DEA524 /* MetalKit.framework in Frameworks */,
 				2FAA099D743A6A55C7C2674D /* QuartzCore.framework in Frameworks */,
 				61D735211C3216F188049DB7 /* Security.framework in Frameworks */,
+				D8C692DF6008878D013F9198 /* SystemConfiguration.framework in Frameworks */,
 				A3D624CE1FB974A17FE0BB96 /* UIKit.framework in Frameworks */,
 				63AD68C06D5FE909F05627B3 /* WebKit.framework in Frameworks */,
 			);
@@ -64,11 +91,45 @@
 		196A4BD86ED2553E80884CCB /* src */ = {
 			isa = PBXGroup;
 			children = (
+				C967AABA73146146D3B2180F /* error_report.rs */,
+				AF5502E9C02FE35CDC78B947 /* iroh_transport.rs */,
 				0FA7403E352A033DC3004A81 /* lib.rs */,
 				2D1A5725AAEFA4E76D738607 /* main.rs */,
+				B30E18EB781A5D0DAC2CD83A /* mcp_server.rs */,
+				BFAC674EE0A0EFF32624F943 /* oauth_loopback.rs */,
+				AE7626CE40234957003C941B /* transcription.rs */,
+				D3CCEC70C0C6CC6E1012FC39 /* code_runner */,
+				F6ECA7147166D9539D9B485E /* handwriting */,
+				393C4AB8BBE4CE03AAFA11C9 /* note_index */,
+				B203A84BA89C0F07A3846500 /* pdf_export */,
+				A3BBD6A6FD15769945B1D0E8 /* workspace_export */,
 			);
 			name = src;
 			path = ../../src;
+			sourceTree = "<group>";
+		};
+		382DD0A098E5F30D0B3978EC /* providers */ = {
+			isa = PBXGroup;
+			children = (
+				211E7198C70E8796B007730E /* audio_transcript.rs */,
+				D0E8E1AA7FAB05E1B87A29E0 /* mod.rs */,
+				77C6DEFAFE3C2FFC2854226C /* note_text.rs */,
+				2ECF7F10A78713A91B1034D7 /* yjs.rs */,
+			);
+			path = providers;
+			sourceTree = "<group>";
+		};
+		393C4AB8BBE4CE03AAFA11C9 /* note_index */ = {
+			isa = PBXGroup;
+			children = (
+				1F53455D1DE04EFF7DB04D68 /* engine.rs */,
+				42859EC2385291CB68258A90 /* mod.rs */,
+				2ECBCACA38730DD6B332CF9C /* semantic.rs */,
+				0BC458936FC425F72D46C262 /* store.rs */,
+				F9388FE0EAD26EBFF1F28431 /* test_fixture.bin */,
+				382DD0A098E5F30D0B3978EC /* providers */,
+			);
+			path = note_index;
 			sourceTree = "<group>";
 		};
 		6235676F34BF835F60945519 /* Frameworks */ = {
@@ -80,6 +141,7 @@
 				2923564DBF489516CD6AAC04 /* MetalKit.framework */,
 				A3EFDCC6BAFFED53F50D66D3 /* QuartzCore.framework */,
 				AE1CCB0A77CF548EE0B710AD /* Security.framework */,
+				643F346E2AB6A7A706120A44 /* SystemConfiguration.framework */,
 				515AAC95DADC66F418D39645 /* UIKit.framework */,
 				C3A3489A3A20A223CDFAC4BE /* WebKit.framework */,
 			);
@@ -125,6 +187,25 @@
 			path = bindings;
 			sourceTree = "<group>";
 		};
+		A3BBD6A6FD15769945B1D0E8 /* workspace_export */ = {
+			isa = PBXGroup;
+			children = (
+				157B1ECB0D0CECDAFBC4937C /* mod.rs */,
+			);
+			path = workspace_export;
+			sourceTree = "<group>";
+		};
+		B203A84BA89C0F07A3846500 /* pdf_export */ = {
+			isa = PBXGroup;
+			children = (
+				62D24DDA9D55B518923A613D /* contract.rs */,
+				BFB607C313F4DD753AFBFB8F /* fonts.rs */,
+				A55B8354775FAB68E38F0159 /* mod.rs */,
+				BEA2F370CA36603616514763 /* render.rs */,
+			);
+			path = pdf_export;
+			sourceTree = "<group>";
+		};
 		C64E08C1230BC9CF38D6673D /* myelin */ = {
 			isa = PBXGroup;
 			children = (
@@ -132,6 +213,15 @@
 				A2DEEBE6AB214572FD1AD0EE /* bindings */,
 			);
 			path = myelin;
+			sourceTree = "<group>";
+		};
+		D3CCEC70C0C6CC6E1012FC39 /* code_runner */ = {
+			isa = PBXGroup;
+			children = (
+				8E662474F8B93C3486A88174 /* mod.rs */,
+				2B851794D1B2CA42D26A683F /* runners.rs */,
+			);
+			path = code_runner;
 			sourceTree = "<group>";
 		};
 		E2AC573467E53BBD8DB25DF9 /* Externals */ = {
@@ -148,6 +238,16 @@
 				4068D196581AAB5C35BD0721 /* myelin_iOS.entitlements */,
 			);
 			path = myelin_iOS;
+			sourceTree = "<group>";
+		};
+		F6ECA7147166D9539D9B485E /* handwriting */ = {
+			isa = PBXGroup;
+			children = (
+				218031913E3011A27CE5BA43 /* engine.rs */,
+				2F5B774F9AFEEFAB60645AA3 /* mod.rs */,
+				C81A84ED7265644C9F4C96CB /* store.rs */,
+			);
+			path = handwriting;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -182,6 +282,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					7A4829C0D0F12732CD97F005 = {
+						DevelopmentTeam = P4Z946QP26;
+					};
 				};
 			};
 			buildConfigurationList = 47F107BB5C37568782195859 /* Build configuration list for PBXProject "myelin" */;
@@ -325,6 +428,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = myelin_iOS/myelin_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = P4Z946QP26;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -338,19 +442,12 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				OTHER_LDFLAGS = (
-					"-framework",
-					Accelerate,
-					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
-					"-lswiftCompatibility56",
-					"-lswiftCompatibilityConcurrency",
-				);
+				OTHER_LDFLAGS = "$(inherited) -framework Accelerate -L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) -lswiftCompatibility56 -lswiftCompatibilityConcurrency";
 				PRODUCT_BUNDLE_IDENTIFIER = com.github.wintersteve25.myelin;
 				PRODUCT_NAME = "Myelin Notes";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
-				DEVELOPMENT_TEAM = "P4Z946QP26";
 			};
 			name = release;
 		};
@@ -364,6 +461,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = myelin_iOS/myelin_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = P4Z946QP26;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -377,19 +475,12 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				OTHER_LDFLAGS = (
-					"-framework",
-					Accelerate,
-					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
-					"-lswiftCompatibility56",
-					"-lswiftCompatibilityConcurrency",
-				);
+				OTHER_LDFLAGS = "$(inherited) -framework Accelerate -L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) -lswiftCompatibility56 -lswiftCompatibilityConcurrency";
 				PRODUCT_BUNDLE_IDENTIFIER = com.github.wintersteve25.myelin;
 				PRODUCT_NAME = "Myelin Notes";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
-				DEVELOPMENT_TEAM = "P4Z946QP26";
 			};
 			name = debug;
 		};
