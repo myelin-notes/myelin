@@ -351,7 +351,7 @@ export class CodeOutputElement extends DrawableElement {
       this.setDerivedOffset(derived.x, derived.y);
     }
 
-    const root = this._root ?? this.mountReact(host);
+    const root = this._root ?? this.createRootElement(host);
     const screen = viewport.worldToScreen({
       x: this.offset.x,
       y: this.offset.y,
@@ -371,6 +371,11 @@ export class CodeOutputElement extends DrawableElement {
     const transform = `scale(${viewport.zoom * this._scale.x}, ${viewport.zoom * this._scale.y})`;
     if (root.style.transform !== transform) {
       root.style.transform = transform;
+    }
+    // Mount after the geometry lands: React's first render must see a sized card, or the body's
+    // flex height is unconstrained and the card view's initial scroll-to-bottom is a no-op.
+    if (!this._reactRoot) {
+      this.mountReact(root);
     }
   }
 
@@ -457,13 +462,16 @@ export class CodeOutputElement extends DrawableElement {
     return this._anchorBlockDom;
   }
 
-  private mountReact(host: HTMLElement): HTMLDivElement {
+  private createRootElement(host: HTMLElement): HTMLDivElement {
     const root = document.createElement('div');
     root.className = 'canvas-code-output';
     root.dataset.elementUuid = this.uuid;
     (getFrameChromeControlsLayer() ?? host).appendChild(root);
     this._root = root;
+    return root;
+  }
 
+  private mountReact(root: HTMLDivElement): void {
     this._reactRoot = createRoot(root);
     // The card is a pure-props component; live run output reaches it by re-rendering here on
     // every store change for this block (see CodeOutputCardView for why not useSyncExternalStore).
@@ -475,8 +483,6 @@ export class CodeOutputElement extends DrawableElement {
       }
     });
     this.render();
-
-    return root;
   }
 
   /** No-op until the React root is mounted lazily in syncDOM. */

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { VirtualList } from '../../components/virtual-list';
 import type { CodeRunSession } from '../../page-frame/pm/code-block/run-store';
 import type { CodeOutputItem, CodeOutputRunMeta } from './element';
@@ -59,9 +59,10 @@ export function CodeOutputCardView({
   const bodyRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
 
-  // Follow the tail as new lines arrive, unless the user scrolled up.
+  // Follow the tail as new lines arrive, unless the user scrolled up. Layout effect so a card
+  // mounting with a finished run's output paints at the bottom rather than flashing the top.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when line count grows
-  useEffect(() => {
+  useLayoutEffect(() => {
     const body = bodyRef.current;
     if (body && stickToBottom.current) {
       body.scrollTop = body.scrollHeight;
