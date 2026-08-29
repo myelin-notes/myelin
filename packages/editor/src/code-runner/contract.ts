@@ -52,15 +52,20 @@ export interface RunCodeRequest {
   source: string;
 }
 
-export interface RunOutputEvent {
-  executionId: string;
+export interface RunOutputLine {
   stream: 'stdout' | 'stderr';
-  /** A coalesced batch of output lines (the backend batches to spare IPC). */
-  lines: string[];
+  text: string;
 }
 
-export interface RunFinishedEvent {
-  executionId: string;
+export interface RunPollResponse {
+  /** Lines from the caller's cursor onward, capped per response. */
+  lines: RunOutputLine[];
+  nextCursor: number;
+  /** Lines the backend's ring evicted before the cursor reached them. */
+  skipped: number;
+  /** True only once the process exited and all of its output is in the ring,
+   *  so `finished` with an empty `lines` means fully drained. */
+  finished: boolean;
   exitCode: number | null;
   error: string | null;
 }

@@ -1,32 +1,50 @@
-import type { EditorView } from 'prosemirror-view';
+import type { RunnableLanguage } from '../../../code-runner/contract';
 
 export interface CodeRunLine {
   text: string;
   stream: 'stdout' | 'stderr';
 }
 
-export interface CodeRunEntry {
-  /** Stable per code-block node view; one overlay per block. */
-  id: string;
-  view: EditorView;
-  blockDom: HTMLElement;
-  lines: CodeRunLine[];
-  visible: boolean;
+export interface CodeRunResult {
+  exitCode: number | null;
+  durationMs: number;
+  error: string | null;
+  cancelled: boolean;
 }
 
-// The overlay re-render is O(line count) (the virtualizer rebuilds its offsets), so pacing well
+/** State of one run, keyed by the block's stable id. In-memory only — never persisted or synced. */
+export interface CodeRunSession {
+  blockId: string;
+  language: RunnableLanguage;
+  lines: CodeRunLine[];
+  /** Lines dropped off the front of `lines` at the cap. */
+  dropped: number;
+  running: boolean;
+  startedAt: number;
+  /** Null while running. */
+  result: CodeRunResult | null;
+  /** Cancels the run; wired by the owning run button so the output card's stop button works. */
+  stop: () => void;
+}
+
+// The card re-render is O(line count) (the virtualizer rebuilds its offsets), so pacing well
 // below the display refresh rate keeps a flood of output from saturating the main thread — ~15 Hz
 // still reads as continuous streaming.
 const OUTPUT_FLUSH_MS = 64;
 
-// Bridges the vanilla code-block node views to the React output overlay layer. Node views push run
-// state here; {@link CodeRunOverlayLayer} renders it.
+/** Lines a session keeps; older ones are dropped and reported as `dropped`. */
+const MAX_LINES = 2000;
+
+// Bridges the vanilla code-block run buttons to the React output cards on the canvas. Run views
+// push output here; CodeOutputCardView subscribes per block id.
 class CodeRunStore {
-  private readonly entries = new Map<string, CodeRunEntry>();
+  private readonly sessions = new Map<string, CodeRunSession>();
   private readonly listeners = new Set<() => void>();
-  private snapshot: CodeRunEntry[] = [];
-  private dirty = true;
+  private version = 0;
+  /** Per-session version, bumped on every notify that touched it. */
+  private readonly versions = new Map<string, number>();
   private flushScheduled = false;
+  private readonly pendingBlockIds = new Set<string>();
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -35,78 +53,86 @@ class CodeRunStore {
     };
   };
 
-  getSnapshot = (): CodeRunEntry[] => {
-    if (this.dirty) {
-      this.snapshot = Array.from(this.entries.values());
-      this.dirty = false;
-    }
-    return this.snapshot;
-  };
+  /** Changes whenever the session for `blockId` starts, streams, or ends — snapshot for React. */
+  getVersion = (blockId: string): number => this.versions.get(blockId) ?? -1;
 
-  start(id: string, view: EditorView, blockDom: HTMLElement): void {
-    this.entries.set(id, {
-      id,
-      view,
-      blockDom,
-      lines: [],
-      visible: true,
-    });
-    this.emit();
+  getSession(blockId: string): CodeRunSession | null {
+    return this.sessions.get(blockId) ?? null;
   }
 
-  appendLine(id: string, line: CodeRunLine): void {
-    const entry = this.entries.get(id);
-    if (!entry) {
-      return;
-    }
-    // Mutate in place (O(1)); the snapshot array identity still changes on the
-    // batched notify, and the overlay re-reads `lines.length`.
-    entry.lines.push(line);
-    this.scheduleEmit();
+  start(blockId: string, language: RunnableLanguage, stop: () => void): void {
+    this.sessions.set(blockId, {
+      blockId,
+      language,
+      lines: [],
+      dropped: 0,
+      running: true,
+      startedAt: Date.now(),
+      result: null,
+      stop,
+    });
+    this.emit(blockId);
+  }
+
+  appendLine(blockId: string, line: CodeRunLine): void {
+    this.appendLines(blockId, [line]);
   }
 
   /** Append a coalesced batch of lines with a single notify. */
-  appendLines(id: string, lines: CodeRunLine[]): void {
-    const entry = this.entries.get(id);
-    if (!entry || lines.length === 0) {
+  appendLines(blockId: string, lines: CodeRunLine[]): void {
+    const session = this.sessions.get(blockId);
+    if (!session || lines.length === 0) {
       return;
     }
     for (const line of lines) {
-      entry.lines.push(line);
+      session.lines.push(line);
     }
-    this.scheduleEmit();
+    const overflow = session.lines.length - MAX_LINES;
+    if (overflow > 0) {
+      session.lines.splice(0, overflow);
+      session.dropped += overflow;
+    }
+    this.scheduleEmit(blockId);
   }
 
-  setVisible(id: string, visible: boolean): void {
-    const entry = this.entries.get(id);
-    if (!entry || entry.visible === visible) {
+  /** Mark the run finished; the session and its output stay until the block is disposed. */
+  finish(blockId: string, result: CodeRunResult): void {
+    const session = this.sessions.get(blockId);
+    if (!session) {
       return;
     }
-    entry.visible = visible;
-    this.emit();
+    session.running = false;
+    session.result = result;
+    this.emit(blockId);
   }
 
-  remove(id: string): void {
-    if (this.entries.delete(id)) {
-      this.emit();
+  remove(blockId: string): void {
+    if (this.sessions.delete(blockId)) {
+      this.emit(blockId);
     }
   }
 
-  private emit(): void {
-    this.dirty = true;
+  private emit(blockId: string): void {
+    this.version += 1;
+    this.versions.set(blockId, this.version);
     for (const listener of this.listeners) {
       listener();
     }
   }
 
-  private scheduleEmit(): void {
-    this.dirty = true;
+  private scheduleEmit(blockId: string): void {
+    this.pendingBlockIds.add(blockId);
     if (this.flushScheduled) {
       return;
     }
     this.flushScheduled = true;
     setTimeout(() => {
       this.flushScheduled = false;
+      this.version += 1;
+      for (const id of this.pendingBlockIds) {
+        this.versions.set(id, this.version);
+      }
+      this.pendingBlockIds.clear();
       for (const listener of this.listeners) {
         listener();
       }

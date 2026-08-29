@@ -115,6 +115,8 @@ export function describeElementType(type: number | null | undefined): string {
       return 'latex';
     case ElementType.AUDIO:
       return 'audio';
+    case ElementType.CODE_OUTPUT:
+      return 'code-output';
     default:
       return `unknown:${String(type)}`;
   }

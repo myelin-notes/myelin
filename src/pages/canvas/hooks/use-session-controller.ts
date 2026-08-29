@@ -8,6 +8,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { codeOutputBridge } from '@myelin/editor/elements/code-output/bridge';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import { createMediaPathResolver } from '@myelin/editor/page-frame/media-path/resolution';
 import {
@@ -232,6 +233,7 @@ export class CanvasSessionController {
       const activeSession = this.activeSession;
       this.activeSession = null;
       this.drawableCanvasRef.current = null;
+      codeOutputBridge.registerCanvas(null);
 
       this.updateSnapshot({
         ...EMPTY_SNAPSHOT,
@@ -312,6 +314,7 @@ export class CanvasSessionController {
       unsubscribePeers,
     };
     this.drawableCanvasRef.current = drawableCanvas;
+    codeOutputBridge.registerCanvas(drawableCanvas);
 
     unsubscribeStatus = noteSession.subscribeStatus((status) => {
       if (this.activeSession?.noteSession !== noteSession) {

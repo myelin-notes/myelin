@@ -45,6 +45,15 @@ interface UseVirtualizerResult {
   scrollToIndex: (index: number) => void;
 }
 
+/** Screen px per layout px, from any CSS transform scaling the list. Derived from the container,
+ *  not the scroll frame: offsetHeight is integer-rounded, and on a ~200px frame that half-pixel
+ *  becomes a scale error that displaces the window by whole rows at deep scroll offsets. The
+ *  container is as tall as the offsets being compared, so its rounding error stays sub-pixel. */
+function verticalScale(container: HTMLElement, containerRect: DOMRect): number {
+  const layoutHeight = container.offsetHeight;
+  return layoutHeight > 0 ? containerRect.height / layoutHeight : 1;
+}
+
 /** Largest index whose offset is `<= target`. Assumes ascending offsets. */
 function findRowAt(offsets: number[], target: number): number {
   let lo = 0;
@@ -129,8 +138,14 @@ export function useVirtualizer({
     }
     const frameRect = frame.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
-    // How far the list's top sits above the frame's top edge.
-    const scrolledPast = Math.max(0, frameRect.top - containerRect.top);
+    // How far the list's top sits above the frame's top edge, in layout px: client rects are in
+    // screen px, so a CSS-transformed ancestor (a zoom-scaled canvas card) has to be divided out
+    // before comparing against `offsets` and `clientHeight`.
+    const scrolledPast = Math.max(
+      0,
+      (frameRect.top - containerRect.top) /
+        verticalScale(container, containerRect),
+    );
     const viewport = frame.clientHeight;
 
     let start = findRowAt(offsets, scrolledPast);
@@ -210,7 +225,9 @@ export function useVirtualizer({
       const frameRect = frame.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
       const containerTopInContent =
-        frame.scrollTop + (containerRect.top - frameRect.top);
+        frame.scrollTop +
+        (containerRect.top - frameRect.top) /
+          verticalScale(container, containerRect);
       const target = containerTopInContent + (offsetsRef.current[index] ?? 0);
       frame.scrollTo({ top: Math.max(0, target - 24), behavior: 'smooth' });
     },
