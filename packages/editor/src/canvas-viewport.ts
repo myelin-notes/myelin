@@ -70,33 +70,7 @@ export class CanvasViewport {
     this.canvas = canvas;
     this._gestureTarget = canvas.parentElement ?? canvas;
 
-    this._handleWheel = (evt) => {
-      this.cancelAnimation();
-      // Stop the browser from scrolling any ancestor / contentEditable; the
-      // viewport owns wheel-driven view changes regardless of edit mode.
-      evt.preventDefault();
-      if (evt.ctrlKey) {
-        // Trackpad pinch (the browser sets ctrlKey) and ctrl+wheel. Anchored on the cursor.
-        if (!this._zoomLocked) {
-          // Exponential step: each notch multiplies zoom by a constant factor, so it feels equally
-          // granular at any zoom level.
-          this.zoomAroundPoint(
-            this._zoom * Math.exp(evt.deltaY * -0.0025),
-            this.getScreenPoint(evt),
-          );
-        }
-      } else {
-        // Two-finger scroll on trackpad / mouse wheel → pan.
-        // In edit mode, lock wheel pan to the edited element's page axis.
-        if (!this.editMode || this.editModePanAxis === 'horizontal') {
-          this._offset.x -= evt.deltaX / this._zoom;
-        }
-        if (!this.editMode || this.editModePanAxis === 'vertical') {
-          this._offset.y -= evt.deltaY / this._zoom;
-        }
-        this.notifyViewChange();
-      }
-    };
+    this._handleWheel = (evt) => this.handleWheel(evt);
 
     const touchDistance = (a: Touch, b: Touch): number => {
       const dx = a.clientX - b.clientX;
@@ -358,6 +332,39 @@ export class CanvasViewport {
   }
 
   /** Pointer position in canvas-local screen pixels (origin = canvas top-left). */
+  /**
+   * Wheel → zoom (ctrl / trackpad pinch) or pan. Bound to the canvas' parent; DOM overlays that
+   * live outside that subtree (the frame chrome layer) forward their wheel events here by hand,
+   * from a non-passive listener so the preventDefault below still suppresses browser page zoom.
+   */
+  public handleWheel(evt: WheelEvent): void {
+    this.cancelAnimation();
+    // Stop the browser from scrolling any ancestor / contentEditable; the
+    // viewport owns wheel-driven view changes regardless of edit mode.
+    evt.preventDefault();
+    if (evt.ctrlKey) {
+      // Trackpad pinch (the browser sets ctrlKey) and ctrl+wheel. Anchored on the cursor.
+      if (!this._zoomLocked) {
+        // Exponential step: each notch multiplies zoom by a constant factor, so it feels equally
+        // granular at any zoom level.
+        this.zoomAroundPoint(
+          this._zoom * Math.exp(evt.deltaY * -0.0025),
+          this.getScreenPoint(evt),
+        );
+      }
+    } else {
+      // Two-finger scroll on trackpad / mouse wheel → pan.
+      // In edit mode, lock wheel pan to the edited element's page axis.
+      if (!this.editMode || this.editModePanAxis === 'horizontal') {
+        this._offset.x -= evt.deltaX / this._zoom;
+      }
+      if (!this.editMode || this.editModePanAxis === 'vertical') {
+        this._offset.y -= evt.deltaY / this._zoom;
+      }
+      this.notifyViewChange();
+    }
+  }
+
   public getScreenPoint(evt: { clientX: number; clientY: number }): Vector2 {
     const rect = this.canvas.getBoundingClientRect();
     return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };

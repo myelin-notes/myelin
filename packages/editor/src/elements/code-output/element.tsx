@@ -64,6 +64,12 @@ export class CodeOutputElement extends DrawableElement {
 
   private _storeUnsubscribe: (() => void) | null = null;
   private _lastStoreVersion = -1;
+  private _viewport: CanvasViewport | null = null;
+
+  /** Stable across renders: the card registers it on a native listener keyed by identity. */
+  private readonly _handleZoomWheel = (event: WheelEvent): void => {
+    this._viewport?.handleWheel(event);
+  };
 
   constructor(uuid: string, frameUuid = '', blockId = '') {
     super(uuid, ElementType.CODE_OUTPUT);
@@ -288,6 +294,7 @@ export class CodeOutputElement extends DrawableElement {
   }
 
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
+    this._viewport = viewport;
     this._lastZoom = viewport.zoom;
     const derived = this.syncAnchor(viewport);
     if (!this._detached && derived) {
@@ -435,7 +442,10 @@ export class CodeOutputElement extends DrawableElement {
     }
     flushSync(() => {
       this._reactRoot!.render(
-        <CodeOutputCardView session={codeRunStore.getSession(this._blockId)} />,
+        <CodeOutputCardView
+          session={codeRunStore.getSession(this._blockId)}
+          onZoomWheel={this._handleZoomWheel}
+        />,
       );
     });
   }

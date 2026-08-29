@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { VirtualList } from '../../components/virtual-list';
 import type {
   CodeRunResult,
@@ -35,6 +35,8 @@ function statusText(result: CodeRunResult): string {
 interface CodeOutputCardViewProps {
   /** Run session for this block, or null if it hasn't run in this app session. */
   session: CodeRunSession | null;
+  /** Forwards a ctrl+wheel event to the viewport; see the wheel effect below. */
+  onZoomWheel: (event: WheelEvent) => void;
 }
 
 /**
@@ -45,7 +47,10 @@ interface CodeOutputCardViewProps {
  * pointer-events: none so dragging it moves the element via the canvas; only the body (text
  * selection, scroll) and the stop button take pointer input.
  */
-export function CodeOutputCardView({ session }: CodeOutputCardViewProps) {
+export function CodeOutputCardView({
+  session,
+  onZoomWheel,
+}: CodeOutputCardViewProps) {
   const running = session?.running === true;
   const lines = session?.lines ?? [];
   const result = session?.result ?? null;
@@ -63,6 +68,24 @@ export function CodeOutputCardView({ session }: CodeOutputCardViewProps) {
       body.scrollTop = body.scrollHeight;
     }
   }, [lines.length]);
+
+  // The card mounts in the frame chrome layer, outside the subtree the viewport listens on, so
+  // ctrl+wheel zoom has to be handed to it explicitly. Native and non-passive because React's own
+  // onWheel is passive, which would leave the browser free to page-zoom on top of the canvas zoom.
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body) {
+      return;
+    }
+    const handleWheel = (event: WheelEvent) => {
+      event.stopPropagation();
+      if (event.ctrlKey) {
+        onZoomWheel(event);
+      }
+    };
+    body.addEventListener('wheel', handleWheel, { passive: false });
+    return () => body.removeEventListener('wheel', handleWheel);
+  }, [onZoomWheel]);
 
   return (
     <div className="canvas-code-output__card">
@@ -93,12 +116,6 @@ export function CodeOutputCardView({ session }: CodeOutputCardViewProps) {
       <div
         ref={bodyRef}
         className="canvas-code-output__body"
-        onWheel={(event) => {
-          // Let ctrl+wheel (and trackpad pinch) reach the canvas so zoom still works over the output.
-          if (!event.ctrlKey) {
-            event.stopPropagation();
-          }
-        }}
         onScroll={() => {
           const body = bodyRef.current;
           if (body) {
