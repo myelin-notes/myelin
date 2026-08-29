@@ -146,6 +146,7 @@ export function commandPalettePageFromTabTarget(
     case 'settings':
       return 'settings';
     case 'image':
+    case 'csv':
       return 'unknown';
   }
 }

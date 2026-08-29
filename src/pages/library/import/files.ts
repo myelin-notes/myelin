@@ -1,7 +1,16 @@
 import type { Repository, VFSNodeId } from '@/lib/sync';
-import { getFileTypeForName, ImageFileTypes, VideoFileTypes } from '@/lib/sync';
+import {
+  DataFileTypes,
+  getFileTypeForName,
+  ImageFileTypes,
+  VideoFileTypes,
+} from '@/lib/sync';
 
-export const STORAGE_FILE_ACCEPT = [...ImageFileTypes, ...VideoFileTypes]
+export const STORAGE_FILE_ACCEPT = [
+  ...ImageFileTypes,
+  ...VideoFileTypes,
+  ...DataFileTypes,
+]
   .map((extension) => `.${extension}`)
   .join(',');
 
