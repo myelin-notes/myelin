@@ -1,16 +1,8 @@
-import {
-  Crop as CropIcon,
-  BetweenHorizontalStart as EmbedIcon,
-  PinOff as ReleaseIcon,
-} from 'lucide-react';
+import { Crop as CropIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { Messages } from '../i18n/messages';
-import {
-  anchorToPageFrame,
-  findFrameForBounds,
-} from '../page-frame/anchor/capture';
-import { scheduleBandSweep } from '../page-frame/anchor/sweep';
+import type { AnchorMode } from '../page-frame/anchor/capture';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import type { YDocManager } from '../ydoc-manager';
 import {
@@ -354,52 +346,15 @@ export class ImageElement extends DrawableElement {
         active: this._cropMode,
         onClick: () => this.toggleCropMode(),
       },
-      ...this.pageEmbedToolbarItems(strings),
-      ...this.pageAnchorToolbarItems(strings),
+      // Crop has its own confirm/cancel flow; page actions would fight it for the toolbar.
+      ...(this._cropMode ? [] : this.pageAnchorToolbarItems(strings)),
     ];
   }
 
-  // Unlike ink, an image never picks a page on its own — it is placed on the canvas deliberately,
-  // so joining the document flow is an explicit act.
-  private pageEmbedToolbarItems(strings: Messages): SelectionToolbarItem[] {
-    const canvas = this._hostCanvas;
-    if (!canvas || this._cropMode) {
-      return [];
-    }
-    if (this.anchoredBandId !== null) {
-      return [
-        {
-          id: 'page-release',
-          label: strings.canvas.selectionToolbar.removeFromPage,
-          icon: ReleaseIcon,
-          onClick: () => {
-            this.detachFromPage();
-            scheduleBandSweep(canvas);
-          },
-        },
-      ];
-    }
-    const bounds = this.boundingBox;
-    const frame = findFrameForBounds(canvas, bounds);
-    if (!frame) {
-      return [];
-    }
-    return [
-      {
-        id: 'page-embed',
-        label: strings.canvas.selectionToolbar.addToPage,
-        icon: EmbedIcon,
-        onClick: () => {
-          anchorToPageFrame(canvas, {
-            element: this,
-            origin: { x: bounds.x, y: bounds.y },
-            bounds,
-            mode: 'flow',
-            frame,
-          });
-        },
-      },
-    ];
+  // Unlike ink, an image never picks a page on its own — it is placed deliberately, so it takes
+  // space in the flow rather than floating over whatever it happens to cover.
+  protected override get pageAnchorMode(): AnchorMode {
+    return 'flow';
   }
 
   public override unselect(): void {

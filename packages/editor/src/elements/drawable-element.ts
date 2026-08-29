@@ -1,10 +1,19 @@
-import { FoldVertical, type LucideIcon, UnfoldVertical } from 'lucide-react';
+import {
+  BetweenHorizontalStart as EmbedIcon,
+  FoldVertical,
+  type LucideIcon,
+  PinOff as ReleaseIcon,
+  UnfoldVertical,
+} from 'lucide-react';
 import type * as Y from 'yjs';
 import { getCanvasPalette } from '../canvas-theme';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { Messages } from '../i18n/messages';
 import {
+  type AnchorMode,
+  anchorToPageFrame,
+  findFrameForBounds,
   getBandReservedHeight,
   setBandReservedHeight,
 } from '../page-frame/anchor/capture';
@@ -13,6 +22,7 @@ import {
   getPageFrame,
   resolveBandWorldPoint,
 } from '../page-frame/anchor/resolve';
+import { scheduleBandSweep } from '../page-frame/anchor/sweep';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { SyncOrigin, YDocManager } from '../ydoc-manager';
@@ -569,16 +579,27 @@ export abstract class DrawableElement {
   }
 
   /**
-   * Toggles an anchored element between floating over the page's content and reserving space in
-   * it. Empty unless the element is anchored, so it appears exactly when the choice is meaningful.
+   * How this element rejoins a page from the toolbar. Ink re-reads the page under it; an image is
+   * always placed deliberately, so it always takes space.
+   */
+  protected get pageAnchorMode(): AnchorMode {
+    return 'auto';
+  }
+
+  /**
+   * Joining, leaving, and — once anchored — floating over the page's content or reserving space in
+   * it. Dragging an element off releases it, so this is the way back on.
    * Subclasses that override {@link getSelectionToolbarItems} should spread this in.
    */
   protected pageAnchorToolbarItems(strings: Messages): SelectionToolbarItem[] {
     const canvas = this._hostCanvas;
+    if (!canvas) {
+      return [];
+    }
     const frameUuid = this.anchoredFrameUuid;
     const bandId = this.anchoredBandId;
-    if (!canvas || frameUuid === null || bandId === null) {
-      return [];
+    if (frameUuid === null || bandId === null) {
+      return this.addToPageToolbarItems(strings, canvas);
     }
     const frame = getPageFrame(canvas, frameUuid);
     if (!frame) {
@@ -606,6 +627,44 @@ export abstract class DrawableElement {
               this.boundingBox.bottom - band.y,
             );
           }
+        },
+      },
+      {
+        id: 'page-release',
+        label: strings.canvas.selectionToolbar.removeFromPage,
+        icon: ReleaseIcon,
+        onClick: () => {
+          this.detachFromPage();
+          scheduleBandSweep(canvas);
+        },
+      },
+    ];
+  }
+
+  private addToPageToolbarItems(
+    strings: Messages,
+    canvas: DrawableCanvas,
+  ): SelectionToolbarItem[] {
+    const bounds = this.boundingBox;
+    const frame = findFrameForBounds(canvas, bounds);
+    if (!frame) {
+      return [];
+    }
+    return [
+      {
+        id: 'page-embed',
+        label: strings.canvas.selectionToolbar.addToPage,
+        icon: EmbedIcon,
+        onClick: () => {
+          anchorToPageFrame(canvas, {
+            element: this,
+            // No pen-down point to go on: the element's own top edge picks the gap it slots into,
+            // and its centre decides whether it reads as a margin note.
+            origin: { x: bounds.x + bounds.width / 2, y: bounds.y },
+            bounds,
+            mode: this.pageAnchorMode,
+            frame,
+          });
         },
       },
     ];
