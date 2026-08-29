@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { FileText } from 'lucide-react';
 import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -14,6 +13,7 @@ import {
 import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
+import { getFileTypeIcon } from './file-icon';
 import { ItemContextMenu } from './item-context-menu';
 import { RenameReferencesDialog } from './rename-references-dialog';
 import { SearchHighlight } from './search-highlight';
@@ -57,6 +57,7 @@ export function FileItem({
     renameReferencesOnRename: file.fileType === 'mcanvas',
   });
 
+  const FileIcon = getFileTypeIcon(file.fileType);
   const matchedTerms = searchMatch?.matchedTerms ?? [];
   const snippet = searchMatch?.contentSnippet ?? null;
 
@@ -87,7 +88,7 @@ export function FileItem({
             />
           }
         >
-          <FileText
+          <FileIcon
             className={cn(
               'size-3 shrink-0 text-text-muted transition-colors duration-200 group-hover:text-text-secondary',
               snippet && 'mt-1',
