@@ -163,6 +163,21 @@ const en = {
         skipped: (count: number) =>
           `${count} page${count === 1 ? '' : 's'} could not be imported`,
       },
+      samsung_notes: {
+        label: 'Samsung Notes (experimental)',
+        description:
+          'A .sdocx note. Handwriting and text import; images, shapes, and PDF backgrounds do not yet, and some notes may fail entirely.',
+        title: 'Import Samsung Notes',
+        scanning: 'Reading note...',
+        empty: 'Nothing in this note can be imported yet',
+        pages: (count: number) => `${count} page${count === 1 ? '' : 's'}`,
+        elements: (count: number) =>
+          `${count} element${count === 1 ? '' : 's'}`,
+        summary: (count: number) =>
+          `Imported ${count} page${count === 1 ? '' : 's'}`,
+        skippedObjects: (count: number) =>
+          `${count} object${count === 1 ? '' : 's'} (images, shapes, or PDF backgrounds) cannot be imported yet`,
+      },
       obsidian_vault: {
         label: 'Obsidian Vault',
         description: 'A vault folder, with its notes and attachments.',

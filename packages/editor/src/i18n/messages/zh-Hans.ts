@@ -156,6 +156,19 @@ const zhHans: typeof en = {
         summary: (count: number) => `已导入 ${count} 个页面`,
         skipped: (count: number) => `有 ${count} 个页面无法导入`,
       },
+      samsung_notes: {
+        label: 'Samsung Notes（实验性）',
+        description:
+          '一个 .sdocx 笔记。可导入手写和文本；图片、形状和 PDF 背景暂不支持，部分笔记可能完全无法导入。',
+        title: '导入 Samsung Notes',
+        scanning: '正在读取笔记…',
+        empty: '此笔记中暂无可导入的内容',
+        pages: (count: number) => `${count} 个页面`,
+        elements: (count: number) => `${count} 个元素`,
+        summary: (count: number) => `已导入 ${count} 个页面`,
+        skippedObjects: (count: number) =>
+          `有 ${count} 个对象（图片、形状或 PDF 背景）暂时无法导入`,
+      },
       obsidian_vault: {
         label: 'Obsidian 仓库',
         description: '仓库文件夹，包含其笔记和附件。',
