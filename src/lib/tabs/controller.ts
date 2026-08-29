@@ -57,6 +57,8 @@ function targetsEqual(a: TabTarget, b: TabTarget): boolean {
       return a.id === (b as Extract<TabTarget, { type: 'canvas' }>).id;
     case 'image':
       return a.id === (b as Extract<TabTarget, { type: 'image' }>).id;
+    case 'csv':
+      return a.id === (b as Extract<TabTarget, { type: 'csv' }>).id;
   }
 }
 
@@ -473,7 +475,9 @@ export class TabStateController {
         for (const tab of node.tabs) {
           const { target } = tab;
           if (
-            (target.type === 'canvas' || target.type === 'image') &&
+            (target.type === 'canvas' ||
+              target.type === 'image' ||
+              target.type === 'csv') &&
             ids.has(target.id)
           ) {
             matches.push({ tabId: tab.id, paneId: node.id });

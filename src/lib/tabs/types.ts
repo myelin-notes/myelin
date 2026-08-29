@@ -12,7 +12,8 @@ export type TabTarget =
       pageFrameName?: string | null;
       pageFrameId?: string | null;
     }
-  | { type: 'image'; id: VFSNodeId; fileType: FileType };
+  | { type: 'image'; id: VFSNodeId; fileType: FileType }
+  | { type: 'csv'; id: VFSNodeId };
 
 export interface Tab {
   id: TabId;

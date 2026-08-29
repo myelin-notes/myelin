@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ChevronRight, FileText, Folder } from 'lucide-react';
+import { ChevronRight, Folder } from 'lucide-react';
 import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { openNote } from '@/lib/note/navigation';
 import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '@/pages/library/accessibility-labels';
+import { getFileTypeIcon } from '@/pages/library/explorer/file-icon';
 import { ItemContextMenu } from '@/pages/library/explorer/item-context-menu';
 import { TagList } from '@/pages/library/explorer/tag-list';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
@@ -154,6 +155,7 @@ export function SidebarFileRow({
     menu,
     dialogs,
   } = useFileItemContextMenu(node, onChanged, { initialRenaming: autoRename });
+  const FileIcon = getFileTypeIcon(node.fileType);
 
   return (
     <>
@@ -184,7 +186,7 @@ export function SidebarFileRow({
           }
         >
           <TreeIndentGuides depth={depth} />
-          <FileText className="size-3.5 shrink-0 text-text-muted transition-colors duration-150 group-hover:text-text-secondary" />
+          <FileIcon className="size-3.5 shrink-0 text-text-muted transition-colors duration-150 group-hover:text-text-secondary" />
           {renaming ? (
             <input
               {...renameInputProps}

@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { Tab } from '@/lib/tabs/types';
 import { CanvasView } from '@/pages/canvas';
+import { CsvViewerPage } from '@/pages/csv-viewer';
 import { GraphPage } from '@/pages/graph';
 import { ImageViewerPage } from '@/pages/image-viewer';
 import { SettingsPage } from '@/pages/settings';
@@ -27,5 +28,7 @@ export const PaneContent = memo(function PaneContent({
       );
     case 'image':
       return <ImageViewerPage id={tab.target.id} />;
+    case 'csv':
+      return <CsvViewerPage id={tab.target.id} />;
   }
 });

@@ -1,6 +1,11 @@
 import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { trackEvent } from '@/lib/analytics';
-import type { FileType, Repository, VFSNodeId } from '@/lib/sync';
+import {
+  type FileType,
+  isDataFileType,
+  type Repository,
+  type VFSNodeId,
+} from '@/lib/sync';
 import type { TabStateController } from '@/lib/tabs/controller';
 import type { TabTarget } from '@/lib/tabs/types';
 import { createBlankCanvasFile } from './create';
@@ -34,6 +39,9 @@ function noteTargetToTabTarget(target: NoteRouteTarget): TabTarget {
       pageFrameName: target.pageFrameName ?? null,
       pageFrameId: target.pageFrameId ?? null,
     };
+  }
+  if (isDataFileType(target.fileType)) {
+    return { type: 'csv', id: target.id };
   }
   return {
     type: 'image',

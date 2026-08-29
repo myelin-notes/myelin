@@ -16,16 +16,19 @@ export const VideoFileTypes = [
   'avi',
   'mkv',
 ] as const;
+export const DataFileTypes = ['csv'] as const;
 export const FileTypes = [
   'mcanvas',
   ...ImageFileTypes,
   ...VideoFileTypes,
+  ...DataFileTypes,
 ] as const;
 export type FileType = (typeof FileTypes)[number];
 
 const FILE_TYPE_SET = new Set<string>(FileTypes);
 const IMAGE_FILE_TYPE_SET = new Set<string>(ImageFileTypes);
 const VIDEO_FILE_TYPE_SET = new Set<string>(VideoFileTypes);
+const DATA_FILE_TYPE_SET = new Set<string>(DataFileTypes);
 
 const MIME_TYPE_BY_FILE_TYPE: Record<FileType, string> = {
   mcanvas: 'application/octet-stream',
@@ -43,6 +46,7 @@ const MIME_TYPE_BY_FILE_TYPE: Record<FileType, string> = {
   webm: 'video/webm',
   avi: 'video/x-msvideo',
   mkv: 'video/x-matroska',
+  csv: 'text/csv',
 };
 
 export function isSupportedFileType(value: string): value is FileType {
@@ -55,6 +59,10 @@ export function isImageFileType(fileType: FileType): boolean {
 
 export function isVideoFileType(fileType: FileType): boolean {
   return VIDEO_FILE_TYPE_SET.has(fileType);
+}
+
+export function isDataFileType(fileType: FileType): boolean {
+  return DATA_FILE_TYPE_SET.has(fileType);
 }
 
 export function getFileTypeForName(name: string): FileType | null {
