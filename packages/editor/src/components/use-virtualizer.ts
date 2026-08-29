@@ -45,6 +45,12 @@ interface UseVirtualizerResult {
   scrollToIndex: (index: number) => void;
 }
 
+/** Screen px per layout px, from any CSS transform scaling the scroll frame. */
+function verticalScale(frame: HTMLElement, frameRect: DOMRect): number {
+  const layoutHeight = frame.offsetHeight;
+  return layoutHeight > 0 ? frameRect.height / layoutHeight : 1;
+}
+
 /** Largest index whose offset is `<= target`. Assumes ascending offsets. */
 function findRowAt(offsets: number[], target: number): number {
   let lo = 0;
@@ -129,8 +135,13 @@ export function useVirtualizer({
     }
     const frameRect = frame.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
-    // How far the list's top sits above the frame's top edge.
-    const scrolledPast = Math.max(0, frameRect.top - containerRect.top);
+    // How far the list's top sits above the frame's top edge, in layout px: client rects are in
+    // screen px, so a CSS-transformed ancestor (a zoom-scaled canvas card) has to be divided out
+    // before comparing against `offsets` and `clientHeight`.
+    const scrolledPast = Math.max(
+      0,
+      (frameRect.top - containerRect.top) / verticalScale(frame, frameRect),
+    );
     const viewport = frame.clientHeight;
 
     let start = findRowAt(offsets, scrolledPast);
@@ -210,7 +221,8 @@ export function useVirtualizer({
       const frameRect = frame.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
       const containerTopInContent =
-        frame.scrollTop + (containerRect.top - frameRect.top);
+        frame.scrollTop +
+        (containerRect.top - frameRect.top) / verticalScale(frame, frameRect);
       const target = containerTopInContent + (offsetsRef.current[index] ?? 0);
       frame.scrollTo({ top: Math.max(0, target - 24), behavior: 'smooth' });
     },

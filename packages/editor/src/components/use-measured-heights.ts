@@ -41,7 +41,9 @@ export function useMeasuredHeights(
   );
 
   const record = useCallback((key: string, el: HTMLElement) => {
-    const height = Math.round(el.getBoundingClientRect().height);
+    // offsetHeight, not getBoundingClientRect: a list inside a CSS-transformed ancestor (the
+    // zoom-scaled canvas cards) must cache layout px, since the offsets built from it are layout px.
+    const height = el.offsetHeight;
     const prev = heightsRef.current.get(key);
     if (height <= 0 || prev === height) {
       return;
