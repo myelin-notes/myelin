@@ -1,10 +1,12 @@
 import type {
   AudioTranscriptionSession,
   TranscriptionCapability,
+  TranscriptSegment,
 } from '@myelin/editor/platform/types';
 import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import pcmCaptureWorkletUrl from './pcm-capture.worklet.ts?worker&url';
 
 const logger = new Logger('AudioTranscription');
 
@@ -28,7 +30,26 @@ interface AudioTranscriptionFinishedPayload {
 }
 
 interface PcmCapture {
+  /** Seconds of audio captured so far, on the capture context's clock. */
+  elapsedSeconds(): number;
   stop(): Promise<void>;
+}
+
+/**
+ * Shift whisper's times onto the recorded file's timeline and drop empty segments.
+ * `offsetSeconds` is how long capture had been running when recording started.
+ */
+export function alignSegments(
+  segments: readonly TranscriptSegment[],
+  offsetSeconds: number,
+): TranscriptSegment[] {
+  return segments
+    .map((segment) => ({
+      startSeconds: Math.max(0, segment.startSeconds - offsetSeconds),
+      endSeconds: Math.max(0, segment.endSeconds - offsetSeconds),
+      text: segment.text.trim(),
+    }))
+    .filter((segment) => segment.text.length > 0);
 }
 
 export const transcription: TranscriptionCapability = {
@@ -96,8 +117,9 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
   private capture: PcmCapture | null = null;
   private sampleSendQueue: Promise<void> = Promise.resolve();
   private stopped = false;
-  private finishPromise: Promise<string> | null = null;
-  private readonly segments: string[] = [];
+  private finishPromise: Promise<TranscriptSegment[]> | null = null;
+  private recordingStartSeconds = 0;
+  private readonly segments: TranscriptSegment[] = [];
   private resolveClosed!: () => void;
   private readonly closedPromise = new Promise<void>((resolve) => {
     this.resolveClosed = resolve;
@@ -114,7 +136,11 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
         if (event.payload.sessionId !== this.sessionId) {
           return;
         }
-        this.segments.push(event.payload.text);
+        this.segments.push({
+          startSeconds: event.payload.startSeconds,
+          endSeconds: event.payload.endSeconds,
+          text: event.payload.text,
+        });
       }),
       listen<AudioTranscriptionFinishedPayload>(FINISHED_EVENT, (event) => {
         if (event.payload.sessionId !== this.sessionId) {
@@ -139,12 +165,16 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
     });
   }
 
-  public finish(): Promise<string> {
+  public markRecordingStart(): void {
+    this.recordingStartSeconds = this.capture?.elapsedSeconds() ?? 0;
+  }
+
+  public finish(): Promise<TranscriptSegment[]> {
     this.finishPromise ??= this.doFinish();
     return this.finishPromise;
   }
 
-  private async doFinish(): Promise<string> {
+  private async doFinish(): Promise<TranscriptSegment[]> {
     // Stop capture first so nothing new is enqueued, then drain the backlog before refusing samples —
     // the import path enqueues the whole file and finishes immediately.
     await this.stopCapture();
@@ -166,10 +196,7 @@ class TauriAudioTranscriptionSession implements AudioTranscriptionSession {
     // its handler calls close(). Deliberately no timeout: a slow machine is not a failure, and the
     // worker always emits FINISHED (even on panic). cancel() also resolves this.
     await this.closedPromise;
-    return this.segments
-      .map((segment) => segment.trim())
-      .filter(Boolean)
-      .join(' ');
+    return alignSegments(this.segments, this.recordingStartSeconds);
   }
 
   public async cancel(): Promise<void> {
@@ -268,28 +295,31 @@ async function startPcmCapture(
   onSamples: (samples: Float32Array, sampleRate: number) => void,
 ): Promise<PcmCapture> {
   const audioContext = new AudioContext();
+  await audioContext.audioWorklet.addModule(pcmCaptureWorkletUrl);
   const source = audioContext.createMediaStreamSource(stream);
-  // Deliberately the deprecated ScriptProcessorNode over AudioWorklet: a worklet needs bundler
-  // plumbing and per-webview verification (WebKitGTK support unconfirmed). Worst case here is
-  // main-thread starvation dropping samples, which only degrades the live transcript — the recording
-  // comes from MediaRecorder and the transcribe button can regenerate it.
-  const processor = audioContext.createScriptProcessor(4096, 1, 1);
+  const capture = new AudioWorkletNode(audioContext, 'pcm-capture');
   const mute = audioContext.createGain();
 
+  // A worklet is only pulled by the graph when it reaches the destination, so route it there
+  // through a silent gain. `capture` writes nothing to its output, so the branch is silence anyway.
   mute.gain.value = 0;
-  processor.onaudioprocess = (event) => {
-    onSamples(mixToMono(event.inputBuffer), audioContext.sampleRate);
+  capture.port.onmessage = (event: MessageEvent<Float32Array>) => {
+    onSamples(event.data, audioContext.sampleRate);
   };
 
-  source.connect(processor);
-  processor.connect(mute);
+  source.connect(capture);
+  capture.connect(mute);
   mute.connect(audioContext.destination);
   await audioContext.resume();
+  const startTime = audioContext.currentTime;
 
   return {
+    elapsedSeconds() {
+      return Math.max(0, audioContext.currentTime - startTime);
+    },
     async stop() {
-      processor.onaudioprocess = null;
-      processor.disconnect();
+      capture.port.onmessage = null;
+      capture.disconnect();
       source.disconnect();
       mute.disconnect();
       await audioContext.close();

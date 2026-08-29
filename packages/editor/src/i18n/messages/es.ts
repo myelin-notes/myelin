@@ -834,6 +834,7 @@ const es: typeof en = {
       transcribingOn: (peer: string) => `Transcribiendo en ${peer}...`,
       transcriptionUnavailable:
         'La transcripción requiere un dispositivo compatible',
+      playFrom: (time: string) => `Reproducir desde ${time}`,
       showTranscript: 'Mostrar transcripción',
       hideTranscript: 'Ocultar transcripción',
       noSpeechDetected: 'No se detectó voz',

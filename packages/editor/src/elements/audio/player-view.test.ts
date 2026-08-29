@@ -27,7 +27,7 @@ describe('getAudioPlayerInteractionState', () => {
   it('disables the primary button for non-creators until audio exists', () => {
     const state = getAudioPlayerInteractionState({
       audioBytes: null,
-      transcript: '',
+      hasTranscript: false,
       isCreator: false,
       slot: { kind: 'none' },
     });
@@ -39,7 +39,7 @@ describe('getAudioPlayerInteractionState', () => {
   it('shows captions as loading while a valid remote claim is transcribing', () => {
     const state = getAudioPlayerInteractionState({
       audioBytes: new Uint8Array([1]),
-      transcript: '',
+      hasTranscript: false,
       isCreator: false,
       slot: { kind: 'transcribing-remote', peerId: 'peer-b' },
     });
@@ -51,7 +51,7 @@ describe('getAudioPlayerInteractionState', () => {
   it('disables captions when no capable client can transcribe here', () => {
     const state = getAudioPlayerInteractionState({
       audioBytes: new Uint8Array([1]),
-      transcript: '',
+      hasTranscript: false,
       isCreator: false,
       slot: { kind: 'unavailable' },
     });
@@ -63,7 +63,7 @@ describe('getAudioPlayerInteractionState', () => {
   it('enables the transcribe affordance for a capable eligible client', () => {
     const state = getAudioPlayerInteractionState({
       audioBytes: new Uint8Array([1]),
-      transcript: '',
+      hasTranscript: false,
       isCreator: false,
       slot: { kind: 'can-transcribe' },
     });
@@ -75,7 +75,7 @@ describe('getAudioPlayerInteractionState', () => {
   it('allows captions once the transcript has synced', () => {
     const state = getAudioPlayerInteractionState({
       audioBytes: new Uint8Array([1]),
-      transcript: 'hello',
+      hasTranscript: true,
       isCreator: false,
       slot: { kind: 'none' },
     });

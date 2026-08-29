@@ -75,14 +75,16 @@ describe('YDocManager.removeElementMap', () => {
 });
 
 describe('async-result origin writes', () => {
+  const SEGMENTS = [{ startSeconds: 0, endSeconds: 1.5, text: 'hello world' }];
+
   it('adds no undo step of its own', () => {
     const ydoc = new YDocManager();
     const yMap = ydoc.createElementMap(ElementType.AUDIO, 'audio-1', {
-      transcript: '',
+      transcriptSegments: [],
     });
     ydoc.undoManager.stopCapturing();
 
-    writeYMap(yMap, { transcript: 'hello world' }, ASYNC_RESULT_ORIGIN);
+    writeYMap(yMap, { transcriptSegments: SEGMENTS }, ASYNC_RESULT_ORIGIN);
 
     // The next undo skips straight past the transcript write and reverts the
     // element creation itself.
@@ -93,9 +95,9 @@ describe('async-result origin writes', () => {
   it('restores the transcript when undoing the element deletion', () => {
     const ydoc = new YDocManager();
     const yMap = ydoc.createElementMap(ElementType.AUDIO, 'audio-1', {
-      transcript: '',
+      transcriptSegments: [],
     });
-    writeYMap(yMap, { transcript: 'hello world' }, ASYNC_RESULT_ORIGIN);
+    writeYMap(yMap, { transcriptSegments: SEGMENTS }, ASYNC_RESULT_ORIGIN);
     ydoc.undoManager.stopCapturing();
 
     ydoc.removeElementMap(yMap);
@@ -103,7 +105,7 @@ describe('async-result origin writes', () => {
 
     ydoc.undoManager.undo();
     expect(ydoc.elements.length).toBe(1);
-    expect(ydoc.elements.get(0).get('transcript')).toBe('hello world');
+    expect(ydoc.elements.get(0).get('transcriptSegments')).toEqual(SEGMENTS);
   });
 });
 

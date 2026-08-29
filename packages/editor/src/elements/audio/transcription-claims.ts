@@ -10,7 +10,7 @@ import type { LivePeer, PeerMode } from '../../sync/live/peers';
 
 export interface TranscriptionCoordinationInput {
   hasAudio: boolean;
-  transcript: string;
+  hasTranscript: boolean;
   /** Contents of the element's `transcribingPeerId` field; '' = never claimed. */
   claimPeerId: string;
   localPeerId: string;
@@ -33,7 +33,7 @@ export type TranscriptionSlotState =
 // Two windows on one device share a persistent peerId, so a sibling window's claim looks like
 // our own idle claim and reads as invalid. The possible same-device duplicate run converges.
 export function isClaimActive(input: TranscriptionCoordinationInput): boolean {
-  if (!input.claimPeerId || input.transcript) {
+  if (!input.claimPeerId || input.hasTranscript) {
     return false;
   }
   if (input.claimPeerId === input.localPeerId) {
@@ -48,7 +48,7 @@ export function isClaimActive(input: TranscriptionCoordinationInput): boolean {
 export function shouldAutoTranscribe(
   input: TranscriptionCoordinationInput,
 ): boolean {
-  if (!input.hasAudio || input.transcript || input.isTranscribingLocally) {
+  if (!input.hasAudio || input.hasTranscript || input.isTranscribingLocally) {
     return false;
   }
   if (!input.claimPeerId || input.claimPeerId !== input.localPeerId) {
@@ -75,7 +75,7 @@ export function shouldStartAutoPickup(options: {
 export function canTranscribeHere(
   input: TranscriptionCoordinationInput,
 ): boolean {
-  if (!input.hasAudio || input.transcript || input.isTranscribingLocally) {
+  if (!input.hasAudio || input.hasTranscript || input.isTranscribingLocally) {
     return false;
   }
   if (!input.localCapable || input.localMode !== 'owner-device') {
@@ -100,7 +100,7 @@ export function shouldClaimOnRecordingStart(options: {
 export function getTranscriptionSlotState(
   input: TranscriptionCoordinationInput,
 ): TranscriptionSlotState {
-  if (!input.hasAudio || input.transcript) {
+  if (!input.hasAudio || input.hasTranscript) {
     return { kind: 'none' };
   }
   if (input.isTranscribingLocally) {

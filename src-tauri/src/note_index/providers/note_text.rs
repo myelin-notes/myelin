@@ -113,7 +113,9 @@ mod tests {
     use super::*;
 
     use super::super::yjs::{decode_doc, TYPE_AUDIO};
-    use yrs::{Array, Doc, Map, MapPrelim, ReadTxn, StateVector, Transact};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use yrs::{Any, Array, Doc, Map, MapPrelim, ReadTxn, StateVector, Transact};
 
     // A real note's persisted bytes, produced by the app's own YDocManager +
     // y-prosemirror + schema (Y.encodeStateAsUpdate). Contents: one page frame
@@ -146,7 +148,18 @@ mod tests {
         let mut txn = doc.transact_mut();
         let map = elements.push_back(&mut txn, MapPrelim::default());
         map.insert(&mut txn, "type", TYPE_AUDIO);
-        map.insert(&mut txn, "transcript", "  hello transcribed   world  ");
+        map.insert(
+            &mut txn,
+            "transcriptSegments",
+            Any::Array(Arc::from(vec![Any::Map(Arc::new(HashMap::from([
+                ("startSeconds".to_string(), Any::Number(0.0)),
+                ("endSeconds".to_string(), Any::Number(1.5)),
+                (
+                    "text".to_string(),
+                    Any::String("hello transcribed world".into()),
+                ),
+            ])))])),
+        );
         let bytes = txn.encode_state_as_update_v1(&StateVector::default());
 
         assert_eq!(extract_note_text(&decode_doc(&bytes).unwrap()).unwrap(), "");
