@@ -1,9 +1,18 @@
-import type { LucideIcon } from 'lucide-react';
+import { FoldVertical, type LucideIcon, UnfoldVertical } from 'lucide-react';
 import type * as Y from 'yjs';
 import { getCanvasPalette } from '../canvas-theme';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { Messages } from '../i18n/messages';
+import {
+  getBandReservedHeight,
+  setBandReservedHeight,
+} from '../page-frame/anchor/capture';
+import { PageAnchor } from '../page-frame/anchor/page-anchor';
+import {
+  getPageFrame,
+  resolveBandWorldPoint,
+} from '../page-frame/anchor/resolve';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { SyncOrigin, YDocManager } from '../ydoc-manager';
@@ -97,6 +106,13 @@ export abstract class DrawableElement {
   /** Yjs backing map — set after element is bound to a Y.Doc. */
   protected _yMap: Y.Map<unknown> | null = null;
   private _yFields: YFieldMap = {};
+  private readonly _pageAnchor = new PageAnchor();
+  /** Set once the element joins a canvas; `null` for elements built for export or tests. */
+  protected _hostCanvas: DrawableCanvas | null = null;
+
+  public attachCanvas(canvas: DrawableCanvas): void {
+    this._hostCanvas = canvas;
+  }
 
   protected constructor(
     // Keys element-owned Yjs state such as page-frame ProseMirror fragments.
@@ -134,7 +150,56 @@ export abstract class DrawableElement {
         this._scale.y = v as number;
         this.updateBoundingBox();
       },
+      ...this._pageAnchor.yFields(),
     });
+  }
+
+  public get anchoredFrameUuid(): string | null {
+    return this._pageAnchor.active ? this._pageAnchor.frameUuid : null;
+  }
+
+  public get anchoredBandId(): string | null {
+    return this._pageAnchor.active ? this._pageAnchor.bandId : null;
+  }
+
+  /** `bandWorld` must be the band's world point as of right now — see {@link PageAnchor.bind}. */
+  public anchorToPage(
+    frameUuid: string,
+    bandId: string,
+    bandWorld: Vector2,
+  ): void {
+    this._pageAnchor.bind(frameUuid, bandId, bandWorld, this._offset);
+    this.syncToYMap(this._pageAnchor.yProps());
+  }
+
+  /** Pins the element where it currently renders. No-op when it isn't anchored. */
+  public detachFromPage(): void {
+    if (!this._pageAnchor.active) {
+      return;
+    }
+    this._pageAnchor.release();
+    this.syncToYMap({
+      ...this._pageAnchor.yProps(),
+      offsetX: this._offset.x,
+      offsetY: this._offset.y,
+    });
+  }
+
+  /**
+   * Re-derives the offset of an anchored element from its band's live position. Runs before the
+   * draw pass, so culling and hit-testing see the same geometry that gets painted.
+   */
+  public syncPageAnchor(canvas: DrawableCanvas): void {
+    const derived = this._pageAnchor.resolve(canvas);
+    if (
+      derived === null ||
+      (derived.x === this._offset.x && derived.y === this._offset.y)
+    ) {
+      return;
+    }
+    this._offset.x = derived.x;
+    this._offset.y = derived.y;
+    this.onTransformChanged?.();
   }
 
   protected bindYFields(yMap: Y.Map<unknown>, fields: YFieldMap): void {
@@ -163,6 +228,9 @@ export abstract class DrawableElement {
     if (dx === 0 && dy === 0) {
       return;
     }
+    // Dragging hands the position back to the user. The live offset is already the anchored one,
+    // so releasing here pins the element exactly where it appears to be.
+    this.detachFromPage();
     this._offset.x += dx;
     this._offset.y += dy;
     this.syncToYMap({ offsetX: this._offset.x, offsetY: this._offset.y });
@@ -496,8 +564,51 @@ export abstract class DrawableElement {
   }
 
   // Only when it is the sole selected element. Override to expose element-specific actions.
-  public getSelectionToolbarItems(_strings: Messages): SelectionToolbarItem[] {
-    return [];
+  public getSelectionToolbarItems(strings: Messages): SelectionToolbarItem[] {
+    return this.pageAnchorToolbarItems(strings);
+  }
+
+  /**
+   * Toggles an anchored element between floating over the page's content and reserving space in
+   * it. Empty unless the element is anchored, so it appears exactly when the choice is meaningful.
+   * Subclasses that override {@link getSelectionToolbarItems} should spread this in.
+   */
+  protected pageAnchorToolbarItems(strings: Messages): SelectionToolbarItem[] {
+    const canvas = this._hostCanvas;
+    const frameUuid = this.anchoredFrameUuid;
+    const bandId = this.anchoredBandId;
+    if (!canvas || frameUuid === null || bandId === null) {
+      return [];
+    }
+    const frame = getPageFrame(canvas, frameUuid);
+    if (!frame) {
+      return [];
+    }
+    const reserved = getBandReservedHeight(frame, bandId) > 0;
+    return [
+      {
+        id: 'page-band',
+        label: reserved
+          ? strings.canvas.selectionToolbar.floatOverText
+          : strings.canvas.selectionToolbar.makeRoom,
+        icon: reserved ? FoldVertical : UnfoldVertical,
+        active: reserved,
+        onClick: () => {
+          if (reserved) {
+            setBandReservedHeight(frame, bandId, 0);
+            return;
+          }
+          const band = resolveBandWorldPoint(frame, bandId, canvas.viewport);
+          if (band) {
+            setBandReservedHeight(
+              frame,
+              bandId,
+              this.boundingBox.bottom - band.y,
+            );
+          }
+        },
+      },
+    ];
   }
 
   /** Called once when a resize drag begins. Snapshot any baseline state here. */

@@ -231,6 +231,42 @@ const horizontalRule: NodeSpec = {
   parseDOM: [{ tag: 'hr' }],
 };
 
+/**
+ * Reserved space in the flow for canvas elements anchored to this point in the document.
+ * `height` of 0 makes it a pure position marker: anchored ink floats over the content below it
+ * without displacing anything. Never breakable, so pagination moves a band whole to the next page
+ * and its ink travels with it.
+ */
+const canvasBand: NodeSpec = {
+  group: 'block',
+  atom: true,
+  selectable: false,
+  attrs: { bandId: {}, height: { default: 0 } },
+  toDOM(node) {
+    return [
+      'div',
+      {
+        class: 'pm-canvas-band',
+        'data-band-id': node.attrs.bandId,
+        style: `height:${node.attrs.height}px`,
+        contenteditable: 'false',
+      },
+    ];
+  },
+  parseDOM: [
+    {
+      tag: 'div.pm-canvas-band',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        return {
+          bandId: el.getAttribute('data-band-id'),
+          height: Number.parseFloat(el.style.height) || 0,
+        };
+      },
+    },
+  ],
+};
+
 const mention: NodeSpec = {
   inline: true,
   group: 'inline',
@@ -430,6 +466,7 @@ export const schema = new Schema({
     codeBlock,
     mathBlock,
     horizontalRule,
+    canvasBand,
     mention,
     ...tableSpecs,
     text: { group: 'inline' },

@@ -769,6 +769,10 @@ const zhHans: typeof en = {
       delete: '删除',
       crop: '裁剪',
       applyCrop: '应用裁剪',
+      addToPage: '加入页面',
+      removeFromPage: '移出页面',
+      makeRoom: '腾出空间',
+      floatOverText: '浮于文字上方',
     },
     insert: {
       title: '插入',
