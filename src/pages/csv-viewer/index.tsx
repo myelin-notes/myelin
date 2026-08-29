@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, LoaderCircle } from 'lucide-react';
 import { isDataFileType, useRepository, type VFSNodeId } from '@/lib/sync';
+import { decodeText } from './decode';
 import { type CsvTable, toCsvTable } from './parse';
 
 const ROW_HEIGHT = 32;
@@ -13,7 +14,7 @@ const MAX_COL_CH = 40;
 
 type CsvViewerState =
   | { status: 'loading' }
-  | { status: 'ready'; table: CsvTable | null }
+  | { status: 'ready'; table: CsvTable | null; encoding: string }
   | { status: 'error'; message: string };
 
 function errorMessage(error: unknown): string {
@@ -55,9 +56,9 @@ export function CsvViewerPage({ id }: CsvViewerPageProps) {
         throw new Error('File data is missing.');
       }
 
-      const text = new TextDecoder().decode(bytes).replace(/^\uFEFF/, '');
+      const { text, encoding } = decodeText(bytes);
       if (!cancelled) {
-        setState({ status: 'ready', table: toCsvTable(text) });
+        setState({ status: 'ready', table: toCsvTable(text), encoding });
       }
     };
 
@@ -101,13 +102,19 @@ export function CsvViewerPage({ id }: CsvViewerPageProps) {
             This file is empty.
           </div>
         ) : (
-          <CsvTableView table={state.table} />
+          <CsvTableView table={state.table} encoding={state.encoding} />
         ))}
     </div>
   );
 }
 
-function CsvTableView({ table }: { table: CsvTable }) {
+function CsvTableView({
+  table,
+  encoding,
+}: {
+  table: CsvTable;
+  encoding: string;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -186,6 +193,7 @@ function CsvTableView({ table }: { table: CsvTable }) {
       <div className="shrink-0 border-subtle border-t px-3 py-1.5 text-text-muted text-xs">
         {total.toLocaleString()} {total === 1 ? 'row' : 'rows'} ·{' '}
         {table.columnCount} {table.columnCount === 1 ? 'column' : 'columns'}
+        {encoding !== 'utf-8' && ` · ${encoding}`}
       </div>
     </>
   );
