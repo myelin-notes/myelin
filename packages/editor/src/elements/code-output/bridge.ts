@@ -1,11 +1,7 @@
 import type { DrawableCanvas } from '../../drawable-canvas';
 import type { PageFramePmScreenRect } from '../../page-frame/pm/screen-rect';
 import { ElementType } from '../element-type';
-import {
-  CodeOutputElement,
-  type CodeOutputItem,
-  type CodeOutputRunMeta,
-} from './element';
+import { CodeOutputElement } from './element';
 
 /** World-px gap between the page frame's edge and a freshly spawned card. */
 const SPAWN_GAP = 24;
@@ -18,19 +14,11 @@ export interface EnsureCardRequest {
   pageLayout: string;
 }
 
-export interface SettleRunRequest {
-  frameUuid: string;
-  blockId: string;
-  items: CodeOutputItem[];
-  runMeta: CodeOutputRunMeta;
-  truncated: number;
-}
-
 /**
  * Connects code-block run buttons (vanilla PM node views with no canvas access) to the active
- * {@link DrawableCanvas} so runs can spawn/settle their output card elements. The app registers
- * the canvas on session attach and clears it on teardown; with none registered, runs still
- * stream to the store — there is just no card to show them.
+ * {@link DrawableCanvas} so runs can spawn their output card elements. The app registers the
+ * canvas on session attach and clears it on teardown; with none registered, runs still stream to
+ * the store — there is just no card to show them.
  */
 class CodeOutputBridge {
   private canvas: DrawableCanvas | null = null;
@@ -71,15 +59,6 @@ class CodeOutputBridge {
       return element;
     });
     card.updateBounds();
-  }
-
-  /** Persist a finished run into its card. No-op if the card was deleted mid-run. */
-  settle(req: SettleRunRequest): void {
-    this.findCard(req.frameUuid, req.blockId)?.setRunResult(
-      req.items,
-      req.runMeta,
-      req.truncated,
-    );
   }
 
   private findCard(

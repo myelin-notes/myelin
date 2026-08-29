@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef } from 'react';
 import { VirtualList } from '../../components/virtual-list';
-import type { CodeRunSession } from '../../page-frame/pm/code-block/run-store';
-import type { CodeOutputItem, CodeOutputRunMeta } from './element';
+import type {
+  CodeRunResult,
+  CodeRunSession,
+} from '../../page-frame/pm/code-block/run-store';
 
 /** Row height before measurement; corrected once each line mounts. */
 const ESTIMATED_LINE_HEIGHT = 18;
@@ -17,44 +19,37 @@ function formatDuration(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-function statusText(meta: CodeOutputRunMeta): string {
-  if (meta.cancelled) {
+function statusText(result: CodeRunResult): string {
+  if (result.cancelled) {
     return 'Stopped';
   }
-  if (meta.error) {
+  if (result.error) {
     return 'Failed';
   }
-  if (meta.exitCode !== 0) {
-    return `Exit ${meta.exitCode}`;
+  if (result.exitCode !== 0) {
+    return `Exit ${result.exitCode}`;
   }
-  return `Done in ${formatDuration(meta.durationMs)}`;
+  return `Done in ${formatDuration(result.durationMs)}`;
 }
 
 interface CodeOutputCardViewProps {
-  /** Live run session for this block, or null once settled. Re-rendered by the element on store changes. */
+  /** Run session for this block, or null if it hasn't run in this app session. */
   session: CodeRunSession | null;
-  items: CodeOutputItem[];
-  runMeta: CodeOutputRunMeta | null;
-  truncated: number;
 }
 
 /**
- * Card body for a {@link CodeOutputElement}. Renders the live run session for its block while one
- * exists (streaming), and the element's persisted items otherwise. Pure props — the element pushes
+ * Card body for a {@link CodeOutputElement}. Renders the run session for its block; output is
+ * in-memory only, so a card whose block hasn't run yet is empty. Pure props — the element pushes
  * store changes through render() imperatively (a useSyncExternalStore subscription inside this
  * flushSync-rendered root executed renders whose commits never reached the DOM). The header is
  * pointer-events: none so dragging it moves the element via the canvas; only the body (text
  * selection, scroll) and the stop button take pointer input.
  */
-export function CodeOutputCardView({
-  session,
-  items,
-  runMeta,
-  truncated,
-}: CodeOutputCardViewProps) {
+export function CodeOutputCardView({ session }: CodeOutputCardViewProps) {
   const running = session?.running === true;
-  const lines = session ? session.lines : items;
-  const language = session?.language ?? runMeta?.language ?? '';
+  const lines = session?.lines ?? [];
+  const result = session?.result ?? null;
+  const dropped = session?.dropped ?? 0;
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -72,7 +67,9 @@ export function CodeOutputCardView({
   return (
     <div className="canvas-code-output__card">
       <div className="canvas-code-output__header">
-        <span className="canvas-code-output__lang">{language}</span>
+        <span className="canvas-code-output__lang">
+          {session?.language ?? ''}
+        </span>
         <span
           className={
             running
@@ -80,7 +77,7 @@ export function CodeOutputCardView({
               : 'canvas-code-output__status'
           }
         >
-          {running ? 'Running' : runMeta ? statusText(runMeta) : ''}
+          {running ? 'Running' : result ? statusText(result) : ''}
         </span>
         {running && session ? (
           <button
@@ -96,7 +93,12 @@ export function CodeOutputCardView({
       <div
         ref={bodyRef}
         className="canvas-code-output__body"
-        onWheel={(event) => event.stopPropagation()}
+        onWheel={(event) => {
+          // Let ctrl+wheel (and trackpad pinch) reach the canvas so zoom still works over the output.
+          if (!event.ctrlKey) {
+            event.stopPropagation();
+          }
+        }}
         onScroll={() => {
           const body = bodyRef.current;
           if (body) {
@@ -106,9 +108,9 @@ export function CodeOutputCardView({
           }
         }}
       >
-        {!session && truncated > 0 ? (
+        {dropped > 0 ? (
           <div className="canvas-code-output__line is-stderr">
-            … {truncated} earlier lines dropped
+            … {dropped} earlier lines dropped
           </div>
         ) : null}
         {lines.length === 0 && !running ? (

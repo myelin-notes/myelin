@@ -6,7 +6,6 @@ import type {
   RunPollResponse,
 } from '../../../code-runner/contract';
 import { codeOutputBridge } from '../../../elements/code-output/bridge';
-import type { CodeOutputItem } from '../../../elements/code-output/element';
 import { type CodeRunnerCapability, getPlatform } from '../../../platform';
 import { PM_EDITOR_CLASS } from '../constants';
 import { getPageFramePmScreenRectForElement } from '../screen-rect';
@@ -18,9 +17,6 @@ const logger = new Logger('CodeBlockRun');
 /** Pull cadence while a run is quiet. Each poll is one bounded IPC round-trip,
  *  so output can never flood the webview faster than this. */
 const POLL_INTERVAL_MS = 50;
-
-/** Lines kept when a finished run settles into the card's persisted (synced, saved) state. */
-const MAX_PERSISTED_LINES = 2000;
 
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -36,8 +32,8 @@ interface CodeBlockRunViewOptions {
 
 /**
  * A code block's Run/Stop button, overlaid in the top-right corner. Absolutely positioned, so it
- * never changes the block's measured size. Output streams to {@link codeRunStore} (rendered live
- * by the block's canvas output card) and settles into the card element when the run finishes.
+ * never changes the block's measured size. Output streams to {@link codeRunStore} (rendered by the
+ * block's canvas output card) and lives there only for as long as this view does.
  */
 export class CodeBlockRunView {
   /** Appended into the node view's DOM as a top-right absolute overlay. */
@@ -84,7 +80,7 @@ export class CodeBlockRunView {
         .then(() => codeRunner.releaseRun(executionId))
         .catch(() => {});
     }
-    if (this.blockId) {
+    if (this.blockId && executionId) {
       codeRunStore.remove(this.blockId);
     }
   }
@@ -221,32 +217,12 @@ export class CodeBlockRunView {
     }
 
     const durationMs = Date.now() - this.runStartedAt;
-    const frameUuid = this.frameUuid();
-    const lines = codeRunStore.getSession(blockId)?.lines ?? [];
-    if (frameUuid && this.runLanguage) {
-      const kept = lines.slice(-MAX_PERSISTED_LINES);
-      const items: CodeOutputItem[] = kept.map((line) => ({
-        kind: 'text',
-        stream: line.stream,
-        text: line.text,
-      }));
-      codeOutputBridge.settle({
-        frameUuid,
-        blockId,
-        items,
-        truncated: lines.length - kept.length,
-        runMeta: {
-          language: this.runLanguage,
-          exitCode,
-          durationMs,
-          finishedAt: Date.now(),
-          error,
-          cancelled: this.runCancelled,
-        },
-      });
-    }
-    // The card now renders the settled items; drop the live session.
-    codeRunStore.remove(blockId);
+    codeRunStore.finish(blockId, {
+      exitCode,
+      durationMs,
+      error,
+      cancelled: this.runCancelled,
+    });
 
     const outcome = this.runCancelled
       ? 'cancelled'

@@ -3,12 +3,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import type * as Y from 'yjs';
 import { getCanvasPalette } from '../../canvas-theme';
 import type { CanvasViewport } from '../../canvas-viewport';
-import type { RunnableLanguage } from '../../code-runner/contract';
 import type { Vector2 } from '../../drawable-canvas';
 import { codeRunStore } from '../../page-frame/pm/code-block/run-store';
 import { PM_EDITOR_CLASS } from '../../page-frame/pm/constants';
 import { mapPmRectToScreen } from '../../page-frame/pm/screen-rect';
-import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
 import {
   DrawableElement,
   type ResizeHandle,
@@ -29,21 +27,6 @@ const ANCHOR_INSET = 14;
 /** Marching-dash speed while running, in screen px/s along the spline. */
 const DASH_SPEED = 60;
 
-export interface CodeOutputItem {
-  kind: 'text';
-  stream: 'stdout' | 'stderr';
-  text: string;
-}
-
-export interface CodeOutputRunMeta {
-  language: RunnableLanguage;
-  exitCode: number | null;
-  durationMs: number;
-  finishedAt: number;
-  error: string | null;
-  cancelled: boolean;
-}
-
 interface WorldRect {
   left: number;
   top: number;
@@ -53,9 +36,11 @@ interface WorldRect {
 
 /**
  * Output card for a code block, linked by `(frameUuid, blockId)` and joined to it by a spline
- * connector drawn in `draw2D`. While `detached` is false the card's offset is re-derived from the
- * block's on-screen rect every frame (in-memory only — Yjs offset is written on settle/drag), so
- * it follows document edits and frame moves; the first user drag detaches it for good.
+ * connector drawn in `draw2D`. The run output itself is never persisted: the card renders the
+ * live {@link codeRunStore} session for its block and is empty until the block is run again.
+ * While `detached` is false the card's offset is re-derived from the block's on-screen rect every
+ * frame (in-memory only — Yjs offset is written on drag), so it follows document edits and frame
+ * moves; the first user drag detaches it for good.
  */
 export class CodeOutputElement extends DrawableElement {
   private _frameUuid: string;
@@ -63,9 +48,6 @@ export class CodeOutputElement extends DrawableElement {
   private _detached = false;
   private _width = CODE_OUTPUT_DEFAULT_WIDTH;
   private _height = CODE_OUTPUT_DEFAULT_HEIGHT;
-  private _items: CodeOutputItem[] = [];
-  private _runMeta: CodeOutputRunMeta | null = null;
-  private _truncated = 0;
 
   private _root: HTMLDivElement | null = null;
   private _reactRoot: Root | null = null;
@@ -103,9 +85,6 @@ export class CodeOutputElement extends DrawableElement {
       detached: this._detached,
       width: this._width,
       height: this._height,
-      items: this._items,
-      runMeta: this._runMeta,
-      truncated: this._truncated,
     };
   }
 
@@ -133,43 +112,7 @@ export class CodeOutputElement extends DrawableElement {
         this._height = typeof v === 'number' ? v : CODE_OUTPUT_DEFAULT_HEIGHT;
         this.render();
       },
-      items: (v) => {
-        this._items = Array.isArray(v) ? (v as CodeOutputItem[]) : [];
-        this.render();
-      },
-      runMeta: (v) => {
-        this._runMeta =
-          v && typeof v === 'object' ? (v as CodeOutputRunMeta) : null;
-        this.render();
-      },
-      truncated: (v) => {
-        this._truncated = typeof v === 'number' ? v : 0;
-        this.render();
-      },
     });
-  }
-
-  /** Settle a finished run into persisted state. Arrives async, so it stays out of undo; the
-   *  derived attached offset is snapshotted here so peers/reloads see the card where it sat. */
-  public setRunResult(
-    items: CodeOutputItem[],
-    runMeta: CodeOutputRunMeta,
-    truncated: number,
-  ): void {
-    this._items = items;
-    this._runMeta = runMeta;
-    this._truncated = truncated;
-    this.syncToYMap(
-      {
-        items,
-        runMeta,
-        truncated,
-        offsetX: this.offset.x,
-        offsetY: this.offset.y,
-      },
-      ASYNC_RESULT_ORIGIN,
-    );
-    this.render();
   }
 
   // An attached card is pinned at its anchored top-left, so only grow-away handles are offered.
@@ -332,7 +275,7 @@ export class CodeOutputElement extends DrawableElement {
     ctx.stroke();
     ctx.fillStyle = palette.border;
     const lineCount = Math.min(
-      Math.max(this._items.length, 1),
+      Math.max(codeRunStore.getSession(this._blockId)?.lines.length ?? 0, 1),
       Math.floor((this._height - 48) / 18),
     );
     for (let i = 0; i < lineCount; i++) {
@@ -432,7 +375,7 @@ export class CodeOutputElement extends DrawableElement {
   }
 
   // In-memory only: the derived position is recomputed every frame, so writing it to Yjs would
-  // flood peers/saves. It is persisted once on settle and on detach (via translate).
+  // flood peers/saves. It is persisted on detach (via translate).
   private setDerivedOffset(x: number, y: number): void {
     this.offset.x = x;
     this.offset.y = y;
@@ -492,12 +435,7 @@ export class CodeOutputElement extends DrawableElement {
     }
     flushSync(() => {
       this._reactRoot!.render(
-        <CodeOutputCardView
-          session={codeRunStore.getSession(this._blockId)}
-          items={this._items}
-          runMeta={this._runMeta}
-          truncated={this._truncated}
-        />,
+        <CodeOutputCardView session={codeRunStore.getSession(this._blockId)} />,
       );
     });
   }
