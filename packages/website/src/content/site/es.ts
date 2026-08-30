@@ -138,22 +138,26 @@ for step in range(3):
       {
         id: 'goodnotes',
         label: 'Importar desde Goodnotes',
-        detail: 'Una carpeta exportada como PDF, en un ZIP.',
+        detail:
+          'Importa tu contenido de Goodnotes exportándolo como un ZIP de PDF.',
       },
       {
         id: 'onenote',
         label: 'Importar desde OneNote',
-        detail: 'Un cuaderno .onepkg o una sección .one.',
+        detail:
+          'Importa tu contenido de OneNote desde un cuaderno .onepkg o una sección .one.',
       },
       {
         id: 'obsidian',
         label: 'Importar desde Obsidian',
-        detail: 'Un vault entero, con notas y adjuntos.',
+        detail:
+          'Importa tu contenido de Obsidian directamente desde la carpeta del vault.',
       },
       {
         id: 'notion',
         label: 'Importar desde Notion',
-        detail: 'Su exportación en Markdown y CSV.',
+        detail:
+          'Importa tu contenido de Notion exportándolo como Markdown y CSV.',
       },
     ],
   },

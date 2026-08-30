@@ -660,14 +660,14 @@ function buildLocalFirst(
 export const IMPORT_BOXES = {
   /** Left edge of the box column, from the scene's own left edge. */
   dx: 950,
-  /** Wide enough that every locale's `detail` stays on one line. */
   width: 660,
   /**
-   * Sized so the name and its one-line `detail` fill the box. That is what
-   * puts the centred mark level with the text: slack here would drop the icon
-   * below the name it belongs to.
+   * Sized so the label and its two-line `detail` fill the box. That is what
+   * puts the centred mark level with the text: slack here drops the icon below
+   * the label it belongs to, which is how it looked when the box ran taller
+   * than its content.
    */
-  height: 114,
+  height: 140,
   gap: 26,
   /** Brand mark: inset from the box's left edge, centred on its height. */
   icon: { dx: 30, size: 40 },

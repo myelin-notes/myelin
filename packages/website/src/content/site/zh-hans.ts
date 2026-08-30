@@ -136,22 +136,22 @@ for step in range(3):
       {
         id: 'goodnotes',
         label: '从 Goodnotes 导入',
-        detail: '导出为 PDF 的 Goodnotes 文件夹压缩包。',
+        detail: '把 Goodnotes 的内容导出为 PDF 压缩包后导入。',
       },
       {
         id: 'onenote',
         label: '从 OneNote 导入',
-        detail: '.onepkg 笔记本或 .one 分区。',
+        detail: '从 .onepkg 笔记本或 .one 分区导入 OneNote 的内容。',
       },
       {
         id: 'obsidian',
         label: '从 Obsidian 导入',
-        detail: '整个 vault 文件夹，连同笔记与附件。',
+        detail: '直接从 vault 文件夹导入 Obsidian 的内容。',
       },
       {
         id: 'notion',
         label: '从 Notion 导入',
-        detail: '它导出的 Markdown 与 CSV。',
+        detail: '把 Notion 的内容导出为 Markdown 与 CSV 后导入。',
       },
     ],
   },
