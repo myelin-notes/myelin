@@ -135,18 +135,23 @@ for step in range(3):
     sources: [
       {
         id: 'goodnotes',
-        name: 'Goodnotes',
+        label: '从 Goodnotes 导入',
         detail: '导出为 PDF 的 Goodnotes 文件夹压缩包。',
       },
       {
         id: 'onenote',
-        name: 'OneNote',
+        label: '从 OneNote 导入',
         detail: '.onepkg 笔记本或 .one 分区。',
       },
       {
         id: 'obsidian',
-        name: 'Obsidian',
+        label: '从 Obsidian 导入',
         detail: '整个 vault 文件夹，连同笔记与附件。',
+      },
+      {
+        id: 'notion',
+        label: '从 Notion 导入',
+        detail: '它导出的 Markdown 与 CSV。',
       },
     ],
   },
@@ -258,7 +263,7 @@ for step in range(3):
 
 ## 可以从别的应用导入吗？
 
-可以。Myelin 支持导入 Obsidian vault、OneNote 的 .onepkg 笔记本或 .one 分区、导出为 PDF 的 Goodnotes 文件夹，以及零散的 Markdown、PDF、图片与视频，还有从 Myelin 自身导出的工作区文件夹。Notion 导入功能已列入计划。
+可以。Myelin 支持导入 Obsidian vault、OneNote 的 .onepkg 笔记本或 .one 分区、导出为 PDF 的 Goodnotes 文件夹，以及零散的 Markdown、PDF、图片与视频，还有从 Myelin 自身导出的工作区文件夹。Notion 的内容可以通过它自己的 Markdown 与 CSV 导出导入，由文件导入器读取；能保留页面层级的专用 Notion 导入器已列入计划。
 
 ## 离线能用吗？
 

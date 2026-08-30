@@ -137,18 +137,23 @@ for step in range(3):
     sources: [
       {
         id: 'goodnotes',
-        name: 'Goodnotes',
+        label: 'Importar desde Goodnotes',
         detail: 'Una carpeta exportada como PDF, en un ZIP.',
       },
       {
         id: 'onenote',
-        name: 'OneNote',
+        label: 'Importar desde OneNote',
         detail: 'Un cuaderno .onepkg o una sección .one.',
       },
       {
         id: 'obsidian',
-        name: 'Obsidian',
+        label: 'Importar desde Obsidian',
         detail: 'Un vault entero, con notas y adjuntos.',
+      },
+      {
+        id: 'notion',
+        label: 'Importar desde Notion',
+        detail: 'Su exportación en Markdown y CSV.',
       },
     ],
   },
@@ -260,7 +265,7 @@ Sí, en directo y de igual a igual, ya hoy. No hay cuenta de Myelin ni nada en m
 
 ## ¿Puedo importar desde otra app?
 
-Sí. Myelin importa un vault de Obsidian, un cuaderno .onepkg o una sección .one de OneNote, una carpeta de Goodnotes exportada como PDF, archivos sueltos de Markdown, PDF, imágenes y video, y una carpeta de espacio de trabajo exportada desde el propio Myelin. Un importador de Notion está en la hoja de ruta.
+Sí. Myelin importa un vault de Obsidian, un cuaderno .onepkg o una sección .one de OneNote, una carpeta de Goodnotes exportada como PDF, archivos sueltos de Markdown, PDF, imágenes y video, y una carpeta de espacio de trabajo exportada desde el propio Myelin. Notion entra a través de su propia exportación en Markdown y CSV, que lee el importador de archivos; un importador de Notion dedicado, que conserve la jerarquía de páginas, está en la hoja de ruta.
 
 ## ¿Funciona sin conexión?
 

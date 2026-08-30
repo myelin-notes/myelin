@@ -144,18 +144,23 @@ for step in range(3):
     sources: [
       {
         id: 'goodnotes',
-        name: 'Goodnotes',
+        label: 'Import from Goodnotes',
         detail: 'A folder exported as PDFs, zipped.',
       },
       {
         id: 'onenote',
-        name: 'OneNote',
+        label: 'Import from OneNote',
         detail: 'A .onepkg notebook or a .one section.',
       },
       {
         id: 'obsidian',
-        name: 'Obsidian',
+        label: 'Import from Obsidian',
         detail: 'A whole vault, notes and attachments.',
+      },
+      {
+        id: 'notion',
+        label: 'Import from Notion',
+        detail: 'Its Markdown and CSV export.',
       },
     ],
   },
@@ -267,7 +272,7 @@ Yes, live and peer to peer, today. There is no Myelin account and nothing sittin
 
 ## Can I import from another app?
 
-Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one section, a Goodnotes folder exported as PDFs, loose Markdown, PDFs, images, and video, and a workspace folder exported from Myelin itself. A Notion importer is on the roadmap.
+Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one section, a Goodnotes folder exported as PDFs, loose Markdown, PDFs, images, and video, and a workspace folder exported from Myelin itself. Notion comes across through its own Markdown and CSV export, which the file importer reads; a dedicated Notion importer that keeps the page hierarchy is on the roadmap.
 
 ## Does it work offline?
 

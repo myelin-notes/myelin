@@ -21,6 +21,10 @@ interface IconProps {
  *   rules forbid. 256px covers 40 world units at the canvas's 3x zoom cap.
  * Obsidian: the SVGs linked from obsidian.md/brand.
  * OneNote: the Office brand-icon CDN, res-1.cdn.office.net/files/fabric.
+ * Notion: the app icon on notion.com. Their guidelines let an integration
+ *   show compatibility with an unmodified asset kept secondary to our own
+ *   branding, which is what this row is. Monochrome is their mark, not a
+ *   tint we applied.
  */
 function brandMark(src: string) {
   return function BrandMark({ className, style }: IconProps) {
@@ -37,6 +41,7 @@ function brandMark(src: string) {
 }
 
 const GoodnotesIcon = brandMark('/brand/goodnotes-icon-256.png');
+const NotionIcon = brandMark('/brand/notion-logo-ios.png');
 const ObsidianIcon = brandMark('/brand/obsidian-logo-gradient.svg');
 const OneNoteIcon = brandMark('/brand/onenote_48x1.svg');
 
@@ -48,4 +53,5 @@ export const IMPORT_SOURCE_ICONS: Record<
   goodnotes: GoodnotesIcon,
   onenote: OneNoteIcon,
   obsidian: ObsidianIcon,
+  notion: NotionIcon,
 };

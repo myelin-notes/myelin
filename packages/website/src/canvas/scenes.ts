@@ -710,7 +710,7 @@ function buildImport(
   sources.forEach((source, i) => {
     const by = top + i * (boxH + gap);
     addShape(canvas, 'rect', sx, by, [0, 0, boxW, boxH], MUTED, 3);
-    addText(canvas, textX, by + 22, source.name, {
+    addText(canvas, textX, by + 22, source.label, {
       size: 27,
       width: textW,
       font: DISPLAY_FONT,

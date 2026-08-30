@@ -67,13 +67,18 @@ interface SyncTier {
 }
 
 /** Apps the site advertises importing from, keyed for icon lookup. */
-export type ImportSourceId = 'goodnotes' | 'onenote' | 'obsidian';
+export type ImportSourceId = 'goodnotes' | 'onenote' | 'obsidian' | 'notion';
 
 /** One app the importer can pull a library out of. */
 interface ImportSource {
-  /** Picks the brand mark; independent of the translated `name`. */
+  /** Picks the brand mark; independent of the translated `label`. */
   id: ImportSourceId;
-  name: string;
+  /**
+   * The whole phrase, not a name a caller prefixes: word order differs by
+   * language (Chinese wraps the app name, 从 X 导入), so each locale writes
+   * its own.
+   */
+  label: string;
   detail: string;
 }
 
@@ -145,10 +150,11 @@ export interface SiteCopy {
     body: string;
     annotation: string;
     /**
-     * Ordered as the app's own import picker lists them. Deliberately only the
-     * apps someone migrates FROM: the picker's "Files" and "Workspace JSON"
-     * rows are real importers but not reasons to switch, so they stay in the
-     * FAQ answer instead.
+     * Ordered as the app's own import picker lists them, then Notion, which
+     * has no picker row of its own: its Markdown and CSV export goes through
+     * the Files importer. Deliberately only the apps someone migrates FROM:
+     * the picker's "Files" and "Workspace JSON" rows are real importers but
+     * not reasons to switch, so they stay in the FAQ answer instead.
      */
     sources: ImportSource[];
   };
