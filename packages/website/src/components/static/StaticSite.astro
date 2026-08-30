@@ -83,13 +83,13 @@ const ctaOutline = cn(
   <!-- PDFs -->
   <section id="pdfs" class="bg-surface">
     <div class:list={[wrap, band]}>
-      <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
-        <div class="lg:col-span-5">
+      <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
+        <div class="md:col-span-6 lg:col-span-5">
           <p class={kicker}>01 / {copy.sceneLabels.ink}</p>
           <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
           <p class={lede}>{copy.ink.pdfBody}</p>
         </div>
-        <div class="lg:col-span-7 lg:pl-6">
+        <div class="md:col-span-6 md:pl-6 lg:col-span-7">
           <Shot src="/pdf.png" alt={copy.shots.pdf} />
         </div>
       </div>
@@ -98,11 +98,11 @@ const ctaOutline = cn(
 
   <!-- Page frames -->
   <section class:list={[wrap, band]}>
-    <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
-      <div class="order-2 lg:order-1 lg:col-span-7 lg:pr-6">
+    <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
+      <div class="order-2 md:order-1 md:col-span-6 md:pr-6 lg:col-span-7">
         <Shot src="/page-frame.png" alt={copy.shots.pageFrame} />
       </div>
-      <div class="order-1 lg:order-2 lg:col-span-5">
+      <div class="order-1 md:order-2 md:col-span-6 lg:col-span-5">
         <p class={kicker}>02 / {copy.sceneLabels.pages}</p>
         <h2 class:list={[heading, 'mt-6']}>{copy.pages.heading}</h2>
         <p class={lede}>{copy.pages.body}</p>
@@ -113,14 +113,14 @@ const ctaOutline = cn(
   <!-- Audio and search -->
   <section class="bg-surface">
     <div class:list={[wrap, band]}>
-      <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
-        <div class="lg:col-span-5">
+      <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
+        <div class="md:col-span-6 lg:col-span-5">
           <p class={kicker}>03 / {copy.sceneLabels['audio-search']}</p>
           <h2 class:list={[heading, 'mt-6']}>{copy.audioSearch.heading}</h2>
           <p class={lede}>{copy.audioSearch.audioBody}</p>
           <p class={lede}>{copy.audioSearch.searchBody}</p>
         </div>
-        <div class="grid gap-5 lg:col-span-7 lg:pl-6">
+        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
           <Shot src="/audio.png" alt={copy.shots.audio} />
         </div>
       </div>
@@ -129,11 +129,11 @@ const ctaOutline = cn(
 
   <!-- Linked notes -->
   <section class:list={[wrap, band]}>
-    <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
-      <div class="order-2 lg:order-1 lg:col-span-7 lg:pr-6">
+    <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
+      <div class="order-2 md:order-1 md:col-span-6 md:pr-6 lg:col-span-7">
         <Shot src="/graph.png" alt={copy.shots.graph} />
       </div>
-      <div class="order-1 lg:order-2 lg:col-span-5">
+      <div class="order-1 md:order-2 md:col-span-6 lg:col-span-5">
         <p class={kicker}>04 / {copy.sceneLabels.linked}</p>
         <h2 class:list={[heading, 'mt-6']}>{copy.linked.heading}</h2>
         <p class={lede}>{copy.linked.body}</p>
@@ -144,13 +144,13 @@ const ctaOutline = cn(
   <!-- Sync and collaboration -->
   <section id="sync" class="bg-surface">
     <div class:list={[wrap, band]}>
-      <div class="grid gap-x-10 gap-y-12 lg:grid-cols-12">
-        <div class="lg:col-span-5">
+      <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
+        <div class="md:col-span-6 lg:col-span-5">
           <p class={kicker}>05 / {copy.sceneLabels.sync}</p>
           <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
           <p class={lede}>{copy.sync.kicker}</p>
         </div>
-        <div class="grid gap-5 lg:col-span-7 lg:pl-6">
+        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
           {
             copy.sync.tiers.map((tier) => (
               <div class="rounded-3xl bg-card p-7 shadow-elevated lg:p-8">
@@ -173,26 +173,29 @@ const ctaOutline = cn(
 
   <!-- Local-first -->
   <section id="local" class:list={[wrap, band]}>
-    <div class="grid items-start gap-x-10 gap-y-12 lg:grid-cols-12">
-      <div class="lg:col-span-5">
+    <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
+      <div class="md:col-span-6 lg:col-span-5">
         <p class={kicker}>06 / {copy.sceneLabels['local-first']}</p>
         <h2 class:list={[heading, 'mt-6']}>{copy.localFirst.heading}</h2>
         <p class={lede}>{copy.localFirst.lede}</p>
       </div>
-      <CheckList items={copy.localFirst.bullets} class="lg:col-span-7 lg:pl-6" />
+      <CheckList
+        items={copy.localFirst.bullets}
+        class="md:col-span-6 md:pl-6 lg:col-span-7"
+      />
     </div>
   </section>
 
   <!-- Import -->
   <section id="import" class="bg-surface">
     <div class:list={[wrap, band]}>
-      <div class="grid gap-x-10 gap-y-12 lg:grid-cols-12">
-        <div class="lg:col-span-5">
+      <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
+        <div class="md:col-span-6 lg:col-span-5">
           <p class={kicker}>07 / {copy.sceneLabels.import}</p>
           <h2 class:list={[heading, 'mt-6']}>{copy.importing.heading}</h2>
           <p class={lede}>{copy.importing.body}</p>
         </div>
-        <div class="grid gap-5 lg:col-span-7 lg:pl-6">
+        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
           {
             copy.importing.sources.map((source) => {
               const Icon = IMPORT_SOURCE_ICONS[source.id];
