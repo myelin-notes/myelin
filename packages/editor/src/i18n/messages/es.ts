@@ -142,7 +142,7 @@ const es: typeof en = {
           `Se importaron ${count} archivo${count === 1 ? '' : 's'}`,
       },
       goodnotes_zip: {
-        label: 'ZIP de Goodnotes',
+        label: 'Importar desde Goodnotes',
         description: 'Una carpeta de Goodnotes exportada como PDF.',
         title: 'Importar ZIP de Goodnotes',
         scanning: 'Leyendo el archivo comprimido...',
@@ -151,7 +151,7 @@ const es: typeof en = {
         summary: (count: number) => `Se importaron ${count} PDF`,
       },
       onenote: {
-        label: 'OneNote',
+        label: 'Importar desde OneNote',
         description:
           'Un bloc .onepkg o una sección .one exportados desde OneNote.',
         title: 'Importar desde OneNote',
@@ -166,7 +166,7 @@ const es: typeof en = {
           `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}`,
       },
       obsidian_vault: {
-        label: 'Bóveda de Obsidian',
+        label: 'Importar desde Obsidian',
         description:
           'Una carpeta de bóveda, con sus notas y archivos adjuntos.',
         title: 'Importar bóveda de Obsidian',
