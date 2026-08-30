@@ -1,11 +1,11 @@
-import { FolderInput } from 'lucide-react';
+import { ObsidianIcon } from '../brand-icons';
 import { getPathName, importObsidianVault, scanVault } from '../obsidian-vault';
 import { createRootFolderImportJob } from './root-folder-job';
 import { expectDirectory, type ImportProvider } from './types';
 
 export const obsidianProvider: ImportProvider = {
   id: 'obsidian_vault',
-  icon: FolderInput,
+  icon: ObsidianIcon,
   picker: { kind: 'directory' },
 
   createJob({ selection, repository, parentId, strings }) {

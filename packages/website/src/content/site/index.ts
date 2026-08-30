@@ -27,6 +27,7 @@ export const SCENE_IDS = [
   'linked',
   'sync',
   'local-first',
+  'import',
   'download',
 ] as const;
 
@@ -63,6 +64,22 @@ interface SyncTier {
   badge: string;
   title: string;
   body: string;
+}
+
+/** Apps the site advertises importing from, keyed for icon lookup. */
+export type ImportSourceId = 'goodnotes' | 'onenote' | 'obsidian' | 'notion';
+
+/** One app the importer can pull a library out of. */
+interface ImportSource {
+  /** Picks the brand mark; independent of the translated `label`. */
+  id: ImportSourceId;
+  /**
+   * The whole phrase, not a name a caller prefixes: word order differs by
+   * language (Chinese wraps the app name, 从 X 导入), so each locale writes
+   * its own.
+   */
+  label: string;
+  detail: string;
 }
 
 /** World-space geometry for one hand-drawn ink decoration. */
@@ -127,6 +144,20 @@ export interface SiteCopy {
   };
 
   linked: { heading: string; body: string };
+
+  importing: {
+    heading: string;
+    body: string;
+    annotation: string;
+    /**
+     * Ordered as the app's own import picker lists them, then Notion, which
+     * has no picker row of its own: its Markdown and CSV export goes through
+     * the Files importer. Deliberately only the apps someone migrates FROM:
+     * the picker's "Files" and "Workspace JSON" rows are real importers but
+     * not reasons to switch, so they stay in the FAQ answer instead.
+     */
+    sources: ImportSource[];
+  };
 
   localFirst: { heading: string; lede: string; bullets: string[] };
 

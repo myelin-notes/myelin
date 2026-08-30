@@ -30,6 +30,7 @@ const es: SiteCopy = {
     linked: 'Notas enlazadas',
     sync: 'Sincronización',
     'local-first': 'Todo en local',
+    import: 'Importar',
     download: 'Descargar',
   },
   faqKicker: 'Preguntas',
@@ -56,7 +57,7 @@ const es: SiteCopy = {
 
   pages: {
     heading: 'Documentos de verdad,\nsobre el lienzo.',
-    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código que puedes ejecutar en nueve lenguajes, dentro de la propia nota. Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C y C++.',
+    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código que puedes ejecutar.',
     annotation: 'una página real y editable. haz clic.',
     pageTitle: 'Clase 12 · Potenciales de acción',
     pageMarkdown: `# Potenciales de acción
@@ -127,6 +128,38 @@ for step in range(3):
   linked: {
     heading: 'Tus notas, conectadas.',
     body: 'Los [[enlaces entre notas]], los retroenlaces y las tarjetas de vista previa mantienen las ideas relacionadas a un solo salto. La paleta de comandos te lleva a cualquier parte, y el historial de versiones por archivo restaura cualquier estado anterior de una nota.',
+  },
+
+  importing: {
+    heading: 'Trae contigo\ntus notas de siempre.',
+    body: 'Importa tus notas desde otras apps',
+    annotation: 'nada de copiar y pegar.',
+    sources: [
+      {
+        id: 'goodnotes',
+        label: 'Importar desde Goodnotes',
+        detail:
+          'Importa tu contenido de Goodnotes exportándolo como un ZIP de PDF.',
+      },
+      {
+        id: 'onenote',
+        label: 'Importar desde OneNote',
+        detail:
+          'Importa tu contenido de OneNote desde un cuaderno .onepkg o una sección .one.',
+      },
+      {
+        id: 'obsidian',
+        label: 'Importar desde Obsidian',
+        detail:
+          'Importa tu contenido de Obsidian directamente desde la carpeta del vault.',
+      },
+      {
+        id: 'notion',
+        label: 'Importar desde Notion',
+        detail:
+          'Importa tu contenido de Notion exportándolo como Markdown y CSV.',
+      },
+    ],
   },
 
   localFirst: {
@@ -234,9 +267,9 @@ No del todo. El código es público, así que cualquiera puede leerlo y comproba
 
 Sí, en directo y de igual a igual, ya hoy. No hay cuenta de Myelin ni nada en medio. Los dispositivos se encuentran a través de la sincronización con GitHub, así que ambos extremos necesitan acceso al mismo repositorio. Los cuadernos compartidos con permisos llegan en la v1.0.
 
-## ¿Puedo importar desde Obsidian o GoodNotes?
+## ¿Puedo importar desde otra app?
 
-Sí, desde ambos. Un importador de Notion está en la hoja de ruta.
+Sí. Myelin importa un vault de Obsidian, un cuaderno .onepkg o una sección .one de OneNote, una carpeta de Goodnotes exportada como PDF, archivos sueltos de Markdown, PDF, imágenes y video, y una carpeta de espacio de trabajo exportada desde el propio Myelin. Notion entra a través de su propia exportación en Markdown y CSV, que lee el importador de archivos; un importador de Notion dedicado, que conserve la jerarquía de páginas, está en la hoja de ruta.
 
 ## ¿Funciona sin conexión?
 

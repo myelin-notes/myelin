@@ -139,7 +139,7 @@ const en = {
           `Imported ${count} file${count === 1 ? '' : 's'}`,
       },
       goodnotes_zip: {
-        label: 'Goodnotes ZIP',
+        label: 'Import from Goodnotes',
         description: 'A Goodnotes folder exported as PDFs.',
         title: 'Import Goodnotes ZIP',
         scanning: 'Reading archive...',
@@ -149,7 +149,7 @@ const en = {
           `Imported ${count} PDF${count === 1 ? '' : 's'}`,
       },
       onenote: {
-        label: 'OneNote',
+        label: 'Import from OneNote',
         description:
           'A .onepkg notebook or .one section exported from OneNote.',
         title: 'Import OneNote',
@@ -164,7 +164,7 @@ const en = {
           `${count} page${count === 1 ? '' : 's'} could not be imported`,
       },
       obsidian_vault: {
-        label: 'Obsidian Vault',
+        label: 'Import from Obsidian',
         description: 'A vault folder, with its notes and attachments.',
         title: 'Import Obsidian Vault',
         scanning: 'Scanning vault...',

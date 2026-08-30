@@ -137,7 +137,7 @@ const zhHans: typeof en = {
         summary: (count: number) => `已导入 ${count} 个文件`,
       },
       goodnotes_zip: {
-        label: 'Goodnotes ZIP',
+        label: '从 Goodnotes 导入',
         description: '以 PDF 形式导出的 Goodnotes 文件夹。',
         title: '导入 Goodnotes ZIP',
         scanning: '正在读取压缩包…',
@@ -146,7 +146,7 @@ const zhHans: typeof en = {
         summary: (count: number) => `已导入 ${count} 个 PDF`,
       },
       onenote: {
-        label: 'OneNote',
+        label: '从 OneNote 导入',
         description: '从 OneNote 导出的 .onepkg 笔记本或 .one 分区。',
         title: '导入 OneNote',
         scanning: '正在读取笔记本…',
@@ -157,7 +157,7 @@ const zhHans: typeof en = {
         skipped: (count: number) => `有 ${count} 个页面无法导入`,
       },
       obsidian_vault: {
-        label: 'Obsidian 仓库',
+        label: '从 Obsidian 导入',
         description: '仓库文件夹，包含其笔记和附件。',
         title: '导入 Obsidian 仓库',
         scanning: '正在扫描仓库…',
