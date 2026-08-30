@@ -7,7 +7,9 @@ import {
   Search as SearchIcon,
 } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { IMPORT_SOURCE_ICONS } from '@/components/import-icons';
 import { useCopy } from '@/content/copy-context';
+import { IMPORT_BOXES, importBoxTop, type WorldRect } from './scenes';
 
 interface WorldLayerProps {
   canvas: DrawableCanvas;
@@ -218,6 +220,40 @@ export function SearchPaletteMock({ x, y }: WorldPos) {
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * Brand marks for the import scene's source boxes. The boxes themselves are
+ * real canvas ShapeElements, so these ride the same world plane at the offsets
+ * `IMPORT_BOXES` pins down. Sizes are world units, like everything else here.
+ */
+export function ImportSourceIcons({ scene }: { scene: WorldRect }) {
+  const sources = useCopy().importing.sources;
+  const { icon } = IMPORT_BOXES;
+  const top = importBoxTop(scene, sources.length);
+
+  return (
+    <>
+      {sources.map((source, i) => {
+        const Icon = IMPORT_SOURCE_ICONS[source.id];
+        return (
+          <Icon
+            key={source.id}
+            style={{
+              position: 'absolute',
+              left: scene.x + IMPORT_BOXES.dx + icon.dx,
+              top:
+                top +
+                i * (IMPORT_BOXES.height + IMPORT_BOXES.gap) +
+                (IMPORT_BOXES.height - icon.size) / 2,
+              width: icon.size,
+              height: icon.size,
+            }}
+          />
+        );
+      })}
+    </>
   );
 }
 

@@ -29,6 +29,7 @@ const zhHans: SiteCopy = {
     linked: '笔记链接',
     sync: '同步与协作',
     'local-first': '本地优先',
+    import: '导入',
     download: '下载',
   },
   faqKicker: '常见问题',
@@ -54,7 +55,7 @@ const zhHans: SiteCopy = {
 
   pages: {
     heading: '真正的文档，\n就在画布上。',
-    body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及可在笔记中直接运行的代码块，支持九种语言。Python、JavaScript、TypeScript、Ruby、Bash、Go、Rust、C 和 C++。',
+    body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及可以直接运行的代码块。',
     annotation: '一个真正可编辑的页面，点进去看看。',
     pageTitle: '第 12 讲 · 动作电位',
     pageMarkdown: `# 动作电位
@@ -125,6 +126,29 @@ for step in range(3):
   linked: {
     heading: '你的笔记，彼此相连。',
     body: '[[笔记链接]]、反向链接与悬停预览卡片，让相关的想法始终只有一步之遥。命令面板带你跳转到任何位置，按文件保存的版本历史可以还原笔记的任一早期状态。',
+  },
+
+  importing: {
+    heading: '把旧笔记\n一起带过来。',
+    body: '从其他应用导入你的笔记',
+    annotation: '不用手动复制粘贴。',
+    sources: [
+      {
+        id: 'goodnotes',
+        name: 'Goodnotes',
+        detail: '导出为 PDF 的 Goodnotes 文件夹压缩包。',
+      },
+      {
+        id: 'onenote',
+        name: 'OneNote',
+        detail: '.onepkg 笔记本或 .one 分区。',
+      },
+      {
+        id: 'obsidian',
+        name: 'Obsidian',
+        detail: '整个 vault 文件夹，连同笔记与附件。',
+      },
+    ],
   },
 
   localFirst: {
@@ -232,9 +256,9 @@ for step in range(3):
 
 可以，现在就支持点对点的实时协作。没有 Myelin 账号，中间也没有任何服务。设备之间通过 GitHub 同步互相发现，因此双方都需要能访问同一个仓库。带权限管理的共享笔记本将在 v1.0 推出。
 
-## 可以从 Obsidian 或 GoodNotes 导入吗？
+## 可以从别的应用导入吗？
 
-两者都可以。Notion 导入功能已列入计划。
+可以。Myelin 支持导入 Obsidian vault、OneNote 的 .onepkg 笔记本或 .one 分区、导出为 PDF 的 Goodnotes 文件夹，以及零散的 Markdown、PDF、图片与视频，还有从 Myelin 自身导出的工作区文件夹。Notion 导入功能已列入计划。
 
 ## 离线能用吗？
 

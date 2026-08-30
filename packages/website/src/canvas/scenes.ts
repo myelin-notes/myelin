@@ -49,6 +49,7 @@ const SIZES: Array<{
   { id: 'linked', w: 1750, h: 800, y: -150 },
   { id: 'sync', w: 1950, h: 1150, y: 900 },
   { id: 'local-first', w: 1850, h: 850, y: 1850 },
+  { id: 'import', w: 1700, h: 900, y: 2500 },
   { id: 'download', w: 2100, h: 1400, y: 1400 },
 ];
 
@@ -651,6 +652,77 @@ function buildLocalFirst(
   });
 }
 
+/**
+ * Source-box geometry for the import scene, shared with the brand icons that
+ * `scene-overlays.tsx` renders as DOM inside these boxes. Both sides must read
+ * the same numbers or the icons drift out of their frames.
+ */
+export const IMPORT_BOXES = {
+  /** Left edge of the box column, from the scene's own left edge. */
+  dx: 950,
+  /** Wide enough that every locale's `detail` stays on one line. */
+  width: 660,
+  /**
+   * Sized so the name and its one-line `detail` fill the box. That is what
+   * puts the centred mark level with the text: slack here would drop the icon
+   * below the name it belongs to.
+   */
+  height: 114,
+  gap: 26,
+  /** Brand mark: inset from the box's left edge, centred on its height. */
+  icon: { dx: 30, size: 40 },
+} as const;
+
+/** Top edge of the first source box, centred in the scene. */
+export function importBoxTop(r: WorldRect, count: number): number {
+  const stack = count * IMPORT_BOXES.height + (count - 1) * IMPORT_BOXES.gap;
+  return r.y + SCENE_PAD + (r.height - SCENE_PAD * 2 - stack) / 2;
+}
+
+function buildImport(
+  canvas: DrawableCanvas,
+  r: WorldRect,
+  copy: SiteCopy,
+): void {
+  const x = r.x + SCENE_PAD;
+  const y = r.y + SCENE_PAD;
+  // Offsets sit the column's optical centre on the box stack's, which
+  // `importBoxTop` centres in the scene. `body` is one line in every locale,
+  // so the rhythm below does not shift as the copy is translated.
+  title(canvas, x, y + 180, copy.importing.heading, 62, 660);
+  addText(canvas, x, y + 390, copy.importing.body, {
+    size: 26,
+    color: MUTED,
+    width: 660,
+  });
+  hand(canvas, x + 40, y + 490, copy.importing.annotation, BLUE, 36, 480);
+
+  // Right column: the apps you are leaving, one per row. The brand marks are
+  // DOM (see world-layer.tsx); only the frames and text are canvas elements.
+  const sources = copy.importing.sources;
+  const { width: boxW, height: boxH, gap, icon } = IMPORT_BOXES;
+  const sx = r.x + IMPORT_BOXES.dx;
+  const top = importBoxTop(r, sources.length);
+  // Text clears the mark; the box keeps the same padding on the far side.
+  const textX = sx + icon.dx + icon.size + 22;
+  const textW = boxW - (textX - sx) - 34;
+
+  sources.forEach((source, i) => {
+    const by = top + i * (boxH + gap);
+    addShape(canvas, 'rect', sx, by, [0, 0, boxW, boxH], MUTED, 3);
+    addText(canvas, textX, by + 22, source.name, {
+      size: 27,
+      width: textW,
+      font: DISPLAY_FONT,
+    });
+    addText(canvas, textX, by + 64, source.detail, {
+      size: 19,
+      color: MUTED,
+      width: textW,
+    });
+  });
+}
+
 /** Anchor for the sync scene's DOM cursors (see scene-overlays.tsx). */
 export const COLLAB_CURSORS = {
   you: { dx: 1280, dy: 230 },
@@ -779,6 +851,7 @@ export async function populateScenes(
   buildAudioSearch(canvas, rect('audio-search'), copy);
   buildLocalFirst(canvas, rect('local-first'), copy);
   buildSync(canvas, rect('sync'), copy);
+  buildImport(canvas, rect('import'), copy);
   await buildInk(canvas, rect('ink'), copy);
   await buildHero(canvas, rect('hero'), copy);
   await buildLinked(canvas, rect('linked'), copy);

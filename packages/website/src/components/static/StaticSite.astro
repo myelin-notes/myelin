@@ -12,6 +12,7 @@
 import { Wordmark, buttonVariants, cn } from '@myelin/ui';
 import CheckList from './CheckList.astro';
 import Shot from './Shot.astro';
+import { IMPORT_SOURCE_ICONS } from '../import-icons';
 import {
   navLinks,
   getCopy,
@@ -182,10 +183,43 @@ const ctaOutline = cn(
     </div>
   </section>
 
+  <!-- Import -->
+  <section id="import" class="bg-surface">
+    <div class:list={[wrap, band]}>
+      <div class="grid gap-x-10 gap-y-12 lg:grid-cols-12">
+        <div class="lg:col-span-5">
+          <p class={kicker}>07 / {copy.sceneLabels.import}</p>
+          <h2 class:list={[heading, 'mt-6']}>{copy.importing.heading}</h2>
+          <p class={lede}>{copy.importing.body}</p>
+        </div>
+        <div class="grid gap-5 lg:col-span-7 lg:pl-6">
+          {
+            copy.importing.sources.map((source) => {
+              const Icon = IMPORT_SOURCE_ICONS[source.id];
+              return (
+                <div class="flex items-center gap-5 rounded-3xl bg-card p-7 shadow-elevated">
+                  <Icon className="size-10 shrink-0" />
+                  <div class="min-w-0">
+                    <h3 class="font-heading text-lg font-medium text-text-primary">
+                      {source.name}
+                    </h3>
+                    <p class="mt-1.5 text-sm leading-relaxed text-text-secondary">
+                      {source.detail}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- FAQ -->
   <section id="faq" class:list={[wrap, band]}>
     <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-      <p class:list={[kicker, 'lg:col-span-3']}>07 / {copy.faqKicker}</p>
+      <p class:list={[kicker, 'lg:col-span-3']}>08 / {copy.faqKicker}</p>
       <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
     </div>
     {/* Two columns from `sm` up, not `lg`: this page only ever renders below
@@ -210,7 +244,7 @@ const ctaOutline = cn(
   <section id="download" class="bg-primary text-text-on-dark">
     <div class:list={[wrap, 'py-28 lg:py-36']}>
       <p class="kicker text-text-on-dark/55">
-        08 / {copy.sceneLabels.download}
+        09 / {copy.sceneLabels.download}
       </p>
       <h2
         class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] whitespace-pre-line"

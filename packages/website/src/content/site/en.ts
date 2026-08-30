@@ -30,6 +30,7 @@ const en: SiteCopy = {
     linked: 'Linked notes',
     sync: 'Sync & collab',
     'local-first': 'Local-first',
+    import: 'Import',
     download: 'Download',
   },
   /** The one static-page section with no scene of its own. */
@@ -61,7 +62,7 @@ const en: SiteCopy = {
 
   pages: {
     heading: 'Real documents,\nright on the canvas.',
-    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks you can run in nine languages, right in the note. Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C, and C++.',
+    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks you can run.',
     annotation: 'a real, editable page. click into it.',
     pageTitle: 'Lecture 12 · Action potentials',
     pageMarkdown: `# Action potentials
@@ -134,6 +135,29 @@ for step in range(3):
   linked: {
     heading: 'Your notes, connected.',
     body: '[[Note links]], backlinks, and hover preview cards keep related ideas one hop away. The command palette jumps you anywhere, and per-file version history restores any earlier state of a note.',
+  },
+
+  importing: {
+    heading: 'Bring your old notes\nwith you.',
+    body: 'Import your notes from other apps',
+    annotation: 'no copying and pasting.',
+    sources: [
+      {
+        id: 'goodnotes',
+        name: 'Goodnotes',
+        detail: 'A folder exported as PDFs, zipped.',
+      },
+      {
+        id: 'onenote',
+        name: 'OneNote',
+        detail: 'A .onepkg notebook or a .one section.',
+      },
+      {
+        id: 'obsidian',
+        name: 'Obsidian',
+        detail: 'A whole vault, notes and attachments.',
+      },
+    ],
   },
 
   localFirst: {
@@ -241,9 +265,9 @@ Not quite. The source is public, so anyone can read it and check what the app do
 
 Yes, live and peer to peer, today. There is no Myelin account and nothing sitting in the middle. Devices find each other through GitHub sync, so both ends need access to the same repo. Shared notebooks with permissions arrive in v1.0.
 
-## Can I import from Obsidian or GoodNotes?
+## Can I import from another app?
 
-Yes, both. A Notion importer is on the roadmap.
+Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one section, a Goodnotes folder exported as PDFs, loose Markdown, PDFs, images, and video, and a workspace folder exported from Myelin itself. A Notion importer is on the roadmap.
 
 ## Does it work offline?
 
