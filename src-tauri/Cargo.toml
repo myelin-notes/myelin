@@ -27,6 +27,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["net", "io-util", "sync", "macros", "time", "process"] }
 tauri-plugin-mcp-bridge = "0.12"
 tauri-plugin-ocr = { path = "plugins/tauri-plugin-ocr" }
+tauri-plugin-pencil = { path = "plugins/tauri-plugin-pencil" }
 tauri-plugin-stronghold = "2"
 tauri-plugin-http = "2"
 iroh = "=1.0.3"

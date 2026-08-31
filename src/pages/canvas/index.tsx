@@ -75,6 +75,7 @@ import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
 import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
+import { usePencilGestures } from './hooks/use-pencil-gestures';
 import { useToolState } from './hooks/use-tool-state';
 import { useCanvasSearch } from './search/use-canvas-search';
 
@@ -126,6 +127,13 @@ function CanvasViewInner({
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
   const toolState = useToolState(drawableCanvasRef);
+  usePencilGestures({
+    drawableCanvasRef,
+    wheelRef,
+    canvasTools: toolState.canvasTools,
+    selectedToolIndex: toolState.selectedToolIndex,
+    toggleOptions: toolState.toggleOptions,
+  });
   const canvasSearch = useCanvasSearch(drawableCanvasRef, id);
 
   const [chromeMenu, setChromeMenu] = useState<{
