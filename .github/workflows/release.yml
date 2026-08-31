@@ -465,12 +465,19 @@ jobs:
         if: env.APPLE_CERTIFICATE != '' && env.APPLE_PROVISIONING_PROFILE != ''
         run: |
           PBXPROJ=src-tauri/gen/apple/myelin.xcodeproj/project.pbxproj
+          EXPORT_OPTIONS=src-tauri/gen/apple/ExportOptions.plist
           perl -0pi -e 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "Apple Distribution";\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "Myelin Notes app store distribution profile";/g' "$PBXPROJ"
           PATCHED=$(grep -c 'CODE_SIGN_IDENTITY = "Apple Distribution";' "$PBXPROJ" || true)
           if [ "$PATCHED" -eq 0 ]; then
             echo "::error::failed to configure App Store signing in $PBXPROJ"
             exit 1
           fi
+          /usr/libexec/PlistBuddy -c 'Add :signingStyle string manual' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :teamID string P4Z946QP26' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :signingCertificate string Apple Distribution' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles dict' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles:com.github.wintersteve25.myelin string Myelin Notes app store distribution profile' "$EXPORT_OPTIONS"
+          plutil -lint "$EXPORT_OPTIONS"
           echo "Configured App Store signing in $PATCHED pbxproj build configuration(s)"
 
       - name: Build iOS
