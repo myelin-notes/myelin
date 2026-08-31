@@ -461,6 +461,18 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
+      - name: Configure App Store signing
+        if: env.APPLE_CERTIFICATE != '' && env.APPLE_PROVISIONING_PROFILE != ''
+        run: |
+          PBXPROJ=src-tauri/gen/apple/myelin.xcodeproj/project.pbxproj
+          perl -0pi -e 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "Apple Distribution";\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "Myelin Notes app store distribution profile";/g' "$PBXPROJ"
+          PATCHED=$(grep -c 'CODE_SIGN_IDENTITY = "Apple Distribution";' "$PBXPROJ" || true)
+          if [ "$PATCHED" -eq 0 ]; then
+            echo "::error::failed to configure App Store signing in $PBXPROJ"
+            exit 1
+          fi
+          echo "Configured App Store signing in $PATCHED pbxproj build configuration(s)"
+
       - name: Build iOS
         env:
           APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
