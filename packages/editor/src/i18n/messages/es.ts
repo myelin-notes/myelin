@@ -874,6 +874,7 @@ const es: typeof en = {
       mode: 'Modo',
       rectangle: 'Rectángulo',
       lasso: 'Lazo',
+      precise: 'Preciso',
       fine: (value: number) => `Fino (${value})`,
       medium: (value: number) => `Medio (${value})`,
       bold: (value: number) => `Grueso (${value})`,
