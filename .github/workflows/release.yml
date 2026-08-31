@@ -497,7 +497,9 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           shopt -s nullglob
-          files=(src-tauri/gen/apple/build/arm64/*.ipa src-tauri/gen/apple/build/**/*.ipa)
-          if [ ${#files[@]} -gt 0 ]; then
-            gh release upload "$TAG" "${files[@]}" --clobber
+          files=(src-tauri/gen/apple/build/arm64/*.ipa)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no IPA found to upload"
+            exit 1
           fi
+          gh release upload "$TAG" "${files[@]}" --clobber
