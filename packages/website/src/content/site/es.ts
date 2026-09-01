@@ -205,7 +205,7 @@ for step in range(3):
 
   download: {
     heading: 'Descargar',
-    body: 'Disponible en español, inglés y chino simplificado.',
+    body: 'Disponible en español, inglés, francés y chino simplificado.',
     cta: 'Descargar Myelin Notes',
     autoUpdates: 'con actualizaciones\nautomáticas',
     platforms: [

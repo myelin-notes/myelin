@@ -8,11 +8,11 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   site: 'https://trymyelin.app',
   // English is unprefixed (`/`), every other locale sits under its own segment
-  // (`/es/`, `/zh-hans/`). Route segments stay lowercase; the BCP 47 tags that
+  // (`/es/`, `/fr/`, `/zh-hans/`). Route segments stay lowercase; the BCP 47 tags that
   // `<html lang>` and hreflang need live in `src/lib/locale.ts`.
   i18n: {
     defaultLocale: 'en',
-    locales: ['en', 'es', 'zh-hans'],
+    locales: ['en', 'es', 'fr', 'zh-hans'],
     routing: { prefixDefaultLocale: false },
   },
   integrations: [
@@ -21,7 +21,7 @@ export default defineConfig({
     sitemap({
       i18n: {
         defaultLocale: 'en',
-        locales: { en: 'en', es: 'es', 'zh-hans': 'zh-Hans' },
+        locales: { en: 'en', es: 'es', fr: 'fr', 'zh-hans': 'zh-Hans' },
       },
     }),
     react(),

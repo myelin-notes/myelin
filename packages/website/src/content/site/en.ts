@@ -1,10 +1,6 @@
 import type { SiteCopy } from './index';
 
 /**
- * English site copy, and the reference every other locale is written against.
- * The shape is `SiteCopy` in `./index`, so a key added there is a compile error
- * here and in `es.ts` and `zh-hans.ts` until all three are written.
- *
  * Site style: no em dashes.
  */
 const en: SiteCopy = {
@@ -211,7 +207,7 @@ for step in range(3):
 
   download: {
     heading: 'Download',
-    body: 'Available in English, Spanish, and Simplified Chinese.',
+    body: 'Available in English, Spanish, French, and Simplified Chinese.',
     cta: 'Download Myelin Notes',
     autoUpdates: 'auto-updates\nincluded',
     platforms: [

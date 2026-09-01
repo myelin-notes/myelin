@@ -199,7 +199,7 @@ for step in range(3):
 
   download: {
     heading: '下载',
-    body: '提供简体中文、英文与西班牙文版本。',
+    body: '提供简体中文、英文、西班牙文与法文版本。',
     cta: '下载 Myelin Notes',
     autoUpdates: '支持\n自动更新',
     platforms: [
