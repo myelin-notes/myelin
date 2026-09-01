@@ -182,10 +182,11 @@ export function coalescedPointerSamples(
   return samples.length > 0 ? samples : [event];
 }
 
-// WebKit (iPadOS 18) drops a pencil touch that lands within ~100ms of a tap-like pencil stroke —
-// the window in which it commits that stroke's synthetic click — so quick handwriting loses every
-// other stroke. Cancelling touchstart/touchend keeps its tap machinery off the pencil entirely. A
-// finger is unaffected, and `touchType` is WebKit-only, so this is inert on Android.
+// On iPad, WebKit drops a pencil touch that lands right after a short stroke, so quick handwriting
+// loses every other stroke; the touch reaches the web view natively but never becomes a DOM event.
+// Traced on iPadOS 18 (also reported on 26): the drop follows only strokes WebKit synthesizes a
+// click for, never a long one, and never a finger. Cancelling the stylus touch is what stops it.
+// `touchType` is WebKit-only, so this is inert on Android.
 export function isStylusTouch(evt: TouchEvent): boolean {
   for (const touch of Array.from(evt.changedTouches)) {
     if ((touch as Touch & { touchType?: string }).touchType === 'stylus') {
