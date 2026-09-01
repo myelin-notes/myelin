@@ -348,7 +348,7 @@ export const SidebarTags = memo(function SidebarTags({
                   <Fragment key={tag}>
                     <div
                       className={cn(
-                        'group/tag relative flex items-center gap-1 rounded-md pr-1 transition-colors',
+                        'relative flex items-center gap-1 rounded-md pr-1 transition-colors',
                         isActive
                           ? 'bg-tag-active text-text-on-dark'
                           : 'text-text-secondary hover:bg-hover-tint',
@@ -365,14 +365,14 @@ export const SidebarTags = memo(function SidebarTags({
                         )}
                         aria-pressed={isActive}
                         style={{ paddingLeft: treeRowPadding(depth) }}
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1 text-left font-medium text-[11px]"
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-0.5 text-left font-medium text-[11px]"
                       >
                         <span className="shrink-0 opacity-50">#</span>
                         <span className="truncate">{label}</span>
                       </button>
                       <span
                         className={cn(
-                          'shrink-0 text-[9px] tabular-nums',
+                          'shrink-0 px-0.5 text-[9px] tabular-nums',
                           isActive ? 'text-text-on-dark/60' : 'text-text-muted',
                         )}
                       >
@@ -384,7 +384,7 @@ export const SidebarTags = memo(function SidebarTags({
                         aria-label={strings.library.semanticTags.addChild(tag)}
                         title={strings.library.semanticTags.addChild(tag)}
                         className={cn(
-                          'flex shrink-0 cursor-pointer items-center rounded p-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
+                          'flex shrink-0 cursor-pointer items-center rounded p-0.5',
                           isActive
                             ? 'text-text-on-dark/70 hover:text-text-on-dark'
                             : 'text-text-muted hover:text-text-primary',
@@ -397,7 +397,7 @@ export const SidebarTags = memo(function SidebarTags({
                         onClick={() => deleteTag(tag)}
                         aria-label={strings.library.semanticTags.deleteTag(tag)}
                         className={cn(
-                          'flex shrink-0 cursor-pointer items-center rounded p-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
+                          'flex shrink-0 cursor-pointer items-center rounded p-0.5',
                           isActive
                             ? 'text-text-on-dark/70 hover:text-text-on-dark'
                             : 'text-text-muted hover:text-destructive',
