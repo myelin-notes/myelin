@@ -38,6 +38,8 @@ export class PenTool implements ITool {
   private dwellAnchor: Vector2 | null = null;
   private recognitionAttemptedForAnchor: boolean = false;
   private snapped: boolean = false;
+  /** World-space handle the pen keeps steering after the snap, until release. */
+  private snapDrag: SnapDrag | null = null;
   private dwellTimer: ReturnType<typeof setTimeout> | null = null;
 
   get id(): ToolId {
@@ -64,8 +66,8 @@ export class PenTool implements ITool {
     event: PointerEvent,
     position: Vector2,
   ): void {
-    // Once snapped, the shape is committed in place; release finalizes it.
     if (this.snapped) {
+      this.dragSnappedShape(canvas, position);
       return;
     }
     this.currentStroke?.addPoint(
@@ -110,6 +112,8 @@ export class PenTool implements ITool {
     const world = result.geom;
     const { offsetX, offsetY } = geomOffset(result.shapeType, world);
     const localGeom = shiftGeom(result.shapeType, world, offsetX, offsetY);
+    const points = stroke.xyPoints;
+    const [penX, penY] = points[points.length - 1];
 
     canvas.transact(() => {
       canvas.removeElement(stroke);
@@ -121,6 +125,40 @@ export class PenTool implements ITool {
     });
     this.currentStroke = null;
     this.snapped = true;
+    this.snapDrag = snapDragTarget(result.shapeType, world, {
+      x: penX,
+      y: penY,
+    });
+  }
+
+  // Line/triangle: the vertex nearest the pen at snap time sits under the pen. Rect/ellipse: the
+  // nearest bbox corner does, with the opposite corner pinned.
+  private dragSnappedShape(canvas: DrawableCanvas, position: Vector2): void {
+    const shape = this.currentShape;
+    const drag = this.snapDrag;
+    if (shape === null || drag === null) {
+      return;
+    }
+    let world: number[];
+    if (drag.kind === 'vertex') {
+      drag.geom[drag.index * 2] = position.x;
+      drag.geom[drag.index * 2 + 1] = position.y;
+      world = drag.geom;
+    } else {
+      const x = Math.min(drag.pinned.x, position.x);
+      const y = Math.min(drag.pinned.y, position.y);
+      world = [
+        x,
+        y,
+        Math.abs(position.x - drag.pinned.x),
+        Math.abs(position.y - drag.pinned.y),
+      ];
+    }
+    const { offsetX, offsetY } = geomOffset(shape.shapeType, world);
+    canvas.transact(() => {
+      shape.setGeom(shiftGeom(shape.shapeType, world, offsetX, offsetY));
+      shape.setOffset(offsetX, offsetY);
+    });
   }
 
   public finish(canvas: DrawableCanvas, _event: PointerEvent): void {
@@ -156,6 +194,7 @@ export class PenTool implements ITool {
     this.currentStroke = null;
     this.currentShape = null;
     this.snapped = false;
+    this.snapDrag = null;
     this.dwellAnchor = null;
     this.recognitionAttemptedForAnchor = false;
   }
@@ -208,6 +247,39 @@ export class PenTool implements ITool {
 
 function distance(a: Vector2, b: Vector2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+type SnapDrag =
+  | { kind: 'vertex'; geom: number[]; index: number }
+  | { kind: 'box'; pinned: Vector2 };
+
+function snapDragTarget(
+  shapeType: ShapeElement['shapeType'],
+  world: number[],
+  pen: Vector2,
+): SnapDrag {
+  const candidates: Vector2[] =
+    shapeType === 'rect' || shapeType === 'ellipse'
+      ? [
+          { x: world[0], y: world[1] },
+          { x: world[0] + world[2], y: world[1] },
+          { x: world[0] + world[2], y: world[1] + world[3] },
+          { x: world[0], y: world[1] + world[3] },
+        ]
+      : Array.from({ length: world.length / 2 }, (_, i) => ({
+          x: world[i * 2],
+          y: world[i * 2 + 1],
+        }));
+  let index = 0;
+  for (let i = 1; i < candidates.length; i++) {
+    if (distance(candidates[i], pen) < distance(candidates[index], pen)) {
+      index = i;
+    }
+  }
+  if (shapeType === 'rect' || shapeType === 'ellipse') {
+    return { kind: 'box', pinned: candidates[(index + 2) % 4] };
+  }
+  return { kind: 'vertex', geom: [...world], index };
 }
 
 /** Bounding-box min of a world-space geom — becomes the element offset. */
