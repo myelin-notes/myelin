@@ -483,11 +483,13 @@ jobs:
       - name: Build iOS
         env:
           APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
+          IOS_BUNDLE_VERSION: "${{ github.run_number }}.${{ github.run_attempt }}"
         run: |
+          CONFIG="{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$IOS_BUNDLE_VERSION\"}}}"
           if [ -n "$APPLE_DEVELOPMENT_TEAM" ]; then
-            yarn tauri ios build --export-method app-store-connect
+            yarn tauri ios build --config "$CONFIG" --export-method app-store-connect
           else
-            yarn tauri ios build --export-method debugging
+            yarn tauri ios build --config "$CONFIG" --export-method debugging
           fi
 
       - name: Upload to release
