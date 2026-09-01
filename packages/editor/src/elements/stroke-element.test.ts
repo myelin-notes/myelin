@@ -94,6 +94,28 @@ describe('StrokeElement points', () => {
     expect(yMap.get('hasPressure')).toBe(true);
   });
 
+  it('persists a replacement point buffer', () => {
+    const s = new StrokeElement(
+      'p4',
+      [0, 0, 0.2, 10, 0, 0.4, 20, 0, 0.6],
+      true,
+      STYLE,
+    );
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.STROKE, 'p4', {
+      offsetX: 0,
+      offsetY: 0,
+      scaleX: 1,
+      scaleY: 1,
+      ...s.getYMapProps(),
+    });
+    s.bindToYMap(yMap);
+
+    s.replacePoints([0, 0, 0.2, 20, 0, 0.6]);
+
+    expect(yMap.get('points')).toEqual([0, 0, 0.2, 20, 0, 0.6]);
+  });
+
   it('hit-tests against the centerline inflated by the stroke half-width', () => {
     const s = new StrokeElement('s3', [], false, { color: '#000', size: 8 });
     s.addPoint(0, 0, 0.5);

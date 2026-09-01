@@ -845,6 +845,7 @@ const zhHans: typeof en = {
       mode: '模式',
       rectangle: '矩形',
       lasso: '套索',
+      precise: '精细',
       fine: (value: number) => `细（${value}）`,
       medium: (value: number) => `中（${value}）`,
       bold: (value: number) => `粗（${value}）`,

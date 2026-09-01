@@ -1,16 +1,21 @@
-import { Eraser as EraserIcon } from 'lucide-react';
+import {
+  Eraser as EraserIcon,
+  SplinePointer as PreciseEraserIcon,
+} from 'lucide-react';
 import { getCanvasPalette, withCanvasAlpha } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { ElementType } from '../elements/element-type';
+import { StrokeElement } from '../elements/stroke-element';
 import type { MessageGetter } from '../i18n';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
-export class EraserTool implements ITool {
-  private radius: number;
+type EraserStyle = 'stroke' | 'precise';
 
-  public constructor(private readonly getStrings: MessageGetter) {
-    this.radius = 20;
-  }
+export class EraserTool implements ITool {
+  private radius = 20;
+  private eraserStyle: EraserStyle = 'stroke';
+
+  public constructor(private readonly getStrings: MessageGetter) {}
 
   get id(): ToolId {
     return 'eraser';
@@ -27,15 +32,61 @@ export class EraserTool implements ITool {
     _event: PointerEvent,
     position: Vector2,
   ): void {
-    canvas.elements
-      .filter(
-        (e) =>
-          (e.type === ElementType.STROKE || e.type === ElementType.SHAPE) &&
-          e.isOver(position.x, position.y, this.radius, canvas.ctx),
-      )
-      .forEach((e) => {
-        canvas.removeElement(e);
-      });
+    for (const element of [...canvas.elements]) {
+      if (
+        element.type !== ElementType.STROKE &&
+        element.type !== ElementType.SHAPE
+      ) {
+        continue;
+      }
+      if (this.eraserStyle === 'precise' && element instanceof StrokeElement) {
+        this.eraseStrokePoints(canvas, element, position);
+        continue;
+      }
+      if (element.isOver(position.x, position.y, this.radius, canvas.ctx)) {
+        canvas.removeElement(element);
+      }
+    }
+  }
+
+  private eraseStrokePoints(
+    canvas: DrawableCanvas,
+    stroke: StrokeElement,
+    position: Vector2,
+  ): void {
+    const runs = stroke.getPointRunsOutsideCircle(
+      position.x,
+      position.y,
+      this.radius,
+    );
+    if (!runs) {
+      return;
+    }
+    if (runs.length === 0) {
+      canvas.removeElement(stroke);
+      return;
+    }
+
+    const originalIndex = canvas.elements.indexOf(stroke);
+    const style = { ...stroke.strokeStyle };
+    const hasPressure = stroke.pressureEnabled;
+    const offset = { ...stroke.offset };
+    const scale = { ...stroke.scale };
+
+    canvas.transact(() => {
+      stroke.replacePoints(runs[0]);
+      for (let i = 1; i < runs.length; i++) {
+        const fragment = canvas.addElement((uuid) => {
+          const next = new StrokeElement(uuid, runs[i], hasPressure, {
+            ...style,
+          });
+          next.updateBounds();
+          return next;
+        }, originalIndex + i);
+        fragment.setOffset(offset.x, offset.y);
+        fragment.setScale(scale.x, scale.y);
+      }
+    });
   }
 
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
@@ -61,11 +112,33 @@ export class EraserTool implements ITool {
   }
 
   getOptions(): ToolOption[] {
+    const strings = this.getStrings().canvas;
     return [
+      {
+        type: 'choice',
+        key: 'eraserStyle',
+        label: strings.toolOptions.mode,
+        value: this.eraserStyle,
+        set: (eraserStyle) => {
+          this.eraserStyle = eraserStyle as EraserStyle;
+        },
+        choices: [
+          {
+            value: 'stroke',
+            label: strings.toolOptions.stroke,
+            icon: EraserIcon,
+          },
+          {
+            value: 'precise',
+            label: strings.toolOptions.precise,
+            icon: PreciseEraserIcon,
+          },
+        ],
+      },
       {
         type: 'size',
         key: 'size',
-        label: this.getStrings().canvas.toolOptions.size,
+        label: strings.toolOptions.size,
         value: this.radius,
         min: 5,
         max: 60,

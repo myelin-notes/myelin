@@ -1377,6 +1377,7 @@ export class DrawableCanvas {
   // The factory receives a freshly generated uuid.
   public addElement<T extends DrawableElement>(
     factory: (uuid: string) => T,
+    positionOverride?: number,
   ): T {
     const uuid = crypto.randomUUID();
     const element = factory(uuid);
@@ -1384,7 +1385,14 @@ export class DrawableCanvas {
 
     // Build the Y.Map properties from the element's current state
     const background = isBackgroundElement(element.type);
-    const position = background ? 0 : this._store.order().length;
+    const defaultPosition = background ? 0 : this._store.order().length;
+    const requestedPosition = background
+      ? defaultPosition
+      : (positionOverride ?? defaultPosition);
+    const position = Math.max(
+      0,
+      Math.min(requestedPosition, this._store.order().length),
+    );
     const props: Record<string, unknown> = {
       offsetX: element.offset.x,
       offsetY: element.offset.y,

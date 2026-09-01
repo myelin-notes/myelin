@@ -52,6 +52,48 @@ export class StrokeElement extends DrawableElement {
     return this.hasPressure;
   }
 
+  /** Surviving contiguous point buffers, or `null` when the eraser touches no sampled point. */
+  public getPointRunsOutsideCircle(
+    x: number,
+    y: number,
+    radius: number,
+  ): number[][] | null {
+    const localX = (x - this.offset.x) / this.scale.x;
+    const localY = (y - this.offset.y) / this.scale.y;
+    const localRadius =
+      radius / Math.min(Math.abs(this.scale.x), Math.abs(this.scale.y));
+    const tolerance = localRadius + this.style.size / 2;
+    const toleranceSquared = tolerance * tolerance;
+    const runs: number[][] = [];
+    let currentRun: number[] | null = null;
+    let erased = false;
+
+    for (let i = 0; i + 2 < this.points.length; i += 3) {
+      const dx = this.points[i] - localX;
+      const dy = this.points[i + 1] - localY;
+      if (dx * dx + dy * dy <= toleranceSquared) {
+        erased = true;
+        currentRun = null;
+        continue;
+      }
+      if (!currentRun) {
+        currentRun = [];
+        runs.push(currentRun);
+      }
+      currentRun.push(this.points[i], this.points[i + 1], this.points[i + 2]);
+    }
+
+    return erased ? runs : null;
+  }
+
+  /** Replace the recorded samples and persist the new buffer. */
+  public replacePoints(points: number[]): void {
+    this.points = points.slice();
+    this.dirty = true;
+    this.updateBounds();
+    this.flushPoints();
+  }
+
   public override getYMapProps(): Record<string, unknown> {
     return {
       color: this.style.color,
