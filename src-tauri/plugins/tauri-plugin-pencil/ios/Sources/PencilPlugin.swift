@@ -21,6 +21,7 @@ struct TouchProbeEvent: Encodable {
 // the web view. Left in .possible so UIKit keeps sending every phase of the sequence.
 class TouchProbeRecognizer: UIGestureRecognizer {
   var report: ((String) -> Void)?
+  var onFirstTouch: (() -> Void)?
 
   private func describe(_ phase: String, _ touches: Set<UITouch>, _ event: UIEvent?) {
     let parts = touches.map { t -> String in
@@ -40,6 +41,7 @@ class TouchProbeRecognizer: UIGestureRecognizer {
   }
 
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+    onFirstTouch?()
     describe("began", touches, event)
   }
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {}
@@ -79,10 +81,14 @@ class PencilPlugin: Plugin {
     }
     webview.addGestureRecognizer(probe)
     self.probe = probe
-    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+    // On the first touch rather than a timer: the JS listener only exists once the canvas mounts.
+    var dumped = false
+    probe.onFirstTouch = { [weak self] in
+      if dumped { return }
+      dumped = true
       let content = webview.scrollView.subviews.first { String(describing: type(of: $0)).contains("WKContentView") }
       let names = (content?.gestureRecognizers ?? []).map { r -> String in
-        "\(type(of: r))(\(r.isEnabled ? "on" : "off"))"
+        "\(type(of: r))(\(r.isEnabled ? "on" : "off"),\(r.state.rawValue))"
       }
       try? self?.trigger("touchprobe", data: TouchProbeEvent(line: "recognizers: " + names.joined(separator: ", ")))
     }

@@ -81,6 +81,7 @@ export class CanvasViewport {
     // Single-finger touch is left alone — DrawableCanvas pans the free canvas with one finger, and
     // in edit mode the contentEditable uses it for cursor placement / selection.
     this._handleTouchStart = (evt) => {
+      preventStylusDefault(evt);
       // Before the suppression bail: gesture* must stand down for any two-finger touch, not just
       // the ones the camera acts on.
       this._touchPinching = evt.touches.length >= 2;
@@ -166,6 +167,7 @@ export class CanvasViewport {
     };
 
     this._handleTouchEnd = (evt) => {
+      preventStylusDefault(evt);
       if (evt.touches.length < 2) {
         this._touchPanLast = null;
         this._touchPinchLastDist = null;
@@ -207,10 +209,26 @@ export class CanvasViewport {
     // TEMP: `localStorage.setItem('ptr-passive', '1')` + reload registers the touch listeners as
     // passive, so WebKit stops treating touchstart as preventable. Remove with PTR_TRACE.
     let touchPassive = false;
+    let preventStylus = false;
     try {
       touchPassive = localStorage.getItem('ptr-passive') === '1';
+      preventStylus = localStorage.getItem('ptr-prevent') === '1';
     } catch {}
-    console.log(`[ptr] viewport touch listeners passive=${touchPassive}`);
+    console.log(
+      `[ptr] viewport touch listeners passive=${touchPassive} preventStylus=${preventStylus}`,
+    );
+    // TEMP: `ptr-prevent` cancels touchstart/touchend for a lone stylus touch, which keeps WebKit's
+    // tap recognizer and synthetic click off pencil strokes. Needs ptr-passive unset.
+    const preventStylusDefault = (evt: TouchEvent) => {
+      if (!preventStylus || evt.changedTouches.length !== 1) {
+        return;
+      }
+      const t = evt.changedTouches[0] as Touch & { touchType?: string };
+      if (t.touchType === 'stylus' && evt.cancelable) {
+        evt.preventDefault();
+        console.log(`[ptr] prevented ${evt.type} for stylus`);
+      }
+    };
     this._gestureTarget.addEventListener(
       'touchstart',
       this._handleTouchStart as EventListener,
