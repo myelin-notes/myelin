@@ -87,10 +87,21 @@ class PencilPlugin: Plugin {
       if dumped { return }
       dumped = true
       let content = webview.scrollView.subviews.first { String(describing: type(of: $0)).contains("WKContentView") }
-      let names = (content?.gestureRecognizers ?? []).map { r -> String in
-        "\(type(of: r))(\(r.isEnabled ? "on" : "off"),\(r.state.rawValue))"
+      for (label, view) in [("webview", webview as UIView?), ("content", content)] {
+        let recognizers = (view?.gestureRecognizers ?? []).map { r -> String in
+          "\(type(of: r))(\(r.isEnabled ? "on" : "off"))"
+        }
+        let interactions = (view?.interactions ?? []).map { "\(type(of: $0))" }
+        try? self?.trigger("touchprobe", data: TouchProbeEvent(line: "\(label) recognizers: " + recognizers.joined(separator: ", ")))
+        try? self?.trigger("touchprobe", data: TouchProbeEvent(line: "\(label) interactions: " + interactions.joined(separator: ", ")))
       }
-      try? self?.trigger("touchprobe", data: TouchProbeEvent(line: "recognizers: " + names.joined(separator: ", ")))
+    }
+
+    // Scribble delays pencil touches while it decides whether they are handwriting for a text
+    // field; opting the view out is the documented way to keep it off. TEMP until confirmed.
+    if #available(iOS 14.0, *) {
+      let scribble = UIScribbleInteraction(delegate: self)
+      webview.addInteraction(scribble)
     }
   }
 
@@ -114,6 +125,13 @@ class PencilPlugin: Plugin {
       data: GestureEvent(
         kind: kind, action: name,
         x: location.map { Double($0.x) }, y: location.map { Double($0.y) }))
+  }
+}
+
+@available(iOS 14.0, *)
+extension PencilPlugin: UIScribbleInteractionDelegate {
+  func scribbleInteraction(_ interaction: UIScribbleInteraction, shouldBeginAt location: CGPoint) -> Bool {
+    return false
   }
 }
 
