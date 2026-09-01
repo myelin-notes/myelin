@@ -71,6 +71,32 @@ const PEN_CONTACT_BUTTONS = 1 | 32;
 /** A second barrel button reports as the middle button, and opens the wheel. */
 const PEN_WHEEL_BUTTONS = 4;
 
+// TEMP: pointer trace for the iPad fast-second-stroke investigation. Remove when done.
+const PTR_TRACE = true;
+let lastMoveKey = '';
+function ptrTrace(
+  tag: string,
+  evt: PointerEvent,
+  state: number,
+  owner: unknown,
+) {
+  if (!PTR_TRACE) {
+    return;
+  }
+  const key = `${evt.type}|${evt.pointerType}|${evt.pointerId}|${evt.buttons}|${state}|${JSON.stringify(owner)}`;
+  if (evt.type === 'pointermove') {
+    if (key === lastMoveKey) {
+      return;
+    }
+    lastMoveKey = key;
+  } else {
+    lastMoveKey = '';
+  }
+  console.log(
+    `[ptr] ${tag} ${evt.type} ${evt.pointerType}#${evt.pointerId} b=${evt.buttons} p=${evt.pressure.toFixed(2)} prim=${evt.isPrimary} t=${evt.timeStamp.toFixed(0)} st=${state} own=${JSON.stringify(owner)} xy=${evt.clientX.toFixed(0)},${evt.clientY.toFixed(0)}`,
+  );
+}
+
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
 }
@@ -1158,6 +1184,11 @@ export class DrawableCanvas {
 
   private initStates() {
     this.state.addEnd(InteractState.UsingTool, (event) => {
+      if (PTR_TRACE) {
+        console.log(
+          `[ptr] tool END abort=${this._abortingInteraction} via=${event?.type ?? 'null'}`,
+        );
+      }
       this._interactionPointer = null;
       if (this._abortingInteraction) {
         if (this.toolSelected.abort) {
@@ -1176,6 +1207,11 @@ export class DrawableCanvas {
         id: event.pointerId,
         pen: event.pointerType === 'pen',
       };
+      if (PTR_TRACE) {
+        console.log(
+          `[ptr] tool START ${event.pointerType}#${event.pointerId} via=${event.type}`,
+        );
+      }
       this._ydoc.undoManager.stopCapturing();
       this._lastToolSampleTime = event.timeStamp;
       this.toolSelected.start(this, event);
@@ -1235,6 +1271,7 @@ export class DrawableCanvas {
     // On the window, not the canvas: DOM layered above the canvas (page-frame chrome, world-anchored
     // links) swallows pointermove, freezing an in-progress drag until the cursor left that DOM again.
     this._handlePointerMove = (evt) => {
+      ptrTrace('move', evt, this.state.current, this._interactionPointer);
       this._input.observe(evt);
       // Before the update, so a barrel pressed mid-gesture hands the rest of it to the tool that
       // just took over. Android never gets here: StylusEventRewriter.kt pins a contact's tool type
@@ -1255,6 +1292,7 @@ export class DrawableCanvas {
     window.addEventListener('pointermove', this._handlePointerMove);
 
     this._handlePointerDown = (evt) => {
+      ptrTrace('down', evt, this.state.current, this._interactionPointer);
       this._input.observe(evt);
       // One-shot placement intercepts primary-button clicks regardless of tool.
       if (this._placement.isActive) {
@@ -1269,6 +1307,11 @@ export class DrawableCanvas {
       switch (evt.pointerType) {
         case 'touch': {
           if (this._palm.suppressed) {
+            if (PTR_TRACE) {
+              console.log(
+                `[ptr] touch#${evt.pointerId} rejected (penContact=${this._palm.penContact})`,
+              );
+            }
             break;
           }
           this._activeTouchPointers.add(evt.pointerId);
@@ -1366,11 +1409,17 @@ export class DrawableCanvas {
     canvas.addEventListener('pointerdown', this._handlePointerDown);
 
     this._handlePointerUp = (evt) => {
+      ptrTrace('up', evt, this.state.current, this._interactionPointer);
       this._activeTouchPointers.delete(evt.pointerId);
       if (evt.pointerType === 'pen') {
         this._palm.penUp();
       }
       if (!this.ownsInteraction(evt)) {
+        if (PTR_TRACE) {
+          console.log(
+            `[ptr] ${evt.type} ${evt.pointerType}#${evt.pointerId} ignored, not owner`,
+          );
+        }
         return;
       }
       // A finger that lifts without dragging is a tap: run it through the select tool. Dragging pans
@@ -1530,6 +1579,11 @@ export class DrawableCanvas {
   private beginPenContact(evt: PointerEvent) {
     this._palm.penDown();
     if (this._activeTouchPointers.size > 0) {
+      if (PTR_TRACE) {
+        console.log(
+          `[ptr] pen landed on ${this._activeTouchPointers.size} touch(es), unwinding state=${this.state.current}`,
+        );
+      }
       this._activeTouchPointers.clear();
       this._touchTapCandidate = null;
       this.abortInteraction();
@@ -1559,11 +1613,20 @@ export class DrawableCanvas {
     }
     if (contact) {
       if (this.state.current !== InteractState.Idle) {
+        if (PTR_TRACE) {
+          console.log(`[ptr] chord OPEN skipped, state=${this.state.current}`);
+        }
         return;
+      }
+      if (PTR_TRACE) {
+        console.log('[ptr] chord OPEN from move');
       }
       this.beginPenContact(evt);
       this.state.change(InteractState.UsingTool, evt);
       return;
+    }
+    if (PTR_TRACE) {
+      console.log('[ptr] chord CLOSE from move');
     }
     this._palm.penUp();
     this.state.change(InteractState.Idle, evt);
