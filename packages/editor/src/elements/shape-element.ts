@@ -174,8 +174,8 @@ export class ShapeElement extends DrawableElement {
     this.updateBounds();
   }
 
-  /** Replace the geometry and mirror it into the backing Y.Map value. */
-  private setGeom(geom: number[]): void {
+  /** Replace the local-frame geometry and mirror it into the backing Y.Map value. */
+  public setGeom(geom: number[]): void {
     this.geom = geom;
     this.updateBoundingBox();
     this.syncToYMap({ geom: [...geom] });
