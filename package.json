@@ -20,6 +20,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
+    "ios:device": "node scripts/ios-device.mjs",
     "tauri": "node ./scripts/tauri.mjs",
     "tauri:mac-deep-links:check": "node scripts/tauri-deep-links.mjs check",
     "tauri:mac-deep-links:clear": "node scripts/tauri-deep-links.mjs clear",
