@@ -120,21 +120,9 @@ export function usePencilGestures({
         listener = l;
       }
     });
-    // TEMP: native touch probe, see PencilPlugin.swift. Remove with it.
-    let probe: PluginListener | null = null;
-    void addPluginListener<{ line: string }>('pencil', 'touchprobe', (e) => {
-      console.log(`[ptr] native ${e.line}`);
-    }).then((l) => {
-      if (disposed) {
-        void l.unregister();
-      } else {
-        probe = l;
-      }
-    });
     return () => {
       disposed = true;
       void listener?.unregister();
-      void probe?.unregister();
     };
   }, []);
 }
