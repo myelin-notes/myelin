@@ -280,14 +280,18 @@ export function useCanvasInserts({
     if (!contextInsert) {
       return;
     }
-    const { screenX, screenY } = contextInsert;
+    const { worldPos } = contextInsert;
     setContextInsert(null);
     void capturePhoto().then((file) => {
-      if (file) {
-        embedFiles([file], screenX, screenY);
+      const dc = drawableCanvasRef.current;
+      if (!file || !dc) {
+        return;
       }
+      // Viewport may have resized (rotation) while the camera was open.
+      const screen = dc.viewport.worldToScreen(worldPos);
+      embedFiles([file], screen.x, screen.y);
     });
-  }, [contextInsert, embedFiles]);
+  }, [contextInsert, drawableCanvasRef, embedFiles]);
 
   const lastClickRef = useRef<{ t: number; x: number; y: number } | null>(null);
 
