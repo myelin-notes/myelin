@@ -16,6 +16,7 @@ import { Logger } from '@myelin/shared/logger';
 import { useRepository } from '@/lib/sync';
 import {
   normalizeTagInput,
+  type OrderedTag,
   orderTagsHierarchically,
   tagMatchesQuery,
 } from '@/lib/sync/repo/tag-hierarchy';
@@ -67,6 +68,7 @@ export const SidebarTags = memo(function SidebarTags({
   // null = not adding; '' = adding a root tag; otherwise the parent tag a new
   // child is being created under.
   const [addParent, setAddParent] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [newTag, setNewTag] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const [height, setHeightState] = useState(() =>
@@ -102,6 +104,22 @@ export const SidebarTags = memo(function SidebarTags({
     setOpen(true);
     setNewTag('');
     setAddParent(parent);
+    // Expand the parent so the new child isn't hidden the moment it's created.
+    if (parent && collapsed.has(parent)) {
+      const next = new Set(collapsed);
+      next.delete(parent);
+      setCollapsed(next);
+    }
+  };
+
+  const toggleCollapsed = (tag: string) => {
+    const next = new Set(collapsed);
+    if (next.has(tag)) {
+      next.delete(tag);
+    } else {
+      next.add(tag);
+    }
+    setCollapsed(next);
   };
 
   const submitAdd = async () => {
@@ -195,6 +213,25 @@ export const SidebarTags = memo(function SidebarTags({
 
   const orderedTags = useMemo(() => orderTagsHierarchically(tags), [tags]);
 
+  // Drop the subtree of every collapsed tag. `orderedTags` is pre-order, so a
+  // tag's descendants are exactly the deeper entries that follow it.
+  const visibleTags = useMemo(() => {
+    const result: (OrderedTag & { hasChildren: boolean })[] = [];
+    let hideDeeperThan = Number.POSITIVE_INFINITY;
+    orderedTags.forEach((entry, index) => {
+      if (entry.depth > hideDeeperThan) {
+        return;
+      }
+      hideDeeperThan = Number.POSITIVE_INFINITY;
+      const hasChildren = (orderedTags[index + 1]?.depth ?? 0) > entry.depth;
+      result.push({ ...entry, hasChildren });
+      if (hasChildren && collapsed.has(entry.tag)) {
+        hideDeeperThan = entry.depth;
+      }
+    });
+    return result;
+  }, [orderedTags, collapsed]);
+
   const toggleTag = (tag: string) => {
     const next = new Set(activeTags);
     if (next.has(tag)) {
@@ -217,6 +254,7 @@ export const SidebarTags = memo(function SidebarTags({
         style={{ paddingLeft: treeRowPadding(depth) }}
       >
         <TreeIndentGuides depth={depth} />
+        <span className="mr-0.5 size-3.5 shrink-0" />
         <span className="shrink-0 font-medium text-[11px] text-text-muted">
           <span className="opacity-50">#</span>
           {parentLeaf ? `${parentLeaf}/` : ''}
@@ -341,20 +379,47 @@ export const SidebarTags = memo(function SidebarTags({
           ) : (
             <>
               {addParent === '' && addRow(0, null)}
-              {orderedTags.map(({ tag, count, depth, label }) => {
+              {visibleTags.map(({ tag, count, depth, label, hasChildren }) => {
                 const isActive = activeTags.has(tag);
+                const isCollapsed = collapsed.has(tag);
                 const formattedCount = formatNumber(count, locale);
                 return (
                   <Fragment key={tag}>
                     <div
+                      style={{ paddingLeft: treeRowPadding(depth) }}
                       className={cn(
-                        'group/tag relative flex items-center gap-1 rounded-md pr-1 transition-colors',
+                        'relative flex items-center gap-1 rounded-md pr-1 transition-colors',
                         isActive
                           ? 'bg-tag-active text-text-on-dark'
                           : 'text-text-secondary hover:bg-hover-tint',
                       )}
                     >
                       <TreeIndentGuides depth={depth} />
+                      {hasChildren ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleCollapsed(tag)}
+                          aria-expanded={!isCollapsed}
+                          aria-label={strings.library.semanticTags.toggleChildren(
+                            tag,
+                          )}
+                          className={cn(
+                            'mr-0.5 flex size-3.5 shrink-0 cursor-pointer items-center justify-center rounded',
+                            isActive
+                              ? 'text-text-on-dark/70 hover:text-text-on-dark'
+                              : 'text-text-muted hover:text-text-primary',
+                          )}
+                        >
+                          <ChevronRight
+                            className={cn(
+                              'size-3.5 transition-transform duration-150',
+                              !isCollapsed && 'rotate-90',
+                            )}
+                          />
+                        </button>
+                      ) : (
+                        <span className="mr-0.5 size-3.5 shrink-0" />
+                      )}
                       <button
                         type="button"
                         onClick={() => toggleTag(tag)}
@@ -364,15 +429,14 @@ export const SidebarTags = memo(function SidebarTags({
                           formattedCount,
                         )}
                         aria-pressed={isActive}
-                        style={{ paddingLeft: treeRowPadding(depth) }}
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-1 text-left font-medium text-[11px]"
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 py-1 pr-0.5 text-left font-medium text-[11px]"
                       >
                         <span className="shrink-0 opacity-50">#</span>
                         <span className="truncate">{label}</span>
                       </button>
                       <span
                         className={cn(
-                          'shrink-0 text-[9px] tabular-nums',
+                          'shrink-0 px-0.5 text-[9px] tabular-nums',
                           isActive ? 'text-text-on-dark/60' : 'text-text-muted',
                         )}
                       >
@@ -384,7 +448,7 @@ export const SidebarTags = memo(function SidebarTags({
                         aria-label={strings.library.semanticTags.addChild(tag)}
                         title={strings.library.semanticTags.addChild(tag)}
                         className={cn(
-                          'flex shrink-0 cursor-pointer items-center rounded p-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
+                          'flex shrink-0 cursor-pointer items-center rounded p-0.5',
                           isActive
                             ? 'text-text-on-dark/70 hover:text-text-on-dark'
                             : 'text-text-muted hover:text-text-primary',
@@ -397,7 +461,7 @@ export const SidebarTags = memo(function SidebarTags({
                         onClick={() => deleteTag(tag)}
                         aria-label={strings.library.semanticTags.deleteTag(tag)}
                         className={cn(
-                          'flex shrink-0 cursor-pointer items-center rounded p-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100',
+                          'flex shrink-0 cursor-pointer items-center rounded p-0.5',
                           isActive
                             ? 'text-text-on-dark/70 hover:text-text-on-dark'
                             : 'text-text-muted hover:text-destructive',

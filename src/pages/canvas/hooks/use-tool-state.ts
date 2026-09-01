@@ -97,7 +97,7 @@ function toolToWheelItem(
     current: (tool: ITool, option: ToolOption, value: unknown) => void;
   },
   strings: Messages,
-  customColors: Record<CustomColorTool, string[]>,
+  customColors: Partial<Record<CustomColorTool, string[]>>,
   promptAddColor: (tool: CustomColorTool) => void,
 ): WheelItem {
   const options = tool.getOptions?.() ?? [];
@@ -114,7 +114,7 @@ function toolToWheelItem(
     const customColorTool = getCustomColorTool(tool);
     const colorChildren: WheelItem[] = [
       ...colorOpt.palette,
-      ...(customColorTool ? customColors[customColorTool] : []),
+      ...(customColorTool ? (customColors[customColorTool] ?? []) : []),
     ].map((hex) => ({
       label: hex,
       color: hex,
@@ -125,7 +125,7 @@ function toolToWheelItem(
     }));
     if (
       customColorTool &&
-      customColors[customColorTool].length < MAX_CUSTOM_COLORS
+      (customColors[customColorTool]?.length ?? 0) < MAX_CUSTOM_COLORS
     ) {
       colorChildren.push({
         label: strings.canvas.toolOptions.addCustomColor,

@@ -54,19 +54,19 @@ export function useDropTarget({
       return;
     }
 
-    const { nodeId } = JSON.parse(raw) as { nodeId: string };
+    const { nodeIds } = JSON.parse(raw) as { nodeIds: string[] };
 
-    // Don't drop onto self
-    if (nodeId === targetFolderId) {
-      return;
+    for (const nodeId of nodeIds) {
+      if (nodeId === targetFolderId) {
+        continue;
+      }
+      try {
+        await repository.moveNode(nodeId, targetFolderId);
+      } catch (err) {
+        logger.error('Failed to move node', err, { nodeId, targetFolderId });
+      }
     }
-
-    try {
-      await repository.moveNode(nodeId, targetFolderId);
-      onMoved();
-    } catch (err) {
-      logger.error('Failed to move node', err, { nodeId, targetFolderId });
-    }
+    onMoved();
   };
 
   return {

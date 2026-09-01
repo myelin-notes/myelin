@@ -46,6 +46,7 @@ export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
   'pen',
   'highlighter',
   'text',
+  'folder',
 ];
 
 // 2 dropped the `children` arrays: parentage is stored only as `node.parentId`,
@@ -62,7 +63,7 @@ export function createEmptyManifest(): VFSManifest {
     version: CURRENT_MANIFEST_VERSION,
     nodes: {},
     linksBySource: {},
-    colors: { pen: [], highlighter: [], text: [] },
+    colors: { pen: [], highlighter: [], text: [], folder: [] },
     tagRegistry: [],
     penPresets: [],
   };
@@ -91,6 +92,7 @@ export function migrate(manifest: VFSManifest): void {
       pen: (legacyManifest.customColors ?? []).slice(0, MAX_CUSTOM_COLORS),
       highlighter: [],
       text: [],
+      folder: [],
     };
     legacyManifest.customColors = undefined;
     manifest.version = 3;
@@ -99,6 +101,7 @@ export function migrate(manifest: VFSManifest): void {
     pen: manifest.colors?.pen ?? [],
     highlighter: manifest.colors?.highlighter ?? [],
     text: manifest.colors?.text ?? [],
+    folder: manifest.colors?.folder ?? [],
   };
 }
 

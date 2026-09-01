@@ -697,6 +697,21 @@ export abstract class BaseRepository
     });
   }
 
+  async setFolderColor(nodeId: string, color: string | null): Promise<void> {
+    const normalized = color === null ? null : normalizeCustomColor(color);
+    if (color !== null && !normalized) {
+      throw new Error(`Invalid color: ${color}`);
+    }
+    await this.mutateManifest('Set folder color', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (node?.type !== 'folder') {
+        return;
+      }
+      node.color = normalized ?? undefined;
+      node.modifiedAt = Date.now();
+    });
+  }
+
   async addTag(nodeId: string, tag: string): Promise<void> {
     await this.mutateManifest('Add node tag', (manifest) => {
       const node = manifest.nodes[nodeId];

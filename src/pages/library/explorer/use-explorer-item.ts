@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useMessages } from '@myelin/editor/i18n';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { Logger } from '@myelin/shared/logger';
 import { type NoteBacklink, useRepository, type VFSNodeId } from '@/lib/sync';
@@ -26,6 +27,8 @@ interface UseExplorerItemOptions {
   nodeId: string;
   name: string;
   dragKind: DragItemKind;
+  /** Every node a drag or remove acts on; defaults to just `nodeId`. */
+  nodeIds?: readonly string[];
   onChanged: () => void | Promise<void>;
   initialRenaming?: boolean;
   renameReferencesOnRename?: boolean;
@@ -35,10 +38,12 @@ export function useExplorerItem({
   nodeId,
   name,
   dragKind,
+  nodeIds = [nodeId],
   onChanged,
   initialRenaming,
   renameReferencesOnRename,
 }: UseExplorerItemOptions) {
+  const strings = useMessages();
   const repository = useRepository();
   const [renaming, setRenaming] = useState(initialRenaming ?? false);
   const [dragging, setDragging] = useState(false);
@@ -171,10 +176,12 @@ export function useExplorerItem({
   };
 
   const handleRemove = async () => {
-    try {
-      await repository.deleteNode(nodeId);
-    } catch (err) {
-      logger.error('Failed to delete node', err, { nodeId });
+    for (const id of nodeIds) {
+      try {
+        await repository.deleteNode(id);
+      } catch (err) {
+        logger.error('Failed to delete node', err, { nodeId: id });
+      }
     }
     await onChanged();
   };
@@ -182,11 +189,15 @@ export function useExplorerItem({
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData(
       'application/myelin-item',
-      JSON.stringify({ nodeId }),
+      JSON.stringify({ nodeIds }),
     );
     e.dataTransfer.effectAllowed = 'move';
 
-    const { element, cleanup } = createItemDragImage(name, dragKind);
+    const label =
+      nodeIds.length > 1
+        ? strings.library.explorerTree.selectedCount(nodeIds.length)
+        : name;
+    const { element, cleanup } = createItemDragImage(label, dragKind);
     e.dataTransfer.setDragImage(element, 16, element.offsetHeight / 2);
     requestAnimationFrame(cleanup);
 

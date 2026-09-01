@@ -46,6 +46,7 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
       pen: loadColors('pen'),
       highlighter: loadColors('highlighter'),
       text: loadColors('text'),
+      folder: loadColors('folder'),
     }),
   );
 

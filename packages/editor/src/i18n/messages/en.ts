@@ -224,6 +224,7 @@ const en = {
       insights: 'Studio Insights',
       addTag: 'New tag',
       addChild: (tag: string) => `Add tag under #${tag}`,
+      toggleChildren: (tag: string) => `Toggle tags under #${tag}`,
       placeholder: 'Tag name...',
       deleteTag: (tag: string) => `Delete #${tag}`,
       stats: {
@@ -238,10 +239,12 @@ const en = {
       emptySearch: 'No results found',
       emptyFilter: 'No items match the selected tags',
       emptyDefault: 'No files yet',
+      selectedCount: (count: number) => `${count} items`,
     },
     itemMenu: {
       rename: 'Rename',
       manageTags: 'Manage Tags',
+      color: 'Color',
       versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
       remove: 'Remove',
@@ -802,6 +805,10 @@ const en = {
       embed: {
         label: 'Image or PDF',
         description: 'Drop in files or paste a URL',
+      },
+      camera: {
+        label: 'Take a photo',
+        description: 'Snap a picture with your camera',
       },
       latex: {
         label: 'LaTeX',

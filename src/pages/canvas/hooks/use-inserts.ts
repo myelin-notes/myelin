@@ -43,6 +43,34 @@ interface UseCanvasInsertsArgs {
   ) => void;
 }
 
+// iOS < 16.4 never fires `cancel`, so a cancelled capture leaves its input mounted;
+// dropping the previous one on the next capture bounds that to a single element.
+let pendingCapture: HTMLInputElement | null = null;
+
+// iOS won't open the picker for a detached input, so mount it for the duration.
+function capturePhoto(): Promise<File | null> {
+  pendingCapture?.remove();
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.setAttribute('capture', 'environment');
+    input.hidden = true;
+    const finish = () => {
+      input.remove();
+      if (pendingCapture === input) {
+        pendingCapture = null;
+      }
+      resolve(input.files?.[0] ?? null);
+    };
+    input.addEventListener('change', finish, { once: true });
+    input.addEventListener('cancel', finish, { once: true });
+    pendingCapture = input;
+    document.body.append(input);
+    input.click();
+  });
+}
+
 export function useCanvasInserts({
   drawableCanvasRef,
   canvasTools,
@@ -186,6 +214,17 @@ export function useCanvasInserts({
     setEmbedOpen(true);
   }, [drawableCanvasRef]);
 
+  const onInsertCamera = useCallback(() => {
+    setInsertOpen(false);
+    setContextInsert(null);
+    drawableCanvasRef.current?.cancelPlacement();
+    void capturePhoto().then((file) => {
+      if (file) {
+        embedFiles([file]);
+      }
+    });
+  }, [drawableCanvasRef, embedFiles]);
+
   const toggleInsert = useCallback(() => {
     setInsertOpen((v) => {
       const next = !v;
@@ -236,6 +275,23 @@ export function useCanvasInserts({
     setContextInsert(null);
     setEmbedOpen(true);
   }, [contextInsert]);
+
+  const onContextInsertCamera = useCallback(() => {
+    if (!contextInsert) {
+      return;
+    }
+    const { worldPos } = contextInsert;
+    setContextInsert(null);
+    void capturePhoto().then((file) => {
+      const dc = drawableCanvasRef.current;
+      if (!file || !dc) {
+        return;
+      }
+      // Viewport may have resized (rotation) while the camera was open.
+      const screen = dc.viewport.worldToScreen(worldPos);
+      embedFiles([file], screen.x, screen.y);
+    });
+  }, [contextInsert, drawableCanvasRef, embedFiles]);
 
   const lastClickRef = useRef<{ t: number; x: number; y: number } | null>(null);
 
@@ -308,10 +364,12 @@ export function useCanvasInserts({
     onInsertEmbed,
     onInsertLatex,
     onInsertAudio,
+    onInsertCamera,
     onContextInsertFrame,
     onContextInsertEmbed,
     onContextInsertLatex,
     onContextInsertAudio,
+    onContextInsertCamera,
     onCanvasClick,
     submitEmbed,
     closeEmbed,

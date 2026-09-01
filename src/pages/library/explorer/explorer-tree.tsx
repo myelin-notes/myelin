@@ -364,9 +364,7 @@ export function ExplorerTree({
       if (viewMode === 'grid') {
         return node.type === 'folder' ? (
           <GridFolderItem
-            id={node.id}
-            name={node.name}
-            tags={node.tags}
+            folder={node}
             autoRename={node.id === renamingNewId}
             onNavigate={() => onNavigate(node.id)}
             onMoved={reloadAndNotify}
@@ -382,9 +380,7 @@ export function ExplorerTree({
       }
       return node.type === 'folder' ? (
         <FolderItem
-          id={node.id}
-          name={node.name}
-          tags={node.tags}
+          folder={node}
           autoRename={node.id === renamingNewId}
           onNavigate={() => onNavigate(node.id)}
           onMoved={reloadAndNotify}

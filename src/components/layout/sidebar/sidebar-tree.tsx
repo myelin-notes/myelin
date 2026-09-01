@@ -9,6 +9,7 @@ import {
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
+import { isApplePlatform } from '@myelin/shared/os';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   type FileType,
@@ -83,6 +84,66 @@ interface FlatResults {
 
 const EMPTY_RESULTS: FlatResults = { nodes: [], ancestors: [] };
 
+interface Selection {
+  ids: ReadonlySet<string>;
+  /** Row a shift-click ranges from; the last plain- or modifier-clicked row. */
+  anchor: string | null;
+}
+
+const EMPTY_SELECTION: Selection = { ids: new Set(), anchor: null };
+
+interface VisibleRow {
+  node: VFSNode;
+  depth: number;
+  expanded: boolean;
+}
+
+function collectRows(
+  nodes: VFSNode[],
+  depth: number,
+  expanded: ReadonlySet<string>,
+  childrenMap: ReadonlyMap<string | null, VFSNode[]>,
+  sortMode: SortMode,
+): VisibleRow[] {
+  return sortNodes(nodes, sortMode).flatMap((node) => {
+    if (node.type !== 'folder') {
+      return [{ node, depth, expanded: false }];
+    }
+    const isExpanded = expanded.has(node.id);
+    return [
+      { node, depth, expanded: isExpanded },
+      ...(isExpanded
+        ? collectRows(
+            childrenMap.get(node.id) ?? [],
+            depth + 1,
+            expanded,
+            childrenMap,
+            sortMode,
+          )
+        : []),
+    ];
+  });
+}
+
+function collectResultRows(
+  nodes: ResultTreeNode[],
+  depth: number,
+  collapsedIds: ReadonlySet<string>,
+): VisibleRow[] {
+  return nodes.flatMap(({ node, children }) => {
+    if (node.type !== 'folder') {
+      return [{ node, depth, expanded: false }];
+    }
+    const isExpanded = !collapsedIds.has(node.id);
+    return [
+      { node, depth, expanded: isExpanded },
+      ...(isExpanded
+        ? collectResultRows(children, depth + 1, collapsedIds)
+        : []),
+    ];
+  });
+}
+
 interface SidebarTreeProps {
   ref?: React.Ref<SidebarTreeHandle>;
   sortMode: SortMode;
@@ -115,6 +176,7 @@ export function SidebarTree({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [searchResults, setSearchResults] =
     useState<FlatResults>(EMPTY_RESULTS);
+  const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
 
@@ -337,39 +399,6 @@ export function SidebarTree({
   const { dragOver: rootDragOver, dropTargetProps: rootDropProps } =
     useDropTarget({ targetFolderId: ROOT_KEY, onMoved: notifyNested });
 
-  const renderNodes = useCallback(
-    (nodes: VFSNode[], depth: number): React.ReactNode[] => {
-      return sortNodes(nodes, sortMode).flatMap((node) => {
-        if (node.type === 'folder') {
-          const isExpanded = expanded.has(node.id);
-          const children = childrenMap.get(node.id) ?? [];
-          return [
-            <SidebarFolderRow
-              key={node.id}
-              node={node}
-              depth={depth}
-              expanded={isExpanded}
-              autoRename={node.id === renamingId}
-              onToggle={() => toggle(node.id)}
-              onChanged={notifyNested}
-            />,
-            ...(isExpanded ? renderNodes(children, depth + 1) : []),
-          ];
-        }
-        return [
-          <SidebarFileRow
-            key={node.id}
-            node={node}
-            depth={depth}
-            autoRename={node.id === renamingId}
-            onChanged={notifyNested}
-          />,
-        ];
-      });
-    },
-    [childrenMap, expanded, renamingId, notifyNested, sortMode, toggle],
-  );
-
   const toggleResultFolder = useCallback(
     (folderId: string) => {
       setCollapsedResults((prev) => {
@@ -397,46 +426,97 @@ export function SidebarTree({
     );
   }, [isFlat, isSearching, searchResults, sortMode]);
 
-  const renderResultNodes = useCallback(
-    (nodes: ResultTreeNode[], depth: number): React.ReactNode[] => {
-      return nodes.flatMap(({ node, children }) => {
-        if (node.type === 'folder') {
-          const isExpanded = !collapsedIds.has(node.id);
-          return [
-            <SidebarFolderRow
-              key={node.id}
-              node={node}
-              depth={depth}
-              expanded={isExpanded}
-              autoRename={false}
-              onToggle={() => toggleResultFolder(node.id)}
-              onChanged={notifyFlat}
-            />,
-            ...(isExpanded ? renderResultNodes(children, depth + 1) : []),
-          ];
-        }
-        return [
-          <SidebarFileRow
-            key={node.id}
-            node={node}
-            depth={depth}
-            autoRename={false}
-            onChanged={notifyFlat}
-          />,
-        ];
-      });
-    },
-    [collapsedIds, notifyFlat, toggleResultFolder],
+  const visibleRows = useMemo(
+    () =>
+      isFlat
+        ? collectResultRows(resultTree ?? [], 0, collapsedIds)
+        : collectRows(
+            childrenMap.get(ROOT_KEY) ?? [],
+            0,
+            expanded,
+            childrenMap,
+            sortMode,
+          ),
+    [childrenMap, collapsedIds, expanded, isFlat, resultTree, sortMode],
   );
+  // Only visible rows act; ids hidden by collapse/move/delete stay inert until shown again.
+  // Descendants of a selected folder are dropped too, or moving the set would flatten them.
+  const selectionIds = useMemo(() => {
+    const ids: string[] = [];
+    let selectedDepth = Infinity;
+    for (const { node, depth } of visibleRows) {
+      if (depth > selectedDepth) {
+        continue;
+      }
+      selectedDepth = Infinity;
+      if (selection.ids.has(node.id)) {
+        ids.push(node.id);
+        selectedDepth = depth;
+      }
+    }
+    return ids;
+  }, [selection.ids, visibleRows]);
+
+  // Returns true when a modifier extended the selection, so the row skips its
+  // default click action (open / expand).
+  const selectRow = (nodeId: string, e: React.MouseEvent): boolean => {
+    const toggling = isApplePlatform ? e.metaKey : e.ctrlKey;
+    if (e.shiftKey) {
+      const order = visibleRows.map((row) => row.node.id);
+      const to = order.indexOf(nodeId);
+      const from =
+        selection.anchor === null ? -1 : order.indexOf(selection.anchor);
+      const range =
+        from === -1
+          ? [nodeId]
+          : order.slice(Math.min(from, to), Math.max(from, to) + 1);
+      setSelection({
+        ids: new Set(toggling ? [...selection.ids, ...range] : range),
+        anchor: from === -1 ? nodeId : selection.anchor,
+      });
+      return true;
+    }
+    if (toggling) {
+      const ids = new Set(selection.ids);
+      if (!ids.delete(nodeId)) {
+        ids.add(nodeId);
+      }
+      setSelection({ ids, anchor: nodeId });
+      return true;
+    }
+    setSelection({ ids: new Set([nodeId]), anchor: nodeId });
+    return false;
+  };
 
   if (!ready) {
     return null;
   }
 
-  const rootNodes = childrenMap.get(ROOT_KEY) ?? [];
-  const rows = isFlat
-    ? renderResultNodes(resultTree ?? [], 0)
-    : renderNodes(rootNodes, 0);
+  const notify = isFlat ? notifyFlat : notifyNested;
+  const rows = visibleRows.map(({ node, depth, expanded: isExpanded }) => {
+    const rowProps = {
+      depth,
+      autoRename: !isFlat && node.id === renamingId,
+      selected: selection.ids.has(node.id),
+      selectionIds,
+      onSelect: (e: React.MouseEvent) => selectRow(node.id, e),
+      onChanged: notify,
+    };
+    if (node.type === 'folder') {
+      return (
+        <SidebarFolderRow
+          key={node.id}
+          node={node}
+          expanded={isExpanded}
+          onToggle={() =>
+            isFlat ? toggleResultFolder(node.id) : toggle(node.id)
+          }
+          {...rowProps}
+        />
+      );
+    }
+    return <SidebarFileRow key={node.id} node={node} {...rowProps} />;
+  });
   const emptyMessage = isSearching
     ? strings.library.explorerTree.emptySearch
     : isFiltering

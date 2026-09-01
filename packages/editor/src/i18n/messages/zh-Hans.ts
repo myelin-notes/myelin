@@ -215,6 +215,7 @@ const zhHans: typeof en = {
       insights: '工作室洞察',
       addTag: '新建标签',
       addChild: (tag: string) => `在 #${tag} 下添加标签`,
+      toggleChildren: (tag: string) => `展开或收起 #${tag} 下的标签`,
       placeholder: '标签名称…',
       deleteTag: (tag: string) => `删除 #${tag}`,
       stats: {
@@ -228,10 +229,12 @@ const zhHans: typeof en = {
       emptySearch: '未找到结果',
       emptyFilter: '没有符合所选标签的项目',
       emptyDefault: '还没有文件',
+      selectedCount: (count: number) => `${count} 个项目`,
     },
     itemMenu: {
       rename: '重命名',
       manageTags: '管理标签',
+      color: '颜色',
       versionHistory: '版本历史',
       revealInFileManager: '在文件管理器中显示',
       remove: '移除',
@@ -780,6 +783,10 @@ const zhHans: typeof en = {
       embed: {
         label: '图片或 PDF',
         description: '拖入文件或粘贴链接',
+      },
+      camera: {
+        label: '拍照',
+        description: '用相机拍摄一张照片',
       },
       latex: {
         label: 'LaTeX',

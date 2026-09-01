@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { FolderOpen, History, Pencil, Tag, Trash2 } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import {
@@ -12,6 +13,8 @@ interface ItemContextMenuProps {
   onReveal?: () => void;
   onManageTags?: () => void;
   onVersionHistory?: () => void;
+  /** Extra items rendered after Manage Tags. */
+  children?: ReactNode;
 }
 
 export function ItemContextMenu({
@@ -20,6 +23,7 @@ export function ItemContextMenu({
   onReveal,
   onManageTags,
   onVersionHistory,
+  children,
 }: ItemContextMenuProps) {
   const strings = useMessages();
 
@@ -41,6 +45,7 @@ export function ItemContextMenu({
           {strings.library.itemMenu.manageTags}
         </ContextMenuItem>
       )}
+      {children}
       {onVersionHistory && (
         <ContextMenuItem
           className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"

@@ -137,10 +137,21 @@ export function canMoveElementOrderForSelection(
   return false;
 }
 
+// A frame gap past this is a dropped frame, not the display's own cadence (16.7ms at 60Hz).
+const LONG_FRAME_MS = 25;
+
 // A stylus samples faster than the display refreshes, so the platform batches samples into one
 // pointermove. Reading only the delivered event draws a straight chord across the batch — the
-// flat segments in handwriting when a frame runs long. Falls back to the event where unsupported.
-export function coalescedPointerSamples(event: PointerEvent): PointerEvent[] {
+// flat segments in handwriting when a frame runs long. Only a long frame opens the batch: on a
+// newer iPad the coalesced Apple Pencil samples knot a fast stroke, while one point per frame at
+// 60–120Hz is already smooth. Falls back to the event where unsupported.
+export function coalescedPointerSamples(
+  event: PointerEvent,
+  prevTimeStamp: number,
+): PointerEvent[] {
+  if (event.timeStamp - prevTimeStamp < LONG_FRAME_MS) {
+    return [event];
+  }
   const samples = event.getCoalescedEvents?.() ?? [];
   return samples.length > 0 ? samples : [event];
 }
@@ -203,6 +214,7 @@ export class DrawableCanvas {
   private _eraserButtonsHeld: boolean = false;
   // Lets the contact edges a chorded button hides be spotted — see syncPenChordedContact.
   private _penContactOpen: boolean = false;
+  private _lastToolSampleTime: number = 0;
 
   // While the stylus is on the glass — and briefly after — a hand resting on
   // the screen must drive nothing.
@@ -1149,11 +1161,14 @@ export class DrawableCanvas {
 
     this.state.addStart(InteractState.UsingTool, (event) => {
       this._ydoc.undoManager.stopCapturing();
+      this._lastToolSampleTime = event.timeStamp;
       this.toolSelected.start(this, event);
     });
 
     this.state.addUpdate(InteractState.UsingTool, (event: PointerEvent) => {
-      for (const sample of coalescedPointerSamples(event)) {
+      const samples = coalescedPointerSamples(event, this._lastToolSampleTime);
+      this._lastToolSampleTime = event.timeStamp;
+      for (const sample of samples) {
         this.toolSelected.update(this, sample, this.viewport.getPoint(sample));
       }
     });

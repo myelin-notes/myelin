@@ -1,56 +1,46 @@
-import { useState } from 'react';
 import { Folder } from 'lucide-react';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
+import type { VFSFolderNode } from '@/lib/sync';
 import { formatExplorerItemAccessibleName } from '../accessibility-labels';
-import { TagManageDialog } from '../tag-manage-dialog';
-import { ItemContextMenu } from './item-context-menu';
+import { folderIconStyle } from './folder-colors';
 import { TagList } from './tag-list';
 import { useDropTarget } from './use-drop-target';
-import { useExplorerItem } from './use-explorer-item';
+import { useFolderItemContextMenu } from './use-folder-item-context-menu';
 
 interface FolderItemProps {
-  id: string;
-  name: string;
-  tags: string[];
+  folder: VFSFolderNode;
   autoRename?: boolean;
   onNavigate: () => void;
   onMoved: () => void;
 }
 
 export function FolderItem({
-  id,
-  name,
-  tags,
+  folder,
   autoRename,
   onNavigate,
   onMoved,
 }: FolderItemProps) {
-  const [tagDialogOpen, setTagDialogOpen] = useState(false);
-
   const {
+    contextMenuProps,
     renaming,
     dragging,
-    startRenaming,
-    handleRemove,
     handleDragStart,
     handleDragEnd,
     renameInputProps,
-  } = useExplorerItem({
-    nodeId: id,
-    name,
-    dragKind: 'folder',
-    onChanged: onMoved,
+    menu,
+    dialogs,
+  } = useFolderItemContextMenu(folder, onMoved, {
     initialRenaming: autoRename,
   });
 
   const { dragOver, dropTargetProps } = useDropTarget({
-    targetFolderId: id,
+    targetFolderId: folder.id,
     onMoved,
   });
 
   return (
     <>
-      <ContextMenu>
+      <ContextMenu {...contextMenuProps}>
         <ContextMenuTrigger
           render={
             <button
@@ -66,7 +56,7 @@ export function FolderItem({
               aria-label={
                 renaming
                   ? undefined
-                  : formatExplorerItemAccessibleName(name, tags)
+                  : formatExplorerItemAccessibleName(folder.name, folder.tags)
               }
               className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-all duration-200 ${
                 dragOver
@@ -76,7 +66,10 @@ export function FolderItem({
             />
           }
         >
-          <Folder className="size-4 shrink-0 fill-accent-amber text-accent-amber transition-all duration-200 group-hover:fill-accent-amber-strong group-hover:text-accent-amber-strong" />
+          <Folder
+            className="size-4 shrink-0"
+            style={folderIconStyle(folder.color)}
+          />
           {renaming ? (
             <input
               {...renameInputProps}
@@ -85,10 +78,10 @@ export function FolderItem({
           ) : (
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate font-medium text-sm text-text-primary">
-                {name}
+                {folder.name}
               </span>
               <TagList
-                tags={tags}
+                tags={folder.tags}
                 className="flex shrink-0 items-center gap-1"
                 tagClassName="rounded-md bg-tag/60 px-1.5 py-0.5 font-medium text-[9px] text-text-tag"
                 overflowClassName="text-[9px] text-text-muted"
@@ -96,19 +89,9 @@ export function FolderItem({
             </div>
           )}
         </ContextMenuTrigger>
-        <ItemContextMenu
-          onRename={startRenaming}
-          onRemove={handleRemove}
-          onManageTags={() => setTagDialogOpen(true)}
-        />
+        {menu}
       </ContextMenu>
-      <TagManageDialog
-        open={tagDialogOpen}
-        onOpenChange={setTagDialogOpen}
-        nodeId={id}
-        nodeName={name}
-        onChanged={onMoved}
-      />
+      {dialogs}
     </>
   );
 }

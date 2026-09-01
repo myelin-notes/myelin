@@ -11,26 +11,36 @@ const order = (...items: Array<[string, ElementType]>): ElementOrderItem[] =>
   items.map(([uuid, type]) => ({ uuid, type }));
 
 describe('coalescedPointerSamples', () => {
-  const event = (getCoalescedEvents?: () => PointerEvent[]): PointerEvent =>
-    ({ getCoalescedEvents }) as unknown as PointerEvent;
+  const event = (
+    timeStamp: number,
+    getCoalescedEvents?: () => PointerEvent[],
+  ): PointerEvent =>
+    ({ timeStamp, getCoalescedEvents }) as unknown as PointerEvent;
 
   it('returns every batched sample so a long frame keeps the whole stroke', () => {
-    const batch = [event(), event(), event()];
-    const delivered = event(() => batch);
+    const batch = [event(110), event(120), event(130)];
+    const delivered = event(130, () => batch);
 
-    expect(coalescedPointerSamples(delivered)).toEqual(batch);
+    expect(coalescedPointerSamples(delivered, 100)).toEqual(batch);
+  });
+
+  it('uses only the delivered event while frames arrive on time', () => {
+    const batch = [event(104), event(108)];
+    const delivered = event(108, () => batch);
+
+    expect(coalescedPointerSamples(delivered, 100)).toEqual([delivered]);
   });
 
   it('falls back to the delivered event when coalescing is unsupported', () => {
-    const delivered = event();
+    const delivered = event(130);
 
-    expect(coalescedPointerSamples(delivered)).toEqual([delivered]);
+    expect(coalescedPointerSamples(delivered, 100)).toEqual([delivered]);
   });
 
   it('falls back to the delivered event when the batch is empty', () => {
-    const delivered = event(() => []);
+    const delivered = event(130, () => []);
 
-    expect(coalescedPointerSamples(delivered)).toEqual([delivered]);
+    expect(coalescedPointerSamples(delivered, 100)).toEqual([delivered]);
   });
 });
 

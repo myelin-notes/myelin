@@ -228,6 +228,8 @@ const es: typeof en = {
       insights: 'Análisis del estudio',
       addTag: 'Nueva etiqueta',
       addChild: (tag: string) => `Añadir etiqueta dentro de #${tag}`,
+      toggleChildren: (tag: string) =>
+        `Mostrar u ocultar etiquetas dentro de #${tag}`,
       placeholder: 'Nombre de etiqueta...',
       deleteTag: (tag: string) => `Eliminar #${tag}`,
       stats: {
@@ -242,10 +244,12 @@ const es: typeof en = {
       emptySearch: 'No se encontraron resultados',
       emptyFilter: 'Ningún elemento coincide con las etiquetas',
       emptyDefault: 'Aún no hay archivos',
+      selectedCount: (count: number) => `${count} elementos`,
     },
     itemMenu: {
       rename: 'Renombrar',
       manageTags: 'Administrar etiquetas',
+      color: 'Color',
       versionHistory: 'Historial de versiones',
       revealInFileManager: 'Mostrar en el explorador de archivos',
       remove: 'Eliminar',
@@ -808,6 +812,10 @@ const es: typeof en = {
       embed: {
         label: 'Imagen o PDF',
         description: 'Arrastra archivos o pega una URL',
+      },
+      camera: {
+        label: 'Tomar una foto',
+        description: 'Captura una imagen con la cámara',
       },
       latex: {
         label: 'LaTeX',
