@@ -440,13 +440,22 @@ export function SidebarTree({
     [childrenMap, collapsedIds, expanded, isFlat, resultTree, sortMode],
   );
   // Only visible rows act; ids hidden by collapse/move/delete stay inert until shown again.
-  const selectionIds = useMemo(
-    () =>
-      visibleRows
-        .filter((row) => selection.ids.has(row.node.id))
-        .map((row) => row.node.id),
-    [selection.ids, visibleRows],
-  );
+  // Descendants of a selected folder are dropped too, or moving the set would flatten them.
+  const selectionIds = useMemo(() => {
+    const ids: string[] = [];
+    let selectedDepth = Infinity;
+    for (const { node, depth } of visibleRows) {
+      if (depth > selectedDepth) {
+        continue;
+      }
+      selectedDepth = Infinity;
+      if (selection.ids.has(node.id)) {
+        ids.push(node.id);
+        selectedDepth = depth;
+      }
+    }
+    return ids;
+  }, [selection.ids, visibleRows]);
 
   // Returns true when a modifier extended the selection, so the row skips its
   // default click action (open / expand).
