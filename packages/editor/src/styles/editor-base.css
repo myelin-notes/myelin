@@ -8,6 +8,10 @@
   /* Entering edit mode focuses the contenteditable root; the page frame draws
      its own edit chrome, so suppress the UA focus ring. */
   outline: none;
+  /* iPad WKWebView autosizes non-editable text in blocks wider than the viewport
+     (the frame is world-sized under zoom: dpr): min line-height inflates spacing and
+     breaks KaTeX vlists until edit mode. Preflight's 100% doesn't disable it. */
+  -webkit-text-size-adjust: none;
 }
 
 /* The doubled .ProseMirror outranks later block rules with equal specificity
