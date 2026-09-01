@@ -439,7 +439,14 @@ export function SidebarTree({
           ),
     [childrenMap, collapsedIds, expanded, isFlat, resultTree, sortMode],
   );
-  const selectionIds = useMemo(() => [...selection.ids], [selection.ids]);
+  // Only visible rows act; ids hidden by collapse/move/delete stay inert until shown again.
+  const selectionIds = useMemo(
+    () =>
+      visibleRows
+        .filter((row) => selection.ids.has(row.node.id))
+        .map((row) => row.node.id),
+    [selection.ids, visibleRows],
+  );
 
   // Returns true when a modifier extended the selection, so the row skips its
   // default click action (open / expand).
