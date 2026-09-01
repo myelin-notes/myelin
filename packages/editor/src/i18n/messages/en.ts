@@ -803,6 +803,10 @@ const en = {
         label: 'Image or PDF',
         description: 'Drop in files or paste a URL',
       },
+      camera: {
+        label: 'Take a photo',
+        description: 'Snap a picture with your camera',
+      },
       latex: {
         label: 'LaTeX',
         description: 'A math block you can write equations in',

@@ -43,6 +43,25 @@ interface UseCanvasInsertsArgs {
   ) => void;
 }
 
+// iOS won't open the picker for a detached input, so mount it for the duration.
+function capturePhoto(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.setAttribute('capture', 'environment');
+    input.hidden = true;
+    const finish = () => {
+      input.remove();
+      resolve(input.files?.[0] ?? null);
+    };
+    input.addEventListener('change', finish, { once: true });
+    input.addEventListener('cancel', finish, { once: true });
+    document.body.append(input);
+    input.click();
+  });
+}
+
 export function useCanvasInserts({
   drawableCanvasRef,
   canvasTools,
@@ -186,6 +205,17 @@ export function useCanvasInserts({
     setEmbedOpen(true);
   }, [drawableCanvasRef]);
 
+  const onInsertCamera = useCallback(() => {
+    setInsertOpen(false);
+    setContextInsert(null);
+    drawableCanvasRef.current?.cancelPlacement();
+    void capturePhoto().then((file) => {
+      if (file) {
+        embedFiles([file]);
+      }
+    });
+  }, [drawableCanvasRef, embedFiles]);
+
   const toggleInsert = useCallback(() => {
     setInsertOpen((v) => {
       const next = !v;
@@ -236,6 +266,19 @@ export function useCanvasInserts({
     setContextInsert(null);
     setEmbedOpen(true);
   }, [contextInsert]);
+
+  const onContextInsertCamera = useCallback(() => {
+    if (!contextInsert) {
+      return;
+    }
+    const { screenX, screenY } = contextInsert;
+    setContextInsert(null);
+    void capturePhoto().then((file) => {
+      if (file) {
+        embedFiles([file], screenX, screenY);
+      }
+    });
+  }, [contextInsert, embedFiles]);
 
   const lastClickRef = useRef<{ t: number; x: number; y: number } | null>(null);
 
@@ -308,10 +351,12 @@ export function useCanvasInserts({
     onInsertEmbed,
     onInsertLatex,
     onInsertAudio,
+    onInsertCamera,
     onContextInsertFrame,
     onContextInsertEmbed,
     onContextInsertLatex,
     onContextInsertAudio,
+    onContextInsertCamera,
     onCanvasClick,
     submitEmbed,
     closeEmbed,

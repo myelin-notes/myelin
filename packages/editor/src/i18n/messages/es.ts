@@ -809,6 +809,10 @@ const es: typeof en = {
         label: 'Imagen o PDF',
         description: 'Arrastra archivos o pega una URL',
       },
+      camera: {
+        label: 'Tomar una foto',
+        description: 'Captura una imagen con la cámara',
+      },
       latex: {
         label: 'LaTeX',
         description: 'Un bloque para escribir ecuaciones',

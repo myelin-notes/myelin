@@ -54,6 +54,7 @@ targets:
         CFBundleShortVersionString: 0.1.0
         CFBundleVersion: "0.1.0"
         CFBundleDisplayName: Myelin Notes
+        NSCameraUsageDescription: Take photos to insert into your notes.
         NSMicrophoneUsageDescription: Record audio notes in Myelin Notes.
         # OAuth redirect target
         CFBundleURLTypes:

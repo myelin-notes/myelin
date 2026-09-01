@@ -781,6 +781,10 @@ const zhHans: typeof en = {
         label: '图片或 PDF',
         description: '拖入文件或粘贴链接',
       },
+      camera: {
+        label: '拍照',
+        description: '用相机拍摄一张照片',
+      },
       latex: {
         label: 'LaTeX',
         description: '可书写公式的数学块',
