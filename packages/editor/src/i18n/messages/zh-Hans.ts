@@ -228,6 +228,7 @@ const zhHans: typeof en = {
       emptySearch: '未找到结果',
       emptyFilter: '没有符合所选标签的项目',
       emptyDefault: '还没有文件',
+      selectedCount: (count: number) => `${count} 个项目`,
     },
     itemMenu: {
       rename: '重命名',

@@ -242,6 +242,7 @@ const es: typeof en = {
       emptySearch: 'No se encontraron resultados',
       emptyFilter: 'Ningún elemento coincide con las etiquetas',
       emptyDefault: 'Aún no hay archivos',
+      selectedCount: (count: number) => `${count} elementos`,
     },
     itemMenu: {
       rename: 'Renombrar',

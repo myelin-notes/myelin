@@ -22,13 +22,21 @@ const tagListProps = {
   overflowClassName: 'text-[9px] text-text-muted',
 } as const;
 
-interface FolderRowProps {
-  node: VFSFolderNode;
+interface RowProps {
   depth: number;
-  expanded: boolean;
   autoRename: boolean;
-  onToggle: () => void;
+  selected: boolean;
+  /** Every selected row id; drag and Remove act on all of them when this row is selected. */
+  selectionIds: readonly string[];
+  /** Returns true when a modifier key handled the click, so the row skips its default action. */
+  onSelect: (e: React.MouseEvent) => boolean;
   onChanged: () => void;
+}
+
+interface FolderRowProps extends RowProps {
+  node: VFSFolderNode;
+  expanded: boolean;
+  onToggle: () => void;
 }
 
 export function SidebarFolderRow({
@@ -36,6 +44,9 @@ export function SidebarFolderRow({
   depth,
   expanded,
   autoRename,
+  selected,
+  selectionIds,
+  onSelect,
   onToggle,
   onChanged,
 }: FolderRowProps) {
@@ -52,6 +63,7 @@ export function SidebarFolderRow({
     nodeId: node.id,
     name: node.name,
     dragKind: 'folder',
+    nodeIds: selected ? selectionIds : undefined,
     onChanged,
     initialRenaming: autoRename,
   });
@@ -68,8 +80,8 @@ export function SidebarFolderRow({
             <button
               type="button"
               draggable={!renaming}
-              onClick={() => {
-                if (!renaming) {
+              onClick={(e) => {
+                if (!renaming && !onSelect(e)) {
                   onToggle();
                 }
               }}
@@ -85,6 +97,7 @@ export function SidebarFolderRow({
               }
               className={cn(
                 'group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150',
+                selected && 'bg-hover-tint',
                 dragOver
                   ? 'bg-accent/15 ring-1 ring-accent/40'
                   : 'hover:bg-hover-tint',
@@ -132,17 +145,17 @@ export function SidebarFolderRow({
   );
 }
 
-interface FileRowProps {
+interface FileRowProps extends RowProps {
   node: VFSFileNode;
-  depth: number;
-  autoRename: boolean;
-  onChanged: () => void;
 }
 
 export function SidebarFileRow({
   node,
   depth,
   autoRename,
+  selected,
+  selectionIds,
+  onSelect,
   onChanged,
 }: FileRowProps) {
   const tabController = useTabController();
@@ -154,7 +167,10 @@ export function SidebarFileRow({
     renameInputProps,
     menu,
     dialogs,
-  } = useFileItemContextMenu(node, onChanged, { initialRenaming: autoRename });
+  } = useFileItemContextMenu(node, onChanged, {
+    initialRenaming: autoRename,
+    nodeIds: selected ? selectionIds : undefined,
+  });
   const FileIcon = getFileTypeIcon(node.fileType);
 
   return (
@@ -165,8 +181,8 @@ export function SidebarFileRow({
             <button
               type="button"
               draggable={!renaming}
-              onClick={() => {
-                if (!renaming) {
+              onClick={(e) => {
+                if (!renaming && !onSelect(e)) {
                   openNote(tabController, node, node.name, 'explorer');
                 }
               }}
@@ -180,6 +196,7 @@ export function SidebarFileRow({
               }
               className={cn(
                 'group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150 hover:bg-hover-tint',
+                selected && 'bg-hover-tint',
                 dragging && 'opacity-40',
               )}
             />

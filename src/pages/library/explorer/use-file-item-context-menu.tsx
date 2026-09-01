@@ -18,7 +18,7 @@ import { useExplorerItem } from './use-explorer-item';
 export function useFileItemContextMenu(
   node: VFSFileNode,
   onChanged: () => void | Promise<void>,
-  options?: { initialRenaming?: boolean },
+  options?: { initialRenaming?: boolean; nodeIds?: readonly string[] },
 ) {
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
@@ -37,6 +37,7 @@ export function useFileItemContextMenu(
     nodeId: node.id,
     name: node.name,
     dragKind: 'file',
+    nodeIds: options?.nodeIds,
     onChanged,
     initialRenaming: options?.initialRenaming,
     renameReferencesOnRename: node.fileType === 'mcanvas',

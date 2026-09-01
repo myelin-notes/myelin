@@ -238,6 +238,7 @@ const en = {
       emptySearch: 'No results found',
       emptyFilter: 'No items match the selected tags',
       emptyDefault: 'No files yet',
+      selectedCount: (count: number) => `${count} items`,
     },
     itemMenu: {
       rename: 'Rename',
