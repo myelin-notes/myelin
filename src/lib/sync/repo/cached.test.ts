@@ -871,11 +871,14 @@ describe('CachedRepository', () => {
     await repository.addCustomColor('#ABCDEF', 'pen');
     await repository.addCustomColor('#FACC15', 'highlighter');
     await repository.addCustomColor('#3B82F6', 'text');
+    await repository.addCustomColor('#EC4899', 'folder');
+    await repository.setFolderColor(folderId, '#EC4899');
 
     const [rootFolders, rootFiles] = await repository.listDirectory(null);
     const remoteBeforeFlush = await remote.exportSnapshot();
 
     expect(rootFolders.map((folder) => folder.id)).toEqual([folderId]);
+    expect(rootFolders[0].color).toBe('#ec4899');
     expect(rootFiles).toHaveLength(1);
     expect(rootFiles[0]).toMatchObject({
       id: fileId,
@@ -891,6 +894,7 @@ describe('CachedRepository', () => {
       '#facc15',
     ]);
     expect(await repository.getCustomColors('text')).toEqual(['#3b82f6']);
+    expect(await repository.getCustomColors('folder')).toEqual(['#ec4899']);
     expect(remoteBeforeFlush.manifest).toEqual(createEmptyManifest());
     expect(remoteBeforeFlush.notes).toEqual({});
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBeGreaterThan(
@@ -901,6 +905,7 @@ describe('CachedRepository', () => {
 
     const [remoteFolders, remoteFiles] = await remote.listDirectory(null);
     expect(remoteFolders.map((folder) => folder.id)).toEqual([folderId]);
+    expect(remoteFolders[0].color).toBe('#ec4899');
     expect(remoteFiles).toHaveLength(1);
     expect(remoteFiles[0]).toMatchObject({
       id: fileId,
@@ -917,6 +922,7 @@ describe('CachedRepository', () => {
     expect(await remote.getCustomColors('pen')).toEqual(['#abcdef']);
     expect(await remote.getCustomColors('highlighter')).toEqual(['#facc15']);
     expect(await remote.getCustomColors('text')).toEqual(['#3b82f6']);
+    expect(await remote.getCustomColors('folder')).toEqual(['#ec4899']);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 

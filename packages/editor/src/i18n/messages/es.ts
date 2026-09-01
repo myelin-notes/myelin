@@ -249,6 +249,7 @@ const es: typeof en = {
     itemMenu: {
       rename: 'Renombrar',
       manageTags: 'Administrar etiquetas',
+      color: 'Color',
       versionHistory: 'Historial de versiones',
       revealInFileManager: 'Mostrar en el explorador de archivos',
       remove: 'Eliminar',

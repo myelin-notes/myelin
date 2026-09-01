@@ -234,6 +234,7 @@ const zhHans: typeof en = {
     itemMenu: {
       rename: '重命名',
       manageTags: '管理标签',
+      color: '颜色',
       versionHistory: '版本历史',
       revealInFileManager: '在文件管理器中显示',
       remove: '移除',

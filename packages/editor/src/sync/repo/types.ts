@@ -5,7 +5,7 @@ import type { FileType } from './file-types';
 export type { VFSNodeId } from '../types';
 export type { FileType } from './file-types';
 
-export type CustomColorTool = 'pen' | 'highlighter' | 'text';
+export type CustomColorTool = 'pen' | 'highlighter' | 'text' | 'folder';
 
 export type PenPresetTool = 'pen' | 'highlighter';
 
@@ -48,6 +48,8 @@ export interface VFSFolderNode {
   createdAt: number;
   modifiedAt: number;
   system?: VFSSystemMetadata;
+  /** Normalized hex icon color. Absent = the default folder color. */
+  color?: string;
 }
 
 export type VFSNode = VFSFileNode | VFSFolderNode;
@@ -199,6 +201,8 @@ export interface Repository {
   setTags(nodeId: VFSNodeId, tags: string[]): Promise<void>;
   addTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   removeTag(nodeId: VFSNodeId, tag: string): Promise<void>;
+  /** `null` clears back to the default color. */
+  setFolderColor(nodeId: VFSNodeId, color: string | null): Promise<void>;
   getRevealPath(nodeId: VFSNodeId): Promise<string | null>;
   /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
   getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;

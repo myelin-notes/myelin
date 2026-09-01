@@ -20,7 +20,6 @@ import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
 import { setChromeMenuOpener } from '@myelin/editor/chrome-menu';
 import { useCanvasCommandContext } from '@myelin/editor/command-context';
-import { CustomColorsProvider } from '@myelin/editor/custom-colors';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
@@ -97,15 +96,13 @@ export function CanvasView({
   initialPageFrameId,
 }: CanvasViewProps) {
   return (
-    <CustomColorsProvider>
-      <PenPresetsProvider>
-        <CanvasViewInner
-          id={id}
-          initialPageFrameName={initialPageFrameName}
-          initialPageFrameId={initialPageFrameId}
-        />
-      </PenPresetsProvider>
-    </CustomColorsProvider>
+    <PenPresetsProvider>
+      <CanvasViewInner
+        id={id}
+        initialPageFrameName={initialPageFrameName}
+        initialPageFrameId={initialPageFrameId}
+      />
+    </PenPresetsProvider>
   );
 }
 

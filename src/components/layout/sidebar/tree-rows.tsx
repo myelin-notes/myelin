@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { ChevronRight, Folder } from 'lucide-react';
 import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
@@ -7,12 +6,11 @@ import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '@/pages/library/accessibility-labels';
 import { getFileTypeIcon } from '@/pages/library/explorer/file-icon';
-import { ItemContextMenu } from '@/pages/library/explorer/item-context-menu';
+import { folderIconStyle } from '@/pages/library/explorer/folder-colors';
 import { TagList } from '@/pages/library/explorer/tag-list';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
-import { useExplorerItem } from '@/pages/library/explorer/use-explorer-item';
 import { useFileItemContextMenu } from '@/pages/library/explorer/use-file-item-context-menu';
-import { TagManageDialog } from '@/pages/library/tag-manage-dialog';
+import { useFolderItemContextMenu } from '@/pages/library/explorer/use-folder-item-context-menu';
 import { TreeIndentGuides, treeRowPadding } from './indent-guides';
 
 const tagListProps = {
@@ -50,21 +48,17 @@ export function SidebarFolderRow({
   onToggle,
   onChanged,
 }: FolderRowProps) {
-  const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const {
+    contextMenuProps,
     renaming,
     dragging,
-    startRenaming,
-    handleRemove,
     handleDragStart,
     handleDragEnd,
     renameInputProps,
-  } = useExplorerItem({
-    nodeId: node.id,
-    name: node.name,
-    dragKind: 'folder',
+    menu,
+    dialogs,
+  } = useFolderItemContextMenu(node, onChanged, {
     nodeIds: selected ? selectionIds : undefined,
-    onChanged,
     initialRenaming: autoRename,
   });
   const { dragOver, dropTargetProps } = useDropTarget({
@@ -74,7 +68,7 @@ export function SidebarFolderRow({
 
   return (
     <>
-      <ContextMenu>
+      <ContextMenu {...contextMenuProps}>
         <ContextMenuTrigger
           render={
             <button
@@ -113,7 +107,10 @@ export function SidebarFolderRow({
               expanded && 'rotate-90',
             )}
           />
-          <Folder className="size-4 shrink-0 fill-accent-amber text-accent-amber transition-colors duration-150 group-hover:fill-accent-amber-strong group-hover:text-accent-amber-strong" />
+          <Folder
+            className="size-4 shrink-0"
+            style={folderIconStyle(node.color)}
+          />
           {renaming ? (
             <input
               {...renameInputProps}
@@ -128,19 +125,9 @@ export function SidebarFolderRow({
             </div>
           )}
         </ContextMenuTrigger>
-        <ItemContextMenu
-          onRename={startRenaming}
-          onRemove={handleRemove}
-          onManageTags={() => setTagDialogOpen(true)}
-        />
+        {menu}
       </ContextMenu>
-      <TagManageDialog
-        open={tagDialogOpen}
-        onOpenChange={setTagDialogOpen}
-        nodeId={node.id}
-        nodeName={node.name}
-        onChanged={onChanged}
-      />
+      {dialogs}
     </>
   );
 }

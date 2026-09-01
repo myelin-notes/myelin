@@ -585,6 +585,15 @@ export class CachedRepository
     );
   }
 
+  async setFolderColor(nodeId: string, color: string | null): Promise<void> {
+    await this.writeLocalAndQueue(
+      () => this.cache.setFolderColor(nodeId, color),
+      (ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+      },
+    );
+  }
+
   async addTag(nodeId: string, tag: string): Promise<void> {
     await this.writeLocalAndQueue(
       () => this.cache.addTag(nodeId, tag),
@@ -1247,6 +1256,7 @@ export class CachedRepository
       pen: await this.cache.getCustomColors('pen'),
       highlighter: await this.cache.getCustomColors('highlighter'),
       text: await this.cache.getCustomColors('text'),
+      folder: await this.cache.getCustomColors('folder'),
     }));
     await this.remote.applyManifestMutation(
       'Sync custom colors',

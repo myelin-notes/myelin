@@ -244,6 +244,7 @@ const en = {
     itemMenu: {
       rename: 'Rename',
       manageTags: 'Manage Tags',
+      color: 'Color',
       versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
       remove: 'Remove',
