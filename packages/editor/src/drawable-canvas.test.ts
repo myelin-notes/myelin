@@ -3,6 +3,7 @@ import {
   canMoveElementOrderForSelection,
   coalescedPointerSamples,
   type ElementOrderItem,
+  isStylusTouch,
   moveElementOrderForSelection,
 } from './drawable-canvas';
 import { ElementType } from './elements/element-type';
@@ -41,6 +42,25 @@ describe('coalescedPointerSamples', () => {
     const delivered = event(130, () => []);
 
     expect(coalescedPointerSamples(delivered, 100)).toEqual([delivered]);
+  });
+});
+
+describe('isStylusTouch', () => {
+  const touchEvent = (touches: { touchType?: string }[]) =>
+    ({ changedTouches: touches }) as unknown as TouchEvent;
+
+  it('spots a WebKit stylus touch', () => {
+    expect(isStylusTouch(touchEvent([{ touchType: 'stylus' }]))).toBe(true);
+    expect(
+      isStylusTouch(
+        touchEvent([{ touchType: 'direct' }, { touchType: 'stylus' }]),
+      ),
+    ).toBe(true);
+  });
+
+  it('is inert for fingers and for browsers without touchType', () => {
+    expect(isStylusTouch(touchEvent([{ touchType: 'direct' }]))).toBe(false);
+    expect(isStylusTouch(touchEvent([{}]))).toBe(false);
   });
 });
 
