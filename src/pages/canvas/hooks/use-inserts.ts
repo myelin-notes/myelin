@@ -43,8 +43,13 @@ interface UseCanvasInsertsArgs {
   ) => void;
 }
 
+// iOS < 16.4 never fires `cancel`, so a cancelled capture leaves its input mounted;
+// dropping the previous one on the next capture bounds that to a single element.
+let pendingCapture: HTMLInputElement | null = null;
+
 // iOS won't open the picker for a detached input, so mount it for the duration.
 function capturePhoto(): Promise<File | null> {
+  pendingCapture?.remove();
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -53,10 +58,14 @@ function capturePhoto(): Promise<File | null> {
     input.hidden = true;
     const finish = () => {
       input.remove();
+      if (pendingCapture === input) {
+        pendingCapture = null;
+      }
       resolve(input.files?.[0] ?? null);
     };
     input.addEventListener('change', finish, { once: true });
     input.addEventListener('cancel', finish, { once: true });
+    pendingCapture = input;
     document.body.append(input);
     input.click();
   });
