@@ -1,5 +1,6 @@
 import Tauri
 import UIKit
+import UIKit.UIGestureRecognizerSubclass
 import WebKit
 
 struct GestureEvent: Encodable {
@@ -11,11 +12,70 @@ struct GestureEvent: Encodable {
   let y: Double?
 }
 
+// TEMP: touch probe for the iPad fast-second-stroke investigation. Remove when done.
+struct TouchProbeEvent: Encodable {
+  let line: String
+}
+
+// Passive: never recognizes, never delays or cancels touches, only reports what UIKit delivers to
+// the web view. Left in .possible so UIKit keeps sending every phase of the sequence.
+class TouchProbeRecognizer: UIGestureRecognizer {
+  var report: ((String) -> Void)?
+
+  private func describe(_ phase: String, _ touches: Set<UITouch>, _ event: UIEvent?) {
+    let parts = touches.map { t -> String in
+      let kind: String
+      switch t.type {
+      case .pencil: kind = "pencil"
+      case .direct: kind = "direct"
+      case .indirect: kind = "indirect"
+      case .indirectPointer: kind = "indirectPointer"
+      @unknown default: kind = "other"
+      }
+      let p = t.location(in: view)
+      return "\(kind)@\(Int(p.x)),\(Int(p.y)) f=\(String(format: "%.2f", t.force))"
+    }
+    let active = event?.allTouches?.count ?? -1
+    report?("\(phase) [\(parts.joined(separator: " "))] active=\(active) t=\(Int((touches.first?.timestamp ?? 0) * 1000))")
+  }
+
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+    describe("began", touches, event)
+  }
+  override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {}
+  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+    describe("ended", touches, event)
+  }
+  override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+    describe("cancelled", touches, event)
+  }
+}
+
 class PencilPlugin: Plugin {
+  private var probe: TouchProbeRecognizer?
+
   @objc public override func load(webview: WKWebView) {
     let interaction = UIPencilInteraction()
     interaction.delegate = self
     webview.addInteraction(interaction)
+
+    // TEMP probe, see TouchProbeRecognizer.
+    let probe = TouchProbeRecognizer()
+    probe.cancelsTouchesInView = false
+    probe.delaysTouchesBegan = false
+    probe.delaysTouchesEnded = false
+    probe.report = { [weak self] line in
+      try? self?.trigger("touchprobe", data: TouchProbeEvent(line: line))
+    }
+    webview.addGestureRecognizer(probe)
+    self.probe = probe
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+      let content = webview.scrollView.subviews.first { String(describing: type(of: $0)).contains("WKContentView") }
+      let names = (content?.gestureRecognizers ?? []).map { r -> String in
+        "\(type(of: r))(\(r.isEnabled ? "on" : "off"))"
+      }
+      try? self?.trigger("touchprobe", data: TouchProbeEvent(line: "recognizers: " + names.joined(separator: ", ")))
+    }
   }
 
   fileprivate func emit(kind: String, action: UIPencilPreferredAction, location: CGPoint?) {

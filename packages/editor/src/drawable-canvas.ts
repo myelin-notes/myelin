@@ -1449,6 +1449,40 @@ export class DrawableCanvas {
       this.renderer.refreshSize();
     };
     window.addEventListener('resize', this._handleResize);
+
+    // TEMP: DOM-level probe, see PTR_TRACE. Never removed; the flag is deleted with the trace.
+    if (PTR_TRACE) {
+      const touchLine = (evt: TouchEvent) =>
+        Array.from(evt.changedTouches)
+          .map(
+            (t) =>
+              `${(t as Touch & { touchType?: string }).touchType ?? '?'}#${t.identifier}@${t.clientX.toFixed(0)},${t.clientY.toFixed(0)}`,
+          )
+          .join(' ');
+      for (const type of ['touchstart', 'touchend', 'touchcancel']) {
+        window.addEventListener(
+          type,
+          (evt) => {
+            const te = evt as TouchEvent;
+            console.log(
+              `[ptr] DOM ${type} changed=[${touchLine(te)}] active=${te.touches.length} t=${te.timeStamp.toFixed(0)} target=${(te.target as Element)?.tagName}`,
+            );
+          },
+          { capture: true, passive: true },
+        );
+      }
+      for (const type of ['click', 'dblclick', 'gesturestart', 'contextmenu']) {
+        window.addEventListener(
+          type,
+          (evt) => {
+            console.log(
+              `[ptr] DOM ${type} t=${evt.timeStamp.toFixed(0)} target=${(evt.target as Element)?.tagName}`,
+            );
+          },
+          { capture: true },
+        );
+      }
+    }
   }
 
   // The factory receives a freshly generated uuid.
