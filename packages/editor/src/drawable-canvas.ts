@@ -182,6 +182,19 @@ export function coalescedPointerSamples(
   return samples.length > 0 ? samples : [event];
 }
 
+// WebKit (iPadOS 18) drops a pencil touch that lands within ~100ms of a tap-like pencil stroke —
+// the window in which it commits that stroke's synthetic click — so quick handwriting loses every
+// other stroke. Cancelling touchstart/touchend keeps its tap machinery off the pencil entirely. A
+// finger is unaffected, and `touchType` is WebKit-only, so this is inert on Android.
+export function isStylusTouch(evt: TouchEvent): boolean {
+  for (const touch of Array.from(evt.changedTouches)) {
+    if ((touch as Touch & { touchType?: string }).touchType === 'stylus') {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function moveElementOrderForSelection(
   items: readonly ElementOrderItem[],
   selectedUuids: Iterable<string>,
@@ -273,6 +286,7 @@ export class DrawableCanvas {
   private _handlePointerDown!: (evt: PointerEvent) => void;
   private _handlePointerMove!: (evt: PointerEvent) => void;
   private _handlePointerUp!: (evt: PointerEvent) => void;
+  private _handleStylusTouch!: (evt: TouchEvent) => void;
   private _handleResize!: () => void;
   private readonly _handleYElementsChange: YElementsDeepObserver = (
     events,
@@ -932,6 +946,8 @@ export class DrawableCanvas {
     this.canvas.removeEventListener('pointerdown', this._handlePointerDown);
     window.removeEventListener('pointerup', this._handlePointerUp);
     window.removeEventListener('pointercancel', this._handlePointerUp);
+    this.canvas.removeEventListener('touchstart', this._handleStylusTouch);
+    this.canvas.removeEventListener('touchend', this._handleStylusTouch);
     window.removeEventListener('resize', this._handleResize);
   }
 
@@ -1444,6 +1460,17 @@ export class DrawableCanvas {
     // iOS fires pointercancel, not pointerup, for touches it absorbs into a system gesture; without
     // this the active-touch set leaks and blocks future single-finger panning.
     window.addEventListener('pointercancel', this._handlePointerUp);
+
+    // See isStylusTouch. Only the canvas: a pencil on a page frame still needs WebKit's caret placement.
+    this._handleStylusTouch = (evt) => {
+      if (evt.cancelable && isStylusTouch(evt)) {
+        evt.preventDefault();
+      }
+    };
+    canvas.addEventListener('touchstart', this._handleStylusTouch, {
+      passive: false,
+    });
+    canvas.addEventListener('touchend', this._handleStylusTouch);
 
     this._handleResize = () => {
       this.renderer.refreshSize();
