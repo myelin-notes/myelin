@@ -45,9 +45,19 @@ class TouchProbeRecognizer: UIGestureRecognizer {
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {}
   override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
     describe("ended", touches, event)
+    failIfSequenceOver(event)
   }
   override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
     describe("cancelled", touches, event)
+    failIfSequenceOver(event)
+  }
+
+  // Leaves nothing in .possible once the sequence is over, so no other recognizer can be waiting on it.
+  private func failIfSequenceOver(_ event: UIEvent) {
+    let live = (event.allTouches ?? []).contains { $0.phase != .ended && $0.phase != .cancelled }
+    if !live {
+      state = .failed
+    }
   }
 }
 

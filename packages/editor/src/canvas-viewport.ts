@@ -204,15 +204,22 @@ export class CanvasViewport {
       this._handleWheel as EventListener,
       { passive: false },
     );
+    // TEMP: `localStorage.setItem('ptr-passive', '1')` + reload registers the touch listeners as
+    // passive, so WebKit stops treating touchstart as preventable. Remove with PTR_TRACE.
+    let touchPassive = false;
+    try {
+      touchPassive = localStorage.getItem('ptr-passive') === '1';
+    } catch {}
+    console.log(`[ptr] viewport touch listeners passive=${touchPassive}`);
     this._gestureTarget.addEventListener(
       'touchstart',
       this._handleTouchStart as EventListener,
-      { passive: false },
+      { passive: touchPassive },
     );
     this._gestureTarget.addEventListener(
       'touchmove',
       this._handleTouchMove as EventListener,
-      { passive: false },
+      { passive: touchPassive },
     );
     this._gestureTarget.addEventListener(
       'touchend',
