@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows listening to Apple Pencil gesture events."
+permissions = [
+  "allow-register-listener",
+  "allow-remove-listener",
+  "allow-registerListener",
+  "allow-removeListener",
+]

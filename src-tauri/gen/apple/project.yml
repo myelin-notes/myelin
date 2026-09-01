@@ -83,8 +83,8 @@ targets:
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
         DEVELOPMENT_TEAM: P4Z946QP26
-        # ios-build.yml's unsigned path rewrites this exact literal to
-        # CODE_SIGNING_ALLOWED = NO and fails the build if it finds no match.
+        # The iOS CI workflows rewrite this exact literal for unsigned or App Store signing
+        # and fail the build if it finds no match.
         CODE_SIGN_IDENTITY: iPhone Developer
       groups: [app]
     dependencies:

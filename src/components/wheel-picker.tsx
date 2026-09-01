@@ -26,8 +26,14 @@ export interface WheelItem {
 }
 
 export interface WheelPickerHandle {
-  show: (event: PointerEvent) => void;
+  /** Without a `pointerId` (Apple Pencil squeeze) the next pointer down drives the wheel. */
+  show: (event: {
+    clientX: number;
+    clientY: number;
+    pointerId?: number;
+  }) => void;
   hide: () => void;
+  isVisible: () => boolean;
 }
 
 interface WheelPickerProps {
@@ -127,7 +133,7 @@ export const WheelPicker = memo(function WheelPicker({
   const R2 = R1 + 55;
 
   const show = useCallback(
-    (event: PointerEvent) => {
+    (event: { clientX: number; clientY: number; pointerId?: number }) => {
       if (items.length === 0) {
         return;
       }
@@ -150,7 +156,7 @@ export const WheelPicker = memo(function WheelPicker({
       }
       setVisible(true);
       centerRef.current = [cx, cy];
-      openedByRef.current = event.pointerId;
+      openedByRef.current = event.pointerId ?? null;
       focusPathRef.current = [];
       setFocusPath([]);
     },
@@ -164,7 +170,11 @@ export const WheelPicker = memo(function WheelPicker({
     setFocusPath([]);
   }, []);
 
-  useImperativeHandle(ref, () => ({ show, hide }), [show, hide]);
+  useImperativeHandle(ref, () => ({ show, hide, isVisible: () => visible }), [
+    show,
+    hide,
+    visible,
+  ]);
 
   /* ── Pointer tracking ────────────────────────────── */
 
@@ -289,9 +299,28 @@ export const WheelPicker = memo(function WheelPicker({
       setFocusPath([]);
     }
 
+    // A wheel opened without a pointer (Apple Pencil squeeze) has no owner yet: the next pointer
+    // down on the wheel adopts it, anywhere else dismisses without committing.
+    function handlePointerDown(evt: PointerEvent) {
+      if (openedByRef.current !== null) {
+        return;
+      }
+      const target = evt.target as Element | null;
+      if (target?.closest('[data-wheel-container]')) {
+        openedByRef.current = evt.pointerId;
+        handlePointerMove(evt);
+      } else {
+        setVisible(false);
+        focusPathRef.current = [];
+        setFocusPath([]);
+      }
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };

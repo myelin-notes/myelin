@@ -1,11 +1,10 @@
 name: iOS Build
 
 # Manual on-demand iOS build for testing on a physical device. Produces an
-# .ipa workflow artifact; it is never uploaded to a release. If the Apple
-# signing secrets are configured the IPA is development-signed and can be
-# installed directly (device UDID must be in the provisioning profile).
-# Without them it builds unsigned — install via a re-signing sideloader
-# (e.g. Sideloadly) with an Apple ID.
+# unsigned .ipa workflow artifact; it is never uploaded to a release. Install
+# via a re-signing sideloader (e.g. Sideloadly) with an Apple ID. The Apple
+# signing secrets are deliberately ignored: they hold an App Store
+# distribution cert/profile, which cannot be installed on a device directly.
 on:
   # Temporary: run on every push to the debug branch. workflow_dispatch only
   # becomes available once this file lands on the default branch — drop the
@@ -36,8 +35,6 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 90
     env:
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
       VITE_TABLET_LAYOUT: "true"
       VITE_GITHUB_CLIENT_SECRET: ${{ secrets.VITE_GITHUB_CLIENT_SECRET }}
       VITE_GOOGLE_CLIENT_SECRET: ${{ secrets.VITE_GOOGLE_CLIENT_SECRET }}
@@ -66,39 +63,19 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Import signing certificate
-        if: env.APPLE_CERTIFICATE != ''
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-      - name: Install provisioning profile
-        if: env.APPLE_PROVISIONING_PROFILE != ''
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-
-      - name: Build iOS (signed)
-        if: env.APPLE_CERTIFICATE != ''
-        env:
-          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
-        run: yarn tauri ios build --export-method debugging
-
-      # No signing secrets: the build must still go through `tauri ios build`
-      # (its "Build Rust Code" Xcode phase connects back to the CLI's options
-      # server, so raw xcodebuild panics with a missing
-      # "<identifier>-server-addr" file), but without a development team the
-      # signing steps fail. Env vars can't carry Xcode settings through: the
-      # CLI spawns xcodebuild with a whitelisted env (TAURI*/WRY*/CARGO_*/
-      # RUST_*/TMPDIR/PATH — see tauri-cli mobile/mod.rs env_vars()), which
-      # strips XCODE_XCCONFIG_FILE. So signing is disabled by patching the
-      # pbxproj in the CI workspace: the build and archive steps then produce
-      # an unsigned .xcarchive, the failure of the final (signing) export
-      # step is tolerated, and the unsigned .app is zipped into an IPA by
-      # hand for a re-signing sideloader (e.g. Sideloadly).
+      # The build must go through `tauri ios build` (its "Build Rust Code"
+      # Xcode phase connects back to the CLI's options server, so raw
+      # xcodebuild panics with a missing "<identifier>-server-addr" file),
+      # but without a development team the signing steps fail. Env vars
+      # can't carry Xcode settings through: the CLI spawns xcodebuild with a
+      # whitelisted env (TAURI*/WRY*/CARGO_*/RUST_*/TMPDIR/PATH — see
+      # tauri-cli mobile/mod.rs env_vars()), which strips XCODE_XCCONFIG_FILE.
+      # So signing is disabled by patching the pbxproj in the CI workspace:
+      # the build and archive steps then produce an unsigned .xcarchive, the
+      # failure of the final (signing) export step is tolerated, and the
+      # unsigned .app is zipped into an IPA by hand for a re-signing
+      # sideloader (e.g. Sideloadly).
       - name: Build iOS (unsigned)
-        if: env.APPLE_CERTIFICATE == ''
         run: |
           PBXPROJ=src-tauri/gen/apple/myelin.xcodeproj/project.pbxproj
           perl -0pi -e 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;/g' "$PBXPROJ"
@@ -125,8 +102,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: myelin-ios
-          path: |
-            src-tauri/gen/apple/build/**/*.ipa
-            ipa-out/*.ipa
+          path: ipa-out/*.ipa
           if-no-files-found: error
           retention-days: 14

@@ -37,6 +37,7 @@
     "stronghold:default",
     "stronghold:allow-remove-store-record",
     "mcp-bridge:default",
+    "pencil:default",
     {
       "identifier": "http:default",
       "allow": [

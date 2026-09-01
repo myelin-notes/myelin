@@ -4690,6 +4690,7 @@ dependencies = [
  "tauri-plugin-mcp-bridge",
  "tauri-plugin-ocr",
  "tauri-plugin-opener",
+ "tauri-plugin-pencil",
  "tauri-plugin-process",
  "tauri-plugin-stronghold",
  "tauri-plugin-updater",
@@ -8811,6 +8812,14 @@ dependencies = [
  "url",
  "windows 0.61.3",
  "zbus",
+]
+
+[[package]]
+name = "tauri-plugin-pencil"
+version = "0.1.0"
+dependencies = [
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]
