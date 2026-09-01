@@ -224,6 +224,7 @@ const en = {
       insights: 'Studio Insights',
       addTag: 'New tag',
       addChild: (tag: string) => `Add tag under #${tag}`,
+      toggleChildren: (tag: string) => `Toggle tags under #${tag}`,
       placeholder: 'Tag name...',
       deleteTag: (tag: string) => `Delete #${tag}`,
       stats: {

@@ -215,6 +215,7 @@ const zhHans: typeof en = {
       insights: '工作室洞察',
       addTag: '新建标签',
       addChild: (tag: string) => `在 #${tag} 下添加标签`,
+      toggleChildren: (tag: string) => `展开或收起 #${tag} 下的标签`,
       placeholder: '标签名称…',
       deleteTag: (tag: string) => `删除 #${tag}`,
       stats: {

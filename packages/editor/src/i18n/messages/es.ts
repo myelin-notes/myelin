@@ -228,6 +228,8 @@ const es: typeof en = {
       insights: 'Análisis del estudio',
       addTag: 'Nueva etiqueta',
       addChild: (tag: string) => `Añadir etiqueta dentro de #${tag}`,
+      toggleChildren: (tag: string) =>
+        `Mostrar u ocultar etiquetas dentro de #${tag}`,
       placeholder: 'Nombre de etiqueta...',
       deleteTag: (tag: string) => `Eliminar #${tag}`,
       stats: {
