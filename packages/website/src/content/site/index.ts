@@ -1,6 +1,7 @@
 import { DEFAULT_LOCALE, type Locale } from '@/lib/locale';
 import en from './en';
 import es from './es';
+import fr from './fr';
 import type { Platform } from './links';
 import zhHans from './zh-hans';
 
@@ -91,7 +92,7 @@ interface Decoration {
 
 /**
  * Every word the site says, in one locale. `en.ts` is the reference; adding a
- * key here breaks `es.ts` and `zh-hans.ts` until they are translated too.
+ * key here breaks `es.ts`, `fr.ts` and `zh-hans.ts` until they are translated too.
  *
  * Site style: no em dashes.
  */
@@ -230,6 +231,7 @@ export interface SiteCopy {
 const catalogs: Record<Locale, SiteCopy> = {
   en,
   es,
+  fr,
   'zh-hans': zhHans,
 };
 
