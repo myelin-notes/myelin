@@ -2,7 +2,10 @@ import { PenTool as PenIcon } from 'lucide-react';
 import { ADAPTIVE_INK } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { ShapeElement } from '../elements/shape-element';
-import { StrokeElement } from '../elements/stroke-element';
+import {
+  DEFAULT_STABILIZATION,
+  StrokeElement,
+} from '../elements/stroke-element';
 import type { MessageGetter } from '../i18n';
 import { recognizeShape } from '../shape-recognizer';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
@@ -34,6 +37,8 @@ export class PenTool implements ITool {
   protected recognizeShapes: boolean = true;
   /** When false, stylus pressure is dropped and stroke width stays uniform. */
   protected usePressure: boolean = true;
+  /** 0–10 slider position; 0 is raw input. */
+  protected stabilization: number = DEFAULT_STABILIZATION * 10;
 
   private dwellAnchor: Vector2 | null = null;
   private recognitionAttemptedForAnchor: boolean = false;
@@ -57,6 +62,7 @@ export class PenTool implements ITool {
         new StrokeElement(uuid, [], false, {
           color: this.color,
           size: this.size,
+          stabilization: this.stabilization / 10,
         }),
     );
   }
@@ -248,6 +254,18 @@ export class PenTool implements ITool {
         value: this.usePressure,
         set: (usePressure) => {
           this.usePressure = usePressure;
+        },
+      },
+      {
+        type: 'size',
+        key: 'stabilization',
+        label: strings.canvas.toolOptions.stabilization,
+        value: this.stabilization,
+        min: 0,
+        max: 10,
+        step: 1,
+        set: (stabilization) => {
+          this.stabilization = stabilization;
         },
       },
     ];

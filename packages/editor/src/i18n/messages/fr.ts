@@ -896,6 +896,7 @@ const fr: typeof en = {
       medium: (value: number) => `Moyen (${value})`,
       bold: (value: number) => `Épais (${value})`,
       pressure: 'Pression',
+      stabilization: 'Stabilisation',
       addCustomColor: 'Ajouter une couleur personnalisée',
       deleteColor: 'Supprimer la couleur',
       decreaseFontSize: 'Réduire la taille de police',

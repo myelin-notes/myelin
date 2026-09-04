@@ -886,6 +886,7 @@ const es: typeof en = {
       medium: (value: number) => `Medio (${value})`,
       bold: (value: number) => `Grueso (${value})`,
       pressure: 'Presión',
+      stabilization: 'Estabilización',
       addCustomColor: 'Añadir color personalizado',
       deleteColor: 'Eliminar color',
       decreaseFontSize: 'Reducir tamaño de fuente',
