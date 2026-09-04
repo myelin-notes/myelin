@@ -1570,7 +1570,12 @@ export class DrawableCanvas {
       return;
     }
     if (contact) {
-      if (this.state.current !== InteractState.Idle) {
+      // A tip landing anywhere else is a tap on UI layered over the canvas, which `pointerdown` on
+      // the canvas would never have seen either.
+      if (
+        evt.target !== this.canvas ||
+        this.state.current !== InteractState.Idle
+      ) {
         return;
       }
       this._penContactOpen = true;
