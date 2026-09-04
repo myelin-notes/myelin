@@ -238,14 +238,17 @@ function createFrameRefs(
   frame: PageFrameElement,
   container: HTMLDivElement,
 ): FrameRefs {
-  const chrome = new FrameChrome({
-    kindLabel: getMessages().canvas.frame.noteKind,
-    getMenuItems: () => frame.getMenuItems(),
-    onTitleCommit: (title) => {
-      frame.setDisplayName(title);
-      return frame.displayName;
+  const chrome = new FrameChrome(
+    {
+      kindLabel: getMessages().canvas.frame.noteKind,
+      getMenuItems: () => frame.getMenuItems(),
+      onTitleCommit: (title) => {
+        frame.setDisplayName(title);
+        return frame.displayName;
+      },
     },
-  });
+    container,
+  );
   chrome.setFileName(frame.displayName);
 
   const frameDiv = document.createElement('div');

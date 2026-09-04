@@ -41,6 +41,7 @@ export class HighlighterTool extends PenTool {
         new StrokeElement(uuid, [], false, {
           color: hexToRgba(this.color, 0.3),
           size: this.size,
+          stabilization: this.stabilization / 10,
         }),
     );
   }

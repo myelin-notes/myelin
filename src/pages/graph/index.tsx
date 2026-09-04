@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, Focus, Search, ZoomIn, ZoomOut } from 'lucide-react';
+import { ExternalLink, Focus, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { Messages } from '@myelin/editor/i18n';
 import { useMessages } from '@myelin/editor/i18n';
 import { Logger } from '@myelin/shared/logger';
@@ -160,6 +160,19 @@ export function GraphPage() {
   }, [selectedId]);
 
   useEffect(() => {
+    if (!selectedId) {
+      return;
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedId(null);
+      }
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [selectedId]);
+
+  useEffect(() => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     const canvas = canvasRef.current;
@@ -212,8 +225,8 @@ export function GraphPage() {
   );
 
   return (
-    <div className="grid h-full w-full grid-cols-1 grid-rows-[minmax(0,1fr)_13rem] overflow-hidden bg-page lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[minmax(0,1fr)]">
-      <section className="relative min-h-0 min-w-0 bg-page">
+    <div className="relative flex h-full w-full overflow-hidden bg-page">
+      <section className="relative min-h-0 min-w-0 flex-1 bg-page">
         <div className="pointer-events-none absolute top-6 left-8 z-10">
           <h1 className="font-heading font-normal text-4xl text-text-primary leading-none">
             {strings.graph.title}
@@ -330,10 +343,20 @@ export function GraphPage() {
         />
       </section>
 
+      {selectedNode && (
+        <button
+          type="button"
+          aria-label={strings.common.close}
+          onClick={() => setSelectedId(null)}
+          className="absolute inset-0 z-20 bg-black/10 lg:hidden"
+        />
+      )}
+
       <GraphInspector
         graph={graph}
         node={selectedNode}
         onOpen={() => openSelectedNode(selectedNode)}
+        onClose={() => setSelectedId(null)}
         onSelect={selectNode}
       />
     </div>
@@ -389,70 +412,86 @@ function GraphInspector({
   graph,
   node,
   onOpen,
+  onClose,
   onSelect,
 }: {
   graph: NoteGraph | null;
   node: NoteGraphNode | null;
   onOpen: () => void;
+  onClose: () => void;
   onSelect: (id: VFSNodeId) => void;
 }) {
   const strings = useMessages();
 
   return (
-    <aside className="flex min-h-0 flex-col gap-6 overflow-y-auto bg-surface px-6 py-7">
+    <aside
+      className={`${node ? 'flex' : 'hidden lg:flex'} absolute inset-3 z-30 min-h-0 flex-col overflow-hidden rounded-2xl border border-border-subtle bg-surface shadow-elevated sm:inset-y-4 sm:right-4 sm:left-auto sm:w-[22rem] lg:static lg:z-auto lg:w-80 lg:shrink-0 lg:rounded-none lg:border-0 lg:shadow-none`}
+    >
       {!node ? (
-        <p className="text-sm text-text-muted">
+        <p className="px-6 py-7 text-sm text-text-muted">
           {strings.graph.emptySelection}
         </p>
       ) : (
         <>
-          <div>
-            <h2 className="font-heading font-normal text-3xl text-text-primary leading-tight">
-              {node.name}
-            </h2>
-            <p className="mt-2 text-sm text-text-muted">
-              {strings.graph.linkCount(
-                node.incomingEdges.length,
-                node.outgoingEdges.length,
+          <div className="flex shrink-0 items-start gap-3 px-5 pt-5 lg:px-6 lg:pt-7">
+            <div className="min-w-0 flex-1">
+              <h2 className="break-words font-heading font-normal text-3xl text-text-primary leading-tight">
+                {node.name}
+              </h2>
+              <p className="mt-2 text-sm text-text-muted">
+                {strings.graph.linkCount(
+                  node.incomingEdges.length,
+                  node.outgoingEdges.length,
+                )}
+              </p>
+              {node.tags.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {node.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-md bg-tag px-2 py-0.5 font-medium text-[11px] text-text-tag uppercase tracking-[0.06em]"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
               )}
-            </p>
-            {node.tags.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {node.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-md bg-tag px-2 py-0.5 font-medium text-[11px] text-text-tag uppercase tracking-[0.06em]"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
+            </div>
+            <button
+              type="button"
+              aria-label={strings.common.close}
+              onClick={onClose}
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary lg:hidden"
+            >
+              <X className="size-5" />
+            </button>
           </div>
           <button
             type="button"
             onClick={onOpen}
-            className="flex h-9 items-center justify-center gap-2 rounded-xl bg-accent-dark px-3 text-sm text-text-on-dark transition-colors hover:bg-accent-dark-hover"
+            className="mx-5 mt-5 flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl bg-accent-dark px-3 text-sm text-text-on-dark transition-colors hover:bg-accent-dark-hover lg:mx-6"
           >
             <ExternalLink className="size-3.5" />
             {strings.graph.openNote}
           </button>
-          <GraphEdgeList
-            title={strings.graph.outgoing}
-            emptyText={strings.common.none}
-            edges={node.outgoingEdges}
-            graph={graph}
-            endpoint="target"
-            onSelect={onSelect}
-          />
-          <GraphEdgeList
-            title={strings.graph.backlinks}
-            emptyText={strings.common.none}
-            edges={node.incomingEdges}
-            graph={graph}
-            endpoint="source"
-            onSelect={onSelect}
-          />
+          <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-5 pt-6 pb-5 lg:px-6 lg:pb-7">
+            <GraphEdgeList
+              title={strings.graph.outgoing}
+              emptyText={strings.common.none}
+              edges={node.outgoingEdges}
+              graph={graph}
+              endpoint="target"
+              onSelect={onSelect}
+            />
+            <GraphEdgeList
+              title={strings.graph.backlinks}
+              emptyText={strings.common.none}
+              edges={node.incomingEdges}
+              graph={graph}
+              endpoint="source"
+              onSelect={onSelect}
+            />
+          </div>
         </>
       )}
     </aside>

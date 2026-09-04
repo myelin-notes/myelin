@@ -342,9 +342,8 @@ const es: typeof en = {
       mode: {
         label: 'Entrada de dibujo',
         description:
-          'Qué hace un dedo en el lienzo. Automático dibuja con el dedo hasta que aparece un lápiz; Lápiz deja el dibujo al lápiz; Toque siempre dibuja con el dedo, y desplaza y hace zoom con dos.',
+          'Qué hace un dedo en el lienzo. Lápiz deja el dibujo al lápiz y desplaza con el dedo; Toque dibuja con el dedo, y desplaza y hace zoom con dos.',
         options: {
-          auto: 'Automático',
           pen: 'Lápiz',
           touch: 'Toque',
         },
@@ -886,6 +885,8 @@ const es: typeof en = {
       fine: (value: number) => `Fino (${value})`,
       medium: (value: number) => `Medio (${value})`,
       bold: (value: number) => `Grueso (${value})`,
+      pressure: 'Presión',
+      stabilization: 'Estabilización',
       addCustomColor: 'Añadir color personalizado',
       deleteColor: 'Eliminar color',
       decreaseFontSize: 'Reducir tamaño de fuente',
@@ -972,6 +973,12 @@ const es: typeof en = {
         'Un lienzo infinito para escritura a mano, texto y todo lo que hay entre medias. Cuatro preguntas rápidas y listo.',
       language: 'Idioma',
       start: 'Empezar',
+    },
+    input: {
+      eyebrow: 'Lápiz y toque',
+      title: '¿Cómo vas a dibujar?',
+      description:
+        'Elige qué hace un dedo en el lienzo. Puedes cambiarlo en cualquier momento en Ajustes.',
     },
     privacy: {
       eyebrow: 'Privacidad',

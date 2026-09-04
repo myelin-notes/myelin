@@ -326,9 +326,8 @@ const zhHans: typeof en = {
       mode: {
         label: '绘图输入',
         description:
-          '手指在画布上的作用。自动：在检测到手写笔之前用手指绘图；手写笔：只有手写笔能绘图；触摸：手指始终绘图，双指平移和缩放。',
+          '手指在画布上的作用。手写笔：只有手写笔能绘图，手指平移；触摸：手指绘图，双指平移和缩放。',
         options: {
-          auto: '自动',
           pen: '手写笔',
           touch: '触摸',
         },
@@ -856,6 +855,8 @@ const zhHans: typeof en = {
       fine: (value: number) => `细（${value}）`,
       medium: (value: number) => `中（${value}）`,
       bold: (value: number) => `粗（${value}）`,
+      pressure: '压感',
+      stabilization: '防抖',
       addCustomColor: '添加自定义颜色',
       deleteColor: '删除颜色',
       decreaseFontSize: '减小字号',
@@ -940,6 +941,11 @@ const zhHans: typeof en = {
         '一块无限画布，可以手写、输入文字，以及两者之间的一切。回答四个问题即可开始。',
       language: '语言',
       start: '开始使用',
+    },
+    input: {
+      eyebrow: '手写笔与触摸',
+      title: '你打算怎么绘图？',
+      description: '选择手指在画布上的作用。随时可以在设置中更改。',
     },
     privacy: {
       eyebrow: '隐私',

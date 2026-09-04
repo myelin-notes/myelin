@@ -226,11 +226,9 @@ export class DrawableCanvas {
   // held state that decides it — see syncEraserOverride.
   private _eraserOverride: ITool | null = null;
   private _eraserButtonsHeld: boolean = false;
+  // Lets the contact edges a chorded button hides be spotted — see syncPenChordedContact.
+  private _penContactOpen: boolean = false;
   private _lastToolSampleTime: number = 0;
-
-  // The pointer that opened the current UsingTool/Moving interaction; nothing another pointer does
-  // may update or end it. Matched by type for a pen: Android can renumber a stylus mid-gesture.
-  private _interactionPointer: { id: number; pen: boolean } | null = null;
 
   // While the stylus is on the glass — and briefly after — a hand resting on
   // the screen must drive nothing.
@@ -1164,18 +1162,8 @@ export class DrawableCanvas {
     return element;
   }
 
-  private ownsInteraction(evt: PointerEvent): boolean {
-    const owner = this._interactionPointer;
-    return (
-      owner === null ||
-      owner.id === evt.pointerId ||
-      (owner.pen && evt.pointerType === 'pen')
-    );
-  }
-
   private initStates() {
     this.state.addEnd(InteractState.UsingTool, (event) => {
-      this._interactionPointer = null;
       if (this._abortingInteraction) {
         if (this.toolSelected.abort) {
           this.toolSelected.abort(this);
@@ -1188,11 +1176,7 @@ export class DrawableCanvas {
       this._ydoc.undoManager.stopCapturing();
     });
 
-    this.state.addStart(InteractState.UsingTool, (event: PointerEvent) => {
-      this._interactionPointer = {
-        id: event.pointerId,
-        pen: event.pointerType === 'pen',
-      };
+    this.state.addStart(InteractState.UsingTool, (event) => {
       this._ydoc.undoManager.stopCapturing();
       this._lastToolSampleTime = event.timeStamp;
       this.toolSelected.start(this, event);
@@ -1206,13 +1190,11 @@ export class DrawableCanvas {
       }
     });
 
-    this.state.addStart(InteractState.Moving, (event: PointerEvent) => {
-      this._interactionPointer = { id: event.pointerId, pen: false };
+    this.state.addStart(InteractState.Moving, () => {
       this.updateCursor();
     });
 
     this.state.addEnd(InteractState.Moving, () => {
-      this._interactionPointer = null;
       this.updateCursor();
     });
 
@@ -1252,15 +1234,16 @@ export class DrawableCanvas {
     // On the window, not the canvas: DOM layered above the canvas (page-frame chrome, world-anchored
     // links) swallows pointermove, freezing an in-progress drag until the cursor left that DOM again.
     this._handlePointerMove = (evt) => {
-      this._input.observe(evt);
+      // A rejected palm still emits moves, and this handler feeds them to the active tool regardless
+      // of which pointer opened the interaction — so the palm would draw into the pen's own stroke.
+      if (this._palm.isKnownPalm(evt.pointerId)) {
+        return;
+      }
       // Before the update, so a barrel pressed mid-gesture hands the rest of it to the tool that
       // just took over. Android never gets here: StylusEventRewriter.kt pins a contact's tool type
       // at touchdown.
       this.syncEraserOverride(evt);
       this.syncPenChordedContact(evt);
-      if (!this.ownsInteraction(evt)) {
-        return;
-      }
       this.screenPosition = this.viewport.getScreenPoint(evt);
       this.state.update(evt);
       if (evt.target === canvas) {
@@ -1272,7 +1255,6 @@ export class DrawableCanvas {
     window.addEventListener('pointermove', this._handlePointerMove);
 
     this._handlePointerDown = (evt) => {
-      this._input.observe(evt);
       // One-shot placement intercepts primary-button clicks regardless of tool.
       if (this._placement.isActive) {
         if (evt.button === 0) {
@@ -1285,7 +1267,7 @@ export class DrawableCanvas {
 
       switch (evt.pointerType) {
         case 'touch': {
-          if (this._palm.suppressed) {
+          if (this._palm.isPalm(evt.pointerId)) {
             break;
           }
           this._activeTouchPointers.add(evt.pointerId);
@@ -1356,6 +1338,7 @@ export class DrawableCanvas {
           if (!(evt.buttons & PEN_CONTACT_BUTTONS)) {
             break;
           }
+          this._penContactOpen = true;
           this.beginPenContact(evt);
           this.state.change(InteractState.UsingTool, evt);
           this.state.update(evt);
@@ -1384,10 +1367,9 @@ export class DrawableCanvas {
 
     this._handlePointerUp = (evt) => {
       this._activeTouchPointers.delete(evt.pointerId);
-      if (evt.pointerType === 'pen') {
-        this._palm.penUp();
-      }
-      if (!this.ownsInteraction(evt)) {
+      // A palm drove nothing, so its lift must end nothing: this window handler would otherwise finish
+      // the stylus's live stroke the moment the hand shifted.
+      if (this._palm.pointerUp(evt.pointerId, evt.pointerType === 'pen')) {
         return;
       }
       // A finger that lifts without dragging is a tap: run it through the select tool. Dragging pans
@@ -1404,6 +1386,9 @@ export class DrawableCanvas {
         this.state.change(InteractState.UsingTool, evt);
       }
       this.state.change(InteractState.Idle, evt);
+      if (evt.pointerType === 'pen') {
+        this._penContactOpen = false;
+      }
       // After the interaction ends, so the eraser gets to finish its own. A
       // barrel still held as the tip lifts keeps erasing into the next stroke.
       this.syncEraserOverride(evt);
@@ -1552,11 +1537,10 @@ export class DrawableCanvas {
     }
   }
 
-  // Anything already on the screen is the hand the stylus rests on — the palm usually lands a moment
-  // before the tip — so the gesture it started is unwound. Its later moves and lift never reach the
-  // stroke: the interaction belongs to the pen from here.
+  // PalmRejection reclassifies the touches already on screen; the gesture they had started still
+  // has to be unwound here, since the pen typically lands just after the hand does.
   private beginPenContact(evt: PointerEvent) {
-    this._palm.penDown();
+    this._palm.penDown(evt.pointerId, this._activeTouchPointers);
     if (this._activeTouchPointers.size > 0) {
       this._activeTouchPointers.clear();
       this._touchTapCandidate = null;
@@ -1582,19 +1566,26 @@ export class DrawableCanvas {
       return;
     }
     const contact = (evt.buttons & PEN_CONTACT_BUTTONS) !== 0;
-    if (contact === this._palm.penContact) {
+    if (contact === this._penContactOpen) {
       return;
     }
     if (contact) {
-      if (this.state.current !== InteractState.Idle) {
+      // A tip landing anywhere else is a tap on UI layered over the canvas, which `pointerdown` on
+      // the canvas would never have seen either.
+      if (
+        evt.target !== this.canvas ||
+        this.state.current !== InteractState.Idle
+      ) {
         return;
       }
+      this._penContactOpen = true;
       this.beginPenContact(evt);
       this.state.change(InteractState.UsingTool, evt);
       return;
     }
-    this._palm.penUp();
+    this._penContactOpen = false;
     this.state.change(InteractState.Idle, evt);
+    this._palm.pointerUp(evt.pointerId, true);
   }
 
   /**
@@ -1657,14 +1648,18 @@ export class DrawableCanvas {
     this._abortingInteraction = false;
   }
 
-  // Only a plain one-finger pan is the app layer's to take: a palm under the stylus is not input
-  // at all, and a finger that grabbed an element is mid-drag.
+  // Only where a finger drives the tools is the gesture the app layer's to take: in pen mode the
+  // finger is panning under a stylus that has its own wheel triggers, and a palm is not input at all.
   public releaseTouchForToolWheel(): boolean {
-    if (this._palm.suppressed || this.state.current !== InteractState.Moving) {
+    if (
+      this._palm.suppressed ||
+      !this._input.touchDrivesTool ||
+      this.state.current !== InteractState.UsingTool
+    ) {
       return false;
     }
     this._touchTapCandidate = null;
-    this.state.change(InteractState.Idle, null);
+    this.abortInteraction();
     return true;
   }
 

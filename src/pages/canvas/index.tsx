@@ -564,6 +564,7 @@ function CanvasViewInner({
   // caret-reveal for offscreen page-frame carets can scroll them and desync the DOM from the canvas.
   return (
     <div
+      data-canvas-root
       className="relative h-full w-full overflow-clip bg-page"
       style={surfaceStyle}
     >
@@ -624,7 +625,7 @@ function CanvasViewInner({
           modals at z-100+). Pointer-events-none by default; individual buttons
           opt in. */}
       <div
-        id="canvas-chrome-controls"
+        data-canvas-chrome-controls
         className="pointer-events-none absolute inset-0 overflow-hidden"
         style={{ zIndex: 20 }}
       />
