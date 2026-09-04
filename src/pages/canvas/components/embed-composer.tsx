@@ -36,8 +36,9 @@ function isSupportedFile(file: File): boolean {
   if (file.type === 'text/markdown' || file.type === 'text/x-markdown') {
     return true;
   }
-  // Some platforms report `` or `text/plain` for `.md` files — accept by extension.
-  return /\.(md|markdown|mdx)$/i.test(file.name);
+  // Some platforms report `` or `text/plain` for `.md` files, and `.ipynb`
+  // usually has no MIME registration at all — accept both by extension.
+  return /\.(md|markdown|mdx|ipynb)$/i.test(file.name);
 }
 
 export function EmbedComposer({
@@ -422,7 +423,7 @@ export function EmbedComposer({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,audio/*,application/pdf,text/markdown,text/x-markdown,.md,.markdown,.mdx"
+        accept="image/*,audio/*,application/pdf,text/markdown,text/x-markdown,.md,.markdown,.mdx,.ipynb"
         multiple
         className="hidden"
         onChange={handleFileInput}

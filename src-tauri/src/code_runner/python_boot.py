@@ -12,6 +12,7 @@ import ast
 import base64
 import io
 import json
+import re
 import sys
 import traceback
 
@@ -37,6 +38,18 @@ RICH_REPRS = (
 )
 BINARY_MIMES = ("image/png", "image/jpeg")
 
+# Vega and Vega-Lite payloads arrive through `_repr_mimebundle_` under a
+# version-stamped mime (Altair 5 emits application/vnd.vegalite.v5+json). They
+# are all normalized to one mime because the renderer reads the dialect and
+# version from the spec's own $schema.
+VEGA_MIME_RE = re.compile(r"^application/vnd\.vega(-?lite)?\.v\d+\+json$")
+VEGA_MIME = "application/vnd.vega+json"
+# Probed when a mimebundle carries no spec. Deliberately excludes text/html:
+# the HTML a charting library publishes there is a wrapper that pulls its
+# renderer from a CDN, which the sandboxed output frame has no network for.
+# Self-contained HTML comes through `_repr_html_` instead.
+BUNDLE_MIMES = ("image/png", "image/svg+xml")
+
 
 def _emit(mime, data):
     if len(data) > MAX_PAYLOAD_CHARS:
@@ -56,8 +69,58 @@ def _encode(mime, value):
     return value
 
 
+def _mimebundle(obj):
+    """The object's `_repr_mimebundle_` dict, or None. This is how Altair,
+    Plotly and ipywidgets publish themselves; `_repr_*_` is the older, narrower
+    protocol."""
+    fn = getattr(obj, "_repr_mimebundle_", None)
+    if not callable(fn):
+        return None
+    try:
+        bundle = fn()
+    except Exception:
+        return None
+    # A bundle may be returned as (data, metadata).
+    if isinstance(bundle, tuple) and bundle:
+        bundle = bundle[0]
+    return bundle if isinstance(bundle, dict) else None
+
+
+def _vega_spec(obj, bundle):
+    """A Vega or Vega-Lite spec as JSON, or None.
+
+    Only objects that publish a mimebundle are considered, which keeps the
+    `to_dict` probe below away from the many unrelated types that happen to
+    have a method by that name.
+    """
+    if bundle is None:
+        return None
+    for mime, payload in bundle.items():
+        if VEGA_MIME_RE.match(mime) and payload:
+            return payload if isinstance(payload, str) else json.dumps(payload)
+
+    # Altair 6's default renderer publishes only a CDN-loading HTML page, so the
+    # spec has to be taken from the chart directly.
+    to_dict = getattr(obj, "to_dict", None)
+    if not callable(to_dict):
+        return None
+    try:
+        spec = to_dict()
+    except Exception as err:
+        print(f"[myelin] could not read chart spec: {err}", file=sys.stderr)
+        return None
+    if isinstance(spec, dict) and "vega" in str(spec.get("$schema", "")):
+        return json.dumps(spec)
+    return None
+
+
 def _rich(obj):
     """The object's richest advertised form as (mime, data), or None."""
+    bundle = _mimebundle(obj)
+    spec = _vega_spec(obj, bundle)
+    if spec:
+        return VEGA_MIME, spec
+
     for attr, mime in RICH_REPRS:
         fn = getattr(obj, attr, None)
         if not callable(fn):
@@ -69,8 +132,14 @@ def _rich(obj):
         if value:
             return mime, _encode(mime, value)
 
+    if bundle:
+        for mime in BUNDLE_MIMES:
+            payload = bundle.get(mime)
+            if payload:
+                return mime, _encode(mime, payload)
+
     # Matplotlib figures (and the seaborn/plotnine wrappers around them) don't
-    # implement the protocol above: core matplotlib leaves the rich repr to
+    # implement the protocols above: core matplotlib leaves the rich repr to
     # IPython's inline backend, which isn't loaded here. `savefig` is the shared
     # shape those objects do expose.
     save = getattr(obj, "savefig", None)

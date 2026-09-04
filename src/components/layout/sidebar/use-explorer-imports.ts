@@ -17,6 +17,11 @@ import {
   isZipFile,
 } from '@/pages/library/import/goodnotes';
 import {
+  importJupyterFile,
+  isJupyterFile,
+  JUPYTER_FILE_ACCEPT,
+} from '@/pages/library/import/jupyter';
+import {
   importMarkdownFile,
   isMarkdownFile,
   MARKDOWN_FILE_ACCEPT,
@@ -30,7 +35,7 @@ import {
 } from '@/pages/library/import/pdf';
 import { createWorkspaceJsonImportSource } from '@/pages/library/import/workspace-json-source';
 
-const SIDEBAR_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
+const SIDEBAR_IMPORT_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${JUPYTER_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
 
 export interface ExplorerImports {
   isImporting: boolean;
@@ -84,7 +89,10 @@ export function useExplorerImports({
     async (files: File[]) => {
       const supportedFiles = files.filter(
         (file) =>
-          isMarkdownFile(file) || isPdfFile(file) || isStorageFile(file),
+          isMarkdownFile(file) ||
+          isJupyterFile(file) ||
+          isPdfFile(file) ||
+          isStorageFile(file),
       );
       if (supportedFiles.length === 0) {
         toast.error(
@@ -100,6 +108,13 @@ export function useExplorerImports({
         for (const file of supportedFiles) {
           if (isMarkdownFile(file)) {
             await importMarkdownFile({
+              file,
+              repository,
+              parentId,
+              fallbackTitle: strings.library.createNew.untitledCanvas,
+            });
+          } else if (isJupyterFile(file)) {
+            await importJupyterFile({
               file,
               repository,
               parentId,

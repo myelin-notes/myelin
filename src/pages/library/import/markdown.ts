@@ -30,12 +30,34 @@ export async function importMarkdownFile({
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {
+  return createCanvasFromMarkdown({
+    markdown: await file.text(),
+    baseTitle: getMarkdownCanvasTitle(file.name, fallbackTitle),
+    repository,
+    parentId,
+  });
+}
+
+/**
+ * Creates a canvas holding one page frame built from `markdown`, cleaning the
+ * canvas up if writing it fails. Shared with the Jupyter importer, which
+ * converts its notebook to markdown first.
+ */
+export async function createCanvasFromMarkdown({
+  markdown,
+  baseTitle,
+  repository,
+  parentId,
+}: {
+  markdown: string;
+  baseTitle: string;
+  repository: Repository;
+  parentId: string | null;
+}): Promise<VFSNodeId> {
   let createdId: VFSNodeId | null = null;
   let session: NoteSession | null = null;
 
   try {
-    const markdown = await file.text();
-    const baseTitle = getMarkdownCanvasTitle(file.name, fallbackTitle);
     const title = await repository.getUniqueFileName(baseTitle, parentId);
     createdId = await repository.createFile(title, 'mcanvas', parentId);
     session = await repository.openSession(createdId);
@@ -48,8 +70,8 @@ export async function importMarkdownFile({
     createdId = null;
     return importedId;
   } catch (error) {
-    logger.error('Failed to import Markdown', error, {
-      fileName: file.name,
+    logger.error('Failed to write imported page frame', error, {
+      baseTitle,
       createdId,
     });
     if (session) {
@@ -57,7 +79,7 @@ export async function importMarkdownFile({
     }
     if (createdId) {
       await repository.deleteNode(createdId).catch((deleteError) => {
-        logger.error('Failed to clean up failed Markdown import', deleteError, {
+        logger.error('Failed to clean up failed import', deleteError, {
           createdId,
         });
       });

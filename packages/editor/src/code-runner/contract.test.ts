@@ -31,6 +31,16 @@ describe('parseDisplayPayload', () => {
     ).toBeNull();
   });
 
+  it('accepts a vega spec payload', () => {
+    const spec =
+      '{"$schema":"https://vega.github.io/schema/vega-lite/v6.json"}';
+    expect(
+      parseDisplayPayload(
+        wrap(JSON.stringify({ mime: 'application/vnd.vega+json', data: spec })),
+      ),
+    ).toEqual({ mime: 'application/vnd.vega+json', data: spec });
+  });
+
   it('requires both delimiters', () => {
     expect(
       parseDisplayPayload(

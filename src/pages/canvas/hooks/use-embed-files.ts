@@ -41,7 +41,7 @@ export function useEmbedFiles(
         return;
       }
       for (const file of files) {
-        const handler = getMediaImportHandler(file.type);
+        const handler = getMediaImportHandler(file.type, file.name);
         if (!handler) {
           toast.error(messages.canvas.embedComposer.errors.unsupportedType, {
             description: messages.canvas.embedComposer.errors.unsupportedDesc(

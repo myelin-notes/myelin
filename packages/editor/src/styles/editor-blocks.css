@@ -157,6 +157,10 @@
   background: transparent;
 }
 
+.pm-code-block__output-chart {
+  overflow-x: auto;
+}
+
 .pm-code-block__output-math {
   overflow-x: auto;
   font-family: var(--font-sans, system-ui, sans-serif);

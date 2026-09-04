@@ -75,13 +75,16 @@ export const DISPLAY_MIMES = [
   'image/svg+xml',
   'text/html',
   'text/latex',
+  // Vega and Vega-Lite specs, normalized to one mime by the runner: the
+  // renderer reads the dialect and version from the spec's own $schema.
+  'application/vnd.vega+json',
 ] as const;
 
 export type DisplayMime = (typeof DISPLAY_MIMES)[number];
 
 export interface DisplayPayload {
   mime: DisplayMime;
-  /** Base64 for image mimes, the raw source for text ones. */
+  /** Base64 for image mimes, the raw source for text ones, JSON for specs. */
   data: string;
 }
 

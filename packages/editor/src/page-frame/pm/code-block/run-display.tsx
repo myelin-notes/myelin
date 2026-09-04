@@ -58,7 +58,63 @@ export function DisplayItemView({ payload }: { payload: DisplayPayload }) {
       return <HtmlFrame html={payload.data} />;
     case 'text/latex':
       return <LatexView source={payload.data} />;
+    case 'application/vnd.vega+json':
+      return <VegaView spec={payload.data} />;
   }
+}
+
+/**
+ * Renders a Vega or Vega-Lite spec. Vega and its renderer are pulled in on
+ * demand -- they are megabytes, and most runs never emit a chart.
+ */
+function VegaView({ spec }: { spec: string }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) {
+      return;
+    }
+    let cancelled = false;
+    let view: { finalize: () => void } | null = null;
+
+    void (async () => {
+      try {
+        const [{ default: embed }, { expressionInterpreter }] =
+          await Promise.all([import('vega-embed'), import('vega-interpreter')]);
+        if (cancelled) {
+          return;
+        }
+        const result = await embed(host, JSON.parse(spec), {
+          actions: false,
+          // The app's CSP grants no 'unsafe-eval', so Vega has to interpret its
+          // expression ASTs rather than compile them with `new Function`.
+          ast: true,
+          expr: expressionInterpreter,
+        });
+        if (cancelled) {
+          result.finalize();
+          return;
+        }
+        view = result;
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      view?.finalize();
+    };
+  }, [spec]);
+
+  if (error) {
+    return <div className="pm-code-block__output-line is-stderr">{error}</div>;
+  }
+  return <div className="pm-code-block__output-chart" ref={hostRef} />;
 }
 
 /**

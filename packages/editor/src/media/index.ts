@@ -3,6 +3,7 @@ import type { NoteLinkResolveSource } from '../page-frame/note-link/resolution';
 import { audioImportHandler } from './audio';
 import { imageImportHandler } from './images';
 import { markdownImportHandler } from './markdown';
+import { notebookImportHandler } from './notebook';
 import { pdfImportHandler } from './pdf';
 
 export interface MediaImportOptions {
@@ -25,14 +26,25 @@ const EXACT_HANDLERS: Record<string, MediaImportHandler> = {
   'text/x-markdown': markdownImportHandler,
 };
 
+// Fallbacks for types the OS has no MIME registration for, so `file.type` is
+// empty and the map above can't match.
+const EXTENSION_HANDLERS: Record<string, MediaImportHandler> = {
+  ipynb: notebookImportHandler,
+};
+
 // Any audio container is worth attempting: audioImportHandler tolerates
 // undecodable input (duration stays 0), and the picker/clipboard filters
 // admit audio/* broadly.
 export function getMediaImportHandler(
   type: string,
+  name?: string,
 ): MediaImportHandler | undefined {
-  return (
+  const byType =
     EXACT_HANDLERS[type] ??
-    (type.startsWith('audio/') ? audioImportHandler : undefined)
-  );
+    (type.startsWith('audio/') ? audioImportHandler : undefined);
+  if (byType) {
+    return byType;
+  }
+  const extension = name?.split('.').pop()?.toLowerCase();
+  return extension ? EXTENSION_HANDLERS[extension] : undefined;
 }
