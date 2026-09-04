@@ -878,6 +878,7 @@ const en = {
       fine: (value: number) => `Fine (${value})`,
       medium: (value: number) => `Medium (${value})`,
       bold: (value: number) => `Bold (${value})`,
+      pressure: 'Pressure',
       addCustomColor: 'Add custom color',
       deleteColor: 'Delete color',
       decreaseFontSize: 'Decrease font size',

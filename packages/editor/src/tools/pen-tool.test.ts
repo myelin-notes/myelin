@@ -238,6 +238,22 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(penStroke.pressureEnabled).toBe(true);
   });
 
+  it('drops stylus pressure once the pressure option is off', () => {
+    const { canvas, created } = makeCanvas();
+    const tool = makeTool();
+    const option = tool.getOptions().find((o) => o.key === 'pressure');
+    if (option?.type !== 'toggle') {
+      throw new Error('pen has no pressure toggle');
+    }
+    option.set(false);
+
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+    tool.update(canvas, { pressure: 0.5 } as PointerEvent, pos(0, 0));
+    tool.update(canvas, { pressure: 0.74 } as PointerEvent, pos(5, 5));
+    expect(stroke.pressureEnabled).toBe(false);
+  });
+
   it('snaps a clean rectangle to a rect ShapeElement after dwell', () => {
     const { canvas, created, removeElement } = makeCanvas();
     const tool = makeTool();

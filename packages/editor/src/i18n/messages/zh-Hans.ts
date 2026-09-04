@@ -855,6 +855,7 @@ const zhHans: typeof en = {
       fine: (value: number) => `细（${value}）`,
       medium: (value: number) => `中（${value}）`,
       bold: (value: number) => `粗（${value}）`,
+      pressure: '压感',
       addCustomColor: '添加自定义颜色',
       deleteColor: '删除颜色',
       decreaseFontSize: '减小字号',

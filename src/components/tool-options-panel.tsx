@@ -9,6 +9,7 @@ import { useMessages } from '@myelin/editor/i18n';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { FontSizeField } from '@/components/font-size-field';
+import { Switch } from '@/components/ui/switch';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface ToolOptionsPanelProps {
@@ -257,6 +258,20 @@ export function ToolOptionsPanel({
                 }}
               />
             </div>
+          );
+        }
+
+        if (option.type === 'toggle') {
+          return (
+            <label
+              key={option.key}
+              className="flex cursor-pointer items-center justify-between gap-3"
+            >
+              <span className="select-none font-bold text-[10px] text-text-muted uppercase tracking-[0.1em]">
+                {option.label}
+              </span>
+              <Switch checked={option.value} onCheckedChange={option.set} />
+            </label>
           );
         }
 

@@ -241,6 +241,15 @@ export class PenTool implements ITool {
           this.size = size;
         },
       },
+      {
+        type: 'toggle',
+        key: 'pressure',
+        label: strings.canvas.toolOptions.pressure,
+        value: this.usePressure,
+        set: (usePressure) => {
+          this.usePressure = usePressure;
+        },
+      },
     ];
   }
 }
