@@ -46,7 +46,7 @@
 /* The canvas engine renders a per-frame/PDF hamburger menu button into this
    layer, but the marketing site exposes no frame menu. Hide it while keeping
    the PDF add/delete-page buttons that share this same layer. */
-#canvas-chrome-controls button:not(.pdf-chrome-button) {
+[data-canvas-chrome-controls] button:not(.pdf-chrome-button) {
   display: none;
 }
 

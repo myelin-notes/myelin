@@ -7,7 +7,7 @@
 }
 
 /* pointer-events: none so card body clicks fall through to the canvas (selection/drag).
-   Only the button opts in. The block mounts above the canvas in #canvas-chrome-controls. */
+   Only the button opts in. The block mounts above the canvas in the canvas chrome controls layer. */
 .canvas-audio-inner {
   pointer-events: none;
   position: relative;

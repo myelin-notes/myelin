@@ -337,7 +337,7 @@ export class AudioElement extends DrawableElement {
     const root = document.createElement('div');
     root.className = 'canvas-audio-block';
     root.dataset.elementUuid = this.uuid;
-    (getFrameChromeControlsLayer() ?? host).appendChild(root);
+    (getFrameChromeControlsLayer(host) ?? host).appendChild(root);
     this._root = root;
 
     this._reactRoot = createRoot(root);

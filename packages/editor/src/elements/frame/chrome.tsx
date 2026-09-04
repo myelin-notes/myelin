@@ -13,11 +13,12 @@ import { getMessages } from '../../i18n';
 import { quantizeRasterZoom } from '../../raster-zoom';
 import { setStyleIfChanged } from '../../utils/style-cache';
 import {
+  CANVAS_ROOT_SELECTOR,
   CHROME_BOTTOM_PADDING,
   CHROME_CORNER_RADIUS,
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
-  CONTROLS_LAYER_ID,
+  CONTROLS_LAYER_SELECTOR,
   getFrameChromeMenuButtonRect,
 } from './chrome-layout';
 import { FrameChromeView, type FrameChromeViewHandle } from './chrome-view';
@@ -40,6 +41,7 @@ export interface FrameChromeOptions {
 export class FrameChrome {
   public readonly root: HTMLDivElement;
   public readonly contentSlot: HTMLDivElement;
+  public readonly controlsLayer: HTMLElement | null;
 
   private readonly controlsSlot: HTMLDivElement;
   private readonly reactRoot: Root;
@@ -51,7 +53,7 @@ export class FrameChrome {
   private kindLabel: string;
   private disposed = false;
 
-  constructor(options: FrameChromeOptions) {
+  constructor(options: FrameChromeOptions, host: HTMLElement) {
     this.kindLabel = options.kindLabel;
     this.getMenuItems = options.getMenuItems;
     this.onTitleCommit = options.onTitleCommit;
@@ -89,7 +91,8 @@ export class FrameChrome {
       willChange: 'transform',
     } as Partial<CSSStyleDeclaration>);
 
-    getFrameChromeControlsLayer()?.appendChild(this.controlsSlot);
+    this.controlsLayer = getFrameChromeControlsLayer(host);
+    this.controlsLayer?.appendChild(this.controlsSlot);
     this.reactRoot = createRoot(this.root);
     this.render();
   }
@@ -263,6 +266,12 @@ export class FrameChrome {
   }
 }
 
-export function getFrameChromeControlsLayer(): HTMLElement | null {
-  return document.getElementById(CONTROLS_LAYER_ID);
+export function getFrameChromeControlsLayer(
+  host: HTMLElement,
+): HTMLElement | null {
+  return (
+    host
+      .closest<HTMLElement>(CANVAS_ROOT_SELECTOR)
+      ?.querySelector<HTMLElement>(CONTROLS_LAYER_SELECTOR) ?? null
+  );
 }

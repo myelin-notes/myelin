@@ -242,7 +242,10 @@ function CanvasEditorInner() {
   }, []);
 
   return (
-    <div className="fixed inset-0 touch-none overflow-hidden bg-page">
+    <div
+      data-canvas-root
+      className="fixed inset-0 touch-none overflow-hidden bg-page"
+    >
       {/* Canvas layers live in their own stage. The viewport attaches its
           wheel listener to the foreground canvas's parent and preventDefaults
           scrolling, so the toolbar must be a sibling of this stage (not a
@@ -278,7 +281,7 @@ function CanvasEditorInner() {
 
       {/* Page-frame hamburger buttons opt into pointer events individually. */}
       <div
-        id="canvas-chrome-controls"
+        data-canvas-chrome-controls
         className="pointer-events-none absolute inset-0 overflow-hidden"
         style={{ zIndex: 20 }}
       />

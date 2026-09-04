@@ -47,7 +47,6 @@ import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
   FrameChrome,
-  getFrameChromeControlsLayer,
 } from './frame/chrome';
 import {
   PAGE_GAP,
@@ -1133,7 +1132,7 @@ export class PdfElement extends DrawableElement {
         this._gapButtons.set(insertPosition, button);
       }
       if (!button.root.isConnected) {
-        getFrameChromeControlsLayer()?.appendChild(button.root);
+        this._chrome?.controlsLayer?.appendChild(button.root);
       }
       activePositions.add(insertPosition);
 
@@ -1196,7 +1195,7 @@ export class PdfElement extends DrawableElement {
         this._deleteButtons.set(pagePosition, button);
       }
       if (!button.root.isConnected) {
-        getFrameChromeControlsLayer()?.appendChild(button.root);
+        this._chrome?.controlsLayer?.appendChild(button.root);
       }
       activePositions.add(pagePosition);
 
@@ -1568,10 +1567,13 @@ export class PdfElement extends DrawableElement {
   }
 
   private createDom(host: HTMLElement): void {
-    const chrome = new FrameChrome({
-      kindLabel: getMessages().canvas.frame.pdfKind,
-      getMenuItems: () => this.getMenuItems(),
-    });
+    const chrome = new FrameChrome(
+      {
+        kindLabel: getMessages().canvas.frame.pdfKind,
+        getMenuItems: () => this.getMenuItems(),
+      },
+      host,
+    );
     chrome.setFileName(this._fileName || null);
     chrome.root.dataset.elementUuid = this.uuid;
     chrome.root.dataset.elementType = 'pdf';

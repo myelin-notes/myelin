@@ -1,4 +1,4 @@
-/* Code-run output card, mounted above the canvases in #canvas-chrome-controls.
+/* Code-run output card, mounted above the canvases in the canvas chrome controls layer.
    Laid out at world px and GPU-scaled to the canvas zoom (transform on the root),
    so the virtualizer's measured row heights are zoom-independent. */
 .canvas-code-output {
