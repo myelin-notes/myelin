@@ -140,7 +140,7 @@ export class EraserTool implements ITool {
         key: 'size',
         label: strings.toolOptions.size,
         value: this.radius,
-        min: 5,
+        min: 1,
         max: 60,
         step: 1,
         set: (size) => {
