@@ -2,6 +2,7 @@ import { Highlighter as HighlighterIcon } from 'lucide-react';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { StrokeElement } from '../elements/stroke-element';
 import type { MessageGetter } from '../i18n';
+import type { AnchorMode } from '../page-frame/anchor/capture';
 import { PenTool } from './pen-tool';
 import type { SvgIcon, ToolId, ToolOption } from './tool';
 
@@ -44,6 +45,11 @@ export class HighlighterTool extends PenTool {
           stabilization: this.stabilization / 10,
         }),
     );
+  }
+
+  // A highlighter marks up what is already written; it never opens space in the document.
+  protected override get anchorMode(): AnchorMode {
+    return 'overlay';
   }
 
   get icon(): SvgIcon {

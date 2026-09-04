@@ -116,6 +116,12 @@ function drawBlock(
       drawRule(ctx, cursor, width);
       return;
     }
+    case 'canvasBand': {
+      // Space held for anchored canvas ink, which the thumbnail's own element pass paints on top.
+      // Reserve the height and draw nothing, or the ink would sit on a grey placeholder.
+      cursor.y += (block.attrs.height as number) || 0;
+      return;
+    }
     case 'table': {
       drawPlaceholderRect(ctx, cursor, width, tableHeight(block));
       return;

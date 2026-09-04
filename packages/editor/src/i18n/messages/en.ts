@@ -793,6 +793,10 @@ const en = {
       delete: 'Delete',
       crop: 'Crop',
       applyCrop: 'Apply crop',
+      addToPage: 'Add to page',
+      removeFromPage: 'Remove from page',
+      makeRoom: 'Make room',
+      floatOverText: 'Float over text',
     },
     insert: {
       title: 'Insert',

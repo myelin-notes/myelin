@@ -7,6 +7,8 @@ import {
   StrokeElement,
 } from '../elements/stroke-element';
 import type { MessageGetter } from '../i18n';
+import type { AnchorMode } from '../page-frame/anchor/capture';
+import { anchorToPageFrame } from '../page-frame/anchor/capture';
 import { recognizeShape } from '../shape-recognizer';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
@@ -40,6 +42,8 @@ export class PenTool implements ITool {
   /** 0–10 slider position; 0 is raw input. */
   protected stabilization: number = DEFAULT_STABILIZATION * 10;
 
+  /** Pen-down point in world space; decides which page frame, if any, claims the stroke. */
+  private origin: Vector2 | null = null;
   private dwellAnchor: Vector2 | null = null;
   private recognitionAttemptedForAnchor: boolean = false;
   private snapped: boolean = false;
@@ -53,6 +57,7 @@ export class PenTool implements ITool {
 
   public start(canvas: DrawableCanvas, _event: PointerEvent): void {
     this.clearDwellTimer();
+    this.origin = null;
     this.dwellAnchor = null;
     this.recognitionAttemptedForAnchor = false;
     this.snapped = false;
@@ -76,6 +81,7 @@ export class PenTool implements ITool {
       this.dragSnappedShape(canvas, position);
       return;
     }
+    this.origin ??= { x: position.x, y: position.y };
     this.currentStroke?.addPoint(
       position.x,
       position.y,
@@ -167,8 +173,23 @@ export class PenTool implements ITool {
     });
   }
 
+  /** Ink laid down by this tool may reserve space in a page frame. A highlighter never does. */
+  protected get anchorMode(): AnchorMode {
+    return 'auto';
+  }
+
   public finish(canvas: DrawableCanvas, _event: PointerEvent): void {
+    const drawn = this.currentStroke ?? this.currentShape;
+    const origin = this.origin;
     this.interrupt(canvas);
+    if (drawn && origin) {
+      anchorToPageFrame(canvas, {
+        element: drawn,
+        origin,
+        bounds: drawn.boundingBox,
+        mode: this.anchorMode,
+      });
+    }
   }
 
   public interrupt(_canvas: DrawableCanvas): void {
@@ -197,6 +218,7 @@ export class PenTool implements ITool {
   }
 
   private reset(): void {
+    this.origin = null;
     this.currentStroke = null;
     this.currentShape = null;
     this.snapped = false;

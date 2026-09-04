@@ -19,6 +19,8 @@ import {
   describeElementType,
   summarizeDrawableElements,
 } from './note/state-summary';
+import { beginAnchorPass } from './page-frame/anchor/resolve';
+import { scheduleBandSweep } from './page-frame/anchor/sweep';
 import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
 import { PalmRejection } from './palm-rejection';
@@ -450,6 +452,7 @@ export class DrawableCanvas {
   }
 
   private configureElement(element: DrawableElement): void {
+    element.attachCanvas(this);
     element.onSelectionChanged = () => {
       this.notifyChange();
     };
@@ -616,13 +619,18 @@ export class DrawableCanvas {
       currentYMaps.add(this._ydoc.elements.get(i));
     }
     const removedUuids = new Set<string>();
+    let removedAnchored = false;
     for (const element of this._store.all()) {
       if (element.yMap && !currentYMaps.has(element.yMap)) {
         element.disposeDOM();
         removedUuids.add(element.uuid);
+        removedAnchored ||= element.anchoredBandId !== null;
       }
     }
     this._store.removeMany(removedUuids);
+    if (removedAnchored) {
+      scheduleBandSweep(this);
+    }
 
     this.rebuildElementOrderFromYDoc();
     logger.debug('Applied external canvas element change', {
@@ -925,10 +933,15 @@ export class DrawableCanvas {
   }
 
   public redraw(deltaTime: number) {
+    const elements = this.elements;
+    beginAnchorPass();
+    for (const element of elements) {
+      element.syncPageAnchor(this);
+    }
     this.renderer.redraw(
       deltaTime,
       this.viewport,
-      this.elements,
+      elements,
       this._editingElement,
       this.toolSelected,
       this.screenPosition,
@@ -1472,6 +1485,9 @@ export class DrawableCanvas {
     }
     this._store.remove(element.uuid);
     element.disposeDOM();
+    if (element.anchoredBandId !== null) {
+      scheduleBandSweep(this);
+    }
     logger.debug('Removed canvas element', {
       uuid: element.uuid,
       type: describeElementType(element.type),

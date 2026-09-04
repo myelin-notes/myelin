@@ -298,3 +298,12 @@
   background: var(--bg-code);
   overflow: auto;
 }
+
+/* Zero margins are load-bearing: a 0-height band is a pure position marker for
+   anchored canvas ink and must not open a gap between the blocks it sits between. */
+.pm-editor .ProseMirror .pm-canvas-band {
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  user-select: none;
+}

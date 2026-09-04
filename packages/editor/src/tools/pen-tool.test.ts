@@ -147,6 +147,8 @@ function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
     addElement,
     removeElement,
     transact,
+    // No page frames, so a finished stroke never anchors into one.
+    getElementsByType: () => [],
   } as unknown as DrawableCanvas;
 
   return {

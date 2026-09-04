@@ -800,6 +800,10 @@ const es: typeof en = {
       delete: 'Eliminar',
       crop: 'Recortar',
       applyCrop: 'Aplicar recorte',
+      addToPage: 'Añadir a la página',
+      removeFromPage: 'Quitar de la página',
+      makeRoom: 'Hacer espacio',
+      floatOverText: 'Flotar sobre el texto',
     },
     insert: {
       title: 'Insertar',

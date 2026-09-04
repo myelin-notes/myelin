@@ -99,6 +99,10 @@ function serializeBlock(node: PMNode): string | null {
       return serializeTable(node);
     case 'horizontalRule':
       return '---';
+    case 'canvasBand':
+      // Reserved space for anchored canvas ink and images. Markdown has no way to carry either,
+      // so the band and everything hanging off it is dropped rather than left as a blank gap.
+      return null;
     default:
       return serializeInline(node);
   }

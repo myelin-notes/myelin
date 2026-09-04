@@ -2,6 +2,7 @@ import { Crop as CropIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { Messages } from '../i18n/messages';
+import type { AnchorMode } from '../page-frame/anchor/capture';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import type { YDocManager } from '../ydoc-manager';
 import {
@@ -345,7 +346,15 @@ export class ImageElement extends DrawableElement {
         active: this._cropMode,
         onClick: () => this.toggleCropMode(),
       },
+      // Crop has its own confirm/cancel flow; page actions would fight it for the toolbar.
+      ...(this._cropMode ? [] : this.pageAnchorToolbarItems(strings)),
     ];
+  }
+
+  // Unlike ink, an image never picks a page on its own — it is placed deliberately, so it takes
+  // space in the flow rather than floating over whatever it happens to cover.
+  protected override get pageAnchorMode(): AnchorMode {
+    return 'flow';
   }
 
   public override unselect(): void {
