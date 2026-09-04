@@ -1234,7 +1234,6 @@ export class DrawableCanvas {
     // On the window, not the canvas: DOM layered above the canvas (page-frame chrome, world-anchored
     // links) swallows pointermove, freezing an in-progress drag until the cursor left that DOM again.
     this._handlePointerMove = (evt) => {
-      this._input.observe(evt);
       // A rejected palm still emits moves, and this handler feeds them to the active tool regardless
       // of which pointer opened the interaction — so the palm would draw into the pen's own stroke.
       if (this._palm.isKnownPalm(evt.pointerId)) {
@@ -1256,7 +1255,6 @@ export class DrawableCanvas {
     window.addEventListener('pointermove', this._handlePointerMove);
 
     this._handlePointerDown = (evt) => {
-      this._input.observe(evt);
       // One-shot placement intercepts primary-button clicks regardless of tool.
       if (this._placement.isActive) {
         if (evt.button === 0) {

@@ -346,9 +346,8 @@ const fr: typeof en = {
       mode: {
         label: 'Mode de dessin',
         description:
-          'Ce que fait un doigt sur le canevas. Auto dessine au doigt jusqu’à ce qu’un stylet apparaisse ; Stylet réserve le dessin au stylet ; Tactile dessine toujours au doigt, et déplace ou zoome à deux doigts.',
+          'Ce que fait un doigt sur le canevas. Stylet réserve le dessin au stylet et déplace au doigt ; Tactile dessine au doigt, et déplace ou zoome à deux doigts.',
         options: {
-          auto: 'Auto',
           pen: 'Stylet',
           touch: 'Tactile',
         },
@@ -981,6 +980,12 @@ const fr: typeof en = {
         'Un canevas infini pour l’écriture manuscrite, le texte et tout ce qu’il y a entre les deux. Quatre questions rapides et c’est fini.',
       language: 'Langue',
       start: 'Commencer',
+    },
+    input: {
+      eyebrow: 'Stylet et tactile',
+      title: 'Comment allez-vous dessiner ?',
+      description:
+        'Choisissez ce que fait un doigt sur le canevas. Vous pourrez le changer à tout moment dans les Réglages.',
     },
     privacy: {
       eyebrow: 'Confidentialité',

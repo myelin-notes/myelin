@@ -337,9 +337,8 @@ const en = {
       mode: {
         label: 'Drawing input',
         description:
-          'What a finger does on the canvas. Auto draws with a finger until a stylus turns up; Pen leaves drawing to the stylus; Touch always draws with a finger, and pans and zooms with two.',
+          'What a finger does on the canvas. Pen leaves drawing to the stylus and pans with a finger; Touch draws with a finger, and pans and zooms with two.',
         options: {
-          auto: 'Auto',
           pen: 'Pen',
           touch: 'Touch',
         },
@@ -963,6 +962,12 @@ const en = {
         'An infinite canvas for handwriting, text, and everything in between. Four quick questions and you are done.',
       language: 'Language',
       start: 'Get started',
+    },
+    input: {
+      eyebrow: 'Pen & Touch',
+      title: 'How will you draw?',
+      description:
+        'Pick what a finger does on the canvas. You can change this any time in Settings.',
     },
     privacy: {
       eyebrow: 'Privacy',
