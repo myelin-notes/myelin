@@ -116,6 +116,12 @@ export const TabBar = memo(function TabBar({
   const openCommandPalette = useCallback(() => {
     keybindings.runAction('app:command-palette');
   }, []);
+  const toggleGraph = useCallback(() => {
+    controller.togglePanePage('graph', pane.id);
+  }, [controller, pane.id]);
+  const toggleSettings = useCallback(() => {
+    controller.togglePanePage('settings', pane.id);
+  }, [controller, pane.id]);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
 
@@ -247,7 +253,9 @@ export const TabBar = memo(function TabBar({
             <TabItem
               key={tab.id}
               tab={tab}
-              isActive={tab.id === pane.activeTabId}
+              isActive={
+                pane.activePage === undefined && tab.id === pane.activeTabId
+              }
               isDragging={tab.id === dragTabId}
               paneId={pane.id}
               showDropIndicator={dropIndex === i}
@@ -259,6 +267,31 @@ export const TabBar = memo(function TabBar({
       )}
 
       {!phoneLayout && <div className="flex-1 self-stretch" {...dragRegion} />}
+
+      {isTopRight && !mobileLayout && (
+        <div className="flex shrink-0 items-center gap-0.5 self-stretch px-2">
+          <button
+            type="button"
+            onClick={toggleGraph}
+            aria-label={strings.sidebar.graph}
+            title={strings.sidebar.graph}
+            aria-pressed={pane.activePage === 'graph'}
+            className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary aria-pressed:bg-hover-tint aria-pressed:text-text-primary"
+          >
+            <Network className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleSettings}
+            aria-label={strings.tabBar.settings}
+            title={strings.tabBar.settings}
+            aria-pressed={pane.activePage === 'settings'}
+            className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary aria-pressed:bg-hover-tint aria-pressed:text-text-primary"
+          >
+            <Settings className="size-4" />
+          </button>
+        </div>
+      )}
 
       {/* Only the top-right bar, so split views don't repeat it. */}
       {isTopRight && <UpdateButton />}

@@ -4,6 +4,7 @@ import type {
   LayoutNode,
   PaneId,
   PaneNode,
+  PanePage,
   SplitDirection,
   SplitNode,
   Tab,
@@ -422,6 +423,7 @@ export class TabStateController {
             tab.id === match.tab.id ? { ...tab, target, title } : tab,
           ),
           activeTabId: match.tab.id,
+          activePage: undefined,
         }),
         focusedPaneId: matchPane.id,
       });
@@ -447,6 +449,7 @@ export class TabStateController {
       ...pane,
       tabs: this.singleTab ? [tab] : insertAt(pane.tabs, tab, insertIndex),
       activeTabId: tab.id,
+      activePage: undefined,
     };
 
     this.commit({
@@ -531,7 +534,11 @@ export class TabStateController {
       return;
     }
 
-    if (pane.activeTabId === tabId && state.focusedPaneId === paneId) {
+    if (
+      pane.activeTabId === tabId &&
+      state.focusedPaneId === paneId &&
+      pane.activePage === undefined
+    ) {
       return;
     }
 
@@ -539,8 +546,25 @@ export class TabStateController {
       layout: replacePane(state.layout, {
         ...pane,
         activeTabId: tabId,
+        activePage: undefined,
       }),
       focusedPaneId: paneId,
+    });
+  }
+
+  togglePanePage(page: PanePage, paneId?: PaneId): void {
+    const state = this.state;
+    const pane = findPane(state.layout, paneId ?? state.focusedPaneId);
+    if (!pane) {
+      return;
+    }
+
+    this.commit({
+      layout: replacePane(state.layout, {
+        ...pane,
+        activePage: pane.activePage === page ? undefined : page,
+      }),
+      focusedPaneId: pane.id,
     });
   }
 
@@ -549,12 +573,16 @@ export class TabStateController {
   showHome(paneId: PaneId): void {
     const state = this.state;
     const pane = findPane(state.layout, paneId);
-    if (!pane || pane.activeTabId === '') {
+    if (!pane || (pane.activeTabId === '' && pane.activePage === undefined)) {
       return;
     }
 
     this.commit({
-      layout: replacePane(state.layout, { ...pane, activeTabId: '' }),
+      layout: replacePane(state.layout, {
+        ...pane,
+        activeTabId: '',
+        activePage: undefined,
+      }),
       focusedPaneId: paneId,
     });
   }
@@ -616,6 +644,7 @@ export class TabStateController {
       ...targetPane,
       tabs: insertAt(targetPane.tabs, tab, index),
       activeTabId: tabId,
+      activePage: undefined,
     };
 
     this.commit({

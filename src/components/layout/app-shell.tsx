@@ -2,7 +2,7 @@ import { PaneIdProvider, useWindowState } from '@/lib/tabs/context';
 import type { PaneNode } from '@/lib/tabs/types';
 import { HomePage } from '@/pages/home';
 import { MobileLibrary } from '@/pages/library/mobile-library';
-import { PaneContent } from './pane';
+import { PaneContent, PanePageContent } from './pane';
 import { PaneDropTarget, PaneLayout } from './pane-layout';
 import { useSidebar } from './sidebar/context';
 import { TabBar } from './tab-bar';
@@ -36,7 +36,9 @@ export function AppShell() {
       {pane && (
         <PaneIdProvider paneId={pane.id}>
           <PaneDropTarget paneId={pane.id} className="min-h-0 flex-1">
-            {activeTab ? (
+            {pane.activePage ? (
+              <PanePageContent page={pane.activePage} />
+            ) : activeTab ? (
               <PaneContent tab={activeTab} />
             ) : mobileLayout ? (
               <MobileLibrary />

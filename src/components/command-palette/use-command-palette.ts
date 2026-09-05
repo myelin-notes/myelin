@@ -17,6 +17,7 @@ import {
 import { Logger } from '@myelin/shared/logger';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { trackEvent } from '@/lib/analytics';
+import { IS_MOBILE_BUILD } from '@/lib/env';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import { useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
@@ -160,7 +161,11 @@ export function useCommandPalette(): {
 
   const openGraph = useCallback(() => {
     closePalette();
-    tabController.openTab({ type: 'graph' }, strings.graph.title);
+    if (IS_MOBILE_BUILD) {
+      tabController.openTab({ type: 'graph' }, strings.graph.title);
+    } else {
+      tabController.togglePanePage('graph');
+    }
   }, [closePalette, strings.graph.title, tabController]);
 
   const triggerLibraryMarkdownImport = useCallback(async () => {

@@ -2,6 +2,7 @@ import type { FileType, VFSNodeId } from '@/lib/sync';
 
 export type TabId = string;
 export type PaneId = string;
+export type PanePage = 'graph' | 'settings';
 
 export type TabTarget =
   | { type: 'graph' }
@@ -26,6 +27,7 @@ export interface PaneNode {
   id: PaneId;
   tabs: Tab[];
   activeTabId: TabId;
+  activePage?: PanePage;
 }
 
 export type SplitDirection = 'horizontal' | 'vertical';

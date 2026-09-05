@@ -25,7 +25,7 @@ import type {
   SplitDirection,
 } from '@/lib/tabs/types';
 import { HomePage } from '@/pages/home';
-import { PaneContent } from './pane';
+import { PaneContent, PanePageContent } from './pane';
 import { TabBar } from './tab-bar';
 
 type SplitEdge = 'left' | 'right' | 'top' | 'bottom';
@@ -329,7 +329,13 @@ function PaneView({
           windowDraggable={isTopLeft}
         />
         <div className="min-h-0 flex-1">
-          {activeTab ? <PaneContent tab={activeTab} /> : <HomePage />}
+          {node.activePage ? (
+            <PanePageContent page={node.activePage} />
+          ) : activeTab ? (
+            <PaneContent tab={activeTab} />
+          ) : (
+            <HomePage />
+          )}
         </div>
       </PaneDropTarget>
     </PaneIdProvider>
