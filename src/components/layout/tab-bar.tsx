@@ -5,16 +5,13 @@ import {
   MoreHorizontal,
   Network,
   PanelLeft,
-  Plus,
   Rows2,
   Settings,
   X,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { type Messages, useMessages } from '@myelin/editor/i18n';
 import { keybindings } from '@myelin/editor/keybinds';
 import { cn } from '@myelin/editor/utils';
-import { Logger } from '@myelin/shared/logger';
 import {
   isMac,
   isWindows,
@@ -27,11 +24,8 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@myelin/ui/context-menu';
-import { errorDescription } from '@/components/command-palette/utils';
 import { useSidebar } from '@/components/layout/sidebar/context';
 import { trackEvent } from '@/lib/analytics';
-import { createBlankCanvasFile } from '@/lib/note/create';
-import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
@@ -48,8 +42,6 @@ import {
 import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { UpdateButton } from './update-button';
 import { WindowControls } from './window-controls';
-
-const logger = new Logger('TabBar');
 
 // Built-in tabs store a title captured at creation time, so they don't follow language changes.
 // Content tabs (canvas/image file names) fall back to the stored title.
@@ -100,7 +92,6 @@ export const TabBar = memo(function TabBar({
 }: TabBarProps) {
   const strings = useMessages();
   const controller = useTabController();
-  const repository = useRepository();
   const {
     collapsed,
     isCompact,
@@ -127,33 +118,6 @@ export const TabBar = memo(function TabBar({
   }, []);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
-
-  // The "+" button creates a fresh canvas note in the library root and opens it
-  // in this pane. Closing every tab returns the pane to the home view.
-  const handleNewTab = useCallback(() => {
-    void (async () => {
-      try {
-        const name = await repository.getUniqueFileName(
-          strings.library.createNew.untitledCanvas,
-          null,
-        );
-        const id = await createBlankCanvasFile(repository, name, null);
-        controller.openTab({ type: 'canvas', id }, name, pane.id);
-        trackEvent('note_created', { file_type: 'mcanvas' });
-      } catch (error) {
-        logger.error('Failed to create note from tab bar', error);
-        toast.error(strings.commandPalette.errors.createNote, {
-          description: errorDescription(error),
-        });
-      }
-    })();
-  }, [
-    controller,
-    pane.id,
-    repository,
-    strings.commandPalette.errors.createNote,
-    strings.library.createNew.untitledCanvas,
-  ]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -293,22 +257,6 @@ export const TabBar = memo(function TabBar({
           {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
         </div>
       )}
-
-      {/* Kept outside the scroll strip so it stays beside the tabs and never
-          scrolls off when they overflow. */}
-      <button
-        type="button"
-        onClick={handleNewTab}
-        aria-label="New tab"
-        className={cn(
-          'mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary',
-          // Nothing follows the button on phones, so it needs its own inset to
-          // match the home button's on the left edge.
-          phoneLayout && 'mr-2',
-        )}
-      >
-        <Plus className="size-3.5" />
-      </button>
 
       {!phoneLayout && <div className="flex-1 self-stretch" {...dragRegion} />}
 

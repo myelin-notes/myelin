@@ -437,6 +437,7 @@ export function MobileLibrary() {
                     onNewFile={handleNewFile}
                     onImport={imports.openPicker}
                     importDisabled={imports.importDisabled}
+                    labeled
                   />
                 </div>
               </div>
@@ -452,6 +453,12 @@ export function MobileLibrary() {
                 searchQuery={searchQuery}
                 searchMode={searchMode}
                 filterTags={filterTags}
+                onCreateCanvas={() =>
+                  handleNewFile(
+                    strings.library.createNew.untitledCanvas,
+                    'mcanvas',
+                  )
+                }
               />
             </div>
 
