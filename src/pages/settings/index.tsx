@@ -43,7 +43,7 @@ export function SettingsPage() {
   return (
     <div className="relative flex h-full w-full bg-page">
       <a href="#settings-main" data-skip-link className="skip-link">
-        {strings.settings.title}
+        {strings.tabBar.settings}
       </a>
 
       <main
@@ -60,7 +60,7 @@ export function SettingsPage() {
                 className="font-extralight font-heading text-text-primary tracking-tight"
                 style={{ fontSize: 'var(--fluid-display)' }}
               >
-                {strings.settings.title}
+                {strings.tabBar.settings}
               </h1>
             </header>
 

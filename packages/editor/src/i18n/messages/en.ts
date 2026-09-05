@@ -298,7 +298,6 @@ const en = {
     restoreFailed: 'Could not restore version',
   },
   settings: {
-    title: 'Preferences',
     theme: {
       title: 'Theme',
       eyebrow: 'Appearance',

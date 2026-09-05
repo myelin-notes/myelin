@@ -288,7 +288,6 @@ const zhHans: typeof en = {
     restoreFailed: '无法恢复版本',
   },
   settings: {
-    title: '偏好设置',
     theme: {
       title: '主题',
       eyebrow: '外观',
