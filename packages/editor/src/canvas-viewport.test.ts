@@ -96,3 +96,18 @@ describe('CanvasViewport content fitting', () => {
     expect(animateViewToFitRect).not.toHaveBeenCalled();
   });
 });
+
+describe('CanvasViewport zoom limits', () => {
+  it('clamps zoom between 5% and 500%', () => {
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    const { viewport } = createViewport();
+
+    viewport.zoomByFactor(1000);
+    expect(viewport.zoom).toBe(5);
+
+    viewport.zoomByFactor(0.00001);
+    expect(viewport.zoom).toBe(0.05);
+
+    vi.unstubAllGlobals();
+  });
+});

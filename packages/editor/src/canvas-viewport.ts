@@ -3,8 +3,8 @@ import type { Vector2 } from './geometry';
 type EditModePanAxis = 'vertical' | 'horizontal';
 
 // Exported because the background layer sizes its overdraw from the largest tile MAX_ZOOM allows.
-export const MIN_ZOOM = 0.2;
-export const MAX_ZOOM = 3;
+export const MIN_ZOOM = 0.05;
+export const MAX_ZOOM = 5;
 
 // A bare number is the width ratio; with both ratios given, the tighter one wins.
 export type ViewFit = number | { widthRatio?: number; heightRatio?: number };

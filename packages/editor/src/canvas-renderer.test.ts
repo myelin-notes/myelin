@@ -59,8 +59,8 @@ describe('background tiling origin', () => {
   it('stays anchored to the world origin at every zoom', () => {
     // The world origin is at screen (offset * zoom) and the pattern repeats every tile, so the tiling
     // origin only has to agree modulo one tile. -BG_OVERDRAW_PX is a whole number of tiles only when
-    // 3/zoom is an integer, so a shift that ignores it leaves a phase error and the grid slides against
-    // the content as the user zooms.
+    // MAX_ZOOM / zoom is an integer, so a shift that ignores it leaves a phase error and the grid slides
+    // against the content as the user zooms.
     const zooms = [MIN_ZOOM, 0.5, 0.75, 1, 1.3, 1.5, 2, 2.5, MAX_ZOOM];
     for (const zoom of zooms) {
       for (const offset of [0, 37.5, -412.25, 10000]) {
