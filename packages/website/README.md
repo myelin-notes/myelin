@@ -10,6 +10,17 @@ yarn website:dev      # dev server (from repo root)
 yarn website:build    # production build
 ```
 
+## Support form
+
+`/support` posts to the Cloudflare Pages Function at
+`functions/api/support.ts`. The function sends through Resend and requires one
+Cloudflare Pages secret named `RESEND_API_KEY`. Verify `trymyelin.app` in Resend
+so the function can send from `support@trymyelin.app`.
+
+The Pages project root must remain the repository root so Cloudflare finds the
+top-level `functions/` directory. The build output is
+`packages/website/dist`.
+
 ## Phase 0 spike verdict: reuse the real engine
 
 The mandated spike asked one question: can the app's canvas be mounted in a

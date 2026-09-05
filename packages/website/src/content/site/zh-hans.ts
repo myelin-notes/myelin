@@ -277,6 +277,7 @@ for step in range(3):
 
   linkLabels: {
     privacy: '隐私政策',
+    support: '支持',
   },
 
   footer: {
