@@ -493,9 +493,14 @@ export class CanvasViewport {
     this._viewAnim = { stop: () => cancelAnimationFrame(rafId) };
   }
 
-  // An empty fit object skips both zoom candidates, so animateViewToFitRect keeps `this._zoom`.
-  public animateRecenter(): void {
-    this.animateViewToFitRect(new DOMRect(0, 0, 0, 0), {});
+  public animateFitContent(): void {
+    const bounds = this._contentBoundsProvider?.();
+    if (bounds) {
+      this.animateViewToFitRect(bounds, {
+        widthRatio: 0.8,
+        heightRatio: 0.8,
+      });
+    }
   }
 
   public zoomByFactor(factor: number): void {
