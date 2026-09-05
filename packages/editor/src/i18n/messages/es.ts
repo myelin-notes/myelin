@@ -303,7 +303,6 @@ const es: typeof en = {
     restoreFailed: 'No se pudo restaurar la versión',
   },
   settings: {
-    title: 'Preferencias',
     theme: {
       title: 'Tema',
       eyebrow: 'Apariencia',

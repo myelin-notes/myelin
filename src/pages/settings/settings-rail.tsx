@@ -12,9 +12,9 @@ export function SettingsRail({ activeId, onJump }: SettingsRailProps) {
   return (
     <aside className="sticky top-12 hidden h-fit w-48 shrink-0 lg:block">
       <p className="mb-4 font-semibold text-[10px] text-text-muted uppercase tracking-widest">
-        {strings.settings.title}
+        {strings.tabBar.settings}
       </p>
-      <nav aria-label={strings.settings.title} className="flex flex-col gap-1">
+      <nav aria-label={strings.tabBar.settings} className="flex flex-col gap-1">
         {SETTINGS_SECTIONS.map((section) => {
           const isActive = activeId === section.id;
           const label = strings.settings[section.titleKey].title;
