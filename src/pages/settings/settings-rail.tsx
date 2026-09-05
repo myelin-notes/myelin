@@ -18,6 +18,7 @@ export function SettingsRail({ activeId, onJump }: SettingsRailProps) {
         {SETTINGS_SECTIONS.map((section) => {
           const isActive = activeId === section.id;
           const label = strings.settings[section.titleKey].title;
+          const Icon = section.icon;
           return (
             <button
               key={section.id}
@@ -25,12 +26,13 @@ export function SettingsRail({ activeId, onJump }: SettingsRailProps) {
               onClick={() => onJump(section.id)}
               aria-current={isActive ? 'true' : undefined}
               className={cn(
-                '-mx-1 cursor-pointer rounded-sm px-1 py-1.5 text-left text-sm transition-colors',
+                '-mx-1 flex cursor-pointer items-center gap-2 rounded-sm px-1 py-1.5 text-left text-sm transition-colors',
                 isActive
                   ? 'font-medium text-text-primary'
                   : 'font-normal text-text-muted hover:text-text-primary',
               )}
             >
+              <Icon className="size-3.5 shrink-0" />
               {label}
             </button>
           );
