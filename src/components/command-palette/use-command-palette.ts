@@ -17,7 +17,6 @@ import {
 import { Logger } from '@myelin/shared/logger';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { trackEvent } from '@/lib/analytics';
-import { IS_MOBILE_BUILD } from '@/lib/env';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import { useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
@@ -26,6 +25,7 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import {
   importMarkdownFile,
   isMarkdownFile,
@@ -103,9 +103,9 @@ export function useCommandPalette(): {
   const focusedTab = focusedPane
     ? (focusedPane.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null)
     : null;
-  const currentPage = commandPalettePageFromTabTarget(
-    focusedTab?.target ?? null,
-  );
+  const currentPage =
+    focusedPane?.activePage ??
+    commandPalettePageFromTabTarget(focusedTab?.target ?? null);
   const canRefreshRepository = useManualRepositoryRefreshAvailable(
     repositoryStatus.config,
     repositoryStatus.initializing,
@@ -161,7 +161,7 @@ export function useCommandPalette(): {
 
   const openGraph = useCallback(() => {
     closePalette();
-    if (IS_MOBILE_BUILD) {
+    if (IS_PHONE_BUILD) {
       tabController.openTab({ type: 'graph' }, strings.graph.title);
     } else {
       tabController.togglePanePage('graph');

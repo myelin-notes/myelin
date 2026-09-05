@@ -268,7 +268,7 @@ export const TabBar = memo(function TabBar({
 
       {!phoneLayout && <div className="flex-1 self-stretch" {...dragRegion} />}
 
-      {isTopRight && !mobileLayout && (
+      {isTopRight && !phoneLayout && (
         <div className="flex shrink-0 items-center gap-0.5 self-stretch px-2">
           <button
             type="button"

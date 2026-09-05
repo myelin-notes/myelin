@@ -42,6 +42,7 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController } from '@/lib/tabs/context';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { ImportHost } from '@/pages/library/import/import-host';
 import { useImports } from '@/pages/library/import/use-imports';
 import { BetaFeedbackBanner } from './beta-feedback-banner';
@@ -255,26 +256,28 @@ export function MobileLibrary() {
               {strings.library.title}
             </h1>
 
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={openGraph}
-                aria-label={strings.sidebar.graph}
-                title={strings.sidebar.graph}
-                className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-              >
-                <Network className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={openSettings}
-                aria-label={strings.tabBar.settings}
-                title={strings.tabBar.settings}
-                className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-              >
-                <Settings className="size-4" />
-              </button>
-            </div>
+            {IS_PHONE_BUILD && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={openGraph}
+                  aria-label={strings.sidebar.graph}
+                  title={strings.sidebar.graph}
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+                >
+                  <Network className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={openSettings}
+                  aria-label={strings.tabBar.settings}
+                  title={strings.tabBar.settings}
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+                >
+                  <Settings className="size-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 max-w-xl">
