@@ -4,21 +4,15 @@ import {
   ArrowDownZA,
   CalendarPlus,
   Clock,
-  Network,
   RefreshCw,
   Search,
-  Settings,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
-import {
-  isMac,
-  TAB_BAR_HEIGHT_CLASS,
-  TRAFFIC_LIGHT_INSET_CLASS,
-} from '@myelin/shared/os';
+import { TAB_BAR_HEIGHT_CLASS } from '@myelin/shared/os';
 import { errorDescription } from '@/components/command-palette/utils';
 import { trackEvent } from '@/lib/analytics';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
@@ -27,7 +21,6 @@ import {
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
-import { useTabController } from '@/lib/tabs/context';
 import { CreateNewDropdown } from '@/pages/library/create-new-dropdown';
 import { ImportHost } from '@/pages/library/import/import-host';
 import { useImports } from '@/pages/library/import/use-imports';
@@ -47,7 +40,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
-  const tabController = useTabController();
   const { width } = useSidebar();
   const treeRef = useRef<SidebarTreeHandle>(null);
 
@@ -93,14 +85,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     repositoryStatus.lastRemoteSyncAt,
     repositoryStatus.dataVersion,
   ]);
-
-  const openGraph = useCallback(() => {
-    tabController.openTab({ type: 'graph' }, strings.graph.title);
-  }, [strings.graph.title, tabController]);
-
-  const openSettings = useCallback(() => {
-    tabController.openTab({ type: 'settings' }, strings.tabBar.settings);
-  }, [strings.tabBar.settings, tabController]);
 
   const cycleSortMode = useCallback(() => {
     setSortMode(
@@ -167,36 +151,8 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     >
       <header
         data-tauri-drag-region
-        className={cn(
-          // Match the pane tab-bar height so the graph/settings buttons line up
-          // vertically with the tabs and the macOS traffic lights.
-          'flex shrink-0 items-center gap-0.5 px-2',
-          TAB_BAR_HEIGHT_CLASS,
-          // Only macOS right-aligns the buttons, since the traffic lights hold the top-left. Every other
-          // platform has no lights there, so center them instead of stranding them in a corner.
-          isMac ? 'justify-end' : 'justify-center',
-          isMac && TRAFFIC_LIGHT_INSET_CLASS,
-        )}
-      >
-        <button
-          type="button"
-          onClick={openGraph}
-          aria-label={strings.sidebar.graph}
-          title={strings.sidebar.graph}
-          className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <Network className="size-4" />
-        </button>
-        <button
-          type="button"
-          onClick={openSettings}
-          aria-label={strings.tabBar.settings}
-          title={strings.tabBar.settings}
-          className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <Settings className="size-4" />
-        </button>
-      </header>
+        className={cn('shrink-0', TAB_BAR_HEIGHT_CLASS)}
+      />
 
       <div className="px-2 pb-2">
         <div className="group flex items-center gap-1 rounded-xl bg-card/75 px-1.5 py-1 ring-1 ring-border-subtle/70 transition-colors duration-150 focus-within:bg-card focus-within:ring-accent-dark/15 hover:bg-card">

@@ -25,6 +25,7 @@ import {
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import {
   importMarkdownFile,
   isMarkdownFile,
@@ -102,9 +103,9 @@ export function useCommandPalette(): {
   const focusedTab = focusedPane
     ? (focusedPane.tabs.find((t) => t.id === focusedPane.activeTabId) ?? null)
     : null;
-  const currentPage = commandPalettePageFromTabTarget(
-    focusedTab?.target ?? null,
-  );
+  const currentPage =
+    focusedPane?.activePage ??
+    commandPalettePageFromTabTarget(focusedTab?.target ?? null);
   const canRefreshRepository = useManualRepositoryRefreshAvailable(
     repositoryStatus.config,
     repositoryStatus.initializing,
@@ -160,7 +161,11 @@ export function useCommandPalette(): {
 
   const openGraph = useCallback(() => {
     closePalette();
-    tabController.openTab({ type: 'graph' }, strings.graph.title);
+    if (IS_PHONE_BUILD) {
+      tabController.openTab({ type: 'graph' }, strings.graph.title);
+    } else {
+      tabController.togglePanePage('graph');
+    }
   }, [closePalette, strings.graph.title, tabController]);
 
   const triggerLibraryMarkdownImport = useCallback(async () => {

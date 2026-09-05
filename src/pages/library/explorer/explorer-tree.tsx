@@ -8,10 +8,12 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Plus } from 'lucide-react';
 import { VirtualList } from '@myelin/editor/components/virtual-list';
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
+import { Button } from '@myelin/ui/button';
 import { VirtualGrid } from '@/components/virtual-grid';
 import {
   type FileType,
@@ -75,6 +77,7 @@ interface ExplorerTreeProps {
   searchQuery?: string;
   searchMode?: SearchMode;
   filterTags?: string[];
+  onCreateCanvas?: () => void;
 }
 
 export function ExplorerTree({
@@ -88,6 +91,7 @@ export function ExplorerTree({
   searchQuery,
   searchMode = 'lexical',
   filterTags,
+  onCreateCanvas,
 }: ExplorerTreeProps) {
   const strings = useMessages();
   const repository = useRepository();
@@ -413,15 +417,28 @@ export function ExplorerTree({
   }
 
   if (sortedNodes.length === 0) {
+    const showCreateCanvas =
+      repositorySetupState === 'ready' &&
+      !isSearching &&
+      !isFiltering &&
+      onCreateCanvas !== undefined;
+
     return (
       <div
         {...(canDrop ? dropTargetProps : {})}
         className={cn(
           'min-h-[80px] rounded-xl transition-colors',
+          showCreateCanvas &&
+            'flex min-h-40 flex-col items-center justify-center gap-4 px-4 py-8 text-center',
           dragOver && canDrop ? 'bg-accent/10' : '',
         )}
       >
-        <span className="block px-4 py-3 text-sm text-text-muted">
+        <span
+          className={cn(
+            'block text-sm text-text-muted',
+            !showCreateCanvas && 'px-4 py-3',
+          )}
+        >
           {repositorySetupState === 'setup-required'
             ? strings.library.explorerTree.repositorySetupRequired
             : isSearching
@@ -430,6 +447,12 @@ export function ExplorerTree({
                 ? strings.library.explorerTree.emptyFilter
                 : strings.library.explorerTree.emptyDefault}
         </span>
+        {showCreateCanvas && (
+          <Button size="lg" onClick={onCreateCanvas}>
+            <Plus />
+            {strings.library.createNew.canvas}
+          </Button>
+        )}
       </div>
     );
   }

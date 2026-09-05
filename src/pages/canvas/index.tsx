@@ -148,8 +148,8 @@ function CanvasViewInner({
       return next;
     });
   }, []);
-  const onRecenterViewport = useCallback(() => {
-    drawableCanvasRef.current?.viewport.animateRecenter();
+  const onFitContent = useCallback(() => {
+    drawableCanvasRef.current?.viewport.animateFitContent();
   }, []);
   const onUndo = useCallback(() => {
     drawableCanvasRef.current?.undo();
@@ -635,7 +635,7 @@ function CanvasViewInner({
         fps={engine.fps}
         zoomLocked={zoomLocked}
         onToggleZoomLock={onToggleZoomLock}
-        onRecenter={onRecenterViewport}
+        onFitContent={onFitContent}
         onRegenerateThumbnail={onRegenerateThumbnail}
       />
       {engine.ready && (

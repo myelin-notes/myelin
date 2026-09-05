@@ -3,8 +3,8 @@ import type { Vector2 } from './geometry';
 type EditModePanAxis = 'vertical' | 'horizontal';
 
 // Exported because the background layer sizes its overdraw from the largest tile MAX_ZOOM allows.
-export const MIN_ZOOM = 0.2;
-export const MAX_ZOOM = 3;
+export const MIN_ZOOM = 0.05;
+export const MAX_ZOOM = 5;
 
 // A bare number is the width ratio; with both ratios given, the tighter one wins.
 export type ViewFit = number | { widthRatio?: number; heightRatio?: number };
@@ -493,9 +493,14 @@ export class CanvasViewport {
     this._viewAnim = { stop: () => cancelAnimationFrame(rafId) };
   }
 
-  // An empty fit object skips both zoom candidates, so animateViewToFitRect keeps `this._zoom`.
-  public animateRecenter(): void {
-    this.animateViewToFitRect(new DOMRect(0, 0, 0, 0), {});
+  public animateFitContent(): void {
+    const bounds = this._contentBoundsProvider?.();
+    if (bounds) {
+      this.animateViewToFitRect(bounds, {
+        widthRatio: 0.8,
+        heightRatio: 0.8,
+      });
+    }
   }
 
   public zoomByFactor(factor: number): void {

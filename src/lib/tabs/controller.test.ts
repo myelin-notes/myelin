@@ -232,6 +232,41 @@ describe('TabStateController', () => {
     expect(rootPane(controller).activeTabId).toBe(alphaId);
   });
 
+  it('toggles pane pages without adding tabs', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha', paneId);
+
+    controller.togglePanePage('graph', paneId);
+    expect(rootPane(controller).activePage).toBe('graph');
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha']);
+
+    controller.togglePanePage('settings', paneId);
+    expect(rootPane(controller).activePage).toBe('settings');
+    expect(rootPane(controller).activeTabId).toBe(alphaId);
+
+    controller.togglePanePage('settings', paneId);
+    expect(rootPane(controller).activePage).toBeUndefined();
+    expect(rootPane(controller).activeTabId).toBe(alphaId);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
+  it('leaves a pane page when navigating to a tab or home', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha', paneId);
+
+    controller.togglePanePage('graph', paneId);
+    controller.activateTab(alphaId, paneId);
+    expect(rootPane(controller).activePage).toBeUndefined();
+
+    controller.togglePanePage('settings', paneId);
+    controller.showHome(paneId);
+    expect(rootPane(controller).activePage).toBeUndefined();
+    expect(rootPane(controller).activeTabId).toBe('');
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha']);
+  });
+
   it('stays on the home view when a background tab is closed', () => {
     const controller = new TabStateController();
     const paneId = focusedPane(controller).id;

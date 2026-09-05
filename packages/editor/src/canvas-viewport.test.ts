@@ -66,3 +66,48 @@ describe('CanvasViewport edit-mode wheel panning', () => {
     expect(viewport.offset).toEqual({ x: -120, y: 0 });
   });
 });
+
+describe('CanvasViewport content fitting', () => {
+  it('fits the current content bounds', () => {
+    const { viewport } = createViewport();
+    const bounds = new DOMRect(100, 200, 1200, 900);
+    viewport.setContentBoundsProvider(() => bounds);
+    const animateViewToFitRect = vi
+      .spyOn(viewport, 'animateViewToFitRect')
+      .mockImplementation(() => {});
+
+    viewport.animateFitContent();
+
+    expect(animateViewToFitRect).toHaveBeenCalledWith(bounds, {
+      widthRatio: 0.8,
+      heightRatio: 0.8,
+    });
+  });
+
+  it('does nothing when the canvas is empty', () => {
+    const { viewport } = createViewport();
+    viewport.setContentBoundsProvider(() => null);
+    const animateViewToFitRect = vi
+      .spyOn(viewport, 'animateViewToFitRect')
+      .mockImplementation(() => {});
+
+    viewport.animateFitContent();
+
+    expect(animateViewToFitRect).not.toHaveBeenCalled();
+  });
+});
+
+describe('CanvasViewport zoom limits', () => {
+  it('clamps zoom between 5% and 500%', () => {
+    vi.stubGlobal('window', { devicePixelRatio: 1 });
+    const { viewport } = createViewport();
+
+    viewport.zoomByFactor(1000);
+    expect(viewport.zoom).toBe(5);
+
+    viewport.zoomByFactor(0.00001);
+    expect(viewport.zoom).toBe(0.05);
+
+    vi.unstubAllGlobals();
+  });
+});

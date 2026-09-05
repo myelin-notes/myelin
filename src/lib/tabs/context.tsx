@@ -110,6 +110,10 @@ function useTabCloseShortcut(controller: TabStateController) {
         return;
       }
       e.preventDefault();
+      if (pane.activePage) {
+        controller.togglePanePage(pane.activePage, pane.id);
+        return;
+      }
       controller.closeTab(pane.activeTabId, pane.id);
     },
     [controller],
