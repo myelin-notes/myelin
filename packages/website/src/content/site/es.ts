@@ -283,6 +283,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
 
   linkLabels: {
     privacy: 'Privacidad',
+    support: 'Ayuda',
   },
 
   footer: {

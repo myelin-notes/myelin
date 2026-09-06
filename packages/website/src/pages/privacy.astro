@@ -1,22 +1,7 @@
 ---
-// The privacy policy. Linked from the site footer (both renderings) and from
-// Settings > Privacy in the app, which is what Apple's guideline 5.1.1(i) asks
-// for: a policy reachable from the store listing and from inside the app.
-//
-// Every claim here is checked against the code. When you change what leaves the
-// device, change this page in the same commit:
-//   - website capture .......... src/lib/posthog.ts
-//   - app capture .............. app src/lib/analytics.ts, src/lib/posthog.ts
-//   - redaction ................ packages/shared/src/logger.ts
-//   - update endpoint .......... src-tauri/tauri.conf.json
-//   - live discovery ........... app src/lib/sync/live/
-//
-// Published in English only, which is what `translated={false}` below marks:
-// it drops the hreflang alternates and hides the topbar's language picker, so
-// no locale advertises a translation that does not exist.
 import Base from '../layouts/Base.astro';
 
-const updated = '17 August 2026';
+const updated = '5 September 2026';
 
 const wrap = 'mx-auto max-w-3xl px-6 lg:px-10';
 const h2 =
@@ -129,6 +114,12 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
           <span class={term}>Where it goes.</span> PostHog processes this on servers
           in the United States.
         </li>
+        <li>
+          <span class={term}>Support requests.</span> If you use the support form,
+          the email address, subject, and message you enter are sent to us so we can
+          reply. The form does not attach analytics identifiers or any content from
+          your notes.
+        </li>
       </ul>
     </section>
 
@@ -218,6 +209,10 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
           to them.
         </li>
         <li>
+          <span class={term}>Resend</span> delivers messages submitted through the
+          support form to our support inbox.
+        </li>
+        <li>
           <span class={term}>GitHub</span> hosts our releases, so it handles the update
           check every copy of the app makes. It also receives your notes, but only
           if you set up GitHub sync.
@@ -249,13 +244,13 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
           automatically when it passes, within minutes of the session ending.
         </li>
         <li>
+          Support correspondence is kept while we respond and maintain a reasonable
+          history of the issue. You can ask us to delete it at any time.
+        </li>
+        <li>
           We keep no server-side request logs of our own for the website or the
           discovery service beyond what Cloudflare retains to operate and protect
           them, and update checks are logged by GitHub rather than by us.
-        </li>
-        <li>
-          There is nothing else to keep, because there is no account and no copy
-          of your notes.
         </li>
       </ul>
     </section>
@@ -277,10 +272,10 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
         </li>
         <li>
           <span class={term}>Ask us to delete it.</span> Email the same address.
-          Because there is no account, what we hold is not linked to your name or
-          email address and cannot be found from an email address alone, so we will
-          walk you through locating your installation identifier and then delete every
-          event carrying it.
+          We can find support correspondence from your email address. Because there
+          is no account, analytics data is not linked to that address, so we will walk
+          you through locating your installation identifier and then delete every event
+          carrying it.
         </li>
       </ul>
     </section>

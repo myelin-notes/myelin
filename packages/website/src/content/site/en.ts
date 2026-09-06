@@ -286,6 +286,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
   /** Labels for the shared link set; the hrefs live in `index.ts`. */
   linkLabels: {
     privacy: 'Privacy',
+    support: 'Support',
   },
 
   footer: {

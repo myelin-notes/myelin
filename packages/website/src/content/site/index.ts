@@ -35,19 +35,22 @@ export const SCENE_IDS = [
 export type SceneId = (typeof SCENE_IDS)[number];
 
 /** Every link the header or footer can point at. */
-export type LinkId = 'privacy';
+export type LinkId = 'privacy' | 'support';
 
 /**
  * The header and footer carry the same links. The set itself is the same in
  * every language; only the labels translate.
  */
-export const navLinks: LinkId[] = ['privacy'];
+export const navLinks: LinkId[] = ['support', 'privacy'];
 
 /**
  * The privacy policy is published in English only, so its href carries no
  * locale prefix and every locale links to the same page.
  */
-const hrefs: Record<LinkId, string> = { privacy: '/privacy' };
+const hrefs: Record<LinkId, string> = {
+  privacy: '/privacy',
+  support: '/support',
+};
 
 export function linkHref(id: LinkId): string {
   return hrefs[id];

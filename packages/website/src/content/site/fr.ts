@@ -275,6 +275,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
 
   linkLabels: {
     privacy: 'Confidentialité',
+    support: 'Assistance',
   },
 
   footer: {
