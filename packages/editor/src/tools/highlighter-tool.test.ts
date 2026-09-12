@@ -171,4 +171,16 @@ describe('HighlighterTool does not snap into shapes', () => {
     }
     expect(Math.max(...middleYs) - Math.min(...middleYs)).toBeCloseTo(18, 5);
   });
+
+  it('exposes stabilization in its options', () => {
+    const tool = makeTool();
+    const option = tool.getOptions().find((o) => o.key === 'stabilization');
+
+    expect(option?.type).toBe('size');
+    if (option?.type !== 'size') {
+      throw new Error('highlighter has no stabilization slider');
+    }
+    expect(option.min).toBe(0);
+    expect(option.max).toBe(10);
+  });
 });

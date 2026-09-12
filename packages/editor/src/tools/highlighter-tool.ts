@@ -78,6 +78,18 @@ export class HighlighterTool extends PenTool {
           this.size = size;
         },
       },
+      {
+        type: 'size',
+        key: 'stabilization',
+        label: strings.toolOptions.stabilization,
+        value: this.stabilization,
+        min: 0,
+        max: 10,
+        step: 1,
+        set: (stabilization) => {
+          this.stabilization = stabilization;
+        },
+      },
     ];
   }
 }
