@@ -236,6 +236,19 @@ export class StrokeElement extends DrawableElement {
       ];
     }
 
+    // perfect-freehand adds synthetic motion for 1–2 inputs and drops pressure in its two-point
+    // expansion. Three explicit samples keep tap caps at the stroke's recorded width.
+    if (input.length === 1) {
+      input.push([...input[0]], [...input[0]]);
+    } else if (input.length === 2) {
+      const [a, b] = input;
+      input.splice(1, 0, [
+        (a[0] + b[0]) / 2,
+        (a[1] + b[1]) / 2,
+        (a[2] + b[2]) / 2,
+      ]);
+    }
+
     const outline = getStroke(input, {
       simulatePressure: this.style.simulatePressure ?? !this.hasPressure,
       size: OUTLINE_SIZE,

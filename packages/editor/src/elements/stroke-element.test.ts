@@ -318,3 +318,26 @@ describe('StrokeElement outline scale', () => {
     }
   });
 });
+
+describe('StrokeElement pressure-disabled taps', () => {
+  const style: StrokeStyle = {
+    ...STYLE,
+    simulatePressure: false,
+  };
+
+  function finishedBounds(points: number[]): DOMRect {
+    const stroke = new StrokeElement('tap', points, false, style);
+    stroke.updateBounds();
+    return stroke.localBoundingBox;
+  }
+
+  it.each([
+    { name: 'one sample', points: [0, 0, 0] },
+    { name: 'two samples', points: [0, 0, 0, 0.1, 0, 0] },
+  ])('keeps a $name tap at the stroke width', ({ points }) => {
+    const line = finishedBounds([0, 0, 0, 10, 0, 0, 20, 0, 0]);
+    const tap = finishedBounds(points);
+
+    expect(tap.height).toBeCloseTo(line.height, 1);
+  });
+});
