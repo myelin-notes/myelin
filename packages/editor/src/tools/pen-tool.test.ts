@@ -105,7 +105,9 @@ function squiggleStroke(): Pt[] {
  *
  * `bind: false` reproduces the unbound-stroke case for the yMap-null guard test.
  */
-function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
+function makeCanvas(
+  opts: { bind?: boolean; realTransact?: boolean; zoom?: number } = {},
+) {
   const bind = opts.bind ?? true;
   const ydoc = new YDocManager();
   const created: DrawableElement[] = [];
@@ -147,6 +149,7 @@ function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
     addElement,
     removeElement,
     transact,
+    viewport: { zoom: opts.zoom ?? 1 },
   } as unknown as DrawableCanvas;
 
   return {
@@ -474,6 +477,19 @@ describe('PenTool draw-and-hold recognition', () => {
     vi.advanceTimersByTime(200);
     // The 800,800 jump makes the stroke no longer a rectangle, so no snap, but
     // the timer DID fire (recognizeShape attempted). Assert no crash + still stroke.
+    expect(created).toHaveLength(1);
+  });
+
+  it('uses screen-space movement for the dwell slop when zoomed', () => {
+    const { canvas, created, removeElement } = makeCanvas({ zoom: 5 });
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    feed(tool, canvas, rectStroke(10, 20, 200, 120));
+
+    vi.advanceTimersByTime(400);
+    tool.update(canvas, PRESSURE_EVENT, pos(213, 23));
+    vi.advanceTimersByTime(400);
+    expect(removeElement).not.toHaveBeenCalled();
     expect(created).toHaveLength(1);
   });
 
