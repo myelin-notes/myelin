@@ -354,6 +354,11 @@ const es: typeof en = {
           touch: 'Toque',
         },
       },
+      penBarrelButtonImmediate: {
+        label: 'Cambiar al borrador inmediatamente',
+        description:
+          'Cambia al borrador al pulsar el botón del lápiz. Si está desactivado, aplica el cambio cuando se levanta el lápiz.',
+      },
     },
     pageFrameEditing: {
       title: 'Edición de marcos de página',

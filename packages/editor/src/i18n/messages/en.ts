@@ -349,6 +349,11 @@ const en = {
           touch: 'Touch',
         },
       },
+      penBarrelButtonImmediate: {
+        label: 'Switch to eraser immediately',
+        description:
+          'Switch to the eraser as soon as the pen button is pressed. When off, apply the switch after the pen lifts.',
+      },
     },
     pageFrameEditing: {
       title: 'Page Frame Editing',

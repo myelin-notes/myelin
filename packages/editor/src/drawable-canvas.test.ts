@@ -5,8 +5,10 @@ import {
   type ElementOrderItem,
   isStylusTouch,
   moveElementOrderForSelection,
+  shouldApplyPenEraserOverride,
 } from './drawable-canvas';
 import { ElementType } from './elements/element-type';
+import { UserPrefs } from './user-prefs';
 
 const order = (...items: Array<[string, ElementType]>): ElementOrderItem[] =>
   items.map(([uuid, type]) => ({ uuid, type }));
@@ -61,6 +63,21 @@ describe('isStylusTouch', () => {
   it('is inert for fingers and for browsers without touchType', () => {
     expect(isStylusTouch(touchEvent([{ touchType: 'direct' }]))).toBe(false);
     expect(isStylusTouch(touchEvent([{}]))).toBe(false);
+  });
+});
+
+describe('shouldApplyPenEraserOverride', () => {
+  it('defaults to queued mode', () => {
+    expect(UserPrefs.get('penBarrelButtonImmediate')).toBe(false);
+  });
+
+  it('applies immediate button changes while the pen is touching', () => {
+    expect(shouldApplyPenEraserOverride(true, true)).toBe(true);
+  });
+
+  it('queues button changes until the pen lifts when immediate mode is off', () => {
+    expect(shouldApplyPenEraserOverride(false, true)).toBe(false);
+    expect(shouldApplyPenEraserOverride(false, false)).toBe(true);
   });
 });
 

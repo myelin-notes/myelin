@@ -30,6 +30,7 @@ import { PenTool } from './tools/pen-tool';
 import { SelectTool } from './tools/select-tool';
 import { TextTool } from './tools/text-tool';
 import type { ITool, ToolId } from './tools/tool';
+import { UserPrefs } from './user-prefs';
 import { CollisionHelper } from './utils/collision-helper';
 import { StateMachine } from './utils/state-machine';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
@@ -70,6 +71,13 @@ const PEN_CONTACT_BUTTONS = 1 | 32;
 
 /** A second barrel button reports as the middle button, and opens the wheel. */
 const PEN_WHEEL_BUTTONS = 4;
+
+export function shouldApplyPenEraserOverride(
+  immediate: boolean,
+  penContact: boolean,
+): boolean {
+  return immediate || !penContact;
+}
 
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
@@ -226,6 +234,7 @@ export class DrawableCanvas {
   // held state that decides it — see syncEraserOverride.
   private _eraserOverride: ITool | null = null;
   private _eraserButtonsHeld: boolean = false;
+  private _queuedEraserSwitch: boolean = false;
   // Lets the contact edges a chorded button hides be spotted — see syncPenChordedContact.
   private _penContactOpen: boolean = false;
   private _lastToolSampleTime: number = 0;
@@ -1600,10 +1609,29 @@ export class DrawableCanvas {
       return;
     }
     const held = (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
-    if (held === this._eraserButtonsHeld) {
+    const changed = held !== this._eraserButtonsHeld;
+    this._eraserButtonsHeld = held;
+    const immediate = UserPrefs.get('penBarrelButtonImmediate');
+    const penContact = (evt.buttons & PEN_CONTACT_BUTTONS) !== 0;
+    const penLifted =
+      evt.type === 'pointerup' || evt.type === 'pointercancel' || !penContact;
+    if (!immediate) {
+      if (changed && held) {
+        this._queuedEraserSwitch = true;
+      }
+      if (this._queuedEraserSwitch && penLifted) {
+        this._queuedEraserSwitch = false;
+        const eraser = this.tools.findIndex((tool) => tool.id === 'eraser');
+        if (eraser >= 0) {
+          this.switchTool(eraser);
+        }
+      }
       return;
     }
-    this._eraserButtonsHeld = held;
+    this._queuedEraserSwitch = false;
+    if (!changed) {
+      return;
+    }
     // Swapping the tool mid-interaction would hand the new one an interaction the old one opened.
     const inFlight = this.state.current === InteractState.UsingTool;
     if (inFlight) {
@@ -1670,6 +1698,7 @@ export class DrawableCanvas {
     // like no change at all and the override could never re-engage.
     this._eraserOverride = null;
     this._eraserButtonsHeld = false;
+    this._queuedEraserSwitch = false;
     this.toolSelected.interrupt(this);
     const next = this.tools[to];
     // A tool that pushes options onto the selection (the text tool) needs it to survive the switch,

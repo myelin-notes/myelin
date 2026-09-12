@@ -338,6 +338,11 @@ const zhHans: typeof en = {
           touch: '触摸',
         },
       },
+      penBarrelButtonImmediate: {
+        label: '立即切换到橡皮擦',
+        description:
+          '按下手写笔按钮后立即切换到橡皮擦。关闭后，抬起手写笔时才应用切换。',
+      },
     },
     pageFrameEditing: {
       title: '页面框编辑',
