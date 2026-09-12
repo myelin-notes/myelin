@@ -12,6 +12,8 @@ export interface StrokeStyle {
   size: number;
   /** perfect-freehand `streamline`, 0 = raw input. Absent on strokes saved before it existed. */
   stabilization?: number;
+  /** Whether perfect-freehand should vary width from velocity when no sensor pressure is recorded. */
+  simulatePressure?: boolean;
 }
 
 export const DEFAULT_STABILIZATION = 0.5;
@@ -103,6 +105,9 @@ export class StrokeElement extends DrawableElement {
       color: this.style.color,
       size: this.style.size,
       stabilization: this.style.stabilization ?? DEFAULT_STABILIZATION,
+      ...(this.style.simulatePressure === undefined
+        ? {}
+        : { simulatePressure: this.style.simulatePressure }),
       hasPressure: this.hasPressure,
       // Flat [x,y,p, ...] stored as a single Y.Map value rather than a
       // Y.Array<number>: one CRDT item instead of one per coordinate.
@@ -134,6 +139,10 @@ export class StrokeElement extends DrawableElement {
       },
       stabilization: (v) => {
         this.style.stabilization = v as number;
+        this.dirty = true;
+      },
+      simulatePressure: (v) => {
+        this.style.simulatePressure = v as boolean;
         this.dirty = true;
       },
       hasPressure: (v) => {
@@ -228,7 +237,7 @@ export class StrokeElement extends DrawableElement {
     }
 
     const outline = getStroke(input, {
-      simulatePressure: !this.hasPressure,
+      simulatePressure: this.style.simulatePressure ?? !this.hasPressure,
       size: OUTLINE_SIZE,
       streamline: this.style.stabilization ?? DEFAULT_STABILIZATION,
       last: true,

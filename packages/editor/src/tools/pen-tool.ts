@@ -63,6 +63,7 @@ export class PenTool implements ITool {
           color: this.color,
           size: this.size,
           stabilization: this.stabilization / 10,
+          simulatePressure: this.usePressure ? undefined : false,
         }),
     );
   }
