@@ -447,9 +447,11 @@ export function PageFrameDomLayer({
       const zoom = dc.viewport.zoom;
       const offset = dc.viewport.offset;
       const viewAnimating = dc.viewport.isAnimatingView;
-      const frames = dc.getElementsByType(
-        ElementType.PAGE_FRAME,
-      ) as PageFrameElement[];
+      const elements = dc.elements;
+      const frames = elements.filter(
+        (element): element is PageFrameElement =>
+          element.type === ElementType.PAGE_FRAME,
+      );
       const activeFrames = new Map<string, PageFrameElement>();
 
       for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
@@ -474,6 +476,7 @@ export function PageFrameDomLayer({
         const contentWidth = frame.totalWidth;
         const contentHeight = frame.totalHeight;
         const pageLayout = frame.pageLayout;
+        refs.chrome.setZIndex(`${elements.indexOf(frame) + 1}`);
         if (dc.editingElement === frame) {
           dc.syncViewportEditModePan();
         }
@@ -764,7 +767,6 @@ export function PageFrameDomLayer({
           inset: 0,
           pointerEvents: 'none',
           overflow: 'clip',
-          zIndex: 5,
         }}
       />
       {activeView && <FloatingToolbar view={activeView} />}

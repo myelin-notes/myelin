@@ -280,8 +280,8 @@ export class CanvasRenderer {
       for (const element of elements) {
         element.syncDOM(viewport, domOverlayHost);
       }
-      // DOM overlay nodes share one layer and stack by DOM order, not element z-order, and syncDOM
-      // only appends on create — so a reorder never moves them. Only out-of-position nodes move.
+      // DOM roots share canvas order with page-frame chrome, so keep both z-index and sibling order
+      // in sync. `syncDOM` only appends on create, so only out-of-position nodes move.
       reorderDomOverlay(domOverlayHost, elements);
     }
   }
@@ -381,27 +381,30 @@ export class CanvasRenderer {
   }
 }
 
-function reorderDomOverlay(
+export function reorderDomOverlay(
   host: HTMLElement,
-  elements: DrawableElement[],
+  elements: readonly Pick<DrawableElement, 'uuid' | 'setDomZIndex'>[],
 ): void {
-  const nodes = new Map<string, Element>();
+  const nodes = new Map<string, HTMLElement>();
   for (const child of host.children) {
-    const uuid = (child as HTMLElement).dataset.elementUuid;
+    const node = child as HTMLElement;
+    const uuid = node.dataset.elementUuid;
     if (uuid) {
-      nodes.set(uuid, child);
+      nodes.set(uuid, node);
     }
   }
-  if (nodes.size < 2) {
-    return;
-  }
-
-  let prev: Element | null = null;
-  for (const element of elements) {
+  let prev: HTMLElement | null = null;
+  for (let index = 0; index < elements.length; index++) {
+    const element = elements[index];
     const node = nodes.get(element.uuid);
     if (!node) {
       continue;
     }
+    const zIndex = String(index + 1);
+    if (node.style.zIndex !== zIndex) {
+      node.style.zIndex = zIndex;
+    }
+    element.setDomZIndex(zIndex);
     const expected: Element | null = prev
       ? prev.nextElementSibling
       : host.firstElementChild;

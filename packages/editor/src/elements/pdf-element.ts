@@ -578,6 +578,20 @@ export class PdfElement extends DrawableElement {
     this.syncDeleteButtons(viewport, zoom, scaleX, scaleY, layout);
   }
 
+  public override setDomZIndex(zIndex: string): void {
+    this._chrome?.setZIndex(zIndex);
+    for (const button of this._gapButtons.values()) {
+      if (button.root.style.zIndex !== zIndex) {
+        button.root.style.zIndex = zIndex;
+      }
+    }
+    for (const button of this._deleteButtons.values()) {
+      if (button.root.style.zIndex !== zIndex) {
+        button.root.style.zIndex = zIndex;
+      }
+    }
+  }
+
   public override disposeDOM(): void {
     super.disposeDOM();
     this._loadGeneration++;
