@@ -22,6 +22,6 @@ export async function pdfImportHandler(
   const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
   const cy = options.screenY ?? canvas.ctx.canvas.height / dpr / 2;
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });
-  pdf.setOffset(world.x - pdf.totalWidth / 2, world.y - pdf.totalHeight / 2);
+  pdf.setOffset(world.x - pdf.totalWidth / 2, world.y);
   pdf.updateBounds();
 }
