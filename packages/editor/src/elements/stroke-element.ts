@@ -259,36 +259,67 @@ export class StrokeElement extends DrawableElement {
       last: true,
     };
     const strokePoints = getStrokePoints(input, options);
-    let before = 0;
-    let after = 0;
-    const tangentDistance = OUTLINE_SIZE / 2;
-    // Estimate nib direction over distance: subpixel moves must not rotate a full-width edge.
-    for (let i = 0; i < strokePoints.length; i++) {
-      const point = strokePoints[i];
-      while (
-        before + 1 < i &&
-        point.runningLength - strokePoints[before + 1].runningLength >=
-          tangentDistance
-      ) {
-        before++;
+    if (strokePoints.length > 1) {
+      // Opposing vectors cancel at a hairpin; averaging their unwrapped angles keeps the turn
+      // continuous while still filtering reversals too short to rotate a full-width edge.
+      const angles = new Array<number>(strokePoints.length);
+      const angleIntegrals = new Array<number>(strokePoints.length).fill(0);
+      angles[0] = Math.atan2(
+        strokePoints[0].vector[1],
+        strokePoints[0].vector[0],
+      );
+      for (let i = 1; i < strokePoints.length; i++) {
+        const rawAngle = Math.atan2(
+          strokePoints[i].vector[1],
+          strokePoints[i].vector[0],
+        );
+        const delta = Math.atan2(
+          Math.sin(rawAngle - angles[i - 1]),
+          Math.cos(rawAngle - angles[i - 1]),
+        );
+        angles[i] = angles[i - 1] + delta;
+        angleIntegrals[i] =
+          angleIntegrals[i - 1] +
+          angles[i] *
+            (strokePoints[i].runningLength - strokePoints[i - 1].runningLength);
       }
-      after = Math.max(after, i);
-      while (
-        after < strokePoints.length - 1 &&
-        strokePoints[after].runningLength - point.runningLength <
-          tangentDistance
-      ) {
-        after++;
-      }
-      const dx = strokePoints[before].point[0] - strokePoints[after].point[0];
-      const dy = strokePoints[before].point[1] - strokePoints[after].point[1];
-      const length = Math.hypot(dx, dy);
-      const span =
-        strokePoints[after].runningLength - strokePoints[before].runningLength;
-      // A collapsed chord crosses a genuine hairpin; its original vectors let perfect-freehand
-      // recognize and round the turn instead of pinching the outline across it.
-      if (length > 0 && length >= span / 2) {
-        point.vector = [dx / length, dy / length];
+
+      let lowerSegment = 1;
+      let upperSegment = 1;
+      const tangentDistance = OUTLINE_SIZE / 2;
+      const totalLength = strokePoints[strokePoints.length - 1].runningLength;
+      for (const point of strokePoints) {
+        const lowerLength = Math.max(
+          strokePoints[0].runningLength,
+          point.runningLength - tangentDistance,
+        );
+        const upperLength = Math.min(
+          totalLength,
+          point.runningLength + tangentDistance,
+        );
+        while (
+          lowerSegment < strokePoints.length - 1 &&
+          strokePoints[lowerSegment].runningLength < lowerLength
+        ) {
+          lowerSegment++;
+        }
+        while (
+          upperSegment < strokePoints.length - 1 &&
+          strokePoints[upperSegment].runningLength < upperLength
+        ) {
+          upperSegment++;
+        }
+        const lowerIntegral =
+          angleIntegrals[lowerSegment - 1] +
+          angles[lowerSegment] *
+            (lowerLength - strokePoints[lowerSegment - 1].runningLength);
+        const upperIntegral =
+          angleIntegrals[upperSegment - 1] +
+          angles[upperSegment] *
+            (upperLength - strokePoints[upperSegment - 1].runningLength);
+        const angle =
+          (upperIntegral - lowerIntegral) / (upperLength - lowerLength);
+        point.vector = [Math.cos(angle), Math.sin(angle)];
       }
     }
     const outline = getStrokeOutlinePoints(strokePoints, options);

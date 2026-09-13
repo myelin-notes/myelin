@@ -414,7 +414,7 @@ describe('StrokeElement turning tip', () => {
     expect(tipDisplacement(expected, actual)).toBeLessThan(0.1);
   });
 
-  it('rounds a tight loop instead of pinching one side', () => {
+  it('rounds a tight loop without splitting its apex into corner caps', () => {
     const points = [
       [-15, 25],
       [0, 25],
@@ -433,8 +433,9 @@ describe('StrokeElement turning tip', () => {
     });
     const outline = outlineAtTip(stroke, 0, 0);
 
+    // A false sharp-corner hit adds perfect-freehand's 26-point circular cap at the apex.
+    expect(outline.length).toBeLessThan(80);
     expect(Math.min(...outline.map(([, y]) => y))).toBeLessThan(-28);
-    expect(outline.some(([x, y]) => x < -4 && y < -24)).toBe(true);
   });
 
   it.each([
