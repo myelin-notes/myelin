@@ -72,9 +72,7 @@ registry.defineDefaults({
   'canvas:pan': {
     key: ' ',
   },
-  'canvas:delete': {
-    key: 'Backspace',
-  },
+  'canvas:delete': [{ key: 'Backspace' }, { key: 'Delete' }],
   'canvas:tool-select': {
     key: 'v',
   },

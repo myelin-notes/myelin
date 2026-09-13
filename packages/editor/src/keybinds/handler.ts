@@ -133,8 +133,10 @@ export class KeybindingHandler {
       if (!b.allowEditable && isEditableTarget(e)) {
         continue;
       }
-      const combo = this.registry.getCombo(b.action);
-      if (combo && comboMatches(e, combo)) {
+      const matches = this.registry
+        .getCombos(b.action)
+        .some((combo) => comboMatches(e, combo));
+      if (matches) {
         b.onDown?.(e);
       }
     }
@@ -145,8 +147,10 @@ export class KeybindingHandler {
       if (!b.allowEditable && !this.filter(e)) {
         continue;
       }
-      const combo = this.registry.getCombo(b.action);
-      if (combo && comboMatches(e, combo)) {
+      const matches = this.registry
+        .getCombos(b.action)
+        .some((combo) => comboMatches(e, combo));
+      if (matches) {
         b.onUp?.(e);
       }
     }

@@ -14,6 +14,8 @@ export interface KeyCombo {
   alt?: boolean;
 }
 
+type DefaultKeyCombo = KeyCombo | KeyCombo[];
+
 export function comboMatches(e: KeyboardEvent, combo: KeyCombo): boolean {
   if (e.key.toLowerCase() !== combo.key.toLowerCase()) {
     return false;
@@ -69,7 +71,7 @@ export function comboToPMKey(combo: KeyCombo): string {
 }
 
 export class KeybindingRegistry {
-  private defaults = new Map<string, KeyCombo>();
+  private defaults = new Map<string, KeyCombo[]>();
   private overrides = new Map<string, KeyCombo>();
   private locked = new Set<string>();
 
@@ -78,14 +80,14 @@ export class KeybindingRegistry {
   }
 
   defineDefaults(
-    defaults: Partial<Record<Action, KeyCombo>>,
+    defaults: Partial<Record<Action, DefaultKeyCombo>>,
     options?: { locked?: boolean },
   ) {
     for (const [action, def] of Object.entries(defaults)) {
       if (!def) {
         continue;
       }
-      this.defaults.set(action, def);
+      this.defaults.set(action, Array.isArray(def) ? def : [def]);
       if (options?.locked) {
         this.locked.add(action);
       }
@@ -93,11 +95,16 @@ export class KeybindingRegistry {
   }
 
   getCombo(action: Action): KeyCombo | undefined {
-    return this.overrides.get(action) ?? this.defaults.get(action);
+    return this.overrides.get(action) ?? this.defaults.get(action)?.[0];
+  }
+
+  getCombos(action: Action): KeyCombo[] {
+    const override = this.overrides.get(action);
+    return override ? [override] : (this.defaults.get(action) ?? []);
   }
 
   getDefault(action: Action): KeyCombo | undefined {
-    return this.defaults.get(action);
+    return this.defaults.get(action)?.[0];
   }
 
   isRebound(action: Action): boolean {
