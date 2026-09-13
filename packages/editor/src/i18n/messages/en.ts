@@ -227,6 +227,10 @@ const en = {
       toggleChildren: (tag: string) => `Toggle tags under #${tag}`,
       placeholder: 'Tag name...',
       deleteTag: (tag: string) => `Delete #${tag}`,
+      deleteUsedTitle: 'Delete used tag?',
+      deleteUsedDescription: (tag: string, count: number) =>
+        `#${tag} is used by ${count} ${count === 1 ? 'item' : 'items'}. Deleting it will also remove matching child tags from those items.`,
+      deleteUsedAction: 'Delete tag',
       stats: {
         totalFiles: 'Total Files',
         folders: 'Folders',

@@ -13,6 +13,16 @@ import { formatNumber } from '@myelin/editor/i18n/format';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useRepository } from '@/lib/sync';
 import {
   normalizeTagInput,
@@ -70,6 +80,10 @@ export const SidebarTags = memo(function SidebarTags({
   const [addParent, setAddParent] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [newTag, setNewTag] = useState('');
+  const [tagPendingDeletion, setTagPendingDeletion] = useState<{
+    tag: string;
+    count: number;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [height, setHeightState] = useState(() =>
     clampTagsHeight(UserPrefs.get('sidebarTagsHeight')),
@@ -162,6 +176,22 @@ export const SidebarTags = memo(function SidebarTags({
     } catch (error) {
       logger.error('Failed to delete tag', error, { tag });
     }
+  };
+
+  const requestDeleteTag = (tag: string, count: number) => {
+    if (count > 0) {
+      setTagPendingDeletion({ tag, count });
+      return;
+    }
+    void deleteTag(tag);
+  };
+
+  const confirmDeleteTag = async () => {
+    if (!tagPendingDeletion) {
+      return;
+    }
+    await deleteTag(tagPendingDeletion.tag);
+    setTagPendingDeletion(null);
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey/internalRefresh are triggers that re-run the fetch
@@ -458,7 +488,7 @@ export const SidebarTags = memo(function SidebarTags({
                       </button>
                       <button
                         type="button"
-                        onClick={() => deleteTag(tag)}
+                        onClick={() => requestDeleteTag(tag, count)}
                         aria-label={strings.library.semanticTags.deleteTag(tag)}
                         className={cn(
                           'flex shrink-0 cursor-pointer items-center rounded p-0.5',
@@ -478,6 +508,36 @@ export const SidebarTags = memo(function SidebarTags({
           )}
         </div>
       )}
+      <AlertDialog
+        open={tagPendingDeletion !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTagPendingDeletion(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {strings.library.semanticTags.deleteUsedTitle}
+            </AlertDialogTitle>
+            {tagPendingDeletion && (
+              <AlertDialogDescription>
+                {strings.library.semanticTags.deleteUsedDescription(
+                  tagPendingDeletion.tag,
+                  tagPendingDeletion.count,
+                )}
+              </AlertDialogDescription>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{strings.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmDeleteTag}>
+              {strings.library.semanticTags.deleteUsedAction}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });
