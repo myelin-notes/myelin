@@ -15,6 +15,7 @@ import {
 // selectable and gives the placeholder room to render.
 const EMPTY_WIDTH = 140;
 const EMPTY_HEIGHT = 44;
+const LATEX_FONT_SIZE_BASE = 16;
 const PLACEHOLDER = 'Add LaTeX…';
 const EDIT_PANEL_MIN_WIDTH = 240;
 const EDIT_PANEL_GAP = 6;
@@ -115,7 +116,22 @@ export class LatexElement extends DrawableElement {
     return this._editing;
   }
 
+  /** The formula's rendered size, derived from its uniform canvas scale. */
+  public get fontSize(): number {
+    return Math.round(Math.abs(this._scale.x) * LATEX_FONT_SIZE_BASE);
+  }
+
+  /** Updates the rendered size by changing the formula's uniform canvas scale. */
+  public setFontSize(fontSize: number): void {
+    const scale = fontSize / LATEX_FONT_SIZE_BASE;
+    this.setScale(scale, scale);
+  }
+
   public override get editable(): boolean {
+    return true;
+  }
+
+  public override get keepsSelectionToolbarWhileEditing(): boolean {
     return true;
   }
 
