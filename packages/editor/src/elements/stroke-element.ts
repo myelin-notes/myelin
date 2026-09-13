@@ -1,4 +1,4 @@
-import { getStroke } from 'perfect-freehand';
+import { getStrokeOutlinePoints, getStrokePoints } from 'perfect-freehand';
 import type * as Y from 'yjs';
 import { resolveInkColor } from '../canvas-theme';
 import { parseCssColor } from '../pdf-export/color';
@@ -249,12 +249,44 @@ export class StrokeElement extends DrawableElement {
       ]);
     }
 
-    const outline = getStroke(input, {
+    const options = {
       simulatePressure: this.style.simulatePressure ?? !this.hasPressure,
       size: OUTLINE_SIZE,
+      // The default edge spacing makes the live cap jump when a new point survives a turn.
+      smoothing: 0.1,
       streamline: this.style.stabilization ?? DEFAULT_STABILIZATION,
       last: true,
-    });
+    };
+    const strokePoints = getStrokePoints(input, options);
+    let before = 0;
+    let after = 0;
+    const tangentDistance = OUTLINE_SIZE / 2;
+    // Estimate nib direction over distance: subpixel moves must not rotate a full-width edge.
+    for (let i = 0; i < strokePoints.length; i++) {
+      const point = strokePoints[i];
+      while (
+        before + 1 < i &&
+        point.runningLength - strokePoints[before + 1].runningLength >=
+          tangentDistance
+      ) {
+        before++;
+      }
+      after = Math.max(after, i);
+      while (
+        after < strokePoints.length - 1 &&
+        strokePoints[after].runningLength - point.runningLength <
+          tangentDistance
+      ) {
+        after++;
+      }
+      const dx = strokePoints[before].point[0] - strokePoints[after].point[0];
+      const dy = strokePoints[before].point[1] - strokePoints[after].point[1];
+      const length = Math.hypot(dx, dy);
+      if (length > 0) {
+        point.vector = [dx / length, dy / length];
+      }
+    }
+    const outline = getStrokeOutlinePoints(strokePoints, options);
     for (const point of outline) {
       point[0] = point[0] / scale + originX;
       point[1] = point[1] / scale + originY;
