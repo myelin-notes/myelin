@@ -1,4 +1,4 @@
-import { memo, useRef } from 'react';
+import { memo, useLayoutEffect, useRef } from 'react';
 import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
@@ -55,6 +55,8 @@ interface CanvasToolbarProps {
   embedComposer?: React.ReactNode;
 }
 
+const PANEL_VIEWPORT_MARGIN = 16;
+
 function getCustomColorTool(tool: ITool | undefined): CustomColorTool | null {
   switch (tool?.id) {
     case 'pen':
@@ -101,6 +103,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
   const insertButtonRef = useRef<HTMLElement | null>(null);
+  const optionsPanelRef = useRef<HTMLDivElement>(null);
+  const optionsPanelContentRef = useRef<HTMLDivElement>(null);
 
   // Compact stacks the panels above a bottom bar, where they span its width and
   // need no per-button alignment.
@@ -129,6 +133,56 @@ export const CanvasToolbar = memo(function CanvasToolbar({
     : 'my-1 h-px w-4 bg-border-divider';
   // 44px touch target on compact, against 36px for a cursor.
   const buttonPadClass = IS_PHONE_BUILD ? 'p-3.5' : 'p-2.5';
+
+  useLayoutEffect(() => {
+    if (IS_PHONE_BUILD || !optionsPresence.mounted) {
+      return;
+    }
+
+    const panel = optionsPanelRef.current;
+    const panelContent = optionsPanelContentRef.current;
+    const toolbar = toolbarRef.current;
+    const button = toolButtonRefs.current[selectedToolIndex];
+    if (!(panel && panelContent && toolbar && button)) {
+      return;
+    }
+
+    const syncPosition = () => {
+      const viewportTop = window.visualViewport?.offsetTop ?? 0;
+      const viewportHeight =
+        window.visualViewport?.height ?? window.innerHeight;
+      const viewportBottom = viewportTop + viewportHeight;
+      panelContent.style.setProperty(
+        '--tool-options-available-height',
+        `${Math.max(0, viewportHeight - PANEL_VIEWPORT_MARGIN * 2)}px`,
+      );
+      const panelHeight = panel.getBoundingClientRect().height;
+      const toolbarTop = toolbar.getBoundingClientRect().top;
+      const anchorTop = button.getBoundingClientRect().top;
+      const maxTop = viewportBottom - PANEL_VIEWPORT_MARGIN - panelHeight;
+      const top = Math.max(
+        viewportTop + PANEL_VIEWPORT_MARGIN,
+        Math.min(anchorTop, maxTop),
+      );
+
+      panel.style.top = `${Math.round(top - toolbarTop)}px`;
+    };
+
+    syncPosition();
+    const resizeObserver = new ResizeObserver(syncPosition);
+    resizeObserver.observe(panelContent);
+    resizeObserver.observe(toolbar);
+    window.addEventListener('resize', syncPosition);
+    window.visualViewport?.addEventListener('resize', syncPosition);
+    window.visualViewport?.addEventListener('scroll', syncPosition);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', syncPosition);
+      window.visualViewport?.removeEventListener('resize', syncPosition);
+      window.visualViewport?.removeEventListener('scroll', syncPosition);
+    };
+  }, [optionsPresence.mounted, selectedToolIndex]);
 
   return (
     <TooltipProvider>
@@ -304,6 +358,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 
         {optionsPresence.mounted && (
           <div
+            ref={optionsPanelRef}
             {...optionsPresence.state}
             onAnimationEnd={optionsPresence.onAnimationEnd}
             className={`data-closed:fade-out-0 data-open:fade-in-0 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in ${
@@ -316,6 +371,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             <ToolOptionsPanel
               options={activeOptions}
               customColorTool={getCustomColorTool(tools[selectedToolIndex])}
+              containerRef={optionsPanelContentRef}
               savePresetDisabledReason={savePresetDisabledReason}
               onSavePreset={onSavePreset}
             />
