@@ -72,13 +72,6 @@ const PEN_CONTACT_BUTTONS = 1 | 32;
 /** A second barrel button reports as the middle button, and opens the wheel. */
 const PEN_WHEEL_BUTTONS = 4;
 
-export function shouldApplyPenEraserOverride(
-  immediate: boolean,
-  penContact: boolean,
-): boolean {
-  return immediate || !penContact;
-}
-
 function getElementLayer(type: ElementType): number {
   return isBackgroundElement(type) ? 0 : 1;
 }
@@ -234,7 +227,7 @@ export class DrawableCanvas {
   // held state that decides it — see syncEraserOverride.
   private _eraserOverride: ITool | null = null;
   private _eraserButtonsHeld: boolean = false;
-  private _queuedEraserSwitch: boolean = false;
+  private _eraserOverrideQueued: boolean = false;
   // Lets the contact edges a chorded button hides be spotted — see syncPenChordedContact.
   private _penContactOpen: boolean = false;
   private _lastToolSampleTime: number = 0;
@@ -1632,23 +1625,16 @@ export class DrawableCanvas {
     const penContact = (evt.buttons & PEN_CONTACT_BUTTONS) !== 0;
     const penLifted =
       evt.type === 'pointerup' || evt.type === 'pointercancel' || !penContact;
-    if (!immediate) {
-      if (changed && held) {
-        this._queuedEraserSwitch = true;
-      }
-      if (this._queuedEraserSwitch && penLifted) {
-        this._queuedEraserSwitch = false;
-        const eraser = this.tools.findIndex((tool) => tool.id === 'eraser');
-        if (eraser >= 0) {
-          this.switchTool(eraser);
-        }
+    if (!immediate && !penLifted) {
+      if (changed) {
+        this._eraserOverrideQueued = true;
       }
       return;
     }
-    this._queuedEraserSwitch = false;
-    if (!changed) {
+    if (!changed && !this._eraserOverrideQueued) {
       return;
     }
+    this._eraserOverrideQueued = false;
     // Swapping the tool mid-interaction would hand the new one an interaction the old one opened.
     const inFlight = this.state.current === InteractState.UsingTool;
     if (inFlight) {
@@ -1715,7 +1701,7 @@ export class DrawableCanvas {
     // like no change at all and the override could never re-engage.
     this._eraserOverride = null;
     this._eraserButtonsHeld = false;
-    this._queuedEraserSwitch = false;
+    this._eraserOverrideQueued = false;
     this.toolSelected.interrupt(this);
     const next = this.tools[to];
     // A tool that pushes options onto the selection (the text tool) needs it to survive the switch,
