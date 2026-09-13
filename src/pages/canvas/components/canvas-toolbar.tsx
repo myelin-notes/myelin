@@ -235,7 +235,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                         : ''}
                     </span>
                     {hotkey && (
-                      <kbd className="flex min-w-[18px] items-center justify-center rounded-[4px] border border-white/20 bg-white/10 px-1 py-[1px] font-sans font-semibold text-[10px] text-white/80">
+                      <kbd className="flex min-w-[18px] items-center justify-center rounded-[4px] border border-background/20 bg-background/10 px-1 py-[1px] font-sans font-semibold text-[10px] text-background/80">
                         {hotkey}
                       </kbd>
                     )}
