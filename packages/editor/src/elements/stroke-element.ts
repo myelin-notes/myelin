@@ -12,7 +12,7 @@ export interface StrokeStyle {
   size: number;
   /** perfect-freehand `streamline`, 0 = raw input. Absent on strokes saved before it existed. */
   stabilization?: number;
-  /** Whether perfect-freehand should vary width from velocity when no sensor pressure is recorded. */
+  /** False for pressure-disabled, uniform-width strokes; absent enables sensor or velocity pressure. */
   simulatePressure?: boolean;
 }
 
@@ -252,6 +252,7 @@ export class StrokeElement extends DrawableElement {
     const options = {
       simulatePressure: this.style.simulatePressure ?? !this.hasPressure,
       size: OUTLINE_SIZE,
+      ...(this.style.simulatePressure === false ? { thinning: 0 } : {}),
       // The default edge spacing makes the live cap jump when a new point survives a turn.
       smoothing: 0.1,
       streamline: this.style.stabilization ?? DEFAULT_STABILIZATION,
@@ -282,7 +283,11 @@ export class StrokeElement extends DrawableElement {
       const dx = strokePoints[before].point[0] - strokePoints[after].point[0];
       const dy = strokePoints[before].point[1] - strokePoints[after].point[1];
       const length = Math.hypot(dx, dy);
-      if (length > 0) {
+      const span =
+        strokePoints[after].runningLength - strokePoints[before].runningLength;
+      // A collapsed chord crosses a genuine hairpin; its original vectors let perfect-freehand
+      // recognize and round the turn instead of pinching the outline across it.
+      if (length > 0 && length >= span / 2) {
         point.vector = [dx / length, dy / length];
       }
     }
