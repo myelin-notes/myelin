@@ -68,17 +68,17 @@ describe('isStylusTouch', () => {
 });
 
 describe('pen eraser override', () => {
-  it('defaults to queued mode', () => {
-    expect(UserPrefs.get('penBarrelButtonImmediate')).toBe(false);
-  });
+  type TestableDrawableCanvas = {
+    toolSelected: ITool;
+    syncEraserOverride(event: PointerEvent): void;
+  };
 
-  it('restores the pen when a queued eraser override is released', () => {
+  const penEvent = (type: string, button: number, buttons: number) =>
+    ({ type, button, buttons, pointerType: 'pen' }) as PointerEvent;
+
+  function makeCanvas() {
     const pen = { id: 'pen' } as ITool;
     const eraser = { id: 'eraser' } as ITool;
-    type TestableDrawableCanvas = {
-      toolSelected: ITool;
-      syncEraserOverride(event: PointerEvent): void;
-    };
     const canvas = Object.assign(Object.create(DrawableCanvas.prototype), {
       tools: [pen, eraser],
       toolSelected: pen,
@@ -87,16 +87,84 @@ describe('pen eraser override', () => {
       _eraserOverrideQueued: false,
       state: { current: Number.NaN },
     }) as TestableDrawableCanvas;
-    const penEvent = (type: string, buttons: number) =>
-      ({ type, buttons, pointerType: 'pen' }) as PointerEvent;
+    return { canvas, pen, eraser };
+  }
 
-    canvas.syncEraserOverride(penEvent('pointerdown', 3));
-    expect(canvas.toolSelected).toBe(pen);
+  it('defaults to queued mode', () => {
+    expect(UserPrefs.get('penBarrelButtonImmediate')).toBe(false);
+  });
 
-    canvas.syncEraserOverride(penEvent('pointermove', 2));
+  it('applies an immediate override on press and restores it on button release', () => {
+    UserPrefs.set('penBarrelButtonImmediate', true);
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 3));
     expect(canvas.toolSelected).toBe(eraser);
 
-    canvas.syncEraserOverride(penEvent('pointerup', 0));
+    canvas.syncEraserOverride(penEvent('pointerup', 0, 0));
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerup', 2, 0));
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('applies a queued override after a chorded tip lift, then restores it', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 3));
+    expect(canvas.toolSelected).toBe(pen);
+
+    canvas.syncEraserOverride(penEvent('pointermove', 0, 2));
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerup', 2, 0));
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('does not mistake a tip lift that clears buttons for a barrel release', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 3));
+    expect(canvas.toolSelected).toBe(pen);
+
+    canvas.syncEraserOverride(penEvent('pointerup', 0, 0));
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerup', 2, 0));
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('applies a queued native eraser signal when its contact lifts', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 5, 32));
+    expect(canvas.toolSelected).toBe(pen);
+
+    canvas.syncEraserOverride(penEvent('pointerup', 5, 0));
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 1));
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('cancels a queued override when the button is released before lift', () => {
+    const { canvas, pen } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 3));
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 1));
+    canvas.syncEraserOverride(penEvent('pointerup', 0, 0));
+
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('restores before the next contact when no separate release event arrives', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 3));
+    canvas.syncEraserOverride(penEvent('pointerup', 0, 0));
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 1));
     expect(canvas.toolSelected).toBe(pen);
   });
 });

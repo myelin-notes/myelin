@@ -1610,37 +1610,61 @@ export class DrawableCanvas {
   /**
    * Track the erase-while-held buttons across every pen event.
    *
-   * `button` names only the button that changed, and is absent when it was already held as the tip
-   * landed — the ordinary way an S Pen is used. `buttons` carries the held state on every event,
-   * hover included, so both edges are visible wherever they happen.
+   * Some WebViews clear the barrel bit from `buttons` when the tip lifts even though the button is
+   * still down. `button` distinguishes that contact change (0) from a barrel release (2); a later
+   * contact without an eraser bit is the fallback when no separate release event arrives. Android's
+   * native barrel rewrite uses the eraser contact value (5), so its queued `pointerup` is a lift.
    */
   private syncEraserOverride(evt: PointerEvent) {
     if (evt.pointerType !== 'pen') {
       return;
     }
-    const held = (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
-    const changed = held !== this._eraserButtonsHeld;
-    this._eraserButtonsHeld = held;
+    const reportedHeld = (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
+    const eraserButtonChanged = evt.button === 2 || evt.button === 5;
     const immediate = UserPrefs.get('penBarrelButtonImmediate');
     const penContact = (evt.buttons & PEN_CONTACT_BUTTONS) !== 0;
-    const penLifted =
-      evt.type === 'pointerup' || evt.type === 'pointercancel' || !penContact;
-    if (!immediate && !penLifted) {
-      if (changed) {
+    let applyOverride: boolean | null = null;
+
+    if (evt.type === 'pointercancel') {
+      this._eraserButtonsHeld = false;
+      this._eraserOverrideQueued = false;
+      applyOverride = false;
+    } else if (reportedHeld && !this._eraserButtonsHeld) {
+      this._eraserButtonsHeld = true;
+      if (immediate || !penContact) {
+        applyOverride = true;
+      } else {
         this._eraserOverrideQueued = true;
       }
+    } else if (this._eraserOverrideQueued && !penContact && evt.button !== 2) {
+      this._eraserOverrideQueued = false;
+      applyOverride = true;
+    } else if (
+      !reportedHeld &&
+      this._eraserButtonsHeld &&
+      (eraserButtonChanged || penContact)
+    ) {
+      this._eraserButtonsHeld = false;
+      this._eraserOverrideQueued = false;
+      applyOverride = false;
+    }
+
+    if (applyOverride === null) {
       return;
     }
-    if (!changed && !this._eraserOverrideQueued) {
+    if (
+      (applyOverride &&
+        (this._eraserOverride || this.toolSelected.id === 'eraser')) ||
+      (!applyOverride && !this._eraserOverride)
+    ) {
       return;
     }
-    this._eraserOverrideQueued = false;
     // Swapping the tool mid-interaction would hand the new one an interaction the old one opened.
     const inFlight = this.state.current === InteractState.UsingTool;
     if (inFlight) {
       this.state.change(InteractState.Idle, evt);
     }
-    if (held) {
+    if (applyOverride) {
       this.beginEraserOverride();
     } else {
       this.endEraserOverride();
