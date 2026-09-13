@@ -97,6 +97,22 @@ function makeTool(): HighlighterTool {
   return new HighlighterTool(() => catalogs.en);
 }
 
+function outlinePoints(stroke: StrokeElement): number[] {
+  let points: number[] = [];
+  stroke.drawToPdf({
+    worldToPagePt: (x, y) => ({ x, y }),
+    ptPerWorldY: 1,
+    push: (item) => {
+      if (item.t === 'path') {
+        points = item.pts;
+      }
+    },
+    addImageBase64: () => 0,
+    addFontBase64: () => 0,
+  });
+  return points;
+}
+
 describe('HighlighterTool does not snap into shapes', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -135,9 +151,36 @@ describe('HighlighterTool does not snap into shapes', () => {
     tool.start(canvas, {} as PointerEvent);
     const stroke = created[0] as StrokeElement;
 
-    tool.update(canvas, { pressure: 0.2 } as PointerEvent, pos(0, 0));
-    tool.update(canvas, { pressure: 0.9 } as PointerEvent, pos(30, 0));
+    for (let i = 0; i <= 40; i++) {
+      tool.update(
+        canvas,
+        { pressure: i % 2 === 0 ? 0.2 : 0.9 } as PointerEvent,
+        pos(i * 10, 0),
+      );
+    }
 
     expect(stroke.pressureEnabled).toBe(false);
+    expect(stroke.strokeStyle.simulatePressure).toBe(false);
+
+    const outline = outlinePoints(stroke);
+    const middleYs = [] as number[];
+    for (let i = 0; i + 1 < outline.length; i += 2) {
+      if (outline[i] >= 40 && outline[i] <= 360) {
+        middleYs.push(outline[i + 1]);
+      }
+    }
+    expect(Math.max(...middleYs) - Math.min(...middleYs)).toBeCloseTo(18, 5);
+  });
+
+  it('exposes stabilization in its options', () => {
+    const tool = makeTool();
+    const option = tool.getOptions().find((o) => o.key === 'stabilization');
+
+    expect(option?.type).toBe('size');
+    if (option?.type !== 'size') {
+      throw new Error('highlighter has no stabilization slider');
+    }
+    expect(option.min).toBe(0);
+    expect(option.max).toBe(10);
   });
 });

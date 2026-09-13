@@ -4,6 +4,7 @@ import type { InputMode } from '@myelin/editor/input-mode';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { useUserPref } from '@/lib/use-user-pref';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
+import { ToggleRow } from '../components/toggle-row';
 
 export function InputModeRow() {
   const strings = useMessages();
@@ -28,6 +29,7 @@ export function InputModeRow() {
 
 export function InputSection() {
   const strings = useMessages();
+  const penBarrelButtonImmediate = useUserPref('penBarrelButtonImmediate');
 
   return (
     <section id="input" className="scroll-mt-12">
@@ -38,6 +40,18 @@ export function InputSection() {
         </span>
       </div>
       <InputModeRow />
+      <div className="mt-2">
+        <ToggleRow
+          checked={penBarrelButtonImmediate}
+          onToggle={() =>
+            UserPrefs.set('penBarrelButtonImmediate', !penBarrelButtonImmediate)
+          }
+          label={strings.settings.input.penBarrelButtonImmediate.label}
+          description={
+            strings.settings.input.penBarrelButtonImmediate.description
+          }
+        />
+      </div>
     </section>
   );
 }

@@ -9,6 +9,7 @@ interface ColorSwatchProps {
   // The text toolbar needs preventDefault to preserve the ProseMirror
   // selection when interacting with the swatch; the pen picker doesn't.
   onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
+  size?: 'sm' | 'md';
 }
 
 export function ColorSwatch({
@@ -17,6 +18,7 @@ export function ColorSwatch({
   title,
   onClick,
   onPointerDown,
+  size = 'sm',
 }: ColorSwatchProps) {
   return (
     <button
@@ -24,7 +26,7 @@ export function ColorSwatch({
       title={title}
       onPointerDown={onPointerDown}
       onClick={onClick}
-      className="size-5 cursor-pointer rounded-lg border-none p-0 transition-transform duration-150 hover:scale-110"
+      className={`${size === 'md' ? 'pointer-coarse:size-8 size-6' : 'size-5'} cursor-pointer rounded-lg border-none p-0 transition-transform duration-150 hover:scale-110`}
       style={{
         // The ink swatch previews what the theme will actually paint. Left as a
         // CSS var so it re-resolves on theme toggle without a re-render.

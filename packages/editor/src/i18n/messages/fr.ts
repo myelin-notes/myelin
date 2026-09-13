@@ -358,6 +358,11 @@ const fr: typeof en = {
           touch: 'Tactile',
         },
       },
+      penBarrelButtonImmediate: {
+        label: 'Passer immédiatement à la gomme',
+        description:
+          'Passe à la gomme dès que le bouton du stylet est pressé. Désactivé, le changement se fait lorsque le stylet est levé.',
+      },
     },
     pageFrameEditing: {
       title: 'Édition des cadres de page',

@@ -184,6 +184,48 @@ describe('appendStrokeOutline', () => {
 describe('StrokeElement live bounds', () => {
   const VIEW = new DOMRect(0, 0, 1000, 1000);
 
+  it.each([
+    { name: 'dot', points: [0, 0, 0.5] },
+    { name: 'short line', points: [0, 0, 0.5, 0.8, 0.8, 0.5] },
+  ])('keeps a thin $name within its maximum start radius', ({ points }) => {
+    const s = new StrokeElement('short', points, true, { ...STYLE, size: 1 });
+    s.updateBounds();
+
+    expect(s.localBoundingBox.left).toBeGreaterThanOrEqual(-0.75);
+    expect(s.localBoundingBox.top).toBeGreaterThanOrEqual(-0.75);
+  });
+
+  it.each([
+    0, 0.5, 1,
+  ])('keeps the tip at the latest sample with stabilization %s', (stabilization) => {
+    const s = new StrokeElement('tip', [], true, {
+      ...STYLE,
+      stabilization,
+    });
+    s.addPoint(0, 0, 0.5);
+    for (const x of [20, 40, 60]) {
+      s.addPoint(x, 0, 0.5);
+      s.updateBounds();
+      expect(s.localBoundingBox.right).toBeCloseTo(x + STYLE.size / 2, 1);
+    }
+  });
+
+  it.each([
+    0, 0.5, 1,
+  ])('keeps the tip at the latest sample through a turn with stabilization %s', (stabilization) => {
+    const s = new StrokeElement('turn', [], true, {
+      ...STYLE,
+      stabilization,
+    });
+    s.addPoint(0, 0, 0.5);
+    s.addPoint(20, 0, 0.5);
+    s.addPoint(40, 0, 0.5);
+    s.addPoint(40, 30, 0.5);
+    s.updateBounds();
+
+    expect(s.localBoundingBox.bottom).toBeCloseTo(30 + STYLE.size / 2, 1);
+  });
+
   it('covers the first sample of a stroke', () => {
     const s = new StrokeElement('live1', [], false, STYLE);
     expect(s.intersectsWorldRect(VIEW, 0)).toBe(true);
@@ -232,5 +274,174 @@ describe('StrokeElement live bounds', () => {
     s.addPoint(5010, 5010, 0.5);
 
     expect(s.intersectsWorldRect(new DOMRect(0, 0, 100, 100), 0)).toBe(false);
+  });
+});
+
+describe('StrokeElement outline scale', () => {
+  function outlineAtSize(size: number, hasPressure: boolean): number[] {
+    const points = Array.from({ length: 100 }, (_, i) => [
+      i * 0.08 * size,
+      Math.sin(i / 8) * 0.8 * size,
+      0.2 + (0.6 * i) / 99,
+    ]).flat();
+    const stroke = new StrokeElement('wave', points, hasPressure, {
+      ...STYLE,
+      size,
+    });
+    let outline: number[] = [];
+    stroke.drawToPdf({
+      worldToPagePt: (x, y) => ({ x: x / size, y: y / size }),
+      ptPerWorldY: 1 / size,
+      push: (item) => {
+        if (item.t === 'path') {
+          outline = item.pts;
+        }
+      },
+      addImageBase64: () => 0,
+      addFontBase64: () => 0,
+    });
+    return outline;
+  }
+
+  it.each([
+    false,
+    true,
+  ])('preserves bends across pen sizes with real pressure %s', (hasPressure) => {
+    const reference = outlineAtSize(16, hasPressure);
+    expect(reference.length).toBeGreaterThan(0);
+    for (const size of [1, 2, 8, 40]) {
+      const outline = outlineAtSize(size, hasPressure);
+      expect(outline).toHaveLength(reference.length);
+      outline.forEach((coordinate, i) => {
+        expect(coordinate).toBeCloseTo(reference[i], 8);
+      });
+    }
+  });
+});
+
+describe('StrokeElement pressure-disabled taps', () => {
+  const style: StrokeStyle = {
+    ...STYLE,
+    simulatePressure: false,
+  };
+
+  function finishedBounds(points: number[]): DOMRect {
+    const stroke = new StrokeElement('tap', points, false, style);
+    stroke.updateBounds();
+    return stroke.localBoundingBox;
+  }
+
+  it.each([
+    { name: 'one sample', points: [0, 0, 0] },
+    { name: 'two samples', points: [0, 0, 0, 0.1, 0, 0] },
+  ])('keeps a $name tap at the stroke width', ({ points }) => {
+    const line = finishedBounds([0, 0, 0, 10, 0, 0, 20, 0, 0]);
+    const tap = finishedBounds(points);
+
+    expect(tap.height).toBeCloseTo(line.height, 1);
+  });
+});
+
+describe('StrokeElement turning tip', () => {
+  function outlineAtTip(
+    stroke: StrokeElement,
+    x: number,
+    y: number,
+  ): number[][] {
+    const outline: number[][] = [];
+    stroke.drawToPdf({
+      worldToPagePt: (px, py) => ({ x: px - x, y: py - y }),
+      ptPerWorldY: 1,
+      push: (item) => {
+        if (item.t === 'path') {
+          for (let i = 0; i < item.pts.length; i += 2) {
+            outline.push([item.pts[i], item.pts[i + 1]]);
+          }
+        }
+      },
+      addImageBase64: () => 0,
+      addFontBase64: () => 0,
+    });
+    return outline;
+  }
+
+  function tipDisplacement(from: number[][], to: number[][]): number {
+    let displacement = 0;
+    for (const [x, y] of from) {
+      if (Math.hypot(x, y) > STYLE.size * 1.25) {
+        continue;
+      }
+      let nearest = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < to.length; i++) {
+        const a = to[i];
+        const b = to[(i + 1) % to.length];
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const lengthSquared = dx * dx + dy * dy;
+        const t = lengthSquared
+          ? Math.max(
+              0,
+              Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / lengthSquared),
+            )
+          : 0;
+        nearest = Math.min(
+          nearest,
+          Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy),
+        );
+      }
+      displacement = Math.max(displacement, nearest);
+    }
+    return displacement;
+  }
+
+  it('does not turn subpixel direction noise into a nib-width spur', () => {
+    const style = { ...STYLE, stabilization: 0 };
+    const reference = new StrokeElement('straight', [], true, style);
+    const noisy = new StrokeElement('wobble', [], true, style);
+    for (let i = 0; i <= 300; i++) {
+      const x = i / 10;
+      reference.addPoint(x, 0, 0.5);
+      noisy.addPoint(
+        i === 280 || i === 281 ? 27.9 : x,
+        i === 280 ? 0.03 : i === 281 ? -0.03 : 0,
+        0.5,
+      );
+    }
+    const expected = outlineAtTip(reference, 30, 0);
+    const actual = outlineAtTip(noisy, 30, 0);
+    expect(tipDisplacement(actual, expected)).toBeLessThan(0.1);
+    expect(tipDisplacement(expected, actual)).toBeLessThan(0.1);
+  });
+
+  it.each([
+    false,
+    true,
+  ])('does not twitch through a slow U turn with sensor pressure %s', (hasPressure) => {
+    const stroke = new StrokeElement('u-turn', [], hasPressure, STYLE);
+    const step = 0.12;
+    for (let i = 0; i < 150; i++) {
+      stroke.addPoint(0, i * step, 0.5);
+    }
+
+    let previous: number[][] | undefined;
+    let largestDisplacement = 0;
+    for (let i = 0; i <= 260; i++) {
+      const angle = Math.PI - (i * Math.PI) / 260;
+      const x = 10 + 10 * Math.cos(angle);
+      const y = 18 + 10 * Math.sin(angle);
+      stroke.addPoint(x, y, 0.5);
+      const outline = outlineAtTip(stroke, x, y);
+      if (previous) {
+        largestDisplacement = Math.max(
+          largestDisplacement,
+          tipDisplacement(outline, previous),
+          tipDisplacement(previous, outline),
+        );
+      }
+      previous = outline;
+    }
+
+    // With the pointer held fixed in the comparison, the contour must not jump farther than a sample.
+    expect(largestDisplacement).toBeLessThanOrEqual(step);
   });
 });

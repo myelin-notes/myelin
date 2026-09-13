@@ -42,6 +42,7 @@ const PREFS = {
     'vertical',
   ),
   inputMode: pref<import('./input-mode').InputMode>('input-mode', 'touch'),
+  penBarrelButtonImmediate: pref<boolean>('pen-barrel-button-immediate', false),
   noteLinkHoverPreview: pref<boolean>('note-link-hover-preview', true),
   linkRequireModifier: pref<boolean>('link-require-modifier', true),
   alwaysRenameNoteReferences: pref<boolean>(

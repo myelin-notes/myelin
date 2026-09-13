@@ -63,6 +63,7 @@ export class PenTool implements ITool {
           color: this.color,
           size: this.size,
           stabilization: this.stabilization / 10,
+          simulatePressure: this.usePressure ? undefined : false,
         }),
     );
   }
@@ -86,7 +87,8 @@ export class PenTool implements ITool {
     // once per stationary hold even when pointermove stops firing for a still pen.
     if (
       this.dwellAnchor === null ||
-      distance(position, this.dwellAnchor) > DWELL_MOVE_PX
+      distance(position, this.dwellAnchor) >
+        DWELL_MOVE_PX / (canvas.viewport?.zoom ?? 1)
     ) {
       this.clearDwellTimer();
       this.dwellAnchor = { x: position.x, y: position.y };

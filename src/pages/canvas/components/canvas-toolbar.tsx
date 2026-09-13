@@ -122,8 +122,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   // The options controls are narrow, so stretched across the bar the panel is
   // mostly empty. On compact it sizes to its content and centres over the bar.
   const optionsAnchorClass = IS_PHONE_BUILD
-    ? 'absolute right-0 bottom-full left-0 mx-auto mb-2 w-fit max-w-[calc(100vw-1.5rem)]'
-    : panelAnchorClass;
+    ? 'absolute right-0 bottom-full left-0 mx-auto mb-2 w-[calc(100vw-1.5rem)] max-w-72'
+    : 'absolute top-0 left-full w-60 max-w-[calc(100vw-5rem)]';
   const dividerClass = IS_PHONE_BUILD
     ? 'mx-1 h-4 w-px bg-border-divider'
     : 'my-1 h-px w-4 bg-border-divider';

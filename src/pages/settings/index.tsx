@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { useMessages } from '@myelin/editor/i18n';
-import { isTouchDevice } from '@myelin/shared/os';
 import { IS_MOBILE_BUILD } from '@/lib/env';
 import { KeybindsSection } from './keybinds-section';
 import { AboutSection } from './sections/about-section';
@@ -67,7 +66,7 @@ export function SettingsPage() {
             <div className="space-y-12 md:space-y-16">
               <AppearanceSection />
               <LanguageSection />
-              {isTouchDevice && <InputSection />}
+              <InputSection />
               <EditingSection />
               <SyncSection />
               <DataSection />
