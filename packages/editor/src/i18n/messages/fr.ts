@@ -741,6 +741,10 @@ const fr: typeof en = {
         title: 'Citation',
         subtitle: 'Transformer ce bloc en citation',
       },
+      callout: {
+        title: 'Encadré',
+        subtitle: 'Insérer un encadré de note mis en évidence',
+      },
       bulletList: {
         title: 'Liste à puces',
         subtitle: 'Transformer ce bloc en élément de liste à puces',
@@ -761,6 +765,14 @@ const fr: typeof en = {
         title: 'Tableau',
         subtitle:
           'Insérer un tableau avec une ligne d’en-tête et des lignes de corps',
+      },
+      codeBlock: {
+        title: 'Bloc de code',
+        subtitle: 'Insérer un bloc de code délimité',
+      },
+      mathBlock: {
+        title: 'Bloc mathématique',
+        subtitle: 'Insérer un bloc mathématique délimité',
       },
       bold: {
         title: 'Gras',

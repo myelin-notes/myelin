@@ -727,6 +727,10 @@ const en = {
         title: 'Quote',
         subtitle: 'Turn this block into a blockquote',
       },
+      callout: {
+        title: 'Callout',
+        subtitle: 'Insert a highlighted note callout',
+      },
       bulletList: {
         title: 'Bullet list',
         subtitle: 'Turn this block into a bulleted list item',
@@ -746,6 +750,14 @@ const en = {
       table: {
         title: 'Table',
         subtitle: 'Insert a table with header and body rows',
+      },
+      codeBlock: {
+        title: 'Code block',
+        subtitle: 'Insert a fenced code block',
+      },
+      mathBlock: {
+        title: 'Math block',
+        subtitle: 'Insert a fenced math block',
       },
       bold: {
         title: 'Bold',

@@ -733,6 +733,10 @@ const es: typeof en = {
         title: 'Cita',
         subtitle: 'Convierte este bloque en una cita',
       },
+      callout: {
+        title: 'Aviso',
+        subtitle: 'Inserta un aviso de nota resaltado',
+      },
       bulletList: {
         title: 'Lista con viñetas',
         subtitle: 'Convierte este bloque en un elemento de lista con viñetas',
@@ -752,6 +756,14 @@ const es: typeof en = {
       table: {
         title: 'Tabla',
         subtitle: 'Inserta una tabla con filas de encabezado y cuerpo',
+      },
+      codeBlock: {
+        title: 'Bloque de código',
+        subtitle: 'Inserta un bloque de código delimitado',
+      },
+      mathBlock: {
+        title: 'Bloque matemático',
+        subtitle: 'Inserta un bloque matemático delimitado',
       },
       bold: {
         title: 'Negrita',

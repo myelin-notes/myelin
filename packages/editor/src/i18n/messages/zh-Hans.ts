@@ -705,6 +705,10 @@ const zhHans: typeof en = {
         title: '引用',
         subtitle: '将此块转换为引用块',
       },
+      callout: {
+        title: '提示框',
+        subtitle: '插入高亮的笔记提示框',
+      },
       bulletList: {
         title: '项目符号列表',
         subtitle: '将此块转换为项目符号列表项',
@@ -724,6 +728,14 @@ const zhHans: typeof en = {
       table: {
         title: '表格',
         subtitle: '插入包含表头和正文行的表格',
+      },
+      codeBlock: {
+        title: '代码块',
+        subtitle: '插入围栏代码块',
+      },
+      mathBlock: {
+        title: '公式块',
+        subtitle: '插入围栏公式块',
       },
       bold: {
         title: '粗体',

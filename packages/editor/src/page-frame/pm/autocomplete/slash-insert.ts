@@ -34,6 +34,12 @@ type SlashInsertAction =
       attrs?: Record<string, number>;
     }
   | {
+      kind: 'fencedBlock';
+      nodeType: 'codeBlock' | 'mathBlock';
+      text: string;
+      selectionOffset: number;
+    }
+  | {
       kind: 'inline';
       open: string;
       close: string;
@@ -47,6 +53,10 @@ type SlashInsertAction =
       kind: 'date';
       offsetDays: number;
       includeTime: boolean;
+    }
+  | {
+      kind: 'callout';
+      type: 'note';
     };
 
 export interface SlashInsertAutocompleteItem extends PageFrameAutocompleteItem {
@@ -130,6 +140,16 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
     },
   },
   {
+    id: 'slash-callout',
+    labelKey: 'callout',
+    detail: '> [!note]',
+    keywords: ['callout', 'note', 'info', 'aside', '[!note]'],
+    slashAction: {
+      kind: 'callout',
+      type: 'note',
+    },
+  },
+  {
     id: 'slash-bullet-list',
     labelKey: 'bulletList',
     detail: '-',
@@ -190,6 +210,30 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
       kind: 'table',
       rows: 2,
       columns: 2,
+    },
+  },
+  {
+    id: 'slash-code-block',
+    labelKey: 'codeBlock',
+    detail: '```',
+    keywords: ['code', 'code block', 'fence', '```'],
+    slashAction: {
+      kind: 'fencedBlock',
+      nodeType: 'codeBlock',
+      text: '```\n\n```',
+      selectionOffset: 4,
+    },
+  },
+  {
+    id: 'slash-math-block',
+    labelKey: 'mathBlock',
+    detail: '$$',
+    keywords: ['math', 'equation', 'latex', 'formula', '$$'],
+    slashAction: {
+      kind: 'fencedBlock',
+      nodeType: 'mathBlock',
+      text: '$$\n\n$$',
+      selectionOffset: 3,
     },
   },
   {
@@ -367,7 +411,10 @@ export function searchSlashInsertAutocompleteItems(
   ).filter((item) => {
     if (
       !allowBlockActions &&
-      (item.slashAction.kind === 'block' || item.slashAction.kind === 'table')
+      (item.slashAction.kind === 'block' ||
+        item.slashAction.kind === 'fencedBlock' ||
+        item.slashAction.kind === 'table' ||
+        item.slashAction.kind === 'callout')
     ) {
       return false;
     }
@@ -493,6 +540,48 @@ export function buildSelectSlashInsertAutocompleteTransaction(
     );
 
     return setSelectionInsideTableCell(tr, blockPos, 0, 0);
+  }
+
+  if (slashAction.kind === 'fencedBlock') {
+    const nodeType = schema.nodes[slashAction.nodeType];
+    if (!nodeType) {
+      return null;
+    }
+
+    const blockPos = state.selection.$from.before();
+    const blockNode = state.selection.$from.parent;
+    const fencedBlock = nodeType.create(null, schema.text(slashAction.text));
+    const tr = state.tr.replaceWith(
+      blockPos,
+      blockPos + blockNode.nodeSize,
+      fencedBlock,
+    );
+    tr.setSelection(
+      TextSelection.create(tr.doc, blockPos + 1 + slashAction.selectionOffset),
+    );
+    return tr;
+  }
+
+  if (slashAction.kind === 'callout') {
+    const blockquoteType = schema.nodes.blockquote;
+    if (!blockquoteType) {
+      return null;
+    }
+
+    const blockPos = state.selection.$from.before();
+    const tr = state.tr.delete(
+      activeRequest.replaceRange.from,
+      activeRequest.replaceRange.to,
+    );
+    const mappedBlockPos = tr.mapping.map(blockPos, -1);
+    const marker = `[!${slashAction.type}] `;
+
+    tr.setNodeMarkup(mappedBlockPos, blockquoteType);
+    tr.insertText(marker, mappedBlockPos + 1);
+    tr.setSelection(
+      TextSelection.create(tr.doc, mappedBlockPos + 1 + marker.length),
+    );
+    return tr;
   }
 
   const nodeType = schema.nodes[slashAction.nodeType];
