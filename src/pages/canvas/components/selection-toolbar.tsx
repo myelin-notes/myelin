@@ -14,12 +14,19 @@ import {
 } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
+import { LatexElement } from '@myelin/editor/elements/latex/element';
 import {
   TextElement,
   type TextStyle,
 } from '@myelin/editor/elements/text/element';
 import { useMessages } from '@myelin/editor/i18n';
 import type { Messages } from '@myelin/editor/i18n/messages';
+import {
+  TEXT_FONT_SIZE_MAX,
+  TEXT_FONT_SIZE_MIN,
+  TEXT_FONT_SIZE_STEP,
+} from '@myelin/editor/tools/text-tool';
+import { FontSizeField } from '@/components/font-size-field';
 import {
   Tooltip,
   TooltipContent,
@@ -40,6 +47,9 @@ interface ToolbarState {
   /** Set when exactly one text box is selected, so its style is editable here. */
   textElement: TextElement | null;
   textStyle: TextStyle | null;
+  /** Set when exactly one LaTeX block is selected, so its scale is editable as text size. */
+  latexElement: LatexElement | null;
+  latexFontSize: number | null;
 }
 
 const HIDDEN_STATE: ToolbarState = {
@@ -49,6 +59,8 @@ const HIDDEN_STATE: ToolbarState = {
   elementItems: [],
   textElement: null,
   textStyle: null,
+  latexElement: null,
+  latexFontSize: null,
 };
 
 const VIEWPORT_MARGIN = 12;
@@ -99,7 +111,9 @@ function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
     a.canMoveLower === b.canMoveLower &&
     sameElementItems(a.elementItems, b.elementItems) &&
     a.textElement === b.textElement &&
-    sameTextStyle(a.textStyle, b.textStyle)
+    sameTextStyle(a.textStyle, b.textStyle) &&
+    a.latexElement === b.latexElement &&
+    a.latexFontSize === b.latexFontSize
   );
 }
 
@@ -110,6 +124,15 @@ function findTextTarget(canvas: DrawableCanvas): TextElement | null {
   }
   const [only] = selected;
   return only instanceof TextElement ? only : null;
+}
+
+function findLatexTarget(canvas: DrawableCanvas): LatexElement | null {
+  const selected = canvas.getSelectedElements();
+  if (selected.length !== 1) {
+    return null;
+  }
+  const [only] = selected;
+  return only instanceof LatexElement ? only : null;
 }
 
 function collectElementItems(
@@ -154,6 +177,7 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
         bounds = canvas.getSelectedElementScreenBounds();
         if (bounds) {
           const textElement = findTextTarget(canvas);
+          const latexElement = findLatexTarget(canvas);
           nextState = {
             visible: true,
             canMoveHigher: canvas.canReorderSelection('higher'),
@@ -161,6 +185,8 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
             elementItems: collectElementItems(canvas, strings),
             textElement,
             textStyle: textElement ? { ...textElement.style } : null,
+            latexElement,
+            latexFontSize: latexElement ? latexElement.fontSize : null,
           };
         }
       }
@@ -298,6 +324,19 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
               key={state.textElement.uuid}
               element={state.textElement}
               style={state.textStyle}
+            />
+            <Divider />
+          </>
+        )}
+        {state.latexElement && state.latexFontSize !== null && (
+          <>
+            <FontSizeField
+              value={state.latexFontSize}
+              min={TEXT_FONT_SIZE_MIN}
+              max={TEXT_FONT_SIZE_MAX}
+              step={TEXT_FONT_SIZE_STEP}
+              onChange={(fontSize) => state.latexElement?.setFontSize(fontSize)}
+              preserveFocus
             />
             <Divider />
           </>

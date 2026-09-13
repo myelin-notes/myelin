@@ -232,6 +232,10 @@ const es: typeof en = {
         `Mostrar u ocultar etiquetas dentro de #${tag}`,
       placeholder: 'Nombre de etiqueta...',
       deleteTag: (tag: string) => `Eliminar #${tag}`,
+      deleteUsedTitle: '¿Eliminar etiqueta en uso?',
+      deleteUsedDescription: (tag: string, count: number) =>
+        `#${tag} se usa en ${count} ${count === 1 ? 'elemento' : 'elementos'}. Al eliminarla, también se quitarán las etiquetas secundarias coincidentes de esos elementos.`,
+      deleteUsedAction: 'Eliminar etiqueta',
       stats: {
         totalFiles: 'Total de archivos',
         folders: 'Carpetas',

@@ -236,6 +236,10 @@ const fr: typeof en = {
         `Afficher/masquer les étiquettes sous #${tag}`,
       placeholder: 'Nom de l’étiquette...',
       deleteTag: (tag: string) => `Supprimer #${tag}`,
+      deleteUsedTitle: 'Supprimer une étiquette utilisée ?',
+      deleteUsedDescription: (tag: string, count: number) =>
+        `#${tag} est utilisée par ${count} ${count > 1 ? 'éléments' : 'élément'}. Sa suppression retirera aussi les étiquettes enfants correspondantes de ces éléments.`,
+      deleteUsedAction: 'Supprimer l’étiquette',
       stats: {
         totalFiles: 'Fichiers au total',
         folders: 'Dossiers',

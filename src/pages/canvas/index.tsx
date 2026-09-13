@@ -345,7 +345,7 @@ function CanvasViewInner({
         handleOpenRequest,
       );
     };
-  }, [openPageFrameNoteLink]);
+  }, []);
   const pageFrameAutocomplete = usePageFrameAutocomplete({
     repository,
     view: activeEditorView,
@@ -598,7 +598,6 @@ function CanvasViewInner({
           ref={domOverlayRef}
           id="dom-overlay"
           className="pointer-events-none absolute inset-0 overflow-hidden"
-          style={{ zIndex: 5 }}
         />
 
         {/* Foreground canvas: strokes, images, element content */}
@@ -617,14 +616,12 @@ function CanvasViewInner({
         style={{ zIndex: 12 }}
       />
 
-      {/* Frame chrome controls (hamburger buttons). Sits above the foreground
-          canvas so clicks reach the buttons first. Below UI chrome (toolbars,
-          modals at z-100+). Pointer-events-none by default; individual buttons
-          opt in. */}
+      {/* Frame chrome controls (hamburger buttons). Each control shares its
+          frame’s stacking rank, so a higher frame can cover a lower frame’s
+          controls. Pointer-events-none by default; individual buttons opt in. */}
       <div
         data-canvas-chrome-controls
         className="pointer-events-none absolute inset-0 overflow-hidden"
-        style={{ zIndex: 20 }}
       />
 
       <StatusBar

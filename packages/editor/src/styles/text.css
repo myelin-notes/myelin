@@ -18,7 +18,7 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-wrap: break-word;
-  caret-color: var(--accent-dark);
+  caret-color: var(--text-primary);
   /* Selection + hit-testing happen on the canvas; the box only takes pointer
      input while being edited. */
   pointer-events: none;

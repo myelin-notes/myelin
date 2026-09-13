@@ -15,9 +15,9 @@ input[type="range"].tool-slider::-webkit-slider-thumb {
   width: 12px;
   height: 12px;
   border-radius: 6px;
-  background: var(--accent-dark);
+  background: var(--primary);
   cursor: pointer;
-  border: none;
+  border: 2px solid var(--card);
   transition: transform 0.1s ease;
 }
 
@@ -29,9 +29,9 @@ input[type="range"].tool-slider::-moz-range-thumb {
   width: 12px;
   height: 12px;
   border-radius: 6px;
-  background: var(--accent-dark);
+  background: var(--primary);
   cursor: pointer;
-  border: none;
+  border: 2px solid var(--card);
 }
 
 input[type="range"].tool-slider::-moz-range-track {

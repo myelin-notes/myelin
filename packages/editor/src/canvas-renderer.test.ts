@@ -1,12 +1,52 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BG_OVERDRAW_PX,
   backgroundPanShift,
   createZoomGestureState,
   cullMarginWorld,
   isZoomGestureActive,
+  reorderDomOverlay,
 } from './canvas-renderer';
 import { MAX_ZOOM, MIN_ZOOM } from './canvas-viewport';
+
+interface OverlayNode {
+  dataset: { elementUuid: string };
+  style: { zIndex: string };
+  readonly nextElementSibling: OverlayNode | null;
+}
+
+function createOverlayHost(uuids: string[]): {
+  host: HTMLElement;
+  nodes: OverlayNode[];
+} {
+  const nodes = uuids.map(
+    (elementUuid) =>
+      ({
+        dataset: { elementUuid },
+        style: { zIndex: '' },
+      }) as OverlayNode,
+  );
+  for (const node of nodes) {
+    Object.defineProperty(node, 'nextElementSibling', {
+      get: () => nodes[nodes.indexOf(node) + 1] ?? null,
+    });
+  }
+  const host = {
+    children: nodes,
+    get firstElementChild() {
+      return nodes[0] ?? null;
+    },
+    insertBefore(node: OverlayNode, expected: OverlayNode | null) {
+      const currentIndex = nodes.indexOf(node);
+      if (currentIndex >= 0) {
+        nodes.splice(currentIndex, 1);
+      }
+      const expectedIndex = expected === null ? -1 : nodes.indexOf(expected);
+      nodes.splice(expectedIndex < 0 ? nodes.length : expectedIndex, 0, node);
+    },
+  };
+  return { host: host as unknown as HTMLElement, nodes };
+}
 
 describe('backgroundPanShift', () => {
   const TILE = 24;
@@ -171,5 +211,37 @@ describe('cullMarginWorld', () => {
     for (const zoom of [0, -1, Number.NaN]) {
       expect(cullMarginWorld(zoom)).toBe(Number.POSITIVE_INFINITY);
     }
+  });
+});
+
+describe('reorderDomOverlay', () => {
+  it('uses the shared canvas position when a page frame occupies another DOM layer', () => {
+    const { host, nodes } = createOverlayHost(['pdf']);
+    const setPdfZIndex = vi.fn();
+    const elements = [
+      { uuid: 'page-frame', setDomZIndex: vi.fn() },
+      { uuid: 'pdf', setDomZIndex: setPdfZIndex },
+    ];
+
+    reorderDomOverlay(host, elements);
+
+    expect(nodes[0].style.zIndex).toBe('2');
+    expect(setPdfZIndex).toHaveBeenCalledWith('2');
+  });
+
+  it('keeps DOM siblings in their shared canvas order', () => {
+    const { host, nodes } = createOverlayHost(['pdf', 'text']);
+    const elements = [
+      { uuid: 'text', setDomZIndex: vi.fn() },
+      { uuid: 'pdf', setDomZIndex: vi.fn() },
+    ];
+
+    reorderDomOverlay(host, elements);
+
+    expect(nodes.map((node) => node.dataset.elementUuid)).toEqual([
+      'text',
+      'pdf',
+    ]);
+    expect(nodes.map((node) => node.style.zIndex)).toEqual(['1', '2']);
   });
 });

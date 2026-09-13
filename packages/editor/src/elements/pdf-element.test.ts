@@ -845,6 +845,17 @@ interface TestablePdfGeometry {
   syncDOM: (viewport: CanvasViewport, host: HTMLElement) => void;
 }
 
+interface TestChromeButton {
+  root: { style: { zIndex: string } };
+}
+
+interface TestablePdfChrome {
+  _chrome: { setZIndex: Mock<(zIndex: string) => void> } | null;
+  _gapButtons: Map<number, TestChromeButton>;
+  _deleteButtons: Map<number, TestChromeButton>;
+  setDomZIndex: (zIndex: string) => void;
+}
+
 describe('PdfElement page geometry', () => {
   // Pages live inside the chrome root, which is laid out at a quantized zoom and carries the
   // remainder as a scale. Sizing pages to the exact zoom applies that remainder twice.
@@ -900,5 +911,24 @@ describe('PdfElement page geometry', () => {
         `translate(0px, ${pagePosition * (pageSize.h + PAGE_GAP) * rasterZoom}px)`,
       );
     }
+  });
+});
+
+describe('PdfElement chrome stacking', () => {
+  it('keeps every portal control at the PDF element’s canvas rank', () => {
+    const setZIndex = vi.fn();
+    const gapButton = { root: { style: { zIndex: '' } } };
+    const deleteButton = { root: { style: { zIndex: '' } } };
+    const element = Object.assign(Object.create(PdfElement.prototype), {
+      _chrome: { setZIndex },
+      _gapButtons: new Map([[0, gapButton]]),
+      _deleteButtons: new Map([[0, deleteButton]]),
+    }) as TestablePdfChrome;
+
+    element.setDomZIndex('2');
+
+    expect(setZIndex).toHaveBeenCalledWith('2');
+    expect(gapButton.root.style.zIndex).toBe('2');
+    expect(deleteButton.root.style.zIndex).toBe('2');
   });
 });

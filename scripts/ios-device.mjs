@@ -57,8 +57,7 @@ function findConnectedDevice() {
       (device) =>
         device.hardwareProperties?.platform === 'iOS' &&
         device.hardwareProperties?.reality === 'physical' &&
-        device.connectionProperties?.transportType === 'wired' &&
-        device.connectionProperties?.tunnelState === 'connected',
+        device.connectionProperties?.transportType === 'wired',
     );
 
     if (devices.length !== 1) {
