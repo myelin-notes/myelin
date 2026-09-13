@@ -113,7 +113,7 @@ function outlinePoints(stroke: StrokeElement): number[] {
   return points;
 }
 
-describe('HighlighterTool does not snap into shapes', () => {
+describe('HighlighterTool shape snapping', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -121,28 +121,21 @@ describe('HighlighterTool does not snap into shapes', () => {
     vi.useRealTimers();
   });
 
-  it('keeps a held rectangle stroke as a StrokeElement (no shape snap)', () => {
+  it('snaps a held rectangle stroke to a ShapeElement', () => {
     const { canvas, created, removeElement } = makeCanvas();
     const tool = makeTool();
     tool.start(canvas, {} as PointerEvent);
     const stroke = created[0] as StrokeElement;
     expect(stroke).toBeInstanceOf(StrokeElement);
 
-    // Draw a clean rectangle (would be recognized by the pen), then hold still.
     feed(tool, canvas, rectStroke(10, 20, 200, 120));
     vi.advanceTimersByTime(600);
 
-    // The highlighter must NOT convert the stroke into a shape.
-    expect(removeElement).not.toHaveBeenCalled();
-    expect(created).toHaveLength(1);
-    expect(
-      (created as DrawableElement[]).some((e) => e instanceof ShapeElement),
-    ).toBe(false);
-
-    // Stroke keeps accepting points.
-    const before = stroke.xyPoints.length;
-    tool.update(canvas, PRESSURE_EVENT, pos(500, 500));
-    expect(stroke.xyPoints.length).toBe(before + 1);
+    expect(removeElement).toHaveBeenCalledWith(stroke);
+    expect(created).toHaveLength(2);
+    const shape = created[1] as ShapeElement;
+    expect(shape).toBeInstanceOf(ShapeElement);
+    expect(shape.shapeType).toBe('rect');
   });
 
   it('stays uniform width even under a real stylus pressure stream', () => {
