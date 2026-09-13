@@ -761,6 +761,14 @@ const fr: typeof en = {
         subtitle:
           'Insérer un tableau avec une ligne d’en-tête et des lignes de corps',
       },
+      codeBlock: {
+        title: 'Bloc de code',
+        subtitle: 'Insérer un bloc de code délimité',
+      },
+      mathBlock: {
+        title: 'Bloc mathématique',
+        subtitle: 'Insérer un bloc mathématique délimité',
+      },
       bold: {
         title: 'Gras',
         subtitle: 'Insérer du markdown **gras**',

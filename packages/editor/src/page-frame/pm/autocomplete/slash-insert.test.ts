@@ -85,7 +85,7 @@ describe('findActiveSlashInsertAutocomplete', () => {
 });
 
 describe('searchSlashInsertAutocompleteItems', () => {
-  it('matches aliases like h2, links, and inline code', () => {
+  it('matches aliases like h2, links, code, and math', () => {
     expect(searchSlashInsertAutocompleteItems('h2', labels)[0]?.id).toBe(
       'slash-heading-2',
     );
@@ -98,8 +98,13 @@ describe('searchSlashInsertAutocompleteItems', () => {
     expect(searchSlashInsertAutocompleteItems('callout', labels)[0]?.id).toBe(
       'slash-callout',
     );
-    expect(searchSlashInsertAutocompleteItems('code', labels)[0]?.id).toBe(
-      'slash-inline-code',
+    const codeIds = searchSlashInsertAutocompleteItems('code', labels).map(
+      (item) => item.id,
+    );
+    expect(codeIds).toContain('slash-inline-code');
+    expect(codeIds).toContain('slash-code-block');
+    expect(searchSlashInsertAutocompleteItems('latex', labels)[0]?.id).toBe(
+      'slash-math-block',
     );
   });
 
@@ -119,6 +124,8 @@ describe('searchSlashInsertAutocompleteItems', () => {
     expect(ids).not.toContain('slash-table');
     expect(ids).not.toContain('slash-callout');
     expect(ids).not.toContain('slash-paragraph');
+    expect(ids).not.toContain('slash-code-block');
+    expect(ids).not.toContain('slash-math-block');
     expect(ids).toContain('slash-link');
     expect(ids).toContain('slash-date-today');
   });
@@ -130,6 +137,8 @@ describe('searchSlashInsertAutocompleteItems', () => {
     expect(ids).toContain('slash-heading-1');
     expect(ids).toContain('slash-table');
     expect(ids).toContain('slash-callout');
+    expect(ids).toContain('slash-code-block');
+    expect(ids).toContain('slash-math-block');
   });
 });
 
@@ -322,5 +331,32 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
     expect(table?.child(0).child(0).type.name).toBe('table_header');
     expect(table?.child(1).child(0).type.name).toBe('table_cell');
     expect(selectedState.selection.$from.parent.type.name).toBe('paragraph');
+  });
+
+  it.each([
+    ['slash-code-block', 'codeBlock', '```\n\n```', 5],
+    ['slash-math-block', 'mathBlock', '$$\n\n$$', 4],
+  ])('replaces the current block with a fenced %s', (id, nodeType, text, selection) => {
+    const markdown = `/${id}`;
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+    const activeRequest = findActiveSlashInsertAutocomplete(state);
+
+    expect(activeRequest).not.toBeNull();
+
+    const tr = buildSelectSlashInsertAutocompleteTransaction(
+      state,
+      schema,
+      activeRequest!,
+      findItem(id),
+    );
+
+    expect(tr).not.toBeNull();
+
+    const selectedState = state.apply(tr!);
+    expect(selectedState.doc.firstChild?.type.name).toBe(nodeType);
+    expect(selectedState.doc.firstChild?.textContent).toBe(text);
+    expect(selectedState.selection.from).toBe(selection);
+    expect(selectedState.selection.to).toBe(selection);
   });
 });

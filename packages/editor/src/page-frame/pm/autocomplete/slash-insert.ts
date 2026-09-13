@@ -34,6 +34,12 @@ type SlashInsertAction =
       attrs?: Record<string, number>;
     }
   | {
+      kind: 'fencedBlock';
+      nodeType: 'codeBlock' | 'mathBlock';
+      text: string;
+      selectionOffset: number;
+    }
+  | {
       kind: 'inline';
       open: string;
       close: string;
@@ -204,6 +210,30 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
       kind: 'table',
       rows: 2,
       columns: 2,
+    },
+  },
+  {
+    id: 'slash-code-block',
+    labelKey: 'codeBlock',
+    detail: '```',
+    keywords: ['code', 'code block', 'fence', '```'],
+    slashAction: {
+      kind: 'fencedBlock',
+      nodeType: 'codeBlock',
+      text: '```\n\n```',
+      selectionOffset: 4,
+    },
+  },
+  {
+    id: 'slash-math-block',
+    labelKey: 'mathBlock',
+    detail: '$$',
+    keywords: ['math', 'equation', 'latex', 'formula', '$$'],
+    slashAction: {
+      kind: 'fencedBlock',
+      nodeType: 'mathBlock',
+      text: '$$\n\n$$',
+      selectionOffset: 3,
     },
   },
   {
@@ -382,6 +412,7 @@ export function searchSlashInsertAutocompleteItems(
     if (
       !allowBlockActions &&
       (item.slashAction.kind === 'block' ||
+        item.slashAction.kind === 'fencedBlock' ||
         item.slashAction.kind === 'table' ||
         item.slashAction.kind === 'callout')
     ) {
@@ -509,6 +540,26 @@ export function buildSelectSlashInsertAutocompleteTransaction(
     );
 
     return setSelectionInsideTableCell(tr, blockPos, 0, 0);
+  }
+
+  if (slashAction.kind === 'fencedBlock') {
+    const nodeType = schema.nodes[slashAction.nodeType];
+    if (!nodeType) {
+      return null;
+    }
+
+    const blockPos = state.selection.$from.before();
+    const blockNode = state.selection.$from.parent;
+    const fencedBlock = nodeType.create(null, schema.text(slashAction.text));
+    const tr = state.tr.replaceWith(
+      blockPos,
+      blockPos + blockNode.nodeSize,
+      fencedBlock,
+    );
+    tr.setSelection(
+      TextSelection.create(tr.doc, blockPos + 1 + slashAction.selectionOffset),
+    );
+    return tr;
   }
 
   if (slashAction.kind === 'callout') {

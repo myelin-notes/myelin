@@ -752,6 +752,14 @@ const es: typeof en = {
         title: 'Tabla',
         subtitle: 'Inserta una tabla con filas de encabezado y cuerpo',
       },
+      codeBlock: {
+        title: 'Bloque de código',
+        subtitle: 'Inserta un bloque de código delimitado',
+      },
+      mathBlock: {
+        title: 'Bloque matemático',
+        subtitle: 'Inserta un bloque matemático delimitado',
+      },
       bold: {
         title: 'Negrita',
         subtitle: 'Inserta marcado **negrita**',

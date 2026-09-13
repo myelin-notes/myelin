@@ -724,6 +724,14 @@ const zhHans: typeof en = {
         title: '表格',
         subtitle: '插入包含表头和正文行的表格',
       },
+      codeBlock: {
+        title: '代码块',
+        subtitle: '插入围栏代码块',
+      },
+      mathBlock: {
+        title: '公式块',
+        subtitle: '插入围栏公式块',
+      },
       bold: {
         title: '粗体',
         subtitle: '插入 **粗体** Markdown',

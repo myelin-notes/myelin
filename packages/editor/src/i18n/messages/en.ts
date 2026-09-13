@@ -746,6 +746,14 @@ const en = {
         title: 'Table',
         subtitle: 'Insert a table with header and body rows',
       },
+      codeBlock: {
+        title: 'Code block',
+        subtitle: 'Insert a fenced code block',
+      },
+      mathBlock: {
+        title: 'Math block',
+        subtitle: 'Insert a fenced math block',
+      },
       bold: {
         title: 'Bold',
         subtitle: 'Insert **bold** markdown',
